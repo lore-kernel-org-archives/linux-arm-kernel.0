@@ -1,70 +1,89 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 19 Apr 2016 13:30:55 +0100
-Subject: [PATCH V2 06/15] coresight: tmc: making prepare/unprepare
- functions generic
-In-Reply-To: <1460483692-25061-7-git-send-email-mathieu.poirier@linaro.org>
-References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
- <1460483692-25061-7-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <571624FF.1040404@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 19 Apr 2016 15:30:39 +0300
+Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
+In-Reply-To: <20160419132206.5d909f7e@bbrezillon>
+References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
+ <5714F011.5080409@ti.com> <20160418170518.363f732d@bbrezillon>
+ <57160862.90603@ti.com> <20160419132206.5d909f7e@bbrezillon>
+Message-ID: <571624EF.9060707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 18:54, Mathieu Poirier wrote:
-> Dealing with HW related matters in tmc_read_prepare/unprepare
-> becomes convoluted when many cases need to be handled distinctively.
->
-> As such moving processing related to HW setup to individual driver
-> files and keep the core driver generic.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-tmc-etf.c | 62 ++++++++++++++++++++++++-
->   drivers/hwtracing/coresight/coresight-tmc-etr.c | 42 ++++++++++++++++-
->   drivers/hwtracing/coresight/coresight-tmc.c     | 55 +++++-----------------
->   drivers/hwtracing/coresight/coresight-tmc.h     |  8 ++--
->   4 files changed, 117 insertions(+), 50 deletions(-)
->
+On 19/04/16 14:22, Boris Brezillon wrote:
+> Hi Roger,
+> 
+> On Tue, 19 Apr 2016 13:28:50 +0300
+> Roger Quadros <rogerq@ti.com> wrote:
+> 
+>>> @@ -1921,6 +1927,9 @@ static int omap_nand_probe(struct platform_device *pdev)
+>>>  		nand_chip->ecc.correct          = omap_correct_data;
+>>>  		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
+>>>  		oobbytes_per_step		= nand_chip->ecc.bytes;
+>>> +
+>>> +		if (nand_chip->options & NAND_BUSWIDTH_16)
+>>> +			min_oobbytes		= 1;
+>>
+>> Shouldn't this have been
+>> 		if (!(nand_chip->options & NAND_BUSWIDTH_16)
+>> 			min_oobbytes		= 1;
+>> ?
+> 
+> Yep.
+> 
+>>
+>>>  		break;
+>>>  
+>>>  	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
+>>> @@ -2038,10 +2047,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+>>>  	}
+>>>  
+>>>  	/* check if NAND device's OOB is enough to store ECC signatures */
+>>> -	min_oobbytes = (oobbytes_per_step *
+>>> -			(mtd->writesize / nand_chip->ecc.size)) +
+>>> -		       (nand_chip->options & NAND_BUSWIDTH_16 ?
+>>> -			BADBLOCK_MARKER_LENGTH : 1);
+>>> +	min_oobbytes += (oobbytes_per_step *
+>>> +			 (mtd->writesize / nand_chip->ecc.size));
+>>>  	if (mtd->oobsize < min_oobbytes) {
+>>>  		dev_err(&info->pdev->dev,
+>>>  			"not enough OOB bytes required = %d, available=%d\n",
+>>>
+>>
+>> After the above changes BCH with HW ECC worked fine but BCH with SW ECC still failed.
+>> I had to fix it up with the below patch. This is mainly because chip->ecc.steps wasn't
+>> yet initialized before calling nand_bch_init().
+>>
+>> After the below patch it worked fine with bch4 (hw & sw), bch8 (hw & sw) and ham1.
+>> I couldn't yet verify bch16 though.
+> 
 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 910d6f3b7d26..495540e9064d 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -70,7 +70,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
->   		drvdata->buf = drvdata->vaddr;
->   }
->
-> -void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
-> +static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
->   {
->   	CS_UNLOCK(drvdata->base);
->
-> @@ -126,3 +126,43 @@ static const struct coresight_ops_sink tmc_etr_sink_ops = {
->   const struct coresight_ops tmc_etr_cs_ops = {
->   	.sink_ops	= &tmc_etr_sink_ops,
->   };
-> +
-> +int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
-> +{
-> +	unsigned long flags;
-> +
-> +	/* config types are set a boot time and never change */
-> +	if (drvdata->config_type != TMC_CONFIG_TYPE_ETR)
-> +		return -EINVAL;
+I just verified that bch16 works as well.
 
-...
+> Thanks for the fix, but I'd prefer fixing the bug for all soft BCH
+> users.
+> 
+> Could you try this patch?
 
-> +
-> +int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
-> +{
-> +	unsigned long flags;
-> +
-> +	/* config types are set a boot time and never change */
-> +	if (drvdata->config_type != TMC_CONFIG_TYPE_ETR)
-> +		return -EINVAL;
-> +
+I tried your patch and it worked fine.
+You will still need the below change to omap2.c
 
-For both cases above should we WARN_ON_ONCE() if we encounter such a case ?
+--
+cheers,
+-roger
 
-Irrespective of that,
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 0abfba6..33c8fde 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -1715,7 +1715,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+ 	int off = BADBLOCK_MARKER_LENGTH;
+ 
+-	if (section)
++	if (section >= chip->ecc.steps)
+ 		return -ERANGE;
+ 
+ 	/*
+-- 
+2.5.0
