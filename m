@@ -1,91 +1,111 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 19 Apr 2016 15:37:19 +0200
-Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
-In-Reply-To: <57160937.6000903@denx.de>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
- <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
- <57151652.4020709@denx.de> <5715D12D.1020303@i2se.com>
- <57160937.6000903@denx.de>
-Message-ID: <5716348F.70200@i2se.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2016 15:41:22 +0200
+Subject: [PATCH v5] spi: orion.c: Add direct access mode
+In-Reply-To: <5715FD81.8090100@denx.de>
+References: <1460974417-32375-1-git-send-email-sr@denx.de>
+ <4509446.OJU128rpNa@wuerfel> <5715FD81.8090100@denx.de>
+Message-ID: <3956609.3ttDzXh866@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Tuesday 19 April 2016 11:42:25 Stefan Roese wrote:
+> On 18.04.2016 15:57, Arnd Bergmann wrote:
+> > On Monday 18 April 2016 15:00:52 Stefan Roese wrote:
+> >> On 18.04.2016 13:32, Arnd Bergmann wrote:
+> > Ok, so I looked up the datasheet again and understood now that it
+> > actually does both ways: a) the direct read/write that I had always assumed
+> > it did with automatic cmd/addr/data generation, and b) the mode where
+> > you do each write transfer separately as implemented by your patch.
+> > 
+> > Those two modes seem to be wildly different in their needs for address
+> > space:
+> > 
+> > - For a) we definitely need the mapping to be the same size as the
+> >    addressable storage of the SPI-NOR (or other device that fits
+> >    into the cmd/addr/data pattern supported by the hardware)
+> > 
+> > - For b) the address is ignored and at most 32 bytes are transfered,
+> >    so whatever the smallest MBUS mapping window size is would certainly
+> >    be enough.
+> >
+> > As a side-note, I see that you use a regular devm_ioremap_resource(),
+> > which I assume prevents the transfers from ever being more than
+> > a single 4-byte word, while burst mode with up to 32 bytes likely
+> > requires a write-combining mapping.
+> 
+> Thanks for the hint. I've tested again with devm_ioremap_wc() and the
+> resulting SPI TX time is identical to the one using the driver with
+> the uncached (non write-combined) mapping. This is most likely a
+> result of the already fully saturated SPI bus speed being the
+> bottle-neck here.
 
-Am 19.04.2016 um 12:32 schrieb Marek Vasut:
-> On 04/19/2016 08:33 AM, Stefan Wahren wrote:
->> Hi Marek,
->>
->> Am 18.04.2016 um 19:16 schrieb Marek Vasut:
->>> On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
->>>> On 14/04/16 21:01, Marek Vasut wrote:
->>>>> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
->>>>>> After successful touchscreen registration the input device was
->>>>>> never freed. So fix this issue by using devm_input_allocate_device().
->>>>>>
->>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>>>> ---
->>>>>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
->>>>>>  1 file changed, 2 insertions(+), 6 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->>>>>> index 33051b8..0576953 100644
->>>>>> --- a/drivers/iio/adc/mxs-lradc.c
->>>>>> +++ b/drivers/iio/adc/mxs-lradc.c
->>>>>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>>>>>  {
->>>>>>  	struct input_dev *input;
->>>>>>  	struct device *dev = lradc->dev;
->>>>>> -	int ret;
->>>>>>  
->>>>>>  	if (!lradc->use_touchscreen)
->>>>>>  		return 0;
->>>>>>  
->>>>>> -	input = input_allocate_device();
->>>>>> +	input = devm_input_allocate_device(dev);
->>>>>>  	if (!input)
->>>>>>  		return -ENOMEM;
->>>>>>  
->>>>>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>>>>>  
->>>>>>  	lradc->ts_input = input;
->>>>>>  	input_set_drvdata(input, lradc);
->>>>>> -	ret = input_register_device(input);
->>>>>> -	if (ret)
->>>>>> -		input_free_device(lradc->ts_input);
->>>>>>  
->>>>>> -	return ret;
->>>>>> +	return input_register_device(input);
->>>>>>  }
->>>>>>  
->>>>>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
->>>>>>
->>>>> Nice find.
->>>>>
->>>>> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
->>>>> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
->>>>> could use a proper fail path. Do you want to send patches or shall I ?
->>>>>
->>>> As this has been there a long time I'm not going to rush it in as a fix.
->>> I did take a proper look today and it seems they do the right thing
->>> afterall. I checked them with kmemleak too to be sure.
->> thanks, input_unregister_device already free the memory.
->>
->> Sorry for the mess :-(
->>
->> I think it would be the best to remove / revert this patch.
-> This one? Why exactly? Please elaborate some more, so it's possible to
-> understand the reasoning :)
->
->
+Ok
 
-as you already pointed out this is not a memory leak, because
-input_unregister_device free the input device. So the commit message is
-incorrect.
+> A bit more testing has shown, that using devm_ioremap_wc() leads
+> to sporadic failures in the FPGA image downloading though. Now
+> I'm unsure, if its really worth to add some cache flushing after
+> the memcpy() call here (flush_cache_vmap ?) or better keep the
+> uncached ioremap in place.
 
-This commit also simplifies the code but in this case we should also
-remove input_unregister_device.
+The cache is not involved here, as devm_ioremap_wc is still uncached.
+However it's possible that memcpy has other issues here. If you
+don't gain anything from sending more than 32 bits at a time,
+writesl() might be a better alternative, but it requires the data
+to be 32-bit aligned in RAM. If the buffer is not aligned, the
+memcpy() might already cause problems in case the kernel
+implementation does not send the data in the correct order.
 
-Regards
-Stefan
+memcpy_toio() could also be helpful here.
+
+> >>> This means that the 1MB window is probably a reasonable size (provided
+> >>> that the (most importantly) the SPI-NOR driver can guarantee that it
+> >>> never exceeds this).
+> >>
+> >> I have no problem switching from 1MiB to using 0xffffffff in the
+> >> SPI controller 'reg' node to allow even bigger windows in v6.
+> > 
+> > How do you decide how much of the window to map though? Using 0xffffffff
+> > is nice because it better represents what the hardware looks like
+> > and doesn't limit you from having arbitrarily large mbus windows
+> > based on your needs, but you'd probably have to try mapping various
+> > sizes then to find the maximum supported one, or you'd have to do
+> > some ugly parsing of the parent node ranges.
+> 
+> This is for the single-window mode, right? My comment above was
+> still referring to the original implementation. And yes, this
+> gets a bit complicated and is most likely not really necessary.
+> So I would prefer to keep the mapping fixed to a max. of 1MiB for
+> now.
+
+No, I also meant the separate windows here. Based on the discussion
+above, I think the driver can ideally just ioremap 4KB for devices
+other than SPI-NOR, and then you can list the 0xffffffff length.
+
+> > In this example, you have to configure the SPI controller to have 1MB per CS
+> > in single-window mode using the "SPI DecodeMode" and "SPI CS Adress Decode"
+> > registers. The mbus then contains two mappings, one 2MB window spanning
+> > CS3 and CS4 in a continuous CPU range, and one 64K window for a device at
+> > CS6, making it as small as possible to conserve CPU address space.
+> 
+> Thanks. I've prepared a new version implementing this single-
+> window mode. Please let me know how you prefer the cache issue
+> above to be handled (uncached mapping, flush or ?) and I'll
+> update the patch accordingly.
+
+If a write-combining mapping doesn't help you here, just use the normal
+ioremap as before.
+
+The single-window mode won't really work with SPI-NOR unless you make each
+window large enough to hold the largest possible flash (128MB with
+single-window, 256MB with double-window), but that size makes it harder
+to gain much from saving mbus windows when you trade them for gigantic
+CPU address space consumption.
+
+Therefore, we probably want the separate-window mode to allow the
+combination of large SPI flashes with other SPI devices in direct-access
+mode. We can also implement the single (and/or double) window mode
+in addition to that, but realistically we probably don't need that
+as all machines we support in the kernel today have at most one
+non-flash device.
+
+	Arnd
