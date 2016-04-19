@@ -1,131 +1,66 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 19 Apr 2016 16:53:17 -0500
-Subject: [PATCH 2/2 v3] arm64: dts: ls2080a: fsl-mc dt node updates
-Message-ID: <1461102797-30632-1-git-send-email-stuart.yoder@nxp.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 19 Apr 2016 17:13:49 -0500
+Subject: [PATCH v2] Documentation: devicetree: Clean up gpio-keys example
+In-Reply-To: <1458129209-15449-1-git-send-email-afaerber@suse.de>
+References: <1458129209-15449-1-git-send-email-afaerber@suse.de>
+Message-ID: <20160419221349.GA25916@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-updates to the fsl-mc node for full functionality:
-   -msi-parent is needed for interrupt support
-   -ranges is needed to enable the bus driver to translate bus addresses
-   -dpmac nodes provide a basis for relating dpmac objects to PHYs
+On Wed, Mar 16, 2016 at 12:53:29PM +0100, Andreas F?rber wrote:
+> Drop #address-cells and #size-cells, which are not required by the
+> gpio-keys binding documentation, as button sub-nodes are not devices.
+> 
+> Rename sub-nodes to avoid new dtc unit address warnings when copied.
+> 
+> While at it, adopt the dashes convention for the node name.
+> 
+> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
+> Cc: Julien Chauveau <chauveau.julien@gmail.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
----
--v3
-   -updated unit addresses to be hex to match the reg properties.
+Applied, thanks.
 
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 98 ++++++++++++++++++++++++++
- 1 file changed, 98 insertions(+)
+Rob
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index 9d746c6..0f21caf 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -265,6 +265,104 @@
- 			compatible = "fsl,qoriq-mc";
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
- 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-+			msi-parent = <&its>;
-+			#address-cells = <3>;
-+			#size-cells = <1>;
-+
-+			/*
-+			 * Region type 0x0 - MC portals
-+			 * Region type 0x1 - QBMAN portals
-+			 */
-+			ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
-+				  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
-+
-+			/*
-+			 * Define the maximum number of MACs present on the SoC.
-+			 */
-+			dpmacs {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				dpmac1: dpmac at 1 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x1>;
-+				};
-+
-+				dpmac2: dpmac at 2 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x2>;
-+				};
-+
-+				dpmac3: dpmac at 3 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x3>;
-+				};
-+
-+				dpmac4: dpmac at 4 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x4>;
-+				};
-+
-+				dpmac5: dpmac at 5 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x5>;
-+				};
-+
-+				dpmac6: dpmac at 6 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x6>;
-+				};
-+
-+				dpmac7: dpmac at 7 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x7>;
-+				};
-+
-+				dpmac8: dpmac at 8 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x8>;
-+				};
-+
-+				dpmac9: dpmac at 9 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x9>;
-+				};
-+
-+				dpmac10: dpmac at a {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0xa>;
-+				};
-+
-+				dpmac11: dpmac at b {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0xb>;
-+				};
-+
-+				dpmac12: dpmac at c {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0xc>;
-+				};
-+
-+				dpmac13: dpmac at d {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0xd>;
-+				};
-+
-+				dpmac14: dpmac at e {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0xe>;
-+				};
-+
-+				dpmac15: dpmac at f {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0xf>;
-+				};
-+
-+				dpmac16: dpmac at 10 {
-+					compatible = "fsl,qoriq-mc-dpmac";
-+					reg = <0x10>;
-+				};
-+			};
- 		};
- 
- 		smmu: iommu at 5000000 {
--- 
-1.9.0
+> ---
+>  v1 -> v2:
+>  * Changed node name from underscore to dash
+>  * Inserted white lines
+>  * Renamed sub-nodes (Geert, Julien)
+>  
+>  Documentation/devicetree/bindings/input/gpio-keys.txt | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/gpio-keys.txt b/Documentation/devicetree/bindings/input/gpio-keys.txt
+> index 21641236c095..a94940481e55 100644
+> --- a/Documentation/devicetree/bindings/input/gpio-keys.txt
+> +++ b/Documentation/devicetree/bindings/input/gpio-keys.txt
+> @@ -32,17 +32,17 @@ Optional subnode-properties:
+>  
+>  Example nodes:
+>  
+> -	gpio_keys {
+> +	gpio-keys {
+>  			compatible = "gpio-keys";
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+>  			autorepeat;
+> -			button at 21 {
+> +
+> +			up {
+>  				label = "GPIO Key UP";
+>  				linux,code = <103>;
+>  				gpios = <&gpio1 0 1>;
+>  			};
+> -			button at 22 {
+> +
+> +			down {
+>  				label = "GPIO Key DOWN";
+>  				linux,code = <108>;
+>  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+> -- 
+> 2.6.2
+> 
