@@ -1,115 +1,70 @@
-From: martinayotte@gmail.com (Martin Ayotte)
-Date: Tue, 19 Apr 2016 15:50:39 -0400
-Subject: [PATCH v2 1/1] add missing UARTs pins and I2C entriesfor AllWinner H3
- DTSI
-Message-ID: <CAKQ8BtjPhfJC+njOUvo-4ZQ+Oj==LqQEhJ1LQROjY85hswE9Mg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Apr 2016 12:51:47 -0700
+Subject: [GIT PULL] omap fixes against v4.6-rc2
+In-Reply-To: <20160419145400.GC5995@atomide.com>
+References: <20160408191854.GZ16484@atomide.com>
+ <20160419145400.GC5995@atomide.com>
+Message-ID: <20160419195147.GE5973@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+* Tony Lindgren <tony@atomide.com> [160419 07:55]:
+> * Tony Lindgren <tony@atomide.com> [160408 12:22]:
+> >       ARM: OMAP: Catch callers of revision information prior to it being populated
+> 
+> And this one causes bogus runtime warnings with other SoCs
+> as reported by Guenter Roeck. I'll revert this and post
+> an updated pull request shortly.
 
-This patch is submit to provide endusers access to additional UARTs on
-AllWinner H3 SoC along with I2C ports.
+And below is the updated pull request with just the above
+commit reverted.
 
 Regards,
-Martin.
 
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 75 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+Tony
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 4a4926b..c947360d 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -508,6 +508,48 @@
-                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-             };
+8< -------------------
+The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
 
-+            uart1_pins_a: uart1 at 0 {
-+                allwinner,pins = "PG6", "PG7";
-+                allwinner,function = "uart1";
-+                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+            };
-+
-+            uart2_pins_a: uart2 at 0 {
-+                allwinner,pins = "PA0", "PA1";
-+                allwinner,function = "uart2";
-+                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+            };
-+
-+            uart3_pins_a: uart3 at 0 {
-+                allwinner,pins = "PA13", "PA14";
-+                allwinner,function = "uart3";
-+                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+            };
-+
-+            i2c0_pins_a: i2c0 at 0 {
-+                allwinner,pins = "PA11", "PA12";
-+                allwinner,function = "i2c0";
-+                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+            };
-+
-+            i2c1_pins_a: i2c1 at 0 {
-+                allwinner,pins = "PA18", "PA19";
-+                allwinner,function = "i2c1";
-+                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+            };
-+
-+            i2c2_pins_a: i2c2 at 0 {
-+                allwinner,pins = "PE12", "PE13";
-+                allwinner,function = "i2c2";
-+                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+            };
-+
-             mmc0_pins_a: mmc0 at 0 {
-                 allwinner,pins = "PF0", "PF1", "PF2", "PF3",
-                          "PF4", "PF5";
-@@ -626,6 +668,39 @@
-             status = "disabled";
-         };
+  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
 
-+        i2c0: i2c at 01c2ac00 {
-+            compatible = "allwinner,sun6i-a31-i2c";
-+            reg = <0x01c2ac00 0x400>;
-+            interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+            clocks = <&bus_gates 96>;
-+            resets = <&apb2_rst 0>;
-+            status = "disabled";
-+            #address-cells = <1>;
-+            #size-cells = <0>;
-+        };
-+
-+        i2c1: i2c at 01c2b000 {
-+            compatible = "allwinner,sun6i-a31-i2c";
-+            reg = <0x01c2b000 0x400>;
-+            interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+            clocks = <&bus_gates 97>;
-+            resets = <&apb2_rst 1>;
-+            status = "disabled";
-+            #address-cells = <1>;
-+            #size-cells = <0>;
-+        };
-+
-+        i2c2: i2c at 01c2b400 {
-+            compatible = "allwinner,sun6i-a31-i2c";
-+            reg = <0x01c2b400 0x400>;
-+            interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+            clocks = <&bus_gates 98>;
-+            resets = <&apb2_rst 2>;
-+            status = "disabled";
-+            #address-cells = <1>;
-+            #size-cells = <0>;
-+        };
-+
-         gic: interrupt-controller at 01c81000 {
-             compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
-             reg = <0x01c81000 0x1000>,
--- 
-2.7.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc2-v2-signed
+
+for you to fetch changes up to 3d51ae172d759198b2e47e104c31a92d20d17927:
+
+  Revert "ARM: OMAP: Catch callers of revision information prior to it being populated" (2016-04-19 08:01:05 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps against v4.6-rc2, mostly to fix suspend for beagle-x15
+that broke when we added runtime based SoC revision detection earlier.
+
+It seems suspend worked earlier as things were only partially initialized,
+while now we initialize things properly for dra7.
+
+Note that the "ARM: OMAP: Catch callers of revision information prior
+to it being populated" had to be reverted as it caused bogus warnings
+for other SoCs because omap initcalls bail out based on revision being
+set to 0 for other SoCs. These initcalls will mostly just disappear
+when we drop support for omap3 legacy booting.
+
+Also included is a fix for dra7 sys_32k_ck clock source that is not
+enabled on boot making system fall back to using emulated clock.
+
+----------------------------------------------------------------
+Keerthy (1):
+      ARM: dts: dra7: Correct clock tree for sys_32k_ck
+
+Nishanth Menon (3):
+      ARM: OMAP: DRA7: wakeupgen: Skip SAR save for wakeupgen
+      ARM: OMAP: DRA7: Provide proper class to omap2_set_globals_tap
+      ARM: OMAP: Catch callers of revision information prior to it being populated
+
+Tony Lindgren (1):
+      Revert "ARM: OMAP: Catch callers of revision information prior to it being populated"
+
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 18 +++++++++++++++++-
+ arch/arm/mach-omap2/io.c             |  3 ++-
+ arch/arm/mach-omap2/omap-wakeupgen.c |  7 +++++++
+ 3 files changed, 26 insertions(+), 2 deletions(-)
