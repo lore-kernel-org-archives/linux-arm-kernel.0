@@ -1,85 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Apr 2016 08:30:07 -0300
-Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
-In-Reply-To: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <CAOMZO5Atp7okpmC8ir20BNrthh=M8ENp3ewx-Xqyt1HR_CNjNg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 19 Apr 2016 12:32:23 +0200
+Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
+In-Reply-To: <5715D12D.1020303@i2se.com>
+References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+ <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
+ <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
+ <57151652.4020709@denx.de> <5715D12D.1020303@i2se.com>
+Message-ID: <57160937.6000903@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 9:25 PM, Sergio Prado
-<sergio.prado@e-labworks.com> wrote:
+On 04/19/2016 08:33 AM, Stefan Wahren wrote:
+> Hi Marek,
+> 
+> Am 18.04.2016 um 19:16 schrieb Marek Vasut:
+>> On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
+>>> On 14/04/16 21:01, Marek Vasut wrote:
+>>>> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
+>>>>> After successful touchscreen registration the input device was
+>>>>> never freed. So fix this issue by using devm_input_allocate_device().
+>>>>>
+>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>>>> ---
+>>>>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
+>>>>>  1 file changed, 2 insertions(+), 6 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+>>>>> index 33051b8..0576953 100644
+>>>>> --- a/drivers/iio/adc/mxs-lradc.c
+>>>>> +++ b/drivers/iio/adc/mxs-lradc.c
+>>>>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>>>  {
+>>>>>  	struct input_dev *input;
+>>>>>  	struct device *dev = lradc->dev;
+>>>>> -	int ret;
+>>>>>  
+>>>>>  	if (!lradc->use_touchscreen)
+>>>>>  		return 0;
+>>>>>  
+>>>>> -	input = input_allocate_device();
+>>>>> +	input = devm_input_allocate_device(dev);
+>>>>>  	if (!input)
+>>>>>  		return -ENOMEM;
+>>>>>  
+>>>>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>>>  
+>>>>>  	lradc->ts_input = input;
+>>>>>  	input_set_drvdata(input, lradc);
+>>>>> -	ret = input_register_device(input);
+>>>>> -	if (ret)
+>>>>> -		input_free_device(lradc->ts_input);
+>>>>>  
+>>>>> -	return ret;
+>>>>> +	return input_register_device(input);
+>>>>>  }
+>>>>>  
+>>>>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+>>>>>
+>>>> Nice find.
+>>>>
+>>>> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
+>>>> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
+>>>> could use a proper fail path. Do you want to send patches or shall I ?
+>>>>
+>>> As this has been there a long time I'm not going to rush it in as a fix.
+>> I did take a proper look today and it seems they do the right thing
+>> afterall. I checked them with kmemleak too to be sure.
+> 
+> thanks, input_unregister_device already free the memory.
+> 
+> Sorry for the mess :-(
+> 
+> I think it would be the best to remove / revert this patch.
 
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +       model = "Embest MarS Board i.MX6Dual";
-> +       compatible = "embest,imx6q-marsboard", "fsl,imx6dl";
-
-This should be "fsl,imx6q".
-
-> +
-> +       memory {
-> +               reg = <0x10000000 0x40000000>;
-> +       };
-> +
-> +       regulators {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-
-Please remove the "simple-bus". Please check this commit:
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/arch/arm/boot/dts/imx6q-tbs2910.dts?h=for-next&id=ddcc6cad715319fff53968db7110a287dbc4a77e
-
-> +
-> +               reg_3p3v: regulator at 1 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <1>;
-> +                       regulator-name = "3P3V";
-> +                       regulator-min-microvolt = <3300000>;
-> +                       regulator-max-microvolt = <3300000>;
-> +               };
-> +
-> +               reg_usb_otg_vbus: regulator at 2 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <2>;
-> +                       regulator-name = "usb_otg_vbus";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-
-You missed the 'enable-active-high' property.
+This one? Why exactly? Please elaborate some more, so it's possible to
+understand the reasoning :)
 
 
-> +               };
-> +       };
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_led>;
-> +
-> +               led at 1 {
-
-There is no need for @1.
-
-
-> +                       label = "imx6:green:user1";
-> +                       gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
-> +                       default-state = "off";
-> +                       linux,default-trigger = "heartbeat";
-> +               };
-> +
-> +               led at 2 {
-
-There is no need for @2.
-
-> +
-> +&iomuxc {
-> +       imx6-riotboard {
-> +               pinctrl_uart1: uart1grp {
-
-You can simplify the iomuxc node by doing like this:
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/arch/arm/boot/dts/imx6q-tbs2910.dts?h=for-next&id=aa7871b53bc3c36b4adefe67f728143e2deeec93
+-- 
+Best regards,
+Marek Vasut
