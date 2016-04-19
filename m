@@ -1,30 +1,47 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 19 Apr 2016 17:49:53 +0800
-Subject: [PATCH 2/2] dt-bindings: add document for rk3399-vop
-In-Reply-To: <6435836.sTKjWLANC0@diego>
-References: <1460949478-2236-1-git-send-email-mark.yao@rock-chips.com>
- <1460949478-2236-2-git-send-email-mark.yao@rock-chips.com>
- <6435836.sTKjWLANC0@diego>
-Message-ID: <5715FF41.3080704@rock-chips.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 19 Apr 2016 11:51:00 +0200
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <5715FD6B.5000809@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+ <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
+ <5715FD6B.5000809@schinagl.nl>
+Message-ID: <CAPDyKFrhyqHYmSjrC23bHOkkz2F0QJGwbDKyryfEmoJhwkgMtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?04?19? 15:58, Heiko St?bner wrote:
-> patch subject above:
-> dt-bindings: add documentation for Rockchip rk3399 display controllers
+On 19 April 2016 at 11:42, Olliver Schinagl <oliver@schinagl.nl> wrote:
+> Hi Ulf,
 >
-> not everybody skimming over patches directly knows what a vop is;-)
+> On 19-04-16 11:29, Ulf Hansson wrote:
+>>
+>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
+>>>
+>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+>>> device as to having an broken HPI implementation. After talking some
+>>> with Hans, we now think it is actually the mmc controller that can be
+>>> broken and not support broken HPI's.
+>>
+>> I don't want us to invent a DT binding for something you *think* is a
+>> HW controller issue.
+>>
+>> Have you really excluded that this isn't a software issue? Me
+>> personally haven't been using HPI that much so I can't really tell
+>> about the code robustness from the mmc core (mmc protocol point of
+>> view).
 >
-> I still believe even such a trivial patch should also get some form of
-> description, something like:
->
-> ---------
-> Document compatible values for rk3399 display controllers.
-> Big and little display controllers are not identical and have differing
-> feature sets on the rk3399.
-> ---------
-Hi Heiko
+> Well this patch goes hand in hand so to speak with the broken-hpi patch
+> introduced by him, he did most of the investigation. We just discussed how
+> to handle it and asked me to cook up the patch.
 
-Good, Thanks for your Document.:-)
+Well, my point is that it's more understandable about having a broken
+HPI implementation for eMMC cards, but for host controllers I am not
+so sure.
 
--- ?ark Yao
+I don't think there is an electrical change required by the host
+controller to support HPI, is just like any other command, right?
+Unless I am missing something, of course.
+
+Kind regards
+Uffe
