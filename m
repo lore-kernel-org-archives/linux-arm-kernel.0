@@ -1,43 +1,66 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 19 Apr 2016 09:58:46 +0100
-Subject: [PATCH v7 01/16] arm64: KVM: Register CPU notifiers when the
- kernel runs at HYP
-In-Reply-To: <20160418161037.GE18257@e104818-lin.cambridge.arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-2-git-send-email-james.morse@arm.com>
- <20160418161037.GE18257@e104818-lin.cambridge.arm.com>
-Message-ID: <5715F346.2060804@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 19 Apr 2016 10:03:26 +0100
+Subject: Tegra baseline test results for v4.6-rc1
+Message-ID: <5715F45E.3080305@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Here are some basic Tegra test results for Linux v4.6-rc1.
+Logs and other details at:
 
-On 18/04/16 17:10, Catalin Marinas wrote:
-> On Fri, Apr 01, 2016 at 05:53:25PM +0100, James Morse wrote:
->> When the kernel is running at EL2, it doesn't need init_hyp_mode() to
->> configure page tables for HYP. This function also registers the CPU
->> hotplug and lower power notifiers that cause HYP to be re-initialised
->> after the CPU has been reset.
->>
->> To avoid losing the register state that controls stage2 translation, move
->> the registering of these notifiers into init_subsystems(), and add a
->> is_kernel_in_hyp_mode() path to each callback.
->>
->> Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
->> Signed-off-by: James Morse <james.morse@arm.com>
-> 
-> To the best of my knowledge of the hyp code:
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks,
-
-> Since it has a Fixes tag, does this need to be picked for 4.6 or a Cc:
-> stable if it goes in later?
-
-This patch was sent as a separate fix for rc1, its here too so that this series
-can be applied directly from the list without conflicts after rc2.
+    https://nvtb.github.io//linux/test_v4.6-rc1/20160330013102/
 
 
+Test summary
+------------
 
-James
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 4): tegra124-jetson-tk1
+    Pass: ( 3/ 4): tegra114-dalmore-a04, tegra20-trimslice,
+		   tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.5 (b562e44f507e863c6792946e4e1b1449fbbac85d)):
+    text      data     bss    total  kernel
+ +358923    +36920    +656  +396499  defconfig
+-3662632  +3897680   -4488  +230560  multi_v7_defconfig
+-2179053  +2281368   -4996   +97319  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.5 (b562e44f507e863c6792946e4e1b1449fbbac85d))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+   -2760k    2760k        .     952k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+   -1208k    1208k        .     684k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+   -2760k    2760k        .     952k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+   -1208k    1208k        .     684k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+   -2760k    2760k        .     952k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+   -1208k    1208k        .     684k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+   -2760k    2760k        .     952k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+   -1208k    1208k        .     684k       tegra30-beaver      tegra_defconfig       tegra30-beaver
