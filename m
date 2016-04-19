@@ -1,125 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Apr 2016 13:56:16 +0100
-Subject: [PATCH] arm64: mm: take CWG into account in __inval_cache_range()
-In-Reply-To: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160419125615.GA20991@leverpostej>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Tue, 19 Apr 2016 13:57:33 +0100
+Subject: [PATCH 26/45] KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register
+ handler
+In-Reply-To: <CAFEAcA9Hy2cSVguOWrxBo6By24BjiE2rgoCPGbfo+OuuPMtSQg@mail.gmail.com>
+References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+ <1460740316-8755-27-git-send-email-andre.przywara@arm.com>
+ <CAFEAcA9Hy2cSVguOWrxBo6By24BjiE2rgoCPGbfo+OuuPMtSQg@mail.gmail.com>
+Message-ID: <57162B3D.9000307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-On Tue, Apr 19, 2016 at 12:29:33PM +0200, Ard Biesheuvel wrote:
-> Currently, the arm64 implementation of __inval_cache_range() [aka
-> __dma_inv_range()] takes CTR_EL0.Dminline into account for two purposes:
-> - the stride to use for doing by-VA cache maintenance,
-> - to check whether the start and end arguments are unaligned with respect
->   to the cache line size, in which case the unaligned extremes need to be
->   cleaned before being invalidated, to avoid corrupting adjacent unrelated
->   memory contents.
->
-> In the second case, the use of Dminline is incorrect, and should use the
-> CWG field instead, since an invalidate operation could result in cache
-> lines that are larger than Dminline to be evicted at any level of the
-> cache hierarchy.
+thanks for going through the pain of looking into this!
 
-Have you seen this in practice, or was this found by inspection?
-
-I agree that we need to round addresses to CWG boundaries when
-performing maintenance to the PoC to prevent subsequent asynchronous
-writebacks of data falling in the same CWG, which could clobber data at
-the PoC.
-
-However, if we have unrelated data in the same CWG, surely we have no
-guarantee that said data will not be dirtied in caches by other kernel
-code, and thus we may still have issues with asynchronous writebacks?
-
-Is sharing a CWG broken by design, or is there some caveat I'm missing
-that prevents/prohibits unrelated data from being dirtied?
-
-Thanks,
-Mark.
-
-> So introduce a macro cache_cwg_size to retrieve the CWG value, and use it
-> to clean as many cachelines as required on either end of the [start, end)
-> interval.
+On 19/04/16 13:34, Peter Maydell wrote:
+> On 15 April 2016 at 18:11, Andre Przywara <andre.przywara@arm.com> wrote:
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic_mmio.c | 21 +++++++++++++++++++--
+>>  1 file changed, 19 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+>> index 7d275a7..dafa235 100644
+>> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+>> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+>> @@ -784,6 +784,23 @@ static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+>>         return 0;
+>>  }
+>>
+>> +static int vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+>> +                                   struct kvm_io_device *dev,
+>> +                                   gpa_t addr, int len, void *val)
+>> +{
+>> +       u32 regnr = (addr & 0x3f) - (GICD_IDREGS & 0x3f);
+>> +       u32 reg = 0;
+>> +
+>> +       switch (regnr + GICD_IDREGS) {
+>> +       case GICD_PIDR2:
+>> +               /* report a GICv3 compliant implementation */
+>> +               reg = 0x3b;
+>> +               break;
+>> +       }
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/cache.S       | 34 ++++++++++++++++++++++------------
->  arch/arm64/mm/proc-macros.S | 13 +++++++++++++
->  2 files changed, 35 insertions(+), 12 deletions(-)
+> We claim to be an ARM implementation, so we should report the full
+> set of ARM ID registers, not just GICD_PIDR2:
+
+Do we really have to? Please note that though we say our implementor is
+ARM (because we lack alternatives, I think), we don't claim to be a
+GIC-500, for instance, but a made-up KVM implementation.
+So there is no need to implement the other ID registers, except for the
+architecturally defined PIDR2, which Linux actually checks to confirm
+that this is a GICv3 compliant GIC.
+
+>         0x44, 0x00, 0x00, 0x00, 0x92, 0xB4, 0x3B, 0x00, 0x0D, 0xF0, 0x05, 0xB1
+
+Yes, I had those registers defined like this in an earlier version, but
+Marc's comment IIRC correctly was that we shouldn't claim to be a
+GIC-500, for instance, because then we would need to mimic GIC-500
+behavior quite closely, which we simply don't and also don't want to.
+
+So architecturally we are fine, I think.
+
+Do you think by claiming coming from ARM we are obliged to implement all
+the other PIDR/CIDR registers the ARM way?
+
+Cheers,
+Andre.
+
 > 
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 6df07069a025..e5067e87e1b5 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -120,19 +120,29 @@ ENTRY(__inval_cache_range)
->   *	- end     - virtual end address of region
->   */
->  __dma_inv_range:
-> -	dcache_line_size x2, x3
-> -	sub	x3, x2, #1
-> -	tst	x1, x3				// end cache line aligned?
-> -	bic	x1, x1, x3
-> -	b.eq	1f
-> -	dc	civac, x1			// clean & invalidate D / U line
-> -1:	tst	x0, x3				// start cache line aligned?
-> -	bic	x0, x0, x3
-> +	dcache_line_size x2, x3			// get Dminline in x2
-> +	sub	x3, x2, #1			// Dminline mask in x3
-> +	bic	x0, x0, x3			// align start down to line size
-> +
-> +	cache_cwg_size x4, x3			// get CWG
-> +	sub	x3, x4, #1			// CWG mask in x3
-> +
-> +	tst	x1, x3				// end CWG aligned?
->  	b.eq	2f
-> -	dc	civac, x0			// clean & invalidate D / U line
-> -	b	3f
-> -2:	dc	ivac, x0			// invalidate D / U line
-> -3:	add	x0, x0, x2
-> +	bic	x5, x1, x3
-> +0:	dc	civac, x5			// clean & invalidate D / U line
-> +	add	x5, x5, x2
-> +	tst	x5, x3
-> +	b.ne	0b
-> +	b	2f
-> +
-> +1:	dc	civac, x0			// clean & invalidate D / U line
-> +	add	x0, x0, x2
-> +2:	tst	x0, x3				// start CWG aligned?
-> +	b.ne	1b
-> +
-> +	dc	ivac, x0			// invalidate D / U line
-> +	add	x0, x0, x2
->  	cmp	x0, x1
->  	b.lo	2b
->  	dsb	sy
-> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-> index e6a30e1268a8..872299ce3081 100644
-> --- a/arch/arm64/mm/proc-macros.S
-> +++ b/arch/arm64/mm/proc-macros.S
-> @@ -54,6 +54,19 @@
->  	.endm
->  
->  /*
-> + * cache_cwg_size - get the maximum cache line size from the CTR register
-> + */
-> +	.macro	cache_cwg_size, reg, tmp
-> +	mrs	\tmp, ctr_el0			// read CTR
-> +	ubfm	\tmp, \tmp, #24, #27		// CTR_EL0.CWG [27:24]
-> +	mov	\reg, #9			// use architectural default of
-> +	cmp	\tmp, xzr			// 2 KB (2^9 words) if CWG is
-> +	csel	\tmp, \tmp, \reg, ne		// not provided
-> +	mov	\reg, #4			// bytes per word
-> +	lsl	\reg, \reg, \tmp		// actual cache line size
-> +	.endm
-> +
-> +/*
->   * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
->   */
->  	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
-> -- 
-> 2.5.0
+> (starting at 0xFFD0 and going up to 0xFFFC.)
+> 
+>> +       write_mask32(reg , addr & 3, len, val);
+>> +       return 0;
+>> +}
+>>  #endif
+> 
+> thanks
+> -- PMM
 > 
