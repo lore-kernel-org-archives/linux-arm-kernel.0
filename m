@@ -1,138 +1,112 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Tue, 19 Apr 2016 17:46:12 +0800
-Subject: [PATCH v5] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
- driver
-Message-ID: <1461059172-47460-1-git-send-email-pc.liao@mediatek.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 19 Apr 2016 18:49:15 +0900
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <5715FD6B.5000809@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+ <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
+ <5715FD6B.5000809@schinagl.nl>
+Message-ID: <5715FF1B.80402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds second I2S connection to rt5650 codec for capture path on
-mt8173-rt5650 machine driver.
+Hi
 
-This patch depends on [1], because snd_soc_of_get_dai_name() fix the property 
-name "sound-dai". This patch needs to change name to use, so export
-snd_soc_get_dai_name() which is included in snd_soc_of_get_dai_name(). 
+On 04/19/2016 06:42 PM, Olliver Schinagl wrote:
+> Hi Ulf,
+> 
+> On 19-04-16 11:29, Ulf Hansson wrote:
+>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
+>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+>>> device as to having an broken HPI implementation. After talking some
+>>> with Hans, we now think it is actually the mmc controller that can be
+>>> broken and not support broken HPI's.
+>> I don't want us to invent a DT binding for something you *think* is a
+>> HW controller issue.
+>>
+>> Have you really excluded that this isn't a software issue? Me
+>> personally haven't been using HPI that much so I can't really tell
+>> about the code robustness from the mmc core (mmc protocol point of
+>> view).
+> Well this patch goes hand in hand so to speak with the broken-hpi patch introduced by him, he did most of the investigation. We just discussed how to handle it and asked me to cook up the patch.
 
-[1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
-snd_soc_get_dai_name")
+I didn't understand why add this property. Is this same patch?
 
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
----
-Changes since v4:
-Change name from "sound-dai" to "capture-dai" to determine the capture path
----
- .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
- sound/soc/mediatek/mt8173-rt5650.c                 |   44 ++++++++++++++++++--
- 2 files changed, 47 insertions(+), 3 deletions(-)
+commit 81f8a7be6642b4c26ab681b2e0f4c4120a6de1b0
+Author: Hans de Goede <hdegoede@redhat.com>
+Date:   Wed Apr 1 17:26:23 2015 +0200
 
-diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-index fe5a5ef..802dd1b 100644
---- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-+++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-@@ -5,11 +5,17 @@ Required properties:
- - mediatek,audio-codec: the phandles of rt5650 codecs
- - mediatek,platform: the phandle of MT8173 ASoC platform
- 
-+Optional properties:
-+- capture-dai: audio codec dai on capture path
-+  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
-+  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
-+
- Example:
- 
- 	sound {
- 		compatible = "mediatek,mt8173-rt5650";
- 		mediatek,audio-codec = <&rt5650>;
- 		mediatek,platform = <&afe>;
-+		capture-dai = <&rt5650 1>;
- 	};
- 
-diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
-index bb09bb1..45dea22 100644
---- a/sound/soc/mediatek/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173-rt5650.c
-@@ -85,12 +85,26 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- {
- 	struct snd_soc_card *card = runtime->card;
- 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
-+	const char *codec_dai_capture = runtime->codec_dais[1]->name;
- 	int ret;
- 
- 	rt5645_sel_asrc_clk_src(codec,
--				RT5645_DA_STEREO_FILTER |
--				RT5645_AD_STEREO_FILTER,
-+				RT5645_DA_STEREO_FILTER,
- 				RT5645_CLK_SEL_I2S1_ASRC);
-+
-+	if (!strcmp(codec_dai_capture, "rt5645-aif1")) {
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+	} else if (!strcmp(codec_dai_capture, "rt5645-aif2")) {
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S2_ASRC);
-+	} else {
-+		dev_err(card->dev, "Can't get the right codec dai\n");
-+		return -EINVAL;
-+	}
-+
- 	/* enable jack detection */
- 	ret = snd_soc_card_jack_new(card, "Headset Jack",
- 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
-@@ -110,6 +124,11 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- 
- static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
- 	{
-+		/* Playback */
-+		.dai_name = "rt5645-aif1",
-+	},
-+	{
-+		/* Capture */
- 		.dai_name = "rt5645-aif1",
- 	},
- };
-@@ -149,7 +168,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
- 		.cpu_dai_name = "I2S",
- 		.no_pcm = 1,
- 		.codecs = mt8173_rt5650_codecs,
--		.num_codecs = 1,
-+		.num_codecs = 2,
- 		.init = mt8173_rt5650_init,
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			   SND_SOC_DAIFMT_CBS_CFS,
-@@ -177,6 +196,8 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &mt8173_rt5650_card;
- 	struct device_node *platform_node;
-+	const char *codec_dai_capture;
-+	struct of_phandle_args args;
- 	int i, ret;
- 
- 	platform_node = of_parse_phandle(pdev->dev.of_node,
-@@ -199,6 +220,23 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- 			"Property 'audio-codec' missing or invalid\n");
- 		return -EINVAL;
- 	}
-+	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
-+
-+	if (device_property_present(&pdev->dev, "capture-dai")) {
-+		ret = of_parse_phandle_with_args(pdev->dev.of_node,
-+						 "capture-dai",
-+						 "#sound-dai-cells", 0, &args);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"%s capture-dai name fail %d\n",
-+				__func__, ret);
-+			return ret;
-+		}
-+
-+		ret = snd_soc_get_dai_name(&args, &codec_dai_capture);
-+		mt8173_rt5650_codecs[1].dai_name = codec_dai_capture;
-+	}
-+
- 	card->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, card);
- 
--- 
-1.7.9.5
+    mmc: Add support for marking hpi as broken through devicetree
+
+    The eMMC on a tablet I've will stop working / communicating as soon as
+    the kernel executes:
+
+                mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+                                EXT_CSD_HPI_MGMT, 1,
+                                card->ext_csd.generic_cmd6_time);
+
+    There seems to be no way to reliable identify eMMC-s which have a broken
+    hpi implementation, but at least for eMMC's which are soldered onto a board
+    we can work around this by specifying that hpi is broken in devicetree.
+
+> 
+> @hans, what do you think?
+>>
+>> Kind regards
+>> Uffe
+>>
+>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
+>>> mark a broken hpi implementation on the host level.
+>>>
+>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>>> ---
+>>>   drivers/mmc/core/host.c  | 2 ++
+>>>   drivers/mmc/core/mmc.c   | 2 +-
+>>>   include/linux/mmc/host.h | 1 +
+>>>   3 files changed, 4 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+>>> index 6e4c55a..9b63b36 100644
+>>> --- a/drivers/mmc/core/host.c
+>>> +++ b/drivers/mmc/core/host.c
+>>> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
+>>>                  host->caps |= MMC_CAP_HW_RESET;
+>>>          if (of_property_read_bool(np, "cap-sdio-irq"))
+>>>                  host->caps |= MMC_CAP_SDIO_IRQ;
+>>> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
+>>> +               host->caps |= MMC_CAP_BROKEN_HPI;
+>>>          if (of_property_read_bool(np, "full-pwr-cycle"))
+>>>                  host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+>>>          if (of_property_read_bool(np, "keep-power-in-suspend"))
+>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>> index 4dbe3df..9a19562 100644
+>>> --- a/drivers/mmc/core/mmc.c
+>>> +++ b/drivers/mmc/core/mmc.c
+>>> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>>>          /*
+>>>           * Enable HPI feature (if supported)
+>>>           */
+>>> -       if (card->ext_csd.hpi) {
+>>> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
+>>>                  err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>>                                  EXT_CSD_HPI_MGMT, 1,
+>>>                                  card->ext_csd.generic_cmd6_time);
+>>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+>>> index 8dd4d29..20f758e 100644
+>>> --- a/include/linux/mmc/host.h
+>>> +++ b/include/linux/mmc/host.h
+>>> @@ -264,6 +264,7 @@ struct mmc_host {
+>>>   #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
+>>>   #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
+>>>   #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
+>>> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
+>>>   #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
+>>>   #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
+>>>
+>>> -- 
+>>> 2.8.0.rc3
+>>>
+> 
+> 
+> 
