@@ -1,98 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Apr 2016 17:03:50 +0100
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <20160419103510.GA5499@wintermute>
-References: <cover.1457539621.git.jglauber@cavium.com>
- <CAEiAFz3eCsX3VoNus_Rq+En5zuB8fAxNCbC3ktw2NqLKwC=_kA@mail.gmail.com>
- <20160419103510.GA5499@wintermute>
-Message-ID: <20160419160350.GE20991@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Apr 2016 17:09:13 +0100
+Subject: [PATCH] arm64: mm: take CWG into account in __inval_cache_range()
+In-Reply-To: <CAKv+Gu890YWn-DU5Hevb1hHqOTLssWn9rWgdBj=oA9FsJhLF0Q@mail.gmail.com>
+References: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160419125615.GA20991@leverpostej>
+ <CAKv+Gu91hFkn5k0s=xVmJ+z0vEYMNe6h6UD6z9Qb0fxe7ba0Vw@mail.gmail.com>
+ <20160419141321.GD8482@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9+V_i6E_85W7kArugp4mwUjYf_p-=O7AFYGn460xU2vw@mail.gmail.com>
+ <20160419153238.GE8482@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu890YWn-DU5Hevb1hHqOTLssWn9rWgdBj=oA9FsJhLF0Q@mail.gmail.com>
+Message-ID: <20160419160913.GF8482@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 12:35:10PM +0200, Jan Glauber wrote:
-> Mark,
+On Tue, Apr 19, 2016 at 05:38:56PM +0200, Ard Biesheuvel wrote:
+> On 19 April 2016 at 17:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Apr 19, 2016 at 04:48:32PM +0200, Ard Biesheuvel wrote:
+> >> On 19 April 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > The best we could do is to warn if ARCH_DMA_MINALIGN is smaller than CWG
+> >> > (as Robin suggested, we could do this only if we have non-coherent DMA
+> >> > masters via arch_setup_dma_ops()). Quick hack below:
+> >> >
+> >> > -------------------------------8<-----------------------------------
+> >> > diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+> >> > index 5082b30bc2c0..5967fcbb617a 100644
+> >> > --- a/arch/arm64/include/asm/cache.h
+> >> > +++ b/arch/arm64/include/asm/cache.h
+> >> > @@ -28,7 +28,7 @@
+> >> >   * cache before the transfer is done, causing old data to be seen by
+> >> >   * the CPU.
+> >> >   */
+> >> > -#define ARCH_DMA_MINALIGN      L1_CACHE_BYTES
+> >> > +#define ARCH_DMA_MINALIGN      128
+> >> >
+> >> >  #ifndef __ASSEMBLY__
+> >> >
+> >> > @@ -37,7 +37,7 @@
+> >> >  static inline int cache_line_size(void)
+> >> >  {
+> >> >         u32 cwg = cache_type_cwg();
+> >> > -       return cwg ? 4 << cwg : L1_CACHE_BYTES;
+> >> > +       return cwg ? 4 << cwg : ARCH_DMA_MINALIGN;
+> >>
+> >> Unrelated, but this does not look right: if the CWG field is zero, we
+> >> should either assume 2 KB, or iterate over all the CCSIDR values and
+> >> take the maximum linesize.
+> >
+> > It may be a better guess but even that is not always relevant since
+> > CCSIDR may not present the real hardware information. It's only meant to
+> > give enough information to be able to do cache maintenance by set/way
+> > and we've seen CPU implementations where this has nothing to do with the
+> > actual cache geometry.
 > 
-> are these patches still queued or should I repost them?
-
-Apologies for the delay. I've just given these a review.
-
-I note an awful lot of duplication over patches 2-5. The pmu::add
-implementations are practically identical, and I suspect can be shared
-without much difficulty. Please try to address that unnecessary
-duplication.
-
-My comments on patches 2 and 3 larely apply to 4 and 5, so I haven't
-reviewed those individually.
-
-Thanks,
-Mark.
-
-
+> I am aware of that discussion, but that was about inferring aliasing
+> properties from the way size, which combines the linesize and the
+> number of sets/ways, and the latter are apparently set to 1/1 in some
+> cases so that any set/way operation simply affects the entire cache.
 > 
-> --Jan
-> 
-> On Mon, Apr 04, 2016 at 01:03:13PM +0200, Jan Glauber wrote:
-> > Hi Mark,
-> > 
-> > can you have a look at these patches?
-> > 
-> > Thanks,
-> > Jan
-> > 
-> > 2016-03-09 17:21 GMT+01:00 Jan Glauber <jglauber@cavium.com>:
-> > 
-> >     This patch series provides access to various counters on the ThunderX SOC.
-> > 
-> >     For details of the uncore implementation see patch #1.
-> > 
-> >     Patches #2-5 add the various ThunderX specific PMUs.
-> > 
-> >     As suggested I've put the files under drivers/perf/uncore. I would
-> >     prefer this location over drivers/bus because not all of the uncore
-> >     drivers are bus related.
-> > 
-> >     Changes to v1:
-> >     - Added NUMA support
-> >     - Fixed CPU hotplug by pmu migration
-> >     - Moved files to drivers/perf/uncore
-> >     - Removed OCX FRC and LNE drivers, these will fit better into a edac driver
-> >     - improved comments abount overflow interrupts
-> >     - removed max device limit
-> >     - trimmed include files
-> > 
-> >     Feedback welcome!
-> >     Jan
-> > 
-> >     -------------------------------------------------
-> > 
-> >     Jan Glauber (5):
-> >     ? arm64/perf: Basic uncore counter support for Cavium ThunderX
-> >     ? arm64/perf: Cavium ThunderX L2C TAD uncore support
-> >     ? arm64/perf: Cavium ThunderX L2C CBC uncore support
-> >     ? arm64/perf: Cavium ThunderX LMC uncore support
-> >     ? arm64/perf: Cavium ThunderX OCX TLK uncore support
-> > 
-> >     ?drivers/perf/Makefile? ? ? ? ? ? ? ? ? ? ? ?|? ?1 +
-> >     ?drivers/perf/uncore/Makefile? ? ? ? ? ? ? ? |? ?5 +
-> >     ?drivers/perf/uncore/uncore_cavium.c? ? ? ? ?| 314 +++++++++++++++
-> >     ?drivers/perf/uncore/uncore_cavium.h? ? ? ? ?|? 95 +++++
-> >     ?drivers/perf/uncore/uncore_cavium_l2c_cbc.c | 237 +++++++++++
-> >     ?drivers/perf/uncore/uncore_cavium_l2c_tad.c | 600
-> >     ++++++++++++++++++++++++++++
-> >     ?drivers/perf/uncore/uncore_cavium_lmc.c? ? ?| 196 +++++++++
-> >     ?drivers/perf/uncore/uncore_cavium_ocx_tlk.c | 380 ++++++++++++++++++
-> >     ?8 files changed, 1828 insertions(+)
-> >     ?create mode 100644 drivers/perf/uncore/Makefile
-> >     ?create mode 100644 drivers/perf/uncore/uncore_cavium.c
-> >     ?create mode 100644 drivers/perf/uncore/uncore_cavium.h
-> >     ?create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_cbc.c
-> >     ?create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_tad.c
-> >     ?create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
-> >     ?create mode 100644 drivers/perf/uncore/uncore_cavium_ocx_tlk.c
-> >    
-> >     --
-> >     1.9.1
-> > 
-> > 
-> > 
-> 
+> However, the CCSIDR linesize field itself is mentioned in the
+> description of CWG in the ARM ARM, as a suitable source of obtaining
+> the maximum linesize in the system.
+
+The ARM ARM confuses me. While CTR_EL0.CWG indeed talks about CCSIDR as
+a fall back, the latter has a note:
+
+  The parameters NumSets, Associativity, and LineSize in these registers
+  define the architecturally visible parameters that are required for
+  the cache maintenance by Set/Way instructions. They are not guaranteed
+  to represent the actual microarchitectural features of a design. You
+  cannot make any inference about the actual sizes of caches based on
+  these parameters.
+
+So it's not clear to me whether LineSize would give us the information
+we need for cache maintenance by VA. But I'm not opposed to using this
+on a CPU that doesn't have CWG (once we see one).
+
+-- 
+Catalin
