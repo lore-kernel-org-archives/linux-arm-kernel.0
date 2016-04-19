@@ -1,52 +1,65 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 19 Apr 2016 11:04:46 +0200
-Subject: [PATCH v2 6/9] pinctrl: Add IRQ support to STM32 gpios
-In-Reply-To: <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
-References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
-Message-ID: <CALszF6CUFKAjzUpEh3pDtSDdJuFan1ON0Kcu_uKD_OX36kXOHQ@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 19 Apr 2016 10:06:12 +0100
+Subject: Tegra baseline test results for v4.6-rc3
+Message-ID: <5715F504.5090908@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+Here are some basic Tegra test results for Linux v4.6-rc3.
+Logs and other details at:
 
-2016-04-08 11:43 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Mar 31, 2016 at 5:09 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->
->> +static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->> +{
->> +       struct stm32_pinctrl *pctl = dev_get_drvdata(chip->parent);
->> +       struct stm32_gpio_bank *bank = gpiochip_get_data(chip);
->> +       unsigned int irq;
->> +
->> +       regmap_field_write(pctl->irqmux[offset], bank->range.id);
->
-> No. You must implement the irqchip and GPIO controllers to
-> be orthogonal, doing things like this creates a semantic that
-> assumes .to_irq() is always called before using the IRQ and
-> that is not guaranteed at all. A consumer may very well
-> use an interrupt right off the irqchip without this being called
-> first. All this function should do is translate a number. No
-> other semantics.
->
-> This needs to be done from the irqchip (sorry).
+    https://nvtb.github.io//linux/test_v4.6-rc3/20160410183102/
 
-Actually, the register written here is not part of the irqchip.
-It is a system config register that is only used when using a GPIO as
-external interrupt.
-Its aim is to mux the GPIO bank on a line.
-For example on line 1, it can be muxed to select either gpioa1,
-gpiob1, gpioc1, ...
-How could I do it in the irqchip that has no gpio knowledge?
 
-In case the consumer uses an interrupt right off the irqchip, it
-should not access this register.
-For example the RTC wakeup lines, where we will reference directly the irqchip.
+Test summary
+------------
 
-That said, do you still believe the implementation is wrong? Do I miss
-something?
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Best regards,
-Maxime
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.6-rc2 (9735a22799b9214d17d3c231fe377fc852f042e9)):
+   text     data      bss    total  kernel
+   +140        0        0     +140  defconfig
+    -16        0        0      -16  multi_v7_defconfig
+  +1120        0      +64    +1184  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.6-rc2 (9735a22799b9214d17d3c231fe377fc852f042e9))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
