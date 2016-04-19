@@ -1,149 +1,29 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 19 Apr 2016 17:16:32 +0100
-Subject: [PATCH V2 13/15] coresight: tmc: implementing TMC-ETF AUX space
- API
-In-Reply-To: <1460483692-25061-14-git-send-email-mathieu.poirier@linaro.org>
-References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
- <1460483692-25061-14-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <571659E0.4090605@arm.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Tue, 19 Apr 2016 13:18:36 -0300
+Subject: [PATCH v2 3/3] leds: gpio: Support the "panic-indicator" firmware
+ property
+In-Reply-To: <570F5B6B.3000702@samsung.com>
+References: <1460570899-24642-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1460570899-24642-4-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <570F5B6B.3000702@samsung.com>
+Message-ID: <CAAEAJfA6O8QV0zk9vnHwePaB7BFgtDVaAsTOm=LVh22eS6Lccg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 18:54, Mathieu Poirier wrote:
-> This patch implement the AUX area interfaces required to
-> use the TMC (configured as an ETF) from the Perf sub-system.
+Hi Jacek,
+
+On 14 April 2016 at 05:57, Jacek Anaszewski <j.anaszewski@samsung.com> wrote:
+> Hi Ezequiel,
 >
-> The heuristic is heavily borrowed from the ETB10 implementation.
+> It would be good to update also leds-gpio bindings,
+> of course in a separate patch:
 >
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-tmc-etf.c | 198 ++++++++++++++++++++++++
->   drivers/hwtracing/coresight/coresight-tmc.h     |  21 +++
->   2 files changed, 219 insertions(+)
+> Documentation/devicetree/bindings/leds/leds-gpio.txt
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index a440784e3b27..fff175d4020d 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -15,7 +15,9 @@
->    * this program.  If not, see <http://www.gnu.org/licenses/>.
->    */
->
-> +#include <linux/circ_buf.h>
->   #include <linux/coresight.h>
-> +#include <linux/perf_event.h>
->   #include <linux/slab.h>
->   #include "coresight-priv.h"
->   #include "coresight-tmc.h"
-> @@ -295,9 +297,205 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
->   	dev_info(drvdata->dev, "TMC disabled\n");
->   }
->
-> +static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
-> +				  void **pages, int nr_pages, bool overwrite)
 
+Yes, you are right. I will send a new series adding this.
 
-
-> +
-> +static void tmc_free_etf_buffer(void *config)
-> +{
-
-> +
-> +static int tmc_set_etf_buffer(struct coresight_device *csdev,
-> +			      struct perf_output_handle *handle,
-> +			      void *sink_config)
-
-
-> +static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
-> +					  struct perf_output_handle *handle,
-> +					  void *sink_config, bool *lost)
-> +{
-
-
->   /**
-> + * struct cs_buffer - keep track of a recording session' specifics
-> + * @cur:	index of the current buffer
-> + * @nr_pages:	max number of pages granted to us
-> + * @offset:	offset within the current buffer
-> + * @data_size:	how much we collected in this run
-> + * @lost:	other than zero if we had a HW buffer wrap around
-> + * @snapshot:	is this run in snapshot mode
-> + * @data_pages:	a handle the ring buffer
-> + */
-> +struct cs_tmc_buffers {
-> +	unsigned int		cur;
-> +	unsigned int		nr_pages;
-> +	unsigned long		offset;
-> +	local_t			data_size;
-> +	local_t			lost;
-> +	bool			snapshot;
-> +	void			**data_pages;
-> +};
-
-
-All of the above look exactly the same as what we have in etb10.c (as you have mentioned).
-Is there any chance we could reuse them under a generic name ?
-
-> +
-> +static void tmc_update_etf_buffer(struct coresight_device *csdev,
-
-
-> +	 * Get a hold of the status register and see if a wrap around
-> +	 * has occurred.  If so adjust things accordingly.
-> +	 */
-> +	status = readl_relaxed(drvdata->base + TMC_STS);
-> +	if (status & TMC_STS_FULL) {
-> +		local_inc(&buf->lost);
-> +		to_read = drvdata->size;
-> +	} else {
-> +		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->size);
-> +	}
-> +
-> +	/*
-> +	 * The TMC RAM buffer may be bigger than the space available in the
-> +	 * perf ring buffer (handle->size).  If so advance the RRP so that we
-> +	 * get the latest trace data.
-> +	 */
-> +	if (to_read > handle->size) {
-> +		u32 mask = 0;
-> +
-> +		/*
-> +		 * The value written to RRP must be byte-address aligned to
-> +		 * the width of the trace memory databus _and_ to a frame
-> +		 * boundary (16 byte), whichever is the biggest. For example,
-> +		 * for 32-bit, 64-bit and 128-bit wide trace memory, the four
-> +		 * LSBs must be 0s. For 256-bit wide trace memory, the five
-> +		 * LSBs must be 0s.
-> +		 */
-> +		switch (drvdata->memwidth) {
-> +		case TMC_MEM_INTF_WIDTH_32BITS:
-> +		case TMC_MEM_INTF_WIDTH_64BITS:
-> +		case TMC_MEM_INTF_WIDTH_128BITS:
-> +			mask = GENMASK(31, 5);
-> +			break;
-> +		case TMC_MEM_INTF_WIDTH_256BITS:
-> +			mask = GENMASK(31, 6);
-> +			break;
-> +		}
-> +
-> +		/*
-> +		 * Make sure the new size is aligned in accordance with the
-> +		 * requirement explained above.
-> +		 */
-> +		to_read -= handle->size & mask;
-
-Shouldn't this be :
-
-		to_read = handle->size & mask;
-
-> +		/* Move the RAM read pointer up */
-> +		read_ptr = (write_ptr + drvdata->size) - to_read;
-> +		/* Make sure we are still within our limits */
-> +		read_ptr &= ~(drvdata->size - 1);
-> +		/* Tell the HW */
-> +		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
-> +		local_inc(&buf->lost);
-> +	}
-
-
-Suzuki
+Thanks,
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
