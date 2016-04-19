@@ -1,32 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Apr 2016 12:02:39 +0200
-Subject: [PATCH v3 08/19] ARM: sun5i: Add DRAM gates
-In-Reply-To: <1458751122-23976-9-git-send-email-maxime.ripard@free-electrons.com>
-References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
- <1458751122-23976-9-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160419100239.GD26050@lukather>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Tue, 19 Apr 2016 18:02:46 +0800
+Subject: [PATCH 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <81160604.beJHM8QlLS@avalon>
+References: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
+ <1460533460-32336-2-git-send-email-songjun.wu@atmel.com>
+ <81160604.beJHM8QlLS@avalon>
+Message-ID: <57160246.2060804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 05:38:31PM +0100, Maxime Ripard wrote:
-> The DRAM gates control whether the image / display devices on the SoC have
-> access to the DRAM clock or not.
-> 
-> Enable it.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied,
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/c7f2980d/attachment-0001.sig>
+On 4/15/2016 00:21, Laurent Pinchart wrote:
+>> >+		return -EINVAL;
+>> >+
+>> >+	parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
+>> >+	if (!parent_names)
+>> >+		return -ENOMEM;
+>> >+
+>> >+	of_clk_parent_fill(np, parent_names, num_parents);
+>> >+
+>> >+	init.parent_names	= parent_names;
+>> >+	init.num_parents	= num_parents;
+>> >+	init.name		= clk_name;
+>> >+	init.ops		= &isc_clk_ops;
+>> >+	init.flags		= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+>> >+
+>> >+	isc_clk = &isc->isc_clks[id];
+>> >+	isc_clk->hw.init	= &init;
+>> >+	isc_clk->regmap		= regmap;
+>> >+	isc_clk->lock		= lock;
+>> >+	isc_clk->id		= id;
+>> >+
+>> >+	isc_clk->clk = clk_register(NULL, &isc_clk->hw);
+>> >+	if (!IS_ERR(isc_clk->clk))
+>> >+		of_clk_add_provider(np, of_clk_src_simple_get, isc_clk->clk);
+>> >+	else {
+>> >+		dev_err(isc->dev, "%s: clock register fail\n", clk_name);
+>> >+		ret = PTR_ERR(isc_clk->clk);
+>> >+		goto free_parent_names;
+>> >+	}
+>> >+
+>> >+free_parent_names:
+>> >+	kfree(parent_names);
+>> >+	return ret;
+>> >+}
+>> >+
+>> >+static int isc_clk_init(struct isc_device *isc)
+>> >+{
+>> >+	struct device_node *np = of_get_child_by_name(isc->dev->of_node,
+>> >+						      "clk_in_isc");
+> Do you really need the clk_in_isc DT node ? I would have assumed that the
+> clock topology inside the ISC is fixed, and that it would be enough to just
+> specify the three parent clocks in the ISC DT node and create the two internal
+> clocks in the driver without needing a DT description.
+>
+Hi Laurent,
+
+I think more, and the clk_in_isc DT node should be needed. The clock 
+topology inside the ISC is fixed, but isc will provide the clock to 
+sensor, we need create the corresponding clock node int DT file, then 
+the sensor will get this clock and set the clock rate in DT file.
