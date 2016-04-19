@@ -1,27 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Apr 2016 16:11:03 +0100
-Subject: [PATCH v7 05/16] arm64: kvm: Move lr save/restore from
- do_el2_call into EL1
-In-Reply-To: <1459529620-22150-6-git-send-email-james.morse@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-6-git-send-email-james.morse@arm.com>
-Message-ID: <57164A87.6060605@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 19 Apr 2016 23:11:11 +0800
+Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS + add
+ new I2C entries for AllWinner H3 DTS
+In-Reply-To: <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
+References: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
+ <CAGb2v67e_F1=VaY7ovzW7Whc2ToJU3YabeT-orrLTb0Pouhw_Q@mail.gmail.com>
+ <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
+Message-ID: <CAGb2v65dsjbpGUrJXFG35cLGnFA6uDxtgMqupBN97=8XNnO68Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/16 17:53, James Morse wrote:
-> Today the 'hvc' calling kvm or the hyp-stub is expected to preserve all
-> registers. Kvm saves/restores the registers it needs on the EL2 stack using
-> do_el2_call. The hyp-stub has no stack, later patches need at least one
-> register they can use.
-> 
-> Allow theses calls to clobber the link register, and add code to
-> save/restore this register at the call sites.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
+On Tue, Apr 19, 2016 at 10:46 PM,  <martinayotte@gmail.com> wrote:
+> Hi ChenYu,
+>
+> Thanks for your comments.
+>
+> On Tuesday, April 19, 2016 at 7:11:50 AM UTC-4, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> >  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts  | 36 ++++++++++++++
+>> >  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 36 ++++++++++++++
+>> >  arch/arm/boot/dts/sun8i-h3.dtsi            | 75
+>>
+>> First of all, you are touching 3 different files here. These should
+>> be separate patches.
+>
+> I'm trying to understand you here, but I can't. Those 3 files changed are related each other. I could have separated the UART changes from I2C changes, but still those 3 files would have been modified at the same time for a single commit and "git patch-format" would still have created a single patch for the 3 files commit.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Try to wrap lines to 80 characters or less.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+1 change per patch. You are making 3 changes here. a) adding shared
+pinmux settings,
+b & c) enabling uarts and i2c busses for 2 boards.
+
+You could split them into 1 dtsi patch adding the pinmux setting, and
+then 1 for each
+board enabling the peripherals.
+
+>
+> Seeing all the patches that coming into the mailing lists, all of them contains multiple files patches, why should it be different here ?
+>
+>>
+>> Secondly, our policy is to not have a default function for generic GPIO pins.
+>>
+>
+> If this is the official policy, then why so many DTS currently present are not following the same rules, such sun6i-a31-hummingbird, sun7i-a20-olinuxino-micro, sun7i-a20-mk808c, sun7i-a20-cubietruck and so many others ?
+
+Perhaps they were enabled before the policy was enacted, or it just
+slipped through. I
+contributed to a few. But for many boards we might not have schematics
+or the actual
+device to check.
+
+Also, other boards having such settings is not a good argument.
+
+> I thought the rules were there to make DTS the most default common usage definitions for most end-users in a general availability.
+> Then, if someone is really in shortage of GPIOs, they could easily turn them back to "disabled" state.
+
+How would you determine what the most common usage is for "development boards"?
+If the vendor explicitly designed the pins to be used one way, and even printed
+the description on the board, then you may have a valid argument. But even then,
+with the C.H.I.P., they are going with DT overlays.
+
+It shouldn't be hard for an end user to modify the DT. And with I2C devices, it
+is almost a requirement.
+
+
+Regards
+ChenYu
