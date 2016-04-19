@@ -1,32 +1,210 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Apr 2016 08:22:42 -0300
-Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
-In-Reply-To: <570EB2DB.20707@e-labworks.com>
-References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
- <CAOMZO5D80VWGad7Lz+Crp8on5xLJzHDXL88FBh7x8d4Mc2XKww@mail.gmail.com>
- <570EB2DB.20707@e-labworks.com>
-Message-ID: <CAOMZO5DwOa8s_tBJWpOjcxt0hj6befxjPFwVH57SOO5J5Hm5fw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 19 Apr 2016 13:22:29 +0200
+Subject: [Linaro-acpi] [PATCH V6 12/13] pci, pci-thunder-ecam: Add ACPI
+ support for ThunderX ECAM.
+In-Reply-To: <20160419111238.GA8192@xora-haswell.xora.org.uk>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-13-git-send-email-tn@semihalf.com>
+ <571607C0.10909@semihalf.com>
+ <CAGCh1+=2vufNvw7wGg=GgQ-s8cH1JQoJBq2FSSc2-b=a6Qh+2g@mail.gmail.com>
+ <20160419111238.GA8192@xora-haswell.xora.org.uk>
+Message-ID: <571614F5.2020004@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergio,
 
-On Wed, Apr 13, 2016 at 5:58 PM, Sergio Prado
-<sergio.prado@e-labworks.com> wrote:
 
-> Although the boards are similar, there are a lot of differences:
+On 19.04.2016 13:12, Graeme Gregory wrote:
+> On Tue, Apr 19, 2016 at 11:41:29AM +0100, G Gregory wrote:
+>> On 19 April 2016 at 11:26, Tomasz Nowicki <tn@semihalf.com> wrote:
+>>> On 15.04.2016 19:06, Tomasz Nowicki wrote:
+>>>>
+>>>> Passes 1.x miss PCI enhanced allocation (EA) header for fixed-BARs,
+>>>> thus these passes should use Cavium-specific config access functions
+>>>> that synthesize the missing EA capabilities.
+>>>>
+>>>> We already have DT driver which addresses errata requirements and
+>>>> allows to use special PCI config accessors. Currently this driver uses
+>>>> compatible = "cavium,pci-host-thunder-ecam" to mach against the errata.
+>>>> For ACPI case we need explicit errata number and corresponding
+>>>> DECLARE_ACPI_MCFG_FIXUP fixup code.
+>>>>
+>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>>> ---
+>>>>    arch/arm64/Kconfig                  | 14 ++++++++++++++
+>>>>    arch/arm64/include/asm/cpufeature.h |  3 ++-
+>>>>    arch/arm64/kernel/cpu_errata.c      |  8 ++++++++
+>>>>    drivers/pci/host/pci-thunder-ecam.c | 35
+>>>> +++++++++++++++++++++++++++++++++++
+>>>>    4 files changed, 59 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index 1bded87..b7614b8 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -445,6 +445,20 @@ config CAVIUM_ERRATUM_27456
+>>>>
+>>>>            If unsure, say Y.
+>>>>
+>>>> +config CAVIUM_ERRATUM_24575
+>>>> +       bool "Cavium erratum 24575: Enhanced Allocation (EA) emualaion"
+>>>> +       default y
+>>>> +       help
+>>>> +         Enable workaround for erratum 24575.
+>>>> +
+>>>> +         Early versions of the Cavium Thunder CN88XX processor are
+>>>> missing
+>>>> +         Enhanced Allocation (EA) capabilities for the fixed BAR
+>>>> addresses used
+>>>> +         by the on-SoC hardware blocks. The erratum adds config access
+>>>> +         functions that synthesize the missing EA capabilities for
+>>>> versions
+>>>> +         that are missing that information.
+>>>> +
+>>>> +         If unsure, say Y.
+>>>> +
+>>>>    endmenu
+>>>>
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/cpufeature.h
+>>>> b/arch/arm64/include/asm/cpufeature.h
+>>>> index b9b6494..a78364e 100644
+>>>> --- a/arch/arm64/include/asm/cpufeature.h
+>>>> +++ b/arch/arm64/include/asm/cpufeature.h
+>>>> @@ -35,8 +35,9 @@
+>>>>    #define ARM64_ALT_PAN_NOT_UAO                 10
+>>>>    #define ARM64_HAS_VIRT_HOST_EXTN              11
+>>>>    #define ARM64_WORKAROUND_CAVIUM_27456         12
+>>>> +#define ARM64_WORKAROUND_CAVIUM_24575          13
+>>>>
+>>>> -#define ARM64_NCAPS                            13
+>>>> +#define ARM64_NCAPS                            14
+>>>>
+>>>>    #ifndef __ASSEMBLY__
+>>>>
+>>>> diff --git a/arch/arm64/kernel/cpu_errata.c
+>>>> b/arch/arm64/kernel/cpu_errata.c
+>>>> index 06afd04..89c13d7 100644
+>>>> --- a/arch/arm64/kernel/cpu_errata.c
+>>>> +++ b/arch/arm64/kernel/cpu_errata.c
+>>>> @@ -97,6 +97,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>>>>                             (1 << MIDR_VARIANT_SHIFT) | 1),
+>>>>          },
+>>>>    #endif
+>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_24575
+>>>> +       {
+>>>> +       /* Cavium ThunderX, pass 1.x */
+>>>> +               .desc = "Cavium erratum 24575",
+>>>> +               .capability = ARM64_WORKAROUND_CAVIUM_24575,
+>>>> +               MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
+>>>> +       },
+>>>> +#endif
+>>>>          {
+>>>>          }
+>>>>    };
+>>>> diff --git a/drivers/pci/host/pci-thunder-ecam.c
+>>>> b/drivers/pci/host/pci-thunder-ecam.c
+>>>> index f67c6d7..01de697 100644
+>>>> --- a/drivers/pci/host/pci-thunder-ecam.c
+>>>> +++ b/drivers/pci/host/pci-thunder-ecam.c
+>>>> @@ -11,10 +11,14 @@
+>>>>    #include <linux/ioport.h>
+>>>>    #include <linux/of_pci.h>
+>>>>    #include <linux/of.h>
+>>>> +#include <linux/pci-acpi.h>
+>>>>    #include <linux/platform_device.h>
+>>>>
+>>>> +#include <asm/virt.h>
+>>>> +
+>>>>    #include "../ecam.h"
+>>>>
+>>>> +
+>>>>    static void set_val(u32 v, int where, int size, u32 *val)
+>>>>    {
+>>>>          int shift = (where & 3) * 8;
+>>>> @@ -376,5 +380,36 @@ static struct platform_driver thunder_ecam_driver = {
+>>>>    };
+>>>>    module_platform_driver(thunder_ecam_driver);
+>>>>
+>>>> +#ifdef CONFIG_ACPI
+>>>> +
+>>>> +static bool needs_cavium_erratum_24575(struct pci_cfg_fixup *fixup,
+>>>> +                                     struct acpi_pci_root *root)
+>>>> +{
+>>>> +       /*
+>>>> +        * We must match errata code and be hypervisor, quirk does not
+>>>> apply
+>>>> +        * for virtual machines.
+>>>> +        */
+>>>> +       return cpus_have_cap(ARM64_WORKAROUND_CAVIUM_24575) &&
+>>>> +              is_hyp_mode_available();
+>>>> +}
+>>>> +
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       0, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       1, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       2, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       3, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       10, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       11, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       12, PCI_MCFG_BUS_ANY);
+>>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
+>>>> &pci_thunder_ecam_ops,
+>>>> +                       13, PCI_MCFG_BUS_ANY);
+>>>> +#endif
+>>>> +
+>>>
+>>>
+>>> I wonder if we can identify quirk based on _DSD properties, like that:
+>>>
+>>> Name (_DSD, Package () {
+>>>          ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>>          Package () {
+>>>                  Package (2) {"cavium,pci-host-thunder-ecam", 1},
+>>>          }
+>>> })
+>>>
+>>> similar for PEM driver:
+>>>
+>>> Name (_DSD, Package () {
+>>>          ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>>          Package () {
+>>>                  Package (2) {"cavium,pci-host-thunder-pem", 1},
+>>>          }
+>>> })
+>>>
+>>> Do you think it is right thing to do?
+>>>
+>>
+>> Well if your adding new properties why not add a Cavium specific _CID?
+>>
 >
-> Marsboard -> imx6dual, no sound, sst25vf016b spi flash, 1 external sd/mmc
-> interface (sdhc2) and one eMMC (sdhc3), different PMUX config for no sdhc3,
-> no pmic, i2c1, i2c2 and i2c3 externally available, no ssi interface.
+> For clarity what I mean is something like this allowed.
 >
-> Riotboard -> imx6solo, sound (sgtl5000), no spi flash, 2 external sd/mmc
-> interface (sdhc2 and sdhc3) and one eMMC (sdhc4), pmic (pfuze100), i2c1,
-> i2c2 and i2c4 externally available, ssi interface.
+> Device (PCI0)
+> {
+>      Name (_HID, EisaId ("PNP0A08"))
+>      Name (_CID, EisaId ("PNP0A03"))
+>      Name (_HID, "CAV0666")) // Cavium Quirky Hardware
 >
-> We could certainly create a dtsi file to be shared between them, but I do
-> not know if it is worth the effort.
+>      ....
 >
-> What do you think?
+> }
+>
 
-Ok, it seems it is not worth to share a device tree between them.
+Rafael, Bjorn, what do you think?
+
+Tomasz
