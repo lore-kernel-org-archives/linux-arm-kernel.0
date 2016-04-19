@@ -1,39 +1,100 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 19 Apr 2016 16:38:14 -0500
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
-Message-ID: <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2016 23:40:38 +0200
+Subject: [PATCH V6 08/13] PCI: generic,
+ thunder: update to use generic ECAM API
+In-Reply-To: <1460740008-19489-9-git-send-email-tn@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-9-git-send-email-tn@semihalf.com>
+Message-ID: <124097091.1DmSn50Vlh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
-> Document the DT bindings for controlling ARM PL310 Power Control
-> settings.
+On Friday 15 April 2016 19:06:43 Tomasz Nowicki wrote:
+> From: Jayachandran C <jchandra@broadcom.com>
 >
-> Signed-off-by: Brad Mouring <brad.mouring@ni.com>
-
-What happened to Josh's ack?
-
-> ---
->  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
+> provide generic functions for accessing memory mapped PCI config space.
 >
-> diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> index fe0398c..c1c756e 100644
-> --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> @@ -84,6 +84,10 @@ Optional properties:
->  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
->    <1> (forcibly enable), property absent (retain settings set by
->    firmware)
-> +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
-> +  disable), <1> or property absent (forcibly enable)
-> +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
-> +  <1>  or property absent (forcibly enable)
+> The API is defined in drivers/pci/ecam.h and is written to replace the
+> API in drivers/pci/host/pci-host-common.h. The file defines a new
+> 'struct pci_config_window' to hold the information related to a PCI
+> config area and its mapping. This structure is expected to be used as
+> sysdata for controllers that have ECAM based mapping.
+>
+> Helper functions are provided to setup the mapping, free the mapping
+> and to implement the map_bus method in 'struct pci_ops'
+>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 
-What happened to "retain settings set by firmware"?
+I've taken a fresh look now at what is going on here.
 
-Rob
+> @@ -58,4 +58,9 @@ void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  /* default ECAM ops, bus shift 20, generic read and write */
+>  extern struct pci_generic_ecam_ops pci_generic_ecam_default_ops;
+>  
+> +#ifdef CONFIG_PCI_HOST_GENERIC
+> +/* for DT based pci controllers that support ECAM */
+> +int pci_host_common_probe(struct platform_device *pdev,
+> +			  struct pci_generic_ecam_ops *ops);
+> +#endif
+>  #endif
+
+This doesn't seem to belong here: just leave the declaration
+in the existing file. 
+
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 7a0780d..31d6eb5 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -82,6 +82,7 @@ config PCI_HOST_GENERIC
+>  	bool "Generic PCI host controller"
+>  	depends on (ARM || ARM64) && OF
+>  	select PCI_HOST_COMMON
+> +	select PCI_GENERIC_ECAM
+>  	help
+>  	  Say Y here if you want to support a simple generic PCI host
+>  	  controller, such as the one emulated by kvmtool.
+> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+> index e9f850f..99d99b3 100644
+> --- a/drivers/pci/host/pci-host-common.c
+> +++ b/drivers/pci/host/pci-host-common.c
+> @@ -22,27 +22,21 @@
+>  #include <linux/of_pci.h>
+>  #include <linux/platform_device.h>
+>  
+> -#include "pci-host-common.h"
+> +#include "../ecam.h"
+
+As mentioned, don't use headers from parent directories, anything
+that needs to be shared must go into include/linux, while the parts
+that are only needed in one directory should be declared there.
+
+> -static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+> +static void gen_pci_generic_unmap_cfg(void *ptr)
+> +{
+> +	pci_generic_ecam_free((struct pci_config_window *)ptr);
+> +}
+
+Why the void pointer?
+
+> +static struct pci_generic_ecam_ops pci_thunder_pem_ops = {
+> +	.bus_shift	= 24,
+> +	.init		= thunder_pem_init,
+> +	.pci_ops	= {
+> +		.map_bus	= pci_generic_ecam_map_bus,
+> +		.read		= thunder_pem_config_read,
+> +		.write		= thunder_pem_config_write,
+> +	}
+> +};
+
+Adding the callback pointer for init here and yet another structure
+pci_config_window really seems to go too far with the number of
+abstraction levels.
+
+I think here it makes much more sense to just implement ECAM pci_ops
+in ACPI separately, as the implementation really trivial to start with,
+and all the complexity comes just from trying to share it with other
+stuff. Doesn't ACPI already have an ECAM implementation for x86
+that you could simply use?
+
+	Arnd
