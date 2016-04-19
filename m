@@ -1,51 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 19 Apr 2016 15:21:39 +0900
-Subject: Problem with 4.6-rc2
-In-Reply-To: <5715279B.9060806@free.fr>
-References: <57150A3D.6020500@free.fr> <57152224.5080003@hurleysoftware.com>
- <5715279B.9060806@free.fr>
-Message-ID: <20160419062139.GA7574@kroah.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 19 Apr 2016 08:27:10 +0200
+Subject: [PATCH] drm/rockchip: support non-iommu buffer path
+In-Reply-To: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
+References: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <2221474.O4M7g09IWn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 08:29:47PM +0200, Mason wrote:
-> On 18/04/2016 20:06, Peter Hurley wrote:
+Am Dienstag, 19. April 2016, 10:19:32 schrieb Mark Yao:
+> Some rockchip vop not support iommu, need use non-iommu
+> buffer for it. And if we get iommu issues, we can compare
+> the issues with non-iommu path, the would help the debug.
 > 
-> > On 04/18/2016 09:24 AM, Mason wrote:
-> >
-> >> I'm running into this panic. I will take a closer look tomorrow.
-> >> Any ideas?
-> > 
-> > commit 8d2acdb9fc3a544ab0442634531834d6007b5467
-> > Author: Jean Delvare <jdelvare@suse.de>
-> > Date:   Mon Feb 22 09:00:39 2016 +0100
-> > 
-> >     serial: 8250: Add hardware dependency to RT288X option
-> >     
-> >     Kconfig option SERIAL_8250_RT288X seems to be only relevant on MIPS
-> >     platforms, so do not present it on other architectures, unless
-> >     build-testing.
-> >     
-> >     Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> >     Cc: Mans Rullgard <mans@mansr.com>
-> >     Cc: Jiri Slaby <jslaby@suse.com>
-> >     Acked-by: John Crispin <blogic@openwrt.org>
-> >     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > 
-> > Not sure why Greg picked this up over my objections though
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   65
+> +++++++++++++++++++-------- 1 file changed, 47 insertions(+), 18
+> deletions(-)
 > 
-> Peter,
-> 
-> Thanks for pointing out the problem.
-> 
-> Greg,
-> 
-> My ARM-based SoC uses this hardware (Palmchip BK-3103) and it
-> now panics on boot.
-> 
-> Can we revert 8d2acdb9fc3a in time for v4.7?
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c index f556a8f..90729c0 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
 
-Now reverted in time for 4.6, sorry about this.
+[...]
 
-greg k-h
+> @@ -497,6 +514,18 @@ static int rockchip_drm_platform_probe(struct
+> platform_device *pdev) continue;
+>  		}
+> 
+> +		iommu = of_parse_phandle(port->parent, "iommus", 0);
+> +		if (!iommu || !of_device_is_available(iommu->parent)) {
+> +			dev_warn(dev, "No available iommu found for %s\n",
+> +				 port->parent->full_name);
+> +			dev_warn(dev, "Force non-iommu buffer for all crtc\n");
+
+As stated in the patch-description, this is somewhat common for _some_ vops 
+[like the Cortex-A9s I'm still hoping to support at some point in the future 
+:-D ], so this should probably be either a dev_dbg or a dev_info as maximum 
+and also condensed into one line of output like:
+
+	dev_dbg(dev, "no iommu attached for %s, using non-iommu buffers\n",
+			  port->parent->full_name);
+
+
+Heiko
