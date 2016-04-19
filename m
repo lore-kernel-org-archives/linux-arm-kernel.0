@@ -1,130 +1,121 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 Apr 2016 18:08:09 +0100
-Subject: [PATCH] drivers/perf: arm-pmu: fix RCU usage on resume from idle
- states
-Message-ID: <1461085689-2893-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 19 Apr 2016 17:13:02 +0000
+Subject: [PATCH v7 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
+ 2/3: msi changes
+Message-ID: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
-added code in the arm perf infrastructure that allows the kernel to
-save/restore perf counters whenever the CPU enters a low-power idle
-state. The kernel saves/restores the counters for each active event
-through the armpmu_{stop/start} ARM pmu API, so that the idle state
-enter/exit power cycle is emulated through pmu start/stop operations
-for each event in use.
+This series implements the MSI address mapping/unmapping in the MSI layer.
+IOMMU binding happens on pci_enable_msi since this function can sleep and
+return errors. On msi_domain_set_affinity, msi_domain_(de)activate, which
+are not allowed to sleep, we simply look for the already existing binding.
 
-However, calling armpmu_start() for each active event on power up
-executes code that requires RCU locking (perf_event_update_userpage())
-to be functional, so, given that the core may call the CPU_PM notifiers
-while running the idle thread in an quiescent RCU state this is not
-allowed as detected through the following splat when kernel is run with
-CONFIG_PROVE_LOCKING enabled:
+A new MSI domain info flag value is introduced to report whether the msi
+domain implements IRQ remapping. GIC v3 ITS is the first MSI controller
+advertising it. This flag value will be used by VFIO subsystem to
+determine whether MSI forwarding is safe.
 
-[   49.293286]
-[   49.294761] ===============================
-[   49.298895] [ INFO: suspicious RCU usage. ]
-[   49.303031] 4.6.0-rc3+ #421 Not tainted
-[   49.306821] -------------------------------
-[   49.310956] include/linux/rcupdate.h:872 rcu_read_lock() used
-illegally while idle!
-[   49.318530]
-[   49.318530] other info that might help us debug this:
-[   49.318530]
-[   49.326451]
-[   49.326451] RCU used illegally from idle CPU!
-[   49.326451] rcu_scheduler_active = 1, debug_locks = 0
-[   49.337209] RCU used illegally from extended quiescent state!
-[   49.342892] 2 locks held by swapper/2/0:
-[   49.346768]  #0:  (cpu_pm_notifier_lock){......}, at:
-[<ffffff8008163c28>] cpu_pm_exit+0x18/0x80
-[   49.355492]  #1:  (rcu_read_lock){......}, at: [<ffffff800816dc38>]
-perf_event_update_userpage+0x0/0x260
+More details & context can be found at:
+http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
 
-This patch refactors the perf CPU_PM notifiers to add a boolean
-flag to the function updating the counters event period, so that the
-userpage update can be skipped when resuming from low-power whilst
-keeping correct save/restore functionality for the running events.
+Best Regards
 
-As a side effect the kernel, while resuming from low-power with
-perf events enabled, runs with a userspace view of active counters that
-is not up-to-date with the kernel one, but since the core power down is
-not really a PMU event start/stop this can be considered acceptable and
-the userspace event snapshot will update the user view of counters
-on subsequent perf event updates requested by either the perf API
-or event counters overflow-triggered interrupts.
+Eric
 
-Fixes: da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reported-by: James Morse <james.morse@arm.com>
-Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- drivers/perf/arm_pmu.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+Applies on top of PART 1/3.
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 32346b5..4343984 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -101,7 +101,8 @@ armpmu_map_event(struct perf_event *event,
- 	return -ENOENT;
- }
- 
--int armpmu_event_set_period(struct perf_event *event)
-+static int __armpmu_event_set_period(struct perf_event *event,
-+				     bool update_user)
- {
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
-@@ -136,11 +137,17 @@ int armpmu_event_set_period(struct perf_event *event)
- 
- 	armpmu->write_counter(event, (u64)(-left) & 0xffffffff);
- 
--	perf_event_update_userpage(event);
-+	if (update_user)
-+		perf_event_update_userpage(event);
- 
- 	return ret;
- }
- 
-+int armpmu_event_set_period(struct perf_event *event)
-+{
-+	return __armpmu_event_set_period(event, true);
-+}
-+
- u64 armpmu_event_update(struct perf_event *event)
- {
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
-@@ -733,12 +740,21 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
- 			/*
- 			 * Stop and update the counter
- 			 */
--			armpmu_stop(event, PERF_EF_UPDATE);
-+			armpmu->disable(event);
-+			armpmu_event_update(event);
- 			break;
- 		case CPU_PM_EXIT:
- 		case CPU_PM_ENTER_FAILED:
--			 /* Restore and enable the counter */
--			armpmu_start(event, PERF_EF_RELOAD);
-+			 /*
-+			  * Restore and enable the counter;
-+			  * user space updates require RCU locking
-+			  * that is disallowed when a CPU is in an
-+			  * idle quiescent state, therefore set
-+			  * update_user bool flag to false so that the
-+			  * user space counters update is skipped.
-+			  */
-+			__armpmu_event_set_period(event, false);
-+			armpmu->enable(event);
- 			break;
- 		default:
- 			break;
+Git: complete series available at
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc4-pcie-passthrough-v7
+
+History:
+
+v6 -> v7:
+- do alloc/map handling on pci_enable_msi and search on msi_(de)domain_activate
+- add msi_doorbell_info callback in irq-chip to retrieve the characteristics
+  of doorbells
+
+RFC v5 -> patch v6:
+- split to ease the review process
+- rebase on default iommu domain code (irq_data_to_msi_mapping_domain
+  checks IOMMU_DOMAIN_DMA type)
+- fix unmap sequence on msi_domain_set_affinity (reported by Marc):
+  unmap the previous doorbell when the new one has been mapped & written to
+  the device, ie. irq_chip_write_msi_msg.
+- "msi: msi_compose wrapper removed" following change above
+- add size parameter to iommu_get_reserved_iova API following Marc's request
+
+RFC v4 -> RFC v5:
+- take into account Thomas' comments on MSI related patches
+  - split "msi: IOMMU map the doorbell address when needed"
+  - increase readability and add comments
+  - fix style issues
+ - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+ - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+ - fix compilation issue with CONFIG_IOMMU API unset
+ - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+
+RFC v3 -> v4:
+- Move doorbell mapping/unmapping in msi.c
+- fix ref count issue on set_affinity: in case of a change in the address
+  the previous address is decremented
+- doorbell map/unmap now is done on msi composition. Should allow the use
+  case for platform MSI controllers
+- create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+  to reserved IOVA management (looking like dma-iommu glue)
+- series reordering to ease the review:
+  - first part is related to IOMMU
+  - second related to MSI sub-system
+  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+- expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+  [this partially addresses Marc's comments on iommu_get/put_single_reserved
+   size/alignment problematic - which I did not ignore - but I don't know
+   how much I can do at the moment]
+
+RFC v2 -> RFC v3:
+- should fix wrong handling of some CONFIG combinations:
+  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+- fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+
+PATCH v1 -> RFC v2:
+- reverted to RFC since it looks more reasonable ;-) the code is split
+  between VFIO, IOMMU, MSI controller and I am not sure I did the right
+  choices. Also API need to be further discussed.
+- iova API usage in arm-smmu.c.
+- MSI controller natively programs the MSI addr with either the PA or IOVA.
+  This is not done anymore in vfio-pci driver as suggested by Alex.
+- check irq remapping capability of the group
+
+RFC v1 [2] -> PATCH v1:
+- use the existing dma map/unmap ioctl interface with a flag to register a
+  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+- a single reserved IOVA contiguous region now is allowed
+- use of an RB tree indexed by PA to store allocated reserved slots
+- use of a vfio_domain iova_domain to manage iova allocation within the
+  window provided by the userspace
+- vfio alloc_map/unmap_free take a vfio_group handle
+- vfio_group handle is cached in vfio_pci_device
+- add ref counting to bindings
+- user modality enabled at the end of the series
+
+
+Eric Auger (8):
+  genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
+  irqchip/gic-v3-its: ITS advertises MSI_FLAG_IRQ_REMAPPING
+  genirq/msi: export msi_get_domain_info
+  genirq/msi: msi_compose wrapper
+  genirq/irq: introduce msi_doorbell's structs and related callback
+  irqchip/gicv2m: implement msi_doorbell_info callback
+  genirq/msi: map/unmap the MSI doorbells on msi_domain_alloc/free_irqs
+  genirq/msi: use the MSI doorbell's IOVA when requested
+
+ drivers/irqchip/irq-gic-v2m.c                 |  32 ++++++-
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   3 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c |   3 +-
+ include/linux/irq.h                           |  26 +++++-
+ include/linux/msi.h                           |   2 +
+ kernel/irq/msi.c                              | 119 +++++++++++++++++++++++---
+ 6 files changed, 166 insertions(+), 19 deletions(-)
+
 -- 
-2.6.4
+1.9.1
