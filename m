@@ -1,47 +1,29 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 19 Apr 2016 17:18:33 -0400
-Subject: [PATCH v1] ARM: dts: omap3-n900: Specify peripherals LDO
- regulators initial mode
-In-Reply-To: <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <20160417122933.GA8093@earth>
- <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <CABxcv=kT5TM1dtK-GXH+XM-DtWpraReirootKSLddQPz4ft1EA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Apr 2016 22:19:58 +0100
+Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
+In-Reply-To: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20160419211958.GD19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ivaylo,
+On Tue, Apr 19, 2016 at 09:45:14PM +0200, Uwe Kleine-K?nig wrote:
+> With the SION bit set a pin can be read as GPIO even though it's not muxed
+> as GPIO. This is useful at times. The downside however is that the signal
+> is not only routed to the GPIO IP but also all other IPs that can make use
+> of the pin. This resulted in more than one issue for me in the past. Things
+> like spi transfers that result in usb reenumeration or setting a GPIO to a
+> value that triggers an RTS irq for an UART.
 
-On Sun, Apr 17, 2016 at 10:29 AM, Ivaylo Dimitrov
-<ivo.g.dimitrov.75@gmail.com> wrote:
-> Without that, regulators are left in the mode last set by the bootloader or
-> by the kernel the device was rebooted from. This leads to various problems,
-> like non-working peripherals.
->
-> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-> ---
->  arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index b3c26a9..d9e2d9c 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -329,6 +329,7 @@
->         regulator-name = "V28";
->         regulator-min-microvolt = <2800000>;
->         regulator-max-microvolt = <2800000>;
-> +       regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+Isn't SION required for all GPIOs such that reading the value of a GPIO
+pin returns the actual state of the pin, not the output value written
+to it?
 
-As Sebastian said, it would be nice if instead of magic numbers +
-comments, we have defines for the modes by moving the definitions from
-include/linux/i2c/twl.h to include/dt-bindings/regulator/ so they can
-be used by DTS.
+What about the ethernet pins?  I know that on iMX6, SION is required for
+correct functionality of certain phy clocking modes, and I wouldn't be
+surprised if this was true in earlier designs as well.
 
-But that can be done as a follow-up though, to avoid adding a
-dependency between the regulator and arm-soc subsystems to get this
-fix applied.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
-Javier
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
