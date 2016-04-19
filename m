@@ -1,52 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Apr 2016 16:37:54 +0200
-Subject: [PATCH] pinctrl: at91-pio4: fix pull-up/down logic
-In-Reply-To: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20160419143754.GB29844@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 Apr 2016 15:39:44 +0100
+Subject: [PATCH v7 01/16] arm64: KVM: Register CPU notifiers when the
+ kernel runs at HYP
+In-Reply-To: <5715F346.2060804@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-2-git-send-email-james.morse@arm.com>
+ <20160418161037.GE18257@e104818-lin.cambridge.arm.com>
+ <5715F346.2060804@arm.com>
+Message-ID: <57164330.10305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/2016 at 16:03:45 +0200, Ludovic Desroches wrote :
-> The default configuration of a pin is often with a value in the
-> pull-up/down field at chip reset. So, even if the internal logic of the
-> controller prevents writing a configuration with pull-up and pull-down at
-> the same time, we must ensure explicitly this condition before writing the
-> register.
+On 19/04/16 09:58, James Morse wrote:
+> Hi Catalin,
 > 
-> This was leading to a pull-down condition not taken into account for
-> instance.
+> On 18/04/16 17:10, Catalin Marinas wrote:
+>> On Fri, Apr 01, 2016 at 05:53:25PM +0100, James Morse wrote:
+>>> When the kernel is running at EL2, it doesn't need init_hyp_mode() to
+>>> configure page tables for HYP. This function also registers the CPU
+>>> hotplug and lower power notifiers that cause HYP to be re-initialised
+>>> after the CPU has been reset.
+>>>
+>>> To avoid losing the register state that controls stage2 translation, move
+>>> the registering of these notifiers into init_subsystems(), and add a
+>>> is_kernel_in_hyp_mode() path to each callback.
+>>>
+>>> Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
+>>> Signed-off-by: James Morse <james.morse@arm.com>
+>>
+>> To the best of my knowledge of the hyp code:
+>>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Fixes: 776180848b57 ("pinctrl: introduce driver for Atmel PIO4 controller")
-> Cc: stable at vger.kernel.org #v4.4 and later
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Thanks,
+> 
+>> Since it has a Fixes tag, does this need to be picked for 4.6 or a Cc:
+>> stable if it goes in later?
+> 
+> This patch was sent as a separate fix for rc1, its here too so that this series
+> can be applied directly from the list without conflicts after rc2.
 
-> ---
->  drivers/pinctrl/pinctrl-at91-pio4.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> index 629b6fe..75093d7 100644
-> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> @@ -722,9 +722,11 @@ static int atmel_conf_pin_config_group_set(struct pinctrl_dev *pctldev,
->  			break;
->  		case PIN_CONFIG_BIAS_PULL_UP:
->  			conf |= ATMEL_PIO_PUEN_MASK;
-> +			conf &= (~ATMEL_PIO_PDEN_MASK);
->  			break;
->  		case PIN_CONFIG_BIAS_PULL_DOWN:
->  			conf |= ATMEL_PIO_PDEN_MASK;
-> +			conf &= (~ATMEL_PIO_PUEN_MASK);
->  			break;
->  		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
->  			if (arg == 0)
-> -- 
-> 2.5.0
-> 
+For the record, this has been merged in 4.6-rc3.
 
+Thanks,
+
+	M.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
