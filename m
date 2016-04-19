@@ -1,29 +1,17 @@
-From: stanislav.meduna@nxtcontrol.com (Stanislav Meduna)
-Date: Tue, 19 Apr 2016 20:28:06 +0200
-Subject: i.MX53 restart via watchdog does not work
-In-Reply-To: <CAOMZO5AxUcjDLo6afdFTkZJv9QnsUvHWwcJmsno3o52DqipN-Q@mail.gmail.com>
-References: <57111429.6040802@nxtcontrol.com>
- <CAOMZO5DHTm2iSyGF1CcwuWxzmwbadttKmtVJQePd60A6a0jsgA@mail.gmail.com>
- <571654B0.6040203@nxtcontrol.com>
- <CAOMZO5AxUcjDLo6afdFTkZJv9QnsUvHWwcJmsno3o52DqipN-Q@mail.gmail.com>
-Message-ID: <571678B6.4010203@nxtcontrol.com>
+From: martinayotte@gmail.com (martinayotte at gmail.com)
+Date: Tue, 19 Apr 2016 11:30:03 -0700 (PDT)
+Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS +
+ add new I2C entries for AllWinner H3 DTS
+In-Reply-To: <16057207-027e-4709-b5c2-61be199e5cb5@googlegroups.com>
+References: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
+ <CAGb2v67e_F1=VaY7ovzW7Whc2ToJU3YabeT-orrLTb0Pouhw_Q@mail.gmail.com>
+ <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
+ <CAGb2v65dsjbpGUrJXFG35cLGnFA6uDxtgMqupBN97=8XNnO68Q@mail.gmail.com>
+ <16057207-027e-4709-b5c2-61be199e5cb5@googlegroups.com>
+Message-ID: <1c76eafd-5003-4a0f-b9c8-38f326a7322d@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/19/2016 8:18 PM, Fabio Estevam wrote:
+Oupps ! sorry for again have a line length exceeding 80 chars.
 
-> I am booting via NFS, so not eMMC related.
-
-Where are you bootstrapping the bootloader from?
-
-I am also not using the eMMC at all, I was tftp-booting
-a minimal initramfs image with just rdinit=/bin/sh (the fastest
-way to play with reboots).
-
-In my case the bootloader (U-Boot) itself is loaded from
-the eMMC. To me it looks the shutdown code somehow brings
-the board to a state where the processor itself can't
-boot the bootloader.
-
--- 
-                                  Stano
+Regards,
