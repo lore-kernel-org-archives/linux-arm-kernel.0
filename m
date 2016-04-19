@@ -1,147 +1,45 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 19 Apr 2016 14:20:40 -0400
-Subject: [PATCH 1/2] ARM: LPC32xx: defconfig update
-In-Reply-To: <1460950283-25053-2-git-send-email-vz@mleia.com>
-References: <1460950283-25053-1-git-send-email-vz@mleia.com>
- <1460950283-25053-2-git-send-email-vz@mleia.com>
-Message-ID: <1461090040.2877.3.camel@localhost>
+From: martinayotte@gmail.com (martinayotte at gmail.com)
+Date: Tue, 19 Apr 2016 11:27:16 -0700 (PDT)
+Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS +
+ add new I2C entries for AllWinner H3 DTS
+In-Reply-To: <CAGb2v65dsjbpGUrJXFG35cLGnFA6uDxtgMqupBN97=8XNnO68Q@mail.gmail.com>
+References: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
+ <CAGb2v67e_F1=VaY7ovzW7Whc2ToJU3YabeT-orrLTb0Pouhw_Q@mail.gmail.com>
+ <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
+ <CAGb2v65dsjbpGUrJXFG35cLGnFA6uDxtgMqupBN97=8XNnO68Q@mail.gmail.com>
+Message-ID: <16057207-027e-4709-b5c2-61be199e5cb5@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-04-18 at 06:31 +0300, Vladimir Zapolskiy wrote:
-> The change is a result of "make lpc32xx_defconfig; make savedefconfig"
-> run, a number of config options are removed:
-> 
->   CONFIG_BINFMT_AOUT=y   -- not needed, legacy
->   CONFIG_FPE_NWFPE=y     -- not needed, AEABI build
->   CONFIG_IPV6_PRIVACY=y  -- removed build option
->   CONFIG_IPV6=y          -- selected by default
->   CONFIG_MII=y           -- not needed, board phys don't select library
->   CONFIG_MTD_CHAR=y      -- removed build option
->   CONFIG_MTD_M25P80=y    -- not needed, AT25 EEPROM driver is in use
->   CONFIG_USB_PHY=y       -- selected by default
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+On Tuesday, April 19, 2016 at 11:11:37 AM UTC-4, Chen-Yu Tsai wrote:
+> Try to wrap lines to 80 characters or less.
 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Ok ! I will be more careful ...
 
-> ---
->  arch/arm/configs/lpc32xx_defconfig | 27 +++++++++------------------
->  1 file changed, 9 insertions(+), 18 deletions(-)
+> 1 change per patch. You are making 3 changes here. a) adding shared
+> pinmux settings,
+> b & c) enabling uarts and i2c busses for 2 boards.
 > 
-> diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-> index 9f56ca3..4303199 100644
-> --- a/arch/arm/configs/lpc32xx_defconfig
-> +++ b/arch/arm/configs/lpc32xx_defconfig
-> @@ -17,8 +17,6 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_BLK_DEV_BSG is not set
->  CONFIG_PARTITION_ADVANCED=y
->  CONFIG_ARCH_LPC32XX=y
-> -CONFIG_GPIO_PCA953X=y
-> -CONFIG_KEYBOARD_GPIO_POLLED=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
->  CONFIG_ZBOOT_ROM_TEXT=0x0
-> @@ -27,10 +25,8 @@ CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
->  CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
->  CONFIG_CPU_IDLE=y
-> -CONFIG_FPE_NWFPE=y
->  CONFIG_VFP=y
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-> -CONFIG_BINFMT_AOUT=y
->  CONFIG_NET=y
->  CONFIG_PACKET=y
->  CONFIG_UNIX=y
-> @@ -42,10 +38,7 @@ CONFIG_IP_PNP_BOOTP=y
->  # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
->  # CONFIG_INET_XFRM_MODE_TUNNEL is not set
->  # CONFIG_INET_XFRM_MODE_BEET is not set
-> -# CONFIG_INET_LRO is not set
->  # CONFIG_INET_DIAG is not set
-> -CONFIG_IPV6=y
-> -CONFIG_IPV6_PRIVACY=y
->  # CONFIG_WIRELESS is not set
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_DEVTMPFS=y
-> @@ -53,9 +46,7 @@ CONFIG_DEVTMPFS_MOUNT=y
->  # CONFIG_FW_LOADER is not set
->  CONFIG_MTD=y
->  CONFIG_MTD_CMDLINE_PARTS=y
-> -CONFIG_MTD_CHAR=y
->  CONFIG_MTD_BLOCK=y
-> -CONFIG_MTD_M25P80=y
->  CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_SLC_LPC32XX=y
->  CONFIG_MTD_NAND_MLC_LPC32XX=y
-> @@ -70,7 +61,6 @@ CONFIG_EEPROM_AT25=y
->  CONFIG_SCSI=y
->  CONFIG_BLK_DEV_SD=y
->  CONFIG_NETDEVICES=y
-> -CONFIG_MII=y
->  # CONFIG_NET_VENDOR_BROADCOM is not set
->  # CONFIG_NET_VENDOR_CIRRUS is not set
->  # CONFIG_NET_VENDOR_FARADAY is not set
-> @@ -91,6 +81,7 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
->  CONFIG_INPUT_EVDEV=y
->  # CONFIG_KEYBOARD_ATKBD is not set
->  CONFIG_KEYBOARD_GPIO=y
-> +CONFIG_KEYBOARD_GPIO_POLLED=y
->  CONFIG_KEYBOARD_LPC32XX=y
->  # CONFIG_INPUT_MOUSE is not set
->  CONFIG_INPUT_TOUCHSCREEN=y
-> @@ -99,8 +90,8 @@ CONFIG_SERIO_LIBPS2=y
->  # CONFIG_LEGACY_PTYS is not set
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
-> -CONFIG_SERIAL_HS_LPC32XX=y
->  CONFIG_SERIAL_OF_PLATFORM=y
-> +CONFIG_SERIAL_HS_LPC32XX=y
->  # CONFIG_HW_RANDOM is not set
->  CONFIG_I2C=y
->  CONFIG_I2C_CHARDEV=y
-> @@ -108,19 +99,20 @@ CONFIG_I2C_PNX=y
->  CONFIG_SPI=y
->  CONFIG_SPI_PL022=y
->  CONFIG_GPIO_SYSFS=y
-> -CONFIG_GPIO_GENERIC_PLATFORM=y
->  CONFIG_GPIO_EM=y
-> +CONFIG_GPIO_GENERIC_PLATFORM=y
->  CONFIG_GPIO_PL061=y
-> +CONFIG_GPIO_ADP5588=y
-> +CONFIG_GPIO_ADNP=y
->  CONFIG_GPIO_MAX7300=y
->  CONFIG_GPIO_MAX732X=y
-> +CONFIG_GPIO_PCA953X=y
->  CONFIG_GPIO_PCF857X=y
->  CONFIG_GPIO_SX150X=y
-> -CONFIG_GPIO_ADP5588=y
-> -CONFIG_GPIO_ADNP=y
-> +CONFIG_GPIO_74X164=y
->  CONFIG_GPIO_MAX7301=y
-> -CONFIG_GPIO_MCP23S08=y
->  CONFIG_GPIO_MC33880=y
-> -CONFIG_GPIO_74X164=y
-> +CONFIG_GPIO_MCP23S08=y
->  CONFIG_SENSORS_DS620=y
->  CONFIG_SENSORS_MAX6639=y
->  CONFIG_WATCHDOG=y
-> @@ -147,7 +139,6 @@ CONFIG_SND_DEBUG_VERBOSE=y
->  # CONFIG_SND_SPI is not set
->  CONFIG_SND_SOC=y
->  CONFIG_USB=y
-> -CONFIG_USB_PHY=y
->  CONFIG_USB_OHCI_HCD=y
->  CONFIG_USB_STORAGE=y
->  CONFIG_USB_GADGET=y
-> @@ -198,9 +189,9 @@ CONFIG_NLS_CODEPAGE_437=y
->  CONFIG_NLS_ASCII=y
->  CONFIG_NLS_ISO8859_1=y
->  CONFIG_NLS_UTF8=y
-> +CONFIG_DEBUG_INFO=y
->  # CONFIG_SCHED_DEBUG is not set
->  # CONFIG_DEBUG_PREEMPT is not set
-> -CONFIG_DEBUG_INFO=y
->  # CONFIG_FTRACE is not set
->  # CONFIG_ARM_UNWIND is not set
->  CONFIG_DEBUG_LL=y
+> You could split them into 1 dtsi patch adding the pinmux setting, and
+> then 1 for each
+> board enabling the peripherals.
+
+Fine ! I will prepare and redo a new submit with only the DTSI for now.
+
+> Perhaps they were enabled before the policy was enacted, or it just
+> slipped through. I
+> contributed to a few. But for many boards we might not have schematics
+> or the actual
+> device to check.
+
+Understood ! But sometimes things are so generic, like having uart0 and not having uart1 make it looks a bit strange. Some other times having some i2c2 because of PMIC while not having i2c0 and i2c1 is also strange.
+
+> How would you determine what the most common usage is for "development boards"?
+> If the vendor explicitly designed the pins to be used one way, and even printed
+> the description on the board, then you may have a valid argument. But even then,
+> with the C.H.I.P., they are going with DT overlays.
+> 
+> It shouldn't be hard for an end user to modify the DT. And with I2C devices, it
+> is almost a requirement.
+
+Ok ! I will look if it is easier to do the rest with overlays.
