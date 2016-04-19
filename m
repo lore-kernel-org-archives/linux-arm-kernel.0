@@ -1,48 +1,28 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Apr 2016 15:39:44 +0100
-Subject: [PATCH v7 01/16] arm64: KVM: Register CPU notifiers when the
- kernel runs at HYP
-In-Reply-To: <5715F346.2060804@arm.com>
+Date: Tue, 19 Apr 2016 15:44:25 +0100
+Subject: [PATCH v7 03/16] arm64: Cleanup SCTLR flags
+In-Reply-To: <1459529620-22150-4-git-send-email-james.morse@arm.com>
 References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-2-git-send-email-james.morse@arm.com>
- <20160418161037.GE18257@e104818-lin.cambridge.arm.com>
- <5715F346.2060804@arm.com>
-Message-ID: <57164330.10305@arm.com>
+ <1459529620-22150-4-git-send-email-james.morse@arm.com>
+Message-ID: <57164449.4060708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 09:58, James Morse wrote:
-> Hi Catalin,
+On 01/04/16 17:53, James Morse wrote:
+> From: Geoff Levand <geoff@infradead.org>
 > 
-> On 18/04/16 17:10, Catalin Marinas wrote:
->> On Fri, Apr 01, 2016 at 05:53:25PM +0100, James Morse wrote:
->>> When the kernel is running at EL2, it doesn't need init_hyp_mode() to
->>> configure page tables for HYP. This function also registers the CPU
->>> hotplug and lower power notifiers that cause HYP to be re-initialised
->>> after the CPU has been reset.
->>>
->>> To avoid losing the register state that controls stage2 translation, move
->>> the registering of these notifiers into init_subsystems(), and add a
->>> is_kernel_in_hyp_mode() path to each callback.
->>>
->>> Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
->>> Signed-off-by: James Morse <james.morse@arm.com>
->>
->> To the best of my knowledge of the hyp code:
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> We currently have macros defining flags for the arm64 sctlr registers in
+> both kvm_arm.h and sysreg.h.  To clean things up and simplify move the
+> definitions of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any
+> SCTLR_EL1 or SCTLR_EL2 flags that are common to both registers to be
+> SCTLR_ELx, with 'x' indicating a common flag, and fixup all files to
+> include the proper header or to use the new macro names.
 > 
-> Thanks,
-> 
->> Since it has a Fixes tag, does this need to be picked for 4.6 or a Cc:
->> stable if it goes in later?
-> 
-> This patch was sent as a separate fix for rc1, its here too so that this series
-> can be applied directly from the list without conflicts after rc2.
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> [Restored pgtable-hwdef.h include]
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-For the record, this has been merged in 4.6-rc3.
-
-Thanks,
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 -- 
