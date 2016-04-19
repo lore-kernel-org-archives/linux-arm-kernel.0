@@ -1,22 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Apr 2016 07:42:17 -0300
-Subject: [PATCH 3/3] nvmem: imx-ocotp: handling clock
-In-Reply-To: <1461054788-339-3-git-send-email-van.freenix@gmail.com>
-References: <1461054788-339-1-git-send-email-van.freenix@gmail.com>
- <1461054788-339-3-git-send-email-van.freenix@gmail.com>
-Message-ID: <CAOMZO5CBeMn_m79vUzmk21nA1s+COiFoqfywXUJ2mOS38wBAdg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 19 Apr 2016 13:52:54 +0300
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+Message-ID: <57160E06.1000806@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peng,
+Hello.
 
-On Tue, Apr 19, 2016 at 5:33 AM, Peng Fan <van.freenix@gmail.com> wrote:
+On 4/19/2016 10:12 AM, Olliver Schinagl wrote:
 
-> @@ -46,11 +48,15 @@ static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
->         if (count > (priv->nregs - index))
->                 count = priv->nregs - index;
+> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+
+    scripts/checkpatch.pl now enforces certain commit citing style, the commit 
+summary should be specified too.
+
+> device as to having an broken HPI implementation. After talking some
+> with Hans, we now think it is actually the mmc controller that can be
+> broken and not support broken HPI's.
 >
-> +       clk_prepare_enable(priv->clk);
+> This patch adds a new capability, mmc-broken-hpi, which allows us to
+> mark a broken hpi implementation on the host level.
+>
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+[...]
 
-clk_prepare_enable() may fail, so you should better check its return
-value and propagate it in the case of error.
+MBR, Sergei
