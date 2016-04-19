@@ -1,68 +1,80 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Tue, 19 Apr 2016 18:33:04 +0800
-Subject: Applied "ASoC: mediatek: Add second I2S on mt8173-rt5650
- machine driver" to the asoc tree
-In-Reply-To: <E1asSQc-0004NY-44@debutante>
-References: <E1asSQc-0004NY-44@debutante>
-Message-ID: <1461061984.28704.8.camel@mtksdaap41>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Tue, 19 Apr 2016 12:35:10 +0200
+Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <CAEiAFz3eCsX3VoNus_Rq+En5zuB8fAxNCbC3ktw2NqLKwC=_kA@mail.gmail.com>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <CAEiAFz3eCsX3VoNus_Rq+En5zuB8fAxNCbC3ktw2NqLKwC=_kA@mail.gmail.com>
+Message-ID: <20160419103510.GA5499@wintermute>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Mark,
 
-On Tue, 2016-04-19 at 17:58 +0800, Mark Brown wrote:
-> The patch
+are these patches still queued or should I repost them?
+
+--Jan
+
+On Mon, Apr 04, 2016 at 01:03:13PM +0200, Jan Glauber wrote:
+> Hi Mark,
 > 
->    ASoC: mediatek: Add second I2S on mt8173-rt5650 machine driver
-> 
-> has been applied to the asoc tree at
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-> 
-> All being well this means that it will be integrated into the linux-next
-> tree (usually sometime in the next 24 hours) and sent to Linus during
-> the next merge window (or sooner if it is a bug fix), however if
-> problems are discovered then the patch may be dropped or reverted.  
-> 
-> You may get further e-mails resulting from automated or manual testing
-> and review of the tree, please engage with people reporting problems and
-> send followup patches addressing any issues that are reported if needed.
-> 
-> If any updates are required or you are submitting further changes they
-> should be sent as incremental updates against current git, existing
-> patches will not be replaced.
-> 
-> Please add any relevant lists and maintainers to the CCs when replying
-> to this mail.
+> can you have a look at these patches?
 > 
 > Thanks,
-> Mark
+> Jan
 > 
-> From 0beeb8d0b434b8b007ac8058fb2cac5997fff6df Mon Sep 17 00:00:00 2001
-> From: PC Liao <pc.liao@mediatek.com>
-> Date: Tue, 19 Apr 2016 17:46:12 +0800
-> Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
->  driver
+> 2016-03-09 17:21 GMT+01:00 Jan Glauber <jglauber@cavium.com>:
 > 
-> This patch adds second I2S connection to rt5650 codec for capture path on
-> mt8173-rt5650 machine driver.
+>     This patch series provides access to various counters on the ThunderX SOC.
 > 
-> This patch depends on [1], because snd_soc_of_get_dai_name() fix the property
-> name "sound-dai". This patch needs to change name to use, so export
-> snd_soc_get_dai_name() which is included in snd_soc_of_get_dai_name().
+>     For details of the uncore implementation see patch #1.
 > 
-> [1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
-> snd_soc_get_dai_name")
+>     Patches #2-5 add the various ThunderX specific PMUs.
 > 
-> Signed-off-by: PC Liao <pc.liao@mediatek.com>
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-
-Thanks for your approval.
-But this patch depends on [1].
-I think it also needs to apply [1], otherwise this patch will build
-fail.
-Or, do I need to upload new version again?
-Thanks!  
-
-[1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
-snd_soc_get_dai_name")
+>     As suggested I've put the files under drivers/perf/uncore. I would
+>     prefer this location over drivers/bus because not all of the uncore
+>     drivers are bus related.
+> 
+>     Changes to v1:
+>     - Added NUMA support
+>     - Fixed CPU hotplug by pmu migration
+>     - Moved files to drivers/perf/uncore
+>     - Removed OCX FRC and LNE drivers, these will fit better into a edac driver
+>     - improved comments abount overflow interrupts
+>     - removed max device limit
+>     - trimmed include files
+> 
+>     Feedback welcome!
+>     Jan
+> 
+>     -------------------------------------------------
+> 
+>     Jan Glauber (5):
+>     ? arm64/perf: Basic uncore counter support for Cavium ThunderX
+>     ? arm64/perf: Cavium ThunderX L2C TAD uncore support
+>     ? arm64/perf: Cavium ThunderX L2C CBC uncore support
+>     ? arm64/perf: Cavium ThunderX LMC uncore support
+>     ? arm64/perf: Cavium ThunderX OCX TLK uncore support
+> 
+>     ?drivers/perf/Makefile? ? ? ? ? ? ? ? ? ? ? ?|? ?1 +
+>     ?drivers/perf/uncore/Makefile? ? ? ? ? ? ? ? |? ?5 +
+>     ?drivers/perf/uncore/uncore_cavium.c? ? ? ? ?| 314 +++++++++++++++
+>     ?drivers/perf/uncore/uncore_cavium.h? ? ? ? ?|? 95 +++++
+>     ?drivers/perf/uncore/uncore_cavium_l2c_cbc.c | 237 +++++++++++
+>     ?drivers/perf/uncore/uncore_cavium_l2c_tad.c | 600
+>     ++++++++++++++++++++++++++++
+>     ?drivers/perf/uncore/uncore_cavium_lmc.c? ? ?| 196 +++++++++
+>     ?drivers/perf/uncore/uncore_cavium_ocx_tlk.c | 380 ++++++++++++++++++
+>     ?8 files changed, 1828 insertions(+)
+>     ?create mode 100644 drivers/perf/uncore/Makefile
+>     ?create mode 100644 drivers/perf/uncore/uncore_cavium.c
+>     ?create mode 100644 drivers/perf/uncore/uncore_cavium.h
+>     ?create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_cbc.c
+>     ?create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_tad.c
+>     ?create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
+>     ?create mode 100644 drivers/perf/uncore/uncore_cavium_ocx_tlk.c
+>    
+>     --
+>     1.9.1
+> 
+> 
+> 
