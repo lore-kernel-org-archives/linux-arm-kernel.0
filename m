@@ -1,103 +1,99 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 19 Apr 2016 14:41:52 +0200
-Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
-In-Reply-To: <571624EF.9060707@ti.com>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
- <5714F011.5080409@ti.com> <20160418170518.363f732d@bbrezillon>
- <57160862.90603@ti.com> <20160419132206.5d909f7e@bbrezillon>
- <571624EF.9060707@ti.com>
-Message-ID: <20160419144152.30a4027d@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2016 14:44:21 +0200
+Subject: [PATCH v2] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <1461064248-31288-1-git-send-email-navam@xilinx.com>
+References: <1461064248-31288-1-git-send-email-navam@xilinx.com>
+Message-ID: <7208820.t2EJm8R9jW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Apr 2016 15:30:39 +0300
-Roger Quadros <rogerq@ti.com> wrote:
+On Tuesday 19 April 2016 16:40:48 Nava kishore Manne wrote:
+> This patch updates the driver to support 64-bit DMA
+> addressing.
+> 
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> ---
+> Changes for v2:
+> 		-Added dma-ranges property in device tree as suggested by Arnd Bergmann.
+>                 -Modified the driver code based on the xlnx,addrwidth.
+>  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
+>  drivers/usb/gadget/udc/udc-xilinx.c                | 39 ++++++++++++++++++++--
+>  2 files changed, 40 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> index 47b4e39..850d792 100644
+> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> @@ -7,12 +7,15 @@ Required properties:
+>  - interrupts		: Should contain single irq line of USB2 device
+>  			  controller
+>  - xlnx,has-builtin-dma	: if DMA is included
+> -
+> +- dma-ranges: Should be as the following <dma_addr cpu_addr max_len>.
 
-> On 19/04/16 14:22, Boris Brezillon wrote:
-> > Hi Roger,
-> > 
-> > On Tue, 19 Apr 2016 13:28:50 +0300
-> > Roger Quadros <rogerq@ti.com> wrote:
-> > 
-> >>> @@ -1921,6 +1927,9 @@ static int omap_nand_probe(struct platform_device *pdev)
-> >>>  		nand_chip->ecc.correct          = omap_correct_data;
-> >>>  		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
-> >>>  		oobbytes_per_step		= nand_chip->ecc.bytes;
-> >>> +
-> >>> +		if (nand_chip->options & NAND_BUSWIDTH_16)
-> >>> +			min_oobbytes		= 1;
-> >>
-> >> Shouldn't this have been
-> >> 		if (!(nand_chip->options & NAND_BUSWIDTH_16)
-> >> 			min_oobbytes		= 1;
-> >> ?
-> > 
-> > Yep.
-> > 
-> >>
-> >>>  		break;
-> >>>  
-> >>>  	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
-> >>> @@ -2038,10 +2047,8 @@ static int omap_nand_probe(struct platform_device *pdev)
-> >>>  	}
-> >>>  
-> >>>  	/* check if NAND device's OOB is enough to store ECC signatures */
-> >>> -	min_oobbytes = (oobbytes_per_step *
-> >>> -			(mtd->writesize / nand_chip->ecc.size)) +
-> >>> -		       (nand_chip->options & NAND_BUSWIDTH_16 ?
-> >>> -			BADBLOCK_MARKER_LENGTH : 1);
-> >>> +	min_oobbytes += (oobbytes_per_step *
-> >>> +			 (mtd->writesize / nand_chip->ecc.size));
-> >>>  	if (mtd->oobsize < min_oobbytes) {
-> >>>  		dev_err(&info->pdev->dev,
-> >>>  			"not enough OOB bytes required = %d, available=%d\n",
-> >>>
-> >>
-> >> After the above changes BCH with HW ECC worked fine but BCH with SW ECC still failed.
-> >> I had to fix it up with the below patch. This is mainly because chip->ecc.steps wasn't
-> >> yet initialized before calling nand_bch_init().
-> >>
-> >> After the below patch it worked fine with bch4 (hw & sw), bch8 (hw & sw) and ham1.
-> >> I couldn't yet verify bch16 though.
-> > 
-> 
-> I just verified that bch16 works as well.
-> 
-> > Thanks for the fix, but I'd prefer fixing the bug for all soft BCH
-> > users.
-> > 
-> > Could you try this patch?
-> 
-> I tried your patch and it worked fine.
+This is not how dma-ranges is works. First of all, it is part of
+the parent node, and the addresses are not "dma" and "cpu"
+addresses but child and parent bus addresses.
 
-Thanks, I'll provide a reworked nand/next branch soon.
-BTW, is there anything to fix in my merge commit (the commit merging
-your GPMC/OMAP changes in nand/next)?
+> +- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
 
-> You will still need the below change to omap2.c
-> 
-> --
-> cheers,
-> -roger
-> 
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index 0abfba6..33c8fde 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -1715,7 +1715,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
->  	struct nand_chip *chip = mtd_to_nand(mtd);
->  	int off = BADBLOCK_MARKER_LENGTH;
+As I said before, the width is not the interesting question here,
+the compatible string is. My guess is that version 4.00.a of the
+hardware always has the registers to do 64-bit DMA, but you should
+talk to the hardware designers to figure out which versions have
+those, or if they are optional, and what other width may be supported.
+
+
+> + * xudc_write64 - write 64bit value to device registers
+> + * @addr: base addr of device registers
+> + * @offset: register offset
+> + * @val: data to be written
+> + **/
+> +static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
+> +{
+> +	lo_hi_writeq(val, addr + offset);
+> +}
+
+This is what I suggested, but on second thought I think it's still
+wrong:
+
+>   * xudc_write32 - little endian write to device registers
+>   * @addr: base addr of device registers
+>   * @offset: register offset
+> @@ -330,8 +352,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
+>  	 * destination registers and then set the length
+>  	 * into the DMA length register.
+>  	 */
+> -	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
+> -	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
+> +	if (udc->dma_addrwidth > 32) {
+> +		xudc_write64(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
+> +		xudc_write64(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
+> +	} else {
+> +		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
+> +		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
+> +	}
+
+I just noticed that write_fn() needs to be used to get the
+correct endianess. lo_hi_writeq() always assumes a little-endian
+register, so it's broken if anyone builds this device with big-endian
+registers.
+
+> @@ -2097,6 +2124,12 @@ static int xudc_probe(struct platform_device *pdev)
 >  
-> -	if (section)
-> +	if (section >= chip->ecc.steps)
->  		return -ERANGE;
+>  	udc->dma_enabled = of_property_read_bool(np, "xlnx,has-builtin-dma");
+>  
+> +	ret = of_property_read_u32(np, "xlnx,addrwidth", &udc->dma_addrwidth);
+> +	if (ret < 0)
+> +		dev_warn(&pdev->dev, "missing xlnx,addrwidth property\n");
+> +
+> +	/* Set the dma mask bits */
+> +	dma_set_mask(&pdev->dev, DMA_BIT_MASK(udc->dma_addrwidth));
 
-Sorry but I don't get why we need that one. Don't we have a single
-oobfree section starting at the end of the ECC sections?
+You have to check the return code of dma_set_mask. As I said earlier, it's
+possible that someone uses a device that has the 64-bit registers on a
+machine that has a 32-bit bus but more than 4GB of RAM. In this case,
+dma_set_mask() will fail, and you should probably fall back to the
+original method for programming the DMA address then.
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+	Arnd
