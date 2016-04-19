@@ -1,107 +1,188 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 19 Apr 2016 15:49:42 +0300
-Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
-In-Reply-To: <20160419144152.30a4027d@bbrezillon>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
- <5714F011.5080409@ti.com> <20160418170518.363f732d@bbrezillon>
- <57160862.90603@ti.com> <20160419132206.5d909f7e@bbrezillon>
- <571624EF.9060707@ti.com> <20160419144152.30a4027d@bbrezillon>
-Message-ID: <57162966.9080205@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 19 Apr 2016 13:55:02 +0100
+Subject: [PATCH V2 07/15] coresight: tmc: allocating memory when needed
+In-Reply-To: <1460483692-25061-8-git-send-email-mathieu.poirier@linaro.org>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <57162AA6.3030605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 15:41, Boris Brezillon wrote:
-> On Tue, 19 Apr 2016 15:30:39 +0300
-> Roger Quadros <rogerq@ti.com> wrote:
-> 
->> On 19/04/16 14:22, Boris Brezillon wrote:
->>> Hi Roger,
->>>
->>> On Tue, 19 Apr 2016 13:28:50 +0300
->>> Roger Quadros <rogerq@ti.com> wrote:
->>>
->>>>> @@ -1921,6 +1927,9 @@ static int omap_nand_probe(struct platform_device *pdev)
->>>>>  		nand_chip->ecc.correct          = omap_correct_data;
->>>>>  		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
->>>>>  		oobbytes_per_step		= nand_chip->ecc.bytes;
->>>>> +
->>>>> +		if (nand_chip->options & NAND_BUSWIDTH_16)
->>>>> +			min_oobbytes		= 1;
->>>>
->>>> Shouldn't this have been
->>>> 		if (!(nand_chip->options & NAND_BUSWIDTH_16)
->>>> 			min_oobbytes		= 1;
->>>> ?
->>>
->>> Yep.
->>>
->>>>
->>>>>  		break;
->>>>>  
->>>>>  	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
->>>>> @@ -2038,10 +2047,8 @@ static int omap_nand_probe(struct platform_device *pdev)
->>>>>  	}
->>>>>  
->>>>>  	/* check if NAND device's OOB is enough to store ECC signatures */
->>>>> -	min_oobbytes = (oobbytes_per_step *
->>>>> -			(mtd->writesize / nand_chip->ecc.size)) +
->>>>> -		       (nand_chip->options & NAND_BUSWIDTH_16 ?
->>>>> -			BADBLOCK_MARKER_LENGTH : 1);
->>>>> +	min_oobbytes += (oobbytes_per_step *
->>>>> +			 (mtd->writesize / nand_chip->ecc.size));
->>>>>  	if (mtd->oobsize < min_oobbytes) {
->>>>>  		dev_err(&info->pdev->dev,
->>>>>  			"not enough OOB bytes required = %d, available=%d\n",
->>>>>
->>>>
->>>> After the above changes BCH with HW ECC worked fine but BCH with SW ECC still failed.
->>>> I had to fix it up with the below patch. This is mainly because chip->ecc.steps wasn't
->>>> yet initialized before calling nand_bch_init().
->>>>
->>>> After the below patch it worked fine with bch4 (hw & sw), bch8 (hw & sw) and ham1.
->>>> I couldn't yet verify bch16 though.
->>>
->>
->> I just verified that bch16 works as well.
->>
->>> Thanks for the fix, but I'd prefer fixing the bug for all soft BCH
->>> users.
->>>
->>> Could you try this patch?
->>
->> I tried your patch and it worked fine.
-> 
-> Thanks, I'll provide a reworked nand/next branch soon.
-> BTW, is there anything to fix in my merge commit (the commit merging
-> your GPMC/OMAP changes in nand/next)?
-> 
+On 12/04/16 18:54, Mathieu Poirier wrote:
+> In it's current form the TMC probe() function allocates
+> trace buffer memory at boot time, event if coresight isn't
+> used.  This is highly inefficient since trace buffers can
+> occupy a lot of memory that could be used otherwised.
+>
+> This patch allocates trace buffers on the fly, when the
+> coresight subsystem is solicited.  Allocated buffers are
+> released when traces are read using the device descriptors
+> under /dev.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 85 +++++++++++++++++++++++--
+>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 83 +++++++++++++++++++++++-
+>   drivers/hwtracing/coresight/coresight-tmc.c     | 14 ----
+>   3 files changed, 163 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 4b8f39bd478b..7cb287ef7b9e 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -16,14 +16,12 @@
+>    */
+>
+>   #include <linux/coresight.h>
+> +#include <linux/slab.h>
+>   #include "coresight-priv.h"
+>   #include "coresight-tmc.h"
+>
+>   void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+>   {
+> -	/* Zero out the memory to help with debug */
+> -	memset(drvdata->buf, 0, drvdata->size);
+> -
+>   	CS_UNLOCK(drvdata->base);
+>
+>   	/* Wait for TMCSReady bit to be set */
+> @@ -110,19 +108,68 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+>
+>   static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+>   {
+> +	bool allocated = false;
 
-I just replied in the other thread that the conflict resolution is fine.
+nit: does "used" or buf_used sound more suitable than allocated ?
 
->> You will still need the below change to omap2.c
->>
->> --
->> cheers,
->> -roger
->>
->> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
->> index 0abfba6..33c8fde 100644
->> --- a/drivers/mtd/nand/omap2.c
->> +++ b/drivers/mtd/nand/omap2.c
->> @@ -1715,7 +1715,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
->>  	struct nand_chip *chip = mtd_to_nand(mtd);
->>  	int off = BADBLOCK_MARKER_LENGTH;
->>  
->> -	if (section)
->> +	if (section >= chip->ecc.steps)
->>  		return -ERANGE;
-> 
-> Sorry but I don't get why we need that one. Don't we have a single
-> oobfree section starting at the end of the ECC sections?
-> 
-> 
-You are right. Nothing needs to be changed there then. Thanks :)
+> +	char *buf = NULL;
+>   	unsigned long flags;
+>   	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>
+> +	 /* This shouldn't be happening */
+> +	WARN_ON(mode != CS_MODE_SYSFS);
+> +
+> +	/*
+> +	 * If a buffer is already allocated *keep holding* the lock and
+> +	 * jump to the fast path.  Otherwise release the lock and allocate
+> +	 * memory to work with.
+> +	 */
+>   	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +	if (drvdata->buf)
+> +		goto fast_path;
+> +
+> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +
+> +	/* Allocating the memory here while outside of the spinlock */
+> +	buf = kzalloc(drvdata->size, GFP_KERNEL);
+> +	if (!buf)
+> +		return -ENOMEM;
+> +
+> +	/* Let's try again */
+> +	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +fast_path:
+>   	if (drvdata->reading) {
+>   		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +		/*
+> +		 * Free allocated memory outside of the spinlock.  There is
+> +		 * no need to assert the validity of 'buf' since calling
+> +		 * kfree(NULL) is safe.
+> +		 */
+> +		kfree(buf);
+>   		return -EBUSY;
+>   	}
 
-cheers,
--roger
+We could check do the above check, before the allocation and avoid an unnecessary
+alloc/free() if we really don't need that. And may be its better to get rid of the
+"jump to fastpath" to avoid complicating the code, by using something like :
+
+	lock();
+	if (drvdata->reading) {
+		rc = -EBUSY;
+		goto unlock_out;
+	}
+
+	if (!drvdata->buf) {
+	/* Drop the lock here before allocation and retake the lock */
+		unlock();
+		alloc();
+		lock();
+		if (!buf) {
+			rc = -ENOMEM;
+			goto unlock_out;
+		}
+	}
+...
+
+> +
+>   	tmc_etb_enable_hw(drvdata);
+>   	drvdata->enable = true;
+
+unlock_out:
+
+>   	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>
+> +	/* Free memory outside the spinlock if need be */
+> +	if (!allocated && buf)
+> +		kfree(buf);
+> +
+
+
+
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index 495540e9064d..6022ff26deba 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -16,6 +16,7 @@
+>    */
+>
+>   #include <linux/coresight.h>
+> +#include <linux/dma-mapping.h>
+>   #include "coresight-priv.h"
+>   #include "coresight-tmc.h"
+>
+> @@ -83,19 +84,69 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+>
+>   static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+>   {
+
+> +
+> +	/*
+> +	 * If a buffer is already allocated *keep holding* the lock and
+> +	 * jump to the fast path.  Otherwise release the lock and allocate
+> +	 * memory to work with.
+> +	 */
+> +	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +	if (drvdata->vaddr)
+> +		goto fast_path;
+> +
+> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +
+> +	/*
+> +	 * Contiguous  memory can't be allocated while a spinlock is held.
+> +	 * As such allocate memory here and free it if a buffer has already
+> +	 * been allocated (from a previous session).
+> +	 */
+> +	vaddr = dma_alloc_coherent(drvdata->dev, drvdata->size,
+> +				   &paddr, GFP_KERNEL);
+> +	if (!vaddr)
+> +		return -ENOMEM;
+> +
+> +	/* Let's try again */
+>   	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +fast_path:
+>   	if (drvdata->reading) {
+>   		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +		if (vaddr)
+> +			dma_free_coherent(drvdata->dev, drvdata->size,
+> +					  vaddr, paddr);
+>   		return -EBUSY;
+>   	}
+
+Same as above, if you move the check above before allocation, we could avoid
+the alloc/free for such cases. And it would be better if simplify the code without
+using the fast_path label to the middle of the code.
+
+Otherwise, looks good.
+
+Thanks
+Suzuki
