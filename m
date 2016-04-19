@@ -1,72 +1,147 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 19 Apr 2016 09:20:15 +0900
-Subject: [PATCH] ARM: suppress "include/generated/mach-types.h is up to
- date."
-In-Reply-To: <1459448746-16527-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1459448746-16527-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASpjgZ3YODBnbnPYKcjAW=THnrkkVUXF07woOPrn2KDsg@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Tue, 19 Apr 2016 10:19:32 +0800
+Subject: [PATCH] drm/rockchip: support non-iommu buffer path
+Message-ID: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like no objection to this patch,
-so I will put it into Russell's patch tracker soon.
+Some rockchip vop not support iommu, need use non-iommu
+buffer for it. And if we get iommu issues, we can compare
+the issues with non-iommu path, the would help the debug.
 
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   65 +++++++++++++++++++--------
+ 1 file changed, 47 insertions(+), 18 deletions(-)
 
-
-2016-04-01 3:25 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> For incremental build, "include/generated/mach-types.h is up to date"
-> is every time displayed like follows:
->
-> $ make ARCH=arm
->   CHK     include/config/kernel.release
->   CHK     include/generated/uapi/linux/version.h
->   CHK     include/generated/utsrelease.h
-> make[1]: `include/generated/mach-types.h' is up to date.
->   CHK     include/generated/bounds.h
->   CHK     include/generated/timeconst.h
->   CHK     include/generated/asm-offsets.h
->
-> This commit avoids such a clumsy log and introduces Kbuild standard
-> log style:
->
->   GEN     include/generated/mach-types.h
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm/tools/Makefile | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
-> index 32d05c8..6e4cd18 100644
-> --- a/arch/arm/tools/Makefile
-> +++ b/arch/arm/tools/Makefile
-> @@ -4,7 +4,10 @@
->  # Copyright (C) 2001 Russell King
->  #
->
-> -include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types
-> -       @$(kecho) '  Generating $@'
-> -       @mkdir -p $(dir $@)
-> -       $(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
-> +quiet_cmd_gen_mach = GEN     $@
-> +      cmd_gen_mach = mkdir -p $(dir $@) && \
-> +                    $(AWK) -f $(filter-out $(PHONY),$^) > $@ || \
-> +                    { rm -f $@; /bin/false; }
-> +
-> +include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types FORCE
-> +       $(call if_changed,gen_mach)
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f556a8f..90729c0 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -36,6 +36,8 @@
+ #define DRIVER_MAJOR	1
+ #define DRIVER_MINOR	0
+ 
++static bool is_support_iommu = true;
++
+ /*
+  * Attach a (component) device to the shared drm dma mapping from master drm
+  * device.  This is used by the VOPs to map GEM buffers to a common DMA
+@@ -47,6 +49,9 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ 	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
+ 	int ret;
+ 
++	if (!is_support_iommu)
++		return 0;
++
+ 	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+ 	if (ret)
+ 		return ret;
+@@ -59,6 +64,9 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ 				    struct device *dev)
+ {
++	if (!is_support_iommu)
++		return;
++
+ 	arm_iommu_detach_device(dev);
+ }
+ 
+@@ -152,23 +160,26 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
+ 		goto err_config_cleanup;
+ 	}
+ 
+-	/* TODO(djkurtz): fetch the mapping start/size from somewhere */
+-	mapping = arm_iommu_create_mapping(&platform_bus_type, 0x00000000,
+-					   SZ_2G);
+-	if (IS_ERR(mapping)) {
+-		ret = PTR_ERR(mapping);
+-		goto err_config_cleanup;
+-	}
++	if (is_support_iommu) {
++		/* TODO(djkurtz): fetch the mapping start/size from somewhere */
++		mapping = arm_iommu_create_mapping(&platform_bus_type,
++						   0x00000000,
++						   SZ_2G);
++		if (IS_ERR(mapping)) {
++			ret = PTR_ERR(mapping);
++			goto err_config_cleanup;
++		}
+ 
+-	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		goto err_release_mapping;
++		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
++		if (ret)
++			goto err_release_mapping;
+ 
+-	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
++		dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+ 
+-	ret = arm_iommu_attach_device(dev, mapping);
+-	if (ret)
+-		goto err_release_mapping;
++		ret = arm_iommu_attach_device(dev, mapping);
++		if (ret)
++			goto err_release_mapping;
++	}
+ 
+ 	/* Try to bind all sub drivers. */
+ 	ret = component_bind_all(dev, drm_dev);
+@@ -226,9 +237,11 @@ err_kms_helper_poll_fini:
+ err_unbind:
+ 	component_unbind_all(dev, drm_dev);
+ err_detach_device:
+-	arm_iommu_detach_device(dev);
++	if (is_support_iommu)
++		arm_iommu_detach_device(dev);
+ err_release_mapping:
+-	arm_iommu_release_mapping(dev->archdata.mapping);
++	if (is_support_iommu)
++		arm_iommu_release_mapping(dev->archdata.mapping);
+ err_config_cleanup:
+ 	drm_mode_config_cleanup(drm_dev);
+ 	drm_dev->dev_private = NULL;
+@@ -243,8 +256,10 @@ static int rockchip_drm_unload(struct drm_device *drm_dev)
+ 	drm_vblank_cleanup(drm_dev);
+ 	drm_kms_helper_poll_fini(drm_dev);
+ 	component_unbind_all(dev, drm_dev);
+-	arm_iommu_detach_device(dev);
+-	arm_iommu_release_mapping(dev->archdata.mapping);
++	if (is_support_iommu) {
++		arm_iommu_detach_device(dev);
++		arm_iommu_release_mapping(dev->archdata.mapping);
++	}
+ 	drm_mode_config_cleanup(drm_dev);
+ 	drm_dev->dev_private = NULL;
+ 
+@@ -488,6 +503,8 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ 	 * works as expected.
+ 	 */
+ 	for (i = 0;; i++) {
++		struct device_node *iommu;
++
+ 		port = of_parse_phandle(np, "ports", i);
+ 		if (!port)
+ 			break;
+@@ -497,6 +514,18 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
++		iommu = of_parse_phandle(port->parent, "iommus", 0);
++		if (!iommu || !of_device_is_available(iommu->parent)) {
++			dev_warn(dev, "No available iommu found for %s\n",
++				 port->parent->full_name);
++			dev_warn(dev, "Force non-iommu buffer for all crtc\n");
++			/*
++			 * if there is a crtc not support iommu, force set all
++			 * crtc use non-iommu buffer.
++			 */
++			is_support_iommu = false;
++		}
++
+ 		component_match_add(dev, &match, compare_of, port->parent);
+ 		of_node_put(port);
+ 	}
 -- 
-Best Regards
-Masahiro Yamada
+1.7.9.5
