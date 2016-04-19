@@ -1,119 +1,192 @@
 From: ashoks@broadcom.com (Ashok Kumar)
-Date: Tue, 19 Apr 2016 11:54:22 -0700
-Subject: [PATCH v5 7/7] arm64/perf: Add Broadcom Vulcan PMU support
+Date: Tue, 19 Apr 2016 11:54:21 -0700
+Subject: [PATCH v5 6/7] arm64/perf: Filter common events based on PMCEIDn_EL0
 In-Reply-To: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
 References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1461092062-7484-8-git-send-email-ashoks@broadcom.com>
+Message-ID: <1461092062-7484-7-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Broadcom Vulcan uses ARMv8 PMUv3 and supports most of
-the ARMv8 recommended implementation defined events.
+The complete common architectural and micro-architectural
+event number structure is filtered based on PMCEIDn_EL0 and
+exposed to /sys using is_visibile function pointer in events
+attribute_group.
+To filter the events in is_visible function, pmceid based bitmap
+is stored in arm_pmu structure and the id field from
+perf_pmu_events_attr is used to check against the bitmap.
 
-Added Vulcan events mapping for perf and perf_cache map.
+The function which derives event bitmap from PMCEIDn_EL0 is
+executed in the cpus, which has the pmu being initialized,
+for heterogeneous pmu support.
 
 Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
 ---
- arch/arm64/kernel/perf_event.c | 60 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+ arch/arm64/kernel/perf_event.c | 76 ++++++++++++++++++++++++++++++++++--------
+ include/linux/perf/arm_pmu.h   |  2 ++
+ 2 files changed, 64 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 71eb90f..4694531 100644
+index 86790d2..71eb90f 100644
 --- a/arch/arm64/kernel/perf_event.c
 +++ b/arch/arm64/kernel/perf_event.c
-@@ -234,6 +234,20 @@ static const unsigned armv8_thunder_perf_map[PERF_COUNT_HW_MAX] = {
- 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
- };
- 
-+/* Broadcom Vulcan events mapping */
-+static const unsigned armv8_vulcan_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
-+	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CPU_CYCLES,
-+	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INST_RETIRED,
-+	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE,
-+	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL,
-+	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_BR_RETIRED,
-+	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
-+	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
-+	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV8_PMUV3_PERFCTR_STALL_FRONTEND,
-+	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
-+};
-+
- static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 						[PERF_COUNT_HW_CACHE_OP_MAX]
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-@@ -326,6 +340,35 @@ static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -326,10 +326,22 @@ static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
  	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
  };
  
-+static const unsigned armv8_vulcan_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-+					      [PERF_COUNT_HW_CACHE_OP_MAX]
-+					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
 +
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_RD,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_RD,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WR,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_WR,
++static ssize_t
++armv8pmu_events_sysfs_show(struct device *dev,
++			   struct device_attribute *attr, char *page)
++{
++	struct perf_pmu_events_attr *pmu_attr;
 +
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
++	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
 +
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB_REFILL,
-+	[C(ITLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB,
++	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
++}
 +
-+	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_RD,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_L1D_TLB_WR,
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_RD,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_WR,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_BR_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_BR_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
-+
-+	[C(NODE)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD,
-+	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
-+};
+ #define ARMV8_EVENT_ATTR_RESOLVE(m) #m
+ #define ARMV8_EVENT_ATTR(name, config) \
+-	PMU_EVENT_ATTR_STRING(name, armv8_event_attr_##name, \
+-			      "event=" ARMV8_EVENT_ATTR_RESOLVE(config))
++	PMU_EVENT_ATTR(name, armv8_event_attr_##name, \
++		       config, armv8pmu_events_sysfs_show)
  
- static ssize_t
- armv8pmu_events_sysfs_show(struct device *dev,
-@@ -889,6 +932,13 @@ static int armv8_thunder_map_event(struct perf_event *event)
+ ARMV8_EVENT_ATTR(sw_incr, ARMV8_PMUV3_PERFCTR_SW_INCR);
+ ARMV8_EVENT_ATTR(l1i_cache_refill, ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL);
+@@ -434,9 +446,27 @@ static struct attribute *armv8_pmuv3_event_attrs[] = {
+ 	NULL,
+ };
+ 
++static umode_t
++armv8pmu_event_attr_is_visible(struct kobject *kobj,
++			       struct attribute *attr, int unused)
++{
++	struct device *dev = kobj_to_dev(kobj);
++	struct pmu *pmu = dev_get_drvdata(dev);
++	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
++	struct perf_pmu_events_attr *pmu_attr;
++
++	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr.attr);
++
++	if (test_bit(pmu_attr->id, cpu_pmu->pmceid_bitmap))
++		return attr->mode;
++
++	return 0;
++}
++
+ static struct attribute_group armv8_pmuv3_events_attr_group = {
+ 	.name = "events",
+ 	.attrs = armv8_pmuv3_event_attrs,
++	.is_visible = armv8pmu_event_attr_is_visible,
+ };
+ 
+ PMU_FORMAT_ATTR(event, "config:0-9");
+@@ -859,10 +889,8 @@ static int armv8_thunder_map_event(struct perf_event *event)
  				ARMV8_PMU_EVTYPE_EVENT);
  }
  
-+static int armv8_vulcan_map_event(struct perf_event *event)
-+{
-+	return armpmu_map_event(event, &armv8_vulcan_perf_map,
-+				&armv8_vulcan_perf_cache_map,
-+				ARMV8_PMU_EVTYPE_EVENT);
-+}
-+
- static void armv8pmu_read_num_pmnc_events(int *nb_cnt)
+-static void armv8pmu_read_num_pmnc_events(void *info)
++static void armv8pmu_read_num_pmnc_events(int *nb_cnt)
  {
+-	int *nb_cnt = info;
+-
  	/* Read the nb of CNTx counters supported from PMNC */
-@@ -984,12 +1034,22 @@ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
- 	return armv8pmu_probe_pmu(cpu_pmu);
+ 	*nb_cnt = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT) & ARMV8_PMU_PMCR_N_MASK;
+ 
+@@ -870,11 +898,30 @@ static void armv8pmu_read_num_pmnc_events(void *info)
+ 	*nb_cnt += 1;
  }
  
-+static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+-static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
++static void armv8pmu_read_common_events_bitmap(unsigned long *bmp)
 +{
-+	armv8_pmu_init(cpu_pmu);
-+	cpu_pmu->name			= "armv8_brcm_vulcan";
-+	cpu_pmu->map_event		= armv8_vulcan_map_event;
-+	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
-+	return armv8pmu_probe_pmu(cpu_pmu);
++	u32 arr[2];
++
++	arr[0] = read_sysreg(pmceid0_el0);
++	arr[1] = read_sysreg(pmceid1_el0);
++
++	bitmap_from_u32array(bmp, ARMV8_PMUV3_MAX_COMMON_EVENTS,
++			     arr, ARRAY_SIZE(arr));
 +}
 +
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
- 	{.compatible = "arm,armv8-pmuv3",	.data = armv8_pmuv3_init},
- 	{.compatible = "arm,cortex-a53-pmu",	.data = armv8_a53_pmu_init},
- 	{.compatible = "arm,cortex-a57-pmu",	.data = armv8_a57_pmu_init},
- 	{.compatible = "arm,cortex-a72-pmu",	.data = armv8_a72_pmu_init},
- 	{.compatible = "cavium,thunder-pmu",	.data = armv8_thunder_pmu_init},
-+	{.compatible = "brcm,vulcan-pmu",	.data = armv8_vulcan_pmu_init},
- 	{},
- };
++static void __armv8pmu_probe_pmu(void *info)
++{
++	struct arm_pmu *cpu_pmu = info;
++
++	armv8pmu_read_num_pmnc_events(&cpu_pmu->num_events);
++	armv8pmu_read_common_events_bitmap(cpu_pmu->pmceid_bitmap);
++}
++
++static int armv8pmu_probe_pmu(struct arm_pmu *cpu_pmu)
+ {
+-	return smp_call_function_any(&arm_pmu->supported_cpus,
+-				    armv8pmu_read_num_pmnc_events,
+-				    &arm_pmu->num_events, 1);
++	return smp_call_function_any(&cpu_pmu->supported_cpus,
++				    __armv8pmu_probe_pmu,
++				    cpu_pmu, 1);
+ }
  
+ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -897,7 +944,8 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+ 	armv8_pmu_init(cpu_pmu);
+ 	cpu_pmu->name			= "armv8_pmuv3";
+ 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
+-	return armv8pmu_probe_num_events(cpu_pmu);
++	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
++	return armv8pmu_probe_pmu(cpu_pmu);
+ }
+ 
+ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -906,7 +954,7 @@ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name			= "armv8_cortex_a53";
+ 	cpu_pmu->map_event		= armv8_a53_map_event;
+ 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+-	return armv8pmu_probe_num_events(cpu_pmu);
++	return armv8pmu_probe_pmu(cpu_pmu);
+ }
+ 
+ static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -915,7 +963,7 @@ static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name			= "armv8_cortex_a57";
+ 	cpu_pmu->map_event		= armv8_a57_map_event;
+ 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+-	return armv8pmu_probe_num_events(cpu_pmu);
++	return armv8pmu_probe_pmu(cpu_pmu);
+ }
+ 
+ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -924,7 +972,7 @@ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name			= "armv8_cortex_a72";
+ 	cpu_pmu->map_event		= armv8_a57_map_event;
+ 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+-	return armv8pmu_probe_num_events(cpu_pmu);
++	return armv8pmu_probe_pmu(cpu_pmu);
+ }
+ 
+ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -933,7 +981,7 @@ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name			= "armv8_cavium_thunder";
+ 	cpu_pmu->map_event		= armv8_thunder_map_event;
+ 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+-	return armv8pmu_probe_num_events(cpu_pmu);
++	return armv8pmu_probe_pmu(cpu_pmu);
+ }
+ 
+ static const struct of_device_id armv8_pmu_of_device_ids[] = {
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 4196c90..d28ac05 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -105,6 +105,8 @@ struct arm_pmu {
+ 	struct mutex	reserve_mutex;
+ 	u64		max_period;
+ 	bool		secure_access; /* 32-bit ARM only */
++#define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
++	DECLARE_BITMAP(pmceid_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
+ 	struct platform_device	*plat_device;
+ 	struct pmu_hw_events	__percpu *hw_events;
+ 	struct notifier_block	hotplug_nb;
 -- 
 2.1.0
