@@ -1,226 +1,68 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 19 Apr 2016 13:28:50 +0300
-Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
-In-Reply-To: <20160418170518.363f732d@bbrezillon>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
- <5714F011.5080409@ti.com> <20160418170518.363f732d@bbrezillon>
-Message-ID: <57160862.90603@ti.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Tue, 19 Apr 2016 18:33:04 +0800
+Subject: Applied "ASoC: mediatek: Add second I2S on mt8173-rt5650
+ machine driver" to the asoc tree
+In-Reply-To: <E1asSQc-0004NY-44@debutante>
+References: <E1asSQc-0004NY-44@debutante>
+Message-ID: <1461061984.28704.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/16 18:05, Boris Brezillon wrote:
-> On Mon, 18 Apr 2016 17:32:49 +0300
-> Roger Quadros <rogerq@ti.com> wrote:
+Hi Mark,
+
+On Tue, 2016-04-19 at 17:58 +0800, Mark Brown wrote:
+> The patch
 > 
->> Boris,
->>
->> On 30/03/16 19:14, Boris Brezillon wrote:
->>> Implementing the mtd_ooblayout_ops interface is the new way of exposing
->>> ECC/OOB layout to MTD users.
->>>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> ---
->>>  drivers/mtd/nand/omap2.c | 194 +++++++++++++++++++++++++++--------------------
->>>  1 file changed, 113 insertions(+), 81 deletions(-)
->>>
->>> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
->>> index 4ebf16b..bca154a 100644
->>> --- a/drivers/mtd/nand/omap2.c
->>> +++ b/drivers/mtd/nand/omap2.c
->>> @@ -169,8 +169,6 @@ struct omap_nand_info {
->>>  	u_char				*buf;
->>>  	int					buf_len;
->>>  	struct gpmc_nand_regs		reg;
->>> -	/* generated at runtime depending on ECC algorithm and layout selected */
->>> -	struct nand_ecclayout		oobinfo;
->>>  	/* fields specific for BCHx_HW ECC scheme */
->>>  	struct device			*elm_dev;
->>>  	struct device_node		*of_node;
->>> @@ -1639,19 +1637,108 @@ static bool omap2_nand_ecc_check(struct omap_nand_info *info,
->>>  	return true;
->>>  }
->>>  
->>> +static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
->>> +			      struct mtd_oob_region *oobregion)
->>> +{
->>> +	struct nand_chip *chip = mtd_to_nand(mtd);
->>> +	int off = chip->options & NAND_BUSWIDTH_16 ?
->>> +		  BADBLOCK_MARKER_LENGTH : 1;
->>
->> IMO "off = 1" is valid only for OMAP_ECC_HAM1_CODE_HW and 8-bit NAND.
->> For all other layouts it is always set to BADBLOCK_MARKER_LENGTH.
+>    ASoC: mediatek: Add second I2S on mt8173-rt5650 machine driver
 > 
-> Indeed.
+> has been applied to the asoc tree at
 > 
-> [...]
+>    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 > 
->>> -	/* all OOB bytes from oobfree->offset till end off OOB are free */
->>> -	ecclayout->oobfree->length = mtd->oobsize - ecclayout->oobfree->offset;
->>>  	/* check if NAND device's OOB is enough to store ECC signatures */
->>> -	if (mtd->oobsize < (ecclayout->eccbytes + BADBLOCK_MARKER_LENGTH)) {
->>> +	min_oobbytes = (oobbytes_per_step *
->>> +			(mtd->writesize / nand_chip->ecc.size)) +
->>> +		       (nand_chip->options & NAND_BUSWIDTH_16 ?
->>> +			BADBLOCK_MARKER_LENGTH : 1);
->>
->> would it affect this as well?
+> All being well this means that it will be integrated into the linux-next
+> tree (usually sometime in the next 24 hours) and sent to Linus during
+> the next merge window (or sooner if it is a bug fix), however if
+> problems are discovered then the patch may be dropped or reverted.  
 > 
-> And here as well.
+> You may get further e-mails resulting from automated or manual testing
+> and review of the tree, please engage with people reporting problems and
+> send followup patches addressing any issues that are reported if needed.
 > 
-> I've generated a patch (see below) fixing those problems.
+> If any updates are required or you are submitting further changes they
+> should be sent as incremental updates against current git, existing
+> patches will not be replaced.
 > 
->>
->>> +	if (mtd->oobsize < min_oobbytes) {
->>>  		dev_err(&info->pdev->dev,
->>>  			"not enough OOB bytes required = %d, available=%d\n",
->>> -			ecclayout->eccbytes, mtd->oobsize);
->>> +			min_oobbytes, mtd->oobsize);
->>>  		err = -EINVAL;
->>>  		goto return_error;
->>>  	}
->>>
->>
->> I will need to test this change with all possible configurations.
->> The number of configurations on OMAP is a bit overwhelming :(.
-> 
-> Sorry about that, but at least now I have someone who can test it :).
+> Please add any relevant lists and maintainers to the CCs when replying
+> to this mail.
 > 
 > Thanks,
+> Mark
 > 
-> Boris
+> From 0beeb8d0b434b8b007ac8058fb2cac5997fff6df Mon Sep 17 00:00:00 2001
+> From: PC Liao <pc.liao@mediatek.com>
+> Date: Tue, 19 Apr 2016 17:46:12 +0800
+> Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
+>  driver
 > 
-> --->8---
+> This patch adds second I2S connection to rt5650 codec for capture path on
+> mt8173-rt5650 machine driver.
 > 
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index 9b96f56..07d4039 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -1640,9 +1640,13 @@ static bool omap2_nand_ecc_check(struct omap_nand_info *info,
->  static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
->  			      struct mtd_oob_region *oobregion)
->  {
-> -	struct nand_chip *chip = mtd_to_nand(mtd);
-> -	int off = chip->options & NAND_BUSWIDTH_16 ?
-> -		  BADBLOCK_MARKER_LENGTH : 1;
-> +	struct omap_nand_info *info = mtd_to_omap(mtd);
-> +	struct nand_chip *chip = &info->nand;
-> +	int off = BADBLOCK_MARKER_LENGTH;
-> +
-> +	if (info->ecc_opt == OMAP_ECC_HAM1_CODE_HW &&
-> +	    !(chip->options & NAND_BUSWIDTH_16))
-> +		off = 1;
->  
->  	if (section)
->  		return -ERANGE;
-> @@ -1656,9 +1660,13 @@ static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
->  static int omap_ooblayout_free(struct mtd_info *mtd, int section,
->  			       struct mtd_oob_region *oobregion)
->  {
-> -	struct nand_chip *chip = mtd_to_nand(mtd);
-> -	int off = chip->options & NAND_BUSWIDTH_16 ?
-> -		  BADBLOCK_MARKER_LENGTH : 1;
-> +	struct omap_nand_info *info = mtd_to_omap(mtd);
-> +	struct nand_chip *chip = &info->nand;
-> +	int off = BADBLOCK_MARKER_LENGTH;
-> +
-> +	if (info->ecc_opt == OMAP_ECC_HAM1_CODE_HW &&
-> +	    !(chip->options & NAND_BUSWIDTH_16))
-> +		off = 1;
->  
->  	if (section)
->  		return -ERANGE;
-> @@ -1682,8 +1690,7 @@ static int omap_sw_ooblayout_ecc(struct mtd_info *mtd, int section,
->  				 struct mtd_oob_region *oobregion)
->  {
->  	struct nand_chip *chip = mtd_to_nand(mtd);
-> -	int off = chip->options & NAND_BUSWIDTH_16 ?
-> -		  BADBLOCK_MARKER_LENGTH : 1;
-> +	int off = BADBLOCK_MARKER_LENGTH;
->  
->  	if (section >= chip->ecc.steps)
->  		return -ERANGE;
-> @@ -1702,8 +1709,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
->  				  struct mtd_oob_region *oobregion)
->  {
->  	struct nand_chip *chip = mtd_to_nand(mtd);
-> -	int off = chip->options & NAND_BUSWIDTH_16 ?
-> -		  BADBLOCK_MARKER_LENGTH : 1;
-> +	int off = BADBLOCK_MARKER_LENGTH;
->  
->  	if (section)
->  		return -ERANGE;
-> @@ -1737,7 +1743,7 @@ static int omap_nand_probe(struct platform_device *pdev)
->  	dma_cap_mask_t			mask;
->  	unsigned			sig;
->  	struct resource			*res;
-> -	int				min_oobbytes;
-> +	int				min_oobbytes = BADBLOCK_MARKER_LENGTH;
->  	int				oobbytes_per_step;
->  
->  	pdata = dev_get_platdata(&pdev->dev);
-> @@ -1921,6 +1927,9 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.correct          = omap_correct_data;
->  		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
->  		oobbytes_per_step		= nand_chip->ecc.bytes;
-> +
-> +		if (nand_chip->options & NAND_BUSWIDTH_16)
-> +			min_oobbytes		= 1;
-
-Shouldn't this have been
-		if (!(nand_chip->options & NAND_BUSWIDTH_16)
-			min_oobbytes		= 1;
-?
-
->  		break;
->  
->  	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
-> @@ -2038,10 +2047,8 @@ static int omap_nand_probe(struct platform_device *pdev)
->  	}
->  
->  	/* check if NAND device's OOB is enough to store ECC signatures */
-> -	min_oobbytes = (oobbytes_per_step *
-> -			(mtd->writesize / nand_chip->ecc.size)) +
-> -		       (nand_chip->options & NAND_BUSWIDTH_16 ?
-> -			BADBLOCK_MARKER_LENGTH : 1);
-> +	min_oobbytes += (oobbytes_per_step *
-> +			 (mtd->writesize / nand_chip->ecc.size));
->  	if (mtd->oobsize < min_oobbytes) {
->  		dev_err(&info->pdev->dev,
->  			"not enough OOB bytes required = %d, available=%d\n",
+> This patch depends on [1], because snd_soc_of_get_dai_name() fix the property
+> name "sound-dai". This patch needs to change name to use, so export
+> snd_soc_get_dai_name() which is included in snd_soc_of_get_dai_name().
 > 
+> [1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
+> snd_soc_get_dai_name")
+> 
+> Signed-off-by: PC Liao <pc.liao@mediatek.com>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 
-After the above changes BCH with HW ECC worked fine but BCH with SW ECC still failed.
-I had to fix it up with the below patch. This is mainly because chip->ecc.steps wasn't
-yet initialized before calling nand_bch_init().
+Thanks for your approval.
+But this patch depends on [1].
+I think it also needs to apply [1], otherwise this patch will build
+fail.
+Or, do I need to upload new version again?
+Thanks!  
 
-After the below patch it worked fine with bch4 (hw & sw), bch8 (hw & sw) and ham1.
-I couldn't yet verify bch16 though.
-
---cheers,
--roger
-
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index db22c01..1b1a804 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -1692,7 +1692,7 @@ static int omap_sw_ooblayout_ecc(struct mtd_info *mtd, int section,
- 	struct nand_chip *chip = mtd_to_nand(mtd);
- 	int off = BADBLOCK_MARKER_LENGTH;
- 
--	if (section >= chip->ecc.steps)
-+	if (section >= mtd->writesize / chip->ecc.size)	/* ecc steps */
- 		return -ERANGE;
- 
- 	/*
-@@ -1711,7 +1711,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
- 	struct nand_chip *chip = mtd_to_nand(mtd);
- 	int off = BADBLOCK_MARKER_LENGTH;
- 
--	if (section)
-+	if (section >= mtd->writesize / chip->ecc.size) /* ecc steps */
- 		return -ERANGE;
- 
- 	/*
--- 
-2.5.0
+[1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
+snd_soc_get_dai_name")
