@@ -1,126 +1,191 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 19 Apr 2016 18:37:13 +0100
-Subject: [PATCH v7 07/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <571656E9.5050402@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-8-git-send-email-james.morse@arm.com>
- <571656E9.5050402@arm.com>
-Message-ID: <57166CC9.4030804@arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Tue, 19 Apr 2016 14:01:24 -0400
+Subject: [PATCH v2] arm: lpc32xx: remove leftovers of legacy clock
+ source and provider drivers
+In-Reply-To: <1460941525-16168-1-git-send-email-vz@mleia.com>
+References: <1460941525-16168-1-git-send-email-vz@mleia.com>
+Message-ID: <1461088884.2877.1.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, Takahiro,
-
-On 19/04/16 17:03, Marc Zyngier wrote:
-> On 01/04/16 17:53, James Morse wrote:
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index b5384311dec4..962904a443be 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -591,7 +587,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  		/*
->>  		 * Re-check atomic conditions
->>  		 */
->> -		if (signal_pending(current)) {
->> +		if (unlikely(!__this_cpu_read(kvm_arm_hardware_enabled))) {
->> +			/* cpu has been torn down */
->> +			ret = 0;
->> +			run->exit_reason = KVM_EXIT_FAIL_ENTRY;
->> +			run->fail_entry.hardware_entry_failure_reason
->> +					= (u64)-ENOEXEC;
+On Mon, 2016-04-18 at 04:05 +0300, Vladimir Zapolskiy wrote:
+> After switching the platform to common clock framework there is no
+> more need to keep dead code in arch/arm/mach-lpc32xx, which glued
+> legacy clock source and clock provider drivers, remove the leftovers.
 > 
-> This hunk makes me feel a bit uneasy. Having to check something that
-> critical on the entry path is at least a bit weird. If we've reset EL2
-> already, it means that we must have forced an exit on the guest to do so.
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-(To save anyone else digging: the story comes from v12 of the kexec copy of this
-patch [0])
+Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
 
-
-> So why do we hand the control back to KVM (or anything else) once we've
-> nuked a CPU? I'd expect it to be put on some back-burner, never to
-> return in this lifetime...
-
-This looks like the normal reboot code being called in the middle of a running
-system. Kexec calls kernel_restart_prepare(), which kicks each reboot notifier,
-one of which is kvm_reboot(), which calls:
-> on_each_cpu(hardware_disable_nolock, NULL, 1);
-
-We have to give the CPU back as there may be other reboot notifiers, and kexec
-hasn't yet shuffled onto the boot cpu.
-
-
-How about moving this check into handle_exit()[1]?
-Currently this sees ARM_EXCEPTION_IRQ, and tries to re-enter the guest, we can
-test for kvm_rebooting, which is set by kvm's reboot notifier .... but this
-would still break if another vcpu wakes from cond_resched() and sprints towards
-__kvm_vcpu_run(). Can we move cond_resched() to immediately before handle_exit()?
-
-I can't see a reason why this doesn't happen on the normal reboot path,
-presumably we rely on user space to kill any running guests.
-
-
-
-It looks like x86 uses the extable to work around this, their vmx_vcpu_run() has:
-> 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
-Where __ex ends up calling ____kvm_handle_fault_on_reboot(), with a nearby comment:
-> * Hardware virtualization extension instructions may fault if a
-> * reboot turns off virtualization while processes are running.
-> * Trap the fault and ignore the instruction if that happens.
-
-
-Takahiro, any ideas/wisdom on this?
-
-
-Thanks,
-
-James
-
-[0] http://lists.infradead.org/pipermail/kexec/2015-December/014953.html
-[1] Untested(!) alternative.
-====================================================
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 0e63047a9530..dfa3cc42ec89 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -562,11 +562,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct k
-vm_run *run)
-        ret = 1;
-        run->exit_reason = KVM_EXIT_UNKNOWN;
-        while (ret > 0) {
--               /*
--                * Check conditions before entering the guest
--                */
--               cond_resched();
--
-                update_vttbr(vcpu->kvm);
-
-                if (vcpu->arch.power_off || vcpu->arch.pause)
-@@ -662,6 +657,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kv
-m_run *run)
-
-                preempt_enable();
-
-+               cond_resched();
-+
-                ret = handle_exit(vcpu, run, ret);
-        }
-
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index eba89e42f0ed..cc562d9ff905 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -170,6 +170,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- {
-        exit_handle_fn exit_handler;
-
-+       if (kvm_rebooting) {
-+               run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
-+               run->fail_entry.hardware_entry_failure_reason = (u64)-ENOEXEC;
-+               return 0;
-+       }
-+
-        switch (exception_index) {
-        case ARM_EXCEPTION_IRQ:
-                return 1;
-====================================================
+> ---
+> v1: http://www.spinics.net/lists/arm-kernel/msg488267.html
+> 
+> Changes from v1 to v2:
+> - no functional changes, rebased on top of v4.6-rc1
+> 
+>  arch/arm/mach-lpc32xx/common.c | 95 ------------------------------------------
+>  arch/arm/mach-lpc32xx/common.h | 23 +---------
+>  2 files changed, 1 insertion(+), 117 deletions(-)
+> 
+> diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
+> index 5b7a1e7..2f6067b 100644
+> --- a/arch/arm/mach-lpc32xx/common.c
+> +++ b/arch/arm/mach-lpc32xx/common.c
+> @@ -17,13 +17,6 @@
+>   */
+>  
+>  #include <linux/init.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/interrupt.h>
+> -#include <linux/irq.h>
+> -#include <linux/err.h>
+> -#include <linux/i2c.h>
+> -#include <linux/i2c-pnx.h>
+> -#include <linux/io.h>
+>  
+>  #include <asm/mach/map.h>
+>  #include <asm/system_info.h>
+> @@ -44,19 +37,6 @@ void lpc32xx_get_uid(u32 devid[4])
+>  }
+>  
+>  /*
+> - * Returns SYSCLK source
+> - * 0 = PLL397, 1 = main oscillator
+> - */
+> -int clk_is_sysclk_mainosc(void)
+> -{
+> -	if ((__raw_readl(LPC32XX_CLKPWR_SYSCLK_CTRL) &
+> -		LPC32XX_CLKPWR_SYSCTRL_SYSCLKMUX) == 0)
+> -		return 1;
+> -
+> -	return 0;
+> -}
+> -
+> -/*
+>   * Detects and returns IRAM size for the device variation
+>   */
+>  #define LPC32XX_IRAM_BANK_SIZE SZ_128K
+> @@ -87,81 +67,6 @@ u32 lpc32xx_return_iram_size(void)
+>  }
+>  EXPORT_SYMBOL_GPL(lpc32xx_return_iram_size);
+>  
+> -/*
+> - * Computes PLL rate from PLL register and input clock
+> - */
+> -u32 clk_check_pll_setup(u32 ifreq, struct clk_pll_setup *pllsetup)
+> -{
+> -	u32 ilfreq, p, m, n, fcco, fref, cfreq;
+> -	int mode;
+> -
+> -	/*
+> -	 * PLL requirements
+> -	 * ifreq must be >= 1MHz and <= 20MHz
+> -	 * FCCO must be >= 156MHz and <= 320MHz
+> -	 * FREF must be >= 1MHz and <= 27MHz
+> -	 * Assume the passed input data is not valid
+> -	 */
+> -
+> -	ilfreq = ifreq;
+> -	m = pllsetup->pll_m;
+> -	n = pllsetup->pll_n;
+> -	p = pllsetup->pll_p;
+> -
+> -	mode = (pllsetup->cco_bypass_b15 << 2) |
+> -		(pllsetup->direct_output_b14 << 1) |
+> -	pllsetup->fdbk_div_ctrl_b13;
+> -
+> -	switch (mode) {
+> -	case 0x0: /* Non-integer mode */
+> -		cfreq = (m * ilfreq) / (2 * p * n);
+> -		fcco = (m * ilfreq) / n;
+> -		fref = ilfreq / n;
+> -		break;
+> -
+> -	case 0x1: /* integer mode */
+> -		cfreq = (m * ilfreq) / n;
+> -		fcco = (m * ilfreq) / (n * 2 * p);
+> -		fref = ilfreq / n;
+> -		break;
+> -
+> -	case 0x2:
+> -	case 0x3: /* Direct mode */
+> -		cfreq = (m * ilfreq) / n;
+> -		fcco = cfreq;
+> -		fref = ilfreq / n;
+> -		break;
+> -
+> -	case 0x4:
+> -	case 0x5: /* Bypass mode */
+> -		cfreq = ilfreq / (2 * p);
+> -		fcco = 156000000;
+> -		fref = 1000000;
+> -		break;
+> -
+> -	case 0x6:
+> -	case 0x7: /* Direct bypass mode */
+> -	default:
+> -		cfreq = ilfreq;
+> -		fcco = 156000000;
+> -		fref = 1000000;
+> -		break;
+> -	}
+> -
+> -	if (fcco < 156000000 || fcco > 320000000)
+> -		cfreq = 0;
+> -
+> -	if (fref < 1000000 || fref > 27000000)
+> -		cfreq = 0;
+> -
+> -	return (u32) cfreq;
+> -}
+> -
+> -u32 clk_get_pclk_div(void)
+> -{
+> -	return 1 + ((__raw_readl(LPC32XX_CLKPWR_HCLK_DIV) >> 2) & 0x1F);
+> -}
+> -
+>  static struct map_desc lpc32xx_io_desc[] __initdata = {
+>  	{
+>  		.virtual	= (unsigned long)IO_ADDRESS(LPC32XX_AHB0_START),
+> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+> index 9b5ae42..30c9e64 100644
+> --- a/arch/arm/mach-lpc32xx/common.h
+> +++ b/arch/arm/mach-lpc32xx/common.h
+> @@ -19,36 +19,15 @@
+>  #ifndef __LPC32XX_COMMON_H
+>  #define __LPC32XX_COMMON_H
+>  
+> -#include <mach/board.h>
+> -#include <linux/platform_device.h>
+> +#include <linux/init.h>
+>  
+>  /*
+>   * Other arch specific structures and functions
+>   */
+> -extern void lpc32xx_timer_init(void);
+>  extern void __init lpc32xx_init_irq(void);
+>  extern void __init lpc32xx_map_io(void);
+>  extern void __init lpc32xx_serial_init(void);
+>  
+> -
+> -/*
+> - * Structure used for setting up and querying the PLLS
+> - */
+> -struct clk_pll_setup {
+> -	int analog_on;
+> -	int cco_bypass_b15;
+> -	int direct_output_b14;
+> -	int fdbk_div_ctrl_b13;
+> -	int pll_p;
+> -	int pll_n;
+> -	u32 pll_m;
+> -};
+> -
+> -extern int clk_is_sysclk_mainosc(void);
+> -extern u32 clk_check_pll_setup(u32 ifreq, struct clk_pll_setup *pllsetup);
+> -extern u32 clk_get_pllrate_from_reg(u32 inputclk, u32 regval);
+> -extern u32 clk_get_pclk_div(void);
+> -
+>  /*
+>   * Returns the LPC32xx unique 128-bit chip ID
+>   */
