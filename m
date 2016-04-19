@@ -1,191 +1,51 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 19 Apr 2016 14:01:24 -0400
-Subject: [PATCH v2] arm: lpc32xx: remove leftovers of legacy clock
- source and provider drivers
-In-Reply-To: <1460941525-16168-1-git-send-email-vz@mleia.com>
-References: <1460941525-16168-1-git-send-email-vz@mleia.com>
-Message-ID: <1461088884.2877.1.camel@localhost>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 20 Apr 2016 02:04:19 +0800
+Subject: [PATCH v7 7/8] genirq/msi: map/unmap the MSI doorbells on
+ msi_domain_alloc/free_irqs
+In-Reply-To: <1461085990-2547-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <201604200215.XNyvZSsl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-04-18 at 04:05 +0300, Vladimir Zapolskiy wrote:
-> After switching the platform to common clock framework there is no
-> more need to keep dead code in arch/arm/mach-lpc32xx, which glued
-> legacy clock source and clock provider drivers, remove the leftovers.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Hi,
 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+[auto build test ERROR on tip/irq/core]
+[also build test ERROR on v4.6-rc4 next-20160419]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> ---
-> v1: http://www.spinics.net/lists/arm-kernel/msg488267.html
-> 
-> Changes from v1 to v2:
-> - no functional changes, rebased on top of v4.6-rc1
-> 
->  arch/arm/mach-lpc32xx/common.c | 95 ------------------------------------------
->  arch/arm/mach-lpc32xx/common.h | 23 +---------
->  2 files changed, 1 insertion(+), 117 deletions(-)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-> index 5b7a1e7..2f6067b 100644
-> --- a/arch/arm/mach-lpc32xx/common.c
-> +++ b/arch/arm/mach-lpc32xx/common.c
-> @@ -17,13 +17,6 @@
->   */
->  
->  #include <linux/init.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/interrupt.h>
-> -#include <linux/irq.h>
-> -#include <linux/err.h>
-> -#include <linux/i2c.h>
-> -#include <linux/i2c-pnx.h>
-> -#include <linux/io.h>
->  
->  #include <asm/mach/map.h>
->  #include <asm/system_info.h>
-> @@ -44,19 +37,6 @@ void lpc32xx_get_uid(u32 devid[4])
->  }
->  
->  /*
-> - * Returns SYSCLK source
-> - * 0 = PLL397, 1 = main oscillator
-> - */
-> -int clk_is_sysclk_mainosc(void)
-> -{
-> -	if ((__raw_readl(LPC32XX_CLKPWR_SYSCLK_CTRL) &
-> -		LPC32XX_CLKPWR_SYSCTRL_SYSCLKMUX) == 0)
-> -		return 1;
-> -
-> -	return 0;
-> -}
-> -
-> -/*
->   * Detects and returns IRAM size for the device variation
->   */
->  #define LPC32XX_IRAM_BANK_SIZE SZ_128K
-> @@ -87,81 +67,6 @@ u32 lpc32xx_return_iram_size(void)
->  }
->  EXPORT_SYMBOL_GPL(lpc32xx_return_iram_size);
->  
-> -/*
-> - * Computes PLL rate from PLL register and input clock
-> - */
-> -u32 clk_check_pll_setup(u32 ifreq, struct clk_pll_setup *pllsetup)
-> -{
-> -	u32 ilfreq, p, m, n, fcco, fref, cfreq;
-> -	int mode;
-> -
-> -	/*
-> -	 * PLL requirements
-> -	 * ifreq must be >= 1MHz and <= 20MHz
-> -	 * FCCO must be >= 156MHz and <= 320MHz
-> -	 * FREF must be >= 1MHz and <= 27MHz
-> -	 * Assume the passed input data is not valid
-> -	 */
-> -
-> -	ilfreq = ifreq;
-> -	m = pllsetup->pll_m;
-> -	n = pllsetup->pll_n;
-> -	p = pllsetup->pll_p;
-> -
-> -	mode = (pllsetup->cco_bypass_b15 << 2) |
-> -		(pllsetup->direct_output_b14 << 1) |
-> -	pllsetup->fdbk_div_ctrl_b13;
-> -
-> -	switch (mode) {
-> -	case 0x0: /* Non-integer mode */
-> -		cfreq = (m * ilfreq) / (2 * p * n);
-> -		fcco = (m * ilfreq) / n;
-> -		fref = ilfreq / n;
-> -		break;
-> -
-> -	case 0x1: /* integer mode */
-> -		cfreq = (m * ilfreq) / n;
-> -		fcco = (m * ilfreq) / (n * 2 * p);
-> -		fref = ilfreq / n;
-> -		break;
-> -
-> -	case 0x2:
-> -	case 0x3: /* Direct mode */
-> -		cfreq = (m * ilfreq) / n;
-> -		fcco = cfreq;
-> -		fref = ilfreq / n;
-> -		break;
-> -
-> -	case 0x4:
-> -	case 0x5: /* Bypass mode */
-> -		cfreq = ilfreq / (2 * p);
-> -		fcco = 156000000;
-> -		fref = 1000000;
-> -		break;
-> -
-> -	case 0x6:
-> -	case 0x7: /* Direct bypass mode */
-> -	default:
-> -		cfreq = ilfreq;
-> -		fcco = 156000000;
-> -		fref = 1000000;
-> -		break;
-> -	}
-> -
-> -	if (fcco < 156000000 || fcco > 320000000)
-> -		cfreq = 0;
-> -
-> -	if (fref < 1000000 || fref > 27000000)
-> -		cfreq = 0;
-> -
-> -	return (u32) cfreq;
-> -}
-> -
-> -u32 clk_get_pclk_div(void)
-> -{
-> -	return 1 + ((__raw_readl(LPC32XX_CLKPWR_HCLK_DIV) >> 2) & 0x1F);
-> -}
-> -
->  static struct map_desc lpc32xx_io_desc[] __initdata = {
->  	{
->  		.virtual	= (unsigned long)IO_ADDRESS(LPC32XX_AHB0_START),
-> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-> index 9b5ae42..30c9e64 100644
-> --- a/arch/arm/mach-lpc32xx/common.h
-> +++ b/arch/arm/mach-lpc32xx/common.h
-> @@ -19,36 +19,15 @@
->  #ifndef __LPC32XX_COMMON_H
->  #define __LPC32XX_COMMON_H
->  
-> -#include <mach/board.h>
-> -#include <linux/platform_device.h>
-> +#include <linux/init.h>
->  
->  /*
->   * Other arch specific structures and functions
->   */
-> -extern void lpc32xx_timer_init(void);
->  extern void __init lpc32xx_init_irq(void);
->  extern void __init lpc32xx_map_io(void);
->  extern void __init lpc32xx_serial_init(void);
->  
-> -
-> -/*
-> - * Structure used for setting up and querying the PLLS
-> - */
-> -struct clk_pll_setup {
-> -	int analog_on;
-> -	int cco_bypass_b15;
-> -	int direct_output_b14;
-> -	int fdbk_div_ctrl_b13;
-> -	int pll_p;
-> -	int pll_n;
-> -	u32 pll_m;
-> -};
-> -
-> -extern int clk_is_sysclk_mainosc(void);
-> -extern u32 clk_check_pll_setup(u32 ifreq, struct clk_pll_setup *pllsetup);
-> -extern u32 clk_get_pllrate_from_reg(u32 inputclk, u32 regval);
-> -extern u32 clk_get_pclk_div(void);
-> -
->  /*
->   * Returns the LPC32xx unique 128-bit chip ID
->   */
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-2-3-msi-changes/20160420-011957
+config: x86_64-lkp (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+>> kernel/irq/msi.c:17:38: fatal error: linux/dma-reserved-iommu.h: No such file or directory
+    #include <linux/dma-reserved-iommu.h>
+                                         ^
+   compilation terminated.
+
+vim +17 kernel/irq/msi.c
+
+    11	 */
+    12	#include <linux/types.h>
+    13	#include <linux/device.h>
+    14	#include <linux/irq.h>
+    15	#include <linux/irqdomain.h>
+    16	#include <linux/msi.h>
+  > 17	#include <linux/dma-reserved-iommu.h>
+    18	#include <linux/iommu.h>
+    19	
+    20	/* Temparory solution for building, will be removed later */
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22417 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160420/f6b60d8e/attachment-0001.obj>
