@@ -1,47 +1,247 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 19 Apr 2016 10:19:11 +0200
-Subject: [PATCH] pinctrl-exynos5440: Use off-stack memory for
- pinctrl_gpio_range
-In-Reply-To: <CA+Ln22Fcdp=W1A7ZY5nNNkUqHWfTTepVBS+SzjdoeO2HDJGpuQ@mail.gmail.com>
-References: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
- <CA+Ln22Fcdp=W1A7ZY5nNNkUqHWfTTepVBS+SzjdoeO2HDJGpuQ@mail.gmail.com>
-Message-ID: <5715E9FF.6080000@samsung.com>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Tue, 19 Apr 2016 11:27:07 +0300
+Subject: [PATCH] arch/defconfig: remove CONFIG_RESOURCE_COUNTERS
+Message-ID: <146105442758.18940.2792564159961963110.stgit@zurg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2016 09:24 AM, Tomasz Figa wrote:
-> Hi Andrew,
-> 
-> 2016-04-19 13:13 GMT+09:00 Andrew Jeffery <andrew@aj.id.au>:
->> The range is registered into a linked list which can be referenced
->> throughout the lifetime of the driver. Ensure the range's memory is useful
->> for the same lifetime by adding it to the driver's private data structure.
->>
->> The bug was introduced in the driver's initial commit, which was present in
->> v3.10.
->>
->> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
->> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
->> Cc: stable at vger.kernel.org
->> ---
->> This is my first contribution to the kernel, so hopefully I've followed all the
->> relevant documentation. If not, please let me know and point me in the right
->> direction!
->>
->> I don't have the means to test the patch, but it compiles. Someone with
->> appropriate hardware should probably give it a spin.
->>
-> 
-> Thanks for the patch. Good catch, I wonder how this even worked. Just
-> one minor nitpick below.
-> 
-> Unfortunately I don't have any platform based on this SoC to test, so
-> I'll defer to Krzysztof or Sylwester to handle this.
+This option replaced by PAGE_COUNTER which is selected by MEMCG.
 
-We don't have this board neither, it is not so popular and apparently
-not many people are using it because such bug remained unnoticed.
+Signed-off-by: Konstantin Khlebnikov <koct9i@gmail.com>
+---
+ arch/arm/configs/bcm_defconfig              |    1 -
+ arch/arm/configs/zx_defconfig               |    1 -
+ arch/mips/configs/db1xxx_defconfig          |    1 -
+ arch/mips/configs/loongson3_defconfig       |    1 -
+ arch/mn10300/configs/asb2364_defconfig      |    1 -
+ arch/sh/configs/apsh4ad0a_defconfig         |    1 -
+ arch/sh/configs/sdk7786_defconfig           |    1 -
+ arch/sh/configs/se7206_defconfig            |    1 -
+ arch/sh/configs/shx3_defconfig              |    1 -
+ arch/sh/configs/urquell_defconfig           |    1 -
+ arch/tile/configs/tilegx_defconfig          |    1 -
+ arch/tile/configs/tilepro_defconfig         |    1 -
+ arch/um/configs/i386_defconfig              |    1 -
+ arch/um/configs/x86_64_defconfig            |    1 -
+ arch/x86/configs/i386_defconfig             |    1 -
+ arch/x86/configs/x86_64_defconfig           |    1 -
+ arch/xtensa/configs/generic_kc705_defconfig |    1 -
+ arch/xtensa/configs/smp_lx200_defconfig     |    1 -
+ 18 files changed, 18 deletions(-)
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 7117662bab2e..909049a280ec 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -12,7 +12,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_BLK_CGROUP=y
+ CONFIG_NAMESPACES=y
+diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
+index ab683fbbb954..d6253a48a9fa 100644
+--- a/arch/arm/configs/zx_defconfig
++++ b/arch/arm/configs/zx_defconfig
+@@ -7,7 +7,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_DEBUG=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_NAMESPACES=y
+diff --git a/arch/mips/configs/db1xxx_defconfig b/arch/mips/configs/db1xxx_defconfig
+index 3bdb72a70364..f0c8971030c4 100644
+--- a/arch/mips/configs/db1xxx_defconfig
++++ b/arch/mips/configs/db1xxx_defconfig
+@@ -18,7 +18,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_MEMCG=y
+ CONFIG_MEMCG_SWAP=y
+ CONFIG_MEMCG_KMEM=y
+diff --git a/arch/mips/configs/loongson3_defconfig b/arch/mips/configs/loongson3_defconfig
+index f8bf915c6d6b..7f95c4b3ab2c 100644
+--- a/arch/mips/configs/loongson3_defconfig
++++ b/arch/mips/configs/loongson3_defconfig
+@@ -25,7 +25,6 @@ CONFIG_TASK_XACCT=y
+ CONFIG_TASK_IO_ACCOUNTING=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_CPUSETS=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_MEMCG=y
+ CONFIG_MEMCG_SWAP=y
+ CONFIG_BLK_CGROUP=y
+diff --git a/arch/mn10300/configs/asb2364_defconfig b/arch/mn10300/configs/asb2364_defconfig
+index fbb96ae3122a..cd0a6cb17dee 100644
+--- a/arch/mn10300/configs/asb2364_defconfig
++++ b/arch/mn10300/configs/asb2364_defconfig
+@@ -11,7 +11,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_RELAY=y
+ # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+ CONFIG_EXPERT=y
+diff --git a/arch/sh/configs/apsh4ad0a_defconfig b/arch/sh/configs/apsh4ad0a_defconfig
+index a8d975793b6d..fe45d2c9b151 100644
+--- a/arch/sh/configs/apsh4ad0a_defconfig
++++ b/arch/sh/configs/apsh4ad0a_defconfig
+@@ -10,7 +10,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_MEMCG=y
+ CONFIG_BLK_CGROUP=y
+ CONFIG_NAMESPACES=y
+diff --git a/arch/sh/configs/sdk7786_defconfig b/arch/sh/configs/sdk7786_defconfig
+index e7e56a4131b4..36642ec2cb97 100644
+--- a/arch/sh/configs/sdk7786_defconfig
++++ b/arch/sh/configs/sdk7786_defconfig
+@@ -17,7 +17,6 @@ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ # CONFIG_PROC_PID_CPUSET is not set
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_MEMCG=y
+ CONFIG_CGROUP_MEMCG_SWAP=y
+ CONFIG_CGROUP_SCHED=y
+diff --git a/arch/sh/configs/se7206_defconfig b/arch/sh/configs/se7206_defconfig
+index 6bc30ab9fd18..91853a67ec34 100644
+--- a/arch/sh/configs/se7206_defconfig
++++ b/arch/sh/configs/se7206_defconfig
+@@ -10,7 +10,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_DEBUG=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_MEMCG=y
+ CONFIG_RELAY=y
+ CONFIG_NAMESPACES=y
+diff --git a/arch/sh/configs/shx3_defconfig b/arch/sh/configs/shx3_defconfig
+index cd6c519f8fad..4a4269ad5b04 100644
+--- a/arch/sh/configs/shx3_defconfig
++++ b/arch/sh/configs/shx3_defconfig
+@@ -12,7 +12,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_MEMCG=y
+ CONFIG_RELAY=y
+ CONFIG_NAMESPACES=y
+diff --git a/arch/sh/configs/urquell_defconfig b/arch/sh/configs/urquell_defconfig
+index 1e843dbed5f0..01c9a91ee896 100644
+--- a/arch/sh/configs/urquell_defconfig
++++ b/arch/sh/configs/urquell_defconfig
+@@ -14,7 +14,6 @@ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ # CONFIG_PROC_PID_CPUSET is not set
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_MEMCG=y
+ CONFIG_CGROUP_MEMCG_SWAP=y
+ CONFIG_CGROUP_SCHED=y
+diff --git a/arch/tile/configs/tilegx_defconfig b/arch/tile/configs/tilegx_defconfig
+index 3f3dfb8b150a..2b91e47461c8 100644
+--- a/arch/tile/configs/tilegx_defconfig
++++ b/arch/tile/configs/tilegx_defconfig
+@@ -16,7 +16,6 @@ CONFIG_CGROUP_DEBUG=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_BLK_CGROUP=y
+diff --git a/arch/tile/configs/tilepro_defconfig b/arch/tile/configs/tilepro_defconfig
+index ef9e27eb2f50..2e2e33403b31 100644
+--- a/arch/tile/configs/tilepro_defconfig
++++ b/arch/tile/configs/tilepro_defconfig
+@@ -15,7 +15,6 @@ CONFIG_CGROUP_DEBUG=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_BLK_CGROUP=y
+diff --git a/arch/um/configs/i386_defconfig b/arch/um/configs/i386_defconfig
+index a12bf68c9f3a..5636221b8785 100644
+--- a/arch/um/configs/i386_defconfig
++++ b/arch/um/configs/i386_defconfig
+@@ -17,7 +17,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_BLK_CGROUP=y
+ # CONFIG_PID_NS is not set
+diff --git a/arch/um/configs/x86_64_defconfig b/arch/um/configs/x86_64_defconfig
+index 3aab117bd553..7a67b7ac1a7e 100644
+--- a/arch/um/configs/x86_64_defconfig
++++ b/arch/um/configs/x86_64_defconfig
+@@ -15,7 +15,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_BLK_CGROUP=y
+ # CONFIG_PID_NS is not set
+diff --git a/arch/x86/configs/i386_defconfig b/arch/x86/configs/i386_defconfig
+index 265901a84f3f..5fa6ee2c2dde 100644
+--- a/arch/x86/configs/i386_defconfig
++++ b/arch/x86/configs/i386_defconfig
+@@ -17,7 +17,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_BLK_DEV_INITRD=y
+ # CONFIG_COMPAT_BRK is not set
+diff --git a/arch/x86/configs/x86_64_defconfig b/arch/x86/configs/x86_64_defconfig
+index 0c8d7963483c..d28bdabcc87e 100644
+--- a/arch/x86/configs/x86_64_defconfig
++++ b/arch/x86/configs/x86_64_defconfig
+@@ -16,7 +16,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_BLK_DEV_INITRD=y
+ # CONFIG_COMPAT_BRK is not set
+diff --git a/arch/xtensa/configs/generic_kc705_defconfig b/arch/xtensa/configs/generic_kc705_defconfig
+index f4b7b3888da8..d9444f01f4da 100644
+--- a/arch/xtensa/configs/generic_kc705_defconfig
++++ b/arch/xtensa/configs/generic_kc705_defconfig
+@@ -11,7 +11,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_MEMCG=y
+ CONFIG_NAMESPACES=y
+ CONFIG_SCHED_AUTOGROUP=y
+diff --git a/arch/xtensa/configs/smp_lx200_defconfig b/arch/xtensa/configs/smp_lx200_defconfig
+index 22eeacba37cc..61f943c95619 100644
+--- a/arch/xtensa/configs/smp_lx200_defconfig
++++ b/arch/xtensa/configs/smp_lx200_defconfig
+@@ -11,7 +11,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_MEMCG=y
+ CONFIG_NAMESPACES=y
+ CONFIG_SCHED_AUTOGROUP=y
