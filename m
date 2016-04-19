@@ -1,17 +1,33 @@
-From: martinayotte@gmail.com (martinayotte at gmail.com)
-Date: Tue, 19 Apr 2016 11:30:03 -0700 (PDT)
-Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS +
- add new I2C entries for AllWinner H3 DTS
-In-Reply-To: <16057207-027e-4709-b5c2-61be199e5cb5@googlegroups.com>
-References: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
- <CAGb2v67e_F1=VaY7ovzW7Whc2ToJU3YabeT-orrLTb0Pouhw_Q@mail.gmail.com>
- <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
- <CAGb2v65dsjbpGUrJXFG35cLGnFA6uDxtgMqupBN97=8XNnO68Q@mail.gmail.com>
- <16057207-027e-4709-b5c2-61be199e5cb5@googlegroups.com>
-Message-ID: <1c76eafd-5003-4a0f-b9c8-38f326a7322d@googlegroups.com>
+From: dennis@ausil.us (Dennis Gilmore)
+Date: Tue, 19 Apr 2016 13:34:23 -0500
+Subject: bug in autoloading of imx-ipuv3-crtc
+Message-ID: <6926808.b0joqYQPQE@anubis.ausil.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oupps ! sorry for again have a line length exceeding 80 chars.
+Hi All,
 
-Regards,
+on all of my i.MX6 systems imx-ipuv3-crtc ius not getting automatically 
+loaded.  Everything is built as a module
+
+CONFIG_DRM_IMX=m
+CONFIG_DRM_IMX_FB_HELPER=m
+CONFIG_DRM_IMX_HDMI=m
+CONFIG_DRM_IMX_IPUV3=m
+CONFIG_DRM_IMX_LDB=m
+CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
+CONFIG_DRM_IMX_TVE=m
+CONFIG_IMX_IPUV3_CORE=m
+
+The result is that until I log in via serial or ssh and modprobe the module 
+there is no display.  I suspect that there is some devicetree glue missing 4.4 
+and 4.5 seem to both be effected.
+
+Dennis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/433e0e1d/attachment.sig>
