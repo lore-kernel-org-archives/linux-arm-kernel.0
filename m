@@ -1,53 +1,57 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 Apr 2016 09:14:49 -0600
-Subject: [PATCH V2 05/15] coresight: tmc: splitting driver in ETB/ETF and
- ETR components
-In-Reply-To: <571622A3.4020103@arm.com>
-References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
- <1460483692-25061-6-git-send-email-mathieu.poirier@linaro.org>
- <571622A3.4020103@arm.com>
-Message-ID: <CANLsYkzkJpm2L3dWGAR9ZWT5rzCjg381jDca79AoYdGX-2JOeg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 19 Apr 2016 17:15:53 +0200
+Subject: [PATCH] pinctrl: at91-pio4: fix pull-up/down logic
+In-Reply-To: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <57164BA9.3040907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 April 2016 at 06:20, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 12/04/16 18:54, Mathieu Poirier wrote:
->>
->> The TMC block can operate in 3 modes (ETB, ETF and ETR) and accessed
->> via two interfaces (sysFS and Perf).  That makes 6 mode to cover, which
->> is way too much coupling for a single file.
->>
->> This patch splits the original TMC driver in 2 halves, one for ETB/ETF
->> and another one for ETR mode.  A common core is kept for functionality
->> common to all 3 modes.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->
->
->
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h
->> b/drivers/hwtracing/coresight/coresight-tmc.h
->> index 2d7d52747b4e..b99d4dfc1d0b 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc.h
->> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
->> @@ -18,6 +18,8 @@
->>   #ifndef _CORESIGHT_TMC_H
->>   #define _CORESIGHT_TMC_H
->>
->> +#include <linux/miscdevice.h>
->> +
->
->
-> What was this for ?
+Le 19/04/2016 16:03, Ludovic Desroches a ?crit :
+> The default configuration of a pin is often with a value in the
+> pull-up/down field at chip reset. So, even if the internal logic of the
+> controller prevents writing a configuration with pull-up and pull-down at
+> the same time, we must ensure explicitly this condition before writing the
+> register.
+> 
+> This was leading to a pull-down condition not taken into account for
+> instance.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: 776180848b57 ("pinctrl: introduce driver for Atmel PIO4 controller")
+> Cc: stable at vger.kernel.org #v4.4 and later
 
-For the struct tmc_drvdata::miscdev field, used to generate the sink's
-entry under /dev.
+Yes, and I can add:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks,
-Mathieu
+and more important:
+On a sama5d2 Xplained board:
+Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
->
-> Irrespective of that,
->
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
+Thanks, bye.
+
+> ---
+>  drivers/pinctrl/pinctrl-at91-pio4.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+> index 629b6fe..75093d7 100644
+> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
+> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+> @@ -722,9 +722,11 @@ static int atmel_conf_pin_config_group_set(struct pinctrl_dev *pctldev,
+>  			break;
+>  		case PIN_CONFIG_BIAS_PULL_UP:
+>  			conf |= ATMEL_PIO_PUEN_MASK;
+> +			conf &= (~ATMEL_PIO_PDEN_MASK);
+>  			break;
+>  		case PIN_CONFIG_BIAS_PULL_DOWN:
+>  			conf |= ATMEL_PIO_PDEN_MASK;
+> +			conf &= (~ATMEL_PIO_PUEN_MASK);
+>  			break;
+>  		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+>  			if (arg == 0)
+> 
+
+
+-- 
+Nicolas Ferre
