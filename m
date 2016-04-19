@@ -1,48 +1,80 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 19 Apr 2016 10:26:51 +0100
-Subject: Tegra baseline test results for v4.6-rc1
-In-Reply-To: <5715F45E.3080305@nvidia.com>
-References: <5715F45E.3080305@nvidia.com>
-Message-ID: <5715F9DB.5040403@nvidia.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 19 Apr 2016 11:29:28 +0200
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+Message-ID: <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
+> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+> device as to having an broken HPI implementation. After talking some
+> with Hans, we now think it is actually the mmc controller that can be
+> broken and not support broken HPI's.
 
-On 19/04/16 10:03, Jon Hunter wrote:
-> Here are some basic Tegra test results for Linux v4.6-rc1.
-> Logs and other details at:
-> 
->     https://nvtb.github.io//linux/test_v4.6-rc1/20160330013102/
-> 
-> 
-> Test summary
-> ------------
-> 
-> Build: zImage:
->     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-> 
-> Build: Image:
->     Pass: ( 1/ 1): defconfig
-> 
-> Boot to userspace: defconfig:
->     Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-> 		   tegra210-p2371-0000
-> 
-> Boot to userspace: multi_v7_defconfig:
->     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-> 		   tegra20-trimslice, tegra30-beaver
-> 
-> Boot to userspace: tegra_defconfig:
->     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-> 		   tegra20-trimslice, tegra30-beaver
-> 
-> PM: System suspend: multi_v7_defconfig:
->     FAIL: ( 1/ 4): tegra124-jetson-tk1
+I don't want us to invent a DT binding for something you *think* is a
+HW controller issue.
 
-This failure occurs intermittently and was caused by enabling the UHS-I
-modes for Tegra124. To workaround this we have disabled these mode for
-now [0].
+Have you really excluded that this isn't a software issue? Me
+personally haven't been using HPI that much so I can't really tell
+about the code robustness from the mmc core (mmc protocol point of
+view).
 
-Jon
+Kind regards
+Uffe
 
-[0] http://www.spinics.net/lists/linux-mmc/msg36245.html
+>
+> This patch adds a new capability, mmc-broken-hpi, which allows us to
+> mark a broken hpi implementation on the host level.
+>
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+>  drivers/mmc/core/host.c  | 2 ++
+>  drivers/mmc/core/mmc.c   | 2 +-
+>  include/linux/mmc/host.h | 1 +
+>  3 files changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> index 6e4c55a..9b63b36 100644
+> --- a/drivers/mmc/core/host.c
+> +++ b/drivers/mmc/core/host.c
+> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
+>                 host->caps |= MMC_CAP_HW_RESET;
+>         if (of_property_read_bool(np, "cap-sdio-irq"))
+>                 host->caps |= MMC_CAP_SDIO_IRQ;
+> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
+> +               host->caps |= MMC_CAP_BROKEN_HPI;
+>         if (of_property_read_bool(np, "full-pwr-cycle"))
+>                 host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+>         if (of_property_read_bool(np, "keep-power-in-suspend"))
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 4dbe3df..9a19562 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>         /*
+>          * Enable HPI feature (if supported)
+>          */
+> -       if (card->ext_csd.hpi) {
+> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
+>                 err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>                                 EXT_CSD_HPI_MGMT, 1,
+>                                 card->ext_csd.generic_cmd6_time);
+> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> index 8dd4d29..20f758e 100644
+> --- a/include/linux/mmc/host.h
+> +++ b/include/linux/mmc/host.h
+> @@ -264,6 +264,7 @@ struct mmc_host {
+>  #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
+>  #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
+>  #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
+> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
+>  #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
+>  #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
+>
+> --
+> 2.8.0.rc3
+>
