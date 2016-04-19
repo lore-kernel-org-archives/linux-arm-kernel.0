@@ -1,223 +1,75 @@
-From: graeme.gregory@linaro.org (G Gregory)
-Date: Tue, 19 Apr 2016 13:29:04 +0100
-Subject: [Linaro-acpi] [PATCH V6 12/13] pci, pci-thunder-ecam: Add ACPI
- support for ThunderX ECAM.
-In-Reply-To: <571614F5.2020004@semihalf.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-13-git-send-email-tn@semihalf.com>
- <571607C0.10909@semihalf.com>
- <CAGCh1+=2vufNvw7wGg=GgQ-s8cH1JQoJBq2FSSc2-b=a6Qh+2g@mail.gmail.com>
- <20160419111238.GA8192@xora-haswell.xora.org.uk>
- <571614F5.2020004@semihalf.com>
-Message-ID: <20160419122904.GB8192@xora-haswell.xora.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 19 Apr 2016 13:30:08 +0100
+Subject: [PATCH v4 0/5] ACPI / processor_idle: Add ACPI v6.0 LPI support
+Message-ID: <1461069013-13292-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 01:22:29PM +0200, Tomasz Nowicki wrote:
-> 
-> 
-> On 19.04.2016 13:12, Graeme Gregory wrote:
-> >On Tue, Apr 19, 2016 at 11:41:29AM +0100, G Gregory wrote:
-> >>On 19 April 2016 at 11:26, Tomasz Nowicki <tn@semihalf.com> wrote:
-> >>>On 15.04.2016 19:06, Tomasz Nowicki wrote:
-> >>>>
-> >>>>Passes 1.x miss PCI enhanced allocation (EA) header for fixed-BARs,
-> >>>>thus these passes should use Cavium-specific config access functions
-> >>>>that synthesize the missing EA capabilities.
-> >>>>
-> >>>>We already have DT driver which addresses errata requirements and
-> >>>>allows to use special PCI config accessors. Currently this driver uses
-> >>>>compatible = "cavium,pci-host-thunder-ecam" to mach against the errata.
-> >>>>For ACPI case we need explicit errata number and corresponding
-> >>>>DECLARE_ACPI_MCFG_FIXUP fixup code.
-> >>>>
-> >>>>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> >>>>---
-> >>>>   arch/arm64/Kconfig                  | 14 ++++++++++++++
-> >>>>   arch/arm64/include/asm/cpufeature.h |  3 ++-
-> >>>>   arch/arm64/kernel/cpu_errata.c      |  8 ++++++++
-> >>>>   drivers/pci/host/pci-thunder-ecam.c | 35
-> >>>>+++++++++++++++++++++++++++++++++++
-> >>>>   4 files changed, 59 insertions(+), 1 deletion(-)
-> >>>>
-> >>>>diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >>>>index 1bded87..b7614b8 100644
-> >>>>--- a/arch/arm64/Kconfig
-> >>>>+++ b/arch/arm64/Kconfig
-> >>>>@@ -445,6 +445,20 @@ config CAVIUM_ERRATUM_27456
-> >>>>
-> >>>>           If unsure, say Y.
-> >>>>
-> >>>>+config CAVIUM_ERRATUM_24575
-> >>>>+       bool "Cavium erratum 24575: Enhanced Allocation (EA) emualaion"
-> >>>>+       default y
-> >>>>+       help
-> >>>>+         Enable workaround for erratum 24575.
-> >>>>+
-> >>>>+         Early versions of the Cavium Thunder CN88XX processor are
-> >>>>missing
-> >>>>+         Enhanced Allocation (EA) capabilities for the fixed BAR
-> >>>>addresses used
-> >>>>+         by the on-SoC hardware blocks. The erratum adds config access
-> >>>>+         functions that synthesize the missing EA capabilities for
-> >>>>versions
-> >>>>+         that are missing that information.
-> >>>>+
-> >>>>+         If unsure, say Y.
-> >>>>+
-> >>>>   endmenu
-> >>>>
-> >>>>
-> >>>>diff --git a/arch/arm64/include/asm/cpufeature.h
-> >>>>b/arch/arm64/include/asm/cpufeature.h
-> >>>>index b9b6494..a78364e 100644
-> >>>>--- a/arch/arm64/include/asm/cpufeature.h
-> >>>>+++ b/arch/arm64/include/asm/cpufeature.h
-> >>>>@@ -35,8 +35,9 @@
-> >>>>   #define ARM64_ALT_PAN_NOT_UAO                 10
-> >>>>   #define ARM64_HAS_VIRT_HOST_EXTN              11
-> >>>>   #define ARM64_WORKAROUND_CAVIUM_27456         12
-> >>>>+#define ARM64_WORKAROUND_CAVIUM_24575          13
-> >>>>
-> >>>>-#define ARM64_NCAPS                            13
-> >>>>+#define ARM64_NCAPS                            14
-> >>>>
-> >>>>   #ifndef __ASSEMBLY__
-> >>>>
-> >>>>diff --git a/arch/arm64/kernel/cpu_errata.c
-> >>>>b/arch/arm64/kernel/cpu_errata.c
-> >>>>index 06afd04..89c13d7 100644
-> >>>>--- a/arch/arm64/kernel/cpu_errata.c
-> >>>>+++ b/arch/arm64/kernel/cpu_errata.c
-> >>>>@@ -97,6 +97,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
-> >>>>                            (1 << MIDR_VARIANT_SHIFT) | 1),
-> >>>>         },
-> >>>>   #endif
-> >>>>+#ifdef CONFIG_CAVIUM_ERRATUM_24575
-> >>>>+       {
-> >>>>+       /* Cavium ThunderX, pass 1.x */
-> >>>>+               .desc = "Cavium erratum 24575",
-> >>>>+               .capability = ARM64_WORKAROUND_CAVIUM_24575,
-> >>>>+               MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
-> >>>>+       },
-> >>>>+#endif
-> >>>>         {
-> >>>>         }
-> >>>>   };
-> >>>>diff --git a/drivers/pci/host/pci-thunder-ecam.c
-> >>>>b/drivers/pci/host/pci-thunder-ecam.c
-> >>>>index f67c6d7..01de697 100644
-> >>>>--- a/drivers/pci/host/pci-thunder-ecam.c
-> >>>>+++ b/drivers/pci/host/pci-thunder-ecam.c
-> >>>>@@ -11,10 +11,14 @@
-> >>>>   #include <linux/ioport.h>
-> >>>>   #include <linux/of_pci.h>
-> >>>>   #include <linux/of.h>
-> >>>>+#include <linux/pci-acpi.h>
-> >>>>   #include <linux/platform_device.h>
-> >>>>
-> >>>>+#include <asm/virt.h>
-> >>>>+
-> >>>>   #include "../ecam.h"
-> >>>>
-> >>>>+
-> >>>>   static void set_val(u32 v, int where, int size, u32 *val)
-> >>>>   {
-> >>>>         int shift = (where & 3) * 8;
-> >>>>@@ -376,5 +380,36 @@ static struct platform_driver thunder_ecam_driver = {
-> >>>>   };
-> >>>>   module_platform_driver(thunder_ecam_driver);
-> >>>>
-> >>>>+#ifdef CONFIG_ACPI
-> >>>>+
-> >>>>+static bool needs_cavium_erratum_24575(struct pci_cfg_fixup *fixup,
-> >>>>+                                     struct acpi_pci_root *root)
-> >>>>+{
-> >>>>+       /*
-> >>>>+        * We must match errata code and be hypervisor, quirk does not
-> >>>>apply
-> >>>>+        * for virtual machines.
-> >>>>+        */
-> >>>>+       return cpus_have_cap(ARM64_WORKAROUND_CAVIUM_24575) &&
-> >>>>+              is_hyp_mode_available();
-> >>>>+}
-> >>>>+
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       0, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       1, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       2, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       3, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       10, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       11, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       12, PCI_MCFG_BUS_ANY);
-> >>>>+DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
-> >>>>&pci_thunder_ecam_ops,
-> >>>>+                       13, PCI_MCFG_BUS_ANY);
-> >>>>+#endif
-> >>>>+
-> >>>
-> >>>
-> >>>I wonder if we can identify quirk based on _DSD properties, like that:
-> >>>
-> >>>Name (_DSD, Package () {
-> >>>         ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-> >>>         Package () {
-> >>>                 Package (2) {"cavium,pci-host-thunder-ecam", 1},
-> >>>         }
-> >>>})
-> >>>
-> >>>similar for PEM driver:
-> >>>
-> >>>Name (_DSD, Package () {
-> >>>         ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-> >>>         Package () {
-> >>>                 Package (2) {"cavium,pci-host-thunder-pem", 1},
-> >>>         }
-> >>>})
-> >>>
-> >>>Do you think it is right thing to do?
-> >>>
-> >>
-> >>Well if your adding new properties why not add a Cavium specific _CID?
-> >>
-> >
-> >For clarity what I mean is something like this allowed.
-> >
-> >Device (PCI0)
-> >{
-> >     Name (_HID, EisaId ("PNP0A08"))
-> >     Name (_CID, EisaId ("PNP0A03"))
-> >     Name (_HID, "CAV0666")) // Cavium Quirky Hardware
-> >
-> >     ....
-> >
-> >}
-> >
-> 
-> Rafael, Bjorn, what do you think?
-> 
+ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+method to describe processor idle states. It extends the specification
+to allow the expression of idle states like C-states selectable by the
+OSPM when a processor goes idle, but may affect more than one processor,
+and may affect other system components.
 
-Another option as has been pointed out to me is that devices that are
-not compliant don't advertise the IDs PNP0A03/8 and should use hardware
-specific IDs.
+LPI extensions leverages the processor container device(again introduced
+in ACPI 6.0) allowing to express which parts of the system are affected
+by a given LPI state. It defines the local power states for each node
+in a hierarchical processor topology. The OSPM can use _LPI object to
+select a local power state for each level of processor hierarchy in the
+system. They used to produce a composite power state request that is
+presented to the platform by the OSPM.
 
-Obviously in linux the drivers for them would re-use 90% of the generic
-code with just their added accessors.
+Since multiple processors affect the idle state for any non-leaf hierarchy
+node, coordination of idle state requests between the processors is
+required. ACPI supports two different coordination schemes: Platform
+coordinated and  OS initiated.
 
-I do not know though what knock-on effects that would have and if there
-is stuff that relies on the host bridge being IDed as the standard one.
+This series aims at providing basic and initial support for platform
+coordinated LPI states.
 
-Graeme
+v3[3]->v4:
+	- Dropped the preparatory patches that are merged already
+	- Added ARM64 arch specific callback implementations
+	- Addressed most of the review comments from Rafael
+
+v2[2]->v3:
+        - rebased against v4.4-rc3
+        - fixed couple of issues reported by Prashanth and review comments
+          from Ashwin
+
+v1[1]->v2[2]:
+        - Fixed support for ACPI0010 processor container
+        - moved sleep state code out of processor_idle
+
+Code is also available @[4]
+
+Regards,
+Sudeep
+
+[1] http://marc.info/?l=linux-acpi&m=143871041601132&w=2
+[2] http://marc.info/?l=linux-acpi&m=144241209800788&w=2
+[3] http://marc.info/?l=linux-acpi&m=144906557814813&w=2
+[4] git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git for_review/arm64_lpi
+
+Sudeep Holla (5):
+  ACPI / processor_idle: introduce ARCH_SUPPORTS_ACPI_PROCESSOR_CSTATE
+  ACPI / processor_idle: Add support for Low Power Idle(LPI) states
+  drivers: psci: refactor psci_cpu_init_idle in preparation for ACPI LPI support
+  arm64: add support for ACPI Low Power Idle(LPI)
+  ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/kernel/acpi.c        |  34 +++
+ arch/ia64/Kconfig               |   1 +
+ arch/x86/Kconfig                |   1 +
+ drivers/acpi/Kconfig            |   5 +-
+ drivers/acpi/bus.c              |  11 +-
+ drivers/acpi/processor_driver.c |   2 +-
+ drivers/acpi/processor_idle.c   | 511 ++++++++++++++++++++++++++++++++++------
+ drivers/firmware/psci.c         |  63 ++++-
+ include/acpi/processor.h        |  28 ++-
+ include/linux/acpi.h            |   4 +
+ 11 files changed, 566 insertions(+), 95 deletions(-)
+
+--
+1.9.1
