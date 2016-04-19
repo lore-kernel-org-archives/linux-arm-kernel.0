@@ -1,79 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Apr 2016 17:09:13 +0100
-Subject: [PATCH] arm64: mm: take CWG into account in __inval_cache_range()
-In-Reply-To: <CAKv+Gu890YWn-DU5Hevb1hHqOTLssWn9rWgdBj=oA9FsJhLF0Q@mail.gmail.com>
-References: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160419125615.GA20991@leverpostej>
- <CAKv+Gu91hFkn5k0s=xVmJ+z0vEYMNe6h6UD6z9Qb0fxe7ba0Vw@mail.gmail.com>
- <20160419141321.GD8482@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9+V_i6E_85W7kArugp4mwUjYf_p-=O7AFYGn460xU2vw@mail.gmail.com>
- <20160419153238.GE8482@e104818-lin.cambridge.arm.com>
- <CAKv+Gu890YWn-DU5Hevb1hHqOTLssWn9rWgdBj=oA9FsJhLF0Q@mail.gmail.com>
-Message-ID: <20160419160913.GF8482@e104818-lin.cambridge.arm.com>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Tue, 19 Apr 2016 16:09:28 +0000
+Subject: [RFC PATCH] arm64: defconfig: add config fragment for Freescale
+ SoCs
+In-Reply-To: <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
+References: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
+ <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
+Message-ID: <HE1PR04MB164140935041902B1A95F52A8D6C0@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 05:38:56PM +0200, Ard Biesheuvel wrote:
-> On 19 April 2016 at 17:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Apr 19, 2016 at 04:48:32PM +0200, Ard Biesheuvel wrote:
-> >> On 19 April 2016 at 16:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > The best we could do is to warn if ARCH_DMA_MINALIGN is smaller than CWG
-> >> > (as Robin suggested, we could do this only if we have non-coherent DMA
-> >> > masters via arch_setup_dma_ops()). Quick hack below:
-> >> >
-> >> > -------------------------------8<-----------------------------------
-> >> > diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-> >> > index 5082b30bc2c0..5967fcbb617a 100644
-> >> > --- a/arch/arm64/include/asm/cache.h
-> >> > +++ b/arch/arm64/include/asm/cache.h
-> >> > @@ -28,7 +28,7 @@
-> >> >   * cache before the transfer is done, causing old data to be seen by
-> >> >   * the CPU.
-> >> >   */
-> >> > -#define ARCH_DMA_MINALIGN      L1_CACHE_BYTES
-> >> > +#define ARCH_DMA_MINALIGN      128
-> >> >
-> >> >  #ifndef __ASSEMBLY__
-> >> >
-> >> > @@ -37,7 +37,7 @@
-> >> >  static inline int cache_line_size(void)
-> >> >  {
-> >> >         u32 cwg = cache_type_cwg();
-> >> > -       return cwg ? 4 << cwg : L1_CACHE_BYTES;
-> >> > +       return cwg ? 4 << cwg : ARCH_DMA_MINALIGN;
-> >>
-> >> Unrelated, but this does not look right: if the CWG field is zero, we
-> >> should either assume 2 KB, or iterate over all the CCSIDR values and
-> >> take the maximum linesize.
-> >
-> > It may be a better guess but even that is not always relevant since
-> > CCSIDR may not present the real hardware information. It's only meant to
-> > give enough information to be able to do cache maintenance by set/way
-> > and we've seen CPU implementations where this has nothing to do with the
-> > actual cache geometry.
+
+
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Thursday, April 14, 2016 12:05 PM
+> To: Stuart Yoder <stuart.yoder@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; will.deacon at arm.com; marc.zyngier at arm.com;
+> mark.rutland at arm.com; Scott Wood <scott.wood@nxp.com>; Yang-Leo Li <leoyang.li@nxp.com>
+> Subject: Re: [RFC PATCH] arm64: defconfig: add config fragment for Freescale SoCs
 > 
-> I am aware of that discussion, but that was about inferring aliasing
-> properties from the way size, which combines the linesize and the
-> number of sets/ways, and the latter are apparently set to 1/1 in some
-> cases so that any set/way operation simply affects the entire cache.
+> On Thu, Apr 14, 2016 at 09:21:25AM -0500, Stuart Yoder wrote:
+> > Add a config fragment enabling a reasonably useful set of
+> > devices and options for Freescale ARM v8 SoCs.
 > 
-> However, the CCSIDR linesize field itself is mentioned in the
-> description of CWG in the ARM ARM, as a suitable source of obtaining
-> the maximum linesize in the system.
+> A gentle NAK ;).
+> 
+> > I realize that we are trying to avoid the defconfig hell in arch/arm with 100+
+> > defconfigs, but the single defconfig in arch/arm64 has some problems too.
+> 
+> Can we address these problems in defconfig?
+> 
+> > I think what we want with arch/arm64/config are some reasonable in-kernel
+> > defconfigs/fragments with built-in drivers for convenience.
+> 
+> A hard requirement for arm64 is single Image and having all SoCs in
+> defconfig is a good way to regularly test this.
+> 
+> I am aware that at some point the defconfig size will get too big but
+> that's when (ideally before) we should put effort into building more
+> stuff as loadable modules.
+> 
+> > The proposal is to allow a chip vendor 1 vendor-specific kconfig fragment
+> > to cover all their chips, allowing them to _override_ the default config
+> > options in defconfig.  One specific issue we have is that due to the ls2080a
+> > physical address map, the combination of 4KB pages and 39-bit VA does not
+> > allow us to see all our DDR.  And, thus we need CONFIG_ARM64_VA_BITS_48=y.
+> 
+> And I'm fine to add this to defconfig. We had a case for Seattle needing
+> 48-bit VA but we eventually decoupled the number of levels for idmap and
+> swapper. If it can't be addressed in a similar way on ls2080a, we may
+> need to increase the VA space to 48-bit.
 
-The ARM ARM confuses me. While CTR_EL0.CWG indeed talks about CCSIDR as
-a fall back, the latter has a note:
+The issue for us is the linear mapping covering the 2 very discontiguous
+memory regions on the ls2080a.  We've tried some experiments to locate all
+DDR high, but that results in issues for some devices with 32-bit DMA masks,
+that need bounce buffers.
 
-  The parameters NumSets, Associativity, and LineSize in these registers
-  define the architecturally visible parameters that are required for
-  the cache maintenance by Set/Way instructions. They are not guaranteed
-  to represent the actual microarchitectural features of a design. You
-  cannot make any inference about the actual sizes of caches based on
-  these parameters.
+I'll submit a patch to increase the VA space to 48-bit, along with 
+the other options.
 
-So it's not clear to me whether LineSize would give us the information
-we need for cache maintenance by VA. But I'm not opposed to using this
-on a CPU that doesn't have CWG (once we see one).
-
--- 
-Catalin
+Thanks,
+Stuart
