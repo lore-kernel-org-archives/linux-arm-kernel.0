@@ -1,111 +1,148 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2016 15:41:22 +0200
-Subject: [PATCH v5] spi: orion.c: Add direct access mode
-In-Reply-To: <5715FD81.8090100@denx.de>
-References: <1460974417-32375-1-git-send-email-sr@denx.de>
- <4509446.OJU128rpNa@wuerfel> <5715FD81.8090100@denx.de>
-Message-ID: <3956609.3ttDzXh866@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 19 Apr 2016 14:42:30 +0100
+Subject: [PATCH V2 11/15] coresight: tmc: make sysFS and Perf mode
+ mutually exclusive
+In-Reply-To: <1460483692-25061-12-git-send-email-mathieu.poirier@linaro.org>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-12-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <571635C6.9070903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2016 11:42:25 Stefan Roese wrote:
-> On 18.04.2016 15:57, Arnd Bergmann wrote:
-> > On Monday 18 April 2016 15:00:52 Stefan Roese wrote:
-> >> On 18.04.2016 13:32, Arnd Bergmann wrote:
-> > Ok, so I looked up the datasheet again and understood now that it
-> > actually does both ways: a) the direct read/write that I had always assumed
-> > it did with automatic cmd/addr/data generation, and b) the mode where
-> > you do each write transfer separately as implemented by your patch.
-> > 
-> > Those two modes seem to be wildly different in their needs for address
-> > space:
-> > 
-> > - For a) we definitely need the mapping to be the same size as the
-> >    addressable storage of the SPI-NOR (or other device that fits
-> >    into the cmd/addr/data pattern supported by the hardware)
-> > 
-> > - For b) the address is ignored and at most 32 bytes are transfered,
-> >    so whatever the smallest MBUS mapping window size is would certainly
-> >    be enough.
-> >
-> > As a side-note, I see that you use a regular devm_ioremap_resource(),
-> > which I assume prevents the transfers from ever being more than
-> > a single 4-byte word, while burst mode with up to 32 bytes likely
-> > requires a write-combining mapping.
-> 
-> Thanks for the hint. I've tested again with devm_ioremap_wc() and the
-> resulting SPI TX time is identical to the one using the driver with
-> the uncached (non write-combined) mapping. This is most likely a
-> result of the already fully saturated SPI bus speed being the
-> bottle-neck here.
+On 12/04/16 18:54, Mathieu Poirier wrote:
+> The sysFS and Perf access methods can't be allowed to interfere
+> with one another.  As such introducing guards to access
+> functions that prevents moving forward if a TMC is already
+> being used.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 59 +++++++++++++++++++++-
+>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 67 +++++++++++++++++++++++--
+>   2 files changed, 119 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 9b4cdaed09f5..50d32e8ef4ea 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -111,7 +111,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+>   	CS_LOCK(drvdata->base);
+>   }
+>
+> -static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+> +static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
+>   {
+>   	bool allocated = false;
+>   	char *buf = NULL;
+> @@ -189,6 +189,53 @@ out:
+>   	return 0;
+>   }
+>
+> +static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
+> +{
+> +	int ret = 0;
+> +	u32 val;
 
-Ok
+To be on the safer side, I believe 'val' should be unsigned long, to match the size of local_t.
 
-> A bit more testing has shown, that using devm_ioremap_wc() leads
-> to sporadic failures in the FPGA image downloading though. Now
-> I'm unsure, if its really worth to add some cache flushing after
-> the memcpy() call here (flush_cache_vmap ?) or better keep the
-> uncached ioremap in place.
+> +	unsigned long flags;
+> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +	 /* This shouldn't be happening */
+> +	WARN_ON(mode != CS_MODE_PERF);
 
-The cache is not involved here, as devm_ioremap_wc is still uncached.
-However it's possible that memcpy has other issues here. If you
-don't gain anything from sending more than 32 bits at a time,
-writesl() might be a better alternative, but it requires the data
-to be 32-bit aligned in RAM. If the buffer is not aligned, the
-memcpy() might already cause problems in case the kernel
-implementation does not send the data in the correct order.
+I think the above check, and the mode parameter itself is superfluous, given
+that this is a static function used internally only for the PERF mode.
+Similarly for the _sysfs version.
 
-memcpy_toio() could also be helpful here.
+> +
+> +	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +	if (drvdata->reading) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	val = local_xchg(&drvdata->mode, mode);
 
-> >>> This means that the 1MB window is probably a reasonable size (provided
-> >>> that the (most importantly) the SPI-NOR driver can guarantee that it
-> >>> never exceeds this).
-> >>
-> >> I have no problem switching from 1MiB to using 0xffffffff in the
-> >> SPI controller 'reg' node to allow even bigger windows in v6.
-> > 
-> > How do you decide how much of the window to map though? Using 0xffffffff
-> > is nice because it better represents what the hardware looks like
-> > and doesn't limit you from having arbitrarily large mbus windows
-> > based on your needs, but you'd probably have to try mapping various
-> > sizes then to find the maximum supported one, or you'd have to do
-> > some ugly parsing of the parent node ranges.
-> 
-> This is for the single-window mode, right? My comment above was
-> still referring to the original implementation. And yes, this
-> gets a bit complicated and is most likely not really necessary.
-> So I would prefer to keep the mapping fixed to a max. of 1MiB for
-> now.
+We should be using local_cmpxchg() here. Otherwise, we could corrupt the mode.
+Similarly for the _sysfs version. I though the previous version of your series
+did that.
 
-No, I also meant the separate windows here. Based on the discussion
-above, I think the driver can ideally just ioremap 4KB for devices
-other than SPI-NOR, and then you can list the 0xffffffff length.
+> +	/*
+> +	 * In Perf mode there can be only one writer per sink.  There
+> +	 * is also no need to continue if the ETB/ETR is already operated
+> +	 * from sysFS.
+> +	 */
+> +	if (val != CS_MODE_DISABLED) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
 
-> > In this example, you have to configure the SPI controller to have 1MB per CS
-> > in single-window mode using the "SPI DecodeMode" and "SPI CS Adress Decode"
-> > registers. The mbus then contains two mappings, one 2MB window spanning
-> > CS3 and CS4 in a continuous CPU range, and one 64K window for a device at
-> > CS6, making it as small as possible to conserve CPU address space.
-> 
-> Thanks. I've prepared a new version implementing this single-
-> window mode. Please let me know how you prefer the cache issue
-> above to be handled (uncached mapping, flush or ?) and I'll
-> update the patch accordingly.
 
-If a write-combining mapping doesn't help you here, just use the normal
-ioremap as before.
+>   static void tmc_disable_etf_sink(struct coresight_device *csdev)
+>   {
+>   	u32 val;
+> @@ -271,6 +318,7 @@ const struct coresight_ops tmc_etf_cs_ops = {
+>
+>   int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+>   {
+> +	u32 val;
+>   	enum tmc_mode mode;
+>   	int ret = 0;
+>   	unsigned long flags;
+> @@ -289,6 +337,13 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+>   		goto out;
+>   	}
+>
+> +	val = local_read(&drvdata->mode);
+> +	/* Don't interfere if operated from Perf */
+> +	if (val == CS_MODE_PERF) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
 
-The single-window mode won't really work with SPI-NOR unless you make each
-window large enough to hold the largest possible flash (128MB with
-single-window, 256MB with double-window), but that size makes it harder
-to gain much from saving mbus windows when you trade them for gigantic
-CPU address space consumption.
+Could we get here when CS_DISABLED ? If not, we could get rid of the check
+for CS_MODE_SYSFS below.
 
-Therefore, we probably want the separate-window mode to allow the
-combination of large SPI flashes with other SPI devices in direct-access
-mode. We can also implement the single (and/or double) window mode
-in addition to that, but realistically we probably don't need that
-as all machines we support in the kernel today have at most one
-non-flash device.
+> +
+>   	/* If drvdata::buf is NULL the trace data has been read already */
+>   	if (drvdata->buf == NULL) {
+>   		ret = -EINVAL;
+> @@ -296,7 +351,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+>   	}
+>
+>   	/* Disable the TMC if need be */
+> -	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+> +	if (val == CS_MODE_SYSFS)
+>   		tmc_etb_disable_hw(drvdata);
+See above
 
-	Arnd
+>   	drvdata->reading = true;
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index de5cf0056802..04fc63d85696 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -87,7 +87,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+>   	CS_LOCK(drvdata->base);
+>   }
+>
+> -static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+> +static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
+>   {
+>   	bool allocated = false;
+>   	u32 val;
+> @@ -166,6 +166,53 @@ out:
+>   	return 0;
+>   }
+>
+
+> +static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
+...
+
+>   static void tmc_disable_etr_sink(struct coresight_device *csdev)
+
+Same comments as for the etb side.
+
+Suzuki
+
+  {
