@@ -1,210 +1,120 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 19 Apr 2016 13:22:29 +0200
-Subject: [Linaro-acpi] [PATCH V6 12/13] pci, pci-thunder-ecam: Add ACPI
- support for ThunderX ECAM.
-In-Reply-To: <20160419111238.GA8192@xora-haswell.xora.org.uk>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-13-git-send-email-tn@semihalf.com>
- <571607C0.10909@semihalf.com>
- <CAGCh1+=2vufNvw7wGg=GgQ-s8cH1JQoJBq2FSSc2-b=a6Qh+2g@mail.gmail.com>
- <20160419111238.GA8192@xora-haswell.xora.org.uk>
-Message-ID: <571614F5.2020004@semihalf.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 19 Apr 2016 13:22:53 +0200
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <5715FD6B.5000809@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+ <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
+ <5715FD6B.5000809@schinagl.nl>
+Message-ID: <5716150D.7060200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+On 19-04-16 11:42, Olliver Schinagl wrote:
+> Hi Ulf,
+>
+> On 19-04-16 11:29, Ulf Hansson wrote:
+>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
+>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+>>> device as to having an broken HPI implementation. After talking some
+>>> with Hans, we now think it is actually the mmc controller that can be
+>>> broken and not support broken HPI's.
+ >>
+>> I don't want us to invent a DT binding for something you *think* is a
+>> HW controller issue.
+
+I agree we should not add a dt flag for this, we can simply set the
+flag in the host driver if we believe this is a host issue.
+
+>> Have you really excluded that this isn't a software issue? Me
+>> personally haven't been using HPI that much so I can't really tell
+>> about the code robustness from the mmc core (mmc protocol point of
+>> view).
+> Well this patch goes hand in hand so to speak with the broken-hpi patch introduced by him, he did most of the investigation. We just discussed how to handle it and asked me to cook up the patch.
+>
+> @hans, what do you think?
+
+When we discussed this a while back we had a pretty small sample
+set of sunxi boards with emmc, and it seemed that hpi was broken
+on all of them. But recently we've been seeing eMMC-s on a lot more
+boards and they all work fine, except the one on my Utoo A13 tablets,
+and the one you are using, so this does really seem be an eMMC
+specific problem. That or it is a problem with the host on sun4i/sun5i/sun7i
+which is not present on sun6i, sun8i and later ...
+
+But given how rare eMMC-s are on sun4i/sun5i/sun7i I think the current
+solution where we set a flag on the emmc dt node rather then on the
+host node / in the host driver is fine.
+
+Taking your case into account too, that will bring us up to 2 cases
+where we set the broken-hpi flag on the emmc node, which does not
+really seem like a number to worry about.
+
+TL;DR: Thanks for writing this patch set, but given recent developments
+I believe that it is best to keep handling broken-hpi as we are doing
+in current kernels and no changes are necessary.
+
+Regards,
+
+Hans
 
 
-On 19.04.2016 13:12, Graeme Gregory wrote:
-> On Tue, Apr 19, 2016 at 11:41:29AM +0100, G Gregory wrote:
->> On 19 April 2016 at 11:26, Tomasz Nowicki <tn@semihalf.com> wrote:
->>> On 15.04.2016 19:06, Tomasz Nowicki wrote:
->>>>
->>>> Passes 1.x miss PCI enhanced allocation (EA) header for fixed-BARs,
->>>> thus these passes should use Cavium-specific config access functions
->>>> that synthesize the missing EA capabilities.
->>>>
->>>> We already have DT driver which addresses errata requirements and
->>>> allows to use special PCI config accessors. Currently this driver uses
->>>> compatible = "cavium,pci-host-thunder-ecam" to mach against the errata.
->>>> For ACPI case we need explicit errata number and corresponding
->>>> DECLARE_ACPI_MCFG_FIXUP fixup code.
->>>>
->>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>>> ---
->>>>    arch/arm64/Kconfig                  | 14 ++++++++++++++
->>>>    arch/arm64/include/asm/cpufeature.h |  3 ++-
->>>>    arch/arm64/kernel/cpu_errata.c      |  8 ++++++++
->>>>    drivers/pci/host/pci-thunder-ecam.c | 35
->>>> +++++++++++++++++++++++++++++++++++
->>>>    4 files changed, 59 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 1bded87..b7614b8 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -445,6 +445,20 @@ config CAVIUM_ERRATUM_27456
->>>>
->>>>            If unsure, say Y.
->>>>
->>>> +config CAVIUM_ERRATUM_24575
->>>> +       bool "Cavium erratum 24575: Enhanced Allocation (EA) emualaion"
->>>> +       default y
->>>> +       help
->>>> +         Enable workaround for erratum 24575.
->>>> +
->>>> +         Early versions of the Cavium Thunder CN88XX processor are
->>>> missing
->>>> +         Enhanced Allocation (EA) capabilities for the fixed BAR
->>>> addresses used
->>>> +         by the on-SoC hardware blocks. The erratum adds config access
->>>> +         functions that synthesize the missing EA capabilities for
->>>> versions
->>>> +         that are missing that information.
->>>> +
->>>> +         If unsure, say Y.
->>>> +
->>>>    endmenu
->>>>
->>>>
->>>> diff --git a/arch/arm64/include/asm/cpufeature.h
->>>> b/arch/arm64/include/asm/cpufeature.h
->>>> index b9b6494..a78364e 100644
->>>> --- a/arch/arm64/include/asm/cpufeature.h
->>>> +++ b/arch/arm64/include/asm/cpufeature.h
->>>> @@ -35,8 +35,9 @@
->>>>    #define ARM64_ALT_PAN_NOT_UAO                 10
->>>>    #define ARM64_HAS_VIRT_HOST_EXTN              11
->>>>    #define ARM64_WORKAROUND_CAVIUM_27456         12
->>>> +#define ARM64_WORKAROUND_CAVIUM_24575          13
->>>>
->>>> -#define ARM64_NCAPS                            13
->>>> +#define ARM64_NCAPS                            14
->>>>
->>>>    #ifndef __ASSEMBLY__
->>>>
->>>> diff --git a/arch/arm64/kernel/cpu_errata.c
->>>> b/arch/arm64/kernel/cpu_errata.c
->>>> index 06afd04..89c13d7 100644
->>>> --- a/arch/arm64/kernel/cpu_errata.c
->>>> +++ b/arch/arm64/kernel/cpu_errata.c
->>>> @@ -97,6 +97,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->>>>                             (1 << MIDR_VARIANT_SHIFT) | 1),
->>>>          },
->>>>    #endif
->>>> +#ifdef CONFIG_CAVIUM_ERRATUM_24575
->>>> +       {
->>>> +       /* Cavium ThunderX, pass 1.x */
->>>> +               .desc = "Cavium erratum 24575",
->>>> +               .capability = ARM64_WORKAROUND_CAVIUM_24575,
->>>> +               MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
->>>> +       },
->>>> +#endif
->>>>          {
->>>>          }
->>>>    };
->>>> diff --git a/drivers/pci/host/pci-thunder-ecam.c
->>>> b/drivers/pci/host/pci-thunder-ecam.c
->>>> index f67c6d7..01de697 100644
->>>> --- a/drivers/pci/host/pci-thunder-ecam.c
->>>> +++ b/drivers/pci/host/pci-thunder-ecam.c
->>>> @@ -11,10 +11,14 @@
->>>>    #include <linux/ioport.h>
->>>>    #include <linux/of_pci.h>
->>>>    #include <linux/of.h>
->>>> +#include <linux/pci-acpi.h>
->>>>    #include <linux/platform_device.h>
->>>>
->>>> +#include <asm/virt.h>
->>>> +
->>>>    #include "../ecam.h"
->>>>
->>>> +
->>>>    static void set_val(u32 v, int where, int size, u32 *val)
->>>>    {
->>>>          int shift = (where & 3) * 8;
->>>> @@ -376,5 +380,36 @@ static struct platform_driver thunder_ecam_driver = {
->>>>    };
->>>>    module_platform_driver(thunder_ecam_driver);
->>>>
->>>> +#ifdef CONFIG_ACPI
->>>> +
->>>> +static bool needs_cavium_erratum_24575(struct pci_cfg_fixup *fixup,
->>>> +                                     struct acpi_pci_root *root)
->>>> +{
->>>> +       /*
->>>> +        * We must match errata code and be hypervisor, quirk does not
->>>> apply
->>>> +        * for virtual machines.
->>>> +        */
->>>> +       return cpus_have_cap(ARM64_WORKAROUND_CAVIUM_24575) &&
->>>> +              is_hyp_mode_available();
->>>> +}
->>>> +
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       0, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       1, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       2, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       3, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       10, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       11, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       12, PCI_MCFG_BUS_ANY);
->>>> +DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575,
->>>> &pci_thunder_ecam_ops,
->>>> +                       13, PCI_MCFG_BUS_ANY);
->>>> +#endif
->>>> +
->>>
->>>
->>> I wonder if we can identify quirk based on _DSD properties, like that:
->>>
->>> Name (_DSD, Package () {
->>>          ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->>>          Package () {
->>>                  Package (2) {"cavium,pci-host-thunder-ecam", 1},
->>>          }
->>> })
->>>
->>> similar for PEM driver:
->>>
->>> Name (_DSD, Package () {
->>>          ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->>>          Package () {
->>>                  Package (2) {"cavium,pci-host-thunder-pem", 1},
->>>          }
->>> })
->>>
->>> Do you think it is right thing to do?
->>>
 >>
->> Well if your adding new properties why not add a Cavium specific _CID?
+>> Kind regards
+>> Uffe
 >>
+>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
+>>> mark a broken hpi implementation on the host level.
+>>>
+>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>>> ---
+>>>   drivers/mmc/core/host.c  | 2 ++
+>>>   drivers/mmc/core/mmc.c   | 2 +-
+>>>   include/linux/mmc/host.h | 1 +
+>>>   3 files changed, 4 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+>>> index 6e4c55a..9b63b36 100644
+>>> --- a/drivers/mmc/core/host.c
+>>> +++ b/drivers/mmc/core/host.c
+>>> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
+>>>                  host->caps |= MMC_CAP_HW_RESET;
+>>>          if (of_property_read_bool(np, "cap-sdio-irq"))
+>>>                  host->caps |= MMC_CAP_SDIO_IRQ;
+>>> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
+>>> +               host->caps |= MMC_CAP_BROKEN_HPI;
+>>>          if (of_property_read_bool(np, "full-pwr-cycle"))
+>>>                  host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+>>>          if (of_property_read_bool(np, "keep-power-in-suspend"))
+>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>> index 4dbe3df..9a19562 100644
+>>> --- a/drivers/mmc/core/mmc.c
+>>> +++ b/drivers/mmc/core/mmc.c
+>>> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>>>          /*
+>>>           * Enable HPI feature (if supported)
+>>>           */
+>>> -       if (card->ext_csd.hpi) {
+>>> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
+>>>                  err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>>                                  EXT_CSD_HPI_MGMT, 1,
+>>>                                  card->ext_csd.generic_cmd6_time);
+>>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+>>> index 8dd4d29..20f758e 100644
+>>> --- a/include/linux/mmc/host.h
+>>> +++ b/include/linux/mmc/host.h
+>>> @@ -264,6 +264,7 @@ struct mmc_host {
+>>>   #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
+>>>   #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
+>>>   #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
+>>> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
+>>>   #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
+>>>   #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
+>>>
+>>> --
+>>> 2.8.0.rc3
+>>>
 >
-> For clarity what I mean is something like this allowed.
->
-> Device (PCI0)
-> {
->      Name (_HID, EisaId ("PNP0A08"))
->      Name (_CID, EisaId ("PNP0A03"))
->      Name (_HID, "CAV0666")) // Cavium Quirky Hardware
->
->      ....
->
-> }
->
-
-Rafael, Bjorn, what do you think?
-
-Tomasz
