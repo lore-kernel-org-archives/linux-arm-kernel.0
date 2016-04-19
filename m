@@ -1,32 +1,36 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue, 19 Apr 2016 21:39:14 +0800
-Subject: [PATCH 3/3] nvmem: imx-ocotp: handling clock
-In-Reply-To: <CAOMZO5CBeMn_m79vUzmk21nA1s+COiFoqfywXUJ2mOS38wBAdg@mail.gmail.com>
-References: <1461054788-339-1-git-send-email-van.freenix@gmail.com>
- <1461054788-339-3-git-send-email-van.freenix@gmail.com>
- <CAOMZO5CBeMn_m79vUzmk21nA1s+COiFoqfywXUJ2mOS38wBAdg@mail.gmail.com>
-Message-ID: <20160419133911.GA6823@linux-vaa1.ap.freescale.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 19 Apr 2016 16:23:40 +0300
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <571622B7.2010202@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+ <57160E06.1000806@cogentembedded.com> <571622B7.2010202@schinagl.nl>
+Message-ID: <5716315C.7070001@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-On Tue, Apr 19, 2016 at 07:42:17AM -0300, Fabio Estevam wrote:
->Hi Peng,
->
->On Tue, Apr 19, 2016 at 5:33 AM, Peng Fan <van.freenix@gmail.com> wrote:
->
->> @@ -46,11 +48,15 @@ static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
->>         if (count > (priv->nregs - index))
->>                 count = priv->nregs - index;
+On 4/19/2016 3:21 PM, Olliver Schinagl wrote:
+
+>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
 >>
->> +       clk_prepare_enable(priv->clk);
->
->clk_prepare_enable() may fail, so you should better check its return
->value and propagate it in the case of error.
+>>    scripts/checkpatch.pl now enforces certain commit citing style, the
+>> commit summary should be specified too.
 
-Thanks for correcting me. Will fix it in V2.
+> I used checkpatch from 4.6.0-rc2(or3) and did not notice it. But I'll add it
+> to v2.
 
-Thanks,
-Peng
+    Maybe it just didn't recognize your commit citing? Anyway, the format is 
+the same as for the "Fixes:" tag.
 
--- 
+>>> device as to having an broken HPI implementation. After talking some
+>>> with Hans, we now think it is actually the mmc controller that can be
+>>> broken and not support broken HPI's.
+>>>
+>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
+>>> mark a broken hpi implementation on the host level.
+>>>
+>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>> [...]
+
+MBR, Sergei
