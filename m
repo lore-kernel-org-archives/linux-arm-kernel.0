@@ -1,36 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Apr 2016 18:33:54 +0100
-Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
- MPIDR_EL1
-In-Reply-To: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
-References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160420183354.31f1bfbd@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 20 Apr 2016 18:35:45 +0100
+Subject: [PATCH v7 10/10] iommu/arm-smmu: call
+ iommu_free_reserved_iova_domain on domain destruction
+In-Reply-To: <1461084994-2355-11-git-send-email-eric.auger@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-11-git-send-email-eric.auger@linaro.org>
+Message-ID: <5717BDF1.7030400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2016 07:08:39 -0700
-Ashok Kumar <ashoks@broadcom.com> wrote:
+On 19/04/16 17:56, Eric Auger wrote:
+> When the domain gets destroyed, let's make sure all reserved iova
+> resources get released.
+>
+> Choice is made to put that call in arm-smmu(-v3).c to do something similar
+> to what was done for iommu_put_dma_cookie.
+>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>
+> ---
+>
+> v7: new
+> ---
+>   drivers/iommu/arm-smmu-v3.c | 2 ++
+>   drivers/iommu/arm-smmu.c    | 2 ++
+>   2 files changed, 4 insertions(+)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index a077a35..afd0dac 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -22,6 +22,7 @@
+>
+>   #include <linux/delay.h>
+>   #include <linux/dma-iommu.h>
+> +#include <linux/dma-reserved-iommu.h>
+>   #include <linux/err.h>
+>   #include <linux/interrupt.h>
+>   #include <linux/iommu.h>
+> @@ -1444,6 +1445,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+>   	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>
+>   	iommu_put_dma_cookie(domain);
+> +	iommu_free_reserved_iova_domain(domain);
 
-> For guests with NUMA configuration, Node ID needs to
-> be recorded in the respective affinity byte of MPIDR_EL1.
+Yikes! No, drivers shouldn't be randomly freeing things they didn't 
+allocate - the owner of the domain, who presumably allocated the thing, 
+can call that right _before_ they call iommu_domain_free().
 
-As others have said before, the mapping between the NUMA hierarchy and
-MPIDR_EL1 are completely arbitrary, and only the firmware description
-can help the kernel in interpreting the affinity levels.
+>   	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+>
+>   	/* Free the CD and ASID, if we allocated them */
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 8cd7b8a..492339f 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -30,6 +30,7 @@
+>
+>   #include <linux/delay.h>
+>   #include <linux/dma-iommu.h>
+> +#include <linux/dma-reserved-iommu.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/err.h>
+>   #include <linux/interrupt.h>
+> @@ -1009,6 +1010,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+>   	 * already been detached.
+>   	 */
+>   	iommu_put_dma_cookie(domain);
+> +	iommu_free_reserved_iova_domain(domain);
 
-If you want any patch like this one to be considered, I'd like to see
-the corresponding userspace that:
+...which has the added bonus of preventing needless duplication everywhere.
 
-- programs the affinity into the vcpus,
-- pins the vcpus to specific physical CPUs,
-- exposes the corresponding firmware description (either DT or ACPI) to
-  the kernel.
+Robin.
 
-Short of having all these elements together, there is little point in
-letting userspace messing with the guest's affinity registers.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>   	arm_smmu_destroy_domain_context(domain);
+>   	kfree(smmu_domain);
+>   }
+>
