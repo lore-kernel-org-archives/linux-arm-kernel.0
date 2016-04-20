@@ -1,131 +1,188 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Apr 2016 15:24:57 +0100
-Subject: [PATCH v5 4/7] arm64/perf: Define complete ARMv8 recommended
- implementation defined events
-In-Reply-To: <1461092062-7484-5-git-send-email-ashoks@broadcom.com>
-References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
- <1461092062-7484-5-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160420142457.GA15229@leverpostej>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 20 Apr 2016 10:29:02 -0400
+Subject: [PATCH next v2 2/2] PCI: keystone: remove unnecessary goto
+ statement
+In-Reply-To: <20160420010627.GJ17863@localhost>
+References: <1460386231-8377-1-git-send-email-m-karicheri2@ti.com>
+ <1460386231-8377-2-git-send-email-m-karicheri2@ti.com>
+ <20160420010627.GJ17863@localhost>
+Message-ID: <5717922E.4000306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 11:54:19AM -0700, Ashok Kumar wrote:
-> Defined all the ARMv8 recommended implementation defined events
-> from J3 - "ARM recommendations for IMPLEMENTATION DEFINED event numbers"
-> in ARMv8 ARM.
+On 04/19/2016 09:06 PM, Bjorn Helgaas wrote:
+> Hi Murali,
 > 
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-
-As far as I can tell, these are correct per the ARM ARM (ARM DDI 0487A.i).
-
-In the commit message, please mention the ARM document number for the
-ARM ARM used, for future reference.
-
-With that:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> ---
->  arch/arm64/kernel/perf_event.c | 79 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 79 insertions(+)
+> On Mon, Apr 11, 2016 at 10:50:31AM -0400, Murali Karicheri wrote:
+>> Fix the misuse of goto statement in ks_pcie_get_irq_controller_info()
+>> as simple return is more appropriate for this function. While at
+>> it add an error log for absence of interrupt controller node.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>>
+>> ---
+>>  v2 - removed an unnecessary extra line added in the previous version
+>>  v1 - same as before initial version
+>>  drivers/pci/host/pci-keystone.c | 9 +++++----
+>>  1 file changed, 5 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+>> index 299f2f0..0234828 100644
+>> --- a/drivers/pci/host/pci-keystone.c
+>> +++ b/drivers/pci/host/pci-keystone.c
+>> @@ -181,11 +181,13 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>>  	*np_temp = of_find_node_by_name(np_pcie, controller);
+>>  	if (!(*np_temp)) {
+>>  		dev_err(dev, "Node for %s is absent\n", controller);
+>> -		goto out;
+>> +		return ret;
+>>  	}
+>>  	temp = of_irq_count(*np_temp);
+>> -	if (!temp)
+>> -		goto out;
+>> +	if (!temp) {
+>> +		dev_err(dev, "No entries in %s\n", controller);
+>> +		return ret;
+>> +	}
+>>  	if (temp > max_host_irqs)
+>>  		dev_warn(dev, "Too many %s interrupts defined %u\n",
+>>  			(legacy ? "legacy" : "MSI"), temp);
+>> @@ -203,7 +205,6 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>>  		*num_irqs = temp;
+>>  		ret = 0;
+>>  	}
+>> -out:
+>>  	return ret;
 > 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 59d5091..2ee61e8 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -94,10 +94,89 @@
->  #define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WR			0x41
->  #define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_RD		0x42
->  #define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_WR		0x43
-> +#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_INNER		0x44
-> +#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_OUTER		0x45
-> +#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WB_VICTIM		0x46
-> +#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WB_CLEAN			0x47
-> +#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_INVAL			0x48
-> +
->  #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_RD			0x4C
->  #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_WR			0x4D
->  #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_RD				0x4E
->  #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_WR				0x4F
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_RD			0x50
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_WR			0x51
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_REFILL_RD		0x52
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_REFILL_WR		0x53
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_WB_VICTIM		0x56
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_WB_CLEAN			0x57
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_INVAL			0x58
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_REFILL_RD			0x5C
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_REFILL_WR			0x5D
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_RD				0x5E
-> +#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_WR				0x5F
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD			0x60
-> +#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR			0x61
-> +#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_SHARED			0x62
-> +#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_NOT_SHARED		0x63
-> +#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_NORMAL			0x64
-> +#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_PERIPH			0x65
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_MEM_ACCESS_RD			0x66
-> +#define ARMV8_IMPDEF_PERFCTR_MEM_ACCESS_WR			0x67
-> +#define ARMV8_IMPDEF_PERFCTR_UNALIGNED_LD_SPEC			0x68
-> +#define ARMV8_IMPDEF_PERFCTR_UNALIGNED_ST_SPEC			0x69
-> +#define ARMV8_IMPDEF_PERFCTR_UNALIGNED_LDST_SPEC		0x6A
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_LDREX_SPEC				0x6C
-> +#define ARMV8_IMPDEF_PERFCTR_STREX_PASS_SPEC			0x6D
-> +#define ARMV8_IMPDEF_PERFCTR_STREX_FAIL_SPEC			0x6E
-> +#define ARMV8_IMPDEF_PERFCTR_STREX_SPEC				0x6F
-> +#define ARMV8_IMPDEF_PERFCTR_LD_SPEC				0x70
-> +#define ARMV8_IMPDEF_PERFCTR_ST_SPEC				0x71
-> +#define ARMV8_IMPDEF_PERFCTR_LDST_SPEC				0x72
-> +#define ARMV8_IMPDEF_PERFCTR_DP_SPEC				0x73
-> +#define ARMV8_IMPDEF_PERFCTR_ASE_SPEC				0x74
-> +#define ARMV8_IMPDEF_PERFCTR_VFP_SPEC				0x75
-> +#define ARMV8_IMPDEF_PERFCTR_PC_WRITE_SPEC			0x76
-> +#define ARMV8_IMPDEF_PERFCTR_CRYPTO_SPEC			0x77
-> +#define ARMV8_IMPDEF_PERFCTR_BR_IMMED_SPEC			0x78
-> +#define ARMV8_IMPDEF_PERFCTR_BR_RETURN_SPEC			0x79
-> +#define ARMV8_IMPDEF_PERFCTR_BR_INDIRECT_SPEC			0x7A
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_ISB_SPEC				0x7C
-> +#define ARMV8_IMPDEF_PERFCTR_DSB_SPEC				0x7D
-> +#define ARMV8_IMPDEF_PERFCTR_DMB_SPEC				0x7E
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_UNDEF				0x81
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_SVC				0x82
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_PABORT				0x83
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_DABORT				0x84
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_IRQ				0x86
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_FIQ				0x87
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_SMC				0x88
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_HVC				0x8A
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_PABORT			0x8B
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_DABORT			0x8C
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_OTHER			0x8D
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_IRQ			0x8E
-> +#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_FIQ			0x8F
-> +#define ARMV8_IMPDEF_PERFCTR_RC_LD_SPEC				0x90
-> +#define ARMV8_IMPDEF_PERFCTR_RC_ST_SPEC				0x91
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_RD			0xA0
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_WR			0xA1
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_REFILL_RD		0xA2
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_REFILL_WR		0xA3
-> +
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_WB_VICTIM		0xA6
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_WB_CLEAN			0xA7
-> +#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_INVAL			0xA8
+> I really like these cleanups; thanks for doing them.
+> 
+> I went a step further because I think we always know the value of
+> "ret" at each of these places, so I inserted those and dropped "ret"
+> altogether.
+> 
+> I applied the patch below to pci/host-keystone for v4.7.
+Bjorn,
+
+Which repo has your  pci/host-keystone branch?
+
+I did a fetch of the remote pci at git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git
+and could see only following host branches:-
+
+git branch -r | grep "pci/pci/host-"
+
+pci/pci/host-designware
+pci/pci/host-generic
+pci/pci/host-imx6
+pci/pci/host-iproc
+pci/pci/host-mvebu
+pci/pci/host-rcar
+pci/pci/host-tegra
+pci/pci/host-vmd
+pci/pci/host-xgene
+pci/pci/host-xgene-dd2
+pci/pci/host-xilinx-nwl
+
+Thanks and Regards,
+
+Murali
+
+> 
+> 
+> commit a7ed67a22484f70b8d0c33c76ad7faeac97222a7
+> Author: Murali Karicheri <m-karicheri2@ti.com>
+> Date:   Mon Apr 11 10:50:31 2016 -0400
+> 
+>     PCI: keystone: Remove unnecessary goto statement
+>     
+>     Fix the misuse of goto statement in ks_pcie_get_irq_controller_info() as
+>     simple return is more appropriate for this function.  While at it add an
+>     error log for absence of interrupt controller node.
+>     
+>     [bhelgaas: drop "ret" altogether since we always know the return value]
+>     Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>     CC: Rob Herring <robh+dt@kernel.org>
+>     CC: Pawel Moll <pawel.moll@arm.com>
+>     CC: Mark Rutland <mark.rutland@arm.com>
+>     CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>     CC: Kumar Gala <galak@codeaurora.org>
+> 
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 6868918..95a66f77 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -160,7 +160,7 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
+>  static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>  					   char *controller, int *num_irqs)
+>  {
+> -	int temp, max_host_irqs, legacy = 1, *host_irqs, ret = -EINVAL;
+> +	int temp, max_host_irqs, legacy = 1, *host_irqs;
+>  	struct device *dev = ks_pcie->pp.dev;
+>  	struct device_node *np_pcie = dev->of_node, **np_temp;
 >  
->  /* ARMv8 Cortex-A53 specific event types. */
->  #define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
-> -- 
-> 2.1.0
+> @@ -181,11 +181,15 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>  	*np_temp = of_find_node_by_name(np_pcie, controller);
+>  	if (!(*np_temp)) {
+>  		dev_err(dev, "Node for %s is absent\n", controller);
+> -		goto out;
+> +		return -EINVAL;
+>  	}
+> +
+>  	temp = of_irq_count(*np_temp);
+> -	if (!temp)
+> -		goto out;
+> +	if (!temp) {
+> +		dev_err(dev, "No IRQ entries in %s\n", controller);
+> +		return -EINVAL;
+> +	}
+> +
+>  	if (temp > max_host_irqs)
+>  		dev_warn(dev, "Too many %s interrupts defined %u\n",
+>  			(legacy ? "legacy" : "MSI"), temp);
+> @@ -199,12 +203,13 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>  		if (!host_irqs[temp])
+>  			break;
+>  	}
+> +
+>  	if (temp) {
+>  		*num_irqs = temp;
+> -		ret = 0;
+> +		return 0;
+>  	}
+> -out:
+> -	return ret;
+> +
+> +	return -EINVAL;
+>  }
+>  
+>  static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
+> @@ -345,7 +350,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+>  		return ret;
+>  	}
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static const struct of_device_id ks_pcie_of_match[] = {
+> @@ -374,7 +379,7 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	void __iomem *reg_p;
+>  	struct phy *phy;
+> -	int ret = 0;
+> +	int ret;
+>  
+>  	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+>  				GFP_KERNEL);
 > 
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
