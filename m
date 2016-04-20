@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Apr 2016 16:32:37 +0200
-Subject: [PATCH 1/8] mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
-In-Reply-To: <1461068317-28016-2-git-send-email-patrice.chotard@st.com>
+Date: Wed, 20 Apr 2016 16:34:26 +0200
+Subject: [PATCH 2/8] mfd: stmpe: Add reset support for all STMPE variant
+In-Reply-To: <1461068317-28016-3-git-send-email-patrice.chotard@st.com>
 References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
- <1461068317-28016-2-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdafbxV-0doYYO-nbVHc_mcYFfu_OS02rpg8cBwMokgahQ@mail.gmail.com>
+ <1461068317-28016-3-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdbcr7Lz6ac27JgfLKtShP4tEjatdK80fJQRsVrsBrqrGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +12,16 @@ On Tue, Apr 19, 2016 at 2:18 PM,  <patrice.chotard@st.com> wrote:
 
 > From: Patrice Chotard <patrice.chotard@st.com>
 >
-> As STMPE1801/1601/24xx has a SYS_CTRL register and
-> STMPE1601/2403 has even a SYS_CTRL2 register, add
-> STMPE_IDX_SYS_CTRL/2 and update driver code accordingly
+> Reset was only implemented for STMPE1801 variant despite
+> all variant have a SOFT_RESET bit.
 >
-> This update prepares the ground for not yet supported STMPE1600
-> which share similar REG_SYS_CTRL register.
+> For STMPE2401/2403/801/1601/1801 SOFT_RESET bit is bit 7
+> of SYS_CTRL register.
+> For STMPE610/811 (which have the same variant id) SOFT_RESET
+> bit is bit 1 of SYS_CTRL register.
 >
 > Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
-Looks reasonable:
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
