@@ -1,120 +1,182 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 20 Apr 2016 11:36:46 +0200
-Subject: [PATCH v7 5/8] genirq/irq: introduce msi_doorbell's structs and
- related callback
-In-Reply-To: <571748D8.3030402@arm.com>
-References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
- <1461085990-2547-6-git-send-email-eric.auger@linaro.org>
- <571748D8.3030402@arm.com>
-Message-ID: <57174DAE.4030101@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Apr 2016 10:38:30 +0100
+Subject: [PATCH v7 09/10] iommu/dma-reserved-iommu:
+ iommu_msi_mapping_translate_msg
+In-Reply-To: <1461084994-2355-10-git-send-email-eric.auger@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-10-git-send-email-eric.auger@linaro.org>
+Message-ID: <57174E16.1050004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-On 04/20/2016 11:16 AM, Marc Zyngier wrote:
-> On 19/04/16 18:13, Eric Auger wrote:
->> The purpose is to be able to retrieve the MSI doorbells of an irqchip.
->> This is now needed since on some platforms those doorbells must be
->> iommu mapped (in case the MSIs transit through an IOMMU that do not
->> bypass those transactions).
->>
->> The assumption is there is a maximum of one doorbell region per cpu.
->> The number of doorbells for the whole irqchip is stored in nb_doorbells.
->>
->> A doorbell region is characterized by its physical address base, size and
->> IOMMU protection flag.
->>
->> irq_chip msi_doorbell_info callback enables to retrieve the doorbells of
->> the irqchip.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->>
->> v7: creation
->> ---
->>  include/linux/irq.h | 26 ++++++++++++++++++++++----
->>  1 file changed, 22 insertions(+), 4 deletions(-)
->>
->> diff --git a/include/linux/irq.h b/include/linux/irq.h
->> index c4de623..fdad8c1 100644
->> --- a/include/linux/irq.h
->> +++ b/include/linux/irq.h
->> @@ -312,9 +312,25 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
->>  	return d->hwirq;
->>  }
->>  
->> -/**
->> - * struct irq_chip - hardware interrupt chip descriptor
->> - *
->> +/* MSI doorbell region */
->> +struct irq_chip_msi_doorbell {
->> +	phys_addr_t base;
->> +	size_t size;
->> +	int prot; /* iommu protection flag */
+On 19/04/16 17:56, Eric Auger wrote:
+> Introduce iommu_msi_mapping_translate_msg whose role consists in
+> detecting whether the device's MSIs must to be mapped into an IOMMU.
+> It case it must, the function overrides the MSI msg originally composed
+> and replaces the doorbell's PA by a pre-allocated and pre-mapped reserved
+> IOVA. In case the corresponding PA region is not found, the function
+> returns an error.
 > 
-> I find this one a bit scary. "int" is a probably not the right type if
-> it is a set of flags (it should describe both the protection and the
-> memory attributes - in this case, probably something like Device +
-> Writeable). You should probably use the same type the IOMMU code uses
-> (and if it is actually an int, then I'll shut up...).
-Hum yes iommu also uses an int ;-)
+> This function is likely to be called in some code that cannot sleep. This
+> is the reason why the allocation/mapping is done separately.
 > 
->> +};
->> +
->> +/*
->> + * Describe all the MSI doorbell regions for an irqchip.
->> + * A single doorbell region per cpu is assumed.
->> + * In case a single doorbell is supported for the whole irqchip,
->> + * the region is described in as cpu #0's one
->> + */
->> +struct irq_chip_msi_doorbell_info {
->> +	struct irq_chip_msi_doorbell __percpu *percpu_doorbells;
->> +	int nb_doorbells; /* overall number of doorbells */
->> +};
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 > 
-> How can size and prot be different from one CPU to another? It really
-> feels like they should be common. Can I suggest something like this?
+> ---
 > 
-> struct irq_chip_msi_doorbell_info {
-> 	phys_addr_t __percpu	*doorbells;
-> 	size_t			size;
-> 	u32			prot;
-> };
+> v7: creation
+> ---
+>  drivers/iommu/dma-reserved-iommu.c | 69 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-reserved-iommu.h | 27 +++++++++++++++
+>  2 files changed, 96 insertions(+)
 > 
-> and get rid of struct irq_chip_msi_doorbell altogether?
-I'am definitively fine with your proposal.
+> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
+> index 907a17f..603ee45 100644
+> --- a/drivers/iommu/dma-reserved-iommu.c
+> +++ b/drivers/iommu/dma-reserved-iommu.c
+> @@ -18,6 +18,14 @@
+>  #include <linux/iommu.h>
+>  #include <linux/iova.h>
+>  #include <linux/msi.h>
+> +#include <linux/irq.h>
+> +
+> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
+> +#define msg_to_phys_addr(msg) \
+> +	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
+> +#else
+> +#define msg_to_phys_addr(msg)	((msg)->address_lo)
+> +#endif
+>  
+>  struct reserved_iova_domain {
+>  	struct iova_domain *iovad;
+> @@ -351,3 +359,64 @@ struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+>  	return d;
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_msi_mapping_desc_to_domain);
+> +
+> +static dma_addr_t iommu_find_reserved_iova(struct iommu_domain *domain,
+> +				    phys_addr_t addr, size_t size)
+> +{
+> +	unsigned long  base_pfn, end_pfn, nb_iommu_pages, order, flags;
+> +	size_t iommu_page_size, binding_size;
+> +	struct iommu_reserved_binding *b;
+> +	phys_addr_t aligned_base, offset;
+> +	dma_addr_t iova = DMA_ERROR_CODE;
+> +	struct iova_domain *iovad;
+> +
+> +	spin_lock_irqsave(&domain->reserved_lock, flags);
+> +
+> +	iovad = (struct iova_domain *)domain->reserved_iova_cookie;
+> +
+> +	if (!iovad)
+> +		goto unlock;
+> +
+> +	order = iova_shift(iovad);
+> +	base_pfn = addr >> order;
+> +	end_pfn = (addr + size - 1) >> order;
+> +	aligned_base = base_pfn << order;
+> +	offset = addr - aligned_base;
+> +	nb_iommu_pages = end_pfn - base_pfn + 1;
+> +	iommu_page_size = 1 << order;
+> +	binding_size = nb_iommu_pages * iommu_page_size;
+> +
+> +	b = find_reserved_binding(domain, aligned_base, binding_size);
+> +	if (b && (b->addr <= aligned_base) &&
+> +		(aligned_base + binding_size <=  b->addr + b->size))
+> +		iova = b->iova + offset + aligned_base - b->addr;
+> +unlock:
+> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+> +	return iova;
+> +}
+> +
+> +int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg)
+> +{
 
-Thanks
+I'm really not keen on passing a full irq_data to something that doesn't
+really care about it. What this really needs is the device that
+generates the MSIs, which makes a lot more sense (you get the device and
+the address from the msi_msg).
 
-Eric
+Or am I getting it wrong?
+
+> +	struct iommu_domain *d;
+> +	struct msi_desc *desc;
+> +	dma_addr_t iova;
+> +
+> +	desc = irq_data_get_msi_desc(data);
+> +	if (!desc)
+> +		return -EINVAL;
+> +
+> +	d = iommu_msi_mapping_desc_to_domain(desc);
+> +	if (!d)
+> +		return 0;
+> +
+> +	iova = iommu_find_reserved_iova(d, msg_to_phys_addr(msg),
+> +					sizeof(phys_addr_t));
+> +
+> +	if (iova == DMA_ERROR_CODE)
+> +		return -EINVAL;
+> +
+> +	msg->address_lo = lower_32_bits(iova);
+> +	msg->address_hi = upper_32_bits(iova);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_msi_mapping_translate_msg);
+> diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
+> index 8373929..04e1912f 100644
+> --- a/include/linux/dma-reserved-iommu.h
+> +++ b/include/linux/dma-reserved-iommu.h
+> @@ -20,6 +20,8 @@
+>  
+>  struct iommu_domain;
+>  struct msi_desc;
+> +struct irq_data;
+> +struct msi_msg;
+>  
+>  #ifdef CONFIG_IOMMU_DMA_RESERVED
+>  
+> @@ -82,6 +84,25 @@ void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
+>   */
+>  struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc);
+>  
+> +/**
+> + * iommu_msi_mapping_translate_msg: in case the MSI transaction is translated
+> + * by an IOMMU, the msg address must be an IOVA instead of a physical address.
+> + * This function overwrites the original MSI message containing the doorbell
+> + * physical address, result of the primary composition, with the doorbell IOVA.
+> + *
+> + * The doorbell physical address must be bound previously to an IOVA using
+> + * iommu_get_reserved_iova
+> + *
+> + * @data: irq data handle
+> + * @msg: original msi message containing the PA to be overwritten with
+> + * the IOVA
+> + *
+> + * return 0 if the MSI does not need to be mapped or when the PA/IOVA
+> + * were successfully swapped; return -EINVAL if the addresses need
+> + * to be swapped but not IOMMU binding is found
+> + */
+> +int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg);
+> +
+>  #else
+>  
+>  static inline int
+> @@ -111,5 +132,11 @@ iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+>  	return NULL;
+>  }
+>  
+> +static inline int iommu_msi_mapping_translate_msg(struct irq_data *data,
+> +						  struct msi_msg *msg)
+> +{
+> +	return 0;
+> +}
+> +
+>  #endif	/* CONFIG_IOMMU_DMA_RESERVED */
+>  #endif	/* __DMA_RESERVED_IOMMU_H */
 > 
->> +
->> +/** * struct irq_chip - hardware interrupt chip descriptor *
->>   * @name:		name for /proc/interrupts
->>   * @irq_startup:	start up the interrupt (defaults to ->enable if NULL)
->>   * @irq_shutdown:	shut down the interrupt (defaults to ->disable if NULL)
->> @@ -349,6 +365,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
->>   * @irq_get_irqchip_state:	return the internal state of an interrupt
->>   * @irq_set_irqchip_state:	set the internal state of a interrupt
->>   * @irq_set_vcpu_affinity:	optional to target a vCPU in a virtual machine
->> + * @msi_doorbell_info:	return the MSI doorbell info
->>   * @ipi_send_single:	send a single IPI to destination cpus
->>   * @ipi_send_mask:	send an IPI to destination cpus in cpumask
->>   * @flags:		chip specific flags
->> @@ -394,7 +411,8 @@ struct irq_chip {
->>  	int		(*irq_set_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool state);
->>  
->>  	int		(*irq_set_vcpu_affinity)(struct irq_data *data, void *vcpu_info);
->> -
->> +	const struct irq_chip_msi_doorbell_info *(*msi_doorbell_info)(
->> +							struct irq_data *data);
->>  	void		(*ipi_send_single)(struct irq_data *data, unsigned int cpu);
->>  	void		(*ipi_send_mask)(struct irq_data *data, const struct cpumask *dest);
->>  
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
