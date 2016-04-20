@@ -1,62 +1,93 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 20 Apr 2016 09:40:15 +0200
-Subject: [PATCH 0/8] STMPE fixes/rework and add STMPE1600 support
-In-Reply-To: <5716545D.9080006@wwwdotorg.org>
-References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
- <5716545D.9080006@wwwdotorg.org>
-Message-ID: <5717325F.6080808@st.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 20 Apr 2016 08:42:03 +0100
+Subject: [BUG linux-next] Kernel panic found with linux-next-20160414
+In-Reply-To: <5716C29F.1090205@linaro.org>
+References: <5716C29F.1090205@linaro.org>
+Message-ID: <571732CB.8010206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+CC LAKML in case somebody hit the same panic there.
 
+Vladimir
 
-On 04/19/2016 05:53 PM, Stephen Warren wrote:
-> On 04/19/2016 06:18 AM, patrice.chotard at st.com wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and 
->> prepare
->>   the ground to add new STMPE1600 support.
->>
->> STMPE1600 datasheet is available here :
->> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/ 
->>
->> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
->>
->> Only STMPE1600 has been tested on STM32 platform. As i have no board 
->> with
->> others STMPE 
->> variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
->> and STMPE2403), i put in CC boards's maintainers which are using 
->> others STMPE variant.
->>
->> If they can kindly check that no regression has been introduce by 
->> this series
->
->> For TEGRA ARCHITECTURE SUPPORT
->>     _ Stephen Warren <swarren@wwwdotorg.org>
->>     _ Thierry Reding <thierry.reding@gmail.com>
->>     _ Alexandre Courbot <gnurou@gmail.com>
->
-> I don't know what STMPE is, and I don't believe it is used on Tegra; 
-> what makes you think it is?
-
-Hi Stephen
-
-STMPE family is GPIO expander, and for some of them, it includes others 
-fonctionnality:
-     _STMPE811 and STMPE610: touchscreen controller
-     _ STMPE1601, STMPE2401 and STMPE2403: keypad and PWM controller
-     _ STMPE1801: keypad controller
-
-For more informations, some datasheets are available here: 
-http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/i-o-expanders-and-level-translators/i-o-expanders.html?querycriteria=productId=SC1027
-
-drivers/mfd/stmpe.c and drivers/gpio/gpio-stmpe.c are drivers which 
-support all STMPE variant.
-I put you in copy as STMPE811 is used on tegra30-apalis and 
-tegra30-colibri platforms.
-
-Thanks
-
-Patrice
+On 20/04/16 00:43, Shi, Yang wrote:
+> Hi folks,
+> 
+> When I ran ltp on linux-next-20160414 on my ARM64 machine, I got the
+> below kernel panic:
+> 
+> Unable to handle kernel paging request at virtual address ffffffc007846000
+> pgd = ffffffc01e21d000
+> [ffffffc007846000] *pgd=0000000000000000, *pud=0000000000000000
+> Internal error: Oops: 96000047 [#11] PREEMPT SMP
+> Modules linked in: loop
+> CPU: 7 PID: 274 Comm: systemd-journal Tainted: G      D
+> 4.6.0-rc3-next-20160414-WR8.0.0.0_standard+ #9
+> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+> task: ffffffc01e3fcf80 ti: ffffffc01ea8c000 task.ti: ffffffc01ea8c000
+> PC is at copy_page+0x38/0x120
+> LR is at migrate_page_copy+0x604/0x1660
+> pc : [<ffffff9008ff2318>] lr : [<ffffff900867cdac>] pstate: 20000145
+> sp : ffffffc01ea8ecd0
+> x29: ffffffc01ea8ecd0 x28: 0000000000000000
+> x27: 1ffffff7b80240f8 x26: ffffffc018196f20
+> x25: ffffffbdc01e1180 x24: ffffffbdc01e1180
+> x23: 0000000000000000 x22: ffffffc01e3fcf80
+> x21: ffffffc00481f000 x20: ffffff900a31d000
+> x19: ffffffbdc01207c0 x18: 0000000000000f00
+> x17: 0000000000000000 x16: 0000000000000000
+> x15: 0000000000000000 x14: 0000000000000000
+> x13: 0000000000000000 x12: 0000000000000000
+> x11: 0000000000000000 x10: 0000000000000000
+> x9 : 0000000000000000 x8 : 0000000000000000
+> x7 : 0000000000000000 x6 : 0000000000000000
+> x5 : 0000000000000000 x4 : 0000000000000000
+> x3 : 0000000000000000 x2 : 0000000000000000
+> x1 : ffffffc00481f080 x0 : ffffffc007846000
+> 
+> Call trace:
+> Exception stack(0xffffffc021fc2ed0 to 0xffffffc021fc2ff0)
+> 2ec0:                                   ffffffbdc00887c0 ffffff900a31d000
+> 2ee0: ffffffc021fc30f0 ffffff9008ff2318 0000000020000145 0000000000000025
+> 2f00: ffffffbdc025a280 ffffffc020adc4c0 0000000041b58ab3 ffffff900a085fd0
+> 2f20: ffffff9008200658 0000000000000000 0000000000000000 ffffffbdc00887c0
+> 2f40: ffffff900b0f1320 ffffffc021fc3078 0000000041b58ab3 ffffff900a0864f8
+> 2f60: ffffff9008210010 ffffffc021fb8960 ffffff900867bacc 1ffffff8043f712d
+> 2f80: ffffffc021fc2fb0 ffffff9008210564 ffffffc021fc3070 ffffffc021fb8940
+> 2fa0: 0000000008221f78 ffffff900862f9c8 ffffffc021fc2fe0 ffffff9008215dc8
+> 2fc0: 1ffffff8043f8602 ffffffc021fc0000 ffffffc00968a000 ffffffc00221f080
+> 2fe0: f9407e11d00001f0 d61f02209103e210
+> [<ffffff9008ff2318>] copy_page+0x38/0x120
+> [<ffffff900867de7c>] migrate_page+0x74/0x98
+> [<ffffff90089ba418>] nfs_migrate_page+0x58/0x80
+> [<ffffff900867dffc>] move_to_new_page+0x15c/0x4d8
+> [<ffffff900867eec8>] migrate_pages+0x7c8/0x11f0
+> [<ffffff90085f8724>] compact_zone+0xdfc/0x2570
+> [<ffffff90085f9f78>] compact_zone_order+0xe0/0x170
+> [<ffffff90085fb688>] try_to_compact_pages+0x2e8/0x8f8
+> [<ffffff90085913a0>] __alloc_pages_direct_compact+0x100/0x540
+> [<ffffff9008592420>] __alloc_pages_nodemask+0xc40/0x1c58
+> [<ffffff90086887e8>] khugepaged+0x468/0x19c8
+> [<ffffff9008301700>] kthread+0x248/0x2c0
+> [<ffffff9008206610>] ret_from_fork+0x10/0x40
+> Code: d281f012 91020021 f1020252 d503201f (a8000c02)
+> 
+> 
+> I did some initial investigation and found it is caused by
+> DEBUG_PAGEALLOC and CONFIG_DEBUG_PAGEALLOC_ENABLE_DEFAULT. And, mainline
+> 4.6-rc3 works well.
+> 
+> It should be not arch specific although I got it caught on ARM64. I
+> suspect this might be caused by Hugh's huge tmpfs patches.
+> 
+> Thanks,
+> Yang
+> 
+> -- 
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
+> 
