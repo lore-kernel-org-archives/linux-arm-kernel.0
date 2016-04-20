@@ -1,99 +1,64 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 19 Apr 2016 18:40:32 -0700
-Subject: [PATCH v5 07/14] x86, acpi,
- numa: cleanup acpi_numa_processor_affinity_init()
+Date: Tue, 19 Apr 2016 18:40:36 -0700
+Subject: [PATCH v5 11/14] acpi, numa,
+ srat: Improve SRAT error detection and add messages.
 In-Reply-To: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461116439-22991-8-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461116439-22991-12-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-Cleanup acpi_numa_processor_affinity_init() in preparation for its
-move to drivers/acpi/numa.c.  It will be reused by arm64, this has no
-functional change.
+Loosely based on code from Robert Richter and Hanjun Guo.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Improve out of range node detection as well as allow for Larger SRAT
+entities.
+
+Add printing of nice messages.
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c | 21 +++++----------------
- 1 file changed, 5 insertions(+), 16 deletions(-)
+ drivers/acpi/numa.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index f242a11..9e2a833 100644
---- a/arch/x86/mm/srat.c
-+++ b/arch/x86/mm/srat.c
-@@ -26,11 +26,6 @@
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 8ba90ad..d244018 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -252,8 +252,11 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
  
- int acpi_numa __initdata;
- 
--static __init int setup_node(int pxm)
--{
--	return acpi_map_pxm_to_node(pxm);
--}
--
- static __init void bad_srat(void)
- {
- 	printk(KERN_ERR "SRAT: SRAT not used.\n");
-@@ -64,7 +59,7 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
- 			 pxm, apic_id);
- 		return;
- 	}
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
- 		bad_srat();
-@@ -100,7 +95,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
- 	pxm = pa->proximity_domain_lo;
- 	if (acpi_srat_revision >= 2)
- 		pxm |= *((unsigned int*)pa->proximity_domain_hi) << 8;
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
- 		bad_srat();
-@@ -124,12 +119,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
- 	       pxm, apic_id, node);
- }
- 
--#ifdef CONFIG_MEMORY_HOTPLUG
--static inline int save_add_info(void) {return 1;}
--#else
--static inline int save_add_info(void) {return 0;}
--#endif
--
- /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
- int __init
- acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
-@@ -145,7 +134,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ 	if (srat_disabled())
+ 		goto out_err;
+-	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
++	if (ma->header.length < sizeof(struct acpi_srat_mem_affinity)) {
++		pr_err("SRAT: Unexpected header length: %d\n",
++		       ma->header.length);
+ 		goto out_err_bad_srat;
++	}
  	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
  		goto out_err;
  	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
--	if (hotpluggable && !save_add_info())
-+	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
- 		goto out_err;
- 
- 	start = ma->base_address;
-@@ -154,7 +143,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- 	if (acpi_srat_revision <= 1)
+@@ -267,13 +270,17 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
  		pxm &= 0xff;
  
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
+ 	node = acpi_map_pxm_to_node(pxm);
+-	if (node < 0) {
+-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
++	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
++		pr_err("SRAT: Too many proximity domains.\n");
  		goto out_err_bad_srat;
-@@ -182,7 +171,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- out_err_bad_srat:
- 	bad_srat();
- out_err:
--	return -1;
-+	return -EINVAL;
- }
+ 	}
  
- int __init x86_acpi_numa_init(void)
+-	if (numa_add_memblk(node, start, end) < 0)
++	if (numa_add_memblk(node, start, end) < 0) {
++		pr_err("SRAT: Failed to add memblk to node %u [mem %#010Lx-%#010Lx]\n",
++		       node, (unsigned long long) start,
++		       (unsigned long long) end - 1);
+ 		goto out_err_bad_srat;
++	}
+ 
+ 	node_set(node, numa_nodes_parsed);
+ 
 -- 
 1.7.11.7
