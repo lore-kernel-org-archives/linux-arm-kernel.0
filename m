@@ -1,53 +1,31 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Wed, 20 Apr 2016 09:29:28 +0800
-Subject: [PATCH v11 5/9] arm64: Kprobes with single stepping support
-In-Reply-To: <1457501543-24197-6-git-send-email-dave.long@linaro.org>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-6-git-send-email-dave.long@linaro.org>
-Message-ID: <5716DB78.2010109@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 Apr 2016 18:36:55 -0700
+Subject: [PATCH] vexpress/spc: Remove CLK_IS_ROOT
+Message-ID: <1461116215-1517-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+CLK_IS_ROOT", 2016-02-02) so remove it.
 
-on 2016/3/9 13:32, David Long wrote:
-> +int __kprobes arch_prepare_kprobe(struct kprobe *p)
-> +{
-> +	unsigned long probe_addr = (unsigned long)p->addr;
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-vexpress/spc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Here should verify the addr alignment:
-
-	if (probe_addr & 0x3)
-		return -EINVAL;
-
-Thanks,
-Li Bin
-
-> +
-> +	/* copy instruction */
-> +	p->opcode = le32_to_cpu(*p->addr);
-> +
-> +	if (in_exception_text(probe_addr))
-> +		return -EINVAL;
-> +
-> +	/* decode instruction */
-> +	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
-> +	case INSN_REJECTED:	/* insn not supported */
-> +		return -EINVAL;
-> +
-> +	case INSN_GOOD_NO_SLOT:	/* insn need simulation */
-> +		return -EINVAL;
-> +
-> +	case INSN_GOOD:	/* instruction uses slot */
-> +		p->ainsn.insn = get_insn_slot();
-> +		if (!p->ainsn.insn)
-> +			return -ENOMEM;
-> +		break;
-> +	};
-> +
-> +	/* prepare the instruction */
-> +	arch_prepare_ss_slot(p);
-> +
-> +	return 0;
-> +}
-> +
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index 5766ce2be32b..8409cab3f760 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -547,7 +547,7 @@ static struct clk *ve_spc_clk_register(struct device *cpu_dev)
+ 
+ 	init.name = dev_name(cpu_dev);
+ 	init.ops = &clk_spc_ops;
+-	init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
++	init.flags = CLK_GET_RATE_NOCACHE;
+ 	init.num_parents = 0;
+ 
+ 	return devm_clk_register(cpu_dev, &spc->hw);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
