@@ -1,73 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Apr 2016 13:00:21 +0200
-Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
-In-Reply-To: <CAKv+Gu_w-vXnB_56k2sNaTpo1k1DZuvmrS4rwi5kgx=MF4+e+Q@mail.gmail.com>
-References: <20160419140220.GA9503@pengutronix.de>
- <20160420092516.GA21732@e103592.cambridge.arm.com>
- <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
- <CAKv+Gu9rzxtw2i1QJAU0C-y4Lmh6KDWH0p+TYNHsndr-6c11zw@mail.gmail.com>
- <20160420095541.GG31470@pengutronix.de>
- <CAKv+Gu_w-vXnB_56k2sNaTpo1k1DZuvmrS4rwi5kgx=MF4+e+Q@mail.gmail.com>
-Message-ID: <20160420110021.GH31470@pengutronix.de>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Wed, 20 Apr 2016 13:06:15 +0200
+Subject: [PATCH V2 2/3] dmaengine: bcm2835: use platform_get_irq_byname
+In-Reply-To: <CAMuHMdW2Jw5=f9ojNSM0d1cGvPc6_QxwH4rcQdWBQTP89zyj4Q@mail.gmail.com>
+References: <1460381349-14408-1-git-send-email-kernel@martin.sperl.org>
+ <1460381349-14408-3-git-send-email-kernel@martin.sperl.org>
+ <CAMuHMdW2Jw5=f9ojNSM0d1cGvPc6_QxwH4rcQdWBQTP89zyj4Q@mail.gmail.com>
+Message-ID: <571762A7.7000005@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 12:26:22PM +0200, Ard Biesheuvel wrote:
-> On 20 April 2016 at 11:55, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Wed, Apr 20, 2016 at 11:43:30AM +0200, Ard Biesheuvel wrote:
-> >> (replying to self)
-> >>
-> >> On 20 April 2016 at 11:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> > (+ Arnd)
-> >> >
-> >> > On 20 April 2016 at 11:25, Dave Martin <Dave.Martin@arm.com> wrote:
-> >> >> On Tue, Apr 19, 2016 at 04:02:20PM +0200, Steffen Trumtrar wrote:
-> >> >>> Hi!
-> >> >>>
-> >> >>> According to kernelci.org (and validating on my own hardware), the current
-> >> >>> socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
-> >> >>>
-> >> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
-> >> >>>
-> >> >>> vs
-> >> >>>
-> >> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
-> >> >>>
-> >> >>> Both boot successfully, but notice that the board fails to bring up CPU1 if
-> >> >>> thumb2 support is enabled.
-> >> >>>
-> >> >>> Any ideas why this might be happening?
-> >> >>
-> >>
-> >> Actually, this looks like a problem with the secondary entry point to
-> >> me. Could you try this?
-> >
-> > Been there, done that. Unfortunately this does not solve the problem.
-> >
-> 
-> How about if you put this on top?
-> 
-> diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-> index 5d94b7a2fb10..c160fa3007e9 100644
-> --- a/arch/arm/mach-socfpga/headsmp.S
-> +++ b/arch/arm/mach-socfpga/headsmp.S
-> @@ -13,6 +13,7 @@
->  #include <asm/assembler.h>
-> 
->         .arch   armv7-a
-> +       .arm
 
-\o/
 
-This did the trick, it now boots with two cpus up. Thanks for looking
-into this issue.
+On 20.04.2016 08:51, Geert Uytterhoeven wrote:
+> On Mon, Apr 11, 2016 at 3:29 PM,  <kernel@martin.sperl.org> wrote:
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>>
+>> Use platform_get_irq_byname to allow for correct mapping of
+>> interrupts to dma channels.
+>>
+>> The currently implemented device tree is unfortunately
+>> implemented with the wrong assumption, that each dma-channel
+>> has its own dma channel, but dma-irq 11 is handling
+>> dma-channel 11-14 and dma-irq 12 is actually a "catch all"
+>> interrupt.
+>>
+>> So here we use the byname variant and require that interrupts
+>> are explicitly named via the interrupts-name property in the
+>
+> interrupt-names
 
-I'll create a patch for this.
 
-Sascha
+Vinod has just merged this patch - do you want me to submit another
+to correct those?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> You're not explicitly looking for "dma-shared-all" for that?
+> You might as well just declare a single unnamed interrupt in the bindings.
+
+dma-shared-all is unfortunately an interrupt-line that triggers
+for interrupt-channels 0-15 and that includes the dma channels
+that are owned by the firmware.
+
+It is there mostly to document the interrupt-line (which is there in the 
+existing device tree files - it is not used.
+
+Martin
