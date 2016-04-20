@@ -1,30 +1,30 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 20 Apr 2016 17:32:06 +0200
-Subject: [PATCH 01/14] ARM: dts: STiH407: DT spelling
- s/interrupts-names/interrupt-names/
+Date: Wed, 20 Apr 2016 17:32:12 +0200
+Subject: [PATCH 07/14] dt: booting-without-of: DT spelling
+ s/#interrupt-cell/#interrupt-cells/
 In-Reply-To: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
 References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1461166339-11109-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1461166339-11109-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 2 +-
+ Documentation/devicetree/booting-without-of.txt | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index a538ae52d32b7cbb..7517d373e10836ff 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -1085,7 +1085,7 @@
- 			reg = <0x0923f080 0x4>;
- 			reg-names = "irqmux";
- 			interrupts = <GIC_SPI 192 IRQ_TYPE_NONE>;
--			interrupts-names = "irqmux";
-+			interrupt-names = "irqmux";
- 			ranges = <0 0x09230000 0x3000>;
+diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+index 3f1437fbca6b49f3..5bcea91c0cc65af2 100644
+--- a/Documentation/devicetree/booting-without-of.txt
++++ b/Documentation/devicetree/booting-without-of.txt
+@@ -1302,7 +1302,7 @@ number and level/sense information. All interrupt children in an
+ OpenPIC interrupt domain use 2 cells per interrupt in their interrupts
+ property.
  
- 			pio40: gpio at 09230000 {
+-The PCI bus binding specifies a #interrupt-cell value of 1 to encode
++The PCI bus binding specifies a #interrupt-cells value of 1 to encode
+ which interrupt pin (INTA,INTB,INTC,INTD) is used.
+ 
+ 2) interrupt-parent property
 -- 
 1.9.1
