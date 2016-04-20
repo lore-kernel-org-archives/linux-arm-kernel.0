@@ -1,39 +1,41 @@
 From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Wed, 20 Apr 2016 10:57:16 -0500
-Subject: [PATCH 0/3 v2] arm64: defconfig updates
-Message-ID: <1461167836-3163-1-git-send-email-stuart.yoder@nxp.com>
+Date: Wed, 20 Apr 2016 10:57:28 -0500
+Subject: [PATCH 1/3 v2] arm64: defconfig: cleanup the defconfig
+Message-ID: <1461167848-3205-1-git-send-email-stuart.yoder@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series was based on 4.6-rc4.
+When doing:
+   make defconfig
+   make savedefconfig
 
-Shawn/Sascha, in the discussion here:
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/494010
-...Arnd and Will suggest having this series go in through
-the SoC maintainers if possible.
+...without making any changes, the newly saved defconfig does
+not match arch/arm64/configs/defconfig, and the diff looks
+like:
 
-As far as I know, when doing a 'make defconfig' immediately followed by 
-'make savedefconfig', the resulting defconfig should exactly match
-the original defconfig.  This was not the case for arm64 and patch 1 cleans
-that up.
+$ diff defconfig arch/arm64/configs/defconfig
+3a4
+> CONFIG_FHANDLE=y
 
-Patch 2 enables 48-bit VA to allow certain armv8 SoCs to cover all of
-their physical memory regions. (see email thread:
-http://www.spinics.net/lists/arm-kernel/msg497210.html)
+Clean that up by committing the output of savedefconfig.
 
-Patch 3 enables some additional device for Freescale/NXP SoCs.
+Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
--v2
-   -added Acked-by tags
-   -fixed typo in one commit message
-
-Stuart Yoder (3):
-  arm64: defconfig: cleanup the defconfig
-  arm64: defconfig: enable 48-bit virtual addresses
-  arm64: defconfig: enable freescale/nxp config options
-
- arch/arm64/configs/defconfig | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index a44ef99..248c242 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -1,7 +1,6 @@
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+-CONFIG_FHANDLE=y
+ CONFIG_AUDIT=y
+ CONFIG_NO_HZ_IDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
 -- 
 1.9.0
