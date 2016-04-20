@@ -1,34 +1,38 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Wed, 20 Apr 2016 11:39:02 -0700
-Subject: [PATCH 2/2] dmaengine: vdma: Add clock support
-In-Reply-To: <1461136800-20334-2-git-send-email-appanad@xilinx.com>
-References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
- <1461136800-20334-2-git-send-email-appanad@xilinx.com>
-Message-ID: <CAAtXAHd=QER9ukD8LKpHCGdmsv=MzJ4bxkvWVEatpfUhsh98SQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 Apr 2016 11:40:03 -0700
+Subject: [PATCH] ARM: mv78xx0: Remove CLK_IS_ROOT
+In-Reply-To: <9103114.2LquUEkh1k@wuerfel>
+References: <1461116404-3285-1-git-send-email-sboyd@codeaurora.org>
+ <9103114.2LquUEkh1k@wuerfel>
+Message-ID: <20160420184003.GI15324@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/20, Arnd Bergmann wrote:
+> On Tuesday 19 April 2016 18:40:04 Stephen Boyd wrote:
+> > This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+> > CLK_IS_ROOT", 2016-02-02) so remove it.
+> > 
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Jason Cooper <jason@lakedaemon.net
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> 
+> Looks good, like all other instances in arch/arm.
+> 
+> If you want to merge these through your tree, please add my
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> to all of them, in addition to the other other Acks. I don't
+> think there is a significant risk for regressions as they all
+> tend to be "stable" in the sense that those files haven't
+> been touched in a while.
+> 
 
-thanks for looking into this.
+Thanks. If Gregory doesn't pick them up I'll take care of it, but
+we're not in any hurry here.
 
-On Wed, Apr 20, 2016 at 12:20 AM, Kedareswara rao Appana
-<appana.durga.rao@xilinx.com> wrote:
-
-> +static int xdma_clk_init(struct xilinx_dma_device *xdev, bool enable)
-> +{
-> +       int i = 0, ret;
-> +
-> +       for (i = 0; i < xdev->numclks; i++) {
-> +               if (enable) {
-> +                       ret = clk_prepare_enable(xdev->clks[i]);
-> +                       if (ret) {
-> +                               dev_err(xdev->dev,
-> +                                       "failed to enable the axidma clock\n");
-> +                               return ret;
-
-What happens to the ones you already turned on, if say the third fails?
-
-Cheers,
-
-Moritz
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
