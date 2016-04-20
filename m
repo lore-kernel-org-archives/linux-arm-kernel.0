@@ -1,49 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Apr 2016 10:02:59 -0600
-Subject: [PATCH 0/8] STMPE fixes/rework and add STMPE1600 support
-In-Reply-To: <5717325F.6080808@st.com>
-References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
- <5716545D.9080006@wwwdotorg.org> <5717325F.6080808@st.com>
-Message-ID: <5717A833.3020304@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Apr 2016 17:11:22 +0100
+Subject: [PATCH 2/2 v6] ASoC: mediatek: Add second I2S on mt8173-rt5650
+ machine driver
+In-Reply-To: <1461145190.3774.5.camel@mtksdaap41>
+References: <1461134447-42001-1-git-send-email-pc.liao@mediatek.com>
+ <1461134447-42001-3-git-send-email-pc.liao@mediatek.com>
+ <20160420082917.GH3217@sirena.org.uk>
+ <1461145190.3774.5.camel@mtksdaap41>
+Message-ID: <20160420161122.GM3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2016 01:40 AM, Patrice Chotard wrote:
-> On 04/19/2016 05:53 PM, Stephen Warren wrote:
->> On 04/19/2016 06:18 AM, patrice.chotard at st.com wrote:
->>> From: Patrice Chotard <patrice.chotard@st.com>
->>>
->>> This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and
->>> prepare
->>>   the ground to add new STMPE1600 support.
->>>
->>> STMPE1600 datasheet is available here :
->>> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
->>>
->>> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
->>>
->>> Only STMPE1600 has been tested on STM32 platform. As i have no board
->>> with
->>> others STMPE
->>> variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
->>> and STMPE2403), i put in CC boards's maintainers which are using
->>> others STMPE variant.
->>>
->>> If they can kindly check that no regression has been introduce by
->>> this series
->>
->>> For TEGRA ARCHITECTURE SUPPORT
->>>     _ Stephen Warren <swarren@wwwdotorg.org>
->>>     _ Thierry Reding <thierry.reding@gmail.com>
->>>     _ Alexandre Courbot <gnurou@gmail.com>
->>
->> I don't know what STMPE is, and I don't believe it is used on Tegra;
->> what makes you think it is?
-...
-> I put you in copy as STMPE811 is used on tegra30-apalis and
-> tegra30-colibri platforms.
+On Wed, Apr 20, 2016 at 05:39:50PM +0800, PC Liao wrote:
+> On Wed, 2016-04-20 at 16:29 +0800, Mark Brown wrote:
+> > On Wed, Apr 20, 2016 at 02:40:47PM +0800, PC Liao wrote:
 
-Ah. You'd best contact the individual board owners, since those are 
-3rd-party Tegra boards and I don't believe anyone at NVIDIA has them to 
-test with etc. I added likely candidates to Cc and dropped all the 
-individuals unrelated to Tegra to keep the CC list low.
+> > > +Optional properties:
+> > > +- capture-dai: audio codec dai on capture path
+> > > +  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
+> > > +  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
+
+> > I sugggested changing this to use a subnode but you've ignored my
+> > suggestion...
+
+> Sorry.... It's my mistake.
+
+> You mean that using a subnode.
+> This is my example:
+
+>   codec-capture {
+> 	  sound-dai = <&rt5650 1>;
+>   };
+
+> Does this is your suggestion?
+
+Yeah.  Having refreshed my mind about the APIs a bit the idea is that if
+you do things this way then any additional parameters that are needed
+for the DAI can be added within the subnode.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160420/f845ba28/attachment.sig>
