@@ -1,27 +1,35 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 20 Apr 2016 15:44:15 -0500
-Subject: Looking for information on modern(ish) use of spidev
-In-Reply-To: <CAF_dkJDR7UEwf6-Ti6-Ocj-nWrB0_CzH4cJVG_QvOz0MqcXZJA@mail.gmail.com>
-References: <CAF_dkJDRaidOF5p1B+ssx=SKgUHonMj5TbG2mT3wE5bOdDw69g@mail.gmail.com>
- <20160420202052.GM2476@tarshish>
- <CAF_dkJDNV5TaX4y+c6s8y5JRH5LtWY5Kaaa=hEMY3aYf_aCdVA@mail.gmail.com>
- <20160420203254.GN2476@tarshish>
- <CAF_dkJDR7UEwf6-Ti6-Ocj-nWrB0_CzH4cJVG_QvOz0MqcXZJA@mail.gmail.com>
-Message-ID: <20160420204415.GA12459@hector.attlocal.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 20 Apr 2016 15:22:33 -0600
+Subject: [PATCH] coresight: etb10: fixing the right amount of words to read
+Message-ID: <1461187353-17894-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 04:35:13PM -0400, Patrick Doyle wrote:
-> On Wed, Apr 20, 2016 at 4:32 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > Hi Patrick,
-> > Are you sure you enabled CONFIG_SPI_SPIDEV in your kernel? Does your SPI
-> > master driver probe successfully?
-> It is configured as a module (and complains wildly when I modprobe it
-> with entries in my device tree).
-> 
-> The master driver probes and shows in in /sys/class/spi_master.
-> 
-> --wpd
+This patch rectifies the amount of words to read when the internal
+buffer is deemed bigger than the amount of space available in the
+perf ring buffer.
 
-Depending on how your devices are enumerated, you might need to rescan to see
-the spidev show up.  "mdev -s" if you are using mdev.
+The amount to read is set to the amount of space in the perf ring
+buffer rather than being subtracted by it.
+
+Reported-by: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etb10.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index a974c39171a9..4d2427600f09 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -440,7 +440,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 		u32 mask = ~(ETB_FRAME_SIZE_WORDS - 1);
+ 
+ 		/* The new read pointer must be frame size aligned */
+-		to_read -= handle->size & mask;
++		to_read = handle->size & mask;
+ 		/*
+ 		 * Move the RAM read pointer up, keeping in mind that
+ 		 * everything is in frame size units.
+-- 
+2.5.0
