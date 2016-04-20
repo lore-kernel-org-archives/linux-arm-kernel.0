@@ -1,140 +1,87 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Thu, 21 Apr 2016 00:40:34 +0800
-Subject: [PATCH v7] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
- driver
-Message-ID: <1461170434-39584-1-git-send-email-pc.liao@mediatek.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 20 Apr 2016 17:52:05 +0100
+Subject: [PATCH] drivers/perf: arm-pmu: fix RCU usage on resume from idle
+ states
+In-Reply-To: <20160420162354.GB3539@linux.vnet.ibm.com>
+References: <1461085689-2893-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160419172320.GD4509@arm.com> <7hr3e1b77r.fsf@baylibre.com>
+ <20160420134116.GA8537@red-moon>
+ <20160420162354.GB3539@linux.vnet.ibm.com>
+Message-ID: <20160420165205.GA17840@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds second I2S connection to rt5650 codec for capture path on
-mt8173-rt5650 machine driver.
+On Wed, Apr 20, 2016 at 09:23:54AM -0700, Paul E. McKenney wrote:
 
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
----
-Changes since v6:
-Use subnode to determine the capture path
----
- .../devicetree/bindings/sound/mt8173-rt5650.txt    |   10 ++++
- sound/soc/mediatek/mt8173-rt5650.c                 |   49 ++++++++++++++++++--
- 2 files changed, 56 insertions(+), 3 deletions(-)
+[...]
 
-diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-index fe5a5ef..5bfa6b6 100644
---- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-+++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-@@ -5,11 +5,21 @@ Required properties:
- - mediatek,audio-codec: the phandles of rt5650 codecs
- - mediatek,platform: the phandle of MT8173 ASoC platform
- 
-+Optional subnodes:
-+- codec-capture : the subnode of rt5650 codec capture
-+Required codec-capture subnode properties:
-+- sound-dai: audio codec dai name on capture path
-+  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
-+  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
-+
- Example:
- 
- 	sound {
- 		compatible = "mediatek,mt8173-rt5650";
- 		mediatek,audio-codec = <&rt5650>;
- 		mediatek,platform = <&afe>;
-+		codec-capture {
-+			sound-dai = <&rt5650 1>;
-+		};
- 	};
- 
-diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
-index bb09bb1..b8ed965 100644
---- a/sound/soc/mediatek/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173-rt5650.c
-@@ -85,12 +85,28 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- {
- 	struct snd_soc_card *card = runtime->card;
- 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
-+	const char *codec_capture_dai = runtime->codec_dais[1]->name;
- 	int ret;
- 
- 	rt5645_sel_asrc_clk_src(codec,
--				RT5645_DA_STEREO_FILTER |
--				RT5645_AD_STEREO_FILTER,
-+				RT5645_DA_STEREO_FILTER,
- 				RT5645_CLK_SEL_I2S1_ASRC);
-+
-+	if (!strcmp(codec_capture_dai, "rt5645-aif1")) {
-+		dev_warn(card->dev,
-+			 "Only one dai codec found in DTS, enabled AD filter\n");
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+	} else if (!strcmp(codec_capture_dai, "rt5645-aif2")) {
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S2_ASRC);
-+	} else {
-+		dev_err(card->dev, "Can't get the right codec dai\n");
-+		return -EINVAL;
-+	}
-+
- 	/* enable jack detection */
- 	ret = snd_soc_card_jack_new(card, "Headset Jack",
- 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
-@@ -110,6 +126,11 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- 
- static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
- 	{
-+		/* Playback */
-+		.dai_name = "rt5645-aif1",
-+	},
-+	{
-+		/* Capture */
- 		.dai_name = "rt5645-aif1",
- 	},
- };
-@@ -149,7 +170,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
- 		.cpu_dai_name = "I2S",
- 		.no_pcm = 1,
- 		.codecs = mt8173_rt5650_codecs,
--		.num_codecs = 1,
-+		.num_codecs = 2,
- 		.init = mt8173_rt5650_init,
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			   SND_SOC_DAIFMT_CBS_CFS,
-@@ -177,6 +198,8 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &mt8173_rt5650_card;
- 	struct device_node *platform_node;
-+	struct device_node *np;
-+	const char *codec_capture_dai;
- 	int i, ret;
- 
- 	platform_node = of_parse_phandle(pdev->dev.of_node,
-@@ -199,6 +222,26 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- 			"Property 'audio-codec' missing or invalid\n");
- 		return -EINVAL;
- 	}
-+	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
-+
-+	if (of_find_node_by_name(platform_node, "codec-capture")) {
-+		np = of_get_child_by_name(pdev->dev.of_node, "codec-capture");
-+		if (!np) {
-+			dev_err(&pdev->dev,
-+				"%s: Can't find codec-capture DT node\n",
-+				__func__);
-+			return -EINVAL;
-+		}
-+		ret = snd_soc_of_get_dai_name(np, &codec_capture_dai);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"%s codec_capture_dai name fail %d\n",
-+				__func__, ret);
-+			return ret;
-+		}
-+		mt8173_rt5650_codecs[1].dai_name = codec_capture_dai;
-+	}
-+
- 	card->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, card);
- 
--- 
-1.7.9.5
+> > > Maybe RCU_NONIDLE() will help here?
+> > 
+> > Thanks for chiming in.
+> > 
+> > CPU_PM notifiers are called from process context (which is not necessarily
+> > the idle thread) with IRQs disabled from:
+> > 
+> > - CPUidle drivers state enter calls
+> > - syscore callbacks (ie suspend2RAM - suspend thread)
+> > - bL switcher
+> > - MCPM loopback
+> > 
+> > The questions I have are:
+> > 
+> > - Is it safe to wrap a call (in this case armpmu_start()) with RCU_NONIDLE
+> >   if the core is not actually executing the idle thread ? The function
+> >   requiring rcu locks/dereferences is perf_event_update_userpage().
+> 
+> Yes it is.
+> 
+> > - What are RCU_NONIDLE side-effects (ie what can be actually called from
+> >   within an RCU_NONIDLE wrapper ?)
+> 
+> There are a few restrictions:
+> 
+> 1.	Code within RCU_NONIDLE() cannot block.  Then again, neither
+> 	can the idle task.  ;-)
+> 
+> 2.	RCU_NONIDLE() can be nested, but not indefinitely.  Then again,
+> 	given that the limit even on a 32-bit system is something like
+> 	a million, I bet you hit compiler or stack-size limits long
+> 	before you overflow RCU_NONIDLE()'s counter.
+> 
+> 3.	You can neither branch into the middle of RCU_NONIDLE()'s code
+> 	nor branch out from the middle of RCU_NONIDLE()'s code.
+> 	Calling functions is just fine, but things like this are not:
+> 
+> 		RCU_NONIDLE({
+> 			do_something();
+> 			goto bad_idea;	/* BUG!!! */
+> 			do_something_else();});
+> 		do_yet_a_third_thing();
+> 	bad_idea:
+> 
+> 	Branching -within- the RCU_NONIDLE() code is just fine.
+> 
+> Yes, and I am adding this information to RCU_NONIDLE()'s header
+> comment, apologies for its not being there to begin with!
+> (See below for patches.)
+
+Thank you for the explanation, that's now clear. For my own understanding:
+RCU_NONIDLE() is a way to inform the RCU subsystem that the CPU in question
+should be temporarily *watched* (ie it is not idle from an RCU standpoint),
+correct ?
+
+> > It would be nice if we can use it instead of merging this patch, I need
+> > more insights into RCU_NONIDLE usage though before proceeding.
+> 
+> Please let me know if any of the above restrictions cause you a problem.
+
+I can't think of any, perf_event_update_userpage(), that I will call
+indirectly through:
+
+RCU_NONIDLE(armpmu_start());
+
+is not allowed to block anyway, so I think we have a much better
+solution than this one, new patch coming, Catalin please drop this one.
+
+Thank you all !
+Lorenzo
