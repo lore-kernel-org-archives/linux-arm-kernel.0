@@ -1,41 +1,19 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 20 Apr 2016 12:49:59 +0530
-Subject: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
-Message-ID: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Wed, 20 Apr 2016 17:04:21 +0930
+Subject: [PATCH v2] pinctrl-exynos5440: Use off-stack memory for
+ pinctrl_gpio_range
+In-Reply-To: <5717281A.70906@samsung.com>
+References: <1461117257-27048-1-git-send-email-andrew@aj.id.au>
+ <5717281A.70906@samsung.com>
+Message-ID: <1461137661.27001.22.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the binding doc with clock description
-for vdma.
+On Wed, 2016-04-20 at 08:56 +0200, Krzysztof Kozlowski wrote:
+> When you resubmit patches (unless there is a significant change in the
+> patch) please always put accumulated tags after existing tags.
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
- Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+Okay, I wasn't sure about that. Thanks for the clarification and I'll
+do so in the future.
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-index fcc2b65..e1c9019 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-@@ -21,6 +21,10 @@ Required properties:
- - dma-channel child node: Should have at least one channel and can have up to
- 	two channels per device. This node specifies the properties of each
- 	DMA channel (see child node properties below).
-+- clocks: Input clock specifier. Refer to common clock bindings.
-+- clock-names: List of input clocks "axi_clk", "tx_clk", "txs_clk" (list of input
-+	       cloks may vary based on the ip configuration. see clock bindings
-+	       for more info).
- 
- Required properties for VDMA:
- - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-@@ -60,6 +64,8 @@ axi_vdma_0: axivdma at 40030000 {
- 	xlnx,num-fstores = <0x8>;
- 	xlnx,flush-fsync = <0x1>;
- 	xlnx,addrwidth = <0x20>;
-+	clocks = <&clk 0>, <&clk 1>, <&clk 2>;
-+	clock-names = "axi_clk", "tx_clk", "txs_clk";
- 	dma-channel at 40030000 {
- 		compatible = "xlnx,axi-vdma-mm2s-channel";
- 		interrupts = < 0 54 4 >;
--- 
-2.1.2
+Andrew
