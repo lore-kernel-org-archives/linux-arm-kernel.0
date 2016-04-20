@@ -1,126 +1,135 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 20 Apr 2016 07:36:22 -0700
-Subject: [PATCH v2 2/2] dmaengine: vdma: Add clock support
-In-Reply-To: <1461152599-28858-2-git-send-email-appanad@xilinx.com>
-References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
- <1461152599-28858-2-git-send-email-appanad@xilinx.com>
-Message-ID: <20160420143622.GP7128@xsjsorenbubuntu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Apr 2016 15:38:38 +0100
+Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
+ MPIDR_EL1
+In-Reply-To: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
+References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160420143838.GB15229@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-04-20 at 17:13:19 +0530, Kedareswara rao Appana wrote:
-> Added basic clock support. The clocks are requested at probe
-> and released at remove.
+On Wed, Apr 20, 2016 at 07:08:39AM -0700, Ashok Kumar wrote:
+> For guests with NUMA configuration, Node ID needs to
+> be recorded in the respective affinity byte of MPIDR_EL1.
+
+The MPIDR.Aff* fields are effectively arbitrary, and do not encode NUMA
+topology information. They may describe some level of closeness of CPUs
+relative to each other, but that is independent of the memory hierarchy,
+and even then is unfortunately not all that informative.
+
+NUMA topology information has to come from FW. With ACPI that's
+SRAT+SLIT, and with DT that's something like [1].
+
+There may be reasons to want to configure the MPIDR_EL1.Aff* fields, but
+this is not required for NUMA, nor is it a good idea for an OS to assume
+NUMA topology from the MPIDR_EL1.Aff* fields.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/420900.html
+
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Cache the MPIDR_EL1 programmed by userspace and use it for
+> subsequent reset_mpidr calls.
+> 
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
 > ---
-> Changes for v2:
-> --> None.
+>  arch/arm64/include/asm/kvm_host.h |  1 +
+>  arch/arm64/kvm/sys_regs.c         | 44 ++++++++++++++++++++++++++++-----------
+>  2 files changed, 33 insertions(+), 12 deletions(-)
 > 
->  drivers/dma/xilinx/xilinx_vdma.c | 56 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-> index 70caea6..d526029 100644
-> --- a/drivers/dma/xilinx/xilinx_vdma.c
-> +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> @@ -44,6 +44,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/of_irq.h>
->  #include <linux/slab.h>
-> +#include <linux/clk.h>
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index f5c6bd2..1fc723d 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -197,6 +197,7 @@ struct kvm_vcpu_arch {
+>  	/* HYP configuration */
+>  	u64 hcr_el2;
+>  	u32 mdcr_el2;
+> +	u64 vmpidr_el2;
 >  
->  #include "../dmaengine.h"
->  
-> @@ -352,6 +353,8 @@ struct xilinx_dma_chan {
->   * @flush_on_fsync: Flush on frame sync
->   * @ext_addr: Indicates 64 bit addressing is supported by dma device
->   * @dmatype: DMA ip type
-> + * @clks:	pointer to array of clocks
-> + * @numclks:	number of clocks available
->   */
->  struct xilinx_dma_device {
->  	void __iomem *regs;
-> @@ -362,6 +365,8 @@ struct xilinx_dma_device {
->  	u32 flush_on_fsync;
->  	bool ext_addr;
->  	enum xdma_ip_type dmatype;
-> +	struct clk **clks;
-> +	int numclks;
->  };
->  
->  /* Macros */
-> @@ -1731,6 +1736,26 @@ int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+>  	/* Exception Information */
+>  	struct kvm_vcpu_fault_info fault;
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 7bbe3ff..468f251 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -424,21 +424,29 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, AMAIR_EL1) = amair;
 >  }
->  EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
 >  
-> +static int xdma_clk_init(struct xilinx_dma_device *xdev, bool enable)
-> +{
-> +	int i = 0, ret;
+> +static int set_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+> +		     const struct kvm_one_reg *reg, void __user *uaddr);
 > +
-> +	for (i = 0; i < xdev->numclks; i++) {
-> +		if (enable) {
-> +			ret = clk_prepare_enable(xdev->clks[i]);
-> +			if (ret) {
-> +				dev_err(xdev->dev,
-> +					"failed to enable the axidma clock\n");
-> +				return ret;
-> +			}
-> +		} else {
-> +			clk_disable_unprepare(xdev->clks[i]);
-> +		}
+>  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  {
+>  	u64 mpidr;
+>  
+> -	/*
+> -	 * Map the vcpu_id into the first three affinity level fields of
+> -	 * the MPIDR. We limit the number of VCPUs in level 0 due to a
+> -	 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
+> -	 * of the GICv3 to be able to address each CPU directly when
+> -	 * sending IPIs.
+> -	 */
+> -	mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
+> -	mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
+> -	mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
+> -	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+> +	if (!vcpu->arch.vmpidr_el2) {
+> +		/*
+> +		 * Map the vcpu_id into the first three affinity level fields of
+> +		 * the MPIDR. We limit the number of VCPUs in level 0 due to a
+> +		 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
+> +		 * of the GICv3 to be able to address each CPU directly when
+> +		 * sending IPIs.
+> +		 */
+> +		mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
+> +		mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
+> +		mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
+> +		vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+> +	} else {
+> +		/* use the userspace configured value */
+> +		vcpu_sys_reg(vcpu, MPIDR_EL1) = vcpu->arch.vmpidr_el2;
 > +	}
+>  }
+>  
+>  static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> @@ -902,7 +910,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  
+>  	/* MPIDR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
+> -	  NULL, reset_mpidr, MPIDR_EL1 },
+> +	  NULL, reset_mpidr, MPIDR_EL1, 0, NULL, set_mpidr },
+>  	/* SCTLR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
+>  	  access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
+> @@ -2034,6 +2042,18 @@ static int demux_c15_set(u64 id, void __user *uaddr)
+>  	}
+>  }
+>  
+> +static int set_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+> +		     const struct kvm_one_reg *reg, void __user *uaddr)
+> +{
+> +	int ret;
 > +
-> +	return 0;
+> +	ret = reg_from_user(&vcpu_sys_reg(vcpu, rd->reg), uaddr, reg->id);
+> +	if (!ret)
+> +		vcpu->arch.vmpidr_el2 = vcpu_sys_reg(vcpu, rd->reg);
+> +
+> +	return ret;
 > +}
 > +
->  /* -----------------------------------------------------------------------------
->   * Probe and remove
->   */
-> @@ -1919,6 +1944,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
->  	struct resource *io;
->  	u32 num_frames, addr_width;
->  	int i, err;
-> +	const char *str;
->  
->  	/* Allocate and initialize the DMA engine structure */
->  	xdev = devm_kzalloc(&pdev->dev, sizeof(*xdev), GFP_KERNEL);
-> @@ -1965,6 +1991,32 @@ static int xilinx_dma_probe(struct platform_device *pdev)
->  	/* Set the dma mask bits */
->  	dma_set_mask(xdev->dev, DMA_BIT_MASK(addr_width));
->  
-> +	xdev->numclks = of_property_count_strings(pdev->dev.of_node,
-> +						  "clock-names");
-> +	if (xdev->numclks > 0) {
-> +		xdev->clks = devm_kmalloc_array(&pdev->dev, xdev->numclks,
-> +						sizeof(struct clk *),
-> +						GFP_KERNEL);
-> +		if (!xdev->clks)
-> +			return -ENOMEM;
-> +
-> +		for (i = 0; i < xdev->numclks; i++) {
-> +			of_property_read_string_index(pdev->dev.of_node,
-> +						      "clock-names", i, &str);
-> +			xdev->clks[i] = devm_clk_get(xdev->dev, str);
-> +			if (IS_ERR(xdev->clks[i])) {
-> +				if (PTR_ERR(xdev->clks[i]) == -ENOENT)
-> +					xdev->clks[i] = NULL;
-> +				else
-> +					return PTR_ERR(xdev->clks[i]);
-> +			}
-> +		}
-> +
-> +		err = xdma_clk_init(xdev, true);
-> +		if (err)
-> +			return err;
-> +	}
-
-I guess this works, but the relation to the binding is a little loose,
-IMHO. Instead of using the clock names from the binding this is just
-using whatever is provided in DT and enabling it. Also, all the clocks
-here are handled as optional feature, while binding - and I guess
-reality too - have them as mandatory.
-It would be nicer if the driver specifically asks for the clocks it
-needs and return an error if a mandatory clock is missing.
-
-	S?ren
+>  int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  {
+>  	const struct sys_reg_desc *r;
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
