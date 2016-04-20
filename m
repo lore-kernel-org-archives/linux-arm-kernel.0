@@ -1,116 +1,63 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 20 Apr 2016 09:57:41 +0200
-Subject: [PATCH 3/3] RTC: Update seconds time programming logic
-In-Reply-To: <3802E9A6666DF54886E2B9CBF743BA9825E0B42B@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1460463346-24923-1-git-send-email-anuragku@xilinx.com>
- <1460463346-24923-3-git-send-email-anuragku@xilinx.com>
- <20160419223109.GF29844@piout.net>
- <3802E9A6666DF54886E2B9CBF743BA9825E0B42B@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160420075741.GK29844@piout.net>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Wed, 20 Apr 2016 13:29:32 +0530
+Subject: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
+In-Reply-To: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
+References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
+Message-ID: <CAKfKVtEkfnDqU476troXmCw20ATvQvj-JdPX-BCuPDR-9ZxKHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/2016 at 07:10:22 +0000, Anurag Kumar Vulisha wrote :
-> The reason for me keeping this logic is, our RTC controller updates the read register after 1 sec
-> delay, so when read , it gives 1 sec delay(correct time - 1 sec). So to avoid that we are programming
-> load time + 1sec into the write register. So when read we would be getting the correct time without
-> any delay. If any request comes from user to read time before RTC updating the read register, we
-> need to give the previous loaded time instead of giving the time from the read register. 
-> For doing the above said, we are relaying on seconds interrupt in  RTC_INT_STS register. We
-> Clear the RTC_INT_STS register while programming the time into the write register . If we get a
-> request from user to read time within the 1 sec period i.e before the RTC_INT_SEC interrupt bit
-> is set in RTC_INT_STS, we need to give the previous loaded time.
-> This should be done if time is requested from user space within  1 sec period after writing time, after
-> the 1 sec  delay if user requested the time , we can  give the give time from read register . This is because
-> the correct time is being updated in the read register after 1 sec delay. For this logic to happen we are
-> depending on  xrtcdev->time_updated  variable to get updated after the very fist RTC_INT_SEC interrupt
-> occurance in the interrupt handler.
-> Since we are relaying on  xrtcdev->time_updated  to get updated from interrupt handler, I think reading
-> the RTC_INT_STS in xlnx_rtc_read_time() is not helpful.
-> 
+On Wed, Apr 20, 2016 at 12:49 PM, Kedareswara rao Appana
+<appana.durga.rao@xilinx.com> wrote:
+> This patch updates the binding doc with clock description
+> for vdma.
+>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+>  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> index fcc2b65..e1c9019 100644
+> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> @@ -21,6 +21,10 @@ Required properties:
+>  - dma-channel child node: Should have at least one channel and can have up to
+>         two channels per device. This node specifies the properties of each
+>         DMA channel (see child node properties below).
+> +- clocks: Input clock specifier. Refer to common clock bindings.
+> +- clock-names: List of input clocks "axi_clk", "tx_clk", "txs_clk" (list of input
+> +              cloks may vary based on the ip configuration. see clock bindings
+> +              for more info).
+>
+>  Required properties for VDMA:
+>  - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
+> @@ -60,6 +64,8 @@ axi_vdma_0: axivdma at 40030000 {
+>         xlnx,num-fstores = <0x8>;
+>         xlnx,flush-fsync = <0x1>;
+>         xlnx,addrwidth = <0x20>;
+> +       clocks = <&clk 0>, <&clk 1>, <&clk 2>;
+> +       clock-names = "axi_clk", "tx_clk", "txs_clk";
 
-Yeas, I understood that. But my question was whether the interrupt
-handling was necessary at all.
-Instead of waiting for an interrupt to set time_updated, can't you
-simply read RTC_INT_STS and check for the RTC_INT_SEC bit in
-xlnx_rtc_read_time() ?
+the module has
+s_axi_lite_aclk Clock I AXI VDMA AXI4-Lite interface clock
+ m_axi_mm2s_aclk Clock I AXI VDMA MM2S clock
+ m_axi_s2mm_aclk Clock I AXI VDMA S2MM clock
+ m_axis_mm2s_aclk Clock I AXI VDMA MM2S AXIS clock
+ s_axis_s2mm_aclk Clock I AXI VDMA S2MM AXIS clock
 
-Something like:
+I think a partial support is not wrong.
+however  we should keep the names same as the TRM.
 
-status = readl(xrtcdev->reg_base + RTC_INT_STS)
-if (status & RTC_INT_SEC)
-	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-else
-	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD) - 1, tm);
 
-It all depends on whether the RTC_INT_SEC bit in RTC_INT_STS is being
-updated even when it is not enabled as an interrupt.
-
-> Thanks,
-> Anurag Kumar V
->   
-> > > +	xrtcdev->time_updated = 0;
-> > > +
-> > >  	return 0;
-> > >  }
-> > >
-> > > @@ -85,7 +103,17 @@ static int xlnx_rtc_read_time(struct device *dev,
-> > > struct rtc_time *tm)  {
-> > >  	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-> > >
-> > > -	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-> > > +	if (xrtcdev->time_updated == 0) {
-> > > +		/*
-> > > +		 * Time written in SET_TIME_WRITE has not yet updated into
-> > > +		 * the seconds read register, so read the time from the
-> > > +		 * SET_TIME_WRITE instead of CURRENT_TIME register.
-> > > +		 */
-> > > +		rtc_time64_to_tm(readl(xrtcdev->reg_base +
-> > RTC_SET_TM_RD), tm);
-> > > +		tm->tm_sec -= 1;
-> > > +	} else {
-> > > +		rtc_time64_to_tm(readl(xrtcdev->reg_base +
-> > RTC_CUR_TM), tm);
-> > > +	}
-> > >
-> > >  	return rtc_valid_tm(tm);
-> > >  }
-> > > @@ -133,6 +161,9 @@ static void xlnx_init_rtc(struct xlnx_rtc_dev
-> > > *xrtcdev)  {
-> > >  	u32 rtc_ctrl;
-> > >
-> > > +	/* Enable RTC SEC interrupts */
-> > > +	writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_EN);
-> > > +
-> > >  	/* Enable RTC switch to battery when VCC_PSAUX is not available */
-> > >  	rtc_ctrl = readl(xrtcdev->reg_base + RTC_CTRL);
-> > >  	rtc_ctrl |= RTC_BATT_EN;
-> > > @@ -169,8 +200,13 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void
-> > *id)
-> > >  	/* Clear interrupt */
-> > >  	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-> > >
-> > > -	if (status & RTC_INT_SEC)
-> > > +	if (status & RTC_INT_SEC) {
-> > > +		if (xrtcdev->time_updated == 0) {
-> > > +			/* RTC updated the seconds read register */
-> > > +			xrtcdev->time_updated = 1;
-> > > +		}
-> > >  		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
-> > > +	}
-> > >  	if (status & RTC_INT_ALRM)
-> > >  		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
-> > >
-> > > --
-> > > 2.1.2
-> > >
-> > 
-> > --
-> > Alexandre Belloni, Free Electrons
-> > Embedded Linux, Kernel and Android engineering
-> > http://free-electrons.com
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>         dma-channel at 40030000 {
+>                 compatible = "xlnx,axi-vdma-mm2s-channel";
+>                 interrupts = < 0 54 4 >;
+> --
+> 2.1.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
