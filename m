@@ -1,57 +1,88 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 20 Apr 2016 13:47:10 +0100
-Subject: [PATCH v7 01/10] iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
-In-Reply-To: <1461084994-2355-2-git-send-email-eric.auger@linaro.org>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-2-git-send-email-eric.auger@linaro.org>
-Message-ID: <57177A4E.4090804@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 20 Apr 2016 14:51:09 +0200
+Subject: [PATCH v3 0/9] EFI framebuffer support for ARM and arm64
+In-Reply-To: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_WPCbGgG1TjnY5tQ4YPgR_LDdaeR1fm-S=C894OsXiGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On 1 April 2016 at 18:05, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This series adds support to ARM and arm64 for using the kernel's EFI
+> framebuffer driver to drive EFI Graphics Output Protocol (GOP) based
+> framebuffers.
+>
 
-On 19/04/16 17:56, Eric Auger wrote:
-> Introduce a new DOMAIN_ATTR_MSI_MAPPING domain attribute. If supported,
-> this means the MSI addresses need to be mapped in the IOMMU.
->
-> x86 IOMMUs typically don't expose the attribute since on x86, MSI write
-> transaction addresses always are within the 1MB PA region [FEE0_0000h -
-> FEF0_000h] window which directly targets the APIC configuration space and
-> hence bypass the sMMU. On ARM and PowerPC however MSI transactions are
-> conveyed through the IOMMU.
+Matt: FYI the memremap() patches for ARM that this series (and the
+memory attributes one as well, for that matter) depends on have been
+pulled by Russell and should turn up in -next shortly. That means
+these patches are good to go, as far as I am concerned (unless there
+are remaining concerns?)
 
-What's stopping us from simply inferring this from the domain's IOMMU 
-not advertising interrupt remapping capabilities?
+Thanks,
+Ard.
 
-Robin.
 
-> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> This involves refactoring some of the existing x86 code so it can be reused
+> by ARM and arm64, and wiring it up both in the UEFI stub and in the core
+> kernel into the existing UEFI infrastructure for ARM and arm64.
 >
-> ---
+> Changes since v2:
+> - added acks from Peter and David (patches #3 and #4)
+> - move introduction of typedef of efi_graphics_output_protocol_query_mode to
+>   patch #1 (and move it along in a subsequent patch) to fix a transient build
+>   issue spotted by the kbuild robot
+> - register screen_info as platform driver data explicitly, as x86 does (David)
+> - assign dummy values to screen_info.orig_video_cols/orig_video_lines, this is
+>   required by dummycon on ARM
 >
-> v4 -> v5:
-> - introduce the user in the next patch
+> Changes since v1:
+> - don't use const efi_guid_t and subsequently cast away constness
+> - update first, then move the x86 GOP code rather than creating a copy
+>   and update at the same time, and delete the x86 code later: this should
+>   make it easier to spot changes to the code that affect its correct operation
+>   on x86
+> - refactor the ARM changes so that the config table creation and consumption
+>   is introduced in the same patch (including the prototype changes for the
+>   install_configuration_table() boot service function pointer)
+> - use true/false rather than 1/0
+> - split stub changes into 32-bit arm/64-bit arm/common arm
+> - split platform device changes from platform driver changes (latter is
+>   basically only a Kconfig change)
 >
-> RFC v1 -> v1:
-> - the data field is not used
-> - for this attribute domain_get_attr simply returns 0 if the MSI_MAPPING
->    capability if needed or <0 if not.
-> - removed struct iommu_domain_msi_maps
-> ---
->   include/linux/iommu.h | 1 +
->   1 file changed, 1 insertion(+)
+> Ard Biesheuvel (9):
+>   efi/x86: prepare GOP handling code for reuse as generic code
+>   efi: libstub: move Graphics Output Protocol handling to generic code
+>   efi/x86: efifb: move DMI based quirks handling out of generic code
+>   efi: efifb: use builtin_platform_driver and drop unused includes
+>   efi/arm64: libstub: make screen_info accessible to the UEFI stub
+>   efi/arm: libstub: make screen_info accessible to the UEFI stub
+>   efi/arm*: libstub: wire up GOP protocol to struct screen_info
+>   efi/arm*: wire up struct screen_info to efi-framebuffer platform
+>     device
+>   efifb: enable the efi-framebuffer platform driver for ARM and arm64
 >
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 62a5eae..b3e8c5b 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -113,6 +113,7 @@ enum iommu_attr {
->   	DOMAIN_ATTR_FSL_PAMU_ENABLE,
->   	DOMAIN_ATTR_FSL_PAMUV1,
->   	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-> +	DOMAIN_ATTR_MSI_MAPPING, /* Require MSIs mapping in iommu */
->   	DOMAIN_ATTR_MAX,
->   };
+>  arch/arm/include/asm/efi.h                |  11 +-
+>  arch/arm/kernel/setup.c                   |   3 +-
+>  arch/arm64/include/asm/efi.h              |  11 +-
+>  arch/arm64/kernel/efi.c                   |   3 +
+>  arch/arm64/kernel/image.h                 |   1 +
+>  arch/x86/boot/compressed/eboot.c          | 308 +----------------
+>  arch/x86/boot/compressed/eboot.h          |  74 ----
+>  arch/x86/include/asm/efi.h                |   7 +
+>  arch/x86/kernel/sysfb_efi.c               |  15 +
+>  drivers/firmware/efi/arm-init.c           |  52 ++-
+>  drivers/firmware/efi/efi.c                |   5 +-
+>  drivers/firmware/efi/libstub/Makefile     |   2 +-
+>  drivers/firmware/efi/libstub/arm-stub.c   |  23 ++
+>  drivers/firmware/efi/libstub/arm32-stub.c |  37 ++
+>  drivers/firmware/efi/libstub/gop.c        | 354 ++++++++++++++++++++
+>  drivers/video/fbdev/Kconfig               |   2 +-
+>  drivers/video/fbdev/efifb.c               |  21 +-
+>  include/linux/efi.h                       |  97 +++++-
+>  18 files changed, 619 insertions(+), 407 deletions(-)
+>  create mode 100644 drivers/firmware/efi/libstub/gop.c
 >
+> --
+> 2.5.0
 >
