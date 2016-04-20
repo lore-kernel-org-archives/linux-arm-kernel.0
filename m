@@ -1,96 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 21 Apr 2016 01:02:29 +0200
-Subject: [PATCH v8 0/2] Fix dma mapping when the cache is coherent
-In-Reply-To: <CAPv3WKe2S1qbSByOgUABRcnTVoW-ad1guSSNsmPuFWJ8-W5sOg@mail.gmail.com>
- (Marcin Wojtas's message of "Sat, 16 Apr 2016 17:27:33 +0200")
-References: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKe2S1qbSByOgUABRcnTVoW-ad1guSSNsmPuFWJ8-W5sOg@mail.gmail.com>
-Message-ID: <877ffrx4sa.fsf@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 21 Apr 2016 01:03:17 +0200
+Subject: bug in autoloading of imx-ipuv3-crtc
+In-Reply-To: <1513165.9WxCa41tI1@anubis.ausil.us>
+References: <6926808.b0joqYQPQE@anubis.ausil.us>
+ <20160419185049.GC19428@n2100.arm.linux.org.uk>
+ <2530051.TK07cZHuGk@anubis.ausil.us>
+ <1513165.9WxCa41tI1@anubis.ausil.us>
+Message-ID: <20160420230317.GT29108@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On sam., avril 16 2016, Marcin Wojtas <mw@semihalf.com> wrote:
+Hello,
 
-> Hi Gregory,
->
-> You can re-add my tested-by. Hang is no longer a problem with your
-> patch during my test of neta.
+On Tue, Apr 19, 2016 at 03:16:01PM -0500, Dennis Gilmore wrote:
+> On Tuesday, April 19, 2016 2:27:17 PM CDT Dennis Gilmore wrote:
+> > On Tuesday, April 19, 2016 7:50:49 PM CDT Russell King - ARM Linux wrote:
+> > > On Tue, Apr 19, 2016 at 01:34:23PM -0500, Dennis Gilmore wrote:
+> > > > on all of my i.MX6 systems imx-ipuv3-crtc ius not getting automatically
+> > > > loaded.  Everything is built as a module
+> > > > 
+> > > > CONFIG_DRM_IMX=m
+> > > > CONFIG_DRM_IMX_FB_HELPER=m
+> > > > CONFIG_DRM_IMX_HDMI=m
+> > > > CONFIG_DRM_IMX_IPUV3=m
+> > > > CONFIG_DRM_IMX_LDB=m
+> > > > CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
+> > > > CONFIG_DRM_IMX_TVE=m
+> > > > CONFIG_IMX_IPUV3_CORE=m
+> > > > 
+> > > > The result is that until I log in via serial or ssh and modprobe the
+> > > > module there is no display.  I suspect that there is some devicetree
+> > > > glue missing 4.4 and 4.5 seem to both be effected.
+> > > 
+> > > DT doesn't come into it for imx-ipuv3-crtc - these platform devices are
+> > > created by drivers/gpu/ipu-v3/ipu-common.c itself.
+> > > 
+> > > drivers/gpu/drm/imx/ipuv3-crtc.c contains the proper module alias which
+> > > should result in the module loaded at boot time when the imx-ipuv3-crtc
+> > > devices are created.
+> > > 
+> > > Could the problem be that imx-ipu-v3 isn't being loaded?  However, again,
+> > > it looks to me like everything is correct there.
+> > > 
+> > > Are you saying that this used to work in older kernel versions like 4.3,
+> > > but stopped in 4.4?
+> > 
+> > yers it used to work and stopped working. I would need to go back and test
+> > old kernels to figure out where it broke.
+> 
+> after installing some old kernels it broke with 4.4-rc4 which included a patch 
+> with teh subject of "drm/imx: Remove of_node assignment from ipuv3-crtc driver 
+> probe"
 
-The patch was already submitted in the Russell King's Patch Tracking
-System, so I can't add the tested-by on them, but I am sure it will help
-these pacthes to be merged.
+Just to be sure: 4.4-rc4 with 407c9eba7897 ("drm/imx: Remove of_node
+assignment from ipuv3-crtc driver probe") reverted works fine for you?
 
-Thanks,
-
-Gregory
-
->
-> Best regards,
-> Marcin
->
-> 2016-04-12 17:31 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
->> Hi,
->>
->> These two patches fixes the dma mapping functions when the system is
->> cache coherent. The first one allows to fix an issue we have on Armada
->> 375/38x with the PL310 that's why it is tagged for stable too.
->>
->> Thanks,
->>
->> Gregory
->>
->> PS: the mailing list was missing in the recipient list of the v7. It
->> was a mistake and I realized it only now. If needed I can repost it
->> with the few exchange we had with Russell King.
->>
->>
->> Changelog
->> v7 -> v8:
->>  - Use a flag instead of a boolean for checking the coherency. It
->>    improve the readability of the code. Suggested by Russell King.
->>  - Consider that when coherency is set, it's for both L1 and L2 caches
->>  - Use the arm_dma_alloc_args struct to pass the coherency status when
->>    possible. Suggested by Rabin Vincent
->>  - Remove the Tested-by flag from Marcin because of the modifications
->>    around the L1 cache management in this series.
->>
->> v6 -> v7:
->>  - Renamed is coherent by l2_coherent as suggested by Russell
->>
->> v5 -> v6:
->>  - Rebased on v4.6-rc1
->>
->> v4 -> v5
->>  - Keep the dmac_* function outside the !is_coherent case.
->>
->> v3 -> v4:
->>  - Rebased on v4.3-rc1
->>  - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
->>    allocation from CMA for coherent DMA"
->>
->> v2 -> v3:
->>
->>  - Fix comments in patch 1 as suggested by Catalin.
->>  - Fix build issues in patch 2 (by using the multi_v7_defconfig +
->>    CONFIG_ROCKCHIP_IOMMU).
->>  - Add the arm_coherent_iommu_mmap_attrs function.
->>
->>
->> Gregory CLEMENT (2):
->>   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
->>   ARM: dma-mapping: Fix the coherent case when iommu is used
->>
->>  arch/arm/mm/dma-mapping.c | 144 +++++++++++++++++++++++++++++++++-------------
->>  1 file changed, 105 insertions(+), 39 deletions(-)
->>
->> --
->> 2.5.0
->>
+Best regards
+Uwe
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
