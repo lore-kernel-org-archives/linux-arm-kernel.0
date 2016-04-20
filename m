@@ -1,10 +1,10 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 20 Apr 2016 14:02:45 +0200
-Subject: [PATCH v6 10/11] soc: renesas: rcar-sysc: Add support for R-Car E2
+Date: Wed, 20 Apr 2016 14:02:41 +0200
+Subject: [PATCH v6 06/11] soc: renesas: rcar-sysc: Add support for R-Car H1
  power areas
 In-Reply-To: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
 References: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1461153766-750-11-git-send-email-geert+renesas@glider.be>
+Message-ID: <1461153766-750-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,37 +19,37 @@ v5:
   - Add "always-on" power area,
 
 v4:
-  - Rename R8A7794_PD_SH to R8A7794_PD_SH_4A, "sh" to "sh-4a",
+  - Drop R8A7779_PD_SH, as it's not documented in the datasheet,
   - Reformat table,
 
 v3:
   - New (converted from DT to C).
 ---
  drivers/soc/renesas/Makefile       |  2 +-
- drivers/soc/renesas/r8a7794-sysc.c | 33 +++++++++++++++++++++++++++++++++
+ drivers/soc/renesas/r8a7779-sysc.c | 34 ++++++++++++++++++++++++++++++++++
  drivers/soc/renesas/rcar-sysc.c    |  3 +++
  drivers/soc/renesas/rcar-sysc.h    |  1 +
- 4 files changed, 38 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
+ 4 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/renesas/r8a7779-sysc.c
 
 diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
-index c6c4ce7ef8a145ea..b328205fef36441a 100644
+index 2b64f6c9468136f9..b8aa9db4fdd95eb8 100644
 --- a/drivers/soc/renesas/Makefile
 +++ b/drivers/soc/renesas/Makefile
-@@ -3,4 +3,4 @@ obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
- obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
- # R-Car M2-N is identical to R-Car M2-W w.r.t. power domains.
- obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o r8a7791-sysc.o
--obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o
-+obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o r8a7794-sysc.o
-diff --git a/drivers/soc/renesas/r8a7794-sysc.c b/drivers/soc/renesas/r8a7794-sysc.c
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o
+ obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o
+diff --git a/drivers/soc/renesas/r8a7779-sysc.c b/drivers/soc/renesas/r8a7779-sysc.c
 new file mode 100644
-index 0000000000000000..c4da2941e06c9468
+index 0000000000000000..9e8e6b7faa044684
 --- /dev/null
-+++ b/drivers/soc/renesas/r8a7794-sysc.c
-@@ -0,0 +1,33 @@
++++ b/drivers/soc/renesas/r8a7779-sysc.c
+@@ -0,0 +1,34 @@
 +/*
-+ * Renesas R-Car E2 System Controller
++ * Renesas R-Car H1 System Controller
 + *
 + * Copyright (C) 2016 Glider bvba
 + *
@@ -61,49 +61,50 @@ index 0000000000000000..c4da2941e06c9468
 +#include <linux/bug.h>
 +#include <linux/kernel.h>
 +
-+#include <dt-bindings/power/r8a7794-sysc.h>
++#include <dt-bindings/power/r8a7779-sysc.h>
 +
 +#include "rcar-sysc.h"
 +
-+static const struct rcar_sysc_area r8a7794_areas[] __initconst = {
-+	{ "always-on",	    0, 0, R8A7794_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
-+	{ "ca7-scu",	0x100, 0, R8A7794_PD_CA7_SCU,	R8A7794_PD_ALWAYS_ON,
-+	  PD_SCU },
-+	{ "ca7-cpu0",	0x1c0, 0, R8A7794_PD_CA7_CPU0,	R8A7794_PD_CA7_SCU,
-+	  PD_CPU_NOCR },
-+	{ "ca7-cpu1",	0x1c0, 1, R8A7794_PD_CA7_CPU1,	R8A7794_PD_CA7_SCU,
-+	  PD_CPU_NOCR },
-+	{ "sh-4a",	 0x80, 0, R8A7794_PD_SH_4A,	R8A7794_PD_ALWAYS_ON },
-+	{ "sgx",	 0xc0, 0, R8A7794_PD_SGX,	R8A7794_PD_ALWAYS_ON },
++static const struct rcar_sysc_area r8a7779_areas[] __initconst = {
++	{ "always-on",	    0, 0, R8A7779_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
++	{ "arm1",	 0x40, 1, R8A7779_PD_ARM1,	R8A7779_PD_ALWAYS_ON,
++	  PD_CPU_CR },
++	{ "arm2",	 0x40, 2, R8A7779_PD_ARM2,	R8A7779_PD_ALWAYS_ON,
++	  PD_CPU_CR },
++	{ "arm3",	 0x40, 3, R8A7779_PD_ARM3,	R8A7779_PD_ALWAYS_ON,
++	  PD_CPU_CR },
++	{ "sgx",	 0xc0, 0, R8A7779_PD_SGX,	R8A7779_PD_ALWAYS_ON },
++	{ "vdp",	0x100, 0, R8A7779_PD_VDP,	R8A7779_PD_ALWAYS_ON },
++	{ "imp",	0x140, 0, R8A7779_PD_IMP,	R8A7779_PD_ALWAYS_ON },
 +};
 +
-+const struct rcar_sysc_info r8a7794_sysc_info __initconst = {
-+	.areas = r8a7794_areas,
-+	.num_areas = ARRAY_SIZE(r8a7794_areas),
++const struct rcar_sysc_info r8a7779_sysc_info __initconst = {
++	.areas = r8a7779_areas,
++	.num_areas = ARRAY_SIZE(r8a7779_areas),
 +};
 diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index d8eaf8b2ee202ba1..e2cd99027303ea24 100644
+index 0d49a25de740fbf8..858ad23ae03aa809 100644
 --- a/drivers/soc/renesas/rcar-sysc.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -297,6 +297,9 @@ static const struct of_device_id rcar_sysc_matches[] = {
- 	/* R-Car M2-N is identical to R-Car M2-W w.r.t. power domains. */
- 	{ .compatible = "renesas,r8a7793-sysc", .data = &r8a7791_sysc_info },
- #endif
-+#ifdef CONFIG_ARCH_R8A7794
-+	{ .compatible = "renesas,r8a7794-sysc", .data = &r8a7794_sysc_info },
+@@ -284,6 +284,9 @@ finalize:
+ }
+ 
+ static const struct of_device_id rcar_sysc_matches[] = {
++#ifdef CONFIG_ARCH_R8A7779
++	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
 +#endif
  	{ /* sentinel */ }
  };
  
 diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
-index d58b39400e790a46..d64258cfaa20ba3f 100644
+index 7bb48b4f7334f960..7cf58b9cd544f4b9 100644
 --- a/drivers/soc/renesas/rcar-sysc.h
 +++ b/drivers/soc/renesas/rcar-sysc.h
-@@ -53,4 +53,5 @@ struct rcar_sysc_info {
- extern const struct rcar_sysc_info r8a7779_sysc_info;
- extern const struct rcar_sysc_info r8a7790_sysc_info;
- extern const struct rcar_sysc_info r8a7791_sysc_info;
-+extern const struct rcar_sysc_info r8a7794_sysc_info;
+@@ -50,4 +50,5 @@ struct rcar_sysc_info {
+ 	unsigned int num_areas;
+ };
+ 
++extern const struct rcar_sysc_info r8a7779_sysc_info;
  #endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 1.9.1
