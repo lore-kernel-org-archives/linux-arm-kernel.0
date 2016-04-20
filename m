@@ -1,48 +1,138 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 20 Apr 2016 17:13:18 +0530
-Subject: [PATCH v2 1/2] Documentation: DT: vdma: Add clock support for vdma
-Message-ID: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
+Date: Wed, 20 Apr 2016 17:13:19 +0530
+Subject: [PATCH v2 2/2] dmaengine: vdma: Add clock support
+In-Reply-To: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
+References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1461152599-28858-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the binding doc with clock description
-for vdma.
+Added basic clock support. The clocks are requested at probe
+and released at remove.
 
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
 Changes for v2:
---> Listed down all the clocks supported by the h/w
-    as suggested by the Datta.
---> Used IP clock names instead of shortcut clock names.
+--> None.
 
- Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/dma/xilinx/xilinx_vdma.c | 56 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-index fcc2b65..afe9eb7 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-@@ -21,6 +21,11 @@ Required properties:
- - dma-channel child node: Should have at least one channel and can have up to
- 	two channels per device. This node specifies the properties of each
- 	DMA channel (see child node properties below).
-+- clocks: Input clock specifier. Refer to common clock bindings.
-+- clock-names: List of input clocks "s_axi_lite_aclk", "m_axi_mm2s_aclk"
-+	       "m_axi_s2mm_aclk", "m_axis_mm2s_aclk", "s_axis_s2mm_aclk"
-+	       (list of input cloks may vary based on the ip configuration.
-+		see clock bindings for more info).
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index 70caea6..d526029 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -44,6 +44,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
++#include <linux/clk.h>
  
- Required properties for VDMA:
- - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-@@ -60,6 +65,9 @@ axi_vdma_0: axivdma at 40030000 {
- 	xlnx,num-fstores = <0x8>;
- 	xlnx,flush-fsync = <0x1>;
- 	xlnx,addrwidth = <0x20>;
-+	clocks = <&clk 0>, <&clk 1>, <&clk 2>, <&clk 3>, <&clk 4>;
-+	clock-names = "s_axi_lite_aclk", "m_axi_mm2s_aclk", "m_axi_s2mm_aclk",
-+		      "m_axis_mm2s_aclk", "s_axis_s2mm_aclk";
- 	dma-channel at 40030000 {
- 		compatible = "xlnx,axi-vdma-mm2s-channel";
- 		interrupts = < 0 54 4 >;
+ #include "../dmaengine.h"
+ 
+@@ -352,6 +353,8 @@ struct xilinx_dma_chan {
+  * @flush_on_fsync: Flush on frame sync
+  * @ext_addr: Indicates 64 bit addressing is supported by dma device
+  * @dmatype: DMA ip type
++ * @clks:	pointer to array of clocks
++ * @numclks:	number of clocks available
+  */
+ struct xilinx_dma_device {
+ 	void __iomem *regs;
+@@ -362,6 +365,8 @@ struct xilinx_dma_device {
+ 	u32 flush_on_fsync;
+ 	bool ext_addr;
+ 	enum xdma_ip_type dmatype;
++	struct clk **clks;
++	int numclks;
+ };
+ 
+ /* Macros */
+@@ -1731,6 +1736,26 @@ int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+ }
+ EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+ 
++static int xdma_clk_init(struct xilinx_dma_device *xdev, bool enable)
++{
++	int i = 0, ret;
++
++	for (i = 0; i < xdev->numclks; i++) {
++		if (enable) {
++			ret = clk_prepare_enable(xdev->clks[i]);
++			if (ret) {
++				dev_err(xdev->dev,
++					"failed to enable the axidma clock\n");
++				return ret;
++			}
++		} else {
++			clk_disable_unprepare(xdev->clks[i]);
++		}
++	}
++
++	return 0;
++}
++
+ /* -----------------------------------------------------------------------------
+  * Probe and remove
+  */
+@@ -1919,6 +1944,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+ 	struct resource *io;
+ 	u32 num_frames, addr_width;
+ 	int i, err;
++	const char *str;
+ 
+ 	/* Allocate and initialize the DMA engine structure */
+ 	xdev = devm_kzalloc(&pdev->dev, sizeof(*xdev), GFP_KERNEL);
+@@ -1965,6 +1991,32 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+ 	/* Set the dma mask bits */
+ 	dma_set_mask(xdev->dev, DMA_BIT_MASK(addr_width));
+ 
++	xdev->numclks = of_property_count_strings(pdev->dev.of_node,
++						  "clock-names");
++	if (xdev->numclks > 0) {
++		xdev->clks = devm_kmalloc_array(&pdev->dev, xdev->numclks,
++						sizeof(struct clk *),
++						GFP_KERNEL);
++		if (!xdev->clks)
++			return -ENOMEM;
++
++		for (i = 0; i < xdev->numclks; i++) {
++			of_property_read_string_index(pdev->dev.of_node,
++						      "clock-names", i, &str);
++			xdev->clks[i] = devm_clk_get(xdev->dev, str);
++			if (IS_ERR(xdev->clks[i])) {
++				if (PTR_ERR(xdev->clks[i]) == -ENOENT)
++					xdev->clks[i] = NULL;
++				else
++					return PTR_ERR(xdev->clks[i]);
++			}
++		}
++
++		err = xdma_clk_init(xdev, true);
++		if (err)
++			return err;
++	}
++
+ 	/* Initialize the DMA engine */
+ 	xdev->common.dev = &pdev->dev;
+ 
+@@ -2025,6 +2077,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ error:
++	if (xdev->numclks > 0)
++		xdma_clk_init(xdev, false);
+ 	for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
+ 		if (xdev->chan[i])
+ 			xilinx_dma_chan_remove(xdev->chan[i]);
+@@ -2050,6 +2104,8 @@ static int xilinx_dma_remove(struct platform_device *pdev)
+ 	for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
+ 		if (xdev->chan[i])
+ 			xilinx_dma_chan_remove(xdev->chan[i]);
++	if (xdev->numclks > 0)
++		xdma_clk_init(xdev, false);
+ 
+ 	return 0;
+ }
 -- 
 2.1.2
