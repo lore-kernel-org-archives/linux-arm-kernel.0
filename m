@@ -1,136 +1,33 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 19 Apr 2016 18:40:38 -0700
-Subject: [PATCH v5 13/14] acpi, numa: Enable ACPI based NUMA on ARM64
-In-Reply-To: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461116439-22991-14-git-send-email-ddaney.cavm@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 Apr 2016 18:45:48 -0700
+Subject: [PATCH] ARM: dove: Remove CLK_IS_ROOT
+Message-ID: <1461116748-5444-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+CLK_IS_ROOT", 2016-02-02) so remove it.
 
-Add function needed for cpu to node mapping, and enable ACPI based
-NUMA for ARM64 in Kconfig
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/acpi/Kconfig |  2 +-
- drivers/acpi/numa.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/acpi.h | 17 ++++++++++++++++-
- 3 files changed, 52 insertions(+), 2 deletions(-)
+ arch/arm/mach-dove/common.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 82b96ee..5ce9f66 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -291,7 +291,7 @@ config ACPI_THERMAL
- config ACPI_NUMA
- 	bool "NUMA support"
- 	depends on NUMA
--	depends on (X86 || IA64)
-+	depends on (X86 || IA64 || ARM64)
- 	default y if IA64_GENERIC || IA64_SGI_SN2
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 0cdaa3851d2e..0d420a2bfe3e 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -88,8 +88,7 @@ static void __init dove_clk_init(void)
+ 	struct clk *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
+ 	struct clk *xor0, *xor1, *ge, *gephy;
  
- config ACPI_CUSTOM_DSDT_FILE
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index d244018..02c6dd8 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
- 		}
- 		break;
+-	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
+-				       dove_tclk);
++	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, dove_tclk);
  
-+	case ACPI_SRAT_TYPE_GICC_AFFINITY:
-+		{
-+			struct acpi_srat_gicc_affinity *p =
-+			    (struct acpi_srat_gicc_affinity *)header;
-+			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
-+				 p->acpi_processor_uid,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
-+				 "enabled" : "disabled");
-+		}
-+		break;
-+
- 	default:
- 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
- 			header->type);
-@@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
- 	return 0;
- }
- 
-+static int __init
-+acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
-+			 const unsigned long end)
-+{
-+	struct acpi_srat_gicc_affinity *processor_affinity;
-+
-+	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
-+	if (!processor_affinity)
-+		return -EINVAL;
-+
-+	acpi_table_print_srat_entry(header);
-+
-+	/* let architecture-dependent part to do it */
-+	acpi_numa_gicc_affinity_init(processor_affinity);
-+
-+	return 0;
-+}
-+
- static int __initdata parsed_numa_memblks;
- 
- static int __init
-@@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
- {
- 	int cnt = 0;
- 
-+	if (acpi_disabled)
-+		return -EINVAL;
-+
- 	/*
- 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
- 	 * SRAT cpu entries could have different order with that in MADT.
-@@ -416,6 +449,8 @@ int __init acpi_numa_init(void)
- 				     acpi_parse_x2apic_affinity, 0);
- 		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
- 				     acpi_parse_processor_affinity, 0);
-+		acpi_table_parse_srat(ACPI_SRAT_TYPE_GICC_AFFINITY,
-+				      acpi_parse_gicc_affinity, 0);
- 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
- 					    acpi_parse_memory_affinity,
- 					    NR_NODE_MEMBLKS);
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index ab6fd96..af34064 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -239,10 +239,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
- int acpi_parse_mcfg (struct acpi_table_header *header);
- void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
- 
--/* the following four functions are architecture-dependent */
-+/* the following numa functions are architecture-dependent */
- void acpi_numa_slit_init (struct acpi_table_slit *slit);
-+
-+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
-+#endif
-+
- void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-+
-+#ifdef CONFIG_ARM64
-+void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
-+#endif
-+
- int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
- 
- #ifndef PHYS_CPUID_INVALID
+ 	usb0 = dove_register_gate("usb0", "tclk", CLOCK_GATING_BIT_USB0);
+ 	usb1 = dove_register_gate("usb1", "tclk", CLOCK_GATING_BIT_USB1);
 -- 
-1.7.11.7
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
