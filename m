@@ -1,87 +1,285 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 20 Apr 2016 08:11:41 +0100
-Subject: next-20160401+: ARM: DRA7: linux-next regression: mm/slab:
- clean-up kmem_cache_node setup
-In-Reply-To: <570B8E0D.7020203@nvidia.com>
-References: <570816F8.9070301@ti.com>
- <20160411020203.GA25211@js1304-P5Q-DELUXE> <570B8E0D.7020203@nvidia.com>
-Message-ID: <57172BAD.5050200@nvidia.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 20 Apr 2016 09:14:46 +0200
+Subject: [RFC PATCH 06/11] drivers: iommu: make of_xlate() interface DT
+ agnostic
+In-Reply-To: <20160419113046.GD9571@red-moon>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-7-git-send-email-lorenzo.pieralisi@arm.com>
+ <5715EC12.2000009@samsung.com> <20160419113046.GD9571@red-moon>
+Message-ID: <57172C66.2080602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joonsoo,
+Hi Lorenzo,
 
-On 11/04/16 12:44, Jon Hunter wrote:
-> On 11/04/16 03:02, Joonsoo Kim wrote:
->> On Fri, Apr 08, 2016 at 03:39:20PM -0500, Nishanth Menon wrote:
->>> Hi,
->>>
->>> http://marc.info/?l=linux-omap&m=146014314115625&w=2 series works with
->>> v4.6-rc2 kernel, however, it fails with linux-next for suspend-to-ram
->>> (mem) on BeagleBoard-X15
->>>
->>> next-20160327 - good
->>> next-20160329 - good
->>> next-20160330 - Fails to boot - I2C crashes
->>> next-20160331-  Fails to boot - USB crashes
->>> next-20160401 -> bad
->>> next-20160408 -> bad
->>>
->>> Bisect log of next-20160408 vs v4.6-rc2 ->
->>> http://pastebin.ubuntu.com/15697856/
->>>
->>> # first bad commit: [2b629704a2b6a5b239f23750e5517a9d8c3a4e8c]
->>> mm/slab: clean-up kmem_cache_node setup
->>>
->>
+On 2016-04-19 13:30, Lorenzo Pieralisi wrote:
+> Hi Marek,
+>
+> On Tue, Apr 19, 2016 at 10:28:02AM +0200, Marek Szyprowski wrote:
 >> Hello,
 >>
->> I made a mistake on that patch. Could you try to test below one on
->> top of it.
->>
->> Thanks.
->>
->> --------->8----------------
->> From d3af3cc409527e9be6beb62ea395cde67f3c5029 Mon Sep 17 00:00:00 2001
->> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->> Date: Mon, 11 Apr 2016 10:48:29 +0900
->> Subject: [PATCH] mm/slab: clean-up kmem_cache_node setup-fix
->>
->> After calling free_block(), we need to re-calculate array_cache's
->> avail counter. Fix it.
->>
->> And, it's better to free objects in shared array when it is
->> really necessary. Check it before calling free_block().
->>
->> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->> ---
->>  mm/slab.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/mm/slab.c b/mm/slab.c
->> index fcd5fbb..27cb390 100644
->> --- a/mm/slab.c
->> +++ b/mm/slab.c
->> @@ -927,9 +927,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
->>  
->>  	n = get_node(cachep, node);
->>  	spin_lock_irq(&n->list_lock);
->> -	if (n->shared) {
->> +	if (n->shared && force_change) {
->>  		free_block(cachep, n->shared->entry,
->>  				n->shared->avail, node, &list);
->> +		n->shared->avail = 0;
->>  	}
->>  
->>  	if (!n->shared || force_change) {
-> 
-> This also fixes a regression on -next for Tegra that was bisected down
-> to the same culprit. So ...
-> 
-> Tested-by: Jon Hunter <jonathanh@nvidia.com>
+>> On 2016-04-14 19:25, Lorenzo Pieralisi wrote:
+>>> On systems booting with ACPI, the IOMMU drivers require the same
+>>> kind of id mapping carried out with a DT tree through the of_xlate()
+>>> API in order to map devices identifiers to IOMMU ones.
+>>>
+>>> On ACPI systems, since DT nodes are not present (ie struct
+>>> device.of_node == NULL), to identify the device requiring the translation
+>>> the struct device_node (and the structure used to pass translation
+>>> information - struct of_phandle_args - that contains a struct device_node)
+>>> cannot be used, so a generic translation structure to be used for IOMMU
+>>> mapping should be defined, based on the firmware agnostic fwnode_handle
+>>> type.
+>>>
+>>> This patch mechanically refactors/renames the of_xlate API to make
+>>> it DT agnostic, by declaring a new type (struct iommu_fwspec), that
+>>> allows the kernel to pass a device identifier (fwnode - which can
+>>> represent either a DT node or an IOMMU FW node) and by changing the
+>>> of_xlate signature so that it does not take anymore the DT specific
+>>> of_phandle_args argument and replaces it with the DT agnostic
+>>> iommu_fwspec one.
+>>>
+>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Cc: Robin Murphy <robin.murphy@arm.com>
+>>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>>> Cc: Joerg Roedel <joro@8bytes.org>
+>>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> I'm not sure if this is the right approach, although I have not enough
+>> knowledge on ACPI firmware. Do you plan to rewrite all subsystems to the
+>> new "fwspec" based interface? Right now of_xlate is rather common
+>> interface used by various subsystems. Maybe it will be much easier to
+> Yes, that's a valid concern, when you say "it is rather common" though,
+> it seems to me that the of_xlate footprint is still subsystem specific,
+> so this patch should be self-contained anyway (granted, doing this
+> conversion for a specific subsystem is questionable, I guess that what
+> you are asking is, if you do it for IOMMU, why would not you do it for
+> other subsystems ?).
 
-This fix still doesn't appear to have made it into -next and this has
-been broken now for nearly 3 weeks. Any chance we can get this into -next?
+I was curious if you want to replace of_xlate() interface in other 
+subsystems
+like clocks, power domains, regulators, etc. Each of_xlate interface is
+specific to particular subsystem, but they all more or less follows the same
+style, what makes it easier to understand the code.
 
-Cheers
-Jon
+> It is an RFC for this specific reason.
+>
+>> just add acpi_xlate callback and plumb it to the generic code? Maybe later
+>> when similar code will be in other subsystems and drivers, it can be
+>> unified, having much more real use cases?
+> Yes, that's a possibility, it means adding yet another hook into
+> the IOMMU drivers, probably a simpler change than this one, I
+> posted this code as and RFC to see which direction we want to take
+> so further feedback is welcome we can then choose the best approach.
+>
+> Thanks,
+> Lorenzo
+>
+>>> ---
+>>>   drivers/iommu/arm-smmu.c     | 12 +++++++-----
+>>>   drivers/iommu/exynos-iommu.c | 11 +++++++----
+>>>   drivers/iommu/mtk_iommu.c    | 13 ++++++++-----
+>>>   drivers/iommu/of_iommu.c     | 20 ++++++++++++++++++--
+>>>   include/linux/iommu.h        | 24 ++++++++++++++++++++----
+>>>   5 files changed, 60 insertions(+), 20 deletions(-)
+>>>
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index 6c42770..84bcff7 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -1440,18 +1440,20 @@ out_unlock:
+>>>   	return ret;
+>>>   }
+>>> -static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>>> +static int arm_smmu_fw_xlate(struct device *dev, struct iommu_fwspec *args)
+>>>   {
+>>>   	struct arm_smmu_device *smmu;
+>>> -	struct platform_device *smmu_pdev;
+>>> +	struct platform_device *smmu_pdev = NULL;
+>>> +
+>>> +	if (is_of_node(args->fwnode))
+>>> +		smmu_pdev = of_find_device_by_node(to_of_node(args->fwnode));
+>>> -	smmu_pdev = of_find_device_by_node(args->np);
+>>>   	if (!smmu_pdev)
+>>>   		return -ENODEV;
+>>>   	smmu = platform_get_drvdata(smmu_pdev);
+>>> -	return arm_smmu_add_dev_streamid(smmu, dev, args->args[0]);
+>>> +	return arm_smmu_add_dev_streamid(smmu, dev, args->param[0]);
+>>>   }
+>>>   static struct iommu_ops arm_smmu_ops = {
+>>> @@ -1468,7 +1470,7 @@ static struct iommu_ops arm_smmu_ops = {
+>>>   	.device_group		= arm_smmu_device_group,
+>>>   	.domain_get_attr	= arm_smmu_domain_get_attr,
+>>>   	.domain_set_attr	= arm_smmu_domain_set_attr,
+>>> -	.of_xlate		= arm_smmu_of_xlate,
+>>> +	.fw_xlate		= arm_smmu_fw_xlate,
+>>>   	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+>>>   };
+>>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>>> index 5ecc86c..84ff5bb 100644
+>>> --- a/drivers/iommu/exynos-iommu.c
+>>> +++ b/drivers/iommu/exynos-iommu.c
+>>> @@ -1250,13 +1250,16 @@ static void exynos_iommu_remove_device(struct device *dev)
+>>>   	iommu_group_remove_device(dev);
+>>>   }
+>>> -static int exynos_iommu_of_xlate(struct device *dev,
+>>> -				 struct of_phandle_args *spec)
+>>> +static int exynos_iommu_fw_xlate(struct device *dev,
+>>> +				 struct iommu_fwspec *args)
+>>>   {
+>>>   	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+>>> -	struct platform_device *sysmmu = of_find_device_by_node(spec->np);
+>>> +	struct platform_device *sysmmu = NULL;
+>>>   	struct sysmmu_drvdata *data;
+>>> +	if (is_of_node(args->fwnode))
+>>> +		sysmmu = of_find_device_by_node(to_of_node(args->fwnode));
+>>> +
+>>>   	if (!sysmmu)
+>>>   		return -ENODEV;
+>>> @@ -1290,7 +1293,7 @@ static struct iommu_ops exynos_iommu_ops = {
+>>>   	.add_device = exynos_iommu_add_device,
+>>>   	.remove_device = exynos_iommu_remove_device,
+>>>   	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+>>> -	.of_xlate = exynos_iommu_of_xlate,
+>>> +	.fw_xlate = exynos_iommu_fw_xlate,
+>>>   };
+>>>   static bool init_done;
+>>> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+>>> index 929a66a..e08dc0a 100644
+>>> --- a/drivers/iommu/mtk_iommu.c
+>>> +++ b/drivers/iommu/mtk_iommu.c
+>>> @@ -436,20 +436,23 @@ static struct iommu_group *mtk_iommu_device_group(struct device *dev)
+>>>   	return data->m4u_group;
+>>>   }
+>>> -static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>>> +static int mtk_iommu_fw_xlate(struct device *dev, struct iommu_fwspec *args)
+>>>   {
+>>>   	struct mtk_iommu_client_priv *head, *priv, *next;
+>>>   	struct platform_device *m4updev;
+>>> -	if (args->args_count != 1) {
+>>> +	if (!is_of_node(args->fwnode))
+>>> +		return -ENODEV;
+>>> +
+>>> +	if (args->param_count != 1) {
+>>>   		dev_err(dev, "invalid #iommu-cells(%d) property for IOMMU\n",
+>>> -			args->args_count);
+>>> +			args->param_count);
+>>>   		return -EINVAL;
+>>>   	}
+>>>   	if (!dev->archdata.iommu) {
+>>>   		/* Get the m4u device */
+>>> -		m4updev = of_find_device_by_node(args->np);
+>>> +		m4updev = of_find_device_by_node(to_of_node(args->fwnode));
+>>>   		of_node_put(args->np);
+>>>   		if (WARN_ON(!m4updev))
+>>>   			return -EINVAL;
+>>> @@ -469,7 +472,7 @@ static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>>>   	if (!priv)
+>>>   		goto err_free_mem;
+>>> -	priv->mtk_m4u_id = args->args[0];
+>>> +	priv->mtk_m4u_id = args->param[0];
+>>>   	list_add_tail(&priv->client, &head->client);
+>>>   	return 0;
+>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>> index 910826c..331dd78 100644
+>>> --- a/drivers/iommu/of_iommu.c
+>>> +++ b/drivers/iommu/of_iommu.c
+>>> @@ -135,6 +135,18 @@ struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+>>>   	return ops;
+>>>   }
+>>> +static void of_phandle_args_to_fwspec(struct of_phandle_args *iommu_data,
+>>> +				      struct iommu_fwspec *fwspec)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	fwspec->fwnode = iommu_data->np ? &iommu_data->np->fwnode : NULL;
+>>> +	fwspec->param_count = iommu_data->args_count;
+>>> +
+>>> +	for (i = 0; i < iommu_data->args_count; i++)
+>>> +		fwspec->param[i] = iommu_data->args[i];
+>>> +}
+>>> +
+>>>   static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>>   {
+>>>   	struct of_phandle_args *iommu_spec = data;
+>>> @@ -148,6 +160,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>   				     struct device_node *master_np)
+>>>   {
+>>>   	struct of_phandle_args iommu_spec;
+>>> +	struct iommu_fwspec fwspec;
+>>>   	struct device_node *np = NULL;
+>>>   	struct iommu_ops *ops = NULL;
+>>>   	int idx = 0;
+>>> @@ -170,8 +183,9 @@ struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>   		iommu_spec.np = np;
+>>>   		iommu_spec.args_count = 1;
+>>> +		of_phandle_args_to_fwspec(&iommu_spec, &fwspec);
+>>>   		ops = of_iommu_get_ops(np);
+>>> -		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
+>>> +		if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
+>>>   			goto err_put_node;
+>>>   		of_node_put(np);
+>>> @@ -189,7 +203,9 @@ struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>   		np = iommu_spec.np;
+>>>   		ops = of_iommu_get_ops(np);
+>>> -		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
+>>> +		of_phandle_args_to_fwspec(&iommu_spec, &fwspec);
+>>> +
+>>> +		if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
+>>>   			goto err_put_node;
+>>>   		of_node_put(np);
+>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>> index 0bba25e..5184d81 100644
+>>> --- a/include/linux/iommu.h
+>>> +++ b/include/linux/iommu.h
+>>> @@ -85,6 +85,24 @@ struct iommu_domain {
+>>>   	void *iova_cookie;
+>>>   };
+>>> +#define IOMMU_MAP_SPEC_PARAMS 16
+>>> +
+>>> +/**
+>>> + * struct iommu_fwspec - generic IOMMU specifier structure
+>>> + *
+>>> + * @fwnode:		Pointer to a firmware-specific descriptor
+>>> + * @param_count:	Number of device-specific parameters
+>>> + * @param:		Device-specific parameters
+>>> + *
+>>> + * This structure, directly modeled after of_phandle_args, is used to
+>>> + * pass a device-specific description of an IOMMU mapping.
+>>> + */
+>>> +struct iommu_fwspec {
+>>> +	struct fwnode_handle *fwnode;
+>>> +	int param_count;
+>>> +	u32 param[IOMMU_MAP_SPEC_PARAMS];
+>>> +};
+>>> +
+>>>   enum iommu_cap {
+>>>   	IOMMU_CAP_CACHE_COHERENCY,	/* IOMMU can enforce cache coherent DMA
+>>>   					   transactions */
+>>> @@ -155,7 +173,7 @@ struct iommu_dm_region {
+>>>    * @domain_window_disable: Disable a particular window for a domain
+>>>    * @domain_set_windows: Set the number of windows for a domain
+>>>    * @domain_get_windows: Return the number of windows for a domain
+>>> - * @of_xlate: add OF master IDs to iommu grouping
+>>> + * @fw_xlate: add FW master IDs to iommu grouping
+>>>    * @pgsize_bitmap: bitmap of supported page sizes
+>>>    * @priv: per-instance data private to the iommu driver
+>>>    */
+>>> @@ -196,9 +214,7 @@ struct iommu_ops {
+>>>   	/* Get the number of windows per domain */
+>>>   	u32 (*domain_get_windows)(struct iommu_domain *domain);
+>>> -#ifdef CONFIG_OF_IOMMU
+>>> -	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+>>> -#endif
+>>> +	int (*fw_xlate)(struct device *dev, struct iommu_fwspec *args);
+>>>   	unsigned long pgsize_bitmap;
+>>>   	void *priv;
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
