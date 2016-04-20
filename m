@@ -1,56 +1,156 @@
-From: brad.mouring@ni.com (Brad Mouring)
-Date: Wed, 20 Apr 2016 09:23:21 -0500
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
- <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
-Message-ID: <20160420142321.GA23956@zardoz.amer.corp.natinst.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 20 Apr 2016 16:23:30 +0200
+Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
+ during disable
+In-Reply-To: <570AFAC2.8080907@rock-chips.com>
+References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
+ <5707043D.6060706@rock-chips.com>
+ <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
+ <570AFAC2.8080907@rock-chips.com>
+Message-ID: <CAAObsKCmPZBaSudVJy8BPThhoZw8VVqxicqsmc8diApajD57nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
-> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
-> > Document the DT bindings for controlling ARM PL310 Power Control
-> > settings.
-> >
-> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
-> 
-> What happened to Josh's ack?
-
-This is not the change that Josh reviewed, if he does agree with it, I'll
-put his ack on it. This was done purposefully.
-
-> > ---
-> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> > index fe0398c..c1c756e 100644
-> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> > @@ -84,6 +84,10 @@ Optional properties:
-> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-> >    <1> (forcibly enable), property absent (retain settings set by
-> >    firmware)
-> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
-> > +  disable), <1> or property absent (forcibly enable)
-> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
-> > +  <1>  or property absent (forcibly enable)
-> 
-> What happened to "retain settings set by firmware"?
+On 11 April 2016 at 03:15, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2016?04?08? 18:54, Tomeu Vizoso wrote:
+>>
+>> On 8 April 2016 at 03:07, Mark yao <mark.yao@rock-chips.com> wrote:
+>>>
+>>> On 2016?04?06? 18:14, Tomeu Vizoso wrote:
+>>>
+>>> When a plane is being disabled but it's still enabled, do check if the
+>>> previous update has been completed by reading yrgb_mst back.
+>>>
+>>> Otherwise, pending pageflips would remain pending after a CRTC is
+>>> disabled.
+>>>
+>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>> ---
+>>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++--
+>>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> index a9b1e8b5ac85..f46b1fd1887b 100644
+>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> @@ -1064,8 +1064,9 @@ static bool vop_win_pending_is_complete(struct
+>>> vop_win
+>>> *vop_win)
+>>>    struct vop_plane_state *state = to_vop_plane_state(plane->state);
+>>>    dma_addr_t yrgb_mst;
+>>>
+>>> - if (!state->enable)
+>>> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
+>>> + if (!state->enable &&
+>>> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
+>>> + return true;
+>>>
+>>>
+>>> It is wrong, the patch would cause a bug.
+>>>
+>>> when state->enable is 0, check yrgb_mst == state->yrgb_mst always be
+>>> true,
+>>> because state->yrgb_mst not update on plane disabled funtion, that would
+>>> cause iommu crash.
+>>
+>> Sorry, but I don't understand where's the bug and what could cause
+>> that crash. What the existing code was doing is saying that a pageflip
+>> event is still pending if we have told the plane to disable but for
+>> some reason it hasn't yet.
+>>
+>> With this modification, if we read back that it's already disabled, we
+>> return true as before. But if we read back that it isn't disabled yet,
+>> then we still check the fb pointers and compare them.
+>>
+>> The iommu mapping is removed when the _CRTC_ is disabled, and what
+>> this series does is to wait for the pending pageflip to finish before
+>> conitnuing with CRTC disablement.
 >
-> Rob
-This is the difference. There was discussion that this would be a
-functional regression for some, and Russell (while noting that he
-generally agreed with keeping fw settings) noted that this would be
-a possible functional regression sprung on those who wanted PM.
+>
+> the iommu mapping will unmap after plane disabled, we need sure that the
+> plane really disabled before unmap, if not, the unmap may call before plane
+> really disable, vop may access unmap address, then would get iommu page
+> fault.
 
-In all honesty, I don't really care one way or the other, since
-we'll be defining this property in our dtbs. I'm all ears if you
-have a strong oppinion (and this *does* seem like the sort of
-setting that can be overridden in the kernel, but should be left
-otherwise as the fw set it).
+Sorry, but I still don't see the error condition that you are
+describing. AFAICS, the unmap will happen after the last pageflip has
+completed.
 
-Brad
+>>> About pending pageflips would remain pending, can you  describe more info
+>>> about it? I think those pending pageflips should be ignore when CRTC is
+>>> disabled.
+>>
+>> Well, right now in rockchip-drm pending pageflips won't be ignored
+>> when a CRTC is disabled, but will be delivered when it's re-enabled.
+>>
+>> If they would be to be ignored (understanding that as dropped), that
+>> would require modifications to clients so they keep track of which fbs
+>> were used in a particular crtc and destroy them when the crtc is
+>> disabled, but that would be incorrect when using the i915 DRM driver
+>> (I also assume others do the same). Given that the pageflip ioctl
+>> isn't driver-specific, I think there cannot be such a difference in
+>> behavior between drivers.
+>>
+>> With the current behavior (pending pageflip events being delayed until
+>> the CRTC is enabled again), compositors and other clients will be
+>> holding on to the fb in the pending pageflip until an arbitrary point
+>> in the future that may not ever come. To me that sounds like a serious
+>> modification of the assumptions on fb lifecycle that might not be
+>> warranted.
+>>
+>> So in summary, even if I haven't found any explicit documentation on
+>> this, I think the ABI is that any pending pageflips are to be
+>> delivered when that CRTC is being disabled and not later.
+>
+>
+> on drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>
+> drm_atomic_helper_commit_planes(dev, state, true);
+> rockchip_atomic_wait_for_complete(dev, state);
+>
+> We set active_only = true, I think planes can only update when crtc is
+> active. and rockchip_atomic_wait_for_complete only wait when crtc is active.
+
+That's fine, but if a pageflip is pending when the client requests the
+CRTC to be disabled, we need to wait for the event to be emitted
+before we actually disable the HW.
+
+Regards,
+
+Tomeu
+
+> Thanks.
+>
+>> Thanks,
+>>
+>> Tomeu
+>>
+>>> Thanks.
+>>>
+>>>
+>>>    yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
+>>>
+>>>
+>>>
+>>> --
+>>> ?ark Yao
+>>>
+>>>
+>>> _______________________________________________
+>>> dri-devel mailing list
+>>> dri-devel at lists.freedesktop.org
+>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>>
+>>
+>>
+>
+>
+> --
+> ?ark Yao
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
