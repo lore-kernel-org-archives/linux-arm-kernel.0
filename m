@@ -1,88 +1,26 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 20 Apr 2016 18:05:27 +0100
-Subject: [PATCH v7 07/10] iommu/dma-reserved-iommu: delete bindings in
- iommu_free_reserved_iova_domain
-In-Reply-To: <1461084994-2355-8-git-send-email-eric.auger@linaro.org>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-8-git-send-email-eric.auger@linaro.org>
-Message-ID: <5717B6D7.4010307@arm.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 20 Apr 2016 20:08:49 +0300
+Subject: [PATCH V5 0/4] Introduce CoreSight STM support
+In-Reply-To: <CANLsYkwtHeXRwM98J3GQDpKwPcqAKXUFW6OWE5TJ6P_Og4RLZA@mail.gmail.com>
+References: <1459997479-19431-1-git-send-email-zhang.chunyan@linaro.org>
+ <CANLsYkwtHeXRwM98J3GQDpKwPcqAKXUFW6OWE5TJ6P_Og4RLZA@mail.gmail.com>
+Message-ID: <87fuug9pi6.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 17:56, Eric Auger wrote:
-> Now reserved bindings can exist, destroy them when destroying
-> the reserved iova domain. iommu_map is not supposed to be atomic,
-> hence the extra complexity in the locking.
->
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->
-> ---
-> v6 -> v7:
-> - remove [PATCH v6 7/7] dma-reserved-iommu: iommu_unmap_reserved and
->    destroy the bindings in iommu_free_reserved_iova_domain
->
-> v5 -> v6:
-> - use spin_lock instead of mutex
->
-> v3 -> v4:
-> - previously "iommu/arm-smmu: relinquish reserved resources on
->    domain deletion"
-> ---
->   drivers/iommu/dma-reserved-iommu.c | 34 ++++++++++++++++++++++++++++------
->   1 file changed, 28 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
-> index 426d339..2522235 100644
-> --- a/drivers/iommu/dma-reserved-iommu.c
-> +++ b/drivers/iommu/dma-reserved-iommu.c
-> @@ -157,14 +157,36 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
->   	unsigned long flags;
->   	int ret = 0;
->
-> -	spin_lock_irqsave(&domain->reserved_lock, flags);
-> -
-> -	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
-> -	if (!rid) {
-> -		ret = -EINVAL;
-> -		goto unlock;
-> +	while (1) {
-> +		struct iommu_reserved_binding *b;
-> +		struct rb_node *node;
-> +		dma_addr_t iova;
-> +		size_t size;
-> +
-> +		spin_lock_irqsave(&domain->reserved_lock, flags);
-> +
-> +		rid = (struct reserved_iova_domain *)
-> +				domain->reserved_iova_cookie;
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-Same comment about casting as before.
-
-> +		if (!rid) {
-> +			ret = -EINVAL;
-> +			goto unlock;
-> +		}
-> +
-> +		node = rb_first(&domain->reserved_binding_list);
-> +		if (!node)
-> +			break;
-> +		b = rb_entry(node, struct iommu_reserved_binding, node);
-> +
-> +		iova = b->iova;
-> +		size = b->size;
-> +
-> +		while (!kref_put(&b->kref, reserved_binding_release))
-> +			;
-
-Since you're freeing the thing anyway, why not just call the function 
-directly?
-
-> +		spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> +		iommu_unmap(domain, iova, size);
->   	}
+> On 6 April 2016 at 20:51, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+>> This patchset adds support for the CoreSight STM IP block.
 >
-> +	domain->reserved_binding_list = RB_ROOT;
->   	domain->reserved_iova_cookie = NULL;
->   unlock:
->   	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+> This has been out there long enough - I'm picking this up.
 >
+> Alex, I'll have 1/4 go through my tree.  Get back to me if you want to
+> proceed differently.
+
+Yes, let's keep it that way. I was sure I had it in my tree too, but,
+alas, I didn't.
+
+Regards,
+--
+Alex
