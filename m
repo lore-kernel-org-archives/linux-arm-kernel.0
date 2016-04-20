@@ -1,33 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Apr 2016 15:34:31 +0200
-Subject: [PATCH] ARM: SoCFPGA: Fix secondary CPU startup in thumb2 kernel
-Message-ID: <1461159271-3764-1-git-send-email-s.hauer@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Apr 2016 14:34:56 +0100
+Subject: [PATCH v5 3/7] arm64/perf: Changed events naming as per ARM ARM
+In-Reply-To: <1461092062-7484-4-git-send-email-ashoks@broadcom.com>
+References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
+ <1461092062-7484-4-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160420133456.GJ11453@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The secondary CPU starts up in ARM mode. When the kernel is compiled in
-thumb2 mode we have to explicitly compile the secondary startup
-trampoline in ARM mode, otherwise the CPU will go to Nirvana.
+On Tue, Apr 19, 2016 at 11:54:18AM -0700, Ashok Kumar wrote:
+> changed all the events name definition as per ARM ARM
+> naming convention.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reported-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: stable at vger.kernel.org
----
- arch/arm/mach-socfpga/headsmp.S | 1 +
- 1 file changed, 1 insertion(+)
+Please note which document you got these from (I assume the ARM ARM),
+complete with the ARM document number (e.g. ARM DDI 0487A.i for revision
+A.i). That gives us a consistent point of reference, which is helpful
+for review and in case these names have cahnged (or change in future).
 
-diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-index 5d94b7a..c160fa3 100644
---- a/arch/arm/mach-socfpga/headsmp.S
-+++ b/arch/arm/mach-socfpga/headsmp.S
-@@ -13,6 +13,7 @@
- #include <asm/assembler.h>
- 
- 	.arch	armv7-a
-+	.arm
- 
- ENTRY(secondary_trampoline)
- 	/* CPU1 will always fetch from 0x0 when it is brought out of reset.
--- 
-2.8.0.rc3
+I've verified that the renaming of architected events now leaves them
+named as per the ARM ARM. I see that we don't have the full list of
+IMPDEF events, but that's a matter for another patch.
+
+It might also be worth explicitly noting the correction of the l21/l2i
+typo, as that looks a little odd otherwise.
+
+>  /* ARMv8 Cortex-A53 specific event types. */
+>  #define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
+>  
+>  /* ARMv8 Cavium ThunderX specific event types. */
+> -#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_MISS_ST			0xE9
+> -#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_ACCESS		0xEA
+> -#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_MISS		0xEB
+> -#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_ACCESS		0xEC
+> -#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_MISS		0xED
+> +#define ARMV8_THUNDER_PERFCTR_L1D_CACHE_MISS_ST			0xE9
+> +#define ARMV8_THUNDER_PERFCTR_L1D_CACHE_PREF_ACCESS		0xEA
+> +#define ARMV8_THUNDER_PERFCTR_L1D_CACHE_PREF_MISS		0xEB
+> +#define ARMV8_THUNDER_PERFCTR_L1I_CACHE_PREF_ACCESS		0xEC
+> +#define ARMV8_THUNDER_PERFCTR_L1I_CACHE_PREF_MISS		0xED
+
+I'm not sure of the value of renaming these. I would think these should
+match whatever is in the documentation for Cortex-A53 and ThunderX
+respectively (and there's the obvious PREFETCH/PREF difference
+remaining).
+
+However, I'll leave that to Will.
+
+Other than that, this looks good to me:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks for putting this together!
+
+Mark.
