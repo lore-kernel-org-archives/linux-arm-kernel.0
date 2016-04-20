@@ -1,159 +1,71 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Wed, 20 Apr 2016 10:39:47 +0100 (BST)
-Subject: [PATCH v11 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <CAJZ5v0gN9S0AKX8SZbbVFOn6ydwCa_7GyxzzJHod8s0xyCXgvA@mail.gmail.com>
-References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
- <1460030614-16112-2-git-send-email-zhaoshenglong@huawei.com>
- <CAJZ5v0gN9S0AKX8SZbbVFOn6ydwCa_7GyxzzJHod8s0xyCXgvA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.10.1604201038490.25611@sstabellini-ThinkPad-X260>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 20 Apr 2016 17:34:32 +0800
+Subject: [RESEND PATCH 0/8] clk: core: support clocks which requires parents on
+Message-ID: <1461144880-8724-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Apr 2016, Rafael J. Wysocki wrote:
-> On Thu, Apr 7, 2016 at 2:03 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> >
-> > ACPI 6.0 introduces a new table STAO to list the devices which are used
-> > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> > UART is used by Xen. So here it hides UART from Dom0.
-> >
-> > CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-> > CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-> > CC: linux-acpi at vger.kernel.org (open list:ACPI)
-> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+This is a RESEND patch series.
+The original one can be found at here:
+http://www.spinics.net/lists/arm-kernel/msg435136.html
+It has no functional changes but improve the commit message and
+comments a bit.
 
-I am going to commit it to the xentip tree, if you prefer to take it in
-your tree please let me know.
+This patch series adds support in clock framework for clocks which all the
+operations like gate/ungate, set_rate, set_parent must require its parent
+clock on.
 
+This special HW requirement can be found on Freescale i.MX7D platform.
+Besides i.MX7D, it seems lpc18xx clock has a similar requirement.
+(see: http://www.spinics.net/lists/arm-kernel/msg439307.html)
+And there may be other SoCs in the same situation.
 
-> > ---
-> >  drivers/acpi/scan.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 74 insertions(+)
-> >
-> > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> > index 5f28cf7..cfc73fe 100644
-> > --- a/drivers/acpi/scan.c
-> > +++ b/drivers/acpi/scan.c
-> > @@ -46,6 +46,13 @@ DEFINE_MUTEX(acpi_device_lock);
-> >  LIST_HEAD(acpi_wakeup_device_list);
-> >  static DEFINE_MUTEX(acpi_hp_context_lock);
-> >
-> > +/*
-> > + * The UART device described by the SPCR table is the only object which needs
-> > + * special-casing. Everything else is covered by ACPI namespace paths in STAO
-> > + * table.
-> > + */
-> > +static u64 spcr_uart_addr;
-> > +
-> >  struct acpi_dep_data {
-> >         struct list_head node;
-> >         acpi_handle master;
-> > @@ -1453,6 +1460,41 @@ static int acpi_add_single_object(struct acpi_device **child,
-> >         return 0;
-> >  }
-> >
-> > +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
-> > +                                           void *context)
-> > +{
-> > +       struct resource *res = context;
-> > +
-> > +       if (acpi_dev_resource_memory(ares, res))
-> > +               return AE_CTRL_TERMINATE;
-> > +
-> > +       return AE_OK;
-> > +}
-> > +
-> > +static bool acpi_device_should_be_hidden(acpi_handle handle)
-> > +{
-> > +       acpi_status status;
-> > +       struct resource res;
-> > +
-> > +       /* Check if it should ignore the UART device */
-> > +       if (!(spcr_uart_addr && acpi_has_method(handle, METHOD_NAME__CRS)))
-> > +               return false;
-> > +
-> > +       /*
-> > +        * The UART device described in SPCR table is assumed to have only one
-> > +        * memory resource present. So we only look for the first one here.
-> > +        */
-> > +       status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-> > +                                    acpi_get_resource_memory, &res);
-> > +       if (ACPI_FAILURE(status) || res.start != spcr_uart_addr)
-> > +               return false;
-> > +
-> > +       acpi_handle_info(handle, "The UART device @%pa in SPCR table will be hidden\n",
-> > +                        &res.start);
-> > +
-> > +       return true;
-> > +}
-> > +
-> >  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
-> >                                     unsigned long long *sta)
-> >  {
-> > @@ -1466,6 +1508,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
-> >         switch (acpi_type) {
-> >         case ACPI_TYPE_ANY:             /* for ACPI_ROOT_OBJECT */
-> >         case ACPI_TYPE_DEVICE:
-> > +               if (acpi_device_should_be_hidden(handle))
-> > +                       return -ENODEV;
-> > +
-> >                 *type = ACPI_BUS_TYPE_DEVICE;
-> >                 status = acpi_bus_get_status_handle(handle, sta);
-> >                 if (ACPI_FAILURE(status))
-> > @@ -1916,9 +1961,24 @@ static int acpi_bus_scan_fixed(void)
-> >         return result < 0 ? result : 0;
-> >  }
-> >
-> > +static void __init acpi_get_spcr_uart_addr(void)
-> > +{
-> > +       acpi_status status;
-> > +       struct acpi_table_spcr *spcr_ptr;
-> > +
-> > +       status = acpi_get_table(ACPI_SIG_SPCR, 0,
-> > +                               (struct acpi_table_header **)&spcr_ptr);
-> > +       if (ACPI_SUCCESS(status))
-> > +               spcr_uart_addr = spcr_ptr->serial_port.address;
-> > +       else
-> > +               printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
-> > +}
-> > +
-> >  int __init acpi_scan_init(void)
-> >  {
-> >         int result;
-> > +       acpi_status status;
-> > +       struct acpi_table_stao *stao_ptr;
-> >
-> >         acpi_pci_root_init();
-> >         acpi_pci_link_init();
-> > @@ -1934,6 +1994,20 @@ int __init acpi_scan_init(void)
-> >
-> >         acpi_scan_add_handler(&generic_device_handler);
-> >
-> > +       /*
-> > +        * If there is STAO table, check whether it needs to ignore the UART
-> > +        * device in SPCR table.
-> > +        */
-> > +       status = acpi_get_table(ACPI_SIG_STAO, 0,
-> > +                               (struct acpi_table_header **)&stao_ptr);
-> > +       if (ACPI_SUCCESS(status)) {
-> > +               if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
-> > +                       printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
-> > +
-> > +               if (stao_ptr->ignore_uart)
-> > +                       acpi_get_spcr_uart_addr();
-> > +       }
-> > +
-> >         mutex_lock(&acpi_scan_lock);
-> >         /*
-> >          * Enumerate devices in the ACPI namespace.
-> > --
-> > 2.0.4
-> >
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Current clock core can not support such type of clock well.
+
+This patch introduce a new flag CLK_SET_PARENT_ON to handle this special
+case in clock core that enable its parent clock firstly for each operation
+and disable it later after operation complete.
+
+There're two special cases for handling this issue:
+
+One is fixing the possible disabling clocks while its parent is already off
+during kernel booting phase in clk_disable_unused_subtree()
+Since this state misalign only happens during booting time,
+so we simply enable the parent clocks before disable it if flag is set.
+For normal clk_disable after kernel booting, there's no such issue
+since the clock tree is already created which makes sure no such issue exist.
+
+Another special case is for set_parent() operation.
+It requires both parent, old one and new one, to be enabled at the same
+time during the operation.
+
+Patch 1~4 does this work.
+
+After clk core supports mx7d type clocks, we don't have to enable all clock
+by default anymore, then we remove the enable of all clocks code and instead
+only enable set of minimum required clocks.
+
+Patch 5~8 does this work.
+
+The whole patch series is based on for-next branch of clock tree:
+git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+
+Dong Aisheng (8):
+  clk: introduce clk_core_enable_lock and clk_core_disable_lock
+    functions
+  clk: move clk_disable_unused after clk_core_disable_unprepare function
+  clk: core: support clocks which requires parents on (part 1)
+  clk: core: support clocks which requires parents on (part 2)
+  clk: imx: re-order and concentrate the same type of clk api
+  clk: imx: add clk api for supporting clk_OPS_PARENT_ON clocks
+  clk: imx7d: using api with flag CLK_OPS_PARENT_ON
+  clk: imx7d: only enable minimum required clocks
+
+ drivers/clk/clk.c            | 329 +++++++++++--------
+ drivers/clk/imx/clk-imx7d.c  | 732 ++++++++++++++++++++++---------------------
+ drivers/clk/imx/clk.h        |  90 ++++--
+ include/linux/clk-provider.h |   2 +
+ 4 files changed, 623 insertions(+), 530 deletions(-)
+
+-- 
+1.9.1
