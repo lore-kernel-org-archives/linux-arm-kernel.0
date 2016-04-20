@@ -1,69 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Apr 2016 10:44:29 +0100
-Subject: [PATCH v7 8/8] genirq/msi: use the MSI doorbell's IOVA when
- requested
-In-Reply-To: <1461085990-2547-9-git-send-email-eric.auger@linaro.org>
-References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
- <1461085990-2547-9-git-send-email-eric.auger@linaro.org>
-Message-ID: <57174F7D.4090501@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Apr 2016 11:55:41 +0200
+Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
+In-Reply-To: <CAKv+Gu9rzxtw2i1QJAU0C-y4Lmh6KDWH0p+TYNHsndr-6c11zw@mail.gmail.com>
+References: <20160419140220.GA9503@pengutronix.de>
+ <20160420092516.GA21732@e103592.cambridge.arm.com>
+ <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
+ <CAKv+Gu9rzxtw2i1QJAU0C-y4Lmh6KDWH0p+TYNHsndr-6c11zw@mail.gmail.com>
+Message-ID: <20160420095541.GG31470@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 18:13, Eric Auger wrote:
-> On MSI message composition we now use the MSI doorbell's IOVA in
-> place of the doorbell's PA in case the device is upstream to an
-> IOMMU that requires MSI addresses to be mapped. The doorbell's
-> allocation and mapping happened on an early stage (pci_enable_msi).
+On Wed, Apr 20, 2016 at 11:43:30AM +0200, Ard Biesheuvel wrote:
+> (replying to self)
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> On 20 April 2016 at 11:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > (+ Arnd)
+> >
+> > On 20 April 2016 at 11:25, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> On Tue, Apr 19, 2016 at 04:02:20PM +0200, Steffen Trumtrar wrote:
+> >>> Hi!
+> >>>
+> >>> According to kernelci.org (and validating on my own hardware), the current
+> >>> socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
+> >>>
+> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+> >>>
+> >>> vs
+> >>>
+> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+> >>>
+> >>> Both boot successfully, but notice that the board fails to bring up CPU1 if
+> >>> thumb2 support is enabled.
+> >>>
+> >>> Any ideas why this might be happening?
+> >>
 > 
-> ---
-> v6 -> v7:
-> - allocation/mapping is done at an earlier stage. We now just perform
->   the iova lookup. So it is safe now to be called in a code that cannot
->   sleep. iommu_msi_set_doorbell_iova is moved in the dma-reserved-iommu
->   API: I think it cleans things up with respect to various #ifdef CONFIGS.
-> 
-> v5:
-> - use macros to increase the readability
-> - add comments
-> - fix a typo that caused a compilation error if CONFIG_IOMMU_API
->   is not set
-> ---
->  kernel/irq/msi.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index e45907e..0ebb2d8 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -19,6 +19,7 @@
->  
->  /* Temparory solution for building, will be removed later */
->  #include <linux/pci.h>
-> +#include <linux/dma-reserved-iommu.h>
->  
->  struct msi_desc *alloc_msi_entry(struct device *dev)
->  {
-> @@ -64,8 +65,12 @@ static int msi_compose(struct irq_data *irq_data,
->  
->  	if (erase)
->  		memset(msg, 0, sizeof(*msg));
-> -	else
-> +	else {
->  		ret = irq_chip_compose_msi_msg(irq_data, msg);
-> +		if (ret)
-> +			return ret;
-> +		iommu_msi_mapping_translate_msg(irq_data, msg);
+> Actually, this looks like a problem with the secondary entry point to
+> me. Could you try this?
 
-I've just commented on this function in its respective series. I really
-think it deals with the wrong data structure. Id rather see something like:
+Been there, done that. Unfortunately this does not solve the problem.
 
-struct device *dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
-iommu_msi_msg_pa_to_va(dev, msg);
+Sascha
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
