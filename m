@@ -1,37 +1,31 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 20 Apr 2016 11:40:03 -0700
-Subject: [PATCH] ARM: mv78xx0: Remove CLK_IS_ROOT
-In-Reply-To: <9103114.2LquUEkh1k@wuerfel>
-References: <1461116404-3285-1-git-send-email-sboyd@codeaurora.org>
- <9103114.2LquUEkh1k@wuerfel>
-Message-ID: <20160420184003.GI15324@codeaurora.org>
+Date: Wed, 20 Apr 2016 11:40:44 -0700
+Subject: [PATCH v2 1/2] clk: Add Oxford Semiconductor OXNAS Standard Clocks
+In-Reply-To: <57174151.8040806@baylibre.com>
+References: <1460973696-5977-1-git-send-email-narmstrong@baylibre.com>
+ <1460973696-5977-2-git-send-email-narmstrong@baylibre.com>
+ <20160419212944.GF15324@codeaurora.org>
+ <57174151.8040806@baylibre.com>
+Message-ID: <20160420184044.GJ15324@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20, Arnd Bergmann wrote:
-> On Tuesday 19 April 2016 18:40:04 Stephen Boyd wrote:
-> > This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
-> > CLK_IS_ROOT", 2016-02-02) so remove it.
+On 04/20, Neil Armstrong wrote:
+> On 04/19/2016 11:29 PM, Stephen Boyd wrote:
+> > On 04/18, Neil Armstrong wrote:
+> >> +		struct clk_oxnas *_clk;
+> >> +
+> >> +		if (!clk_oxnas_init[i].clk_init)
+> >> +			continue;
 > > 
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > Cc: Jason Cooper <jason@lakedaemon.net
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > New design is fine, really it's up to you, but then this check
+> > isn't needed anymore, right?
 > > 
 > 
-> Looks good, like all other instances in arch/arm.
-> 
-> If you want to merge these through your tree, please add my
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> to all of them, in addition to the other other Acks. I don't
-> think there is a significant risk for regressions as they all
-> tend to be "stable" in the sense that those files haven't
-> been touched in a while.
+> it's not needed for sure, but do I need to send a v3 to remove this ?
 > 
 
-Thanks. If Gregory doesn't pick them up I'll take care of it, but
-we're not in any hurry here.
+No worries. I'll remove these two lines while applying.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
