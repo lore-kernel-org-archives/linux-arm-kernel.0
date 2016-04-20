@@ -1,106 +1,43 @@
-From: luke.starrett@broadcom.com (Luke Starrett)
-Date: Wed, 20 Apr 2016 13:40:02 -0400
-Subject: [PATCH v2 1/1] arm64: dts: NS2 secondary core enablement via PSCI
-Message-ID: <1461174002-18178-1-git-send-email-luke.starrett@broadcom.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 20 Apr 2016 10:42:41 -0700
+Subject: [PATCH 09/14] Input: touchscreen: Broadcom iProc: DT spelling
+ s/clock-name/clock-names/
+In-Reply-To: <1461166339-11109-10-git-send-email-geert+renesas@glider.be>
+References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
+ <1461166339-11109-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160420174241.GA28831@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare PSCI-1.0 node and enable CPU_ON method via PSCI.  Spin-table
-memreserve has been removed as well as syscon based reset, as PSCI-1.0
-expects reset implementation in firmware.
+On Wed, Apr 20, 2016 at 05:32:14PM +0200, Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Luke Starrett <luke.starrett@broadcom.com>
----
+Applied, thank you.
 
-Changes from v1:
- - No code changes, adding missing reviewers to CC list
+> ---
+>  .../devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt    | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+> index 25541f30e38701f2..ac5dff412e25266f 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+> @@ -7,7 +7,7 @@ Required properties:
+>    If this property is selected please make sure MFD_SYSCON config
+>    is enabled in the defconfig file.
+>  - clocks:  The clock provided by the SOC to driver the tsc
+> -- clock-name:  name for the clock
+> +- clock-names:  name for the clock
+>  - interrupts: The touchscreen controller's interrupt
+>  - address-cells: Specify the number of u32 entries needed in child nodes.
+>    Should set to 1.
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-input" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 31 +++++++++----------------------
- 1 file changed, 9 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 123cd9c..ec68ec1 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -33,8 +33,6 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/bcm-ns2.h>
- 
--/memreserve/ 0x84b00000 0x00000008;
--
- / {
- 	compatible = "brcm,ns2";
- 	interrupt-parent = <&gic>;
-@@ -49,8 +47,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0 0>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0 0x84b00000>;
-+			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
- 		};
- 
-@@ -58,8 +55,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0 1>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0 0x84b00000>;
-+			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
- 		};
- 
-@@ -67,8 +63,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0 2>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0 0x84b00000>;
-+			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
- 		};
- 
-@@ -76,8 +71,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0 3>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0 0x84b00000>;
-+			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
- 		};
- 
-@@ -86,6 +80,11 @@
- 		};
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
-@@ -252,18 +251,6 @@
- 			mmu-masters;
- 		};
- 
--		crmu: crmu@65024000 {
--			compatible = "syscon";
--			reg = <0x65024000 0x100>;
--		};
--
--		reboot at 65024000 {
--			compatible ="syscon-reboot";
--			regmap = <&crmu>;
--			offset = <0x90>;
--			mask = <0xfffffffd>;
--		};
--
- 		gic: interrupt-controller at 65210000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
 -- 
-2.1.0
+Dmitry
