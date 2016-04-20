@@ -1,57 +1,68 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 20 Apr 2016 17:16:00 +0300
-Subject: [PATCH 2/4] i2c: designware-platdrv: fix unbalanced clk enable
- and prepare
-In-Reply-To: <57177C32.4090000@linux.intel.com>
-References: <1460638414-5987-1-git-send-email-jszhang@marvell.com>
- <1460638414-5987-3-git-send-email-jszhang@marvell.com>
- <57177C32.4090000@linux.intel.com>
-Message-ID: <1461161760.6620.306.camel@linux.intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Apr 2016 16:17:20 +0200
+Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
+ PM domains
+In-Reply-To: <CAMuHMdVZZoq=t1x_RXXfT_PwR9fFVOrdK1J+xtJWW-yHHbBmHQ@mail.gmail.com>
+References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
+ <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
+ <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
+ <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
+ <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
+ <CAMuHMdVZZoq=t1x_RXXfT_PwR9fFVOrdK1J+xtJWW-yHHbBmHQ@mail.gmail.com>
+Message-ID: <CAPDyKFqJywUnCt99Dy=J8WXZ1ThyO319RvQx=kGK0YTJJ9AEng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-04-20 at 15:55 +0300, Jarkko Nikula wrote:
-> On 04/14/2016 03:53 PM, Jisheng Zhang wrote:
-> > 
-> > If i2c_dw_probe() fail, we should call i2c_dw_plat_prepare_clk() to
-> > disable and unprepare the clk, otherwise the clk enable and prepare
-> > is left unbalanced.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> > ? drivers/i2c/busses/i2c-designware-platdrv.c | 2 ++
-> > ? 1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
-> > b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > index 00f9e99..1488cea 100644
-> > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > @@ -268,6 +268,8 @@ rpm_disable:
-> > ??		pm_runtime_put_noidle(&pdev->dev);
-> > ??	}
-> > 
-> > +	i2c_dw_plat_prepare_clk(dev, false);
-> > +
-> > ??	return r;
-> > ? }
-> > 
-> This is a bit unclear to me does devm_clk_get take care of clk
-> disabling?
-> in case of probe error or driver removal?
-> 
-> I see Andy's 1cb715ca4694 ("i2c-designware: move to managed functions?
-> (devm_*)") removed it but at quick look drivers/clk/clk-devres.c:?
-> devm_clk_release() calls only clk_put and I don't see disable is done?
-> down the path.
+On 20 April 2016 at 10:24, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Ulf,
+>
+> On Mon, Apr 18, 2016 at 4:02 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 18 April 2016 at 15:39, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>>> On Mon, Apr 18, 2016 at 2:59 PM, Geert Uytterhoeven
+>>> <geert@linux-m68k.org> wrote:
+>>>> On Mon, Apr 18, 2016 at 2:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>>> [...]
+>>>>>
+>>>>>> +
+>>>>>> +static bool rcar_sysc_active_wakeup(struct device *dev)
+>>>>>> +{
+>>>>>> +       return true;
+>>>>>
+>>>>> I am interested to know why this is always returning true. Perhaps you
+>>>>> can elaborate a bit on that?
+>>>>
+>>>> Too many copying from old shmobile PM Domain code?
+>>>> Honestly, I don't know...
+>>>>
+>>>> Perhaps Rafael still remembers the original rationale, as git history for
+>>>> commit e3e0109138376bb2 ("ARM / shmobile: Support for I/O power domains for
+>>>> SH7372 (v9)") doesn't have it.
+>>>>
+>>>> Google did find: https://lkml.org/lkml/2011/6/30/471
+>>>>
+>>>> Do we still need this at all? I.e. aren't PM Domains containing wake-up
+>>>> devices kept powered automatically during system suspend?
+>>>
+>>> No they aren't. So for pm-rmobile we do need it.
+>>
+>> I don't quite understand why genpd should need to treat all devices
+>> within the same domain exactly the same, it seems suboptimal.
+>>
+>> I guess it would be more clever to allow this to be controlled on per
+>> device basis instead, so let's say from each driver.
+>
+> Perhaps this can be handled through device_set_wakeup_enable()?
 
-The following is a mistake of the mentioned patch.
--???????clk_disable_unprepare(dev->clk);
+Yes, the pm_wakeirq API should help with all what is needed.
 
-I did at the same mistake in dw_dmac driver which had been fixed later
-in the commit 8be4f523b480 ("dmaengine: dw: fix regression in dw_probe()
-function").
+> Unfortunately this doesn't seem to be called from e.g. gpio-keys.
+>
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Okay, so it's a matter of deployment for these devices/drivers.
+
+A list of such drivers/devices that needs to be fixed would be great
+to have. :-)
+
+Kind regards
+Uffe
