@@ -1,94 +1,65 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 20 Apr 2016 03:18:39 -0500
-Subject: [PATCH] ARM: dts: AM57xx/DRA7: Update SoC voltage rail limits to
- match data sheet
-Message-ID: <1461140319-32026-1-git-send-email-nm@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 20 Apr 2016 10:24:04 +0200
+Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
+ PM domains
+In-Reply-To: <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
+References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
+ <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
+ <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
+ <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
+ <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
+Message-ID: <CAMuHMdVZZoq=t1x_RXXfT_PwR9fFVOrdK1J+xtJWW-yHHbBmHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per the data sheet starting from SPRUHQ0H (Nov 2015 - Latest[1]),
-VDD_CORE can vary from 0.85v to 1.15v for AVS class0. VDD GPU/DSP
-et.al. can range from 0.85v to 1.25V with AVS class0
+Hi Ulf,
 
-Since dynamic voltage scaling is disabled for DRA7/AM57xx SoCs for
-all SoC rails other than MPU, the bootloader is responsible for
-setting up the AVS class0 voltage, however, with wrong voltage machine
-constraints in dtb, regulator framework will lower the voltage below
-the required voltage levels for certain samples in production flow.
-This can cause catastrophic failures which can be pretty hard to
-identify.
+On Mon, Apr 18, 2016 at 4:02 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 18 April 2016 at 15:39, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Mon, Apr 18, 2016 at 2:59 PM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> On Mon, Apr 18, 2016 at 2:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>> [...]
+>>>>
+>>>>> +
+>>>>> +static bool rcar_sysc_active_wakeup(struct device *dev)
+>>>>> +{
+>>>>> +       return true;
+>>>>
+>>>> I am interested to know why this is always returning true. Perhaps you
+>>>> can elaborate a bit on that?
+>>>
+>>> Too many copying from old shmobile PM Domain code?
+>>> Honestly, I don't know...
+>>>
+>>> Perhaps Rafael still remembers the original rationale, as git history for
+>>> commit e3e0109138376bb2 ("ARM / shmobile: Support for I/O power domains for
+>>> SH7372 (v9)") doesn't have it.
+>>>
+>>> Google did find: https://lkml.org/lkml/2011/6/30/471
+>>>
+>>> Do we still need this at all? I.e. aren't PM Domains containing wake-up
+>>> devices kept powered automatically during system suspend?
+>>
+>> No they aren't. So for pm-rmobile we do need it.
+>
+> I don't quite understand why genpd should need to treat all devices
+> within the same domain exactly the same, it seems suboptimal.
+>
+> I guess it would be more clever to allow this to be controlled on per
+> device basis instead, so let's say from each driver.
 
-Update board files which don't match required specification.
+Perhaps this can be handled through device_set_wakeup_enable()?
+Unfortunately this doesn't seem to be called from e.g. gpio-keys.
 
-[1] http://www.ti.com/product/AM5728/datasheet/specifications#SPRT637-7340
+Gr{oetje,eeting}s,
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Based on:
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-omap-for-v4.7/dt     a4240d3af677 ARM: dts: Add support for dra72-evm rev C (SR2.0)
+                        Geert
 
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 4 ++--
- arch/arm/boot/dts/dra7-evm.dts          | 4 ++--
- arch/arm/boot/dts/dra72-evm-common.dtsi | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 75d04b1bbd1b..779466e18d34 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -438,7 +438,7 @@
- 					/* VDD_DSPEVE, VDD_IVA, VDD_GPU */
- 					regulator-name = "smps45";
- 					regulator-min-microvolt = < 850000>;
--					regulator-max-microvolt = <1150000>;
-+					regulator-max-microvolt = <1250000>;
- 					regulator-always-on;
- 					regulator-boot-on;
- 				};
-@@ -447,7 +447,7 @@
- 					/* VDD_CORE */
- 					regulator-name = "smps6";
- 					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1030000>;
-+					regulator-max-microvolt = <1150000>;
- 					regulator-always-on;
- 					regulator-boot-on;
- 				};
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index d272cf140197..e94cbb7dd3c5 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -431,7 +431,7 @@
- 					/* VDD_DSPEVE */
- 					regulator-name = "smps45";
- 					regulator-min-microvolt = < 850000>;
--					regulator-max-microvolt = <1150000>;
-+					regulator-max-microvolt = <1250000>;
- 					regulator-always-on;
- 					regulator-boot-on;
- 				};
-@@ -449,7 +449,7 @@
- 					/* CORE_VDD */
- 					regulator-name = "smps7";
- 					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1060000>;
-+					regulator-max-microvolt = <1150000>;
- 					regulator-always-on;
- 					regulator-boot-on;
- 				};
-diff --git a/arch/arm/boot/dts/dra72-evm-common.dtsi b/arch/arm/boot/dts/dra72-evm-common.dtsi
-index 2c880501ba2e..874bdf1db306 100644
---- a/arch/arm/boot/dts/dra72-evm-common.dtsi
-+++ b/arch/arm/boot/dts/dra72-evm-common.dtsi
-@@ -328,7 +328,7 @@
- 					/* VDD_CORE */
- 					regulator-name = "smps2";
- 					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1060000>;
-+					regulator-max-microvolt = <1150000>;
- 					regulator-boot-on;
- 					regulator-always-on;
- 				};
--- 
-2.8.0
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
