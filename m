@@ -1,68 +1,160 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Wed, 20 Apr 2016 14:29:03 +0200
-Subject: [PATCH v2 1/5] arm64/perf: Basic uncore counter support for
- Cavium ThunderX
-In-Reply-To: <20160419150607.GB20991@leverpostej>
-References: <cover.1457539621.git.jglauber@cavium.com>
- <2588abcb011df6e60cd8212a8583454999180748.1457539622.git.jglauber@cavium.com>
- <20160419150607.GB20991@leverpostej>
-Message-ID: <20160420122903.GA3352@hardcore>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 20 Apr 2016 14:33:17 +0200
+Subject: [PATCH v7 6/8] irqchip/gicv2m: implement msi_doorbell_info
+ callback
+In-Reply-To: <57174B8E.9050803@arm.com>
+References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
+ <1461085990-2547-7-git-send-email-eric.auger@linaro.org>
+ <57174B8E.9050803@arm.com>
+Message-ID: <5717770D.6090005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 04:06:08PM +0100, Mark Rutland wrote:
-> On Wed, Mar 09, 2016 at 05:21:03PM +0100, Jan Glauber wrote:
-> > Provide "uncore" facilities for different non-CPU performance
-> > counter units. Based on Intel/AMD uncore pmu support.
-> > 
-> > The uncore drivers cover quite different functionality including
-> > L2 Cache, memory controllers and interconnects.
-> > 
-> > The uncore PMUs can be found under /sys/bus/event_source/devices.
-> > All counters are exported via sysfs in the corresponding events
-> > files under the PMU directory so the perf tool can list the event names.
-> > 
-> > There are some points that are special in this implementation:
-> > 
-> > 1) The PMU detection relies on PCI device detection. If a
-> >    matching PCI device is found the PMU is created. The code can deal
-> >    with multiple units of the same type, e.g. more than one memory
-> >    controller.
-> >    Note: There is also a CPUID check to determine the CPU variant,
-> >    this is needed to support different hardware versions that use
-> >    the same PCI IDs.
-> > 
-> > 2) Counters are summarized across different units of the same type
-> >    on one NUMA node.
-> >    For instance L2C TAD 0..7 are presented as a single counter
-> >    (adding the values from TAD 0 to 7). Although losing the ability
-> >    to read a single value the merged values are easier to use.
+Marc,
+On 04/20/2016 11:27 AM, Marc Zyngier wrote:
+> On 19/04/16 18:13, Eric Auger wrote:
+>> This patch implements the msi_doorbell_info callback in the
+>> gicv2m driver.
+>>
+>> The driver now is able to return its doorbell characteristics
+>> (base, size, prot). A single doorbell is exposed.
+>>
+>> This will allow the msi layer to iommu_map this doorbell when
+>> requested.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v7: creation
+>> ---
+>>  drivers/irqchip/irq-gic-v2m.c | 32 +++++++++++++++++++++++++++++++-
+>>  1 file changed, 31 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+>> index 28f047c..54690b9 100644
+>> --- a/drivers/irqchip/irq-gic-v2m.c
+>> +++ b/drivers/irqchip/irq-gic-v2m.c
+>> @@ -24,6 +24,8 @@
+>>  #include <linux/of_pci.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/spinlock.h>
+>> +#include <linux/percpu.h>
+>> +#include <linux/iommu.h>
+>>  
+>>  /*
+>>  * MSI_TYPER:
+>> @@ -64,6 +66,7 @@ struct v2m_data {
+>>  	u32 nr_spis;		/* The number of SPIs for MSIs */
+>>  	unsigned long *bm;	/* MSI vector bitmap */
+>>  	u32 flags;		/* v2m flags for specific implementation */
+>> +	struct irq_chip_msi_doorbell_info doorbell_info;
+>>  };
+>>  
+>>  static void gicv2m_mask_msi_irq(struct irq_data *d)
+>> @@ -105,6 +108,16 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>>  		msg->data -= v2m->spi_start;
+>>  }
+>>  
+>> +static const struct irq_chip_msi_doorbell_info *
+>> +gicv2m_msi_doorbell_info(struct irq_data *data)
+>> +{
+>> +	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
+>> +
+>> +	if (!v2m)
+>> +		return NULL;
 > 
-> Merging within a NUMA node, but no further seems a little arbitrary.
+> How can this ever be NULL? I think you can drop that test.
+OK
 > 
-> > 3) NUMA support. The device node id is used to group devices by node
-> >    so counters on one node can be merged. The NUMA node can be selected
-> >    via a new sysfs node attribute.
-> >    Without NUMA support all devices will be on node 0.
+>> +	return (const struct irq_chip_msi_doorbell_info *)(&v2m->doorbell_info);
 > 
-> It doesn't seem great that this depends on kernel configuration (which
-> is independent of HW configuration). It seems confusing for the user,
-> and fragile.
+> Please don't do that. Use "const" in the functions that are using
+> irq_chip_msi_doorbell_info, but do not make this "const" here.
+It definitively compiles without casting so obviously this is not needed
+but is there any other wrong thing I don't see?
+we still want this function to return a pointer to a const?
 > 
-> Do we not have access to another way of grouping cores (e.g. a socket
-> ID), that's independent of kernel configuration? That seems to be how
-> the x86 uncore PMUs are handled.
+>> +}
+>> +
+>>  static struct irq_chip gicv2m_irq_chip = {
+>>  	.name			= "GICv2m",
+>>  	.irq_mask		= irq_chip_mask_parent,
+>> @@ -112,6 +125,7 @@ static struct irq_chip gicv2m_irq_chip = {
+>>  	.irq_eoi		= irq_chip_eoi_parent,
+>>  	.irq_set_affinity	= irq_chip_set_affinity_parent,
+>>  	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
+>> +	.msi_doorbell_info	= gicv2m_msi_doorbell_info,
+>>  };
+>>  
+>>  static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
+>> @@ -247,6 +261,7 @@ static void gicv2m_teardown(void)
+>>  
+>>  	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
+>>  		list_del(&v2m->entry);
+>> +		free_percpu(v2m->doorbell_info.percpu_doorbells);
+>>  		kfree(v2m->bm);
+>>  		iounmap(v2m->base);
+>>  		of_node_put(to_of_node(v2m->fwnode));
+>> @@ -299,6 +314,7 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+>>  {
+>>  	int ret;
+>>  	struct v2m_data *v2m;
+>> +	struct irq_chip_msi_doorbell __percpu *doorbell;
+>>  
+>>  	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
+>>  	if (!v2m) {
+>> @@ -311,11 +327,23 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+>>  
+>>  	memcpy(&v2m->res, res, sizeof(struct resource));
+>>  
+>> +	v2m->doorbell_info.percpu_doorbells =
+>> +		alloc_percpu(struct irq_chip_msi_doorbell);
+>> +	if (WARN_ON(!v2m->doorbell_info.percpu_doorbells)) {
+>> +		ret = -ENOMEM;
+>> +		goto err_free_v2m;
+>> +	}
+>> +	doorbell = per_cpu_ptr(v2m->doorbell_info.percpu_doorbells, 0);
+>> +	doorbell->base = v2m->res.start;
+>> +	doorbell->size = 4;
+>> +	doorbell->prot = IOMMU_WRITE;
+> 
+> You probably need to also have something that says IOMMU_DEVICE or
+> something similar, because I'm afraid you're getting a memory mapping
+> here. I've had a quick look at the two other series, but couldn't find
+> anything that would force the memory attributes.
+Yes you're right I currently just enforce the direction (which is
+checked against what VFIO user registered). Do you refer to IOMMU_MMIO,
+latterly proposed on the ML. In the positive, yes I intend to add it
+once it gets upstreamed.
 
-I'm not sure how relevant the use case of a multi-node system without
-CONFIG_NUMA is, but maybe we can get the socket ID from the
-multiprocessor affinity register (MPIDR_EL1)? The AFF2 part (bits 23:16)
-should contain the socket number on ThunderX.
+Thanks
 
-Would that be better?
-
-thanks,
-Jan
-
-> If we don't have that information, it really feels like we need
-> additional info from FW (which would also solve the CPUID issue with
-> point 1), or this is likely to be very fragile.
+Eric
+> 
+>> +	v2m->doorbell_info.nb_doorbells = 1;
+>> +
+>>  	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
+>>  	if (!v2m->base) {
+>>  		pr_err("Failed to map GICv2m resource\n");
+>>  		ret = -ENOMEM;
+>> -		goto err_free_v2m;
+>> +		goto err_free_v2m_doorbells;
+>>  	}
+>>  
+>>  	if (spi_start && nr_spis) {
+>> @@ -359,6 +387,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+>>  
+>>  err_iounmap:
+>>  	iounmap(v2m->base);
+>> +err_free_v2m_doorbells:
+>> +	free_percpu(v2m->doorbell_info.percpu_doorbells);
+>>  err_free_v2m:
+>>  	kfree(v2m);
+>>  	return ret;
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
