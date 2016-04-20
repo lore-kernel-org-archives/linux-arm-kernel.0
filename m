@@ -1,157 +1,20 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Apr 2016 12:12:39 +0100
-Subject: [PATCH v5 5/7] arm64/perf: Access pmu register using
- <read/write>_sys_reg
-In-Reply-To: <1461092062-7484-6-git-send-email-ashoks@broadcom.com>
-References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
- <1461092062-7484-6-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160420111239.GF11453@leverpostej>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 20 Apr 2016 13:15:27 +0200
+Subject: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A578F73@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
+ <CAKfKVtEkfnDqU476troXmCw20ATvQvj-JdPX-BCuPDR-9ZxKHQ@mail.gmail.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A578F73@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <571764CF.6070003@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 11:54:20AM -0700, Ashok Kumar wrote:
-> changed pmu register access to make use of <read/write>_sys_reg
-> from sysreg.h instead of accessing them directly.
+On 04/20/2016 10:39 AM, Appana Durga Kedareswara Rao wrote:
+[...]
+>> however  we should keep the names same as the TRM.
 > 
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 33 ++++++++++++++++-----------------
->  1 file changed, 16 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 2ee61e8..86790d2 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -22,6 +22,7 @@
->  #include <asm/irq_regs.h>
->  #include <asm/perf_event.h>
->  #include <asm/virt.h>
-> +#include <asm/sysreg.h>
+> Why?? Why can't we use simple convenient names that refers to equivalent clocks of h/w 
 
-Please move this between the includes of <asm/perf_event.h> and
-<asm/virt.h>, so as to keep them in alphabetical order.
-
-Otherwise, this looks like a nice cleanup!
-
-With that fixed up:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
->  
->  #include <linux/of.h>
->  #include <linux/perf/arm_pmu.h>
-> @@ -476,16 +477,14 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
->  
->  static inline u32 armv8pmu_pmcr_read(void)
->  {
-> -	u32 val;
-> -	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
-> -	return val;
-> +	return read_sysreg(pmcr_el0);
->  }
->  
->  static inline void armv8pmu_pmcr_write(u32 val)
->  {
->  	val &= ARMV8_PMU_PMCR_MASK;
->  	isb();
-> -	asm volatile("msr pmcr_el0, %0" :: "r" (val));
-> +	write_sysreg(val, pmcr_el0);
->  }
->  
->  static inline int armv8pmu_has_overflowed(u32 pmovsr)
-> @@ -507,7 +506,7 @@ static inline int armv8pmu_counter_has_overflowed(u32 pmnc, int idx)
->  static inline int armv8pmu_select_counter(int idx)
->  {
->  	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
-> -	asm volatile("msr pmselr_el0, %0" :: "r" (counter));
-> +	write_sysreg(counter, pmselr_el0);
->  	isb();
->  
->  	return idx;
-> @@ -524,9 +523,9 @@ static inline u32 armv8pmu_read_counter(struct perf_event *event)
->  		pr_err("CPU%u reading wrong counter %d\n",
->  			smp_processor_id(), idx);
->  	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
-> -		asm volatile("mrs %0, pmccntr_el0" : "=r" (value));
-> +		value = read_sysreg(pmccntr_el0);
->  	else if (armv8pmu_select_counter(idx) == idx)
-> -		asm volatile("mrs %0, pmxevcntr_el0" : "=r" (value));
-> +		value = read_sysreg(pmxevcntr_el0);
->  
->  	return value;
->  }
-> @@ -548,47 +547,47 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
->  		 */
->  		u64 value64 = 0xffffffff00000000ULL | value;
->  
-> -		asm volatile("msr pmccntr_el0, %0" :: "r" (value64));
-> +		write_sysreg(value64, pmccntr_el0);
->  	} else if (armv8pmu_select_counter(idx) == idx)
-> -		asm volatile("msr pmxevcntr_el0, %0" :: "r" (value));
-> +		write_sysreg(value, pmxevcntr_el0);
->  }
->  
->  static inline void armv8pmu_write_evtype(int idx, u32 val)
->  {
->  	if (armv8pmu_select_counter(idx) == idx) {
->  		val &= ARMV8_PMU_EVTYPE_MASK;
-> -		asm volatile("msr pmxevtyper_el0, %0" :: "r" (val));
-> +		write_sysreg(val, pmxevtyper_el0);
->  	}
->  }
->  
->  static inline int armv8pmu_enable_counter(int idx)
->  {
->  	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
-> -	asm volatile("msr pmcntenset_el0, %0" :: "r" (BIT(counter)));
-> +	write_sysreg(BIT(counter), pmcntenset_el0);
->  	return idx;
->  }
->  
->  static inline int armv8pmu_disable_counter(int idx)
->  {
->  	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
-> -	asm volatile("msr pmcntenclr_el0, %0" :: "r" (BIT(counter)));
-> +	write_sysreg(BIT(counter), pmcntenclr_el0);
->  	return idx;
->  }
->  
->  static inline int armv8pmu_enable_intens(int idx)
->  {
->  	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
-> -	asm volatile("msr pmintenset_el1, %0" :: "r" (BIT(counter)));
-> +	write_sysreg(BIT(counter), pmintenset_el1);
->  	return idx;
->  }
->  
->  static inline int armv8pmu_disable_intens(int idx)
->  {
->  	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
-> -	asm volatile("msr pmintenclr_el1, %0" :: "r" (BIT(counter)));
-> +	write_sysreg(BIT(counter), pmintenclr_el1);
->  	isb();
->  	/* Clear the overflow flag in case an interrupt is pending. */
-> -	asm volatile("msr pmovsclr_el0, %0" :: "r" (BIT(counter)));
-> +	write_sysreg(BIT(counter), pmovsclr_el0);
->  	isb();
->  
->  	return idx;
-> @@ -599,11 +598,11 @@ static inline u32 armv8pmu_getreset_flags(void)
->  	u32 value;
->  
->  	/* Read */
-> -	asm volatile("mrs %0, pmovsclr_el0" : "=r" (value));
-> +	value = read_sysreg(pmovsclr_el0);
->  
->  	/* Write to clear flags */
->  	value &= ARMV8_PMU_OVSR_MASK;
-> -	asm volatile("msr pmovsclr_el0, %0" :: "r" (value));
-> +	write_sysreg(value, pmovsclr_el0);
->  
->  	return value;
->  }
-> -- 
-> 2.1.0
-> 
+Because it is confusing. If you use the same name it's very straight forward
+to understand which clock is being referred to. That's not the case if you
+come up with random new names.
