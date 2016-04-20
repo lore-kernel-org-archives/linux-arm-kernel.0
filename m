@@ -1,161 +1,56 @@
-From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
-Date: Wed, 20 Apr 2016 14:20:06 +0000
-Subject: [PATCH V2] rtc: zynqmp: Update seconds time programming logic
-In-Reply-To: <20160420140310.GS29844@piout.net>
-References: <1461160279-40600-1-git-send-email-anuragku@xilinx.com>
- <20160420140310.GS29844@piout.net>
-Message-ID: <3802E9A6666DF54886E2B9CBF743BA9825E0B53D@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: brad.mouring@ni.com (Brad Mouring)
+Date: Wed, 20 Apr 2016 09:23:21 -0500
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
+In-Reply-To: <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
+References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
+ <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
+Message-ID: <20160420142321.GA23956@zardoz.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
+> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
+> > Document the DT bindings for controlling ARM PL310 Power Control
+> > settings.
+> >
+> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+> 
+> What happened to Josh's ack?
 
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: Wednesday, April 20, 2016 7:33 PM
-> To: Anurag Kumar Vulisha <anuragku@xilinx.com>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>; Soren Brinkmann
-> <sorenb@xilinx.com>; Michal Simek <michals@xilinx.com>; rtc-
-> linux at googlegroups.com; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Punnaiah Choudary Kalluri <punnaia@xilinx.com>;
-> Anirudha Sarangi <anirudh@xilinx.com>; Srikanth Vemula
-> <svemula@xilinx.com>; Srinivas Goud <sgoud@xilinx.com>; Anurag Kumar
-> Vulisha <anuragku@xilinx.com>
-> Subject: Re: [PATCH V2] rtc: zynqmp: Update seconds time programming
-> logic
->
-> On 20/04/2016 at 19:21:19 +0530, Anurag Kumar Vulisha wrote :
-> > We programe RTC time using SET_TIME_WRITE register and read the RTC
-> > current time using CURRENT_TIME register. When we set the time by
-> > writing into SET_TIME_WRITE Register and immediately try to read the
-> > rtc time from CURRENT_TIME register, the previous old value is
-> > returned instead of the new loaded time. This is because RTC takes
-> > nearly 1 sec to update the  new loaded value into the CURRENT_TIME
-> > register. This behaviour is expected in our RTC IP.
-> >
-> > This patch updates the driver to read the current time from
-> > SET_TIME_WRITE register instead of CURRENT_TIME when rtc time is
-> > requested within an 1sec period after setting the RTC time. Doing so
-> > will ensure the correct time is given to the user.
-> >
-> > Since there is an delay of 1sec in updating the CURRENT_TIME we are
-> > loading set time +1sec while programming the SET_TIME_WRITE register,
-> > doing this will give correct time without any delay when read from
-> CURRENT_TIME.
-> >
-> > This patch updates the above said.
-> >
-> > Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+This is not the change that Josh reviewed, if he does agree with it, I'll
+put his ack on it. This was done purposefully.
+
 > > ---
-> >  Changes in v2:
-> >     1. Updated the Time programming logic as suggested by Alexandre
-> Belloni
-> >     2. Changed the commit message
-> > ---
-> >  drivers/rtc/rtc-zynqmp.c | 41
-> > ++++++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 36 insertions(+), 5 deletions(-)
+> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
+> >  1 file changed, 4 insertions(+)
 > >
-> > diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c index
-> > f87f971..ba4203a 100644
-> > --- a/drivers/rtc/rtc-zynqmp.c
-> > +++ b/drivers/rtc/rtc-zynqmp.c
-> > @@ -64,6 +64,12 @@ static int xlnx_rtc_set_time(struct device *dev, struct
-> rtc_time *tm)
-> >     struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-> >     unsigned long new_time;
-> >
-> > +   /*
-> > +    * The value written will be updated after 1 sec into the
-> > +    * seconds read register, so we need to program time +1 sec
-> > +    * to get the correct time on read.
-> > +    */
-> > +   tm->tm_sec += 1;
-> >     new_time = rtc_tm_to_time64(tm);
-> >
-> >     if (new_time > RTC_SEC_MAX_VAL)
-> > @@ -78,14 +84,41 @@ static int xlnx_rtc_set_time(struct device *dev,
-> > struct rtc_time *tm)
-> >
-> >     writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
-> >
-> > +   /*
-> > +    * Clear the rtc interrupt status register after setting the
-> > +    * time. During a read_time function, the code should read the
-> > +    * RTC_INT_STATUS register and if bit 0 is still 0, it means
-> > +    * that one second has not elapsed yet since RTC was set and
-> > +    * the current time should be read from SET_TIME_READ register;
-> > +    * otherwise, CURRENT_TIME register is read to report the time
-> > +    */
-> > +   writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_STS);
-> > +
-> >     return 0;
-> >  }
-> >
-> >  static int xlnx_rtc_read_time(struct device *dev, struct rtc_time
-> > *tm)  {
-> > +   int status;
-> >     struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-> >
-> > -   rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-> > +   status = readl(xrtcdev->reg_base + RTC_INT_STS);
-> > +
-> > +   if (status & RTC_INT_SEC) {
-> > +           /*
-> > +            * RTC has updated the CURRENT_TIME with the time written
-> into
-> > +            * SET_TIME_WRITE register.
-> > +            */
-> > +           rtc_time64_to_tm(readl(xrtcdev->reg_base +
-> RTC_CUR_TM), tm);
-> > +   } else {
-> > +           /*
-> > +            * Time written in SET_TIME_WRITE has not yet updated into
-> > +            * the seconds read register, so read the time from the
-> > +            * SET_TIME_WRITE instead of CURRENT_TIME register.
-> > +            */
-> > +           rtc_time64_to_tm(readl(xrtcdev->reg_base +
-> RTC_SET_TM_RD), tm);
-> > +           tm->tm_sec -= 1;
+> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> > index fe0398c..c1c756e 100644
+> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> > @@ -84,6 +84,10 @@ Optional properties:
+> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+> >    <1> (forcibly enable), property absent (retain settings set by
+> >    firmware)
+> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
+> > +  disable), <1> or property absent (forcibly enable)
+> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
+> > +  <1>  or property absent (forcibly enable)
+> 
+> What happened to "retain settings set by firmware"?
 >
-> Well, I didn't point it out directly earlier but this doesn't work while my
-> example is working:
-> rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD) - 1, tm);
-> Think about what is happening when tm->tm_sec == 0 ...
->
+> Rob
+This is the difference. There was discussion that this would be a
+functional regression for some, and Russell (while noting that he
+generally agreed with keeping fw settings) noted that this would be
+a possible functional regression sprung on those who wanted PM.
 
-Thanks  for pointing it out, will change this part
+In all honesty, I don't really care one way or the other, since
+we'll be defining this property in our dtbs. I'm all ears if you
+have a strong oppinion (and this *does* seem like the sort of
+setting that can be overridden in the kernel, but should be left
+otherwise as the fw set it).
 
-Regards,
-Anurag Kumar V
-
-> > +   }
-> >
-> >     return rtc_valid_tm(tm);
-> >  }
-> > @@ -166,11 +199,9 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void
-> *id)
-> >     if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
-> >             return IRQ_NONE;
-> >
-> > -   /* Clear interrupt */
-> > -   writel(status, xrtcdev->reg_base + RTC_INT_STS);
-> > +   /* Clear RTC_INT_ALRM interrupt only */
-> > +   writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_STS);
-> >
-> > -   if (status & RTC_INT_SEC)
-> > -           rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
-> >     if (status & RTC_INT_ALRM)
-> >             rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
-> >
-> > --
-> > 2.1.2
-> >
->
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Brad
