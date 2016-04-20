@@ -1,59 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Apr 2016 10:11:50 +0200
-Subject: [PATCH v5] spi: orion.c: Add direct access mode
-In-Reply-To: <571731F5.2010809@denx.de>
-References: <1460974417-32375-1-git-send-email-sr@denx.de>
- <3956609.3ttDzXh866@wuerfel> <571731F5.2010809@denx.de>
-Message-ID: <4680158.9eGGVIb1s6@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 20 Apr 2016 03:18:39 -0500
+Subject: [PATCH] ARM: dts: AM57xx/DRA7: Update SoC voltage rail limits to
+ match data sheet
+Message-ID: <1461140319-32026-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 April 2016 09:38:29 Stefan Roese wrote:
-> > The single-window mode won't really work with SPI-NOR unless you make each
-> > window large enough to hold the largest possible flash (128MB with
-> > single-window, 256MB with double-window), but that size makes it harder
-> > to gain much from saving mbus windows when you trade them for gigantic
-> > CPU address space consumption.
-> >
-> > Therefore, we probably want the separate-window mode to allow the
-> > combination of large SPI flashes with other SPI devices in direct-access
-> > mode. We can also implement the single (and/or double) window mode
-> > in addition to that, but realistically we probably don't need that
-> > as all machines we support in the kernel today have at most one
-> > non-flash device.
-> 
-> Yes, this is also my feeling. While implementing this 0xffffffff
-> size in the SPI controller 'reg' DT node, I just stumbled over the
-> following problem: The resulting size of the area to map
-> (of_address_to_resource) is not the minimum of the 'soc' 'ranges'
-> entry and this 0xffffffff as I would have expected. But its always
-> 0xffffffff. Do you know if this is general problem with this
-> approach or perhaps a problem / bug in the DT address probing /
-> translation?
+As per the data sheet starting from SPRUHQ0H (Nov 2015 - Latest[1]),
+VDD_CORE can vary from 0.85v to 1.15v for AVS class0. VDD GPU/DSP
+et.al. can range from 0.85v to 1.25V with AVS class0
 
-That is the problem I was trying to explain a few mails back. The
-creation of the platform resources does not look at what size can
-be translated. I had not considered the possibility that this could
-be changed (which would make things work here), but there are also
-reasons for not changing it: if we make the resource smaller (possibly
-even changing the start rather than the end), that may be even
-more unexpected to other driver writers when the parent ranges 
-are smaller than the device addresses.
+Since dynamic voltage scaling is disabled for DRA7/AM57xx SoCs for
+all SoC rails other than MPU, the bootloader is responsible for
+setting up the AVS class0 voltage, however, with wrong voltage machine
+constraints in dtb, regulator framework will lower the voltage below
+the required voltage levels for certain samples in production flow.
+This can cause catastrophic failures which can be pretty hard to
+identify.
 
-However, I think there is a simpler solution here: for normal
-devices, just always map just a single page using ioremap,
-independent of what size the mbus mapping is. If you change
-from memcpy() to writesl(), all writes will go to address zero
-anyway, and we are already guaranteed (by not using ioremap_wc)
-that there won't be any transfers that span more than four bytes
-at a time (8 bytes once we use the driver on 64-bit machines
-with writesq()).
+Update board files which don't match required specification.
 
-For the direct spi-nor or spi-nand modes, we need extra code
-in the spi controller driver, and that code will then also have
-to ioremap_wc() the entire device. That ioremap should fail
-if the ranges property lists a smaller area than the entire
-device and it can fall back to the mode of using the 4k page
-map.
+[1] http://www.ti.com/product/AM5728/datasheet/specifications#SPRT637-7340
 
-	Arnd
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+omap-for-v4.7/dt     a4240d3af677 ARM: dts: Add support for dra72-evm rev C (SR2.0)
+
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 4 ++--
+ arch/arm/boot/dts/dra7-evm.dts          | 4 ++--
+ arch/arm/boot/dts/dra72-evm-common.dtsi | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 75d04b1bbd1b..779466e18d34 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -438,7 +438,7 @@
+ 					/* VDD_DSPEVE, VDD_IVA, VDD_GPU */
+ 					regulator-name = "smps45";
+ 					regulator-min-microvolt = < 850000>;
+-					regulator-max-microvolt = <1150000>;
++					regulator-max-microvolt = <1250000>;
+ 					regulator-always-on;
+ 					regulator-boot-on;
+ 				};
+@@ -447,7 +447,7 @@
+ 					/* VDD_CORE */
+ 					regulator-name = "smps6";
+ 					regulator-min-microvolt = <850000>;
+-					regulator-max-microvolt = <1030000>;
++					regulator-max-microvolt = <1150000>;
+ 					regulator-always-on;
+ 					regulator-boot-on;
+ 				};
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index d272cf140197..e94cbb7dd3c5 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -431,7 +431,7 @@
+ 					/* VDD_DSPEVE */
+ 					regulator-name = "smps45";
+ 					regulator-min-microvolt = < 850000>;
+-					regulator-max-microvolt = <1150000>;
++					regulator-max-microvolt = <1250000>;
+ 					regulator-always-on;
+ 					regulator-boot-on;
+ 				};
+@@ -449,7 +449,7 @@
+ 					/* CORE_VDD */
+ 					regulator-name = "smps7";
+ 					regulator-min-microvolt = <850000>;
+-					regulator-max-microvolt = <1060000>;
++					regulator-max-microvolt = <1150000>;
+ 					regulator-always-on;
+ 					regulator-boot-on;
+ 				};
+diff --git a/arch/arm/boot/dts/dra72-evm-common.dtsi b/arch/arm/boot/dts/dra72-evm-common.dtsi
+index 2c880501ba2e..874bdf1db306 100644
+--- a/arch/arm/boot/dts/dra72-evm-common.dtsi
++++ b/arch/arm/boot/dts/dra72-evm-common.dtsi
+@@ -328,7 +328,7 @@
+ 					/* VDD_CORE */
+ 					regulator-name = "smps2";
+ 					regulator-min-microvolt = <850000>;
+-					regulator-max-microvolt = <1060000>;
++					regulator-max-microvolt = <1150000>;
+ 					regulator-boot-on;
+ 					regulator-always-on;
+ 				};
+-- 
+2.8.0
