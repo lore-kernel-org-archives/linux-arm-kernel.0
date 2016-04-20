@@ -1,81 +1,111 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Wed, 20 Apr 2016 15:49:14 +0200
-Subject: [PATCH v4 1/5] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20160404093819.GH1023@pathway.suse.cz>
-References: <1459353210-20260-1-git-send-email-pmladek@suse.com>
- <1459353210-20260-2-git-send-email-pmladek@suse.com>
- <20160404044928.GD6164@swordfish>
- <20160404093819.GH1023@pathway.suse.cz>
-Message-ID: <20160420134914.GK6862@pathway.suse.cz>
+From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
+Date: Wed, 20 Apr 2016 19:21:19 +0530
+Subject: [PATCH V2] rtc: zynqmp: Update seconds time programming logic
+Message-ID: <1461160279-40600-1-git-send-email-anuragku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-04-04 11:38:19, Petr Mladek wrote:
-> On Mon 2016-04-04 13:49:28, Sergey Senozhatsky wrote:
-> > Hello,
-> > 
-> > On (03/30/16 17:53), Petr Mladek wrote:
-> > > +/*
-> > > + * Flush data from the associated per_CPU buffer. The function
-> > > + * can be called either via IRQ work or independently.
-> > > + */
-> > > +static void __printk_nmi_flush(struct irq_work *work)
-> > > +{
-> > > +	static raw_spinlock_t read_lock =
-> > > +		__RAW_SPIN_LOCK_INITIALIZER(read_lock);
-> > > +	struct nmi_seq_buf *s = container_of(work, struct nmi_seq_buf, work);
-> > > +	unsigned long flags;
-> > > +	size_t len, size;
-> > > +	int i, last_i;
-> > > +
-> > > +	/*
-> > > +	 * The lock has two functions. First, one reader has to flush all
-> > > +	 * available message to make the lockless synchronization with
-> > > +	 * writers easier. Second, we do not want to mix messages from
-> > > +	 * different CPUs. This is especially important when printing
-> > > +	 * a backtrace.
-> > > +	 */
-> > > +	raw_spin_lock_irqsave(&read_lock, flags);
-> > > +
-> > 
-> > hm... so here we have
-> > 	for (; i < size; i++)
-> > 		printk()
-> > 
-> > under the spinlock. the thing is that one of printk() can end up
-> > in console_unlock()->call_console_drivers() loop, iterating there
-> > long enough to spinlock lockup other CPUs that might want to flush
-> > NMI buffers (if any), assuming that there are enough printk() (or
-> > may be a slow serial console) happening concurrently on other CPUs
-> > to keep the current ->read_lock busy. async printk can help here,
-> > but user can request sync version of printk.
-> 
-> I think that printk() is called on many other locations under
-> a spinlock and they all are waiting for the async printk.
->
-> > how about using deferred printk for nmi flush?
-> > print_nmi_seq_line()->printk_deferred() ?
+We programe RTC time using SET_TIME_WRITE register and read the RTC
+current time using CURRENT_TIME register. When we set the time by
+writing into SET_TIME_WRITE Register and immediately try to read the
+rtc time from CURRENT_TIME register, the previous old value is
+returned instead of the new loaded time. This is because RTC takes
+nearly 1 sec to update the  new loaded value into the CURRENT_TIME
+register. This behaviour is expected in our RTC IP.
 
-I thought more about it. printk_nmi_flush() is primary called
-via irq work. If we use deferred printk() here we will just delay
-the console stuff to another irq work.
+This patch updates the driver to read the current time from SET_TIME_WRITE
+register instead of CURRENT_TIME when rtc time is requested within an 1sec
+period after setting the RTC time. Doing so will ensure the correct time
+is given to the user.
 
-If we use async printk from your patch set, it will unnecessary
-create another irq work and delay the waking of the printk kthread.
+Since there is an delay of 1sec in updating the CURRENT_TIME we are loading
+set time +1sec while programming the SET_TIME_WRITE register, doing this
+will give correct time without any delay when read from CURRENT_TIME.
 
-If anyone forces sync printk, it will not help much. We will still
-call console from the IRQ context and the potential flood of messages
-still might cause a soft lookup.
+This patch updates the above said.
 
-Finally, as I already said. This is not different from any other
-printk() call under a spinlock.
+Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+---
+ Changes in v2:
+    1. Updated the Time programming logic as suggested by Alexandre Belloni
+    2. Changed the commit message
+---
+ drivers/rtc/rtc-zynqmp.c | 41 ++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 36 insertions(+), 5 deletions(-)
 
-After all, I am going to use the normal printk() when flushing
-the NMI buffers.
-
-The only exception will be when this is called on panic in NMI
-context. In this case, printk_deferred() will do exactly what
-we need.
-
-Best Regards,
-Petr
+diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
+index f87f971..ba4203a 100644
+--- a/drivers/rtc/rtc-zynqmp.c
++++ b/drivers/rtc/rtc-zynqmp.c
+@@ -64,6 +64,12 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
+ 	unsigned long new_time;
+ 
++	/*
++	 * The value written will be updated after 1 sec into the
++	 * seconds read register, so we need to program time +1 sec
++	 * to get the correct time on read.
++	 */
++	tm->tm_sec += 1;
+ 	new_time = rtc_tm_to_time64(tm);
+ 
+ 	if (new_time > RTC_SEC_MAX_VAL)
+@@ -78,14 +84,41 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 
+ 	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
+ 
++	/*
++	 * Clear the rtc interrupt status register after setting the
++	 * time. During a read_time function, the code should read the
++	 * RTC_INT_STATUS register and if bit 0 is still 0, it means
++	 * that one second has not elapsed yet since RTC was set and
++	 * the current time should be read from SET_TIME_READ register;
++	 * otherwise, CURRENT_TIME register is read to report the time
++	 */
++	writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_STS);
++
+ 	return 0;
+ }
+ 
+ static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ {
++	int status;
+ 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
+ 
+-	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
++	status = readl(xrtcdev->reg_base + RTC_INT_STS);
++
++	if (status & RTC_INT_SEC) {
++		/*
++		 * RTC has updated the CURRENT_TIME with the time written into
++		 * SET_TIME_WRITE register.
++		 */
++		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
++	} else {
++		/*
++		 * Time written in SET_TIME_WRITE has not yet updated into
++		 * the seconds read register, so read the time from the
++		 * SET_TIME_WRITE instead of CURRENT_TIME register.
++		 */
++		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD), tm);
++		tm->tm_sec -= 1;
++	}
+ 
+ 	return rtc_valid_tm(tm);
+ }
+@@ -166,11 +199,9 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
+ 	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
+ 		return IRQ_NONE;
+ 
+-	/* Clear interrupt */
+-	writel(status, xrtcdev->reg_base + RTC_INT_STS);
++	/* Clear RTC_INT_ALRM interrupt only */
++	writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_STS);
+ 
+-	if (status & RTC_INT_SEC)
+-		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
+ 	if (status & RTC_INT_ALRM)
+ 		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
+ 
+-- 
+2.1.2
