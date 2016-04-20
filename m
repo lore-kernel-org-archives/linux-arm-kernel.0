@@ -1,41 +1,36 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 20 Apr 2016 23:20:52 +0300
-Subject: Looking for information on modern(ish) use of spidev
-In-Reply-To: <CAF_dkJDRaidOF5p1B+ssx=SKgUHonMj5TbG2mT3wE5bOdDw69g@mail.gmail.com>
-References: <CAF_dkJDRaidOF5p1B+ssx=SKgUHonMj5TbG2mT3wE5bOdDw69g@mail.gmail.com>
-Message-ID: <20160420202052.GM2476@tarshish>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 20 Apr 2016 13:27:47 -0700
+Subject: [GIT PULL 2/2] bcm2835 defconfig changes for 4.7
+In-Reply-To: <1461184067-31925-1-git-send-email-eric@anholt.net>
+References: <1461184067-31925-1-git-send-email-eric@anholt.net>
+Message-ID: <1461184067-31925-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrick,
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-On Wed, Apr 20, 2016 at 03:55:42PM -0400, Patrick Doyle wrote:
-> Can anybody point me at a relatively recent tutorial/explanation of
-> the current usage of spidev?
+are available in the git repository at:
 
-There is a dedicated list to the SPI subsystem (linux-spi at vger.kernel.org). 
-See MAINTAINERS.
+  https://github.com/anholt/linux tags/bcm2835-defconfig-next-2016-04-20
 
-> What should I put in my device tree?  Should I modprobe spidev?
+for you to fetch changes up to 3652bb35abf6ee11333cbec1d2855c1c0f9f6b27:
 
-The spidev binding is not documented, but you can find a few examples under 
-arch/arm/boot/dts/.
+  ARM: bcm2835: Enable NFS root support. (2016-04-04 11:03:30 -0700)
 
-> I have 2 devices hanging off a SPI bus and I would like to verify that
-> they work.  All I need to be able to do is to transfer some data to
-> and from the devices and see that it looks reasonable.  I'll figure
-> out the correct device driver later, but I just want to see some
-> transactions on the bus today.
-> 
-> What's the simplest way to do that?  If spidev isn't the right tree to
-> climb, where should I look instead?
+----------------------------------------------------------------
+This pull request brings in changes for bcm2835_defconfig and
+multi_v7_defconfig in 4.7.
 
-For half duplex transfers just read/write the spidev device node. For 
-something more complex see the examples under tools/spi/.
+----------------------------------------------------------------
+Eric Anholt (7):
+      ARM: multi_v7_defconfig: Add more BCM2835 support
+      ARM: multi_v7_defconfig: Switch BCM2835 to sdhci-iproc.c for MMC
+      ARM: multi_v7_defconfig: Build in DWC2 USB support
+      ARM: bcm2835: Switch BCM2835 to sdhci-iproc.c for MMC
+      ARM: bcm2835: Enable CONFIG_PM.
+      ARM: bcm2835: Enable the VC4 graphics driver in the defconfig
+      ARM: bcm2835: Enable NFS root support.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+ arch/arm/configs/bcm2835_defconfig  | 11 +++++++----
+ arch/arm/configs/multi_v7_defconfig |  5 +++--
+ 2 files changed, 10 insertions(+), 6 deletions(-)
