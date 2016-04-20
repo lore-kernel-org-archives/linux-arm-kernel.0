@@ -1,92 +1,60 @@
-From: hughd@google.com (Hugh Dickins)
-Date: Wed, 20 Apr 2016 01:31:42 -0700 (PDT)
-Subject: [PATCHv7 00/29] THP-enabled tmpfs/shmem using compound pages
-In-Reply-To: <571565F0.9070203@linaro.org>
-References: <1460766240-84565-1-git-send-email-kirill.shutemov@linux.intel.com>
- <571565F0.9070203@linaro.org>
-Message-ID: <alpine.LSU.2.11.1604200114440.3009@eggly.anvils>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 20 Apr 2016 17:33:45 +0900
+Subject: [PATCH v2] pinctrl-exynos5440: Use off-stack memory for
+ pinctrl_gpio_range
+In-Reply-To: <5717281A.70906@samsung.com>
+References: <1461117257-27048-1-git-send-email-andrew@aj.id.au>
+ <5717281A.70906@samsung.com>
+Message-ID: <CA+Ln22GOBfOfZNJH_3eyPLmmkt3hWGcUG=w27YUb4H2CbFzgcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Apr 2016, Shi, Yang wrote:
+2016-04-20 15:56 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> On 04/20/2016 03:54 AM, Andrew Jeffery wrote:
+>> The range is registered into a linked list which can be referenced
+>> throughout the lifetime of the driver. Ensure the range's memory is useful
+>> for the same lifetime by adding it to the driver's private data structure.
+>>
+>> The bug was introduced in the driver's initial commit, which was present in
+>> v3.10.
+>>
+>> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+>> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
+>> Cc: stable at vger.kernel.org
+>> ---
+>> Since v1:
+>>
+>> * Add range member kerneldoc addressing Tomasz Figa's comment
+>>
+>> This is my first contribution to the kernel, so hopefully I've followed all the
+>> relevant documentation. If not, please let me know and point me in the right
+>> direction!
+>>
+>> I don't have the means to test the patch, but it compiles. Someone with
+>> appropriate hardware should probably give it a spin. From the responses it
+>> seems that few might have access, and given the nature of the bug it might be
+>> the case that no-one has complained because no-one is affected - is it worth
+>> maintaining going forward?
+>>
+>>  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 15 ++++++++-------
+>>  1 file changed, 8 insertions(+), 7 deletions(-)
+>
+> Thank you for your contribution. You already received positive feedback
+> on v1 of this patch: Tomasz acked it ("acked-by") and I reviewed it
+> ("reviewed-by"). These are called "tags".
+>
+> When you resubmit patches (unless there is a significant change in the
+> patch) please always put accumulated tags after existing tags. Usually
+> after signed-off-by, in this case after Cc-stable, so this would look like:
+>
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for
+> Samsung EXYNOS5440 SoC")
+> Cc: stable at vger.kernel.org
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> Hi Kirill,
-> 
-> Finally, I got some time to look into and try yours and Hugh's patches, got
+In any case, I think this is ready for applying with the tags above. Thanks.
 
-Thank you.
-
-> two problems.
-> 
-> 1. A quick boot up test on my ARM64 machine with your v7 tree shows some
-> unexpected error:
-> 
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:16863: No space left on device
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:16865: No space left on device
->          Starting DNS forwarder and DHCP server.systemd-journald[285]: Failed
-> to save stream data /run/systemd/journal/streams/8:16867: No space left on
-> device
-> ..
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:16869: No space left on device
->          Starting Postfix Mail Transport Agent...
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:16871: No space left on device
->          Starting Berkeley Internet Name Domain (DNS)...
->          Starting Wait for Network to be Configured...
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:2422: No space left on device
-> [  OK  ] Started /etc/rc.local Compatibility.
-> [FAILED] Failed to start DNS forwarder and DHCP server.
-> See 'systemctl status dnsmasq.service' for details.
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:2425: No space left on device
-> [  OK  ] Started Serial Getty on ttyS1.
-> [  OK  ] Started Serial Getty on ttyS0.
-> [  OK  ] Started Getty on tty1.
-> systemd-journald[285]: Failed to save stream data
-> /run/systemd/journal/streams/8:2433: No space left on device
-> [FAILED] Failed to start Berkeley Internet Name Domain (DNS).
-> See 'systemctl status named.service' for details.
-
-Expected behaviour: that is a significant limitation of Kirill's current
-implementation.  We have agreed at LSF/MM that he will fix that before
-his patchset goes further.  (And different changes needed in my patchset.)
-
-> 
-> 
-> The /run dir is mounted as tmpfs.
-> 
-> x86 boot doesn't get such error. And, Hugh's patches don't have such problem.
-> 
-> 2. I ran my THP test (generated a program with 4MB text section) on both
-> x86-64 and ARM64 with yours and Hugh's patches (linux-next tree), I got the
-> program execution time reduced by ~12% on x86-64, it looks very impressive.
-
-12% sounds about right for x86.  Some loads have been seen to benefit 17%.
-
-> 
-> But, on ARM64, there is just ~3% change, and sometimes huge tmpfs may show
-> even worse data than non-hugepage.
-> 
-> Both yours and Hugh's patches has the same behavior.
-> 
-> Any idea?
-
-... and in a later posting..,
-
-> 
-> It would be better if Kirill and Hugh could share what benchmark they ran and
-> how much they got improved since my test case is very simple and may just
-> cover a small part of it.
-
-Sorry, I've not run any benchmark myself (prefer to let others get more
-objective results), nor run on arm64.  I have no idea what to expect on
-arm64 - you need to ask the arm64 guys what hugepage advantage they see
-with anon THP or hugetlbfs (and probably need to tell them what machine
-you're running on): then expect a similar advantage from either Kirill's
-or my huge tmpfs patchset.
-
-Hugh
+Best regards,
+Tomasz
