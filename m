@@ -1,88 +1,196 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 20 Apr 2016 14:51:09 +0200
-Subject: [PATCH v3 0/9] EFI framebuffer support for ARM and arm64
-In-Reply-To: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_WPCbGgG1TjnY5tQ4YPgR_LDdaeR1fm-S=C894OsXiGQ@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 20 Apr 2016 14:50:44 +0200
+Subject: [PATCH v7 09/10] iommu/dma-reserved-iommu:
+ iommu_msi_mapping_translate_msg
+In-Reply-To: <57174E16.1050004@arm.com>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-10-git-send-email-eric.auger@linaro.org>
+ <57174E16.1050004@arm.com>
+Message-ID: <57177B24.9090208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 April 2016 at 18:05, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This series adds support to ARM and arm64 for using the kernel's EFI
-> framebuffer driver to drive EFI Graphics Output Protocol (GOP) based
-> framebuffers.
->
+On 04/20/2016 11:38 AM, Marc Zyngier wrote:
+> On 19/04/16 17:56, Eric Auger wrote:
+>> Introduce iommu_msi_mapping_translate_msg whose role consists in
+>> detecting whether the device's MSIs must to be mapped into an IOMMU.
+>> It case it must, the function overrides the MSI msg originally composed
+>> and replaces the doorbell's PA by a pre-allocated and pre-mapped reserved
+>> IOVA. In case the corresponding PA region is not found, the function
+>> returns an error.
+>>
+>> This function is likely to be called in some code that cannot sleep. This
+>> is the reason why the allocation/mapping is done separately.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v7: creation
+>> ---
+>>  drivers/iommu/dma-reserved-iommu.c | 69 ++++++++++++++++++++++++++++++++++++++
+>>  include/linux/dma-reserved-iommu.h | 27 +++++++++++++++
+>>  2 files changed, 96 insertions(+)
+>>
+>> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
+>> index 907a17f..603ee45 100644
+>> --- a/drivers/iommu/dma-reserved-iommu.c
+>> +++ b/drivers/iommu/dma-reserved-iommu.c
+>> @@ -18,6 +18,14 @@
+>>  #include <linux/iommu.h>
+>>  #include <linux/iova.h>
+>>  #include <linux/msi.h>
+>> +#include <linux/irq.h>
+>> +
+>> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
+>> +#define msg_to_phys_addr(msg) \
+>> +	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
+>> +#else
+>> +#define msg_to_phys_addr(msg)	((msg)->address_lo)
+>> +#endif
+>>  
+>>  struct reserved_iova_domain {
+>>  	struct iova_domain *iovad;
+>> @@ -351,3 +359,64 @@ struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+>>  	return d;
+>>  }
+>>  EXPORT_SYMBOL_GPL(iommu_msi_mapping_desc_to_domain);
+>> +
+>> +static dma_addr_t iommu_find_reserved_iova(struct iommu_domain *domain,
+>> +				    phys_addr_t addr, size_t size)
+>> +{
+>> +	unsigned long  base_pfn, end_pfn, nb_iommu_pages, order, flags;
+>> +	size_t iommu_page_size, binding_size;
+>> +	struct iommu_reserved_binding *b;
+>> +	phys_addr_t aligned_base, offset;
+>> +	dma_addr_t iova = DMA_ERROR_CODE;
+>> +	struct iova_domain *iovad;
+>> +
+>> +	spin_lock_irqsave(&domain->reserved_lock, flags);
+>> +
+>> +	iovad = (struct iova_domain *)domain->reserved_iova_cookie;
+>> +
+>> +	if (!iovad)
+>> +		goto unlock;
+>> +
+>> +	order = iova_shift(iovad);
+>> +	base_pfn = addr >> order;
+>> +	end_pfn = (addr + size - 1) >> order;
+>> +	aligned_base = base_pfn << order;
+>> +	offset = addr - aligned_base;
+>> +	nb_iommu_pages = end_pfn - base_pfn + 1;
+>> +	iommu_page_size = 1 << order;
+>> +	binding_size = nb_iommu_pages * iommu_page_size;
+>> +
+>> +	b = find_reserved_binding(domain, aligned_base, binding_size);
+>> +	if (b && (b->addr <= aligned_base) &&
+>> +		(aligned_base + binding_size <=  b->addr + b->size))
+>> +		iova = b->iova + offset + aligned_base - b->addr;
+>> +unlock:
+>> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+>> +	return iova;
+>> +}
+>> +
+>> +int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg)
+>> +{
+> 
+> I'm really not keen on passing a full irq_data to something that doesn't
+> really care about it. What this really needs is the device that
+> generates the MSIs, which makes a lot more sense (you get the device and
+> the address from the msi_msg).
+> 
+> Or am I getting it wrong?
 
-Matt: FYI the memremap() patches for ARM that this series (and the
-memory attributes one as well, for that matter) depends on have been
-pulled by Russell and should turn up in -next shortly. That means
-these patches are good to go, as far as I am concerned (unless there
-are remaining concerns?)
+No I have no objection. I eventually decided to keep the irq_data*
+parameter to be homegeneous with irq_chip_compose_msi_msg and I found
+the function name understandable. However I also understand it looks
+weird to get this irq-data incursion in this API
 
-Thanks,
-Ard.
+will change into iommu_msi_msg_pa_to_va, as you proposed.
+
+Thank you for your time
+
+Eric
 
 
-> This involves refactoring some of the existing x86 code so it can be reused
-> by ARM and arm64, and wiring it up both in the UEFI stub and in the core
-> kernel into the existing UEFI infrastructure for ARM and arm64.
->
-> Changes since v2:
-> - added acks from Peter and David (patches #3 and #4)
-> - move introduction of typedef of efi_graphics_output_protocol_query_mode to
->   patch #1 (and move it along in a subsequent patch) to fix a transient build
->   issue spotted by the kbuild robot
-> - register screen_info as platform driver data explicitly, as x86 does (David)
-> - assign dummy values to screen_info.orig_video_cols/orig_video_lines, this is
->   required by dummycon on ARM
->
-> Changes since v1:
-> - don't use const efi_guid_t and subsequently cast away constness
-> - update first, then move the x86 GOP code rather than creating a copy
->   and update at the same time, and delete the x86 code later: this should
->   make it easier to spot changes to the code that affect its correct operation
->   on x86
-> - refactor the ARM changes so that the config table creation and consumption
->   is introduced in the same patch (including the prototype changes for the
->   install_configuration_table() boot service function pointer)
-> - use true/false rather than 1/0
-> - split stub changes into 32-bit arm/64-bit arm/common arm
-> - split platform device changes from platform driver changes (latter is
->   basically only a Kconfig change)
->
-> Ard Biesheuvel (9):
->   efi/x86: prepare GOP handling code for reuse as generic code
->   efi: libstub: move Graphics Output Protocol handling to generic code
->   efi/x86: efifb: move DMI based quirks handling out of generic code
->   efi: efifb: use builtin_platform_driver and drop unused includes
->   efi/arm64: libstub: make screen_info accessible to the UEFI stub
->   efi/arm: libstub: make screen_info accessible to the UEFI stub
->   efi/arm*: libstub: wire up GOP protocol to struct screen_info
->   efi/arm*: wire up struct screen_info to efi-framebuffer platform
->     device
->   efifb: enable the efi-framebuffer platform driver for ARM and arm64
->
->  arch/arm/include/asm/efi.h                |  11 +-
->  arch/arm/kernel/setup.c                   |   3 +-
->  arch/arm64/include/asm/efi.h              |  11 +-
->  arch/arm64/kernel/efi.c                   |   3 +
->  arch/arm64/kernel/image.h                 |   1 +
->  arch/x86/boot/compressed/eboot.c          | 308 +----------------
->  arch/x86/boot/compressed/eboot.h          |  74 ----
->  arch/x86/include/asm/efi.h                |   7 +
->  arch/x86/kernel/sysfb_efi.c               |  15 +
->  drivers/firmware/efi/arm-init.c           |  52 ++-
->  drivers/firmware/efi/efi.c                |   5 +-
->  drivers/firmware/efi/libstub/Makefile     |   2 +-
->  drivers/firmware/efi/libstub/arm-stub.c   |  23 ++
->  drivers/firmware/efi/libstub/arm32-stub.c |  37 ++
->  drivers/firmware/efi/libstub/gop.c        | 354 ++++++++++++++++++++
->  drivers/video/fbdev/Kconfig               |   2 +-
->  drivers/video/fbdev/efifb.c               |  21 +-
->  include/linux/efi.h                       |  97 +++++-
->  18 files changed, 619 insertions(+), 407 deletions(-)
->  create mode 100644 drivers/firmware/efi/libstub/gop.c
->
-> --
-> 2.5.0
->
+> 
+>> +	struct iommu_domain *d;
+>> +	struct msi_desc *desc;
+>> +	dma_addr_t iova;
+>> +
+>> +	desc = irq_data_get_msi_desc(data);
+>> +	if (!desc)
+>> +		return -EINVAL;
+>> +
+>> +	d = iommu_msi_mapping_desc_to_domain(desc);
+>> +	if (!d)
+>> +		return 0;
+>> +
+>> +	iova = iommu_find_reserved_iova(d, msg_to_phys_addr(msg),
+>> +					sizeof(phys_addr_t));
+>> +
+>> +	if (iova == DMA_ERROR_CODE)
+>> +		return -EINVAL;
+>> +
+>> +	msg->address_lo = lower_32_bits(iova);
+>> +	msg->address_hi = upper_32_bits(iova);
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(iommu_msi_mapping_translate_msg);
+>> diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
+>> index 8373929..04e1912f 100644
+>> --- a/include/linux/dma-reserved-iommu.h
+>> +++ b/include/linux/dma-reserved-iommu.h
+>> @@ -20,6 +20,8 @@
+>>  
+>>  struct iommu_domain;
+>>  struct msi_desc;
+>> +struct irq_data;
+>> +struct msi_msg;
+>>  
+>>  #ifdef CONFIG_IOMMU_DMA_RESERVED
+>>  
+>> @@ -82,6 +84,25 @@ void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
+>>   */
+>>  struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc);
+>>  
+>> +/**
+>> + * iommu_msi_mapping_translate_msg: in case the MSI transaction is translated
+>> + * by an IOMMU, the msg address must be an IOVA instead of a physical address.
+>> + * This function overwrites the original MSI message containing the doorbell
+>> + * physical address, result of the primary composition, with the doorbell IOVA.
+>> + *
+>> + * The doorbell physical address must be bound previously to an IOVA using
+>> + * iommu_get_reserved_iova
+>> + *
+>> + * @data: irq data handle
+>> + * @msg: original msi message containing the PA to be overwritten with
+>> + * the IOVA
+>> + *
+>> + * return 0 if the MSI does not need to be mapped or when the PA/IOVA
+>> + * were successfully swapped; return -EINVAL if the addresses need
+>> + * to be swapped but not IOMMU binding is found
+>> + */
+>> +int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg);
+>> +
+>>  #else
+>>  
+>>  static inline int
+>> @@ -111,5 +132,11 @@ iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+>>  	return NULL;
+>>  }
+>>  
+>> +static inline int iommu_msi_mapping_translate_msg(struct irq_data *data,
+>> +						  struct msi_msg *msg)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>>  #endif	/* CONFIG_IOMMU_DMA_RESERVED */
+>>  #endif	/* __DMA_RESERVED_IOMMU_H */
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
