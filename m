@@ -1,50 +1,50 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 20 Apr 2016 13:07:44 +0200
-Subject: [PATCH V6 00/11] soc: mediatek: PMIC wrap: add MT6323/2701/7623
- support
-In-Reply-To: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
-References: <1455871455-21212-1-git-send-email-blogic@openwrt.org>
-Message-ID: <57176300.8050505@gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 20 Apr 2016 19:11:32 +0800
+Subject: [PATCH 5/6] clk: rockchip: rk3399: fix the cifout clock
+In-Reply-To: <1461150414-29638-1-git-send-email-zhengxing@rock-chips.com>
+References: <1461150414-29638-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1461150692-29751-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The cifout clock is incorrect due to the manual error, we need to
+fix it.
 
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-On 19/02/16 09:44, John Crispin wrote:
-> This series adds support for the MT6323 PMIC and the MT2701/7623 SoC.
-> MT6323 is slightly different to the already supported PMIC. This series
-> makes a few changes to the code to allow easy addition of the new PMIC
-> and SoCs.
->
-> Changes in V6
-> * 4/11 - make description verbose and rename init_special
-> * 6/11 - make description verbose
-> * 7/11 - make description verbose
-> * 8/11 - make description verbose
-> * 9/11 - put mt6397 specific dew registers in their own paragraph
->
->
-> John Crispin (11):
->    dt-bindings: ARM: Mediatek: add MT2701/7623 string to the PMIC
->      wrapper doc
->    soc: mediatek: PMIC wrap: don't duplicate the wrapper data
->    soc: mediatek: PMIC wrap: add wrapper callbacks for init_reg_clock
->    soc: mediatek: PMIC wrap: split SoC specific init into callback
->    soc: mediatek: PMIC wrap: WRAP_INT_EN needs a different bitmask for
->      MT2701/7623
->    soc: mediatek: PMIC wrap: SPI_WRITE needs a different bitmask for
->      MT2701/7623
->    soc: mediatek: PMIC wrap: move wdt_src into the pmic_wrapper_type
->      struct
->    soc: mediatek: PMIC wrap: remove pwrap_is_mt8135() and
->      pwrap_is_mt8173()
->    soc: mediatek: PMIC wrap: add a slave specific struct
->    soc: mediatek: PMIC wrap: add mt6323 slave support
->    soc: mediatek: PMIC wrap: add MT2701/7623 support
->
->   .../devicetree/bindings/soc/mediatek/pwrap.txt     |    1 +
->   drivers/soc/mediatek/mtk-pmic-wrap.c               |  544 +++++++++++++++-----
->   2 files changed, 414 insertions(+), 131 deletions(-)
->
+ drivers/clk/rockchip/clk-rk3399.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Applied, thanks!
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 1da4fe1..e81cc85 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -158,7 +158,7 @@ PNAME(mux_dclk_vop0_p)			= { "dclk_vop0_div",
+ PNAME(mux_dclk_vop1_p)			= { "dclk_vop1_div",
+ 					    "dclk_vop1_frac" };
+ 
+-PNAME(mux_clk_cif_p)			= { "clk_cifout_div", "xin24m" };
++PNAME(mux_clk_cif_p)				= { "clk_cifout_src", "xin24m" };
+ 
+ PNAME(mux_pll_src_24m_usbphy480m_p)	= { "xin24m", "clk_usbphy_480m" };
+ PNAME(mux_pll_src_24m_pciephy_p)	= { "xin24m", "clk_pciephy_ref100m" };
+@@ -1254,11 +1254,12 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKGATE_CON(27), 6, GFLAGS),
+ 
+ 	/* cif */
+-	COMPOSITE(0, "clk_cifout_div", mux_pll_src_cpll_gpll_npll_p, 0,
+-			RK3399_CLKSEL_CON(56), 6, 2, MFLAGS, 0, 5, DFLAGS,
++	COMPOSITE_NODIV(0, "clk_cifout_src", mux_pll_src_cpll_gpll_npll_p, 0,
++			RK3399_CLKSEL_CON(56), 6, 2, MFLAGS,
+ 			RK3399_CLKGATE_CON(10), 7, GFLAGS),
+-	MUX(SCLK_CIF_OUT, "clk_cifout", mux_clk_cif_p, CLK_SET_RATE_PARENT,
+-			RK3399_CLKSEL_CON(56), 5, 1, MFLAGS),
++
++	COMPOSITE_NOGATE(SCLK_CIF_OUT, "clk_cifout", mux_clk_cif_p, 0,
++			 RK3399_CLKSEL_CON(56), 5, 1, MFLAGS, 0, 5, DFLAGS),
+ 
+ 	/* gic */
+ 	COMPOSITE(ACLK_GIC_PRE, "aclk_gic_pre", mux_pll_src_cpll_gpll_p, CLK_IGNORE_UNUSED,
+-- 
+1.7.9.5
