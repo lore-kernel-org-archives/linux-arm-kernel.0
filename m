@@ -1,31 +1,22 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Wed, 20 Apr 2016 16:41:46 -0300
-Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
-In-Reply-To: <CAOMZO5AKdFtCZJSFg5ZJ2j8MBta_s=HSNBaH5a9zoTdkwQ477Q@mail.gmail.com>
-References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
- <CAOMZO5AKdFtCZJSFg5ZJ2j8MBta_s=HSNBaH5a9zoTdkwQ477Q@mail.gmail.com>
-Message-ID: <5717DB7A.4030406@e-labworks.com>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Wed, 20 Apr 2016 15:55:42 -0400
+Subject: Looking for information on modern(ish) use of spidev
+Message-ID: <CAF_dkJDRaidOF5p1B+ssx=SKgUHonMj5TbG2mT3wE5bOdDw69g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Can anybody point me at a relatively recent tutorial/explanation of
+the current usage of spidev?
 
-On 19-04-2016 08:34, Fabio Estevam wrote:
-> On Mon, Apr 11, 2016 at 9:25 PM, Sergio Prado
-> <sergio.prado@e-labworks.com> wrote:
->
->> +&fec {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_enet>;
->> +       phy-mode = "rgmii";
->> +       phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_HIGH>;
->
-> Are you sure this is really active high?
->
+What should I put in my device tree?  Should I modprobe spidev?
 
-You are right. Although the ethernet interface did work that way, the 
-reset pin is active low. I will fix in V3.
+I have 2 devices hanging off a SPI bus and I would like to verify that
+they work.  All I need to be able to do is to transfer some data to
+and from the devices and see that it looks reasonable.  I'll figure
+out the correct device driver later, but I just want to see some
+transactions on the bus today.
 
-Best regards,
+What's the simplest way to do that?  If spidev isn't the right tree to
+climb, where should I look instead?
 
-Sergio Prado
+--wpd
