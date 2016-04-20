@@ -1,25 +1,27 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Wed, 20 Apr 2016 10:29:11 +0200
-Subject: [PATCH] kbuild: drop FORCE from PHONY targets
-In-Reply-To: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <57173DD7.6020601@suse.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Apr 2016 09:29:17 +0100
+Subject: [PATCH 2/2 v6] ASoC: mediatek: Add second I2S on mt8173-rt5650
+ machine driver
+In-Reply-To: <1461134447-42001-3-git-send-email-pc.liao@mediatek.com>
+References: <1461134447-42001-1-git-send-email-pc.liao@mediatek.com>
+ <1461134447-42001-3-git-send-email-pc.liao@mediatek.com>
+Message-ID: <20160420082917.GH3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 13.3.2016 v 01:13 Masahiro Yamada napsal(a):
-> These targets are marked as PHONY.  No need to add FORCE to their
-> dependency.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  Makefile                     | 8 ++++----
->  arch/arm/vdso/Makefile       | 2 +-
->  arch/ia64/Makefile           | 4 ++--
->  arch/x86/entry/vdso/Makefile | 4 ++--
->  4 files changed, 9 insertions(+), 9 deletions(-)
+On Wed, Apr 20, 2016 at 02:40:47PM +0800, PC Liao wrote:
 
-Applied to kbuild.git#kbuild now, sorry for the delay.
+> +Optional properties:
+> +- capture-dai: audio codec dai on capture path
+> +  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
+> +  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
 
-Michal
+I sugggested changing this to use a subnode but you've ignored my
+suggestion...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160420/8e598ea3/attachment-0001.sig>
