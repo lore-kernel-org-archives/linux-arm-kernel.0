@@ -1,46 +1,19 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Apr 2016 12:46:28 +0100
-Subject: [PATCH v7 07/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <571765D1.9070207@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-8-git-send-email-james.morse@arm.com>
- <571656E9.5050402@arm.com> <57166CC9.4030804@arm.com>
- <57175BD7.30902@arm.com> <571765D1.9070207@arm.com>
-Message-ID: <57176C14.40305@arm.com>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Wed, 20 Apr 2016 17:24:17 +0530
+Subject: [PATCH v2 2/2] dmaengine: vdma: Add clock support
+In-Reply-To: <1461152599-28858-2-git-send-email-appanad@xilinx.com>
+References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
+ <1461152599-28858-2-git-send-email-appanad@xilinx.com>
+Message-ID: <CAKfKVtE6iPRPw0KHuxhWKkY3uF-43uoKV=VjXqOnua9wq+8VdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/16 12:19, James Morse wrote:
-> Hi Marc,
-> 
-> On 20/04/16 11:37, Marc Zyngier wrote:
->> On 19/04/16 18:37, James Morse wrote:
->>> It looks like x86 uses the extable to work around this, their vmx_vcpu_run() has:
->>>> 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
->>> Where __ex ends up calling ____kvm_handle_fault_on_reboot(), with a nearby comment:
->>>> * Hardware virtualization extension instructions may fault if a
->>>> * reboot turns off virtualization while processes are running.
->>>> * Trap the fault and ignore the instruction if that happens.
->>
->> I very much like that approach, to be honest. Tearing down a CPU is
->> something exceptional, so let's make it an actual exception.
->>
->> It is now pretty easy to discriminate between KVM functions and stub
->> functions thanks to your earlier patch, so if we end up calling the
->> hyp-stub because we've torn down KVM's EL2, let's just return an
->> appropriate error code (ARM_EXCEPTION_HYP_GONE), and handle it at EL1.
-> 
-> Okay. kexec uses kvm_call_hyp() against the hyp-stub to do the kernel-copy and
-> hand over to purgatory, but we could change that to a new 'special' builtin
-> call, something like HVC_KEXEC_CALL_HYP. It never calls it with kvm loaded, so
-> there is no reason the calls have to be same.
-> 
-> Given hibernate doesn't hit this issue, I will drop this hunk from this version
-> of the patch, and repost hibernate incorporating the feedback so far. I will
-> provide a patch for kexec to do the above.
+On Wed, Apr 20, 2016 at 5:13 PM, Kedareswara rao Appana
+<appana.durga.rao@xilinx.com> wrote:
+> Added basic clock support. The clocks are requested at probe
+> and released at remove.
+>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 
-Awesome. Thanks James.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Reviewed-by: Shubhrajyoti Datta  <shubhraj@xilinx.com>
