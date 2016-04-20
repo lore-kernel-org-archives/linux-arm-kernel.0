@@ -1,24 +1,40 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 20 Apr 2016 09:53:47 +0100
-Subject: [PATCH] vexpress/spc: Remove CLK_IS_ROOT
-In-Reply-To: <1461116215-1517-1-git-send-email-sboyd@codeaurora.org>
-References: <1461116215-1517-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5717439B.20801@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 20 Apr 2016 17:56:31 +0900
+Subject: [PATCH] kbuild: drop redundant "PHONY += FORCE"
+In-Reply-To: <20160420084710.GF15339@pobox.suse.cz>
+References: <1460081770-29437-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160420084710.GF15339@pobox.suse.cz>
+Message-ID: <CAK7LNATv51PRc9bGU7Q8_oTk9=C5ryfu7vMsKbG5drcgVbf1-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Michal,
 
-
-On 20/04/16 02:36, Stephen Boyd wrote:
-> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
-> CLK_IS_ROOT", 2016-02-02) so remove it.
+2016-04-20 17:47 GMT+09:00 Michal Marek <mmarek@suse.cz>:
+> On Fri, Apr 08, 2016 at 11:16:10AM +0900, Masahiro Yamada wrote:
+>> "PHONY += FORCE" is already cared by scripts/Makefile.build,
+>> which these files are included from.
 >
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> arch/ia64/Makefile is in fact included via the main Makefile. But this
+> one also has the PHONY += FORCE statement. Maybe we should initialize
+> PHONY with FORCE in Kbuild.include. Nevertheless, this patch is correct.
+>
+> Michal
 
-FWIW:
+Ah, right.
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+If it is not too late and you do not mind,
+could you rephrase the git-log?
+
+Like this?
+
+----------------------->8------------------------------------
+"PHONY += FORCE" is already cared by scripts/Makefile.build or the
+top level Makefile, which these files are included from.
+-----------------------8<------------------------------------
+
+
 
 -- 
-Regards,
-Sudeep
+Best Regards
+Masahiro Yamada
