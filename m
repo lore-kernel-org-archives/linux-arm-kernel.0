@@ -1,46 +1,34 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 20 Apr 2016 10:44:01 +0200
-Subject: [PATCH v2 1/2] clk: Add Oxford Semiconductor OXNAS Standard Clocks
-In-Reply-To: <20160419212944.GF15324@codeaurora.org>
-References: <1460973696-5977-1-git-send-email-narmstrong@baylibre.com>
- <1460973696-5977-2-git-send-email-narmstrong@baylibre.com>
- <20160419212944.GF15324@codeaurora.org>
-Message-ID: <57174151.8040806@baylibre.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 20 Apr 2016 10:46:17 +0200
+Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
+In-Reply-To: <20160419211958.GD19428@n2100.arm.linux.org.uk>
+References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160419211958.GD19428@n2100.arm.linux.org.uk>
+Message-ID: <20160420104617.15cf8461@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi,
 
-On 04/19/2016 11:29 PM, Stephen Boyd wrote:
-> On 04/18, Neil Armstrong wrote:
->> +
->> +static int oxnas_stdclk_probe(struct platform_device *pdev)
->> +{
->> +	struct device_node *np = pdev->dev.of_node;
->> +	struct clk_oxnas_data *clk_oxnas;
->> +	struct regmap *regmap;
->> +	int i;
->> +
->> +	clk_oxnas = devm_kzalloc(&pdev->dev, sizeof(*clk_oxnas), GFP_KERNEL);
->> +	if (!clk_oxnas)
->> +		return -ENOMEM;
->> +
->> +	regmap = syscon_node_to_regmap(of_get_parent(np));
->> +	if (!regmap) {
->> +		dev_err(&pdev->dev, "failed to have parent regmap\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	for (i = 0; i < ARRAY_SIZE(clk_oxnas_init); i++) {
->> +		struct clk_oxnas *_clk;
->> +
->> +		if (!clk_oxnas_init[i].clk_init)
->> +			continue;
+On Tue, 19 Apr 2016 22:19:58 +0100 Russell King - ARM Linux wrote:
+> On Tue, Apr 19, 2016 at 09:45:14PM +0200, Uwe Kleine-K?nig wrote:
+> > With the SION bit set a pin can be read as GPIO even though it's not muxed
+> > as GPIO. This is useful at times. The downside however is that the signal
+> > is not only routed to the GPIO IP but also all other IPs that can make use
+> > of the pin. This resulted in more than one issue for me in the past. Things
+> > like spi transfers that result in usb reenumeration or setting a GPIO to a
+> > value that triggers an RTS irq for an UART.
 > 
-> New design is fine, really it's up to you, but then this check
-> isn't needed anymore, right?
+> Isn't SION required for all GPIOs such that reading the value of a GPIO
+> pin returns the actual state of the pin, not the output value written
+> to it?
 > 
+> What about the ethernet pins?  I know that on iMX6, SION is required for
+> correct functionality of certain phy clocking modes, and I wouldn't be
+> surprised if this was true in earlier designs as well.
+> 
+SION essentially makes any OUTPUT pin (GPIO or other function)
+bidirectional.
 
-it's not needed for sure, but do I need to send a v3 to remove this ?
 
-Neil
+Lothar Wa?mann
