@@ -1,38 +1,54 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 20 Apr 2016 19:12:10 +0800
-Subject: [PATCH 6/6] clk: rockchip: rk3399: fix the gate bit for i2c4 and i2c8
-In-Reply-To: <1461150414-29638-1-git-send-email-zhengxing@rock-chips.com>
-References: <1461150414-29638-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1461150730-29787-1-git-send-email-zhengxing@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 20 Apr 2016 13:12:36 +0200
+Subject: [PATCH V2 2/3] dmaengine: bcm2835: use platform_get_irq_byname
+In-Reply-To: <571762A7.7000005@martin.sperl.org>
+References: <1460381349-14408-1-git-send-email-kernel@martin.sperl.org>
+ <1460381349-14408-3-git-send-email-kernel@martin.sperl.org>
+ <CAMuHMdW2Jw5=f9ojNSM0d1cGvPc6_QxwH4rcQdWBQTP89zyj4Q@mail.gmail.com>
+ <571762A7.7000005@martin.sperl.org>
+Message-ID: <CAMuHMdUgfyLrdmfHLHd3eNh79FcJarVPuhbxtU4XYZok=skLkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gate bits of the i2c4 and i2c8 are incorrect due to the manual
-error, we need to fix them.
+Hi Martin,
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+On Wed, Apr 20, 2016 at 1:06 PM, Martin Sperl <kernel@martin.sperl.org> wrote:
+> On 20.04.2016 08:51, Geert Uytterhoeven wrote:
+>>
+>> On Mon, Apr 11, 2016 at 3:29 PM,  <kernel@martin.sperl.org> wrote:
+>>>
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>
+>>> Use platform_get_irq_byname to allow for correct mapping of
+>>> interrupts to dma channels.
+>>>
+>>> The currently implemented device tree is unfortunately
+>>> implemented with the wrong assumption, that each dma-channel
+>>> has its own dma channel, but dma-irq 11 is handling
+>>> dma-channel 11-14 and dma-irq 12 is actually a "catch all"
+>>> interrupt.
+>>>
+>>> So here we use the byname variant and require that interrupts
+>>> are explicitly named via the interrupts-name property in the
+>>
+>> interrupt-names
+>
+> Vinod has just merged this patch - do you want me to submit another
 
- drivers/clk/rockchip/clk-rk3399.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Yeah, that's how I noticed by accident :-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index e81cc85..3c5ab39 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1411,11 +1411,11 @@ static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
- 
- 	COMPOSITE_NOMUX(SCLK_I2C4_PMU, "clk_i2c4_pmu", "ppll", 0,
- 			RK3399_PMU_CLKSEL_CON(3), 0, 7, DFLAGS,
--			RK3399_PMU_CLKGATE_CON(0), 11, GFLAGS),
-+			RK3399_PMU_CLKGATE_CON(0), 10, GFLAGS),
- 
- 	COMPOSITE_NOMUX(SCLK_I2C8_PMU, "clk_i2c8_pmu", "ppll", 0,
- 			RK3399_PMU_CLKSEL_CON(2), 8, 7, DFLAGS,
--			RK3399_PMU_CLKGATE_CON(0), 10, GFLAGS),
-+			RK3399_PMU_CLKGATE_CON(0), 11, GFLAGS),
- 
- 	DIV(0, "clk_32k_suspend_pmu", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3399_PMU_CLKSEL_CON(4), 0, 10, DFLAGS),
--- 
-1.7.9.5
+> to correct those?
+
+For the commit message it's indeed too late. For the error message in the
+code, yes please.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
