@@ -1,75 +1,46 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 20 Apr 2016 13:35:11 +0900
-Subject: Nouveau crashes in 4.6-rc on arm64
-In-Reply-To: <570B50B4.4020304@nvidia.com>
-References: <57064992.1060509@arm.com> <570737F5.30105@nvidia.com>
- <5707FC9F.50905@arm.com> <570B50B4.4020304@nvidia.com>
-Message-ID: <571706FF.1010300@nvidia.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 20 Apr 2016 07:01:41 +0200
+Subject: [PATCH 0/4] ARM: cpuidle: use const and __initconst for
+ cpuidle_ops
+In-Reply-To: <20160419173113.GB2939@red-moon>
+References: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
+ <56F52063.6020002@linaro.org> <20160419173113.GB2939@red-moon>
+Message-ID: <20160420050141.GE5862@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2016 04:22 PM, Alexandre Courbot wrote:
-> Hi Robin,
->
-> On 04/09/2016 03:46 AM, Robin Murphy wrote:
->> Hi Alex,
->>
->> On 08/04/16 05:47, Alexandre Courbot wrote:
->>> Hi Robin,
->>>
->>> On 04/07/2016 08:50 PM, Robin Murphy wrote:
->>>> Hello,
->>>>
->>>> With 4.6-rc2 (and -rc1) I'm seeing Nouveau blowing up at boot, from the
->>>> look of it by dereferencing some offset from NULL inside
->>>> nouveau_fbcon_imageblit(). My setup is an old XFX 7600GT card plugged
->>>> into an ARM Juno r1 board, which works fine with 4.5 and earlier.
->>>>
->>>> Attached are a couple of logs from booting arm64 defconfig plus DRM and
->>>> Nouveau enabled - the second also has framebuffer console rotation
->>>> turned on, which interestingly seems to move the point of failure, and
->>>> the display does eventually come up to show the tail end of the
->>>> panic in
->>>> that case.
->>>>
->>>> I might be able to find time for a full bisection next week if isn't
->>>> something sufficiently obvious to anyone who knows this driver.
->>>
->>> Looking at the log it is not clear to me what could be causing this. I
->>> can boot 4.6-rc2 with a GM206 card without any issue. A bisect would
->>> indeed be useful here.
->>
->> OK, turns out the lure of writing something to remotely drive a Juno and
->> parse kernel bootlogs through an automatic bisection was too great to
->> resist on a Friday afternoon :D
->>
->> Bisection came down to 1733a2ad3674("drm/nouveau/device/pci: set as
->> non-CPU-coherent on ARM64"), and sure enough reverting that removes the
->> crash.
->
-> Thanks for taking the time to bisect this. And apologies as it seems my
-> commit is the reason for your troubles.
->
-> The CPU coherency flag is used for two things: explicitly sync buffers
-> pages when required, and allocating buffers that are not explicitly
-> synced (like fences or pushbuffers) using the DMA API. For this latter
-> use, it also accesses the buffer's content using the mapping provided by
-> dma_alloc_coherent() instead of creating a new one. All nouveau_bos are
-> supposed to be written using nouveau_bo_rd32(), and this function
-> handles the case of an DMA-API allocated object by detecting that the
-> result of ttm_kmap_obj_virtual() is NULL.
->
-> But as it turns out, OUT_RINGp() also calls ttm_kmap_obj_virtual() in
-> order to perform a memcpy and uses its result directly - which means we
-> are doing memcpy on a NULL pointer. We never caught this because we
-> typically do not use Nouveau's fbcon with an ARM setup.
->
-> I don't really like this special access for coherent objects, and
-> actually had a patch in my tree to attempt to remove it (attached).
-> Although it is not the whole solution (see below), the issue should at
-> least not be visible with it applied - could you confirm?
+On Tue, Apr 19, 2016 at 06:31:14PM +0100, Lorenzo Pieralisi wrote:
+> Hi Daniel,
+> 
+> On Fri, Mar 25, 2016 at 12:26:27PM +0100, Daniel Lezcano wrote:
+> > On 03/22/2016 03:42 PM, Jisheng Zhang wrote:
+> > >These trivial patches are similar as Masahiro posted in[1]. The main
+> > >purpose is let cpuidle_ops structure be constified and replace
+> > >"__initdata" with "__initconst".
+> > >
+> > >[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/365826.html
+> > >
+> > >Jisheng Zhang (4):
+> > >   ARM: cpuidle: add const qualifier to cpuidle_ops member in structures
+> > >   ARM: cpuidle: constify return value of arm_cpuidle_get_ops()
+> > >   soc: qcom: spm: use const and __initconst for qcom_cpuidle_ops
+> > >   drivers: firmware: psci: use const and __initconst for
+> > >     psci_cpuidle_ops
+> > >
+> > >  arch/arm/include/asm/cpuidle.h | 2 +-
+> > >  arch/arm/kernel/cpuidle.c      | 6 +++---
+> > >  drivers/firmware/psci.c        | 2 +-
+> > >  drivers/soc/qcom/spm.c         | 2 +-
+> > >  4 files changed, 6 insertions(+), 6 deletions(-)
+> > 
+> > Sounds reasonable.
+> 
+> Are you taking them ? I could send the last one but it would
+> make more sense for them to be part of the same series, I will
+> check they do not conflict with patches queued for PSCI.
 
-Hi Robin, could you confirm whether the attached patch in my previous 
-mail helps with your problem?
+Ok, let me know via an acked-by.
 
-Thanks!
+Thanks.
+
+  -- Daniel
