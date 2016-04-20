@@ -1,91 +1,47 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Thu, 21 Apr 2016 01:26:17 +0800
-Subject: [PATCH V2 3/3] nvmem: imx-ocotp: handling clock
-In-Reply-To: <1461173177-11930-1-git-send-email-van.freenix@gmail.com>
-References: <1461173177-11930-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <1461173177-11930-3-git-send-email-van.freenix@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 Apr 2016 10:12:00 +0100
+Subject: [PATCH 0/3] arm64: defconfig updates
+In-Reply-To: <7790483.f4tRIAaceA@wuerfel>
+References: <1461105540-23799-1-git-send-email-stuart.yoder@nxp.com>
+ <7790483.f4tRIAaceA@wuerfel>
+Message-ID: <20160420091159.GB30601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before access ocotp nvmem area, the clock should be enabled.
-Or, `hexdump nvmem` will hang the system. So, use such flow:
-"
-  1. clock_enable_prepare
-  2. read nvmem ocotp area
-  3. clock_disable_unprepare
-"
+On Wed, Apr 20, 2016 at 01:18:28AM +0200, Arnd Bergmann wrote:
+> On Tuesday 19 April 2016 17:39:00 Stuart Yoder wrote:
+> > This patch series was based on 4.6-rc4.
+> > 
+> > As far as I know, when doing a 'make defconfig' immediately followed by 
+> > 'make savedefconfig', the resulting defconfig should exactly match
+> > the original defconfig.  This was not the case for arm64 and patch 1 cleans
+> > that up.
+> > 
+> > Patch 2 enables 48-bit VA to allow certain armv8 SoCs to cover all of
+> > their physical memory regions. (see email thread:
+> > http://www.spinics.net/lists/arm-kernel/msg497210.html)
+> > 
+> > Patch 3 enables some additional device for Freescale/NXP SoCs.
+> > 
+> 
+> The series looks fine to me. I'd suggest merging it through the
+> platform maintainer path, e.g. having the i.MX mainainers pick
+> them up and forward them to arm at kernel.org for inclusion in arm-soc.
+> 
+> If the arm64 maintainers want to pick them up (or maybe just patches
+> 1 and 2, which are not platform specific), that's fine too, and you
+> can add my
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> We haven't come up with a really good way to deal with this kind of
+> update for arm64, as a lot of the changes to the defconfig file are
+> related to stuff that goes through arm-soc, but some other stuff
+> doesn't.
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
----
+I tend to see what got missed around -rc1, then send a single patch for
+-rc2 that mops up the leftovers. Not ideal, but it seems to work...
 
-V2:
- Follow Fabio's comments, check return value of clk_prepare_enable
+But yes, please send as much as you can via the platform maintainers.
 
- drivers/nvmem/imx-ocotp.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7796eb..3f1dd9f 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -15,6 +15,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -27,6 +28,7 @@
- 
- struct ocotp_priv {
- 	struct device *dev;
-+	struct clk *clk;
- 	void __iomem *base;
- 	unsigned int nregs;
- };
-@@ -37,7 +39,7 @@ static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
- 	struct ocotp_priv *priv = context;
- 	unsigned int offset = *(u32 *)reg;
- 	unsigned int count;
--	int i;
-+	int i, ret;
- 	u32 index;
- 
- 	index = offset >> 2;
-@@ -46,11 +48,19 @@ static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
- 	if (count > (priv->nregs - index))
- 		count = priv->nregs - index;
- 
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret < 0) {
-+		dev_err(priv->dev, "failed to prepare/enable ocotp clk\n");
-+		return ret;
-+	}
-+
- 	for (i = index; i < (index + count); i++) {
- 		*(u32 *)val = readl(priv->base + 0x400 + i * 0x10);
- 		val += 4;
- 	}
- 
-+	clk_disable_unprepare(priv->clk);
-+
- 	return 0;
- }
- 
-@@ -112,6 +122,10 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->base))
- 		return PTR_ERR(priv->base);
- 
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->clk))
-+		return PTR_ERR(priv->clk);
-+
- 	of_id = of_match_device(imx_ocotp_dt_ids, dev);
- 	priv->nregs = (unsigned int)of_id->data;
- 	imx_ocotp_regmap_config.max_register = 4 * priv->nregs - 4;
--- 
-2.6.6
+Will
