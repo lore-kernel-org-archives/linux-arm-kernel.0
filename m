@@ -1,47 +1,43 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 20 Apr 2016 11:30:10 +0000
-Subject: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
-In-Reply-To: <571764CF.6070003@metafoo.de>
-References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
- <CAKfKVtEkfnDqU476troXmCw20ATvQvj-JdPX-BCuPDR-9ZxKHQ@mail.gmail.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A578F73@XAP-PVEXMBX01.xlnx.xilinx.com>
- <571764CF.6070003@metafoo.de>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5791F3@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 Apr 2016 12:31:22 +0100
+Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
+ SoC PMU DTS binding
+In-Reply-To: <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+ <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
+ <20160418170009.GA15338@rob-hp-laptop>
+ <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
+Message-ID: <20160420113121.GE2514@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
-
-> -----Original Message-----
-> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
-> Sent: Wednesday, April 20, 2016 4:45 PM
-> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>; Shubhrajyoti Datta
-> <shubhrajyoti.datta@gmail.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>;
-> Mark Rutland <mark.rutland@arm.com>; Ian Campbell
-> <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Michal
-> Simek <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> vinod.koul at intel.com; dan.j.williams at intel.com; Moritz Fischer
-> <moritz.fischer@ettus.com>; Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com>; luis at debethencourt.com; Anirudha
-> Sarangi <anirudh@xilinx.com>; Punnaiah Choudary Kalluri
-> <punnaia@xilinx.com>; dmaengine at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
-> 
-> On 04/20/2016 10:39 AM, Appana Durga Kedareswara Rao wrote:
-> [...]
-> >> however  we should keep the names same as the TRM.
+On Mon, Apr 18, 2016 at 01:04:53PM -0700, Tai Tri Nguyen wrote:
+> >> +Required properties for MCB subnode:
+> >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
+> >> +- reg                        : First resource shall be the MCB PMU resource.
+> >> +- index                      : Instance number of the MCB PMU.
+> >> +
+> >> +Required properties for MC subnode:
+> >> +- compatible         : Shall be "apm,xgene-pmu-mc".
+> >> +- reg                        : First resource shall be the MC PMU resource.
+> >> +- index                      : Instance number of the MC PMU.
 > >
-> > Why?? Why can't we use simple convenient names that refers to
-> > equivalent clocks of h/w
+> > Don't use indexes. You probably need phandles to the nodes these are
+> > related to.
+> >
+> > How many variations of child nodes do you expect to have? 2, 10, 50? You
+> > might want to just collapse all this down to a single node and put this
+> > information in the driver if it is fixed for each SoC and there's only a
+> > handful.
+> >
 > 
-> Because it is confusing. If you use the same name it's very straight forward to
-> understand which clock is being referred to. That's not the case if you come up
-> with random new names.
+> For each kind of PMU, for example memory controller PMU, I expect to
+> have the number of instances up to 8.
+> They are actually all independent PMU nodes and have their own CSR memory bases.
+> The indexes are used for exposing the devices to perf user only. It
+> doesn't have an impact on the programming model.
+> Mark also had the same concern.
 
-Ok will fix in the v2...
+Regardless, I'll need an ack from Rob or Mark before I can merge this.
 
-Regards,
-Kedar.
+Will
