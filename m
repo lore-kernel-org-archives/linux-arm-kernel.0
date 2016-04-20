@@ -1,50 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Apr 2016 16:43:24 +0200
-Subject: [PATCH 6/8] mfd: Add STMPE1600 support
-In-Reply-To: <1461068317-28016-7-git-send-email-patrice.chotard@st.com>
-References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
- <1461068317-28016-7-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdb73QAs5jZpTq1Qz_RX=fSj3ymQ54S-6RwNDTZ9x8ASkg@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 20 Apr 2016 14:50:27 +0000
+Subject: [PATCH v2 1/2] Documentation: DT: vdma: Add clock support for vdma
+In-Reply-To: <20160420142736.GO7128@xsjsorenbubuntu>
+References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
+ <20160420142736.GO7128@xsjsorenbubuntu>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5792F0@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 2:18 PM,  <patrice.chotard@st.com> wrote:
+Hi Soren,	
 
-> From: Patrice Chotard <patrice.chotard@st.com>
->
-> STMPE1600 is a 16-bit port expander.
-> Datasheet is available here :
-> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
-> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
->
-> As STMPE1600's SYS_CTRL register has the same layout as
-> STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
-> bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
->
-> Signed-off-by: Amelie DELAUNAY <amelie.delaunay@st.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> -----Original Message-----
+> From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
+> Sent: Wednesday, April 20, 2016 7:58 PM
+> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>
+> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
+> <michals@xilinx.com>; vinod.koul at intel.com; dan.j.williams at intel.com;
+> Appana Durga Kedareswara Rao <appanad@xilinx.com>;
+> moritz.fischer at ettus.com; laurent.pinchart at ideasonboard.com;
+> luis at debethencourt.com; Anirudha Sarangi <anirudh@xilinx.com>; Punnaiah
+> Choudary Kalluri <punnaia@xilinx.com>; Shubhrajyoti Datta
+> <shubhraj@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> dmaengine at vger.kernel.org
+> Subject: Re: [PATCH v2 1/2] Documentation: DT: vdma: Add clock support for
+> vdma
+> 
+> On Wed, 2016-04-20 at 17:13:18 +0530, Kedareswara rao Appana wrote:
+> > This patch updates the binding doc with clock description for vdma.
+> >
+> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > ---
+> > Changes for v2:
+> > --> Listed down all the clocks supported by the h/w
+> >     as suggested by the Datta.
+> > --> Used IP clock names instead of shortcut clock names.
+> >
+> >  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 8
+> > ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > index fcc2b65..afe9eb7 100644
+> > --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > @@ -21,6 +21,11 @@ Required properties:
+> >  - dma-channel child node: Should have at least one channel and can have up
+> to
+> >  	two channels per device. This node specifies the properties of each
+> >  	DMA channel (see child node properties below).
+> > +- clocks: Input clock specifier. Refer to common clock bindings.
+> > +- clock-names: List of input clocks "s_axi_lite_aclk", "m_axi_mm2s_aclk"
+> > +	       "m_axi_s2mm_aclk", "m_axis_mm2s_aclk", "s_axis_s2mm_aclk"
+> > +	       (list of input cloks may vary based on the ip configuration.
+> 
+> s/cloks/clocks
 
-(...)
->  #define STMPE_SYS_CTRL_RESET   (1 << 7)
-> +#define STMPE_SYS_CTRL_INT_EN  (1 << 2)
-> +#define STMPE_SYS_CTRL_INT_HI  (1 << 0)
->
->  /*
->   * STMPE801
-> @@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
->  #define STMPE801_REG_GPIO_SET_PIN      0x11
->  #define STMPE801_REG_GPIO_DIR          0x12
->
-> -#define STMPE801_REG_SYS_CTRL_RESET    (1 << 7)
-> -#define STMPE801_REG_SYS_CTRL_INT_EN   (1 << 2)
-> -#define STMPE801_REG_SYS_CTRL_INT_HI   (1 << 0)
+Ok will fix in next version...
+> 
+> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-This looks like unrelated cleanups?
-Should this be in the reset enablement patch?
-(It's OK with me though.)
+Thanks for the ack...
 
-With that fixed:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Regards,
+Kedar.
 
-Yours,
-Linus Walleij
+> 
+> 	S?ren
