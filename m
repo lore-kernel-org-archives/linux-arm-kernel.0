@@ -1,72 +1,44 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 20 Apr 2016 09:21:00 -0400
-Subject: [PATCH v2 3/3] ARM: dts: lpc32xx: disabled ssp0/spi1 & ssp1/spi2 by
- default
-In-Reply-To: <1461158460-2946-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1461158460-2946-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1461158460-2946-4-git-send-email-slemieux.tyco@gmail.com>
+Date: Wed, 20 Apr 2016 09:28:45 -0400
+Subject: [PATCH 0/3] arm: dts: lpc32xx: update ssp / spi nodes
+In-Reply-To: <489344042.f8O28rOoB7@wuerfel>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <5714664C.7080201@mleia.com> <1461014548.27294.10.camel@localhost>
+ <489344042.f8O28rOoB7@wuerfel>
+Message-ID: <1461158925.3004.3.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+Hi Vladimir,
 
-The SSP0/SPI1 and SSP1/SPI2 shared pinout and should be disable by default.
+On Mon, 2016-04-18 at 23:52 +0200, Arnd Bergmann wrote:
+> On Monday 18 April 2016 17:22:28 Sylvain Lemieux wrote:
+> > On Mon, 2016-04-18 at 07:45 +0300, Vladimir Zapolskiy wrote:
+> > > > Once we have an agreement on who does this, please send a patch to
+> > > > update the MAINTAINERS file.
+> > > 
+Will you send a patch to update the MAINTAINERS file or do you want
+me to send it?
 
-Board specific dts should enable them, as needed.
+Should we add the lpc32xx dts to the list of supported file?
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
- arch/arm/boot/dts/lpc32xx.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> > > I'll send a change on behalf of myself, at this point I don't think that
+> > > pure lpc32xx maintenance (deliberately here I exclude development!) task
+> > > takes more than 20 hours per month, which is affordable for me,
+> > > Sylvain please express your view.
+> > > 
+> > I can provide support for pure lpc32xx maintenance task 
+> > (I also exclude development); I can free up to 10-15 hours a
+> > month for doing testing and patch review.
+> 
+> Thanks both of you!
+> 
+> > Is there any documentation available on the process 
+> > to submit a merge request to the mailing list?
+> 
+> We usually teach people on the fly, but you can watch my ELC
+> presentation from last year at https://www.youtube.com/watch?v=msT1O8P6KXQ
+> 
+> 	Arnd
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 1b2f351..73c4746 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -162,32 +162,44 @@
- 			compatible = "simple-bus";
- 			ranges = <0x20000000 0x20000000 0x30000000>;
- 
-+			/*
-+			 * ssp0 and spi1 are shared pins;
-+			 * enable one in your board dts, as needed.
-+			 */
- 			ssp0: ssp at 20084000 {
- 				compatible = "arm,pl022", "arm,primecell";
- 				reg = <0x20084000 0x1000>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_SSP0>;
- 				clock-names = "apb_pclk";
-+				status = "disabled";
- 			};
- 
- 			spi1: spi at 20088000 {
- 				compatible = "nxp,lpc3220-spi";
- 				reg = <0x20088000 0x1000>;
- 				clocks = <&clk LPC32XX_CLK_SPI1>;
-+				status = "disabled";
- 			};
- 
-+			/*
-+			 * ssp1 and spi2 are shared pins;
-+			 * enable one in your board dts, as needed.
-+			 */
- 			ssp1: ssp at 2008c000 {
- 				compatible = "arm,pl022", "arm,primecell";
- 				reg = <0x2008c000 0x1000>;
- 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_SSP1>;
- 				clock-names = "apb_pclk";
-+				status = "disabled";
- 			};
- 
- 			spi2: spi at 20090000 {
- 				compatible = "nxp,lpc3220-spi";
- 				reg = <0x20090000 0x1000>;
- 				clocks = <&clk LPC32XX_CLK_SPI2>;
-+				status = "disabled";
- 			};
- 
- 			i2s0: i2s at 20094000 {
--- 
-1.8.3.1
+Sylvain
