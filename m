@@ -1,116 +1,46 @@
-From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
-Date: Wed, 20 Apr 2016 20:28:51 +0530
-Subject: [PATCH V3] rtc: zynqmp: Update seconds time programming logic
-Message-ID: <1461164331-13732-1-git-send-email-anuragku@xilinx.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Apr 2016 08:01:09 -0700
+Subject: Regression in next for smsc911x with tigthen lockdep checks
+Message-ID: <20160420150108.GF5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We programe RTC time using SET_TIME_WRITE register and read the RTC
-current time using CURRENT_TIME register. When we set the time by
-writing into SET_TIME_WRITE Register and immediately try to read the
-rtc time from CURRENT_TIME register, the previous old value is
-returned instead of the new loaded time. This is because RTC takes
-nearly 1 sec to update the  new loaded value into the CURRENT_TIME
-register. This behaviour is expected in our RTC IP.
+Hi,
 
-This patch updates the driver to read the current time from SET_TIME_WRITE
-register instead of CURRENT_TIME when rtc time is requested within an 1sec
-period after setting the RTC time. Doing so will ensure the correct time
-is given to the user.
+Looks like commit fafc4e1ea1a4 ("sock: tigthen lockdep checks for
+sock_owned_by_user") in next causes a regression at least for
+smsc911x with CONFIG_LOCKDEP. It keeps spamming with the following
+message. Any ideas?
 
-Since there is an delay of 1sec in updating the CURRENT_TIME we are loading
-set time +1sec while programming the SET_TIME_WRITE register, doing this
-will give correct time without any delay when read from CURRENT_TIME.
+Regards,
 
-This patch updates the above said.
+Tony
 
-Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
----
- Changes in v3:
-   1. Corrected the read time logic
- Changes in v2:
-   1. Updated the Time programming logic as suggested by Alexandre Belloni
-   2. Changed the commit message	
----
- drivers/rtc/rtc-zynqmp.c | 44 ++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 38 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
-index f87f971..c2f4495 100644
---- a/drivers/rtc/rtc-zynqmp.c
-+++ b/drivers/rtc/rtc-zynqmp.c
-@@ -64,7 +64,12 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
- 	unsigned long new_time;
- 
--	new_time = rtc_tm_to_time64(tm);
-+	/*
-+	 * The value written will be updated after 1 sec into the
-+	 * seconds read register, so we need to program time +1 sec
-+	 * to get the correct time on read.
-+	 */
-+	new_time = rtc_tm_to_time64(tm) + 1;
- 
- 	if (new_time > RTC_SEC_MAX_VAL)
- 		return -EINVAL;
-@@ -78,14 +83,43 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 
- 	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
- 
-+	/*
-+	 * Clear the rtc interrupt status register after setting the
-+	 * time. During a read_time function, the code should read the
-+	 * RTC_INT_STATUS register and if bit 0 is still 0, it means
-+	 * that one second has not elapsed yet since RTC was set and
-+	 * the current time should be read from SET_TIME_READ register;
-+	 * otherwise, CURRENT_TIME register is read to report the time
-+	 */
-+	writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_STS);
-+
- 	return 0;
- }
- 
- static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
- {
-+	u32 status, read_time;
- 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
- 
--	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+	status = readl(xrtcdev->reg_base + RTC_INT_STS);
-+
-+	if (status & RTC_INT_SEC) {
-+		/*
-+		 * RTC has updated the CURRENT_TIME with the time written into
-+		 * SET_TIME_WRITE register.
-+		 */
-+		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+	} else {
-+		/*
-+		 * Time written in SET_TIME_WRITE has not yet updated into
-+		 * the seconds read register, so read the time from the
-+		 * SET_TIME_WRITE instead of CURRENT_TIME register.
-+		 * Since we add +1 sec while writing, we need to -1 sec while
-+		 * reading.
-+		 */
-+		read_time = readl(xrtcdev->reg_base + RTC_SET_TM_RD) - 1;
-+		rtc_time64_to_tm(read_time, tm);
-+	}
- 
- 	return rtc_valid_tm(tm);
- }
-@@ -166,11 +200,9 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
- 	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
- 		return IRQ_NONE;
- 
--	/* Clear interrupt */
--	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-+	/* Clear RTC_INT_ALRM interrupt only */
-+	writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_STS);
- 
--	if (status & RTC_INT_SEC)
--		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
- 	if (status & RTC_INT_ALRM)
- 		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
- 
--- 
-2.1.2
+8< ----------------
+WARNING: CPU: 0 PID: 0@include/net/sock.h:1408 udp_queue_rcv_skb+0x398/0x640
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4-next-20160420 #1087
+Hardware name: Generic OMAP36xx (Flattened Device Tree)
+[<c01103c8>] (unwind_backtrace) from [<c010c400>] (show_stack+0x10/0x14)
+[<c010c400>] (show_stack) from [<c04813ec>] (dump_stack+0xb0/0xe4)
+[<c04813ec>] (dump_stack) from [<c0137afc>] (__warn+0xd8/0x104)
+[<c0137afc>] (__warn) from [<c0137bd8>] (warn_slowpath_null+0x20/0x28)
+[<c0137bd8>] (warn_slowpath_null) from [<c06d5310>] (udp_queue_rcv_skb+0x398/0x640)
+[<c06d5310>] (udp_queue_rcv_skb) from [<c06d5a84>] (__udp4_lib_rcv+0x4cc/0xc0c)
+[<c06d5a84>] (__udp4_lib_rcv) from [<c069e980>] (ip_local_deliver_finish+0xcc/0x4f4)
+[<c069e980>] (ip_local_deliver_finish) from [<c069f748>] (ip_local_deliver+0xcc/0xd8)
+[<c069f748>] (ip_local_deliver) from [<c069ee64>] (ip_rcv_finish+0xbc/0x700)
+[<c069ee64>] (ip_rcv_finish) from [<c069fbe0>] (ip_rcv+0x48c/0x6d4)
+[<c069fbe0>] (ip_rcv) from [<c0662790>] (__netif_receive_skb_core+0x380/0xa10)
+[<c0662790>] (__netif_receive_skb_core) from [<c0665138>] (netif_receive_skb_internal+
+0x74/0x1ec)
+[<c0665138>] (netif_receive_skb_internal) from [<c05da394>] (smsc911x_poll+0xd8/0x228)
+[<c05da394>] (smsc911x_poll) from [<c0665cd0>] (net_rx_action+0x124/0x470)
+[<c0665cd0>] (net_rx_action) from [<c013e114>] (__do_softirq+0xc8/0x54c)
+[<c013e114>] (__do_softirq) from [<c013e8b8>] (irq_exit+0xbc/0x130)
+[<c013e8b8>] (irq_exit) from [<c019c8c8>] (__handle_domain_irq+0x6c/0xdc)
+[<c019c8c8>] (__handle_domain_irq) from [<c07af2b8>] (__irq_svc+0x58/0x78)
+[<c07af2b8>] (__irq_svc) from [<c0603884>] (cpuidle_enter_state+0xc4/0x3d4)
+[<c0603884>] (cpuidle_enter_state) from [<c0183be0>] (cpu_startup_entry+0x198/0x3a0)
+[<c0183be0>] (cpu_startup_entry) from [<c0b00c08>] (start_kernel+0x350/0x3c8)
+[<c0b00c08>] (start_kernel) from [<8000807c>] (0x8000807c)
