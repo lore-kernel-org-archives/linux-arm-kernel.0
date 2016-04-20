@@ -1,53 +1,88 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 21 Apr 2016 00:51:32 +0800
-Subject: [PATCH 3/3] mmc: core: support hs speed mode if hs200 mode fails
-In-Reply-To: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
-References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 20 Apr 2016 18:05:27 +0100
+Subject: [PATCH v7 07/10] iommu/dma-reserved-iommu: delete bindings in
+ iommu_free_reserved_iova_domain
+In-Reply-To: <1461084994-2355-8-git-send-email-eric.auger@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <5717B6D7.4010307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently if mmc_select_hs200 mode switch fails, MMC core
-can only use legacy mode to run the card.
-Let's retry HS speed mode if HS200 fails.
+On 19/04/16 17:56, Eric Auger wrote:
+> Now reserved bindings can exist, destroy them when destroying
+> the reserved iova domain. iommu_map is not supposed to be atomic,
+> hence the extra complexity in the locking.
+>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>
+> ---
+> v6 -> v7:
+> - remove [PATCH v6 7/7] dma-reserved-iommu: iommu_unmap_reserved and
+>    destroy the bindings in iommu_free_reserved_iova_domain
+>
+> v5 -> v6:
+> - use spin_lock instead of mutex
+>
+> v3 -> v4:
+> - previously "iommu/arm-smmu: relinquish reserved resources on
+>    domain deletion"
+> ---
+>   drivers/iommu/dma-reserved-iommu.c | 34 ++++++++++++++++++++++++++++------
+>   1 file changed, 28 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
+> index 426d339..2522235 100644
+> --- a/drivers/iommu/dma-reserved-iommu.c
+> +++ b/drivers/iommu/dma-reserved-iommu.c
+> @@ -157,14 +157,36 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+>   	unsigned long flags;
+>   	int ret = 0;
+>
+> -	spin_lock_irqsave(&domain->reserved_lock, flags);
+> -
+> -	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
+> -	if (!rid) {
+> -		ret = -EINVAL;
+> -		goto unlock;
+> +	while (1) {
+> +		struct iommu_reserved_binding *b;
+> +		struct rb_node *node;
+> +		dma_addr_t iova;
+> +		size_t size;
+> +
+> +		spin_lock_irqsave(&domain->reserved_lock, flags);
+> +
+> +		rid = (struct reserved_iova_domain *)
+> +				domain->reserved_iova_cookie;
 
-Before the fix:
-mmc0: mmc_select_hs200 failed, error -74
-: switch to mmc0 failed
-mmc0: new MMC card at address 0001
-mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
-mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
-mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
-mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
- mmcblk0: p1 p2
+Same comment about casting as before.
 
-After the fix:
-mmc0: mmc_select_hs200 failed, error -74
-mmc0: new DDR MMC card at address 0001
-mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
-mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
-mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
-mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
- mmcblk0: p1 p2
+> +		if (!rid) {
+> +			ret = -EINVAL;
+> +			goto unlock;
+> +		}
+> +
+> +		node = rb_first(&domain->reserved_binding_list);
+> +		if (!node)
+> +			break;
+> +		b = rb_entry(node, struct iommu_reserved_binding, node);
+> +
+> +		iova = b->iova;
+> +		size = b->size;
+> +
+> +		while (!kref_put(&b->kref, reserved_binding_release))
+> +			;
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/mmc/core/mmc.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Since you're freeing the thing anyway, why not just call the function 
+directly?
 
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 55c8201..b573dc7 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -1315,7 +1315,8 @@ static int mmc_select_timing(struct mmc_card *card)
- 
- 	if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
- 		err = mmc_select_hs200(card);
--	else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
-+
-+	if (err && (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS))
- 		err = mmc_select_hs(card);
- 
- 	if (err && err != -EBADMSG)
--- 
-1.9.1
+> +		spin_unlock_irqrestore(&domain->reserved_lock, flags);
+> +		iommu_unmap(domain, iova, size);
+>   	}
+>
+> +	domain->reserved_binding_list = RB_ROOT;
+>   	domain->reserved_iova_cookie = NULL;
+>   unlock:
+>   	spin_unlock_irqrestore(&domain->reserved_lock, flags);
+>
