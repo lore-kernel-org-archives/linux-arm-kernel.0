@@ -1,210 +1,135 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 20 Apr 2016 15:38:28 -0600
-Subject: [PATCH V2 6/9] acpi: apei: handle SEA notification type for ARMv8
-In-Reply-To: <1459955578-24602-7-git-send-email-tbaicar@codeaurora.org>
-References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
- <1459955578-24602-7-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <5717F6D4.8090400@codeaurora.org>
+From: han.xu@nxp.com (Han Xu)
+Date: Wed, 20 Apr 2016 22:34:27 +0000
+Subject: [PATCH 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
+In-Reply-To: <1460605855-6689-7-git-send-email-B56489@freescale.com>
+References: <1460605855-6689-1-git-send-email-B56489@freescale.com>,
+ <1460605855-6689-7-git-send-email-B56489@freescale.com>
+Message-ID: <DB5PR0401MB184503776038D76AD91B1779976D0@DB5PR0401MB1845.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch currently breaks compilation of "allyesconfig" for x86 
-because HAVE_ACPI_APEI_SEA is really only supported for ARM64 at this 
-point. Is making this config dependent on ARM64 the correct way to go 
-about fixing this? Then, in the future when this support is added for 
-other architectures, whomever adds the support can say this config 
-depends on either ARM64 or whatever other architecture they add support for.
 
-If this is not the correct way to go about this, please suggest how to 
-get around this compilation failure.
 
-Thanks,
-Tyler
+________________________________________
+From: Yunhui Cui <B56489@freescale.com>
+Sent: Wednesday, April 13, 2016 9:50 PM
+To: dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com
+Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
+Subject: [PATCH 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
 
-On 4/6/2016 9:12 AM, Tyler Baicar wrote:
-> ARM APEI extension proposal added SEA (Synchrounous External
-> Abort) notification type for ARMv8.
-> Add a new GHES error source handling function for SEA. If an error
-> source's notification type is SEA, then this function can be registered
-> into the SEA exception handler. That way GHES will parse and report
-> SEA exceptions when they occur.
->
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->   arch/arm64/Kconfig        |  1 +
->   drivers/acpi/apei/Kconfig | 14 ++++++++
->   drivers/acpi/apei/ghes.c  | 83 +++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 98 insertions(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 08952ec..6a7e166 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -4,6 +4,7 @@ config ARM64
->   	select ACPI_GENERIC_GSI if ACPI
->   	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->   	select HAVE_ACPI_APEI if ACPI
-> +	select HAVE_ACPI_APEI_SEA if ACPI
->   	select ARCH_HAS_DEVMEM_IS_ALLOWED
->   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->   	select ARCH_HAS_ELF_RANDOMIZE
-> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-> index b0140c8..2d6cd9b 100644
-> --- a/drivers/acpi/apei/Kconfig
-> +++ b/drivers/acpi/apei/Kconfig
-> @@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
->   config HAVE_ACPI_APEI_NMI
->   	bool
->   
-> +config HAVE_ACPI_APEI_SEA
-> +	bool "APEI Synchronous External Abort logging/recovering support"
-> +	help
-> +	  This option should be enabled if the system supports
-> +	  firmware first handling of SEA (Synchronous External Abort).
-> +	  SEA happens with certain faults of data abort or instruction
-> +	  abort synchronous exceptions on ARMv8 systems. If a system
-> +	  supports firmware first handling of SEA, the platform analyzes
-> +	  and handles hardware error notifications with SEA, and it may then
-> +	  form a HW error record for the OS to parse and handle. This
-> +	  option allows the OS to look for such HW error record, and
-> +	  take appropriate action.
-> +
->   config ACPI_APEI
->   	bool "ACPI Platform Error Interface (APEI)"
->   	select MISC_FILESYSTEMS
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index a6848706..aae5ca0 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -50,6 +50,10 @@
->   #include <acpi/apei.h>
->   #include <asm/tlbflush.h>
->   
-> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-> +#include <asm/system_misc.h>
-> +#endif
-> +
->   #include "apei-internal.h"
->   
->   #define GHES_PFX	"GHES: "
-> @@ -789,6 +793,62 @@ static struct notifier_block ghes_notifier_sci = {
->   	.notifier_call = ghes_notify_sci,
->   };
->   
-> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-> +static LIST_HEAD(ghes_sea);
-> +
-> +static int ghes_notify_sea(struct notifier_block *this,
-> +				  unsigned long event, void *data)
-> +{
-> +	struct ghes *ghes;
-> +	int ret = NOTIFY_DONE;
-> +
-> +	rcu_read_lock();
-> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-> +		if (!ghes_proc(ghes))
-> +			ret = NOTIFY_OK;
-> +	}
-> +	rcu_read_unlock();
-> +
-> +	return ret;
-> +}
-> +
-> +static struct notifier_block ghes_notifier_sea = {
-> +	.notifier_call = ghes_notify_sea,
-> +};
-> +
-> +static int ghes_sea_add(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	if (list_empty(&ghes_sea))
-> +		sea_register_handler_chain(&ghes_notifier_sea);
-> +	list_add_rcu(&ghes->list, &ghes_sea);
-> +	mutex_unlock(&ghes_list_mutex);
-> +	return 0;
-> +}
-> +
-> +static void ghes_sea_remove(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	list_del_rcu(&ghes->list);
-> +	if (list_empty(&ghes_sea))
-> +		sea_unregister_handler_chain(&ghes_notifier_sea);
-> +	mutex_unlock(&ghes_list_mutex);
-> +}
-> +#else /* CONFIG_HAVE_ACPI_APEI_SEA */
-> +static inline int ghes_sea_add(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +	return -ENOTSUPP;
-> +}
-> +
-> +static inline void ghes_sea_remove(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +}
-> +#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
-> +
->   #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->   /*
->    * printk is not safe in NMI context.  So in NMI handler, we allocate
-> @@ -1033,6 +1093,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
->   	case ACPI_HEST_NOTIFY_EXTERNAL:
->   	case ACPI_HEST_NOTIFY_SCI:
->   		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
-> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
-> +				generic->header.source_id);
-> +			rc = -ENOTSUPP;
-> +			goto err;
-> +		}
-> +		break;
->   	case ACPI_HEST_NOTIFY_NMI:
->   		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
->   			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-> @@ -1044,6 +1112,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
->   		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
->   			   generic->header.source_id);
->   		goto err;
-> +	case ACPI_HEST_NOTIFY_GPIO:
-> +	case ACPI_HEST_NOTIFY_SEI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
-> +			generic->header.source_id, generic->header.source_id);
-> +		rc = -ENOTSUPP;
-> +		goto err;
->   	default:
->   		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
->   			   generic->notify.type, generic->header.source_id);
-> @@ -1098,6 +1173,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
->   		list_add_rcu(&ghes->list, &ghes_sci);
->   		mutex_unlock(&ghes_list_mutex);
->   		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		rc = ghes_sea_add(ghes);
-> +		if (rc)
-> +			goto err_edac_unreg;
-> +		break;
->   	case ACPI_HEST_NOTIFY_NMI:
->   		ghes_nmi_add(ghes);
->   		break;
-> @@ -1140,6 +1220,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
->   			unregister_acpi_hed_notifier(&ghes_notifier_sci);
->   		mutex_unlock(&ghes_list_mutex);
->   		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		ghes_sea_remove(ghes);
-> +		break;
->   	case ACPI_HEST_NOTIFY_NMI:
->   		ghes_nmi_remove(ghes);
->   		break;
+From: Yunhui Cui <yunhui.cui@nxp.com>
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+With the physical sectors combination, S25FS-S family flash
+requires some special operations for read/write functions.
+
+Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 59 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 157841d..91ee920 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -39,6 +39,10 @@
+
+ #define SPI_NOR_MAX_ID_LEN     6
+ #define SPI_NOR_MAX_ADDR_WIDTH 4
++/* Added for S25FS-S family flash */
++#define SPINOR_CONFIG_REG3_OFFSET      0x800004
++#define CR3V_4KB_ERASE_UNABLE  0x8
++#define SPINOR_S25FS_FAMILY_ID 0x81
+
+ struct flash_info {
+        char            *name;
+@@ -78,6 +82,7 @@ struct flash_info {
+ };
+
+ #define JEDEC_MFR(info)        ((info)->id[0])
++#define EXT_ID(info)   ((info)->id[5])
+
+ static const struct flash_info *spi_nor_match_id(const char *name);
+
+@@ -881,6 +886,7 @@ static const struct flash_info spi_nor_ids[] = {
+         */
+        { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+        { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
++       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024, 512, 0)},
+        { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
+        { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+        { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+@@ -1018,6 +1024,53 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+        return ERR_PTR(-ENODEV);
+ }
+
++/*
++ * The S25FS-S family physical sectors may be configured as a
++ * hybrid combination of eight 4-kB parameter sectors
++ * at the top or bottom of the address space with all
++ * but one of the remaining sectors being uniform size.
++ * The Parameter Sector Erase commands (20h or 21h) must
++ * be used to erase the 4-kB parameter sectors individually.
++ * The Sector (uniform sector) Erase commands (D8h or DCh)
++ * must be used to erase any of the remaining
++ * sectors, including the portion of highest or lowest address
++ * sector that is not overlaid by the parameter sectors.
++ * The uniform sector erase command has no effect on parameter sectors.
++ */
++static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor)
++{
++       struct fsl_qspi *q;
++       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
++       u8 cr3v = 0x0;
++       int ret = 0x0;
++
++       q = nor->priv;
++
++       nor->cmd_buf[2] = cr3v_addr >> 16;
++       nor->cmd_buf[1] = cr3v_addr >> 8;
++       nor->cmd_buf[0] = cr3v_addr >> 0;
+
+I feel it's hacking code.
+
+Hi Brian, do we have any plan to support this special case? The RDAR(
+Read Any Register) needs an extra address parameter.
+
++
++       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
++       if (ret)
++               return ret;
++       if (cr3v & CR3V_4KB_ERASE_UNABLE)
++               return 0;
++       ret = nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
++       if (ret)
++               return ret;
++       cr3v = CR3V_4KB_ERASE_UNABLE;
++       nor->program_opcode = SPINOR_OP_SPANSION_WRAR;
++       nor->write(nor, cr3v_addr, 1, NULL, &cr3v);
++
++       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
++       if (ret)
++               return ret;
++       if (!(cr3v & CR3V_4KB_ERASE_UNABLE))
++               return -EPERM;
++
++       return 0;
++}
++
+ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
+                        size_t *retlen, u_char *buf)
+ {
+@@ -1311,6 +1364,12 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+                spi_nor_wait_till_ready(nor);
+        }
+
++       if (EXT_ID(info) == SPINOR_S25FS_FAMILY_ID) {
++               ret = spansion_s25fs_disable_4kb_erase(nor);
++               if (ret)
++                       return ret;
++       }
++
+        if (!mtd->name)
+                mtd->name = dev_name(dev);
+        mtd->priv = nor;
+--
+2.1.0.27.g96db324
