@@ -1,40 +1,34 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 20 Apr 2016 20:24:04 +0200
-Subject: [PATCH] ARM: pxa: remove platform dma code
-In-Reply-To: <1459675439-25941-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Sun, 3 Apr 2016 11:23:59 +0200")
-References: <1459675439-25941-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87oa94rvej.fsf@belgarion.home>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Wed, 20 Apr 2016 11:39:02 -0700
+Subject: [PATCH 2/2] dmaengine: vdma: Add clock support
+In-Reply-To: <1461136800-20334-2-git-send-email-appanad@xilinx.com>
+References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
+ <1461136800-20334-2-git-send-email-appanad@xilinx.com>
+Message-ID: <CAAtXAHd=QER9ukD8LKpHCGdmsv=MzJ4bxkvWVEatpfUhsh98SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Hi,
 
-> As the last pxa related driver was converted to dmaengine, it's time to
-> kill the legacy dma code, which is not used anymore.
->
-> This finishes the pxa dmaengine transition.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  arch/arm/mach-pxa/devices.h          |   1 +
->  arch/arm/mach-pxa/include/mach/dma.h |   1 -
->  arch/arm/mach-pxa/pxa25x.c           |   3 -
->  arch/arm/mach-pxa/pxa27x.c           |   3 -
->  arch/arm/mach-pxa/pxa3xx.c           |   3 -
->  arch/arm/plat-pxa/Makefile           |   2 -
->  arch/arm/plat-pxa/dma.c              | 386 -----------------------------------
->  arch/arm/plat-pxa/include/plat/dma.h | 100 ---------
->  8 files changed, 1 insertion(+), 498 deletions(-)
->  delete mode 100644 arch/arm/plat-pxa/dma.c
->  delete mode 100644 arch/arm/plat-pxa/include/plat/dma.h
+thanks for looking into this.
 
-I'll leave that one exposed until the next weekend so that the MMP maintainers
-can raise a red flag if I break their architecture.
+On Wed, Apr 20, 2016 at 12:20 AM, Kedareswara rao Appana
+<appana.durga.rao@xilinx.com> wrote:
 
-If no feedback, I'll queued it in my pxa/for-next tree.
+> +static int xdma_clk_init(struct xilinx_dma_device *xdev, bool enable)
+> +{
+> +       int i = 0, ret;
+> +
+> +       for (i = 0; i < xdev->numclks; i++) {
+> +               if (enable) {
+> +                       ret = clk_prepare_enable(xdev->clks[i]);
+> +                       if (ret) {
+> +                               dev_err(xdev->dev,
+> +                                       "failed to enable the axidma clock\n");
+> +                               return ret;
 
-Cheers.
+What happens to the ones you already turned on, if say the third fails?
 
---
-Robert
+Cheers,
+
+Moritz
