@@ -1,43 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 20 Apr 2016 10:42:41 -0700
-Subject: [PATCH 09/14] Input: touchscreen: Broadcom iProc: DT spelling
- s/clock-name/clock-names/
-In-Reply-To: <1461166339-11109-10-git-send-email-geert+renesas@glider.be>
-References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
- <1461166339-11109-10-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160420174241.GA28831@dtor-ws>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Apr 2016 19:49:01 +0200
+Subject: [PATCH] AMBA: Drop redundant assignment of the system PM callbacks
+Message-ID: <1461174541-21942-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 05:32:14PM +0200, Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Instead of assigning the system PM callbacks to the pm_generic_* helpers,
+we can rely on the PM core to get the same behaviour. Therefore let's drop
+the assignments.
 
-Applied, thank you.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/amba/bus.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-> ---
->  .../devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt    | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
-> index 25541f30e38701f2..ac5dff412e25266f 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
-> @@ -7,7 +7,7 @@ Required properties:
->    If this property is selected please make sure MFD_SYSCON config
->    is enabled in the defconfig file.
->  - clocks:  The clock provided by the SOC to driver the tsc
-> -- clock-name:  name for the clock
-> +- clock-names:  name for the clock
->  - interrupts: The touchscreen controller's interrupt
->  - address-cells: Specify the number of u32 entries needed in child nodes.
->    Should set to 1.
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-input" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index f009936..1e4f57f 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -172,12 +172,6 @@ static int amba_pm_runtime_resume(struct device *dev)
+ #endif /* CONFIG_PM */
+ 
+ static const struct dev_pm_ops amba_pm = {
+-	.suspend	= pm_generic_suspend,
+-	.resume		= pm_generic_resume,
+-	.freeze		= pm_generic_freeze,
+-	.thaw		= pm_generic_thaw,
+-	.poweroff	= pm_generic_poweroff,
+-	.restore	= pm_generic_restore,
+ 	SET_RUNTIME_PM_OPS(
+ 		amba_pm_runtime_suspend,
+ 		amba_pm_runtime_resume,
 -- 
-Dmitry
+1.9.1
