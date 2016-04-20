@@ -1,93 +1,289 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 20 Apr 2016 08:42:03 +0100
-Subject: [BUG linux-next] Kernel panic found with linux-next-20160414
-In-Reply-To: <5716C29F.1090205@linaro.org>
-References: <5716C29F.1090205@linaro.org>
-Message-ID: <571732CB.8010206@arm.com>
+From: dennis.chen@linaro.org (Dennis Chen)
+Date: Wed, 20 Apr 2016 15:41:51 +0800
+Subject: [PATCH v5 12/14] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <1461116439-22991-13-git-send-email-ddaney.cavm@gmail.com>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+ <1461116439-22991-13-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CADKHWaeZPj7UWU4znf7NRo3JO8+JGrBP4WJE6S5gVM0KvydNug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC LAKML in case somebody hit the same panic there.
+On 20 April 2016 at 09:40, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> Introduce a new file to hold ACPI based NUMA information parsing from
+> SRAT and SLIT.
+>
+> SRAT includes the CPU ACPI ID to Proximity Domain mappings and memory
+> ranges to Proximity Domain mapping.  SLIT has the information of inter
+> node distances(relative number for access latency).
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> [rrichter at cavium.com Reworked for numa v10 series ]
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> [david.daney at cavium.com reorderd and combinded with other patches in Hanjun Guo's original set]
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  arch/arm64/include/asm/acpi.h |   8 +++
+>  arch/arm64/include/asm/numa.h |   2 +
+>  arch/arm64/kernel/Makefile    |   1 +
+>  arch/arm64/kernel/acpi_numa.c | 149 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/smp.c       |   2 +
+>  arch/arm64/mm/numa.c          |   5 +-
+>  6 files changed, 166 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/kernel/acpi_numa.c
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index aee323b..4b13ecd 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -113,4 +113,12 @@ static inline const char *acpi_get_enable_method(int cpu)
+>  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+>  #endif
+>
+> +#ifdef CONFIG_ACPI_NUMA
+> +int arm64_acpi_numa_init(void);
+> +int acpi_numa_get_nid(unsigned int cpu, u64 hwid);
+> +#else
+> +static inline int arm64_acpi_numa_init(void) { return -ENOSYS; }
+> +static inline int acpi_numa_get_nid(unsigned int cpu, u64 hwid) { return NUMA_NO_NODE; }
+> +#endif /* CONFIG_ACPI_NUMA */
+> +
+>  #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+> index e9b4f29..600887e 100644
+> --- a/arch/arm64/include/asm/numa.h
+> +++ b/arch/arm64/include/asm/numa.h
+> @@ -5,6 +5,8 @@
+>
+>  #ifdef CONFIG_NUMA
+>
+> +#define NR_NODE_MEMBLKS                (MAX_NUMNODES * 2)
+> +
+>  /* currently, arm64 implements flat NUMA topology */
+>  #define parent_node(node)      (node)
+>
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 3793003..69569c6 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -42,6 +42,7 @@ arm64-obj-$(CONFIG_EFI)                       += efi.o efi-entry.stub.o
+>  arm64-obj-$(CONFIG_PCI)                        += pci.o
+>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)   += armv8_deprecated.o
+>  arm64-obj-$(CONFIG_ACPI)               += acpi.o
+> +arm64-obj-$(CONFIG_ACPI_NUMA)          += acpi_numa.o
+>  arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)        += acpi_parking_protocol.o
+>  arm64-obj-$(CONFIG_PARAVIRT)           += paravirt.o
+>  arm64-obj-$(CONFIG_RANDOMIZE_BASE)     += kaslr.o
+> diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
+> new file mode 100644
+> index 0000000..fd72070
+> --- /dev/null
+> +++ b/arch/arm64/kernel/acpi_numa.c
+> @@ -0,0 +1,149 @@
+> +/*
+> + * ACPI 5.1 based NUMA setup for ARM64
+> + * Lots of code was borrowed from arch/x86/mm/srat.c
+> + *
+> + * Copyright 2004 Andi Kleen, SuSE Labs.
+> + * Copyright (C) 2013-2016, Linaro Ltd.
+> + *             Author: Hanjun Guo <hanjun.guo@linaro.org>
+> + *
+> + * Reads the ACPI SRAT table to figure out what memory belongs to which CPUs.
+> + *
+> + * Called from acpi_numa_init while reading the SRAT and SLIT tables.
+> + * Assumes all memory regions belonging to a single proximity domain
+> + * are in one chunk. Holes between them will be included in the node.
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: NUMA: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/bitmap.h>
+> +#include <linux/bootmem.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mm.h>
+> +#include <linux/memblock.h>
+> +#include <linux/mmzone.h>
+> +#include <linux/module.h>
+> +#include <linux/topology.h>
+> +
+> +#include <acpi/processor.h>
+> +#include <asm/numa.h>
+> +
+> +static int cpus_in_srat;
+> +
+> +struct __node_cpu_hwid {
+> +       u32 node_id;    /* logical node containing this CPU */
+> +       u64 cpu_hwid;   /* MPIDR for this CPU */
+> +};
+> +
+> +static struct __node_cpu_hwid early_node_cpu_hwid[NR_CPUS] = {
+> +[0 ... NR_CPUS - 1] = {NUMA_NO_NODE, PHYS_CPUID_INVALID} };
+> +
+> +int acpi_numa_get_nid(unsigned int cpu, u64 hwid)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < cpus_in_srat; i++) {
+> +               if (hwid == early_node_cpu_hwid[i].cpu_hwid)
+> +                       return early_node_cpu_hwid[i].node_id;
+> +       }
+> +
+> +       return NUMA_NO_NODE;
+> +}
+> +
+> +static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
+> +{
+> +       unsigned long madt_end, entry;
+> +       struct acpi_table_madt *madt;
+> +       acpi_size tbl_size;
+> +
+> +       if (ACPI_FAILURE(acpi_get_table_with_size(ACPI_SIG_MADT, 0,
+> +                       (struct acpi_table_header **)&madt, &tbl_size)))
+> +               return -ENODEV;
+> +
+> +       entry = (unsigned long)madt;
+> +       madt_end = entry + madt->header.length;
+> +
+> +       /* Parse all entries looking for a match. */
+> +       entry += sizeof(struct acpi_table_madt);
+> +       while (entry + sizeof(struct acpi_subtable_header) < madt_end) {
+> +               struct acpi_subtable_header *header =
+> +                       (struct acpi_subtable_header *)entry;
+> +
+> +               if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+> +                       struct acpi_madt_generic_interrupt *gicc =
+> +                               container_of(header,
+> +                               struct acpi_madt_generic_interrupt, header);
+> +
+> +                       if ((gicc->flags & ACPI_MADT_ENABLED) &&
+> +                           (gicc->uid == acpi_id)) {
+> +                               *mpidr = gicc->arm_mpidr;
+> +                               early_acpi_os_unmap_memory(madt, tbl_size);
+> +                               return 0;
+> +                       }
+> +               }
+> +               entry += header->length;
+> +       }
+> +
+> +       early_acpi_os_unmap_memory(madt, tbl_size);
+> +       return -ENODEV;
+> +}
+> +
+> +/* Callback for Proximity Domain -> ACPI processor UID mapping */
+> +void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+> +{
+> +       int pxm, node;
+> +       u64 mpidr;
+> +
+> +       if (srat_disabled())
+> +               return;
+> +
+> +       if (pa->header.length < sizeof(struct acpi_srat_gicc_affinity)) {
+> +               pr_err("SRAT: Invalid SRAT header length: %d\n",
+> +                       pa->header.length);
+> +               bad_srat();
+> +               return;
+> +       }
+> +
+> +       if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+> +               return;
+> +
+> +       if (cpus_in_srat >= NR_CPUS) {
+> +               pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
+> +                            NR_CPUS);
+> +               return;
+> +       }
+> +
+> +       pxm = pa->proximity_domain;
+> +       node = acpi_map_pxm_to_node(pxm);
+> +
+> +       if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+> +               pr_err("SRAT: Too many proximity domains %d\n", pxm);
+> +               bad_srat();
+> +               return;
+> +       }
+> +
+> +       if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
+> +               pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
+> +                       pxm, pa->acpi_processor_uid);
+> +               bad_srat();
+> +               return;
+> +       }
+> +
+> +       early_node_cpu_hwid[cpus_in_srat].node_id = node;
+> +       early_node_cpu_hwid[cpus_in_srat].cpu_hwid =  mpidr;
+> +       node_set(node, numa_nodes_parsed);
+> +       cpus_in_srat++;
+> +       pr_info("SRAT: PXM %d -> MPIDR 0x%Lx -> Node %d cpu %d\n",
+> +               pxm, mpidr, node, cpus_in_srat);
+> +}
+> +
+> +int __init arm64_acpi_numa_init(void)
+> +{
+> +       int ret;
+> +
+> +       ret = acpi_numa_init();
+> +       if (ret)
+> +               return ret;
+> +
+> +       return srat_disabled() ? -EINVAL : 0;
+> +}
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index bebc4c6..6c7ef8f 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -524,6 +524,8 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>          */
+>         acpi_set_mailbox_entry(cpu_count, processor);
+>
+> +       early_map_cpu_to_node(cpu_count, acpi_numa_get_nid(cpu_count, hwid));
+> +
+>         cpu_count++;
+>  }
+>
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 6cb03f9..fc15186 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -17,6 +17,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>
+> +#include <linux/acpi.h>
+>  #include <linux/bootmem.h>
+>  #include <linux/memblock.h>
+>  #include <linux/module.h>
+> @@ -388,7 +389,9 @@ static int __init dummy_numa_init(void)
+>  void __init arm64_numa_init(void)
+>  {
+>         if (!numa_off) {
+> -               if (!numa_init(of_numa_init))
+> +               if (!acpi_disabled && !numa_init(arm64_acpi_numa_init))
+> +                       return;
+> +               if (acpi_disabled && !numa_init(of_numa_init))
+>                         return;
+>         }
+>
+On top of the latest version of the dt-based numa patch, if 'numa=off'
+specified in the command line,
+this function will fallback to invoke dummy_numa_init(), which give
+rise the question here is, do we need to
+touch any ACPI related stuff in the case? If not, then the output
+message "No NUMA configuration found" followed
+seems is not necessary since it's a little bit confusing in case of
+numa has already been turned off explicitly.
 
-Vladimir
+Thanks,
+Dennis
 
-On 20/04/16 00:43, Shi, Yang wrote:
-> Hi folks,
-> 
-> When I ran ltp on linux-next-20160414 on my ARM64 machine, I got the
-> below kernel panic:
-> 
-> Unable to handle kernel paging request at virtual address ffffffc007846000
-> pgd = ffffffc01e21d000
-> [ffffffc007846000] *pgd=0000000000000000, *pud=0000000000000000
-> Internal error: Oops: 96000047 [#11] PREEMPT SMP
-> Modules linked in: loop
-> CPU: 7 PID: 274 Comm: systemd-journal Tainted: G      D
-> 4.6.0-rc3-next-20160414-WR8.0.0.0_standard+ #9
-> Hardware name: Freescale Layerscape 2085a RDB Board (DT)
-> task: ffffffc01e3fcf80 ti: ffffffc01ea8c000 task.ti: ffffffc01ea8c000
-> PC is at copy_page+0x38/0x120
-> LR is at migrate_page_copy+0x604/0x1660
-> pc : [<ffffff9008ff2318>] lr : [<ffffff900867cdac>] pstate: 20000145
-> sp : ffffffc01ea8ecd0
-> x29: ffffffc01ea8ecd0 x28: 0000000000000000
-> x27: 1ffffff7b80240f8 x26: ffffffc018196f20
-> x25: ffffffbdc01e1180 x24: ffffffbdc01e1180
-> x23: 0000000000000000 x22: ffffffc01e3fcf80
-> x21: ffffffc00481f000 x20: ffffff900a31d000
-> x19: ffffffbdc01207c0 x18: 0000000000000f00
-> x17: 0000000000000000 x16: 0000000000000000
-> x15: 0000000000000000 x14: 0000000000000000
-> x13: 0000000000000000 x12: 0000000000000000
-> x11: 0000000000000000 x10: 0000000000000000
-> x9 : 0000000000000000 x8 : 0000000000000000
-> x7 : 0000000000000000 x6 : 0000000000000000
-> x5 : 0000000000000000 x4 : 0000000000000000
-> x3 : 0000000000000000 x2 : 0000000000000000
-> x1 : ffffffc00481f080 x0 : ffffffc007846000
-> 
-> Call trace:
-> Exception stack(0xffffffc021fc2ed0 to 0xffffffc021fc2ff0)
-> 2ec0:                                   ffffffbdc00887c0 ffffff900a31d000
-> 2ee0: ffffffc021fc30f0 ffffff9008ff2318 0000000020000145 0000000000000025
-> 2f00: ffffffbdc025a280 ffffffc020adc4c0 0000000041b58ab3 ffffff900a085fd0
-> 2f20: ffffff9008200658 0000000000000000 0000000000000000 ffffffbdc00887c0
-> 2f40: ffffff900b0f1320 ffffffc021fc3078 0000000041b58ab3 ffffff900a0864f8
-> 2f60: ffffff9008210010 ffffffc021fb8960 ffffff900867bacc 1ffffff8043f712d
-> 2f80: ffffffc021fc2fb0 ffffff9008210564 ffffffc021fc3070 ffffffc021fb8940
-> 2fa0: 0000000008221f78 ffffff900862f9c8 ffffffc021fc2fe0 ffffff9008215dc8
-> 2fc0: 1ffffff8043f8602 ffffffc021fc0000 ffffffc00968a000 ffffffc00221f080
-> 2fe0: f9407e11d00001f0 d61f02209103e210
-> [<ffffff9008ff2318>] copy_page+0x38/0x120
-> [<ffffff900867de7c>] migrate_page+0x74/0x98
-> [<ffffff90089ba418>] nfs_migrate_page+0x58/0x80
-> [<ffffff900867dffc>] move_to_new_page+0x15c/0x4d8
-> [<ffffff900867eec8>] migrate_pages+0x7c8/0x11f0
-> [<ffffff90085f8724>] compact_zone+0xdfc/0x2570
-> [<ffffff90085f9f78>] compact_zone_order+0xe0/0x170
-> [<ffffff90085fb688>] try_to_compact_pages+0x2e8/0x8f8
-> [<ffffff90085913a0>] __alloc_pages_direct_compact+0x100/0x540
-> [<ffffff9008592420>] __alloc_pages_nodemask+0xc40/0x1c58
-> [<ffffff90086887e8>] khugepaged+0x468/0x19c8
-> [<ffffff9008301700>] kthread+0x248/0x2c0
-> [<ffffff9008206610>] ret_from_fork+0x10/0x40
-> Code: d281f012 91020021 f1020252 d503201f (a8000c02)
-> 
-> 
-> I did some initial investigation and found it is caused by
-> DEBUG_PAGEALLOC and CONFIG_DEBUG_PAGEALLOC_ENABLE_DEFAULT. And, mainline
-> 4.6-rc3 works well.
-> 
-> It should be not arch specific although I got it caught on ARM64. I
-> suspect this might be caused by Hugh's huge tmpfs patches.
-> 
-> Thanks,
-> Yang
-> 
-> -- 
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-> 
-> 
+> --
+> 1.7.11.7
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
