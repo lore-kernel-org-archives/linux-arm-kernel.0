@@ -1,142 +1,50 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 20 Apr 2016 16:39:30 +0200
-Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
- MPIDR_EL1
-In-Reply-To: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
-References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160420143930.6eamewydldojgaqw@hawk.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Apr 2016 16:43:24 +0200
+Subject: [PATCH 6/8] mfd: Add STMPE1600 support
+In-Reply-To: <1461068317-28016-7-git-send-email-patrice.chotard@st.com>
+References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
+ <1461068317-28016-7-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdb73QAs5jZpTq1Qz_RX=fSj3ymQ54S-6RwNDTZ9x8ASkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 07:08:39AM -0700, Ashok Kumar wrote:
-> For guests with NUMA configuration, Node ID needs to
-> be recorded in the respective affinity byte of MPIDR_EL1.
-> 
-> Cache the MPIDR_EL1 programmed by userspace and use it for
-> subsequent reset_mpidr calls.
-> 
+On Tue, Apr 19, 2016 at 2:18 PM,  <patrice.chotard@st.com> wrote:
 
-It shouldn't be necessary for NUMA, but it is necessary for cpu
-topology, and likely a "socket" will map to a numa node in many
-cases. We shouldn't count on that though, and thus we shouldn't
-associate the word NUMA with MPIDR here. Let's change this to
-
-"In order for guests to be configured with arbitrary cpu
- topologies we need to allow userspace to program the MPIDR."
-
-or some such.
-
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  1 +
->  arch/arm64/kvm/sys_regs.c         | 44 ++++++++++++++++++++++++++++-----------
->  2 files changed, 33 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index f5c6bd2..1fc723d 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -197,6 +197,7 @@ struct kvm_vcpu_arch {
->  	/* HYP configuration */
->  	u64 hcr_el2;
->  	u32 mdcr_el2;
-> +	u64 vmpidr_el2;
-
-As this state is only used if set by the user, then I wonder if we
-should use a _user type of name. Or, as this cached value may have
-other uses (I have one in mind), then we may want to always write
-vcpu_sys_reg(vcpu, MPIDR_EL1) to it at the end of vcpu initialization.
-
->  
->  	/* Exception Information */
->  	struct kvm_vcpu_fault_info fault;
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 7bbe3ff..468f251 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -424,21 +424,29 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  	vcpu_sys_reg(vcpu, AMAIR_EL1) = amair;
->  }
->  
-> +static int set_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-> +		     const struct kvm_one_reg *reg, void __user *uaddr);
-> +
->  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  {
->  	u64 mpidr;
->  
-> -	/*
-> -	 * Map the vcpu_id into the first three affinity level fields of
-> -	 * the MPIDR. We limit the number of VCPUs in level 0 due to a
-> -	 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
-> -	 * of the GICv3 to be able to address each CPU directly when
-> -	 * sending IPIs.
-> -	 */
-> -	mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
-> -	mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
-> -	mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
-> -	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
-> +	if (!vcpu->arch.vmpidr_el2) {
-
-OK, so here we're counting on at least bit 31 being non-zero, as all
-affinity levels may be zero, per userspace's request. If we can count
-on bit 31, then that's fine, otherwise we should consider using
-INVALID_HWID, but that would require initializing vmpidr_el2...
-
-> +		/*
-> +		 * Map the vcpu_id into the first three affinity level fields of
-> +		 * the MPIDR. We limit the number of VCPUs in level 0 due to a
-> +		 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
-> +		 * of the GICv3 to be able to address each CPU directly when
-> +		 * sending IPIs.
-> +		 */
-> +		mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
-> +		mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
-> +		mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
-> +		vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
-> +	} else {
-> +		/* use the userspace configured value */
-> +		vcpu_sys_reg(vcpu, MPIDR_EL1) = vcpu->arch.vmpidr_el2;
-> +	}
->  }
->  
->  static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> @@ -902,7 +910,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  
->  	/* MPIDR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
-> -	  NULL, reset_mpidr, MPIDR_EL1 },
-> +	  NULL, reset_mpidr, MPIDR_EL1, 0, NULL, set_mpidr },
->  	/* SCTLR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
->  	  access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
-> @@ -2034,6 +2042,18 @@ static int demux_c15_set(u64 id, void __user *uaddr)
->  	}
->  }
->  
-> +static int set_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-> +		     const struct kvm_one_reg *reg, void __user *uaddr)
-> +{
-> +	int ret;
-> +
-> +	ret = reg_from_user(&vcpu_sys_reg(vcpu, rd->reg), uaddr, reg->id);
-> +	if (!ret)
-> +		vcpu->arch.vmpidr_el2 = vcpu_sys_reg(vcpu, rd->reg);
-
-I think we should either sanity check bit 31 is set, or just OR it in to
-make sure it is. We should also either check or mask-off all bits outside
-MPIDR_HWID_BITMASK.
-
-> +
-> +	return ret;
-> +}
-> +
->  int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  {
->  	const struct sys_reg_desc *r;
-> -- 
-> 2.1.0
+> From: Patrice Chotard <patrice.chotard@st.com>
 >
+> STMPE1600 is a 16-bit port expander.
+> Datasheet is available here :
+> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
+> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
+>
+> As STMPE1600's SYS_CTRL register has the same layout as
+> STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
+> bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
+>
+> Signed-off-by: Amelie DELAUNAY <amelie.delaunay@st.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
-Thanks,
-drew 
+(...)
+>  #define STMPE_SYS_CTRL_RESET   (1 << 7)
+> +#define STMPE_SYS_CTRL_INT_EN  (1 << 2)
+> +#define STMPE_SYS_CTRL_INT_HI  (1 << 0)
+>
+>  /*
+>   * STMPE801
+> @@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE801_REG_GPIO_SET_PIN      0x11
+>  #define STMPE801_REG_GPIO_DIR          0x12
+>
+> -#define STMPE801_REG_SYS_CTRL_RESET    (1 << 7)
+> -#define STMPE801_REG_SYS_CTRL_INT_EN   (1 << 2)
+> -#define STMPE801_REG_SYS_CTRL_INT_HI   (1 << 0)
+
+This looks like unrelated cleanups?
+Should this be in the reset enablement patch?
+(It's OK with me though.)
+
+With that fixed:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
