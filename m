@@ -1,83 +1,59 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Wed, 20 Apr 2016 16:02:16 +0800
-Subject: [PATCH] arm: dts: mt2701: Use real clock for UARTs
-Message-ID: <1461139336-1107-1-git-send-email-erin.lo@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Apr 2016 10:11:50 +0200
+Subject: [PATCH v5] spi: orion.c: Add direct access mode
+In-Reply-To: <571731F5.2010809@denx.de>
+References: <1460974417-32375-1-git-send-email-sr@denx.de>
+ <3956609.3ttDzXh866@wuerfel> <571731F5.2010809@denx.de>
+Message-ID: <4680158.9eGGVIb1s6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We used to use a fixed rate clock for the UARTs. Now that we have clock
-support we can associate the correct clocks to the UARTs and drop the
-26MHz fixed rate UART clock.
+On Wednesday 20 April 2016 09:38:29 Stefan Roese wrote:
+> > The single-window mode won't really work with SPI-NOR unless you make each
+> > window large enough to hold the largest possible flash (128MB with
+> > single-window, 256MB with double-window), but that size makes it harder
+> > to gain much from saving mbus windows when you trade them for gigantic
+> > CPU address space consumption.
+> >
+> > Therefore, we probably want the separate-window mode to allow the
+> > combination of large SPI flashes with other SPI devices in direct-access
+> > mode. We can also implement the single (and/or double) window mode
+> > in addition to that, but realistically we probably don't need that
+> > as all machines we support in the kernel today have at most one
+> > non-flash device.
+> 
+> Yes, this is also my feeling. While implementing this 0xffffffff
+> size in the SPI controller 'reg' DT node, I just stumbled over the
+> following problem: The resulting size of the area to map
+> (of_address_to_resource) is not the minimum of the 'soc' 'ranges'
+> entry and this 0xffffffff as I would have expected. But its always
+> 0xffffffff. Do you know if this is general problem with this
+> approach or perhaps a problem / bug in the DT address probing /
+> translation?
 
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
----
-This patch dependents on "Add clock support for Mediatek MT2701"[1].
+That is the problem I was trying to explain a few mails back. The
+creation of the platform resources does not look at what size can
+be translated. I had not considered the possibility that this could
+be changed (which would make things work here), but there are also
+reasons for not changing it: if we make the resource smaller (possibly
+even changing the start rather than the end), that may be even
+more unexpected to other driver writers when the parent ranges 
+are smaller than the device addresses.
 
-If we have clock support, we must associate the correct clocks to the UARTs.
-Otherwise it will cause booting issue.
-Please also accept this patch together with [1].
+However, I think there is a simpler solution here: for normal
+devices, just always map just a single page using ioremap,
+independent of what size the mbus mapping is. If you change
+from memcpy() to writesl(), all writes will go to address zero
+anyway, and we are already guaranteed (by not using ioremap_wc)
+that there won't be any transfers that span more than four bytes
+at a time (8 bytes once we use the driver on 64-bit machines
+with writesq()).
 
-[1]http://lists.infradead.org/pipermail/linux-mediatek/2016-April/004938.html
----
- arch/arm/boot/dts/mt2701.dtsi | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+For the direct spi-nor or spi-nand modes, we need extra code
+in the spi controller driver, and that code will then also have
+to ioremap_wc() the entire device. That ioremap should fail
+if the ranges property lists a smaller area than the entire
+device and it can fall back to the mode of using the 4k page
+map.
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 171d4da..e79e88f 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -71,12 +71,6 @@
- 		#clock-cells = <0>;
- 	};
- 
--	uart_clk: dummy26m {
--		compatible = "fixed-clock";
--		clock-frequency = <26000000>;
--		#clock-cells = <0>;
--	};
--
- 	clk26m: oscillator at 0 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-@@ -167,7 +161,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11002000 0 0x400>;
- 		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- 
-@@ -176,7 +171,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11003000 0 0x400>;
- 		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART1_SEL>, <&pericfg CLK_PERI_UART1>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- 
-@@ -185,7 +181,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11004000 0 0x400>;
- 		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART2_SEL>, <&pericfg CLK_PERI_UART2>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- 
-@@ -194,7 +191,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11005000 0 0x400>;
- 		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART3_SEL>, <&pericfg CLK_PERI_UART3>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- };
--- 
-1.9.1
+	Arnd
