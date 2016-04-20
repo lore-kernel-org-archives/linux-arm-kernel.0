@@ -1,34 +1,155 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 Apr 2016 18:05:04 -0700
-Subject: [PATCH] ASoC: ak4642: Remove CLK_IS_ROOT
-Message-ID: <1461114304-10495-1-git-send-email-sboyd@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Apr 2016 20:06:27 -0500
+Subject: [PATCH next v2 2/2] PCI: keystone: remove unnecessary goto
+ statement
+In-Reply-To: <1460386231-8377-2-git-send-email-m-karicheri2@ti.com>
+References: <1460386231-8377-1-git-send-email-m-karicheri2@ti.com>
+ <1460386231-8377-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20160420010627.GJ17863@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
-CLK_IS_ROOT", 2016-02-02) so remove it.
+Hi Murali,
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- sound/soc/codecs/ak4642.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+On Mon, Apr 11, 2016 at 10:50:31AM -0400, Murali Karicheri wrote:
+> Fix the misuse of goto statement in ks_pcie_get_irq_controller_info()
+> as simple return is more appropriate for this function. While at
+> it add an error log for absence of interrupt controller node.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> ---
+>  v2 - removed an unnecessary extra line added in the previous version
+>  v1 - same as before initial version
+>  drivers/pci/host/pci-keystone.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 299f2f0..0234828 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -181,11 +181,13 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>  	*np_temp = of_find_node_by_name(np_pcie, controller);
+>  	if (!(*np_temp)) {
+>  		dev_err(dev, "Node for %s is absent\n", controller);
+> -		goto out;
+> +		return ret;
+>  	}
+>  	temp = of_irq_count(*np_temp);
+> -	if (!temp)
+> -		goto out;
+> +	if (!temp) {
+> +		dev_err(dev, "No entries in %s\n", controller);
+> +		return ret;
+> +	}
+>  	if (temp > max_host_irqs)
+>  		dev_warn(dev, "Too many %s interrupts defined %u\n",
+>  			(legacy ? "legacy" : "MSI"), temp);
+> @@ -203,7 +205,6 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>  		*num_irqs = temp;
+>  		ret = 0;
+>  	}
+> -out:
+>  	return ret;
 
-diff --git a/sound/soc/codecs/ak4642.c b/sound/soc/codecs/ak4642.c
-index cda27c22812a..1ee8506c06c7 100644
---- a/sound/soc/codecs/ak4642.c
-+++ b/sound/soc/codecs/ak4642.c
-@@ -608,9 +608,7 @@ static struct clk *ak4642_of_parse_mcko(struct device *dev)
+I really like these cleanups; thanks for doing them.
+
+I went a step further because I think we always know the value of
+"ret" at each of these places, so I inserted those and dropped "ret"
+altogether.
+
+I applied the patch below to pci/host-keystone for v4.7.
+
+
+commit a7ed67a22484f70b8d0c33c76ad7faeac97222a7
+Author: Murali Karicheri <m-karicheri2@ti.com>
+Date:   Mon Apr 11 10:50:31 2016 -0400
+
+    PCI: keystone: Remove unnecessary goto statement
+    
+    Fix the misuse of goto statement in ks_pcie_get_irq_controller_info() as
+    simple return is more appropriate for this function.  While at it add an
+    error log for absence of interrupt controller node.
+    
+    [bhelgaas: drop "ret" altogether since we always know the return value]
+    Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    CC: Rob Herring <robh+dt@kernel.org>
+    CC: Pawel Moll <pawel.moll@arm.com>
+    CC: Mark Rutland <mark.rutland@arm.com>
+    CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+    CC: Kumar Gala <galak@codeaurora.org>
+
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index 6868918..95a66f77 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -160,7 +160,7 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
+ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+ 					   char *controller, int *num_irqs)
+ {
+-	int temp, max_host_irqs, legacy = 1, *host_irqs, ret = -EINVAL;
++	int temp, max_host_irqs, legacy = 1, *host_irqs;
+ 	struct device *dev = ks_pcie->pp.dev;
+ 	struct device_node *np_pcie = dev->of_node, **np_temp;
  
- 	of_property_read_string(np, "clock-output-names", &clk_name);
+@@ -181,11 +181,15 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+ 	*np_temp = of_find_node_by_name(np_pcie, controller);
+ 	if (!(*np_temp)) {
+ 		dev_err(dev, "Node for %s is absent\n", controller);
+-		goto out;
++		return -EINVAL;
+ 	}
++
+ 	temp = of_irq_count(*np_temp);
+-	if (!temp)
+-		goto out;
++	if (!temp) {
++		dev_err(dev, "No IRQ entries in %s\n", controller);
++		return -EINVAL;
++	}
++
+ 	if (temp > max_host_irqs)
+ 		dev_warn(dev, "Too many %s interrupts defined %u\n",
+ 			(legacy ? "legacy" : "MSI"), temp);
+@@ -199,12 +203,13 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+ 		if (!host_irqs[temp])
+ 			break;
+ 	}
++
+ 	if (temp) {
+ 		*num_irqs = temp;
+-		ret = 0;
++		return 0;
+ 	}
+-out:
+-	return ret;
++
++	return -EINVAL;
+ }
  
--	clk = clk_register_fixed_rate(dev, clk_name, parent_clk_name,
--				      (parent_clk_name) ? 0 : CLK_IS_ROOT,
--				      rate);
-+	clk = clk_register_fixed_rate(dev, clk_name, parent_clk_name, 0, rate);
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
+@@ -345,7 +350,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+ 		return ret;
+ 	}
  
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-	return ret;
++	return 0;
+ }
+ 
+ static const struct of_device_id ks_pcie_of_match[] = {
+@@ -374,7 +379,7 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	void __iomem *reg_p;
+ 	struct phy *phy;
+-	int ret = 0;
++	int ret;
+ 
+ 	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+ 				GFP_KERNEL);
