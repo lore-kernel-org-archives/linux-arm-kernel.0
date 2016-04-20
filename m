@@ -1,63 +1,25 @@
-From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
-Date: Wed, 20 Apr 2016 13:29:32 +0530
-Subject: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
-In-Reply-To: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
-References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
-Message-ID: <CAKfKVtEkfnDqU476troXmCw20ATvQvj-JdPX-BCuPDR-9ZxKHQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 20 Apr 2016 10:00:23 +0200
+Subject: [PATCH] rtc: hym8563: Remove CLK_IS_ROOT
+In-Reply-To: <1461114838-17604-1-git-send-email-sboyd@codeaurora.org>
+References: <1461114838-17604-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160420080023.GM29844@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 12:49 PM, Kedareswara rao Appana
-<appana.durga.rao@xilinx.com> wrote:
-> This patch updates the binding doc with clock description
-> for vdma.
->
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+On 19/04/2016 at 18:13:58 -0700, Stephen Boyd wrote :
+> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+> CLK_IS_ROOT", 2016-02-02) so remove it.
+> 
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> index fcc2b65..e1c9019 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> @@ -21,6 +21,10 @@ Required properties:
->  - dma-channel child node: Should have at least one channel and can have up to
->         two channels per device. This node specifies the properties of each
->         DMA channel (see child node properties below).
-> +- clocks: Input clock specifier. Refer to common clock bindings.
-> +- clock-names: List of input clocks "axi_clk", "tx_clk", "txs_clk" (list of input
-> +              cloks may vary based on the ip configuration. see clock bindings
-> +              for more info).
->
->  Required properties for VDMA:
->  - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-> @@ -60,6 +64,8 @@ axi_vdma_0: axivdma at 40030000 {
->         xlnx,num-fstores = <0x8>;
->         xlnx,flush-fsync = <0x1>;
->         xlnx,addrwidth = <0x20>;
-> +       clocks = <&clk 0>, <&clk 1>, <&clk 2>;
-> +       clock-names = "axi_clk", "tx_clk", "txs_clk";
+>  drivers/rtc/rtc-hym8563.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+Applied, thanks.
 
-the module has
-s_axi_lite_aclk Clock I AXI VDMA AXI4-Lite interface clock
- m_axi_mm2s_aclk Clock I AXI VDMA MM2S clock
- m_axi_s2mm_aclk Clock I AXI VDMA S2MM clock
- m_axis_mm2s_aclk Clock I AXI VDMA MM2S AXIS clock
- s_axis_s2mm_aclk Clock I AXI VDMA S2MM AXIS clock
-
-I think a partial support is not wrong.
-however  we should keep the names same as the TRM.
-
-
->         dma-channel at 40030000 {
->                 compatible = "xlnx,axi-vdma-mm2s-channel";
->                 interrupts = < 0 54 4 >;
-> --
-> 2.1.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
