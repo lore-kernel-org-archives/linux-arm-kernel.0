@@ -1,81 +1,68 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Wed, 20 Apr 2016 10:57:40 -0500
-Subject: [PATCH 3/3 v2] arm64: defconfig: enable freescale/nxp config options
-Message-ID: <1461167860-3283-1-git-send-email-stuart.yoder@nxp.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 20 Apr 2016 17:58:48 +0200
+Subject: [PATCH v7 01/10] iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+In-Reply-To: <57177A4E.4090804@arm.com>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-2-git-send-email-eric.auger@linaro.org>
+ <57177A4E.4090804@arm.com>
+Message-ID: <5717A738.9090904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable standard drivers for the NXP/Freescale ls2080a and
-ls1043a SoCs:
-   -system clock driver
-   -sata (AHCI)
-   -sd/mmc (ESDHC)
-   -i2c support and i2c mux
-   -i2c rtc clock
-   -i2c sensors (as modules)
+Hi Robin,
+On 04/20/2016 02:47 PM, Robin Murphy wrote:
+> Hi Eric,
+> 
+> On 19/04/16 17:56, Eric Auger wrote:
+>> Introduce a new DOMAIN_ATTR_MSI_MAPPING domain attribute. If supported,
+>> this means the MSI addresses need to be mapped in the IOMMU.
+>>
+>> x86 IOMMUs typically don't expose the attribute since on x86, MSI write
+>> transaction addresses always are within the 1MB PA region [FEE0_0000h -
+>> FEF0_000h] window which directly targets the APIC configuration space and
+>> hence bypass the sMMU. On ARM and PowerPC however MSI transactions are
+>> conveyed through the IOMMU.
+> 
+> What's stopping us from simply inferring this from the domain's IOMMU
+> not advertising interrupt remapping capabilities?
+My current understanding is it is not possible:
+on x86 CAP_INTR_REMAP is not systematically exposed (the feature can be
+disabled) and MSIs are never mapped in the IOMMU I think.
 
-Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/configs/defconfig | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Best Regards
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index e8bc263..523e19d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -102,6 +102,7 @@ CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_AHCI_CEVA=y
- CONFIG_AHCI_MVEBU=y
- CONFIG_AHCI_XGENE=y
-+CONFIG_AHCI_QORIQ=y
- CONFIG_SATA_RCAR=y
- CONFIG_PATA_PLATFORM=y
- CONFIG_PATA_OF_PLATFORM=y
-@@ -146,7 +147,10 @@ CONFIG_SERIAL_MVEBU_UART=y
- CONFIG_VIRTIO_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MUX=y
-+CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_IMX=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_TEGRA=y
-@@ -167,7 +171,8 @@ CONFIG_GPIO_XGENE=y
- CONFIG_POWER_RESET_MSM=y
- CONFIG_POWER_RESET_XGENE=y
- CONFIG_POWER_RESET_SYSCON=y
--# CONFIG_HWMON is not set
-+CONFIG_SENSORS_LM90=m
-+CONFIG_SENSORS_INA2XX=m
- CONFIG_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
- CONFIG_EXYNOS_THERMAL=y
-@@ -213,6 +218,7 @@ CONFIG_MMC_BLOCK_MINORS=32
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_OF_ESDHC=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_SPI=y
-@@ -229,6 +235,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S5M=y
-+CONFIG_RTC_DRV_DS3232=y
- CONFIG_RTC_DRV_EFI=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_SUN6I=y
-@@ -246,6 +253,7 @@ CONFIG_XEN_GNTDEV=y
- CONFIG_XEN_GRANT_DEV_ALLOC=y
- CONFIG_COMMON_CLK_SCPI=y
- CONFIG_COMMON_CLK_CS2000_CP=y
-+CONFIG_CLK_QORIQ=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_HWSPINLOCK_QCOM=y
--- 
-1.9.0
+Eric
+> 
+> Robin.
+> 
+>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v4 -> v5:
+>> - introduce the user in the next patch
+>>
+>> RFC v1 -> v1:
+>> - the data field is not used
+>> - for this attribute domain_get_attr simply returns 0 if the MSI_MAPPING
+>>    capability if needed or <0 if not.
+>> - removed struct iommu_domain_msi_maps
+>> ---
+>>   include/linux/iommu.h | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>> index 62a5eae..b3e8c5b 100644
+>> --- a/include/linux/iommu.h
+>> +++ b/include/linux/iommu.h
+>> @@ -113,6 +113,7 @@ enum iommu_attr {
+>>       DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>>       DOMAIN_ATTR_FSL_PAMUV1,
+>>       DOMAIN_ATTR_NESTING,    /* two stages of translation */
+>> +    DOMAIN_ATTR_MSI_MAPPING, /* Require MSIs mapping in iommu */
+>>       DOMAIN_ATTR_MAX,
+>>   };
+>>
+>>
+> 
