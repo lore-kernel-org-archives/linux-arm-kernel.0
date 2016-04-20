@@ -1,33 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 Apr 2016 18:45:48 -0700
-Subject: [PATCH] ARM: dove: Remove CLK_IS_ROOT
-Message-ID: <1461116748-5444-1-git-send-email-sboyd@codeaurora.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue, 19 Apr 2016 18:40:39 -0700
+Subject: [PATCH v5 14/14] arm64, acpi, numa: Default enable ACPI_NUMA with NUMA
+In-Reply-To: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461116439-22991-15-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
-CLK_IS_ROOT", 2016-02-02) so remove it.
+From: Robert Richter <rrichter@cavium.com>
 
-Cc: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/arm/mach-dove/common.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/acpi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 0cdaa3851d2e..0d420a2bfe3e 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -88,8 +88,7 @@ static void __init dove_clk_init(void)
- 	struct clk *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
- 	struct clk *xor0, *xor1, *ge, *gephy;
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 5ce9f66..bacf245 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -292,7 +292,7 @@ config ACPI_NUMA
+ 	bool "NUMA support"
+ 	depends on NUMA
+ 	depends on (X86 || IA64 || ARM64)
+-	default y if IA64_GENERIC || IA64_SGI_SN2
++	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
  
--	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
--				       dove_tclk);
-+	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, dove_tclk);
- 
- 	usb0 = dove_register_gate("usb0", "tclk", CLOCK_GATING_BIT_USB0);
- 	usb1 = dove_register_gate("usb1", "tclk", CLOCK_GATING_BIT_USB1);
+ config ACPI_CUSTOM_DSDT_FILE
+ 	string "Custom DSDT Table file to include"
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.11.7
