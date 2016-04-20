@@ -1,94 +1,48 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Wed, 20 Apr 2016 11:18:54 +0800
-Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
-In-Reply-To: <20160412145903.GF8066@e104818-lin.cambridge.arm.com>
-References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
- <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
- <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
- <570B5875.20804@hisilicon.com>
- <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
- <570B758E.7070005@hisilicon.com>
- <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
- <20160412145903.GF8066@e104818-lin.cambridge.arm.com>
-Message-ID: <5716F51E.70101@hisilicon.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 20 Apr 2016 13:12:05 +0900
+Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
+ pinctrl_{register, unregister}
+In-Reply-To: <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
+ <56D307CC.2050202@nvidia.com> <56E031CA.9010204@nvidia.com>
+ <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
+Message-ID: <CAK7LNARUxy_ACa77t7ZZy4NqK6WOoKBqghy8YgyHg2Q0vLiymA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi.
 
-Thanks for your reply.
-On 2016/4/12 22:59, Catalin Marinas wrote:
-> On Mon, Apr 11, 2016 at 12:31:53PM +0200, Ard Biesheuvel wrote:
->> On 11 April 2016 at 11:59, Chen Feng <puck.chen@hisilicon.com> wrote:
->>> On 2016/4/11 16:00, Ard Biesheuvel wrote:
->>>> On 11 April 2016 at 09:55, Chen Feng <puck.chen@hisilicon.com> wrote:
->>>>> On 2016/4/11 15:35, Ard Biesheuvel wrote:
->>>>>> On 11 April 2016 at 04:49, Chen Feng <puck.chen@hisilicon.com> wrote:
->>>>>>>  0             1.5G    2G             3.5G            4G
->>>>>>>  |              |      |               |              |
->>>>>>>  +--------------+------+---------------+--------------+
->>>>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
->>>>>>>  +--------------+------+---------------+--------------+
->>>>> The hole in 1.5G ~ 2G is also allocated mem-map array. And also with the 3.5G ~ 4G.
->>>>>
->>>>
->>>> No, it is not. It may be covered by a section, but that does not mean
->>>> sparsemem vmemmap will actually allocate backing for it. The
->>>> granularity used by sparsemem vmemmap on a 4k pages kernel is 128 MB,
->>>> due to the fact that the backing is performed at PMD granularity.
->>>>
->>>> Please, could you share the contents of the vmemmap section in
->>>> /sys/kernel/debug/kernel_page_tables of your system running with
->>>> sparsemem vmemmap enabled? You will need to set CONFIG_ARM64_PTDUMP=y
+2016-03-15 17:31 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Mar 9, 2016 at 3:23 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+>
+>>> Pushed the change at:
+>>> Branch "devm_pinctrl_register" of
+>>> https://github.com/ldewangan/linux-upstream.git.
 >>>
->>> Please see the pg-tables below.
+>>> Base repo is
+>>> for-next of
+>>> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
 >>>
->>> With sparse and vmemmap enable.
 >>>
->>> ---[ vmemmap start ]---
->>> 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
->>> ---[ vmemmap end ]---
-> [...]
->>> The board is 4GB, and the memap is 70MB
->>> 1G memory --- 14MB mem_map array.
+>>> If required, I can send the V2 version of list with acks.
 >>
->> No, this is incorrect. 1 GB corresponds with 16 MB worth of struct
->> pages assuming sizeof(struct page) == 64
->>
->> So you are losing 6 MB to rounding here, which I agree is significant.
->> I wonder if it makes sense to use a lower value for SECTION_SIZE_BITS
->> on 4k pages kernels, but perhaps we're better off asking the opinion
->> of the other cc'ees.
-> 
-> IIRC, SECTION_SIZE_BITS was chosen to be the maximum sane value we were
-> thinking of at the time, assuming that 1GB RAM alignment to be fairly
-> normal. For the !SPARSEMEM_VMEMMAP case, we should probably be fine with
-> 29 but, as Will said, we need to be careful with the page flags. At a
-> quick look, we have 25 page flags, 2 bits per zone, NUMA nodes and (48 -
-> section_size_bits) for the section width. We also need to take into
-> account 4 more bits for 52-bit PA support (ARMv8.2). So, without NUMA
-> nodes, we are currently at 49 bits used in page->flags.
-> 
-> For the SPARSEMEM_VMEMMAP case, we can decrease the SECTION_SIZE_BITS in
-> the MAX_ORDER limit.
-> 
-> An alternative would be to free the vmemmap holes later (but still keep
-> the vmemmap mapping alias). Yet another option would be to change the
-> sparse_mem_map_populate() logic get the actual section end rather than
-> always assuming PAGES_PER_SECTION. But I don't think any of these are
-> worth if we can safely reduce SECTION_SIZE_BITS.
-> 
-Yes,
-currently,it's safely to reduce the SECTION_SIZE_BITS to match this issue
-very well.
+>> Let me know if I need to send full series (V2 with collected ack) again or
+>> fine to pull it from above location.
+>
+> Please collect the ACKs on your branch and ask me to pull it after v4.6-rc1.
+> No need to resend the patches.
+>
+> Unfortunately it arrived too late for the merge window, but hey: we got the
+> devm gpiochip in for v4.6.
 
-As I mentioned before, if the memory layout is not like this scene. There
-will be not suitable to reduce the SECTION_SIZE_BITS.
 
-We have 4G memory, and 64GB phys address.
+Not pulled yet?
 
-There will be a lot of holes in the memory layout.
-And the *holes size are not always the same*.
+I want to do my development on top of the devm_pinctrl_register series.
 
-So,it's the reason I want to enable flat-mem in ARM64-ARCH. Why not makes
-the flat-mem an optional setting for arm64?
+
+
+-- 
+Best Regards
+Masahiro Yamada
