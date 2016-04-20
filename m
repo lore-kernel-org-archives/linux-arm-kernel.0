@@ -1,188 +1,54 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 20 Apr 2016 18:39:58 +0800
-Subject: [PATCH v4 4/5] arm64: add support for ACPI Low Power Idle(LPI)
-In-Reply-To: <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
-References: <1461069013-13292-1-git-send-email-sudeep.holla@arm.com>
- <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160420183958.648980db@xhacker>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 20 Apr 2016 11:44:55 +0100
+Subject: Nouveau crashes in 4.6-rc on arm64
+In-Reply-To: <571706FF.1010300@nvidia.com>
+References: <57064992.1060509@arm.com> <570737F5.30105@nvidia.com>
+ <5707FC9F.50905@arm.com> <570B50B4.4020304@nvidia.com>
+ <571706FF.1010300@nvidia.com>
+Message-ID: <57175DA7.3000505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sudeep,
+Hi Alex,
 
-On Tue, 19 Apr 2016 13:30:12 +0100 Sudeep Holla wrote:
+On 20/04/16 05:35, Alexandre Courbot wrote:
+[...]
+>>> Bisection came down to 1733a2ad3674("drm/nouveau/device/pci: set as
+>>> non-CPU-coherent on ARM64"), and sure enough reverting that removes the
+>>> crash.
+>>
+>> Thanks for taking the time to bisect this. And apologies as it seems my
+>> commit is the reason for your troubles.
+>>
+>> The CPU coherency flag is used for two things: explicitly sync buffers
+>> pages when required, and allocating buffers that are not explicitly
+>> synced (like fences or pushbuffers) using the DMA API. For this latter
+>> use, it also accesses the buffer's content using the mapping provided by
+>> dma_alloc_coherent() instead of creating a new one. All nouveau_bos are
+>> supposed to be written using nouveau_bo_rd32(), and this function
+>> handles the case of an DMA-API allocated object by detecting that the
+>> result of ttm_kmap_obj_virtual() is NULL.
+>>
+>> But as it turns out, OUT_RINGp() also calls ttm_kmap_obj_virtual() in
+>> order to perform a memcpy and uses its result directly - which means we
+>> are doing memcpy on a NULL pointer. We never caught this because we
+>> typically do not use Nouveau's fbcon with an ARM setup.
+>>
+>> I don't really like this special access for coherent objects, and
+>> actually had a patch in my tree to attempt to remove it (attached).
+>> Although it is not the whole solution (see below), the issue should at
+>> least not be visible with it applied - could you confirm?
+>
+> Hi Robin, could you confirm whether the attached patch in my previous
+> mail helps with your problem?
 
-> This patch adds appropriate callbacks to support ACPI Low Power Idle
-> (LPI) on ARM64.
-> 
-> It also selects ARCH_SUPPORTS_ACPI_PROCESSOR_LPI if ACPI is enabled
-> on ARM64.
-> 
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/Kconfig       |  1 +
->  arch/arm64/kernel/acpi.c | 34 ++++++++++++++++++++++++++++++++++
->  drivers/firmware/psci.c  | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 83 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4f436220384f..e7536540387d 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -10,6 +10,7 @@ config ARM64
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->  	select ARCH_USE_CMPXCHG_LOCKREF
-> +	select ARCH_SUPPORTS_ACPI_PROCESSOR_LPI if ACPI
->  	select ARCH_SUPPORTS_ATOMIC_RMW
->  	select ARCH_WANT_OPTIONAL_GPIOLIB
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2f98b9..3c05ad5957be 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -18,6 +18,7 @@
->  #include <linux/acpi.h>
->  #include <linux/bootmem.h>
->  #include <linux/cpumask.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/init.h>
->  #include <linux/irq.h>
->  #include <linux/irqdomain.h>
-> @@ -25,9 +26,11 @@
->  #include <linux/of_fdt.h>
->  #include <linux/smp.h>
->  
-> +#include <asm/cpuidle.h>
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
->  #include <asm/smp_plat.h>
-> +#include <acpi/processor.h>
+With that patch on top of -rc4, it's conjuring up something that looks
+somewhat more like a real address on top of the offset, as it now
+crashes with "Unable to handle kernel paging request at virtual address
+ffffff8008f841ac", rather than the previous "Unable to handle kernel
+NULL pointer dereference at virtual address 000001ac".
 
-It's better to keep headers alphabetic sorted
+That does of course mean it still crashes in the same place, though :(
 
->  
->  #ifdef CONFIG_ACPI_APEI
->  # include <linux/efi.h>
-> @@ -211,6 +214,37 @@ void __init acpi_boot_table_init(void)
->  	}
->  }
->  
-> +int acpi_processor_ffh_lpi_probe(unsigned int cpu)
-> +{
-> +	return arm_cpuidle_init(cpu);
-> +}
-> +
-> +struct acpi_processor_lpi *lpi;
-> +int acpi_processor_ffh_lpi_enter(struct acpi_processor_lpi *lpi, int idx)
-> +{
-> +	int ret;
-> +
-> +	if (!idx) {
-> +		cpu_do_idle();
-> +		return idx;
-> +	}
-> +
-> +	/* TODO cpu_pm_{enter,exit} can be done in generic code ? */
-> +	ret = cpu_pm_enter();
-> +	if (!ret) {
-> +		/*
-> +		 * Pass idle state index to cpu_suspend which in turn will
-> +		 * call the CPU ops suspend protocol with idle index as a
-> +		 * parameter.
-> +		 */
-> +		ret = arm_cpuidle_suspend(idx);
-> +
-> +		cpu_pm_exit();
-> +	}
-> +
-> +	return ret ? -1 : idx;
-> +}
-> +
->  #ifdef CONFIG_ACPI_APEI
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->  {
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index af6c5c839568..70cf2a500d4b 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -24,6 +24,7 @@
->  #include <linux/reboot.h>
->  #include <linux/slab.h>
->  #include <linux/suspend.h>
-> +#include <linux/acpi.h>
-
-same here
-
->  
->  #include <uapi/linux/psci.h>
->  
-> @@ -32,6 +33,7 @@
->  #include <asm/system_misc.h>
->  #include <asm/smp_plat.h>
->  #include <asm/suspend.h>
-> +#include <acpi/processor.h>
-
-ditto
-
->  
->  /*
->   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-> @@ -316,8 +318,54 @@ static int psci_dt_cpu_init_idle(unsigned int cpu)
->  	return ret;
->  }
->  
-> +static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
-> +{
-> +	int i, count;
-> +	u32 *psci_states;
-> +	struct acpi_processor *pr;
-> +	struct acpi_processor_lpi *lpi;
-> +
-> +	pr = per_cpu(processors, cpu);
-> +	if (unlikely(!pr || !pr->flags.has_lpi))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * If the PSCI cpu_suspend function hook has not been initialized
-> +	 * idle states must not be enabled, so bail out
-> +	 */
-> +	if (!psci_ops.cpu_suspend)
-> +		return -EOPNOTSUPP;
-> +
-> +	count = pr->power.count - 1;
-> +	if (!count)
-> +		return -ENODEV;
-> +
-> +	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
-> +	if (!psci_states)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		u32 state;
-> +
-> +		lpi = &pr->power.lpi_states[i + 1];
-> +		state = lpi->address & 0xFFFFFFFF;
-> +		if (!psci_power_state_is_valid(state)) {
-> +			pr_warn("Invalid PSCI power state %#x\n", state);
-> +			kfree(psci_states);
-> +			return -EINVAL;
-> +		}
-> +		psci_states[i] = state;
-> +	}
-> +	/* Idle states parsed correctly, initialize per-cpu pointer */
-> +	per_cpu(psci_power_state, cpu) = psci_states;
-> +	return 0;
-> +}
-> +
->  int psci_cpu_init_idle(unsigned int cpu)
->  {
-> +	if (!acpi_disabled)
-> +		return psci_acpi_cpu_init_idle(cpu);
-> +
->  	return psci_dt_cpu_init_idle(cpu);
->  }
->  
+Robin.
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
