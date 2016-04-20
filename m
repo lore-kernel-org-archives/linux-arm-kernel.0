@@ -1,44 +1,26 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 20 Apr 2016 17:32:11 +0200
-Subject: [PATCH 06/14] dmaengine: bcm2835: DT spelling
- s/interrupts-names/interrupt-names/
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 20 Apr 2016 17:37:30 +0200
+Subject: [PATCH 00/14] DT: Fix spelling of standard properties
 In-Reply-To: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
 References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdUUCJEAyhstdi1oxJXmyOh5wFbsE1JiaMs4f2ojGwSoig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
- drivers/dma/bcm2835-dma.c                                 | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Wed, Apr 20, 2016 at 5:32 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> This patch series fixes misspellings of various standard DT properties
+> in DT binding documentation, DTS files, and error messages.
 
-diff --git a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-index 55b53e1fd72c9d6e..e0b6165c9cfcec19 100644
---- a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-+++ b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-@@ -43,7 +43,7 @@ mcbsp0: mcbsp at 1d10000 {
- 		<0x00310000 0x1000>;
- 	reg-names = "mpu", "dat";
- 	interrupts = <97 98>;
--	interrupts-names = "rx", "tx";
-+	interrupt-names = "rx", "tx";
- 	dmas = <&edma0 3 1
- 		&edma0 2 1>;
- 	dma-names = "tx", "rx";
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 974015193b93cdb3..d724393e904e9a41 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -974,7 +974,7 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
- 
- 		/* legacy device tree case handling */
- 		dev_warn_once(&pdev->dev,
--			      "missing interrupts-names property in device tree - legacy interpretation is used");
-+			      "missing interrupt-names property in device tree - legacy interpretation is used");
- 		/*
- 		 * in case of channel >= 11
- 		 * use the 11th interrupt and that is shared
--- 
-1.9.1
+BTW, this is against next-20160420.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
