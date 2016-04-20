@@ -1,89 +1,73 @@
-From: han.xu@nxp.com (Han Xu)
-Date: Wed, 20 Apr 2016 22:37:21 +0000
-Subject: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
-In-Reply-To: <1460605855-6689-9-git-send-email-B56489@freescale.com>
-References: <1460605855-6689-1-git-send-email-B56489@freescale.com>,
- <1460605855-6689-9-git-send-email-B56489@freescale.com>
-Message-ID: <DB5PR0401MB18454AF685ADE37F1C39C088976D0@DB5PR0401MB1845.eurprd04.prod.outlook.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Wed, 20 Apr 2016 16:01:39 -0700
+Subject: [BUG] set_pte_at: racy dirty state clearing warning
+Message-ID: <57180A53.3000207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will and Catalin,
+
+When I enable memory comact via
+
+# echo 1 > /proc/sys/vm/compact_memory
+
+I got the below WARNING:
+
+set_pte_at: racy dirty state clearing: 0x0068000099371bd3 -> 
+0x0068000099371fd3
+------------[ cut here ]------------
+WARNING: CPU: 5 PID: 294 at ./arch/arm64/include/asm/pgtable.h:227 
+ptep_set_access_flags+0x138/0x1b8
+Modules linked in:
+
+CPU: 5 PID: 294 Comm: systemd-journal Not tainted 
+4.6.0-rc3-next-20160414 #13
+Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+task: ffff80001e4f8080 ti: ffff80001e8b4000 task.ti: ffff80001e8b4000
+PC is at ptep_set_access_flags+0x138/0x1b8
+LR is at ptep_set_access_flags+0x138/0x1b8
+pc : [<ffff200008497b70>] lr : [<ffff200008497b70>] pstate: 20000145
+sp : ffff80001e8b7bc0
+x29: ffff80001e8b7bc0 x28: ffff80001e843ac8
+x27: 0000000000000040 x26: ffff80001e9ae0d8
+x25: ffff200009901000 x24: ffff80001f32a938
+x23: 0000000000000001 x22: ffff80001e9ae088
+x21: 0000ffff7eb59000 x20: ffff80001e843ac8
+x19: 0068000099371fd3 x18: fffffffffffffe09
+x17: 0000ffff7ea48c88 x16: 0000aaaacb5afb20
+x15: 003b9aca00000000 x14: 307830203e2d2033
+x13: 6462313733393930 x12: 3030303836303078
+x11: 30203a676e697261 x10: 656c632065746174
+x9 : 7320797472696420 x8 : 79636172203a7461
+x7 : 5f6574705f746573 x6 : ffff200008300ab8
+x5 : 0000000000000003 x4 : 0000000000000000
+x3 : 0000000000000003 x2 : ffff100003d16f64
+x1 : dfff200000000000 x0 : 000000000000004f
+
+---[ end trace d75cd9bb88364c80 ]---
+Call trace:
+Exception stack(0xffff80001e8b79a0 to 0xffff80001e8b7ac0)
+79a0: 0068000099371fd3 ffff80001e843ac8 ffff80001e8b7bc0 ffff200008497b70
+79c0: 0000000020000145 000000000000003d ffff200009901000 ffff200008301558
+79e0: 0000000041b58ab3 ffff2000096870d0 ffff200008200668 ffff2000092b0e40
+7a00: 0000000000000001 ffff80001f32a938 ffff200009901000 ffff80001e9ae0d8
+7a20: 0000000000000040 ffff80001e843ac8 ffff200009901000 ffff80001e9ae0d8
+7a40: ffff20000a9dcf60 0000000000000000 000000000a6d9320 ffff200000000000
+7a60: ffff80001e8b7bc0 ffff80001e8b7bc0 ffff80001e8b7b80 00000000ffffffc8
+7a80: ffff80001e8b7ad0 ffff200008415418 ffff80001e8b4000 1ffff00003d16f64
+7aa0: 000000000000004f dfff200000000000 ffff100003d16f64 0000000000000003
+[<ffff200008497b70>] ptep_set_access_flags+0x138/0x1b8
+[<ffff20000847f564>] handle_mm_fault+0xa24/0xfa0
+[<ffff20000821e7dc>] do_page_fault+0x3d4/0x4c0
+[<ffff20000820045c>] do_mem_abort+0xac/0x140
 
 
-________________________________________
-From: Yunhui Cui <B56489@freescale.com>
-Sent: Wednesday, April 13, 2016 9:50 PM
-To: dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com
-Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
-Subject: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+My kernel has ARM64_HW_AFDBM enabled, but LS2085 is not ARMv8.1.
 
-From: Yunhui Cui <yunhui.cui@nxp.com>
+The code shows it just check if ARM64_HW_AFDBM is enabled or not, but 
+doesn't check if the CPU really has such capability.
 
-A-009282: QuadSPI: QuadSPI data pre-fetch can result in incorrect data
-Affects: QuadSPI
-Description: With AHB buffer prefetch enabled, the QuadSPI may return
-incorrect data on the AHB
-interface. The buffer pre-fetch is enabled if the fetch size as
-configured either in the LUT or in
-the BUFxCR register is greater than 8 bytes.
-Impact: Only 64 bit read allowed.
-Workaround: Keep the read data size to 64 bits (8 Bytes), which disables
-the prefetch on the AHB buffer,
-and prevents this issue from occurring.
+So, it might be better to have the capability checked runtime?
 
-Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
----
- drivers/mtd/spi-nor/fsl-quadspi.c | 29 +++++++++++++++++++++++------
- 1 file changed, 23 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index fea18b6..d9f3e50 100644
---- a/drivers/mtd/spi-nor/fsl-quadspi.c
-+++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -752,19 +752,36 @@ static void fsl_qspi_init_abh_read(struct fsl_qspi *q)
- {
-        void __iomem *base = q->iobase;
-        int seqid;
-+       const struct fsl_qspi_devtype_data *devtype_data = q->devtype_data;
-
-        /* AHB configuration for access buffer 0/1/2 .*/
-        qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF0CR);
-        qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF1CR);
-        qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF2CR);
-+
-        /*
--        * Set ADATSZ with the maximum AHB buffer size to improve the
--        * read performance.
-+        * Errata: A-009282: QuadSPI data prefetch may result in incorrect data
-+        * Workaround: Keep the read data size to 64 bits (8 bytes).
-+        * This disables the prefetch on the AHB buffer and
-+        * prevents this issue from occurring.
-         */
--       qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
--                       ((q->devtype_data->ahb_buf_size / 8)
--                       << QUADSPI_BUF3CR_ADATSZ_SHIFT),
--                       base + QUADSPI_BUF3CR);
-+       if (devtype_data->devtype == FSL_QUADSPI_LS2080A ||
-+           devtype_data->devtype == FSL_QUADSPI_LS1021A) {
-
-Use QUIRK, not SoC name.
-+
-+               qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
-+                               (1 << QUADSPI_BUF3CR_ADATSZ_SHIFT),
-+                               base + QUADSPI_BUF3CR);
-+
-+       } else {
-+               /*
-+                * Set ADATSZ with the maximum AHB buffer size to improve the
-+                * read performance.
-+               */
-+               qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
-+                               ((q->devtype_data->ahb_buf_size / 8)
-+                               << QUADSPI_BUF3CR_ADATSZ_SHIFT),
-+                               base + QUADSPI_BUF3CR);
-+       }
-
-        /* We only use the buffer3 */
-        qspi_writel(q, 0, base + QUADSPI_BUF0IND);
---
-2.1.0.27.g96db324
+Thanks,
+Yang
