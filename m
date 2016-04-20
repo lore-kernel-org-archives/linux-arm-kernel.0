@@ -1,60 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 20 Apr 2016 17:33:45 +0900
-Subject: [PATCH v2] pinctrl-exynos5440: Use off-stack memory for
- pinctrl_gpio_range
-In-Reply-To: <5717281A.70906@samsung.com>
-References: <1461117257-27048-1-git-send-email-andrew@aj.id.au>
- <5717281A.70906@samsung.com>
-Message-ID: <CA+Ln22GOBfOfZNJH_3eyPLmmkt3hWGcUG=w27YUb4H2CbFzgcg@mail.gmail.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Wed, 20 Apr 2016 10:38:17 +0200
+Subject: [PATCH] kbuild: delete unnecessary "@:"
+In-Reply-To: <1459422856-31754-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1459422856-31754-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160420083817.GE15339@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-04-20 15:56 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> On 04/20/2016 03:54 AM, Andrew Jeffery wrote:
->> The range is registered into a linked list which can be referenced
->> throughout the lifetime of the driver. Ensure the range's memory is useful
->> for the same lifetime by adding it to the driver's private data structure.
->>
->> The bug was introduced in the driver's initial commit, which was present in
->> v3.10.
->>
->> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
->> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
->> Cc: stable at vger.kernel.org
->> ---
->> Since v1:
->>
->> * Add range member kerneldoc addressing Tomasz Figa's comment
->>
->> This is my first contribution to the kernel, so hopefully I've followed all the
->> relevant documentation. If not, please let me know and point me in the right
->> direction!
->>
->> I don't have the means to test the patch, but it compiles. Someone with
->> appropriate hardware should probably give it a spin. From the responses it
->> seems that few might have access, and given the nature of the bug it might be
->> the case that no-one has complained because no-one is affected - is it worth
->> maintaining going forward?
->>
->>  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 15 ++++++++-------
->>  1 file changed, 8 insertions(+), 7 deletions(-)
->
-> Thank you for your contribution. You already received positive feedback
-> on v1 of this patch: Tomasz acked it ("acked-by") and I reviewed it
-> ("reviewed-by"). These are called "tags".
->
-> When you resubmit patches (unless there is a significant change in the
-> patch) please always put accumulated tags after existing tags. Usually
-> after signed-off-by, in this case after Cc-stable, so this would look like:
->
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for
-> Samsung EXYNOS5440 SoC")
-> Cc: stable at vger.kernel.org
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Thu, Mar 31, 2016 at 08:14:16PM +0900, Masahiro Yamada wrote:
+> Since commit 2aedcd098a94 ('kbuild: suppress annoying "... is up to
+> date." message'), $(call if_changed,...) is evaluated to "@:"
+> when there is nothing to do.
+> 
+> We no longer need to add "@:" after $(call if_changed,...) to
+> suppress "... is up to date." message.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  arch/arm/boot/Makefile                  | 1 -
+>  arch/arm/boot/bootp/Makefile            | 1 -
+>  arch/h8300/boot/compressed/Makefile     | 1 -
+>  arch/m32r/boot/compressed/Makefile      | 1 -
+>  arch/mn10300/boot/compressed/Makefile   | 1 -
+>  arch/nios2/boot/compressed/Makefile     | 1 -
+>  arch/s390/boot/compressed/Makefile      | 1 -
+>  arch/sh/boot/compressed/Makefile        | 1 -
+>  arch/sh/boot/romimage/Makefile          | 1 -
+>  arch/unicore32/boot/compressed/Makefile | 1 -
+>  arch/x86/boot/compressed/Makefile       | 1 -
+>  arch/x86/purgatory/Makefile             | 2 --
+>  arch/x86/realmode/rm/Makefile           | 1 -
+>  13 files changed, 14 deletions(-)
 
-In any case, I think this is ready for applying with the tags above. Thanks.
+Applied to kbuild.git#kbuild, thanks.
 
-Best regards,
-Tomasz
+Michal
