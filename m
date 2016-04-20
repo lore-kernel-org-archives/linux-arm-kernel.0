@@ -1,182 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Apr 2016 10:38:30 +0100
-Subject: [PATCH v7 09/10] iommu/dma-reserved-iommu:
- iommu_msi_mapping_translate_msg
-In-Reply-To: <1461084994-2355-10-git-send-email-eric.auger@linaro.org>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-10-git-send-email-eric.auger@linaro.org>
-Message-ID: <57174E16.1050004@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 20 Apr 2016 11:39:29 +0200
+Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
+In-Reply-To: <20160420092516.GA21732@e103592.cambridge.arm.com>
+References: <20160419140220.GA9503@pengutronix.de>
+ <20160420092516.GA21732@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 17:56, Eric Auger wrote:
-> Introduce iommu_msi_mapping_translate_msg whose role consists in
-> detecting whether the device's MSIs must to be mapped into an IOMMU.
-> It case it must, the function overrides the MSI msg originally composed
-> and replaces the doorbell's PA by a pre-allocated and pre-mapped reserved
-> IOVA. In case the corresponding PA region is not found, the function
-> returns an error.
-> 
-> This function is likely to be called in some code that cannot sleep. This
-> is the reason why the allocation/mapping is done separately.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> 
-> v7: creation
-> ---
->  drivers/iommu/dma-reserved-iommu.c | 69 ++++++++++++++++++++++++++++++++++++++
->  include/linux/dma-reserved-iommu.h | 27 +++++++++++++++
->  2 files changed, 96 insertions(+)
-> 
-> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
-> index 907a17f..603ee45 100644
-> --- a/drivers/iommu/dma-reserved-iommu.c
-> +++ b/drivers/iommu/dma-reserved-iommu.c
-> @@ -18,6 +18,14 @@
->  #include <linux/iommu.h>
->  #include <linux/iova.h>
->  #include <linux/msi.h>
-> +#include <linux/irq.h>
-> +
-> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
-> +#define msg_to_phys_addr(msg) \
-> +	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
-> +#else
-> +#define msg_to_phys_addr(msg)	((msg)->address_lo)
-> +#endif
->  
->  struct reserved_iova_domain {
->  	struct iova_domain *iovad;
-> @@ -351,3 +359,64 @@ struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
->  	return d;
->  }
->  EXPORT_SYMBOL_GPL(iommu_msi_mapping_desc_to_domain);
-> +
-> +static dma_addr_t iommu_find_reserved_iova(struct iommu_domain *domain,
-> +				    phys_addr_t addr, size_t size)
-> +{
-> +	unsigned long  base_pfn, end_pfn, nb_iommu_pages, order, flags;
-> +	size_t iommu_page_size, binding_size;
-> +	struct iommu_reserved_binding *b;
-> +	phys_addr_t aligned_base, offset;
-> +	dma_addr_t iova = DMA_ERROR_CODE;
-> +	struct iova_domain *iovad;
-> +
-> +	spin_lock_irqsave(&domain->reserved_lock, flags);
-> +
-> +	iovad = (struct iova_domain *)domain->reserved_iova_cookie;
-> +
-> +	if (!iovad)
-> +		goto unlock;
-> +
-> +	order = iova_shift(iovad);
-> +	base_pfn = addr >> order;
-> +	end_pfn = (addr + size - 1) >> order;
-> +	aligned_base = base_pfn << order;
-> +	offset = addr - aligned_base;
-> +	nb_iommu_pages = end_pfn - base_pfn + 1;
-> +	iommu_page_size = 1 << order;
-> +	binding_size = nb_iommu_pages * iommu_page_size;
-> +
-> +	b = find_reserved_binding(domain, aligned_base, binding_size);
-> +	if (b && (b->addr <= aligned_base) &&
-> +		(aligned_base + binding_size <=  b->addr + b->size))
-> +		iova = b->iova + offset + aligned_base - b->addr;
-> +unlock:
-> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> +	return iova;
-> +}
-> +
-> +int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg)
-> +{
+(+ Arnd)
 
-I'm really not keen on passing a full irq_data to something that doesn't
-really care about it. What this really needs is the device that
-generates the MSIs, which makes a lot more sense (you get the device and
-the address from the msi_msg).
+On 20 April 2016 at 11:25, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Tue, Apr 19, 2016 at 04:02:20PM +0200, Steffen Trumtrar wrote:
+>> Hi!
+>>
+>> According to kernelci.org (and validating on my own hardware), the current
+>> socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
+>>
+>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+>>
+>> vs
+>>
+>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+>>
+>> Both boot successfully, but notice that the board fails to bring up CPU1 if
+>> thumb2 support is enabled.
+>>
+>> Any ideas why this might be happening?
+>
+> Looks like there is at least a module loading problem:
+>
+> dwc2: section 2 reloc 234 sym '_raw_spin_lock': relocation 10 out of range (0xbf801086 -> 0xc08c2d75)
+>
+> This happens because of the smaller branch range on Thumb2 versus ARM,
+> if the combined size of the kernel and modules area gets too large.
+>
+> So, use CONFIG_THUMB2_KERNEL=n, shrink your kernel or load fewer
+> modules :P
+>
 
-Or am I getting it wrong?
+Indeed. 0xc08c2d74 - 0xbf801086 == 0x10c1f0 which exceeds the +/- 16
+MB range of the branch instruction of the Thumb2 ISA
 
-> +	struct iommu_domain *d;
-> +	struct msi_desc *desc;
-> +	dma_addr_t iova;
-> +
-> +	desc = irq_data_get_msi_desc(data);
-> +	if (!desc)
-> +		return -EINVAL;
-> +
-> +	d = iommu_msi_mapping_desc_to_domain(desc);
-> +	if (!d)
-> +		return 0;
-> +
-> +	iova = iommu_find_reserved_iova(d, msg_to_phys_addr(msg),
-> +					sizeof(phys_addr_t));
-> +
-> +	if (iova == DMA_ERROR_CODE)
-> +		return -EINVAL;
-> +
-> +	msg->address_lo = lower_32_bits(iova);
-> +	msg->address_hi = upper_32_bits(iova);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_msi_mapping_translate_msg);
-> diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
-> index 8373929..04e1912f 100644
-> --- a/include/linux/dma-reserved-iommu.h
-> +++ b/include/linux/dma-reserved-iommu.h
-> @@ -20,6 +20,8 @@
->  
->  struct iommu_domain;
->  struct msi_desc;
-> +struct irq_data;
-> +struct msi_msg;
->  
->  #ifdef CONFIG_IOMMU_DMA_RESERVED
->  
-> @@ -82,6 +84,25 @@ void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
->   */
->  struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc);
->  
-> +/**
-> + * iommu_msi_mapping_translate_msg: in case the MSI transaction is translated
-> + * by an IOMMU, the msg address must be an IOVA instead of a physical address.
-> + * This function overwrites the original MSI message containing the doorbell
-> + * physical address, result of the primary composition, with the doorbell IOVA.
-> + *
-> + * The doorbell physical address must be bound previously to an IOVA using
-> + * iommu_get_reserved_iova
-> + *
-> + * @data: irq data handle
-> + * @msg: original msi message containing the PA to be overwritten with
-> + * the IOVA
-> + *
-> + * return 0 if the MSI does not need to be mapped or when the PA/IOVA
-> + * were successfully swapped; return -EINVAL if the addresses need
-> + * to be swapped but not IOMMU binding is found
-> + */
-> +int iommu_msi_mapping_translate_msg(struct irq_data *data, struct msi_msg *msg);
-> +
->  #else
->  
->  static inline int
-> @@ -111,5 +132,11 @@ iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
->  	return NULL;
->  }
->  
-> +static inline int iommu_msi_mapping_translate_msg(struct irq_data *data,
-> +						  struct msi_msg *msg)
-> +{
-> +	return 0;
-> +}
-> +
->  #endif	/* CONFIG_IOMMU_DMA_RESERVED */
->  #endif	/* __DMA_RESERVED_IOMMU_H */
-> 
+> You could try enabling CONFIG_ARM_MODULE_PLTS -- I've never tried that,
+> but it looks like it is designed to solve this problem by allocating
+> space for trampolines to help resolve long branches.  If you are
+> _already_ enabling this option, there may be a bug in its
+> implementation though...
+>
 
-Thanks,
+This is disabled by default, so the kernelci.org builds would not have
+that enabled.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I will propose a patch to kernelci to enable the PLT option for these
+kernels, as multi_v7_defconfig obviously requires it due to the size
+of the core image
