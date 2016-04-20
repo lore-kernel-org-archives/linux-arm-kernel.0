@@ -1,84 +1,82 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 20 Apr 2016 09:36:16 -0400
-Subject: [PATCH 1/2] i2c: s3c2410: Print errno code in error logs
-In-Reply-To: <5717455A.1000007@samsung.com>
-References: <1461096641-19788-1-git-send-email-javier@osg.samsung.com>
- <5717455A.1000007@samsung.com>
-Message-ID: <571785D0.8090808@osg.samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 20 Apr 2016 15:37:15 +0200
+Subject: [PATCH v2] drm/panel: simple: Add support for Innolux AT070TN92
+Message-ID: <1461159435-16528-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+From: Riccardo Bortolato <bortolato@navaltechitalia.it>
 
-Thanks a lot for your feedback.
+Add support for the Innolux AT070TN92 panel.
 
-On 04/20/2016 05:01 AM, Krzysztof Kozlowski wrote:
-> On 04/19/2016 10:10 PM, Javier Martinez Canillas wrote:
->> The driver not always prints the error code in case of a failure but this
->> information can be very useful for debugging. So let's print if available.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->>
->> Hello,
->>
->> This patch and 2/2 were only build tested because I don't have access to
->> a board using this IP block. I just noticed these issues when comparing
->> the i2c-s3c2410 driver with i2c-exynos5 where I did some fixes recently.
->>
->> I think the patches are simple enough that is safe to pick them but of
->> course testing will be highly appreciated.
->>
->> Best regards,
->> Javier
->>
->>  drivers/i2c/busses/i2c-s3c2410.c | 18 +++++++++++-------
->>  1 file changed, 11 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
->> index 362a6de54833..4b873fe9a75b 100644
->> --- a/drivers/i2c/busses/i2c-s3c2410.c
->> +++ b/drivers/i2c/busses/i2c-s3c2410.c
->> @@ -944,7 +944,7 @@ static int s3c24xx_i2c_cpufreq_transition(struct notifier_block *nb,
->>  		i2c_unlock_adapter(&i2c->adap);
->>  
->>  		if (ret < 0)
->> -			dev_err(i2c->dev, "cannot find frequency\n");
->> +			dev_err(i2c->dev, "cannot find frequency (%d)\n", ret);
->>  		else
->>  			dev_info(i2c->dev, "setting freq %d\n", got);
->>  	}
->> @@ -995,7 +995,8 @@ static int s3c24xx_i2c_parse_dt_gpio(struct s3c24xx_i2c *i2c)
->>  
->>  		ret = gpio_request(gpio, "i2c-bus");
->>  		if (ret) {
->> -			dev_err(i2c->dev, "gpio [%d] request failed\n", gpio);
->> +			dev_err(i2c->dev, "gpio [%d] request failed (%d)\n",
->> +				gpio, ret);
->>  			goto free_gpio;
->>  		}
->>  	}
-> 
-> The changes above are okay. Below - do not make sense. Just think...
-> What do you want to improve? The probe failure already prints errno!
->
-> 
-> Just look at crafted example (error triggered manually):
-> [    0.135443] s3c-i2c 13860000.i2c: I2C clock enable failed (-100)
-> [    0.135484] s3c-i2c: probe of 13860000.i2c failed with error -100
->
+Signed-off-by: Riccardo Bortolato <bortolato@navaltechitalia.it>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Sorry, I missed that. I should had looked more carefully to the call path...
+---
+Changes since v1:
+- Add missing SoB
+---
+ .../bindings/display/panel/innolux,at070tn92.txt   |  7 ++++++
+ drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
 
-I'll post a v2 with only the changes that makes sense.
-
-> Best regards,
-> Krzysztof
-> 
-
-Best regards,
+diff --git a/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt b/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
+new file mode 100644
+index 0000000..3e10cd7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
+@@ -0,0 +1,7 @@
++Innolux AT070TN92 7.0" WQVGA TFT LCD panel
++
++Required properties:
++- compatible: should be "innolux,at070tn92"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 3649eb0..d321c57 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -822,6 +822,29 @@ static const struct panel_desc innolux_at043tn24 = {
+ 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+ };
+ 
++static const struct drm_display_mode innolux_at070tn92_mode = {
++	.clock = 33333,
++	.hdisplay = 800,
++	.hsync_start = 800 + 210,
++	.hsync_end = 800 + 210 + 20,
++	.htotal = 800 + 210 + 20 + 46,
++	.vdisplay = 480,
++	.vsync_start = 480 + 22,
++	.vsync_end = 480 + 22 + 10,
++	.vtotal = 480 + 22 + 23 + 10,
++	.vrefresh = 60,
++};
++
++static const struct panel_desc innolux_at070tn92 = {
++	.modes = &innolux_at070tn92_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 154,
++		.height = 86,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
++};
++
+ static const struct drm_display_mode innolux_g121i1_l01_mode = {
+ 	.clock = 71000,
+ 	.hdisplay = 1280,
+@@ -1362,6 +1385,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "innolux,at043tn24",
+ 		.data = &innolux_at043tn24,
+ 	}, {
++		.compatible = "innolux,at070tn92",
++		.data = &innolux_at070tn92,
++	}, {
+ 		.compatible ="innolux,g121i1-l01",
+ 		.data = &innolux_g121i1_l01
+ 	}, {
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.5.0
