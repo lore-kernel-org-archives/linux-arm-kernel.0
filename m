@@ -1,55 +1,110 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Apr 2016 08:02:56 -0700
-Subject: Regression in next for smsc911x with tigthen lockdep checks
-In-Reply-To: <20160420150108.GF5995@atomide.com>
-References: <20160420150108.GF5995@atomide.com>
-Message-ID: <20160420150256.GG5995@atomide.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 20 Apr 2016 09:06:02 -0600
+Subject: [PATCH V5 0/4] Introduce CoreSight STM support
+In-Reply-To: <1459997479-19431-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1459997479-19431-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CANLsYkwtHeXRwM98J3GQDpKwPcqAKXUFW6OWE5TJ6P_Og4RLZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160420 08:02]:
-> Hi,
-> 
-> Looks like commit fafc4e1ea1a4 ("sock: tigthen lockdep checks for
-> sock_owned_by_user") in next causes a regression at least for
-> smsc911x with CONFIG_LOCKDEP. It keeps spamming with the following
-> message. Any ideas?
+On 6 April 2016 at 20:51, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> This patchset adds support for the CoreSight STM IP block.
 
-Sorry forgot to add Steve to Cc, added now.
+This has been out there long enough - I'm picking this up.
 
-> Regards,
-> 
-> Tony
-> 
-> 8< ----------------
-> WARNING: CPU: 0 PID: 0 at include/net/sock.h:1408 udp_queue_rcv_skb+0x398/0x640
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4-next-20160420 #1087
-> Hardware name: Generic OMAP36xx (Flattened Device Tree)
-> [<c01103c8>] (unwind_backtrace) from [<c010c400>] (show_stack+0x10/0x14)
-> [<c010c400>] (show_stack) from [<c04813ec>] (dump_stack+0xb0/0xe4)
-> [<c04813ec>] (dump_stack) from [<c0137afc>] (__warn+0xd8/0x104)
-> [<c0137afc>] (__warn) from [<c0137bd8>] (warn_slowpath_null+0x20/0x28)
-> [<c0137bd8>] (warn_slowpath_null) from [<c06d5310>] (udp_queue_rcv_skb+0x398/0x640)
-> [<c06d5310>] (udp_queue_rcv_skb) from [<c06d5a84>] (__udp4_lib_rcv+0x4cc/0xc0c)
-> [<c06d5a84>] (__udp4_lib_rcv) from [<c069e980>] (ip_local_deliver_finish+0xcc/0x4f4)
-> [<c069e980>] (ip_local_deliver_finish) from [<c069f748>] (ip_local_deliver+0xcc/0xd8)
-> [<c069f748>] (ip_local_deliver) from [<c069ee64>] (ip_rcv_finish+0xbc/0x700)
-> [<c069ee64>] (ip_rcv_finish) from [<c069fbe0>] (ip_rcv+0x48c/0x6d4)
-> [<c069fbe0>] (ip_rcv) from [<c0662790>] (__netif_receive_skb_core+0x380/0xa10)
-> [<c0662790>] (__netif_receive_skb_core) from [<c0665138>] (netif_receive_skb_internal+
-> 0x74/0x1ec)
-> [<c0665138>] (netif_receive_skb_internal) from [<c05da394>] (smsc911x_poll+0xd8/0x228)
-> [<c05da394>] (smsc911x_poll) from [<c0665cd0>] (net_rx_action+0x124/0x470)
-> [<c0665cd0>] (net_rx_action) from [<c013e114>] (__do_softirq+0xc8/0x54c)
-> [<c013e114>] (__do_softirq) from [<c013e8b8>] (irq_exit+0xbc/0x130)
-> [<c013e8b8>] (irq_exit) from [<c019c8c8>] (__handle_domain_irq+0x6c/0xdc)
-> [<c019c8c8>] (__handle_domain_irq) from [<c07af2b8>] (__irq_svc+0x58/0x78)
-> [<c07af2b8>] (__irq_svc) from [<c0603884>] (cpuidle_enter_state+0xc4/0x3d4)
-> [<c0603884>] (cpuidle_enter_state) from [<c0183be0>] (cpu_startup_entry+0x198/0x3a0)
-> [<c0183be0>] (cpu_startup_entry) from [<c0b00c08>] (start_kernel+0x350/0x3c8)
-> [<c0b00c08>] (start_kernel) from [<8000807c>] (0x8000807c)
+Alex, I'll have 1/4 go through my tree.  Get back to me if you want to
+proceed differently.
+
+Thanks,
+Mathieu
+
+>
+> Changes from V4:
+>  - Rebased the whole patch set onto [4] (v4.6-rc1).
+>  - Made a few minor modifications according to the code changes since v4.5.
+>  - Replaced the original 1/4 with a new patch the Alex provided.
+>  - Another new patch 2/4 in this set is for storing path from CS-STM to sink.
+>  - Addressed comments from V4.
+>  - Removed coresight_simple_func() from CS-STM driver, used the common definition instead.
+>  - Modified STM tracer-id from an arbitrary value 0x20 to 0x1.
+>  - Replaced module_amba_driver() with builtin_amba_driver() according to [5].
+>  - Used driver->suppress_bind_attr to prevent CS-STM being unbound from the driver.
+>  - Updated the kernel version (4.7) and month in sysfs-bus-coresight-devices-stm.
+>  - Replaced 'mshared' with 'hw_override' in CS-STM driver.
+>  - Initialized sw_start and sw_end with 1.
+>  - Returned a size of '1' after processing FLAG packets.
+>  - Removed pre-compile option 'CONFIG_64BIT' for the packet size of 8.
+>  - Added Michael Williams's Reviewed-by in 4/4.
+>
+> Changes from V3:
+>  - Removed ioctl get_options interface from the generic STM code and CoreSight STM driver.
+>  - Removed 'write_max' from the structure 'stm_drvdata', and changed 'write_64bit' to 'write_bytes'.
+>  - Revised stm_fundamental_data_size() to return the fundamental data size instead of 0/1.
+>  - Removed stm_remove() from the driver.
+>  - Revised the return value of ::packet() callback function according to [2].
+>  - Modified stm_send() to send one STP packet at a time.
+>  - Added comments to invariant/guaranteed CoreSight STM transaction mode.
+>
+> Changes from V2:
+>  - Changed to return -EFAULT if failed on the command STP_GET_OPTIONS.
+>  - Used Alex's patch [1] instead of the last 2/6.
+>  - Removed the while loop from stm_send(), since the packet size passed
+>    to it isn't larger than 4 bytes on 32-bit system and 8 bytes on
+>    64-bit system.
+>  - Removed stm_send_64bit(), since the process of packets on 64-bit
+>    CS-STM should be basically the same with on 32-bit system, except the
+>    maximum length of writing STM at a time.
+>  - Removed the support of writing 64-bit to CoreSight STM buffer at a time
+>    on 32-bit ARM architecture according to an ARM engineer suggestion.  As
+>    he said that the STM might receive a 64-bit write, or might receive a
+>    pair of 32-bit writes to the two addressed words in either order.
+>    So 64-bit write isn't guaranteed to work on the ARM 32-bit architecture.
+>
+> Changes from v1:
+>  - Added a definition of coresight_simple_func() in CS-STM driver to
+>    avoid the kbuild test robot error for the time being.  This
+>    modification will be removed when merging the code in which the
+>    coresight_simple_func() has been moved to the header file.
+>  - Calculate the channel number according to the channel memory space size.
+>
+>
+> Thanks,
+> Chunyan
+>
+> [1] https://lkml.org/lkml/2016/2/4/652
+> [2] https://lkml.org/lkml/2016/2/12/397
+> [3] https://lkml.org/lkml/2015/12/22/348
+> [4] https://git.linaro.org/kernel/coresight.git/shortlog/refs/heads/next
+> [5] http://www.spinics.net/lists/kernel/msg2187320.html
+>
+> Alexander Shishkin (1):
+>   stm class: Support devices that override software assigned masters
+>
+> Mathieu Poirier (2):
+>   coresight: adding path for STM device
+>   coresight-stm: Bindings for System Trace Macrocell
+>
+> Pratik Patel (1):
+>   coresight-stm: adding driver for CoreSight STM component
+>
+>  .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
+>  Documentation/ABI/testing/sysfs-class-stm          |  10 +
+>  .../devicetree/bindings/arm/coresight.txt          |  28 +
+>  Documentation/trace/coresight.txt                  |  37 +-
+>  drivers/hwtracing/coresight/Kconfig                |  11 +
+>  drivers/hwtracing/coresight/Makefile               |   1 +
+>  drivers/hwtracing/coresight/coresight-stm.c        | 918 +++++++++++++++++++++
+>  drivers/hwtracing/coresight/coresight.c            | 106 ++-
+>  drivers/hwtracing/stm/core.c                       |  15 +
+>  include/linux/coresight-stm.h                      |   6 +
+>  include/linux/stm.h                                |   3 +
+>  include/uapi/linux/coresight-stm.h                 |  21 +
+>  12 files changed, 1183 insertions(+), 26 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+>  create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
+>  create mode 100644 include/linux/coresight-stm.h
+>  create mode 100644 include/uapi/linux/coresight-stm.h
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.9.1
+>
