@@ -1,103 +1,110 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 20 Apr 2016 14:02:40 +0200
-Subject: [PATCH v6 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for I/O
- devices
+Date: Wed, 20 Apr 2016 14:02:43 +0200
+Subject: [PATCH v6 08/11] soc: renesas: rcar-sysc: Add support for R-Car M2-W
+ power areas
 In-Reply-To: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
 References: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1461153766-750-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1461153766-750-9-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-On R-Car H3, some power areas (e.g. A3VP) contain I/O devices, which are
-also part of the CPG/MSSR Clock Domain.
-On all R-Car SoCs, devices in the "always-on" PM Domain are part of the
-Clock Domain served by the CPG/MSSR or CPG/MSTP driver.
-
-Hook up the CPG/MSTP or CPG/MSSR Clock Domain attach/detach callbacks to
-enable power management using module clocks. Which callback to hook up
-depends on the presence of device nodes compatible with
-"renesas,cpg-mstp-clocks". This clears the path for a future migration
-from the CPG/MSTP to the CPG/MSSR driver on R-Car H1 and
-Gen2.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 v6:
-  - Add Reviewed-by,
-  - Rebased,
+  - No changes,
 
 v5:
-  - Revert v4 changes,
-  - Use either the cpg_mssr_*() or cpg_mstp_*() callbacks,
-  - Drop dependency on r8a7795, as this is used for the "always-on" PM
-    Domain on R-Car H1 and Gen2, too,
+  - Add Reviewed-by,
+  - Add "always-on" power area,
 
 v4:
-  - Remove the explicit dependency on the CPG/MSSR driver by forwarding
-    the attach/detach callbacks to the parent PM Domain.
-    If deemed reusable, rcar_sysc_{at,de}tach_dev() can be moved to
-    common genpd code later.
+  - Rename R8A7791_PD_SH to R8A7791_PD_SH_4A, "sh" to "sh-4a",
+  - Reformat table,
 
 v3:
-  - Hook up the CPG/MSSR Clock Domain attach/detach callbacks instead of
-    using our own copies,
-
-v2:
-  - New.
+  - New (converted from DT to C).
 ---
- drivers/soc/renesas/rcar-sysc.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/soc/renesas/Makefile       |  2 +-
+ drivers/soc/renesas/r8a7791-sysc.c | 33 +++++++++++++++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.c    |  3 +++
+ drivers/soc/renesas/rcar-sysc.h    |  1 +
+ 4 files changed, 38 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/renesas/r8a7791-sysc.c
 
+diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+index 6588be3c6776fadf..96463c05ee594335 100644
+--- a/drivers/soc/renesas/Makefile
++++ b/drivers/soc/renesas/Makefile
+@@ -1,5 +1,5 @@
+ obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
+-obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
+ obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o
+ obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o
+diff --git a/drivers/soc/renesas/r8a7791-sysc.c b/drivers/soc/renesas/r8a7791-sysc.c
+new file mode 100644
+index 0000000000000000..03b9f41a34e62f36
+--- /dev/null
++++ b/drivers/soc/renesas/r8a7791-sysc.c
+@@ -0,0 +1,33 @@
++/*
++ * Renesas R-Car M2-W/N System Controller
++ *
++ * Copyright (C) 2016 Glider bvba
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#include <linux/bug.h>
++#include <linux/kernel.h>
++
++#include <dt-bindings/power/r8a7791-sysc.h>
++
++#include "rcar-sysc.h"
++
++static const struct rcar_sysc_area r8a7791_areas[] __initconst = {
++	{ "always-on",	    0, 0, R8A7791_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
++	{ "ca15-scu",	0x180, 0, R8A7791_PD_CA15_SCU,	R8A7791_PD_ALWAYS_ON,
++	  PD_SCU },
++	{ "ca15-cpu0",	 0x40, 0, R8A7791_PD_CA15_CPU0,	R8A7791_PD_CA15_SCU,
++	  PD_CPU_NOCR },
++	{ "ca15-cpu1",	 0x40, 1, R8A7791_PD_CA15_CPU1,	R8A7791_PD_CA15_SCU,
++	  PD_CPU_NOCR },
++	{ "sh-4a",	 0x80, 0, R8A7791_PD_SH_4A,	R8A7791_PD_ALWAYS_ON },
++	{ "sgx",	 0xc0, 0, R8A7791_PD_SGX,	R8A7791_PD_ALWAYS_ON },
++};
++
++const struct rcar_sysc_info r8a7791_sysc_info __initconst = {
++	.areas = r8a7791_areas,
++	.num_areas = ARRAY_SIZE(r8a7791_areas),
++};
 diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 4e760d63f2abd93f..0d49a25de740fbf8 100644
+index 07ea25925e85ce75..5b70b93a2aa710b2 100644
 --- a/drivers/soc/renesas/rcar-sysc.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -9,6 +9,7 @@
-  * for more details.
-  */
+@@ -290,6 +290,9 @@ static const struct of_device_id rcar_sysc_matches[] = {
+ #ifdef CONFIG_ARCH_R8A7790
+ 	{ .compatible = "renesas,r8a7790-sysc", .data = &r8a7790_sysc_info },
+ #endif
++#ifdef CONFIG_ARCH_R8A7791
++	{ .compatible = "renesas,r8a7791-sysc", .data = &r8a7791_sysc_info },
++#endif
+ 	{ /* sentinel */ }
+ };
  
-+#include <linux/clk/renesas.h>
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/mm.h>
-@@ -217,6 +218,8 @@ static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
- 	return rcar_sysc_power_up(&pd->ch);
- }
+diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
+index 33c8f2d00a01eac6..d58b39400e790a46 100644
+--- a/drivers/soc/renesas/rcar-sysc.h
++++ b/drivers/soc/renesas/rcar-sysc.h
+@@ -52,4 +52,5 @@ struct rcar_sysc_info {
  
-+static bool has_cpg_mstp;
-+
- static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- {
- 	struct generic_pm_domain *genpd = &pd->genpd;
-@@ -248,6 +251,18 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- 		gov = &pm_domain_always_on_gov;
- 	}
- 
-+	if (!(pd->flags & (PD_CPU | PD_SCU))) {
-+		/* Enable Clock Domain for I/O devices */
-+		genpd->flags = GENPD_FLAG_PM_CLK;
-+		if (has_cpg_mstp) {
-+			genpd->attach_dev = cpg_mstp_attach_dev;
-+			genpd->detach_dev = cpg_mstp_detach_dev;
-+		} else {
-+			genpd->attach_dev = cpg_mssr_attach_dev;
-+			genpd->detach_dev = cpg_mssr_detach_dev;
-+		}
-+	}
-+
- 	genpd->power_off = rcar_sysc_pd_power_off;
- 	genpd->power_on = rcar_sysc_pd_power_on;
- 
-@@ -294,6 +309,9 @@ static int __init rcar_sysc_pd_init(void)
- 
- 	info = match->data;
- 
-+	has_cpg_mstp = of_find_compatible_node(NULL, NULL,
-+					       "renesas,cpg-mstp-clocks");
-+
- 	base = of_iomap(np, 0);
- 	if (!base) {
- 		pr_warn("%s: Cannot map regs\n", np->full_name);
+ extern const struct rcar_sysc_info r8a7779_sysc_info;
+ extern const struct rcar_sysc_info r8a7790_sysc_info;
++extern const struct rcar_sysc_info r8a7791_sysc_info;
+ #endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 1.9.1
