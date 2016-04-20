@@ -1,72 +1,68 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 20 Apr 2016 14:50:27 +0000
-Subject: [PATCH v2 1/2] Documentation: DT: vdma: Add clock support for vdma
-In-Reply-To: <20160420142736.GO7128@xsjsorenbubuntu>
-References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
- <20160420142736.GO7128@xsjsorenbubuntu>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5792F0@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Apr 2016 15:52:58 +0100
+Subject: [PATCH v5 6/7] arm64/perf: Filter common events based on
+ PMCEIDn_EL0
+In-Reply-To: <1461092062-7484-7-git-send-email-ashoks@broadcom.com>
+References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
+ <1461092062-7484-7-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160420145258.GC15229@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Soren,	
+On Tue, Apr 19, 2016 at 11:54:21AM -0700, Ashok Kumar wrote:
+> +static ssize_t
+> +armv8pmu_events_sysfs_show(struct device *dev,
+> +			   struct device_attribute *attr, char *page)
+> +{
+> +	struct perf_pmu_events_attr *pmu_attr;
+> +
+> +	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
+> +
+> +	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
+> +}
 
-> -----Original Message-----
-> From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
-> Sent: Wednesday, April 20, 2016 7:58 PM
-> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> <michals@xilinx.com>; vinod.koul at intel.com; dan.j.williams at intel.com;
-> Appana Durga Kedareswara Rao <appanad@xilinx.com>;
-> moritz.fischer at ettus.com; laurent.pinchart at ideasonboard.com;
-> luis at debethencourt.com; Anirudha Sarangi <anirudh@xilinx.com>; Punnaiah
-> Choudary Kalluri <punnaia@xilinx.com>; Shubhrajyoti Datta
-> <shubhraj@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> dmaengine at vger.kernel.org
-> Subject: Re: [PATCH v2 1/2] Documentation: DT: vdma: Add clock support for
-> vdma
-> 
-> On Wed, 2016-04-20 at 17:13:18 +0530, Kedareswara rao Appana wrote:
-> > This patch updates the binding doc with clock description for vdma.
-> >
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > ---
-> > Changes for v2:
-> > --> Listed down all the clocks supported by the h/w
-> >     as suggested by the Datta.
-> > --> Used IP clock names instead of shortcut clock names.
-> >
-> >  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 8
-> > ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > index fcc2b65..afe9eb7 100644
-> > --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > @@ -21,6 +21,11 @@ Required properties:
-> >  - dma-channel child node: Should have at least one channel and can have up
-> to
-> >  	two channels per device. This node specifies the properties of each
-> >  	DMA channel (see child node properties below).
-> > +- clocks: Input clock specifier. Refer to common clock bindings.
-> > +- clock-names: List of input clocks "s_axi_lite_aclk", "m_axi_mm2s_aclk"
-> > +	       "m_axi_s2mm_aclk", "m_axis_mm2s_aclk", "s_axis_s2mm_aclk"
-> > +	       (list of input cloks may vary based on the ip configuration.
-> 
-> s/cloks/clocks
+It might be best to make that %03llx from the outset. Event encodings
+are 10 bits, and the ARM ARM lists them all as 0xNNN (i.e. with three
+hex digits).
 
-Ok will fix in next version...
-> 
-> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> -static void armv8pmu_read_num_pmnc_events(void *info)
+> +static void armv8pmu_read_num_pmnc_events(int *nb_cnt)
+>  {
+> -	int *nb_cnt = info;
+> -
+>  	/* Read the nb of CNTx counters supported from PMNC */
+>  	*nb_cnt = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT) & ARMV8_PMU_PMCR_N_MASK;
+>  
+> @@ -870,11 +898,30 @@ static void armv8pmu_read_num_pmnc_events(void *info)
+>  	*nb_cnt += 1;
+>  }
+>  
+> -static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
+> +static void armv8pmu_read_common_events_bitmap(unsigned long *bmp)
+> +{
+> +	u32 arr[2];
+> +
+> +	arr[0] = read_sysreg(pmceid0_el0);
+> +	arr[1] = read_sysreg(pmceid1_el0);
+> +
+> +	bitmap_from_u32array(bmp, ARMV8_PMUV3_MAX_COMMON_EVENTS,
+> +			     arr, ARRAY_SIZE(arr));
+> +}
 
-Thanks for the ack...
+I'd recommend s/arr/pmceid/ here.
 
-Regards,
-Kedar.
+> +static void __armv8pmu_probe_pmu(void *info)
+> +{
+> +	struct arm_pmu *cpu_pmu = info;
+> +
+> +	armv8pmu_read_num_pmnc_events(&cpu_pmu->num_events);
+> +	armv8pmu_read_common_events_bitmap(cpu_pmu->pmceid_bitmap);
+> +}
 
-> 
-> 	S?ren
+We may as well just fold these in to the same function; passwing
+pointers to fields feels a little odd.
+
+Otherwise this looks good to me.
+
+Thanks,
+Mark.
