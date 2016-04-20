@@ -1,152 +1,52 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Wed, 20 Apr 2016 10:53:33 +0800
-Subject: [PATCH v2] drm/rockchip: support non-iommu buffer path
-In-Reply-To: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
-References: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1461120813-1117-1-git-send-email-mark.yao@rock-chips.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 20 Apr 2016 11:05:04 +0800
+Subject: [PATCH v7 3/7] vfio/type1: specialize remove_dma and replay
+ according to type
+In-Reply-To: <1461086687-2658-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <201604201036.N5sysMVJ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some rockchip vop not support iommu, need use non-iommu
-buffer for it. And if we get iommu issues, we can compare
-the issues with non-iommu path, the would help the debug.
+Hi,
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+[auto build test ERROR on iommu/next]
+[also build test ERROR on v4.6-rc4 next-20160419]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-3-3-vfio-changes/20160420-013110
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
+config: x86_64-rhel (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/vfio/vfio_iommu_type1.c:39:38: fatal error: linux/dma-reserved-iommu.h: No such file or directory
+    #include <linux/dma-reserved-iommu.h>
+                                         ^
+   compilation terminated.
+
+vim +39 drivers/vfio/vfio_iommu_type1.c
+
+    33	#include <linux/rbtree.h>
+    34	#include <linux/sched.h>
+    35	#include <linux/slab.h>
+    36	#include <linux/uaccess.h>
+    37	#include <linux/vfio.h>
+    38	#include <linux/workqueue.h>
+  > 39	#include <linux/dma-reserved-iommu.h>
+    40	
+    41	#define DRIVER_VERSION  "0.2"
+    42	#define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+
 ---
-Changes in v2
-Advised by Heiko Stuebner
-- use more suitable message print.
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   64 +++++++++++++++++++--------
- 1 file changed, 46 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f556a8f..00aa175 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -36,6 +36,8 @@
- #define DRIVER_MAJOR	1
- #define DRIVER_MINOR	0
- 
-+static bool is_support_iommu = true;
-+
- /*
-  * Attach a (component) device to the shared drm dma mapping from master drm
-  * device.  This is used by the VOPs to map GEM buffers to a common DMA
-@@ -47,6 +49,9 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
- 	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
- 	int ret;
- 
-+	if (!is_support_iommu)
-+		return 0;
-+
- 	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
- 	if (ret)
- 		return ret;
-@@ -59,6 +64,9 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
- void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
- 				    struct device *dev)
- {
-+	if (!is_support_iommu)
-+		return;
-+
- 	arm_iommu_detach_device(dev);
- }
- 
-@@ -152,23 +160,26 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
- 		goto err_config_cleanup;
- 	}
- 
--	/* TODO(djkurtz): fetch the mapping start/size from somewhere */
--	mapping = arm_iommu_create_mapping(&platform_bus_type, 0x00000000,
--					   SZ_2G);
--	if (IS_ERR(mapping)) {
--		ret = PTR_ERR(mapping);
--		goto err_config_cleanup;
--	}
-+	if (is_support_iommu) {
-+		/* TODO(djkurtz): fetch the mapping start/size from somewhere */
-+		mapping = arm_iommu_create_mapping(&platform_bus_type,
-+						   0x00000000,
-+						   SZ_2G);
-+		if (IS_ERR(mapping)) {
-+			ret = PTR_ERR(mapping);
-+			goto err_config_cleanup;
-+		}
- 
--	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
--	if (ret)
--		goto err_release_mapping;
-+		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
-+		if (ret)
-+			goto err_release_mapping;
- 
--	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
-+		dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
- 
--	ret = arm_iommu_attach_device(dev, mapping);
--	if (ret)
--		goto err_release_mapping;
-+		ret = arm_iommu_attach_device(dev, mapping);
-+		if (ret)
-+			goto err_release_mapping;
-+	}
- 
- 	/* Try to bind all sub drivers. */
- 	ret = component_bind_all(dev, drm_dev);
-@@ -226,9 +237,11 @@ err_kms_helper_poll_fini:
- err_unbind:
- 	component_unbind_all(dev, drm_dev);
- err_detach_device:
--	arm_iommu_detach_device(dev);
-+	if (is_support_iommu)
-+		arm_iommu_detach_device(dev);
- err_release_mapping:
--	arm_iommu_release_mapping(dev->archdata.mapping);
-+	if (is_support_iommu)
-+		arm_iommu_release_mapping(dev->archdata.mapping);
- err_config_cleanup:
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
-@@ -243,8 +256,10 @@ static int rockchip_drm_unload(struct drm_device *drm_dev)
- 	drm_vblank_cleanup(drm_dev);
- 	drm_kms_helper_poll_fini(drm_dev);
- 	component_unbind_all(dev, drm_dev);
--	arm_iommu_detach_device(dev);
--	arm_iommu_release_mapping(dev->archdata.mapping);
-+	if (is_support_iommu) {
-+		arm_iommu_detach_device(dev);
-+		arm_iommu_release_mapping(dev->archdata.mapping);
-+	}
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
- 
-@@ -488,6 +503,8 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
- 	 * works as expected.
- 	 */
- 	for (i = 0;; i++) {
-+		struct device_node *iommu;
-+
- 		port = of_parse_phandle(np, "ports", i);
- 		if (!port)
- 			break;
-@@ -497,6 +514,17 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		iommu = of_parse_phandle(port->parent, "iommus", 0);
-+		if (!iommu || !of_device_is_available(iommu->parent)) {
-+			dev_dbg(dev, "no iommu attached for %s, using non-iommu buffers\n",
-+				port->parent->full_name);
-+			/*
-+			 * if there is a crtc not support iommu, force set all
-+			 * crtc use non-iommu buffer.
-+			 */
-+			is_support_iommu = false;
-+		}
-+
- 		component_match_add(dev, &match, compare_of, port->parent);
- 		of_node_put(port);
- 	}
--- 
-1.7.9.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36435 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160420/860cc76e/attachment-0001.obj>
