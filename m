@@ -1,45 +1,61 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 20 Apr 2016 12:19:45 +0100
-Subject: [PATCH v7 07/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <57175BD7.30902@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-8-git-send-email-james.morse@arm.com>
- <571656E9.5050402@arm.com> <57166CC9.4030804@arm.com>
- <57175BD7.30902@arm.com>
-Message-ID: <571765D1.9070207@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 20 Apr 2016 13:23:58 +0200
+Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
+In-Reply-To: <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <571766CE.2000202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-On 20/04/16 11:37, Marc Zyngier wrote:
-> On 19/04/16 18:37, James Morse wrote:
->> It looks like x86 uses the extable to work around this, their vmx_vcpu_run() has:
->>> 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
->> Where __ex ends up calling ____kvm_handle_fault_on_reboot(), with a nearby comment:
->>> * Hardware virtualization extension instructions may fault if a
->>> * reboot turns off virtualization while processes are running.
->>> * Trap the fault and ignore the instruction if that happens.
-> 
-> I very much like that approach, to be honest. Tearing down a CPU is
-> something exceptional, so let's make it an actual exception.
+
+On 30/11/15 12:42, Sascha Hauer wrote:
+> This adds the thermal controller and auxadc nodes to the Mediatek MT8173
+> dtsi file.
 >
-> It is now pretty easy to discriminate between KVM functions and stub
-> functions thanks to your earlier patch, so if we end up calling the
-> hyp-stub because we've torn down KVM's EL2, let's just return an
-> appropriate error code (ARM_EXCEPTION_HYP_GONE), and handle it at EL1.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 06a1564..e2ddd03 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -277,6 +277,11 @@
+>   				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>   		};
+>
+> +		auxadc: auxadc at 11001000 {
+> +			compatible = "mediatek,mt8173-auxadc";
+> +			reg = <0 0x11001000 0 0x1000>;
+> +		};
+> +
+>   		uart0: serial at 11002000 {
+>   			compatible = "mediatek,mt8173-uart",
+>   				     "mediatek,mt6577-uart";
+> @@ -487,6 +492,18 @@
+>   			clock-names = "source", "hclk";
+>   			status = "disabled";
+>   		};
+> +
+> +		thermal: thermal at 1100b000 {
+> +			#thermal-sensor-cells = <0>;
+> +			compatible = "mediatek,mt8173-thermal";
+> +			reg = <0 0x1100b000 0 0x1000>;
+> +			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+> +			clock-names = "therm", "auxadc";
+> +			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
+> +			mediatek,auxadc = <&auxadc>;
+> +			mediatek,apmixedsys = <&apmixedsys>;
+> +		};
+>   	};
+>   };
+>
+>
 
-Okay. kexec uses kvm_call_hyp() against the hyp-stub to do the kernel-copy and
-hand over to purgatory, but we could change that to a new 'special' builtin
-call, something like HVC_KEXEC_CALL_HYP. It never calls it with kvm loaded, so
-there is no reason the calls have to be same.
-
-Given hibernate doesn't hit this issue, I will drop this hunk from this version
-of the patch, and repost hibernate incorporating the feedback so far. I will
-provide a patch for kexec to do the above.
-
-
-
-Thanks,
-
-James
+Applied with the ACK from Eduardo.
+Thanks.
