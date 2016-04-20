@@ -1,46 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 20 Apr 2016 07:01:41 +0200
-Subject: [PATCH 0/4] ARM: cpuidle: use const and __initconst for
- cpuidle_ops
-In-Reply-To: <20160419173113.GB2939@red-moon>
-References: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
- <56F52063.6020002@linaro.org> <20160419173113.GB2939@red-moon>
-Message-ID: <20160420050141.GE5862@linaro.org>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed, 20 Apr 2016 14:18:12 +0800
+Subject: =?UTF-8?q?=5BPATCH=20v2=200/5=5D=20drm/rockchip=3A=20add=20rk3399=20display=20controller=20support?=
+Message-ID: <1461133097-1478-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 06:31:14PM +0100, Lorenzo Pieralisi wrote:
-> Hi Daniel,
-> 
-> On Fri, Mar 25, 2016 at 12:26:27PM +0100, Daniel Lezcano wrote:
-> > On 03/22/2016 03:42 PM, Jisheng Zhang wrote:
-> > >These trivial patches are similar as Masahiro posted in[1]. The main
-> > >purpose is let cpuidle_ops structure be constified and replace
-> > >"__initdata" with "__initconst".
-> > >
-> > >[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/365826.html
-> > >
-> > >Jisheng Zhang (4):
-> > >   ARM: cpuidle: add const qualifier to cpuidle_ops member in structures
-> > >   ARM: cpuidle: constify return value of arm_cpuidle_get_ops()
-> > >   soc: qcom: spm: use const and __initconst for qcom_cpuidle_ops
-> > >   drivers: firmware: psci: use const and __initconst for
-> > >     psci_cpuidle_ops
-> > >
-> > >  arch/arm/include/asm/cpuidle.h | 2 +-
-> > >  arch/arm/kernel/cpuidle.c      | 6 +++---
-> > >  drivers/firmware/psci.c        | 2 +-
-> > >  drivers/soc/qcom/spm.c         | 2 +-
-> > >  4 files changed, 6 insertions(+), 6 deletions(-)
-> > 
-> > Sounds reasonable.
-> 
-> Are you taking them ? I could send the last one but it would
-> make more sense for them to be part of the same series, I will
-> check they do not conflict with patches queued for PSCI.
+This series of patches add support for rk3399 display crontroller(vop),
 
-Ok, let me know via an acked-by.
+there are two VOP in rk3399 chip, respectively VOP_BIG and VOP_LIT.
+most registers layout of this two vop is same, their framework are both
+VOP_FULL, the differences of this two is VOP_LIT cut off some features.
 
-Thanks.
+Those patches tested on rk3399 evb board.
 
-  -- Daniel
+Changes in v2:
+- sort the registers and vop compatible name
+- spilt VOP_REG_MASK into a single patch
+- make rk3399 vop documentation more readable(Heiko St?bner)
+
+Mark Yao (5):
+  drm/rockchip: sort registers define by chip's number
+  dt-bindings: sort Rockchip vop compatible by chip's number
+  drm/rockchip: vop: introduce VOP_REG_MASK
+  drm/rockchip: vop: add rk3399 vop support
+  dt-bindings: add documentation for Rockchip rk3399 display
+    controllers
+
+ .../bindings/display/rockchip/rockchip-vop.txt     |    7 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   60 +++--
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |    5 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |  236 ++++++++++++-----
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.h        |  279 +++++++++++++++++---
+ 5 files changed, 447 insertions(+), 140 deletions(-)
+
+-- 
+1.7.9.5
