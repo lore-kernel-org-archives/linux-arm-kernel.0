@@ -1,146 +1,119 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Apr 2016 10:27:42 +0100
-Subject: [PATCH v7 6/8] irqchip/gicv2m: implement msi_doorbell_info
- callback
-In-Reply-To: <1461085990-2547-7-git-send-email-eric.auger@linaro.org>
-References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
- <1461085990-2547-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <57174B8E.9050803@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Apr 2016 10:32:23 +0100
+Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
+In-Reply-To: <5716F51E.70101@hisilicon.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
+ <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
+ <570B5875.20804@hisilicon.com>
+ <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
+ <570B758E.7070005@hisilicon.com>
+ <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
+ <20160412145903.GF8066@e104818-lin.cambridge.arm.com>
+ <5716F51E.70101@hisilicon.com>
+Message-ID: <20160420093223.GG8482@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 18:13, Eric Auger wrote:
-> This patch implements the msi_doorbell_info callback in the
-> gicv2m driver.
+Hi Chen,
+
+On Wed, Apr 20, 2016 at 11:18:54AM +0800, Chen Feng wrote:
+> Thanks for your reply.
+> On 2016/4/12 22:59, Catalin Marinas wrote:
+> > On Mon, Apr 11, 2016 at 12:31:53PM +0200, Ard Biesheuvel wrote:
+> >> On 11 April 2016 at 11:59, Chen Feng <puck.chen@hisilicon.com> wrote:
+> >>> On 2016/4/11 16:00, Ard Biesheuvel wrote:
+> >>>> On 11 April 2016 at 09:55, Chen Feng <puck.chen@hisilicon.com> wrote:
+> >>>>> On 2016/4/11 15:35, Ard Biesheuvel wrote:
+> >>>>>> On 11 April 2016 at 04:49, Chen Feng <puck.chen@hisilicon.com> wrote:
+> >>>>>>>  0             1.5G    2G             3.5G            4G
+> >>>>>>>  |              |      |               |              |
+> >>>>>>>  +--------------+------+---------------+--------------+
+> >>>>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+> >>>>>>>  +--------------+------+---------------+--------------+
+> >>>>> The hole in 1.5G ~ 2G is also allocated mem-map array. And also with the 3.5G ~ 4G.
+> >>>>
+> >>>> No, it is not. It may be covered by a section, but that does not mean
+> >>>> sparsemem vmemmap will actually allocate backing for it. The
+> >>>> granularity used by sparsemem vmemmap on a 4k pages kernel is 128 MB,
+> >>>> due to the fact that the backing is performed at PMD granularity.
+> >>>>
+> >>>> Please, could you share the contents of the vmemmap section in
+> >>>> /sys/kernel/debug/kernel_page_tables of your system running with
+> >>>> sparsemem vmemmap enabled? You will need to set CONFIG_ARM64_PTDUMP=y
+> >>>
+> >>> Please see the pg-tables below.
+> >>>
+> >>> With sparse and vmemmap enable.
+> >>>
+> >>> ---[ vmemmap start ]---
+> >>> 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
+> >>> ---[ vmemmap end ]---
+> > [...]
+> >>> The board is 4GB, and the memap is 70MB
+> >>> 1G memory --- 14MB mem_map array.
+> >>
+> >> No, this is incorrect. 1 GB corresponds with 16 MB worth of struct
+> >> pages assuming sizeof(struct page) == 64
+> >>
+> >> So you are losing 6 MB to rounding here, which I agree is significant.
+> >> I wonder if it makes sense to use a lower value for SECTION_SIZE_BITS
+> >> on 4k pages kernels, but perhaps we're better off asking the opinion
+> >> of the other cc'ees.
+> > 
+> > IIRC, SECTION_SIZE_BITS was chosen to be the maximum sane value we were
+> > thinking of at the time, assuming that 1GB RAM alignment to be fairly
+> > normal. For the !SPARSEMEM_VMEMMAP case, we should probably be fine with
+> > 29 but, as Will said, we need to be careful with the page flags. At a
+> > quick look, we have 25 page flags, 2 bits per zone, NUMA nodes and (48 -
+> > section_size_bits) for the section width. We also need to take into
+> > account 4 more bits for 52-bit PA support (ARMv8.2). So, without NUMA
+> > nodes, we are currently at 49 bits used in page->flags.
+> > 
+> > For the SPARSEMEM_VMEMMAP case, we can decrease the SECTION_SIZE_BITS in
+> > the MAX_ORDER limit.
+> > 
+> > An alternative would be to free the vmemmap holes later (but still keep
+> > the vmemmap mapping alias). Yet another option would be to change the
+> > sparse_mem_map_populate() logic get the actual section end rather than
+> > always assuming PAGES_PER_SECTION. But I don't think any of these are
+> > worth if we can safely reduce SECTION_SIZE_BITS.
 > 
-> The driver now is able to return its doorbell characteristics
-> (base, size, prot). A single doorbell is exposed.
+> Yes,
+> currently,it's safely to reduce the SECTION_SIZE_BITS to match this issue
+> very well.
 > 
-> This will allow the msi layer to iommu_map this doorbell when
-> requested.
+> As I mentioned before, if the memory layout is not like this scene. There
+> will be not suitable to reduce the SECTION_SIZE_BITS.
+
+SECTION_SIZE_BITS is not meant to cover all possible combinations but
+only sane ones and it was primarily targeted at the ARM memory map
+recommendations:
+
+http://infocenter.arm.com/help/topic/com.arm.doc.den0001c/DEN0001C_principles_of_arm_memory_maps.pdf
+
+As you know have reported a platform that uses half GB-aligned RAM
+blocks/sizes, I'm fine to change SECTION_SIZE_BITS. If in the future we
+see even more insane configurations and the memory wasted is
+significant, we may have to revisit this (I also proposed an alternative
+above like freeing the vmmemap holes, that's not too different from a
+flat memmap array).
+
+> We have 4G memory, and 64GB phys address.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> 
-> v7: creation
-> ---
->  drivers/irqchip/irq-gic-v2m.c | 32 +++++++++++++++++++++++++++++++-
->  1 file changed, 31 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index 28f047c..54690b9 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -24,6 +24,8 @@
->  #include <linux/of_pci.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> +#include <linux/percpu.h>
-> +#include <linux/iommu.h>
->  
->  /*
->  * MSI_TYPER:
-> @@ -64,6 +66,7 @@ struct v2m_data {
->  	u32 nr_spis;		/* The number of SPIs for MSIs */
->  	unsigned long *bm;	/* MSI vector bitmap */
->  	u32 flags;		/* v2m flags for specific implementation */
-> +	struct irq_chip_msi_doorbell_info doorbell_info;
->  };
->  
->  static void gicv2m_mask_msi_irq(struct irq_data *d)
-> @@ -105,6 +108,16 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  		msg->data -= v2m->spi_start;
->  }
->  
-> +static const struct irq_chip_msi_doorbell_info *
-> +gicv2m_msi_doorbell_info(struct irq_data *data)
-> +{
-> +	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
-> +
-> +	if (!v2m)
-> +		return NULL;
+> There will be a lot of holes in the memory layout.
+> And the *holes size are not always the same*.
 
-How can this ever be NULL? I think you can drop that test.
+It's not the hole size that matters but rather the section size and
+alignment.
 
-> +	return (const struct irq_chip_msi_doorbell_info *)(&v2m->doorbell_info);
+> So,it's the reason I want to enable flat-mem in ARM64-ARCH. Why not makes
+> the flat-mem an optional setting for arm64?
 
-Please don't do that. Use "const" in the functions that are using
-irq_chip_msi_doorbell_info, but do not make this "const" here.
+Because (a) I strongly believe in single Image, (b) I do not want to
+increase the configuration space unnecessarily (already large enough
+with all the page and VA size combinations) and (c) I don't see any
+advantage in flatmem compared to sparsemem+vmemap.
 
-> +}
-> +
->  static struct irq_chip gicv2m_irq_chip = {
->  	.name			= "GICv2m",
->  	.irq_mask		= irq_chip_mask_parent,
-> @@ -112,6 +125,7 @@ static struct irq_chip gicv2m_irq_chip = {
->  	.irq_eoi		= irq_chip_eoi_parent,
->  	.irq_set_affinity	= irq_chip_set_affinity_parent,
->  	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
-> +	.msi_doorbell_info	= gicv2m_msi_doorbell_info,
->  };
->  
->  static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
-> @@ -247,6 +261,7 @@ static void gicv2m_teardown(void)
->  
->  	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
->  		list_del(&v2m->entry);
-> +		free_percpu(v2m->doorbell_info.percpu_doorbells);
->  		kfree(v2m->bm);
->  		iounmap(v2m->base);
->  		of_node_put(to_of_node(v2m->fwnode));
-> @@ -299,6 +314,7 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->  {
->  	int ret;
->  	struct v2m_data *v2m;
-> +	struct irq_chip_msi_doorbell __percpu *doorbell;
->  
->  	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
->  	if (!v2m) {
-> @@ -311,11 +327,23 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->  
->  	memcpy(&v2m->res, res, sizeof(struct resource));
->  
-> +	v2m->doorbell_info.percpu_doorbells =
-> +		alloc_percpu(struct irq_chip_msi_doorbell);
-> +	if (WARN_ON(!v2m->doorbell_info.percpu_doorbells)) {
-> +		ret = -ENOMEM;
-> +		goto err_free_v2m;
-> +	}
-> +	doorbell = per_cpu_ptr(v2m->doorbell_info.percpu_doorbells, 0);
-> +	doorbell->base = v2m->res.start;
-> +	doorbell->size = 4;
-> +	doorbell->prot = IOMMU_WRITE;
-
-You probably need to also have something that says IOMMU_DEVICE or
-something similar, because I'm afraid you're getting a memory mapping
-here. I've had a quick look at the two other series, but couldn't find
-anything that would force the memory attributes.
-
-> +	v2m->doorbell_info.nb_doorbells = 1;
-> +
->  	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
->  	if (!v2m->base) {
->  		pr_err("Failed to map GICv2m resource\n");
->  		ret = -ENOMEM;
-> -		goto err_free_v2m;
-> +		goto err_free_v2m_doorbells;
->  	}
->  
->  	if (spi_start && nr_spis) {
-> @@ -359,6 +387,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->  
->  err_iounmap:
->  	iounmap(v2m->base);
-> +err_free_v2m_doorbells:
-> +	free_percpu(v2m->doorbell_info.percpu_doorbells);
->  err_free_v2m:
->  	kfree(v2m);
->  	return ret;
-> 
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
