@@ -1,47 +1,112 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Apr 2016 10:12:00 +0100
-Subject: [PATCH 0/3] arm64: defconfig updates
-In-Reply-To: <7790483.f4tRIAaceA@wuerfel>
-References: <1461105540-23799-1-git-send-email-stuart.yoder@nxp.com>
- <7790483.f4tRIAaceA@wuerfel>
-Message-ID: <20160420091159.GB30601@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Apr 2016 10:16:08 +0100
+Subject: [PATCH v7 5/8] genirq/irq: introduce msi_doorbell's structs and
+ related callback
+In-Reply-To: <1461085990-2547-6-git-send-email-eric.auger@linaro.org>
+References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
+ <1461085990-2547-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <571748D8.3030402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 01:18:28AM +0200, Arnd Bergmann wrote:
-> On Tuesday 19 April 2016 17:39:00 Stuart Yoder wrote:
-> > This patch series was based on 4.6-rc4.
-> > 
-> > As far as I know, when doing a 'make defconfig' immediately followed by 
-> > 'make savedefconfig', the resulting defconfig should exactly match
-> > the original defconfig.  This was not the case for arm64 and patch 1 cleans
-> > that up.
-> > 
-> > Patch 2 enables 48-bit VA to allow certain armv8 SoCs to cover all of
-> > their physical memory regions. (see email thread:
-> > http://www.spinics.net/lists/arm-kernel/msg497210.html)
-> > 
-> > Patch 3 enables some additional device for Freescale/NXP SoCs.
-> > 
+On 19/04/16 18:13, Eric Auger wrote:
+> The purpose is to be able to retrieve the MSI doorbells of an irqchip.
+> This is now needed since on some platforms those doorbells must be
+> iommu mapped (in case the MSIs transit through an IOMMU that do not
+> bypass those transactions).
 > 
-> The series looks fine to me. I'd suggest merging it through the
-> platform maintainer path, e.g. having the i.MX mainainers pick
-> them up and forward them to arm at kernel.org for inclusion in arm-soc.
+> The assumption is there is a maximum of one doorbell region per cpu.
+> The number of doorbells for the whole irqchip is stored in nb_doorbells.
 > 
-> If the arm64 maintainers want to pick them up (or maybe just patches
-> 1 and 2, which are not platform specific), that's fine too, and you
-> can add my
+> A doorbell region is characterized by its physical address base, size and
+> IOMMU protection flag.
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> irq_chip msi_doorbell_info callback enables to retrieve the doorbells of
+> the irqchip.
 > 
-> We haven't come up with a really good way to deal with this kind of
-> update for arm64, as a lot of the changes to the defconfig file are
-> related to stuff that goes through arm-soc, but some other stuff
-> doesn't.
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> 
+> v7: creation
+> ---
+>  include/linux/irq.h | 26 ++++++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index c4de623..fdad8c1 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -312,9 +312,25 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+>  	return d->hwirq;
+>  }
+>  
+> -/**
+> - * struct irq_chip - hardware interrupt chip descriptor
+> - *
+> +/* MSI doorbell region */
+> +struct irq_chip_msi_doorbell {
+> +	phys_addr_t base;
+> +	size_t size;
+> +	int prot; /* iommu protection flag */
 
-I tend to see what got missed around -rc1, then send a single patch for
--rc2 that mops up the leftovers. Not ideal, but it seems to work...
+I find this one a bit scary. "int" is a probably not the right type if
+it is a set of flags (it should describe both the protection and the
+memory attributes - in this case, probably something like Device +
+Writeable). You should probably use the same type the IOMMU code uses
+(and if it is actually an int, then I'll shut up...).
 
-But yes, please send as much as you can via the platform maintainers.
+> +};
+> +
+> +/*
+> + * Describe all the MSI doorbell regions for an irqchip.
+> + * A single doorbell region per cpu is assumed.
+> + * In case a single doorbell is supported for the whole irqchip,
+> + * the region is described in as cpu #0's one
+> + */
+> +struct irq_chip_msi_doorbell_info {
+> +	struct irq_chip_msi_doorbell __percpu *percpu_doorbells;
+> +	int nb_doorbells; /* overall number of doorbells */
+> +};
 
-Will
+How can size and prot be different from one CPU to another? It really
+feels like they should be common. Can I suggest something like this?
+
+struct irq_chip_msi_doorbell_info {
+	phys_addr_t __percpu	*doorbells;
+	size_t			size;
+	u32			prot;
+};
+
+and get rid of struct irq_chip_msi_doorbell altogether?
+
+> +
+> +/** * struct irq_chip - hardware interrupt chip descriptor *
+>   * @name:		name for /proc/interrupts
+>   * @irq_startup:	start up the interrupt (defaults to ->enable if NULL)
+>   * @irq_shutdown:	shut down the interrupt (defaults to ->disable if NULL)
+> @@ -349,6 +365,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+>   * @irq_get_irqchip_state:	return the internal state of an interrupt
+>   * @irq_set_irqchip_state:	set the internal state of a interrupt
+>   * @irq_set_vcpu_affinity:	optional to target a vCPU in a virtual machine
+> + * @msi_doorbell_info:	return the MSI doorbell info
+>   * @ipi_send_single:	send a single IPI to destination cpus
+>   * @ipi_send_mask:	send an IPI to destination cpus in cpumask
+>   * @flags:		chip specific flags
+> @@ -394,7 +411,8 @@ struct irq_chip {
+>  	int		(*irq_set_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool state);
+>  
+>  	int		(*irq_set_vcpu_affinity)(struct irq_data *data, void *vcpu_info);
+> -
+> +	const struct irq_chip_msi_doorbell_info *(*msi_doorbell_info)(
+> +							struct irq_data *data);
+>  	void		(*ipi_send_single)(struct irq_data *data, unsigned int cpu);
+>  	void		(*ipi_send_mask)(struct irq_data *data, const struct cpumask *dest);
+>  
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
