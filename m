@@ -1,18 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 20 Apr 2016 17:26:43 +0100
-Subject: [PATCH v7 11/16] arm64: Promote KERNEL_START/KERNEL_END
- definitions to a header file
-In-Reply-To: <1459529620-22150-12-git-send-email-james.morse@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-12-git-send-email-james.morse@arm.com>
-Message-ID: <20160420162643.GE11377@e104818-lin.cambridge.arm.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Thu, 21 Apr 2016 00:27:44 +0800
+Subject: [PATCH 2/2 v6] ASoC: mediatek: Add second I2S on mt8173-rt5650
+ machine driver
+In-Reply-To: <57178482.9090705@gmail.com>
+References: <1461134447-42001-1-git-send-email-pc.liao@mediatek.com>
+ <1461134447-42001-3-git-send-email-pc.liao@mediatek.com>
+ <57178482.9090705@gmail.com>
+Message-ID: <1461169664.8479.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 05:53:35PM +0100, James Morse wrote:
-> KERNEL_START and KERNEL_END are useful outside head.S, move them to a
-> header file.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
+Hi Matthias,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On Wed, 2016-04-20 at 21:30 +0800, Matthias Brugger wrote:
+> 
+> For compatibility you should change this to something like:
+> 
+>     dev_warn(card->dev, "Only one dai codec found in DTS, enabled rt5645
+>                          AD filter\n");
+>     rt5645_sel_asrc_clk_src(codec, RT5645_AD_STEREO_FILTER,
+>                                    RT5645_CLK_SEL_I2S1_ASRC);
+> }
+> 
+
+I will use this in next version.
+Thanks!
