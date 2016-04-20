@@ -1,59 +1,130 @@
 From: pc.liao@mediatek.com (PC Liao)
-Date: Wed, 20 Apr 2016 14:40:46 +0800
-Subject: [PATCH 1/2 v6] ASoC: core: export snd_soc_get_dai_name
+Date: Wed, 20 Apr 2016 14:40:47 +0800
+Subject: [PATCH 2/2 v6] ASoC: mediatek: Add second I2S on mt8173-rt5650
+ machine driver
 In-Reply-To: <1461134447-42001-1-git-send-email-pc.liao@mediatek.com>
 References: <1461134447-42001-1-git-send-email-pc.liao@mediatek.com>
-Message-ID: <1461134447-42001-2-git-send-email-pc.liao@mediatek.com>
+Message-ID: <1461134447-42001-3-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Francois Moine <moinejf@free.fr>
+This patch adds second I2S connection to rt5650 codec for capture path on
+mt8173-rt5650 machine driver.
 
-snd_soc_get_dai_name() may be used to define a sound card with
-a different syntax from the one of the simple-card.
-
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 Signed-off-by: PC Liao <pc.liao@mediatek.com>
 ---
- include/sound/soc.h  |    2 ++
- sound/soc/soc-core.c |    5 +++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
+ sound/soc/mediatek/mt8173-rt5650.c                 |   44 ++++++++++++++++++--
+ 2 files changed, 47 insertions(+), 3 deletions(-)
 
-diff --git a/include/sound/soc.h b/include/sound/soc.h
-index 02b4a21..03b2d19 100644
---- a/include/sound/soc.h
-+++ b/include/sound/soc.h
-@@ -1669,6 +1669,8 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
- 				     const char *prefix,
- 				     struct device_node **bitclkmaster,
- 				     struct device_node **framemaster);
-+int snd_soc_get_dai_name(struct of_phandle_args *args,
-+			 const char **dai_name);
- int snd_soc_of_get_dai_name(struct device_node *of_node,
- 			    const char **dai_name);
- int snd_soc_of_get_dai_link_codecs(struct device *dev,
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index d2e62b15..69cbbb0 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -3786,8 +3786,8 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
- }
- EXPORT_SYMBOL_GPL(snd_soc_of_parse_daifmt);
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+index fe5a5ef..802dd1b 100644
+--- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
++++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+@@ -5,11 +5,17 @@ Required properties:
+ - mediatek,audio-codec: the phandles of rt5650 codecs
+ - mediatek,platform: the phandle of MT8173 ASoC platform
  
--static int snd_soc_get_dai_name(struct of_phandle_args *args,
--				const char **dai_name)
-+int snd_soc_get_dai_name(struct of_phandle_args *args,
-+			 const char **dai_name)
++Optional properties:
++- capture-dai: audio codec dai on capture path
++  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
++  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
++
+ Example:
+ 
+ 	sound {
+ 		compatible = "mediatek,mt8173-rt5650";
+ 		mediatek,audio-codec = <&rt5650>;
+ 		mediatek,platform = <&afe>;
++		capture-dai = <&rt5650 1>;
+ 	};
+ 
+diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
+index bb09bb1..45dea22 100644
+--- a/sound/soc/mediatek/mt8173-rt5650.c
++++ b/sound/soc/mediatek/mt8173-rt5650.c
+@@ -85,12 +85,26 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
  {
- 	struct snd_soc_component *pos;
- 	struct device_node *component_of_node;
-@@ -3838,6 +3838,7 @@ static int snd_soc_get_dai_name(struct of_phandle_args *args,
- 	mutex_unlock(&client_mutex);
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(snd_soc_get_dai_name);
+ 	struct snd_soc_card *card = runtime->card;
+ 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
++	const char *codec_dai_capture = runtime->codec_dais[1]->name;
+ 	int ret;
  
- int snd_soc_of_get_dai_name(struct device_node *of_node,
- 			    const char **dai_name)
+ 	rt5645_sel_asrc_clk_src(codec,
+-				RT5645_DA_STEREO_FILTER |
+-				RT5645_AD_STEREO_FILTER,
++				RT5645_DA_STEREO_FILTER,
+ 				RT5645_CLK_SEL_I2S1_ASRC);
++
++	if (!strcmp(codec_dai_capture, "rt5645-aif1")) {
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++	} else if (!strcmp(codec_dai_capture, "rt5645-aif2")) {
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S2_ASRC);
++	} else {
++		dev_err(card->dev, "Can't get the right codec dai\n");
++		return -EINVAL;
++	}
++
+ 	/* enable jack detection */
+ 	ret = snd_soc_card_jack_new(card, "Headset Jack",
+ 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
+@@ -110,6 +124,11 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
+ 
+ static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
+ 	{
++		/* Playback */
++		.dai_name = "rt5645-aif1",
++	},
++	{
++		/* Capture */
+ 		.dai_name = "rt5645-aif1",
+ 	},
+ };
+@@ -149,7 +168,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
+ 		.cpu_dai_name = "I2S",
+ 		.no_pcm = 1,
+ 		.codecs = mt8173_rt5650_codecs,
+-		.num_codecs = 1,
++		.num_codecs = 2,
+ 		.init = mt8173_rt5650_init,
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			   SND_SOC_DAIFMT_CBS_CFS,
+@@ -177,6 +196,8 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &mt8173_rt5650_card;
+ 	struct device_node *platform_node;
++	const char *codec_dai_capture;
++	struct of_phandle_args args;
+ 	int i, ret;
+ 
+ 	platform_node = of_parse_phandle(pdev->dev.of_node,
+@@ -199,6 +220,23 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ 			"Property 'audio-codec' missing or invalid\n");
+ 		return -EINVAL;
+ 	}
++	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
++
++	if (device_property_present(&pdev->dev, "capture-dai")) {
++		ret = of_parse_phandle_with_args(pdev->dev.of_node,
++						 "capture-dai",
++						 "#sound-dai-cells", 0, &args);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"%s capture-dai name fail %d\n",
++				__func__, ret);
++			return ret;
++		}
++
++		ret = snd_soc_get_dai_name(&args, &codec_dai_capture);
++		mt8173_rt5650_codecs[1].dai_name = codec_dai_capture;
++	}
++
+ 	card->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, card);
+ 
 -- 
 1.7.9.5
