@@ -1,129 +1,57 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 20 Apr 2016 18:14:01 +0200
-Subject: [PATCH v7 03/10] iommu: introduce a reserved iova cookie
-In-Reply-To: <57177C31.9090004@arm.com>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-4-git-send-email-eric.auger@linaro.org>
- <57177C31.9090004@arm.com>
-Message-ID: <5717AAC9.10505@linaro.org>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Wed, 20 Apr 2016 16:15:51 +0000
+Subject: [PATCH 0/8] STMPE fixes/rework and add STMPE1600 support
+In-Reply-To: <20160419124126.GF8284@ulmo.ba.sec>
+References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>,
+ <20160419124126.GF8284@ulmo.ba.sec>
+Message-ID: <45e660f1-81ad-4d1f-ba3a-fc042e35961b@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-On 04/20/2016 02:55 PM, Robin Murphy wrote:
-> On 19/04/16 17:56, Eric Auger wrote:
->> This patch introduces some new fields in the iommu_domain struct,
->> dedicated to reserved iova management.
->>
->> In a similar way as DMA mapping IOVA window, we need to store
->> information related to a reserved IOVA window.
->>
->> The reserved_iova_cookie will store the reserved iova_domain
->> handle. An RB tree indexed by physical address is introduced to
->> store the host physical addresses bound to reserved IOVAs.
->>
->> Those physical addresses will correspond to MSI frame base
->> addresses, also referred to as doorbells. Their number should be
->> quite limited per domain.
->>
->> Also a spin_lock is introduced to protect accesses to the iova_domain
->> and RB tree. The choice of a spin_lock is driven by the fact the RB
->> tree will need to be accessed in MSI controller code not allowed to
->> sleep.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->> v5 -> v6:
->> - initialize reserved_binding_list
->> - use a spinlock instead of a mutex
->> ---
->>   drivers/iommu/iommu.c | 2 ++
->>   include/linux/iommu.h | 6 ++++++
->>   2 files changed, 8 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index b9df141..f70ef3b 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -1073,6 +1073,8 @@ static struct iommu_domain
->> *__iommu_domain_alloc(struct bus_type *bus,
->>
->>       domain->ops  = bus->iommu_ops;
->>       domain->type = type;
->> +    spin_lock_init(&domain->reserved_lock);
->> +    domain->reserved_binding_list = RB_ROOT;
->>
->>       return domain;
->>   }
->> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->> index b3e8c5b..60999db 100644
->> --- a/include/linux/iommu.h
->> +++ b/include/linux/iommu.h
->> @@ -24,6 +24,7 @@
->>   #include <linux/of.h>
->>   #include <linux/types.h>
->>   #include <linux/scatterlist.h>
->> +#include <linux/spinlock.h>
->>   #include <trace/events/iommu.h>
->>
->>   #define IOMMU_READ    (1 << 0)
->> @@ -83,6 +84,11 @@ struct iommu_domain {
->>       void *handler_token;
->>       struct iommu_domain_geometry geometry;
->>       void *iova_cookie;
->> +    void *reserved_iova_cookie;
-> 
-> Why exactly do we need this? From your description, it's for the user of
-> the domain to keep track of IOVA allocations in, but then that's
-> precisely what the iova_cookie exists for.
 
-I was not sure whether both APIs could not be used concurrently, hence a
-separate cookie. If we only consider MSI mapping use case I guess we are
-either with a DMA domain or with a domain for VFIO and I would agree
-with you, ie. we can reuse the same cookie.
-> 
->> +    /* rb tree indexed by PA, for reserved bindings only */
->> +    struct rb_root reserved_binding_list;
-> 
-> Nit: that's more puzzling than helpful - "reserved binding" is
-> particularly vague and nondescript, and makes me think of anything but
-> MSI descriptors.
-my heart is torn between advised genericity and MSI use case. My natural
-short-sighted inclination would head me for an MSI mapping dedicated API
-but I am following advices. As discussed with Alex there are
-implementation details pretty related to MSI problematics I think (the
-fact we store the "bindings" in an rb-tree/list, locking)
+On Apr 19, 2016 14:41, Thierry Reding <thierry.reding@gmail.com> wrote:
+>...
+> Adding Marcel Ziswiler, who's better suited a
 
-If Marc & Alex I can retarget this API to be less generic.
+On Tue, Apr 19, 2016 at 02:18:29PM +0200, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and prepare
+>  the ground to add new STMPE1600 support.
+>
+> STMPE1600 datasheet is available here :
+> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
+> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
+>
+> Only STMPE1600 has been tested on STM32 platform. As i have no board with
+> others STMPE variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
+> and STMPE2403), i put in CC boards's maintainers which are using others STMPE variant.
+>
+> If they can kindly check that no regression has been introduce by this series
+> :
+>
+> For ARM/FREESCALE IMX / MXC ARM ARCHITECTURE:
+>       _ Shawn Guo <shawnguo@kernel.org>
+>       _ Sascha Hauer <kernel@pengutronix.de>
+>
+> For ARM/SOCFPGA ARCHITECTURE
+>       _ Dinh Nguyen <dinguyen@opensource.altera.com>
+>
+> For SPEAR PLATFORM SUPPORT
+>       _ Viresh Kumar <vireshk@kernel.org>
+>       _ Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+>
+> For TEGRA ARCHITECTURE SUPPORT
+>       _ Stephen Warren <swarren@wwwdotorg.org>
+>       _ Thierry Reding <thierry.reding@gmail.com>
+>       _ Alexandre Courbot <gnurou@gmail.com>
 
- Plus it's called a list but isn't a list (that said,
-> given that we'd typically only expect a handful of entries, and lookups
-> are hardly going to be a performance-critical bottleneck, would a simple
-> list not suffice?)
-I fully agree on that point. An rb-tree is overkill today for MSI use
-case. Again if we were to use this API for anything else, this may
-change the decision. But sure we can refactor afterwards upon needs. TBH
-the rb-tree is inherited from vfio_iommu_type1 dma tree where that code
-was originally located.
-> 
->> +    /* protects reserved cookie and rbtree manipulation */
->> +    spinlock_t reserved_lock;
-> 
-> A cookie is an opaque structure, so any locking it needs would normally
-> be hidden within. If on the other hand it's not meant to be opaque at
-> this level, then it should probably be something more specific than a
-> void * (if at all, as above).
-agreed
+Adding Marcel Ziswiler, who's better suited at judging whether or not
+this has any impact on Apalis/Colibri.
 
-Thanks
+Marcel, in case you don't have these in your inbox you can find them on
+linux-gpio's patchwork:
 
-Eric
-> 
-> Robin.
-> 
->>   };
->>
->>   enum iommu_cap {
->>
-> 
+        https://patchwork.ozlabs.org/project/linux-gpio/list/
+
+Thierry
