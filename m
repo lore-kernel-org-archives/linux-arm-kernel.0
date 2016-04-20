@@ -1,21 +1,30 @@
-From: hannes@stressinduktion.org (Hannes Frederic Sowa)
-Date: Wed, 20 Apr 2016 17:22:49 +0200
-Subject: Regression in next for smsc911x with tigthen lockdep checks
-In-Reply-To: <20160420150108.GF5995@atomide.com>
-References: <20160420150108.GF5995@atomide.com>
-Message-ID: <57179EC9.6000505@stressinduktion.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 20 Apr 2016 17:32:09 +0200
+Subject: [PATCH 04/14] ARM: dts: OMAP36xx: : DT spelling
+ s/#address-cell/#address-cells/
+In-Reply-To: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
+References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1461166339-11109-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/omap36xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 20.04.2016 17:01, Tony Lindgren wrote:
-> Looks like commit fafc4e1ea1a4 ("sock: tigthen lockdep checks for
-> sock_owned_by_user") in next causes a regression at least for
-> smsc911x with CONFIG_LOCKDEP. It keeps spamming with the following
-> message. Any ideas?
-
-Not yet, can you quickly send me your config?
-
-Thanks,
-Hannes
+diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+index ce1e242d4dc07ea8..8b797915300894d8 100644
+--- a/arch/arm/boot/dts/omap36xx.dtsi
++++ b/arch/arm/boot/dts/omap36xx.dtsi
+@@ -44,7 +44,7 @@
+ 		abb_mpu_iva: regulator-abb-mpu {
+ 			compatible = "ti,abb-v1";
+ 			regulator-name = "abb_mpu_iva";
+-			#address-cell = <0>;
++			#address-cells = <0>;
+ 			#size-cells = <0>;
+ 			reg = <0x483072f0 0x8>, <0x48306818 0x4>;
+ 			reg-names = "base-address", "int-address";
+-- 
+1.9.1
