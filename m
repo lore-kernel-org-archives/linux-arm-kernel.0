@@ -1,77 +1,68 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 20 Apr 2016 14:17:59 +0200
-Subject: [PATCH] drm/panel: simple: Add support for Innolux AT070TN92
-Message-ID: <1461154679-7214-1-git-send-email-boris.brezillon@free-electrons.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Wed, 20 Apr 2016 14:29:03 +0200
+Subject: [PATCH v2 1/5] arm64/perf: Basic uncore counter support for
+ Cavium ThunderX
+In-Reply-To: <20160419150607.GB20991@leverpostej>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <2588abcb011df6e60cd8212a8583454999180748.1457539622.git.jglauber@cavium.com>
+ <20160419150607.GB20991@leverpostej>
+Message-ID: <20160420122903.GA3352@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Riccardo Bortolato <bortolato@navaltechitalia.it>
+On Tue, Apr 19, 2016 at 04:06:08PM +0100, Mark Rutland wrote:
+> On Wed, Mar 09, 2016 at 05:21:03PM +0100, Jan Glauber wrote:
+> > Provide "uncore" facilities for different non-CPU performance
+> > counter units. Based on Intel/AMD uncore pmu support.
+> > 
+> > The uncore drivers cover quite different functionality including
+> > L2 Cache, memory controllers and interconnects.
+> > 
+> > The uncore PMUs can be found under /sys/bus/event_source/devices.
+> > All counters are exported via sysfs in the corresponding events
+> > files under the PMU directory so the perf tool can list the event names.
+> > 
+> > There are some points that are special in this implementation:
+> > 
+> > 1) The PMU detection relies on PCI device detection. If a
+> >    matching PCI device is found the PMU is created. The code can deal
+> >    with multiple units of the same type, e.g. more than one memory
+> >    controller.
+> >    Note: There is also a CPUID check to determine the CPU variant,
+> >    this is needed to support different hardware versions that use
+> >    the same PCI IDs.
+> > 
+> > 2) Counters are summarized across different units of the same type
+> >    on one NUMA node.
+> >    For instance L2C TAD 0..7 are presented as a single counter
+> >    (adding the values from TAD 0 to 7). Although losing the ability
+> >    to read a single value the merged values are easier to use.
+> 
+> Merging within a NUMA node, but no further seems a little arbitrary.
+> 
+> > 3) NUMA support. The device node id is used to group devices by node
+> >    so counters on one node can be merged. The NUMA node can be selected
+> >    via a new sysfs node attribute.
+> >    Without NUMA support all devices will be on node 0.
+> 
+> It doesn't seem great that this depends on kernel configuration (which
+> is independent of HW configuration). It seems confusing for the user,
+> and fragile.
+> 
+> Do we not have access to another way of grouping cores (e.g. a socket
+> ID), that's independent of kernel configuration? That seems to be how
+> the x86 uncore PMUs are handled.
 
-Add support for the Innolux AT070TN92 panel.
+I'm not sure how relevant the use case of a multi-node system without
+CONFIG_NUMA is, but maybe we can get the socket ID from the
+multiprocessor affinity register (MPIDR_EL1)? The AFF2 part (bits 23:16)
+should contain the socket number on ThunderX.
 
-Signed-off-by: Riccardo Bortolato <bortolato@navaltechitalia.it>
----
- .../bindings/display/panel/innolux,at070tn92.txt   |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
+Would that be better?
 
-diff --git a/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt b/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
-new file mode 100644
-index 0000000..3e10cd7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
-@@ -0,0 +1,7 @@
-+Innolux AT070TN92 7.0" WQVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "innolux,at070tn92"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 3649eb0..d321c57 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -822,6 +822,29 @@ static const struct panel_desc innolux_at043tn24 = {
- 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
- };
- 
-+static const struct drm_display_mode innolux_at070tn92_mode = {
-+	.clock = 33333,
-+	.hdisplay = 800,
-+	.hsync_start = 800 + 210,
-+	.hsync_end = 800 + 210 + 20,
-+	.htotal = 800 + 210 + 20 + 46,
-+	.vdisplay = 480,
-+	.vsync_start = 480 + 22,
-+	.vsync_end = 480 + 22 + 10,
-+	.vtotal = 480 + 22 + 23 + 10,
-+	.vrefresh = 60,
-+};
-+
-+static const struct panel_desc innolux_at070tn92 = {
-+	.modes = &innolux_at070tn92_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 154,
-+		.height = 86,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-+};
-+
- static const struct drm_display_mode innolux_g121i1_l01_mode = {
- 	.clock = 71000,
- 	.hdisplay = 1280,
-@@ -1362,6 +1385,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "innolux,at043tn24",
- 		.data = &innolux_at043tn24,
- 	}, {
-+		.compatible = "innolux,at070tn92",
-+		.data = &innolux_at070tn92,
-+	}, {
- 		.compatible ="innolux,g121i1-l01",
- 		.data = &innolux_g121i1_l01
- 	}, {
--- 
-2.5.0
+thanks,
+Jan
+
+> If we don't have that information, it really feels like we need
+> additional info from FW (which would also solve the CPUID issue with
+> point 1), or this is likely to be very fragile.
