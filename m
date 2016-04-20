@@ -1,75 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 20 Apr 2016 11:20:59 +0100
-Subject: [PATCH v4 4/5] arm64: add support for ACPI Low Power Idle(LPI)
-In-Reply-To: <CAGm_ybgNWyRXc3PmOE99=3q9A0Jpjm9taHww8p3oD3YRwfJDxA@mail.gmail.com>
-References: <1461069013-13292-1-git-send-email-sudeep.holla@arm.com>
- <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
- <CAGm_ybgNWyRXc3PmOE99=3q9A0Jpjm9taHww8p3oD3YRwfJDxA@mail.gmail.com>
-Message-ID: <5717580B.8060209@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 20 Apr 2016 12:26:22 +0200
+Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
+In-Reply-To: <20160420095541.GG31470@pengutronix.de>
+References: <20160419140220.GA9503@pengutronix.de>
+ <20160420092516.GA21732@e103592.cambridge.arm.com>
+ <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
+ <CAKv+Gu9rzxtw2i1QJAU0C-y4Lmh6KDWH0p+TYNHsndr-6c11zw@mail.gmail.com>
+ <20160420095541.GG31470@pengutronix.de>
+Message-ID: <CAKv+Gu_w-vXnB_56k2sNaTpo1k1DZuvmrS4rwi5kgx=MF4+e+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 20/04/16 10:59, Vikas Sajjan wrote:
-> Hi Sudeep,
->
-> On Tue, Apr 19, 2016 at 6:00 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> This patch adds appropriate callbacks to support ACPI Low Power Idle
->> (LPI) on ARM64.
+On 20 April 2016 at 11:55, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Apr 20, 2016 at 11:43:30AM +0200, Ard Biesheuvel wrote:
+>> (replying to self)
 >>
->> It also selects ARCH_SUPPORTS_ACPI_PROCESSOR_LPI if ACPI is enabled
->> on ARM64.
+>> On 20 April 2016 at 11:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > (+ Arnd)
+>> >
+>> > On 20 April 2016 at 11:25, Dave Martin <Dave.Martin@arm.com> wrote:
+>> >> On Tue, Apr 19, 2016 at 04:02:20PM +0200, Steffen Trumtrar wrote:
+>> >>> Hi!
+>> >>>
+>> >>> According to kernelci.org (and validating on my own hardware), the current
+>> >>> socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
+>> >>>
+>> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+>> >>>
+>> >>> vs
+>> >>>
+>> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+>> >>>
+>> >>> Both boot successfully, but notice that the board fails to bring up CPU1 if
+>> >>> thumb2 support is enabled.
+>> >>>
+>> >>> Any ideas why this might be happening?
+>> >>
 >>
-
-[...]
-
->> @@ -211,6 +214,37 @@ void __init acpi_boot_table_init(void)
->>          }
->>   }
->>
->> +int acpi_processor_ffh_lpi_probe(unsigned int cpu)
->> +{
->> +       return arm_cpuidle_init(cpu);
->> +}
->> +
+>> Actually, this looks like a problem with the secondary entry point to
+>> me. Could you try this?
 >
-> This is generating warning as below:
->
-> WARNING: vmlinux.o(.text+0x11024): Section mismatch in reference from
-> the function acpi_processor_ffh_lpi_probe() to the function
-> .init.text:arm_cpuidle_init()
-> The function acpi_processor_ffh_lpi_probe() references
-> the function __init arm_cpuidle_init().
-> This is often because acpi_processor_ffh_lpi_probe lacks a __init
-> annotation or the annotation of arm_cpuidle_init is wrong.
+> Been there, done that. Unfortunately this does not solve the problem.
 >
 
-I am aware of this and needs to be fixed. I posted ARM64/PSCI related
-patches for completeness.
+How about if you put this on top?
 
-We can't have __init annotation for ..ffh_lpi_probe as it can be called
-from hotplug paths in ACPI. Only solution I see is to remove __init tag
-for arm_cpuidle_init. I raised similar concern on the other thread
-yesterday[1]
+diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+index 5d94b7a2fb10..c160fa3007e9 100644
+--- a/arch/arm/mach-socfpga/headsmp.S
++++ b/arch/arm/mach-socfpga/headsmp.S
+@@ -13,6 +13,7 @@
+ #include <asm/assembler.h>
 
-Thanks for looking at these patches, much appreciated.
+        .arch   armv7-a
++       .arm
 
->
->> +struct acpi_processor_lpi *lpi;
->> +int acpi_processor_ffh_lpi_enter(struct acpi_processor_lpi *lpi, int idx)
->
-> Wondering how are you handling with Resource Dependencies for Idle.
-> I mean _RDI needs to be taken care, since the dependency between the
-> power resources and the LPI state is described in _RDI.
->
-
-Correct, right now I haven't considered RDI yet as I don't have proper
-platform to test. IMO it can be added later as RDI is optional and not
-used on all platforms.
-
--- 
-Regards,
-Sudeep
-
-[1] http://lkml.iu.edu/hypermail/linux/kernel/1604.2/02181.html
+ ENTRY(secondary_trampoline)
+        /* CPU1 will always fetch from 0x0 when it is brought out of reset.
