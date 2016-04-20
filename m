@@ -1,97 +1,65 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed, 20 Apr 2016 16:49:00 +0900
-Subject: next-20160401+: ARM: DRA7: linux-next regression: mm/slab:
- clean-up kmem_cache_node setup
-In-Reply-To: <57172BAD.5050200@nvidia.com>
-References: <570816F8.9070301@ti.com>
- <20160411020203.GA25211@js1304-P5Q-DELUXE>
- <570B8E0D.7020203@nvidia.com> <57172BAD.5050200@nvidia.com>
-Message-ID: <20160420074900.GA7071@js1304-P5Q-DELUXE>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 20 Apr 2016 09:47:19 +0200
+Subject: [PATCH v7 7/8] genirq/msi: map/unmap the MSI doorbells on
+ msi_domain_alloc/free_irqs
+In-Reply-To: <201604200215.XNyvZSsl%fengguang.wu@intel.com>
+References: <201604200215.XNyvZSsl%fengguang.wu@intel.com>
+Message-ID: <57173407.9040401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ccing Stephen.
+Hi,
 
-On Wed, Apr 20, 2016 at 08:11:41AM +0100, Jon Hunter wrote:
-> Hi Joonsoo,
+Both reported errors related to this series are due to the fact part n
+has dependency on part n-1.
+
+Does anyone know how to let the 0-day CI robot know about such
+dependency between series?
+
+If it is an inconvenience I can put all the patches back into the same
+big series, specifying tentative patch split according to sub-systems in
+the cover-letter?
+
+Thank you in advance
+
+Best Regards
+
+Eric
+
+04/19/2016 08:04 PM, kbuild test robot wrote:
+> Hi,
 > 
-> On 11/04/16 12:44, Jon Hunter wrote:
-> > On 11/04/16 03:02, Joonsoo Kim wrote:
-> >> On Fri, Apr 08, 2016 at 03:39:20PM -0500, Nishanth Menon wrote:
-> >>> Hi,
-> >>>
-> >>> http://marc.info/?l=linux-omap&m=146014314115625&w=2 series works with
-> >>> v4.6-rc2 kernel, however, it fails with linux-next for suspend-to-ram
-> >>> (mem) on BeagleBoard-X15
-> >>>
-> >>> next-20160327 - good
-> >>> next-20160329 - good
-> >>> next-20160330 - Fails to boot - I2C crashes
-> >>> next-20160331-  Fails to boot - USB crashes
-> >>> next-20160401 -> bad
-> >>> next-20160408 -> bad
-> >>>
-> >>> Bisect log of next-20160408 vs v4.6-rc2 ->
-> >>> http://pastebin.ubuntu.com/15697856/
-> >>>
-> >>> # first bad commit: [2b629704a2b6a5b239f23750e5517a9d8c3a4e8c]
-> >>> mm/slab: clean-up kmem_cache_node setup
-> >>>
-> >>
-> >> Hello,
-> >>
-> >> I made a mistake on that patch. Could you try to test below one on
-> >> top of it.
-> >>
-> >> Thanks.
-> >>
-> >> --------->8----------------
-> >> From d3af3cc409527e9be6beb62ea395cde67f3c5029 Mon Sep 17 00:00:00 2001
-> >> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> >> Date: Mon, 11 Apr 2016 10:48:29 +0900
-> >> Subject: [PATCH] mm/slab: clean-up kmem_cache_node setup-fix
-> >>
-> >> After calling free_block(), we need to re-calculate array_cache's
-> >> avail counter. Fix it.
-> >>
-> >> And, it's better to free objects in shared array when it is
-> >> really necessary. Check it before calling free_block().
-> >>
-> >> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> >> ---
-> >>  mm/slab.c | 3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/mm/slab.c b/mm/slab.c
-> >> index fcd5fbb..27cb390 100644
-> >> --- a/mm/slab.c
-> >> +++ b/mm/slab.c
-> >> @@ -927,9 +927,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
-> >>  
-> >>  	n = get_node(cachep, node);
-> >>  	spin_lock_irq(&n->list_lock);
-> >> -	if (n->shared) {
-> >> +	if (n->shared && force_change) {
-> >>  		free_block(cachep, n->shared->entry,
-> >>  				n->shared->avail, node, &list);
-> >> +		n->shared->avail = 0;
-> >>  	}
-> >>  
-> >>  	if (!n->shared || force_change) {
-> > 
-> > This also fixes a regression on -next for Tegra that was bisected down
-> > to the same culprit. So ...
-> > 
-> > Tested-by: Jon Hunter <jonathanh@nvidia.com>
+> [auto build test ERROR on tip/irq/core]
+> [also build test ERROR on v4.6-rc4 next-20160419]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 > 
-> This fix still doesn't appear to have made it into -next and this has
-> been broken now for nearly 3 weeks. Any chance we can get this into -next?
-
-Sorry about that.
-
-Hello, Stephen.
-
-It seems that Andrew is busy now. I guess he will be back soon but
-could you merge this fix to the next tree directly?
-
-Thanks.
+> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-2-3-msi-changes/20160420-011957
+> config: x86_64-lkp (attached as .config)
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=x86_64 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>>> kernel/irq/msi.c:17:38: fatal error: linux/dma-reserved-iommu.h: No such file or directory
+>     #include <linux/dma-reserved-iommu.h>
+>                                          ^
+>    compilation terminated.
+> 
+> vim +17 kernel/irq/msi.c
+> 
+>     11	 */
+>     12	#include <linux/types.h>
+>     13	#include <linux/device.h>
+>     14	#include <linux/irq.h>
+>     15	#include <linux/irqdomain.h>
+>     16	#include <linux/msi.h>
+>   > 17	#include <linux/dma-reserved-iommu.h>
+>     18	#include <linux/iommu.h>
+>     19	
+>     20	/* Temparory solution for building, will be removed later */
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
