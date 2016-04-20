@@ -1,34 +1,32 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 20 Apr 2016 11:30:12 -0500
-Subject: [PATCH 2/3] ACPI / ARM64: Remove EXPERT dependency for ACPI on
- ARM64
-In-Reply-To: <1460706823-16566-2-git-send-email-broonie@kernel.org>
-References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
- <1460706823-16566-2-git-send-email-broonie@kernel.org>
-Message-ID: <CAOZdJXWzqwZMHV0Qu4FE=j+N3oP3XrDN-+AqUhG61wxFdC945w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Apr 2016 17:38:14 +0100
+Subject: [PATCH v7 12/16] arm64: Add new asm macro copy_page
+In-Reply-To: <1459529620-22150-13-git-send-email-james.morse@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-13-git-send-email-james.morse@arm.com>
+Message-ID: <20160420163814.GF11377@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 2:53 AM, Mark Brown <broonie@kernel.org> wrote:
->
-> Given all this it seems that at this point the EXPERT dependency mainly
-> creates inconvenience for users with systems that are doing the right
-> thing and gets in the way of including the ACPI code in the testing that
-> people are doing on mainline.  Removing it should help our ongoing
-> testing cover those platforms with only ACPI support and help ensure
-> that when ACPI code is merged any problems it causes for other users are
-> more easily discovered.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> Acked-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Al Stone <ahs3@redhat.com>
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On Fri, Apr 01, 2016 at 05:53:36PM +0100, James Morse wrote:
+> From: Geoff Levand <geoff@infradead.org>
+> 
+> Kexec and hibernate need to copy pages of memory, but may not have all
+> of the kernel mapped, and are unable to call copy_page().
+> 
+> Add a simplistic copy_page() macro, that can be inlined in these
+> situations. lib/copy_page.S provides a bigger better version, but
+> uses more registers.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> [Changed asm label to 9998, added commit message]
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-Acked-by: Timur Tabi <timur@codeaurora.org>
+Good enough for the brief usage:
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Would there be another user of this macro in the future (kexec)?
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Catalin
