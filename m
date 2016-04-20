@@ -1,48 +1,75 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 20 Apr 2016 13:12:05 +0900
-Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
- pinctrl_{register, unregister}
-In-Reply-To: <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
- <56D307CC.2050202@nvidia.com> <56E031CA.9010204@nvidia.com>
- <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
-Message-ID: <CAK7LNARUxy_ACa77t7ZZy4NqK6WOoKBqghy8YgyHg2Q0vLiymA@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 20 Apr 2016 13:35:11 +0900
+Subject: Nouveau crashes in 4.6-rc on arm64
+In-Reply-To: <570B50B4.4020304@nvidia.com>
+References: <57064992.1060509@arm.com> <570737F5.30105@nvidia.com>
+ <5707FC9F.50905@arm.com> <570B50B4.4020304@nvidia.com>
+Message-ID: <571706FF.1010300@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
-
-2016-03-15 17:31 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Wed, Mar 9, 2016 at 3:23 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+On 04/11/2016 04:22 PM, Alexandre Courbot wrote:
+> Hi Robin,
 >
->>> Pushed the change at:
->>> Branch "devm_pinctrl_register" of
->>> https://github.com/ldewangan/linux-upstream.git.
->>>
->>> Base repo is
->>> for-next of
->>> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
->>>
->>>
->>> If required, I can send the V2 version of list with acks.
+> On 04/09/2016 03:46 AM, Robin Murphy wrote:
+>> Hi Alex,
 >>
->> Let me know if I need to send full series (V2 with collected ack) again or
->> fine to pull it from above location.
+>> On 08/04/16 05:47, Alexandre Courbot wrote:
+>>> Hi Robin,
+>>>
+>>> On 04/07/2016 08:50 PM, Robin Murphy wrote:
+>>>> Hello,
+>>>>
+>>>> With 4.6-rc2 (and -rc1) I'm seeing Nouveau blowing up at boot, from the
+>>>> look of it by dereferencing some offset from NULL inside
+>>>> nouveau_fbcon_imageblit(). My setup is an old XFX 7600GT card plugged
+>>>> into an ARM Juno r1 board, which works fine with 4.5 and earlier.
+>>>>
+>>>> Attached are a couple of logs from booting arm64 defconfig plus DRM and
+>>>> Nouveau enabled - the second also has framebuffer console rotation
+>>>> turned on, which interestingly seems to move the point of failure, and
+>>>> the display does eventually come up to show the tail end of the
+>>>> panic in
+>>>> that case.
+>>>>
+>>>> I might be able to find time for a full bisection next week if isn't
+>>>> something sufficiently obvious to anyone who knows this driver.
+>>>
+>>> Looking at the log it is not clear to me what could be causing this. I
+>>> can boot 4.6-rc2 with a GM206 card without any issue. A bisect would
+>>> indeed be useful here.
+>>
+>> OK, turns out the lure of writing something to remotely drive a Juno and
+>> parse kernel bootlogs through an automatic bisection was too great to
+>> resist on a Friday afternoon :D
+>>
+>> Bisection came down to 1733a2ad3674("drm/nouveau/device/pci: set as
+>> non-CPU-coherent on ARM64"), and sure enough reverting that removes the
+>> crash.
 >
-> Please collect the ACKs on your branch and ask me to pull it after v4.6-rc1.
-> No need to resend the patches.
+> Thanks for taking the time to bisect this. And apologies as it seems my
+> commit is the reason for your troubles.
 >
-> Unfortunately it arrived too late for the merge window, but hey: we got the
-> devm gpiochip in for v4.6.
+> The CPU coherency flag is used for two things: explicitly sync buffers
+> pages when required, and allocating buffers that are not explicitly
+> synced (like fences or pushbuffers) using the DMA API. For this latter
+> use, it also accesses the buffer's content using the mapping provided by
+> dma_alloc_coherent() instead of creating a new one. All nouveau_bos are
+> supposed to be written using nouveau_bo_rd32(), and this function
+> handles the case of an DMA-API allocated object by detecting that the
+> result of ttm_kmap_obj_virtual() is NULL.
+>
+> But as it turns out, OUT_RINGp() also calls ttm_kmap_obj_virtual() in
+> order to perform a memcpy and uses its result directly - which means we
+> are doing memcpy on a NULL pointer. We never caught this because we
+> typically do not use Nouveau's fbcon with an ARM setup.
+>
+> I don't really like this special access for coherent objects, and
+> actually had a patch in my tree to attempt to remove it (attached).
+> Although it is not the whole solution (see below), the issue should at
+> least not be visible with it applied - could you confirm?
 
+Hi Robin, could you confirm whether the attached patch in my previous 
+mail helps with your problem?
 
-Not pulled yet?
-
-I want to do my development on top of the devm_pinctrl_register series.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks!
