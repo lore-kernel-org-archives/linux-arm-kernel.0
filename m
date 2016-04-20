@@ -1,94 +1,110 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 20 Apr 2016 10:19:15 -0700
-Subject: [PATCH] drivers/perf: arm-pmu: fix RCU usage on resume from idle
- states
-In-Reply-To: <20160420165205.GA17840@red-moon>
-References: <1461085689-2893-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160419172320.GD4509@arm.com> <7hr3e1b77r.fsf@baylibre.com>
- <20160420134116.GA8537@red-moon>
- <20160420162354.GB3539@linux.vnet.ibm.com>
- <20160420165205.GA17840@red-moon>
-Message-ID: <20160420171915.GD3539@linux.vnet.ibm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 20 Apr 2016 18:19:58 +0100
+Subject: [PATCH v7 08/10] iommu/dma-reserved_iommu:
+ iommu_msi_mapping_desc_to_domain
+In-Reply-To: <1461084994-2355-9-git-send-email-eric.auger@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-9-git-send-email-eric.auger@linaro.org>
+Message-ID: <5717BA3E.8050901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 05:52:05PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Apr 20, 2016 at 09:23:54AM -0700, Paul E. McKenney wrote:
-> 
-> [...]
-> 
-> > > > Maybe RCU_NONIDLE() will help here?
-> > > 
-> > > Thanks for chiming in.
-> > > 
-> > > CPU_PM notifiers are called from process context (which is not necessarily
-> > > the idle thread) with IRQs disabled from:
-> > > 
-> > > - CPUidle drivers state enter calls
-> > > - syscore callbacks (ie suspend2RAM - suspend thread)
-> > > - bL switcher
-> > > - MCPM loopback
-> > > 
-> > > The questions I have are:
-> > > 
-> > > - Is it safe to wrap a call (in this case armpmu_start()) with RCU_NONIDLE
-> > >   if the core is not actually executing the idle thread ? The function
-> > >   requiring rcu locks/dereferences is perf_event_update_userpage().
-> > 
-> > Yes it is.
-> > 
-> > > - What are RCU_NONIDLE side-effects (ie what can be actually called from
-> > >   within an RCU_NONIDLE wrapper ?)
-> > 
-> > There are a few restrictions:
-> > 
-> > 1.	Code within RCU_NONIDLE() cannot block.  Then again, neither
-> > 	can the idle task.  ;-)
-> > 
-> > 2.	RCU_NONIDLE() can be nested, but not indefinitely.  Then again,
-> > 	given that the limit even on a 32-bit system is something like
-> > 	a million, I bet you hit compiler or stack-size limits long
-> > 	before you overflow RCU_NONIDLE()'s counter.
-> > 
-> > 3.	You can neither branch into the middle of RCU_NONIDLE()'s code
-> > 	nor branch out from the middle of RCU_NONIDLE()'s code.
-> > 	Calling functions is just fine, but things like this are not:
-> > 
-> > 		RCU_NONIDLE({
-> > 			do_something();
-> > 			goto bad_idea;	/* BUG!!! */
-> > 			do_something_else();});
-> > 		do_yet_a_third_thing();
-> > 	bad_idea:
-> > 
-> > 	Branching -within- the RCU_NONIDLE() code is just fine.
-> > 
-> > Yes, and I am adding this information to RCU_NONIDLE()'s header
-> > comment, apologies for its not being there to begin with!
-> > (See below for patches.)
-> 
-> Thank you for the explanation, that's now clear. For my own understanding:
-> RCU_NONIDLE() is a way to inform the RCU subsystem that the CPU in question
-> should be temporarily *watched* (ie it is not idle from an RCU standpoint),
-> correct ?
+On 19/04/16 17:56, Eric Auger wrote:
+> This function checks whether
+> - the device emitting the MSI belongs to a non default iommu domain
+> - the iommu domain requires the MSI address to be mapped.
+>
+> If those conditions are met, the function returns the iommu domain
+> to be used for mapping the MSI doorbell; else it returns NULL.
+>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>   drivers/iommu/dma-reserved-iommu.c | 19 +++++++++++++++++++
+>   include/linux/dma-reserved-iommu.h | 18 ++++++++++++++++++
+>   2 files changed, 37 insertions(+)
+>
+> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
+> index 2522235..907a17f 100644
+> --- a/drivers/iommu/dma-reserved-iommu.c
+> +++ b/drivers/iommu/dma-reserved-iommu.c
+> @@ -17,6 +17,7 @@
+>
+>   #include <linux/iommu.h>
+>   #include <linux/iova.h>
+> +#include <linux/msi.h>
+>
+>   struct reserved_iova_domain {
+>   	struct iova_domain *iovad;
+> @@ -332,3 +333,21 @@ unlock:
+>   }
+>   EXPORT_SYMBOL_GPL(iommu_put_reserved_iova);
+>
+> +struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+> +{
+> +	struct device *dev;
+> +	struct iommu_domain *d;
+> +
+> +	dev = msi_desc_to_dev(desc);
+> +
+> +	d = iommu_get_domain_for_dev(dev);
+> +
+> +	if (!d || (d->type == IOMMU_DOMAIN_DMA))
+> +		return NULL;
+> +
+> +	if (iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_MAPPING, NULL))
+> +		return NULL;
 
-Exactly!
+Yeah, I don't see why we couldn't just use
 
-> > > It would be nice if we can use it instead of merging this patch, I need
-> > > more insights into RCU_NONIDLE usage though before proceeding.
-> > 
-> > Please let me know if any of the above restrictions cause you a problem.
-> 
-> I can't think of any, perf_event_update_userpage(), that I will call
-> indirectly through:
-> 
-> RCU_NONIDLE(armpmu_start());
-> 
-> is not allowed to block anyway, so I think we have a much better
-> solution than this one, new patch coming, Catalin please drop this one.
-> 
-> Thank you all !
+if (domain->ops->capable(IOMMU_CAP_INTR_REMAP))
+	return NULL
 
-Please let me know how it goes!
+there instead.
 
-							Thanx, Paul
+> +
+> +	return d;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_msi_mapping_desc_to_domain);
+> diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
+> index 8722131..8373929 100644
+> --- a/include/linux/dma-reserved-iommu.h
+> +++ b/include/linux/dma-reserved-iommu.h
+> @@ -19,6 +19,7 @@
+>   #include <linux/kernel.h>
+>
+>   struct iommu_domain;
+> +struct msi_desc;
+>
+>   #ifdef CONFIG_IOMMU_DMA_RESERVED
+>
+> @@ -70,6 +71,17 @@ int iommu_get_reserved_iova(struct iommu_domain *domain,
+>    * if the binding ref count is null, destroy the reserved mapping
+>    */
+>   void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
+> +
+> +/**
+> + * iommu_msi_mapping_desc_to_domain: in case the MSI originates from a device
+> + * upstream to an IOMMU and this IOMMU translates the MSI transaction,
+> + * this function returns the iommu domain the MSI doorbell address must be
+> + * mapped in. Else it returns NULL.
+> + *
+> + * @desc: msi desc handle
+> + */
+> +struct iommu_domain *iommu_msi_mapping_desc_to_domain(struct msi_desc *desc);
+> +
+>   #else
+>
+>   static inline int
+> @@ -93,5 +105,11 @@ static inline int iommu_get_reserved_iova(struct iommu_domain *domain,
+>   static inline void iommu_put_reserved_iova(struct iommu_domain *domain,
+>   					   phys_addr_t addr) {}
+>
+> +static inline struct iommu_domain *
+> +iommu_msi_mapping_desc_to_domain(struct msi_desc *desc)
+> +{
+> +	return NULL;
+> +}
+> +
+>   #endif	/* CONFIG_IOMMU_DMA_RESERVED */
+>   #endif	/* __DMA_RESERVED_IOMMU_H */
+>
