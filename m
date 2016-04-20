@@ -1,73 +1,73 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 20 Apr 2016 11:51:06 +0100
-Subject: Nouveau crashes in 4.6-rc on arm64
-In-Reply-To: <57175DA7.3000505@arm.com>
-References: <57064992.1060509@arm.com> <570737F5.30105@nvidia.com>
- <5707FC9F.50905@arm.com> <570B50B4.4020304@nvidia.com>
- <571706FF.1010300@nvidia.com> <57175DA7.3000505@arm.com>
-Message-ID: <57175F1A.5060708@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Apr 2016 13:00:21 +0200
+Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
+In-Reply-To: <CAKv+Gu_w-vXnB_56k2sNaTpo1k1DZuvmrS4rwi5kgx=MF4+e+Q@mail.gmail.com>
+References: <20160419140220.GA9503@pengutronix.de>
+ <20160420092516.GA21732@e103592.cambridge.arm.com>
+ <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
+ <CAKv+Gu9rzxtw2i1QJAU0C-y4Lmh6KDWH0p+TYNHsndr-6c11zw@mail.gmail.com>
+ <20160420095541.GG31470@pengutronix.de>
+ <CAKv+Gu_w-vXnB_56k2sNaTpo1k1DZuvmrS4rwi5kgx=MF4+e+Q@mail.gmail.com>
+Message-ID: <20160420110021.GH31470@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/16 11:44, Robin Murphy wrote:
-> Hi Alex,
->
-> On 20/04/16 05:35, Alexandre Courbot wrote:
-> [...]
->>>> Bisection came down to 1733a2ad3674("drm/nouveau/device/pci: set as
->>>> non-CPU-coherent on ARM64"), and sure enough reverting that removes the
->>>> crash.
->>>
->>> Thanks for taking the time to bisect this. And apologies as it seems my
->>> commit is the reason for your troubles.
->>>
->>> The CPU coherency flag is used for two things: explicitly sync buffers
->>> pages when required, and allocating buffers that are not explicitly
->>> synced (like fences or pushbuffers) using the DMA API. For this latter
->>> use, it also accesses the buffer's content using the mapping provided by
->>> dma_alloc_coherent() instead of creating a new one. All nouveau_bos are
->>> supposed to be written using nouveau_bo_rd32(), and this function
->>> handles the case of an DMA-API allocated object by detecting that the
->>> result of ttm_kmap_obj_virtual() is NULL.
->>>
->>> But as it turns out, OUT_RINGp() also calls ttm_kmap_obj_virtual() in
->>> order to perform a memcpy and uses its result directly - which means we
->>> are doing memcpy on a NULL pointer. We never caught this because we
->>> typically do not use Nouveau's fbcon with an ARM setup.
->>>
->>> I don't really like this special access for coherent objects, and
->>> actually had a patch in my tree to attempt to remove it (attached).
->>> Although it is not the whole solution (see below), the issue should at
->>> least not be visible with it applied - could you confirm?
->>
->> Hi Robin, could you confirm whether the attached patch in my previous
->> mail helps with your problem?
->
-> With that patch on top of -rc4, it's conjuring up something that looks
-> somewhat more like a real address on top of the offset, as it now
-> crashes with "Unable to handle kernel paging request at virtual address
-> ffffff8008f841ac", rather than the previous "Unable to handle kernel
-> NULL pointer dereference at virtual address 000001ac".
->
-> That does of course mean it still crashes in the same place, though :(
->
-> Robin.
-> IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended
-> recipient, please notify the sender immediately and do not disclose the
-> contents to any other person, use it for any purpose, or store or copy
-> the information in any medium. Thank you.
+On Wed, Apr 20, 2016 at 12:26:22PM +0200, Ard Biesheuvel wrote:
+> On 20 April 2016 at 11:55, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Wed, Apr 20, 2016 at 11:43:30AM +0200, Ard Biesheuvel wrote:
+> >> (replying to self)
+> >>
+> >> On 20 April 2016 at 11:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> > (+ Arnd)
+> >> >
+> >> > On 20 April 2016 at 11:25, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> >> On Tue, Apr 19, 2016 at 04:02:20PM +0200, Steffen Trumtrar wrote:
+> >> >>> Hi!
+> >> >>>
+> >> >>> According to kernelci.org (and validating on my own hardware), the current
+> >> >>> socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
+> >> >>>
+> >> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+> >> >>>
+> >> >>> vs
+> >> >>>
+> >> >>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+> >> >>>
+> >> >>> Both boot successfully, but notice that the board fails to bring up CPU1 if
+> >> >>> thumb2 support is enabled.
+> >> >>>
+> >> >>> Any ideas why this might be happening?
+> >> >>
+> >>
+> >> Actually, this looks like a problem with the secondary entry point to
+> >> me. Could you try this?
+> >
+> > Been there, done that. Unfortunately this does not solve the problem.
+> >
+> 
+> How about if you put this on top?
+> 
+> diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+> index 5d94b7a2fb10..c160fa3007e9 100644
+> --- a/arch/arm/mach-socfpga/headsmp.S
+> +++ b/arch/arm/mach-socfpga/headsmp.S
+> @@ -13,6 +13,7 @@
+>  #include <asm/assembler.h>
+> 
+>         .arch   armv7-a
+> +       .arm
 
-And since I intentionally sent this to the lists, anyone reading that 
-_is_ an intended recipient, so it's all good, I promise!
+\o/
 
-[sorry, SMTP server mixup on my end... *berates self*]
+This did the trick, it now boots with two cpus up. Thanks for looking
+into this issue.
 
-Robin.
+I'll create a patch for this.
 
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
