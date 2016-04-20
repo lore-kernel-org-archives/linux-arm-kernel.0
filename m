@@ -1,25 +1,37 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 20 Apr 2016 12:36:18 +0200
-Subject: [alsa-devel] [RFC PATCH v2 2/5] ASoC: mediatek: add documents for
- mt2701
-In-Reply-To: <1460636070-37426-3-git-send-email-garlic.tseng@mediatek.com>
-References: <1460636070-37426-1-git-send-email-garlic.tseng@mediatek.com>
- <1460636070-37426-3-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <57175BA2.4070706@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Apr 2016 11:37:11 +0100
+Subject: [PATCH v7 07/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <57166CC9.4030804@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-8-git-send-email-james.morse@arm.com>
+ <571656E9.5050402@arm.com> <57166CC9.4030804@arm.com>
+Message-ID: <57175BD7.30902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 19/04/16 18:37, James Morse wrote:
+> Hi Marc, Takahiro,
+> 
 
-
-On 14/04/16 14:14, Garlic Tseng wrote:
 [...]
 
-> diff --git a/Documentation/devicetree/bindings/sound/mtk2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mtk2701-afe-pcm.txt
-> new file mode 100644
+> It looks like x86 uses the extable to work around this, their vmx_vcpu_run() has:
+>> 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
+> Where __ex ends up calling ____kvm_handle_fault_on_reboot(), with a nearby comment:
+>> * Hardware virtualization extension instructions may fault if a
+>> * reboot turns off virtualization while processes are running.
+>> * Trap the fault and ignore the instruction if that happens.
 
-Nit:
-I would prefer to name it mt2701-afe-pcm.txt as all the other SoC 
-specific files.
+I very much like that approach, to be honest. Tearing down a CPU is
+something exceptional, so let's make it an actual exception.
 
-Regards,
-Matthias
+It is now pretty easy to discriminate between KVM functions and stub
+functions thanks to your earlier patch, so if we end up calling the
+hyp-stub because we've torn down KVM's EL2, let's just return an
+appropriate error code (ARM_EXCEPTION_HYP_GONE), and handle it at EL1.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
