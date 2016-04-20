@@ -1,58 +1,106 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 20 Apr 2016 09:04:39 -0500
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <20160419224122.GE19428@n2100.arm.linux.org.uk>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
- <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
- <20160419224122.GE19428@n2100.arm.linux.org.uk>
-Message-ID: <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Wed, 20 Apr 2016 07:08:39 -0700
+Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest MPIDR_EL1
+Message-ID: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 5:41 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
->> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
->> > Document the DT bindings for controlling ARM PL310 Power Control
->> > settings.
->> >
->> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
->>
->> What happened to Josh's ack?
->>
->> > ---
->> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
->> >  1 file changed, 4 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
->> > index fe0398c..c1c756e 100644
->> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
->> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
->> > @@ -84,6 +84,10 @@ Optional properties:
->> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
->> >    <1> (forcibly enable), property absent (retain settings set by
->> >    firmware)
->> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
->> > +  disable), <1> or property absent (forcibly enable)
->> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
->> > +  <1>  or property absent (forcibly enable)
->>
->> What happened to "retain settings set by firmware"?
->
-> I said we shouldn't.  Current behaviour is that we enable these features,
-> and moving to missing-means-retain means that everything today ends up
-> with these features disabled.  IOW, it's yet another change of actual
-> behaviour that every platform would see.
+For guests with NUMA configuration, Node ID needs to
+be recorded in the respective affinity byte of MPIDR_EL1.
 
-Right, but then the properties are different from prefetch-instr and
-others IIRC. We're letting the OS define the binding. If BSD doesn't
-enable these settings currently, then there is a mismatch between the
-binding and actual behavior. Saying "retain firmware settings" also
-defines specific OS behavior. I think absent should mean OS is free to
-do whatever it wants which could be retain firmware settings, enable
-or disable. In other words, it is undefined as this ship has already
-sailed.
+Cache the MPIDR_EL1 programmed by userspace and use it for
+subsequent reset_mpidr calls.
 
-Rob
+Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+---
+ arch/arm64/include/asm/kvm_host.h |  1 +
+ arch/arm64/kvm/sys_regs.c         | 44 ++++++++++++++++++++++++++++-----------
+ 2 files changed, 33 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index f5c6bd2..1fc723d 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -197,6 +197,7 @@ struct kvm_vcpu_arch {
+ 	/* HYP configuration */
+ 	u64 hcr_el2;
+ 	u32 mdcr_el2;
++	u64 vmpidr_el2;
+ 
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 7bbe3ff..468f251 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -424,21 +424,29 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 	vcpu_sys_reg(vcpu, AMAIR_EL1) = amair;
+ }
+ 
++static int set_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		     const struct kvm_one_reg *reg, void __user *uaddr);
++
+ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ {
+ 	u64 mpidr;
+ 
+-	/*
+-	 * Map the vcpu_id into the first three affinity level fields of
+-	 * the MPIDR. We limit the number of VCPUs in level 0 due to a
+-	 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
+-	 * of the GICv3 to be able to address each CPU directly when
+-	 * sending IPIs.
+-	 */
+-	mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
+-	mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
+-	mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
+-	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
++	if (!vcpu->arch.vmpidr_el2) {
++		/*
++		 * Map the vcpu_id into the first three affinity level fields of
++		 * the MPIDR. We limit the number of VCPUs in level 0 due to a
++		 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
++		 * of the GICv3 to be able to address each CPU directly when
++		 * sending IPIs.
++		 */
++		mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
++		mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
++		mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
++		vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
++	} else {
++		/* use the userspace configured value */
++		vcpu_sys_reg(vcpu, MPIDR_EL1) = vcpu->arch.vmpidr_el2;
++	}
+ }
+ 
+ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+@@ -902,7 +910,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	/* MPIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
+-	  NULL, reset_mpidr, MPIDR_EL1 },
++	  NULL, reset_mpidr, MPIDR_EL1, 0, NULL, set_mpidr },
+ 	/* SCTLR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
+ 	  access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
+@@ -2034,6 +2042,18 @@ static int demux_c15_set(u64 id, void __user *uaddr)
+ 	}
+ }
+ 
++static int set_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		     const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	int ret;
++
++	ret = reg_from_user(&vcpu_sys_reg(vcpu, rd->reg), uaddr, reg->id);
++	if (!ret)
++		vcpu->arch.vmpidr_el2 = vcpu_sys_reg(vcpu, rd->reg);
++
++	return ret;
++}
++
+ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct sys_reg_desc *r;
+-- 
+2.1.0
