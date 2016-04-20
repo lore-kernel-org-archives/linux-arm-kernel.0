@@ -1,50 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Apr 2016 00:51:00 +0100
-Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
-In-Reply-To: <CAKv+Gu8dmYDqri7Nt_A6vKTQo1eqFa7G=wdYQ8ad7EaT_smA7Q@mail.gmail.com>
-References: <20160419140220.GA9503@pengutronix.de>
- <20160420092516.GA21732@e103592.cambridge.arm.com>
- <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
- <CAKv+Gu9rzxtw2i1QJAU0C-y4Lmh6KDWH0p+TYNHsndr-6c11zw@mail.gmail.com>
- <20160420095541.GG31470@pengutronix.de>
- <CAKv+Gu_w-vXnB_56k2sNaTpo1k1DZuvmrS4rwi5kgx=MF4+e+Q@mail.gmail.com>
- <20160420110021.GH31470@pengutronix.de>
- <CAKv+Gu8dmYDqri7Nt_A6vKTQo1eqFa7G=wdYQ8ad7EaT_smA7Q@mail.gmail.com>
-Message-ID: <20160420235059.GF19428@n2100.arm.linux.org.uk>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 20 Apr 2016 16:51:28 -0700
+Subject: [PATCH v5 00/11] qcom: Add support for TSENS driver
+In-Reply-To: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
+References: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20160420235127.GC2558@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 01:06:28PM +0200, Ard Biesheuvel wrote:
-> @@ -21,15 +22,9 @@ ENTRY(secondary_trampoline)
->          * where the physical memory does not start at 0x0.
->         */
->  ARM_BE8(setend be)
-> -       adr     r0, 1f
-> -       ldmia   r0, {r1, r2}
-> -       sub     r2, r2, #PAGE_OFFSET
-> +       ldr     r2, =socfpga_cpu1start_addr - PAGE_OFFSET
+On Thu, Apr 14, 2016 at 03:01:48PM +0530, Rajendra Nayak wrote:
+> Current set of patches apply on 4.6-rc3. nvmem apis are currently
+> broken and hence need to pull in the fixes for it as proposed here [1]
 
-NAK.  Where do you expect the assembler to place the literal pool for
-this constant?  The only way that'll work is if it's placed before
-"ENTRY(secondary_trampoline_end)" below, but there's no guarantee
-(afaik) where literal pools will be placed.
 
->         ldr     r3, [r2]
->         ldr     r4, [r3]
->  ARM_BE8(rev    r4, r4)
->         bx      r4
-> -
-> -       .align
-> -1:     .long   .
-> -       .long   socfpga_cpu1start_addr
->  ENTRY(secondary_trampoline_end)
+Could you please clarify this a bit?
+
+Do I understand properly that we need to wait until [1] gets merged to
+get the driver functional again after applying this series?
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
