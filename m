@@ -1,26 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Apr 2016 17:37:30 +0200
-Subject: [PATCH 00/14] DT: Fix spelling of standard properties
-In-Reply-To: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
-References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdUUCJEAyhstdi1oxJXmyOh5wFbsE1JiaMs4f2ojGwSoig@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Apr 2016 08:32:30 -0700
+Subject: Regression in next for smsc911x with tigthen lockdep checks
+In-Reply-To: <57179EC9.6000505@stressinduktion.org>
+References: <20160420150108.GF5995@atomide.com>
+ <57179EC9.6000505@stressinduktion.org>
+Message-ID: <20160420153230.GI5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 5:32 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> This patch series fixes misspellings of various standard DT properties
-> in DT binding documentation, DTS files, and error messages.
+* Hannes Frederic Sowa <hannes@stressinduktion.org> [160420 08:24]:
+> Hi,
+> 
+> On 20.04.2016 17:01, Tony Lindgren wrote:
+> > Looks like commit fafc4e1ea1a4 ("sock: tigthen lockdep checks for
+> > sock_owned_by_user") in next causes a regression at least for
+> > smsc911x with CONFIG_LOCKDEP. It keeps spamming with the following
+> > message. Any ideas?
+> 
+> Not yet, can you quickly send me your config?
 
-BTW, this is against next-20160420.
+It's just the arch/arm/configs/omap2plus_defconfig I'm using.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Tony
