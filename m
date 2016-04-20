@@ -1,160 +1,62 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 20 Apr 2016 14:33:17 +0200
-Subject: [PATCH v7 6/8] irqchip/gicv2m: implement msi_doorbell_info
- callback
-In-Reply-To: <57174B8E.9050803@arm.com>
-References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
- <1461085990-2547-7-git-send-email-eric.auger@linaro.org>
- <57174B8E.9050803@arm.com>
-Message-ID: <5717770D.6090005@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 20 Apr 2016 13:35:27 +0100
+Subject: [PATCH v2 1/5] arm64: cpufeature: Add scope for capability check
+In-Reply-To: <20160420112800.GC2514@arm.com>
+References: <1460997334-26232-1-git-send-email-suzuki.poulose@arm.com>
+ <1460997334-26232-2-git-send-email-suzuki.poulose@arm.com>
+ <20160420112800.GC2514@arm.com>
+Message-ID: <5717778F.5020702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-On 04/20/2016 11:27 AM, Marc Zyngier wrote:
-> On 19/04/16 18:13, Eric Auger wrote:
->> This patch implements the msi_doorbell_info callback in the
->> gicv2m driver.
->>
->> The driver now is able to return its doorbell characteristics
->> (base, size, prot). A single doorbell is exposed.
->>
->> This will allow the msi layer to iommu_map this doorbell when
->> requested.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->>
->> v7: creation
->> ---
->>  drivers/irqchip/irq-gic-v2m.c | 32 +++++++++++++++++++++++++++++++-
->>  1 file changed, 31 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
->> index 28f047c..54690b9 100644
->> --- a/drivers/irqchip/irq-gic-v2m.c
->> +++ b/drivers/irqchip/irq-gic-v2m.c
->> @@ -24,6 +24,8 @@
->>  #include <linux/of_pci.h>
->>  #include <linux/slab.h>
->>  #include <linux/spinlock.h>
->> +#include <linux/percpu.h>
->> +#include <linux/iommu.h>
->>  
->>  /*
->>  * MSI_TYPER:
->> @@ -64,6 +66,7 @@ struct v2m_data {
->>  	u32 nr_spis;		/* The number of SPIs for MSIs */
->>  	unsigned long *bm;	/* MSI vector bitmap */
->>  	u32 flags;		/* v2m flags for specific implementation */
->> +	struct irq_chip_msi_doorbell_info doorbell_info;
->>  };
->>  
->>  static void gicv2m_mask_msi_irq(struct irq_data *d)
->> @@ -105,6 +108,16 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->>  		msg->data -= v2m->spi_start;
->>  }
->>  
->> +static const struct irq_chip_msi_doorbell_info *
->> +gicv2m_msi_doorbell_info(struct irq_data *data)
->> +{
->> +	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
->> +
->> +	if (!v2m)
->> +		return NULL;
-> 
-> How can this ever be NULL? I think you can drop that test.
+On 20/04/16 12:28, Will Deacon wrote:
+> On Mon, Apr 18, 2016 at 05:35:30PM +0100, Suzuki K Poulose wrote:
+>> Add scope parameter to the arm64_cpu_capabilities::matches(), so that
+>> this can be reused for checking the capability on a given CPU vs the
+>> system wide. The system uses the default scope associated with the
+>> capability for initialising the CPU_HWCAPs and ELF_HWCAPs.
+
+>> +/* scope of capability check */
+>> +enum {
+>> +	SCOPE_SYSTEM,
+>> +	SCOPE_CPU,
+>> +};
+>
+> I think I actually prefer the GLOBAL/LOCAL naming, since SYSTEM is going
+> to be the scope you want when talking about all CPUs. Or maybe just
+> rename SCOPE_CPU to SCOPE_LOCAL_CPU.
+
 OK
-> 
->> +	return (const struct irq_chip_msi_doorbell_info *)(&v2m->doorbell_info);
-> 
-> Please don't do that. Use "const" in the functions that are using
-> irq_chip_msi_doorbell_info, but do not make this "const" here.
-It definitively compiles without casting so obviously this is not needed
-but is there any other wrong thing I don't see?
-we still want this function to return a pointer to a const?
-> 
->> +}
->> +
->>  static struct irq_chip gicv2m_irq_chip = {
->>  	.name			= "GICv2m",
->>  	.irq_mask		= irq_chip_mask_parent,
->> @@ -112,6 +125,7 @@ static struct irq_chip gicv2m_irq_chip = {
->>  	.irq_eoi		= irq_chip_eoi_parent,
->>  	.irq_set_affinity	= irq_chip_set_affinity_parent,
->>  	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
->> +	.msi_doorbell_info	= gicv2m_msi_doorbell_info,
->>  };
->>  
->>  static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
->> @@ -247,6 +261,7 @@ static void gicv2m_teardown(void)
->>  
->>  	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
->>  		list_del(&v2m->entry);
->> +		free_percpu(v2m->doorbell_info.percpu_doorbells);
->>  		kfree(v2m->bm);
->>  		iounmap(v2m->base);
->>  		of_node_put(to_of_node(v2m->fwnode));
->> @@ -299,6 +314,7 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->>  {
->>  	int ret;
->>  	struct v2m_data *v2m;
->> +	struct irq_chip_msi_doorbell __percpu *doorbell;
->>  
->>  	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
->>  	if (!v2m) {
->> @@ -311,11 +327,23 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->>  
->>  	memcpy(&v2m->res, res, sizeof(struct resource));
->>  
->> +	v2m->doorbell_info.percpu_doorbells =
->> +		alloc_percpu(struct irq_chip_msi_doorbell);
->> +	if (WARN_ON(!v2m->doorbell_info.percpu_doorbells)) {
->> +		ret = -ENOMEM;
->> +		goto err_free_v2m;
->> +	}
->> +	doorbell = per_cpu_ptr(v2m->doorbell_info.percpu_doorbells, 0);
->> +	doorbell->base = v2m->res.start;
->> +	doorbell->size = 4;
->> +	doorbell->prot = IOMMU_WRITE;
-> 
-> You probably need to also have something that says IOMMU_DEVICE or
-> something similar, because I'm afraid you're getting a memory mapping
-> here. I've had a quick look at the two other series, but couldn't find
-> anything that would force the memory attributes.
-Yes you're right I currently just enforce the direction (which is
-checked against what VFIO user registered). Do you refer to IOMMU_MMIO,
-latterly proposed on the ML. In the positive, yes I intend to add it
-once it gets upstreamed.
 
-Thanks
+>
+> We might want a preemptible() check when probing SCOPE_CPU properties,
+> too.
 
-Eric
-> 
->> +	v2m->doorbell_info.nb_doorbells = 1;
->> +
->>  	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
->>  	if (!v2m->base) {
->>  		pr_err("Failed to map GICv2m resource\n");
->>  		ret = -ENOMEM;
->> -		goto err_free_v2m;
->> +		goto err_free_v2m_doorbells;
->>  	}
->>  
->>  	if (spi_start && nr_spis) {
->> @@ -359,6 +387,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->>  
->>  err_iounmap:
->>  	iounmap(v2m->base);
->> +err_free_v2m_doorbells:
->> +	free_percpu(v2m->doorbell_info.percpu_doorbells);
->>  err_free_v2m:
->>  	kfree(v2m);
->>  	return ret;
+Good point. The current users are all calling them from the CPU init phase,
+where it is not preemptible. But it would be good to add a check to make sure
+nobody violates this condition. Also, will add a comment for
+"this_cpu_has_cap()" API to call it under !preemptible() state.
+  
+
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 8c46621..db392c5 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -71,7 +71,9 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
 >>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+>>   /* meta feature for alternatives */
+>>   static bool __maybe_unused
+>> -cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry);
+>> +cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
+>> +
+>> +static u64 __raw_read_system_reg(u32 sys_id);
+>
+> Can we not reorder the functions in this file to avoid the internal forward
+> declarations?
+
+We can. I had that in my initial version, but the patch looked a bit more complicated
+with the code movement. I will bring it back and get rid of the declaration.
+
+
+Cheers
+Suzuki
