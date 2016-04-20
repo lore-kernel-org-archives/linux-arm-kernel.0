@@ -1,40 +1,18 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 20 Apr 2016 11:18:44 -0500
-Subject: [PATCH] ARM: SoCFPGA: Fix secondary CPU startup in thumb2 kernel
-In-Reply-To: <1461159271-3764-1-git-send-email-s.hauer@pengutronix.de>
-References: <1461159271-3764-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <5717ABE4.5010906@opensource.altera.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Apr 2016 17:26:43 +0100
+Subject: [PATCH v7 11/16] arm64: Promote KERNEL_START/KERNEL_END
+ definitions to a header file
+In-Reply-To: <1459529620-22150-12-git-send-email-james.morse@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-12-git-send-email-james.morse@arm.com>
+Message-ID: <20160420162643.GE11377@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2016 08:34 AM, Sascha Hauer wrote:
-> The secondary CPU starts up in ARM mode. When the kernel is compiled in
-> thumb2 mode we have to explicitly compile the secondary startup
-> trampoline in ARM mode, otherwise the CPU will go to Nirvana.
+On Fri, Apr 01, 2016 at 05:53:35PM +0100, James Morse wrote:
+> KERNEL_START and KERNEL_END are useful outside head.S, move them to a
+> header file.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Reported-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm/mach-socfpga/headsmp.S | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-> index 5d94b7a..c160fa3 100644
-> --- a/arch/arm/mach-socfpga/headsmp.S
-> +++ b/arch/arm/mach-socfpga/headsmp.S
-> @@ -13,6 +13,7 @@
->  #include <asm/assembler.h>
->  
->  	.arch	armv7-a
-> +	.arm
->  
->  ENTRY(secondary_trampoline)
->  	/* CPU1 will always fetch from 0x0 when it is brought out of reset.
-> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-Applied!
-
-Thanks,
-Dinh
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
