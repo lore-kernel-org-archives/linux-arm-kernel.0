@@ -1,82 +1,81 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 20 Apr 2016 15:37:15 +0200
-Subject: [PATCH v2] drm/panel: simple: Add support for Innolux AT070TN92
-Message-ID: <1461159435-16528-1-git-send-email-boris.brezillon@free-electrons.com>
+From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
+Date: Wed, 20 Apr 2016 13:37:30 +0000
+Subject: [PATCH 3/3] RTC: Update seconds time programming logic
+In-Reply-To: <20160420120221.GR29844@piout.net>
+References: <1460463346-24923-1-git-send-email-anuragku@xilinx.com>
+ <1460463346-24923-3-git-send-email-anuragku@xilinx.com>
+ <20160419223109.GF29844@piout.net>
+ <3802E9A6666DF54886E2B9CBF743BA9825E0B42B@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160420075741.GK29844@piout.net>
+ <3802E9A6666DF54886E2B9CBF743BA9825E0B4BE@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160420120221.GR29844@piout.net>
+Message-ID: <3802E9A6666DF54886E2B9CBF743BA9825E0B50C@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Riccardo Bortolato <bortolato@navaltechitalia.it>
+Hi Alexandre,
 
-Add support for the Innolux AT070TN92 panel.
+Thanks for reviewing the patch, I will sent v2 with the changes updated.
 
-Signed-off-by: Riccardo Bortolato <bortolato@navaltechitalia.it>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Thanks,
+Anurag Kumar V
 
----
-Changes since v1:
-- Add missing SoB
----
- .../bindings/display/panel/innolux,at070tn92.txt   |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
-
-diff --git a/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt b/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
-new file mode 100644
-index 0000000..3e10cd7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/innolux,at070tn92.txt
-@@ -0,0 +1,7 @@
-+Innolux AT070TN92 7.0" WQVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "innolux,at070tn92"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 3649eb0..d321c57 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -822,6 +822,29 @@ static const struct panel_desc innolux_at043tn24 = {
- 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
- };
- 
-+static const struct drm_display_mode innolux_at070tn92_mode = {
-+	.clock = 33333,
-+	.hdisplay = 800,
-+	.hsync_start = 800 + 210,
-+	.hsync_end = 800 + 210 + 20,
-+	.htotal = 800 + 210 + 20 + 46,
-+	.vdisplay = 480,
-+	.vsync_start = 480 + 22,
-+	.vsync_end = 480 + 22 + 10,
-+	.vtotal = 480 + 22 + 23 + 10,
-+	.vrefresh = 60,
-+};
-+
-+static const struct panel_desc innolux_at070tn92 = {
-+	.modes = &innolux_at070tn92_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 154,
-+		.height = 86,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-+};
-+
- static const struct drm_display_mode innolux_g121i1_l01_mode = {
- 	.clock = 71000,
- 	.hdisplay = 1280,
-@@ -1362,6 +1385,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "innolux,at043tn24",
- 		.data = &innolux_at043tn24,
- 	}, {
-+		.compatible = "innolux,at070tn92",
-+		.data = &innolux_at070tn92,
-+	}, {
- 		.compatible ="innolux,g121i1-l01",
- 		.data = &innolux_g121i1_l01
- 	}, {
--- 
-2.5.0
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: Wednesday, April 20, 2016 5:32 PM
+> To: Anurag Kumar Vulisha <anuragku@xilinx.com>
+> Cc: Alessandro Zummo <a.zummo@towertech.it>; Soren Brinkmann
+> <sorenb@xilinx.com>; Michal Simek <michals@xilinx.com>; rtc-
+> linux at googlegroups.com; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Punnaiah Choudary Kalluri <punnaia@xilinx.com>;
+> Anirudha Sarangi <anirudh@xilinx.com>; Srikanth Vemula
+> <svemula@xilinx.com>; Srinivas Goud <sgoud@xilinx.com>
+> Subject: Re: [PATCH 3/3] RTC: Update seconds time programming logic
+> 
+> On 20/04/2016 at 10:31:06 +0000, Anurag Kumar Vulisha wrote :
+> > > Yeas, I understood that. But my question was whether the interrupt
+> > > handling was necessary at all.
+> > > Instead of waiting for an interrupt to set time_updated, can't you
+> > > simply read RTC_INT_STS and check for the RTC_INT_SEC bit in
+> > > xlnx_rtc_read_time() ?
+> > >
+> > > Something like:
+> > >
+> > > status = readl(xrtcdev->reg_base + RTC_INT_STS) if (status &
+> RTC_INT_SEC)
+> > >       rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
+> > > else
+> > >       rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD) - 1,
+> > > tm);
+> > >
+> > > It all depends on whether the RTC_INT_SEC bit in RTC_INT_STS is
+> > > being updated even when it is not enabled as an interrupt.
+> > >
+> >
+> > The above said logic will work if we doesn't clear the RTC_INT_STS
+> > register after the RTC_INT_SEC bit is set, this happens only if
+> > interrupts are not enabled. If interrupts are enabled we will be clearing the
+> RTC_INT_STS every time in the interrupt handler.
+> > And moreover we need to return time from RTC_SET_TM_RD only if time is
+> > requested within 1 sec span after programming the time only , so this is
+> required only for one time.
+> > Since we are clearing the RTC_INT_STS in our interrupt handler, we
+> > might end up in giving the wrong time to the user when requested.So I
+> think this logic might not work.
+> > Please correct me if am wrong.
+> >
+> 
+> Simply stop clearing RTC_INT_SEC from RTC_INT_STS in the interrupt
+> handler.
+> 
+> You can also remove
+> 	if (status & RTC_INT_SEC)
+> 		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
+> 
+> as it will not be used. Update interrupts are handled by the core using timers
+> anyway. And as you can see, there was no code enabling RTC_INT_SEC in
+> RTC_INT_EN before your patch.
+> 
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering http://free-electrons.com
