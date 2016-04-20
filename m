@@ -1,19 +1,17 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 19 Apr 2016 18:40:30 -0700
-Subject: [PATCH v5 05/14] acpi,
- numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+Date: Tue, 19 Apr 2016 18:40:35 -0700
+Subject: [PATCH v5 10/14] acpi,
+ numa: Move acpi_numa_memory_affinity_init() to drivers/acpi/numa.c
 In-Reply-To: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461116439-22991-6-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461116439-22991-11-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Identical implementations of acpi_numa_slit_init() are used by both
-x86 and follow-on arm64 support.  Move it to drivers/acpi/numa.c, and
-guard with CONFIG_X86 || CONFIG_ARM64 because ia64 has its own
-architecture specific implementation.
+acpi_numa_memory_affinity_init() will be reused by arm64.  Move it to
+drivers/acpi/numa.c to facilitate reuse.
 
 No code change.
 
@@ -21,87 +19,162 @@ Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c  | 27 ---------------------------
- drivers/acpi/numa.c | 29 +++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 27 deletions(-)
+ arch/x86/mm/srat.c  | 57 --------------------------------------------------
+ drivers/acpi/numa.c | 60 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 57 deletions(-)
 
 diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index 90b6ed9..f242a11 100644
+index 30460f5..b1ecff4 100644
 --- a/arch/x86/mm/srat.c
 +++ b/arch/x86/mm/srat.c
-@@ -42,33 +42,6 @@ static __init inline int srat_disabled(void)
- 	return acpi_numa < 0;
+@@ -15,8 +15,6 @@
+ #include <linux/bitmap.h>
+ #include <linux/module.h>
+ #include <linux/topology.h>
+-#include <linux/bootmem.h>
+-#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <asm/proto.h>
+ #include <asm/numa.h>
+@@ -104,61 +102,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+ 	       pxm, apic_id, node);
  }
  
--/*
-- * Callback for SLIT parsing.  pxm_to_node() returns NUMA_NO_NODE for
-- * I/O localities since SRAT does not list them.  I/O localities are
-- * not supported@this point.
-- */
--void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+-/* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
+-int __init
+-acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 -{
--	int i, j;
+-	u64 start, end;
+-	u32 hotpluggable;
+-	int node, pxm;
 -
--	for (i = 0; i < slit->locality_count; i++) {
--		const int from_node = pxm_to_node(i);
+-	if (srat_disabled())
+-		goto out_err;
+-	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
+-		goto out_err_bad_srat;
+-	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
+-		goto out_err;
+-	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
+-	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
+-		goto out_err;
 -
--		if (from_node == NUMA_NO_NODE)
--			continue;
+-	start = ma->base_address;
+-	end = start + ma->length;
+-	pxm = ma->proximity_domain;
+-	if (acpi_srat_revision <= 1)
+-		pxm &= 0xff;
 -
--		for (j = 0; j < slit->locality_count; j++) {
--			const int to_node = pxm_to_node(j);
--
--			if (to_node == NUMA_NO_NODE)
--				continue;
--
--			numa_set_distance(from_node, to_node,
--				slit->entry[slit->locality_count * i + j]);
--		}
+-	node = acpi_map_pxm_to_node(pxm);
+-	if (node < 0) {
+-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
+-		goto out_err_bad_srat;
 -	}
+-
+-	if (numa_add_memblk(node, start, end) < 0)
+-		goto out_err_bad_srat;
+-
+-	node_set(node, numa_nodes_parsed);
+-
+-	pr_info("SRAT: Node %u PXM %u [mem %#010Lx-%#010Lx]%s%s\n",
+-		node, pxm,
+-		(unsigned long long) start, (unsigned long long) end - 1,
+-		hotpluggable ? " hotplug" : "",
+-		ma->flags & ACPI_SRAT_MEM_NON_VOLATILE ? " non-volatile" : "");
+-
+-	/* Mark hotplug range in memblock. */
+-	if (hotpluggable && memblock_mark_hotplug(start, ma->length))
+-		pr_warn("SRAT: Failed to mark hotplug range [mem %#010Lx-%#010Lx] in memblock\n",
+-			(unsigned long long)start, (unsigned long long)end - 1);
+-
+-	max_possible_pfn = max(max_possible_pfn, PFN_UP(end - 1));
+-
+-	return 0;
+-out_err_bad_srat:
+-	bad_srat();
+-out_err:
+-	return -EINVAL;
 -}
 -
- /* Callback for Proximity Domain -> x2APIC mapping */
- void __init
- acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+ int __init x86_acpi_numa_init(void)
+ {
+ 	int ret;
 diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index f41f06b..acc361d 100644
+index 7174a38..8ba90ad 100644
 --- a/drivers/acpi/numa.c
 +++ b/drivers/acpi/numa.c
-@@ -197,6 +197,35 @@ static int __init slit_valid(struct acpi_table_slit *slit)
- 	return 1;
+@@ -27,6 +27,8 @@
+ #include <linux/types.h>
+ #include <linux/errno.h>
+ #include <linux/acpi.h>
++#include <linux/bootmem.h>
++#include <linux/memblock.h>
+ #include <linux/numa.h>
+ #include <linux/nodemask.h>
+ #include <linux/topology.h>
+@@ -236,6 +238,64 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+ 		}
+ 	}
  }
- 
-+#if defined(CONFIG_X86) || defined(CONFIG_ARM64)
++
 +/*
-+ * Callback for SLIT parsing.  pxm_to_node() returns NUMA_NO_NODE for
-+ * I/O localities since SRAT does not list them.  I/O localities are
-+ * not supported at this point.
++ * Default callback for parsing of the Proximity Domain <-> Memory
++ * Area mappings
 + */
-+void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
++int __init
++acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 +{
-+	int i, j;
++	u64 start, end;
++	u32 hotpluggable;
++	int node, pxm;
 +
-+	for (i = 0; i < slit->locality_count; i++) {
-+		const int from_node = pxm_to_node(i);
++	if (srat_disabled())
++		goto out_err;
++	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
++		goto out_err_bad_srat;
++	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
++		goto out_err;
++	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
++	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
++		goto out_err;
 +
-+		if (from_node == NUMA_NO_NODE)
-+			continue;
++	start = ma->base_address;
++	end = start + ma->length;
++	pxm = ma->proximity_domain;
++	if (acpi_srat_revision <= 1)
++		pxm &= 0xff;
 +
-+		for (j = 0; j < slit->locality_count; j++) {
-+			const int to_node = pxm_to_node(j);
-+
-+			if (to_node == NUMA_NO_NODE)
-+				continue;
-+
-+			numa_set_distance(from_node, to_node,
-+				slit->entry[slit->locality_count * i + j]);
-+		}
++	node = acpi_map_pxm_to_node(pxm);
++	if (node < 0) {
++		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
++		goto out_err_bad_srat;
 +	}
-+}
-+#endif /* defined(CONFIG_X86) || defined (CONFIG_ARM64) */
 +
++	if (numa_add_memblk(node, start, end) < 0)
++		goto out_err_bad_srat;
++
++	node_set(node, numa_nodes_parsed);
++
++	pr_info("SRAT: Node %u PXM %u [mem %#010Lx-%#010Lx]%s%s\n",
++		node, pxm,
++		(unsigned long long) start, (unsigned long long) end - 1,
++		hotpluggable ? " hotplug" : "",
++		ma->flags & ACPI_SRAT_MEM_NON_VOLATILE ? " non-volatile" : "");
++
++	/* Mark hotplug range in memblock. */
++	if (hotpluggable && memblock_mark_hotplug(start, ma->length))
++		pr_warn("SRAT: Failed to mark hotplug range [mem %#010Lx-%#010Lx] in memblock\n",
++			(unsigned long long)start, (unsigned long long)end - 1);
++
++	max_possible_pfn = max(max_possible_pfn, PFN_UP(end - 1));
++
++	return 0;
++out_err_bad_srat:
++	bad_srat();
++out_err:
++	return -EINVAL;
++}
+ #endif /* defined(CONFIG_X86) || defined (CONFIG_ARM64) */
+ 
  static int __init acpi_parse_slit(struct acpi_table_header *table)
- {
- 	struct acpi_table_slit *slit = (struct acpi_table_slit *)table;
 -- 
 1.7.11.7
