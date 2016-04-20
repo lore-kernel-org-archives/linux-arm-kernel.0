@@ -1,62 +1,96 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 20 Apr 2016 15:58:25 -0700
-Subject: [PATCH] drm/layerscape: reduce excessive stack usage
-In-Reply-To: <1456176818-1207477-1-git-send-email-arnd@arndb.de>
-References: <1456176818-1207477-1-git-send-email-arnd@arndb.de>
-Message-ID: <205ea5e0b82ba83a7679b4a2f9f660e3@agner.ch>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 21 Apr 2016 01:02:29 +0200
+Subject: [PATCH v8 0/2] Fix dma mapping when the cache is coherent
+In-Reply-To: <CAPv3WKe2S1qbSByOgUABRcnTVoW-ad1guSSNsmPuFWJ8-W5sOg@mail.gmail.com>
+ (Marcin Wojtas's message of "Sat, 16 Apr 2016 17:27:33 +0200")
+References: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKe2S1qbSByOgUABRcnTVoW-ad1guSSNsmPuFWJ8-W5sOg@mail.gmail.com>
+Message-ID: <877ffrx4sa.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-02-22 13:33, Arnd Bergmann wrote:
-> The fsl-dcu driver copies a drm_mode_config object to its
-> stack but then only accesses a single member (dpms_property)
-> once. The data structure is large enough to trigger a warning
-> about the amount of kernel stack being used:
-> 
-> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c: In function
-> 'fsl_dcu_drm_connector_create':
-> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c:182:1: error: the frame size
-> of 1040 bytes is larger than 1024 bytes [-Werror=frame-larger-than=]
-> 
-> This changes the fsl_dcu_drm_connector_create() function to
-> only access the drm_mode_config by reference, which is also
-> more efficient.
+Hi Marcin,
+ 
+ On sam., avril 16 2016, Marcin Wojtas <mw@semihalf.com> wrote:
 
-Applied to my tree:
-http://git.agner.ch/gitweb/?p=linux-drm-fsl-dcu.git;a=summary
+> Hi Gregory,
+>
+> You can re-add my tested-by. Hang is no longer a problem with your
+> patch during my test of neta.
 
---
-Stefan
+The patch was already submitted in the Russell King's Patch Tracking
+System, so I can't add the tested-by on them, but I am sure it will help
+these pacthes to be merged.
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 109eee2f2a18 ("drm/layerscape: Add Freescale DCU DRM driver")
-> ---
->  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-> b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-> index 8780deba5e8a..92149152db44 100644
-> --- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-> +++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
-> @@ -131,7 +131,7 @@ int fsl_dcu_drm_connector_create(struct
-> fsl_dcu_drm_device *fsl_dev,
->  				 struct drm_encoder *encoder)
->  {
->  	struct drm_connector *connector = &fsl_dev->connector.base;
-> -	struct drm_mode_config mode_config = fsl_dev->drm->mode_config;
-> +	struct drm_mode_config *mode_config = &fsl_dev->drm->mode_config;
->  	struct device_node *panel_node;
->  	int ret;
->  
-> @@ -153,7 +153,7 @@ int fsl_dcu_drm_connector_create(struct
-> fsl_dcu_drm_device *fsl_dev,
->  		goto err_sysfs;
->  
->  	drm_object_property_set_value(&connector->base,
-> -				      mode_config.dpms_property,
-> +				      mode_config->dpms_property,
->  				      DRM_MODE_DPMS_OFF);
->  
->  	panel_node = of_parse_phandle(fsl_dev->np, "fsl,panel", 0);
+Thanks,
+
+Gregory
+
+>
+> Best regards,
+> Marcin
+>
+> 2016-04-12 17:31 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+>> Hi,
+>>
+>> These two patches fixes the dma mapping functions when the system is
+>> cache coherent. The first one allows to fix an issue we have on Armada
+>> 375/38x with the PL310 that's why it is tagged for stable too.
+>>
+>> Thanks,
+>>
+>> Gregory
+>>
+>> PS: the mailing list was missing in the recipient list of the v7. It
+>> was a mistake and I realized it only now. If needed I can repost it
+>> with the few exchange we had with Russell King.
+>>
+>>
+>> Changelog
+>> v7 -> v8:
+>>  - Use a flag instead of a boolean for checking the coherency. It
+>>    improve the readability of the code. Suggested by Russell King.
+>>  - Consider that when coherency is set, it's for both L1 and L2 caches
+>>  - Use the arm_dma_alloc_args struct to pass the coherency status when
+>>    possible. Suggested by Rabin Vincent
+>>  - Remove the Tested-by flag from Marcin because of the modifications
+>>    around the L1 cache management in this series.
+>>
+>> v6 -> v7:
+>>  - Renamed is coherent by l2_coherent as suggested by Russell
+>>
+>> v5 -> v6:
+>>  - Rebased on v4.6-rc1
+>>
+>> v4 -> v5
+>>  - Keep the dmac_* function outside the !is_coherent case.
+>>
+>> v3 -> v4:
+>>  - Rebased on v4.3-rc1
+>>  - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
+>>    allocation from CMA for coherent DMA"
+>>
+>> v2 -> v3:
+>>
+>>  - Fix comments in patch 1 as suggested by Catalin.
+>>  - Fix build issues in patch 2 (by using the multi_v7_defconfig +
+>>    CONFIG_ROCKCHIP_IOMMU).
+>>  - Add the arm_coherent_iommu_mmap_attrs function.
+>>
+>>
+>> Gregory CLEMENT (2):
+>>   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
+>>   ARM: dma-mapping: Fix the coherent case when iommu is used
+>>
+>>  arch/arm/mm/dma-mapping.c | 144 +++++++++++++++++++++++++++++++++-------------
+>>  1 file changed, 105 insertions(+), 39 deletions(-)
+>>
+>> --
+>> 2.5.0
+>>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
