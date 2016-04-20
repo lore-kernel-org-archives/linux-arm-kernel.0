@@ -1,111 +1,42 @@
-From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
-Date: Wed, 20 Apr 2016 19:21:19 +0530
-Subject: [PATCH V2] rtc: zynqmp: Update seconds time programming logic
-Message-ID: <1461160279-40600-1-git-send-email-anuragku@xilinx.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Wed, 20 Apr 2016 16:53:08 +0300
+Subject: [PATCH 1/4] i2c: designware-platdrv: Fix runtime PM initialization
+In-Reply-To: <1460638414-5987-2-git-send-email-jszhang@marvell.com>
+References: <1460638414-5987-1-git-send-email-jszhang@marvell.com>
+ <1460638414-5987-2-git-send-email-jszhang@marvell.com>
+Message-ID: <571789C4.5020904@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We programe RTC time using SET_TIME_WRITE register and read the RTC
-current time using CURRENT_TIME register. When we set the time by
-writing into SET_TIME_WRITE Register and immediately try to read the
-rtc time from CURRENT_TIME register, the previous old value is
-returned instead of the new loaded time. This is because RTC takes
-nearly 1 sec to update the  new loaded value into the CURRENT_TIME
-register. This behaviour is expected in our RTC IP.
+On 04/14/2016 03:53 PM, Jisheng Zhang wrote:
+> When pm_runtime_enable() was being called, the device's usage counter
+> was 0, causing the PM layer to runtime-suspend the device.  We then
+> went on to call i2c_dw_probe() on a suspended device, which could hung.
+>
+> Fix this by incrementing the usage counter before pm_runtime_enable().
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   drivers/i2c/busses/i2c-designware-platdrv.c | 14 +++++++++++++-
+>   1 file changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index d656657..00f9e99 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -246,6 +246,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
+>   	if (dev->pm_runtime_disabled) {
+>   		pm_runtime_forbid(&pdev->dev);
+>   	} else {
+> +		pm_runtime_get_noresume(&pdev->dev);
+>   		pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
+>   		pm_runtime_use_autosuspend(&pdev->dev);
+>   		pm_runtime_set_active(&pdev->dev);
 
-This patch updates the driver to read the current time from SET_TIME_WRITE
-register instead of CURRENT_TIME when rtc time is requested within an 1sec
-period after setting the RTC time. Doing so will ensure the correct time
-is given to the user.
+pm_runtime_enable() here after pm_runtime_set_active() shouldn't suspend 
+as far as I understand which made me thinking if there is some other 
+issue that cause the symptoms what you are seeing? Like race with 
+runtime PM or similar.
 
-Since there is an delay of 1sec in updating the CURRENT_TIME we are loading
-set time +1sec while programming the SET_TIME_WRITE register, doing this
-will give correct time without any delay when read from CURRENT_TIME.
-
-This patch updates the above said.
-
-Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
----
- Changes in v2:
-    1. Updated the Time programming logic as suggested by Alexandre Belloni
-    2. Changed the commit message
----
- drivers/rtc/rtc-zynqmp.c | 41 ++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 36 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
-index f87f971..ba4203a 100644
---- a/drivers/rtc/rtc-zynqmp.c
-+++ b/drivers/rtc/rtc-zynqmp.c
-@@ -64,6 +64,12 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
- 	unsigned long new_time;
- 
-+	/*
-+	 * The value written will be updated after 1 sec into the
-+	 * seconds read register, so we need to program time +1 sec
-+	 * to get the correct time on read.
-+	 */
-+	tm->tm_sec += 1;
- 	new_time = rtc_tm_to_time64(tm);
- 
- 	if (new_time > RTC_SEC_MAX_VAL)
-@@ -78,14 +84,41 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 
- 	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
- 
-+	/*
-+	 * Clear the rtc interrupt status register after setting the
-+	 * time. During a read_time function, the code should read the
-+	 * RTC_INT_STATUS register and if bit 0 is still 0, it means
-+	 * that one second has not elapsed yet since RTC was set and
-+	 * the current time should be read from SET_TIME_READ register;
-+	 * otherwise, CURRENT_TIME register is read to report the time
-+	 */
-+	writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_STS);
-+
- 	return 0;
- }
- 
- static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
- {
-+	int status;
- 	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
- 
--	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+	status = readl(xrtcdev->reg_base + RTC_INT_STS);
-+
-+	if (status & RTC_INT_SEC) {
-+		/*
-+		 * RTC has updated the CURRENT_TIME with the time written into
-+		 * SET_TIME_WRITE register.
-+		 */
-+		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+	} else {
-+		/*
-+		 * Time written in SET_TIME_WRITE has not yet updated into
-+		 * the seconds read register, so read the time from the
-+		 * SET_TIME_WRITE instead of CURRENT_TIME register.
-+		 */
-+		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD), tm);
-+		tm->tm_sec -= 1;
-+	}
- 
- 	return rtc_valid_tm(tm);
- }
-@@ -166,11 +199,9 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
- 	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
- 		return IRQ_NONE;
- 
--	/* Clear interrupt */
--	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-+	/* Clear RTC_INT_ALRM interrupt only */
-+	writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_STS);
- 
--	if (status & RTC_INT_SEC)
--		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
- 	if (status & RTC_INT_ALRM)
- 		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
- 
 -- 
-2.1.2
+Jarkko
