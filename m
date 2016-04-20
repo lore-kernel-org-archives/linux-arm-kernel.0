@@ -1,65 +1,25 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Apr 2016 10:24:04 +0200
-Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
- PM domains
-In-Reply-To: <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
-References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
- <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
- <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
- <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
- <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
-Message-ID: <CAMuHMdVZZoq=t1x_RXXfT_PwR9fFVOrdK1J+xtJWW-yHHbBmHQ@mail.gmail.com>
+From: mmarek@suse.com (Michal Marek)
+Date: Wed, 20 Apr 2016 10:29:11 +0200
+Subject: [PATCH] kbuild: drop FORCE from PHONY targets
+In-Reply-To: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <57173DD7.6020601@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Dne 13.3.2016 v 01:13 Masahiro Yamada napsal(a):
+> These targets are marked as PHONY.  No need to add FORCE to their
+> dependency.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  Makefile                     | 8 ++++----
+>  arch/arm/vdso/Makefile       | 2 +-
+>  arch/ia64/Makefile           | 4 ++--
+>  arch/x86/entry/vdso/Makefile | 4 ++--
+>  4 files changed, 9 insertions(+), 9 deletions(-)
 
-On Mon, Apr 18, 2016 at 4:02 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 18 April 2016 at 15:39, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Mon, Apr 18, 2016 at 2:59 PM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> On Mon, Apr 18, 2016 at 2:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> [...]
->>>>
->>>>> +
->>>>> +static bool rcar_sysc_active_wakeup(struct device *dev)
->>>>> +{
->>>>> +       return true;
->>>>
->>>> I am interested to know why this is always returning true. Perhaps you
->>>> can elaborate a bit on that?
->>>
->>> Too many copying from old shmobile PM Domain code?
->>> Honestly, I don't know...
->>>
->>> Perhaps Rafael still remembers the original rationale, as git history for
->>> commit e3e0109138376bb2 ("ARM / shmobile: Support for I/O power domains for
->>> SH7372 (v9)") doesn't have it.
->>>
->>> Google did find: https://lkml.org/lkml/2011/6/30/471
->>>
->>> Do we still need this at all? I.e. aren't PM Domains containing wake-up
->>> devices kept powered automatically during system suspend?
->>
->> No they aren't. So for pm-rmobile we do need it.
->
-> I don't quite understand why genpd should need to treat all devices
-> within the same domain exactly the same, it seems suboptimal.
->
-> I guess it would be more clever to allow this to be controlled on per
-> device basis instead, so let's say from each driver.
+Applied to kbuild.git#kbuild now, sorry for the delay.
 
-Perhaps this can be handled through device_set_wakeup_enable()?
-Unfortunately this doesn't seem to be called from e.g. gpio-keys.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Michal
