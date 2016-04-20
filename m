@@ -1,126 +1,58 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 20 Apr 2016 16:03:10 +0200
-Subject: [PATCH V2] rtc: zynqmp: Update seconds time programming logic
-In-Reply-To: <1461160279-40600-1-git-send-email-anuragku@xilinx.com>
-References: <1461160279-40600-1-git-send-email-anuragku@xilinx.com>
-Message-ID: <20160420140310.GS29844@piout.net>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 20 Apr 2016 09:04:39 -0500
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
+In-Reply-To: <20160419224122.GE19428@n2100.arm.linux.org.uk>
+References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
+ <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
+ <20160419224122.GE19428@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/2016 at 19:21:19 +0530, Anurag Kumar Vulisha wrote :
-> We programe RTC time using SET_TIME_WRITE register and read the RTC
-> current time using CURRENT_TIME register. When we set the time by
-> writing into SET_TIME_WRITE Register and immediately try to read the
-> rtc time from CURRENT_TIME register, the previous old value is
-> returned instead of the new loaded time. This is because RTC takes
-> nearly 1 sec to update the  new loaded value into the CURRENT_TIME
-> register. This behaviour is expected in our RTC IP.
-> 
-> This patch updates the driver to read the current time from SET_TIME_WRITE
-> register instead of CURRENT_TIME when rtc time is requested within an 1sec
-> period after setting the RTC time. Doing so will ensure the correct time
-> is given to the user.
-> 
-> Since there is an delay of 1sec in updating the CURRENT_TIME we are loading
-> set time +1sec while programming the SET_TIME_WRITE register, doing this
-> will give correct time without any delay when read from CURRENT_TIME.
-> 
-> This patch updates the above said.
-> 
-> Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
-> ---
->  Changes in v2:
->     1. Updated the Time programming logic as suggested by Alexandre Belloni
->     2. Changed the commit message
-> ---
->  drivers/rtc/rtc-zynqmp.c | 41 ++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 36 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
-> index f87f971..ba4203a 100644
-> --- a/drivers/rtc/rtc-zynqmp.c
-> +++ b/drivers/rtc/rtc-zynqmp.c
-> @@ -64,6 +64,12 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
->  	unsigned long new_time;
->  
-> +	/*
-> +	 * The value written will be updated after 1 sec into the
-> +	 * seconds read register, so we need to program time +1 sec
-> +	 * to get the correct time on read.
-> +	 */
-> +	tm->tm_sec += 1;
->  	new_time = rtc_tm_to_time64(tm);
->  
->  	if (new_time > RTC_SEC_MAX_VAL)
-> @@ -78,14 +84,41 @@ static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  
->  	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
->  
-> +	/*
-> +	 * Clear the rtc interrupt status register after setting the
-> +	 * time. During a read_time function, the code should read the
-> +	 * RTC_INT_STATUS register and if bit 0 is still 0, it means
-> +	 * that one second has not elapsed yet since RTC was set and
-> +	 * the current time should be read from SET_TIME_READ register;
-> +	 * otherwise, CURRENT_TIME register is read to report the time
-> +	 */
-> +	writel(RTC_INT_SEC, xrtcdev->reg_base + RTC_INT_STS);
-> +
->  	return 0;
->  }
->  
->  static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  {
-> +	int status;
->  	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
->  
-> -	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-> +	status = readl(xrtcdev->reg_base + RTC_INT_STS);
-> +
-> +	if (status & RTC_INT_SEC) {
-> +		/*
-> +		 * RTC has updated the CURRENT_TIME with the time written into
-> +		 * SET_TIME_WRITE register.
-> +		 */
-> +		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-> +	} else {
-> +		/*
-> +		 * Time written in SET_TIME_WRITE has not yet updated into
-> +		 * the seconds read register, so read the time from the
-> +		 * SET_TIME_WRITE instead of CURRENT_TIME register.
-> +		 */
-> +		rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD), tm);
-> +		tm->tm_sec -= 1;
+On Tue, Apr 19, 2016 at 5:41 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
+>> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
+>> > Document the DT bindings for controlling ARM PL310 Power Control
+>> > settings.
+>> >
+>> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+>>
+>> What happened to Josh's ack?
+>>
+>> > ---
+>> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
+>> >  1 file changed, 4 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> > index fe0398c..c1c756e 100644
+>> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> > @@ -84,6 +84,10 @@ Optional properties:
+>> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+>> >    <1> (forcibly enable), property absent (retain settings set by
+>> >    firmware)
+>> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
+>> > +  disable), <1> or property absent (forcibly enable)
+>> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
+>> > +  <1>  or property absent (forcibly enable)
+>>
+>> What happened to "retain settings set by firmware"?
+>
+> I said we shouldn't.  Current behaviour is that we enable these features,
+> and moving to missing-means-retain means that everything today ends up
+> with these features disabled.  IOW, it's yet another change of actual
+> behaviour that every platform would see.
 
-Well, I didn't point it out directly earlier but this doesn't work while
-my example is working:
-rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_SET_TM_RD) - 1, tm);
-Think about what is happening when tm->tm_sec == 0 ...
+Right, but then the properties are different from prefetch-instr and
+others IIRC. We're letting the OS define the binding. If BSD doesn't
+enable these settings currently, then there is a mismatch between the
+binding and actual behavior. Saying "retain firmware settings" also
+defines specific OS behavior. I think absent should mean OS is free to
+do whatever it wants which could be retain firmware settings, enable
+or disable. In other words, it is undefined as this ship has already
+sailed.
 
-> +	}
->  
->  	return rtc_valid_tm(tm);
->  }
-> @@ -166,11 +199,9 @@ static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
->  	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
->  		return IRQ_NONE;
->  
-> -	/* Clear interrupt */
-> -	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-> +	/* Clear RTC_INT_ALRM interrupt only */
-> +	writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_STS);
->  
-> -	if (status & RTC_INT_SEC)
-> -		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
->  	if (status & RTC_INT_ALRM)
->  		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
->  
-> -- 
-> 2.1.2
-> 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Rob
