@@ -1,165 +1,129 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 20 Apr 2016 09:12:01 -0700
-Subject: [PATCH v2 2/2] dmaengine: vdma: Add clock support
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A57930F@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
- <1461152599-28858-2-git-send-email-appanad@xilinx.com>
- <20160420143622.GP7128@xsjsorenbubuntu>
- <C246CAC1457055469EF09E3A7AC4E11A4A57930F@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160420161201.GS7128@xsjsorenbubuntu>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 20 Apr 2016 18:14:01 +0200
+Subject: [PATCH v7 03/10] iommu: introduce a reserved iova cookie
+In-Reply-To: <57177C31.9090004@arm.com>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-4-git-send-email-eric.auger@linaro.org>
+ <57177C31.9090004@arm.com>
+Message-ID: <5717AAC9.10505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-04-20 at 07:55:27 -0700, Appana Durga Kedareswara Rao wrote:
-> Hi Soren,
+Hi Robin,
+On 04/20/2016 02:55 PM, Robin Murphy wrote:
+> On 19/04/16 17:56, Eric Auger wrote:
+>> This patch introduces some new fields in the iommu_domain struct,
+>> dedicated to reserved iova management.
+>>
+>> In a similar way as DMA mapping IOVA window, we need to store
+>> information related to a reserved IOVA window.
+>>
+>> The reserved_iova_cookie will store the reserved iova_domain
+>> handle. An RB tree indexed by physical address is introduced to
+>> store the host physical addresses bound to reserved IOVAs.
+>>
+>> Those physical addresses will correspond to MSI frame base
+>> addresses, also referred to as doorbells. Their number should be
+>> quite limited per domain.
+>>
+>> Also a spin_lock is introduced to protect accesses to the iova_domain
+>> and RB tree. The choice of a spin_lock is driven by the fact the RB
+>> tree will need to be accessed in MSI controller code not allowed to
+>> sleep.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>> v5 -> v6:
+>> - initialize reserved_binding_list
+>> - use a spinlock instead of a mutex
+>> ---
+>>   drivers/iommu/iommu.c | 2 ++
+>>   include/linux/iommu.h | 6 ++++++
+>>   2 files changed, 8 insertions(+)
+>>
+>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>> index b9df141..f70ef3b 100644
+>> --- a/drivers/iommu/iommu.c
+>> +++ b/drivers/iommu/iommu.c
+>> @@ -1073,6 +1073,8 @@ static struct iommu_domain
+>> *__iommu_domain_alloc(struct bus_type *bus,
+>>
+>>       domain->ops  = bus->iommu_ops;
+>>       domain->type = type;
+>> +    spin_lock_init(&domain->reserved_lock);
+>> +    domain->reserved_binding_list = RB_ROOT;
+>>
+>>       return domain;
+>>   }
+>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>> index b3e8c5b..60999db 100644
+>> --- a/include/linux/iommu.h
+>> +++ b/include/linux/iommu.h
+>> @@ -24,6 +24,7 @@
+>>   #include <linux/of.h>
+>>   #include <linux/types.h>
+>>   #include <linux/scatterlist.h>
+>> +#include <linux/spinlock.h>
+>>   #include <trace/events/iommu.h>
+>>
+>>   #define IOMMU_READ    (1 << 0)
+>> @@ -83,6 +84,11 @@ struct iommu_domain {
+>>       void *handler_token;
+>>       struct iommu_domain_geometry geometry;
+>>       void *iova_cookie;
+>> +    void *reserved_iova_cookie;
 > 
-> > -----Original Message-----
-> > From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
-> > Sent: Wednesday, April 20, 2016 8:06 PM
-> > To: Appana Durga Kedareswara Rao <appanad@xilinx.com>
-> > Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> > <michals@xilinx.com>; vinod.koul at intel.com; dan.j.williams at intel.com;
-> > Appana Durga Kedareswara Rao <appanad@xilinx.com>;
-> > moritz.fischer at ettus.com; laurent.pinchart at ideasonboard.com;
-> > luis at debethencourt.com; Anirudha Sarangi <anirudh@xilinx.com>; Punnaiah
-> > Choudary Kalluri <punnaia@xilinx.com>; Shubhrajyoti Datta
-> > <shubhraj@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > dmaengine at vger.kernel.org
-> > Subject: Re: [PATCH v2 2/2] dmaengine: vdma: Add clock support
-> > 
-> > On Wed, 2016-04-20 at 17:13:19 +0530, Kedareswara rao Appana wrote:
-> > > Added basic clock support. The clocks are requested at probe and
-> > > released at remove.
-> > >
-> > > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > > ---
-> > > Changes for v2:
-> > > --> None.
-> > >
-> > >  drivers/dma/xilinx/xilinx_vdma.c | 56
-> > > ++++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 56 insertions(+)
-> > >
-> > > diff --git a/drivers/dma/xilinx/xilinx_vdma.c
-> > > b/drivers/dma/xilinx/xilinx_vdma.c
-> > > index 70caea6..d526029 100644
-> > > --- a/drivers/dma/xilinx/xilinx_vdma.c
-> > > +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> > > @@ -44,6 +44,7 @@
-> > >  #include <linux/of_platform.h>
-> > >  #include <linux/of_irq.h>
-> > >  #include <linux/slab.h>
-> > > +#include <linux/clk.h>
-> > >
-> > >  #include "../dmaengine.h"
-> > >
-> > > @@ -352,6 +353,8 @@ struct xilinx_dma_chan {
-> > >   * @flush_on_fsync: Flush on frame sync
-> > >   * @ext_addr: Indicates 64 bit addressing is supported by dma device
-> > >   * @dmatype: DMA ip type
-> > > + * @clks:	pointer to array of clocks
-> > > + * @numclks:	number of clocks available
-> > >   */
-> > >  struct xilinx_dma_device {
-> > >  	void __iomem *regs;
-> > > @@ -362,6 +365,8 @@ struct xilinx_dma_device {
-> > >  	u32 flush_on_fsync;
-> > >  	bool ext_addr;
-> > >  	enum xdma_ip_type dmatype;
-> > > +	struct clk **clks;
-> > > +	int numclks;
-> > >  };
-> > >
-> > >  /* Macros */
-> > > @@ -1731,6 +1736,26 @@ int xilinx_vdma_channel_set_config(struct
-> > > dma_chan *dchan,  }  EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
-> > >
-> > > +static int xdma_clk_init(struct xilinx_dma_device *xdev, bool enable)
-> > > +{
-> > > +	int i = 0, ret;
-> > > +
-> > > +	for (i = 0; i < xdev->numclks; i++) {
-> > > +		if (enable) {
-> > > +			ret = clk_prepare_enable(xdev->clks[i]);
-> > > +			if (ret) {
-> > > +				dev_err(xdev->dev,
-> > > +					"failed to enable the axidma clock\n");
-> > > +				return ret;
-> > > +			}
-> > > +		} else {
-> > > +			clk_disable_unprepare(xdev->clks[i]);
-> > > +		}
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > >  /* -----------------------------------------------------------------------------
-> > >   * Probe and remove
-> > >   */
-> > > @@ -1919,6 +1944,7 @@ static int xilinx_dma_probe(struct platform_device
-> > *pdev)
-> > >  	struct resource *io;
-> > >  	u32 num_frames, addr_width;
-> > >  	int i, err;
-> > > +	const char *str;
-> > >
-> > >  	/* Allocate and initialize the DMA engine structure */
-> > >  	xdev = devm_kzalloc(&pdev->dev, sizeof(*xdev), GFP_KERNEL); @@
-> > > -1965,6 +1991,32 @@ static int xilinx_dma_probe(struct platform_device
-> > *pdev)
-> > >  	/* Set the dma mask bits */
-> > >  	dma_set_mask(xdev->dev, DMA_BIT_MASK(addr_width));
-> > >
-> > > +	xdev->numclks = of_property_count_strings(pdev->dev.of_node,
-> > > +						  "clock-names");
-> > > +	if (xdev->numclks > 0) {
-> > > +		xdev->clks = devm_kmalloc_array(&pdev->dev, xdev->numclks,
-> > > +						sizeof(struct clk *),
-> > > +						GFP_KERNEL);
-> > > +		if (!xdev->clks)
-> > > +			return -ENOMEM;
-> > > +
-> > > +		for (i = 0; i < xdev->numclks; i++) {
-> > > +			of_property_read_string_index(pdev->dev.of_node,
-> > > +						      "clock-names", i, &str);
-> > > +			xdev->clks[i] = devm_clk_get(xdev->dev, str);
-> > > +			if (IS_ERR(xdev->clks[i])) {
-> > > +				if (PTR_ERR(xdev->clks[i]) == -ENOENT)
-> > > +					xdev->clks[i] = NULL;
-> > > +				else
-> > > +					return PTR_ERR(xdev->clks[i]);
-> > > +			}
-> > > +		}
-> > > +
-> > > +		err = xdma_clk_init(xdev, true);
-> > > +		if (err)
-> > > +			return err;
-> > > +	}
-> > 
-> > I guess this works, but the relation to the binding is a little loose, IMHO. Instead
-> > of using the clock names from the binding this is just using whatever is provided
-> > in DT and enabling it. Also, all the clocks here are handled as optional feature,
-> > while binding - and I guess reality too - have them as mandatory.
-> > It would be nicer if the driver specifically asks for the clocks it needs and return
-> > an error if a mandatory clock is missing.
-> 
-> Here DMA channels are configurable I mean if user select only mm2s channel then we will have
-> Only 3 clocks. If user selects both mm2s and s2mm channels we will have 5 clocks.
-> That?s why reading the number of clocks from the clock-names property.
-> 
-> And also the AXI DMA/CDMA Ip support also getting added to this driver for those IP's also the clocks are configurable
-> For AXI DMA it is either 3 or 4 clocks and for AXI CDMA it is 2 clocks.
-> 
-> That's why I thought it is the proper solution.
-> 
-> If you have any better idea please let me know will try in that way...
+> Why exactly do we need this? From your description, it's for the user of
+> the domain to keep track of IOVA allocations in, but then that's
+> precisely what the iova_cookie exists for.
 
-I guess the driver know all these things: whether it controls vdma or
-cdma, what interfaces it has and how many channels? Based on that, I
-guess it should be possible to derive what clocks are required for
-correct operation.
+I was not sure whether both APIs could not be used concurrently, hence a
+separate cookie. If we only consider MSI mapping use case I guess we are
+either with a DMA domain or with a domain for VFIO and I would agree
+with you, ie. we can reuse the same cookie.
+> 
+>> +    /* rb tree indexed by PA, for reserved bindings only */
+>> +    struct rb_root reserved_binding_list;
+> 
+> Nit: that's more puzzling than helpful - "reserved binding" is
+> particularly vague and nondescript, and makes me think of anything but
+> MSI descriptors.
+my heart is torn between advised genericity and MSI use case. My natural
+short-sighted inclination would head me for an MSI mapping dedicated API
+but I am following advices. As discussed with Alex there are
+implementation details pretty related to MSI problematics I think (the
+fact we store the "bindings" in an rb-tree/list, locking)
 
-	S?ren
+If Marc & Alex I can retarget this API to be less generic.
+
+ Plus it's called a list but isn't a list (that said,
+> given that we'd typically only expect a handful of entries, and lookups
+> are hardly going to be a performance-critical bottleneck, would a simple
+> list not suffice?)
+I fully agree on that point. An rb-tree is overkill today for MSI use
+case. Again if we were to use this API for anything else, this may
+change the decision. But sure we can refactor afterwards upon needs. TBH
+the rb-tree is inherited from vfio_iommu_type1 dma tree where that code
+was originally located.
+> 
+>> +    /* protects reserved cookie and rbtree manipulation */
+>> +    spinlock_t reserved_lock;
+> 
+> A cookie is an opaque structure, so any locking it needs would normally
+> be hidden within. If on the other hand it's not meant to be opaque at
+> this level, then it should probably be something more specific than a
+> void * (if at all, as above).
+agreed
+
+Thanks
+
+Eric
+> 
+> Robin.
+> 
+>>   };
+>>
+>>   enum iommu_cap {
+>>
+> 
