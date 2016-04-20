@@ -1,339 +1,66 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 20 Apr 2016 17:58:41 +0100
-Subject: [PATCH v7 06/10] iommu/dma-reserved-iommu:
- iommu_get/put_reserved_iova
-In-Reply-To: <1461084994-2355-7-git-send-email-eric.auger@linaro.org>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <5717B541.7090003@arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 21 Apr 2016 00:51:30 +0800
+Subject: [PATCH 1/3] mmc: core: fix using wrong io voltage if mmc_select_hs200
+ fails
+Message-ID: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 17:56, Eric Auger wrote:
-> This patch introduces iommu_get/put_reserved_iova.
->
-> iommu_get_reserved_iova allows to iommu map a contiguous physical region
-> onto a reserved contiguous IOVA region. The physical region base address
-> does not need to be iommu page size aligned. iova pages are allocated and
-> mapped so that they cover all the physical region. This mapping is
-> tracked as a whole (and cannot be split) in an RB tree indexed by PA.
->
-> In case a mapping already exists for the physical pages, the IOVA mapped
-> to the PA base is directly returned.
->
-> Each time the get succeeds a binding ref count is incremented.
->
-> iommu_put_reserved_iova decrements the ref count and when this latter
-> is null, the mapping is destroyed and the iovas are released.
->
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->
-> ---
-> v7:
-> - change title and rework commit message with new name of the functions
->    and size parameter
-> - fix locking
-> - rework header doc comments
-> - put now takes a phys_addr_t
-> - check prot argument against reserved_iova_domain prot flags
->
-> v5 -> v6:
-> - revisit locking with spin_lock instead of mutex
-> - do not kref_get on 1st get
-> - add size parameter to the get function following Marc's request
-> - use the iova domain shift instead of using the smallest supported page size
->
-> v3 -> v4:
-> - formerly in iommu: iommu_get/put_single_reserved &
->    iommu/arm-smmu: implement iommu_get/put_single_reserved
-> - Attempted to address Marc's doubts about missing size/alignment
->    at VFIO level (user-space knows the IOMMU page size and the number
->    of IOVA pages to provision)
->
-> v2 -> v3:
-> - remove static implementation of iommu_get_single_reserved &
->    iommu_put_single_reserved when CONFIG_IOMMU_API is not set
->
-> v1 -> v2:
-> - previously a VFIO API, named vfio_alloc_map/unmap_free_reserved_iova
-> ---
->   drivers/iommu/dma-reserved-iommu.c | 150 +++++++++++++++++++++++++++++++++++++
->   include/linux/dma-reserved-iommu.h |  38 ++++++++++
->   2 files changed, 188 insertions(+)
->
-> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
-> index f6fa18e..426d339 100644
-> --- a/drivers/iommu/dma-reserved-iommu.c
-> +++ b/drivers/iommu/dma-reserved-iommu.c
-> @@ -135,6 +135,22 @@ unlock:
->   }
->   EXPORT_SYMBOL_GPL(iommu_alloc_reserved_iova_domain);
->
-> +/* called with domain's reserved_lock held */
-> +static void reserved_binding_release(struct kref *kref)
-> +{
-> +	struct iommu_reserved_binding *b =
-> +		container_of(kref, struct iommu_reserved_binding, kref);
-> +	struct iommu_domain *d = b->domain;
-> +	struct reserved_iova_domain *rid =
-> +		(struct reserved_iova_domain *)d->reserved_iova_cookie;
+Currently MMC core will keep going if HS200/HS timing switch failed
+with -EBADMSG error by the assumption that the old timing is still valid.
 
-Either it's a void *, in which case you don't need to cast it, or it 
-should be the appropriate type as I mentioned earlier, in which case you 
-still wouldn't need to cast it.
+However, for mmc_select_hs200 case, the signal voltage may have already
+been switched. If the timing switch failed, we should fall back to
+the old voltage in case the card is continue run with legacy timing.
 
-> +	unsigned long order;
-> +
-> +	order = iova_shift(rid->iovad);
-> +	free_iova(rid->iovad, b->iova >> order);
+If fall back signal voltage failed, we explicitly report an EIO error
+to force retry during the next power cycle.
 
-iova_pfn() ?
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ drivers/mmc/core/mmc.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-> +	unlink_reserved_binding(d, b);
-> +	kfree(b);
-> +}
-> +
->   void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
->   {
->   	struct reserved_iova_domain *rid;
-> @@ -160,3 +176,137 @@ unlock:
->   	}
->   }
->   EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
-> +
-> +int iommu_get_reserved_iova(struct iommu_domain *domain,
-> +			      phys_addr_t addr, size_t size, int prot,
-> +			      dma_addr_t *iova)
-> +{
-> +	unsigned long base_pfn, end_pfn, nb_iommu_pages, order, flags;
-> +	struct iommu_reserved_binding *b, *newb;
-> +	size_t iommu_page_size, binding_size;
-> +	phys_addr_t aligned_base, offset;
-> +	struct reserved_iova_domain *rid;
-> +	struct iova_domain *iovad;
-> +	struct iova *p_iova;
-> +	int ret = -EINVAL;
-> +
-> +	newb = kzalloc(sizeof(*newb), GFP_KERNEL);
-> +	if (!newb)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_irqsave(&domain->reserved_lock, flags);
-> +
-> +	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
-> +	if (!rid)
-> +		goto free_newb;
-> +
-> +	if ((prot & IOMMU_READ & !(rid->prot & IOMMU_READ)) ||
-> +	    (prot & IOMMU_WRITE & !(rid->prot & IOMMU_WRITE)))
-
-Are devices wanting to read from MSI doorbells really a thing?
-
-> +		goto free_newb;
-> +
-> +	iovad = rid->iovad;
-> +	order = iova_shift(iovad);
-> +	base_pfn = addr >> order;
-> +	end_pfn = (addr + size - 1) >> order;
-> +	aligned_base = base_pfn << order;
-> +	offset = addr - aligned_base;
-> +	nb_iommu_pages = end_pfn - base_pfn + 1;
-> +	iommu_page_size = 1 << order;
-> +	binding_size = nb_iommu_pages * iommu_page_size;
-
-offset = iova_offset(iovad, addr);
-aligned_base = addr - offset;
-binding_size = iova_align(iovad, size + offset);
-
-Am I right?
-
-> +
-> +	b = find_reserved_binding(domain, aligned_base, binding_size);
-> +	if (b) {
-> +		*iova = b->iova + offset + aligned_base - b->addr;
-> +		kref_get(&b->kref);
-> +		ret = 0;
-> +		goto free_newb;
-> +	}
-> +
-> +	p_iova = alloc_iova(iovad, nb_iommu_pages,
-> +			    iovad->dma_32bit_pfn, true);
-> +	if (!p_iova) {
-> +		ret = -ENOMEM;
-> +		goto free_newb;
-> +	}
-> +
-> +	*iova = iova_dma_addr(iovad, p_iova);
-> +
-> +	/* unlock to call iommu_map which is not guaranteed to be atomic */
-
-Hmm, that's concerning, because the ARM DMA mapping code, and 
-consequently the iommu-dma layer, has always relied on it being so. On 
-brief inspection, it looks to be only the AMD IOMMU doing something 
-obviously non-atomic (taking a mutex) in its map callback, but then that 
-has a separate DMA ops implementation. It doesn't look like it would be 
-too intrusive to change, either, but that's an idea for its own thread.
-
-> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> +
-> +	ret = iommu_map(domain, *iova, aligned_base, binding_size, prot);
-> +
-> +	spin_lock_irqsave(&domain->reserved_lock, flags);
-> +
-> +	rid = (struct reserved_iova_domain *) domain->reserved_iova_cookie;
-> +	if (!rid || (rid->iovad != iovad)) {
-> +		/* reserved iova domain was destroyed in our back */
-
-That that could happen at all is terrifying! Surely the reserved domain 
-should be set up immediately after iommu_domain_alloc() and torn down 
-immediately before iommu_domain_free(). Things going missing while a 
-domain is live smacks of horrible brokenness.
-
-> +		ret = -EBUSY;
-> +		goto free_newb; /* iova already released */
-> +	}
-> +
-> +	/* no change in iova reserved domain but iommu_map failed */
-> +	if (ret)
-> +		goto free_iova;
-> +
-> +	/* everything is fine, add in the new node in the rb tree */
-> +	kref_init(&newb->kref);
-> +	newb->domain = domain;
-> +	newb->addr = aligned_base;
-> +	newb->iova = *iova;
-> +	newb->size = binding_size;
-> +
-> +	link_reserved_binding(domain, newb);
-> +
-> +	*iova += offset;
-> +	goto unlock;
-> +
-> +free_iova:
-> +	free_iova(rid->iovad, p_iova->pfn_lo);
-> +free_newb:
-> +	kfree(newb);
-> +unlock:
-> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_get_reserved_iova);
-> +
-> +void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr)
-> +{
-> +	phys_addr_t aligned_addr, page_size, mask;
-> +	struct iommu_reserved_binding *b;
-> +	struct reserved_iova_domain *rid;
-> +	unsigned long order, flags;
-> +	struct iommu_domain *d;
-> +	dma_addr_t iova;
-> +	size_t size;
-> +	int ret = 0;
-> +
-> +	spin_lock_irqsave(&domain->reserved_lock, flags);
-> +
-> +	rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
-> +	if (!rid)
-> +		goto unlock;
-> +
-> +	order = iova_shift(rid->iovad);
-> +	page_size = (uint64_t)1 << order;
-> +	mask = page_size - 1;
-> +	aligned_addr = addr & ~mask;
-
-addr & ~iova_mask(rid->iovad)
-
-> +
-> +	b = find_reserved_binding(domain, aligned_addr, page_size);
-> +	if (!b)
-> +		goto unlock;
-> +
-> +	iova = b->iova;
-> +	size = b->size;
-> +	d = b->domain;
-> +
-> +	ret = kref_put(&b->kref, reserved_binding_release);
-> +
-> +unlock:
-> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> +	if (ret)
-> +		iommu_unmap(d, iova, size);
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_put_reserved_iova);
-> +
-> diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
-> index 01ec385..8722131 100644
-> --- a/include/linux/dma-reserved-iommu.h
-> +++ b/include/linux/dma-reserved-iommu.h
-> @@ -42,6 +42,34 @@ int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
->    */
->   void iommu_free_reserved_iova_domain(struct iommu_domain *domain);
->
-> +/**
-> + * iommu_get_reserved_iova: allocate a contiguous set of iova pages and
-> + * map them to the physical range defined by @addr and @size.
-> + *
-> + * @domain: iommu domain handle
-> + * @addr: physical address to bind
-> + * @size: size of the binding
-> + * @prot: mapping protection attribute
-> + * @iova: returned iova
-> + *
-> + * Mapped physical pfns are within [@addr >> order, (@addr + size -1) >> order]
-> + * where order corresponds to the reserved iova domain order.
-> + * This mapping is tracked and reference counted with the minimal granularity
-> + * of @size.
-> + */
-> +int iommu_get_reserved_iova(struct iommu_domain *domain,
-> +			    phys_addr_t addr, size_t size, int prot,
-> +			    dma_addr_t *iova);
-> +
-> +/**
-> + * iommu_put_reserved_iova: decrement a ref count of the reserved mapping
-> + *
-> + * @domain: iommu domain handle
-> + * @addr: physical address whose binding ref count is decremented
-> + *
-> + * if the binding ref count is null, destroy the reserved mapping
-> + */
-> +void iommu_put_reserved_iova(struct iommu_domain *domain, phys_addr_t addr);
->   #else
->
->   static inline int
-> @@ -55,5 +83,15 @@ iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
->   static inline void
->   iommu_free_reserved_iova_domain(struct iommu_domain *domain) {}
->
-> +static inline int iommu_get_reserved_iova(struct iommu_domain *domain,
-> +					  phys_addr_t addr, size_t size,
-> +					  int prot, dma_addr_t *iova)
-> +{
-> +	return -ENOENT;
-> +}
-> +
-> +static inline void iommu_put_reserved_iova(struct iommu_domain *domain,
-> +					   phys_addr_t addr) {}
-> +
->   #endif	/* CONFIG_IOMMU_DMA_RESERVED */
->   #endif	/* __DMA_RESERVED_IOMMU_H */
->
-
-I worry that this all falls into the trap of trying too hard to abstract 
-something which doesn't need abstracting. AFAICS all we need is 
-something for VFIO to keep track of its own IOVA usage vs. userspace's, 
-plus a list of MSI descriptors (with IOVAs) wrapped in refcounts hanging 
-off the iommu_domain, with a handful of functions to manage them. The 
-former is as good as solved already - stick an iova_domain or even just 
-a bitmap in the iova_cookie and use it directly - and the latter would 
-actually be reusable elsewhere (e.g. for iommu-dma domains). What I'm 
-seeing here is layers upon layers of complexity with no immediate 
-justification, that's 'generic' enough to not directly solve the problem 
-at hand, but in a way that still makes it more or less unusable for 
-solving equivalent problems elsewhere.
-
-Since I don't like that everything I have to say about this series so 
-far seems negative, I'll plan to spend some time next week having a go 
-at hardening my 50-line proof-of-concept for stage 1 MSIs, and see if I 
-can offer code instead of criticism :)
-
-Robin.
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index b8aa12c..f6683a9 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1245,9 +1245,11 @@ static int mmc_select_hs200(struct mmc_card *card)
+ 	struct mmc_host *host = card->host;
+ 	bool send_status = true;
+ 	unsigned int old_timing;
++	unsigned int old_signal_voltage;
+ 	int err = -EINVAL;
+ 	u8 val;
+ 
++	old_signal_voltage = host->ios.signal_voltage;
+ 	if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200_1_2V)
+ 		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120);
+ 
+@@ -1256,7 +1258,7 @@ static int mmc_select_hs200(struct mmc_card *card)
+ 
+ 	/* If fails try again during next card power cycle */
+ 	if (err)
+-		goto err;
++		return err;
+ 
+ 	mmc_select_driver_type(card);
+ 
+@@ -1290,9 +1292,14 @@ static int mmc_select_hs200(struct mmc_card *card)
+ 		}
+ 	}
+ err:
+-	if (err)
++	if (err) {
++		/* fall back to the old signal voltage, if fails report error */
++		if (__mmc_set_signal_voltage(host, old_signal_voltage))
++			err = -EIO;
++
+ 		pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
+ 		       __func__, err);
++	}
+ 	return err;
+ }
+ 
+-- 
+1.9.1
