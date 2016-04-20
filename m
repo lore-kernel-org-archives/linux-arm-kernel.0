@@ -1,20 +1,48 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 20 Apr 2016 13:15:27 +0200
-Subject: [PATCH 1/2] Documentation: DT: vdma: Add clock support for vdma
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A578F73@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1461136800-20334-1-git-send-email-appanad@xilinx.com>
- <CAKfKVtEkfnDqU476troXmCw20ATvQvj-JdPX-BCuPDR-9ZxKHQ@mail.gmail.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A578F73@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <571764CF.6070003@metafoo.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Apr 2016 12:15:48 +0100
+Subject: [PATCH v5 1/7] Documentation: arm64: pmu: Add Broadcom Vulcan
+ PMU binding
+In-Reply-To: <1461092062-7484-2-git-send-email-ashoks@broadcom.com>
+References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
+ <1461092062-7484-2-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160420111547.GG11453@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2016 10:39 AM, Appana Durga Kedareswara Rao wrote:
-[...]
->> however  we should keep the names same as the TRM.
+On Tue, Apr 19, 2016 at 11:54:16AM -0700, Ashok Kumar wrote:
+> Document the compatible string for Broadcom Vulcan PMU.
+> Also arranged the list in alphabetical order.
 > 
-> Why?? Why can't we use simple convenient names that refers to equivalent clocks of h/w 
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Because it is confusing. If you use the same name it's very straight forward
-to understand which clock is being referred to. That's not the case if you
-come up with random new names.
+FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 6eb73be..74d5417 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -22,10 +22,11 @@ Required properties:
+>  	"arm,arm11mpcore-pmu"
+>  	"arm,arm1176-pmu"
+>  	"arm,arm1136-pmu"
+> +	"brcm,vulcan-pmu"
+> +	"cavium,thunder-pmu"
+>  	"qcom,scorpion-pmu"
+>  	"qcom,scorpion-mp-pmu"
+>  	"qcom,krait-pmu"
+> -	"cavium,thunder-pmu"
+>  - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+>                 interrupt (PPI) then 1 interrupt should be specified.
+>  
+> -- 
+> 2.1.0
+> 
