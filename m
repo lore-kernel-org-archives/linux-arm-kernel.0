@@ -1,7 +1,9 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Wed, 20 Apr 2016 10:31:45 +0800
-Subject: [PATCH v2] drm/rockchip: get rid of rockchip_drm_crtc_mode_config
-Message-ID: <1461119505-27076-1-git-send-email-mark.yao@rock-chips.com>
+Date: Wed, 20 Apr 2016 10:41:42 +0800
+Subject: [PATCH v3] drm/rockchip: get rid of rockchip_drm_crtc_mode_config
+In-Reply-To: <1461119505-27076-1-git-send-email-mark.yao@rock-chips.com>
+References: <1461119505-27076-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1461120102-32054-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,17 +16,19 @@ it's nice to make them into atomic.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
+Changes in v3:
+- foget remove rockchip_drm_crtc_mode_config function in v2, remove it in v3.
+ 
 Changes in v2:
 Advised by John Keeping
 - use atomic crtc state to transmit output_type and output_mode
-
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |   48 +++++++++++++----------
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c          |   38 +++++++++++-------
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |   14 +++++++
- drivers/gpu/drm/rockchip/inno_hdmi.c            |   17 ++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |    8 ++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c     |   43 +++++++++++++++++++-
- 6 files changed, 128 insertions(+), 40 deletions(-)
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |   48 ++++++++-------
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c          |   38 +++++++-----
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |   17 ++++-
+ drivers/gpu/drm/rockchip/inno_hdmi.c            |   17 ++++-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |   10 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c     |   75 +++++++++++++----------
+ 6 files changed, 128 insertions(+), 77 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
 index a1d94d8..50e558d 100644
@@ -173,10 +177,20 @@ index 7975158..dedc65b 100644
  
  static struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
 diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index d5cfef7..5659b83 100644
+index d5cfef7..801110f 100644
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -215,11 +215,25 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+@@ -201,9 +201,6 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+ 	u32 val;
+ 	int mux;
+ 
+-	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
+-				      ROCKCHIP_OUT_MODE_AAAA);
+-
+ 	mux = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
+ 	if (mux)
+ 		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
+@@ -215,11 +212,25 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
  		(mux) ? "LIT" : "BIG");
  }
  
@@ -243,7 +257,7 @@ index 10d62ff..6aca6b2 100644
  
  static struct drm_encoder_funcs inno_hdmi_encoder_funcs = {
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index 00d17d7..32a369a 100644
+index 00d17d7..56f43a3 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
 @@ -50,6 +50,14 @@ struct rockchip_atomic_commit {
@@ -261,11 +275,59 @@ index 00d17d7..32a369a 100644
  /*
   * Rockchip drm private structure.
   *
+@@ -68,8 +76,6 @@ void rockchip_drm_atomic_work(struct work_struct *work);
+ int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
+ 				 const struct rockchip_crtc_funcs *crtc_funcs);
+ void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
+-int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
+-				  int out_mode);
+ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ 				   struct device *dev);
+ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index a619f12..fc7cdd2 100644
+index a619f12..28596e7 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -931,6 +931,7 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+@@ -818,38 +818,6 @@ static const struct drm_plane_funcs vop_plane_funcs = {
+ 	.atomic_destroy_state = vop_atomic_plane_destroy_state,
+ };
+ 
+-int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
+-				  int connector_type,
+-				  int out_mode)
+-{
+-	struct vop *vop = to_vop(crtc);
+-
+-	if (WARN_ON(!vop->is_enabled))
+-		return -EINVAL;
+-
+-	switch (connector_type) {
+-	case DRM_MODE_CONNECTOR_LVDS:
+-		VOP_CTRL_SET(vop, rgb_en, 1);
+-		break;
+-	case DRM_MODE_CONNECTOR_eDP:
+-		VOP_CTRL_SET(vop, edp_en, 1);
+-		break;
+-	case DRM_MODE_CONNECTOR_HDMIA:
+-		VOP_CTRL_SET(vop, hdmi_en, 1);
+-		break;
+-	case DRM_MODE_CONNECTOR_DSI:
+-		VOP_CTRL_SET(vop, mipi_en, 1);
+-		break;
+-	default:
+-		DRM_ERROR("unsupport connector_type[%d]\n", connector_type);
+-		return -EINVAL;
+-	};
+-	VOP_CTRL_SET(vop, out_mode, out_mode);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
+-
+ static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
+@@ -931,6 +899,7 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
  static void vop_crtc_enable(struct drm_crtc *crtc)
  {
  	struct vop *vop = to_vop(crtc);
@@ -273,7 +335,7 @@ index a619f12..fc7cdd2 100644
  	struct drm_display_mode *adjusted_mode = &crtc->state->adjusted_mode;
  	u16 hsync_len = adjusted_mode->hsync_end - adjusted_mode->hsync_start;
  	u16 hdisplay = adjusted_mode->hdisplay;
-@@ -985,6 +986,23 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+@@ -985,6 +954,23 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
  	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
  	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
  	VOP_CTRL_SET(vop, pin_pol, val);
@@ -297,7 +359,7 @@ index a619f12..fc7cdd2 100644
  
  	VOP_CTRL_SET(vop, htotal_pw, (htotal << 16) | hsync_len);
  	val = hact_st << 16;
-@@ -1044,13 +1062,34 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
+@@ -1044,13 +1030,34 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
  	drm_crtc_cleanup(crtc);
  }
  
