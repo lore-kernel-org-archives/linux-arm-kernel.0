@@ -1,19 +1,35 @@
-From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
-Date: Wed, 20 Apr 2016 17:24:17 +0530
-Subject: [PATCH v2 2/2] dmaengine: vdma: Add clock support
-In-Reply-To: <1461152599-28858-2-git-send-email-appanad@xilinx.com>
-References: <1461152599-28858-1-git-send-email-appanad@xilinx.com>
- <1461152599-28858-2-git-send-email-appanad@xilinx.com>
-Message-ID: <CAKfKVtE6iPRPw0KHuxhWKkY3uF-43uoKV=VjXqOnua9wq+8VdA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 20 Apr 2016 13:58:07 +0200
+Subject: [RESEND][PATCH 1/3] thermal: mediatek: Add cpu dynamic power
+ cooling model.
+In-Reply-To: <CAJZ5v0hpkyMCVhvYy4JzR1A5OZKs7dqDOB64aQXmjXiLM0F=BQ@mail.gmail.com>
+References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
+ <1458029437-12846-2-git-send-email-dawei.chien@mediatek.com>
+ <20160412053807.GT16238@vireshk-i7>
+ <CAJZ5v0hpkyMCVhvYy4JzR1A5OZKs7dqDOB64aQXmjXiLM0F=BQ@mail.gmail.com>
+Message-ID: <57176ECF.6020705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 5:13 PM, Kedareswara rao Appana
-<appana.durga.rao@xilinx.com> wrote:
-> Added basic clock support. The clocks are requested at probe
-> and released at remove.
+Hi Rafael,
+
+On 13/04/16 06:52, Rafael J. Wysocki wrote:
+> On Tue, Apr 12, 2016 at 7:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> Hi Rafael,
+>>
+>> On 15-03-16, 16:10, Dawei Chien wrote:
+>>> MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
+>>> cooling devices with dynamic power coefficient.
+>>>
+>>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+>> Can you please apply this patch from Dawei ?
 >
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> I can, but I'm traveling this week, so that's rather going to happen next week.
+>
 
+I don't see the patch in linux-next, did you forget to pick/push it?
 
-Reviewed-by: Shubhrajyoti Datta  <shubhraj@xilinx.com>
+Regards,
+Matthias
