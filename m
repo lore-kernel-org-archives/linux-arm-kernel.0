@@ -1,103 +1,116 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Thu, 21 Apr 2016 04:46:21 -0700
-Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
- MPIDR_EL1
-In-Reply-To: <20160421095603.s7dhtwpy36nlbr2l@hawk.localdomain>
-References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
- <20160420183354.31f1bfbd@arm.com>
- <20160421070447.nwuqlxvpq7fj6h7m@hawk.localdomain>
- <57189C84.8080206@arm.com>
- <20160421095603.s7dhtwpy36nlbr2l@hawk.localdomain>
-Message-ID: <20160421114619.GB3673@ashok.sekar@broadcom.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Thu, 21 Apr 2016 13:48:41 +0200
+Subject: [PATCH v5 0/4] Cleaning printk stuff in NMI context
+Message-ID: <1461239325-22779-1-git-send-email-pmladek@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 11:56:03AM +0200, Andrew Jones wrote:
-> On Thu, Apr 21, 2016 at 10:25:24AM +0100, Marc Zyngier wrote:
-> > Hey Andrew,
-> > 
-> > On 21/04/16 08:04, Andrew Jones wrote:
-> > > On Wed, Apr 20, 2016 at 06:33:54PM +0100, Marc Zyngier wrote:
-> > >> On Wed, 20 Apr 2016 07:08:39 -0700
-> > >> Ashok Kumar <ashoks@broadcom.com> wrote:
-> > >>
-> > >>> For guests with NUMA configuration, Node ID needs to
-> > >>> be recorded in the respective affinity byte of MPIDR_EL1.
-> > >>
-> > >> As others have said before, the mapping between the NUMA hierarchy and
-> > >> MPIDR_EL1 are completely arbitrary, and only the firmware description
-> > >> can help the kernel in interpreting the affinity levels.
-> > >>
-> > >> If you want any patch like this one to be considered, I'd like to see
-> > >> the corresponding userspace that:
-> > >>
-> > >> - programs the affinity into the vcpus,
-> > > 
-> > > I have a start on this for QEMU that I can dust off and send as an RFC
-> > > soon.
-> > > 
-> > >> - pins the vcpus to specific physical CPUs,
-> > > 
-> > > This wouldn't be part of the userspace directly interacting with KVM,
-> > > but rather a higher level (even higher than libvirt, e.g.
-> > > openstack/ovirt). I also don't think we should need to worry about
-> > > which/how the phyiscal cpus get chosen. Let's assume that entity
-> > > knows how to best map the guest's virtual topology to a physical one.
-> > 
-> > Surely the platform emulation userspace has to implement the pinning
-> > itself, because I can't see high level tools being involved in the
-> > creation of the vcpu threads themselves.
-> 
-> The pinning comes after the threads are created, but before they are
-> run. The virtual topology created for a guest may or may not map well
-> to the physical topology of a given host. That's not the problem of
-> the emulation though. That's a problem of a high level application
-> trying to fit it.
-> 
-> > 
-> > Also, I'd like to have a "simple" tool to test this without having to
-> > deploy openstack (the day this becomes mandatory for kernel development,
-> > I'll move my carrier to something more... agricultural).
-> > 
-> > So something in QEMU would be really good...
-> > 
-> 
-> To test the virtual topology only requires booting a guest, whether
-> the vcpus are pinned or not. To test that it was worth the effort to
-> create a virtual topology does require the pinning, and the perf
-> measuring. However we still don't need the pinning in QEMU. We can
-> start a guest paused, run a script that does a handful of tasksets,
-> and then resumes the guest. Or, just use libvirt, which allows one
-> to save vcpu affinities, and thus on guest launch it will automatically
-> do the affinity setting for you.
-> 
-> > > 
-> > >> - exposes the corresponding firmware description (either DT or ACPI) to
-> > >>   the kernel.
-> > > 
-> > > The QEMU patches I've started on already generate the DT (the cpu-map
-> > > node). I started looking into how to do it for ACPI too, but there
-> > > were some questions about whether or not the topology description
-> > > tables added to the 6.1 spec were sufficient. I can send the DT part
-> > > soon, and continue to look into the ACPI part later though.
-> > 
-> > That'd be great. Can you please sync with Ashok so that we have
-> > something consistent between the two of you?
-> 
-> Yup. I'm hoping Ashok will chime in to share any userspace status
-> they have.
+This patch set generalizes the already existing solution for
+printing NMI messages. The main idea comes from Peter Zijlstra.
 
-I tested it using qemu's arm numa patchset [1] and I don't have any
-changes for cpu-map.
-I just used qemu's thread,core,socket information from "-smp" command
-line argument to populate the affinity.
-I was hoping to see the reception for this patch and then post qemu
-changes.
+v5 adds changes suggested by Sergey Senozhatsky. It should not longer
+conflict with his async printk patchset.
 
-[1] https://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00363.html
+There are some conflicts with the nmi_backtrace improvements
+from Chris Metcalf, see
+https://lkml.kernel.org/g/<1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
+Feel free to ask me to resolve them.
 
-Thanks,
-Ashok
-> 
-> Thanks,
-> drew
+
+Changes against v4:
+
+  + merged 2nd patch into the 1st one to do not break bisection
+
+  + set vprintk_nmi() early in nmi_enter() and set vprintk_default()
+    later in nmi_exit() to make sure that all NMI messages are printed
+    to the temporary ring buffer
+
+  + used printk_deferred() when flushing the temporary buffers
+    on panic in NMI; we do not longer need to touch vprintk_emit()
+    and define the ugly macro deferred_console_in_nmi().
+
+
+Changes against v3:
+
+  + merged all small changes from -mm tree, including commit
+    descriptions
+
+  + disabled interrupts when taking the read_lock in __printk_nmi_flush();
+    printk_nmi_flush() might be called from any context; reported
+    by lockdep
+
+  + never introduce NEED_PRINTK_NMI; in -mm tree was introduced
+    in 1st patch and removed in the 4th one
+
+  + flush NMI buffers when the system goes down (new 5th patch);
+    addresses Daniel's concerns
+
+
+Changes against v2:
+
+  + fixed compilation problems reported by 0-day build robot
+
+  + MN10300 and Xtensa architectures will get handled separately
+
+  + dropped the patch that printed NMI messages directly when Oops
+    in progress; it made the solution less reliable
+
+  + made the size of the buffer configurable; use real numbers
+    instead of PAGE_SIZE
+
+
+Changes against v1:
+
+  + rebased on top of 4.4-rc2; there the old implementation was
+    moved to lib/nmi_backtrace.c and used also on arm; I hope that
+    I got the arm side correctly; I was not able to test on arm :-(
+
+  + defined HAVE_NMI on arm for !CPU_V7M instead of !CPU_V7;
+    handle_fiq_as_nmi() is called from entry-armv.S that
+    is compiled when !CPU_V7M
+
+  + defined HAVE_NMI also on mips; it calls nmi_enter() and
+    seems to have real NMIs (or am I wrong?)
+
+  + serialized backtraces when printing directly
+    (oops_in_progress)
+
+
+Petr Mladek (4):
+  printk/nmi: generic solution for safe printk in NMI
+  printk/nmi: warn when some message has been lost in NMI context
+  printk/nmi: increase the size of NMI buffer and make it configurable
+  printk/nmi: flush NMI messages on the system panic
+
+ arch/Kconfig                  |   4 +
+ arch/arm/Kconfig              |   1 +
+ arch/arm/kernel/smp.c         |   2 +
+ arch/avr32/Kconfig            |   1 +
+ arch/blackfin/Kconfig         |   1 +
+ arch/cris/Kconfig             |   1 +
+ arch/mips/Kconfig             |   1 +
+ arch/powerpc/Kconfig          |   1 +
+ arch/s390/Kconfig             |   1 +
+ arch/sh/Kconfig               |   1 +
+ arch/sparc/Kconfig            |   1 +
+ arch/tile/Kconfig             |   1 +
+ arch/x86/Kconfig              |   1 +
+ arch/x86/kernel/apic/hw_nmi.c |   1 -
+ include/linux/hardirq.h       |   2 +
+ include/linux/percpu.h        |   3 -
+ include/linux/printk.h        |  14 ++-
+ init/Kconfig                  |  27 +++++
+ init/main.c                   |   1 +
+ kernel/kexec_core.c           |   1 +
+ kernel/panic.c                |   6 +-
+ kernel/printk/Makefile        |   1 +
+ kernel/printk/internal.h      |  57 +++++++++
+ kernel/printk/nmi.c           | 260 ++++++++++++++++++++++++++++++++++++++++++
+ kernel/printk/printk.c        |  31 ++---
+ lib/nmi_backtrace.c           |  89 +--------------
+ 26 files changed, 401 insertions(+), 109 deletions(-)
+ create mode 100644 kernel/printk/internal.h
+ create mode 100644 kernel/printk/nmi.c
+
+-- 
+1.8.5.6
