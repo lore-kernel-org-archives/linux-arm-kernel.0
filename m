@@ -1,61 +1,53 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 21 Apr 2016 12:04:27 +0100
-Subject: [PATCH 10/18] ASoC: sti: Update example to include assigned-clocks
- and mclk-fs
+Date: Thu, 21 Apr 2016 12:04:29 +0100
+Subject: [PATCH 12/18] ARM: DT: STiH407: Add i2s_out pinctrl configuration
 In-Reply-To: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
 References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1461236675-10176-13-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the examples, as otherwise driver errors with an incorrect
-mclk ratio at runtime.
+This patch adds the pinctrl config for the i2s_out pins
+used by the uniperif player IP.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Cc: arnaud.pouliquen at st.com
 ---
- Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-index ef2e0c6..e6ef96a8 100644
---- a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-+++ b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-@@ -62,6 +62,9 @@ Example:
- 		#sound-dai-cells = <0>;
- 		st,syscfg = <&syscfg_core>;
- 		clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
-+		assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
-+		assigned-clock-parents = <&clk_s_d0_quadfs 2>;
-+		assigned-clock-rates = <50000000>;
- 		reg = <0x8D82000 0x158>;
- 		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
- 		dmas = <&fdma0 4 0 1>;
-@@ -78,6 +81,9 @@ Example:
- 		#sound-dai-cells = <0>;
- 		st,syscfg = <&syscfg_core>;
- 		clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
-+		assigned-clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
-+		assigned-clock-parents = <&clk_s_d0_quadfs 3>;
-+		assigned-clock-rates = <50000000>;
- 		reg = <0x8D85000 0x158>;
- 		interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
- 		dmas = <&fdma0 7 0 1>;
-@@ -133,6 +139,7 @@ Example of audio card declaration:
- 			/* DAC */
- 			format = "i2s";
- 			dai-tdm-slot-width = <32>;
-+			mclk-fs = <256>;
- 			cpu {
- 				sound-dai = <&sti_uni_player2>;
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index a538ae5..0fb5c8a 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -1067,6 +1067,29 @@
+ 				};
  			};
-@@ -144,6 +151,7 @@ Example of audio card declaration:
- 		simple-audio-card,dai-link at 1 {
- 			/* SPDIF */
- 			format = "left_j";
-+			mclk-fs = <128>;
- 			cpu {
- 				sound-dai = <&sti_uni_player3>;
- 			};
+ 
++			i2s_out {
++				pinctrl_i2s_8ch_out: i2s_8ch_out{
++					st,pins {
++						mclk = <&pio33 5 ALT1 OUT>;
++						lrclk = <&pio33 7 ALT1 OUT>;
++						sclk = <&pio33 6 ALT1 OUT>;
++						data0 = <&pio33 4 ALT1 OUT>;
++						data1 = <&pio34 0 ALT1 OUT>;
++						data2 = <&pio34 1 ALT1 OUT>;
++						data3 = <&pio34 2 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_i2s_2ch_out: i2s_2ch_out{
++					st,pins {
++						mclk = <&pio33 5 ALT1 OUT>;
++						lrclk = <&pio33 7 ALT1 OUT>;
++						sclk = <&pio33 6 ALT1 OUT>;
++						data0 = <&pio33 4 ALT1 OUT>;
++					};
++				};
++			};
++
+ 			serial3 {
+ 				pinctrl_serial3: serial3-0 {
+ 					st,pins {
 -- 
 1.9.1
