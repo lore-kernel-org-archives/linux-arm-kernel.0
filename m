@@ -1,89 +1,48 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 21 Apr 2016 11:56:03 +0200
-Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
- MPIDR_EL1
-In-Reply-To: <57189C84.8080206@arm.com>
-References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
- <20160420183354.31f1bfbd@arm.com>
- <20160421070447.nwuqlxvpq7fj6h7m@hawk.localdomain>
- <57189C84.8080206@arm.com>
-Message-ID: <20160421095603.s7dhtwpy36nlbr2l@hawk.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Apr 2016 11:59:24 +0200
+Subject: [PATCH 0/3] arm: dts: lpc32xx: update ssp / spi nodes
+In-Reply-To: <571838C5.4050102@mleia.com>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <1461158925.3004.3.camel@localhost> <571838C5.4050102@mleia.com>
+Message-ID: <7082850.i7ZQLBP0Xs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 10:25:24AM +0100, Marc Zyngier wrote:
-> Hey Andrew,
+On Thursday 21 April 2016 05:19:49 Vladimir Zapolskiy wrote:
+> Hi Sylvain,
 > 
-> On 21/04/16 08:04, Andrew Jones wrote:
-> > On Wed, Apr 20, 2016 at 06:33:54PM +0100, Marc Zyngier wrote:
-> >> On Wed, 20 Apr 2016 07:08:39 -0700
-> >> Ashok Kumar <ashoks@broadcom.com> wrote:
-> >>
-> >>> For guests with NUMA configuration, Node ID needs to
-> >>> be recorded in the respective affinity byte of MPIDR_EL1.
-> >>
-> >> As others have said before, the mapping between the NUMA hierarchy and
-> >> MPIDR_EL1 are completely arbitrary, and only the firmware description
-> >> can help the kernel in interpreting the affinity levels.
-> >>
-> >> If you want any patch like this one to be considered, I'd like to see
-> >> the corresponding userspace that:
-> >>
-> >> - programs the affinity into the vcpus,
+> On 20.04.2016 16:28, Sylvain Lemieux wrote:
+> > Hi Vladimir,
 > > 
-> > I have a start on this for QEMU that I can dust off and send as an RFC
-> > soon.
+> > On Mon, 2016-04-18 at 23:52 +0200, Arnd Bergmann wrote:
+> >> On Monday 18 April 2016 17:22:28 Sylvain Lemieux wrote:
+> >>> On Mon, 2016-04-18 at 07:45 +0300, Vladimir Zapolskiy wrote:
+> >>>>> Once we have an agreement on who does this, please send a patch to
+> >>>>> update the MAINTAINERS file.
+> >>>>
+> > Will you send a patch to update the MAINTAINERS file or do you want
+> > me to send it?
+> 
+> I'll send to change, you'll be included as a maintainer, the record
+> also needs some other updates, e.g. it is not about machine support
+> but about SoC support etc.
+> 
+> Arnd, I'm not sure if MAINTAINERS update should go though a pull
+> request (= no explicit SoB from an ARM maintainer) or if you expect
+> to get a patch and apply it yourself, please advise.
+
+Either way works. We tend to group MAINTAINER file updates with bugfixes,
+so if you have any other fixes for 4.6 or 4.7, just throw it in the same
+pull request you send us, otherwise send a separate patch.
+
+> > Should we add the lpc32xx dts to the list of supported file?
 > > 
-> >> - pins the vcpus to specific physical CPUs,
-> > 
-> > This wouldn't be part of the userspace directly interacting with KVM,
-> > but rather a higher level (even higher than libvirt, e.g.
-> > openstack/ovirt). I also don't think we should need to worry about
-> > which/how the phyiscal cpus get chosen. Let's assume that entity
-> > knows how to best map the guest's virtual topology to a physical one.
 > 
-> Surely the platform emulation userspace has to implement the pinning
-> itself, because I can't see high level tools being involved in the
-> creation of the vcpu threads themselves.
+> There is a possibility to add files by regex, which makes sense
+> to do after renaming dts files - this is in my first priority todo list.
 
-The pinning comes after the threads are created, but before they are
-run. The virtual topology created for a guest may or may not map well
-to the physical topology of a given host. That's not the problem of
-the emulation though. That's a problem of a high level application
-trying to fit it.
+The order is not important here, it's fine with me if you want to add
+a regex for the new name even if the actual renaming is in a different
+branch.
 
-> 
-> Also, I'd like to have a "simple" tool to test this without having to
-> deploy openstack (the day this becomes mandatory for kernel development,
-> I'll move my carrier to something more... agricultural).
-> 
-> So something in QEMU would be really good...
-> 
-
-To test the virtual topology only requires booting a guest, whether
-the vcpus are pinned or not. To test that it was worth the effort to
-create a virtual topology does require the pinning, and the perf
-measuring. However we still don't need the pinning in QEMU. We can
-start a guest paused, run a script that does a handful of tasksets,
-and then resumes the guest. Or, just use libvirt, which allows one
-to save vcpu affinities, and thus on guest launch it will automatically
-do the affinity setting for you.
-
-> > 
-> >> - exposes the corresponding firmware description (either DT or ACPI) to
-> >>   the kernel.
-> > 
-> > The QEMU patches I've started on already generate the DT (the cpu-map
-> > node). I started looking into how to do it for ACPI too, but there
-> > were some questions about whether or not the topology description
-> > tables added to the 6.1 spec were sufficient. I can send the DT part
-> > soon, and continue to look into the ACPI part later though.
-> 
-> That'd be great. Can you please sync with Ashok so that we have
-> something consistent between the two of you?
-
-Yup. I'm hoping Ashok will chime in to share any userspace status
-they have.
-
-Thanks,
-drew
+	Arnd
