@@ -1,185 +1,51 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Thu, 21 Apr 2016 05:58:44 -0700
-Subject: [PATCH v6 6/7] arm64/perf: Filter common events based on PMCEIDn_EL0
-In-Reply-To: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
-References: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1461243525-13603-7-git-send-email-ashoks@broadcom.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 21 Apr 2016 15:04:11 +0200
+Subject: [PATCH 5/8] cpufreq: shmobile: Use generic platdev driver
+In-Reply-To: <ab29df38f70453e67089e3f3dbb9085336eef1c2.1461228081.git.viresh.kumar@linaro.org>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <ab29df38f70453e67089e3f3dbb9085336eef1c2.1461228081.git.viresh.kumar@linaro.org>
+Message-ID: <CAMuHMdUnzgr==S86Wiz0fGk2gSWW2=j+maiq3=3x9Ozy7AoOZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The complete common architectural and micro-architectural
-event number structure is filtered based on PMCEIDn_EL0 and
-exposed to /sys using is_visibile function pointer in events
-attribute_group.
-To filter the events in is_visible function, pmceid based bitmap
-is stored in arm_pmu structure and the id field from
-perf_pmu_events_attr is used to check against the bitmap.
+Hi Viresh,
 
-The function which derives event bitmap from PMCEIDn_EL0 is
-executed in the cpus, which has the pmu being initialized,
-for heterogeneous pmu support.
+On Thu, Apr 21, 2016 at 10:43 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -29,6 +29,18 @@ static const struct of_device_id machines[] = {
+>         { .compatible = "samsung,exynos5800", },
+>  #endif
+>
 
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- arch/arm64/kernel/perf_event.c | 70 +++++++++++++++++++++++++++++++++---------
- include/linux/perf/arm_pmu.h   |  2 ++
- 2 files changed, 57 insertions(+), 15 deletions(-)
+I think an #ifdef CONFIG_ARCH_RENESAS block wouldn't hurt, likewise
+for the other SoCs.
+Soon you'll have this file filled with lots of compatible values for random\
+SoCs...
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 946ce4b..e6a0fdb 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -326,10 +326,22 @@ static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
- };
- 
-+
-+static ssize_t
-+armv8pmu_events_sysfs_show(struct device *dev,
-+			   struct device_attribute *attr, char *page)
-+{
-+	struct perf_pmu_events_attr *pmu_attr;
-+
-+	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
-+
-+	return sprintf(page, "event=0x%03llx\n", pmu_attr->id);
-+}
-+
- #define ARMV8_EVENT_ATTR_RESOLVE(m) #m
- #define ARMV8_EVENT_ATTR(name, config) \
--	PMU_EVENT_ATTR_STRING(name, armv8_event_attr_##name, \
--			      "event=" ARMV8_EVENT_ATTR_RESOLVE(config))
-+	PMU_EVENT_ATTR(name, armv8_event_attr_##name, \
-+		       config, armv8pmu_events_sysfs_show)
- 
- ARMV8_EVENT_ATTR(sw_incr, ARMV8_PMUV3_PERFCTR_SW_INCR);
- ARMV8_EVENT_ATTR(l1i_cache_refill, ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL);
-@@ -434,9 +446,27 @@ static struct attribute *armv8_pmuv3_event_attrs[] = {
- 	NULL,
- };
- 
-+static umode_t
-+armv8pmu_event_attr_is_visible(struct kobject *kobj,
-+			       struct attribute *attr, int unused)
-+{
-+	struct device *dev = kobj_to_dev(kobj);
-+	struct pmu *pmu = dev_get_drvdata(dev);
-+	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
-+	struct perf_pmu_events_attr *pmu_attr;
-+
-+	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr.attr);
-+
-+	if (test_bit(pmu_attr->id, cpu_pmu->pmceid_bitmap))
-+		return attr->mode;
-+
-+	return 0;
-+}
-+
- static struct attribute_group armv8_pmuv3_events_attr_group = {
- 	.name = "events",
- 	.attrs = armv8_pmuv3_event_attrs,
-+	.is_visible = armv8pmu_event_attr_is_visible,
- };
- 
- PMU_FORMAT_ATTR(event, "config:0-9");
-@@ -859,22 +889,31 @@ static int armv8_thunder_map_event(struct perf_event *event)
- 				ARMV8_PMU_EVTYPE_EVENT);
- }
- 
--static void armv8pmu_read_num_pmnc_events(void *info)
-+static void __armv8pmu_probe_pmu(void *info)
- {
--	int *nb_cnt = info;
-+	struct arm_pmu *cpu_pmu = info;
-+	u32 pmceid[2];
- 
- 	/* Read the nb of CNTx counters supported from PMNC */
--	*nb_cnt = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT) & ARMV8_PMU_PMCR_N_MASK;
-+	cpu_pmu->num_events = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT)
-+		& ARMV8_PMU_PMCR_N_MASK;
- 
- 	/* Add the CPU cycles counter */
--	*nb_cnt += 1;
-+	cpu_pmu->num_events += 1;
-+
-+	pmceid[0] = read_sysreg(pmceid0_el0);
-+	pmceid[1] = read_sysreg(pmceid1_el0);
-+
-+	bitmap_from_u32array(cpu_pmu->pmceid_bitmap,
-+			     ARMV8_PMUV3_MAX_COMMON_EVENTS, pmceid,
-+			     ARRAY_SIZE(pmceid));
- }
- 
--static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
-+static int armv8pmu_probe_pmu(struct arm_pmu *cpu_pmu)
- {
--	return smp_call_function_any(&arm_pmu->supported_cpus,
--				    armv8pmu_read_num_pmnc_events,
--				    &arm_pmu->num_events, 1);
-+	return smp_call_function_any(&cpu_pmu->supported_cpus,
-+				    __armv8pmu_probe_pmu,
-+				    cpu_pmu, 1);
- }
- 
- static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -897,7 +936,8 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_pmuv3";
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
-+	return armv8pmu_probe_pmu(cpu_pmu);
- }
- 
- static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -906,7 +946,7 @@ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name			= "armv8_cortex_a53";
- 	cpu_pmu->map_event		= armv8_a53_map_event;
- 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8pmu_probe_pmu(cpu_pmu);
- }
- 
- static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -915,7 +955,7 @@ static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name			= "armv8_cortex_a57";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
- 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8pmu_probe_pmu(cpu_pmu);
- }
- 
- static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -924,7 +964,7 @@ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name			= "armv8_cortex_a72";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
- 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8pmu_probe_pmu(cpu_pmu);
- }
- 
- static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
-@@ -933,7 +973,7 @@ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name			= "armv8_cavium_thunder";
- 	cpu_pmu->map_event		= armv8_thunder_map_event;
- 	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8pmu_probe_pmu(cpu_pmu);
- }
- 
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 4196c90..d28ac05 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -105,6 +105,8 @@ struct arm_pmu {
- 	struct mutex	reserve_mutex;
- 	u64		max_period;
- 	bool		secure_access; /* 32-bit ARM only */
-+#define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
-+	DECLARE_BITMAP(pmceid_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	__percpu *hw_events;
- 	struct notifier_block	hotplug_nb;
--- 
-2.1.0
+> +       { .compatible = "renesas,emev2", },
+> +       { .compatible = "renesas,r7s72100", },
+> +       { .compatible = "renesas,r8a73a4", },
+> +       { .compatible = "renesas,r8a7740", },
+> +       { .compatible = "renesas,r8a7778", },
+> +       { .compatible = "renesas,r8a7779", },
+> +       { .compatible = "renesas,r8a7790", },
+> +       { .compatible = "renesas,r8a7791", },
+> +       { .compatible = "renesas,r8a7793", },
+> +       { .compatible = "renesas,r8a7794", },
+> +       { .compatible = "renesas,sh73a0", },
+> +
+>         { .compatible = "rockchip,rk2928", },
+>         { .compatible = "rockchip,rk3066a", },
+>         { .compatible = "rockchip,rk3066b", },
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
