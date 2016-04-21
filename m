@@ -1,167 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:22:02 -0700
-Subject: [PATCH v2 11/13] clk: gpio: Add hw based registration APIs
-In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-12-git-send-email-sboyd@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Apr 2016 16:27:29 -0600
+Subject: [PATCH] ARM: tegra: import latest Jetson TK1 spreadsheet
+Message-ID: <1461277649-18173-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk gpio code to return struct
-clk_hw pointers instead of struct clk pointers. This way we hide
-the struct clk pointer from providers unless they need to use
-consumer facing APIs.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+This imports v11 of "Jetson TK1 Development Platform Pin Mux" from
+https://developer.nvidia.com/embedded/downloads.
+
+The new version defines the mux option for the MIPI pad ctrl selection.
+The OWR pin no longer has an entry in the configuration table because
+the only mux option it support is OWR, that feature isn't supported, and
+hence can't conflict with any other pin. This pin can only usefully be
+used as a GPIO.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/clk/clk-gpio.c       | 52 ++++++++++++++++++++++++++++++++++----------
- include/linux/clk-provider.h |  8 +++++++
- 2 files changed, 49 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-index 08f65acc5d57..86b245746a6b 100644
---- a/drivers/clk/clk-gpio.c
-+++ b/drivers/clk/clk-gpio.c
-@@ -94,13 +94,13 @@ const struct clk_ops clk_gpio_mux_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_gpio_mux_ops);
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 66b4451eb2ca..f8242ee70be3 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1342,14 +1342,6 @@
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+ 			};
+-			owr {
+-				nvidia,pins = "owr";
+-				nvidia,function = "rsvd2";
+-				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+-				nvidia,rcv-sel = <TEGRA_PIN_DISABLE>;
+-			};
+ 			clk_32k_in {
+ 				nvidia,pins = "clk_32k_in";
+ 				nvidia,function = "clk";
+@@ -1364,6 +1356,10 @@
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+ 			};
++			dsi_b {
++				nvidia,pins = "mipi_pad_ctrl_dsi_b";
++				nvidia,function = "dsi_b";
++			};
+ 		};
+ 	};
  
--static struct clk *clk_register_gpio(struct device *dev, const char *name,
-+static struct clk_hw *clk_register_gpio(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents, unsigned gpio,
- 		bool active_low, unsigned long flags,
- 		const struct clk_ops *clk_gpio_ops)
- {
- 	struct clk_gpio *clk_gpio;
--	struct clk *clk;
-+	struct clk_hw *hw;
- 	struct clk_init_data init = {};
- 	unsigned long gpio_flags;
- 	int err;
-@@ -141,24 +141,26 @@ static struct clk *clk_register_gpio(struct device *dev, const char *name,
- 	clk_gpio->gpiod = gpio_to_desc(gpio);
- 	clk_gpio->hw.init = &init;
- 
-+	hw = &clk_gpio->hw;
- 	if (dev)
--		clk = devm_clk_register(dev, &clk_gpio->hw);
-+		err = devm_clk_hw_register(dev, hw);
- 	else
--		clk = clk_register(NULL, &clk_gpio->hw);
-+		err = clk_hw_register(NULL, hw);
- 
--	if (!IS_ERR(clk))
--		return clk;
-+	if (!err)
-+		return hw;
- 
- 	if (!dev) {
- 		gpiod_put(clk_gpio->gpiod);
- 		kfree(clk_gpio);
- 	}
- 
--	return clk;
-+	return ERR_PTR(err);
- }
- 
- /**
-- * clk_register_gpio_gate - register a gpio clock gate with the clock framework
-+ * clk_hw_register_gpio_gate - register a gpio clock gate with the clock
-+ * framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of this clock's parent
-@@ -166,7 +168,7 @@ static struct clk *clk_register_gpio(struct device *dev, const char *name,
-  * @active_low: true if gpio should be set to 0 to enable clock
-  * @flags: clock flags
-  */
--struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_gpio_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned gpio, bool active_low,
- 		unsigned long flags)
- {
-@@ -175,10 +177,24 @@ struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
- 			(parent_name ? 1 : 0), gpio, active_low, flags,
- 			&clk_gpio_gate_ops);
- }
-+EXPORT_SYMBOL_GPL(clk_hw_register_gpio_gate);
-+
-+struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned gpio, bool active_low,
-+		unsigned long flags)
-+{
-+	struct clk_hw *hw;
-+
-+	hw = clk_hw_register_gpio_gate(dev, name, parent_name, gpio, active_low,
-+				       flags);
-+	if (IS_ERR(hw))
-+		return ERR_CAST(hw);
-+	return hw->clk;
-+}
- EXPORT_SYMBOL_GPL(clk_register_gpio_gate);
- 
- /**
-- * clk_register_gpio_mux - register a gpio clock mux with the clock framework
-+ * clk_hw_register_gpio_mux - register a gpio clock mux with the clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_names: names of this clock's parents
-@@ -187,7 +203,7 @@ EXPORT_SYMBOL_GPL(clk_register_gpio_gate);
-  * @active_low: true if gpio should be set to 0 to enable clock
-  * @flags: clock flags
-  */
--struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents, unsigned gpio,
- 		bool active_low, unsigned long flags)
- {
-@@ -199,6 +215,20 @@ struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
- 	return clk_register_gpio(dev, name, parent_names, num_parents,
- 			gpio, active_low, flags, &clk_gpio_mux_ops);
- }
-+EXPORT_SYMBOL_GPL(clk_hw_register_gpio_mux);
-+
-+struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
-+		const char * const *parent_names, u8 num_parents, unsigned gpio,
-+		bool active_low, unsigned long flags)
-+{
-+	struct clk_hw *hw;
-+
-+	hw = clk_hw_register_gpio_mux(dev, name, parent_names, num_parents,
-+			gpio, active_low, flags);
-+	if (IS_ERR(hw))
-+		return ERR_CAST(hw);
-+	return hw->clk;
-+}
- EXPORT_SYMBOL_GPL(clk_register_gpio_mux);
- 
- static int gpio_clk_driver_probe(struct platform_device *pdev)
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 456c3ced1ac9..6c36c5e8ccbe 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -667,6 +667,10 @@ extern const struct clk_ops clk_gpio_gate_ops;
- struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned gpio, bool active_low,
- 		unsigned long flags);
-+struct clk_hw *clk_hw_register_gpio_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned gpio, bool active_low,
-+		unsigned long flags);
-+void clk_hw_unregister_gpio_gate(struct clk_hw *hw);
- 
- /**
-  * struct clk_gpio_mux - gpio controlled clock multiplexer
-@@ -682,6 +686,10 @@ extern const struct clk_ops clk_gpio_mux_ops;
- struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents, unsigned gpio,
- 		bool active_low, unsigned long flags);
-+struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
-+		const char * const *parent_names, u8 num_parents, unsigned gpio,
-+		bool active_low, unsigned long flags);
-+void clk_hw_unregister_gpio_mux(struct clk_hw *hw);
- 
- /**
-  * clk_register - allocate a new clock, register it and return an opaque cookie
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.8.1
