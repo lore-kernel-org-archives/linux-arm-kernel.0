@@ -1,70 +1,75 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Thu, 21 Apr 2016 14:41:06 -0400
-Subject: [PATCH net v2 3/3] drivers: net: cpsw: use of_phy_connect() in
- fixed-link case
-In-Reply-To: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <1461264066-12358-1-git-send-email-drivshin.allworx@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 21 Apr 2016 21:23:27 +0200
+Subject: [PATCH] PM / Runtime: Defer resuming of the device in
+ pm_runtime_force_resume()
+In-Reply-To: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
+References: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1575769.B1ataT0Qqy@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <drivshin@allworx.com>
+On Thursday, April 21, 2016 12:34:02 PM Ulf Hansson wrote:
+> When the pm_runtime_force_suspend|resume() helpers were invented, we still
+> had CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP as separate Kconfig options.
+> 
+> To make sure these helpers worked for all combinations and without
+> introducing too much of complexity, the device was always resumed in
+> pm_runtime_force_resume().
+> 
+> More precisely, when CONFIG_PM_SLEEP was set and CONFIG_PM_RUNTIME was
+> unset, we needed to resume the device as the subsystem/driver couldn't
+> rely on using runtime PM to do it.
+> 
+> As the CONFIG_PM_RUNTIME option was merged into CONFIG_PM a while ago, it
+> removed this combination, of using CONFIG_PM_SLEEP without the earlier
+> CONFIG_PM_RUNTIME.
+> 
+> For this reason we can now rely on the subsystem/driver to use runtime PM
+> to resume the device, instead of forcing that to be done in all cases. In
+> other words, let's defer this to a later point when it's actually needed.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+> 
+> Note, this patch is based upon another not yet queued patch [1]. The reason is
+> simply because that [1] is a more important patch as it fixes a problem. It was
+> posted to linux-pm April 8th and I expect it (or a new revision of it) to be
+> applied before $subject patch.
+> 
+> [1]
+> https://patchwork.kernel.org/patch/8782851
+> 
+> ---
+>  drivers/base/power/runtime.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index b746904..a190ca0 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -1506,6 +1506,17 @@ int pm_runtime_force_resume(struct device *dev)
+>  		goto out;
+>  	}
+>  
+> +	/*
+> +	 * The PM core increases the runtime PM usage count in the system PM
+> +	 * prepare phase. If the count is greather than 1 at this point, someone
+> +	 * else has also increased it. In such case, let's make sure to runtime
+> +	 * resume the device as that is likely what is expected. In other case
 
-If a fixed-link DT subnode is used, the phy_device was looked up so
-that a PHY ID string could be constructed and passed to phy_connect().
-This is not necessary, as the device_node can be passed directly to
-of_phy_connect() instead. This reuses the same codepath as if the
-phy-handle DT property was used.
+That doesn't sound quite right.  I'd rather say "In that case, invoke the
+runtime resume callback for the device as that is likely what is expected" here.
 
-Signed-off-by: David Rivshin <drivshin@allworx.com>
-Tested-by: Nicolas Chauvet <kwizart@gmail.com>
----
+> +	 * we trust the subsystem/driver to runtime resume the device when it's
+> +	 * actually needed.
+> +	 */
+> +	if (atomic_read(&dev->power.usage_count) < 2)
+> +		goto out;
+> +
+>  	ret = pm_runtime_set_active(dev);
+>  	if (ret)
+>  		goto out;
+> 
 
-Changes since v1 [1]:
-- Rebased (trivial conflict, e5a03bfd modified the deleted snprintf)
-- Added Tested-by from Nicolas Chauvet
-
-[1] https://patchwork.ozlabs.org/patch/560327/
-
-
- drivers/net/ethernet/ti/cpsw.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
-
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 3c81413..245f919 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -2038,30 +2038,21 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 							"phy-handle", 0);
- 		parp = of_get_property(slave_node, "phy_id", &lenp);
- 		if (slave_data->phy_node) {
- 			dev_dbg(&pdev->dev,
- 				"slave[%d] using phy-handle=\"%s\"\n",
- 				i, slave_data->phy_node->full_name);
- 		} else if (of_phy_is_fixed_link(slave_node)) {
--			struct device_node *phy_node;
--			struct phy_device *phy_dev;
--
- 			/* In the case of a fixed PHY, the DT node associated
- 			 * to the PHY is the Ethernet MAC DT node.
- 			 */
- 			ret = of_phy_register_fixed_link(slave_node);
- 			if (ret)
- 				return ret;
--			phy_node = of_node_get(slave_node);
--			phy_dev = of_phy_find_device(phy_node);
--			if (!phy_dev)
--				return -ENODEV;
--			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
--				 PHY_ID_FMT, phy_dev->mdio.bus->id,
--				 phy_dev->mdio.addr);
-+			slave_data->phy_node = of_node_get(slave_node);
- 		} else if (parp) {
- 			u32 phyid;
- 			struct device_node *mdio_node;
- 			struct platform_device *mdio;
- 
- 			if (lenp != (sizeof(__be32) * 2)) {
- 				dev_err(&pdev->dev, "Invalid slave[%d] phy_id property\n", i);
--- 
-2.5.5
+Thanks,
+Rafael
