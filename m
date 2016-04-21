@@ -1,20 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2016 13:25:19 +0200
-Subject: [PATCH 01/18] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
- binding documentation
-In-Reply-To: <1461236675-10176-2-git-send-email-peter.griffin@linaro.org>
+Date: Thu, 21 Apr 2016 13:25:46 +0200
+Subject: [PATCH 08/18] ARM: multi_v7_defconfig: Enable STi FDMA driver
+In-Reply-To: <1461236675-10176-9-git-send-email-peter.griffin@linaro.org>
 References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <3920014.LnOL9gjB2a@wuerfel>
+ <1461236675-10176-9-git-send-email-peter.griffin@linaro.org>
+Message-ID: <5937696.Zdx8BrBD6K@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 12:04:18 Peter Griffin wrote:
-> +- clocks       : Must contain an entry for each name in clock-names
-> +- clock-names  : Must contain "fdma_slim, fdma_hi, fdma_low, fdma_ic" entries
-> +See: Documentation/devicetree/bindings/clock/clock-bindings.txt
+On Thursday 21 April 2016 12:04:25 Peter Griffin wrote:
+> This DMA controller is found on all STi chipsets.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 2823490..61008a0 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -727,6 +727,7 @@ CONFIG_DMA_OMAP=y
+>  CONFIG_QCOM_BAM_DMA=y
+>  CONFIG_XILINX_VDMA=y
+>  CONFIG_DMA_SUN6I=y
+> +CONFIG_ST_FDMA=y
+>  CONFIG_STAGING=y
+>  CONFIG_SENSORS_ISL29018=y
+>  CONFIG_SENSORS_ISL29028=y
+> -- 
 
-The fdma_ prefix for the clock names is redundant, just make these
-"slim", "hi", "low", and "ic".
+Is this needed for booting? If not, make it a loadable module.
 
 	Arnd
