@@ -1,120 +1,66 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 21 Apr 2016 09:18:14 +0100
-Subject: [PATCH RFC 02/10] ARM: V7M: Make read_cpuid() generally available on
- V7M.
+Date: Thu, 21 Apr 2016 09:18:15 +0100
+Subject: [PATCH RFC 03/10] ARM: V7M: Add addresses for mem-mapped V7M cache
+ operations
 In-Reply-To: <1461226702-27160-1-git-send-email-vladimir.murzin@arm.com>
 References: <1461226702-27160-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1461226702-27160-3-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1461226702-27160-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jonathan Austin <jonathan.austin@arm.com>
 
-Previously V7M had a custom definition for read_cpuid_id that didn't use the
-underlying read_cpuid() macro and a stub definition for read_cpuid().
+V7M implements cache operations similarly to V7A/R, however all operations
+are performed via memory-mapped IO instead of co-processor operations.
 
-This requires a custom specialisation for each of the CPUID_* registers, and
-as more than just CPUID_ID may be implemented in the future this doesn't
-make much sense.
-
-This patch creates a generic implementation of read_cpuid for V7M and
-removes the custom read_cpuid_id implementation.
+This patch adds register definitions relevant to the V7M ARM architecture's
+cache architecture.
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/cputype.h |   50 ++++++++++++++++++++++------------------
- 1 file changed, 28 insertions(+), 22 deletions(-)
+ arch/arm/include/asm/v7m.h |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index b23c6c8..2d46425 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -4,15 +4,15 @@
- #include <linux/stringify.h>
- #include <linux/kernel.h>
+diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
+index 615781c..1fd775c 100644
+--- a/arch/arm/include/asm/v7m.h
++++ b/arch/arm/include/asm/v7m.h
+@@ -24,6 +24,9 @@
  
--#define CPUID_ID	0
--#define CPUID_CACHETYPE	1
--#define CPUID_TCM	2
--#define CPUID_TLBTYPE	3
--#define CPUID_MPUIR	4
--#define CPUID_MPIDR	5
--#define CPUID_REVIDR	6
--
- #ifdef CONFIG_CPU_V7M
+ #define V7M_SCB_CCR			0x14
+ #define V7M_SCB_CCR_STKALIGN			(1 << 9)
++#define V7M_SCB_CCR_DC				(1 << 16)
++#define V7M_SCB_CCR_IC				(1 << 17)
++#define V7M_SCB_CCR_BP				(1 << 18)
+ 
+ #define V7M_SCB_SHPR2			0x1c
+ #define V7M_SCB_SHPR3			0x20
+@@ -47,6 +50,25 @@
+ #define EXC_RET_STACK_MASK			0x00000004
+ #define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
+ 
++/* Cache related definitions */
 +
-+#define CPUID_ID	0x0
-+#define CPUID_CACHETYPE	-1
-+#define CPUID_TCM	-1
-+#define CPUID_TLBTYPE	-1
-+#define CPUID_MPIDR	-1
-+#define CPUID_REVIDR	-1
++#define	V7M_SCB_CLIDR		0x78	/* Cache Level ID register */
++#define	V7M_SCB_CTR		0x7c	/* Cache Type register */
++#define	V7M_SCB_CCSIDR		0x80	/* Cache size ID register */
++#define	V7M_SCB_CSSELR		0x84	/* Cache size selection register */
 +
- #define CPUID_EXT_PFR0	0x40
- #define CPUID_EXT_PFR1	0x44
- #define CPUID_EXT_DFR0	0x48
-@@ -28,6 +28,14 @@
- #define CPUID_EXT_ISAR4	0x70
- #define CPUID_EXT_ISAR5	0x74
- #else
-+#define CPUID_ID	0
-+#define CPUID_CACHETYPE	1
-+#define CPUID_TCM	2
-+#define CPUID_TLBTYPE	3
-+#define CPUID_MPUIR	4
-+#define CPUID_MPIDR	5
-+#define CPUID_REVIDR	6
++/* Cache opeartions */
++#define	V7M_SCB_ICIALLU		0x250	/* I-cache invalidate all to PoU */
++#define	V7M_SCB_ICIMVAU		0x258	/* I-cache invalidate by MVA to PoU */
++#define	V7M_SCB_DCIMVAC		0x25c	/* D-cache invalidate by MVA to PoC */
++#define	V7M_SCB_DCISW		0x260	/* D-cache invalidate by set-way */
++#define	V7M_SCB_DCCMVAU		0x264	/* D-cache clean by MVA to PoU */
++#define	V7M_SCB_DCCMVAC		0x268	/* D-cache clean by MVA to PoC */
++#define	V7M_SCB_DCCSW		0x26c	/* D-cache clean by set-way */
++#define	V7M_SCB_DCCIMVAC	0x270	/* D-cache clean and invalidate by MVA to PoC */
++#define	V7M_SCB_DCCISW		0x274	/* D-cache clean and invalidate by set-way */
++#define	V7M_SCB_BPIALL		0x278	/* D-cache clean and invalidate by set-way */
 +
- #define CPUID_EXT_PFR0	"c1, 0"
- #define CPUID_EXT_PFR1	"c1, 1"
- #define CPUID_EXT_DFR0	"c1, 2"
-@@ -114,11 +122,16 @@ extern unsigned int processor_id;
- #include <asm/io.h>
- #include <asm/v7m.h>
+ #ifndef __ASSEMBLY__
  
--#define read_cpuid(reg)							\
--	({								\
--		WARN_ON_ONCE(1);					\
--		0;							\
--	})
-+static inline unsigned int __attribute_const__ read_cpuid(unsigned offset)
-+{
-+	switch (offset) {
-+	case CPUID_ID:
-+		return readl(BASEADDR_V7M_SCB + offset);
-+	default:
-+		WARN_ON_ONCE(1);
-+		return 0;
-+	}
-+}
- 
- static inline unsigned int __attribute_const__ read_cpuid_ext(unsigned offset)
- {
-@@ -141,7 +154,7 @@ static inline unsigned int __attribute_const__ read_cpuid_ext(unsigned offset)
- 
- #endif /* ifdef CONFIG_CPU_CP15 / else */
- 
--#ifdef CONFIG_CPU_CP15
-+#if defined(CONFIG_CPU_CP15) || defined(CONFIG_CPU_V7M)
- /*
-  * The CPU ID never changes at run time, so we might as well tell the
-  * compiler that it's constant.  Use this function to read the CPU ID
-@@ -152,14 +165,7 @@ static inline unsigned int __attribute_const__ read_cpuid_id(void)
- 	return read_cpuid(CPUID_ID);
- }
- 
--#elif defined(CONFIG_CPU_V7M)
--
--static inline unsigned int __attribute_const__ read_cpuid_id(void)
--{
--	return readl(BASEADDR_V7M_SCB + V7M_SCB_CPUID);
--}
--
--#else /* ifdef CONFIG_CPU_CP15 / elif defined(CONFIG_CPU_V7M) */
-+#else /* if defined(CONFIG_CPU_CP15) || defined(CONFIG_CPU_V7M) */
- 
- static inline unsigned int __attribute_const__ read_cpuid_id(void)
- {
+ enum reboot_mode;
 -- 
 1.7.9.5
