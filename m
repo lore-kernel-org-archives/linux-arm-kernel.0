@@ -1,41 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 21 Apr 2016 09:49:46 +0100
-Subject: [BUG] set_pte_at: racy dirty state clearing warning
-In-Reply-To: <57180A53.3000207@linaro.org>
-References: <57180A53.3000207@linaro.org>
-Message-ID: <20160421084946.GA23774@e104818-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Apr 2016 10:54:02 +0200
+Subject: [PATCH 6/8] cpufreq: sunxi: Use generic platdev driver
+In-Reply-To: <e82bf5994897cc979a67c72f09229b8b295bb69a.1461228081.git.viresh.kumar@linaro.org>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <e82bf5994897cc979a67c72f09229b8b295bb69a.1461228081.git.viresh.kumar@linaro.org>
+Message-ID: <20160421085402.GL13045@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 04:01:39PM -0700, Shi, Yang wrote:
-> When I enable memory comact via
+On Thu, Apr 21, 2016 at 02:13:52PM +0530, Viresh Kumar wrote:
+> The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+> device now, reuse that and remove similar code from platform code.
 > 
-> # echo 1 > /proc/sys/vm/compact_memory
-> 
-> I got the below WARNING:
-> 
-> set_pte_at: racy dirty state clearing: 0x0068000099371bd3 ->
-> 0x0068000099371fd3
-> ------------[ cut here ]------------
-> WARNING: CPU: 5 PID: 294 at ./arch/arm64/include/asm/pgtable.h:227
-> ptep_set_access_flags+0x138/0x1b8
-> Modules linked in:
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Do you have this patch applied:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/492239
-
-It's also queued into -next as commit 66dbd6e61a52.
-
-> My kernel has ARM64_HW_AFDBM enabled, but LS2085 is not ARMv8.1.
-> 
-> The code shows it just check if ARM64_HW_AFDBM is enabled or not, but
-> doesn't check if the CPU really has such capability.
-> 
-> So, it might be better to have the capability checked runtime?
-
-The warnings are there to spot any incorrect uses of the pte accessors
-even before you run on AF/DBM-capable hardware.
+Thanks,
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/9c237690/attachment.sig>
