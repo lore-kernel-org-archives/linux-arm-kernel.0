@@ -1,42 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2016 12:17:07 +0200
-Subject: [PATCH 2/8] cpufreq: imx: Use generic platdev driver
-In-Reply-To: <20160421095032.GD29799@vireshk-i7>
-References: <cover.1461228081.git.viresh.kumar@linaro.org>
- <18756925.NSB5aJaqC9@wuerfel> <20160421095032.GD29799@vireshk-i7>
-Message-ID: <8137134.6Dsv9n3KFK@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 21 Apr 2016 11:19:30 +0100
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20160421101930.GG6879@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 15:20:32 Viresh Kumar wrote:
-> > > diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
-> > > index bd42d1bd10af..90c62bf01f9e 100644
-> > > --- a/arch/arm/mach-imx/imx27-dt.c
-> > > +++ b/arch/arm/mach-imx/imx27-dt.c
-> > > @@ -20,11 +20,7 @@
-> > >  
-> > >  static void __init imx27_dt_init(void)
-> > >  {
-> > > -   struct platform_device_info devinfo = { .name = "cpufreq-dt", };
-> > > -
-> > >     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > > -
-> > > -   platform_device_register_full(&devinfo);
-> > >  }
-> > >
-> > 
-> > Please remove the entire function now, a NULL .init_machine machine
-> > callback pointer has the same effect as the remaining line.
-> > 
-> > The rest of the patch is fine.
-> 
-> Perhaps that should be done in a separate patch I feel. Will do so after this is
-> merged.
-> 
+On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
+> +		cpu_l0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x0>;
+> +			enable-method = "psci";
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			clocks = <&cru ARMCLKL>;
+> +		};
 
-I would do it in the same patch, just like you remove some of the
-.init_late() callbacks elsewhere, but it clearly works either way, so
-do as you like unless Shawn or Sascha have a strong opinion on the
-matter.
+> +		cpu_b0: cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a72", "arm,armv8";
+> +			reg = <0x0 0x100>;
+> +			enable-method = "psci";
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			clocks = <&cru ARMCLKB>;
+> +		};
 
-	Arnd
+> +
+> +	arm-pmu {
+> +		compatible = "arm,armv8-pmuv3";
+> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+
+This is wrong, and must go. There should be a separate node for the PMU
+of each microarchitecture, with the appropriate compatible string to
+represent that (see the juno dts).
+
+In this case things are messier as the same PPI number is being used
+across clusters. Marc (Cc'd) has been working on PPI partitions, which
+should allow us to support that.
+
+Thanks,
+Mark.
