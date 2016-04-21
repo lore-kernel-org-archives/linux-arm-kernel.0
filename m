@@ -1,88 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Apr 2016 12:30:18 +0100
-Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
-In-Reply-To: <5718AFB8.5070004@rock-chips.com>
-References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
- <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
- <20160421101930.GG6879@leverpostej>
- <5718AFB8.5070004@rock-chips.com>
-Message-ID: <20160421123018.096d4a75@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 21 Apr 2016 12:33:09 +0100
+Subject: [PATCH v7 17/16] arm64: hibernate: Refuse to hibernate if the
+ boot cpu is offline
+In-Reply-To: <1460565110-26341-1-git-send-email-james.morse@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1460565110-26341-1-git-send-email-james.morse@arm.com>
+Message-ID: <20160421113309.GA7547@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2016 18:47:20 +0800
-"Huang, Tao" <huangtao@rock-chips.com> wrote:
+On Wed, Apr 13, 2016 at 05:31:50PM +0100, James Morse wrote:
+> It is important to hibernate/resume on the same CPU, otherwise we may
+> change the cpu order or restore a big cpu's register state on a little
+> cpu.
 
-> Hi, Mark:
-> On 2016?04?21? 18:19, Mark Rutland wrote:
-> > On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
-> >> +		cpu_l0: cpu at 0 {
-> >> +			device_type = "cpu";
-> >> +			compatible = "arm,cortex-a53", "arm,armv8";
-> >> +			reg = <0x0 0x0>;
-> >> +			enable-method = "psci";
-> >> +			#cooling-cells = <2>; /* min followed by max */
-> >> +			clocks = <&cru ARMCLKL>;
-> >> +		};
-> >> +		cpu_b0: cpu at 100 {
-> >> +			device_type = "cpu";
-> >> +			compatible = "arm,cortex-a72", "arm,armv8";
-> >> +			reg = <0x0 0x100>;
-> >> +			enable-method = "psci";
-> >> +			#cooling-cells = <2>; /* min followed by max */
-> >> +			clocks = <&cru ARMCLKB>;
-> >> +		};
-> >> +
-> >> +	arm-pmu {
-> >> +		compatible = "arm,armv8-pmuv3";
-> >> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
-> >> +	};
-> > This is wrong, and must go. There should be a separate node for the PMU
-> > of each microarchitecture, with the appropriate compatible string to
-> > represent that (see the juno dts).
-> You are right. The first version we wrote is:
->     pmu_a53 {
->         compatible = "arm,cortex-a53-pmu";
->         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
->         interrupt-affinity = <&cpu_l0>,
->                      <&cpu_l1>,
->                      <&cpu_l2>,
->                      <&cpu_l3>;
->     };
+I think the problem is that we would end up having no context to
+resume to altogether given how cpu_suspend() is implemented (or
+context that is simply stale).
+
+> We know cpu 0 is the cpu the firmware booted us on last time, refuse to
+> hibernate if it has been hotplugged out. Follow x86's example by registering
+> a pm notifier that is called before processes are frozen and devices are
+> stopped.
+
+"Hibernation represents a system state save/restore through
+a system reboot; this implies that the logical cpus carrying
+out hibernation/thawing must be the same, so that the context
+saved in the snapshot image on hibernation is consistent with
+the state of the system on resume. If resume from hibernation
+is driven through kernel command line parameter, the cpu responsible
+for thawing the system will be whatever CPU firmware boots the system
+on upon cold-boot (ie logical cpu 0); this means that in order to
+keep system context consistent between the hibernate snapshot image
+and system state on kernel resume from hibernate, logical cpu 0 must
+be online on hibernation and must be the logical cpu that creates
+the snapshot image.
+
+This patch adds a PM notifier that enforces logical cpu 0 is online
+when the hibernation is started (and prevents hibernation if it is
+not), which is sufficient to guarantee it will be the one creating
+the snapshot image therefore providing the resume cpu a consistent
+snapshot of the system to resume to."
+
+A tad verbose, feel free to modify it as you deem fit.
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/kernel/hibernate.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 > 
->     pmu_a72 {
->         compatible = "arm,cortex-a72-pmu";
->         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
->         interrupt-affinity = <&cpu_b0>,
->                      <&cpu_b1>;
->     };
-> but unfortunately, the arm pmu driver do not support PPI in two cluster
-> well,
-> so we have to replace with this implementation.
-> > In this case things are messier as the same PPI number is being used
-> > across clusters. Marc (Cc'd) has been working on PPI partitions, which
-> > should allow us to support that.
-> Great! So what we can do right now? Wait this feature, and delete
-> arm-pmu node?
-
-I'd rather you have a look at the patches, test them with your HW,
-and comment on what doesn't work!
-
-You can find the patches over there:
-
-https://lkml.org/lkml/2016/4/11/182
-
-and on the following branch:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-irq/percpu-partition
-
-Of course, you'll have to hack a bit in the PMU code to make it
-understand per-PMU affinity together with percpu interrupts, but it
-wouldn't be fun if there was nothing to do...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index 486315249f2a..1ef4bf2207a5 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -17,6 +17,7 @@
+>  #define pr_fmt(x) "hibernate: " x
+>  #include <linux/kvm_host.h>
+>  #include <linux/mm.h>
+> +#include <linux/notifier.h>
+>  #include <linux/pm.h>
+>  #include <linux/sched.h>
+>  #include <linux/suspend.h>
+> @@ -476,3 +477,28 @@ int swsusp_arch_resume(void)
+>  out:
+>  	return rc;
+>  }
+> +
+> +static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
+> +					     unsigned long action, void *ptr)
+> +{
+> +	if (action == PM_HIBERNATION_PREPARE &&
+> +	     cpumask_first(cpu_online_mask) != 0) {
+> +		pr_warn("CPU0 is offline.\n");
+> +		return notifier_from_errno(-ENODEV);
+> +	}
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static int __init check_boot_cpu_online_init(void)
+> +{
+> +	/*
+> +	 * Set this pm_notifier callback with a lower priority than
+> +	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
+> +	 * called earlier to disable cpu hotplug before the cpu online check.
+> +	 */
+> +	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
+> +
+> +	return 0;
+> +}
+> +core_initcall(check_boot_cpu_online_init);
