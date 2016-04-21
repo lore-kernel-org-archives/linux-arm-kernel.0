@@ -1,55 +1,53 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Thu, 21 Apr 2016 13:50:32 -0400
-Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
-Message-ID: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 21 Apr 2016 19:53:08 +0200
+Subject: [RESEND][PATCH 1/3] thermal: mediatek: Add cpu dynamic power
+ cooling model.
+In-Reply-To: <20160421030141.GA4845@localhost.localdomain>
+References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
+ <CAJZ5v0hpkyMCVhvYy4JzR1A5OZKs7dqDOB64aQXmjXiLM0F=BQ@mail.gmail.com>
+ <57176ECF.6020705@gmail.com> <12007858.UuqVGafLHV@vostro.rjw.lan>
+ <20160421030141.GA4845@localhost.localdomain>
+Message-ID: <CAJZ5v0h_W6CW6Z-kux-kbur_NE3XZH-hKZazXV5TX3tET-6cAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <drivshin@allworx.com>
+On Thu, Apr 21, 2016 at 5:01 AM, Eduardo Valentin <edubezval@gmail.com> wrote:
+> On Thu, Apr 21, 2016 at 02:41:24AM +0200, Rafael J. Wysocki wrote:
+>> On Wednesday, April 20, 2016 01:58:07 PM Matthias Brugger wrote:
+>> > Hi Rafael,
+>> >
+>> > On 13/04/16 06:52, Rafael J. Wysocki wrote:
+>> > > On Tue, Apr 12, 2016 at 7:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> > >> Hi Rafael,
+>> > >>
+>> > >> On 15-03-16, 16:10, Dawei Chien wrote:
+>> > >>> MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
+>> > >>> cooling devices with dynamic power coefficient.
+>> > >>>
+>> > >>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+>> > >>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> > >>
+>> > >> Can you please apply this patch from Dawei ?
+>> > >
+>> > > I can, but I'm traveling this week, so that's rather going to happen next week.
+>> > >
+>> >
+>> > I don't see the patch in linux-next, did you forget to pick/push it?
+>>
+>> No, I didn't.  I just didn't have the time to get to them before.
+>>
+>> Now, given that they are thermal patches, they really should go in via
+>> linux-soc-thermal.git.
+>>
+>> Eduardo, any chance to take care of these?
+>
+> Yes I can add this one, given that they have the proper acked-by. I was
+> a bit hesitant to just get them because they are touching
+> drivers/cpufreq.
 
-The first patch fixes a bug that makes dual_emac mode break if
-either slave uses the phy-handle property in the devicetree.
+Generally, ACKs from Viresh are sufficient for ARM cpufreq drivers
+unless the maintainers of the platform in question disagree.
 
-The second patch fixes some cosmetic problems with error messages,
-and also makes the binding documentation more explicit.
+> Anyways, I am adding this to my branch to the next merge window.
 
-The third patch cleans up the fixed-link case to work like
-the now-fixed phy-handle case.
-
-I have tested on the following hardware configurations:
- - (EVMSK) dual emac, phy_id property in both slaves
- - (EVMSK) dual emac, phy-handle property in both slaves
- - (BeagleBoneBlack) single emac, phy_id property
- - (custom) single emac, fixed-link subnode
-
-Nicolas Chauvet reported testing on an HP t410 (dm8148).
-
-Markus Brunner reported testing v1 on the following [1]:
- - emac0 with phy_id and emac1 with fixed phy
- - emac0 with phy-handle and emac1 with fixed phy
- - emac0 with fixed phy and emac1 with fixed phy
-
-
-Changes since v1 [2]:
-- Rebased
-- Added Tested-by from Nicolas Chauvet on all patches
-- Added Acked-by from Rob Herring for the binding change in patch 2 [3]
-
-[1] http://www.spinics.net/lists/netdev/msg357890.html
-[2] http://www.spinics.net/lists/netdev/msg357772.html
-[3] http://www.spinics.net/lists/netdev/msg358254.html
-
-David Rivshin (3):
-  drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
-    config
-  drivers: net: cpsw: fix error messages when using phy-handle DT
-    property
-  drivers: net: cpsw: use of_phy_connect() in fixed-link case
-
- Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
- drivers/net/ethernet/ti/cpsw.c                 | 41 +++++++++++++-------------
- drivers/net/ethernet/ti/cpsw.h                 |  1 +
- 3 files changed, 23 insertions(+), 23 deletions(-)
-
--- 
-2.5.5
+Thanks!
