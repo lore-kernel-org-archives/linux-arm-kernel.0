@@ -1,34 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 21 Apr 2016 15:38:35 +0200
-Subject: [PATCH v3] PCI: rcar-pcie: Remove Gen2 designation from Kconfig
-In-Reply-To: <1461210715-29304-1-git-send-email-horms+renesas@verge.net.au>
-References: <1461210715-29304-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXtVvNERECxbp1EtJ1SNOQG-j_xtV3NpsGqgyDLmc7cOg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 21 Apr 2016 08:42:26 -0500
+Subject: [PATCH v6 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
+ device tree binding documentation
+In-Reply-To: <1460710374-25077-1-git-send-email-appanad@xilinx.com>
+References: <1460710374-25077-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160421134226.GA10399@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 5:51 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> It appears that Gen2 is a misnomer for the R-Car PCIE driver
-> which also supports Gen 1 and Gen 3 SoCs. Accordingly, drop Gen 2
-> from the help text and Kconfig symbol.
->
-> Also, re-arange the Kconfig symbol name to use PCIE as the prefix.
-> This appears to be in keeping with other PCIE Kconfig symbols.
->
-> Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+On Fri, Apr 15, 2016 at 02:22:53PM +0530, Kedareswara rao Appana wrote:
+> Device-tree binding documentation for Xilinx zynqmp dma engine used in
+> Zynq UltraScale+ MPSoC.
+> 
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes in v6:
+> - Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
+>   from the binding doc as it allow broken combinations when dma-coherent
+>   is set as suggested by Rob.
+> - Fixed minor comments given by Rob related coding(lower case DT node name).
+> Changes in v5:
+> - Use dma-coherent flag for coherent transfers as suggested by rob.
+> - Removed unnecessary properties from binding doc as suggested by Rob.
+> Changes in v4:
+> - None
+> Changes in v3:
+> - None
+> Changes in v2:
+> - None.
+> 
+>  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> new file mode 100644
+> index 0000000..f0f0b54
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> @@ -0,0 +1,44 @@
+> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
+> +memory to device and device to memory transfers. It also has flow
+> +control and rate control support for slave/peripheral dma access.
+> +
+> +Required properties:
+> +- compatible		: Should be "xlnx,zynqmp-dma-1.0"
+> +- reg			: Memory map for gdma/adma module access.
+> +- interrupt-parent	: Interrupt controller the interrupt is routed through
+> +- interrupts		: Should contain DMA channel interrupt.
+> +- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I think how this is getting used by the driver is wrong. 
+{src,dst}_addr_widths are supposed to be a bitmask of supported slave 
+device register widths. You aren't doing a bitmask and you are also 
+saying you only support slaves with 8 or 16 byte data registers which is 
+somewhat rare. It may happen to work because 128/8 == BIT(4). However, 
+the documentation for the field is contradictory in that it says 1,2,4 
+or 8 byte widths are supported, but the enum has more sizes.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Rob
