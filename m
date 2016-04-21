@@ -1,40 +1,38 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 21 Apr 2016 02:10:47 +0200
-Subject: [PATCH 1/3] ACPI / ARM64: Don't enable ACPI by default on ARM64
-In-Reply-To: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-Message-ID: <9772131.95BO0QMhPX@vostro.rjw.lan>
+Date: Thu, 21 Apr 2016 02:16:22 +0200
+Subject: [PATCH V2] acpi: implement Generic Event Device
+In-Reply-To: <1454857231-21388-1-git-send-email-okaya@codeaurora.org>
+References: <1454857231-21388-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <9220738.hpb0S9FjMY@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 15, 2016 08:53:41 AM Mark Brown wrote:
-> If ACPI is selectable it is enabled by default.  This is a good choice
-> for architectures where the overwhelming majority of systems use ACPI
-> like x86 and IA-64 but is less clear for architectures where it's less
-> common like ARM64.  Change the default selection so that it's only done
-> explicitly on those architectures where ACPI is universally used.
+On Sunday, February 07, 2016 10:00:31 AM Sinan Kaya wrote:
+> Generic Event Device described in ACPI 6.1 allows platforms to handle
+> platform interrupts in ACPI ASL statements. It borrows constructs like
+> _EVT from GPIO events. All interrupts are listed in _CRS and the handler
+> is written in _EVT method. Here is an example.
 > 
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->  drivers/acpi/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Device (GED0)
+> {
 > 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 82b96ee8624c..2fcf87a6d270 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -8,7 +8,7 @@ menuconfig ACPI
->  	depends on IA64 || X86 || (ARM64 && EXPERT)
->  	depends on PCI
->  	select PNP
-> -	default y
-> +	default y if (IA64 || X86)
->  	help
->  	  Advanced Configuration and Power Interface (ACPI) support for 
->  	  Linux requires an ACPI-compliant platform (hardware/firmware),
+> 	Name (_HID, "ACPI0013")
+> 	Name (_UID, 0)
+> 	Name(_CRS, ResourceTemplate ()
+> 	{
+> 		Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
+> 		 {123}
+> 	})
 > 
+> 	Method (_EVT, 1) {
+> 		if (Lequal(123, Arg0))
+> 		{
+> 		}
+> 	}
+> }
+> 
+> Wake capability has not been implemented yet.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-Everyone seems to be fine with the whole series, so I'm going to apply it.
-
-Thanks,
-Rafael
+Applied, thanks!
