@@ -1,195 +1,111 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:21:53 -0700
-Subject: [PATCH v2 02/13] clk: Add {devm_}clk_hw_{register,unregister}() APIs
+Date: Thu, 21 Apr 2016 15:21:59 -0700
+Subject: [PATCH v2 08/13] clk: fixed-factor: Add hw based registration APIs
 In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1461277324-27185-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've largely split the clk consumer and provider APIs along
-struct clk and struct clk_hw, but clk_register() still returns a
-struct clk pointer for each struct clk_hw that's registered.
-Eventually we'd like to only allocate struct clks when there's a
-user, because struct clk is per-user now, so clk_register() needs
-to change.
-
-Let's add new APIs to register struct clk_hws, but this time
-we'll hide the struct clk from the caller by returning an int
-error code. Also add an unregistration API that takes the clk_hw
-structure that was passed to the registration API. This way
-provider drivers never have to deal with a struct clk pointer
-unless they're using the clk consumer APIs.
+Add registration APIs in the clk fixed-factor code to return
+struct clk_hw pointers instead of struct clk pointers. This way
+we hide the struct clk pointer from providers unless they need to
+use consumer facing APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/driver-model/devres.txt |  1 +
- drivers/clk/clk.c                     | 86 +++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h          |  6 +++
- 3 files changed, 93 insertions(+)
+ drivers/clk/clk-fixed-factor.c | 42 +++++++++++++++++++++++++++++++++++-------
+ include/linux/clk-provider.h   |  4 ++++
+ 2 files changed, 39 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-index 73b98dfbcea4..108d45553e1b 100644
---- a/Documentation/driver-model/devres.txt
-+++ b/Documentation/driver-model/devres.txt
-@@ -236,6 +236,7 @@ certainly invest a bit more effort into libata core layer).
- CLOCK
-   devm_clk_get()
-   devm_clk_put()
-+  devm_clk_hw_register()
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 053448e2453d..75cd6c792cb8 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -68,13 +68,14 @@ const struct clk_ops clk_fixed_factor_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_fixed_factor_ops);
  
- DMA
-   dmam_alloc_coherent()
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index fb74dc1f7520..0ef919666827 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2536,6 +2536,22 @@ fail_out:
- }
- EXPORT_SYMBOL_GPL(clk_register);
- 
-+/**
-+ * clk_hw_register - register a clk_hw and return an error code
-+ * @dev: device that is registering this clock
-+ * @hw: link to hardware-specific clock data
-+ *
-+ * clk_hw_register is the primary interface for populating the clock tree with
-+ * new clock nodes. It returns an integer equal to zero indicating success or
-+ * less than zero indicating failure. Drivers must test for an error code after
-+ * calling clk_hw_register().
-+ */
-+int clk_hw_register(struct device *dev, struct clk_hw *hw)
-+{
-+	return PTR_ERR_OR_ZERO(clk_register(dev, hw));
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register);
-+
- /* Free memory allocated for a clock. */
- static void __clk_release(struct kref *ref)
+-struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+-		const char *parent_name, unsigned long flags,
++struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
++		const char *name, const char *parent_name, unsigned long flags,
+ 		unsigned int mult, unsigned int div)
  {
-@@ -2637,11 +2653,26 @@ unlock:
- }
- EXPORT_SYMBOL_GPL(clk_unregister);
- 
-+/**
-+ * clk_hw_unregister - unregister a currently registered clk_hw
-+ * @hw: hardware-specific clock data to unregister
-+ */
-+void clk_hw_unregister(struct clk_hw *hw)
-+{
-+	clk_unregister(hw->clk);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_unregister);
-+
- static void devm_clk_release(struct device *dev, void *res)
- {
- 	clk_unregister(*(struct clk **)res);
- }
- 
-+static void devm_clk_hw_release(struct device *dev, void *res)
-+{
-+	clk_hw_unregister(*(struct clk_hw **)res);
-+}
-+
- /**
-  * devm_clk_register - resource managed clk_register()
-  * @dev: device that is registering this clock
-@@ -2672,6 +2703,36 @@ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw)
- }
- EXPORT_SYMBOL_GPL(devm_clk_register);
- 
-+/**
-+ * devm_clk_hw_register - resource managed clk_hw_register()
-+ * @dev: device that is registering this clock
-+ * @hw: link to hardware-specific clock data
-+ *
-+ * Managed clk_hw_register(). Clocks returned from this function are
-+ * automatically clk_hw_unregister()ed on driver detach. See clk_hw_register()
-+ * for more information.
-+ */
-+int devm_clk_hw_register(struct device *dev, struct clk_hw *hw)
-+{
-+	struct clk_hw **hwp;
+ 	struct clk_fixed_factor *fix;
+ 	struct clk_init_data init;
+-	struct clk *clk;
++	struct clk_hw *hw;
 +	int ret;
-+
-+	hwp = devres_alloc(devm_clk_hw_release, sizeof(*hwp), GFP_KERNEL);
-+	if (!hwp)
-+		return -ENOMEM;
-+
+ 
+ 	fix = kmalloc(sizeof(*fix), GFP_KERNEL);
+ 	if (!fix)
+@@ -91,12 +92,28 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+ 
+-	clk = clk_register(dev, &fix->hw);
+-
+-	if (IS_ERR(clk))
++	hw = &fix->hw;
 +	ret = clk_hw_register(dev, hw);
-+	if (!ret) {
-+		*hwp = hw;
-+		devres_add(dev, hwp);
-+	} else {
-+		devres_free(hwp);
++	if (ret) {
+ 		kfree(fix);
++		hw = ERR_PTR(ret);
 +	}
 +
-+	return ret;
++	return hw;
 +}
-+EXPORT_SYMBOL_GPL(devm_clk_hw_register);
++EXPORT_SYMBOL_GPL(clk_hw_register_fixed_factor);
 +
- static int devm_clk_match(struct device *dev, void *res, void *data)
- {
- 	struct clk *c = res;
-@@ -2680,6 +2741,15 @@ static int devm_clk_match(struct device *dev, void *res, void *data)
- 	return c == data;
- }
- 
-+static int devm_clk_hw_match(struct device *dev, void *res, void *data)
++struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int mult, unsigned int div)
 +{
-+	struct clk_hw *hw = res;
++	struct clk_hw *hw;
+ 
+-	return clk;
++	hw = clk_hw_register_fixed_factor(dev, name, parent_name, flags, mult,
++					  div);
++	if (IS_ERR(hw))
++		return ERR_CAST(hw);
++	return hw->clk;
+ }
+ EXPORT_SYMBOL_GPL(clk_register_fixed_factor);
+ 
+@@ -113,6 +130,17 @@ void clk_unregister_fixed_factor(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(clk_unregister_fixed_factor);
+ 
++void clk_hw_unregister_fixed_factor(struct clk_hw *hw)
++{
++	struct clk_fixed_factor *fix;
 +
-+	if (WARN_ON(!hw))
-+		return 0;
-+	return hw == data;
++	fix = to_clk_fixed_factor(hw);
++
++	clk_hw_unregister(hw);
++	kfree(fix);
 +}
++EXPORT_SYMBOL_GPL(clk_hw_unregister_fixed_factor);
 +
+ #ifdef CONFIG_OF
  /**
-  * devm_clk_unregister - resource managed clk_unregister()
-  * @clk: clock to unregister
-@@ -2694,6 +2764,22 @@ void devm_clk_unregister(struct device *dev, struct clk *clk)
- }
- EXPORT_SYMBOL_GPL(devm_clk_unregister);
- 
-+/**
-+ * devm_clk_hw_unregister - resource managed clk_hw_unregister()
-+ * @dev: device that is unregistering the hardware-specific clock data
-+ * @hw: link to hardware-specific clock data
-+ *
-+ * Unregister a clk_hw registered with devm_clk_hw_register(). Normally
-+ * this function will not need to be called and the resource management
-+ * code will ensure that the resource is freed.
-+ */
-+void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw)
-+{
-+	WARN_ON(devres_release(dev, devm_clk_hw_release, devm_clk_hw_match,
-+				hw));
-+}
-+EXPORT_SYMBOL_GPL(devm_clk_hw_unregister);
-+
- /*
-  * clkdev helpers
-  */
+  * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index da95258127aa..bc6c8de1fac1 100644
+index d690d99b9c1c..79ad1a8a6831 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -655,9 +655,15 @@ struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
- struct clk *clk_register(struct device *dev, struct clk_hw *hw);
- struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
+@@ -525,6 +525,10 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		unsigned int mult, unsigned int div);
+ void clk_unregister_fixed_factor(struct clk *clk);
++struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
++		const char *name, const char *parent_name, unsigned long flags,
++		unsigned int mult, unsigned int div);
++void clk_hw_unregister_fixed_factor(struct clk_hw *hw);
  
-+int __must_check clk_hw_register(struct device *dev, struct clk_hw *hw);
-+int __must_check devm_clk_hw_register(struct device *dev, struct clk_hw *hw);
-+
- void clk_unregister(struct clk *clk);
- void devm_clk_unregister(struct device *dev, struct clk *clk);
- 
-+void clk_hw_unregister(struct clk_hw *hw);
-+void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw);
-+
- /* helper functions */
- const char *__clk_get_name(const struct clk *clk);
- const char *clk_hw_get_name(const struct clk_hw *hw);
+ /**
+  * struct clk_fractional_divider - adjustable fractional divider clock
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
