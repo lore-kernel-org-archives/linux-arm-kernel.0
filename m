@@ -1,27 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Apr 2016 12:44:16 +0100
-Subject: [PATCH v7 17/16] arm64: hibernate: Refuse to hibernate if the
- boot cpu is offline
-In-Reply-To: <1460565110-26341-1-git-send-email-james.morse@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1460565110-26341-1-git-send-email-james.morse@arm.com>
-Message-ID: <20160421114415.GJ6879@leverpostej>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Thu, 21 Apr 2016 04:46:21 -0700
+Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
+ MPIDR_EL1
+In-Reply-To: <20160421095603.s7dhtwpy36nlbr2l@hawk.localdomain>
+References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
+ <20160420183354.31f1bfbd@arm.com>
+ <20160421070447.nwuqlxvpq7fj6h7m@hawk.localdomain>
+ <57189C84.8080206@arm.com>
+ <20160421095603.s7dhtwpy36nlbr2l@hawk.localdomain>
+Message-ID: <20160421114619.GB3673@ashok.sekar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 05:31:50PM +0100, James Morse wrote:
-> It is important to hibernate/resume on the same CPU, otherwise we may
-> change the cpu order or restore a big cpu's register state on a little
-> cpu.
+On Thu, Apr 21, 2016 at 11:56:03AM +0200, Andrew Jones wrote:
+> On Thu, Apr 21, 2016 at 10:25:24AM +0100, Marc Zyngier wrote:
+> > Hey Andrew,
+> > 
+> > On 21/04/16 08:04, Andrew Jones wrote:
+> > > On Wed, Apr 20, 2016 at 06:33:54PM +0100, Marc Zyngier wrote:
+> > >> On Wed, 20 Apr 2016 07:08:39 -0700
+> > >> Ashok Kumar <ashoks@broadcom.com> wrote:
+> > >>
+> > >>> For guests with NUMA configuration, Node ID needs to
+> > >>> be recorded in the respective affinity byte of MPIDR_EL1.
+> > >>
+> > >> As others have said before, the mapping between the NUMA hierarchy and
+> > >> MPIDR_EL1 are completely arbitrary, and only the firmware description
+> > >> can help the kernel in interpreting the affinity levels.
+> > >>
+> > >> If you want any patch like this one to be considered, I'd like to see
+> > >> the corresponding userspace that:
+> > >>
+> > >> - programs the affinity into the vcpus,
+> > > 
+> > > I have a start on this for QEMU that I can dust off and send as an RFC
+> > > soon.
+> > > 
+> > >> - pins the vcpus to specific physical CPUs,
+> > > 
+> > > This wouldn't be part of the userspace directly interacting with KVM,
+> > > but rather a higher level (even higher than libvirt, e.g.
+> > > openstack/ovirt). I also don't think we should need to worry about
+> > > which/how the phyiscal cpus get chosen. Let's assume that entity
+> > > knows how to best map the guest's virtual topology to a physical one.
+> > 
+> > Surely the platform emulation userspace has to implement the pinning
+> > itself, because I can't see high level tools being involved in the
+> > creation of the vcpu threads themselves.
 > 
-> We know cpu 0 is the cpu the firmware booted us on last time, 
+> The pinning comes after the threads are created, but before they are
+> run. The virtual topology created for a guest may or may not map well
+> to the physical topology of a given host. That's not the problem of
+> the emulation though. That's a problem of a high level application
+> trying to fit it.
+> 
+> > 
+> > Also, I'd like to have a "simple" tool to test this without having to
+> > deploy openstack (the day this becomes mandatory for kernel development,
+> > I'll move my carrier to something more... agricultural).
+> > 
+> > So something in QEMU would be really good...
+> > 
+> 
+> To test the virtual topology only requires booting a guest, whether
+> the vcpus are pinned or not. To test that it was worth the effort to
+> create a virtual topology does require the pinning, and the perf
+> measuring. However we still don't need the pinning in QEMU. We can
+> start a guest paused, run a script that does a handful of tasksets,
+> and then resumes the guest. Or, just use libvirt, which allows one
+> to save vcpu affinities, and thus on guest launch it will automatically
+> do the affinity setting for you.
+> 
+> > > 
+> > >> - exposes the corresponding firmware description (either DT or ACPI) to
+> > >>   the kernel.
+> > > 
+> > > The QEMU patches I've started on already generate the DT (the cpu-map
+> > > node). I started looking into how to do it for ACPI too, but there
+> > > were some questions about whether or not the topology description
+> > > tables added to the 6.1 spec were sufficient. I can send the DT part
+> > > soon, and continue to look into the ACPI part later though.
+> > 
+> > That'd be great. Can you please sync with Ashok so that we have
+> > something consistent between the two of you?
+> 
+> Yup. I'm hoping Ashok will chime in to share any userspace status
+> they have.
 
-This assumes that we only kexec from CPU0 also, which we will have to
-enforce. For example, disable_nonboot_cpus() does not enforce this if
-CPU0 has been hotplugged out.
+I tested it using qemu's arm numa patchset [1] and I don't have any
+changes for cpu-map.
+I just used qemu's thread,core,socket information from "-smp" command
+line argument to populate the affinity.
+I was hoping to see the reception for this patch and then post qemu
+changes.
 
-Otherwise, this kernel's CPU0 is not necessarily the CPU the FW booted
-a kernel on.
+[1] https://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00363.html
 
 Thanks,
-Mark.
+Ashok
+> 
+> Thanks,
+> drew
