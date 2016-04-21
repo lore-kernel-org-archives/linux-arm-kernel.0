@@ -1,58 +1,51 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 21 Apr 2016 20:11:16 +0000
-Subject: [PATCH RFT V2 1/3] iio: mxs-lradc: simplify TS registration
+Date: Thu, 21 Apr 2016 20:11:17 +0000
+Subject: [PATCH RFT V2 2/3] iio: mxs-lradc: disable only masked channels in
+ mxs_lradc_hw_stop
 In-Reply-To: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
 References: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1461269478-449-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1461269478-449-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simplifies the TS registration of mxs-lradc by
-using devm_input_allocate_device.
+Disabling of the touchscreen IRQs should be done in
+mxs_lradc_disable_ts. So disable only the masked virtual channels
+in mxs_lradc_hw_stop and finally remove the unused function
+mxs_lradc_irq_en_mask.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/iio/adc/mxs-lradc.c |    9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/iio/adc/mxs-lradc.c |   11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-index ad26da1..223650b 100644
+index 223650b..cfc558f 100644
 --- a/drivers/iio/adc/mxs-lradc.c
 +++ b/drivers/iio/adc/mxs-lradc.c
-@@ -1120,12 +1120,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+@@ -373,13 +373,6 @@ static u32 mxs_lradc_plate_mask(struct mxs_lradc *lradc)
+ 	return LRADC_CTRL0_MX28_PLATE_MASK;
+ }
+ 
+-static u32 mxs_lradc_irq_en_mask(struct mxs_lradc *lradc)
+-{
+-	if (lradc->soc == IMX23_LRADC)
+-		return LRADC_CTRL1_MX23_LRADC_IRQ_EN_MASK;
+-	return LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK;
+-}
+-
+ static u32 mxs_lradc_irq_mask(struct mxs_lradc *lradc)
  {
- 	struct input_dev *input;
- 	struct device *dev = lradc->dev;
--	int ret;
+ 	if (lradc->soc == IMX23_LRADC)
+@@ -1505,7 +1498,9 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
+ {
+ 	int i;
  
- 	if (!lradc->use_touchscreen)
- 		return 0;
+-	mxs_lradc_reg_clear(lradc, mxs_lradc_irq_en_mask(lradc), LRADC_CTRL1);
++	mxs_lradc_reg_clear(lradc,
++		lradc->buffer_vchans << LRADC_CTRL1_LRADC_IRQ_EN_OFFSET,
++		LRADC_CTRL1);
  
--	input = input_allocate_device();
-+	input = devm_input_allocate_device(dev);
- 	if (!input)
- 		return -ENOMEM;
- 
-@@ -1146,11 +1145,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
- 
- 	lradc->ts_input = input;
- 	input_set_drvdata(input, lradc);
--	ret = input_register_device(input);
--	if (ret)
--		input_free_device(lradc->ts_input);
- 
--	return ret;
-+	return input_register_device(input);
- }
- 
- static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
-@@ -1159,7 +1155,6 @@ static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
- 		return;
- 
- 	mxs_lradc_disable_ts(lradc);
--	input_unregister_device(lradc->ts_input);
- }
- 
- /*
+ 	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
+ 		mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
 -- 
 1.7.9.5
