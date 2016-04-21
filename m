@@ -1,145 +1,211 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 21 Apr 2016 20:04:16 +0200
-Subject: [PATCH 7/7] KVM: arm/arm64: remove irq_phys_map pointer from
- kvm_vgic_map_phys_irq()
-In-Reply-To: <1460729047-6346-8-git-send-email-andre.przywara@arm.com>
-References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
- <1460729047-6346-8-git-send-email-andre.przywara@arm.com>
-Message-ID: <57191620.5020404@linaro.org>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Thu, 21 Apr 2016 20:16:12 +0200
+Subject: [PATCH v2] ARM: dts: tegra: correct Beaver pinmux
+In-Reply-To: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
+References: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
+Message-ID: <1461262572.2494.0.camel@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2016 04:04 PM, Andre Przywara wrote:
-> Now that the virtual arch timer does not care about the irq_phys_map
-> anymore, let's rework kvm_vgic_map_phys_irq() to return an error
-> value instead. Any reference to thap mapping can later be done by
-> passing the correct combination of VCPU and virtual IRQ number.
-> This makes the irq_phys_map handling completely private to the
-> VGIC code.
+Am Freitag, den 26.02.2016, 20:18 +0100 schrieb Lucas Stach:
+> Update pinmux to get rid of invalid uses of the rsvd1 function, which
+> lead
+> to the mux settings on those pins to not be applied.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Also add correct drive settings, derived from the Tegra3 TRM, for
+> SDIO1,
+> which makes some more SD-cards work.
+> 
+Just a gentle ping on this patch, as I haven't seen it being applied
+anywhere.
+
+> Signed-off-by: Lucas Stach <dev@lynxeye.de>
 > ---
->  include/kvm/arm_vgic.h    |  3 +--
->  virt/kvm/arm/arch_timer.c |  8 ++++----
->  virt/kvm/arm/vgic.c       | 23 +++++++++++------------
->  3 files changed, 16 insertions(+), 18 deletions(-)
+> ?arch/arm/boot/dts/tegra30-beaver.dts | 39 ++++++++++++++++++++++--
+> ------------
+> ?1 file changed, 24 insertions(+), 15 deletions(-)
 > 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 49c559e..f842d7d 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -343,8 +343,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->  			       unsigned int virt_irq, bool level);
->  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> -struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> -					   int virt_irq, int phys_irq);
-> +int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq);
->  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 1598e23..270f971 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -306,10 +306,10 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  			 const struct kvm_irq_level *irq)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> -	struct irq_phys_map *map;
->  	struct irq_desc *desc;
->  	struct irq_data *data;
->  	int phys_irq;
-> +	int ret;
->  
->  	/*
->  	 * The vcpu timer irq number cannot be determined in
-> @@ -347,9 +347,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  	 * Tell the VGIC that the virtual interrupt is tied to a
->  	 * physical interrupt. We do that once per VCPU.
->  	 */
-> -	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
-> -	if (WARN_ON(IS_ERR(map)))
-> -		return PTR_ERR(map);
-> +	ret = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
-> +	if (ret)
-> +		return ret;
->  
->  	timer->virt_irq = irq->irq;
->  	return 0;
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index ac5838b..00386df 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1712,29 +1712,28 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
->  /**
->   * kvm_vgic_map_phys_irq - map a virtual IRQ to a physical IRQ
->   * @vcpu: The VCPU pointer
-> - * @virt_irq: The virtual irq number
-> - * @irq: The Linux IRQ number
-> + * @virt_irq: The virtual IRQ number for the guest
-> + * @phys_irq: The hardware IRQ number of the host
-nit: not belonging to this patch ;-)
->   *
->   * Establish a mapping between a guest visible irq (@virt_irq) and a
-> - * Linux irq (@irq). On injection, @virt_irq will be associated with
-> - * the physical interrupt represented by @irq. This mapping can be
-> + * hardware irq (@phys_irq). On injection, @virt_irq will be associated with
-> + * the physical interrupt represented by @phys_irq. This mapping can be
-same
-
-Besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
-
-Have a nice evening
-
-Cheers
-
-Eric
-
-
->   * established multiple times as long as the parameters are the same.
->   *
-> - * Returns a valid pointer on success, and an error pointer otherwise
-> + * Returns 0 on success or an error value otherwise.
->   */
-> -struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> -					   int virt_irq, int phys_irq)
-> +int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
->  	struct irq_phys_map *map;
->  	struct irq_phys_map_entry *entry;
-> -
-> +	int ret = 0;
->  
->  	/* Create a new mapping */
->  	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
->  	if (!entry)
-> -		return ERR_PTR(-ENOMEM);
-> +		return -ENOMEM;
->  
->  	spin_lock(&dist->irq_phys_map_lock);
->  
-> @@ -1743,7 +1742,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->  	if (map) {
->  		/* Make sure this mapping matches */
->  		if (map->phys_irq != phys_irq)
-> -			map = ERR_PTR(-EINVAL);
-> +			ret = -EINVAL;
->  
->  		/* Found an existing, valid mapping */
->  		goto out;
-> @@ -1759,9 +1758,9 @@ out:
->  	spin_unlock(&dist->irq_phys_map_lock);
->  	/* If we've found a hit in the existing list, free the useless
->  	 * entry */
-> -	if (IS_ERR(map) || map != &entry->map)
-> +	if (ret || map != &entry->map)
->  		kfree(entry);
-> -	return map;
-> +	return ret;
->  }
->  
->  static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
-> 
+> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts
+> b/arch/arm/boot/dts/tegra30-beaver.dts
+> index 3dede39..1daed40 100644
+> --- a/arch/arm/boot/dts/tegra30-beaver.dts
+> +++ b/arch/arm/boot/dts/tegra30-beaver.dts
+> @@ -255,14 +255,14 @@
+> ?			};
+> ?			sdmmc3_dat6_pd3 {
+> ?				nvidia,pins = "sdmmc3_dat6_pd3";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "spdif";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> ?			};
+> ?			sdmmc3_dat7_pd4 {
+> ?				nvidia,pins = "sdmmc3_dat7_pd4";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "spdif";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -276,14 +276,14 @@
+> ?			};
+> ?			vi_vsync_pd6 {
+> ?				nvidia,pins = "vi_vsync_pd6";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "ddr";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> ?			};
+> ?			vi_hsync_pd7 {
+> ?				nvidia,pins = "vi_hsync_pd7";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "ddr";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -801,7 +801,7 @@
+> ?			};
+> ?			hdmi_int_pn7 {
+> ?				nvidia,pins = "hdmi_int_pn7";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "hdmi";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_ENABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -836,7 +836,7 @@
+> ?			};
+> ?			ulpi_data3_po4 {
+> ?				nvidia,pins = "ulpi_data3_po4";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "uarta";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1102,21 +1102,21 @@
+> ?			};
+> ?			vi_d10_pt2 {
+> ?				nvidia,pins = "vi_d10_pt2";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "ddr";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> ?			};
+> ?			vi_d11_pt3 {
+> ?				nvidia,pins = "vi_d11_pt3";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "ddr";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_UP>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> ?			};
+> ?			vi_d0_pt4 {
+> ?				nvidia,pins = "vi_d0_pt4";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "ddr";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1146,7 +1146,7 @@
+> ?			};
+> ?			pu0 {
+> ?				nvidia,pins = "pu0";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "owr";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1167,7 +1167,7 @@
+> ?			};
+> ?			pu3 {
+> ?				nvidia,pins = "pu3";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "pwm0";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1188,7 +1188,7 @@
+> ?			};
+> ?			pu6 {
+> ?				nvidia,pins = "pu6";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "pwm3";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1216,7 +1216,7 @@
+> ?			};
+> ?			pv3 {
+> ?				nvidia,pins = "pv3";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "clk_12m_out";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_DISABLE>;
+> @@ -1505,7 +1505,7 @@
+> ?			};
+> ?			pbb0 {
+> ?				nvidia,pins = "pbb0";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "i2s4";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1570,7 +1570,7 @@
+> ?			};
+> ?			pcc1 {
+> ?				nvidia,pins = "pcc1";
+> -				nvidia,function = "rsvd1";
+> +				nvidia,function = "i2s4";
+> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+> ?				nvidia,tristate =
+> <TEGRA_PIN_DISABLE>;
+> ?				nvidia,enable-input =
+> <TEGRA_PIN_ENABLE>;
+> @@ -1718,6 +1718,15 @@
+> ?				nvidia,slew-rate-rising = <1>;
+> ?				nvidia,slew-rate-falling = <1>;
+> ?			};
+> +			sdio1 {
+> +				nvidia,pins = "drive_sdio1";
+> +				nvidia,high-speed-mode =
+> <TEGRA_PIN_DISABLE>;
+> +				nvidia,schmitt =
+> <TEGRA_PIN_DISABLE>;
+> +				nvidia,pull-down-strength = <46>;
+> +				nvidia,pull-up-strength = <42>;
+> +				nvidia,slew-rate-rising = <1>;
+> +				nvidia,slew-rate-falling = <1>;
+> +			};
+> ?			gpv {
+> ?				nvidia,pins = "drive_gpv";
+> ?				nvidia,pull-up-strength = <16>;
