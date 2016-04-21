@@ -1,42 +1,47 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Apr 2016 17:33:59 +0930
-Subject: [PATCH v2 01/11] doc/devicetree: Add Aspeed and Tyan to
- vendor-prefixes
+Date: Thu, 21 Apr 2016 17:34:00 +0930
+Subject: [PATCH v2 02/11] doc/devicetree: Add Aspeed VIC bindings
 In-Reply-To: <1461225849-28074-1-git-send-email-joel@jms.id.au>
 References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
-Message-ID: <1461225849-28074-2-git-send-email-joel@jms.id.au>
+Message-ID: <1461225849-28074-3-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASPEED Technology Inc is a fabless IC-design company.  Their web site
-is http://www.aspeedtech.com/.
-
-Tyan is a manufactuer of server and workstation platforms.
-
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ .../interrupt-controller/aspeed,ast2400-vic.txt    | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 86740d4a270d..192843189ceb 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -29,6 +29,7 @@ arm	ARM Ltd.
- armadeus	ARMadeus Systems SARL
- artesyn	Artesyn Embedded Technologies Inc.
- asahi-kasei	Asahi Kasei Corp.
-+aspeed	ASPEED Technology Inc.
- atlas	Atlas Scientific LLC
- atmel	Atmel Corporation
- auo	AU Optronics Corporation
-@@ -250,6 +251,7 @@ tplink	TP-LINK Technologies Co., Ltd.
- tronfy	Tronfy
- tronsmart	Tronsmart
- truly	Truly Semiconductors Limited
-+tyan	Tyan Computer Corporation
- upisemi	uPI Semiconductor Corp.
- urt	United Radiant Technology Corporation
- usi	Universal Scientific Industrial Co., Ltd.
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt b/Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
+new file mode 100644
+index 000000000000..10ed0c20ee6f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
+@@ -0,0 +1,24 @@
++Aspeed Vectored Interrupt Controller
++
++These bindings are for the Aspeed AST2400 interrupt controller register layout.
++The SoC has an legacy register layout, but this driver does not support that
++mode of operation.
++
++Required properties:
++
++- compatible : should be "aspeed,ast2400-vic".
++
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 1.
++- valid-sources : bitmask of valid irq sources
++
++Example:
++
++ vic: interrupt-controller {
++      compatible = "aspeed,ast2400-new-vic";
++      interrupt-controller;
++      #interrupt-cells = <1>;
++      valid-sources = < 0xffffffff 0x0007ffff>;
++      reg = <0x1e6c0080 0x80>;
++ };
 -- 
 2.7.4
