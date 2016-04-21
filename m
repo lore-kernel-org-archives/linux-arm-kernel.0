@@ -1,205 +1,54 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Apr 2016 17:34:09 +0930
-Subject: [PATCH v2 11/11] arm/configs: Add aspeed defconfig
-In-Reply-To: <1461225849-28074-1-git-send-email-joel@jms.id.au>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
-Message-ID: <1461225849-28074-12-git-send-email-joel@jms.id.au>
+From: finley.xiao@rock-chips.com (Finlye Xiao)
+Date: Thu, 21 Apr 2016 16:04:09 +0800
+Subject: [PATCH v1] cpufreq: rockchip: Use generic platdev driver
+Message-ID: <1461225849-36866-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/configs/aspeed_g4_defconfig | 86 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/aspeed_g5_defconfig | 88 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 174 insertions(+)
- create mode 100644 arch/arm/configs/aspeed_g4_defconfig
- create mode 100644 arch/arm/configs/aspeed_g5_defconfig
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_g4_defconfig
-new file mode 100644
-index 000000000000..83691bf98d09
---- /dev/null
-+++ b/arch/arm/configs/aspeed_g4_defconfig
-@@ -0,0 +1,86 @@
-+CONFIG_KERNEL_XZ=y
-+CONFIG_SYSVIPC=y
-+CONFIG_USELIB=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_LZO is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_BPF_SYSCALL=y
-+# CONFIG_SHMEM is not set
-+# CONFIG_AIO is not set
-+CONFIG_EMBEDDED=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_CC_STACKPROTECTOR_STRONG=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLOCK is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_ASPEED=y
-+CONFIG_MACH_AST_G4=y
-+CONFIG_DEBUG_RODATA=y
-+CONFIG_AEABI=y
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_SECCOMP=y
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_KEXEC=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=6
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=6
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_FIRMWARE_MEMMAP=y
-+CONFIG_FANOTIFY=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_PAGE_POISONING=y
-+CONFIG_DEBUG_KMEMLEAK=y
-+CONFIG_DEBUG_SHIRQ=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_WQ_WATCHDOG=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_SCHED_STACK_END_CHECK=y
-+CONFIG_DEBUG_RT_MUTEXES=y
-+CONFIG_DEBUG_WW_MUTEX_SLOWPATH=y
-+# CONFIG_FTRACE is not set
-+CONFIG_MEMTEST=y
-+CONFIG_UBSAN=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_8250=y
-+CONFIG_DEBUG_UART_PHYS=0x1e784000
-+CONFIG_DEBUG_UART_VIRT=0xe8784000
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_DEBUG_SET_MODULE_RONX=y
-+# CONFIG_XZ_DEC_X86 is not set
-+# CONFIG_XZ_DEC_POWERPC is not set
-+# CONFIG_XZ_DEC_IA64 is not set
-+# CONFIG_XZ_DEC_SPARC is not set
-diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
-new file mode 100644
-index 000000000000..274f96e1e3bf
---- /dev/null
-+++ b/arch/arm/configs/aspeed_g5_defconfig
-@@ -0,0 +1,88 @@
-+CONFIG_KERNEL_XZ=y
-+CONFIG_SYSVIPC=y
-+CONFIG_USELIB=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_LZO is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_BPF_SYSCALL=y
-+# CONFIG_SHMEM is not set
-+# CONFIG_AIO is not set
-+CONFIG_EMBEDDED=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_CC_STACKPROTECTOR_STRONG=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLOCK is not set
-+CONFIG_ARCH_MULTI_V6=y
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_ASPEED=y
-+CONFIG_MACH_AST_G5=y
-+CONFIG_DEBUG_RODATA=y
-+CONFIG_AEABI=y
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_SECCOMP=y
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_KEXEC=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=6
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=6
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_FIRMWARE_MEMMAP=y
-+CONFIG_FANOTIFY=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_PAGE_POISONING=y
-+CONFIG_DEBUG_KMEMLEAK=y
-+CONFIG_DEBUG_SHIRQ=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_WQ_WATCHDOG=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_SCHED_STACK_END_CHECK=y
-+CONFIG_DEBUG_RT_MUTEXES=y
-+CONFIG_DEBUG_WW_MUTEX_SLOWPATH=y
-+# CONFIG_FTRACE is not set
-+CONFIG_MEMTEST=y
-+CONFIG_UBSAN=y
-+CONFIG_UBSAN_ALIGNMENT=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_8250=y
-+CONFIG_DEBUG_UART_PHYS=0x1e784000
-+CONFIG_DEBUG_UART_VIRT=0xe8784000
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_DEBUG_SET_MODULE_RONX=y
-+# CONFIG_XZ_DEC_X86 is not set
-+# CONFIG_XZ_DEC_POWERPC is not set
-+# CONFIG_XZ_DEC_IA64 is not set
-+# CONFIG_XZ_DEC_SPARC is not set
+This patch add rockchip's compatible string to the compat list and
+remove similar code from platform code for supporting generic platdev
+driver.
+
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+---
+ arch/arm/mach-rockchip/rockchip.c    |  1 -
+ drivers/cpufreq/cpufreq-dt-platdev.c | 10 ++++++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 3f07cc5..beb71da 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
+ {
+ 	rockchip_suspend_init();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
+ }
+ 
+ static const char * const rockchip_board_dt_compat[] = {
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index f2ae7ad..2128767 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -21,6 +21,16 @@ static const struct of_device_id machines[] = {
+ 	{ .compatible = "samsung,exynos5420", },
+ 	{ .compatible = "samsung,exynos5800", },
+ #endif
++	{ .compatible = "rockchip,rk2928", },
++	{ .compatible = "rockchip,rk3036", },
++	{ .compatible = "rockchip,rk3066a", },
++	{ .compatible = "rockchip,rk3066b", },
++	{ .compatible = "rockchip,rk3188", },
++	{ .compatible = "rockchip,rk3228", },
++	{ .compatible = "rockchip,rk3288", },
++	{ .compatible = "rockchip,rk3366", },
++	{ .compatible = "rockchip,rk3368", },
++	{ .compatible = "rockchip,rk3399", },
+ };
+ 
+ static int __init cpufreq_dt_platdev_init(void)
 -- 
-2.7.4
+1.9.1
