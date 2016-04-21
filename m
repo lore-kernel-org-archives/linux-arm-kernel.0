@@ -1,40 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 21 Apr 2016 09:01:20 +0200
-Subject: [PATCH 2/3] i2c: s3c2410: Minor function-level comment cleanup
-In-Reply-To: <57178B58.7050104@osg.samsung.com>
-References: <1461144292-22141-1-git-send-email-k.kozlowski@samsung.com>
- <1461144292-22141-2-git-send-email-k.kozlowski@samsung.com>
- <57178B58.7050104@osg.samsung.com>
-Message-ID: <57187AC0.3000503@samsung.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 21 Apr 2016 09:04:47 +0200
+Subject: [RFC PATCH] arm64: KVM: Allow userspace to configure guest
+ MPIDR_EL1
+In-Reply-To: <20160420183354.31f1bfbd@arm.com>
+References: <1461161319-38835-1-git-send-email-ashoks@broadcom.com>
+ <20160420183354.31f1bfbd@arm.com>
+Message-ID: <20160421070447.nwuqlxvpq7fj6h7m@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2016 03:59 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
+On Wed, Apr 20, 2016 at 06:33:54PM +0100, Marc Zyngier wrote:
+> On Wed, 20 Apr 2016 07:08:39 -0700
+> Ashok Kumar <ashoks@broadcom.com> wrote:
 > 
-> On 04/20/2016 05:24 AM, Krzysztof Kozlowski wrote:
->> Cleanup the weird function-level comments and remove obvious
->> documentatoin for probe/remove.
->>
+> > For guests with NUMA configuration, Node ID needs to
+> > be recorded in the respective affinity byte of MPIDR_EL1.
 > 
-> s/documentatoin/documentation
->  
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
+> As others have said before, the mapping between the NUMA hierarchy and
+> MPIDR_EL1 are completely arbitrary, and only the firmware description
+> can help the kernel in interpreting the affinity levels.
 > 
-> I wonder if instead we should change to kernel-doc formatted documentation.
+> If you want any patch like this one to be considered, I'd like to see
+> the corresponding userspace that:
 > 
-> All the functions are static so kernel-doc is not really required but still
-> Documentation/kernel-doc-nano-HOWTO.txt says that is suggested for source
-> code layout consistency.
-> 
-> But I agree that's either kernel-doc format or minimal as your patch does:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> - programs the affinity into the vcpus,
 
-Thanks for review. Indeed switching to kernel-doc would be the best...
-but that would require a little bit more rewritting than now. I just
-wanted to fix some weird looking comments.
+I have a start on this for QEMU that I can dust off and send as an RFC
+soon.
 
-Best regards,
-Krzysztof
+> - pins the vcpus to specific physical CPUs,
+
+This wouldn't be part of the userspace directly interacting with KVM,
+but rather a higher level (even higher than libvirt, e.g.
+openstack/ovirt). I also don't think we should need to worry about
+which/how the phyiscal cpus get chosen. Let's assume that entity
+knows how to best map the guest's virtual topology to a physical one.
+
+> - exposes the corresponding firmware description (either DT or ACPI) to
+>   the kernel.
+
+The QEMU patches I've started on already generate the DT (the cpu-map
+node). I started looking into how to do it for ACPI too, but there
+were some questions about whether or not the topology description
+tables added to the 6.1 spec were sufficient. I can send the DT part
+soon, and continue to look into the ACPI part later though.
+
+Thanks,
+drew
