@@ -1,243 +1,229 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:21:54 -0700
-Subject: [PATCH v2 03/13] clk: Add clk_hw OF clk providers
+Date: Thu, 21 Apr 2016 15:22:04 -0700
+Subject: [PATCH v2 13/13] clk: qcom: Migrate to clk_hw based registration and
+ OF APIs
 In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1461277324-27185-14-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a clk registration API that doesn't return
-struct clks, we need to have some way to hand out struct clks via
-the clk_get() APIs that doesn't involve associating struct clk
-pointers with an OF node. Currently we ask the OF provider to
-give us a struct clk pointer for some clkspec, turn that struct
-clk into a struct clk_hw and then allocate a new struct clk to
-return to the caller.
-
-Let's add a clk_hw based OF provider hook that returns a struct
-clk_hw directly, so that we skip the intermediate step of
-converting from struct clk to struct clk_hw. Eventually when
-we've converted all OF clk providers to struct clk_hw based APIs
-we can remove the struct clk based ones.
-
-It should also be noted that we change the onecell provider to
-have a flex array instead of a pointer for the array of clk_hw
-pointers. This allows providers to allocate one structure of the
-correct length in one step instead of two.
-
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk.c            | 85 +++++++++++++++++++++++++++++++++++++++++---
- include/linux/clk-provider.h | 30 ++++++++++++++++
- 2 files changed, 111 insertions(+), 4 deletions(-)
+ drivers/clk/qcom/clk-regmap.c   |  5 ++--
+ drivers/clk/qcom/clk-regmap.h   |  3 +--
+ drivers/clk/qcom/common.c       | 58 +++++++++++++++++++++++------------------
+ drivers/clk/qcom/gcc-msm8996.c  |  9 +++----
+ drivers/clk/qcom/mmcc-msm8996.c |  9 +++----
+ 5 files changed, 43 insertions(+), 41 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 0ef919666827..e813b2aabc87 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2941,6 +2941,7 @@ struct of_clk_provider {
+diff --git a/drivers/clk/qcom/clk-regmap.c b/drivers/clk/qcom/clk-regmap.c
+index a58ba39a900c..1c856d330733 100644
+--- a/drivers/clk/qcom/clk-regmap.c
++++ b/drivers/clk/qcom/clk-regmap.c
+@@ -101,14 +101,13 @@ EXPORT_SYMBOL_GPL(clk_disable_regmap);
+  * clk_regmap struct via this function so that the regmap is initialized
+  * and so that the clock is registered with the common clock framework.
+  */
+-struct clk *devm_clk_register_regmap(struct device *dev,
+-				     struct clk_regmap *rclk)
++int devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk)
+ {
+ 	if (dev && dev_get_regmap(dev, NULL))
+ 		rclk->regmap = dev_get_regmap(dev, NULL);
+ 	else if (dev && dev->parent)
+ 		rclk->regmap = dev_get_regmap(dev->parent, NULL);
  
- 	struct device_node *node;
- 	struct clk *(*get)(struct of_phandle_args *clkspec, void *data);
-+	struct clk_hw *(*get_hw)(struct of_phandle_args *clkspec, void *data);
- 	void *data;
+-	return devm_clk_register(dev, &rclk->hw);
++	return devm_clk_hw_register(dev, &rclk->hw);
+ }
+ EXPORT_SYMBOL_GPL(devm_clk_register_regmap);
+diff --git a/drivers/clk/qcom/clk-regmap.h b/drivers/clk/qcom/clk-regmap.h
+index 491a63d537df..90d95cd11ec6 100644
+--- a/drivers/clk/qcom/clk-regmap.h
++++ b/drivers/clk/qcom/clk-regmap.h
+@@ -39,7 +39,6 @@ struct clk_regmap {
+ int clk_is_enabled_regmap(struct clk_hw *hw);
+ int clk_enable_regmap(struct clk_hw *hw);
+ void clk_disable_regmap(struct clk_hw *hw);
+-struct clk *
+-devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk);
++int devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk);
+ 
+ #endif
+diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+index f7c226ab4307..fffcbaf0fba7 100644
+--- a/drivers/clk/qcom/common.c
++++ b/drivers/clk/qcom/common.c
+@@ -27,8 +27,8 @@
+ 
+ struct qcom_cc {
+ 	struct qcom_reset_controller reset;
+-	struct clk_onecell_data data;
+-	struct clk *clks[];
++	struct clk_regmap **rclks;
++	size_t num_rclks;
  };
  
-@@ -2957,6 +2958,12 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
- }
- EXPORT_SYMBOL_GPL(of_clk_src_simple_get);
+ const
+@@ -102,8 +102,8 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
+ 	struct device_node *clocks_node;
+ 	struct clk_fixed_factor *factor;
+ 	struct clk_fixed_rate *fixed;
+-	struct clk *clk;
+ 	struct clk_init_data init_data = { };
++	int ret;
  
-+struct clk_hw *of_clk_hw_simple_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	return data;
-+}
-+EXPORT_SYMBOL_GPL(of_clk_hw_simple_get);
-+
- struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data)
- {
- 	struct clk_onecell_data *clk_data = data;
-@@ -2971,6 +2978,21 @@ struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data)
- }
- EXPORT_SYMBOL_GPL(of_clk_src_onecell_get);
+ 	clocks_node = of_find_node_by_path("/clocks");
+ 	if (clocks_node)
+@@ -121,9 +121,9 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
+ 		init_data.name = path;
+ 		init_data.ops = &clk_fixed_rate_ops;
  
-+struct clk_hw *
-+of_clk_hw_onecell_get(struct of_phandle_args *clkspec, void *data)
+-		clk = devm_clk_register(dev, &fixed->hw);
+-		if (IS_ERR(clk))
+-			return PTR_ERR(clk);
++		ret = devm_clk_hw_register(dev, &fixed->hw);
++		if (ret)
++			return ret;
+ 	}
+ 	of_node_put(node);
+ 
+@@ -141,9 +141,9 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
+ 		init_data.flags = 0;
+ 		init_data.ops = &clk_fixed_factor_ops;
+ 
+-		clk = devm_clk_register(dev, &factor->hw);
+-		if (IS_ERR(clk))
+-			return PTR_ERR(clk);
++		ret = devm_clk_hw_register(dev, &factor->hw);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	return 0;
+@@ -174,42 +174,48 @@ int qcom_cc_register_sleep_clk(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(qcom_cc_register_sleep_clk);
+ 
++static struct clk_hw *qcom_cc_clk_hw_get(struct of_phandle_args *clkspec,
++					 void *data)
 +{
-+	struct clk_hw_onecell_data *hw_data = data;
++	struct qcom_cc *cc = data;
 +	unsigned int idx = clkspec->args[0];
 +
-+	if (idx >= hw_data->num) {
++	if (idx >= cc->num_rclks) {
 +		pr_err("%s: invalid index %u\n", __func__, idx);
 +		return ERR_PTR(-EINVAL);
 +	}
 +
-+	return hw_data->hws[idx];
-+}
-+EXPORT_SYMBOL_GPL(of_clk_hw_onecell_get);
-+
- /**
-  * of_clk_add_provider() - Register a clock provider for a node
-  * @np: Device node pointer associated with clock provider
-@@ -3007,6 +3029,41 @@ int of_clk_add_provider(struct device_node *np,
- EXPORT_SYMBOL_GPL(of_clk_add_provider);
- 
- /**
-+ * of_clk_add_hw_provider() - Register a clock provider for a node
-+ * @np: Device node pointer associated with clock provider
-+ * @get: callback for decoding clk_hw
-+ * @data: context pointer for @get callback.
-+ */
-+int of_clk_add_hw_provider(struct device_node *np,
-+			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+						 void *data),
-+			   void *data)
-+{
-+	struct of_clk_provider *cp;
-+	int ret;
-+
-+	cp = kzalloc(sizeof(*cp), GFP_KERNEL);
-+	if (!cp)
-+		return -ENOMEM;
-+
-+	cp->node = of_node_get(np);
-+	cp->data = data;
-+	cp->get_hw = get;
-+
-+	mutex_lock(&of_clk_mutex);
-+	list_add(&cp->link, &of_clk_providers);
-+	mutex_unlock(&of_clk_mutex);
-+	pr_debug("Added clk_hw provider from %s\n", np->full_name);
-+
-+	ret = of_clk_set_defaults(np, true);
-+	if (ret < 0)
-+		of_clk_del_provider(np);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(of_clk_add_hw_provider);
-+
-+/**
-  * of_clk_del_provider() - Remove a previously registered clock provider
-  * @np: Device node pointer associated with clock provider
-  */
-@@ -3027,11 +3084,32 @@ void of_clk_del_provider(struct device_node *np)
- }
- EXPORT_SYMBOL_GPL(of_clk_del_provider);
- 
-+static struct clk_hw *
-+__of_clk_get_hw_from_provider(struct of_clk_provider *provider,
-+			      struct of_phandle_args *clkspec)
-+{
-+	struct clk *clk;
-+	struct clk_hw *hw = ERR_PTR(-EPROBE_DEFER);
-+
-+	if (provider->get_hw) {
-+		hw = provider->get_hw(clkspec, provider->data);
-+	} else if (provider->get) {
-+		clk = provider->get(clkspec, provider->data);
-+		if (!IS_ERR(clk))
-+			hw = __clk_get_hw(clk);
-+		else
-+			hw = ERR_CAST(clk);
-+	}
-+
-+	return hw;
++	return cc->rclks[idx] ? &cc->rclks[idx]->hw : ERR_PTR(-ENOENT);
 +}
 +
- struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
- 				       const char *dev_id, const char *con_id)
+ int qcom_cc_really_probe(struct platform_device *pdev,
+ 			 const struct qcom_cc_desc *desc, struct regmap *regmap)
  {
- 	struct of_clk_provider *provider;
- 	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
-+	struct clk_hw *hw = ERR_PTR(-EPROBE_DEFER);
+ 	int i, ret;
+ 	struct device *dev = &pdev->dev;
+-	struct clk *clk;
+-	struct clk_onecell_data *data;
+-	struct clk **clks;
+ 	struct qcom_reset_controller *reset;
+ 	struct qcom_cc *cc;
+ 	struct gdsc_desc *scd;
+ 	size_t num_clks = desc->num_clks;
+ 	struct clk_regmap **rclks = desc->clks;
  
- 	if (!clkspec)
- 		return ERR_PTR(-EINVAL);
-@@ -3040,10 +3118,9 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
- 	mutex_lock(&of_clk_mutex);
- 	list_for_each_entry(provider, &of_clk_providers, link) {
- 		if (provider->node == clkspec->np)
--			clk = provider->get(clkspec, provider->data);
--		if (!IS_ERR(clk)) {
--			clk = __clk_create_clk(__clk_get_hw(clk), dev_id,
--					       con_id);
-+			hw = __of_clk_get_hw_from_provider(provider, clkspec);
-+		if (!IS_ERR(hw)) {
-+			clk = __clk_create_clk(hw, dev_id, con_id);
+-	cc = devm_kzalloc(dev, sizeof(*cc) + sizeof(*clks) * num_clks,
+-			  GFP_KERNEL);
++	cc = devm_kzalloc(dev, sizeof(*cc), GFP_KERNEL);
+ 	if (!cc)
+ 		return -ENOMEM;
  
- 			if (!IS_ERR(clk) && !__clk_get(clk)) {
- 				__clk_free_clk(clk);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index bc6c8de1fac1..bf8c8bb8c2cb 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -709,6 +709,11 @@ struct clk_onecell_data {
- 	unsigned int clk_num;
- };
+-	clks = cc->clks;
+-	data = &cc->data;
+-	data->clks = clks;
+-	data->clk_num = num_clks;
++	cc->rclks = rclks;
++	cc->num_rclks = num_clks;
  
-+struct clk_hw_onecell_data {
-+	size_t num;
-+	struct clk_hw *hws[];
-+};
+ 	for (i = 0; i < num_clks; i++) {
+-		if (!rclks[i]) {
+-			clks[i] = ERR_PTR(-ENOENT);
++		if (!rclks[i])
+ 			continue;
+-		}
+-		clk = devm_clk_register_regmap(dev, rclks[i]);
+-		if (IS_ERR(clk))
+-			return PTR_ERR(clk);
+-		clks[i] = clk;
 +
- extern struct of_device_id __clk_of_table;
++		ret = devm_clk_register_regmap(dev, rclks[i]);
++		if (ret)
++			return ret;
+ 	}
  
- #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-@@ -718,10 +723,18 @@ int of_clk_add_provider(struct device_node *np,
- 			struct clk *(*clk_src_get)(struct of_phandle_args *args,
- 						   void *data),
- 			void *data);
-+int of_clk_add_hw_provider(struct device_node *np,
-+			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+						 void *data),
-+			   void *data);
- void of_clk_del_provider(struct device_node *np);
- struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
- 				  void *data);
-+struct clk_hw *of_clk_hw_simple_get(struct of_phandle_args *clkspec,
-+				    void *data);
- struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
-+struct clk_hw *of_clk_hw_onecell_get(struct of_phandle_args *clkspec,
-+				     void *data);
- unsigned int of_clk_get_parent_count(struct device_node *np);
- int of_clk_parent_fill(struct device_node *np, const char **parents,
- 		       unsigned int size);
-@@ -738,17 +751,34 @@ static inline int of_clk_add_provider(struct device_node *np,
+-	ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get, data);
++	ret = of_clk_add_hw_provider(dev->of_node, qcom_cc_clk_hw_get, cc);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/drivers/clk/qcom/gcc-msm8996.c b/drivers/clk/qcom/gcc-msm8996.c
+index c9b96f318d9c..7a6fd069ba5d 100644
+--- a/drivers/clk/qcom/gcc-msm8996.c
++++ b/drivers/clk/qcom/gcc-msm8996.c
+@@ -3463,9 +3463,8 @@ MODULE_DEVICE_TABLE(of, gcc_msm8996_match_table);
+ 
+ static int gcc_msm8996_probe(struct platform_device *pdev)
  {
- 	return 0;
- }
-+static inline int of_clk_add_hw_provider(struct device_node *np,
-+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+					      void *data),
-+			void *data)
-+{
-+	return 0;
-+}
- static inline void of_clk_del_provider(struct device_node *np) {}
- static inline struct clk *of_clk_src_simple_get(
- 	struct of_phandle_args *clkspec, void *data)
+-	struct clk *clk;
+ 	struct device *dev = &pdev->dev;
+-	int i;
++	int i, ret;
+ 	struct regmap *regmap;
+ 
+ 	regmap = qcom_cc_map(pdev, &gcc_msm8996_desc);
+@@ -3479,9 +3478,9 @@ static int gcc_msm8996_probe(struct platform_device *pdev)
+ 	regmap_update_bits(regmap, 0x52008, BIT(21), BIT(21));
+ 
+ 	for (i = 0; i < ARRAY_SIZE(gcc_msm8996_hws); i++) {
+-		clk = devm_clk_register(dev, gcc_msm8996_hws[i]);
+-		if (IS_ERR(clk))
+-			return PTR_ERR(clk);
++		ret = devm_clk_hw_register(dev, gcc_msm8996_hws[i]);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	return qcom_cc_really_probe(pdev, &gcc_msm8996_desc, regmap);
+diff --git a/drivers/clk/qcom/mmcc-msm8996.c b/drivers/clk/qcom/mmcc-msm8996.c
+index 6df7ff36b416..e21f76817827 100644
+--- a/drivers/clk/qcom/mmcc-msm8996.c
++++ b/drivers/clk/qcom/mmcc-msm8996.c
+@@ -3337,9 +3337,8 @@ MODULE_DEVICE_TABLE(of, mmcc_msm8996_match_table);
+ 
+ static int mmcc_msm8996_probe(struct platform_device *pdev)
  {
- 	return ERR_PTR(-ENOENT);
- }
-+static inline struct clk_hw *
-+of_clk_hw_simple_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
- static inline struct clk *of_clk_src_onecell_get(
- 	struct of_phandle_args *clkspec, void *data)
- {
- 	return ERR_PTR(-ENOENT);
- }
-+static inline struct clk_hw *
-+of_clk_hw_onecell_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
- static inline int of_clk_get_parent_count(struct device_node *np)
- {
- 	return 0;
+-	struct clk *clk;
+ 	struct device *dev = &pdev->dev;
+-	int i;
++	int i, ret;
+ 	struct regmap *regmap;
+ 
+ 	regmap = qcom_cc_map(pdev, &mmcc_msm8996_desc);
+@@ -3352,9 +3351,9 @@ static int mmcc_msm8996_probe(struct platform_device *pdev)
+ 	regmap_update_bits(regmap, 0x5054, BIT(15), 0);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(mmcc_msm8996_hws); i++) {
+-		clk = devm_clk_register(dev, mmcc_msm8996_hws[i]);
+-		if (IS_ERR(clk))
+-			return PTR_ERR(clk);
++		ret = devm_clk_hw_register(dev, mmcc_msm8996_hws[i]);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	return qcom_cc_really_probe(pdev, &mmcc_msm8996_desc, regmap);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
