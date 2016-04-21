@@ -1,101 +1,59 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 21 Apr 2016 10:40:49 +0200
-Subject: [PATCH v7 07/10] iommu/dma-reserved-iommu: delete bindings in
- iommu_free_reserved_iova_domain
-In-Reply-To: <5717B6D7.4010307@arm.com>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-8-git-send-email-eric.auger@linaro.org>
- <5717B6D7.4010307@arm.com>
-Message-ID: <57189211.7030802@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 21 Apr 2016 14:13:47 +0530
+Subject: [PATCH 1/8] cpufreq: berlin: Use generic platdev driver
+In-Reply-To: <cover.1461228081.git.viresh.kumar@linaro.org>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+Message-ID: <4be5e8c38aed34a4aae08db2cae39ca8ece54d29.1461228081.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 04/20/2016 07:05 PM, Robin Murphy wrote:
-> On 19/04/16 17:56, Eric Auger wrote:
->> Now reserved bindings can exist, destroy them when destroying
->> the reserved iova domain. iommu_map is not supposed to be atomic,
->> hence the extra complexity in the locking.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->> v6 -> v7:
->> - remove [PATCH v6 7/7] dma-reserved-iommu: iommu_unmap_reserved and
->>    destroy the bindings in iommu_free_reserved_iova_domain
->>
->> v5 -> v6:
->> - use spin_lock instead of mutex
->>
->> v3 -> v4:
->> - previously "iommu/arm-smmu: relinquish reserved resources on
->>    domain deletion"
->> ---
->>   drivers/iommu/dma-reserved-iommu.c | 34
->> ++++++++++++++++++++++++++++------
->>   1 file changed, 28 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/iommu/dma-reserved-iommu.c
->> b/drivers/iommu/dma-reserved-iommu.c
->> index 426d339..2522235 100644
->> --- a/drivers/iommu/dma-reserved-iommu.c
->> +++ b/drivers/iommu/dma-reserved-iommu.c
->> @@ -157,14 +157,36 @@ void iommu_free_reserved_iova_domain(struct
->> iommu_domain *domain)
->>       unsigned long flags;
->>       int ret = 0;
->>
->> -    spin_lock_irqsave(&domain->reserved_lock, flags);
->> -
->> -    rid = (struct reserved_iova_domain *)domain->reserved_iova_cookie;
->> -    if (!rid) {
->> -        ret = -EINVAL;
->> -        goto unlock;
->> +    while (1) {
->> +        struct iommu_reserved_binding *b;
->> +        struct rb_node *node;
->> +        dma_addr_t iova;
->> +        size_t size;
->> +
->> +        spin_lock_irqsave(&domain->reserved_lock, flags);
->> +
->> +        rid = (struct reserved_iova_domain *)
->> +                domain->reserved_iova_cookie;
-> 
-> Same comment about casting as before.
-OK
-> 
->> +        if (!rid) {
->> +            ret = -EINVAL;
->> +            goto unlock;
->> +        }
->> +
->> +        node = rb_first(&domain->reserved_binding_list);
->> +        if (!node)
->> +            break;
->> +        b = rb_entry(node, struct iommu_reserved_binding, node);
->> +
->> +        iova = b->iova;
->> +        size = b->size;
->> +
->> +        while (!kref_put(&b->kref, reserved_binding_release))
->> +            ;
-> 
-> Since you're freeing the thing anyway, why not just call the function
-> directly?
-makes sense indeed.
+The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+device now, reuse that and remove similar code from platform code.
 
-Thanks
+Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-berlin/berlin.c        | 6 ------
+ drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-Eric
-> 
->> +        spin_unlock_irqrestore(&domain->reserved_lock, flags);
->> +        iommu_unmap(domain, iova, size);
->>       }
->>
->> +    domain->reserved_binding_list = RB_ROOT;
->>       domain->reserved_iova_cookie = NULL;
->>   unlock:
->>       spin_unlock_irqrestore(&domain->reserved_lock, flags);
->>
-> 
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+index 25d73870ccca..ac181c6797ee 100644
+--- a/arch/arm/mach-berlin/berlin.c
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -18,11 +18,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ 
+-static void __init berlin_init_late(void)
+-{
+-	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+-}
+-
+ static const char * const berlin_dt_compat[] = {
+ 	"marvell,berlin",
+ 	NULL,
+@@ -30,7 +25,6 @@ static const char * const berlin_dt_compat[] = {
+ 
+ DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+ 	.dt_compat	= berlin_dt_compat,
+-	.init_late	= berlin_init_late,
+ 	/*
+ 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+ 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index f2ae7ad99a3c..3b3e6804cf14 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -12,6 +12,8 @@
+ #include <linux/platform_device.h>
+ 
+ static const struct of_device_id machines[] = {
++	{ .compatible = "marvell,berlin", },
++
+ 	{ .compatible = "samsung,exynos3250", },
+ 	{ .compatible = "samsung,exynos4210", },
+ 	{ .compatible = "samsung,exynos4212", },
+-- 
+2.7.1.410.g6faf27b
