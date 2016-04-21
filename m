@@ -1,115 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Apr 2016 11:12:54 +0100
-Subject: [PATCH v2] drivers/perf: arm-pmu: fix RCU usage on pmu resume
- from low-power
-In-Reply-To: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160421101254.GF6879@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Apr 2016 12:17:07 +0200
+Subject: [PATCH 2/8] cpufreq: imx: Use generic platdev driver
+In-Reply-To: <20160421095032.GD29799@vireshk-i7>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <18756925.NSB5aJaqC9@wuerfel> <20160421095032.GD29799@vireshk-i7>
+Message-ID: <8137134.6Dsv9n3KFK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 10:24:34AM +0100, Lorenzo Pieralisi wrote:
-> Commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
-> added code in the arm perf infrastructure that allows the kernel to
-> save/restore perf counters whenever the CPU enters a low-power
-> state. The kernel saves/restores the counters for each active event
-> through the armpmu_{stop/start} ARM pmu API, so that the low-power state
-> enter/exit cycle is emulated through pmu start/stop operations for each
-> event in use.
+On Thursday 21 April 2016 15:20:32 Viresh Kumar wrote:
+> > > diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
+> > > index bd42d1bd10af..90c62bf01f9e 100644
+> > > --- a/arch/arm/mach-imx/imx27-dt.c
+> > > +++ b/arch/arm/mach-imx/imx27-dt.c
+> > > @@ -20,11 +20,7 @@
+> > >  
+> > >  static void __init imx27_dt_init(void)
+> > >  {
+> > > -   struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+> > > -
+> > >     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > > -
+> > > -   platform_device_register_full(&devinfo);
+> > >  }
+> > >
+> > 
+> > Please remove the entire function now, a NULL .init_machine machine
+> > callback pointer has the same effect as the remaining line.
+> > 
+> > The rest of the patch is fine.
 > 
-> However, calling armpmu_start() for each active event on power up
-> executes code that requires RCU locking (perf_event_update_userpage())
-> to be functional, so, given that the core may call the CPU_PM notifiers
-> while running the idle thread in an quiescent RCU state this is not
-> allowed as detected through the following splat when kernel is run with
-> CONFIG_PROVE_LOCKING enabled:
+> Perhaps that should be done in a separate patch I feel. Will do so after this is
+> merged.
 > 
-> [   49.293286]
-> [   49.294761] ===============================
-> [   49.298895] [ INFO: suspicious RCU usage. ]
-> [   49.303031] 4.6.0-rc3+ #421 Not tainted
-> [   49.306821] -------------------------------
-> [   49.310956] include/linux/rcupdate.h:872 rcu_read_lock() used
-> illegally while idle!
-> [   49.318530]
-> [   49.318530] other info that might help us debug this:
-> [   49.318530]
-> [   49.326451]
-> [   49.326451] RCU used illegally from idle CPU!
-> [   49.326451] rcu_scheduler_active = 1, debug_locks = 0
-> [   49.337209] RCU used illegally from extended quiescent state!
-> [   49.342892] 2 locks held by swapper/2/0:
-> [   49.346768]  #0:  (cpu_pm_notifier_lock){......}, at:
-> [<ffffff8008163c28>] cpu_pm_exit+0x18/0x80
-> [   49.355492]  #1:  (rcu_read_lock){......}, at: [<ffffff800816dc38>]
-> perf_event_update_userpage+0x0/0x260
-> 
-> This patch wraps the armpmu_start() call (that indirectly calls
-> perf_event_update_userpage()) on CPU_PM notifier power state exit (or
-> failed entry) within the RCU_NONIDLE() macro so that the RCU subsystem
-> is made aware the calling cpu is not idle from an RCU perspective for
-> the armpmu_start() call duration, therefore fixing the issue.
-> 
-> Fixes: da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: James Morse <james.morse@arm.com>
-> Suggested-by: Kevin Hilman <khilman@baylibre.com>
-> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
 
-FWIW:
+I would do it in the same patch, just like you remove some of the
+.init_late() callbacks elsewhere, but it clearly works either way, so
+do as you like unless Shawn or Sascha have a strong opinion on the
+matter.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks for fighting with this!
-
-Mark.
-
-> ---
-> v1 -> v2
-> 
-> - Wrapped armpmu_start() code in CPU_PM notifier within RCU_NONIDLE
-> - Dropped armpmu_event_set_period() refactoring
-> - Updated patch subject, added required tags
-> 
-> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/423404.html
-> 
->  drivers/perf/arm_pmu.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 32346b5..f700908 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -737,8 +737,19 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
->  			break;
->  		case CPU_PM_EXIT:
->  		case CPU_PM_ENTER_FAILED:
-> -			 /* Restore and enable the counter */
-> -			armpmu_start(event, PERF_EF_RELOAD);
-> +			 /*
-> +			  * Restore and enable the counter.
-> +			  * armpmu_start() indirectly calls
-> +			  *
-> +			  * perf_event_update_userpage()
-> +			  *
-> +			  * that requires RCU read locking to be functional,
-> +			  * wrap the call within RCU_NONIDLE to make the
-> +			  * RCU subsystem aware this cpu is not idle from
-> +			  * an RCU perspective for the armpmu_start() call
-> +			  * duration.
-> +			  */
-> +			RCU_NONIDLE(armpmu_start(event, PERF_EF_RELOAD));
->  			break;
->  		default:
->  			break;
-> -- 
-> 2.6.4
-> 
+	Arnd
