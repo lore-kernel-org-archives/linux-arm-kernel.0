@@ -1,42 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2016 13:20:03 +0200
-Subject: [PATCH 02/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
- driver header file
-In-Reply-To: <1461236675-10176-3-git-send-email-peter.griffin@linaro.org>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <3852823.Jd9ACgHlZU@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 21 Apr 2016 13:20:11 +0200
+Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
+In-Reply-To: <1461225849-28074-4-git-send-email-joel@jms.id.au>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-4-git-send-email-joel@jms.id.au>
+Message-ID: <4956403.scaVRGhPEf@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 12:04:19 Peter Griffin wrote:
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+[+clock-related patches should include clock-maintainers and lists]
 
-Please add a changelog text for each patch.
-
->  drivers/dma/st_fdma.h | 281 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 281 insertions(+)
->  create mode 100644 drivers/dma/st_fdma.h
-
-When the header file is only included from one other file, it's
-usually better to move the entire contents into the .c file.
-
-> +#define fdma_read(fdev, name) \
-> +	readl_relaxed((fdev)->io_base + FDMA_##name##_OFST)
+Am Donnerstag, 21. April 2016, 17:34:01 schrieb Joel Stanley:
+> +For example:
 > +
-> +#define fdma_write(fdev, val, name) \
-> +	writel_relaxed((val), (fdev)->io_base + FDMA_##name##_OFST)
+> +	clk_clkin: clk_clkin {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <48000000>;
+> +	};
+> +
+> +	clk_hpll: clk_hpll {
+> +		compatible = "aspeed,g4-hpll-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x1e6e2008 0x4>;
+> +	};
+> +
+> +	clk_apb: clk_apb at 1e6e2008 {
+> +		#clock-cells = <0>;
+> +		compatible = "aspeed,g4-apb-clock";
+> +		reg = <0x1e6e2008 0x4>;
+> +		clocks = <&clk_hpll>;
+> +	};
 
-Try to avoid string concatenation for macro names. It's better
-to always pass the full name of the register in there to make
-it easier to grep for the usage when trying to understand the
-driver as a reader.
+You have both the hpll and apb_clk in the same register (probably even more 
+clocks?) and separate clock instances where each instance will of_iomap the 
+register itself (and thus multiple times in general).
 
-Once you do that, just convert the macro into an inline function.
+>From what I remember exposing the clock controller as one block (instead of 
+declaring each clock individually in the dts) is still the preferred way but I 
+don't think I can find Mike's mail from back then easily.
 
-> +bool st_fdma_filter_fn(struct dma_chan *chan, void *param);
+And I think most clock-controller implementations actually use that paradigm.
 
-The filter function should not be needed here.
 
-	Arnd
+Heiko
