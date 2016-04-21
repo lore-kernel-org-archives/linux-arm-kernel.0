@@ -1,69 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 Apr 2016 17:48:40 +0100
-Subject: [PATCHv2 2/5] arm64/efi: move to generic {__,}efi_call_virt
-In-Reply-To: <1461238529-12810-3-git-send-email-mark.rutland@arm.com>
-References: <1461238529-12810-1-git-send-email-mark.rutland@arm.com>
- <1461238529-12810-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160421164840.GO929@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Apr 2016 18:56:14 +0200
+Subject: [PATCH v3 04/19] clk: sunxi: Add TCON channel1 clock
+In-Reply-To: <20160415223936.GU14441@codeaurora.org>
+References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1458751122-23976-5-git-send-email-maxime.ripard@free-electrons.com>
+ <20160415223936.GU14441@codeaurora.org>
+Message-ID: <20160421165614.GR13045@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 12:35:26PM +0100, Mark Rutland wrote:
-> Now there's a common template for {__,}efi_call_virt, remove the
-> duplicate logic from the arm64 efi code.
+On Fri, Apr 15, 2016 at 03:39:36PM -0700, Stephen Boyd wrote:
+> On 03/23, Maxime Ripard wrote:
+> > The TCON is a controller generating the timings to output videos signals,
+> > acting like both a CRTC and an encoder.
+> > 
+> > It has two channels depending on the output, each channel being driven by
+> > its own clock (and own clock controller).
+> > 
+> > Add a driver for the channel 1 clock.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-efi at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm64/include/asm/efi.h | 21 +++++++--------------
->  1 file changed, 7 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 8e88a69..f4f71224 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -14,28 +14,21 @@ extern void efi_init(void);
->  
->  int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
->  
-> -#define efi_call_virt(f, ...)						\
-> +#define arch_efi_call_virt_setup()					\
->  ({									\
-> -	efi_##f##_t *__f;						\
-> -	efi_status_t __s;						\
-> -									\
->  	kernel_neon_begin();						\
->  	efi_virtmap_load();						\
-> -	__f = efi.systab->runtime->f;					\
-> -	__s = __f(__VA_ARGS__);						\
-> -	efi_virtmap_unload();						\
-> -	kernel_neon_end();						\
-> -	__s;								\
->  })
->  
-> -#define __efi_call_virt(f, ...)						\
-> +#define arch_efi_call_virt(f, args...)					\
->  ({									\
->  	efi_##f##_t *__f;						\
-> -									\
-> -	kernel_neon_begin();						\
-> -	efi_virtmap_load();						\
->  	__f = efi.systab->runtime->f;					\
-> -	__f(__VA_ARGS__);						\
-> +	__f(args);							\
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Any reason to change this to a named argument? This patch is hard enough
-to review as it is, given the way the diff has been generated!
+Applied, thanks!
+Maxime
 
-Either way:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/2a0917b5/attachment.sig>
