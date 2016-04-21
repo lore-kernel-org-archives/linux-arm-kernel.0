@@ -1,30 +1,70 @@
-From: rnayak@codeaurora.org (Nayak, Rajendra)
-Date: Thu, 21 Apr 2016 16:19:34 +0530
-Subject: [PATCH v5 00/11] qcom: Add support for TSENS driver
-In-Reply-To: <20160420235127.GC2558@localhost.localdomain>
-References: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
- <20160420235127.GC2558@localhost.localdomain>
-Message-ID: <5718B03E.8040500@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Apr 2016 12:58:12 +0200
+Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
+In-Reply-To: <5718AAF0.3010606@gmail.com>
+References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150826021659.GD8784@linux>
+ <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
+ <22538895.vrRgZUmQTV@vostro.rjw.lan>
+ <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
+ <55E73077.8060106@gmail.com> <5718AAF0.3010606@gmail.com>
+Message-ID: <5718B244.3020201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
 
-On 4/21/2016 5:21 AM, Eduardo Valentin wrote:
-> On Thu, Apr 14, 2016 at 03:01:48PM +0530, Rajendra Nayak wrote:
->> Current set of patches apply on 4.6-rc3. nvmem apis are currently
->> broken and hence need to pull in the fixes for it as proposed here [1]
+
+On 21/04/16 12:26, Matthias Brugger wrote:
 >
 >
-> Could you please clarify this a bit?
+> On 02/09/15 19:23, Matthias Brugger wrote:
+>>
+>>
+>> On 02/09/15 08:45, Daniel Kurtz wrote:
+>>> Matthias,
+>>>
+>>> On Fri, Aug 28, 2015 at 10:06 PM, Rafael J. Wysocki
+>>> <rjw@rjwysocki.net> wrote:
+>>>> On Wednesday, August 26, 2015 02:53:39 PM Pi-Cheng Chen wrote:
+>>>>> On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar
+>>>>> <viresh.kumar@linaro.org> wrote:
+>>>>>> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
+>>>>>>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the
+>>>>>>> patch which
+>>>>>>> introduce a new clock type[2] consumed by MT8173 cpufreq driver.
+>>>>>>> So it will
+>>>>>>> cause some conflicts if it goes through your tree. I am not sure
+>>>>>>> how this
+>>>>>>> should be handled, but should it be merged through Mediatek SoC
+>>>>>>> maintainer
+>>>>>>> tree?
+>>>>>>
+>>>>>> Just get that applied to MTK tree, it doesn't have any dependency on
+>>>>>> rest of the patches for build/boot. The only thing is that cpufreq
+>>>>>> wouldn't work and it will work as soon as Rafael's and MTK's trees
+>>>>>> are
+>>>>>> merged by Linus.
+>>>>>
+>>>>> Thanks for your explanation.
+>>>>>
+>>>>> @Rafael, Would you please apply [1,2] to your tree?
+>>>>
+>>>> Applied, thanks!
+>>>
+>>> Can you please apply [3] from this set to your dts tree?
+>>>
+>>
+>> I will as soon as v4.3-rc1 shows up.
 >
-> Do I understand properly that we need to wait until [1] gets merged to
-> get the driver functional again after applying this series?
+> I somehow forgot this patch. Sorry for that.
+> Applied for v4.6-next/dts64 right now.
+>
 
-Yes, thats correct. We need the nvmem apis to be functional for this
-series to work.
-I have added Srini who is working on fixing it and reworking [1] as
-Mark wasn't happy with the current approach.
+I just realized that CLK_INFRA_CA53SEL and CLK_APMIXED_MAINPLL are not 
+part of the clk driver.
 
-regards,
-Rajendra
+Pi-Cheng, can you check if they got renamed in the meanwhile? Or do we 
+need some clock driver patches that enable this clocks for the series?
+
+Regards,
+Matthias
