@@ -1,90 +1,109 @@
-From: mcgrof@suse.com (Luis R. Rodriguez)
-Date: Thu, 21 Apr 2016 13:47:36 +0100
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <CAPcyv4g0-CcFRCWPBdKB7h0zZEO5qzT-N9YLYJw9sb=_HYnXiA@mail.gmail.com>
-References: <20150726172527.GA29513@lst.de>
- <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
- <20150727051258.GB15836@lst.de>
- <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
- <20150729065004.GA17162@lst.de> <20150729182712.GI30479@wotan.suse.de>
- <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
- <1438203638.3214.418.camel@hp.com> <20150729214358.GK30479@wotan.suse.de>
- <1438214404.3214.438.camel@hp.com> <20150811213021.GD30479@wotan.suse.de>
- <1439332857.24434.37.camel@hp.com>
- <CAB=NE6U+k5mucfGOhuFoayZB48YMJ0d6o0o8Xe4jH=3ZNgrf-g@mail.gmail.com>
- <CAPcyv4g0-CcFRCWPBdKB7h0zZEO5qzT-N9YLYJw9sb=_HYnXiA@mail.gmail.com>
-Message-ID: <CAB=NE6XDh4kss+qq35tjkjVcsU1m1jny2U7PUWV6Lx1OXb739A@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 21 Apr 2016 05:50:15 -0700
+Subject: [PATCH v2] drivers/perf: arm-pmu: fix RCU usage on pmu resume
+ from low-power
+In-Reply-To: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160421125015.GV3539@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:13 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Aug 11, 2015 at 3:52 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
->> On Tue, Aug 11, 2015 at 3:40 PM, Toshi Kani <toshi.kani@hp.com> wrote:
->>> On Tue, 2015-08-11 at 23:30 +0200, Luis R. Rodriguez wrote:
->>>> On Wed, Jul 29, 2015 at 06:00:04PM -0600, Toshi Kani wrote:
->>>> > On Wed, 2015-07-29 at 23:43 +0200, Luis R. Rodriguez wrote:
->>>> > > On Wed, Jul 29, 2015 at 03:00:38PM -0600, Toshi Kani wrote:
->>>> > > > On Wed, 2015-07-29 at 11:33 -0700, Dan Williams wrote:
->>>   :
->>>> > > That would depend on the purpose of the region and the driver
->>>> > > developer should in theory know best. One issue with this of course is
->>>> > > that, as we've discovered, the semantics of on the ioremap*() variant
->>>> > > front regarding cache types is not clearly well defined, or at least
->>>> > > it may be only well defined implicitly on x86 only, so the driver
->>>> > > developer can only *hope* for the best across architectures. Our
->>>> > > ambiguity on our semantics on ioremap*() variants therefore means
->>>> > > driver developers can resonably be puzzled by what fallbacks to use.
->>>> > > That also means architectures maintainers should not whip driver
->>>> > > developers for any misuse. Such considerations are why although we're
->>>> > > now revisiting semantics for ioremap*() variants I was in hopes we
->>>> > > could be at least somewhat pedantic about memremap() semantics.
->>>> >
->>>> > I agree.  However, there are a few exceptions like /dev/mem, which can
->>>> > map a target range without knowledge.
->>>>
->>>> Still, the expectation to require support for overlapping ioremap() calls
->>>> would seem to be more of an exception than the norm, so I'd argue that
->>>> requiring callers who know they do need overlapping support to be explicit
->>>> about it may help us simplify expecations on semantics in other areas of
->>>> the kernel.
->>>
->>> Again, I agree.  I am simply saying that the fallback in an overlapping case
->>> may need to remain supported for such exceptional cases, possibly with a
->>> separate interface.
->>
->> Great.
->>
->>>> > > For instance since memremap() only has 2 types right now can a
->>>> > > respective fallback be documented as an alternative to help with this
->>>> > > ? Or can we not generalize this ?  One for MEMREMAP_WB and one for
->>>> > > MEMREMAP_WT ?
->>>> >
->>>> > Yes, if a target range can be only mapped by memremap().  However, there
->>>> > is no restriction that a range can be mapped with a single interface
->>>> > alone.  For example, a range can be mapped with remap_pfn_range() to
->>>> > user space with any cache type.  So, in theory, memremap() can overlap
->>>> > with any other types.
->>>>
->>>> Shouldn't that be an issue or area of concern ? It seems the flakiness on
->>>> ioremap() and its wide array flexibility would spill over the any
->>>> semantics which folks would be trying to set out with memremap(). That
->>>> should not stop the evolution of memremap() though, just pointing out that
->>>> perhaps we should be a bit more restrictive over how things can criss
->>>> -cross and who areas can do it.
->>>
->>> reserve_pfn_range() allows the caller to specify if the fallback needs to be
->>> enabled or disabled with 'strict_prot'.  track_pfn_remap() called from
->>> remap_pfn_range() enables it, and track_pfn_copy() disables it.  I think we
->>> can do similar for the memremap and ioremap families as well.  The fallback
->>> could be set disabled in the regular interfaces, and enabled in some
->>> interface as necessary.  This also allows gradual transition, ex. disable in
->>> memremap while ioremap remains enabled for now.
->>
->> Sounds sexy to me.
->
-> Cool, sounds like something we can tackle in 4.4 along with the
-> ioremap_cache removal cleanups.
+On Thu, Apr 21, 2016 at 10:24:34AM +0100, Lorenzo Pieralisi wrote:
+> Commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
+> added code in the arm perf infrastructure that allows the kernel to
+> save/restore perf counters whenever the CPU enters a low-power
+> state. The kernel saves/restores the counters for each active event
+> through the armpmu_{stop/start} ARM pmu API, so that the low-power state
+> enter/exit cycle is emulated through pmu start/stop operations for each
+> event in use.
+> 
+> However, calling armpmu_start() for each active event on power up
+> executes code that requires RCU locking (perf_event_update_userpage())
+> to be functional, so, given that the core may call the CPU_PM notifiers
+> while running the idle thread in an quiescent RCU state this is not
+> allowed as detected through the following splat when kernel is run with
+> CONFIG_PROVE_LOCKING enabled:
+> 
+> [   49.293286]
+> [   49.294761] ===============================
+> [   49.298895] [ INFO: suspicious RCU usage. ]
+> [   49.303031] 4.6.0-rc3+ #421 Not tainted
+> [   49.306821] -------------------------------
+> [   49.310956] include/linux/rcupdate.h:872 rcu_read_lock() used
+> illegally while idle!
+> [   49.318530]
+> [   49.318530] other info that might help us debug this:
+> [   49.318530]
+> [   49.326451]
+> [   49.326451] RCU used illegally from idle CPU!
+> [   49.326451] rcu_scheduler_active = 1, debug_locks = 0
+> [   49.337209] RCU used illegally from extended quiescent state!
+> [   49.342892] 2 locks held by swapper/2/0:
+> [   49.346768]  #0:  (cpu_pm_notifier_lock){......}, at:
+> [<ffffff8008163c28>] cpu_pm_exit+0x18/0x80
+> [   49.355492]  #1:  (rcu_read_lock){......}, at: [<ffffff800816dc38>]
+> perf_event_update_userpage+0x0/0x260
+> 
+> This patch wraps the armpmu_start() call (that indirectly calls
+> perf_event_update_userpage()) on CPU_PM notifier power state exit (or
+> failed entry) within the RCU_NONIDLE() macro so that the RCU subsystem
+> is made aware the calling cpu is not idle from an RCU perspective for
+> the armpmu_start() call duration, therefore fixing the issue.
+> 
+> Fixes: da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: James Morse <james.morse@arm.com>
+> Suggested-by: Kevin Hilman <khilman@baylibre.com>
+> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-Just a reminder that we should expect some of these changes soon :D
+Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 
- Luis
+> ---
+> v1 -> v2
+> 
+> - Wrapped armpmu_start() code in CPU_PM notifier within RCU_NONIDLE
+> - Dropped armpmu_event_set_period() refactoring
+> - Updated patch subject, added required tags
+> 
+> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/423404.html
+> 
+>  drivers/perf/arm_pmu.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 32346b5..f700908 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -737,8 +737,19 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
+>  			break;
+>  		case CPU_PM_EXIT:
+>  		case CPU_PM_ENTER_FAILED:
+> -			 /* Restore and enable the counter */
+> -			armpmu_start(event, PERF_EF_RELOAD);
+> +			 /*
+> +			  * Restore and enable the counter.
+> +			  * armpmu_start() indirectly calls
+> +			  *
+> +			  * perf_event_update_userpage()
+> +			  *
+> +			  * that requires RCU read locking to be functional,
+> +			  * wrap the call within RCU_NONIDLE to make the
+> +			  * RCU subsystem aware this cpu is not idle from
+> +			  * an RCU perspective for the armpmu_start() call
+> +			  * duration.
+> +			  */
+> +			RCU_NONIDLE(armpmu_start(event, PERF_EF_RELOAD));
+>  			break;
+>  		default:
+>  			break;
+> -- 
+> 2.6.4
+> 
