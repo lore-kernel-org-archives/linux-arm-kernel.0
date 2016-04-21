@@ -1,211 +1,156 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Thu, 21 Apr 2016 20:16:12 +0200
-Subject: [PATCH v2] ARM: dts: tegra: correct Beaver pinmux
-In-Reply-To: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
-References: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
-Message-ID: <1461262572.2494.0.camel@lynxeye.de>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Thu, 21 Apr 2016 14:19:54 -0400
+Subject: [PATCH net v2 1/3] drivers: net: cpsw: fix parsing of phy-handle DT
+ property in dual_emac config
+In-Reply-To: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <1461262794-9562-1-git-send-email-drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 26.02.2016, 20:18 +0100 schrieb Lucas Stach:
-> Update pinmux to get rid of invalid uses of the rsvd1 function, which
-> lead
-> to the mux settings on those pins to not be applied.
-> 
-> Also add correct drive settings, derived from the Tegra3 TRM, for
-> SDIO1,
-> which makes some more SD-cards work.
-> 
-Just a gentle ping on this patch, as I haven't seen it being applied
-anywhere.
+From: David Rivshin <drivshin@allworx.com>
 
-> Signed-off-by: Lucas Stach <dev@lynxeye.de>
-> ---
-> ?arch/arm/boot/dts/tegra30-beaver.dts | 39 ++++++++++++++++++++++--
-> ------------
-> ?1 file changed, 24 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts
-> b/arch/arm/boot/dts/tegra30-beaver.dts
-> index 3dede39..1daed40 100644
-> --- a/arch/arm/boot/dts/tegra30-beaver.dts
-> +++ b/arch/arm/boot/dts/tegra30-beaver.dts
-> @@ -255,14 +255,14 @@
-> ?			};
-> ?			sdmmc3_dat6_pd3 {
-> ?				nvidia,pins = "sdmmc3_dat6_pd3";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "spdif";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> ?			};
-> ?			sdmmc3_dat7_pd4 {
-> ?				nvidia,pins = "sdmmc3_dat7_pd4";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "spdif";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -276,14 +276,14 @@
-> ?			};
-> ?			vi_vsync_pd6 {
-> ?				nvidia,pins = "vi_vsync_pd6";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "ddr";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> ?			};
-> ?			vi_hsync_pd7 {
-> ?				nvidia,pins = "vi_hsync_pd7";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "ddr";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -801,7 +801,7 @@
-> ?			};
-> ?			hdmi_int_pn7 {
-> ?				nvidia,pins = "hdmi_int_pn7";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "hdmi";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_ENABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -836,7 +836,7 @@
-> ?			};
-> ?			ulpi_data3_po4 {
-> ?				nvidia,pins = "ulpi_data3_po4";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "uarta";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1102,21 +1102,21 @@
-> ?			};
-> ?			vi_d10_pt2 {
-> ?				nvidia,pins = "vi_d10_pt2";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "ddr";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> ?			};
-> ?			vi_d11_pt3 {
-> ?				nvidia,pins = "vi_d11_pt3";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "ddr";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> ?			};
-> ?			vi_d0_pt4 {
-> ?				nvidia,pins = "vi_d0_pt4";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "ddr";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1146,7 +1146,7 @@
-> ?			};
-> ?			pu0 {
-> ?				nvidia,pins = "pu0";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "owr";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1167,7 +1167,7 @@
-> ?			};
-> ?			pu3 {
-> ?				nvidia,pins = "pu3";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "pwm0";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1188,7 +1188,7 @@
-> ?			};
-> ?			pu6 {
-> ?				nvidia,pins = "pu6";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "pwm3";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1216,7 +1216,7 @@
-> ?			};
-> ?			pv3 {
-> ?				nvidia,pins = "pv3";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "clk_12m_out";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_DISABLE>;
-> @@ -1505,7 +1505,7 @@
-> ?			};
-> ?			pbb0 {
-> ?				nvidia,pins = "pbb0";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "i2s4";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1570,7 +1570,7 @@
-> ?			};
-> ?			pcc1 {
-> ?				nvidia,pins = "pcc1";
-> -				nvidia,function = "rsvd1";
-> +				nvidia,function = "i2s4";
-> ?				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> ?				nvidia,tristate =
-> <TEGRA_PIN_DISABLE>;
-> ?				nvidia,enable-input =
-> <TEGRA_PIN_ENABLE>;
-> @@ -1718,6 +1718,15 @@
-> ?				nvidia,slew-rate-rising = <1>;
-> ?				nvidia,slew-rate-falling = <1>;
-> ?			};
-> +			sdio1 {
-> +				nvidia,pins = "drive_sdio1";
-> +				nvidia,high-speed-mode =
-> <TEGRA_PIN_DISABLE>;
-> +				nvidia,schmitt =
-> <TEGRA_PIN_DISABLE>;
-> +				nvidia,pull-down-strength = <46>;
-> +				nvidia,pull-up-strength = <42>;
-> +				nvidia,slew-rate-rising = <1>;
-> +				nvidia,slew-rate-falling = <1>;
-> +			};
-> ?			gpv {
-> ?				nvidia,pins = "drive_gpv";
-> ?				nvidia,pull-up-strength = <16>;
+Commit 9e42f715264ff158478fa30eaed847f6e131366b ("drivers: net: cpsw: add
+phy-handle parsing") saved the "phy-handle" phandle into a new cpsw_priv
+field. However, phy connections are per-slave, so the phy_node field should
+be in cpsw_slave_data rather than cpsw_priv.
+
+This would go unnoticed in a single emac configuration. But in dual_emac
+mode, the last "phy-handle" property parsed for either slave would be used
+by both of them, causing them both to refer to the same phy_device.
+
+Fixes: 9e42f715264f ("drivers: net: cpsw: add phy-handle parsing")
+Signed-off-by: David Rivshin <drivshin@allworx.com>
+Tested-by: Nicolas Chauvet <kwizart@gmail.com>
+---
+I would suggest this for -stable. It should apply cleanly as far back
+as 4.4.
+
+Changes since v1 [1]:
+- Rebased (no conflicts)
+- Added Tested-by from Nicolas Chauvet
+
+[1] https://patchwork.ozlabs.org/patch/560326/
+
+ drivers/net/ethernet/ti/cpsw.c | 13 ++++++-------
+ drivers/net/ethernet/ti/cpsw.h |  1 +
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 42fdfd4..d69cb3f 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -363,15 +363,14 @@ static inline void slave_write(struct cpsw_slave *slave, u32 val, u32 offset)
+ 	__raw_writel(val, slave->regs + offset);
+ }
+ 
+ struct cpsw_priv {
+ 	spinlock_t			lock;
+ 	struct platform_device		*pdev;
+ 	struct net_device		*ndev;
+-	struct device_node		*phy_node;
+ 	struct napi_struct		napi_rx;
+ 	struct napi_struct		napi_tx;
+ 	struct device			*dev;
+ 	struct cpsw_platform_data	data;
+ 	struct cpsw_ss_regs __iomem	*regs;
+ 	struct cpsw_wr_regs __iomem	*wr_regs;
+ 	u8 __iomem			*hw_stats;
+@@ -1144,16 +1143,16 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
+ 
+ 	if (priv->data.dual_emac)
+ 		cpsw_add_dual_emac_def_ale_entries(priv, slave, slave_port);
+ 	else
+ 		cpsw_ale_add_mcast(priv->ale, priv->ndev->broadcast,
+ 				   1 << slave_port, 0, 0, ALE_MCAST_FWD_2);
+ 
+-	if (priv->phy_node)
+-		slave->phy = of_phy_connect(priv->ndev, priv->phy_node,
++	if (slave->data->phy_node)
++		slave->phy = of_phy_connect(priv->ndev, slave->data->phy_node,
+ 				 &cpsw_adjust_link, 0, slave->data->phy_if);
+ 	else
+ 		slave->phy = phy_connect(priv->ndev, slave->data->phy_id,
+ 				 &cpsw_adjust_link, slave->data->phy_if);
+ 	if (IS_ERR(slave->phy)) {
+ 		dev_err(priv->dev, "phy %s not found on slave %d\n",
+ 			slave->data->phy_id, slave->slave_num);
+@@ -1936,20 +1935,19 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
+ 
+ 	slave->data	= data;
+ 	slave->regs	= regs + slave_reg_ofs;
+ 	slave->sliver	= regs + sliver_reg_ofs;
+ 	slave->port_vlan = data->dual_emac_res_vlan;
+ }
+ 
+-static int cpsw_probe_dt(struct cpsw_priv *priv,
++static int cpsw_probe_dt(struct cpsw_platform_data *data,
+ 			 struct platform_device *pdev)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
+ 	struct device_node *slave_node;
+-	struct cpsw_platform_data *data = &priv->data;
+ 	int i = 0, ret;
+ 	u32 prop;
+ 
+ 	if (!node)
+ 		return -EINVAL;
+ 
+ 	if (of_property_read_u32(node, "slaves", &prop)) {
+@@ -2029,15 +2027,16 @@ static int cpsw_probe_dt(struct cpsw_priv *priv,
+ 		int lenp;
+ 		const __be32 *parp;
+ 
+ 		/* This is no slave child node, continue */
+ 		if (strcmp(slave_node->name, "slave"))
+ 			continue;
+ 
+-		priv->phy_node = of_parse_phandle(slave_node, "phy-handle", 0);
++		slave_data->phy_node = of_parse_phandle(slave_node,
++							"phy-handle", 0);
+ 		parp = of_get_property(slave_node, "phy_id", &lenp);
+ 		if (of_phy_is_fixed_link(slave_node)) {
+ 			struct device_node *phy_node;
+ 			struct phy_device *phy_dev;
+ 
+ 			/* In the case of a fixed PHY, the DT node associated
+ 			 * to the PHY is the Ethernet MAC DT node.
+@@ -2271,15 +2270,15 @@ static int cpsw_probe(struct platform_device *pdev)
+ 	 * This may be required here for child devices.
+ 	 */
+ 	pm_runtime_enable(&pdev->dev);
+ 
+ 	/* Select default pin state */
+ 	pinctrl_pm_select_default_state(&pdev->dev);
+ 
+-	if (cpsw_probe_dt(priv, pdev)) {
++	if (cpsw_probe_dt(&priv->data, pdev)) {
+ 		dev_err(&pdev->dev, "cpsw: platform data missing\n");
+ 		ret = -ENODEV;
+ 		goto clean_runtime_disable_ret;
+ 	}
+ 	data = &priv->data;
+ 
+ 	if (is_valid_ether_addr(data->slave_data[0].mac_addr)) {
+diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
+index 442a703..e50afd1 100644
+--- a/drivers/net/ethernet/ti/cpsw.h
++++ b/drivers/net/ethernet/ti/cpsw.h
+@@ -14,14 +14,15 @@
+ #ifndef __CPSW_H__
+ #define __CPSW_H__
+ 
+ #include <linux/if_ether.h>
+ #include <linux/phy.h>
+ 
+ struct cpsw_slave_data {
++	struct device_node *phy_node;
+ 	char		phy_id[MII_BUS_ID_SIZE];
+ 	int		phy_if;
+ 	u8		mac_addr[ETH_ALEN];
+ 	u16		dual_emac_res_vlan;	/* Reserved VLAN for DualEMAC */
+ };
+ 
+ struct cpsw_platform_data {
+-- 
+2.5.5
