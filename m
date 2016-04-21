@@ -1,100 +1,39 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 21 Apr 2016 10:48:32 -0500
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED4B88D@lhreml503-mbs>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
- <20160407103734.55e72da7@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
- <20160407163443.291fbd49@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
- <20160407140551.GA2648@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED45C38@lhreml503-mbs>
- <20160408160145.GA10565@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED4B88D@lhreml503-mbs>
-Message-ID: <20160421154832.GC32739@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Apr 2016 16:49:33 +0100
+Subject: [PATCH 10/18] ASoC: sti: Update example to include
+ assigned-clocks and mclk-fs
+In-Reply-To: <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160421154933.GR3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 09:43:32AM +0000, Gabriele Paoloni wrote:
-> Hi Bjorn
-> 
-> [...]
-> 
-> > > >
-> > > > What's the hisi plan for resuming after suspend-to-RAM?  How does
-> > the
-> > > > RC get reprogrammed after it loses all its state?
-> > >
-> > > PM is not part of the driver yet. This is planned for near
-> > > future release so haven't made such considerations yet
-> > > >
-> > > > What would break if hisi did call dw_pcie_setup_rc()?  I know you
-> > said
-> > > > it would overwrite what the bootloader already did, which is true.
-> > >
-> > > I am try to figure this out now with our HW team.
-> > >
-> > > >
-> > > > But hisi does call dw_pcie_host_init(), so it reads pp->mem (which
-> > > > determines pp->mem_base) and pp->lanes from the DT.  Other drivers
-> > > > then call dw_pcie_setup_rc() which programs the RC based on
-> > > > pp->mem_base and pp->lanes.  So hisi assumes UEFI programmed the RC
-> > to
-> > > > match the DT, while the other drivers read the DT and program the
-> > RC
-> > > > to match.  The latter seems more robust because it enforces the
-> > > > consistency rather than relying on it.
-> > >
-> > > Yes I agree with you, however we have preferred to move RC config to
-> > > BIOS to have a single driver to support multiple versions of the
-> > > same SoC.
-> > 
-> > I think there are two reasonable approaches:
-> > 
-> >   1) A single generic driver that doesn't have any knowledge about the
-> >   chipset registers; it uses run-time firmware interfaces to manage
-> >   the bridge.  The ACPI pci_root.c driver is the best example so far
-> >   and works very well.  It supports basically all x86 and ia64
-> >   chipsets and requires no kernel work for new ones.
-> > 
-> >   2) Native drivers specific to each chipset.  These may get
-> >   configuration information from DT, but they do their own
-> >   register-level programming of the device without run-time help from
-> >   firmware.
-> > 
-> > I think hisi is a native driver because it uses hip05/hip06 registers
-> > to check link state and perform config operations.  And apparently you
-> > rely on the ATU, BAR, class, and link width programming currently done
-> > in dw_pcie_host_init().  But you want to rely on pre-boot firmware to
-> > set up the link.  That doesn't make sense to me -- if the driver wants
-> > to twiddle the registers, it should know how to do it all.  I don't
-> > see how you can reasonably manage this half-way approach.
-> > 
-> > > The patch I proposed above does the same job as the original patch
-> > > proposed by Jisheng and also allows hisi driver to call the moved
-> > > code.
-> > >
-> > > Do you see anything wrong with it?
-> > 
-> > Only that it makes the structure more complicated and we haven't
-> > identified a corresponding benefit yet.
-> 
-> Finally I have checked that assigning .host_init function pointer
-> in our driver to call dw_pcie_setup_rc() will not affect the values
-> already set by BIOS.
-> 
-> Also I agree with you that a hybrid approach is not ideal.
-> 
-> So I will update the driver to call dw_pcie_setup_rc() from
-> .host_init and ask the BIOS team to update the firmware for next
-> releases (the driver will be backward compatible anyway). 
+On Thu, Apr 21, 2016 at 12:04:27PM +0100, Peter Griffin wrote:
 
-Am I right in assuming that the patch currently in my tree:
+>  		clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
+> +		assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
+> +		assigned-clock-parents = <&clk_s_d0_quadfs 2>;
+> +		assigned-clock-rates = <50000000>;
 
-https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-designware&id=1488aefa37a4033080942c860294d13c613ec829
+This may be true for the particular system you're looking at but isn't
+really relevant to the device.
 
-will work for you?  I'm going to assume so unless I hear otherwise.
+> @@ -133,6 +139,7 @@ Example of audio card declaration:
+>  			/* DAC */
+>  			format = "i2s";
+>  			dai-tdm-slot-width = <32>;
+> +			mclk-fs = <256>;
+>  			cpu {
+>  				sound-dai = <&sti_uni_player2>;
+>  			};
 
-Bjorn
+This one is more relevant though I'm still a bit concerned that there's
+an expectation that the examples can just be pasted in...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/7c8ea534/attachment.sig>
