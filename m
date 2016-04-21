@@ -1,153 +1,195 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:21:55 -0700
-Subject: [PATCH v2 04/13] clkdev: Add clk_hw based registration APIs
+Date: Thu, 21 Apr 2016 15:21:53 -0700
+Subject: [PATCH v2 02/13] clk: Add {devm_}clk_hw_{register,unregister}() APIs
 In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1461277324-27185-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a clk registration API that doesn't return
-struct clks, we need to have some way to hand out struct clks via
-the clk_get() APIs that doesn't involve associating struct clk
-pointers with a struct clk_lookup. Luckily, clkdev already
-operates on struct clk_hw pointers, except for the registration
-facing APIs where it converts struct clk pointers into struct
-clk_hw pointers almost immediately.
+We've largely split the clk consumer and provider APIs along
+struct clk and struct clk_hw, but clk_register() still returns a
+struct clk pointer for each struct clk_hw that's registered.
+Eventually we'd like to only allocate struct clks when there's a
+user, because struct clk is per-user now, so clk_register() needs
+to change.
 
-Let's add clk_hw based registration APIs so that we can skip the
-conversion step and provide a way for clk provider drivers to
-operate exclusively on clk_hw structs. This way we clearly
-split the API between consumers and providers.
+Let's add new APIs to register struct clk_hws, but this time
+we'll hide the struct clk from the caller by returning an int
+error code. Also add an unregistration API that takes the clk_hw
+structure that was passed to the registration API. This way
+provider drivers never have to deal with a struct clk pointer
+unless they're using the clk consumer APIs.
 
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clkdev.c   | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clkdev.h |  6 +++++
- 2 files changed, 70 insertions(+)
+ Documentation/driver-model/devres.txt |  1 +
+ drivers/clk/clk.c                     | 86 +++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h          |  6 +++
+ 3 files changed, 93 insertions(+)
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index ae8e40a82d34..89cc700fbc37 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -301,6 +301,20 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
- }
- EXPORT_SYMBOL(clkdev_alloc);
+diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+index 73b98dfbcea4..108d45553e1b 100644
+--- a/Documentation/driver-model/devres.txt
++++ b/Documentation/driver-model/devres.txt
+@@ -236,6 +236,7 @@ certainly invest a bit more effort into libata core layer).
+ CLOCK
+   devm_clk_get()
+   devm_clk_put()
++  devm_clk_hw_register()
  
-+struct clk_lookup *
-+clkdev_hw_alloc(struct clk_hw *hw, const char *con_id, const char *dev_fmt, ...)
+ DMA
+   dmam_alloc_coherent()
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index fb74dc1f7520..0ef919666827 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2536,6 +2536,22 @@ fail_out:
+ }
+ EXPORT_SYMBOL_GPL(clk_register);
+ 
++/**
++ * clk_hw_register - register a clk_hw and return an error code
++ * @dev: device that is registering this clock
++ * @hw: link to hardware-specific clock data
++ *
++ * clk_hw_register is the primary interface for populating the clock tree with
++ * new clock nodes. It returns an integer equal to zero indicating success or
++ * less than zero indicating failure. Drivers must test for an error code after
++ * calling clk_hw_register().
++ */
++int clk_hw_register(struct device *dev, struct clk_hw *hw)
 +{
-+	struct clk_lookup *cl;
-+	va_list ap;
-+
-+	va_start(ap, dev_fmt);
-+	cl = vclkdev_alloc(hw, con_id, dev_fmt, ap);
-+	va_end(ap);
-+
-+	return cl;
++	return PTR_ERR_OR_ZERO(clk_register(dev, hw));
 +}
-+EXPORT_SYMBOL(clkdev_hw_alloc);
++EXPORT_SYMBOL_GPL(clk_hw_register);
++
+ /* Free memory allocated for a clock. */
+ static void __clk_release(struct kref *ref)
+ {
+@@ -2637,11 +2653,26 @@ unlock:
+ }
+ EXPORT_SYMBOL_GPL(clk_unregister);
+ 
++/**
++ * clk_hw_unregister - unregister a currently registered clk_hw
++ * @hw: hardware-specific clock data to unregister
++ */
++void clk_hw_unregister(struct clk_hw *hw)
++{
++	clk_unregister(hw->clk);
++}
++EXPORT_SYMBOL_GPL(clk_hw_unregister);
++
+ static void devm_clk_release(struct device *dev, void *res)
+ {
+ 	clk_unregister(*(struct clk **)res);
+ }
+ 
++static void devm_clk_hw_release(struct device *dev, void *res)
++{
++	clk_hw_unregister(*(struct clk_hw **)res);
++}
 +
  /**
-  * clkdev_create - allocate and add a clkdev lookup structure
-  * @clk: struct clk to associate with all clk_lookups
-@@ -324,6 +338,29 @@ struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
+  * devm_clk_register - resource managed clk_register()
+  * @dev: device that is registering this clock
+@@ -2672,6 +2703,36 @@ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw)
  }
- EXPORT_SYMBOL_GPL(clkdev_create);
+ EXPORT_SYMBOL_GPL(devm_clk_register);
  
 +/**
-+ * clkdev_hw_create - allocate and add a clkdev lookup structure
-+ * @hw: struct clk_hw to associate with all clk_lookups
-+ * @con_id: connection ID string on device
-+ * @dev_fmt: format string describing device name
++ * devm_clk_hw_register - resource managed clk_hw_register()
++ * @dev: device that is registering this clock
++ * @hw: link to hardware-specific clock data
 + *
-+ * Returns a clk_lookup structure, which can be later unregistered and
-+ * freed.
++ * Managed clk_hw_register(). Clocks returned from this function are
++ * automatically clk_hw_unregister()ed on driver detach. See clk_hw_register()
++ * for more information.
 + */
-+struct clk_lookup *clkdev_hw_create(struct clk_hw *hw, const char *con_id,
-+	const char *dev_fmt, ...)
++int devm_clk_hw_register(struct device *dev, struct clk_hw *hw)
 +{
-+	struct clk_lookup *cl;
-+	va_list ap;
++	struct clk_hw **hwp;
++	int ret;
 +
-+	va_start(ap, dev_fmt);
-+	cl = vclkdev_create(hw, con_id, dev_fmt, ap);
-+	va_end(ap);
++	hwp = devres_alloc(devm_clk_hw_release, sizeof(*hwp), GFP_KERNEL);
++	if (!hwp)
++		return -ENOMEM;
 +
-+	return cl;
++	ret = clk_hw_register(dev, hw);
++	if (!ret) {
++		*hwp = hw;
++		devres_add(dev, hwp);
++	} else {
++		devres_free(hwp);
++	}
++
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(clkdev_hw_create);
++EXPORT_SYMBOL_GPL(devm_clk_hw_register);
 +
- int clk_add_alias(const char *alias, const char *alias_dev_name,
- 	const char *con_id, struct device *dev)
+ static int devm_clk_match(struct device *dev, void *res, void *data)
  {
-@@ -402,3 +439,30 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
- 	return cl ? 0 : -ENOMEM;
+ 	struct clk *c = res;
+@@ -2680,6 +2741,15 @@ static int devm_clk_match(struct device *dev, void *res, void *data)
+ 	return c == data;
  }
- EXPORT_SYMBOL(clk_register_clkdev);
-+
-+/**
-+ * clk_hw_register_clkdev - register one clock lookup for a struct clk_hw
-+ * @hw: struct clk_hw to associate with all clk_lookups
-+ * @con_id: connection ID string on device
-+ * @dev_id: format string describing device name
-+ *
-+ * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-+ * clkdev.
-+ */
-+int clk_hw_register_clkdev(struct clk_hw *hw, const char *con_id,
-+	const char *dev_id)
+ 
++static int devm_clk_hw_match(struct device *dev, void *res, void *data)
 +{
-+	struct clk_lookup *cl;
++	struct clk_hw *hw = res;
 +
-+	/*
-+	 * Since dev_id can be NULL, and NULL is handled specially, we must
-+	 * pass it as either a NULL format string, or with "%s".
-+	 */
-+	if (dev_id)
-+		cl = __clk_register_clkdev(hw, con_id, "%s", dev_id);
-+	else
-+		cl = __clk_register_clkdev(hw, con_id, NULL);
-+
-+	return cl ? 0 : -ENOMEM;
++	if (WARN_ON(!hw))
++		return 0;
++	return hw == data;
 +}
-+EXPORT_SYMBOL(clk_hw_register_clkdev);
-diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-index e6f8eb1d585f..2eabc862abdb 100644
---- a/include/linux/clkdev.h
-+++ b/include/linux/clkdev.h
-@@ -15,6 +15,7 @@
- #include <asm/clkdev.h>
++
+ /**
+  * devm_clk_unregister - resource managed clk_unregister()
+  * @clk: clock to unregister
+@@ -2694,6 +2764,22 @@ void devm_clk_unregister(struct device *dev, struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(devm_clk_unregister);
  
- struct clk;
-+struct clk_hw;
- struct device;
++/**
++ * devm_clk_hw_unregister - resource managed clk_hw_unregister()
++ * @dev: device that is unregistering the hardware-specific clock data
++ * @hw: link to hardware-specific clock data
++ *
++ * Unregister a clk_hw registered with devm_clk_hw_register(). Normally
++ * this function will not need to be called and the resource management
++ * code will ensure that the resource is freed.
++ */
++void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw)
++{
++	WARN_ON(devres_release(dev, devm_clk_hw_release, devm_clk_hw_match,
++				hw));
++}
++EXPORT_SYMBOL_GPL(devm_clk_hw_unregister);
++
+ /*
+  * clkdev helpers
+  */
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index da95258127aa..bc6c8de1fac1 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -655,9 +655,15 @@ struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
+ struct clk *clk_register(struct device *dev, struct clk_hw *hw);
+ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
  
- struct clk_lookup {
-@@ -34,17 +35,22 @@ struct clk_lookup {
++int __must_check clk_hw_register(struct device *dev, struct clk_hw *hw);
++int __must_check devm_clk_hw_register(struct device *dev, struct clk_hw *hw);
++
+ void clk_unregister(struct clk *clk);
+ void devm_clk_unregister(struct device *dev, struct clk *clk);
  
- struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
- 	const char *dev_fmt, ...) __printf(3, 4);
-+struct clk_lookup *clkdev_hw_alloc(struct clk_hw *hw, const char *con_id,
-+	const char *dev_fmt, ...) __printf(3, 4);
- 
- void clkdev_add(struct clk_lookup *cl);
- void clkdev_drop(struct clk_lookup *cl);
- 
- struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
- 	const char *dev_fmt, ...) __printf(3, 4);
-+struct clk_lookup *clkdev_hw_create(struct clk_hw *hw, const char *con_id,
-+	const char *dev_fmt, ...) __printf(3, 4);
- 
- void clkdev_add_table(struct clk_lookup *, size_t);
- int clk_add_alias(const char *, const char *, const char *, struct device *);
- 
- int clk_register_clkdev(struct clk *, const char *, const char *);
-+int clk_hw_register_clkdev(struct clk_hw *, const char *, const char *);
- 
- #ifdef CONFIG_COMMON_CLK
- int __clk_get(struct clk *clk);
++void clk_hw_unregister(struct clk_hw *hw);
++void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw);
++
+ /* helper functions */
+ const char *__clk_get_name(const struct clk *clk);
+ const char *clk_hw_get_name(const struct clk_hw *hw);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
