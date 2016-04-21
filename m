@@ -1,66 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Apr 2016 09:52:03 +0200
-Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
-In-Reply-To: <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
-References: <20160419140220.GA9503@pengutronix.de>
- <20160420092516.GA21732@e103592.cambridge.arm.com>
- <CAKv+Gu8_hZvY1TK=D3bhwy6F2UW1kSeSGyRciU5wVQPHy0m7LA@mail.gmail.com>
-Message-ID: <CAKv+Gu_mpj_qodDmtY+FiawD7r=q4ouxacqQ3Ezh9aJbqObKgA@mail.gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 21 Apr 2016 15:55:54 +0800
+Subject: [PATCH v2 all 00/14] use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <CAL_JsqK34MOSkdJb1Sqq3CzYSz5xGeEnuThS_GmfFXMHX-8d9A@mail.gmail.com>
+References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
+ <CAL_JsqK34MOSkdJb1Sqq3CzYSz5xGeEnuThS_GmfFXMHX-8d9A@mail.gmail.com>
+Message-ID: <5718878A.8040901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2016 at 11:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> (+ Arnd)
->
-> On 20 April 2016 at 11:25, Dave Martin <Dave.Martin@arm.com> wrote:
->> On Tue, Apr 19, 2016 at 04:02:20PM +0200, Steffen Trumtrar wrote:
->>> Hi!
->>>
->>> According to kernelci.org (and validating on my own hardware), the current
->>> socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
->>>
->>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
->>>
->>> vs
->>>
->>> https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
->>>
->>> Both boot successfully, but notice that the board fails to bring up CPU1 if
->>> thumb2 support is enabled.
->>>
->>> Any ideas why this might be happening?
->>
->> Looks like there is at least a module loading problem:
->>
->> dwc2: section 2 reloc 234 sym '_raw_spin_lock': relocation 10 out of range (0xbf801086 -> 0xc08c2d75)
->>
->> This happens because of the smaller branch range on Thumb2 versus ARM,
->> if the combined size of the kernel and modules area gets too large.
->>
->> So, use CONFIG_THUMB2_KERNEL=n, shrink your kernel or load fewer
->> modules :P
->>
->
-> Indeed. 0xc08c2d74 - 0xbf801086 == 0x10c1f0 which exceeds the +/- 16
-> MB range of the branch instruction of the Thumb2 ISA
->
->> You could try enabling CONFIG_ARM_MODULE_PLTS -- I've never tried that,
->> but it looks like it is designed to solve this problem by allocating
->> space for trampolines to help resolve long branches.  If you are
->> _already_ enabling this option, there may be a bug in its
->> implementation though...
->>
->
-> This is disabled by default, so the kernelci.org builds would not have
-> that enabled.
->
-> I will propose a patch to kernelci to enable the PLT option for these
-> kernels, as multi_v7_defconfig obviously requires it due to the size
-> of the core image
+Hi Rob,
 
-FYI this is now fixed. The multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y
-configuration was updated to
-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y+CONFIG_ARM_MODULE_PLTS=y and
-the relocation out of range error is no longer emitted.
+On 2016/4/20 5:10, Rob Herring wrote:
+> On Wed, Mar 16, 2016 at 2:35 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+>> Use helper of_platform_default_populate() in linux/of_platform
+>> when possible, instead of calling of_platform_populate() with
+>> the default match table.
+>>
+>> Then it is possible for driver code build as a module, and no
+>> need to export of_default_bus_match_table anymore.
+>>
+>> This patchset is based on Linux 4.5.
+>>
+>> Changes since v1:
+>> - Add ack, test and review
+>> - Remove v1 patch 14/15, the similar patch has posted and applied,
+>>   see https://patchwork.kernel.org/patch/8096991/
+>>
+>> v1:
+>> - https://lkml.org/lkml/2016/1/26/1123
+> 
+> I was going to apply this, but I've thought about this some more and
+> it is a lot of tree wide churn for little gain. Most of the call sites
+> here I want to get rid of by making of_platform_populate callable
+> multiple times. The infrastructure is almost there, but I think we
+> just need something like this:
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 8d103e4..b25e710 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -345,6 +345,9 @@ static int of_platform_bus_create(struct device_node *bus,
+>                 return 0;
+>         }
+> 
+> +       if (of_node_check_flag(bus, OF_POPULATED_BUS))
+> +               return 0;
+> +
+>         auxdata = of_dev_lookup(lookup, bus);
+>         if (auxdata) {
+>                 bus_id = auxdata->name;
+> 
+> Then we can call of_platform_populate from the DT core and remove all
+> the default calls.
 
-https://storage.kernelci.org/mainline/v4.6-rc4-17-g55f058e7574c/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y+CONFIG_ARM_MODULE_PLTS=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+OK, it seems that we can drop all the of_of_platform_default_populate in arch code
+by this changes, will do it.
+
+But replace of_platform_populate() with the default match table by of_platform_default_populate
+is a cleanup, and especially for the driver, we can not need export of_default_bus_match_table
+after that.
+
+There is a v3 patchset[1], it is based 4.6-rc2 with some updated, should this be merge firstly,
+then drop all the default of_platform_populate in arch code, and I think the of_iommu_init() in
+arch code could do the same thing.
+
+If not, I will repost the patches with new ways, but still exists the part of unexport
+of_default_bus_match_table by helper of_platform_default_populate().
+
+Hope the v3 patchset could be merge in advance, after all, it has been reviewed fully. Thanks a lot.
+
+BRs,
+Kefeng
+
+
+[1] https://lkml.org/lkml/2016/4/5/55
+
+> 
+> Rob
+> 
+> .
+> 
