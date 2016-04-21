@@ -1,70 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 21 Apr 2016 14:47:11 +0100
-Subject: [PATCH v2] drivers/perf: arm-pmu: fix RCU usage on pmu resume
- from low-power
-In-Reply-To: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160421134711.GD23774@e104818-lin.cambridge.arm.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 21 Apr 2016 15:48:44 +0200
+Subject: [PATCH 3/8] gpio: stmpe: fix edge and rising/falling edge
+ detection
+In-Reply-To: <CACRpkdZWmYo-QgVgYaoHwUV7t=e5MGi-Ge5oWjKAi46+h1JMWg@mail.gmail.com>
+References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
+ <1461068317-28016-4-git-send-email-patrice.chotard@st.com>
+ <CACRpkdZWmYo-QgVgYaoHwUV7t=e5MGi-Ge5oWjKAi46+h1JMWg@mail.gmail.com>
+Message-ID: <5718DA3C.6060304@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 10:24:34AM +0100, Lorenzo Pieralisi wrote:
-> Commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
-> added code in the arm perf infrastructure that allows the kernel to
-> save/restore perf counters whenever the CPU enters a low-power
-> state. The kernel saves/restores the counters for each active event
-> through the armpmu_{stop/start} ARM pmu API, so that the low-power state
-> enter/exit cycle is emulated through pmu start/stop operations for each
-> event in use.
-> 
-> However, calling armpmu_start() for each active event on power up
-> executes code that requires RCU locking (perf_event_update_userpage())
-> to be functional, so, given that the core may call the CPU_PM notifiers
-> while running the idle thread in an quiescent RCU state this is not
-> allowed as detected through the following splat when kernel is run with
-> CONFIG_PROVE_LOCKING enabled:
-> 
-> [   49.293286]
-> [   49.294761] ===============================
-> [   49.298895] [ INFO: suspicious RCU usage. ]
-> [   49.303031] 4.6.0-rc3+ #421 Not tainted
-> [   49.306821] -------------------------------
-> [   49.310956] include/linux/rcupdate.h:872 rcu_read_lock() used
-> illegally while idle!
-> [   49.318530]
-> [   49.318530] other info that might help us debug this:
-> [   49.318530]
-> [   49.326451]
-> [   49.326451] RCU used illegally from idle CPU!
-> [   49.326451] rcu_scheduler_active = 1, debug_locks = 0
-> [   49.337209] RCU used illegally from extended quiescent state!
-> [   49.342892] 2 locks held by swapper/2/0:
-> [   49.346768]  #0:  (cpu_pm_notifier_lock){......}, at:
-> [<ffffff8008163c28>] cpu_pm_exit+0x18/0x80
-> [   49.355492]  #1:  (rcu_read_lock){......}, at: [<ffffff800816dc38>]
-> perf_event_update_userpage+0x0/0x260
-> 
-> This patch wraps the armpmu_start() call (that indirectly calls
-> perf_event_update_userpage()) on CPU_PM notifier power state exit (or
-> failed entry) within the RCU_NONIDLE() macro so that the RCU subsystem
-> is made aware the calling cpu is not idle from an RCU perspective for
-> the armpmu_start() call duration, therefore fixing the issue.
-> 
-> Fixes: da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: James Morse <james.morse@arm.com>
-> Suggested-by: Kevin Hilman <khilman@baylibre.com>
-> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
 
-Applied. Thanks.
 
--- 
-Catalin
+On 04/20/2016 04:37 PM, Linus Walleij wrote:
+> On Tue, Apr 19, 2016 at 2:18 PM,  <patrice.chotard@st.com> wrote:
+>
+>> From: Patrice Chotard <patrice.chotard@st.com>
+>>
+>> By cross-checking STMPE 610/801/811/1601/2401/2403 datasheets,
+>> it appears that edge detection and rising/falling edge detection
+>> is not supported by all STMPE variant:
+>>
+>>             GPIO              GPIO
+>>        Edge detection     rising/falling
+>>                           edge detection
+>>   610 |      X        |         X       |
+>>   801 |               |                 |
+>>   811 |      X        |         X       |
+>> 1600 |               |                 |
+>> 1601 |      X        |         X       |
+>> 1801 |               |         X       |
+>> 2401 |      X        |         X       |
+>> 2403 |      X        |         X       |
+>>
+>> Rework stmpe_dbg_show_one() and stmpe_gpio_irq to correctly
+>> take these cases into account.
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Very nice.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I expect this to go into the MFD tree with the rest, I guess
+> Lee will cook me an immutable branch for the whole thing
+> once he's happy with it.
+>
+> Yours,
+> Linus Walleij
+
+Hi Linus
+
+I will send a v2 as warnings as been detected by kbuild test robot
+
+Thanks
+
+Patrice
