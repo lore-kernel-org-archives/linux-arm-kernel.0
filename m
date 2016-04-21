@@ -1,178 +1,117 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Thu, 21 Apr 2016 14:48:43 +0530
-Subject: [PATCH 6/6] net:phy: Add Ethernet Master for iProc Shared MDIO
- Controller
-In-Reply-To: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1461230323-27891-7-git-send-email-pramod.kumar@broadcom.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 21 Apr 2016 11:19:39 +0200
+Subject: [PATCH 2/8] cpufreq: imx: Use generic platdev driver
+In-Reply-To: <08c7bf360dfb7620591c0e0de6e047fffb0a5546.1461228081.git.viresh.kumar@linaro.org>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <08c7bf360dfb7620591c0e0de6e047fffb0a5546.1461228081.git.viresh.kumar@linaro.org>
+Message-ID: <1461230379.29430.0.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet master driver which registers the ethernet phy
-to standard legacy mdio framework.
+Am Donnerstag, den 21.04.2016, 14:13 +0530 schrieb Viresh Kumar:
+> The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+> device now, reuse that and remove similar code from platform code.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
----
- drivers/net/phy/Kconfig                 |  11 +++
- drivers/net/phy/Makefile                |   1 +
- drivers/net/phy/mdio-bcm-iproc-shared.c | 116 ++++++++++++++++++++++++++++++++
- 3 files changed, 128 insertions(+)
- create mode 100644 drivers/net/phy/mdio-bcm-iproc-shared.c
+Looks good to me:
 
-diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-index 6dad9a9..35a7d59 100644
---- a/drivers/net/phy/Kconfig
-+++ b/drivers/net/phy/Kconfig
-@@ -271,6 +271,17 @@ config MDIO_BCM_IPROC
- 	  This module provides a driver for the MDIO busses found in the
- 	  Broadcom iProc SoC's.
- 
-+config MDIO_BCM_IPROC_SHARED
-+	tristate "Ethernet Master for Broadcom iProc Shared MDIO Controller"
-+	depends on OF && OF_MDIO && (ARCH_BCM_IPROC || COMPILE_TEST)
-+	default ARCH_BCM_IPROC
-+	help
-+	  This module provides a driver for the ethernet master found in
-+	  shared MDIO controller in the Broadcom iProc SoC's.
-+
-+	  Enable this to support the Shared MDIO controller.
-+	  if unsure, say N.
-+
- endif # PHYLIB
- 
- config MICREL_KS8995MA
-diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
-index fcdbb92..e1c0bc5 100644
---- a/drivers/net/phy/Makefile
-+++ b/drivers/net/phy/Makefile
-@@ -44,3 +44,4 @@ obj-$(CONFIG_MDIO_MOXART)	+= mdio-moxart.o
- obj-$(CONFIG_MDIO_BCM_UNIMAC)	+= mdio-bcm-unimac.o
- obj-$(CONFIG_MICROCHIP_PHY)	+= microchip.o
- obj-$(CONFIG_MDIO_BCM_IPROC)	+= mdio-bcm-iproc.o
-+obj-$(CONFIG_MDIO_BCM_IPROC_SHARED)	+= mdio-bcm-iproc-shared.o
-diff --git a/drivers/net/phy/mdio-bcm-iproc-shared.c b/drivers/net/phy/mdio-bcm-iproc-shared.c
-new file mode 100644
-index 0000000..6844107
---- /dev/null
-+++ b/drivers/net/phy/mdio-bcm-iproc-shared.c
-@@ -0,0 +1,116 @@
-+/*
-+ * Copyright (C) 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/shared_mdio.h>
-+#include <linux/io.h>
-+#include <linux/phy.h>
-+#include <linux/of_mdio.h>
-+
-+struct iproc_mdio_priv {
-+	struct shared_mdio_master *master;
-+	struct mii_bus *mii_bus;
-+};
-+
-+static int iproc_mdio_mii_read(struct mii_bus *bus, int phyadr, int reg)
-+{
-+	struct iproc_mdio_priv *priv = (struct iproc_mdio_priv *)bus->priv;
-+
-+	return shared_mdio_read(priv->master, phyadr, reg);
-+}
-+
-+static int iproc_mdio_mii_write(struct mii_bus *bus, int phyadr, int reg,
-+				u16 val)
-+{
-+	struct iproc_mdio_priv *priv = bus->priv;
-+
-+	return shared_mdio_write(priv->master, phyadr, reg, val);
-+}
-+
-+static int iproc_mdio_probe(struct shared_mdio_master *master)
-+{
-+	struct device *dev = &master->dev;
-+	struct iproc_mdio_priv *priv;
-+	struct mii_bus *bus;
-+	struct device_node *dn = dev->of_node;
-+	int rc = 0;
-+
-+	if (of_get_child_count(dn) == 0)
-+		return -ENODEV;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+	priv->master = master;
-+
-+	priv->mii_bus = mdiobus_alloc();
-+	if (!priv->mii_bus) {
-+		dev_err(dev, "mdio bus alloc failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	bus = priv->mii_bus;
-+	bus->priv = priv;
-+	bus->name = "iProc MDIO bus";
-+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-%d", dev_name(&master->dev),
-+							master->dev_num);
-+	bus->parent = &master->dev;
-+	bus->read = iproc_mdio_mii_read;
-+	bus->write = iproc_mdio_mii_write;
-+
-+	rc = of_mdiobus_register(bus, master->dev.of_node);
-+	if (rc) {
-+		dev_err(dev, "mdio bus registration failed\n");
-+		goto mdiobus_err;
-+	}
-+
-+	shared_mdio_set_drvdata(master, priv);
-+	dev_info(dev, "iProc MDIO bus registered\n");
-+	return 0;
-+
-+mdiobus_err:
-+	mdiobus_free(bus);
-+	return rc;
-+}
-+
-+int iproc_mdio_remove(struct shared_mdio_master *master)
-+{
-+	struct iproc_mdio_priv *priv = shared_mdio_get_drvdata(master);
-+
-+	mdiobus_unregister(priv->mii_bus);
-+	mdiobus_free(priv->mii_bus);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id iproc_mdio_of_match[] = {
-+	{ .compatible = "brcm,iproc-mdio-master-eth" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, iproc_mdio_of_match);
-+
-+static struct shared_mdio_driver iproc_mdio_driver = {
-+	.driver = {
-+		.name = "iproc-mdio-master-eth",
-+		.of_match_table = iproc_mdio_of_match,
-+	},
-+	.probe = iproc_mdio_probe,
-+	.remove = iproc_mdio_remove,
-+};
-+module_shared_mdio_driver(iproc_mdio_driver);
-+
-+MODULE_DESCRIPTION("Broadcom iProc shared mdio master driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Pramod Kumar <pramod.kumar@broadcom.com>");
--- 
-1.9.1
+Acked-by: Lucas Stach <l.stach@pengutronix.de>
+
+> ---
+>  arch/arm/mach-imx/imx27-dt.c         | 4 ----
+>  arch/arm/mach-imx/mach-imx51.c       | 3 ---
+>  arch/arm/mach-imx/mach-imx53.c       | 2 --
+>  arch/arm/mach-imx/mach-imx7d.c       | 6 ------
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
+>  5 files changed, 5 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
+> index bd42d1bd10af..90c62bf01f9e 100644
+> --- a/arch/arm/mach-imx/imx27-dt.c
+> +++ b/arch/arm/mach-imx/imx27-dt.c
+> @@ -20,11 +20,7 @@
+>  
+>  static void __init imx27_dt_init(void)
+>  {
+> -	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+> -
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> -
+> -	platform_device_register_full(&devinfo);
+>  }
+>  
+>  static const char * const imx27_dt_board_compat[] __initconst = {
+> diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
+> index 6883fbaf9484..10a82a4f1e58 100644
+> --- a/arch/arm/mach-imx/mach-imx51.c
+> +++ b/arch/arm/mach-imx/mach-imx51.c
+> @@ -50,13 +50,10 @@ static void __init imx51_ipu_mipi_setup(void)
+>  
+>  static void __init imx51_dt_init(void)
+>  {
+> -	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+> -
+>  	imx51_ipu_mipi_setup();
+>  	imx_src_init();
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> -	platform_device_register_full(&devinfo);
+>  }
+>  
+>  static void __init imx51_init_late(void)
+> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> index 86316a979297..18b5c5c136db 100644
+> --- a/arch/arm/mach-imx/mach-imx53.c
+> +++ b/arch/arm/mach-imx/mach-imx53.c
+> @@ -40,8 +40,6 @@ static void __init imx53_dt_init(void)
+>  static void __init imx53_init_late(void)
+>  {
+>  	imx53_pm_init();
+> -
+> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+>  }
+>  
+>  static const char * const imx53_dt_board_compat[] __initconst = {
+> diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+> index 5a27f20c9a82..b450f525a670 100644
+> --- a/arch/arm/mach-imx/mach-imx7d.c
+> +++ b/arch/arm/mach-imx/mach-imx7d.c
+> @@ -105,11 +105,6 @@ static void __init imx7d_init_irq(void)
+>  	irqchip_init();
+>  }
+>  
+> -static void __init imx7d_init_late(void)
+> -{
+> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> -}
+> -
+>  static const char *const imx7d_dt_compat[] __initconst = {
+>  	"fsl,imx7d",
+>  	NULL,
+> @@ -117,7 +112,6 @@ static const char *const imx7d_dt_compat[] __initconst = {
+>  
+>  DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
+>  	.init_irq	= imx7d_init_irq,
+> -	.init_late	= imx7d_init_late,
+>  	.init_machine	= imx7d_init_machine,
+>  	.dt_compat	= imx7d_dt_compat,
+>  MACHINE_END
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index 3b3e6804cf14..ac12c4a02964 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -12,6 +12,11 @@
+>  #include <linux/platform_device.h>
+>  
+>  static const struct of_device_id machines[] = {
+> +	{ .compatible = "fsl,imx27", },
+> +	{ .compatible = "fsl,imx51", },
+> +	{ .compatible = "fsl,imx53", },
+> +	{ .compatible = "fsl,imx7d", },
+> +
+>  	{ .compatible = "marvell,berlin", },
+>  
+>  	{ .compatible = "samsung,exynos3250", },
