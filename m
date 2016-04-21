@@ -1,72 +1,45 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 21 Apr 2016 23:28:08 +0200
-Subject: Nokia N900 retention mode in v4.6, camera buttons fun
-In-Reply-To: <20160421130450.GQ29406@pali>
-References: <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
- <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
- <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
- <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
- <20160417175539.GA502@amd> <20160421130450.GQ29406@pali>
-Message-ID: <20160421212808.GA31979@amd>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 21 Apr 2016 14:48:26 -0700
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for rk3399 SoCs
+In-Reply-To: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20160421214826.GA69116@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> > CONFIG_HSI breaks power management completely, so power management
-> > with modem will be another topic.  
+On Wed, Apr 20, 2016 at 11:15:50AM +0800, Jianqun Xu wrote:
+> This patch adds core dtsi file for rk3399 found on Rockchip
+> rk3399 SoCs, tested on rk3399 evb.
 > 
-> Sebastian, any idea why power management does not work for HSI?
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1744 ++++++++++++++++++++++++++++++
+>  1 file changed, 1744 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
 > 
-> > > > > In the meantime, I found what is causing the rention mode to break for
-> > > > > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
-> > > > > 
-> > > > > I still get problems with the camera button, in config similar to
-> > > > > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
-> > > > > console. As long as I hold camera button down, I even get it into off
-> > > > > mode for brief period.
-> > > > 
-> > > > Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
-> > > > mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
-> > > > problems for you?)
-> > > > 
-> > > > Any idea why it enters off mode only once after each screenblank?
-> > > 
-> > > After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
-> > > blanking the screen, my n900 hits off mode just fine about once
-> > > a second. Sounds like you still have some extra devices enabled
-> > > causing it.
-> > 
-> > I checked again... also with vanilla 4.6-rc2 to double check... same effect.
-> > 
-> > Aha, got it... cat-ing /sys/kernel/debug/pm_debug/count breaks the
-> > off mode. If I don't do that (tm), it seems to work way better.
-> 
-> So what is result? Is power management working for CONFIG_KEYBOARD_GPIO?
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> new file mode 100644
+> index 0000000..fa6fc2c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -0,0 +1,1744 @@
+[...]
 
-camera and unlock button GPIOs seem to break the powermanagement,
-too. I disabled it for now.
+> +	emmc_phy: phy {
+> +		compatible = "rockchip,rk3399-emmc-phy";
+> +		reg-offset = <0xf780>;
 
-Next hint I got from Sebastian was that I may need to enable power
-management in /sys.
+This property is not documented. The current doc says we "require" reg,
+but you're kinda misusing it, I believe. At any rate, the current phy
+driver won't probe without 'reg'.
 
-pavel at n900:/my/tui/ofone$ cat
-/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/runtime_status
-active
-pavel at n900:/my/tui/ofone$ cat
-/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/autosuspend_delay_ms
-cat:
-/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/autosuspend_delay_ms:
-Input/output error
-root at n900:/my/tui/ofone# cat
-/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/control
-auto
+> +		#phy-cells = <0>;
+> +		rockchip,grf = <&grf>;
+> +		status = "disabled";
+> +	};
 
-I could not get it to sleep :-(.
+[...]
 
-Best regards,
-								Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Brian
