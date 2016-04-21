@@ -1,131 +1,148 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:22:03 -0700
-Subject: [PATCH v2 12/13] clk: fixed-rate: Add hw based registration APIs
+Date: Thu, 21 Apr 2016 15:22:01 -0700
+Subject: [PATCH v2 10/13] clk: composite: Add hw based registration APIs
 In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-13-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1461277324-27185-11-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk fixed-rate code to return struct
+Add registration APIs in the clk composite code to return struct
 clk_hw pointers instead of struct clk pointers. This way we hide
 the struct clk pointer from providers unless they need to use
 consumer facing APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-fixed-rate.c | 44 ++++++++++++++++++++++++++++++++++++--------
+ drivers/clk/clk-composite.c  | 45 ++++++++++++++++++++++++++++++++------------
  include/linux/clk-provider.h |  7 +++++++
- 2 files changed, 43 insertions(+), 8 deletions(-)
+ 2 files changed, 40 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index cd9dc925b3f8..8e4453eb54e8 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -45,8 +45,8 @@ const struct clk_ops clk_fixed_rate_ops = {
- EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 1f903e1f86a2..463fadd5a68f 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -184,17 +184,18 @@ static void clk_composite_disable(struct clk_hw *hw)
+ 	gate_ops->disable(gate_hw);
+ }
  
- /**
-- * clk_register_fixed_rate_with_accuracy - register fixed-rate clock with the
-- *					   clock framework
-+ * clk_hw_register_fixed_rate_with_accuracy - register fixed-rate clock with
-+ * the clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of clock's parent
-@@ -54,13 +54,14 @@ EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
-  * @fixed_rate: non-adjustable clock rate
-  * @fixed_accuracy: non-adjustable clock rate
-  */
--struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+struct clk_hw *clk_hw_register_fixed_rate_with_accuracy(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate, unsigned long fixed_accuracy)
+-struct clk *clk_register_composite(struct device *dev, const char *name,
++struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
+ 			const char * const *parent_names, int num_parents,
+ 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+ 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+ 			unsigned long flags)
  {
- 	struct clk_fixed_rate *fixed;
 -	struct clk *clk;
 +	struct clk_hw *hw;
  	struct clk_init_data init;
+ 	struct clk_composite *composite;
+ 	struct clk_ops *clk_composite_ops;
 +	int ret;
  
- 	/* allocate fixed-rate clock */
- 	fixed = kzalloc(sizeof(*fixed), GFP_KERNEL);
-@@ -79,22 +80,49 @@ struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
- 	fixed->hw.init = &init;
+ 	composite = kzalloc(sizeof(*composite), GFP_KERNEL);
+ 	if (!composite)
+@@ -204,12 +205,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 	init.flags = flags | CLK_IS_BASIC;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
++	hw = &composite->hw;
  
- 	/* register the clock */
--	clk = clk_register(dev, &fixed->hw);
+ 	clk_composite_ops = &composite->ops;
+ 
+ 	if (mux_hw && mux_ops) {
+ 		if (!mux_ops->get_parent) {
+-			clk = ERR_PTR(-EINVAL);
++			hw = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
+ 
+@@ -224,7 +226,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 
+ 	if (rate_hw && rate_ops) {
+ 		if (!rate_ops->recalc_rate) {
+-			clk = ERR_PTR(-EINVAL);
++			hw = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
+ 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+@@ -253,7 +255,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 	if (gate_hw && gate_ops) {
+ 		if (!gate_ops->is_enabled || !gate_ops->enable ||
+ 		    !gate_ops->disable) {
+-			clk = ERR_PTR(-EINVAL);
++			hw = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
+ 
+@@ -267,22 +269,41 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 	init.ops = clk_composite_ops;
+ 	composite->hw.init = &init;
+ 
+-	clk = clk_register(dev, &composite->hw);
 -	if (IS_ERR(clk))
-+	hw = &fixed->hw;
 +	ret = clk_hw_register(dev, hw);
 +	if (ret) {
- 		kfree(fixed);
 +		hw = ERR_PTR(ret);
+ 		goto err;
 +	}
+ 
+ 	if (composite->mux_hw)
+-		composite->mux_hw->clk = clk;
++		composite->mux_hw->clk = hw->clk;
+ 
+ 	if (composite->rate_hw)
+-		composite->rate_hw->clk = clk;
++		composite->rate_hw->clk = hw->clk;
+ 
+ 	if (composite->gate_hw)
+-		composite->gate_hw->clk = clk;
++		composite->gate_hw->clk = hw->clk;
  
 -	return clk;
 +	return hw;
+ 
+ err:
+ 	kfree(composite);
+-	return clk;
++	return hw;
 +}
-+EXPORT_SYMBOL_GPL(clk_hw_register_fixed_rate_with_accuracy);
 +
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy)
++struct clk *clk_register_composite(struct device *dev, const char *name,
++			const char * const *parent_names, int num_parents,
++			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
++			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
++			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
++			unsigned long flags)
 +{
 +	struct clk_hw *hw;
 +
-+	hw = clk_hw_register_fixed_rate_with_accuracy(dev, name, parent_name,
-+			flags, fixed_rate, fixed_accuracy);
++	hw = clk_hw_register_composite(dev, name, parent_names, num_parents,
++			mux_hw, mux_ops, rate_hw, rate_ops, gate_hw, gate_ops,
++			flags);
 +	if (IS_ERR(hw))
 +		return ERR_CAST(hw);
 +	return hw->clk;
  }
- EXPORT_SYMBOL_GPL(clk_register_fixed_rate_with_accuracy);
- 
- /**
-- * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * clk_hw_register_fixed_rate - register fixed-rate clock with the clock
-+ * framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of clock's parent
-  * @flags: framework-specific flags
-  * @fixed_rate: non-adjustable clock rate
-  */
-+struct clk_hw *clk_hw_register_fixed_rate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate)
-+{
-+	return clk_hw_register_fixed_rate_with_accuracy(dev, name, parent_name,
-+						     flags, fixed_rate, 0);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register_fixed_rate);
-+
- struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate)
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 6c36c5e8ccbe..c3fc042d517c 100644
+index bcbaf6c95d52..456c3ced1ac9 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -282,10 +282,17 @@ extern const struct clk_ops clk_fixed_rate_ops;
- struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate);
-+struct clk_hw *clk_hw_register_fixed_rate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate);
- struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate, unsigned long fixed_accuracy);
- void clk_unregister_fixed_rate(struct clk *clk);
-+struct clk_hw *clk_hw_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy);
-+
- void of_fixed_clk_setup(struct device_node *np);
+@@ -638,6 +638,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+ 		unsigned long flags);
++struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
++		const char * const *parent_names, int num_parents,
++		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
++		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
++		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
++		unsigned long flags);
++void clk_hw_unregister_composite(struct clk_hw *hw);
  
- /**
+ /***
+  * struct clk_gpio_gate - gpio gated clock
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
