@@ -1,71 +1,60 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 21 Apr 2016 12:04:35 +0100
-Subject: [PATCH 18/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio
- card
+Date: Thu, 21 Apr 2016 12:04:26 +0100
+Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver code
 In-Reply-To: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
 References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1461236675-10176-19-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1461236675-10176-10-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the uniperif players 2 & 3 for b2120 boards
-and also adds the "simple-audio-card" device node to interconnect
-the SoC sound device and the codec.
+uniperiph-id, version and mode are ST specific bindings and
+need the 'st,' prefix. Update the examples, as otherwise copying
+them yields a runtime error parsing the DT node.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Cc: arnaud.pouliquen at st.com
 ---
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 40 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ .../devicetree/bindings/sound/st,sti-asoc-card.txt         | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 133375b..f50d293 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -135,5 +135,45 @@
- 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
- 			};
- 		};
-+
-+		sti_uni_player2: sti-uni-player at 2 {
-+			status = "okay";
-+		};
-+
-+		sti_uni_player3: sti-uni-player at 3 {
-+			status = "okay";
-+		};
-+
-+		sound {
-+			compatible = "simple-audio-card";
-+			simple-audio-card,name = "sti audio card";
-+			status = "okay";
-+
-+			simple-audio-card,dai-link at 0 {
-+				/* DAC */
-+				format = "i2s";
-+				dai-tdm-slot-width = <32>;
-+				mclk-fs = <256>;
-+				cpu {
-+					sound-dai = <&sti_uni_player2>;
-+				};
-+
-+				codec {
-+					sound-dai = <&sti_sasg_codec 1>;
-+				};
-+			};
-+			simple-audio-card,dai-link at 1 {
-+				/* SPDIF */
-+				format = "left_j";
-+				mclk-fs = <128>;
-+				cpu {
-+					sound-dai = <&sti_uni_player3>;
-+				};
-+
-+				codec {
-+					sound-dai = <&sti_sasg_codec 0>;
-+				};
-+			};
-+		};
+diff --git a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
+index 028fa1c..ef2e0c6 100644
+--- a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
++++ b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
+@@ -67,9 +67,9 @@ Example:
+ 		dmas = <&fdma0 4 0 1>;
+ 		dai-name = "Uni Player #1 (DAC)";
+ 		dma-names = "tx";
+-		uniperiph-id = <2>;
+-		version = <5>;
+-		mode = "PCM";
++		st,uniperiph-id = <2>;
++		st,version = <5>;
++		st,mode = "PCM";
  	};
- };
+ 
+ 	sti_uni_player3: sti-uni-player at 3 {
+@@ -83,9 +83,9 @@ Example:
+ 		dmas = <&fdma0 7 0 1>;
+ 		dma-names = "tx";
+ 		dai-name = "Uni Player #1 (PIO)";
+-		uniperiph-id = <3>;
+-		version = <5>;
+-		mode = "SPDIF";
++		st,uniperiph-id = <3>;
++		st,version = <5>;
++		st,mode = "SPDIF";
+ 	};
+ 
+ 	sti_uni_reader1: sti-uni-reader at 1 {
+@@ -98,7 +98,7 @@ Example:
+ 		dmas = <&fdma0 6 0 1>;
+ 		dma-names = "rx";
+ 		dai-name = "Uni Reader #1 (HDMI RX)";
+-		version = <3>;
++		st,version = <3>;
+ 	};
+ 
+ 2) sti-sas-codec: internal audio codec IPs driver
 -- 
 1.9.1
