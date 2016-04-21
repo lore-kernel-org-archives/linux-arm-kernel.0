@@ -1,65 +1,83 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 21 Apr 2016 14:35:18 +0530
-Subject: [PATCH v2] cpufreq: rockchip: Use generic platdev driver
-In-Reply-To: <1461229265-53750-1-git-send-email-finley.xiao@rock-chips.com>
-References: <1461225849-36866-1-git-send-email-finley.xiao@rock-chips.com>
- <1461229265-53750-1-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <20160421090518.GC9309@vireshk-i7>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 21 Apr 2016 11:05:30 +0200
+Subject: [PATCH 1/8] cpufreq: berlin: Use generic platdev driver
+In-Reply-To: <4be5e8c38aed34a4aae08db2cae39ca8ece54d29.1461228081.git.viresh.kumar@linaro.org>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <4be5e8c38aed34a4aae08db2cae39ca8ece54d29.1461228081.git.viresh.kumar@linaro.org>
+Message-ID: <20160421090530.GE3685@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-04-16, 17:01, Finlye Xiao wrote:
-> From: Finley Xiao <finley.xiao@rock-chips.com>
+Hi,
+
+On Thu, Apr 21, 2016 at 02:13:47PM +0530, Viresh Kumar wrote:
+> The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+> device now, reuse that and remove similar code from platform code.
 > 
-> This patch add rockchip's compatible string to the compat list and
-> remove similar code from platform code for supporting generic platdev
-> driver.
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Thanks!
+
+Antoine
+
 > ---
-> v1->v2:
-> - add a blank line before rockchip's compatible
+>  arch/arm/mach-berlin/berlin.c        | 6 ------
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+>  2 files changed, 2 insertions(+), 6 deletions(-)
 > 
->  arch/arm/mach-rockchip/rockchip.c    |  1 -
->  drivers/cpufreq/cpufreq-dt-platdev.c | 11 +++++++++++
->  2 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-> index 3f07cc5..beb71da 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
->  {
->  	rockchip_suspend_init();
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> -	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
->  }
+> diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+> index 25d73870ccca..ac181c6797ee 100644
+> --- a/arch/arm/mach-berlin/berlin.c
+> +++ b/arch/arm/mach-berlin/berlin.c
+> @@ -18,11 +18,6 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
 >  
->  static const char * const rockchip_board_dt_compat[] = {
+> -static void __init berlin_init_late(void)
+> -{
+> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> -}
+> -
+>  static const char * const berlin_dt_compat[] = {
+>  	"marvell,berlin",
+>  	NULL,
+> @@ -30,7 +25,6 @@ static const char * const berlin_dt_compat[] = {
+>  
+>  DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+>  	.dt_compat	= berlin_dt_compat,
+> -	.init_late	= berlin_init_late,
+>  	/*
+>  	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+>  	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
 > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> index f2ae7ad..fc6529b 100644
+> index f2ae7ad99a3c..3b3e6804cf14 100644
 > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
 > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> @@ -21,6 +21,17 @@ static const struct of_device_id machines[] = {
->  	{ .compatible = "samsung,exynos5420", },
->  	{ .compatible = "samsung,exynos5800", },
->  #endif
-> +
-> +	{ .compatible = "rockchip,rk2928", },
-> +	{ .compatible = "rockchip,rk3036", },
-> +	{ .compatible = "rockchip,rk3066a", },
-> +	{ .compatible = "rockchip,rk3066b", },
-> +	{ .compatible = "rockchip,rk3188", },
-> +	{ .compatible = "rockchip,rk3228", },
-> +	{ .compatible = "rockchip,rk3288", },
-> +	{ .compatible = "rockchip,rk3366", },
-> +	{ .compatible = "rockchip,rk3368", },
-> +	{ .compatible = "rockchip,rk3399", },
->  };
+> @@ -12,6 +12,8 @@
+>  #include <linux/platform_device.h>
 >  
->  static int __init cpufreq_dt_platdev_init(void)
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>  static const struct of_device_id machines[] = {
+> +	{ .compatible = "marvell,berlin", },
+> +
+>  	{ .compatible = "samsung,exynos3250", },
+>  	{ .compatible = "samsung,exynos4210", },
+>  	{ .compatible = "samsung,exynos4212", },
+> -- 
+> 2.7.1.410.g6faf27b
+> 
 
 -- 
-viresh
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/88b91cfd/attachment.sig>
