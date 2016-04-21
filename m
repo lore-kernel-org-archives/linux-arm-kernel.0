@@ -1,116 +1,120 @@
 From: pmladek@suse.com (Petr Mladek)
-Date: Thu, 21 Apr 2016 13:48:41 +0200
-Subject: [PATCH v5 0/4] Cleaning printk stuff in NMI context
-Message-ID: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+Date: Thu, 21 Apr 2016 13:48:43 +0200
+Subject: [PATCH v5 2/4] printk/nmi: warn when some message has been lost in
+ NMI context
+In-Reply-To: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+Message-ID: <1461239325-22779-3-git-send-email-pmladek@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set generalizes the already existing solution for
-printing NMI messages. The main idea comes from Peter Zijlstra.
+We could not resize the temporary buffer in NMI context.  Let's warn if a
+message is lost.
 
-v5 adds changes suggested by Sergey Senozhatsky. It should not longer
-conflict with his async printk patchset.
+This is rather theoretical.  printk() should not be used in NMI.  The only
+sensible use is when we want to print backtrace from all CPUs.  The
+current buffer should be enough for this purpose.
 
-There are some conflicts with the nmi_backtrace improvements
-from Chris Metcalf, see
-https://lkml.kernel.org/g/<1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
-Feel free to ask me to resolve them.
+[akpm at linux-foundation.org: whitespace fixlet]
+Signed-off-by: Petr Mladek <pmladek@suse.com>
+Cc: Jan Kara <jack@suse.cz>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Jiri Kosina <jkosina@suse.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+ kernel/printk/internal.h | 11 +++++++++++
+ kernel/printk/nmi.c      |  5 ++++-
+ kernel/printk/printk.c   | 10 ++++++++++
+ 3 files changed, 25 insertions(+), 1 deletion(-)
 
-
-Changes against v4:
-
-  + merged 2nd patch into the 1st one to do not break bisection
-
-  + set vprintk_nmi() early in nmi_enter() and set vprintk_default()
-    later in nmi_exit() to make sure that all NMI messages are printed
-    to the temporary ring buffer
-
-  + used printk_deferred() when flushing the temporary buffers
-    on panic in NMI; we do not longer need to touch vprintk_emit()
-    and define the ugly macro deferred_console_in_nmi().
-
-
-Changes against v3:
-
-  + merged all small changes from -mm tree, including commit
-    descriptions
-
-  + disabled interrupts when taking the read_lock in __printk_nmi_flush();
-    printk_nmi_flush() might be called from any context; reported
-    by lockdep
-
-  + never introduce NEED_PRINTK_NMI; in -mm tree was introduced
-    in 1st patch and removed in the 4th one
-
-  + flush NMI buffers when the system goes down (new 5th patch);
-    addresses Daniel's concerns
-
-
-Changes against v2:
-
-  + fixed compilation problems reported by 0-day build robot
-
-  + MN10300 and Xtensa architectures will get handled separately
-
-  + dropped the patch that printed NMI messages directly when Oops
-    in progress; it made the solution less reliable
-
-  + made the size of the buffer configurable; use real numbers
-    instead of PAGE_SIZE
-
-
-Changes against v1:
-
-  + rebased on top of 4.4-rc2; there the old implementation was
-    moved to lib/nmi_backtrace.c and used also on arm; I hope that
-    I got the arm side correctly; I was not able to test on arm :-(
-
-  + defined HAVE_NMI on arm for !CPU_V7M instead of !CPU_V7;
-    handle_fiq_as_nmi() is called from entry-armv.S that
-    is compiled when !CPU_V7M
-
-  + defined HAVE_NMI also on mips; it calls nmi_enter() and
-    seems to have real NMIs (or am I wrong?)
-
-  + serialized backtraces when printing directly
-    (oops_in_progress)
-
-
-Petr Mladek (4):
-  printk/nmi: generic solution for safe printk in NMI
-  printk/nmi: warn when some message has been lost in NMI context
-  printk/nmi: increase the size of NMI buffer and make it configurable
-  printk/nmi: flush NMI messages on the system panic
-
- arch/Kconfig                  |   4 +
- arch/arm/Kconfig              |   1 +
- arch/arm/kernel/smp.c         |   2 +
- arch/avr32/Kconfig            |   1 +
- arch/blackfin/Kconfig         |   1 +
- arch/cris/Kconfig             |   1 +
- arch/mips/Kconfig             |   1 +
- arch/powerpc/Kconfig          |   1 +
- arch/s390/Kconfig             |   1 +
- arch/sh/Kconfig               |   1 +
- arch/sparc/Kconfig            |   1 +
- arch/tile/Kconfig             |   1 +
- arch/x86/Kconfig              |   1 +
- arch/x86/kernel/apic/hw_nmi.c |   1 -
- include/linux/hardirq.h       |   2 +
- include/linux/percpu.h        |   3 -
- include/linux/printk.h        |  14 ++-
- init/Kconfig                  |  27 +++++
- init/main.c                   |   1 +
- kernel/kexec_core.c           |   1 +
- kernel/panic.c                |   6 +-
- kernel/printk/Makefile        |   1 +
- kernel/printk/internal.h      |  57 +++++++++
- kernel/printk/nmi.c           | 260 ++++++++++++++++++++++++++++++++++++++++++
- kernel/printk/printk.c        |  31 ++---
- lib/nmi_backtrace.c           |  89 +--------------
- 26 files changed, 401 insertions(+), 109 deletions(-)
- create mode 100644 kernel/printk/internal.h
- create mode 100644 kernel/printk/nmi.c
-
+diff --git a/kernel/printk/internal.h b/kernel/printk/internal.h
+index 2de99faedfc1..341bedccc065 100644
+--- a/kernel/printk/internal.h
++++ b/kernel/printk/internal.h
+@@ -34,6 +34,12 @@ static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
+ 	return this_cpu_read(printk_func)(fmt, args);
+ }
+ 
++extern atomic_t nmi_message_lost;
++static inline int get_nmi_message_lost(void)
++{
++	return atomic_xchg(&nmi_message_lost, 0);
++}
++
+ #else /* CONFIG_PRINTK_NMI */
+ 
+ static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
+@@ -41,4 +47,9 @@ static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
+ 	return vprintk_default(fmt, args);
+ }
+ 
++static inline int get_nmi_message_lost(void)
++{
++	return 0;
++}
++
+ #endif /* CONFIG_PRINTK_NMI */
+diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
+index 303cf0d15e57..572f94922230 100644
+--- a/kernel/printk/nmi.c
++++ b/kernel/printk/nmi.c
+@@ -39,6 +39,7 @@
+  */
+ DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
+ static int printk_nmi_irq_ready;
++atomic_t nmi_message_lost;
+ 
+ #define NMI_LOG_BUF_LEN (4096 - sizeof(atomic_t) - sizeof(struct irq_work))
+ 
+@@ -64,8 +65,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
+ again:
+ 	len = atomic_read(&s->len);
+ 
+-	if (len >= sizeof(s->buffer))
++	if (len >= sizeof(s->buffer)) {
++		atomic_inc(&nmi_message_lost);
+ 		return 0;
++	}
+ 
+ 	/*
+ 	 * Make sure that all old data have been read before the buffer was
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index 71eba0607034..e38579d730f4 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -1617,6 +1617,7 @@ asmlinkage int vprintk_emit(int facility, int level,
+ 	unsigned long flags;
+ 	int this_cpu;
+ 	int printed_len = 0;
++	int nmi_message_lost;
+ 	bool in_sched = false;
+ 	/* cpu currently holding logbuf_lock in this function */
+ 	static unsigned int logbuf_cpu = UINT_MAX;
+@@ -1667,6 +1668,15 @@ asmlinkage int vprintk_emit(int facility, int level,
+ 					 strlen(recursion_msg));
+ 	}
+ 
++	nmi_message_lost = get_nmi_message_lost();
++	if (unlikely(nmi_message_lost)) {
++		text_len = scnprintf(textbuf, sizeof(textbuf),
++				     "BAD LUCK: lost %d message(s) from NMI context!",
++				     nmi_message_lost);
++		printed_len += log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
++					 NULL, 0, textbuf, text_len);
++	}
++
+ 	/*
+ 	 * The printf needs to come first; we need the syslog
+ 	 * prefix which might be passed-in as a parameter.
 -- 
 1.8.5.6
