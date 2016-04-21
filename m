@@ -1,75 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 21 Apr 2016 21:23:27 +0200
-Subject: [PATCH] PM / Runtime: Defer resuming of the device in
- pm_runtime_force_resume()
-In-Reply-To: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
-References: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1575769.B1ataT0Qqy@vostro.rjw.lan>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 21 Apr 2016 14:29:18 -0500
+Subject: [PATCH 14/14] regulator: ti-abb: DT spelling s/#{address,
+ size}-cell/#{address, size}-cells/
+In-Reply-To: <1461166339-11109-15-git-send-email-geert+renesas@glider.be>
+References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
+ <1461166339-11109-15-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAL_JsqL7QFpTimE3=+jp1cgsgv0cSjBHr+uOtPOGnxyBN=0=Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 21, 2016 12:34:02 PM Ulf Hansson wrote:
-> When the pm_runtime_force_suspend|resume() helpers were invented, we still
-> had CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP as separate Kconfig options.
-> 
-> To make sure these helpers worked for all combinations and without
-> introducing too much of complexity, the device was always resumed in
-> pm_runtime_force_resume().
-> 
-> More precisely, when CONFIG_PM_SLEEP was set and CONFIG_PM_RUNTIME was
-> unset, we needed to resume the device as the subsystem/driver couldn't
-> rely on using runtime PM to do it.
-> 
-> As the CONFIG_PM_RUNTIME option was merged into CONFIG_PM a while ago, it
-> removed this combination, of using CONFIG_PM_SLEEP without the earlier
-> CONFIG_PM_RUNTIME.
-> 
-> For this reason we can now rely on the subsystem/driver to use runtime PM
-> to resume the device, instead of forcing that to be done in all cases. In
-> other words, let's defer this to a later point when it's actually needed.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Wed, Apr 20, 2016 at 10:32 AM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-> 
-> Note, this patch is based upon another not yet queued patch [1]. The reason is
-> simply because that [1] is a more important patch as it fixes a problem. It was
-> posted to linux-pm April 8th and I expect it (or a new revision of it) to be
-> applied before $subject patch.
-> 
-> [1]
-> https://patchwork.kernel.org/patch/8782851
-> 
-> ---
->  drivers/base/power/runtime.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> index b746904..a190ca0 100644
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -1506,6 +1506,17 @@ int pm_runtime_force_resume(struct device *dev)
->  		goto out;
->  	}
->  
-> +	/*
-> +	 * The PM core increases the runtime PM usage count in the system PM
-> +	 * prepare phase. If the count is greather than 1 at this point, someone
-> +	 * else has also increased it. In such case, let's make sure to runtime
-> +	 * resume the device as that is likely what is expected. In other case
+>  .../devicetree/bindings/regulator/ti-abb-regulator.txt         | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt b/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt
+> index c58db75f959e601f..c3f6546ebac77742 100644
+> --- a/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt
+> +++ b/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt
+> @@ -14,8 +14,8 @@ Required Properties:
+>    - "setup-address"    - contains setup register address of ABB module (ti,abb-v3)
+>    - "int-address"      - contains address of interrupt register for ABB module
+>    (also see Optional properties)
+> -- #address-cell: should be 0
+> -- #size-cell: should be 0
+> +- #address-cells: should be 0
+> +- #size-cells: should be 0
 
-That doesn't sound quite right.  I'd rather say "In that case, invoke the
-runtime resume callback for the device as that is likely what is expected" here.
+Looks to me like you can just drop these.
 
-> +	 * we trust the subsystem/driver to runtime resume the device when it's
-> +	 * actually needed.
-> +	 */
-> +	if (atomic_read(&dev->power.usage_count) < 2)
-> +		goto out;
-> +
->  	ret = pm_runtime_set_active(dev);
->  	if (ret)
->  		goto out;
-> 
-
-Thanks,
-Rafael
+Rob
