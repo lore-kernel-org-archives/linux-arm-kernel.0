@@ -1,54 +1,55 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Thu, 21 Apr 2016 19:40:42 +0200
-Subject: [PATCH v5] irqchip, gicv3-its, numa: Enable workaround for
- Cavium thunderx erratum 23144
-In-Reply-To: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
-References: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
-Message-ID: <20160421174042.GD24726@rric.localdomain>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Thu, 21 Apr 2016 13:50:32 -0400
+Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
+Message-ID: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.04.16 21:30:05, Robert Richter wrote:
-> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> 
-> The erratum fixes the hang of ITS SYNC command by avoiding inter node
-> io and collections/cpu mapping on thunderx dual-socket platform.
-> 
-> This fix is only applicable for Cavium's ThunderX dual-socket platform.
-> 
-> This is based on NUMA v16 series.
-> Message-Id: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
+From: David Rivshin <drivshin@allworx.com>
 
-Will, Catalin,
+The first patch fixes a bug that makes dual_emac mode break if
+either slave uses the phy-handle property in the devicetree.
 
-after NUMA base patches went into linux-next (many thanks), please
-consider this pass 1.x errata workaround for inclusion too.
+The second patch fixes some cosmetic problems with error messages,
+and also makes the binding documentation more explicit.
 
-Thanks,
+The third patch cleans up the fixed-link case to work like
+the now-fixed phy-handle case.
 
--Robert
+I have tested on the following hardware configurations:
+ - (EVMSK) dual emac, phy_id property in both slaves
+ - (EVMSK) dual emac, phy-handle property in both slaves
+ - (BeagleBoneBlack) single emac, phy_id property
+ - (custom) single emac, fixed-link subnode
 
-> 
-> v5 (by Robert Richter):
-> fixed use of cpumask_of_node() only for (node >= 0)
-> minor style fixes
-> 
-> v4:
-> updated silicon-errata.txt
-> updated as per Robert Richter review comment.
-> 
-> v3:
-> updatated as per Marc Zyngier's review comments.
-> http://www.spinics.net/lists/arm-kernel/msg443462.html
-> 
-> v2:
-> updatated as per Marc Zyngier's review comments.
-> 
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     |  9 +++++++
->  drivers/irqchip/irq-gic-v3-its.c       | 49 ++++++++++++++++++++++++++++++++--
->  3 files changed, 57 insertions(+), 2 deletions(-)
+Nicolas Chauvet reported testing on an HP t410 (dm8148).
+
+Markus Brunner reported testing v1 on the following [1]:
+ - emac0 with phy_id and emac1 with fixed phy
+ - emac0 with phy-handle and emac1 with fixed phy
+ - emac0 with fixed phy and emac1 with fixed phy
+
+
+Changes since v1 [2]:
+- Rebased
+- Added Tested-by from Nicolas Chauvet on all patches
+- Added Acked-by from Rob Herring for the binding change in patch 2 [3]
+
+[1] http://www.spinics.net/lists/netdev/msg357890.html
+[2] http://www.spinics.net/lists/netdev/msg357772.html
+[3] http://www.spinics.net/lists/netdev/msg358254.html
+
+David Rivshin (3):
+  drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
+    config
+  drivers: net: cpsw: fix error messages when using phy-handle DT
+    property
+  drivers: net: cpsw: use of_phy_connect() in fixed-link case
+
+ Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
+ drivers/net/ethernet/ti/cpsw.c                 | 41 +++++++++++++-------------
+ drivers/net/ethernet/ti/cpsw.h                 |  1 +
+ 3 files changed, 23 insertions(+), 23 deletions(-)
+
+-- 
+2.5.5
