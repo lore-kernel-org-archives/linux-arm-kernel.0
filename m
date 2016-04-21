@@ -1,148 +1,105 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:22:01 -0700
-Subject: [PATCH v2 10/13] clk: composite: Add hw based registration APIs
+Date: Thu, 21 Apr 2016 15:22:00 -0700
+Subject: [PATCH v2 09/13] clk: fractional-divider: Add hw based registration
+ APIs
 In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-11-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1461277324-27185-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk composite code to return struct
-clk_hw pointers instead of struct clk pointers. This way we hide
-the struct clk pointer from providers unless they need to use
-consumer facing APIs.
+Add registration APIs in the clk fractional divider code to
+return struct clk_hw pointers instead of struct clk pointers.
+This way we hide the struct clk pointer from providers unless
+they need to use consumer facing APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-composite.c  | 45 ++++++++++++++++++++++++++++++++------------
- include/linux/clk-provider.h |  7 +++++++
- 2 files changed, 40 insertions(+), 12 deletions(-)
+ drivers/clk/clk-fractional-divider.c | 40 +++++++++++++++++++++++++++++++-----
+ include/linux/clk-provider.h         |  5 +++++
+ 2 files changed, 40 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 1f903e1f86a2..463fadd5a68f 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -184,17 +184,18 @@ static void clk_composite_disable(struct clk_hw *hw)
- 	gate_ops->disable(gate_hw);
- }
+diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
+index 1abcd76b4993..aab904618eb6 100644
+--- a/drivers/clk/clk-fractional-divider.c
++++ b/drivers/clk/clk-fractional-divider.c
+@@ -116,14 +116,15 @@ const struct clk_ops clk_fractional_divider_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_fractional_divider_ops);
  
--struct clk *clk_register_composite(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
- 			const char * const *parent_names, int num_parents,
- 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
- 			unsigned long flags)
+-struct clk *clk_register_fractional_divider(struct device *dev,
++struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+ 		u8 clk_divider_flags, spinlock_t *lock)
  {
+ 	struct clk_fractional_divider *fd;
+ 	struct clk_init_data init;
 -	struct clk *clk;
 +	struct clk_hw *hw;
- 	struct clk_init_data init;
- 	struct clk_composite *composite;
- 	struct clk_ops *clk_composite_ops;
 +	int ret;
  
- 	composite = kzalloc(sizeof(*composite), GFP_KERNEL);
- 	if (!composite)
-@@ -204,12 +205,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 	init.flags = flags | CLK_IS_BASIC;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
-+	hw = &composite->hw;
+ 	fd = kzalloc(sizeof(*fd), GFP_KERNEL);
+ 	if (!fd)
+@@ -146,10 +147,39 @@ struct clk *clk_register_fractional_divider(struct device *dev,
+ 	fd->lock = lock;
+ 	fd->hw.init = &init;
  
- 	clk_composite_ops = &composite->ops;
- 
- 	if (mux_hw && mux_ops) {
- 		if (!mux_ops->get_parent) {
--			clk = ERR_PTR(-EINVAL);
-+			hw = ERR_PTR(-EINVAL);
- 			goto err;
- 		}
- 
-@@ -224,7 +226,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 
- 	if (rate_hw && rate_ops) {
- 		if (!rate_ops->recalc_rate) {
--			clk = ERR_PTR(-EINVAL);
-+			hw = ERR_PTR(-EINVAL);
- 			goto err;
- 		}
- 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
-@@ -253,7 +255,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 	if (gate_hw && gate_ops) {
- 		if (!gate_ops->is_enabled || !gate_ops->enable ||
- 		    !gate_ops->disable) {
--			clk = ERR_PTR(-EINVAL);
-+			hw = ERR_PTR(-EINVAL);
- 			goto err;
- 		}
- 
-@@ -267,22 +269,41 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 	init.ops = clk_composite_ops;
- 	composite->hw.init = &init;
- 
--	clk = clk_register(dev, &composite->hw);
+-	clk = clk_register(dev, &fd->hw);
 -	if (IS_ERR(clk))
++	hw = &fd->hw;
 +	ret = clk_hw_register(dev, hw);
 +	if (ret) {
+ 		kfree(fd);
 +		hw = ERR_PTR(ret);
- 		goto err;
 +	}
- 
- 	if (composite->mux_hw)
--		composite->mux_hw->clk = clk;
-+		composite->mux_hw->clk = hw->clk;
- 
- 	if (composite->rate_hw)
--		composite->rate_hw->clk = clk;
-+		composite->rate_hw->clk = hw->clk;
- 
- 	if (composite->gate_hw)
--		composite->gate_hw->clk = clk;
-+		composite->gate_hw->clk = hw->clk;
- 
--	return clk;
-+	return hw;
- 
- err:
- 	kfree(composite);
--	return clk;
++
 +	return hw;
 +}
-+
-+struct clk *clk_register_composite(struct device *dev, const char *name,
-+			const char * const *parent_names, int num_parents,
-+			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-+			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
-+			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-+			unsigned long flags)
++EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider);
+ 
+-	return clk;
++struct clk *clk_register_fractional_divider(struct device *dev,
++		const char *name, const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
++		u8 clk_divider_flags, spinlock_t *lock)
 +{
 +	struct clk_hw *hw;
 +
-+	hw = clk_hw_register_composite(dev, name, parent_names, num_parents,
-+			mux_hw, mux_ops, rate_hw, rate_ops, gate_hw, gate_ops,
-+			flags);
++	hw = clk_hw_register_fractional_divider(dev, name, parent_name, flags,
++			reg, mshift, mwidth, nshift, nwidth, clk_divider_flags,
++			lock);
 +	if (IS_ERR(hw))
 +		return ERR_CAST(hw);
 +	return hw->clk;
  }
+ EXPORT_SYMBOL_GPL(clk_register_fractional_divider);
++
++void clk_hw_unregister_fractional_divider(struct clk_hw *hw)
++{
++	struct clk_fractional_divider *fd;
++
++	fd = to_clk_fd(hw);
++
++	clk_hw_unregister(hw);
++	kfree(fd);
++}
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index bcbaf6c95d52..456c3ced1ac9 100644
+index 79ad1a8a6831..bcbaf6c95d52 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -638,6 +638,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
- 		unsigned long flags);
-+struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
-+		const char * const *parent_names, int num_parents,
-+		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-+		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
-+		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-+		unsigned long flags);
-+void clk_hw_unregister_composite(struct clk_hw *hw);
+@@ -563,6 +563,11 @@ struct clk *clk_register_fractional_divider(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+ 		u8 clk_divider_flags, spinlock_t *lock);
++struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
++		const char *name, const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
++		u8 clk_divider_flags, spinlock_t *lock);
++void clk_hw_unregister_fractional_divider(struct clk_hw *hw);
  
- /***
-  * struct clk_gpio_gate - gpio gated clock
+ /**
+  * struct clk_multiplier - adjustable multiplier clock
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
