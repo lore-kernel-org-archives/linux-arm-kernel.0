@@ -1,78 +1,167 @@
-From: dennis@ausil.us (Dennis Gilmore)
-Date: Thu, 21 Apr 2016 12:37:28 -0500
-Subject: bug in autoloading of imx-ipuv3-crtc
-In-Reply-To: <20160420230317.GT29108@pengutronix.de>
-References: <6926808.b0joqYQPQE@anubis.ausil.us>
- <1513165.9WxCa41tI1@anubis.ausil.us> <20160420230317.GT29108@pengutronix.de>
-Message-ID: <1668410.ik7sLCmBP7@anubis.ausil.us>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 21 Apr 2016 19:41:01 +0200
+Subject: [PATCH 5/7] KVM: arm/arm64: Remove the IRQ field from struct
+ irq_phys_map
+In-Reply-To: <1460729047-6346-6-git-send-email-andre.przywara@arm.com>
+References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
+ <1460729047-6346-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <571910AD.4050704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 21, 2016 1:03:17 AM CDT Uwe Kleine-K?nig wrote:
-> Hello,
+Hi Andre,
+On 04/15/2016 04:04 PM, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> On Tue, Apr 19, 2016 at 03:16:01PM -0500, Dennis Gilmore wrote:
-> > On Tuesday, April 19, 2016 2:27:17 PM CDT Dennis Gilmore wrote:
-> > > On Tuesday, April 19, 2016 7:50:49 PM CDT Russell King - ARM Linux 
-wrote:
-> > > > On Tue, Apr 19, 2016 at 01:34:23PM -0500, Dennis Gilmore wrote:
-> > > > > on all of my i.MX6 systems imx-ipuv3-crtc ius not getting
-> > > > > automatically
-> > > > > loaded.  Everything is built as a module
-> > > > > 
-> > > > > CONFIG_DRM_IMX=m
-> > > > > CONFIG_DRM_IMX_FB_HELPER=m
-> > > > > CONFIG_DRM_IMX_HDMI=m
-> > > > > CONFIG_DRM_IMX_IPUV3=m
-> > > > > CONFIG_DRM_IMX_LDB=m
-> > > > > CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
-> > > > > CONFIG_DRM_IMX_TVE=m
-> > > > > CONFIG_IMX_IPUV3_CORE=m
-> > > > > 
-> > > > > The result is that until I log in via serial or ssh and modprobe the
-> > > > > module there is no display.  I suspect that there is some devicetree
-> > > > > glue missing 4.4 and 4.5 seem to both be effected.
-> > > > 
-> > > > DT doesn't come into it for imx-ipuv3-crtc - these platform devices
-> > > > are
-> > > > created by drivers/gpu/ipu-v3/ipu-common.c itself.
-> > > > 
-> > > > drivers/gpu/drm/imx/ipuv3-crtc.c contains the proper module alias
-> > > > which
-> > > > should result in the module loaded at boot time when the
-> > > > imx-ipuv3-crtc
-> > > > devices are created.
-> > > > 
-> > > > Could the problem be that imx-ipu-v3 isn't being loaded?  However,
-> > > > again,
-> > > > it looks to me like everything is correct there.
-> > > > 
-> > > > Are you saying that this used to work in older kernel versions like
-> > > > 4.3,
-> > > > but stopped in 4.4?
-> > > 
-> > > yers it used to work and stopped working. I would need to go back and
-> > > test
-> > > old kernels to figure out where it broke.
-> > 
-> > after installing some old kernels it broke with 4.4-rc4 which included a
-> > patch with teh subject of "drm/imx: Remove of_node assignment from
-> > ipuv3-crtc driver probe"
+> The communication of a Linux IRQ number from outside the VGIC to the
+> vgic was a leftover from the day when the vgic code cared about how a
+> particular device injects virtual interrupts mapped to a physical
+> interrupt.
 > 
-> Just to be sure: 4.4-rc4 with 407c9eba7897 ("drm/imx: Remove of_node
-> assignment from ipuv3-crtc driver probe") reverted works fine for you?
-I can confirm that reverting just that patch makes things work again
-
-Dennis
-
+> We can safely remove this notion, leaving all physical IRQ handling to
+> be done in the device driver (the arch timer in this case), which makes
+> room for a saner API for the new VGIC.
 > 
-> Best regards
-> Uwe
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h    |  3 +--
+>  virt/kvm/arm/arch_timer.c | 22 ++++++++++++++++++++--
+>  virt/kvm/arm/vgic.c       | 20 ++------------------
+>  3 files changed, 23 insertions(+), 22 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 43eeb18..49c559e 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -157,7 +157,6 @@ struct vgic_io_device {
+>  struct irq_phys_map {
+>  	u32			virt_irq;
+>  	u32			phys_irq;
+> -	u32			irq;
+>  };
+>  
+>  struct irq_phys_map_entry {
+> @@ -345,7 +344,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+> -					   int virt_irq, int irq);
+> +					   int virt_irq, int phys_irq);
+>  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>  bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>  
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index b4d96b1..cfdf88f 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -274,7 +274,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>  	if (timer->active_cleared_last && !phys_active)
+>  		return;
+>  
+> -	ret = irq_set_irqchip_state(timer->map->irq,
+> +	ret = irq_set_irqchip_state(host_vtimer_irq,
+>  				    IRQCHIP_STATE_ACTIVE,
+>  				    phys_active);
+>  	WARN_ON(ret);
+> @@ -307,6 +307,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct irq_phys_map *map;
+> +	struct irq_desc *desc;
+> +	struct irq_data *data;
+> +	int phys_irq;
+>  
+>  	/*
+>  	 * The vcpu timer irq number cannot be determined in
+> @@ -326,10 +329,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  	kvm_timer_update_state(vcpu);
+>  
+>  	/*
+> +	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+> +	 */
+> +	desc = irq_to_desc(host_vtimer_irq);
+> +	if (!desc) {
+can this really happen?
+> +		kvm_err("%s: no interrupt descriptor\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	data = irq_desc_get_irq_data(desc);
+> +	while (data->parent_data)
+> +		data = data->parent_data;
+> +
+> +	phys_irq = data->hwirq;
+> +
+> +	/*
+>  	 * Tell the VGIC that the virtual interrupt is tied to a
+>  	 * physical interrupt. We do that once per VCPU.
+>  	 */
+> -	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
+> +	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
+>  	if (WARN_ON(IS_ERR(map)))
+>  		return PTR_ERR(map);
+>  
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 2d7ae35..ac5838b 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1723,27 +1723,13 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
+>   * Returns a valid pointer on success, and an error pointer otherwise
+>   */
+the doc comment must be updated
+ * @irq: The Linux IRQ number
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/c47ec52f/attachment.sig>
+Besides
+
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+
+Cheers
+
+Eric
+
+>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+> -					   int virt_irq, int irq)
+> +					   int virt_irq, int phys_irq)
+>  {
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
+>  	struct irq_phys_map *map;
+>  	struct irq_phys_map_entry *entry;
+> -	struct irq_desc *desc;
+> -	struct irq_data *data;
+> -	int phys_irq;
+>  
+> -	desc = irq_to_desc(irq);
+> -	if (!desc) {
+> -		kvm_err("%s: no interrupt descriptor\n", __func__);
+> -		return ERR_PTR(-EINVAL);
+> -	}
+> -
+> -	data = irq_desc_get_irq_data(desc);
+> -	while (data->parent_data)
+> -		data = data->parent_data;
+> -
+> -	phys_irq = data->hwirq;
+>  
+>  	/* Create a new mapping */
+>  	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+> @@ -1756,8 +1742,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>  	map = vgic_irq_map_search(vcpu, virt_irq);
+>  	if (map) {
+>  		/* Make sure this mapping matches */
+> -		if (map->phys_irq != phys_irq	||
+> -		    map->irq      != irq)
+> +		if (map->phys_irq != phys_irq)
+>  			map = ERR_PTR(-EINVAL);
+>  
+>  		/* Found an existing, valid mapping */
+> @@ -1767,7 +1752,6 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>  	map           = &entry->map;
+>  	map->virt_irq = virt_irq;
+>  	map->phys_irq = phys_irq;
+> -	map->irq      = irq;
+>  
+>  	list_add_tail_rcu(&entry->entry, root);
+>  
+> 
