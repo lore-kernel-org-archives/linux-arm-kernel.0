@@ -1,75 +1,76 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Apr 2016 17:34:06 +0930
-Subject: [PATCH v2 08/11] arm/dts: Add Aspeed ast2400 device tree
+Date: Thu, 21 Apr 2016 17:34:07 +0930
+Subject: [PATCH v2 09/11] arm/dst: Add Aspeed ast2500 device tree
 In-Reply-To: <1461225849-28074-1-git-send-email-joel@jms.id.au>
 References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
-Message-ID: <1461225849-28074-9-git-send-email-joel@jms.id.au>
+Message-ID: <1461225849-28074-10-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A common device tree for all forth gen/ast2400 systems and a board
-specific dts for the Palmetto OpenPower developemnt machine which was
-used for testing.
+This adds a common device tree for all fifth generation Aspeed systems,
+and a board specific device tree for the ast2500 evaluation board.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |  21 ++++
- arch/arm/boot/dts/aspeed-g4.dtsi              | 152 ++++++++++++++++++++++++++
- 3 files changed, 174 insertions(+)
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
- create mode 100644 arch/arm/boot/dts/aspeed-g4.dtsi
+ arch/arm/boot/dts/Makefile               |   3 +-
+ arch/arm/boot/dts/aspeed-ast2500-evb.dts |  21 +++++
+ arch/arm/boot/dts/aspeed-g5.dtsi         | 156 +++++++++++++++++++++++++++++++
+ 3 files changed, 179 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/aspeed-ast2500-evb.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-g5.dtsi
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 95c1923ce6fa..dee3a92cbd3c 100644
+index dee3a92cbd3c..98251828883f 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -839,6 +839,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+@@ -839,7 +839,8 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
  	mt8127-moose.dtb \
  	mt8135-evbp1.dtb
  dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-+dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb
+-dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb
++dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
++	aspeed-ast2500-evb.dtb
  endif
  
  dtstree		:= $(srctree)/$(src)
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
 new file mode 100644
-index 000000000000..29015c4b70bb
+index 000000000000..24f2b60ed2fd
 --- /dev/null
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
 @@ -0,0 +1,21 @@
 +/dts-v1/;
 +
-+#include "aspeed-g4.dtsi"
++#include "aspeed-g5.dtsi"
 +
 +/ {
-+	model = "Palmetto BMC";
-+	compatible = "tyan,palmetto-bmc", "aspeed,ast2400";
++	model = "AST2500 EVB";
++	compatible = "aspeed,ast2500";
 +
 +	chosen {
 +		stdout-path = &uart5;
-+		bootargs = "console=ttyS4,38400";
++		bootargs = "console=ttyS4,115200";
 +	};
 +
 +	memory {
-+		reg = < 0x40000000 0x10000000 >;
++		reg = < 0x80000000 0x10000000 >;
 +	};
 +};
 +
 +&uart5 {
 +	status = "okay";
 +};
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
 new file mode 100644
-index 000000000000..64c720cfacfe
+index 000000000000..05a5f5bf458e
 --- /dev/null
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -0,0 +1,152 @@
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -0,0 +1,156 @@
 +#include "skeleton.dtsi"
 +
 +/ {
 +	model = "Aspeed BMC";
-+	compatible = "aspeed,ast2400";
++	compatible = "aspeed,ast2500";
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +	interrupt-parent = <&vic>;
@@ -79,7 +80,7 @@ index 000000000000..64c720cfacfe
 +		#size-cells = <0>;
 +
 +		cpu at 0 {
-+			compatible = "arm,arm926ej-s";
++			compatible = "arm,arm1176jzf-s";
 +			device_type = "cpu";
 +			reg = <0>;
 +		};
@@ -94,15 +95,6 @@ index 000000000000..64c720cfacfe
 +		serial5 = &uart6;
 +	};
 +
-+	clocks {
-+		clk_clkin: clk_clkin {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <48000000>;
-+		};
-+
-+	};
-+
 +	ahb {
 +		compatible = "simple-bus";
 +		#address-cells = <1>;
@@ -113,7 +105,7 @@ index 000000000000..64c720cfacfe
 +			compatible = "aspeed,ast2400-vic";
 +			interrupt-controller;
 +			#interrupt-cells = <1>;
-+			valid-sources = <0xffffffff 0x0007ffff>;
++			valid-sources = <0xfefff7ff 0x0807ffff>;
 +			reg = <0x1e6c0080 0x80>;
 +		};
 +
@@ -123,23 +115,36 @@ index 000000000000..64c720cfacfe
 +			#size-cells = <1>;
 +			ranges;
 +
-+			clk_hpll: clk_hpll at 1e6e2070 {
++			clk_clkin: clk_clkin at 1e6e2070 {
 +				#clock-cells = <0>;
-+				compatible = "aspeed,g4-hpll-clock";
-+				reg = <0x1e6e2070 0x4>;
++				compatible = "aspeed,g5-clkin-clock";
++				reg = <0x1e6e2070 0x04>;
++			};
++
++			clk_hpll: clk_hpll at 1e6e2024 {
++				#clock-cells = <0>;
++				compatible = "aspeed,g5-hpll-clock";
++				reg = <0x1e6e2024 0x4>;
 +				clocks = <&clk_clkin>;
++			};
++
++			clk_ahb: clk_ahb at 1e6e2070 {
++				#clock-cells = <0>;
++				compatible = "aspeed,g5-ahb-clock";
++				reg = <0x1e6e2070 0x4>;
++				clocks = <&clk_hpll>;
 +			};
 +
 +			clk_apb: clk_apb at 1e6e2008 {
 +				#clock-cells = <0>;
-+				compatible = "aspeed,g4-apb-clock";
++				compatible = "aspeed,g5-apb-clock";
 +				reg = <0x1e6e2008 0x4>;
 +				clocks = <&clk_hpll>;
 +			};
 +
 +			sram at 1e720000 {
 +				compatible = "mmio-sram";
-+				reg = <0x1e720000 0x8000>;	// 32K
++				reg = <0x1e720000 0x9000>;	// 36K
 +			};
 +
 +			timer: timer at 1e782000 {
