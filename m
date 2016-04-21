@@ -1,70 +1,42 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 Apr 2016 12:58:12 +0200
-Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <5718AAF0.3010606@gmail.com>
-References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150826021659.GD8784@linux>
- <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
- <22538895.vrRgZUmQTV@vostro.rjw.lan>
- <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
- <55E73077.8060106@gmail.com> <5718AAF0.3010606@gmail.com>
-Message-ID: <5718B244.3020201@gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 21 Apr 2016 14:03:34 +0300
+Subject: [PATCH v2] i2c: designware-platdrv: fix unbalanced clk enable
+ and prepare
+In-Reply-To: <1461230811-7495-1-git-send-email-jszhang@marvell.com>
+References: <1461230811-7495-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1461236614.6620.312.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2016-04-21 at 17:26 +0800, Jisheng Zhang wrote:
+> If i2c_dw_probe() fail, we should disable and unprepare the clk,
+
+clk -> clock, or use function name explicitly.
+
+> otherwise the clk enable and prepare is left unbalanced.
+> 
+
+Ditto.
+
+> In dw_i2c_plat_remove(), we'd better to not rely on rpm to disable
+> and unprepare the clk since CONFIG_PM may be disabled when configuring
+
+Ditto.
+
+> the kernel. So we explicitly disable and unprepare the clk in
+
+Ditto.
+
+> dw_i2c_plat_remove().
 
 
-On 21/04/16 12:26, Matthias Brugger wrote:
->
->
-> On 02/09/15 19:23, Matthias Brugger wrote:
->>
->>
->> On 02/09/15 08:45, Daniel Kurtz wrote:
->>> Matthias,
->>>
->>> On Fri, Aug 28, 2015 at 10:06 PM, Rafael J. Wysocki
->>> <rjw@rjwysocki.net> wrote:
->>>> On Wednesday, August 26, 2015 02:53:39 PM Pi-Cheng Chen wrote:
->>>>> On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar
->>>>> <viresh.kumar@linaro.org> wrote:
->>>>>> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
->>>>>>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the
->>>>>>> patch which
->>>>>>> introduce a new clock type[2] consumed by MT8173 cpufreq driver.
->>>>>>> So it will
->>>>>>> cause some conflicts if it goes through your tree. I am not sure
->>>>>>> how this
->>>>>>> should be handled, but should it be merged through Mediatek SoC
->>>>>>> maintainer
->>>>>>> tree?
->>>>>>
->>>>>> Just get that applied to MTK tree, it doesn't have any dependency on
->>>>>> rest of the patches for build/boot. The only thing is that cpufreq
->>>>>> wouldn't work and it will work as soon as Rafael's and MTK's trees
->>>>>> are
->>>>>> merged by Linus.
->>>>>
->>>>> Thanks for your explanation.
->>>>>
->>>>> @Rafael, Would you please apply [1,2] to your tree?
->>>>
->>>> Applied, thanks!
->>>
->>> Can you please apply [3] from this set to your dts tree?
->>>
->>
->> I will as soon as v4.3-rc1 shows up.
->
-> I somehow forgot this patch. Sorry for that.
-> Applied for v4.6-next/dts64 right now.
->
+> +	pm_runtime_put_noidle(&pdev->dev);
+> ?
+> -	pm_runtime_put_sync(&pdev->dev);
+> 
 
-I just realized that CLK_INFRA_CA53SEL and CLK_APMIXED_MAINPLL are not 
-part of the clk driver.
+This change also needs to be described in the commit message.
 
-Pi-Cheng, can you check if they got renamed in the meanwhile? Or do we 
-need some clock driver patches that enable this clocks for the series?
-
-Regards,
-Matthias
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
