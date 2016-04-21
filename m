@@ -1,130 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 21 Apr 2016 20:32:45 +0200
-Subject: [PATCH 5/7] KVM: arm/arm64: Remove the IRQ field from struct
- irq_phys_map
-In-Reply-To: <571910AD.4050704@linaro.org>
-References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
- <1460729047-6346-6-git-send-email-andre.przywara@arm.com>
- <571910AD.4050704@linaro.org>
-Message-ID: <20160421183245.GB25288@cbox>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Thu, 21 Apr 2016 14:41:06 -0400
+Subject: [PATCH net v2 3/3] drivers: net: cpsw: use of_phy_connect() in
+ fixed-link case
+In-Reply-To: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <1461264066-12358-1-git-send-email-drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 07:41:01PM +0200, Eric Auger wrote:
-> Hi Andre,
-> On 04/15/2016 04:04 PM, Andre Przywara wrote:
-> > From: Christoffer Dall <christoffer.dall@linaro.org>
-> > 
-> > The communication of a Linux IRQ number from outside the VGIC to the
-> > vgic was a leftover from the day when the vgic code cared about how a
-> > particular device injects virtual interrupts mapped to a physical
-> > interrupt.
-> > 
-> > We can safely remove this notion, leaving all physical IRQ handling to
-> > be done in the device driver (the arch timer in this case), which makes
-> > room for a saner API for the new VGIC.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > ---
-> >  include/kvm/arm_vgic.h    |  3 +--
-> >  virt/kvm/arm/arch_timer.c | 22 ++++++++++++++++++++--
-> >  virt/kvm/arm/vgic.c       | 20 ++------------------
-> >  3 files changed, 23 insertions(+), 22 deletions(-)
-> > 
-> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> > index 43eeb18..49c559e 100644
-> > --- a/include/kvm/arm_vgic.h
-> > +++ b/include/kvm/arm_vgic.h
-> > @@ -157,7 +157,6 @@ struct vgic_io_device {
-> >  struct irq_phys_map {
-> >  	u32			virt_irq;
-> >  	u32			phys_irq;
-> > -	u32			irq;
-> >  };
-> >  
-> >  struct irq_phys_map_entry {
-> > @@ -345,7 +344,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
-> >  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
-> >  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> >  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> > -					   int virt_irq, int irq);
-> > +					   int virt_irq, int phys_irq);
-> >  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-> >  bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-> >  
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index b4d96b1..cfdf88f 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -274,7 +274,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-> >  	if (timer->active_cleared_last && !phys_active)
-> >  		return;
-> >  
-> > -	ret = irq_set_irqchip_state(timer->map->irq,
-> > +	ret = irq_set_irqchip_state(host_vtimer_irq,
-> >  				    IRQCHIP_STATE_ACTIVE,
-> >  				    phys_active);
-> >  	WARN_ON(ret);
-> > @@ -307,6 +307,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
-> >  {
-> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> >  	struct irq_phys_map *map;
-> > +	struct irq_desc *desc;
-> > +	struct irq_data *data;
-> > +	int phys_irq;
-> >  
-> >  	/*
-> >  	 * The vcpu timer irq number cannot be determined in
-> > @@ -326,10 +329,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
-> >  	kvm_timer_update_state(vcpu);
-> >  
-> >  	/*
-> > +	 * Find the physical IRQ number corresponding to the host_vtimer_irq
-> > +	 */
-> > +	desc = irq_to_desc(host_vtimer_irq);
-> > +	if (!desc) {
-> can this really happen?
+From: David Rivshin <drivshin@allworx.com>
 
-this is just moving the logic.  We had this check before, so I assume
-so...
+If a fixed-link DT subnode is used, the phy_device was looked up so
+that a PHY ID string could be constructed and passed to phy_connect().
+This is not necessary, as the device_node can be passed directly to
+of_phy_connect() instead. This reuses the same codepath as if the
+phy-handle DT property was used.
 
-> > +		kvm_err("%s: no interrupt descriptor\n", __func__);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	data = irq_desc_get_irq_data(desc);
-> > +	while (data->parent_data)
-> > +		data = data->parent_data;
-> > +
-> > +	phys_irq = data->hwirq;
-> > +
-> > +	/*
-> >  	 * Tell the VGIC that the virtual interrupt is tied to a
-> >  	 * physical interrupt. We do that once per VCPU.
-> >  	 */
-> > -	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
-> > +	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
-> >  	if (WARN_ON(IS_ERR(map)))
-> >  		return PTR_ERR(map);
-> >  
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 2d7ae35..ac5838b 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -1723,27 +1723,13 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
-> >   * Returns a valid pointer on success, and an error pointer otherwise
-> >   */
-> the doc comment must be updated
->  * @irq: The Linux IRQ number
-> 
-> Besides
-> 
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> 
-Thanks!
+Signed-off-by: David Rivshin <drivshin@allworx.com>
+Tested-by: Nicolas Chauvet <kwizart@gmail.com>
+---
 
-Andre, let me know if you need me to provide an updated patch or if you
-can just tweak that comment.
+Changes since v1 [1]:
+- Rebased (trivial conflict, e5a03bfd modified the deleted snprintf)
+- Added Tested-by from Nicolas Chauvet
 
--Christoffer
+[1] https://patchwork.ozlabs.org/patch/560327/
+
+
+ drivers/net/ethernet/ti/cpsw.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 3c81413..245f919 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -2038,30 +2038,21 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+ 							"phy-handle", 0);
+ 		parp = of_get_property(slave_node, "phy_id", &lenp);
+ 		if (slave_data->phy_node) {
+ 			dev_dbg(&pdev->dev,
+ 				"slave[%d] using phy-handle=\"%s\"\n",
+ 				i, slave_data->phy_node->full_name);
+ 		} else if (of_phy_is_fixed_link(slave_node)) {
+-			struct device_node *phy_node;
+-			struct phy_device *phy_dev;
+-
+ 			/* In the case of a fixed PHY, the DT node associated
+ 			 * to the PHY is the Ethernet MAC DT node.
+ 			 */
+ 			ret = of_phy_register_fixed_link(slave_node);
+ 			if (ret)
+ 				return ret;
+-			phy_node = of_node_get(slave_node);
+-			phy_dev = of_phy_find_device(phy_node);
+-			if (!phy_dev)
+-				return -ENODEV;
+-			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+-				 PHY_ID_FMT, phy_dev->mdio.bus->id,
+-				 phy_dev->mdio.addr);
++			slave_data->phy_node = of_node_get(slave_node);
+ 		} else if (parp) {
+ 			u32 phyid;
+ 			struct device_node *mdio_node;
+ 			struct platform_device *mdio;
+ 
+ 			if (lenp != (sizeof(__be32) * 2)) {
+ 				dev_err(&pdev->dev, "Invalid slave[%d] phy_id property\n", i);
+-- 
+2.5.5
