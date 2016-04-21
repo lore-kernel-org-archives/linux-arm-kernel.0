@@ -1,73 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 07:47:15 -0500
-Subject: dtc warnings
-In-Reply-To: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
-References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
-Message-ID: <CAL_Jsq+fWBkNK6gVAuyp8L3gUoztaYJGaCy47rrqke2AKKhEcw@mail.gmail.com>
+From: mcgrof@suse.com (Luis R. Rodriguez)
+Date: Thu, 21 Apr 2016 13:47:36 +0100
+Subject: [PATCH v2 08/25] arch: introduce memremap()
+In-Reply-To: <CAPcyv4g0-CcFRCWPBdKB7h0zZEO5qzT-N9YLYJw9sb=_HYnXiA@mail.gmail.com>
+References: <20150726172527.GA29513@lst.de>
+ <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
+ <20150727051258.GB15836@lst.de>
+ <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
+ <20150729065004.GA17162@lst.de> <20150729182712.GI30479@wotan.suse.de>
+ <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
+ <1438203638.3214.418.camel@hp.com> <20150729214358.GK30479@wotan.suse.de>
+ <1438214404.3214.438.camel@hp.com> <20150811213021.GD30479@wotan.suse.de>
+ <1439332857.24434.37.camel@hp.com>
+ <CAB=NE6U+k5mucfGOhuFoayZB48YMJ0d6o0o8Xe4jH=3ZNgrf-g@mail.gmail.com>
+ <CAPcyv4g0-CcFRCWPBdKB7h0zZEO5qzT-N9YLYJw9sb=_HYnXiA@mail.gmail.com>
+Message-ID: <CAB=NE6XDh4kss+qq35tjkjVcsU1m1jny2U7PUWV6Lx1OXb739A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 8:40 PM, Rob Herring <robh@kernel.org> wrote:
-> You may have noticed that linux-next had gotten noisy with dtc
-> warnings lately. I dropped the change for a bit, but added it back
-> today except now it is disabled unless building with "W=1".
+On Wed, Aug 12, 2015 at 12:13 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, Aug 11, 2015 at 3:52 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
+>> On Tue, Aug 11, 2015 at 3:40 PM, Toshi Kani <toshi.kani@hp.com> wrote:
+>>> On Tue, 2015-08-11 at 23:30 +0200, Luis R. Rodriguez wrote:
+>>>> On Wed, Jul 29, 2015 at 06:00:04PM -0600, Toshi Kani wrote:
+>>>> > On Wed, 2015-07-29 at 23:43 +0200, Luis R. Rodriguez wrote:
+>>>> > > On Wed, Jul 29, 2015 at 03:00:38PM -0600, Toshi Kani wrote:
+>>>> > > > On Wed, 2015-07-29 at 11:33 -0700, Dan Williams wrote:
+>>>   :
+>>>> > > That would depend on the purpose of the region and the driver
+>>>> > > developer should in theory know best. One issue with this of course is
+>>>> > > that, as we've discovered, the semantics of on the ioremap*() variant
+>>>> > > front regarding cache types is not clearly well defined, or at least
+>>>> > > it may be only well defined implicitly on x86 only, so the driver
+>>>> > > developer can only *hope* for the best across architectures. Our
+>>>> > > ambiguity on our semantics on ioremap*() variants therefore means
+>>>> > > driver developers can resonably be puzzled by what fallbacks to use.
+>>>> > > That also means architectures maintainers should not whip driver
+>>>> > > developers for any misuse. Such considerations are why although we're
+>>>> > > now revisiting semantics for ioremap*() variants I was in hopes we
+>>>> > > could be at least somewhat pedantic about memremap() semantics.
+>>>> >
+>>>> > I agree.  However, there are a few exceptions like /dev/mem, which can
+>>>> > map a target range without knowledge.
+>>>>
+>>>> Still, the expectation to require support for overlapping ioremap() calls
+>>>> would seem to be more of an exception than the norm, so I'd argue that
+>>>> requiring callers who know they do need overlapping support to be explicit
+>>>> about it may help us simplify expecations on semantics in other areas of
+>>>> the kernel.
+>>>
+>>> Again, I agree.  I am simply saying that the fallback in an overlapping case
+>>> may need to remain supported for such exceptional cases, possibly with a
+>>> separate interface.
+>>
+>> Great.
+>>
+>>>> > > For instance since memremap() only has 2 types right now can a
+>>>> > > respective fallback be documented as an alternative to help with this
+>>>> > > ? Or can we not generalize this ?  One for MEMREMAP_WB and one for
+>>>> > > MEMREMAP_WT ?
+>>>> >
+>>>> > Yes, if a target range can be only mapped by memremap().  However, there
+>>>> > is no restriction that a range can be mapped with a single interface
+>>>> > alone.  For example, a range can be mapped with remap_pfn_range() to
+>>>> > user space with any cache type.  So, in theory, memremap() can overlap
+>>>> > with any other types.
+>>>>
+>>>> Shouldn't that be an issue or area of concern ? It seems the flakiness on
+>>>> ioremap() and its wide array flexibility would spill over the any
+>>>> semantics which folks would be trying to set out with memremap(). That
+>>>> should not stop the evolution of memremap() though, just pointing out that
+>>>> perhaps we should be a bit more restrictive over how things can criss
+>>>> -cross and who areas can do it.
+>>>
+>>> reserve_pfn_range() allows the caller to specify if the fallback needs to be
+>>> enabled or disabled with 'strict_prot'.  track_pfn_remap() called from
+>>> remap_pfn_range() enables it, and track_pfn_copy() disables it.  I think we
+>>> can do similar for the memremap and ioremap families as well.  The fallback
+>>> could be set disabled in the regular interfaces, and enabled in some
+>>> interface as necessary.  This also allows gradual transition, ex. disable in
+>>> memremap while ioremap remains enabled for now.
+>>
+>> Sounds sexy to me.
 >
-> There's ~25K (2500 unique) warnings generated from the ARM dts files.
-> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
-> on the similar counts, probably lots of duplicates). Please help
-> remind contributors to test with W=1 and start to fix these.
+> Cool, sounds like something we can tackle in 4.4 along with the
+> ioremap_cache removal cleanups.
 
-Good progress here. Next is now 11054 total, 1516 unique. Here's the
-top ones now:
+Just a reminder that we should expect some of these changes soon :D
 
-165 : arch/arm/boot/dts/atlas7-evb.dtb
-91 : arch/arm/boot/dts/at91-sama5d4ek.dtb
-90 : arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dtb
-88 : arch/arm/boot/dts/at91-sama5d4_xplained.dtb
-87 : arch/arm/boot/dts/at91-vinco.dtb
-82 : arch/arm/boot/dts/at91-sama5d2_xplained.dtb
-79 : arch/arm/boot/dts/keystone-k2hk-evm.dtb
-74 : arch/arm/boot/dts/ste-nomadik-s8815.dtb
-74 : arch/arm/boot/dts/ste-nomadik-nhk15.dtb
-73 : arch/arm/boot/dts/at91-sama5d3_xplained.dtb
-72 : arch/arm/boot/dts/sama5d36ek.dtb
-70 : arch/arm/boot/dts/sama5d35ek.dtb
-70 : arch/arm/boot/dts/sama5d34ek.dtb
-69 : arch/arm/boot/dts/sama5d31ek.dtb
-68 : arch/arm/boot/dts/at91-kizbox2.dtb
-67 : arch/arm/boot/dts/sama5d33ek.dtb
-65 : arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dtb
-65 : arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dtb
-64 : arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dtb
-62 : arch/arm/boot/dts/atlas6-evb.dtb
-61 : arch/arm/boot/dts/prima2-evb.dtb
-59 : arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dtb
-59 : arch/arm/boot/dts/sun7i-a20-pcduino3.dtb
-59 : arch/arm/boot/dts/keystone-k2l-evm.dtb
-58 : arch/arm/boot/dts/sun7i-a20-cubietruck.dtb
-57 : arch/arm/boot/dts/sun7i-a20-orangepi-mini.dtb
-57 : arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dtb
-57 : arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dtb
-57 : arch/arm/boot/dts/sun7i-a20-i12-tvbox.dtb
-56 : arch/arm/boot/dts/sun7i-a20-orangepi.dtb
-56 : arch/arm/boot/dts/sun7i-a20-lamobo-r1.dtb
-56 : arch/arm/boot/dts/sun7i-a20-bananapro.dtb
-56 : arch/arm/boot/dts/sun7i-a20-bananapi.dtb
-55 : arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dtb
-55 : arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dtb
-55 : arch/arm/boot/dts/sun7i-a20-mk808c.dtb
-55 : arch/arm/boot/dts/sun7i-a20-hummingbird.dtb
-55 : arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb
-54 : arch/arm/boot/dts/sun7i-a20-m3.dtb
-54 : arch/arm/boot/dts/sun7i-a20-itead-ibox.dtb
-53 : arch/arm/boot/dts/sun7i-a20-icnova-swac.dtb
-51 : arch/arm/boot/dts/at91sam9x35ek.dtb
-50 : arch/arm/boot/dts/at91sam9x25ek.dtb
-49 : arch/arm/boot/dts/at91sam9g35ek.dtb
-48 : arch/arm/boot/dts/at91sam9g15ek.dtb
-48 : arch/arm/boot/dts/at91-ariag25.dtb
-47 : arch/arm/boot/dts/at91sam9g25ek.dtb
-47 : arch/arm/boot/dts/at91-cosino_mega2560.dtb
-46 : arch/arm/boot/dts/pm9g45.dtb
-
-Rob
+ Luis
