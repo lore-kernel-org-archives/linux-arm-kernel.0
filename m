@@ -1,88 +1,54 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 21 Apr 2016 19:41:10 +0200
-Subject: [PATCH 4/7] KVM: arm/arm64: directly pass virtual IRQ number on
- kvm_vgic_unmap_phys_irq()
-In-Reply-To: <1460729047-6346-5-git-send-email-andre.przywara@arm.com>
-References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
- <1460729047-6346-5-git-send-email-andre.przywara@arm.com>
-Message-ID: <571910B6.1030504@linaro.org>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Thu, 21 Apr 2016 19:40:42 +0200
+Subject: [PATCH v5] irqchip, gicv3-its, numa: Enable workaround for
+ Cavium thunderx erratum 23144
+In-Reply-To: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
+References: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
+Message-ID: <20160421174042.GD24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-
-Eric
-
-On 04/15/2016 04:04 PM, Andre Przywara wrote:
-> kvm_vgic_unmap_phys_irq() only needs the virtual IRQ number, so let's
-> just pass that between the arch timer and the VGIC to get rid of
-> the irq_phys_map pointer.
+On 15.04.16 21:30:05, Robert Richter wrote:
+> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> The erratum fixes the hang of ITS SYNC command by avoiding inter node
+> io and collections/cpu mapping on thunderx dual-socket platform.
+> 
+> This fix is only applicable for Cavium's ThunderX dual-socket platform.
+> 
+> This is based on NUMA v16 series.
+> Message-Id: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
+
+Will, Catalin,
+
+after NUMA base patches went into linux-next (many thanks), please
+consider this pass 1.x errata workaround for inclusion too.
+
+Thanks,
+
+-Robert
+
+> 
+> v5 (by Robert Richter):
+> fixed use of cpumask_of_node() only for (node >= 0)
+> minor style fixes
+> 
+> v4:
+> updated silicon-errata.txt
+> updated as per Robert Richter review comment.
+> 
+> v3:
+> updatated as per Marc Zyngier's review comments.
+> http://www.spinics.net/lists/arm-kernel/msg443462.html
+> 
+> v2:
+> updatated as per Marc Zyngier's review comments.
+> 
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
 > ---
->  include/kvm/arm_vgic.h    |  2 +-
->  virt/kvm/arm/arch_timer.c |  2 +-
->  virt/kvm/arm/vgic.c       | 11 ++++-------
->  3 files changed, 6 insertions(+), 9 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 5a34adc..43eeb18 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -346,7 +346,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->  					   int virt_irq, int irq);
-> -int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
-> +int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 793465b..b4d96b1 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -477,7 +477,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
->  
->  	timer_disarm(timer);
->  	if (timer->map)
-> -		kvm_vgic_unmap_phys_irq(vcpu, timer->map);
-> +		kvm_vgic_unmap_phys_irq(vcpu, timer->map->virt_irq);
->  }
->  
->  void kvm_timer_enable(struct kvm *kvm)
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 6911327..2d7ae35 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1813,25 +1813,22 @@ static void vgic_free_phys_irq_map_rcu(struct rcu_head *rcu)
->  /**
->   * kvm_vgic_unmap_phys_irq - Remove a virtual to physical IRQ mapping
->   * @vcpu: The VCPU pointer
-> - * @map: The pointer to a mapping obtained through kvm_vgic_map_phys_irq
-> + * @virt_irq: The virtual IRQ number to be unmapped
->   *
->   * Remove an existing mapping between virtual and physical interrupts.
->   */
-> -int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
-> +int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	struct irq_phys_map_entry *entry;
->  	struct list_head *root;
->  
-> -	if (!map)
-> -		return -EINVAL;
-> -
-> -	root = vgic_get_irq_phys_map_list(vcpu, map->virt_irq);
-> +	root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
->  
->  	spin_lock(&dist->irq_phys_map_lock);
->  
->  	list_for_each_entry(entry, root, entry) {
-> -		if (&entry->map == map) {
-> +		if (entry->map.virt_irq == virt_irq) {
->  			list_del_rcu(&entry->entry);
->  			call_rcu(&entry->rcu, vgic_free_phys_irq_map_rcu);
->  			break;
-> 
+>  Documentation/arm64/silicon-errata.txt |  1 +
+>  arch/arm64/Kconfig                     |  9 +++++++
+>  drivers/irqchip/irq-gic-v3-its.c       | 49 ++++++++++++++++++++++++++++++++--
+>  3 files changed, 57 insertions(+), 2 deletions(-)
