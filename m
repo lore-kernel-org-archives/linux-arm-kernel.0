@@ -1,55 +1,66 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Wed, 20 Apr 2016 23:51:31 -0400
-Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
-Message-ID: <1461210694-29120-1-git-send-email-drivshin.allworx@gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 21 Apr 2016 11:45:20 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+Message-ID: <20160421034520.GA19965@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <drivshin@allworx.com>
+On Fri, Jan 29, 2016 at 02:49:23PM -0800, Stefan Agner wrote:
+> If a clock gets enabled early during boot time, it can lead to a PLL
+> startup. The wait_lock function makes sure that the PLL is really
+> stareted up before it gets used. However, the function sleeps which
+> leads to scheduling and an error:
+> bad: scheduling from the idle thread!
+> ...
+> 
+> Use udelay in case IRQ's are still disabled.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/clk/imx/clk-pllv3.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> index c05c43d..b5ff561 100644
+> --- a/drivers/clk/imx/clk-pllv3.c
+> +++ b/drivers/clk/imx/clk-pllv3.c
+> @@ -63,7 +63,10 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+>  			break;
+>  		if (time_after(jiffies, timeout))
+>  			break;
+> -		usleep_range(50, 500);
+> +		if (unlikely(irqs_disabled()))
 
-The first patch fixes a bug that makes dual_emac mode break if
-either slave uses the phy-handle property in the devicetree.
+This causes a bit confusion that clk_pllv3_prepare is sleepable.
+But this line indicates it's possible to be called in irq context.
+Although it's only happened during kernel boot phase where irq is
+still not enabled.
+It seems schedule_debug() somehow did not catch it during early boot
+phase. Maybe schedule guys can help explain.
 
-The second patch fixes some cosmetic problems with error messages,
-and also makes the binding documentation more explicit.
+My question is if it's really worthy to introduce this confusion
+to fix the issue since the delay is minor?
 
-The third patch cleans up the fixed-link case to work like
-the now-fixed phy-handle case.
+Furthermore, shouldn't it be udelay(500)?
 
-I have tested on the following hardware configurations:
- - (EVMSK) dual emac, phy_id property in both slaves
- - (EVMSK) dual emac, phy-handle property in both slaves
- - (BeagleBoneBlack) single emac, phy_id property
- - (custom) single emac, fixed-link subnode
+Shawn,
+What's your idea?
 
-Nicolas Chauvet reported testing on an HP t410 (dm8148).
+Regards
+Dong Aisheng
 
-Markus Brunner reported testing v1 on the following [1]:
- - emac0 with phy_id and emac1 with fixed phy
- - emac0 with phy-handle and emac1 with fixed phy
- - emac0 with fixed phy and emac1 with fixed phy
-
-
-Changes since v1 [2]:
-- Rebased
-- Added Tested-by from Nicolas Chauvet on all patches
-- Added Acked-by from Rob Herring for the binding change in patch 2 [3]
-
-[1] http://www.spinics.net/lists/netdev/msg357890.html
-[2] http://www.spinics.net/lists/netdev/msg357772.html
-[3] http://www.spinics.net/lists/netdev/msg358254.html
-
-David Rivshin (3):
-  drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
-    config
-  drivers: net: cpsw: fix error messages when using phy-handle DT
-    property
-  drivers: net: cpsw: use of_phy_connect() in fixed-link case
-
- Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
- drivers/net/ethernet/ti/cpsw.c                 | 41 +++++++++++++-------------
- drivers/net/ethernet/ti/cpsw.h                 |  1 +
- 3 files changed, 23 insertions(+), 23 deletions(-)
-
--- 
-2.5.5
+> +			udelay(50);
+> +		else
+> +			usleep_range(50, 500);
+>  	} while (1);
+>  
+>  	return readl_relaxed(pll->base) & BM_PLL_LOCK ? 0 : -ETIMEDOUT;
+> -- 
+> 2.7.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
