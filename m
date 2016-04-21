@@ -1,59 +1,58 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 22 Apr 2016 00:32:54 +0200
-Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for rk3399 SoCs
-In-Reply-To: <20160421214826.GA69116@google.com>
-References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
- <20160421214826.GA69116@google.com>
-Message-ID: <1828302.c0tldb2naZ@diego>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 22 Apr 2016 08:28:57 +1000
+Subject: [PATCH v2 10/11] arm: Add Aspeed machine
+In-Reply-To: <6245614.OXDTEyrM2z@wuerfel>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-11-git-send-email-joel@jms.id.au>
+ <6245614.OXDTEyrM2z@wuerfel>
+Message-ID: <1461277737.3135.14.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 21. April 2016, 14:48:26 schrieb Brian Norris:
-> Hi,
+On Thu, 2016-04-21 at 10:35 +0200, Arnd Bergmann wrote:
 > 
-> On Wed, Apr 20, 2016 at 11:15:50AM +0800, Jianqun Xu wrote:
-> > This patch adds core dtsi file for rk3399 found on Rockchip
-> > rk3399 SoCs, tested on rk3399 evb.
+> > +#define SCU_PASSWORD	0x1688A8A8
+> > +
+> > +static void __init aspeed_init_early(void)
+> > +{
+> > +	u32 reg;
+> > +
+> > +	/*
+> > +	?* Unlock SCU
+> > +	?*/
+> > +	writel(SCU_PASSWORD, AST_IO(AST_BASE_SCU));
+> > +
+> > +	/* We enable the UART clock divisor in the SCU's misc control
+> > +	?* register, as the baud rates in aspeed.dtb all assume that the
+> > +	?* divisor is active
+> > +	?*/
+> > +	reg = readl(AST_IO(AST_BASE_SCU | 0x2c));
+> > +	writel(reg | 0x00001000, AST_IO(AST_BASE_SCU | 0x2c));
+
+> Can you explain a bit more about this? I would assume that the UART
+> that is used for the console is working at the point that the bootloader
+> hands over to the kernel, while the other uarts don't need to be
+> active this early. Why do you need to do this at such an early stage
+
+It may or may not be already correct, you don't necessarily have a
+serial enabled bootloader or it might be using a UART driver that
+doesn't use the 'standard' divisors etc... This just sanitizes it.
+
+This register contains misc controls. That specific bit controls a
+clock divisor by 13 from the main 24Mhz source, which provides a
+reasonably "standard" 1.84 Mhz input to the UARTs.
+
 > > 
-> > Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
-> > ---
-> > 
-> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1744
-> >  ++++++++++++++++++++++++++++++ 1 file changed, 1744 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi new file mode 100644
-> > index 0000000..fa6fc2c
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > @@ -0,0 +1,1744 @@
-> 
-> [...]
-> 
-> > +	emmc_phy: phy {
-> > +		compatible = "rockchip,rk3399-emmc-phy";
-> > +		reg-offset = <0xf780>;
-> 
-> This property is not documented. The current doc says we "require" reg,
-> but you're kinda misusing it, I believe. At any rate, the current phy
-> driver won't probe without 'reg'.
+> > +	/*
+> > +	?* Disable the watchdogs
+> > +	?*/
+> > +	writel(0, AST_IO(AST_BASE_WDT | 0x0c));
+> > +	writel(0, AST_IO(AST_BASE_WDT | 0x2c));
+> > +}
+> Similarly here: why so early? Is the initial timeout too short to wait
+> for the watchdog driver to come up? I think it makes sense to require
+> the watchdog driver to be loaded if a watchdog is enabled during boot,
+> and that keeps the register access in one place.
 
-thanks for spotting this.
-
-Please also note the changed binding [0] that I'm still hoping
-will make it into 4.6.
-
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/kishon/linux-phy.git/log/?h=fixes
-
-
-> > +		#phy-cells = <0>;
-> > +		rockchip,grf = <&grf>;
-> > +		status = "disabled";
-> > +	};
-> 
-> [...]
-> 
-> Brian
+Cheers
+Ben.
