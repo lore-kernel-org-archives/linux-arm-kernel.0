@@ -1,33 +1,68 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 Apr 2016 17:38:27 +0100
-Subject: [PATCH 0/5] Introduce per-domain page sizes
-In-Reply-To: <cover.1460048991.git.robin.murphy@arm.com>
-References: <cover.1460048991.git.robin.murphy@arm.com>
-Message-ID: <20160421163826.GM929@arm.com>
+Date: Thu, 21 Apr 2016 17:48:40 +0100
+Subject: [PATCHv2 2/5] arm64/efi: move to generic {__,}efi_call_virt
+In-Reply-To: <1461238529-12810-3-git-send-email-mark.rutland@arm.com>
+References: <1461238529-12810-1-git-send-email-mark.rutland@arm.com>
+ <1461238529-12810-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160421164840.GO929@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2016 at 06:42:03PM +0100, Robin Murphy wrote:
-> Hi all,
-
-Hi Robin,
-
-> Since this area seems to be in vogue at the moment, here's what I was
-> working on when the related patches[1][2] popped up, which happens to
-> be more or less the intersection of both. As I recycled some of Will's
-> old series as a starting point, I've retained the cleanup patches from
-> that with their original acks - hope that's OK.
+On Thu, Apr 21, 2016 at 12:35:26PM +0100, Mark Rutland wrote:
+> Now there's a common template for {__,}efi_call_virt, remove the
+> duplicate logic from the arm64 efi code.
 > 
-> Fortunately, this already looks rather like parts of Joerg's plan[3],
-> so I hope it's a suitable first step. Below is a quick hacked-up example
-> of the kind of caller-controlled special use-case alluded to, using the
-> SMMU/HDLCD combo on Juno - for a 'real' implementation of this we'd want
-> the group-based domain allocation call so the driver could throw the
-> device at that and get its own non-default DMA ops domain to play with.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Leif Lindholm <leif.lindholm@linaro.org>
+> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-efi at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm64/include/asm/efi.h | 21 +++++++--------------
+>  1 file changed, 7 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index 8e88a69..f4f71224 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -14,28 +14,21 @@ extern void efi_init(void);
+>  
+>  int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
+>  
+> -#define efi_call_virt(f, ...)						\
+> +#define arch_efi_call_virt_setup()					\
+>  ({									\
+> -	efi_##f##_t *__f;						\
+> -	efi_status_t __s;						\
+> -									\
+>  	kernel_neon_begin();						\
+>  	efi_virtmap_load();						\
+> -	__f = efi.systab->runtime->f;					\
+> -	__s = __f(__VA_ARGS__);						\
+> -	efi_virtmap_unload();						\
+> -	kernel_neon_end();						\
+> -	__s;								\
+>  })
+>  
+> -#define __efi_call_virt(f, ...)						\
+> +#define arch_efi_call_virt(f, args...)					\
+>  ({									\
+>  	efi_##f##_t *__f;						\
+> -									\
+> -	kernel_neon_begin();						\
+> -	efi_virtmap_load();						\
+>  	__f = efi.systab->runtime->f;					\
+> -	__f(__VA_ARGS__);						\
+> +	__f(args);							\
 
-I like this series a lot and it moves us a significant step closer to
-being able to request specific IOMMU geometry at domain initialisation
-time. For the series:
+Any reason to change this to a named argument? This patch is hard enough
+to review as it is, given the way the diff has been generated!
+
+Either way:
 
 Acked-by: Will Deacon <will.deacon@arm.com>
 
