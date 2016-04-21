@@ -1,42 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Apr 2016 15:02:02 +0100
-Subject: [RFC PATCH] arm64: Fix EL1/EL2 early init inconsistencies with VHE
-In-Reply-To: <1461002246-25314-1-git-send-email-Dave.Martin@arm.com>
-References: <1461002246-25314-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <5718DD5A.2050800@arm.com>
+From: jroedel@suse.de (Joerg Roedel)
+Date: Thu, 21 Apr 2016 16:51:12 +0200
+Subject: [PATCH 0/2] iommu/arm-smmu: Fixed for 4.6
+In-Reply-To: <1461160413-15403-1-git-send-email-will.deacon@arm.com>
+References: <1461160413-15403-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160421145112.GL3886@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On 18/04/16 18:57, Dave Martin wrote:
-> When using the Virtualisation Host Extensions, EL1 is not used in
-> the host and requires no separate configuration.
+On Wed, Apr 20, 2016 at 02:53:31PM +0100, Will Deacon wrote:
+> Hi Joerg,
 > 
-> In addition, with VHE enabled, non-hyp-specific EL2 configuration
-> that does not need to be done early will be done anyway in
-> __cpu_setup via the _EL1 system register aliases.  In particular,
-> the layout and definition of CPTR_EL2 are changed by enabling VHE
-> so that they resemble CPACR_EL1, so existing code to initialise
-> CPTR_EL2 becomes architecturally wrong in this case.
+> Please can you take these two related arm-smmu fixes for 4.6? They
+> address a regression seem by both Eric and Yang following the partial
+> support for default domains that we added during the merge window.
 > 
-> This patch simply skips the affected initialisation code in the
-> non-VHE case.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
-> 
-> Note -- not tested yet, and I'm still unclear on whether this is the
-> correct architectural approach...
+> I can send a pull request if you prefer, but it doesn't seem necessary
+> to me.
 
-This looks correct to me. Given that we're not leaving EL2, there is no
-reason to do things earlier than they are done at EL1, and this fixes an
-obvious bug on CPTR_EL2 access.
+Sure, applied both. Thanks Will.
 
-I've given it a go on a VHE model, and it ran just fine, so:
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Joerg
