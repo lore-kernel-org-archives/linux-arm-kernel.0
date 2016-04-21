@@ -1,53 +1,95 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 21 Apr 2016 19:53:08 +0200
-Subject: [RESEND][PATCH 1/3] thermal: mediatek: Add cpu dynamic power
- cooling model.
-In-Reply-To: <20160421030141.GA4845@localhost.localdomain>
-References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
- <CAJZ5v0hpkyMCVhvYy4JzR1A5OZKs7dqDOB64aQXmjXiLM0F=BQ@mail.gmail.com>
- <57176ECF.6020705@gmail.com> <12007858.UuqVGafLHV@vostro.rjw.lan>
- <20160421030141.GA4845@localhost.localdomain>
-Message-ID: <CAJZ5v0h_W6CW6Z-kux-kbur_NE3XZH-hKZazXV5TX3tET-6cAg@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 21 Apr 2016 19:56:03 +0200
+Subject: [PATCH 6/7] KVM: arm/arm64: remove irq_phys_map from the arch
+ timer
+In-Reply-To: <1460729047-6346-7-git-send-email-andre.przywara@arm.com>
+References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
+ <1460729047-6346-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <57191433.40508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 5:01 AM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> On Thu, Apr 21, 2016 at 02:41:24AM +0200, Rafael J. Wysocki wrote:
->> On Wednesday, April 20, 2016 01:58:07 PM Matthias Brugger wrote:
->> > Hi Rafael,
->> >
->> > On 13/04/16 06:52, Rafael J. Wysocki wrote:
->> > > On Tue, Apr 12, 2016 at 7:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> > >> Hi Rafael,
->> > >>
->> > >> On 15-03-16, 16:10, Dawei Chien wrote:
->> > >>> MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
->> > >>> cooling devices with dynamic power coefficient.
->> > >>>
->> > >>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
->> > >>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> > >>
->> > >> Can you please apply this patch from Dawei ?
->> > >
->> > > I can, but I'm traveling this week, so that's rather going to happen next week.
->> > >
->> >
->> > I don't see the patch in linux-next, did you forget to pick/push it?
->>
->> No, I didn't.  I just didn't have the time to get to them before.
->>
->> Now, given that they are thermal patches, they really should go in via
->> linux-soc-thermal.git.
->>
->> Eduardo, any chance to take care of these?
->
-> Yes I can add this one, given that they have the proper acked-by. I was
-> a bit hesitant to just get them because they are touching
-> drivers/cpufreq.
+On 04/15/2016 04:04 PM, Andre Przywara wrote:
+> Now that the interface between the arch timer and the VGIC does not
+> require passing the irq_phys_map entry pointer anymore, let's remove
+> it from the virtual arch timer and use the virtual IRQ number instead
+> directly.
+> The remaining pointer returned by kvm_vgic_map_phys_irq() will be
+> removed in the following patch.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_arch_timer.h |  4 ++--
+>  virt/kvm/arm/arch_timer.c    | 12 ++++++------
+>  2 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index b651aed..1ed70f6 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -53,8 +53,8 @@ struct arch_timer_cpu {
+>  	/* Timer IRQ */
+>  	struct kvm_irq_level		irq;
+>  
+> -	/* VGIC mapping */
+> -	struct irq_phys_map		*map;
+> +	/* The virtual IRQ number */
+> +	unsigned int			virt_irq;
+what's the difference between irq.irq and virt_irq? aren't they duplicates?
+>  
+>  	/* Active IRQ state caching */
+>  	bool				active_cleared_last;
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index cfdf88f..1598e23 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -137,10 +137,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+>  
+>  	timer->active_cleared_last = false;
+>  	timer->irq.level = new_level;
+> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
+> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->virt_irq,
+>  				   timer->irq.level);
+>  	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+> -					 timer->map->virt_irq,
+> +					 timer->virt_irq,
+>  					 timer->irq.level);
+>  	WARN_ON(ret);
+>  }
+> @@ -246,7 +246,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>  	* to ensure that hardware interrupts from the timer triggers a guest
+>  	* exit.
+>  	*/
+> -	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->map->virt_irq))
+> +	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->virt_irq))
+>  		phys_active = true;
+>  	else
+>  		phys_active = false;
+> @@ -351,7 +351,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  	if (WARN_ON(IS_ERR(map)))
+>  		return PTR_ERR(map);
+>  
+> -	timer->map = map;
+> +	timer->virt_irq = irq->irq;
+you also have a duplicate above:
+        timer->irq.irq = irq->irq;
+>  	return 0;
+>  }
+>  
+> @@ -494,8 +494,8 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  
+>  	timer_disarm(timer);
+> -	if (timer->map)
+> -		kvm_vgic_unmap_phys_irq(vcpu, timer->map->virt_irq);
+> +	if (timer->virt_irq)
+> +		kvm_vgic_unmap_phys_irq(vcpu, timer->virt_irq);
+always unmap?
 
-Generally, ACKs from Viresh are sufficient for ARM cpufreq drivers
-unless the maintainers of the platform in question disagree.
+Cheers
 
-> Anyways, I am adding this to my branch to the next merge window.
-
-Thanks!
+Eric
+>  }
+>  
+>  void kvm_timer_enable(struct kvm *kvm)
+> 
