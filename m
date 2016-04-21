@@ -1,45 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2016 13:27:39 +0200
-Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
- code
-In-Reply-To: <1461236675-10176-10-git-send-email-peter.griffin@linaro.org>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-10-git-send-email-peter.griffin@linaro.org>
-Message-ID: <4337545.DyleYAUzIV@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 21 Apr 2016 12:30:18 +0100
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <5718AFB8.5070004@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+ <20160421101930.GG6879@leverpostej>
+ <5718AFB8.5070004@rock-chips.com>
+Message-ID: <20160421123018.096d4a75@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 12:04:26 Peter Griffin wrote:
-> uniperiph-id, version and mode are ST specific bindings and
-> need the 'st,' prefix. Update the examples, as otherwise copying
-> them yields a runtime error parsing the DT node.
+On Thu, 21 Apr 2016 18:47:20 +0800
+"Huang, Tao" <huangtao@rock-chips.com> wrote:
+
+> Hi, Mark:
+> On 2016?04?21? 18:19, Mark Rutland wrote:
+> > On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
+> >> +		cpu_l0: cpu at 0 {
+> >> +			device_type = "cpu";
+> >> +			compatible = "arm,cortex-a53", "arm,armv8";
+> >> +			reg = <0x0 0x0>;
+> >> +			enable-method = "psci";
+> >> +			#cooling-cells = <2>; /* min followed by max */
+> >> +			clocks = <&cru ARMCLKL>;
+> >> +		};
+> >> +		cpu_b0: cpu at 100 {
+> >> +			device_type = "cpu";
+> >> +			compatible = "arm,cortex-a72", "arm,armv8";
+> >> +			reg = <0x0 0x100>;
+> >> +			enable-method = "psci";
+> >> +			#cooling-cells = <2>; /* min followed by max */
+> >> +			clocks = <&cru ARMCLKB>;
+> >> +		};
+> >> +
+> >> +	arm-pmu {
+> >> +		compatible = "arm,armv8-pmuv3";
+> >> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+> >> +	};
+> > This is wrong, and must go. There should be a separate node for the PMU
+> > of each microarchitecture, with the appropriate compatible string to
+> > represent that (see the juno dts).
+> You are right. The first version we wrote is:
+>     pmu_a53 {
+>         compatible = "arm,cortex-a53-pmu";
+>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>         interrupt-affinity = <&cpu_l0>,
+>                      <&cpu_l1>,
+>                      <&cpu_l2>,
+>                      <&cpu_l3>;
+>     };
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Cc: arnaud.pouliquen at st.com
-> ---
->  .../devicetree/bindings/sound/st,sti-asoc-card.txt         | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-> index 028fa1c..ef2e0c6 100644
-> --- a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-> +++ b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-> @@ -67,9 +67,9 @@ Example:
->                 dmas = <&fdma0 4 0 1>;
->                 dai-name = "Uni Player #1 (DAC)";
->                 dma-names = "tx";
-> -               uniperiph-id = <2>;
-> -               version = <5>;
-> -               mode = "PCM";
-> +               st,uniperiph-id = <2>;
-> +               st,version = <5>;
-> +               st,mode = "PCM";
->         };
+>     pmu_a72 {
+>         compatible = "arm,cortex-a72-pmu";
+>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>         interrupt-affinity = <&cpu_b0>,
+>                      <&cpu_b1>;
+>     };
+> but unfortunately, the arm pmu driver do not support PPI in two cluster
+> well,
+> so we have to replace with this implementation.
+> > In this case things are messier as the same PPI number is being used
+> > across clusters. Marc (Cc'd) has been working on PPI partitions, which
+> > should allow us to support that.
+> Great! So what we can do right now? Wait this feature, and delete
+> arm-pmu node?
 
-You don't change the binding desciption here, only the example,
-so they no longer match.
+I'd rather you have a look at the patches, test them with your HW,
+and comment on what doesn't work!
 
-What is st,uniperiph-id needed for anyway? It's often an indication
-that you are doing something wrong if you need this.
+You can find the patches over there:
 
-	Arnd
+https://lkml.org/lkml/2016/4/11/182
+
+and on the following branch:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+irq/percpu-partition
+
+Of course, you'll have to hack a bit in the PMU code to make it
+understand per-PMU affinity together with percpu interrupts, but it
+wouldn't be fun if there was nothing to do...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
