@@ -1,129 +1,101 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Thu, 21 Apr 2016 12:27:51 +0530
-Subject: [PATCH v2 3/4] net: thunderx: add sysfs attribute for SQS/SVF
- assigments
+Date: Thu, 21 Apr 2016 12:27:52 +0530
+Subject: [PATCH v2 4/4] net: thunderx: Improvement for MBX interface debug
+ messages
 In-Reply-To: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1461221872-38841-4-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1461221872-38841-5-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Radoslaw Biernacki <rad@semihalf.com>
 
-With this sysfs attribute (sriov_sqs_assignment) administrator will be
-able to read the current assigment of SQS/SVF for a given VF. This is
-useful to decide which VFs needs to be attached to UIO for a successful
-allocation of secondary Qsets
+Adding debug messages in case of NACK for a mailbox message, also
+did small cleanups.
 
 Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c |   67 +++++++++++++++++++++++-
- 1 files changed, 66 insertions(+), 1 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c   |   16 ++++++++++------
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c |    8 ++++++--
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index cd5e7a4..02e9a75 100644
+index 02e9a75..6c99257 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -1163,6 +1163,60 @@ static void nic_poll_for_link(struct work_struct *work)
- 	queue_delayed_work(nic->check_link, &nic->dwork, HZ * 2);
- }
- 
-+ssize_t sriov_sqs_assignment_show(struct device *dev,
-+				  struct device_attribute *attr, char *buf)
-+{
-+	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
-+	struct pci_dev *vf_dev;
-+	struct pci_driver *vf_drv;
-+	struct nicpf *nic = pci_get_drvdata(pdev);
-+	size_t vf, off, svf_idx;
-+
-+	off = scnprintf(buf, PAGE_SIZE, "%u\n", nic->num_vf_en);
-+
-+	for (vf = 0; vf < nic->num_vf_en; vf++) {
-+		vf_dev = nic->vf_pdev[vf];
-+		vf_drv = vf_dev ? pci_dev_driver(vf_dev) : NULL;
-+		if (off >= PAGE_SIZE)
-+			break;
-+		off += scnprintf(&buf[off], PAGE_SIZE - off,
-+				 "%zu %04x:%02x:%02x.%d %s %c:",
-+				 vf, pci_domain_nr(vf_dev->bus),
-+				 vf_dev->bus->number, PCI_SLOT(vf_dev->devfn),
-+				 PCI_FUNC(vf_dev->devfn),
-+				 vf_drv ? vf_drv->name : "no-driver",
-+				 nic->vf_enabled[vf] ? '+' : '-');
-+		for (svf_idx = 0; svf_idx < MAX_SQS_PER_VF; svf_idx++) {
-+			if (off >= PAGE_SIZE)
-+				break;
-+			if (nic->vf_sqs[vf][svf_idx] == NIC_VF_UNASSIGNED)
-+				break;
-+			off += scnprintf(&buf[off], PAGE_SIZE - off, " %d",
-+					 nic->vf_sqs[vf][svf_idx]);
-+		}
-+		if (off >= PAGE_SIZE)
-+			break;
-+		off += scnprintf(&buf[off], PAGE_SIZE - off, "\n");
-+	}
-+
-+	for (vf = nic->num_vf_en; vf < nic->num_vf_en + nic->num_sqs_en; vf++) {
-+		vf_dev = nic->vf_pdev[vf];
-+		vf_drv = vf_dev ? pci_dev_driver(vf_dev) : NULL;
-+		if (off >= PAGE_SIZE)
-+			break;
-+		off += scnprintf(&buf[off], PAGE_SIZE - off,
-+				 "%zu %04x:%02x:%02x.%d %s: %u\n",
-+				 vf, pci_domain_nr(vf_dev->bus),
-+				 vf_dev->bus->number, PCI_SLOT(vf_dev->devfn),
-+				 PCI_FUNC(vf_dev->devfn),
-+				 vf_drv ? vf_drv->name : "no-driver",
-+				 nic->pqs_vf[vf]);
-+	}
-+
-+	return off;
-+}
-+DEVICE_ATTR_RO(sriov_sqs_assignment);
-+
- static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct device *dev = &pdev->dev;
-@@ -1239,12 +1293,18 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 	if (err)
- 		goto err_unregister_interrupts;
- 
-+	err = device_create_file(dev, &dev_attr_sriov_sqs_assignment);
-+	if (err) {
-+		err = -ENOMEM;
-+		goto err_disable_sriov;
-+	}
-+
- 	/* Register a physical link status poll fn() */
- 	nic->check_link = alloc_workqueue("check_link_status",
- 					  WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
- 	if (!nic->check_link) {
- 		err = -ENOMEM;
--		goto err_disable_sriov;
-+		goto err_remove_sysfs_attr;
+@@ -822,7 +822,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		mbx_addr += sizeof(u64);
  	}
  
- 	INIT_DELAYED_WORK(&nic->dwork, nic_poll_for_link);
-@@ -1252,6 +1312,8 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+-	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg %d from VF%d\n",
++	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg 0x%02x from VF%d\n",
+ 		__func__, mbx.msg.msg, vf);
+ 	switch (mbx.msg.msg) {
+ 	case NIC_MBOX_MSG_READY:
+@@ -832,8 +832,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 			nic->duplex[vf] = 0;
+ 			nic->speed[vf] = 0;
+ 		}
+-		ret = 1;
+-		break;
++		goto unlock;
+ 	case NIC_MBOX_MSG_QS_CFG:
+ 		reg_addr = NIC_PF_QSET_0_127_CFG |
+ 			   (mbx.qs.num << NIC_QS_ID_SHIFT);
+@@ -875,8 +874,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		nic_tx_channel_cfg(nic, mbx.qs.num, &mbx.sq);
+ 		break;
+ 	case NIC_MBOX_MSG_SET_MAC:
+-		if (vf >= nic->num_vf_en)
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
+ 			break;
++		}
+ 		lmac = mbx.mac.vf_id;
+ 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
+ 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
+@@ -936,10 +937,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		break;
+ 	}
  
- 	return 0;
+-	if (!ret)
++	if (!ret) {
+ 		nic_mbx_send_ack(nic, vf);
+-	else if (mbx.msg.msg != NIC_MBOX_MSG_READY)
++	} else if (mbx.msg.msg != NIC_MBOX_MSG_READY) {
++		dev_err(&nic->pdev->dev, "NACK for MBOX 0x%02x from VF %d\n",
++			mbx.msg.msg, vf);
+ 		nic_mbx_send_nack(nic, vf);
++	}
+ unlock:
+ 	nic->mbx_lock[vf] = false;
+ }
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 87d0f56..12ea73a 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -134,15 +134,19 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
  
-+err_remove_sysfs_attr:
-+	device_remove_file(dev, &dev_attr_sriov_sqs_assignment);
- err_disable_sriov:
- 	if (nic->flags & NIC_SRIOV_ENABLED) {
- 		nic_put_vf_pdev(nic);
-@@ -1270,6 +1332,9 @@ err_disable_device:
- static void nic_remove(struct pci_dev *pdev)
- {
- 	struct nicpf *nic = pci_get_drvdata(pdev);
-+	struct device *dev = &pdev->dev;
-+
-+	device_remove_file(dev, &dev_attr_sriov_sqs_assignment);
- 
- 	if (nic->flags & NIC_SRIOV_ENABLED) {
- 		nic_put_vf_pdev(nic);
+ 	/* Wait for previous message to be acked, timeout 2sec */
+ 	while (!nic->pf_acked) {
+-		if (nic->pf_nacked)
++		if (nic->pf_nacked) {
++			netdev_err(nic->netdev,
++				   "PF NACK to mbox msg 0x%02x from VF%d\n",
++				   (mbx->msg.msg & 0xFF), nic->vf_id);
+ 			return -EINVAL;
++		}
+ 		msleep(sleep);
+ 		if (nic->pf_acked)
+ 			break;
+ 		timeout -= sleep;
+ 		if (!timeout) {
+ 			netdev_err(nic->netdev,
+-				   "PF didn't ack to mbox msg %d from VF%d\n",
++				   "PF didn't ACK to mbox msg 0x%02x from VF%d\n",
+ 				   (mbx->msg.msg & 0xFF), nic->vf_id);
+ 			return -EBUSY;
+ 		}
 -- 
 1.7.1
