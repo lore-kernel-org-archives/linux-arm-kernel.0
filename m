@@ -1,102 +1,101 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 21 Apr 2016 20:11:18 +0000
-Subject: [PATCH RFT V2 3/3] iio: mxs-lradc: implement suspend/resume support
-In-Reply-To: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
-References: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1461269478-449-4-git-send-email-stefan.wahren@i2se.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 21 Apr 2016 22:24:09 +0200
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <20160421123018.096d4a75@arm.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <5718AFB8.5070004@rock-chips.com> <20160421123018.096d4a75@arm.com>
+Message-ID: <2131452.5tyGOfVRfi@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements suspend/resume support for mxs-lradc.
-It's possible to use the touchscreen as wakeup source.
+Am Donnerstag, 21. April 2016, 12:30:18 schrieb Marc Zyngier:
+> On Thu, 21 Apr 2016 18:47:20 +0800
+> 
+> "Huang, Tao" <huangtao@rock-chips.com> wrote:
+> > Hi, Mark:
+> > 
+> > On 2016?04?21? 18:19, Mark Rutland wrote:
+> > > On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
+> > >> +		cpu_l0: cpu at 0 {
+> > >> +			device_type = "cpu";
+> > >> +			compatible = "arm,cortex-a53", "arm,armv8";
+> > >> +			reg = <0x0 0x0>;
+> > >> +			enable-method = "psci";
+> > >> +			#cooling-cells = <2>; /* min followed by max */
+> > >> +			clocks = <&cru ARMCLKL>;
+> > >> +		};
+> > >> +		cpu_b0: cpu at 100 {
+> > >> +			device_type = "cpu";
+> > >> +			compatible = "arm,cortex-a72", "arm,armv8";
+> > >> +			reg = <0x0 0x100>;
+> > >> +			enable-method = "psci";
+> > >> +			#cooling-cells = <2>; /* min followed by max */
+> > >> +			clocks = <&cru ARMCLKB>;
+> > >> +		};
+> > >> +
+> > >> +	arm-pmu {
+> > >> +		compatible = "arm,armv8-pmuv3";
+> > >> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+> > >> +	};
+> > > 
+> > > This is wrong, and must go. There should be a separate node for the PMU
+> > > of each microarchitecture, with the appropriate compatible string to
+> > > represent that (see the juno dts).
+> > 
+> > You are right. The first version we wrote is:
+> >     pmu_a53 {
+> >     
+> >         compatible = "arm,cortex-a53-pmu";
+> >         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+> >         interrupt-affinity = <&cpu_l0>,
+> >         
+> >                      <&cpu_l1>,
+> >                      <&cpu_l2>,
+> >                      <&cpu_l3>;
+> >     
+> >     };
+> >     
+> >     pmu_a72 {
+> >     
+> >         compatible = "arm,cortex-a72-pmu";
+> >         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+> >         interrupt-affinity = <&cpu_b0>,
+> >         
+> >                      <&cpu_b1>;
+> >     
+> >     };
+> > 
+> > but unfortunately, the arm pmu driver do not support PPI in two cluster
+> > well,
+> > so we have to replace with this implementation.
+> > 
+> > > In this case things are messier as the same PPI number is being used
+> > > across clusters. Marc (Cc'd) has been working on PPI partitions, which
+> > > should allow us to support that.
+> > 
+> > Great! So what we can do right now? Wait this feature, and delete
+> > arm-pmu node?
+> 
+> I'd rather you have a look at the patches, test them with your HW,
+> and comment on what doesn't work!
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/iio/adc/mxs-lradc.c |   61 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+I would think we could do it in two tracks, testing and fixing but also letting 
+the rk3399 devicetrees move forward without the pmu at first :-) .
 
-diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-index cfc558f..6bd387f 100644
---- a/drivers/iio/adc/mxs-lradc.c
-+++ b/drivers/iio/adc/mxs-lradc.c
-@@ -29,6 +29,7 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-+#include <linux/pm.h>
- #include <linux/slab.h>
- #include <linux/stmp_device.h>
- #include <linux/sysfs.h>
-@@ -1745,10 +1746,70 @@ static int mxs_lradc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int __maybe_unused mxs_lradc_suspend(struct device *dev)
-+{
-+	struct iio_dev *iio = dev_get_drvdata(dev);
-+	struct mxs_lradc *lradc = iio_priv(iio);
-+	struct input_dev *input = lradc->ts_input;
-+	int ret = 0;
-+
-+	if (input) {
-+		mutex_lock(&input->mutex);
-+
-+		/* Enable touchscreen wakeup irq */
-+		if (input->users && device_may_wakeup(dev))
-+			ret = enable_irq_wake(lradc->irq[0]);
-+		else
-+			mxs_lradc_disable_ts(lradc);
-+
-+		mutex_unlock(&input->mutex);
-+	}
-+
-+	if (ret)
-+		return ret;
-+
-+	mxs_lradc_hw_stop(lradc);
-+
-+	clk_disable_unprepare(lradc->clk);
-+
-+	return ret;
-+}
-+
-+static int __maybe_unused mxs_lradc_resume(struct device *dev)
-+{
-+	struct iio_dev *iio = dev_get_drvdata(dev);
-+	struct mxs_lradc *lradc = iio_priv(iio);
-+	struct input_dev *input = lradc->ts_input;
-+	int ret;
-+
-+	ret = clk_prepare_enable(lradc->clk);
-+	if (ret)
-+		return ret;
-+
-+	mxs_lradc_hw_init(lradc);
-+
-+	if (input) {
-+		mutex_lock(&input->mutex);
-+
-+		/* Disable touchscreen wakeup irq */
-+		if (input->users && device_may_wakeup(dev))
-+			ret = disable_irq_wake(lradc->irq[0]);
-+		else
-+			mxs_lradc_enable_touch_detection(lradc);
-+
-+		mutex_unlock(&input->mutex);
-+	}
-+
-+	return ret;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(mxs_lradc_pm_ops, mxs_lradc_suspend, mxs_lradc_resume);
-+
- static struct platform_driver mxs_lradc_driver = {
- 	.driver	= {
- 		.name	= DRIVER_NAME,
- 		.of_match_table = mxs_lradc_dt_ids,
-+		.pm	= &mxs_lradc_pm_ops,
- 	},
- 	.probe	= mxs_lradc_probe,
- 	.remove	= mxs_lradc_remove,
--- 
-1.7.9.5
+> 
+> You can find the patches over there:
+> 
+> https://lkml.org/lkml/2016/4/11/182
+> 
+> and on the following branch:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> irq/percpu-partition
+> 
+> Of course, you'll have to hack a bit in the PMU code to make it
+> understand per-PMU affinity together with percpu interrupts, but it
+> wouldn't be fun if there was nothing to do...
+> 
+> Thanks,
+> 
+> 	M.
