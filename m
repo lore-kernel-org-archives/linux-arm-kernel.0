@@ -1,53 +1,129 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 21 Apr 2016 08:54:10 +0200
-Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
-In-Reply-To: <5717A67C.4010007@opensource.altera.com>
-References: <20160419140220.GA9503@pengutronix.de>
- <20160420110643.GI31470@pengutronix.de>
- <5717A67C.4010007@opensource.altera.com>
-Message-ID: <20160421065410.GA21638@pengutronix.de>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Thu, 21 Apr 2016 12:27:51 +0530
+Subject: [PATCH v2 3/4] net: thunderx: add sysfs attribute for SQS/SVF
+ assigments
+In-Reply-To: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1461221872-38841-4-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 10:55:40AM -0500, Dinh Nguyen wrote:
-> >  void __init socfpga_sysmgr_init(void)
-> >  {
-> > @@ -38,14 +37,6 @@ void __init socfpga_sysmgr_init(void)
-> >  
-> >  	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
-> >  
-> > -	if (of_property_read_u32(np, "cpu1-start-addr",
-> > -			(u32 *) &socfpga_cpu1start_addr))
-> > -		pr_err("SMP: Need cpu1-start-addr in device tree.\n");
-> > -
-> > -	/* Ensure that socfpga_cpu1start_addr is visible to other CPUs */
-> > -	smp_wmb();
-> > -	sync_cache_w(&socfpga_cpu1start_addr);
-> > -
-> >  	sys_manager_base_addr = of_iomap(np, 0);
-> >  
-> >  	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
-> > 
-> 
-> Your proposed patch is causing this failure during a CPU hotlpug, and
-> ultimately CPU1 doesn't seem to be able to comeback online at all:
-> 
-> # echo 0 > /sys/devices/system/cpu/cpu1/online
-> [   53.664085] CPU1: shutdown
-> # echo 1 > /sys/devices/system/cpu/cpu1/online
-> 
-> [   60.394169] Unable to handle kernel paging request at virtual address
-> c0118668
+From: Radoslaw Biernacki <rad@semihalf.com>
 
-This issue can be fixed by setting the socfpga_boot_fn variable in the
-smp_prepare_cpus hook instead of the smp_boot_secondary hook. I just
-a fixed version as a formal patch. Compared to the last version I also
-removed the unnecessary if(1) and fixed big endian support.
+With this sysfs attribute (sriov_sqs_assignment) administrator will be
+able to read the current assigment of SQS/SVF for a given VF. This is
+useful to decide which VFs needs to be attached to UIO for a successful
+allocation of secondary Qsets
 
-Sascha
+Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic_main.c |   67 +++++++++++++++++++++++-
+ 1 files changed, 66 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index cd5e7a4..02e9a75 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -1163,6 +1163,60 @@ static void nic_poll_for_link(struct work_struct *work)
+ 	queue_delayed_work(nic->check_link, &nic->dwork, HZ * 2);
+ }
+ 
++ssize_t sriov_sqs_assignment_show(struct device *dev,
++				  struct device_attribute *attr, char *buf)
++{
++	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
++	struct pci_dev *vf_dev;
++	struct pci_driver *vf_drv;
++	struct nicpf *nic = pci_get_drvdata(pdev);
++	size_t vf, off, svf_idx;
++
++	off = scnprintf(buf, PAGE_SIZE, "%u\n", nic->num_vf_en);
++
++	for (vf = 0; vf < nic->num_vf_en; vf++) {
++		vf_dev = nic->vf_pdev[vf];
++		vf_drv = vf_dev ? pci_dev_driver(vf_dev) : NULL;
++		if (off >= PAGE_SIZE)
++			break;
++		off += scnprintf(&buf[off], PAGE_SIZE - off,
++				 "%zu %04x:%02x:%02x.%d %s %c:",
++				 vf, pci_domain_nr(vf_dev->bus),
++				 vf_dev->bus->number, PCI_SLOT(vf_dev->devfn),
++				 PCI_FUNC(vf_dev->devfn),
++				 vf_drv ? vf_drv->name : "no-driver",
++				 nic->vf_enabled[vf] ? '+' : '-');
++		for (svf_idx = 0; svf_idx < MAX_SQS_PER_VF; svf_idx++) {
++			if (off >= PAGE_SIZE)
++				break;
++			if (nic->vf_sqs[vf][svf_idx] == NIC_VF_UNASSIGNED)
++				break;
++			off += scnprintf(&buf[off], PAGE_SIZE - off, " %d",
++					 nic->vf_sqs[vf][svf_idx]);
++		}
++		if (off >= PAGE_SIZE)
++			break;
++		off += scnprintf(&buf[off], PAGE_SIZE - off, "\n");
++	}
++
++	for (vf = nic->num_vf_en; vf < nic->num_vf_en + nic->num_sqs_en; vf++) {
++		vf_dev = nic->vf_pdev[vf];
++		vf_drv = vf_dev ? pci_dev_driver(vf_dev) : NULL;
++		if (off >= PAGE_SIZE)
++			break;
++		off += scnprintf(&buf[off], PAGE_SIZE - off,
++				 "%zu %04x:%02x:%02x.%d %s: %u\n",
++				 vf, pci_domain_nr(vf_dev->bus),
++				 vf_dev->bus->number, PCI_SLOT(vf_dev->devfn),
++				 PCI_FUNC(vf_dev->devfn),
++				 vf_drv ? vf_drv->name : "no-driver",
++				 nic->pqs_vf[vf]);
++	}
++
++	return off;
++}
++DEVICE_ATTR_RO(sriov_sqs_assignment);
++
+ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1239,12 +1293,18 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (err)
+ 		goto err_unregister_interrupts;
+ 
++	err = device_create_file(dev, &dev_attr_sriov_sqs_assignment);
++	if (err) {
++		err = -ENOMEM;
++		goto err_disable_sriov;
++	}
++
+ 	/* Register a physical link status poll fn() */
+ 	nic->check_link = alloc_workqueue("check_link_status",
+ 					  WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
+ 	if (!nic->check_link) {
+ 		err = -ENOMEM;
+-		goto err_disable_sriov;
++		goto err_remove_sysfs_attr;
+ 	}
+ 
+ 	INIT_DELAYED_WORK(&nic->dwork, nic_poll_for_link);
+@@ -1252,6 +1312,8 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 
+ 	return 0;
+ 
++err_remove_sysfs_attr:
++	device_remove_file(dev, &dev_attr_sriov_sqs_assignment);
+ err_disable_sriov:
+ 	if (nic->flags & NIC_SRIOV_ENABLED) {
+ 		nic_put_vf_pdev(nic);
+@@ -1270,6 +1332,9 @@ err_disable_device:
+ static void nic_remove(struct pci_dev *pdev)
+ {
+ 	struct nicpf *nic = pci_get_drvdata(pdev);
++	struct device *dev = &pdev->dev;
++
++	device_remove_file(dev, &dev_attr_sriov_sqs_assignment);
+ 
+ 	if (nic->flags & NIC_SRIOV_ENABLED) {
+ 		nic_put_vf_pdev(nic);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1
