@@ -1,68 +1,51 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Thu, 21 Apr 2016 00:20:04 -0400
-Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
-In-Reply-To: <1461209082-25609-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461209082-25609-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <20160421002004.7a87517e.drivshin.allworx@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 21 Apr 2016 13:13:28 +0800
+Subject: [PATCH 2/4] net: thunderx: Add multiqset support for dataplane
+ apps
+In-Reply-To: <1461072812-44239-3-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <201604211331.ptfwtkIL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry all for the noise. Gmail seems to be deciding that this outgoing 
-mail is spammy, and starts blocking it part-way through. I've tried 
-cutting down the CC list, but still no luck. If anyone knows how to get 
-around this (while still having a reasonable patch submission), please 
-let me know. 
+Hi,
 
-For tonight, I guess I have no choice but to give up. I'll try again
-tomorrow in hopes gmail becomes sane again.
+[auto build test ERROR on net/master]
+[also build test ERROR on v4.6-rc4 next-20160420]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
+url:    https://github.com/0day-ci/linux/commits/sunil-kovvuri-gmail-com/net-thunderx-Add-multiqset-support-for-DPDK/20160419-213640
+config: x86_64-randconfig-s4-04211222 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-On Wed, 20 Apr 2016 23:24:39 -0400
-"David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
+All errors (new ones prefixed by >>):
 
-> From: David Rivshin <drivshin@allworx.com>
-> 
-> The first patch fixes a bug that makes dual_emac mode break if
-> either slave uses the phy-handle property in the devicetree.
-> 
-> The second patch fixes some cosmetic problems with error messages,
-> and also makes the binding documentation more explicit.
-> 
-> The third patch cleans up the fixed-link case to work like
-> the now-fixed phy-handle case.
-> 
-> I have tested on the following hardware configurations:
->  - (EVMSK) dual emac, phy_id property in both slaves
->  - (EVMSK) dual emac, phy-handle property in both slaves
->  - (BeagleBoneBlack) single emac, phy_id property
->  - (custom) single emac, fixed-link subnode
-> 
-> Nicolas Chauvet reported testing on an HP t410 (dm8148).
-> 
-> Markus Brunner reported testing v1 on the following [1]:
->  - emac0 with phy_id and emac1 with fixed phy
->  - emac0 with phy-handle and emac1 with fixed phy
->  - emac0 with fixed phy and emac1 with fixed phy
-> 
-> 
-> Changes since v1 [2]:
-> - Rebased
-> - Added Tested-by from Nicolas Chauvet on all patches
-> - Added Acked-by from Rob Herring for the binding change in patch 2 [3]
-> 
-> [1] http://www.spinics.net/lists/netdev/msg357890.html
-> [2] http://www.spinics.net/lists/netdev/msg357772.html
-> [3] http://www.spinics.net/lists/netdev/msg358254.html
-> 
-> David Rivshin (3):
->   drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
->     config
->   drivers: net: cpsw: fix error messages when using phy-handle DT
->     property
->   drivers: net: cpsw: use of_phy_connect() in fixed-link case
-> 
->  Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
->  drivers/net/ethernet/ti/cpsw.c                 | 41 +++++++++++++-------------
->  drivers/net/ethernet/ti/cpsw.h                 |  1 +
->  3 files changed, 23 insertions(+), 23 deletions(-)
-> 
+   drivers/net/ethernet/cavium/thunder/nic_main.c: In function 'nic_get_vf_pdev':
+>> drivers/net/ethernet/cavium/thunder/nic_main.c:600:12: error: 'struct pci_dev' has no member named 'physfn'
+      if (vfdev->physfn != pdev)
+               ^
+
+vim +600 drivers/net/ethernet/cavium/thunder/nic_main.c
+
+   594		pci_read_config_word(pdev, pos + PCI_SRIOV_VF_DID, &devid);
+   595	
+   596		vfdev = pci_get_device(vid, devid, NULL);
+   597		for (; vfdev; vfdev = pci_get_device(vid, devid, vfdev)) {
+   598			if (!vfdev->is_virtfn)
+   599				continue;
+ > 600			if (vfdev->physfn != pdev)
+   601				continue;
+   602			if (vf >= vf_en)
+   603				continue;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 24128 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/5a686ae4/attachment-0001.obj>
