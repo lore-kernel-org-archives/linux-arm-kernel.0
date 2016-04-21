@@ -1,94 +1,43 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 21 Apr 2016 15:29:20 +0300
-Subject: [PATCH v3] i2c: designware-platdrv: fix unbalanced clk enable
- and prepare
-In-Reply-To: <1461237767-7928-1-git-send-email-jszhang@marvell.com>
-References: <1461237767-7928-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1461241760.6620.315.camel@linux.intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 21 Apr 2016 13:33:35 +0100
+Subject: [PATCH v7 17/16] arm64: hibernate: Refuse to hibernate if the
+ boot cpu is offline
+In-Reply-To: <20160421114415.GJ6879@leverpostej>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1460565110-26341-1-git-send-email-james.morse@arm.com>
+ <20160421114415.GJ6879@leverpostej>
+Message-ID: <20160421123335.GK6879@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-04-21 at 19:22 +0800, Jisheng Zhang wrote:
-> If i2c_dw_probe() fails, we should disable and unprepare the clock,
-> otherwise the clock enable and prepare is left unbalanced.
+On Thu, Apr 21, 2016 at 12:44:16PM +0100, Mark Rutland wrote:
+> On Wed, Apr 13, 2016 at 05:31:50PM +0100, James Morse wrote:
+> > It is important to hibernate/resume on the same CPU, otherwise we may
+> > change the cpu order or restore a big cpu's register state on a little
+> > cpu.
+> > 
+> > We know cpu 0 is the cpu the firmware booted us on last time, 
 > 
-> In dw_i2c_plat_remove(), we'd better to not rely on rpm to disable
-
-Sorry, didn't notice earlier
-rpm -> runtime PM
-
-> and unprepare the clock since CONFIG_PM may be disabled when
-> configuring the kernel. So we explicitly disable and unprepare the
-> clock in dw_i2c_plat_remove() rather than implicitly rely on
-> pm_runtime_put_sync(). To keep the device usage count balanced, we
-> call pm_runtime_put_noidle(() to decrease the usage count.
-
-(() -> ()
-
+> This assumes that we only kexec from CPU0 also, which we will have to
+> enforce. For example, disable_nonboot_cpus() does not enforce this if
+> CPU0 has been hotplugged out.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Otherwise, this kernel's CPU0 is not necessarily the CPU the FW booted
+> a kernel on.
 
-I don't know if Wolfram wants you to send new version, and I dunno if
-others still have comments, but
+A better approach might be:
 
-Patch is in a good shape, but I think we have to carefully check the
-runtime PM change.
+* When going down for hibernate, store the physical CPU ID (e.g.
+  MPIDR_EL1.Aff*) in the header for the hibernate image.
 
-> ---
-> Since v2:
-> ?- s/clk/clock
-> ?- describe why use pm_runtime_put_noidle()
-> 
-> Since v1:
-> ?- fix commit msg: "not rely on rpm" rather than "rely on rpm"
-> ?- call i2c_dw_plat_prepare_clk after pm_rumtime_disable()
-> 
-> ?drivers/i2c/busses/i2c-designware-platdrv.c | 16 ++++++++++------
-> ?1 file changed, 10 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
-> b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index d656657..a771781 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -253,8 +253,11 @@ static int dw_i2c_plat_probe(struct
-> platform_device *pdev)
-> ?	}
-> ?
-> ?	r = i2c_dw_probe(dev);
-> -	if (r && !dev->pm_runtime_disabled)
-> -		pm_runtime_disable(&pdev->dev);
-> +	if (r) {
-> +		if (!dev->pm_runtime_disabled)
-> +			pm_runtime_disable(&pdev->dev);
-> +		i2c_dw_plat_prepare_clk(dev, false);
-> +	}
-> ?
-> ?	return r;
-> ?}
-> @@ -264,15 +267,16 @@ static int dw_i2c_plat_remove(struct
-> platform_device *pdev)
-> ?	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
-> ?
-> ?	pm_runtime_get_sync(&pdev->dev);
-> +	pm_runtime_dont_use_autosuspend(&pdev->dev);
-> +	if (!dev->pm_runtime_disabled)
-> +		pm_runtime_disable(&pdev->dev);
-> +	pm_runtime_put_noidle(&pdev->dev);
-> ?
-> ?	i2c_del_adapter(&dev->adapter);
-> ?
-> ?	i2c_dw_disable(dev);
-> ?
-> -	pm_runtime_dont_use_autosuspend(&pdev->dev);
-> -	pm_runtime_put_sync(&pdev->dev);
-> -	if (!dev->pm_runtime_disabled)
-> -		pm_runtime_disable(&pdev->dev);
-> +	i2c_dw_plat_prepare_clk(dev, false);
-> ?
-> ?	return 0;
-> ?}
+* When restoring a hibernate image, first switch over to the CPU
+  described in the header (rather than assuming CPU0). 
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+I think this is a matter of adding a new disable_non_hibernate_cpus()
+function (defaulting to disable_nonboot_cpus()), and overriding that in
+the arch code. Then that can be called in resume_target_kernel.
+
+Though there are likely caveats I've missed.
+
+Thanks,
+Mark.
