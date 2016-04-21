@@ -1,80 +1,115 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 08:10:48 -0500
-Subject: [PATCH v2 all 00/14] use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <5718878A.8040901@huawei.com>
-References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
- <CAL_JsqK34MOSkdJb1Sqq3CzYSz5xGeEnuThS_GmfFXMHX-8d9A@mail.gmail.com>
- <5718878A.8040901@huawei.com>
-Message-ID: <CAL_Jsq+cGbrtz6ZC8fgdD3H1yk7rWpzc9rg8uXOXqL6EJJDsOg@mail.gmail.com>
+From: alexey.klimov@arm.com (Alexey Klimov)
+Date: Thu, 21 Apr 2016 14:37:56 +0100
+Subject: [PATCH v4] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <1461007942-20969-1-git-send-email-al.stone@linaro.org>
+Message-ID: <20160421133740.GA24209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 2:55 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
-> Hi Rob,
->
-> On 2016/4/20 5:10, Rob Herring wrote:
->> On Wed, Mar 16, 2016 at 2:35 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
->>> Use helper of_platform_default_populate() in linux/of_platform
->>> when possible, instead of calling of_platform_populate() with
->>> the default match table.
->>>
->>> Then it is possible for driver code build as a module, and no
->>> need to export of_default_bus_match_table anymore.
->>>
->>> This patchset is based on Linux 4.5.
->>>
->>> Changes since v1:
->>> - Add ack, test and review
->>> - Remove v1 patch 14/15, the similar patch has posted and applied,
->>>   see https://patchwork.kernel.org/patch/8096991/
->>>
->>> v1:
->>> - https://lkml.org/lkml/2016/1/26/1123
->>
->> I was going to apply this, but I've thought about this some more and
->> it is a lot of tree wide churn for little gain. Most of the call sites
->> here I want to get rid of by making of_platform_populate callable
->> multiple times. The infrastructure is almost there, but I think we
->> just need something like this:
->>
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index 8d103e4..b25e710 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -345,6 +345,9 @@ static int of_platform_bus_create(struct device_node *bus,
->>                 return 0;
->>         }
->>
->> +       if (of_node_check_flag(bus, OF_POPULATED_BUS))
->> +               return 0;
->> +
->>         auxdata = of_dev_lookup(lookup, bus);
->>         if (auxdata) {
->>                 bus_id = auxdata->name;
->>
->> Then we can call of_platform_populate from the DT core and remove all
->> the default calls.
->
-> OK, it seems that we can drop all the of_of_platform_default_populate in arch code
-> by this changes, will do it.
->
-> But replace of_platform_populate() with the default match table by of_platform_default_populate
-> is a cleanup, and especially for the driver, we can not need export of_default_bus_match_table
-> after that.
->
-> There is a v3 patchset[1], it is based 4.6-rc2 with some updated, should this be merge firstly,
-> then drop all the default of_platform_populate in arch code, and I think the of_iommu_init() in
-> arch code could do the same thing.
->
-> If not, I will repost the patches with new ways, but still exists the part of unexport
-> of_default_bus_match_table by helper of_platform_default_populate().
->
-> Hope the v3 patchset could be merge in advance, after all, it has been reviewed fully. Thanks a lot.
+Hi Al,
 
-We'd be touching the same line twice in a bunch of places if we apply
-this series first, so it makes more sense to remove all these calls
-first and then use of_platform_default_populate where it is still
-needed.
+I hope you don't mind if I put few minor questions here.
 
-Rob
+On Mon, Apr 18, 2016 at 8:32 PM, Al Stone <al.stone@linaro.org> wrote:
+> The ACPI 6.1 specification was recently released at the end of January
+> 2016, but the arm64 kernel documentation for the use of ACPI was written
+> for the 5.1 version of the spec.  There were significant additions to the
+> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> added to make it easier to define processors and low power idle states,
+> as well as the 6.1 addition allowing regular interrupts (not just from
+> GPIO) be used to signal ACPI general purpose events.
+> 
+> This patch reflects going back through and examining the specs in detail
+> and updating content appropriately.  Whilst there, a few odds and ends of
+> typos were caught as well.  This brings the documentation up to date with
+> ACPI 6.1 for arm64.
+
+Why linux-acpi is not in the destination list?
+ 
+> Changes for v4:
+>    -- Clarify that IORT can sometimes be optional (Jon Masters).
+>    -- Remove "Use as needed" descriptions of ACPI objects; they provide
+>       no substantive information and doing so simplifies maintenance of
+>       this document over time.  These have been replaced with a simpler
+>       notice that states that unless otherwise noted, do what the APCI
+>       specification says is needed.
+>    -- Corrected the _OSI object usage recommendation; it described kernel
+>       behavior that does not exist (Al Stone).
+> 
+> Changes for v3:
+>    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+>    -- Whitespace cleanup as pointed out by checkpatch
+> 
+> Changes for v2:
+>    -- Clean up white space (Harb Abdulhahmid)
+>    -- Clarification on _CCA usage (Harb Abdulhamid)
+>    -- IORT moved to required from recommended (Hanjun Guo)
+>    -- Clarify IORT description (Hanjun Guo)
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> ---
+>  Documentation/arm64/acpi_object_usage.txt | 347 ++++++++++++++++--------------
+>  Documentation/arm64/arm-acpi.txt          |  28 ++-
+>  2 files changed, 212 insertions(+), 163 deletions(-)
+> 
+> diff --git a/Documentation/arm64/acpi_object_usage.txt
+> b/Documentation/arm64/acpi_object_usage.txt
+> index a6e1a18..3891750 100644
+> --- a/Documentation/arm64/acpi_object_usage.txt
+> +++ b/Documentation/arm64/acpi_object_usage.txt
+> @@ -13,14 +13,18 @@ For ACPI on arm64, tables also fall into the
+> following categories:
+
+[..]
+
+>         == Memory-mapped ConFiGuration space ==
+> @@ -176,14 +192,38 @@ MPST   Section 5.2.21 (signature == "MPST")
+>         == Memory Power State Table ==
+>         Optional, not currently supported.
+> 
+> +MSCT   Section 5.2.19 (signature == "MSCT")
+> +       == Maximum System Characteristic Table ==
+> +       Optional, not currently supported.
+> +
+>  MSDM   Signature Reserved (signature == "MSDM")
+>         == Microsoft Data Management table ==
+>         Microsoft only table, will not be supported.
+> 
+> -MSCT   Section 5.2.19 (signature == "MSCT")
+> -       == Maximum System Characteristic Table ==
+> +NFIT   Section 5.2.25 (signature == "NFIT")
+> +       == NVDIMM Firmware Interface Table ==
+>         Optional, not currently supported.
+> 
+> +OEMx   Signature of "OEMx" only
+> +       == OEM Specific Tables ==
+> +       All tables starting with a signature of "OEM" are reserved for OEM
+> +       use.  Since these are not meant to be of general use but are limited
+> +       to very specific end users, they are not recommended for use and are
+> +       not supported by the kernel for arm64.
+> +
+> +PCCT   Section 14.1 (signature == "PCCT)
+> +       == Platform Communications Channel Table ==
+> +       Recommend for use on arm64, and required when using CPPC to control
+> +       power on the platform.
+
+Could you please check corectness of this sentence?
+
+If I remember correctly CPPC may operate via PCC interface but there is no
+strict requirement to implement control mechanism via PCC.
+
+> using CPPC to control power on the platform
+
+Sorry, I think I need to disagree.
+Main description of CPPC says that CPPC defines mechanism to manage performance
+of logical processor.
+
+What do you think about "to control performance on the platform"?
+(or maybe "to control performance and power on the platform")
+
+Thanks,
+Alexey
