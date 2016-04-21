@@ -1,23 +1,74 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Thu, 21 Apr 2016 16:51:12 +0200
-Subject: [PATCH 0/2] iommu/arm-smmu: Fixed for 4.6
-In-Reply-To: <1461160413-15403-1-git-send-email-will.deacon@arm.com>
-References: <1461160413-15403-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160421145112.GL3886@suse.de>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 21 Apr 2016 15:56:34 +0100
+Subject: [PATCH v3 2/5] arm64: Allow a capability to be checked on a single CPU
+In-Reply-To: <1461250597-16712-1-git-send-email-suzuki.poulose@arm.com>
+References: <1461250597-16712-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1461250597-16712-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 02:53:31PM +0100, Will Deacon wrote:
-> Hi Joerg,
-> 
-> Please can you take these two related arm-smmu fixes for 4.6? They
-> address a regression seem by both Eric and Yang following the partial
-> support for default domains that we added during the merge window.
-> 
-> I can send a pull request if you prefer, but it doesn't seem necessary
-> to me.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Sure, applied both. Thanks Will.
+Now that the capabilities are only available once all the CPUs
+have booted, we're unable to check for a particular feature
+in any subsystem that gets initialized before then.
 
+In order to support this, introduce a local_cpu_has_cap() function
+that tests for the presence of a given capability independently
+of the whole framework.
 
-	Joerg
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+[ Added preemptible() check ]
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+Changes since V2:
+ - Check for preemptible()
+---
+ arch/arm64/include/asm/cpufeature.h |    2 ++
+ arch/arm64/kernel/cpufeature.c      |   18 ++++++++++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index e501e4a..d39db63 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -109,6 +109,8 @@ struct arm64_cpu_capabilities {
+ 
+ extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
++bool this_cpu_has_cap(unsigned int cap);
++
+ static inline bool cpu_have_feature(unsigned int num)
+ {
+ 	return elf_hwcap & (1UL << num);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e153489..74e733a 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1005,6 +1005,24 @@ static void __init setup_feature_capabilities(void)
+ 	enable_cpu_capabilities(arm64_features);
+ }
+ 
++/*
++ * Check if the current CPU has a given feature capability.
++ * Should be called from non-preemptible context.
++ */
++bool this_cpu_has_cap(unsigned int cap)
++{
++	const struct arm64_cpu_capabilities *caps = arm64_features;
++
++	if (WARN_ON(preemptible()))
++		return false;
++
++	for (caps = arm64_features; caps->desc; caps++)
++		if (caps->capability == cap && caps->matches)
++			return caps->matches(caps, SCOPE_LOCAL_CPU);
++
++	return false;
++}
++
+ void __init setup_cpu_features(void)
+ {
+ 	u32 cwg;
+-- 
+1.7.9.5
