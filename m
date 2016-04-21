@@ -1,30 +1,83 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 14:35:15 -0500
-Subject: [PATCH 00/14] DT: Fix spelling of standard properties
-In-Reply-To: <CAL_Jsq+JO41w2PweW0n1Z78=wPnYh+wfa==Hb8o37L3ynDndkA@mail.gmail.com>
-References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
- <CAL_Jsq+JO41w2PweW0n1Z78=wPnYh+wfa==Hb8o37L3ynDndkA@mail.gmail.com>
-Message-ID: <CAL_JsqLr+vS4BB9qvkrbg93Ypm8yhzs6eqESQFpjkL5_fv+jkw@mail.gmail.com>
+From: dennis@ausil.us (Dennis Gilmore)
+Date: Thu, 21 Apr 2016 14:39:19 -0500
+Subject: bug in autoloading of imx-ipuv3-crtc
+In-Reply-To: <1668410.ik7sLCmBP7@anubis.ausil.us>
+References: <6926808.b0joqYQPQE@anubis.ausil.us>
+ <20160420230317.GT29108@pengutronix.de> <1668410.ik7sLCmBP7@anubis.ausil.us>
+Message-ID: <4016678.ygHnHqLjmM@anubis.ausil.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 6:58 PM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Wed, Apr 20, 2016 at 10:32 AM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
->>         Hi all,
->>
->> This patch series fixes misspellings of various standard DT properties
->> in DT binding documentation, DTS files, and error messages.
->> While most of these are harmless, some of them may cause hard-to-debug
->> failures.
->>
->> Please apply where appropriate.
->
-> I'll happily take the whole series if you like, though I've not
-> reviewed it all yet.
+On Thursday, April 21, 2016 12:37:28 PM CDT Dennis Gilmore wrote:
+> On Thursday, April 21, 2016 1:03:17 AM CDT Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Tue, Apr 19, 2016 at 03:16:01PM -0500, Dennis Gilmore wrote:
+> > > On Tuesday, April 19, 2016 2:27:17 PM CDT Dennis Gilmore wrote:
+> > > > On Tuesday, April 19, 2016 7:50:49 PM CDT Russell King - ARM Linux
+> 
+> wrote:
+> > > > > On Tue, Apr 19, 2016 at 01:34:23PM -0500, Dennis Gilmore wrote:
+> > > > > > on all of my i.MX6 systems imx-ipuv3-crtc ius not getting
+> > > > > > automatically
+> > > > > > loaded.  Everything is built as a module
+> > > > > > 
+> > > > > > CONFIG_DRM_IMX=m
+> > > > > > CONFIG_DRM_IMX_FB_HELPER=m
+> > > > > > CONFIG_DRM_IMX_HDMI=m
+> > > > > > CONFIG_DRM_IMX_IPUV3=m
+> > > > > > CONFIG_DRM_IMX_LDB=m
+> > > > > > CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
+> > > > > > CONFIG_DRM_IMX_TVE=m
+> > > > > > CONFIG_IMX_IPUV3_CORE=m
+> > > > > > 
+> > > > > > The result is that until I log in via serial or ssh and modprobe
+> > > > > > the
+> > > > > > module there is no display.  I suspect that there is some
+> > > > > > devicetree
+> > > > > > glue missing 4.4 and 4.5 seem to both be effected.
+> > > > > 
+> > > > > DT doesn't come into it for imx-ipuv3-crtc - these platform devices
+> > > > > are
+> > > > > created by drivers/gpu/ipu-v3/ipu-common.c itself.
+> > > > > 
+> > > > > drivers/gpu/drm/imx/ipuv3-crtc.c contains the proper module alias
+> > > > > which
+> > > > > should result in the module loaded at boot time when the
+> > > > > imx-ipuv3-crtc
+> > > > > devices are created.
+> > > > > 
+> > > > > Could the problem be that imx-ipu-v3 isn't being loaded?  However,
+> > > > > again,
+> > > > > it looks to me like everything is correct there.
+> > > > > 
+> > > > > Are you saying that this used to work in older kernel versions like
+> > > > > 4.3,
+> > > > > but stopped in 4.4?
+> > > > 
+> > > > yers it used to work and stopped working. I would need to go back and
+> > > > test
+> > > > old kernels to figure out where it broke.
+> > > 
+> > > after installing some old kernels it broke with 4.4-rc4 which included a
+> > > patch with teh subject of "drm/imx: Remove of_node assignment from
+> > > ipuv3-crtc driver probe"
+> > 
+> > Just to be sure: 4.4-rc4 with 407c9eba7897 ("drm/imx: Remove of_node
+> > assignment from ipuv3-crtc driver probe") reverted works fine for you?
+> 
+> I can confirm that reverting just that patch makes things work again
 
-Now, I have. Other than patch 4 and 14, for the series:
+Sorry I missed that due to an old kernel package bug the dtb was not in place 
+and a different than expected kernel booted.  reverting the one patch is not 
+sufficient
 
-Acked-by: Rob Herring <robh@kernel.org>
+Dennis
 
-Rob
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160421/0af68342/attachment-0001.sig>
