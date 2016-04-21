@@ -1,101 +1,40 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Thu, 21 Apr 2016 12:27:52 +0530
-Subject: [PATCH v2 4/4] net: thunderx: Improvement for MBX interface debug
- messages
-In-Reply-To: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1461221872-38841-5-git-send-email-sunil.kovvuri@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 21 Apr 2016 09:01:20 +0200
+Subject: [PATCH 2/3] i2c: s3c2410: Minor function-level comment cleanup
+In-Reply-To: <57178B58.7050104@osg.samsung.com>
+References: <1461144292-22141-1-git-send-email-k.kozlowski@samsung.com>
+ <1461144292-22141-2-git-send-email-k.kozlowski@samsung.com>
+ <57178B58.7050104@osg.samsung.com>
+Message-ID: <57187AC0.3000503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radoslaw Biernacki <rad@semihalf.com>
+On 04/20/2016 03:59 PM, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 04/20/2016 05:24 AM, Krzysztof Kozlowski wrote:
+>> Cleanup the weird function-level comments and remove obvious
+>> documentatoin for probe/remove.
+>>
+> 
+> s/documentatoin/documentation
+>  
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+> 
+> I wonder if instead we should change to kernel-doc formatted documentation.
+> 
+> All the functions are static so kernel-doc is not really required but still
+> Documentation/kernel-doc-nano-HOWTO.txt says that is suggested for source
+> code layout consistency.
+> 
+> But I agree that's either kernel-doc format or minimal as your patch does:
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Adding debug messages in case of NACK for a mailbox message, also
-did small cleanups.
+Thanks for review. Indeed switching to kernel-doc would be the best...
+but that would require a little bit more rewritting than now. I just
+wanted to fix some weird looking comments.
 
-Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic_main.c   |   16 ++++++++++------
- drivers/net/ethernet/cavium/thunder/nicvf_main.c |    8 ++++++--
- 2 files changed, 16 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 02e9a75..6c99257 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -822,7 +822,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		mbx_addr += sizeof(u64);
- 	}
- 
--	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg %d from VF%d\n",
-+	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg 0x%02x from VF%d\n",
- 		__func__, mbx.msg.msg, vf);
- 	switch (mbx.msg.msg) {
- 	case NIC_MBOX_MSG_READY:
-@@ -832,8 +832,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 			nic->duplex[vf] = 0;
- 			nic->speed[vf] = 0;
- 		}
--		ret = 1;
--		break;
-+		goto unlock;
- 	case NIC_MBOX_MSG_QS_CFG:
- 		reg_addr = NIC_PF_QSET_0_127_CFG |
- 			   (mbx.qs.num << NIC_QS_ID_SHIFT);
-@@ -875,8 +874,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		nic_tx_channel_cfg(nic, mbx.qs.num, &mbx.sq);
- 		break;
- 	case NIC_MBOX_MSG_SET_MAC:
--		if (vf >= nic->num_vf_en)
-+		if (vf >= nic->num_vf_en) {
-+			ret = -1; /* NACK */
- 			break;
-+		}
- 		lmac = mbx.mac.vf_id;
- 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
- 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
-@@ -936,10 +937,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		break;
- 	}
- 
--	if (!ret)
-+	if (!ret) {
- 		nic_mbx_send_ack(nic, vf);
--	else if (mbx.msg.msg != NIC_MBOX_MSG_READY)
-+	} else if (mbx.msg.msg != NIC_MBOX_MSG_READY) {
-+		dev_err(&nic->pdev->dev, "NACK for MBOX 0x%02x from VF %d\n",
-+			mbx.msg.msg, vf);
- 		nic_mbx_send_nack(nic, vf);
-+	}
- unlock:
- 	nic->mbx_lock[vf] = false;
- }
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 87d0f56..12ea73a 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -134,15 +134,19 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
- 
- 	/* Wait for previous message to be acked, timeout 2sec */
- 	while (!nic->pf_acked) {
--		if (nic->pf_nacked)
-+		if (nic->pf_nacked) {
-+			netdev_err(nic->netdev,
-+				   "PF NACK to mbox msg 0x%02x from VF%d\n",
-+				   (mbx->msg.msg & 0xFF), nic->vf_id);
- 			return -EINVAL;
-+		}
- 		msleep(sleep);
- 		if (nic->pf_acked)
- 			break;
- 		timeout -= sleep;
- 		if (!timeout) {
- 			netdev_err(nic->netdev,
--				   "PF didn't ack to mbox msg %d from VF%d\n",
-+				   "PF didn't ACK to mbox msg 0x%02x from VF%d\n",
- 				   (mbx->msg.msg & 0xFF), nic->vf_id);
- 			return -EBUSY;
- 		}
--- 
-1.7.1
+Best regards,
+Krzysztof
