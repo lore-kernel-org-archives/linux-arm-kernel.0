@@ -1,61 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Apr 2016 12:35:27 +0100
-Subject: [PATCHv2 3/5] arm/efi: move to generic {__,}efi_call_virt
-In-Reply-To: <1461238529-12810-1-git-send-email-mark.rutland@arm.com>
-References: <1461238529-12810-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1461238529-12810-4-git-send-email-mark.rutland@arm.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Thu, 21 Apr 2016 19:37:58 +0800
+Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
+In-Reply-To: <5718B244.3020201@gmail.com>
+References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150826021659.GD8784@linux>
+ <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
+ <22538895.vrRgZUmQTV@vostro.rjw.lan>
+ <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
+ <55E73077.8060106@gmail.com> <5718AAF0.3010606@gmail.com>
+ <5718B244.3020201@gmail.com>
+Message-ID: <1461238678.20801.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now there's a common template for {__,}efi_call_virt, remove the
-duplicate logic from the arm efi code.
+Hi Matthias,
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-efi at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/include/asm/efi.h | 20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
+On Thu, 2016-04-21 at 12:58 +0200, Matthias Brugger wrote:
+> 
+> On 21/04/16 12:26, Matthias Brugger wrote:
+> >
+> >
+> > On 02/09/15 19:23, Matthias Brugger wrote:
+> >>
+> >>
+> >> On 02/09/15 08:45, Daniel Kurtz wrote:
+> >>> Matthias,
+> >>>
+> >>> On Fri, Aug 28, 2015 at 10:06 PM, Rafael J. Wysocki
+> >>> <rjw@rjwysocki.net> wrote:
+> >>>> On Wednesday, August 26, 2015 02:53:39 PM Pi-Cheng Chen wrote:
+> >>>>> On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar
+> >>>>> <viresh.kumar@linaro.org> wrote:
+> >>>>>> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
+> >>>>>>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the
+> >>>>>>> patch which
+> >>>>>>> introduce a new clock type[2] consumed by MT8173 cpufreq driver.
+> >>>>>>> So it will
+> >>>>>>> cause some conflicts if it goes through your tree. I am not sure
+> >>>>>>> how this
+> >>>>>>> should be handled, but should it be merged through Mediatek SoC
+> >>>>>>> maintainer
+> >>>>>>> tree?
+> >>>>>>
+> >>>>>> Just get that applied to MTK tree, it doesn't have any dependency on
+> >>>>>> rest of the patches for build/boot. The only thing is that cpufreq
+> >>>>>> wouldn't work and it will work as soon as Rafael's and MTK's trees
+> >>>>>> are
+> >>>>>> merged by Linus.
+> >>>>>
+> >>>>> Thanks for your explanation.
+> >>>>>
+> >>>>> @Rafael, Would you please apply [1,2] to your tree?
+> >>>>
+> >>>> Applied, thanks!
+> >>>
+> >>> Can you please apply [3] from this set to your dts tree?
+> >>>
+> >>
+> >> I will as soon as v4.3-rc1 shows up.
+> >
+> > I somehow forgot this patch. Sorry for that.
+> > Applied for v4.6-next/dts64 right now.
+> >
+> 
+> I just realized that CLK_INFRA_CA53SEL and CLK_APMIXED_MAINPLL are not 
+> part of the clk driver.
+> 
+> Pi-Cheng, can you check if they got renamed in the meanwhile? Or do we 
+> need some clock driver patches that enable this clocks for the series?
+> 
 
-diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-index e0eea72..e1461fc 100644
---- a/arch/arm/include/asm/efi.h
-+++ b/arch/arm/include/asm/efi.h
-@@ -23,26 +23,14 @@ void efi_init(void);
- 
- int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
- 
--#define efi_call_virt(f, ...)						\
--({									\
--	efi_##f##_t *__f;						\
--	efi_status_t __s;						\
--									\
--	efi_virtmap_load();						\
--	__f = efi.systab->runtime->f;					\
--	__s = __f(__VA_ARGS__);						\
--	efi_virtmap_unload();						\
--	__s;								\
--})
-+#define arch_efi_call_virt_setup()	efi_virtmap_load()
-+#define arch_efi_call_virt_teardown()	efi_virtmap_unload()
- 
--#define __efi_call_virt(f, ...)						\
-+#define arch_efi_call_virt(f, args...)					\
- ({									\
- 	efi_##f##_t *__f;						\
--									\
--	efi_virtmap_load();						\
- 	__f = efi.systab->runtime->f;					\
--	__f(__VA_ARGS__);						\
--	efi_virtmap_unload();						\
-+	__f(args);							\
- })
- 
- static inline void efi_set_pgd(struct mm_struct *mm)
--- 
-1.9.1
+Thanks your notice. Unfortunately, we still have no chance let patch
+with these two clock merged. The last version is [1]. This clock patch
+will block cpufreq dts [2] and dynamic power dts [3]. Clock maintainer
+is working on new architecture [4], hopefully we can send new clock
+patch soon. After that, we will send new cpufreq and dynamic power dts.
+So please ignore [2] [3] at this moment. 
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/369737.html
+[2] https://lkml.org/lkml/2015/7/9/206
+[3]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/423899.html
+[4]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418796.html
+
+Eddie
+Thanks
