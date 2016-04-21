@@ -1,119 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2016 10:35:59 +0200
-Subject: [PATCH v2 10/11] arm: Add Aspeed machine
-In-Reply-To: <1461225849-28074-11-git-send-email-joel@jms.id.au>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-11-git-send-email-joel@jms.id.au>
-Message-ID: <6245614.OXDTEyrM2z@wuerfel>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 21 Apr 2016 10:39:30 +0200
+Subject: [PATCH v7 10/10] iommu/arm-smmu: call
+ iommu_free_reserved_iova_domain on domain destruction
+In-Reply-To: <5717BDF1.7030400@arm.com>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-11-git-send-email-eric.auger@linaro.org>
+ <5717BDF1.7030400@arm.com>
+Message-ID: <571891C2.50900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 17:34:08 Joel Stanley wrote:
-> diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
-> new file mode 100644
-> index 000000000000..30bafc0bbd8b
-> --- /dev/null
-> +++ b/arch/arm/mach-aspeed/Kconfig
-> @@ -0,0 +1,28 @@
-> +menuconfig ARCH_ASPEED
-> +	bool "Aspeed BMC architectures"
-> +	select OF
-> +	select SRAM
+Hi Robin,
+On 04/20/2016 07:35 PM, Robin Murphy wrote:
+> On 19/04/16 17:56, Eric Auger wrote:
+>> When the domain gets destroyed, let's make sure all reserved iova
+>> resources get released.
+>>
+>> Choice is made to put that call in arm-smmu(-v3).c to do something
+>> similar
+>> to what was done for iommu_put_dma_cookie.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v7: new
+>> ---
+>>   drivers/iommu/arm-smmu-v3.c | 2 ++
+>>   drivers/iommu/arm-smmu.c    | 2 ++
+>>   2 files changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index a077a35..afd0dac 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -22,6 +22,7 @@
+>>
+>>   #include <linux/delay.h>
+>>   #include <linux/dma-iommu.h>
+>> +#include <linux/dma-reserved-iommu.h>
+>>   #include <linux/err.h>
+>>   #include <linux/interrupt.h>
+>>   #include <linux/iommu.h>
+>> @@ -1444,6 +1445,7 @@ static void arm_smmu_domain_free(struct
+>> iommu_domain *domain)
+>>       struct arm_smmu_device *smmu = smmu_domain->smmu;
+>>
+>>       iommu_put_dma_cookie(domain);
+>> +    iommu_free_reserved_iova_domain(domain);
+> 
+> Yikes! No, drivers shouldn't be randomly freeing things they didn't
+> allocate - the owner of the domain, who presumably allocated the thing,
+> can call that right _before_ they call iommu_domain_free().
+OK I move that back to vfio_iommu_type1.c.
 
-Please add
+Thanks
 
-	depends on ARCH_MULTI_V5 || ARCH_MULTI_V6
-
-to hide the submenu otherwise. The 'select OF' is redundant and
-can be removed.
-
-
-> +	help
-> +	  Say Y here if you want to run your kernel on hardware with an
-> +	  ASpeed BMC SoC.
-> +
-> +if ARCH_ASPEED
-> +
-> +config MACH_AST_G4
-> +	bool "Aspeed SoC 4th Generation" if ARCH_MULTI_V5
-> +	depends on ARCH_ASPEED
-> +	select CPU_ARM926T
-> +	help
-> +	 Say yes if you intend to run on an Aspeed ast2400 or similar
-> +	 fourth generation BMCs, such as those used by OpenPower Power8
-> +	 systems.
-> +
-> +config MACH_AST_G5
-> +	bool "Aspeed SoC 5th Generation" if ARCH_MULTI_V6
-> +	depends on ARCH_ASPEED
-
-The two 'depends on ARCH_ASPEED are redundant as well, you already have
-the 'if ARCH_ASPEED' around it.
-
-> +
-> +#define AST_BASE_WDT		0x1E785000 /* Watchdog Timer (WDT) */
-> +#define AST_BASE_SCU		0x1E6E2000 /* System Control Unit (SCU) */
-
-Please try to avoid hardcoding any addresses in the platform file.
-
-> +static void __init aspeed_dt_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-
-We have just introduced of_platform_default_populate() that you could
-use here, but the preferred way is to leave out the function entirely
-as this is what we do anyway if none is provided.
-
-> +#define AST_IO_VA	0xf0000000
-> +#define AST_IO_PA	0x1e600000
-> +#define AST_IO_SZ	0x00200000
-> +
-> +#define AST_IO(__pa)	((void __iomem *)(((__pa) & 0x001fffff) | AST_IO_VA))
-> +
-> +static struct map_desc aspeed_io_desc[] __initdata __maybe_unused = {
-> +	{
-> +		.virtual	=  AST_IO_VA,
-> +		.pfn		= __phys_to_pfn(AST_IO_PA),
-> +		.length		= AST_IO_SZ,
-> +		.type		= MT_DEVICE
-> +	},
-> +};
->
-> +
-> +#define SCU_PASSWORD	0x1688A8A8
-> +
-> +static void __init aspeed_init_early(void)
-> +{
-> +	u32 reg;
-> +
-> +	/*
-> +	 * Unlock SCU
-> +	 */
-> +	writel(SCU_PASSWORD, AST_IO(AST_BASE_SCU));
-> +
-> +	/* We enable the UART clock divisor in the SCU's misc control
-> +	 * register, as the baud rates in aspeed.dtb all assume that the
-> +	 * divisor is active
-> +	 */
-> +	reg = readl(AST_IO(AST_BASE_SCU | 0x2c));
-> +	writel(reg | 0x00001000, AST_IO(AST_BASE_SCU | 0x2c));
-
-Can you explain a bit more about this? I would assume that the UART
-that is used for the console is working at the point that the bootloader
-hands over to the kernel, while the other uarts don't need to be
-active this early. Why do you need to do this at such an early stage?
-
-> +	/*
-> +	 * Disable the watchdogs
-> +	 */
-> +	writel(0, AST_IO(AST_BASE_WDT | 0x0c));
-> +	writel(0, AST_IO(AST_BASE_WDT | 0x2c));
-> +}
-
-Similarly here: why so early? Is the initial timeout too short to wait
-for the watchdog driver to come up? I think it makes sense to require
-the watchdog driver to be loaded if a watchdog is enabled during boot,
-and that keeps the register access in one place.
-
-	Arnd
+Eric
+> 
+>>       free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+>>
+>>       /* Free the CD and ASID, if we allocated them */
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 8cd7b8a..492339f 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -30,6 +30,7 @@
+>>
+>>   #include <linux/delay.h>
+>>   #include <linux/dma-iommu.h>
+>> +#include <linux/dma-reserved-iommu.h>
+>>   #include <linux/dma-mapping.h>
+>>   #include <linux/err.h>
+>>   #include <linux/interrupt.h>
+>> @@ -1009,6 +1010,7 @@ static void arm_smmu_domain_free(struct
+>> iommu_domain *domain)
+>>        * already been detached.
+>>        */
+>>       iommu_put_dma_cookie(domain);
+>> +    iommu_free_reserved_iova_domain(domain);
+> 
+> ...which has the added bonus of preventing needless duplication everywhere.
+> 
+> Robin.
+> 
+>>       arm_smmu_destroy_domain_context(domain);
+>>       kfree(smmu_domain);
+>>   }
+>>
+> 
