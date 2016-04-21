@@ -1,117 +1,63 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 21 Apr 2016 11:19:39 +0200
-Subject: [PATCH 2/8] cpufreq: imx: Use generic platdev driver
-In-Reply-To: <08c7bf360dfb7620591c0e0de6e047fffb0a5546.1461228081.git.viresh.kumar@linaro.org>
-References: <cover.1461228081.git.viresh.kumar@linaro.org>
- <08c7bf360dfb7620591c0e0de6e047fffb0a5546.1461228081.git.viresh.kumar@linaro.org>
-Message-ID: <1461230379.29430.0.camel@pengutronix.de>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Thu, 21 Apr 2016 02:21:10 -0700
+Subject: [PATCH v5 3/7] arm64/perf: Changed events naming as per ARM ARM
+In-Reply-To: <20160420133456.GJ11453@leverpostej>
+References: <1461092062-7484-1-git-send-email-ashoks@broadcom.com>
+ <1461092062-7484-4-git-send-email-ashoks@broadcom.com>
+ <20160420133456.GJ11453@leverpostej>
+Message-ID: <20160421092107.GA3673@ashok.sekar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 21.04.2016, 14:13 +0530 schrieb Viresh Kumar:
-> The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
-> device now, reuse that and remove similar code from platform code.
+On Wed, Apr 20, 2016 at 02:34:56PM +0100, Mark Rutland wrote:
+> On Tue, Apr 19, 2016 at 11:54:18AM -0700, Ashok Kumar wrote:
+> > changed all the events name definition as per ARM ARM
+> > naming convention.
 > 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Looks good to me:
-
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
-
-> ---
->  arch/arm/mach-imx/imx27-dt.c         | 4 ----
->  arch/arm/mach-imx/mach-imx51.c       | 3 ---
->  arch/arm/mach-imx/mach-imx53.c       | 2 --
->  arch/arm/mach-imx/mach-imx7d.c       | 6 ------
->  drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
->  5 files changed, 5 insertions(+), 15 deletions(-)
+> Please note which document you got these from (I assume the ARM ARM),
+> complete with the ARM document number (e.g. ARM DDI 0487A.i for revision
+> A.i). That gives us a consistent point of reference, which is helpful
+> for review and in case these names have cahnged (or change in future).
 > 
-> diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
-> index bd42d1bd10af..90c62bf01f9e 100644
-> --- a/arch/arm/mach-imx/imx27-dt.c
-> +++ b/arch/arm/mach-imx/imx27-dt.c
-> @@ -20,11 +20,7 @@
->  
->  static void __init imx27_dt_init(void)
->  {
-> -	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
-> -
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> -
-> -	platform_device_register_full(&devinfo);
->  }
->  
->  static const char * const imx27_dt_board_compat[] __initconst = {
-> diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
-> index 6883fbaf9484..10a82a4f1e58 100644
-> --- a/arch/arm/mach-imx/mach-imx51.c
-> +++ b/arch/arm/mach-imx/mach-imx51.c
-> @@ -50,13 +50,10 @@ static void __init imx51_ipu_mipi_setup(void)
->  
->  static void __init imx51_dt_init(void)
->  {
-> -	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
-> -
->  	imx51_ipu_mipi_setup();
->  	imx_src_init();
->  
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> -	platform_device_register_full(&devinfo);
->  }
->  
->  static void __init imx51_init_late(void)
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index 86316a979297..18b5c5c136db 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -40,8 +40,6 @@ static void __init imx53_dt_init(void)
->  static void __init imx53_init_late(void)
->  {
->  	imx53_pm_init();
-> -
-> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
->  }
->  
->  static const char * const imx53_dt_board_compat[] __initconst = {
-> diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
-> index 5a27f20c9a82..b450f525a670 100644
-> --- a/arch/arm/mach-imx/mach-imx7d.c
-> +++ b/arch/arm/mach-imx/mach-imx7d.c
-> @@ -105,11 +105,6 @@ static void __init imx7d_init_irq(void)
->  	irqchip_init();
->  }
->  
-> -static void __init imx7d_init_late(void)
-> -{
-> -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> -}
-> -
->  static const char *const imx7d_dt_compat[] __initconst = {
->  	"fsl,imx7d",
->  	NULL,
-> @@ -117,7 +112,6 @@ static const char *const imx7d_dt_compat[] __initconst = {
->  
->  DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
->  	.init_irq	= imx7d_init_irq,
-> -	.init_late	= imx7d_init_late,
->  	.init_machine	= imx7d_init_machine,
->  	.dt_compat	= imx7d_dt_compat,
->  MACHINE_END
-> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> index 3b3e6804cf14..ac12c4a02964 100644
-> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> @@ -12,6 +12,11 @@
->  #include <linux/platform_device.h>
->  
->  static const struct of_device_id machines[] = {
-> +	{ .compatible = "fsl,imx27", },
-> +	{ .compatible = "fsl,imx51", },
-> +	{ .compatible = "fsl,imx53", },
-> +	{ .compatible = "fsl,imx7d", },
-> +
->  	{ .compatible = "marvell,berlin", },
->  
->  	{ .compatible = "samsung,exynos3250", },
+> I've verified that the renaming of architected events now leaves them
+> named as per the ARM ARM. I see that we don't have the full list of
+> IMPDEF events, but that's a matter for another patch.
+> 
+> It might also be worth explicitly noting the correction of the l21/l2i
+> typo, as that looks a little odd otherwise.
+> 
+> >  /* ARMv8 Cortex-A53 specific event types. */
+> >  #define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
+> >  
+> >  /* ARMv8 Cavium ThunderX specific event types. */
+> > -#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_MISS_ST			0xE9
+> > -#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_ACCESS		0xEA
+> > -#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_MISS		0xEB
+> > -#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_ACCESS		0xEC
+> > -#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_MISS		0xED
+> > +#define ARMV8_THUNDER_PERFCTR_L1D_CACHE_MISS_ST			0xE9
+> > +#define ARMV8_THUNDER_PERFCTR_L1D_CACHE_PREF_ACCESS		0xEA
+> > +#define ARMV8_THUNDER_PERFCTR_L1D_CACHE_PREF_MISS		0xEB
+> > +#define ARMV8_THUNDER_PERFCTR_L1I_CACHE_PREF_ACCESS		0xEC
+> > +#define ARMV8_THUNDER_PERFCTR_L1I_CACHE_PREF_MISS		0xED
+> 
+> I'm not sure of the value of renaming these. I would think these should
+> match whatever is in the documentation for Cortex-A53 and ThunderX
+> respectively (and there's the obvious PREFETCH/PREF difference
+> remaining).
+I have changed them to PREF and will post it in v6.
+I checked table 12.28 in Cortex-A53 MPCore Processor TRM r0p4.
+For 0xc2, event mnemonic is not available but event name says 
+"Linefill because of prefetch".
+
+Thanks for the review.
+> 
+> However, I'll leave that to Will.
+> 
+> Other than that, this looks good to me:
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks for putting this together!
+> 
+> Mark.
