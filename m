@@ -1,59 +1,364 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 Apr 2016 17:18:59 +0100
-Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
-In-Reply-To: <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
-Message-ID: <20160421161859.GK929@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 21 Apr 2016 09:21:53 -0700
+Subject: [PATCH v3 3/3] dmaengine: vdma: Add clock support
+In-Reply-To: <1461235118-800-4-git-send-email-appanad@xilinx.com>
+References: <1461235118-800-1-git-send-email-appanad@xilinx.com>
+ <1461235118-800-4-git-send-email-appanad@xilinx.com>
+Message-ID: <20160421162153.GZ7128@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 06:13:00PM +0100, Robin Murphy wrote:
-> Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
-> accessor macros as conditional wrappers") makes the *_relaxed forms of
-> I/O accessors universally available to drivers, in cases where writeq()
-> is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
-> end up falling back to writel() regardless of whether writel_relaxed()
-> is available (identically for s/write/read/).
+On Thu, 2016-04-21 at 16:08:38 +0530, Kedareswara rao Appana wrote:
+> Added basic clock support for axi dma's.
+> The clocks are requested at probe and released at remove.
 > 
-> Add corresponding relaxed forms of the nonatomic helpers to delegate
-> to the equivalent 32-bit accessors as appropriate.
-> 
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Christoph Hellwig <hch@lst.de>
-> CC: Darren Hart <dvhart@linux.intel.com>
-> CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Reviewed-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
->  include/linux/io-64-nonatomic-hi-lo.h | 25 +++++++++++++++++++++++++
->  include/linux/io-64-nonatomic-lo-hi.h | 25 +++++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
+> Changes for v3:
+> ---> Added clock support for all the AXI DMA's.
+> ---> Fixed clk_unprepare leak during probe fail as suggested by Moritz.
+> ---> Fixed comment driver specifically asks for the clocks it needs and return
+> an error if a mandatory clock is missing as suggested by soren.
+> Changes for v2:
+> ---> None.
 > 
-> diff --git a/include/linux/io-64-nonatomic-hi-lo.h b/include/linux/io-64-nonatomic-hi-lo.h
-> index 11d7e84..1a85566 100644
-> --- a/include/linux/io-64-nonatomic-hi-lo.h
-> +++ b/include/linux/io-64-nonatomic-hi-lo.h
-> @@ -21,6 +21,23 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
->  	writel(val, addr);
+>  drivers/dma/xilinx/xilinx_vdma.c | 225 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 223 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+> index 5bfaa32..41bb5b3 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -44,6 +44,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/slab.h>
+> +#include <linux/clk.h>
+>  
+>  #include "../dmaengine.h"
+>  
+> @@ -344,6 +345,9 @@ struct xilinx_dma_chan {
+>  
+>  struct dma_config {
+>  	enum xdma_ip_type dmatype;
+> +	int (*clk_init)(struct platform_device *pdev, struct clk **axi_clk,
+> +			struct clk **tx_clk, struct clk **txs_clk,
+> +			struct clk **rx_clk, struct clk **rxs_clk);
+>  };
+>  
+>  /**
+> @@ -365,7 +369,13 @@ struct xilinx_dma_device {
+>  	bool has_sg;
+>  	u32 flush_on_fsync;
+>  	bool ext_addr;
+> +	struct platform_device  *pdev;
+>  	const struct dma_config *dma_config;
+> +	struct clk *axi_clk;
+> +	struct clk *tx_clk;
+> +	struct clk *txs_clk;
+> +	struct clk *rx_clk;
+> +	struct clk *rxs_clk;
+>  };
+
+the struct members could be documented
+
+>  
+>  /* Macros */
+> @@ -1757,6 +1767,200 @@ static void xilinx_dma_chan_remove(struct xilinx_dma_chan *chan)
+>  	list_del(&chan->common.device_node);
 >  }
 >  
-> +static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
+> +static int axidma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
+> +			    struct clk **tx_clk, struct clk **rx_clk,
+> +			    struct clk **sg_clk, struct clk **tmp_clk)
 > +{
-> +	const volatile u32 __iomem *p = addr;
-> +	u32 low, high;
+> +	int err;
 > +
-> +	high = readl_relaxed(p + 1);
-> +	low = readl_relaxed(p);
+> +	*tmp_clk = NULL;
 > +
-> +	return low + ((u64)high << 32);
+> +	*axi_clk = devm_clk_get(&pdev->dev, "s_axi_lite_aclk");
+> +	if (IS_ERR(*axi_clk)) {
+> +		err = PTR_ERR(*axi_clk);
+> +		dev_err(&pdev->dev, "failed to get axi_aclk (%u)\n", err);
+> +		return err;
+> +	}
+> +
+> +	*tx_clk = devm_clk_get(&pdev->dev, "m_axi_mm2s_aclk");
+> +	if (IS_ERR(*tx_clk))
+> +		*tx_clk = NULL;
+> +
+> +	*rx_clk = devm_clk_get(&pdev->dev, "m_axi_s2mm_aclk");
+> +	if (IS_ERR(*rx_clk))
+> +		*rx_clk = NULL;
+> +
+> +	*sg_clk = devm_clk_get(&pdev->dev, "m_axi_sg_aclk");
+> +	if (IS_ERR(*sg_clk))
+> +		*sg_clk = NULL;
+> +
+> +
+> +	err = clk_prepare_enable(*axi_clk);
+
+Should this be called if you know that the pointer might be NULL?
+
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable axi_clk (%u)\n", err);
+> +		return err;
+> +	}
+> +
+> +	err = clk_prepare_enable(*tx_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
+> +		goto err_disable_axiclk;
+> +	}
+> +
+> +	err = clk_prepare_enable(*rx_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable txs_clk (%u)\n", err);
+> +		goto err_disable_txclk;
+> +	}
+> +
+> +	err = clk_prepare_enable(*sg_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable rxs_clk (%u)\n", err);
+> +		goto err_disable_rxclk;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_disable_rxclk:
+> +	clk_disable_unprepare(*rx_clk);
+> +err_disable_txclk:
+> +	clk_disable_unprepare(*tx_clk);
+> +err_disable_axiclk:
+> +	clk_disable_unprepare(*axi_clk);
+> +
+> +	return err;
 > +}
 > +
-> +static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
+> +static int axicdma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
+> +			    struct clk **dev_clk, struct clk **tmp_clk,
+> +			    struct clk **tmp1_clk, struct clk **tmp2_clk)
 > +{
-> +	writel_relaxed(val >> 32, addr + 4);
-> +	writel_relaxed(val, addr);
+> +	int err;
+> +
+> +	*tmp_clk = NULL;
+> +	*tmp1_clk = NULL;
+> +	*tmp2_clk = NULL;
+> +
+> +	*axi_clk = devm_clk_get(&pdev->dev, "s_axi_lite_aclk");
+> +	if (IS_ERR(*axi_clk)) {
+> +		err = PTR_ERR(*axi_clk);
+> +		dev_err(&pdev->dev, "failed to get axi_aclk (%u)\n", err);
+> +		return err;
+> +	}
+> +
+> +	*dev_clk = devm_clk_get(&pdev->dev, "m_axi_aclk");
+> +	if (IS_ERR(*dev_clk))
+> +		*dev_clk = NULL;
+
+This is a required clock according to binding but a failure is ignored
+here.
+
+> +
+> +
+> +	err = clk_prepare_enable(*axi_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable axi_clk (%u)\n", err);
+> +		return err;
+> +	}
+> +
+> +	err = clk_prepare_enable(*dev_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
+> +		goto err_disable_axiclk;
+> +	}
+> +
+> +
+> +	return 0;
+> +
+> +err_disable_axiclk:
+> +	clk_disable_unprepare(*axi_clk);
+> +
+> +	return err;
 > +}
+> +
+> +static int axivdma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
+> +			    struct clk **tx_clk, struct clk **txs_clk,
+> +			    struct clk **rx_clk, struct clk **rxs_clk)
+> +{
+> +	int err;
+> +
+> +	*axi_clk = devm_clk_get(&pdev->dev, "s_axi_lite_aclk");
+> +	if (IS_ERR(*axi_clk)) {
+> +		err = PTR_ERR(*axi_clk);
+> +		dev_err(&pdev->dev, "failed to get axi_aclk (%u)\n", err);
+> +		return err;
+> +	}
+> +
+> +	*tx_clk = devm_clk_get(&pdev->dev, "m_axi_mm2s_aclk");
+> +	if (IS_ERR(*tx_clk))
+> +		*tx_clk = NULL;
+> +
+> +	*txs_clk = devm_clk_get(&pdev->dev, "m_axis_mm2s_aclk");
+> +	if (IS_ERR(*txs_clk))
+> +		*txs_clk = NULL;
+> +
+> +	*rx_clk = devm_clk_get(&pdev->dev, "m_axi_s2mm_aclk");
+> +	if (IS_ERR(*rx_clk))
+> +		*rx_clk = NULL;
+> +
+> +	*rxs_clk = devm_clk_get(&pdev->dev, "s_axis_s2mm_aclk");
+> +	if (IS_ERR(*rxs_clk))
+> +		*rxs_clk = NULL;
+> +
+> +
+> +	err = clk_prepare_enable(*axi_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable axi_clk (%u)\n", err);
+> +		return err;
+> +	}
+> +
+> +	err = clk_prepare_enable(*tx_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
+> +		goto err_disable_axiclk;
+> +	}
+> +
+> +	err = clk_prepare_enable(*txs_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable txs_clk (%u)\n", err);
+> +		goto err_disable_txclk;
+> +	}
+> +
+> +	err = clk_prepare_enable(*rx_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable rx_clk (%u)\n", err);
+> +		goto err_disable_txsclk;
+> +	}
+> +
+> +	err = clk_prepare_enable(*rxs_clk);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to enable rxs_clk (%u)\n", err);
+> +		goto err_disable_rxclk;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_disable_rxclk:
+> +	clk_disable_unprepare(*rx_clk);
+> +err_disable_txsclk:
+> +	clk_disable_unprepare(*txs_clk);
+> +err_disable_txclk:
+> +	clk_disable_unprepare(*tx_clk);
+> +err_disable_axiclk:
+> +	clk_disable_unprepare(*axi_clk);
+> +
+> +	return err;
+> +}
+> +
+> +static void xdma_disable_allclks(struct xilinx_dma_device *xdev)
+> +{
+> +	if (!IS_ERR(xdev->rxs_clk))
 
-Could we not generate the _relaxed variants with some macro magic?
+The init functions set the optional clocks to NULL if not present. So,
+these pointers should be valid or NULL, but not an error pointer (I
+think NULL is not considered an error pointer as there is a
+IS_ERR_OR_NULL macro).
 
-Will
+> +		clk_disable_unprepare(xdev->rxs_clk);
+> +	if (!IS_ERR(xdev->rx_clk))
+> +		clk_disable_unprepare(xdev->rx_clk);
+> +	if (!IS_ERR(xdev->txs_clk))
+> +		clk_disable_unprepare(xdev->txs_clk);
+> +	if (!IS_ERR(xdev->tx_clk))
+> +		clk_disable_unprepare(xdev->tx_clk);
+> +	clk_disable_unprepare(xdev->axi_clk);
+> +}
+> +
+>  /**
+>   * xilinx_dma_chan_probe - Per Channel Probing
+>   * It get channel features from the device tree entry and
+> @@ -1900,14 +2104,17 @@ static struct dma_chan *of_dma_xilinx_xlate(struct of_phandle_args *dma_spec,
+>  
+>  static const struct dma_config axidma_config = {
+>  	.dmatype = XDMA_TYPE_AXIDMA,
+> +	.clk_init = axidma_clk_init,
+>  };
+>  
+>  static const struct dma_config axicdma_config = {
+>  	.dmatype = XDMA_TYPE_CDMA,
+> +	.clk_init = axicdma_clk_init,
+>  };
+>  
+>  static const struct dma_config axivdma_config = {
+>  	.dmatype = XDMA_TYPE_VDMA,
+> +	.clk_init = axivdma_clk_init,
+>  };
+>  
+>  static const struct of_device_id xilinx_dma_of_ids[] = {
+> @@ -1926,9 +2133,13 @@ MODULE_DEVICE_TABLE(of, xilinx_dma_of_ids);
+>   */
+>  static int xilinx_dma_probe(struct platform_device *pdev)
+>  {
+> +	int (*clk_init)(struct platform_device *, struct clk **, struct clk **,
+> +			struct clk **, struct clk **, struct clk **)
+> +					= axivdma_clk_init;
+>  	struct device_node *node = pdev->dev.of_node;
+>  	struct xilinx_dma_device *xdev;
+>  	struct device_node *child, *np = pdev->dev.of_node;
+> +	struct clk *axi_clk, *tx_clk, *txs_clk, *rx_clk, *rxs_clk;
+
+Are these local vars ever transferred into the struct xilinx_dma_device
+(I actually think you can directly use the struct instead of these
+locals).
+
+>  	struct resource *io;
+>  	u32 num_frames, addr_width;
+>  	int i, err;
+> @@ -1943,10 +2154,16 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+>  		const struct of_device_id *match;
+>  
+>  		match = of_match_node(xilinx_dma_of_ids, np);
+> -		if (match && match->data)
+> +		if (match && match->data) {
+>  			xdev->dma_config = match->data;
+> +			clk_init = xdev->dma_config->clk_init;
+> +		}
+>  	}
+>  
+> +	err = clk_init(pdev, &axi_clk, &tx_clk, &txs_clk, &rx_clk, &rxs_clk);
+> +	if (err)
+> +		return err;
+> +
+>  	/* Request and map I/O memory */
+>  	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	xdev->regs = devm_ioremap_resource(&pdev->dev, io);
+> @@ -2019,7 +2236,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+>  	for_each_child_of_node(node, child) {
+>  		err = xilinx_dma_chan_probe(xdev, child);
+>  		if (err < 0)
+> -			goto error;
+> +			goto disable_clks;
+>  	}
+>  
+>  	if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
+> @@ -2043,6 +2260,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+>  
+>  	return 0;
+>  
+> +disable_clks:
+> +	xdma_disable_allclks(xdev);
+>  error:
+>  	for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
+>  		if (xdev->chan[i])
+> @@ -2070,6 +2289,8 @@ static int xilinx_dma_remove(struct platform_device *pdev)
+>  		if (xdev->chan[i])
+>  			xilinx_dma_chan_remove(xdev->chan[i]);
+>  
+> +	xdma_disable_allclks(xdev);
+> +
+>  	return 0;
+>  }
+
+S?ren
