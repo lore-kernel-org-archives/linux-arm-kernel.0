@@ -1,66 +1,68 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Thu, 21 Apr 2016 12:12:51 +0800
-Subject: [RESEND][PATCH 3/3] arm64: dts: mt8173: Add dynamic power node.
-In-Reply-To: <1458029437-12846-4-git-send-email-dawei.chien@mediatek.com>
-References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
- <1458029437-12846-4-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1461211971.16427.4.camel@mtksdaap41>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Thu, 21 Apr 2016 00:20:04 -0400
+Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
+In-Reply-To: <1461209082-25609-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1461209082-25609-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <20160421002004.7a87517e.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-03-15 at 16:10 +0800, Dawei Chien (???) wrote:
-> This device node is for calculating dynamic power in mW.
-> Since mt8173 has two clusters, there are two dynamic power
-> coefficient as well.
-> 
-> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> ---
-> This patch is base on patchset:
-> https://lkml.org/lkml/2015/11/17/251
+Sorry all for the noise. Gmail seems to be deciding that this outgoing 
+mail is spammy, and starts blocking it part-way through. I've tried 
+cutting down the CC list, but still no luck. If anyone knows how to get 
+around this (while still having a reasonable patch submission), please 
+let me know. 
 
-Sorry for miss one dependence for this device node.
-https://lkml.org/lkml/2015/7/9/206
+For tonight, I guess I have no choice but to give up. I'll try again
+tomorrow in hopes gmail becomes sane again.
 
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    4 ++++
->  1 file changed, 4 insertions(+)
+
+On Wed, 20 Apr 2016 23:24:39 -0400
+"David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
+
+> From: David Rivshin <drivshin@allworx.com>
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index f9c44cc..5cb6b4e 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -71,6 +71,7 @@
->                         #cooling-cells = <2>;
->                         #cooling-min-level = <0>;
->                         #cooling-max-level = <7>;
-> +                       dynamic-power-coefficient = <263>;
->                 };
+> The first patch fixes a bug that makes dual_emac mode break if
+> either slave uses the phy-handle property in the devicetree.
 > 
->                 cpu1: cpu at 1 {
-> @@ -95,6 +96,7 @@
->                         #cooling-cells = <2>;
->                         #cooling-min-level = <0>;
->                         #cooling-max-level = <7>;
-> +                       dynamic-power-coefficient = <263>;
->                 };
+> The second patch fixes some cosmetic problems with error messages,
+> and also makes the binding documentation more explicit.
 > 
->                 cpu2: cpu at 100 {
-> @@ -119,6 +121,7 @@
->                         #cooling-cells = <2>;
->                         #cooling-min-level = <0>;
->                         #cooling-max-level = <7>;
-> +                       dynamic-power-coefficient = <530>;
->                 };
+> The third patch cleans up the fixed-link case to work like
+> the now-fixed phy-handle case.
 > 
->                 cpu3: cpu at 101 {
-> @@ -143,6 +146,7 @@
->                         #cooling-cells = <2>;
->                         #cooling-min-level = <0>;
->                         #cooling-max-level = <7>;
-> +                       dynamic-power-coefficient = <530>;
->                 };
+> I have tested on the following hardware configurations:
+>  - (EVMSK) dual emac, phy_id property in both slaves
+>  - (EVMSK) dual emac, phy-handle property in both slaves
+>  - (BeagleBoneBlack) single emac, phy_id property
+>  - (custom) single emac, fixed-link subnode
 > 
->                 idle-states {
-> --
-> 1.7.9.5
+> Nicolas Chauvet reported testing on an HP t410 (dm8148).
+> 
+> Markus Brunner reported testing v1 on the following [1]:
+>  - emac0 with phy_id and emac1 with fixed phy
+>  - emac0 with phy-handle and emac1 with fixed phy
+>  - emac0 with fixed phy and emac1 with fixed phy
+> 
+> 
+> Changes since v1 [2]:
+> - Rebased
+> - Added Tested-by from Nicolas Chauvet on all patches
+> - Added Acked-by from Rob Herring for the binding change in patch 2 [3]
+> 
+> [1] http://www.spinics.net/lists/netdev/msg357890.html
+> [2] http://www.spinics.net/lists/netdev/msg357772.html
+> [3] http://www.spinics.net/lists/netdev/msg358254.html
+> 
+> David Rivshin (3):
+>   drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
+>     config
+>   drivers: net: cpsw: fix error messages when using phy-handle DT
+>     property
+>   drivers: net: cpsw: use of_phy_connect() in fixed-link case
+> 
+>  Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
+>  drivers/net/ethernet/ti/cpsw.c                 | 41 +++++++++++++-------------
+>  drivers/net/ethernet/ti/cpsw.h                 |  1 +
+>  3 files changed, 23 insertions(+), 23 deletions(-)
 > 
