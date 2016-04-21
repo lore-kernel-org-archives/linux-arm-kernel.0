@@ -1,61 +1,44 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 20 Apr 2016 20:40:42 -0700
-Subject: [RESEND][PATCH 1/3] thermal: mediatek: Add cpu dynamic power
- cooling model.
-In-Reply-To: <20160421030141.GA4845@localhost.localdomain>
-References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
- <CAJZ5v0hpkyMCVhvYy4JzR1A5OZKs7dqDOB64aQXmjXiLM0F=BQ@mail.gmail.com>
- <57176ECF.6020705@gmail.com> <12007858.UuqVGafLHV@vostro.rjw.lan>
- <20160421030141.GA4845@localhost.localdomain>
-Message-ID: <20160421034040.GA26525@localhost.localdomain>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 21 Apr 2016 13:44:30 +1000
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
+Message-ID: <cover.1461209970.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 08:01:41PM -0700, Eduardo Valentin wrote:
-> On Thu, Apr 21, 2016 at 02:41:24AM +0200, Rafael J. Wysocki wrote:
-> > On Wednesday, April 20, 2016 01:58:07 PM Matthias Brugger wrote:
-> > > Hi Rafael,
-> > > 
-> > > On 13/04/16 06:52, Rafael J. Wysocki wrote:
-> > > > On Tue, Apr 12, 2016 at 7:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > > >> Hi Rafael,
-> > > >>
-> > > >> On 15-03-16, 16:10, Dawei Chien wrote:
-> > > >>> MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
-> > > >>> cooling devices with dynamic power coefficient.
-> > > >>>
-> > > >>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > > >>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > >>
-> > > >> Can you please apply this patch from Dawei ?
-> > > >
-> > > > I can, but I'm traveling this week, so that's rather going to happen next week.
-> > > >
-> > > 
-> > > I don't see the patch in linux-next, did you forget to pick/push it?
-> > 
-> > No, I didn't.  I just didn't have the time to get to them before.
-> > 
-> > Now, given that they are thermal patches, they really should go in via
-> > linux-soc-thermal.git.
-> > 
-> > Eduardo, any chance to take care of these?
-> 
-> Yes I can add this one, given that they have the proper acked-by. I was
-> a bit hesitant to just get them because they are touching
-> drivers/cpufreq. 
-> 
-> Anyways, I am adding this to my branch to the next merge window.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Added the driver changes. The dt parts should go via your platform tree.
-And you can add my 
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
+Please consider these Renesas ARM based SoC fixes for v4.6.
 
-on the dt changes.
 
-> 
-> 
-> > 
-> > Thanks,
-> > Rafael
-> > 
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.6
+
+for you to fetch changes up to c531fb27e9699eaee478ee5686a3cca5dee73602:
+
+  ARM: shmobile: timer: Fix preset_lpj leading to too short delays (2016-04-20 08:52:55 +1000)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v4.6
+
+* Correct preset_lpj calculation which may lead to too short delays
+* Correct handling of optional clocks on r8a7791 to restore
+  access to the serial port the porter board
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: timer: Fix preset_lpj leading to too short delays
+
+Sjoerd Simons (2):
+      ARM: dts: r8a7791: Don't disable referenced optional clocks
+      Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+
+ arch/arm/boot/dts/r8a7791-koelsch.dts |  1 +
+ arch/arm/boot/dts/r8a7791-porter.dts  | 14 +-------------
+ arch/arm/boot/dts/r8a7791.dtsi        |  5 +----
+ arch/arm/mach-shmobile/timer.c        | 28 +++++++++++-----------------
+ 4 files changed, 14 insertions(+), 34 deletions(-)
