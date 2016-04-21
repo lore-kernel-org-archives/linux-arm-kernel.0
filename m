@@ -1,36 +1,54 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 21 Apr 2016 12:04:28 +0100
-Subject: [PATCH 11/18] ARM: multi_v7_defconfig: Enable STi and simple-card
- drivers.
+Date: Thu, 21 Apr 2016 12:04:30 +0100
+Subject: [PATCH 13/18] ARM: DT: STiH407: Add i2s_in pinctrl configuration
 In-Reply-To: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
 References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1461236675-10176-12-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1461236675-10176-14-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the STi ALSA drivers found on STi platforms
-as well as the simple-card driver which is a dependency to have
-working sound.
+This patch adds the pinctrl config for the i2s_in pins
+used by the uniperif reader IP.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Cc: arnaud.pouliquen at st.com
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 61008a0..b391882 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -588,6 +588,9 @@ CONFIG_SND_SOC_AK4642=m
- CONFIG_SND_SOC_SGTL5000=m
- CONFIG_SND_SOC_SPDIF=m
- CONFIG_SND_SOC_WM8978=m
-+CONFIG_SND_SOC_STI=m
-+CONFIG_SND_SOC_STI_SAS=m
-+CONFIG_SND_SIMPLE_CARD=m
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index 0fb5c8a..537db7e 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -1090,6 +1090,30 @@
+ 				};
+ 			};
+ 
++			i2s_in {
++				pinctrl_i2s_8ch_in: i2s_8ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++						data1 = <&pio33 0 ALT1 IN>;
++						data2 = <&pio33 1 ALT1 IN>;
++						data3 = <&pio33 2 ALT1 IN>;
++						data4 = <&pio33 3 ALT1 IN>;
++					};
++				};
++
++				pinctrl_i2s_2ch_in: i2s_2ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++					};
++				};
++			};
++
+ 			serial3 {
+ 				pinctrl_serial3: serial3-0 {
+ 					st,pins {
 -- 
 1.9.1
