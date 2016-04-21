@@ -1,44 +1,70 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 21 Apr 2016 09:46:17 -0400
-Subject: [PATCH 2/3] drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC
- Kconfig dependency
-In-Reply-To: <1459214937-18686-3-git-send-email-javier@osg.samsung.com>
-References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
- <1459214937-18686-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <5718D9A9.4040309@osg.samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 21 Apr 2016 14:47:11 +0100
+Subject: [PATCH v2] drivers/perf: arm-pmu: fix RCU usage on pmu resume
+ from low-power
+In-Reply-To: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1461230674-7412-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160421134711.GD23774@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Inki,
-
-On 03/28/2016 09:28 PM, Javier Martinez Canillas wrote:
-> Commit aeefb36832e5 ("drm/exynos: gsc: add device tree support and remove
-> usage of static mappings") made the DRM_EXYNOS_GSC Kconfig symbol to only
-> be selectable if the exynos-gsc V4L2 driver isn't enabled, since both use
-> the same HW IP block.
+On Thu, Apr 21, 2016 at 10:24:34AM +0100, Lorenzo Pieralisi wrote:
+> Commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
+> added code in the arm perf infrastructure that allows the kernel to
+> save/restore perf counters whenever the CPU enters a low-power
+> state. The kernel saves/restores the counters for each active event
+> through the armpmu_{stop/start} ARM pmu API, so that the low-power state
+> enter/exit cycle is emulated through pmu start/stop operations for each
+> event in use.
 > 
-> But added the dependency as depends on !VIDEO_SAMSUNG_EXYNOS_GSC which is
-> not correct since Kconfig expressions are not boolean but tristate. So it
-> will only evaluate to 'n' if VIDEO_SAMSUNG_EXYNOS_GSC=y but will evaluate
-> to 'm' if VIDEO_SAMSUNG_S5P_G2D=m.
+> However, calling armpmu_start() for each active event on power up
+> executes code that requires RCU locking (perf_event_update_userpage())
+> to be functional, so, given that the core may call the CPU_PM notifiers
+> while running the idle thread in an quiescent RCU state this is not
+> allowed as detected through the following splat when kernel is run with
+> CONFIG_PROVE_LOCKING enabled:
 > 
-> This means that both the V4L2 and DRM drivers can be enabled if the former
-> is enabled as a module, which is not what we want.
+> [   49.293286]
+> [   49.294761] ===============================
+> [   49.298895] [ INFO: suspicious RCU usage. ]
+> [   49.303031] 4.6.0-rc3+ #421 Not tainted
+> [   49.306821] -------------------------------
+> [   49.310956] include/linux/rcupdate.h:872 rcu_read_lock() used
+> illegally while idle!
+> [   49.318530]
+> [   49.318530] other info that might help us debug this:
+> [   49.318530]
+> [   49.326451]
+> [   49.326451] RCU used illegally from idle CPU!
+> [   49.326451] rcu_scheduler_active = 1, debug_locks = 0
+> [   49.337209] RCU used illegally from extended quiescent state!
+> [   49.342892] 2 locks held by swapper/2/0:
+> [   49.346768]  #0:  (cpu_pm_notifier_lock){......}, at:
+> [<ffffff8008163c28>] cpu_pm_exit+0x18/0x80
+> [   49.355492]  #1:  (rcu_read_lock){......}, at: [<ffffff800816dc38>]
+> perf_event_update_userpage+0x0/0x260
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
+> This patch wraps the armpmu_start() call (that indirectly calls
+> perf_event_update_userpage()) on CPU_PM notifier power state exit (or
+> failed entry) within the RCU_NONIDLE() macro so that the RCU subsystem
+> is made aware the calling cpu is not idle from an RCU perspective for
+> the armpmu_start() call duration, therefore fixing the issue.
+> 
+> Fixes: da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: James Morse <james.morse@arm.com>
+> Suggested-by: Kevin Hilman <khilman@baylibre.com>
+> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-I see that only patch 1/3 from this series was picked but according to the
-conversation with Seung-Woo [0] in the cover letter, the GSC v4l2 and drm
-drivers don't support to be simultaneous enabled like is the case for FIMC.
+Applied. Thanks.
 
-So patch 3/3 is the only one of the series that should be dropped and this
-one picked as well.
-
-[0]: https://lkml.org/lkml/2016/3/29/7
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Catalin
