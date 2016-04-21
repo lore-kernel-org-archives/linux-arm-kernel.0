@@ -1,225 +1,221 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Apr 2016 17:34:05 +0930
-Subject: [PATCH v2 07/11] clk: Add driver for Aspeed fifth gen SoCs
+Date: Thu, 21 Apr 2016 17:34:06 +0930
+Subject: [PATCH v2 08/11] arm/dts: Add Aspeed ast2400 device tree
 In-Reply-To: <1461225849-28074-1-git-send-email-joel@jms.id.au>
 References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
-Message-ID: <1461225849-28074-8-git-send-email-joel@jms.id.au>
+Message-ID: <1461225849-28074-9-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Creates fixed clocks from the strapping registers.
+A common device tree for all forth gen/ast2400 systems and a board
+specific dts for the Palmetto OpenPower developemnt machine which was
+used for testing.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/clk/Makefile        |   2 +-
- drivers/clk/clk-aspeed-g5.c | 189 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 190 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/clk-aspeed-g5.c
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |  21 ++++
+ arch/arm/boot/dts/aspeed-g4.dtsi              | 152 ++++++++++++++++++++++++++
+ 3 files changed, 174 insertions(+)
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-g4.dtsi
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index bd28f6c95aa1..cdd4643e9ee1 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -84,4 +84,4 @@ obj-$(CONFIG_X86)			+= x86/
- obj-$(CONFIG_ARCH_ZX)			+= zte/
- obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
- obj-$(CONFIG_H8300)		+= h8300/
--obj-$(CONFIG_ARCH_ASPEED)		+= clk-aspeed-g4.o
-+obj-$(CONFIG_ARCH_ASPEED)		+= clk-aspeed-g4.o clk-aspeed-g5.o
-diff --git a/drivers/clk/clk-aspeed-g5.c b/drivers/clk/clk-aspeed-g5.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 95c1923ce6fa..dee3a92cbd3c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -839,6 +839,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt8127-moose.dtb \
+ 	mt8135-evbp1.dtb
+ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
++dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb
+ endif
+ 
+ dtstree		:= $(srctree)/$(src)
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
 new file mode 100644
-index 000000000000..812fd9accf30
+index 000000000000..29015c4b70bb
 --- /dev/null
-+++ b/drivers/clk/clk-aspeed-g5.c
-@@ -0,0 +1,189 @@
-+/*
-+ * Copyright 2016 IBM Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -0,0 +1,21 @@
++/dts-v1/;
 +
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/clkdev.h>
++#include "aspeed-g4.dtsi"
 +
-+static void __init aspeed_of_clkin_clk_init(struct device_node *node)
-+{
-+	struct clk *clk;
-+	void __iomem *base;
-+	int reg, rate;
-+	const char *name = node->name;
++/ {
++	model = "Palmetto BMC";
++	compatible = "tyan,palmetto-bmc", "aspeed,ast2400";
 +
-+	of_property_read_string(node, "clock-output-names", &name);
++	chosen {
++		stdout-path = &uart5;
++		bootargs = "console=ttyS4,38400";
++	};
 +
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+	/* Strap register SCU70 */
-+	reg = readl(base) & BIT(23);
-+	iounmap(base);
++	memory {
++		reg = < 0x40000000 0x10000000 >;
++	};
++};
 +
-+	if (reg)
-+		rate = 25 * 1000 * 1000;
-+	else
-+		rate = 24 * 1000 * 1000;
++&uart5 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+new file mode 100644
+index 000000000000..64c720cfacfe
+--- /dev/null
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -0,0 +1,152 @@
++#include "skeleton.dtsi"
 +
-+	clk = clk_register_fixed_rate(NULL, name, NULL, 0, rate);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register clock\n", node->full_name);
-+		return;
-+	}
++/ {
++	model = "Aspeed BMC";
++	compatible = "aspeed,ast2400";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&vic>;
 +
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(aspeed_clkin_clock, "aspeed,g5-clkin-clock",
-+	       aspeed_of_clkin_clk_init);
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
++		cpu at 0 {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++			reg = <0>;
++		};
++	};
 +
-+static void __init aspeed_of_hpll_clk_init(struct device_node *node)
-+{
-+	struct clk *clk, *clkin_clk;
-+	void __iomem *base;
-+	int reg, rate, clkin;
-+	const char *name = node->name;
-+	const char *parent_name;
++	aliases {
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++		serial4 = &uart5;
++		serial5 = &uart6;
++	};
 +
-+	of_property_read_string(node, "clock-output-names", &name);
-+	parent_name = of_clk_get_parent_name(node, 0);
++	clocks {
++		clk_clkin: clk_clkin {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++		};
 +
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+	/* H-PLL parameter register SCU24 */
-+	reg = readl(base);
-+	iounmap(base);
++	};
 +
-+	clkin_clk = of_clk_get(node, 0);
-+	if (IS_ERR(clkin_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
++	ahb {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+	clkin = clk_get_rate(clkin_clk);
++		vic: interrupt-controller at 1e6c0080 {
++			compatible = "aspeed,ast2400-vic";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			valid-sources = <0xffffffff 0x0007ffff>;
++			reg = <0x1e6c0080 0x80>;
++		};
 +
-+	if (reg & BIT(21)) {
-+		rate = 0;
-+	} else if (reg & BIT(20)) {
-+		rate = clkin;
-+	} else {
-+		int p = (reg >> 13) & 0x3f;
-+		int m = (reg >> 5) & 0xff;
-+		int n = reg & 0x1f;
++		apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+		rate = clkin * ((m + 1) / (n + 1)) / (p + 1);
-+	}
++			clk_hpll: clk_hpll at 1e6e2070 {
++				#clock-cells = <0>;
++				compatible = "aspeed,g4-hpll-clock";
++				reg = <0x1e6e2070 0x4>;
++				clocks = <&clk_clkin>;
++			};
 +
-+	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register clock\n", node->full_name);
-+		return;
-+	}
++			clk_apb: clk_apb at 1e6e2008 {
++				#clock-cells = <0>;
++				compatible = "aspeed,g4-apb-clock";
++				reg = <0x1e6e2008 0x4>;
++				clocks = <&clk_hpll>;
++			};
 +
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g5-hpll-clock",
-+	       aspeed_of_hpll_clk_init);
++			sram at 1e720000 {
++				compatible = "mmio-sram";
++				reg = <0x1e720000 0x8000>;	// 32K
++			};
 +
++			timer: timer at 1e782000 {
++				compatible = "aspeed,ast2400-timer";
++				reg = <0x1e782000 0x90>;
++				// The moxart_timer driver registers only one
++				// interrupt and assumes it's for timer 1
++				//interrupts = <16 17 18 35 36 37 38 39>;
++				interrupts = <16>;
++				clocks = <&clk_apb>;
++			};
 +
-+static void __init aspeed_of_ahb_clk_init(struct device_node *node)
-+{
-+	struct clk *clk, *hpll_clk;
-+	void __iomem *base;
-+	int reg, rate, hpll;
-+	const char *name = node->name;
-+	const char *parent_name;
++			uart1: serial at 1e783000 {
++				compatible = "ns16550a";
++				reg = <0x1e783000 0x1000>;
++				reg-shift = <2>;
++				interrupts = <9>;
++				clock-frequency = <1843200>;
++				no-loopback-test;
++				status = "disabled";
++			};
 +
-+	of_property_read_string(node, "clock-output-names", &name);
-+	parent_name = of_clk_get_parent_name(node, 0);
++			uart2: serial at 1e78d000 {
++				compatible = "ns16550a";
++				reg = <0x1e78d000 0x1000>;
++				reg-shift = <2>;
++				interrupts = <32>;
++				clock-frequency = <1843200>;
++				no-loopback-test;
++				status = "disabled";
++			};
 +
-+	/* Strap register SCU70 */
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+	reg = (readl(base) >> 9) & 0x03;
-+	iounmap(base);
++			uart3: serial at 1e78e000 {
++				compatible = "ns16550a";
++				reg = <0x1e78e000 0x1000>;
++				reg-shift = <2>;
++				interrupts = <33>;
++				clock-frequency = <1843200>;
++				no-loopback-test;
++				status = "disabled";
++			};
 +
-+	/* A value of zero is undefined */
-+	WARN_ON(reg == 0);
++			uart4: serial at 1e78f000 {
++				compatible = "ns16550a";
++				reg = <0x1e78f000 0x1000>;
++				reg-shift = <2>;
++				interrupts = <34>;
++				clock-frequency = <1843200>;
++				current-speed = <115200>;
++				no-loopback-test;
++				status = "disabled";
++			};
 +
-+	hpll_clk = of_clk_get(node, 0);
-+	if (IS_ERR(hpll_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
++			uart5: serial at 1e784000 {
++				compatible = "ns16550a";
++				reg = <0x1e784000 0x1000>;
++				reg-shift = <2>;
++				interrupts = <10>;
++				clock-frequency = <1843200>;
++				current-speed = <38400>;
++				no-loopback-test;
++				status = "disabled";
++			};
 +
-+	hpll = clk_get_rate(hpll_clk);
-+
-+	rate = hpll / 2 / (reg + 1);
-+
-+	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register clock\n", node->full_name);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(aspeed_ahb_clock, "aspeed,g5-ahb-clock",
-+	       aspeed_of_ahb_clk_init);
-+
-+
-+static void __init aspeed_of_apb_clk_init(struct device_node *node)
-+{
-+	struct clk *clk, *hpll_clk;
-+	void __iomem *base;
-+	int reg, rate;
-+	const char *name = node->name;
-+	const char *parent_name;
-+
-+	of_property_read_string(node, "clock-output-names", &name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	/* Clock selection register SCU08 */
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+	reg = readl(base) >> 23 & 0x3;
-+	iounmap(base);
-+
-+	hpll_clk = of_clk_get(node, 0);
-+	if (IS_ERR(hpll_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
-+
-+	rate = clk_get_rate(hpll_clk) / (4 * (reg + 1));
-+
-+	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register clock\n", node->full_name);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g5-apb-clock",
-+	       aspeed_of_apb_clk_init);
++			uart6: serial at 1e787000 {
++				compatible = "ns16550a";
++				reg = <0x1e787000 0x1000>;
++				reg-shift = <2>;
++				interrupts = <10>;
++				clock-frequency = <1843200>;
++				current-speed = <38400>;
++				no-loopback-test;
++				status = "disabled";
++			};
++		};
++	};
++};
 -- 
 2.7.4
