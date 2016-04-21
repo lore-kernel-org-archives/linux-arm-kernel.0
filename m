@@ -1,117 +1,59 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 16:02:19 -0500
-Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
-In-Reply-To: <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
-References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
- <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <CAL_JsqJ-kyCc=3XdVGvtK4MvRqWOr2RA=9t4kgy73K+cE=JOUg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 21 Apr 2016 22:44:01 +0200
+Subject: [PATCH RFT V2 2/3] iio: mxs-lradc: disable only masked channels
+ in mxs_lradc_hw_stop
+In-Reply-To: <1461269478-449-3-git-send-email-stefan.wahren@i2se.com>
+References: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
+ <1461269478-449-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <57193B91.9030704@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 10:58 PM, Jianqun Xu <jay.xu@rock-chips.com> wrote:
-> This patch adds rk3399.dtsi for rk3399 found on Rockchip
-> RK3399 SoCs, also add rk3399-evb.dts for Rockchip RK3399
-> Evaluation Board.
->
-> Patch is tested on RK3399 evb.
->
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+On 04/21/2016 10:11 PM, Stefan Wahren wrote:
+> Disabling of the touchscreen IRQs should be done in
+> mxs_lradc_disable_ts. So disable only the masked virtual channels
+> in mxs_lradc_hw_stop and finally remove the unused function
+> mxs_lradc_irq_en_mask.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  arch/arm64/boot/dts/rockchip/Makefile       |    1 +
->  arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  537 ++++++++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 1757 +++++++++++++++++++++++++++
->  3 files changed, 2295 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
->
-> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-> index df37865..7037a16 100644
-> --- a/arch/arm64/boot/dts/rockchip/Makefile
-> +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> @@ -1,6 +1,7 @@
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
->
->  always         := $(dtb-y)
->  subdir-y       := $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> new file mode 100644
-> index 0000000..4cb0028
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> @@ -0,0 +1,537 @@
-> +/*
-> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/pwm/pwm.h>
-> +#include "rk3399.dtsi"
-> +
-> +/ {
-> +       model = "Rockchip RK3399 Evaluation Board";
-> +       compatible = "rockchip,evb", "rockchip,rk3399-evb";
-> +
-> +       chosen {
-> +               bootargs = "console=uart,mmio32,0xff1a0000";
-> +       };
-> +
-> +       ramoops_mem: ramoops_mem {
-> +               reg = <0x0 0x100000 0x0 0x100000>;
-> +               reg-names = "ramoops_mem";
-> +       };
-> +
-> +       ramoops {
-> +               compatible = "ramoops";
-> +               record-size = <0x0 0x20000>;
-> +               console-size = <0x0 0x80000>;
-> +               ftrace-size = <0x0 0x10000>;
-> +               pmsg-size = <0x0 0x50000>;
-> +               memory-region = <&ramoops_mem>;
-> +       };
+>  drivers/iio/adc/mxs-lradc.c |   11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+> index 223650b..cfc558f 100644
+> --- a/drivers/iio/adc/mxs-lradc.c
+> +++ b/drivers/iio/adc/mxs-lradc.c
+> @@ -373,13 +373,6 @@ static u32 mxs_lradc_plate_mask(struct mxs_lradc *lradc)
+>  	return LRADC_CTRL0_MX28_PLATE_MASK;
+>  }
+>  
+> -static u32 mxs_lradc_irq_en_mask(struct mxs_lradc *lradc)
+> -{
+> -	if (lradc->soc == IMX23_LRADC)
+> -		return LRADC_CTRL1_MX23_LRADC_IRQ_EN_MASK;
+> -	return LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK;
+> -}
+> -
+>  static u32 mxs_lradc_irq_mask(struct mxs_lradc *lradc)
+>  {
+>  	if (lradc->soc == IMX23_LRADC)
+> @@ -1505,7 +1498,9 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
+>  {
+>  	int i;
+>  
+> -	mxs_lradc_reg_clear(lradc, mxs_lradc_irq_en_mask(lradc), LRADC_CTRL1);
+> +	mxs_lradc_reg_clear(lradc,
+> +		lradc->buffer_vchans << LRADC_CTRL1_LRADC_IRQ_EN_OFFSET,
+> +		LRADC_CTRL1);
+>  
+>  	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
+>  		mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
+> 
+Looks sane too:
 
-This binding is not upstream yet. It would be great if it was if you
-want to pick up the last try.
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-Rob
+-- 
+Best regards,
+Marek Vasut
