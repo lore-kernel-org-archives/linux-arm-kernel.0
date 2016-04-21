@@ -1,34 +1,20 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 14:29:18 -0500
-Subject: [PATCH 14/14] regulator: ti-abb: DT spelling s/#{address,
- size}-cell/#{address, size}-cells/
-In-Reply-To: <1461166339-11109-15-git-send-email-geert+renesas@glider.be>
-References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
- <1461166339-11109-15-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAL_JsqL7QFpTimE3=+jp1cgsgv0cSjBHr+uOtPOGnxyBN=0=Mg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 21 Apr 2016 15:31:44 -0400 (EDT)
+Subject: [PATCH v2 0/4] net: thunderx: Add multiqset support for DPDK
+In-Reply-To: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1461221872-38841-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20160421.153144.774884339123710587.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 10:32 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  .../devicetree/bindings/regulator/ti-abb-regulator.txt         | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt b/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt
-> index c58db75f959e601f..c3f6546ebac77742 100644
-> --- a/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/ti-abb-regulator.txt
-> @@ -14,8 +14,8 @@ Required Properties:
->    - "setup-address"    - contains setup register address of ABB module (ti,abb-v3)
->    - "int-address"      - contains address of interrupt register for ABB module
->    (also see Optional properties)
-> -- #address-cell: should be 0
-> -- #size-cell: should be 0
-> +- #address-cells: should be 0
-> +- #size-cells: should be 0
+From: sunil.kovvuri@gmail.com
+Date: Thu, 21 Apr 2016 12:27:48 +0530
 
-Looks to me like you can just drop these.
+> This patch series mainly adds support for userspace application
+> like DPDK with a VNIC VF attached to request additional QSets
+> for having morethan the default 8 queues.
 
-Rob
+I don't think it's appropriate to add facilities for non-upstream
+features, especially DPDK.
+
+Thanks.
