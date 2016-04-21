@@ -1,116 +1,117 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 21 Apr 2016 23:57:32 +0300
-Subject: [PATCH] PM / Runtime: Defer resuming of the device in
- pm_runtime_force_resume()
-In-Reply-To: <3340490.Br5NVWnCR9@avalon>
-References: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
- <3340490.Br5NVWnCR9@avalon>
-Message-ID: <27575455.zVxi7rnRNK@avalon>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 21 Apr 2016 16:02:19 -0500
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <CAL_JsqJ-kyCc=3XdVGvtK4MvRqWOr2RA=9t4kgy73K+cE=JOUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 Apr 2016 20:31:52 Laurent Pinchart wrote:
-> Hi Ulf,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 21 Apr 2016 12:34:02 Ulf Hansson wrote:
-> > When the pm_runtime_force_suspend|resume() helpers were invented, we still
-> > had CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP as separate Kconfig options.
-> > 
-> > To make sure these helpers worked for all combinations and without
-> > introducing too much of complexity, the device was always resumed in
-> > pm_runtime_force_resume().
-> > 
-> > More precisely, when CONFIG_PM_SLEEP was set and CONFIG_PM_RUNTIME was
-> > unset, we needed to resume the device as the subsystem/driver couldn't
-> > rely on using runtime PM to do it.
-> > 
-> > As the CONFIG_PM_RUNTIME option was merged into CONFIG_PM a while ago, it
-> > removed this combination, of using CONFIG_PM_SLEEP without the earlier
-> > CONFIG_PM_RUNTIME.
-> > 
-> > For this reason we can now rely on the subsystem/driver to use runtime PM
-> > to resume the device, instead of forcing that to be done in all cases. In
-> > other words, let's defer this to a later point when it's actually needed.
-> > 
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > ---
-> > 
-> > Note, this patch is based upon another not yet queued patch [1]. The
-> > reason
-> > is simply because that [1] is a more important patch as it fixes a
-> > problem.
-> > It was posted to linux-pm April 8th and I expect it (or a new revision of
-> > it) to be applied before $subject patch.
-> > 
-> > [1]
-> > https://patchwork.kernel.org/patch/8782851
-> > 
-> > ---
-> > 
-> >  drivers/base/power/runtime.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> > index b746904..a190ca0 100644
-> > --- a/drivers/base/power/runtime.c
-> > +++ b/drivers/base/power/runtime.c
-> > @@ -1506,6 +1506,17 @@ int pm_runtime_force_resume(struct device *dev)
-> > 
-> >  		goto out;
-> >  	
-> >  	}
-> > 
-> > +	/*
-> > +	 * The PM core increases the runtime PM usage count in the system PM
-> > +	 * prepare phase. If the count is greather than 1 at this point, 
-someone
-> > +	 * else has also increased it. In such case, let's make sure to runtime
-> > +	 * resume the device as that is likely what is expected. In other case
-> > +	 * we trust the subsystem/driver to runtime resume the device when it's
-> > +	 * actually needed.
-> > +	 */
-> > +	if (atomic_read(&dev->power.usage_count) < 2)
-> > +		goto out;
-> > +
-> > 
-> >  	ret = pm_runtime_set_active(dev);
-> >  	if (ret)
-> >  	
-> >  		goto out;
-> 
-> This works in the sense that it prevents devices from being PM resumed at
-> system resume time if not needed. However, devices that are part of a PM
-> domain and that were idle before system suspend are suspended twice (with
-> their .runtime_suspend() handler called twice), which is not good at all.
-> 
-> The first suspend occurs at system suspend time, with
-> pm_runtime_force_suspend() rightfully suspending the device as the device is
-> active (due to being woken up by pm_genpd_prepare()). The second suspend
-> occurs at resume time due to device_complete() calling pm_runtime_put().
-> 
-> I've tracked the issue to the fact that pm_genpd_complete() calls
-> pm_runtime_set_active() regardless of whether the device was PM resumed or
-> not. As pm_runtime_force_suspend() doesn't resume devices with this patch
-> applied, the pm_runtime_put() call from device_complete() will try to
-> runtime suspend the device a second time as the state is incorrectly set to
-> RPM_ACTIVE.
-> 
-> With the current genpd implementation this patch isn't needed (and neither
-> is my patch), as genpd expects the device to be always active when the
-> system is resumed. However, when genpd isn't used,
-> pm_runtime_force_resume() needs to skip resuming devices that were
-> suspended before system suspend. This patch looks good to me to fix that
-> problem.
+On Wed, Apr 20, 2016 at 10:58 PM, Jianqun Xu <jay.xu@rock-chips.com> wrote:
+> This patch adds rk3399.dtsi for rk3399 found on Rockchip
+> RK3399 SoCs, also add rk3399-evb.dts for Rockchip RK3399
+> Evaluation Board.
 >
-> Do we need to fix genpd first ?
+> Patch is tested on RK3399 evb.
+>
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+>  arch/arm64/boot/dts/rockchip/Makefile       |    1 +
+>  arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  537 ++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 1757 +++++++++++++++++++++++++++
+>  3 files changed, 2295 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+> index df37865..7037a16 100644
+> --- a/arch/arm64/boot/dts/rockchip/Makefile
+> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> @@ -1,6 +1,7 @@
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
+>
+>  always         := $(dtb-y)
+>  subdir-y       := $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> new file mode 100644
+> index 0000000..4cb0028
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> @@ -0,0 +1,537 @@
+> +/*
+> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/pwm/pwm.h>
+> +#include "rk3399.dtsi"
+> +
+> +/ {
+> +       model = "Rockchip RK3399 Evaluation Board";
+> +       compatible = "rockchip,evb", "rockchip,rk3399-evb";
+> +
+> +       chosen {
+> +               bootargs = "console=uart,mmio32,0xff1a0000";
+> +       };
+> +
+> +       ramoops_mem: ramoops_mem {
+> +               reg = <0x0 0x100000 0x0 0x100000>;
+> +               reg-names = "ramoops_mem";
+> +       };
+> +
+> +       ramoops {
+> +               compatible = "ramoops";
+> +               record-size = <0x0 0x20000>;
+> +               console-size = <0x0 0x80000>;
+> +               ftrace-size = <0x0 0x10000>;
+> +               pmsg-size = <0x0 0x50000>;
+> +               memory-region = <&ramoops_mem>;
+> +       };
 
-And for the record, while this patch would require fixing genpd first, "[PATCH 
-v2] PM / Runtime: Only force-resume device if it has been force-suspended" 
-doesn't (at least as far as I understand the problem).
+This binding is not upstream yet. It would be great if it was if you
+want to pick up the last try.
 
--- 
-Regards,
-
-Laurent Pinchart
+Rob
