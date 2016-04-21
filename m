@@ -1,62 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 08:42:26 -0500
-Subject: [PATCH v6 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
- device tree binding documentation
-In-Reply-To: <1460710374-25077-1-git-send-email-appanad@xilinx.com>
-References: <1460710374-25077-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20160421134226.GA10399@rob-hp-laptop>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 21 Apr 2016 09:46:17 -0400
+Subject: [PATCH 2/3] drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC
+ Kconfig dependency
+In-Reply-To: <1459214937-18686-3-git-send-email-javier@osg.samsung.com>
+References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+ <1459214937-18686-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <5718D9A9.4040309@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 02:22:53PM +0530, Kedareswara rao Appana wrote:
-> Device-tree binding documentation for Xilinx zynqmp dma engine used in
-> Zynq UltraScale+ MPSoC.
+Hello Inki,
+
+On 03/28/2016 09:28 PM, Javier Martinez Canillas wrote:
+> Commit aeefb36832e5 ("drm/exynos: gsc: add device tree support and remove
+> usage of static mappings") made the DRM_EXYNOS_GSC Kconfig symbol to only
+> be selectable if the exynos-gsc V4L2 driver isn't enabled, since both use
+> the same HW IP block.
 > 
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> But added the dependency as depends on !VIDEO_SAMSUNG_EXYNOS_GSC which is
+> not correct since Kconfig expressions are not boolean but tristate. So it
+> will only evaluate to 'n' if VIDEO_SAMSUNG_EXYNOS_GSC=y but will evaluate
+> to 'm' if VIDEO_SAMSUNG_S5P_G2D=m.
+> 
+> This means that both the V4L2 and DRM drivers can be enabled if the former
+> is enabled as a module, which is not what we want.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > ---
-> Changes in v6:
-> - Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
->   from the binding doc as it allow broken combinations when dma-coherent
->   is set as suggested by Rob.
-> - Fixed minor comments given by Rob related coding(lower case DT node name).
-> Changes in v5:
-> - Use dma-coherent flag for coherent transfers as suggested by rob.
-> - Removed unnecessary properties from binding doc as suggested by Rob.
-> Changes in v4:
-> - None
-> Changes in v3:
-> - None
-> Changes in v2:
-> - None.
-> 
->  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  | 44 ++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> new file mode 100644
-> index 0000000..f0f0b54
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> @@ -0,0 +1,44 @@
-> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
-> +memory to device and device to memory transfers. It also has flow
-> +control and rate control support for slave/peripheral dma access.
-> +
-> +Required properties:
-> +- compatible		: Should be "xlnx,zynqmp-dma-1.0"
-> +- reg			: Memory map for gdma/adma module access.
-> +- interrupt-parent	: Interrupt controller the interrupt is routed through
-> +- interrupts		: Should contain DMA channel interrupt.
-> +- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
 
-I think how this is getting used by the driver is wrong. 
-{src,dst}_addr_widths are supposed to be a bitmask of supported slave 
-device register widths. You aren't doing a bitmask and you are also 
-saying you only support slaves with 8 or 16 byte data registers which is 
-somewhat rare. It may happen to work because 128/8 == BIT(4). However, 
-the documentation for the field is contradictory in that it says 1,2,4 
-or 8 byte widths are supported, but the enum has more sizes.
+I see that only patch 1/3 from this series was picked but according to the
+conversation with Seung-Woo [0] in the cover letter, the GSC v4l2 and drm
+drivers don't support to be simultaneous enabled like is the case for FIMC.
 
-Rob
+So patch 3/3 is the only one of the series that should be dropped and this
+one picked as well.
+
+[0]: https://lkml.org/lkml/2016/3/29/7
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
