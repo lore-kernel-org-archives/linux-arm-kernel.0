@@ -1,51 +1,60 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 21 Apr 2016 14:29:02 +0530
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <cover.1461228504.git.viresh.kumar@linaro.org>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
-Message-ID: <1c2cc13d812e04f231ddd4313e3ba6a54fb4632c.1461228504.git.viresh.kumar@linaro.org>
+From: finley.xiao@rock-chips.com (Finlye Xiao)
+Date: Thu, 21 Apr 2016 17:01:05 +0800
+Subject: [PATCH v2] cpufreq: rockchip: Use generic platdev driver
+In-Reply-To: <1461225849-36866-1-git-send-email-finley.xiao@rock-chips.com>
+References: <1461225849-36866-1-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <1461229265-53750-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
-device now, reuse that and remove similar code from platform code.
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+This patch add rockchip's compatible string to the compat list and
+remove similar code from platform code for supporting generic platdev
+driver.
+
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 ---
- arch/arm/mach-mvebu/pmsu.c           | 2 --
- drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
- 2 files changed, 2 insertions(+), 2 deletions(-)
+v1->v2:
+- add a blank line before rockchip's compatible
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 79d0a5d9da8e..f24f46776fbb 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -685,8 +685,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 			dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
- 				__func__, ret);
- 	}
--
--	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
- 	return 0;
+ arch/arm/mach-rockchip/rockchip.c    |  1 -
+ drivers/cpufreq/cpufreq-dt-platdev.c | 11 +++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 3f07cc5..beb71da 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
+ {
+ 	rockchip_suspend_init();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
  }
  
+ static const char * const rockchip_board_dt_compat[] = {
 diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 69b2a222c84e..5704a92c52dc 100644
+index f2ae7ad..fc6529b 100644
 --- a/drivers/cpufreq/cpufreq-dt-platdev.c
 +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -33,6 +33,8 @@ static const struct of_device_id machines[] = {
- 
- 	{ .compatible = "marvell,berlin", },
- 
-+	{ .compatible = "marvell,armadaxp", },
+@@ -21,6 +21,17 @@ static const struct of_device_id machines[] = {
+ 	{ .compatible = "samsung,exynos5420", },
+ 	{ .compatible = "samsung,exynos5800", },
+ #endif
 +
- 	{ .compatible = "samsung,exynos3250", },
- 	{ .compatible = "samsung,exynos4210", },
- 	{ .compatible = "samsung,exynos4212", },
++	{ .compatible = "rockchip,rk2928", },
++	{ .compatible = "rockchip,rk3036", },
++	{ .compatible = "rockchip,rk3066a", },
++	{ .compatible = "rockchip,rk3066b", },
++	{ .compatible = "rockchip,rk3188", },
++	{ .compatible = "rockchip,rk3228", },
++	{ .compatible = "rockchip,rk3288", },
++	{ .compatible = "rockchip,rk3366", },
++	{ .compatible = "rockchip,rk3368", },
++	{ .compatible = "rockchip,rk3399", },
+ };
+ 
+ static int __init cpufreq_dt_platdev_init(void)
 -- 
-2.7.1.410.g6faf27b
+1.9.1
