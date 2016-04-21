@@ -1,86 +1,53 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 21 Apr 2016 11:48:20 +0200
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <20160413132916.GC19650@bigcity.dyn.berto.se>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160311125846.GF1111@bigcity.dyn.berto.se>
- <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
- <20160321152601.GA11674@infradead.org>
- <20160413132916.GC19650@bigcity.dyn.berto.se>
-Message-ID: <20160421094820.GM19650@bigcity.dyn.berto.se>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 21 Apr 2016 15:20:32 +0530
+Subject: [PATCH 2/8] cpufreq: imx: Use generic platdev driver
+In-Reply-To: <18756925.NSB5aJaqC9@wuerfel>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <08c7bf360dfb7620591c0e0de6e047fffb0a5546.1461228081.git.viresh.kumar@linaro.org>
+ <18756925.NSB5aJaqC9@wuerfel>
+Message-ID: <20160421095032.GD29799@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
-
-Have you had time to look at the audit? Is there anything else I can do 
-make progress on this?
-
-On 2016-04-13 15:29:16 +0200, Niklas S?derlund wrote:
-> Hi Christoph,
-> 
-> On 2016-03-21 08:26:01 -0700, Christoph Hellwig wrote:
-> > On Thu, Mar 17, 2016 at 01:33:51PM +0200, Laurent Pinchart wrote:
-> > > The good news is that, given that no code uses this new API at the moment, 
-> > > there isn't much to audit. The patch series implements the resource mapping 
-> > > for arch/arm only, and makes use of it in the rcar-dmac driver only. Would you 
-> > > like anything audited else than the arch/arm dma mapping implementation, the 
-> > > rcar-dmac driver and the code that then deals with the dma addresses (I'm 
-> > > thinking about the IOMMU subsystem and the ipmmu-vmsa driver in particular) ?
+On 21-04-16, 11:46, Arnd Bergmann wrote:
+> On Thursday 21 April 2016 14:13:48 Viresh Kumar wrote:
+> > The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+> > device now, reuse that and remove similar code from platform code.
 > > 
-> > Yes, it would be good to do an audit of all the ARM dma_ops as well
-> > as generic code like drivers/base/dma-*.c, lib/dma-debug.c and
-> > include/linux/dma-*.h
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  arch/arm/mach-imx/imx27-dt.c         | 4 ----
+> >  arch/arm/mach-imx/mach-imx51.c       | 3 ---
+> >  arch/arm/mach-imx/mach-imx53.c       | 2 --
+> >  arch/arm/mach-imx/mach-imx7d.c       | 6 ------
+> >  drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
+> >  5 files changed, 5 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
+> > index bd42d1bd10af..90c62bf01f9e 100644
+> > --- a/arch/arm/mach-imx/imx27-dt.c
+> > +++ b/arch/arm/mach-imx/imx27-dt.c
+> > @@ -20,11 +20,7 @@
+> >  
+> >  static void __init imx27_dt_init(void)
+> >  {
+> > -	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+> > -
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > -
+> > -	platform_device_register_full(&devinfo);
+> >  }
+> >
 > 
-> I have now done an audit to the best of my abilities, thanks to Laurent 
-> for pointing me in the right direction. And from what I can tell we are 
-> good.
+> Please remove the entire function now, a NULL .init_machine machine
+> callback pointer has the same effect as the remaining line.
 > 
-> * drivers/dma/sh/rcar-dmac.c
->   Once the phys_addr_t is mapped to a dma_addr_t using 
->   dma_map_resource() it is only used to check that the transfere do not 
->   cross 4GB boundaries and then only directly written to HW registers.
-> 
-> * drivers/iommu/iommu.c
->   - iommu_map()
->     Check that it's align to min page size or return -EINVAL then calls
->     domain->ops->map()
-> 
-> * drivers/iommu/ipmmu-vmsa.c
->   - ipmmu_map()
->     No logic only calls domain->ops->map()
-> 
-> * drivers/iommu/io-pgtable-arm.c
->   - arm_lpae_map()
->     No logic only calls __arm_lpae_map()
->   - __arm_lpae_map()
->     No logic only calls arm_lpae_init_pte()
->   - arm_lpae_init_pte()
->     Used to get a pte:
->       pte |= pfn_to_iopte(paddr >> data->pg_shift, data);
-> 
-> * drivers/iommu/io-pgtable-arm-v7s.c
->   - arm_v7s_map()
->     No logic only calls __arm_v7s_map()
->   - __arm_v7s_map()
->     No logic only calls arm_v7s_init_pte()
->   - arm_v7s_init_pte
->     Used to get a pte:
->       pte |= paddr & ARM_V7S_LVL_MASK(lvl);
-> 
-> * ARM dma-mapping
->   - dma_unmap_*
->     Only valid unmap is dma_unmap_resource() all others are an invalid 
->     use case.
->   - dma_sync_single_*
->     Invalid use case, memmory that is mapped is device memmory
->   - dma_common_mmap() and dma_mmap_attrs()
->     Invalid use case
->   - dma_common_get_sgtable() and dma_get_sgtable_attrs()
->     Invalid use case, only for dma_alloc_* allocated memory,
->   - dma_mapping_error()
->     OK
+> The rest of the patch is fine.
+
+Perhaps that should be done in a separate patch I feel. Will do so after this is
+merged.
 
 -- 
-Regards,
-Niklas S?derlund
+viresh
