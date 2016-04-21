@@ -1,45 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Apr 2016 11:19:30 +0100
-Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
-In-Reply-To: <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
-References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
- <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160421101930.GG6879@leverpostej>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Apr 2016 12:26:56 +0200
+Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
+In-Reply-To: <55E73077.8060106@gmail.com>
+References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150826021659.GD8784@linux>
+ <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
+ <22538895.vrRgZUmQTV@vostro.rjw.lan>
+ <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
+ <55E73077.8060106@gmail.com>
+Message-ID: <5718AAF0.3010606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
-> +		cpu_l0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "psci";
-> +			#cooling-cells = <2>; /* min followed by max */
-> +			clocks = <&cru ARMCLKL>;
-> +		};
 
-> +		cpu_b0: cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a72", "arm,armv8";
-> +			reg = <0x0 0x100>;
-> +			enable-method = "psci";
-> +			#cooling-cells = <2>; /* min followed by max */
-> +			clocks = <&cru ARMCLKB>;
-> +		};
 
-> +
-> +	arm-pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
-> +	};
+On 02/09/15 19:23, Matthias Brugger wrote:
+>
+>
+> On 02/09/15 08:45, Daniel Kurtz wrote:
+>> Matthias,
+>>
+>> On Fri, Aug 28, 2015 at 10:06 PM, Rafael J. Wysocki
+>> <rjw@rjwysocki.net> wrote:
+>>> On Wednesday, August 26, 2015 02:53:39 PM Pi-Cheng Chen wrote:
+>>>> On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar
+>>>> <viresh.kumar@linaro.org> wrote:
+>>>>> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
+>>>>>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the
+>>>>>> patch which
+>>>>>> introduce a new clock type[2] consumed by MT8173 cpufreq driver.
+>>>>>> So it will
+>>>>>> cause some conflicts if it goes through your tree. I am not sure
+>>>>>> how this
+>>>>>> should be handled, but should it be merged through Mediatek SoC
+>>>>>> maintainer
+>>>>>> tree?
+>>>>>
+>>>>> Just get that applied to MTK tree, it doesn't have any dependency on
+>>>>> rest of the patches for build/boot. The only thing is that cpufreq
+>>>>> wouldn't work and it will work as soon as Rafael's and MTK's trees are
+>>>>> merged by Linus.
+>>>>
+>>>> Thanks for your explanation.
+>>>>
+>>>> @Rafael, Would you please apply [1,2] to your tree?
+>>>
+>>> Applied, thanks!
+>>
+>> Can you please apply [3] from this set to your dts tree?
+>>
+>
+> I will as soon as v4.3-rc1 shows up.
 
-This is wrong, and must go. There should be a separate node for the PMU
-of each microarchitecture, with the appropriate compatible string to
-represent that (see the juno dts).
+I somehow forgot this patch. Sorry for that.
+Applied for v4.6-next/dts64 right now.
 
-In this case things are messier as the same PPI number is being used
-across clusters. Marc (Cc'd) has been working on PPI partitions, which
-should allow us to support that.
-
-Thanks,
-Mark.
+Regards,
+Matthias
