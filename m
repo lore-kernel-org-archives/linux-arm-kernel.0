@@ -1,69 +1,25 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 21 Apr 2016 15:54:06 +0200
-Subject: [PATCH] mmc: sdhci-of-at91: add presets setup
-Message-ID: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 21 Apr 2016 14:54:50 +0100
+Subject: [PATCH v6 7/7] arm64/perf: Add Broadcom Vulcan PMU support
+In-Reply-To: <1461243525-13603-8-git-send-email-ashoks@broadcom.com>
+References: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
+ <1461243525-13603-8-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160421135450.GO6879@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The controller claims to support SDR104. In fact, it only supports a
-degraded SDR104 since the maximum frequency of the SD clock is 120 MHz
-instead of 208 MHz.
-The sdhci core is unaware of it and will compute a wrong clock divider.
-We can deal with this specific case by using presets.
+On Thu, Apr 21, 2016 at 05:58:45AM -0700, Ashok Kumar wrote:
+> +static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+> +{
+> +	armv8_pmu_init(cpu_pmu);
+> +	cpu_pmu->name			= "armv8_brcm_vulcan";
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/sdhci-of-at91.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Are we happy with "brcm" being the exposed userspace name? It might be
+better to have this as "armv8_broadcom_vulcan".
 
-diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-index c1923c0..76308b1 100644
---- a/drivers/mmc/host/sdhci-of-at91.c
-+++ b/drivers/mmc/host/sdhci-of-at91.c
-@@ -18,6 +18,7 @@
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/kernel.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/slot-gpio.h>
- #include <linux/module.h>
-@@ -163,6 +164,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 	unsigned int			clk_base, clk_mul;
- 	unsigned int			gck_rate, real_gck_rate;
- 	int				ret;
-+	unsigned int			preset_div, preset_common = 0x400; /* drv type B, programmable clock mode */
- 
- 	match = of_match_device(sdhci_at91_dt_match, &pdev->dev);
- 	if (!match)
-@@ -230,6 +232,28 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 			 clk_mul, real_gck_rate);
- 	}
- 
-+	/*
-+	 * We have to set preset values because it depends on the clk_mul
-+	 * value. Moreover, SDR104 is supported in a degraded mode since the
-+	 * maximum sd clock value is 120 MHz instead of 208 MHz. For that
-+	 * reason, we need to use presets to support SDR104.
-+	 */
-+	preset_div = DIV_ROUND_UP(real_gck_rate, 24000000) - 1;
-+	writew(preset_common | preset_div,
-+	       host->ioaddr + SDHCI_PRESET_FOR_SDR12);
-+	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
-+	writew(preset_common | preset_div,
-+	       host->ioaddr + SDHCI_PRESET_FOR_SDR25);
-+	preset_div = DIV_ROUND_UP(real_gck_rate, 100000000) - 1;
-+	writew(preset_common | preset_div,
-+	       host->ioaddr + SDHCI_PRESET_FOR_SDR50);
-+	preset_div = DIV_ROUND_UP(real_gck_rate, 120000000) - 1;
-+	writew(preset_common | preset_div,
-+	       host->ioaddr + SDHCI_PRESET_FOR_SDR104);
-+	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
-+	writew(preset_common | preset_div,
-+	       host->ioaddr + SDHCI_PRESET_FOR_DDR50);
-+
- 	clk_prepare_enable(priv->mainck);
- 	clk_prepare_enable(priv->gck);
- 
--- 
-2.5.0
+I'll leave that to you and Will. Either way:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
