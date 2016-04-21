@@ -1,54 +1,79 @@
-From: finley.xiao@rock-chips.com (Finlye Xiao)
-Date: Thu, 21 Apr 2016 16:04:09 +0800
-Subject: [PATCH v1] cpufreq: rockchip: Use generic platdev driver
-Message-ID: <1461225849-36866-1-git-send-email-finley.xiao@rock-chips.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 21 Apr 2016 09:18:13 +0100
+Subject: [PATCH RFC 01/10] ARM: factor out CSSELR/CCSIDR operations that use
+ cp15 directly
+In-Reply-To: <1461226702-27160-1-git-send-email-vladimir.murzin@arm.com>
+References: <1461226702-27160-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1461226702-27160-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finley Xiao <finley.xiao@rock-chips.com>
+From: Jonathan Austin <jonathan.austin@arm.com>
 
-This patch add rockchip's compatible string to the compat list and
-remove similar code from platform code for supporting generic platdev
-driver.
+Currently we use raw cp15 operations to access the cache setup data.
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+This patch abstracts the CSSELR and CCSIDR accessors out to a header so
+that the implementation for them can be switched out as we do with other
+cpu/cachetype operations.
+
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/mach-rockchip/rockchip.c    |  1 -
- drivers/cpufreq/cpufreq-dt-platdev.c | 10 ++++++++++
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/cachetype.h |   24 ++++++++++++++++++++++++
+ arch/arm/kernel/setup.c          |    7 ++-----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 3f07cc5..beb71da 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
- {
- 	rockchip_suspend_init();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
+diff --git a/arch/arm/include/asm/cachetype.h b/arch/arm/include/asm/cachetype.h
+index 7ea7814..8609de8 100644
+--- a/arch/arm/include/asm/cachetype.h
++++ b/arch/arm/include/asm/cachetype.h
+@@ -56,4 +56,28 @@ static inline unsigned int __attribute__((pure)) cacheid_is(unsigned int mask)
+ 	       (~__CACHEID_NEVER & __CACHEID_ARCH_MIN & mask & cacheid);
  }
  
- static const char * const rockchip_board_dt_compat[] = {
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index f2ae7ad..2128767 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -21,6 +21,16 @@ static const struct of_device_id machines[] = {
- 	{ .compatible = "samsung,exynos5420", },
- 	{ .compatible = "samsung,exynos5800", },
++#define CSSELR_ICACHE	1
++#define CSSELR_DCACHE	0
++
++#define CSSELR_L1	(0 << 1)
++#define CSSELR_L2	(1 << 1)
++#define CSSELR_L3	(2 << 1)
++#define CSSELR_L4	(3 << 1)
++#define CSSELR_L5	(4 << 1)
++#define CSSELR_L6	(5 << 1)
++#define CSSELR_L7	(6 << 1)
++
++static inline void set_csselr(unsigned int cache_selector)
++{
++	asm volatile("mcr p15, 2, %0, c0, c0, 0" : : "r" (cache_selector));
++}
++
++static inline unsigned int read_ccsidr(void)
++{
++	unsigned int val;
++
++	asm volatile("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
++	return val;
++}
++
  #endif
-+	{ .compatible = "rockchip,rk2928", },
-+	{ .compatible = "rockchip,rk3036", },
-+	{ .compatible = "rockchip,rk3066a", },
-+	{ .compatible = "rockchip,rk3066b", },
-+	{ .compatible = "rockchip,rk3188", },
-+	{ .compatible = "rockchip,rk3228", },
-+	{ .compatible = "rockchip,rk3288", },
-+	{ .compatible = "rockchip,rk3366", },
-+	{ .compatible = "rockchip,rk3368", },
-+	{ .compatible = "rockchip,rk3399", },
- };
- 
- static int __init cpufreq_dt_platdev_init(void)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index a28fce0..163a90d 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -291,12 +291,9 @@ static int cpu_has_aliasing_icache(unsigned int arch)
+ 	/* arch specifies the register format */
+ 	switch (arch) {
+ 	case CPU_ARCH_ARMv7:
+-		asm("mcr	p15, 2, %0, c0, c0, 0 @ set CSSELR"
+-		    : /* No output operands */
+-		    : "r" (1));
++		set_csselr(CSSELR_ICACHE | CSSELR_L1);
+ 		isb();
+-		asm("mrc	p15, 1, %0, c0, c0, 0 @ read CCSIDR"
+-		    : "=r" (id_reg));
++		id_reg = read_ccsidr();
+ 		line_size = 4 << ((id_reg & 0x7) + 2);
+ 		num_sets = ((id_reg >> 13) & 0x7fff) + 1;
+ 		aliasing_icache = (line_size * num_sets) > PAGE_SIZE;
 -- 
-1.9.1
+1.7.9.5
