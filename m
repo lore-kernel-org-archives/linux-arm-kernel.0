@@ -1,36 +1,61 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 22 Apr 2016 01:00:08 +0300
-Subject: [PATCH v6] i2c: rk3x: add i2c support for rk3399 soc
-In-Reply-To: <1461074137-23899-1-git-send-email-david.wu@rock-chips.com>
-References: <1458147438-62387-3-git-send-email-david.wu@rock-chips.com>
- <1461074137-23899-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAHp75VdWz2sgWmBW30Jb5D4YCgUyM-LQQxzmGZ_3uW=iKUuKKQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 21 Apr 2016 16:00:22 -0600
+Subject: [PATCH V2 14/15] coresight: tmc: implementing TMC-ETR AUX space
+ API
+In-Reply-To: <5718FB80.90205@arm.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-15-git-send-email-mathieu.poirier@linaro.org>
+ <5718FB80.90205@arm.com>
+Message-ID: <CANLsYkz-3i4wnZ2s1ns0zjkrtJ_5UgYOFf31QPpmPuANHqz_tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 4:55 PM, David Wu <david.wu@rock-chips.com> wrote:
-> From: David Wu <wdc@rock-chips.com>
+On 21 April 2016 at 10:10, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 12/04/16 18:54, Mathieu Poirier wrote:
+>>
+>> This patch implement the AUX area interfaces required to
+>> use the TMC (configured as an ETR) from the Perf sub-system.
+>>
+>> The heuristic is heavily borrowed from the ETB10 and TMC-ETF
+>> implementation.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 >
-> - new method to caculate i2c timings for rk3399:
->   There was an timing issue about "repeated start" time at the I2C
->   controller of version0, controller appears to drop SDA at .875x (7/8)
->   programmed clk high. On version 1 of the controller, the rule(.875x)
->   isn't enough to meet tSU;STA
->   requirements on 100k's Standard-mode. To resolve this issue,
->   sda_update_config, start_setup_config and stop_setup_config for I2C
->   timing information are added, new rules are designed to calculate
->   the timing information at new v1.
-> - pclk and function clk are separated at rk3399.
-> - support i2c highspeed mode: 1.7MHz for rk3399
 >
+>> +static void tmc_update_etr_buffer(struct coresight_device *csdev,
+>> +                                 struct perf_output_handle *handle,
+>> +                                 void *sink_config)
+>> +{
+>> +       struct cs_etr_buffers *buf = sink_config;
+>> +
+>> +       /*
+>> +        * An ETR configured to work in contiguous memory mode works the
+>> same
+>> +        * was as an ETB or ETF.
+>> +        */
+>> +       tmc_update_etf_buffer(csdev, handle, &buf->tmc);
+>
+>
+> Really ? I thought the ETR stores the data to the allocated System RAM and
+> can
+> be read directly from the memory than using the RRD ?
 
-Remove redundant parens in cases like
-1. x * (a->b)
-2. x = (a + b);
+Using an ETR in contiguous mode is inefficient to start with.
+Regardless of the approach taken trace data has to be copied to perf's
+non-contiguous ring buffer pages.  It would be more efficient to copy
+bigger chunks of data to the ring buffer (because we can), but I
+rather spend my time enabling scatter-gather mode than optimizing a
+sub-optimal mode of operation.
 
-Don't touch pieces of code that are not related (you removed one empty
-line without any reason).
+This currently work and enables people to use the IP block while
+scatter-gather mode is in flight.  I should probably make that clear
+in the commit log.
 
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks,
+Mathieu
+
+>
+> Suzuki
+>
+>
+>
