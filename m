@@ -1,105 +1,120 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 15:22:00 -0700
-Subject: [PATCH v2 09/13] clk: fractional-divider: Add hw based registration
- APIs
+Date: Thu, 21 Apr 2016 15:21:57 -0700
+Subject: [PATCH v2 06/13] clk: gate: Add hw based registration APIs
 In-Reply-To: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1461277324-27185-10-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1461277324-27185-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registration APIs in the clk fractional divider code to
-return struct clk_hw pointers instead of struct clk pointers.
-This way we hide the struct clk pointer from providers unless
-they need to use consumer facing APIs.
+Add registration APIs in the clk gate code to return struct
+clk_hw pointers instead of struct clk pointers. This way we hide
+the struct clk pointer from providers unless they need to use
+consumer facing APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-fractional-divider.c | 40 +++++++++++++++++++++++++++++++-----
- include/linux/clk-provider.h         |  5 +++++
- 2 files changed, 40 insertions(+), 5 deletions(-)
+ drivers/clk/clk-gate.c       | 43 ++++++++++++++++++++++++++++++++++++-------
+ include/linux/clk-provider.h |  5 +++++
+ 2 files changed, 41 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
-index 1abcd76b4993..aab904618eb6 100644
---- a/drivers/clk/clk-fractional-divider.c
-+++ b/drivers/clk/clk-fractional-divider.c
-@@ -116,14 +116,15 @@ const struct clk_ops clk_fractional_divider_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_fractional_divider_ops);
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index d0d8ec8e1f1b..4e691e35483a 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -110,7 +110,7 @@ const struct clk_ops clk_gate_ops = {
+ EXPORT_SYMBOL_GPL(clk_gate_ops);
  
--struct clk *clk_register_fractional_divider(struct device *dev,
-+struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
- 		u8 clk_divider_flags, spinlock_t *lock)
+ /**
+- * clk_register_gate - register a gate clock with the clock framework
++ * clk_hw_register_gate - register a gate clock with the clock framework
+  * @dev: device that is registering this clock
+  * @name: name of this clock
+  * @parent_name: name of this clock's parent
+@@ -120,14 +120,15 @@ EXPORT_SYMBOL_GPL(clk_gate_ops);
+  * @clk_gate_flags: gate-specific flags for this clock
+  * @lock: shared register lock for this clock
+  */
+-struct clk *clk_register_gate(struct device *dev, const char *name,
++struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock)
  {
- 	struct clk_fractional_divider *fd;
- 	struct clk_init_data init;
+ 	struct clk_gate *gate;
 -	struct clk *clk;
 +	struct clk_hw *hw;
+ 	struct clk_init_data init;
 +	int ret;
  
- 	fd = kzalloc(sizeof(*fd), GFP_KERNEL);
- 	if (!fd)
-@@ -146,10 +147,39 @@ struct clk *clk_register_fractional_divider(struct device *dev,
- 	fd->lock = lock;
- 	fd->hw.init = &init;
+ 	if (clk_gate_flags & CLK_GATE_HIWORD_MASK) {
+ 		if (bit_idx > 15) {
+@@ -154,12 +155,29 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 	gate->lock = lock;
+ 	gate->hw.init = &init;
  
--	clk = clk_register(dev, &fd->hw);
+-	clk = clk_register(dev, &gate->hw);
+-
 -	if (IS_ERR(clk))
-+	hw = &fd->hw;
++	hw = &gate->hw;
 +	ret = clk_hw_register(dev, hw);
 +	if (ret) {
- 		kfree(fd);
+ 		kfree(gate);
 +		hw = ERR_PTR(ret);
 +	}
-+
-+	return hw;
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider);
  
 -	return clk;
-+struct clk *clk_register_fractional_divider(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
-+		u8 clk_divider_flags, spinlock_t *lock)
++	return hw;
++}
++EXPORT_SYMBOL_GPL(clk_hw_register_gate);
++
++struct clk *clk_register_gate(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 bit_idx,
++		u8 clk_gate_flags, spinlock_t *lock)
 +{
 +	struct clk_hw *hw;
 +
-+	hw = clk_hw_register_fractional_divider(dev, name, parent_name, flags,
-+			reg, mshift, mwidth, nshift, nwidth, clk_divider_flags,
-+			lock);
++	hw = clk_hw_register_gate(dev, name, parent_name, flags, reg,
++				  bit_idx, clk_gate_flags, lock);
 +	if (IS_ERR(hw))
 +		return ERR_CAST(hw);
 +	return hw->clk;
  }
- EXPORT_SYMBOL_GPL(clk_register_fractional_divider);
+ EXPORT_SYMBOL_GPL(clk_register_gate);
+ 
+@@ -178,3 +196,14 @@ void clk_unregister_gate(struct clk *clk)
+ 	kfree(gate);
+ }
+ EXPORT_SYMBOL_GPL(clk_unregister_gate);
 +
-+void clk_hw_unregister_fractional_divider(struct clk_hw *hw)
++void clk_hw_unregister_gate(struct clk_hw *hw)
 +{
-+	struct clk_fractional_divider *fd;
++	struct clk_gate *gate;
 +
-+	fd = to_clk_fd(hw);
++	gate = to_clk_gate(hw);
 +
 +	clk_hw_unregister(hw);
-+	kfree(fd);
++	kfree(gate);
 +}
++EXPORT_SYMBOL_GPL(clk_hw_unregister_gate);
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 79ad1a8a6831..bcbaf6c95d52 100644
+index 8885d0350596..bf12050aadd5 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -563,6 +563,11 @@ struct clk *clk_register_fractional_divider(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
- 		u8 clk_divider_flags, spinlock_t *lock);
-+struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
-+		u8 clk_divider_flags, spinlock_t *lock);
-+void clk_hw_unregister_fractional_divider(struct clk_hw *hw);
+@@ -326,7 +326,12 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock);
++struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 bit_idx,
++		u8 clk_gate_flags, spinlock_t *lock);
+ void clk_unregister_gate(struct clk *clk);
++void clk_hw_unregister_gate(struct clk_hw *hw);
  
- /**
-  * struct clk_multiplier - adjustable multiplier clock
+ struct clk_div_table {
+ 	unsigned int	val;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
