@@ -1,7 +1,7 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 21 Apr 2016 11:01:06 +0900
+Date: Thu, 21 Apr 2016 11:04:20 +0900
 Subject: [PATCH] ARM: cache-uniphier: activate ways for secondary CPUs
-Message-ID: <1461204066-27051-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1461204260-27202-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,21 +15,22 @@ There would be two possible ways to achieve this:
 
 [1] Each CPU initializes active ways for itself.  This can be done
     via the SSCLPDAWCR register.  This is a banked register, so each
-    CPU sees a different instance of the register.
+    CPU sees a different instance of the register for its own.
 
 [2] The master CPU initializes active ways for all the CPUs.  This
-    is available via SSCDAWCARMR(N) registers.  They are mapped at
-    the address SSCDAWCARMR + 4 * N, where N is the CPU number.
+    is available via SSCDAWCARMR(N) registers, where all instances
+    of SSCLPDAWCR are mirrored.  They are mapped at the address
+    SSCDAWCARMR + 4 * N, where N is the CPU number.
 
 The outer cache frame work does not support a per-CPU init callback.
 So this commit adopts [2]; the master CPU iterates over possible CPUs
 setting up SSCDAWCARMR(N) registers.
 
-Unfortunately, the register offsets for SSCDAWCARMR(N) are different
-by SoC.  We can live with it by checking the version register.
-
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
+
+KernelVersion: 4.6-rc4
+
 
  arch/arm/mm/cache-uniphier.c | 26 ++++++++++++++++++++++++--
  1 file changed, 24 insertions(+), 2 deletions(-)
