@@ -1,38 +1,21 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 21 Apr 2016 02:16:22 +0200
-Subject: [PATCH V2] acpi: implement Generic Event Device
-In-Reply-To: <1454857231-21388-1-git-send-email-okaya@codeaurora.org>
-References: <1454857231-21388-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <9220738.hpb0S9FjMY@vostro.rjw.lan>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 20 Apr 2016 21:27:43 -0300
+Subject: [PATCH v3] ARM: dts: imx6: Add dts for Embest MarS Board
+In-Reply-To: <1461184684-5241-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1461184684-5241-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <CAOMZO5Cyth4inJKmPJzd-so=Xh_DTe5+iD7gqOZoSgM+hG+KCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, February 07, 2016 10:00:31 AM Sinan Kaya wrote:
-> Generic Event Device described in ACPI 6.1 allows platforms to handle
-> platform interrupts in ACPI ASL statements. It borrows constructs like
-> _EVT from GPIO events. All interrupts are listed in _CRS and the handler
-> is written in _EVT method. Here is an example.
-> 
-> Device (GED0)
-> {
-> 
-> 	Name (_HID, "ACPI0013")
-> 	Name (_UID, 0)
-> 	Name(_CRS, ResourceTemplate ()
-> 	{
-> 		Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
-> 		 {123}
-> 	})
-> 
-> 	Method (_EVT, 1) {
-> 		if (Lequal(123, Arg0))
-> 		{
-> 		}
-> 	}
-> }
-> 
-> Wake capability has not been implemented yet.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+On Wed, Apr 20, 2016 at 5:38 PM, Sergio Prado
+<sergio.prado@e-labworks.com> wrote:
 
-Applied, thanks!
+> Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
+> Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
+> and with a 4MB SPI flash.
+>
+> [1] http://www.embest-tech.com/shop/star/marsboard.html
+>
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
