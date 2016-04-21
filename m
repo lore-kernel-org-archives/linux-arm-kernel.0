@@ -1,21 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Apr 2016 21:27:43 -0300
-Subject: [PATCH v3] ARM: dts: imx6: Add dts for Embest MarS Board
-In-Reply-To: <1461184684-5241-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1461184684-5241-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <CAOMZO5Cyth4inJKmPJzd-so=Xh_DTe5+iD7gqOZoSgM+hG+KCQ@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 21 Apr 2016 02:41:24 +0200
+Subject: [RESEND][PATCH 1/3] thermal: mediatek: Add cpu dynamic power
+ cooling model.
+In-Reply-To: <57176ECF.6020705@gmail.com>
+References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
+ <CAJZ5v0hpkyMCVhvYy4JzR1A5OZKs7dqDOB64aQXmjXiLM0F=BQ@mail.gmail.com>
+ <57176ECF.6020705@gmail.com>
+Message-ID: <12007858.UuqVGafLHV@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 5:38 PM, Sergio Prado
-<sergio.prado@e-labworks.com> wrote:
+On Wednesday, April 20, 2016 01:58:07 PM Matthias Brugger wrote:
+> Hi Rafael,
+> 
+> On 13/04/16 06:52, Rafael J. Wysocki wrote:
+> > On Tue, Apr 12, 2016 at 7:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >> Hi Rafael,
+> >>
+> >> On 15-03-16, 16:10, Dawei Chien wrote:
+> >>> MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
+> >>> cooling devices with dynamic power coefficient.
+> >>>
+> >>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> >>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >>
+> >> Can you please apply this patch from Dawei ?
+> >
+> > I can, but I'm traveling this week, so that's rather going to happen next week.
+> >
+> 
+> I don't see the patch in linux-next, did you forget to pick/push it?
 
-> Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
-> Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
-> and with a 4MB SPI flash.
->
-> [1] http://www.embest-tech.com/shop/star/marsboard.html
->
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+No, I didn't.  I just didn't have the time to get to them before.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Now, given that they are thermal patches, they really should go in via
+linux-soc-thermal.git.
+
+Eduardo, any chance to take care of these?
+
+Thanks,
+Rafael
