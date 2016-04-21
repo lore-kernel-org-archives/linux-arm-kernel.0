@@ -1,21 +1,79 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Apr 2016 10:10:19 -0500
-Subject: [PATCH 1/3] documentation: nvmem: imx-ocotp: Add i.MX6UL support
-In-Reply-To: <1461056354-973-1-git-send-email-van.freenix@gmail.com>
-References: <1461056354-973-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <20160421151019.GA7103@rob-hp-laptop>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 21 Apr 2016 17:14:40 +0200
+Subject: [PATCH v6 00/11] soc: renesas: Add R-Car SYSC PM Domain Support
+In-Reply-To: <20160421032811.GF11116@verge.net.au>
+References: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
+ <20160421032811.GF11116@verge.net.au>
+Message-ID: <CAMuHMdW8uyWUBiqrbkQ=SYd+k-_Ag2PmsGf6N0+-TtJvx0YFQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 04:59:12PM +0800, Peng Fan wrote:
-> Add i.MX6UL support in documentation.
-> 
-> Signed-off-by: Peng Fan <van.freenix@gmail.com>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> ---
->  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+Hi Simon,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Thu, Apr 21, 2016 at 5:28 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Apr 20, 2016 at 02:02:35PM +0200, Geert Uytterhoeven wrote:
+>> This patch series introduces a DT-based driver for the R-Car System
+>> Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
+>> SoCs.
+>>
+>> This is a dependency for the enablement of DU and VSP on R-Car H3, as
+>> the VSPs are located in a PM Domain.
+
+[...]
+
+>> Dependencies:
+>>   - clk-renesas-for-v4.7 (which now includes "[PATCH v2 0/4] clk:
+>>     renesas: R-Car SYSC PM Domain Preparation"; pull request sent),
+>>   - renesas-devel-20160420-v4.6-rc4 (which already contains series
+>>     "[PATCH v5 0/7] PM / Domains: Add DT bindings for the R-Car System
+>>     Controller").
+>>
+>> I won't be resending follow-up series "[PATCH v5 00/12] ARM/arm64: dts:
+>> rcar: Add SYSC PM domains" for now, as it's unchanged, except for an
+>> ugly rebase due to dropping the commits to reference both DMA
+>> controllers on R-Car Gen2.
+>>
+>> For your convenience, I've pushed this, incl. all dependencies, to the
+>> topic/rcar-sysc-pd-v6 branch of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+>> Integration with renesas-drivers-2016-04-12-v4.6-rc3 is available in the
+>> topic/gen3-latest branch.
+>>
+>> This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
+>> r8a7794/alt, and r8a7795/salvator-x.
+>>
+>> Thanks!
+>
+> Thanks. I am not planning to queue these up at this point.
+> Let me know if that is not what you expected.
+
+As the clock maintainers has merged the preparatory clock work, and pushed
+it out into clk-next, you can now:
+  1. Pull the preparatory clock work in your tree, i.e. pull from:
+
+        git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
+tags/clk-renesas-for-v4.7-tag2
+
+  2. Apply this series.
+
+After that,
+  3. I will rebase and update "[PATCH v5 00/12] ARM/arm64: dts: rcar: Add SYSC
+     PM domains" to match your current dt-for-v4.7 and arm64-dt-for-v4.7 (for
+     dmas/dma-names changes and recently added mmc and sdhi nodes),
+     and send it out,
+  4. You can apply it to a branch containing all of the above as prerequisites.
+
+Is that OK for you?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
