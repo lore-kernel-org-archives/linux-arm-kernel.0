@@ -1,91 +1,170 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Apr 2016 13:13:59 +0100
-Subject: [GIT PULL] STi DT updates for v4.7 #1
-In-Reply-To: <20160413220539.GZ19945@localhost>
-References: <5707B032.60401@st.com>
- <20160413220539.GZ19945@localhost>
-Message-ID: <20160421121359.GA16208@dell>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 21 Apr 2016 14:18:09 +0200
+Subject: [PATCH v7 00/10] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
+ part 1/3: iommu changes
+In-Reply-To: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <5718C501.20906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Apr 2016, Olof Johansson wrote:
-> On Fri, Apr 08, 2016 at 03:20:50PM +0200, Maxime Coquelin wrote:
-> > Hi Olof, Arnd and Kevin,
-> > 
-> > Please consider this first round of STi DT updates for v4.7:
-> > 
-> > The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-> > 
-> >   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git
-> > tags/sti-dt-for-v4.7-1
-> > 
-> > for you to fetch changes up to a8ff73843d015af1a65e94604677c2efd9ae70d4:
-> > 
-> >   ARM: STi: DT: STih407: Switch LPC mode from RTC to Clocksource (2016-04-05
-> > 15:42:29 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > Highlights:
-> > -----------
-> >  - Add CPUFreq support to STiH407 family
-> >  - Add Mailbox nodes to STiH407 family
-> >  - Add RemoteProc nodes to STiH407 family
-> >  - Use 'reserved-memory' for DMA memory on STiH407
-> >  - Use the LPC timer as a clocksource
-> > 
-> > ----------------------------------------------------------------
-> > Lee Jones (9):
-> >       ARM: STi: STiH407: Provide generic (safe) DVFS configuration
-> >       ARM: STi: STiH407: Provide CPU with clocking information
-> >       ARM: STi: STiH407: Link CPU with its voltage supply
-> >       ARM: STi: STiH407: Provide CPU with a means to look-up Major number
-> >       ARM: STi: stih407-family: Add nodes for Mailbox
-> >       ARM: STi: DT: STiH407: Enable Mailbox testing facility
-> >       ARM: STiH407: Add nodes for RemoteProc
-> >       ARM: STiH407: Move over to using the 'reserved-memory' API for
-> > obtaining DMA memory
-> >       ARM: STi: DT: STih407: Switch LPC mode from RTC to Clocksource
-
-Probably simpler to reply here, rather than to the patches themselves.
-
-> We use the format;
+Hi Alex, Robin,
+On 04/19/2016 06:56 PM, Eric Auger wrote:
+> This series introduces the dma-reserved-iommu api used to:
 > 
-> ARM: dts: STi: <...>
+> - create/destroy an iova domain dedicated to reserved iova bindings
+> - map/unmap physical addresses onto reserved IOVAs.
+> - search for an existing reserved iova mapping matching a PA window
+> - determine whether an msi needs to be iommu mapped
+> - translate an msi_msg PA address into its IOVA counterpart
 
-First I'd heard that this is now the defacto format.  That certainly
-wasn't the case when these patches were first authored.  I will adopt
-it from now on.
+Following Robin's review, I understand one important point we have to
+clarify is how much this API has to be generic.
 
-> for DT changes.
+I agree with Robin on the fact there is quite a lot of duplication
+between this dma-reserved-iommu implementation and dma-iommu
+implementation. Maybe we could consider an msi-mapping API
+implementation upon dma-iommu.c. This implementation would add MSI
+doorbell binding list management, including, ref counting and locking.
+
+We would need to add a map/unmap function taking an iova/pa/size as
+parameters in current dma-iommu.c
+
+An important assumption is that the dma-mapping API and the msi-mapping
+API must not be used concurrently (be would be trying to use the same
+cookie to store a different iova_domain).
+
+Any thought/suggestion?
+
+Best Regards
+
+Eric
+
+
 > 
-> Also, I've sent several replies directly to patches that should be
-> revisited (or dropped):
+> Currently reserved IOVAs are meant to map MSI physical doorbells. A single
+> reserved domain does exit per domain.
 > 
-> ARM: STi: stih407-family: Add nodes for Mailbox: Fix unit-ids.
-
-These were left out due to historical reasons, but yes, they should be
-in there now.  Will change.
-
-> ARM: STi: DT: STiH407: Enable Mailbox testing facility: Should probably not be
-> in DT.
-
-Depends what your reasons are for not wanting it in DT.  The node has
-no real use, dispite testing, so I can't really justify it being in
-the upstream kernel.  Will remove.
-
-> ARM: STiH407: Add nodes for RemoteProc: Doesn't conform to the bindings patch.
-
-Not sure what you mean here.  Again, there have been some changes over
-time.  The evolution of change is reflected in the two RemoteProc
-patches in the set.  The resultant file should conform to the
-documented bindings.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Also a new domain attribute is introduced to signal whether the MSI
+> addresses must be mapped in the IOMMU.
+> 
+> In current usage:
+> VFIO subsystem is supposed to create/destroy the iommu reserved domain.
+> The MSI layer is supposed to allocate/free iova mappings
+> 
+> Since several drivers are likely to use the same doorbell, a reference
+> counting takes place on the bindings. An RB-tree indexed by PA is used
+> to easily lookup for existing mappings at MSI message composition time.
+> 
+> More details & context can be found at:
+> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
+> 
+> Best Regards
+> 
+> Eric
+> 
+> Git: complete series available at
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc4-pcie-passthrough-v7
+> 
+> History:
+> 
+> v6 -> v7:
+> - fixed known lock bugs and multiple page sized slots matching
+>   (I currently only have a single MSI frame made of a single page)
+> - reserved_iova_cookie now pointing to a struct that encapsulates the
+>   iova domain handle + protection attribute passed from VFIO (Alex' req)
+> - 2 new functions exposed: iommu_msi_mapping_translate_msg,
+>   iommu_msi_mapping_desc_to_domain: not sure this is the right location/proto
+>   though
+> - iommu_put_reserved_iova now takes a phys_addr_t
+> - everything now is cleanup on iommu_domain destruction
+> 
+> RFC v5 -> patch v6:
+> - split to ease the review process
+> - in dma-reserved-api use a spin lock instead of a mutex (reported by
+>   Jean-Philippe)
+> - revisit iommu_get_reserved_iova API to pass a size parameter upon
+>   Marc's request
+> - Consistently use the page order passed when creating the iova domain.
+> - init reserved_binding_list (reported by Julien)
+> 
+> RFC v4 -> RFC v5:
+> - take into account Thomas' comments on MSI related patches
+>   - split "msi: IOMMU map the doorbell address when needed"
+>   - increase readability and add comments
+>   - fix style issues
+>  - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+>  - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+>  - fix compilation issue with CONFIG_IOMMU API unset
+>  - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+> 
+> RFC v3 -> v4:
+> - Move doorbell mapping/unmapping in msi.c
+> - fix ref count issue on set_affinity: in case of a change in the address
+>   the previous address is decremented
+> - doorbell map/unmap now is done on msi composition. Should allow the use
+>   case for platform MSI controllers
+> - create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+>   to reserved IOVA management (looking like dma-iommu glue)
+> - series reordering to ease the review:
+>   - first part is related to IOMMU
+>   - second related to MSI sub-system
+>   - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+> - expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+>   [this partially addresses Marc's comments on iommu_get/put_single_reserved
+>    size/alignment problematic - which I did not ignore - but I don't know
+>    how much I can do at the moment]
+> 
+> RFC v2 -> RFC v3:
+> - should fix wrong handling of some CONFIG combinations:
+>   CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+> 
+> PATCH v1 -> RFC v2:
+> - reverted to RFC since it looks more reasonable ;-) the code is split
+>   between VFIO, IOMMU, MSI controller and I am not sure I did the right
+>   choices. Also API need to be further discussed.
+> - iova API usage in arm-smmu.c.
+> - MSI controller natively programs the MSI addr with either the PA or IOVA.
+>   This is not done anymore in vfio-pci driver as suggested by Alex.
+> - check irq remapping capability of the group
+> 
+> RFC v1 [2] -> PATCH v1:
+> - use the existing dma map/unmap ioctl interface with a flag to register a
+>   reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+> - a single reserved IOVA contiguous region now is allowed
+> - use of an RB tree indexed by PA to store allocated reserved slots
+> - use of a vfio_domain iova_domain to manage iova allocation within the
+>   window provided by the userspace
+> - vfio alloc_map/unmap_free take a vfio_group handle
+> - vfio_group handle is cached in vfio_pci_device
+> - add ref counting to bindings
+> - user modality enabled at the end of the series
+> 
+> 
+> Eric Auger (10):
+>   iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+>   iommu/arm-smmu: advertise DOMAIN_ATTR_MSI_MAPPING attribute
+>   iommu: introduce a reserved iova cookie
+>   iommu/dma-reserved-iommu: alloc/free_reserved_iova_domain
+>   iommu/dma-reserved-iommu: reserved binding rb-tree and helpers
+>   iommu/dma-reserved-iommu: iommu_get/put_reserved_iova
+>   iommu/dma-reserved-iommu: delete bindings in
+>     iommu_free_reserved_iova_domain
+>   iommu/dma-reserved_iommu: iommu_msi_mapping_desc_to_domain
+>   iommu/dma-reserved-iommu: iommu_msi_mapping_translate_msg
+>   iommu/arm-smmu: call iommu_free_reserved_iova_domain on domain
+>     destruction
+> 
+>  drivers/iommu/Kconfig              |   8 +
+>  drivers/iommu/Makefile             |   1 +
+>  drivers/iommu/arm-smmu-v3.c        |   4 +
+>  drivers/iommu/arm-smmu.c           |   4 +
+>  drivers/iommu/dma-reserved-iommu.c | 422 +++++++++++++++++++++++++++++++++++++
+>  drivers/iommu/iommu.c              |   2 +
+>  include/linux/dma-reserved-iommu.h | 142 +++++++++++++
+>  include/linux/iommu.h              |   7 +
+>  8 files changed, 590 insertions(+)
+>  create mode 100644 drivers/iommu/dma-reserved-iommu.c
+>  create mode 100644 include/linux/dma-reserved-iommu.h
+> 
