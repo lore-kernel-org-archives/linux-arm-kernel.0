@@ -1,66 +1,22 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 21 Apr 2016 12:34:02 +0200
-Subject: [PATCH] PM / Runtime: Defer resuming of the device in
- pm_runtime_force_resume()
-Message-ID: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 21 Apr 2016 16:08:35 +0530
+Subject: [PATCH v3 0/3] dmaengine: Add clock support for AXI DMAS
+Message-ID: <1461235118-800-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the pm_runtime_force_suspend|resume() helpers were invented, we still
-had CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP as separate Kconfig options.
+This patch series adds basic clock support for AXI DMAS
+This patch series is created on top of the 
+"dmaengine: vdma: AXI DMA's enhancments" patch series.
 
-To make sure these helpers worked for all combinations and without
-introducing too much of complexity, the device was always resumed in
-pm_runtime_force_resume().
+Kedareswara rao Appana (3):
+  dmaengine: vdma: Add config structure to differentiate dmas
+  Documentation: DT: vdma: Add clock support for dmas
+  dmaengine: vdma: Add clock support
 
-More precisely, when CONFIG_PM_SLEEP was set and CONFIG_PM_RUNTIME was
-unset, we needed to resume the device as the subsystem/driver couldn't
-rely on using runtime PM to do it.
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |  15 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 304 ++++++++++++++++++---
+ 2 files changed, 287 insertions(+), 32 deletions(-)
 
-As the CONFIG_PM_RUNTIME option was merged into CONFIG_PM a while ago, it
-removed this combination, of using CONFIG_PM_SLEEP without the earlier
-CONFIG_PM_RUNTIME.
-
-For this reason we can now rely on the subsystem/driver to use runtime PM
-to resume the device, instead of forcing that to be done in all cases. In
-other words, let's defer this to a later point when it's actually needed.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
-
-Note, this patch is based upon another not yet queued patch [1]. The reason is
-simply because that [1] is a more important patch as it fixes a problem. It was
-posted to linux-pm April 8th and I expect it (or a new revision of it) to be
-applied before $subject patch.
-
-[1]
-https://patchwork.kernel.org/patch/8782851
-
----
- drivers/base/power/runtime.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index b746904..a190ca0 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -1506,6 +1506,17 @@ int pm_runtime_force_resume(struct device *dev)
- 		goto out;
- 	}
- 
-+	/*
-+	 * The PM core increases the runtime PM usage count in the system PM
-+	 * prepare phase. If the count is greather than 1 at this point, someone
-+	 * else has also increased it. In such case, let's make sure to runtime
-+	 * resume the device as that is likely what is expected. In other case
-+	 * we trust the subsystem/driver to runtime resume the device when it's
-+	 * actually needed.
-+	 */
-+	if (atomic_read(&dev->power.usage_count) < 2)
-+		goto out;
-+
- 	ret = pm_runtime_set_active(dev);
- 	if (ret)
- 		goto out;
 -- 
-1.9.1
+2.1.2
