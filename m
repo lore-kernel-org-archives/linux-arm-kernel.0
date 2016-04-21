@@ -1,21 +1,72 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2016 14:20:31 -0700
-Subject: [PATCH v2 2/2] dt-bindings: Add Oxford Semiconductor OXNAS
- Standard Clocks bindings
-In-Reply-To: <1460973696-5977-3-git-send-email-narmstrong@baylibre.com>
-References: <1460973696-5977-1-git-send-email-narmstrong@baylibre.com>
- <1460973696-5977-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160421212031.GB13149@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 21 Apr 2016 23:28:08 +0200
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160421130450.GQ29406@pali>
+References: <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
+ <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
+ <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
+ <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
+ <20160417175539.GA502@amd> <20160421130450.GQ29406@pali>
+Message-ID: <20160421212808.GA31979@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18, Neil Armstrong wrote:
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
+Hi!
 
-Applied to clk-next
+> > CONFIG_HSI breaks power management completely, so power management
+> > with modem will be another topic.  
+> 
+> Sebastian, any idea why power management does not work for HSI?
+> 
+> > > > > In the meantime, I found what is causing the rention mode to break for
+> > > > > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
+> > > > > 
+> > > > > I still get problems with the camera button, in config similar to
+> > > > > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
+> > > > > console. As long as I hold camera button down, I even get it into off
+> > > > > mode for brief period.
+> > > > 
+> > > > Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
+> > > > mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
+> > > > problems for you?)
+> > > > 
+> > > > Any idea why it enters off mode only once after each screenblank?
+> > > 
+> > > After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
+> > > blanking the screen, my n900 hits off mode just fine about once
+> > > a second. Sounds like you still have some extra devices enabled
+> > > causing it.
+> > 
+> > I checked again... also with vanilla 4.6-rc2 to double check... same effect.
+> > 
+> > Aha, got it... cat-ing /sys/kernel/debug/pm_debug/count breaks the
+> > off mode. If I don't do that (tm), it seems to work way better.
+> 
+> So what is result? Is power management working for CONFIG_KEYBOARD_GPIO?
+
+camera and unlock button GPIOs seem to break the powermanagement,
+too. I disabled it for now.
+
+Next hint I got from Sebastian was that I may need to enable power
+management in /sys.
+
+pavel at n900:/my/tui/ofone$ cat
+/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/runtime_status
+active
+pavel at n900:/my/tui/ofone$ cat
+/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/autosuspend_delay_ms
+cat:
+/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/autosuspend_delay_ms:
+Input/output error
+root at n900:/my/tui/ofone# cat
+/sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/control
+auto
+
+I could not get it to sleep :-(.
+
+Best regards,
+								Pavel
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
