@@ -1,109 +1,55 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 21 Apr 2016 13:51:55 +1000
-Subject: [PATCH v3] PCI: rcar-pcie: Remove Gen2 designation from Kconfig
-Message-ID: <1461210715-29304-1-git-send-email-horms+renesas@verge.net.au>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Wed, 20 Apr 2016 23:51:31 -0400
+Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
+Message-ID: <1461210694-29120-1-git-send-email-drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that Gen2 is a misnomer for the R-Car PCIE driver
-which also supports Gen 1 and Gen 3 SoCs. Accordingly, drop Gen 2
-from the help text and Kconfig symbol.
+From: David Rivshin <drivshin@allworx.com>
 
-Also, re-arange the Kconfig symbol name to use PCIE as the prefix.
-This appears to be in keeping with other PCIE Kconfig symbols.
+The first patch fixes a bug that makes dual_emac mode break if
+either slave uses the phy-handle property in the devicetree.
 
-Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
----
-Hi Bjorn,
+The second patch fixes some cosmetic problems with error messages,
+and also makes the binding documentation more explicit.
 
-As discussed elsewhere I am planning to take this through the renesas tree.
+The third patch cleans up the fixed-link case to work like
+the now-fixed phy-handle case.
 
-v3
-* Added Ack from Bjorn Helgaas
-* Added defconfig updates
+I have tested on the following hardware configurations:
+ - (EVMSK) dual emac, phy_id property in both slaves
+ - (EVMSK) dual emac, phy-handle property in both slaves
+ - (BeagleBoneBlack) single emac, phy_id property
+ - (custom) single emac, fixed-link subnode
 
-v2
-* As suggested by Geert Uytterhoeven:
-  - Use PCIE as prefix in Kconfig symbol
----
- arch/arm/configs/multi_v7_defconfig | 2 +-
- arch/arm/configs/shmobile_defconfig | 2 +-
- arch/arm64/configs/defconfig        | 2 +-
- drivers/pci/host/Kconfig            | 4 ++--
- drivers/pci/host/Makefile           | 2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
+Nicolas Chauvet reported testing on an HP t410 (dm8148).
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 434f86b110bb..a1cf13dfdea1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -119,7 +119,7 @@ CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
- CONFIG_PCI_RCAR_GEN2=y
--CONFIG_PCI_RCAR_GEN2_PCIE=y
-+CONFIG_PCIE_RCAR=y
- CONFIG_PCIEPORTBUS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=16
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index e06acb9b38ce..f2d635566a13 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -24,7 +24,7 @@ CONFIG_PL310_ERRATA_588369=y
- CONFIG_ARM_ERRATA_754322=y
- CONFIG_PCI=y
- CONFIG_PCI_RCAR_GEN2=y
--CONFIG_PCI_RCAR_GEN2_PCIE=y
-+CONFIG_PCIE_RCAR=y
- CONFIG_SMP=y
- CONFIG_SCHED_MC=y
- CONFIG_HAVE_ARM_ARCH_TIMER=y
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index a44ef995d8ae..23dd767b2971 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -56,7 +56,7 @@ CONFIG_ARCH_ZYNQMP=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_IOV=y
--CONFIG_PCI_RCAR_GEN2_PCIE=y
-+CONFIG_PCIE_RCAR=y
- CONFIG_PCI_HOST_GENERIC=y
- CONFIG_PCI_XGENE=y
- CONFIG_PCI_LAYERSCAPE=y
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 7a0780d56d2d..8fb1cf54617d 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -69,11 +69,11 @@ config PCI_RCAR_GEN2
- 	  There are 3 internal PCI controllers available with a single
- 	  built-in EHCI/OHCI host controller present on each one.
- 
--config PCI_RCAR_GEN2_PCIE
-+config PCIE_RCAR
- 	bool "Renesas R-Car PCIe controller"
- 	depends on ARCH_RENESAS || (ARM && COMPILE_TEST)
- 	help
--	  Say Y here if you want PCIe controller support on R-Car Gen2 SoCs.
-+	  Say Y here if you want PCIe controller support on R-Car SoCs.
- 
- config PCI_HOST_COMMON
- 	bool
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index d85b5faf9bbc..d3d8e1b36fb9 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -7,7 +7,7 @@ obj-$(CONFIG_PCI_HYPERV) += pci-hyperv.o
- obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
- obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
- obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
--obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
-+obj-$(CONFIG_PCIE_RCAR) += pcie-rcar.o
- obj-$(CONFIG_PCI_HOST_COMMON) += pci-host-common.o
- obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
- obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+Markus Brunner reported testing v1 on the following [1]:
+ - emac0 with phy_id and emac1 with fixed phy
+ - emac0 with phy-handle and emac1 with fixed phy
+ - emac0 with fixed phy and emac1 with fixed phy
+
+
+Changes since v1 [2]:
+- Rebased
+- Added Tested-by from Nicolas Chauvet on all patches
+- Added Acked-by from Rob Herring for the binding change in patch 2 [3]
+
+[1] http://www.spinics.net/lists/netdev/msg357890.html
+[2] http://www.spinics.net/lists/netdev/msg357772.html
+[3] http://www.spinics.net/lists/netdev/msg358254.html
+
+David Rivshin (3):
+  drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
+    config
+  drivers: net: cpsw: fix error messages when using phy-handle DT
+    property
+  drivers: net: cpsw: use of_phy_connect() in fixed-link case
+
+ Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
+ drivers/net/ethernet/ti/cpsw.c                 | 41 +++++++++++++-------------
+ drivers/net/ethernet/ti/cpsw.h                 |  1 +
+ 3 files changed, 23 insertions(+), 23 deletions(-)
+
 -- 
-2.7.0.rc3.207.g0ac5344
+2.5.5
