@@ -1,82 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 11:41:48 +0100
-Subject: [PATCH v7 17/16] arm64: hibernate: Refuse to hibernate if the
- boot cpu is offline
-In-Reply-To: <20160421162852.GB14030@red-moon>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1460565110-26341-1-git-send-email-james.morse@arm.com>
- <20160421114415.GJ6879@leverpostej>
- <20160421123335.GK6879@leverpostej>
- <20160421162852.GB14030@red-moon>
-Message-ID: <20160422104148.GD10606@leverpostej>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 22 Apr 2016 20:45:32 +1000
+Subject: [PATCH v6 00/12] ARM/arm64: dts: rcar: Add SYSC PM domains
+In-Reply-To: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
+References: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160422104528.GA12957@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 05:28:52PM +0100, Lorenzo Pieralisi wrote:
-> On Thu, Apr 21, 2016 at 01:33:35PM +0100, Mark Rutland wrote:
-> > On Thu, Apr 21, 2016 at 12:44:16PM +0100, Mark Rutland wrote:
-> > > On Wed, Apr 13, 2016 at 05:31:50PM +0100, James Morse wrote:
-> > > > It is important to hibernate/resume on the same CPU, otherwise we may
-> > > > change the cpu order or restore a big cpu's register state on a little
-> > > > cpu.
-> > > > 
-> > > > We know cpu 0 is the cpu the firmware booted us on last time, 
-> > > 
-> > > This assumes that we only kexec from CPU0 also, which we will have to
-> > > enforce. For example, disable_nonboot_cpus() does not enforce this if
-> > > CPU0 has been hotplugged out.
-> > > 
-> > > Otherwise, this kernel's CPU0 is not necessarily the CPU the FW booted
-> > > a kernel on.
-> > 
-> > A better approach might be:
-> > 
-> > * When going down for hibernate, store the physical CPU ID (e.g.
-> >   MPIDR_EL1.Aff*) in the header for the hibernate image.
-> > 
-> > * When restoring a hibernate image, first switch over to the CPU
-> >   described in the header (rather than assuming CPU0). 
-> > 
-> > I think this is a matter of adding a new disable_non_hibernate_cpus()
-> > function (defaulting to disable_nonboot_cpus()), and overriding that in
-> > the arch code. Then that can be called in resume_target_kernel.
+On Fri, Apr 22, 2016 at 11:07:22AM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> Yes, it looks feasible at least by code inspection, given that it
-> requires changes in core code I wonder whether it is a restriction
-> that we can remove later or we want it in from the beginning (given
-> that the issue with kexec you mention above is not present in the
-> current kernel, hopefully not for long :)).
-
-So long as we're not tied to a specific ABI for the hibernate image then
-we should be fine to change that later; I agree that this can be a
-subsequent improvement.
-
-So long as we have a mechanism to detect that the hibernate image format
-changed, we should be OK to add stuff to it.
-
-> > Though there are likely caveats I've missed.
+> This patch series adds the R-Car System Controller to the DTS files for
+> the various Renesas R-Car SoCs, and hooks up devices to their respective
+> PM domains.
 > 
-> Same here, it *should* just be a matter of rescheduling on the
-> cpu whose MPIDR corresponds to the cpu that created the snapshot
-> image instead of the first cpu online, that can be done as you
-> said with a generalized disable_nonboot_cpus() that looks up
-> the MPIDR and get the corresponding cpu index, in the *current*
-> logical map that I expect to be identical to the one in the
-> hibernated kernel (actually I am not even sure that's a requirement).
+> This (more specifically patch 1) is a dependency for the enablement of the
+> Display Unit on R-Car H3, as on this SoC the DU needs to use the VSPs, and the
+> VSPs are located in a PM Domain.
+> 
+> This series contains 2 parts, for both arm64 and arm32:
+>   1. Patches 1 (arm64) and 3-7 (arm32) add device node for the System
+>      Controllers, and hook up CPU cores and L2 caches/SCUs to their
+>      respective PM Domains,
+>   2. Patches 2 (arm64) and 8-12 (arm32) hook up devices to the SYSC
+>      "always-on" PM Domain, for a more consistent device-power-area
+>      description in DT.
+> 
+> Changes compared to v5:
+>   - Add Acked-by,
+>   - Rebased R-Car Gen2 patches because of dropping of references to the
+>     second DMA controllers,
+>   - Updated for addition of sdhi[0-2] device nodes on r8a7793,
+>   - Reordered arm64 patches first, as these have a higher priority.
+> 
+> Changes compared to v4:
+>   - Add Acked-by,
+>   - Remove "power-domains" property again from the sysc nodes, as the
+>     System Controller theirselves are not part of the Clock Domains.
+> 
+> Changes compared to v3:
+>   - Add power-domains properties to the sysc nodes, to refer to the
+>     SoC's Clock Domains,
+>   - Extract using the SYSC "always-on" PM Domain on R-Car H3 into its
+>     own patch,
+>   - Add patches to use the SYSC "always-on" PM Domain on R-Car H1 and
+>     R-Car Gen2,
+>   - Update for recently added can0, can1, pciec0, and pciec1 device
+>     nodes on R-Car H3.
+> 
+> Changes compared to v2:
+>   - Move power area hierarchy from DT to C (cfr. DT bindings for Renesas
+>     CPG/MSSR), and switch to "#power-domain-cells = <1>",
+>   - Drop fallback compatibility strings, as the bindings are
+>     SoC-specific,
+>   - Add an "always-on" power area on R-Car H3.
+> 
+> Changes compared to v1:
+>   - Add R-Car H3 (r8a7795) support,
+>   - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
+>   - Add fallback compatibility strings for R-Car Gen2 and Gen3.
+> 
+> Dependencies:
+>   - renesas-devel-20160422v2-v4.6-rc4.
+> 
+> Suggested patch application strategy:
+>   - On branch arm64-dt-for-v4.7:
+>       - Merge rcar-sysc-for-v4.7,
+>       - Apply patches 1-2.
+>   - On branch dt-for-v4.7:
+>       - Merge rcar-sysc-for-v4.7,
+>       - Apply patches 3-12.
+> 
+> Suggested arm-soc pull request strategy:
+>   - Send pull-request for rcar-sysc-for-v4.7,
+>   - Send pull-request for arm64-dt-for-v4.7,
+>   - Send pull-request for dt-for-v4.7.
+> 
+> For your convenience, I've pushed this to the topic/rcar-sysc-pd-dt-v6
+> branch of
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+> Integration with renesas-drivers-2016-04-12-v4.6-rc3 is available in the
+> topic/gen3-latest branch.
+> 
+> This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
+> r8a7794/alt, and r8a7795/salvator-x.
+> 
+> Thanks for applying!
 
-That can't be a requirement. The logical ID may be arbitrarily
-different.
-
-Imagine a two CPU system (0x000 and 0x100, say):
-
-* Kernel A boots (CPU0: 0x000, CPU1: 0x100);
-* Kernel A hotplugs out CPU0 (0x000)
-* Kernel A kexecs to kernel B on CPU1 (0x100)
-* Kernel B boots (CPU0: 0x100, CPU1: 0x000)
-* Kernel B hibernates on CPU0 (0x100)
-* Kernel C boots (CPU0: 0x000, CPU1: 0x100)
-* Kernel C switches to CPU1 (0x100)
-* Kernel C resumes Kernel B, CPU1 becomes CPU0 (0x100)
-
-Thanks,
-Mark.
+Thanks, done.
