@@ -1,59 +1,74 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 22 Apr 2016 12:25:33 +0100
-Subject: [PATCH v4 3/5] irqchip/gic: Restore CPU interface checking
+Date: Fri, 22 Apr 2016 12:25:35 +0100
+Subject: [PATCH v4 5/5] arm64: Fix behavior of maxcpus=N
 In-Reply-To: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
 References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1461324335-5081-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1461324335-5081-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+maxcpu=n sets the number of CPUs activated at boot time to a max of n,
+but allowing the remaining CPUs to be brought up later if the user
+decides to do so. However, on arm64 due to various reasons, we disallowed
+hotplugging CPUs beyond n, by marking them not present. Now that
+we have checks in place to make sure the hotplugged CPUs have compatible
+features with system and requires no new errata, relax the restriction.
 
-When introducing the whole CPU feature detection framework,
-we lost the capability to detect a mismatched GIC configuration
-(using the GICv2 MMIO interface, but having the system register
-interface enabled).
-
-In order to solve this, use the new this_cpu_has_cap() helper.
-Also move the check to the CPU interface path in order to catch
-systems where the first CPU has been correctly configured,
-but the secondaries are not.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: James Morse <james.morse@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/irqchip/irq-gic.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/smp.c |   18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 282344b..095bb5b 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -55,7 +55,7 @@
- 
- static void gic_check_cpu_features(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b2d5f4e..fa9dbaa 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -647,33 +647,18 @@ void __init smp_init_cpus(void)
+ void __init smp_prepare_cpus(unsigned int max_cpus)
  {
--	WARN_TAINT_ONCE(cpus_have_cap(ARM64_HAS_SYSREG_GIC_CPUIF),
-+	WARN_TAINT_ONCE(this_cpu_has_cap(ARM64_HAS_SYSREG_GIC_CPUIF),
- 			TAINT_CPU_OUT_OF_SPEC,
- 			"GICv3 system registers enabled, broken firmware!\n");
- }
-@@ -490,6 +490,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 		 * Get what the GIC says our CPU mask is.
- 		 */
- 		BUG_ON(cpu >= NR_GIC_CPU_IF);
-+		gic_check_cpu_features();
- 		cpu_mask = gic_get_cpumask(gic);
- 		gic_cpu_map[cpu] = cpu_mask;
+ 	int err;
+-	unsigned int cpu, ncores = num_possible_cpus();
++	unsigned int cpu;
  
-@@ -1021,8 +1022,6 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	init_cpu_topology();
  
- 	BUG_ON(gic_nr >= CONFIG_ARM_GIC_MAX_NR);
+ 	smp_store_cpu_info(smp_processor_id());
  
--	gic_check_cpu_features();
+ 	/*
+-	 * are we trying to boot more cores than exist?
+-	 */
+-	if (max_cpus > ncores)
+-		max_cpus = ncores;
 -
- 	gic = &gic_data[gic_nr];
+-	/* Don't bother if we're effectively UP */
+-	if (max_cpus <= 1)
+-		return;
+-
+-	/*
+ 	 * Initialise the present map (which describes the set of CPUs
+ 	 * actually populated at the present time) and release the
+ 	 * secondaries from the bootloader.
+-	 *
+-	 * Make sure we online@most (max_cpus - 1) additional CPUs.
+ 	 */
+-	max_cpus--;
+ 	for_each_possible_cpu(cpu) {
+-		if (max_cpus == 0)
+-			break;
  
- 	/* Initialize irq_chip */
+ 		if (cpu == smp_processor_id())
+ 			continue;
+@@ -686,7 +671,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 			continue;
+ 
+ 		set_cpu_present(cpu, true);
+-		max_cpus--;
+ 	}
+ }
+ 
 -- 
 1.7.9.5
