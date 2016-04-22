@@ -1,62 +1,105 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Apr 2016 11:18:07 +0100
-Subject: [[PATCH v2] 03/11] pwm: sysfs: Add PWM Capture support
+Date: Fri, 22 Apr 2016 11:18:11 +0100
+Subject: [[PATCH v2] 07/11] pwm: sti: Supply PWM Capture clock handling
 In-Reply-To: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
 References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1461320295-20414-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1461320295-20414-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a user to read PWM Capture results from /sysfs.
-
-To start a capture and read the result, simply read the file:
-
-  $ cat $PWMCHIP/capture
-
-The output format is "<period>:<duty_cycle>".
+ST's PWM IP is supplied by 2 different clocks.  One for PWM
+Output and the other for Capture.  This patch provides clock
+handling for the latter.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pwm/sysfs.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/pwm/pwm-sti.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index 9c90886..ca0d886 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -167,16 +167,33 @@ static ssize_t polarity_store(struct device *child,
- 	return ret ? : size;
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index 2f61e1e..78979d0 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -74,6 +74,7 @@ struct sti_pwm_compat_data {
+ struct sti_pwm_chip {
+ 	struct device *dev;
+ 	struct clk *pwm_clk;
++	struct clk *cpt_clk;
+ 	struct regmap *regmap;
+ 	struct sti_pwm_compat_data *cdata;
+ 	struct regmap_field *prescale_low;
+@@ -183,6 +184,10 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		if (ret)
+ 			return ret;
+ 
++		ret = clk_enable(pc->cpt_clk);
++		if (ret)
++			return ret;
++
+ 		if (!period_same) {
+ 			ret = sti_pwm_get_prescale(pc, period_ns, &prescale);
+ 			if (ret)
+@@ -227,6 +232,7 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 
+ clk_dis:
+ 	clk_disable(pc->pwm_clk);
++	clk_disable(pc->cpt_clk);
+ 	return ret;
  }
  
-+static ssize_t capture_show(struct device *child,
-+			    struct device_attribute *attr,
-+			    char *buf)
-+{
-+	struct pwm_device *pwm = child_to_pwm_device(child);
-+	struct pwm_capture result;
-+	int ret;
-+
-+	ret = pwm_capture(pwm, &result, jiffies_to_msecs(HZ));
-+	if (ret)
-+		return ret;
-+
-+	return sprintf(buf, "%llu %llu\n", result.period, result.duty_cycle);
-+}
-+
- static DEVICE_ATTR_RW(period);
- static DEVICE_ATTR_RW(duty_cycle);
- static DEVICE_ATTR_RW(enable);
- static DEVICE_ATTR_RW(polarity);
-+static DEVICE_ATTR_RO(capture);
+@@ -246,6 +252,10 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 		if (ret)
+ 			goto out;
  
- static struct attribute *pwm_attrs[] = {
- 	&dev_attr_period.attr,
- 	&dev_attr_duty_cycle.attr,
- 	&dev_attr_enable.attr,
- 	&dev_attr_polarity.attr,
-+	&dev_attr_capture.attr,
- 	NULL
- };
- ATTRIBUTE_GROUPS(pwm);
++		ret = clk_enable(pc->cpt_clk);
++		if (ret)
++			goto out;
++
+ 		ret = regmap_field_write(pc->pwm_out_en, 1);
+ 		if (ret) {
+ 			dev_err(dev, "failed to enable PWM device:%d\n",
+@@ -271,6 +281,7 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	regmap_field_write(pc->pwm_out_en, 0);
+ 
+ 	clk_disable(pc->pwm_clk);
++	clk_disable(pc->cpt_clk);
+ 	mutex_unlock(&pc->sti_pwm_lock);
+ }
+ 
+@@ -390,6 +401,18 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	pc->cpt_clk = of_clk_get_by_name(dev->of_node, "capture");
++	if (IS_ERR(pc->cpt_clk)) {
++		dev_err(dev, "failed to get PWM capture clock\n");
++		return PTR_ERR(pc->cpt_clk);
++	}
++
++	ret = clk_prepare(pc->cpt_clk);
++	if (ret) {
++		dev_err(dev, "failed to prepare clock\n");
++		return ret;
++	}
++
+ 	pc->chip.dev = dev;
+ 	pc->chip.ops = &sti_pwm_ops;
+ 	pc->chip.base = -1;
+@@ -399,6 +422,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	ret = pwmchip_add(&pc->chip);
+ 	if (ret < 0) {
+ 		clk_unprepare(pc->pwm_clk);
++		clk_unprepare(pc->cpt_clk);
+ 		return ret;
+ 	}
+ 
+@@ -416,6 +440,7 @@ static int sti_pwm_remove(struct platform_device *pdev)
+ 		pwm_disable(&pc->chip.pwms[i]);
+ 
+ 	clk_unprepare(pc->pwm_clk);
++	clk_unprepare(pc->cpt_clk);
+ 
+ 	return pwmchip_remove(&pc->chip);
+ }
 -- 
 2.8.0
