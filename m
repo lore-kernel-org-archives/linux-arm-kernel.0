@@ -1,64 +1,40 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 22 Apr 2016 11:22:25 -0500
-Subject: [PATCH v2.1 1/9] dt-binding: remoteproc: Introduce Qualcomm WCNSS
- loader binding
-In-Reply-To: <1461259256-28529-1-git-send-email-bjorn.andersson@linaro.org>
-References: <1459222625-11440-2-git-send-email-bjorn.andersson@linaro.org>
- <1461259256-28529-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <CAL_JsqLgehfMVXgDQdHaC6SJ7MU3oRKFn4ogLbtgp_31keX95g@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 22 Apr 2016 17:24:33 +0100
+Subject: [PATCH v2] arm-ccn: Fix building as a module
+In-Reply-To: <7hd1ph4pnt.fsf@baylibre.com>
+References: <1461318211-25151-1-git-send-email-suzuki.poulose@arm.com>
+ <1461324729.2721.93.camel@arm.com> <7hd1ph4pnt.fsf@baylibre.com>
+Message-ID: <571A5041.5010908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 12:20 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+On 22/04/16 16:41, Kevin Hilman wrote:
+> Pawel Moll <pawel.moll@arm.com> writes:
 >
-> The document defines the binding for a component that loads firmware for
-> and boots the Qualcomm WCNSS core.
+>> On Fri, 2016-04-22 at 10:43 +0100, Suzuki K Poulose wrote:
+>>> arm-ccn driver uses irq_set_affinity, which is not exported and
+>>> hence cannot be built as a module, eventhough we have all the
+>>> bits ready. This patch makes use of the exported helper
+>>> irq_set_affinity_hint() instead. Also, the __free_irq expects
+>>> the affinity_hint to be NULL when we free the irq. So set the
+>>> affinity_hint to NULL at clean up.
+>>>
+>>> Now that we can build it as a module, update the Kconfig to
+>>> reflect the change.
+>>>
+>>> Applies on 4.6-rc4.
+>>
+>> Acked-by: Pawel Moll <pawel.moll@arm.com>
+>>
 >
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
->
-> Rob,
->
-> I got your Ack on v2, but I would like to make a small amendment before merging
-> this.
->
->
-> As we discussed related to the WiFi binding I should reference the mmio
-> registers by a phandle to a DT node specifying the two necessary register
-> blocks (ccu & dxe).
->
-> These two register blocks are part of the riva/pronto (the two major versions)
-> subsystem, that also contains the "pmu" register block, which is what I access
-> here.
->
-> Further more, the ccu block contains valuable information for debugging
-> purposes that the implementation of this binding would find useful.
->
->
-> I would therefor like to double this node (in the dts) as both the
-> riva/pronto-pil and the target for the mmio phandle reference from the WiFi
-> node.
->
-> This works fine, but unless using reg-names for defining the order or the regs
-> I get a messy ordering dependency between the two bindings. I do not know which
-> of the other 7-8 register blocks we will add for debugging, but with the below
-> change I can keep them in block order regardless of the order we implement them
-> in.
+> Applied to arm-soc/fixes with Pawel's ack.
 
-You should know based on the compatible string what the number and
-order of register ranges are. reg is not something we want evolving
-over time.
+Kevin,
 
-> So, can I update the "reg" and add "reg-names" as below to the binding and
-> depend on reg-names for the ordering of reg? Or should I speculatively add all
-> ranges I know of to keep the order sane?
+Please note that there is a change to Kconfig for ARM_CCN. So if you
+think changes to Kconfig shouldn't be pushed as a fix, by all means you
+can push this to 4.7.
 
-I'm okay with using this for convenience of the client not having to
-care which compatible the block is, but the above should still be met.
+The title of the patch doesn't convey that. Sorry about that.
 
-Also, you could add a cell which is the index to the register range you need.
-
-Rob
+Suzuki
