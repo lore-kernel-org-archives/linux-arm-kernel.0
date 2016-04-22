@@ -1,44 +1,40 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 22 Apr 2016 10:30:05 +0200
-Subject: [PULL] ARM: cpuidle: changes for 4.7
-Message-ID: <5719E10D.5020008@linaro.org>
+Date: Fri, 22 Apr 2016 10:31:27 +0200
+Subject: [PATCH 1/4] ARM: cpuidle: add const qualifier to cpuidle_ops member
+ in structures
+In-Reply-To: <5719E10D.5020008@linaro.org>
+References: <5719E10D.5020008@linaro.org>
+Message-ID: <1461313892-20613-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+From: Jisheng Zhang <jszhang@marvell.com>
 
-please pull the following changes for 4.7.
+The core code does not modify smp_operations structures. To clarify it,
+this patch adds 'const' qualifier to the 'ops' member of struct
+of_cpuidle_method.
 
-  * Constify the cpuidle_ops structure and the types returned by the 
-functions using it (Jisheng Zhang)
+This change allows each arm cpuidle code to add 'const' qualifier to
+its cpuidle_ops structure.
 
-Thanks !
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/include/asm/cpuidle.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-   -- Daniel
-
-The following changes since commit c3b46c73264b03000d1e18b22f5caf63332547c9:
-
-   Linux 4.6-rc4 (2016-04-17 19:13:32 -0700)
-
-are available in the git repository at:
-
-   http://git.linaro.org/people/daniel.lezcano/linux.git cpuidle/4.7
-
-for you to fetch changes up to 5e7c17df795e462c70a43f1b3b670e08efefe8fd:
-
-   drivers: firmware: psci: use const and __initconst for 
-psci_cpuidle_ops (2016-04-20 10:44:32 +0200)
-
-----------------------------------------------------------------
-Jisheng Zhang (4):
-       ARM: cpuidle: add const qualifier to cpuidle_ops member in structures
-       ARM: cpuidle: constify return value of arm_cpuidle_get_ops()
-       soc: qcom: spm: Use const and __initconst for qcom_cpuidle_ops
-       drivers: firmware: psci: use const and __initconst for 
-psci_cpuidle_ops
-
-  arch/arm/include/asm/cpuidle.h | 2 +-
-  arch/arm/kernel/cpuidle.c      | 6 +++---
-  drivers/firmware/psci.c        | 2 +-
-  drivers/soc/qcom/spm.c         | 2 +-
-  4 files changed, 6 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+index 3848259..baefe1d 100644
+--- a/arch/arm/include/asm/cpuidle.h
++++ b/arch/arm/include/asm/cpuidle.h
+@@ -36,7 +36,7 @@ struct cpuidle_ops {
+ 
+ struct of_cpuidle_method {
+ 	const char *method;
+-	struct cpuidle_ops *ops;
++	const struct cpuidle_ops *ops;
+ };
+ 
+ #define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)			\
+-- 
+1.9.1
