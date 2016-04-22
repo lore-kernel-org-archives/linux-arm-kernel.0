@@ -1,26 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 22 Apr 2016 15:24:47 -0700
-Subject: [PATCH 08/10] mvebu: Use dev_pm_opp_set_sharing_cpus() to mark
- OPP tables as shared
-In-Reply-To: <3808dbeda9c233026ed78fa3ec94c0bbd898875c.1461228504.git.viresh.kumar@linaro.org>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <3808dbeda9c233026ed78fa3ec94c0bbd898875c.1461228504.git.viresh.kumar@linaro.org>
-Message-ID: <20160422222447.GS13149@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 23 Apr 2016 00:30:49 +0200
+Subject: [PATCH v2] drm/panel: simple: Add support for Innolux AT070TN92
+In-Reply-To: <877ffrp3fc.fsf@gmail.com>
+References: <1461159435-16528-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160420134036.GA7470@ulmo.ba.sec> <877ffrp3fc.fsf@gmail.com>
+Message-ID: <20160422223047.GA22161@mithrandir.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21, Viresh Kumar wrote:
-> @@ -683,10 +678,15 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  			clk_put(clk);
->  			return ret;
->  		}
-> +
-> +		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
-> +				(struct cpumask *) cpumask_of(cpu_dev->id));
+On Thu, Apr 21, 2016 at 02:11:19PM +0200, Holger Schurig wrote:
+> Thierry Reding <thierry.reding@gmail.com> writes:
+> > Applied, thanks.
+> 
+> I once read that this is the recommended way to go, instead of
+> specifying the timings in the device tree. Why is this so?  Any new
+> display just increases the .text size of the kernel unnessary.
 
-This cast doesn't look good. Why are we casting away const?
-Shouldn't dev_pm_opp_set_sharing_cpus() take a const mask anyway?
+It's actually only the .rodata section that's increased every time we
+add a new display panel.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Did this idea stem from the era where bootloaders like Barebox couldn't
+> modify the DT ad-hoc before handing it over to the kernel?
+
+No, not really. But since this has come up every now and again I finally
+wrote down my recollection and thoughts on the matter, hopefully that
+will be satisfactory as an answer:
+
+	http://sietch-tagr.blogspot.com/2016/04/display-panels-are-not-special.html
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160423/7be16892/attachment.sig>
