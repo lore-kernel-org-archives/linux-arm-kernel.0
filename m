@@ -1,76 +1,144 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 15:44:40 +0100
-Subject: [PATCH] drivers: firmware: psci: unify enable-method binding on
- ARM {64,32}-bit systems
-In-Reply-To: <1461335911-13233-1-git-send-email-sudeep.holla@arm.com>
-References: <1461335911-13233-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160422144440.GN10606@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 15:49:52 +0100
+Subject: [PATCH v7 01/10] iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+In-Reply-To: <571A1273.9060808@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-2-git-send-email-eric.auger@linaro.org>
+ <57177A4E.4090804@arm.com> <5717A738.9090904@linaro.org>
+ <571A0B78.6070509@arm.com> <571A1273.9060808@linaro.org>
+Message-ID: <571A3A10.70601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 03:38:31PM +0100, Sudeep Holla wrote:
-> Currently ARM CPUs DT bindings allows different enable-method value for
-> PSCI based systems. On ARM 64-bit this property is required and must be
-> "psci" while on ARM 32-bit systems this property is optional and must
-> be "arm,psci".
+On 22/04/16 13:00, Eric Auger wrote:
+> Hi Robin,
+> On 04/22/2016 01:31 PM, Robin Murphy wrote:
+>> On 20/04/16 16:58, Eric Auger wrote:
+>>> Hi Robin,
+>>> On 04/20/2016 02:47 PM, Robin Murphy wrote:
+>>>> Hi Eric,
+>>>>
+>>>> On 19/04/16 17:56, Eric Auger wrote:
+>>>>> Introduce a new DOMAIN_ATTR_MSI_MAPPING domain attribute. If supported,
+>>>>> this means the MSI addresses need to be mapped in the IOMMU.
+>>>>>
+>>>>> x86 IOMMUs typically don't expose the attribute since on x86, MSI write
+>>>>> transaction addresses always are within the 1MB PA region [FEE0_0000h -
+>>>>> FEF0_000h] window which directly targets the APIC configuration
+>>>>> space and
+>>>>> hence bypass the sMMU. On ARM and PowerPC however MSI transactions are
+>>>>> conveyed through the IOMMU.
+>>>>
+>>>> What's stopping us from simply inferring this from the domain's IOMMU
+>>>> not advertising interrupt remapping capabilities?
+>>> My current understanding is it is not possible:
+>>> on x86 CAP_INTR_REMAP is not systematically exposed (the feature can be
+>>> disabled) and MSIs are never mapped in the IOMMU I think.
+>>
+>> Not sure I follow - if the feature is disabled such that the IOMMU
+>> doesn't isolate MSIs, then it's no different a situation from the SMMU, no?
+>
+> sorry I understood you wanted to use IOMMU_CAP_INTR_REMAP as the sole
+> criteria to detect whether MSI mapping was requested.
+>>
+>> My point was that this logic:
+>>
+>>      if (IOMMU_CAP_INTR_REMAP)
+>>          we're good
+>>      else if (DOMAIN_ATTR_MSI_MAPPING)
+>>          if (acquire_msi_remapping_resources(domain))
+>>              we're good
+>>          else
+>>              oh no!
+>>      else
+>>          oh no!
+>>
+>> should be easily reducible to this:
+>>
+>>      if (IOMMU_CAP_INTR_REMAP)
+>>          we're good
+>>      else if (acquire_msi_remapping_resources(domain))
+>
+> But Can't we imagine a mix of smmus on the same platform, some
+> requesting MSI mapping and some which don't. As soon as an smmu requires
+> MSI mapping, CONFIG_IOMMU_DMA_RESERVED is set and
+> acquire_msi_remapping_resources(domain) will be implemented & succeed.
+> Doesn't it lead to a wrong decision. Do I miss something, or do you
+> consider this situation as far-fetched?
 
-FWIW, "arm,psci" has always been the compatible string for the PSCI
-node, and was never intended to be the enable-method. So as far as I can
-tell, this was a mistake/bug, and not a deliberate attempt at specifying
-32-bit differently.
+Sorry, what was implicit there was that the imaginary 
+acquire_msi_remapping_resources(*IOMMU* domian) call still involves 
+going all the way down to check for MSI_FLAG_IRQ_REMAPPING in the 
+relevant place.
 
-> This is problematic if 32-bit OS is run on 64-bit system which has
-> "psci" as enable-method rather than the expected "arm,psci".
-> 
-> So let's unify the value into "psci" and remove support for "arm,psci"
-> before it finds any users.
-> 
-> Reported-by: Soby Mathew <Soby.Mathew@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Either way, now that I consider it further, a flag on the IOMMU domain 
+is not just unnecessary, I think it's actually fundamentally incorrect: 
+picture a system which for some crazy reason has both a GICv3 ITS plus 
+some other dumb v2m-like MMIO-SPI bridge - whether a device's MSI domain 
+targets the (safe) ITS or the (unsafe) bridge isn't a property of the 
+IOMMU domain it's trying to attach to; if you can't rely on the IOMMU 
+itself to isolate MSIs, then you can only know whether to allow or 
+reject any given group by inspecting every device in that group to make 
+sure they all have isolation provided by their MSI domains and that the 
+IOMMU domain has all the relevant doorbell mappings ready.
 
-This was definitely a mistake, as "arm,psci" was the compatible string
-for the psci node, and was never the enable-method. So:
+I guess the allow_unsafe_interrupts case might complicate matters beyond 
+the logic I sketched out, because then we might actually care about the 
+difference between "is isolation provided?" and "are sufficient 
+IOVA/descriptor resources available?", but the main point still stands.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Robin.
 
-Hopefully no-one's begun to use this.
-
-Thanks,
-Mark.
-
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 1 -
->  drivers/firmware/psci.c                        | 2 +-
->  2 files changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index ccc62f145306..3f0cbbb8395f 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -192,7 +192,6 @@ nodes to be present and contain the properties described below.
->  			  can be one of:
->  			    "allwinner,sun6i-a31"
->  			    "allwinner,sun8i-a23"
-> -			    "arm,psci"
->  			    "arm,realview-smp"
->  			    "brcm,bcm-nsp-smp"
->  			    "brcm,brahma-b15"
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 11bfee8b79a9..b5d05807e6ec 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -360,7 +360,7 @@ static struct cpuidle_ops psci_cpuidle_ops __initdata = {
->  	.init = psci_dt_cpu_init_idle,
->  };
->  
-> -CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
-> +CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
->  #endif
->  #endif
->  
-> -- 
-> 1.9.1
-> 
+> Thanks
+>
+> Eric
+>
+>>          we're good
+>>      else
+>>          oh no!    // Don't care whether the domain ran out of
+>>              // resources or simply doesn't support it,
+>>              // either way we can't proceed.
+>>
+>> Robin.
+>>
+>>> Best Regards
+>>>
+>>> Eric
+>>>>
+>>>> Robin.
+>>>>
+>>>>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+>>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>>
+>>>>> ---
+>>>>>
+>>>>> v4 -> v5:
+>>>>> - introduce the user in the next patch
+>>>>>
+>>>>> RFC v1 -> v1:
+>>>>> - the data field is not used
+>>>>> - for this attribute domain_get_attr simply returns 0 if the
+>>>>> MSI_MAPPING
+>>>>>      capability if needed or <0 if not.
+>>>>> - removed struct iommu_domain_msi_maps
+>>>>> ---
+>>>>>     include/linux/iommu.h | 1 +
+>>>>>     1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>>>> index 62a5eae..b3e8c5b 100644
+>>>>> --- a/include/linux/iommu.h
+>>>>> +++ b/include/linux/iommu.h
+>>>>> @@ -113,6 +113,7 @@ enum iommu_attr {
+>>>>>         DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>>>>>         DOMAIN_ATTR_FSL_PAMUV1,
+>>>>>         DOMAIN_ATTR_NESTING,    /* two stages of translation */
+>>>>> +    DOMAIN_ATTR_MSI_MAPPING, /* Require MSIs mapping in iommu */
+>>>>>         DOMAIN_ATTR_MAX,
+>>>>>     };
+>>>>>
+>>>>>
+>>>>
+>>>
+>>
+>
