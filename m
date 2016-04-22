@@ -1,51 +1,41 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 22 Apr 2016 09:44:48 -0700
-Subject: [PATCH v2] arm-ccn: Fix building as a module
-In-Reply-To: <571A5041.5010908@arm.com> (Suzuki K. Poulose's message of "Fri,
- 22 Apr 2016 17:24:33 +0100")
-References: <1461318211-25151-1-git-send-email-suzuki.poulose@arm.com>
- <1461324729.2721.93.camel@arm.com> <7hd1ph4pnt.fsf@baylibre.com>
- <571A5041.5010908@arm.com>
-Message-ID: <7h7ffp4mpr.fsf@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 22 Apr 2016 18:48:02 +0200
+Subject: [PATCH v2 0/6] arm64/ARM pt dumper changes 
+Message-ID: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
+This series updates the kernel page table dumper to:
+- not initialize the vmemmap region markers dynamically
+- show region boundaries for the kasan shadow region
+- include the UEFI runtime services mappings
 
-> On 22/04/16 16:41, Kevin Hilman wrote:
->> Pawel Moll <pawel.moll@arm.com> writes:
->>
->>> On Fri, 2016-04-22 at 10:43 +0100, Suzuki K Poulose wrote:
->>>> arm-ccn driver uses irq_set_affinity, which is not exported and
->>>> hence cannot be built as a module, eventhough we have all the
->>>> bits ready. This patch makes use of the exported helper
->>>> irq_set_affinity_hint() instead. Also, the __free_irq expects
->>>> the affinity_hint to be NULL when we free the irq. So set the
->>>> affinity_hint to NULL at clean up.
->>>>
->>>> Now that we can build it as a module, update the Kconfig to
->>>> reflect the change.
->>>>
->>>> Applies on 4.6-rc4.
->>>
->>> Acked-by: Pawel Moll <pawel.moll@arm.com>
->>>
->>
->> Applied to arm-soc/fixes with Pawel's ack.
->
-> Kevin,
->
-> Please note that there is a change to Kconfig for ARM_CCN. So if you
-> think changes to Kconfig shouldn't be pushed as a fix, by all means you
-> can push this to 4.7.
->
-> The title of the patch doesn't convey that. Sorry about that.
+Changes since v1:
+- incorporated Mark Rutland's patches to split into separate sysfs files
+- give ARM the same treatment so that we can export the UEFI page tables in
+  code that is shared between ARM and arm64
+- added file to use char arrays rather than char pointer in the marker and
+  prot_bits arrays (arm64)
 
-Thanks, I was just noticing that and thinking that at this stage of the
--rc, that would better wait for v4.7.
+Ard Biesheuvel (4):
+  arm64: ptdump: use static initializers for vmemmap region boundaries
+  arm64: ptdump: add region marker for kasan shadow region
+  arm64: ptdump: fold string literals into address_markers[] and
+    pte_bits[]
+  arm: mm: dump: make page table dumping reusable
 
-Please resumit later for v4.7
+Mark Rutland (2):
+  arm64: mm: dump: make page table dumping reusable
+  efi/arm*: add support to dump the EFI page tables
 
-Thanks,
+ arch/arm/include/asm/ptdump.h      | 44 +++++++++
+ arch/arm/mm/dump.c                 | 60 ++++++++-----
+ arch/arm64/include/asm/ptdump.h    | 44 +++++++++
+ arch/arm64/mm/dump.c               | 94 +++++++++-----------
+ drivers/firmware/efi/arm-runtime.c | 21 +++++
+ 5 files changed, 188 insertions(+), 75 deletions(-)
+ create mode 100644 arch/arm/include/asm/ptdump.h
+ create mode 100644 arch/arm64/include/asm/ptdump.h
 
-Kevin
+-- 
+2.7.4
