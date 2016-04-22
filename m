@@ -1,63 +1,99 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 22 Apr 2016 08:38:37 -0700
-Subject: [GIT PULL] omap fixes against v4.6-rc2
-In-Reply-To: <20160419195147.GE5973@atomide.com> (Tony Lindgren's message of
- "Tue, 19 Apr 2016 12:51:47 -0700")
-References: <20160408191854.GZ16484@atomide.com>
- <20160419145400.GC5995@atomide.com>
- <20160419195147.GE5973@atomide.com>
-Message-ID: <7hinz94ps2.fsf@baylibre.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 16:40:20 +0100
+Subject: [PATCH v7 6/7] iommu/arm-smmu: do not advertise
+ IOMMU_CAP_INTR_REMAP
+In-Reply-To: <571A0D61.5010009@linaro.org>
+References: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
+ <1461086687-2658-7-git-send-email-eric.auger@linaro.org>
+ <571A080A.4040406@arm.com> <571A0D61.5010009@linaro.org>
+Message-ID: <571A45E4.5050006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On 22/04/16 12:39, Eric Auger wrote:
+> Hi Robin,
+> On 04/22/2016 01:16 PM, Robin Murphy wrote:
+>> Hi Eric, Alex,
+>>
+>> On 19/04/16 18:24, Eric Auger wrote:
+>>> Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu(-v3). Indeed the
+>>> irq_remapping capability is abstracted on irqchip side for ARM as
+>>> opposed to Intel IOMMU featuring IRQ remapping HW.
+>>>
+>>> So to check IRQ remapping capability, the msi domain needs to be
+>>> checked instead.
+>>>
+>>> This commit needs to be applied after "vfio/type1: also check IRQ
+>>> remapping capability at msi domain" else the legacy interrupt
+>>> assignment gets broken with arm-smmu.
+>>
+>> Hmm, that smells of papering over a different problem. I may have missed
+>> it, but I don't see anything changing legacy interrupt behaviour in this
+>> series - are legacy INTx (or platform) interrupts intrinsically safe
+>> because they're physically wired, or intrinsically unsafe because they
+>> could be shared?
+>
+> I think it is safe. With legacy/platform interrupts we have:
+> vfio pci driver physical IRQ handler signals an irqfd.
+> upon this irqfd signaling KVM injects a virtual IRQ.
+>
+> So the assigned device does not have any way to trigger a storm of
+> interrupts on the host, as opposed to with MSI.
+>
+> Does it make sense to you?
 
-> * Tony Lindgren <tony@atomide.com> [160419 07:55]:
->> * Tony Lindgren <tony@atomide.com> [160408 12:22]:
->> >       ARM: OMAP: Catch callers of revision information prior to it being populated
->> 
->> And this one causes bogus runtime warnings with other SoCs
->> as reported by Guenter Roeck. I'll revert this and post
->> an updated pull request shortly.
->
-> And below is the updated pull request with just the above
-> commit reverted.
->
-> Regards,
->
-> Tony
->
-> 8< -------------------
-> The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
->
->   Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc2-v2-signed
->
-> for you to fetch changes up to 3d51ae172d759198b2e47e104c31a92d20d17927:
->
->   Revert "ARM: OMAP: Catch callers of revision information prior to it being populated" (2016-04-19 08:01:05 -0700)
->
-> ----------------------------------------------------------------
-> Fixes for omaps against v4.6-rc2, mostly to fix suspend for beagle-x15
-> that broke when we added runtime based SoC revision detection earlier.
->
-> It seems suspend worked earlier as things were only partially initialized,
-> while now we initialize things properly for dra7.
->
-> Note that the "ARM: OMAP: Catch callers of revision information prior
-> to it being populated" had to be reverted as it caused bogus warnings
-> for other SoCs because omap initcalls bail out based on revision being
-> set to 0 for other SoCs. These initcalls will mostly just disappear
-> when we drop support for omap3 legacy booting.
->
-> Also included is a fix for dra7 sys_32k_ck clock source that is not
-> enabled on boot making system fall back to using emulated clock.
->
-> ----------------------------------------------------------------
+I think so, thanks for the explanation. In that case, I'm strongly in 
+favour of applying this patch and un-breaking legacy interrupts 
+regardless of MSI support. I'll keep investigating to see what I can 
+figure out.
 
-Applied to fixes,
+Robin.
 
-Kevin
+> Best Regards
+>
+> Eric
+>
+>   If it's the latter then I don't see how the IOMMU or
+>> MSI controller changes anything in that respect, and if it's the former
+>> then surely we should support that right now without the SMMU having to
+>> lie about MSI isolation? I started looking into it but I'm a bit lost...
+>>
+>> Robin.
+>>
+>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>> ---
+>>>    drivers/iommu/arm-smmu-v3.c | 3 ++-
+>>>    drivers/iommu/arm-smmu.c    | 3 ++-
+>>>    2 files changed, 4 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>> index afd0dac..1d0106c 100644
+>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>> @@ -1386,7 +1386,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>>>        case IOMMU_CAP_CACHE_COHERENCY:
+>>>            return true;
+>>>        case IOMMU_CAP_INTR_REMAP:
+>>> -        return true; /* MSIs are just memory writes */
+>>> +        /* interrupt translation handled at MSI controller level */
+>>> +        return false;
+>>>        case IOMMU_CAP_NOEXEC:
+>>>            return true;
+>>>        default:
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index 492339f..6232b2a 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -1312,7 +1312,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>>>             */
+>>>            return true;
+>>>        case IOMMU_CAP_INTR_REMAP:
+>>> -        return true; /* MSIs are just memory writes */
+>>> +        /* interrupt translation handled at MSI controller level */
+>>> +        return false;
+>>>        case IOMMU_CAP_NOEXEC:
+>>>            return true;
+>>>        default:
+>>>
+>>
+>
