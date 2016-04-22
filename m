@@ -1,101 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 22 Apr 2016 09:02:01 +0200
-Subject: [PATCH v6 00/11] soc: renesas: Add R-Car SYSC PM Domain Support
-In-Reply-To: <20160422003310.GE25416@verge.net.au>
-References: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
- <20160421032811.GF11116@verge.net.au>
- <CAMuHMdW8uyWUBiqrbkQ=SYd+k-_Ag2PmsGf6N0+-TtJvx0YFQg@mail.gmail.com>
- <20160422003310.GE25416@verge.net.au>
-Message-ID: <CAMuHMdVWONBiKYo1w4HwhPQV1oZvw2Kgya7Gxb=NCHXvnr48Tw@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 22 Apr 2016 09:05:11 +0200
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160421212808.GA31979@amd>
+References: <20160407234134.GQ16484@atomide.com> <20160411093023.GC11814@amd>
+ <20160411094130.GA5753@amd> <20160411211026.GH5995@atomide.com>
+ <20160412121658.GA32486@amd> <20160412123013.GA12296@amd>
+ <20160412163055.GP5995@atomide.com> <20160417175539.GA502@amd>
+ <20160421130450.GQ29406@pali> <20160421212808.GA31979@amd>
+Message-ID: <20160422070511.GW29406@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thursday 21 April 2016 23:28:08 Pavel Machek wrote:
+> Hi!
+> 
+> > > CONFIG_HSI breaks power management completely, so power management
+> > > with modem will be another topic.  
+> > 
+> > Sebastian, any idea why power management does not work for HSI?
+> > 
+> > > > > > In the meantime, I found what is causing the rention mode to break for
+> > > > > > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
+> > > > > > 
+> > > > > > I still get problems with the camera button, in config similar to
+> > > > > > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
+> > > > > > console. As long as I hold camera button down, I even get it into off
+> > > > > > mode for brief period.
+> > > > > 
+> > > > > Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
+> > > > > mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
+> > > > > problems for you?)
+> > > > > 
+> > > > > Any idea why it enters off mode only once after each screenblank?
+> > > > 
+> > > > After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
+> > > > blanking the screen, my n900 hits off mode just fine about once
+> > > > a second. Sounds like you still have some extra devices enabled
+> > > > causing it.
+> > > 
+> > > I checked again... also with vanilla 4.6-rc2 to double check... same effect.
+> > > 
+> > > Aha, got it... cat-ing /sys/kernel/debug/pm_debug/count breaks the
+> > > off mode. If I don't do that (tm), it seems to work way better.
+> > 
+> > So what is result? Is power management working for CONFIG_KEYBOARD_GPIO?
+> 
+> camera and unlock button GPIOs seem to break the powermanagement,
+> too. I disabled it for now.
 
-On Fri, Apr 22, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Apr 21, 2016 at 05:14:40PM +0200, Geert Uytterhoeven wrote:
->> On Thu, Apr 21, 2016 at 5:28 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Wed, Apr 20, 2016 at 02:02:35PM +0200, Geert Uytterhoeven wrote:
->> >> This patch series introduces a DT-based driver for the R-Car System
->> >> Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
->> >> SoCs.
->> >>
->> >> This is a dependency for the enablement of DU and VSP on R-Car H3, as
->> >> the VSPs are located in a PM Domain.
->>
->> [...]
->>
->> >> Dependencies:
->> >>   - clk-renesas-for-v4.7 (which now includes "[PATCH v2 0/4] clk:
->> >>     renesas: R-Car SYSC PM Domain Preparation"; pull request sent),
->> >>   - renesas-devel-20160420-v4.6-rc4 (which already contains series
->> >>     "[PATCH v5 0/7] PM / Domains: Add DT bindings for the R-Car System
->> >>     Controller").
->> >>
->> >> I won't be resending follow-up series "[PATCH v5 00/12] ARM/arm64: dts:
->> >> rcar: Add SYSC PM domains" for now, as it's unchanged, except for an
->> >> ugly rebase due to dropping the commits to reference both DMA
->> >> controllers on R-Car Gen2.
->> >>
->> >> For your convenience, I've pushed this, incl. all dependencies, to the
->> >> topic/rcar-sysc-pd-v6 branch of
->> >> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
->> >> Integration with renesas-drivers-2016-04-12-v4.6-rc3 is available in the
->> >> topic/gen3-latest branch.
->> >>
->> >> This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
->> >> r8a7794/alt, and r8a7795/salvator-x.
->> >>
->> >> Thanks!
->> >
->> > Thanks. I am not planning to queue these up at this point.
->> > Let me know if that is not what you expected.
->>
->> As the clock maintainers has merged the preparatory clock work, and pushed
->> it out into clk-next, you can now:
->>   1. Pull the preparatory clock work in your tree, i.e. pull from:
->>
->>         git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
->> tags/clk-renesas-for-v4.7-tag2
->
-> To my mind I need some kind of assurance from the clk maintainers that the
-> patches are stable there - in particular that the commit ids won't change.
+So this sounds like a problem in gpio keyboard driver. Maybe you can
+ping maintainers of that driver?
 
-As the clock maintainer pulled the same tag instead of applying emailed
-patches, the commit IDs won't change, even if he has to rework the clk-next
-branch and repull.
+> Next hint I got from Sebastian was that I may need to enable power
+> management in /sys.
+> 
+> pavel at n900:/my/tui/ofone$ cat
+> /sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/runtime_status
+> active
+> pavel at n900:/my/tui/ofone$ cat
+> /sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/autosuspend_delay_ms
+> cat:
+> /sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/autosuspend_delay_ms:
+> Input/output error
+> root at n900:/my/tui/ofone# cat
+> /sys/devices/platform/68000000.ocp/48058000.ssi-controller/power/control
+> auto
+> 
+> I could not get it to sleep :-(.
+> 
+> Best regards,
+> 								Pavel
+> 
 
-> And that both they and the ARM-SoC maintainers are happy with me pulling
-> it into my tree for this purpose.
+Maybe down phonet0 interface and other hsi/ssi interfaces?
 
-I also mentioned that in the pull request. Pulling in a stable branch is
-standard procedure: the code fails to compile if you don't merge
-tags/clk-renesas-for-v4.7-tag2 first.
-
-> I do wonder, as we are almost at the closing point for queuing up changes
-> for v4.7 if, assuming the above patches are scheduled for inclusion in
-> v4.7-rc1, it might not be better for me to queue up this series for v4.8.
->
-> I could do that sooner rather than later in the devel branch of the renesas
-> tree if you like.
-
-v4.7-rc1 is still more than one month in the future.
-
-As Laurent said, that would delay multimedia work by one more kernel cycle,
-as R-Car SYSC PM Domains already missed v4.6.
-In addition, it would mean continued rebasing/updating of "[PATCH v5 00/12]
-ARM/arm64: dts: rcar: Add SYSC PM domains" in renesas-drivers, as it touches
-all R-Car DTSes all over the place.
-
-Thanks for reconsidering!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
