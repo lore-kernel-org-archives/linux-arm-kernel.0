@@ -1,84 +1,59 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 22 Apr 2016 14:31:18 +0200
-Subject: [PATCH v7 00/10] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
- part 1/3: iommu changes
-In-Reply-To: <20160421133222.76e45596@t450s.home>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <5718C501.20906@linaro.org> <20160421133222.76e45596@t450s.home>
-Message-ID: <571A1996.5010009@linaro.org>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 22 Apr 2016 15:30:40 +0300
+Subject: [PATCH 07/23] mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do
+ voltage switch
+In-Reply-To: <1460741387-23815-8-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <571A1970.7010800@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 04/21/2016 09:32 PM, Alex Williamson wrote:
-> On Thu, 21 Apr 2016 14:18:09 +0200
-> Eric Auger <eric.auger@linaro.org> wrote:
+On 15/04/16 20:29, Dong Aisheng wrote:
+> Currently when card type supports EXT_CSD_CARD_TYPE_DDR_1_8V
+> which means it can work on DDR mode with either 3.3v IO or 1.8v
+> IO voltage. MMC core will first try 1.8v then 3.3v if host claims
+> MMC_CAP_1_8V_DDR support.
+> However the host driver voltage switch code does not check NO_1_8_V
+> quirk which may set a wrong 1.8v and causes the card fixed to 3.3v
+> VIO un-work.
 > 
->> Hi Alex, Robin,
->> On 04/19/2016 06:56 PM, Eric Auger wrote:
->>> This series introduces the dma-reserved-iommu api used to:
->>>
->>> - create/destroy an iova domain dedicated to reserved iova bindings
->>> - map/unmap physical addresses onto reserved IOVAs.
->>> - search for an existing reserved iova mapping matching a PA window
->>> - determine whether an msi needs to be iommu mapped
->>> - translate an msi_msg PA address into its IOVA counterpart  
->>
->> Following Robin's review, I understand one important point we have to
->> clarify is how much this API has to be generic.
->>
->> I agree with Robin on the fact there is quite a lot of duplication
->> between this dma-reserved-iommu implementation and dma-iommu
->> implementation. Maybe we could consider an msi-mapping API
->> implementation upon dma-iommu.c. This implementation would add MSI
->> doorbell binding list management, including, ref counting and locking.
->>
->> We would need to add a map/unmap function taking an iova/pa/size as
->> parameters in current dma-iommu.c
->>
->> An important assumption is that the dma-mapping API and the msi-mapping
->> API must not be used concurrently (be would be trying to use the same
->> cookie to store a different iova_domain).
->>
->> Any thought/suggestion?
-> 
-> Hi Eric,
-> 
-> I'm not attached to a generic interface, the important part for me is
-> that if we have an iommu domain with space reserved for MSI, the MSI
-> setup and allocation code should handle that so we don't need to play
-> the remapping tricks between vfio-pci and a vfio iommu driver that we
-> saw in early drafts of this.  My first inclination is always to try to
-> make a generic, re-usable interface, but I apologize if that's led us
-> astray here and we really do want the more simple, MSI specific
-> interface.
-> 
-> For the IOMMU API, rather than just a DOMAIN_ATTR_MSI_MAPPING flag,
-> what about DOMAIN_ATTR_MSI_GEOMETRY with both a get and set attribute?
-> Maybe something like:
-> 
-> struct iommu_domain_msi_geometry {
-> 	dma_addr_t	aperture_start;
-> 	dma_addr_t	aperture_end;
-> 	bool		fixed; /* or 'programmable' depending on your polarity preference */
-> };
-> 
-> Calling \get\ on arm would return { 0, 0, false }, indicating it's
-> programmable, \set\ would allocate the iovad as specified.  That would
-> make it very easy to expand the API to x86 with reporting of the fixed
-> MSI range and it operates within the existing IOMMU API interfaces.
-> Thanks,
-Yes I would be happy to handle this x86 query requirement. I would be
-more inclined to define it at "MSI mapping API" level since the IOMMU
-API implementation does not handle iova allocation, as Robin argued as
-the beginning. When "MSI MAPPING API" CONFIG is unset I would return
-default x86 aperture.
+> Checking 1.8V quirk before setting it to avoid such issue.
 
-Does it make sense?
+We need to look forward to when SDHCI_QUIRK2_NO_1_8_V doesn't exist.
 
-Best Regards
+There are two possibilities:
 
-Eric
+1. Add MMC_CAP_3_3V_DDR and support to core and use that instead of
+MMC_CAP_1_8V_DDR.  You'll need Ulf's feedback on that.
+
+2. Replace ->start_signal_voltage_switch() i.e.
+
+host->mmc_host_ops.start_signal_voltage_switch =
+esdhci_start_signal_voltage_switch;
+
+You will also need to change all calls to
+sdhci_start_signal_voltage_switch() with
+host->mmc->ops->start_signal_voltage_switch(), but that needs to be done anyway.
+
 > 
-> Alex
+> CC: stable <stable@vger.kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 2338aab..96ccb15 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1683,6 +1683,8 @@ static int sdhci_do_signal_voltage_switch(struct sdhci_host *host,
+>  
+>  		return -EAGAIN;
+>  	case MMC_SIGNAL_VOLTAGE_180:
+> +		if (host->quirks2 & SDHCI_QUIRK2_NO_1_8_V)
+> +			return -EINVAL;
+>  		/*
+>  		 * Enable 1.8V Signal Enable in the Host Control2
+>  		 * register
 > 
