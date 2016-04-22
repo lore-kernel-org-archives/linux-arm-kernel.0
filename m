@@ -1,15 +1,15 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 22 Apr 2016 11:07:28 +0200
-Subject: [PATCH v6 06/12] ARM: dts: r8a7793: Add SYSC PM Domains
+Date: Fri, 22 Apr 2016 11:07:23 +0200
+Subject: [PATCH v6 01/12] arm64: dts: r8a7795: Add SYSC PM Domains
 In-Reply-To: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
 References: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1461316054-27999-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1461316054-27999-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add a device node for the System Controller.
-Hook up the first Cortex-A15 CPU core and the Cortex-A15 L2 cache/SCU to
-their respective PM Domains.
+Hook up the Cortex-A57 CPU cores and the Cortex-A57 and Cortex A53 L2
+caches/SCUs to their respective PM Domains.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
@@ -24,59 +24,93 @@ v5:
 v4:
   - Add "power-domains" property to the sysc node, to refer to the SoC's
     Clock Domain,
+  - Extract using "<&sysc R8A7795_PD_ALWAYS_ON>" for devices in the
+    always-on power area into a separate patch,
 
 v3:
   - Drop power area hiearchy from DT,
   - Switch to "#power-domain-cells = <1>",
+  - Use "<&sysc R8A7795_PD_ALWAYS_ON>" for devices in the always-on
+    power area,
   - Drop fallback compatibility strings,
 
 v2:
-  - Change one-line summary prefix to match current arm-soc practices,
-  - Update compatible values.
+  - New.
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 6186179fd66db6b2..53e235e3279d08c1 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -11,6 +11,7 @@
- #include <dt-bindings/clock/r8a7793-clock.h>
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 11f9971a85433b7f..9c7424fc171fb876 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -10,6 +10,7 @@
+ 
+ #include <dt-bindings/clock/r8a7795-cpg-mssr.h>
  #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/power/r8a7793-sysc.h>
++#include <dt-bindings/power/r8a7795-sysc.h>
  
  / {
- 	compatible = "renesas,r8a7793";
-@@ -43,6 +44,7 @@
- 			voltage-tolerance = <1>; /* 1% */
- 			clocks = <&cpg_clocks R8A7793_CLK_Z>;
- 			clock-latency = <300000>; /* 300 us */
-+			power-domains = <&sysc R8A7793_PD_CA15_CPU0>;
+ 	compatible = "renesas,r8a7795";
+@@ -39,6 +40,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -47,6 +49,7 @@
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x1>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU1>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -54,6 +57,7 @@
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x2>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU2>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -61,6 +65,7 @@
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x3>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU3>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -68,12 +73,14 @@
  
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1500000 1000000>,
-@@ -76,6 +78,7 @@
- 
- 	L2_CA15: cache-controller at 0 {
+ 	L2_CA57: cache-controller at 0 {
  		compatible = "cache";
-+		power-domains = <&sysc R8A7793_PD_CA15_SCU>;
++		power-domains = <&sysc R8A7795_PD_CA57_SCU>;
  		cache-unified;
  		cache-level = <2>;
  	};
-@@ -1223,6 +1226,12 @@
- 		};
- 	};
  
-+	sysc: system-controller at e6180000 {
-+		compatible = "renesas,r8a7793-sysc";
-+		reg = <0 0xe6180000 0 0x0200>;
-+		#power-domain-cells = <1>;
-+	};
+ 	L2_CA53: cache-controller at 1 {
+ 		compatible = "cache";
++		power-domains = <&sysc R8A7795_PD_CA53_SCU>;
+ 		cache-unified;
+ 		cache-level = <2>;
+ 	};
+@@ -305,6 +312,12 @@
+ 			#power-domain-cells = <0>;
+ 		};
+ 
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a7795-sysc";
++			reg = <0 0xe6180000 0 0x0400>;
++			#power-domain-cells = <1>;
++		};
 +
- 	ipmmu_sy0: mmu at e6280000 {
- 		compatible = "renesas,ipmmu-r8a7793", "renesas,ipmmu-vmsa";
- 		reg = <0 0xe6280000 0 0x1000>;
+ 		audma0: dma-controller at ec700000 {
+ 			compatible = "renesas,rcar-dmac";
+ 			reg = <0 0xec700000 0 0x10000>;
 -- 
 1.9.1
