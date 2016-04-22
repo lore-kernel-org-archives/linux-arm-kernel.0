@@ -1,116 +1,61 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 22 Apr 2016 11:07:23 +0200
-Subject: [PATCH v6 01/12] arm64: dts: r8a7795: Add SYSC PM Domains
-In-Reply-To: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
-References: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1461316054-27999-2-git-send-email-geert+renesas@glider.be>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 22 Apr 2016 10:11:55 +0100
+Subject: [PATCH v2 05/13] ARM: dts: db600c: add pmic regulator supplies
+In-Reply-To: <571682A1.9010000@codeaurora.org>
+References: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1460453642-5809-6-git-send-email-srinivas.kandagatla@linaro.org>
+ <571682A1.9010000@codeaurora.org>
+Message-ID: <5719EADB.9090704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the System Controller.
-Hook up the Cortex-A57 CPU cores and the Cortex-A57 and Cortex A53 L2
-caches/SCUs to their respective PM Domains.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
-v6:
-  - Add Acked-by,
 
-v5:
-  - Remove "power-domains" property again from the sysc node, as the
-    System Controller itself is not part of the Clock Domain,
+On 19/04/16 20:10, Stephen Boyd wrote:
+> On 04/12/2016 02:33 AM, Srinivas Kandagatla wrote:
+>> This patch adds pmic regulator supplies connected on the board.
+>> Rest of the invidual regulators would be added as and when required by
+>> the devices.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts | 62 +++++++++++++++++++++++++
+>>   1 file changed, 62 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
+>> index 57d4500..6695b00 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
+>> @@ -9,7 +9,69 @@
+>>   		serial1 = &gsbi1_serial;
+>>   	};
+>>
+>> +	regulators {
+>> +		compatible = "simple-bus";
+>> +		vph: regulator-fixed at 1 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-min-microvolt = <4500000>;
+>> +			regulator-max-microvolt = <4500000>;
+>> +			regulator-name = "VPH";
+>> +			regulator-type = "voltage";
+>> +			regulator-boot-on;
+>> +		};
+>> +	};
+>
+> Just curious why we added the vph supply? Is that for some framework
+> requirement? We haven't done this on other boards, although we probably
+> should if there's a good reason for it.
 
-v4:
-  - Add "power-domains" property to the sysc node, to refer to the SoC's
-    Clock Domain,
-  - Extract using "<&sysc R8A7795_PD_ALWAYS_ON>" for devices in the
-    always-on power area into a separate patch,
+This is an on board 12V TO 4.5V @5.5A DC/DC convertor for PMIC VPH 
+power. Yep we should do something similar on the other boards too. 
+Without this probably you would notice some error messages from 
+rpm_regulators about missing supply nodes.
 
-v3:
-  - Drop power area hiearchy from DT,
-  - Switch to "#power-domain-cells = <1>",
-  - Use "<&sysc R8A7795_PD_ALWAYS_ON>" for devices in the always-on
-    power area,
-  - Drop fallback compatibility strings,
 
-v2:
-  - New.
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+thanks,
+srini
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 11f9971a85433b7f..9c7424fc171fb876 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -10,6 +10,7 @@
- 
- #include <dt-bindings/clock/r8a7795-cpg-mssr.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/r8a7795-sysc.h>
- 
- / {
- 	compatible = "renesas,r8a7795";
-@@ -39,6 +40,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x0>;
- 			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
- 		};
-@@ -47,6 +49,7 @@
- 			compatible = "arm,cortex-a57","arm,armv8";
- 			reg = <0x1>;
- 			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA57_CPU1>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
- 		};
-@@ -54,6 +57,7 @@
- 			compatible = "arm,cortex-a57","arm,armv8";
- 			reg = <0x2>;
- 			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA57_CPU2>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
- 		};
-@@ -61,6 +65,7 @@
- 			compatible = "arm,cortex-a57","arm,armv8";
- 			reg = <0x3>;
- 			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA57_CPU3>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
- 		};
-@@ -68,12 +73,14 @@
- 
- 	L2_CA57: cache-controller at 0 {
- 		compatible = "cache";
-+		power-domains = <&sysc R8A7795_PD_CA57_SCU>;
- 		cache-unified;
- 		cache-level = <2>;
- 	};
- 
- 	L2_CA53: cache-controller at 1 {
- 		compatible = "cache";
-+		power-domains = <&sysc R8A7795_PD_CA53_SCU>;
- 		cache-unified;
- 		cache-level = <2>;
- 	};
-@@ -305,6 +312,12 @@
- 			#power-domain-cells = <0>;
- 		};
- 
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a7795-sysc";
-+			reg = <0 0xe6180000 0 0x0400>;
-+			#power-domain-cells = <1>;
-+		};
-+
- 		audma0: dma-controller at ec700000 {
- 			compatible = "renesas,rcar-dmac";
- 			reg = <0 0xec700000 0 0x10000>;
--- 
-1.9.1
+
+
+>
