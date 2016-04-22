@@ -1,89 +1,399 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 22 Apr 2016 13:07:28 -0600
-Subject: [PATCH v7 00/10] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
- part 1/3: iommu changes
-In-Reply-To: <571A1996.5010009@linaro.org>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <5718C501.20906@linaro.org> <20160421133222.76e45596@t450s.home>
- <571A1996.5010009@linaro.org>
-Message-ID: <20160422130728.62afe3a0@t450s.home>
+From: harald@ccbib.org (Harald Geyer)
+Date: Fri, 22 Apr 2016 21:23:11 +0200
+Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
+In-Reply-To: <CAL7P5jKYp0JrF2MHdLkLTBvgYb0KSDwPEMuNPGxcctcxCRnazg@mail.gmail.com>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <1461333147-11873-2-git-send-email-harald@ccbib.org>
+ <571A4831.2020604@denx.de>
+ <CAL7P5jKYp0JrF2MHdLkLTBvgYb0KSDwPEMuNPGxcctcxCRnazg@mail.gmail.com>
+Message-ID: <f4c00c5c2242f6a951f1f8d8eca56357@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Apr 2016 14:31:18 +0200
-Eric Auger <eric.auger@linaro.org> wrote:
+[CCing Mark and Liam again]
 
-> Hi Alex,
-> On 04/21/2016 09:32 PM, Alex Williamson wrote:
-> > On Thu, 21 Apr 2016 14:18:09 +0200
-> > Eric Auger <eric.auger@linaro.org> wrote:
-> >   
-> >> Hi Alex, Robin,
-> >> On 04/19/2016 06:56 PM, Eric Auger wrote:  
-> >>> This series introduces the dma-reserved-iommu api used to:
-> >>>
-> >>> - create/destroy an iova domain dedicated to reserved iova bindings
-> >>> - map/unmap physical addresses onto reserved IOVAs.
-> >>> - search for an existing reserved iova mapping matching a PA window
-> >>> - determine whether an msi needs to be iommu mapped
-> >>> - translate an msi_msg PA address into its IOVA counterpart    
-> >>
-> >> Following Robin's review, I understand one important point we have to
-> >> clarify is how much this API has to be generic.
-> >>
-> >> I agree with Robin on the fact there is quite a lot of duplication
-> >> between this dma-reserved-iommu implementation and dma-iommu
-> >> implementation. Maybe we could consider an msi-mapping API
-> >> implementation upon dma-iommu.c. This implementation would add MSI
-> >> doorbell binding list management, including, ref counting and locking.
-> >>
-> >> We would need to add a map/unmap function taking an iova/pa/size as
-> >> parameters in current dma-iommu.c
-> >>
-> >> An important assumption is that the dma-mapping API and the msi-mapping
-> >> API must not be used concurrently (be would be trying to use the same
-> >> cookie to store a different iova_domain).
-> >>
-> >> Any thought/suggestion?  
-> > 
-> > Hi Eric,
-> > 
-> > I'm not attached to a generic interface, the important part for me is
-> > that if we have an iommu domain with space reserved for MSI, the MSI
-> > setup and allocation code should handle that so we don't need to play
-> > the remapping tricks between vfio-pci and a vfio iommu driver that we
-> > saw in early drafts of this.  My first inclination is always to try to
-> > make a generic, re-usable interface, but I apologize if that's led us
-> > astray here and we really do want the more simple, MSI specific
-> > interface.
-> > 
-> > For the IOMMU API, rather than just a DOMAIN_ATTR_MSI_MAPPING flag,
-> > what about DOMAIN_ATTR_MSI_GEOMETRY with both a get and set attribute?
-> > Maybe something like:
-> > 
-> > struct iommu_domain_msi_geometry {
-> > 	dma_addr_t	aperture_start;
-> > 	dma_addr_t	aperture_end;
-> > 	bool		fixed; /* or 'programmable' depending on your polarity preference */
-> > };
-> > 
-> > Calling \get\ on arm would return { 0, 0, false }, indicating it's
-> > programmable, \set\ would allocate the iovad as specified.  That would
-> > make it very easy to expand the API to x86 with reporting of the fixed
-> > MSI range and it operates within the existing IOMMU API interfaces.
-> > Thanks,  
-> Yes I would be happy to handle this x86 query requirement. I would be
-> more inclined to define it at "MSI mapping API" level since the IOMMU
-> API implementation does not handle iova allocation, as Robin argued as
-> the beginning. When "MSI MAPPING API" CONFIG is unset I would return
-> default x86 aperture.
-> 
-> Does it make sense?
+On 22.04.2016 19:00, Ksenija Stanojevi? wrote:
+> On Fri, Apr 22, 2016 at 5:50 PM, Marek Vasut <marex@denx.de> wrote:
+>> On 04/22/2016 03:52 PM, Harald Geyer wrote:
+>>> The hardware has two current sources ISRC0 and ISRC1 to allow 
+>>> measuring
+>>> resistors without additional circuitry. This commit makes them 
+>>> available
+>>> as regulators.
+>>>
+>>> Tested on an imx233-olinuxino board.
+>>>
+>>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+>>> ---
+>>> The current regulator API doesn't fit this type of device very 
+>>> well: Typically
+>>> consumers will want to set a defined current, ie. min_uA == max_uA, 
+>>> but they
+>>> can't without help from configuration data, because the valid 
+>>> values aren't
+>>> reported by the API for current regulators. I have been thinking 
+>>> about
+>>> extending the API, but currently AFAIK no such consumers exist and 
+>>> most
+>>> users, like myself, will force the regulator to a defined value in
+>>> devicetree anyway.
+>>
+>> I am tempted to block this patch and ask you to properly split the
+>> mxs-lradc driver into MFD with touchscreen and IIO part and only 
+>> then
+>> add the regulator bits. The lradc is becoming a katamari of ad-hoc
+>> misplaced functionality.
 
-It's not entirely clear to me if x86 would be participating in this MSI
-mapping API given the implicit handling within iommu/irq-remapping.
-It might make sense if x86 iommus simply left a gap in their existing
-geometry reporting through the iommu api.  I guess we'll see in your
-next draft ;)  Thanks,
+I know. However I'm afraid working this into a proper MFD is above my 
+skills
+and I don't feel responsible for the status quo either.
 
-Alex
+> I almost finished, I already split the driver into MFD, sorry for the 
+> delay.
+
+Wow, looks like I have a lot of luck today.
+
+> Can this wait a little bit?
+
+Sure. I now have a working kernel for my purposes, so no hurry on my 
+part.
+CC my when you submit your code or maybe even pick my patch into your 
+series,
+if you feel like it.
+
+Thanks,
+Harald
+
+> Thanks,
+> Ksenija
+>
+>>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>>>  drivers/iio/adc/Kconfig                            |   1 +
+>>>  drivers/iio/adc/mxs-lradc.c                        | 152 
+>>> +++++++++++++++++++++
+>>>  3 files changed, 182 insertions(+)
+>>>
+>>> diff --git 
+>>> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt 
+>>> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>> index 555fb11..983952c 100644
+>>> --- 
+>>> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>> +++ 
+>>> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>> @@ -19,6 +19,15 @@ Optional properties:
+>>>  - fsl,settling: delay between plate switch to next sample. Allowed 
+>>> value is
+>>>                  1 ... 2047. It counts at 2 kHz and its default is
+>>>                  10 (= 5 ms)
+>>> +- ISRC0: A node describing the regulator of internal current 
+>>> source 0
+>>> +- ISRC1: A node describing the regulator of internal current 
+>>> source 1
+>>> +
+>>> +Required properties for the ISRCx sub-nodes:
+>>> +- regulator-max-microamp: See standard regulator binding 
+>>> documentation.
+>>> +                          Valid values are from 0 to 300 in steps 
+>>> of 20.
+>>> +
+>>> +Optional properties for the ISRCx sub-nodes:
+>>> +Any standard regulator properties that apply to current 
+>>> regulators.
+>>>
+>>>  Example for i.MX23 SoC:
+>>>
+>>> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
+>>>               fsl,ave-ctrl = <4>;
+>>>               fsl,ave-delay = <2>;
+>>>               fsl,settling = <10>;
+>>> +
+>>> +             isrc_lradc0: ISRC0 {
+>>> +                     regulator-max-microamp = <300>;
+>>> +             };
+>>> +
+>>> +             isrc_lradc1: ISRC1 {
+>>> +                     regulator-max-microamp = <120>;
+>>> +                     regulator-min-microamp = <120>;
+>>> +                     regulator-always-on;
+>>> +             };
+>>>       };
+>>>
+>>>  Example for i.MX28 SoC:
+>>> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
+>>>               fsl,ave-ctrl = <4>;
+>>>               fsl,ave-delay = <2>;
+>>>               fsl,settling = <10>;
+>>> +
+>>> +             isrc_lradc0: ISRC0 {
+>>> +                     regulator-max-microamp = <300>;
+>>> +             };
+>>> +
+>>> +             isrc_lradc6: ISRC1 {
+>>> +                     regulator-max-microamp = <120>;
+>>> +                     regulator-min-microamp = <120>;
+>>> +                     regulator-always-on;
+>>> +             };
+>>>       };
+>>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>>> index 5937030..1968d1c 100644
+>>> --- a/drivers/iio/adc/Kconfig
+>>> +++ b/drivers/iio/adc/Kconfig
+>>> @@ -319,6 +319,7 @@ config MXS_LRADC
+>>>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>>>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+>>>          depends on INPUT
+>>> +        depends on REGULATOR
+>>>          select STMP_DEVICE
+>>>          select IIO_BUFFER
+>>>          select IIO_TRIGGERED_BUFFER
+>>> diff --git a/drivers/iio/adc/mxs-lradc.c 
+>>> b/drivers/iio/adc/mxs-lradc.c
+>>> index 33051b8..f22f339 100644
+>>> --- a/drivers/iio/adc/mxs-lradc.c
+>>> +++ b/drivers/iio/adc/mxs-lradc.c
+>>> @@ -40,6 +40,10 @@
+>>>  #include <linux/iio/triggered_buffer.h>
+>>>  #include <linux/iio/sysfs.h>
+>>>
+>>> +#include <linux/regulator/driver.h>
+>>> +#include <linux/regulator/machine.h>
+>>> +#include <linux/regulator/of_regulator.h>
+>>> +
+>>>  #define DRIVER_NAME          "mxs-lradc"
+>>>
+>>>  #define LRADC_MAX_DELAY_CHANS        4
+>>> @@ -261,6 +265,9 @@ struct mxs_lradc {
+>>>       unsigned                over_sample_delay;
+>>>       /* time in clocks to wait after the plates where switched */
+>>>       unsigned                settling_delay;
+>>> +
+>>> +     struct regulator_desc isrc0;
+>>> +     struct regulator_desc isrc1;
+>>>  };
+>>>
+>>>  #define      LRADC_CTRL0                             0x00
+>>> @@ -305,6 +312,11 @@ struct mxs_lradc {
+>>>  #define      LRADC_CTRL2                             0x20
+>>>  #define      LRADC_CTRL2_DIVIDE_BY_TWO_OFFSET        24
+>>>  #define      LRADC_CTRL2_TEMPSENSE_PWD               BIT(15)
+>>> +#define      LRADC_CTRL2_TEMP_SENSOR_IENABLE1        BIT(9)
+>>> +#define      LRADC_CTRL2_TEMP_SENSOR_IENABLE0        BIT(8)
+>>> +#define      LRADC_CTRL2_TEMP_ISRC1_OFFSET           4
+>>> +#define      LRADC_CTRL2_TEMP_ISRC0_OFFSET           0
+>>> +#define      LRADC_CTRL2_TEMP_ISRC_MASK              0x0f
+>>>
+>>>  #define      LRADC_STATUS                            0x40
+>>>  #define      LRADC_STATUS_TOUCH_DETECT_RAW           BIT(0)
+>>> @@ -1383,6 +1395,109 @@ static const struct iio_buffer_setup_ops 
+>>> mxs_lradc_buffer_ops = {
+>>>       .validate_scan_mask = &mxs_lradc_validate_scan_mask,
+>>>  };
+>>>
+>>> +static int mxs_lradc_regulator_is_enabled(struct regulator_dev 
+>>> *dev)
+>>> +{
+>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>> +     int reg = readl(lradc->base + LRADC_CTRL2);
+>>> +
+>>> +     if (dev->desc == &lradc->isrc0)
+>>> +             return reg & LRADC_CTRL2_TEMP_SENSOR_IENABLE0;
+>>> +     else if (dev->desc == &lradc->isrc1)
+>>> +             return reg & LRADC_CTRL2_TEMP_SENSOR_IENABLE1;
+>>> +
+>>> +     /* This should never happen */
+>>> +     return -ENODEV;
+>>> +}
+>>> +
+>>> +#define LRADC_REGVALUE2uA(regval, offset) \
+>>> +     (20 * ((regval >> offset) & LRADC_CTRL2_TEMP_ISRC_MASK))
+>>> +
+>>> +static int mxs_lradc_regulator_get_current_limit(struct 
+>>> regulator_dev *dev)
+>>> +{
+>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>> +     int reg = readl(lradc->base + LRADC_CTRL2);
+>>> +
+>>> +     if (dev->desc == &lradc->isrc0)
+>>> +             return LRADC_REGVALUE2uA(reg, 
+>>> LRADC_CTRL2_TEMP_ISRC0_OFFSET);
+>>> +     else if (dev->desc == &lradc->isrc1)
+>>> +             return LRADC_REGVALUE2uA(reg, 
+>>> LRADC_CTRL2_TEMP_ISRC1_OFFSET);
+>>> +
+>>> +     /* This should never happen */
+>>> +     return -ENODEV;
+>>> +}
+>>> +
+>>> +static int mxs_lradc_regulator_enable(struct regulator_dev *dev)
+>>> +{
+>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>> +
+>>> +     if (dev->desc == &lradc->isrc0)
+>>> +             mxs_lradc_reg_set(lradc, 
+>>> LRADC_CTRL2_TEMP_SENSOR_IENABLE0,
+>>> +                               LRADC_CTRL2);
+>>> +     else if (dev->desc == &lradc->isrc1)
+>>> +             mxs_lradc_reg_set(lradc, 
+>>> LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
+>>> +                               LRADC_CTRL2);
+>>> +     else
+>>> +             /* This should never happen */
+>>> +             return -ENODEV;
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static int mxs_lradc_regulator_disable(struct regulator_dev *dev)
+>>> +{
+>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>> +
+>>> +     if (dev->desc == &lradc->isrc0)
+>>> +             mxs_lradc_reg_clear(lradc, 
+>>> LRADC_CTRL2_TEMP_SENSOR_IENABLE0,
+>>> +                                 LRADC_CTRL2);
+>>> +     else if (dev->desc == &lradc->isrc1)
+>>> +             mxs_lradc_reg_clear(lradc, 
+>>> LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
+>>> +                                 LRADC_CTRL2);
+>>> +     else
+>>> +             /* This should never happen */
+>>> +             return -ENODEV;
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static int mxs_lradc_regulator_set_current_limit(struct 
+>>> regulator_dev *dev,
+>>> +                                              int min_uA, int 
+>>> max_uA)
+>>> +{
+>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>> +     int offset, value;
+>>> +
+>>> +     if (dev->desc == &lradc->isrc0)
+>>> +             offset = LRADC_CTRL2_TEMP_ISRC0_OFFSET;
+>>> +     else if (dev->desc == &lradc->isrc1)
+>>> +             offset = LRADC_CTRL2_TEMP_ISRC1_OFFSET;
+>>> +     else
+>>> +             /* This should never happen */
+>>> +             return -ENODEV;
+>>> +
+>>> +     value = min_uA / 20;
+>>> +     if (min_uA % 20)
+>>> +             value++;
+>>> +     if (value * 20 > max_uA)
+>>> +             return -EINVAL;
+>>> +     if (value & ~LRADC_CTRL2_TEMP_ISRC_MASK)
+>>> +             /* This should never happen */
+>>> +             return -EPERM;
+>>> +
+>>> +     mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_ISRC_MASK << 
+>>> offset,
+>>> +                         LRADC_CTRL2);
+>>> +     mxs_lradc_reg_set(lradc, value << offset, LRADC_CTRL2);
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static struct regulator_ops mxs_lradc_regulator_current_ops = {
+>>> +     .enable = mxs_lradc_regulator_enable,
+>>> +     .is_enabled = mxs_lradc_regulator_is_enabled,
+>>> +     .disable = mxs_lradc_regulator_disable,
+>>> +     .get_current_limit = mxs_lradc_regulator_get_current_limit,
+>>> +     .set_current_limit = mxs_lradc_regulator_set_current_limit,
+>>> +};
+>>> +
+>>>  /*
+>>>   * Driver initialization
+>>>   */
+>>> @@ -1519,6 +1634,10 @@ static void mxs_lradc_hw_stop(struct 
+>>> mxs_lradc *lradc)
+>>>
+>>>       for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
+>>>               mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
+>>> +
+>>> +     mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0 |
+>>> +                                     
+>>> LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
+>>> +                         LRADC_CTRL2);
+>>>  }
+>>>
+>>>  static const struct of_device_id mxs_lradc_dt_ids[] = {
+>>> @@ -1592,6 +1711,32 @@ static int 
+>>> mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
+>>>       return 0;
+>>>  }
+>>>
+>>> +static void mxs_lradc_reg_helper(struct device_node *np, const 
+>>> char *name,
+>>> +                              struct regulator_config *conf,
+>>> +                              struct regulator_desc *desc)
+>>> +{
+>>> +     struct regulator_dev *ret;
+>>> +
+>>> +     conf->of_node = of_get_child_by_name(np, name);
+>>> +     if (!conf->of_node)
+>>> +             return;
+>>> +
+>>> +     desc->name = name;
+>>> +     desc->owner = THIS_MODULE;
+>>> +     desc->type = REGULATOR_CURRENT;
+>>> +     desc->ops = &mxs_lradc_regulator_current_ops;
+>>> +
+>>> +     conf->init_data = of_get_regulator_init_data(conf->dev, 
+>>> conf->of_node,
+>>> +                                                  desc);
+>>> +     ret = devm_regulator_register(conf->dev, desc, conf);
+>>> +     if (IS_ERR(ret))
+>>> +             /* Just pretend the regulator isn't there */
+>>> +             dev_err(conf->dev, "Failed to register regulator %s: 
+>>> %ld\n",
+>>> +                     desc->name, PTR_ERR(ret));
+>>> +
+>>> +     of_node_put(conf->of_node);
+>>> +}
+>>> +
+>>>  static int mxs_lradc_probe(struct platform_device *pdev)
+>>>  {
+>>>       const struct of_device_id *of_id =
+>>> @@ -1603,6 +1748,7 @@ static int mxs_lradc_probe(struct 
+>>> platform_device *pdev)
+>>>       struct mxs_lradc *lradc;
+>>>       struct iio_dev *iio;
+>>>       struct resource *iores;
+>>> +     struct regulator_config regconf;
+>>>       int ret = 0, touch_ret;
+>>>       int i, s;
+>>>       u64 scale_uv;
+>>> @@ -1727,6 +1873,12 @@ static int mxs_lradc_probe(struct 
+>>> platform_device *pdev)
+>>>               goto err_ts;
+>>>       }
+>>>
+>>> +     /* Setup regulator devices for current source. */
+>>> +     regconf.dev = dev;
+>>> +     regconf.driver_data = lradc;
+>>> +     mxs_lradc_reg_helper(node, "ISRC0", &regconf, &lradc->isrc0);
+>>> +     mxs_lradc_reg_helper(node, "ISRC1", &regconf, &lradc->isrc1);
+>>> +
+>>>       return 0;
+>>>
+>>>  err_ts:
+>>>
+>>
+>>
+>> --
+>> Best regards,
+>> Marek Vasut
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-iio" 
+>> in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+If you want to support my work:
+see http://friends.ccbib.org/harald/supporting/
+or donate via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
+or bitcoin 1FUtd8T9jRN1rFz63vZz7s2fDtB6d6A7aS
