@@ -1,51 +1,93 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 21 Apr 2016 19:00:34 -0700
-Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-Message-ID: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 22 Apr 2016 10:47:32 +0800
+Subject: [PATCH v2 all 00/14] use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <CAL_Jsq+cGbrtz6ZC8fgdD3H1yk7rWpzc9rg8uXOXqL6EJJDsOg@mail.gmail.com>
+References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
+ <CAL_JsqK34MOSkdJb1Sqq3CzYSz5xGeEnuThS_GmfFXMHX-8d9A@mail.gmail.com>
+ <5718878A.8040901@huawei.com>
+ <CAL_Jsq+cGbrtz6ZC8fgdD3H1yk7rWpzc9rg8uXOXqL6EJJDsOg@mail.gmail.com>
+Message-ID: <571990C4.7000901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If dirty_tx isn't updated, then dma_unmap_single
-will be called twice.
 
-This fixes a
-[   58.420980] ------------[ cut here ]------------
-[   58.425667] WARNING: CPU: 0 PID: 377 at /home/schurig/d/mkarm/linux-4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
-[   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free DMA memory it has not allocated [device address=0x0000000000000000] [size=66 bytes]
 
-encountered by Holger
+On 2016/4/21 21:10, Rob Herring wrote:
+> On Thu, Apr 21, 2016 at 2:55 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+>> Hi Rob,
+>>
+>> On 2016/4/20 5:10, Rob Herring wrote:
+>>> On Wed, Mar 16, 2016 at 2:35 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+>>>> Use helper of_platform_default_populate() in linux/of_platform
+>>>> when possible, instead of calling of_platform_populate() with
+>>>> the default match table.
+>>>>
+>>>> Then it is possible for driver code build as a module, and no
+>>>> need to export of_default_bus_match_table anymore.
+>>>>
+>>>> This patchset is based on Linux 4.5.
+>>>>
+>>>> Changes since v1:
+>>>> - Add ack, test and review
+>>>> - Remove v1 patch 14/15, the similar patch has posted and applied,
+>>>>   see https://patchwork.kernel.org/patch/8096991/
+>>>>
+>>>> v1:
+>>>> - https://lkml.org/lkml/2016/1/26/1123
+>>>
+>>> I was going to apply this, but I've thought about this some more and
+>>> it is a lot of tree wide churn for little gain. Most of the call sites
+>>> here I want to get rid of by making of_platform_populate callable
+>>> multiple times. The infrastructure is almost there, but I think we
+>>> just need something like this:
+>>>
+>>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>>> index 8d103e4..b25e710 100644
+>>> --- a/drivers/of/platform.c
+>>> +++ b/drivers/of/platform.c
+>>> @@ -345,6 +345,9 @@ static int of_platform_bus_create(struct device_node *bus,
+>>>                 return 0;
+>>>         }
+>>>
+>>> +       if (of_node_check_flag(bus, OF_POPULATED_BUS))
+>>> +               return 0;
+>>> +
+>>>         auxdata = of_dev_lookup(lookup, bus);
+>>>         if (auxdata) {
+>>>                 bus_id = auxdata->name;
+>>>
+>>> Then we can call of_platform_populate from the DT core and remove all
+>>> the default calls.
+>>
+>> OK, it seems that we can drop all the of_of_platform_default_populate in arch code
+>> by this changes, will do it.
+>>
+>> But replace of_platform_populate() with the default match table by of_platform_default_populate
+>> is a cleanup, and especially for the driver, we can not need export of_default_bus_match_table
+>> after that.
+>>
+>> There is a v3 patchset[1], it is based 4.6-rc2 with some updated, should this be merge firstly,
+>> then drop all the default of_platform_populate in arch code, and I think the of_iommu_init() in
+>> arch code could do the same thing.
+>>
+>> If not, I will repost the patches with new ways, but still exists the part of unexport
+>> of_default_bus_match_table by helper of_platform_default_populate().
+>>
+>> Hope the v3 patchset could be merge in advance, after all, it has been reviewed fully. Thanks a lot.
+> 
+> We'd be touching the same line twice in a bunch of places if we apply
+> this series first, so it makes more sense to remove all these calls
+> first and then use of_platform_default_populate where it is still
+> needed.
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-Tested-by: <holgerschurig@gmail.com>
----
- drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+Agree, will repost them.
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 08243c2..b71654c 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
- 					 fec16_to_cpu(bdp->cbd_datlen),
- 					 DMA_TO_DEVICE);
- 		bdp->cbd_bufaddr = cpu_to_fec32(0);
--		if (!skb) {
--			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
--			continue;
--		}
-+		if (!skb)
-+			goto skb_done;
- 
- 		/* Check for errors. */
- 		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
-@@ -1239,7 +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
- 
- 		/* Free the sk buffer associated with this last transmit */
- 		dev_kfree_skb_any(skb);
--
-+skb_done:
- 		/* Make sure the update to bdp and tx_skbuff are performed
- 		 * before dirty_tx
- 		 */
--- 
-2.5.0
+BRs,
+Kefeng
+
+> 
+> Rob
+> 
+> .
+> 
