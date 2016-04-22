@@ -1,9 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 22 Apr 2016 12:24:28 -0700
-Subject: [GIT PULL 1/2] bcm2835 DT changes for 4.7
-In-Reply-To: <1461184067-31925-1-git-send-email-eric@anholt.net>
+Date: Fri, 22 Apr 2016 12:26:22 -0700
+Subject: [GIT PULL 2/2] bcm2835 defconfig changes for 4.7
+In-Reply-To: <1461184067-31925-2-git-send-email-eric@anholt.net>
 References: <1461184067-31925-1-git-send-email-eric@anholt.net>
-Message-ID: <571A7A6C.4060205@gmail.com>
+ <1461184067-31925-2-git-send-email-eric@anholt.net>
+Message-ID: <571A7ADE.3040903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +13,16 @@ On 20/04/16 13:27, Eric Anholt wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/anholt/linux tags/bcm2835-dt-next-2016-04-20
+>   https://github.com/anholt/linux tags/bcm2835-defconfig-next-2016-04-20
 > 
-> for you to fetch changes up to 896ad420db8d5ec4cc4727b786d15e28eb59b366:
+> for you to fetch changes up to 3652bb35abf6ee11333cbec1d2855c1c0f9f6b27:
 > 
->   dt/bindings: bcm2835: correct description for DMA-int (2016-04-19 17:31:58 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in VC4 devicetree support and the other minor
-> DT changes for 4.7.
-> 
-> Also included is a DRM patch necessary to prevent regressions when
-> simplefb and vc4 drivers are both present.  The patch was suggested by
-> the simplefb maintainer as the solution agreed upon at ELCE 2014, and
-> was acked by the DRM maintainer for merging through this tree.
+>   ARM: bcm2835: Enable NFS root support. (2016-04-04 11:03:30 -0700)
 > 
 > ----------------------------------------------------------------
+> This pull request brings in changes for bcm2835_defconfig and
+> multi_v7_defconfig in 4.7.
 
-Merged into devicetree/next, thanks Eric!
+Also merged into defconfig/next, thanks Eric!
 -- 
 Florian
