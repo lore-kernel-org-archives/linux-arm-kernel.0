@@ -1,67 +1,61 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 14:51:19 +0100
-Subject: [PATCHv2 2/6] arm64/efi: move to generic {__,}efi_call_virt
+Date: Fri, 22 Apr 2016 14:51:20 +0100
+Subject: [PATCHv2 3/6] arm/efi: move to generic {__,}efi_call_virt
 In-Reply-To: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
 References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1461333083-15529-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1461333083-15529-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Now there's a common template for {__,}efi_call_virt, remove the
-duplicate logic from the arm64 efi code.
+duplicate logic from the arm efi code.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Leif Lindholm <leif.lindholm@linaro.org>
 Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-efi at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm64/include/asm/efi.h | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/efi.h | 20 ++++----------------
+ 1 file changed, 4 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 8e88a69..f4f71224 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -14,28 +14,21 @@ extern void efi_init(void);
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+index e0eea72..e1461fc 100644
+--- a/arch/arm/include/asm/efi.h
++++ b/arch/arm/include/asm/efi.h
+@@ -23,26 +23,14 @@ void efi_init(void);
  
  int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
  
 -#define efi_call_virt(f, ...)						\
-+#define arch_efi_call_virt_setup()					\
- ({									\
+-({									\
 -	efi_##f##_t *__f;						\
 -	efi_status_t __s;						\
 -									\
- 	kernel_neon_begin();						\
- 	efi_virtmap_load();						\
+-	efi_virtmap_load();						\
 -	__f = efi.systab->runtime->f;					\
 -	__s = __f(__VA_ARGS__);						\
 -	efi_virtmap_unload();						\
--	kernel_neon_end();						\
 -	__s;								\
- })
+-})
++#define arch_efi_call_virt_setup()	efi_virtmap_load()
++#define arch_efi_call_virt_teardown()	efi_virtmap_unload()
  
 -#define __efi_call_virt(f, ...)						\
 +#define arch_efi_call_virt(f, args...)					\
  ({									\
  	efi_##f##_t *__f;						\
 -									\
--	kernel_neon_begin();						\
 -	efi_virtmap_load();						\
  	__f = efi.systab->runtime->f;					\
 -	__f(__VA_ARGS__);						\
+-	efi_virtmap_unload();						\
 +	__f(args);							\
-+})
-+
-+#define arch_efi_call_virt_teardown()					\
-+({									\
- 	efi_virtmap_unload();						\
- 	kernel_neon_end();						\
  })
+ 
+ static inline void efi_set_pgd(struct mm_struct *mm)
 -- 
 1.9.1
