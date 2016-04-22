@@ -1,69 +1,80 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 22 Apr 2016 09:00:28 -0700
-Subject: [PATCH V6 08/13] PCI: generic, thunder: update to use generic
- ECAM API
-In-Reply-To: <571A3587.2020704@redhat.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Fri, 22 Apr 2016 18:08:59 +0200
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <3830999.dF71UWYsBP@wuerfel> <57189D2F.9070802@semihalf.com>
- <8950494.UV8UrWiFbx@wuerfel> <5718A6AE.4080203@semihalf.com>
- <571A3587.2020704@redhat.com>
-Message-ID: <571A4A9C.7000201@gmail.com>
+Message-ID: <20160422160859.GF24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2016 07:30 AM, Jon Masters wrote:
-> On 04/21/2016 06:08 AM, Tomasz Nowicki wrote:
->> On 21.04.2016 11:36, Arnd Bergmann wrote:
->>> On Thursday 21 April 2016 11:28:15 Tomasz Nowicki wrote:
->>>> On 19.04.2016 15:06, Arnd Bergmann wrote:
->>>>> On Monday 18 April 2016 21:31:54 Tomasz Nowicki wrote:
->>>>>>
->>>>>> Basically the whole content of pci-thunder-ecam.c and
->>>>>> pci-thunder-pem.c.
->>>>>>
->>>>>> pci-thunder-ecam.c contains config space accessors. Similar for
->>>>>> pci-thunder-pem.c but it also has extra init call (it is now called
->>>>>> thunder_pem_init) which finds and maps related registers.
->>>>>
->>>>> They seem to do much more than just override the accessors, they
->>>>> actually
->>>>> change the contents of the config space as well. Is that really
->>>>> necessary
->>>>> on ACPI based systems as well?
->>>>
->>>> Yes, the pci-thunder-ecam.c accessors are meant to emulate config space
->>>> capabilities. They are necessary to synthesize EA capabilities (fixed
->>>> PCI BARs), it wont work without this, for ACPI boot as well.
->>>
->>> Why is that? I thought the BARs never get reassigned when using ACPI,
->>> so I'm surprised it's actually needed. Maybe I misunderstood what
->>> you mean by fixed PCI BARs.
->>
->> Yes, I meant something else. ThunderX has non-programmable PCI BAR
->> addresses. So it uses PCI EA (Extended allocation) capabilities to get
->> know PCI BARs addresses. But the early implementation (pass1.x) misses
->> EA capabilities hence we need to emulate it in config space accessors.
->
-> Aside: In case it's helpful, at least one enterprise vendor I know of is
-> only supporting later silicon as a result of this. So IMO there's no
-> need to worry about this issue on the early preproduction chips.
->
+On 15.04.16 19:06:35, Tomasz Nowicki wrote:
+> From the functionality point of view this series might be split into the
+> following logic parts:
+> 1. Necessary fixes as the preparation for using driver on ARM64.
+> 2. New ECAM API and update for users of the pci-host-common API
+> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
+> 
+> Patches has been built on top of 4.6-rc2 and can be found here:
+> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
+> 
+> This has been tested on Cavium ThunderX server. Any help in reviewing and
+> testing is very appreciated.
 
-There are two separate issues that make fixing up the ECAM space necessary:
+For the whole series:
 
-1) As Jon mentioned, preproduction silicon lacks EA capabilities.
+Tested-by: Robert Richter <rrichter@cavium.com>
+Acked-by: Robert Richter <rrichter@cavium.com>
 
-2) On 2-node NUMA systems, the EA capabilities of some devices may be 
-incorrect even in production silicon.
+-Robert
 
-In general, the strategy we use for dealing with both of these is to 
-hook into the ECAM access methods, and supply corrected config space 
-data.  For the case of device-tree provisioned ECAM access, the fix ups 
-are done in pci-thunder-ecam.c.  This code is already present and seems 
-to be working well.
-
-As we consider ACPI support, supporting case #2 above will be desirable. 
-  If we reuse the code in pci-thunder-ecam.c for this, we will probably 
-get support for #1 for free.
-
-David Daney
+> v5 -> v6
+> - dropped idea of x86 MMCONFIG code refactoring
+> - integrated JC's patches which introduce new ECAM API:
+>   https://lkml.org/lkml/2016/4/11/907
+>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
+> - added ACPI support for ThunderX ECAM and PEM drivers
+> - rebased to 4.6-rc2
+> 
+> v4 -> v5
+> - dropped MCFG refactoring group patches 1-6 from series v4 and integrated Jayachandran's patch
+>   https://patchwork.ozlabs.org/patch/575525/
+> - rewrite PCI legacy IRQs allocation
+> - squashed two patches 11 and 12 from series v4, fixed bisection issue
+> - changelog improvements
+> - rebased to 4.5-rc3
+> 
+> v3 -> v4
+> - dropped Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
+> - added Lorenzo's fix patch 19/24
+> - ACPI PCI bus domain number assigning cleanup
+> - changed resource management, we now claim and reassign resources
+> - improvements for applying quirks
+> - dropped Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
+> - rebased to 4.5-rc1
+> 
+> v2 -> v3
+> - fix legacy IRQ assigning and IO ports registration
+> - remove reference to arch specific companion device for ia64
+> - move ACPI PCI host controller driver to pci_root.c
+> - drop generic domain assignment for x86 and ia64 as I am not
+>   able to run all necessary test variants
+> - drop patch which cleaned legacy IRQ assignment since it belongs to
+>   Mathew's series:
+>   https://patchwork.ozlabs.org/patch/557504/
+> - extend MCFG quirk code
+> - rebased to 4.4
+> 
+> v1 -> v2
+> - moved non-arch specific piece of code to dirver/acpi/ directory
+> - fixed IO resource handling
+> - introduced PCI config accessors quirks matching
+> - moved ACPI_COMPANION_SET to generic code
+> 
+> v1 - https://lkml.org/lkml/2015/10/27/504
+> v2 - https://lkml.org/lkml/2015/12/16/246
+> v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
+> v4 - https://lkml.org/lkml/2016/2/4/646
+> v5 - https://lkml.org/lkml/2016/2/16/426
