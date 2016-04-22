@@ -1,69 +1,27 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 22 Apr 2016 15:32:44 +0200
-Subject: [PATCH RFT V2 3/3] iio: mxs-lradc: implement suspend/resume
- support
-In-Reply-To: <20160421210810.GC25466@dtor-ws>
-References: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
- <1461269478-449-4-git-send-email-stefan.wahren@i2se.com>
- <20160421210810.GC25466@dtor-ws>
-Message-ID: <571A27FC.4030301@i2se.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Apr 2016 14:33:56 +0100
+Subject: [PATCH v4 3/5] irqchip/gic: Restore CPU interface checking
+In-Reply-To: <1461324335-5081-4-git-send-email-suzuki.poulose@arm.com>
+References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
+ <1461324335-5081-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160422133356.GK2998@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On Fri, Apr 22, 2016 at 12:25:33PM +0100, Suzuki K. Poulose wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> When introducing the whole CPU feature detection framework,
+> we lost the capability to detect a mismatched GIC configuration
+> (using the GICv2 MMIO interface, but having the system register
+> interface enabled).
+> 
+> In order to solve this, use the new this_cpu_has_cap() helper.
+> Also move the check to the CPU interface path in order to catch
+> systems where the first CPU has been correctly configured,
+> but the secondaries are not.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Am 21.04.2016 um 23:08 schrieb Dmitry Torokhov:
-> On Thu, Apr 21, 2016 at 08:11:18PM +0000, Stefan Wahren wrote:
->> This patch implements suspend/resume support for mxs-lradc.
->> It's possible to use the touchscreen as wakeup source.
->>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> ---
->>  drivers/iio/adc/mxs-lradc.c |   61 +++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 61 insertions(+)
->>
->> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->> index cfc558f..6bd387f 100644
->> --- a/drivers/iio/adc/mxs-lradc.c
->> +++ b/drivers/iio/adc/mxs-lradc.c
->> @@ -29,6 +29,7 @@
->>  #include <linux/of.h>
->>  #include <linux/of_device.h>
->>  #include <linux/platform_device.h>
->> +#include <linux/pm.h>
->>  #include <linux/slab.h>
->>  #include <linux/stmp_device.h>
->>  #include <linux/sysfs.h>
->> @@ -1745,10 +1746,70 @@ static int mxs_lradc_remove(struct platform_device *pdev)
->>  	return 0;
->>  }
->>  
->> +static int __maybe_unused mxs_lradc_suspend(struct device *dev)
->> +{
->> +	struct iio_dev *iio = dev_get_drvdata(dev);
->> +	struct mxs_lradc *lradc = iio_priv(iio);
->> +	struct input_dev *input = lradc->ts_input;
->> +	int ret = 0;
->> +
->> +	if (input) {
->> +		mutex_lock(&input->mutex);
->> +
->> +		/* Enable touchscreen wakeup irq */
->> +		if (input->users && device_may_wakeup(dev))
->> +			ret = enable_irq_wake(lradc->irq[0]);
->> +		else
->> +			mxs_lradc_disable_ts(lradc);
->> +
->> +		mutex_unlock(&input->mutex);
->> +	}
->> +
->> +	if (ret)
->> +		return ret;
-> I'd rather we had it right after we do:
->
-> 			ret = enable_irq_wake(lradc->irq[0]);
-
-but we must unlock the mutex first before return. An option would be to
-place the return inside the input branch.
-
-Stefan
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
