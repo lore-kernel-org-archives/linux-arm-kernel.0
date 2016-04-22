@@ -1,129 +1,146 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 22 Apr 2016 15:04:09 +0200
-Subject: [PATCH 02/11] clk: tegra: dfll: Move SoC specific data into
- of_device_id
-In-Reply-To: <1461321071-6431-3-git-send-email-pchiu@nvidia.com>
-References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
- <1461321071-6431-3-git-send-email-pchiu@nvidia.com>
-Message-ID: <20160422130409.GK9047@ulmo.ba.sec>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 14:05:10 +0100
+Subject: [PATCH v7 05/10] iommu/dma-reserved-iommu: reserved binding
+ rb-tree and helpers
+In-Reply-To: <5717ABF2.1030204@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-6-git-send-email-eric.auger@linaro.org>
+ <5717805A.3070602@arm.com> <5717ABF2.1030204@linaro.org>
+Message-ID: <571A2186.1050004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 06:31:02PM +0800, Penny Chiu wrote:
-> Move all SoC specific fcpu data into of_device_id structure, and
-> move SoC fcpu data assignments from init function to probe
-> function.
-> 
-> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
-> ---
->  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 51 ++++++++++++++++++++++--------
->  1 file changed, 37 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> index 5e5958e..b577bc6 100644
-> --- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> @@ -21,6 +21,7 @@
->  #include <linux/err.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <soc/tegra/fuse.h>
->  
-> @@ -28,8 +29,15 @@
->  #include "clk-dfll.h"
->  #include "cvb.h"
->  
-> +struct dfll_fcpu_data {
-> +	const unsigned long *cpu_max_freq_table;
-> +	unsigned int cpu_max_freq_table_size;
-> +	const struct cvb_table *cpu_cvb_tables;
-> +	unsigned int cpu_cvb_tables_size;
-> +};
-> +
->  /* Maximum CPU frequency, indexed by CPU speedo id */
-> -static const unsigned long cpu_max_freq_table[] = {
-> +static const unsigned long tegra124_cpu_max_freq_table[] = {
->  	[0] = 2014500000UL,
->  	[1] = 2320500000UL,
->  	[2] = 2116500000UL,
-> @@ -79,18 +87,39 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
->  	},
->  };
->  
-> +static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
-> +	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
-> +	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
-> +	.cpu_cvb_tables = tegra124_cpu_cvb_tables,
-> +	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
-> +};
-> +
-> +static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
+On 20/04/16 17:18, Eric Auger wrote:
+> Robin,
+> On 04/20/2016 03:12 PM, Robin Murphy wrote:
+>> On 19/04/16 17:56, Eric Auger wrote:
+>>> we will need to track which host physical addresses are mapped to
+>>> reserved IOVA. In that prospect we introduce a new RB tree indexed
+>>> by physical address. This RB tree only is used for reserved IOVA
+>>> bindings.
+>>>
+>>> It is expected this RB tree will contain very few bindings.
+>>
+>> Sounds like a good reason in favour of using a list, and thus having
+>> rather less code here ;)
+>
+> OK will move to a simple list.
+>>
+>>>   Those
+>>> generally correspond to single page mapping one MSI frame (GICv2m
+>>> frame or ITS GITS_TRANSLATER frame).
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>
+>>> ---
+>>> v5 -> v6:
+>>> - add comment about @d->reserved_lock to be held
+>>>
+>>> v3 -> v4:
+>>> - that code was formerly in "iommu/arm-smmu: add a reserved binding RB
+>>> tree"
+>>> ---
+>>>    drivers/iommu/dma-reserved-iommu.c | 63
+>>> ++++++++++++++++++++++++++++++++++++++
+>>>    1 file changed, 63 insertions(+)
+>>>
+>>> diff --git a/drivers/iommu/dma-reserved-iommu.c
+>>> b/drivers/iommu/dma-reserved-iommu.c
+>>> index 2562af0..f6fa18e 100644
+>>> --- a/drivers/iommu/dma-reserved-iommu.c
+>>> +++ b/drivers/iommu/dma-reserved-iommu.c
+>>> @@ -23,6 +23,69 @@ struct reserved_iova_domain {
+>>>        int prot; /* iommu protection attributes to be obeyed */
+>>>    };
+>>>
+>>> +struct iommu_reserved_binding {
+>>> +    struct kref        kref;
+>>> +    struct rb_node        node;
+>>> +    struct iommu_domain    *domain;
+>>
+>> Hang on, the tree these are in is already embedded in a domain. Ergo we
+>> can't look them up without first knowing the domain they belong to, so
+>> what purpose does this guy serve?
+> this is used on the kref_put. The release function takes a kref; then we
+> get the container to retrieve the binding and storing the domain here
+> enables to unlink the node.
 
-There's no need to prefix this with tegra124_ since obviously the goal
-is to make this a table that works at least on Tegra210 as well.
+Ah yes, I see now - that's annoyingly awkward. I think it could possibly 
+be avoided in the list case (if the kref_put callback just did 
+list_del_init(), the entry could then be checked for an empty list and 
+disposed of outside the lock), but I'm not sure whether that's really 
+worth the fuss. Oh well.
 
-> +	{
-> +		.compatible = "nvidia,tegra124-dfll",
-> +		.data = &tegra124_dfll_fcpu_data
-> +	},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
-> +
->  static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
->  {
->  	int process_id, speedo_id, speedo_value, ret;
->  	struct rail_alignment align;
->  	struct tegra_dfll_soc_data *soc;
->  	const struct cvb_table *cvb;
-> +	const struct of_device_id *of_id;
-> +	const struct dfll_fcpu_data *fcpu_data;
-> +
-> +	of_id = of_match_device(tegra124_dfll_fcpu_of_match, &pdev->dev);
-> +	fcpu_data = of_id->data;
+Robin.
 
-You should be using of_device_get_match_data() nowadays. That allows you
-to do this in one step while at the same time allowing to keep the match
-tables where they are.
-
->  
->  	process_id = tegra_sku_info.cpu_process_id;
->  	speedo_id = tegra_sku_info.cpu_speedo_id;
->  	speedo_value = tegra_sku_info.cpu_speedo_value;
->  
-> -	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
-> +	if (speedo_id >= fcpu_data->cpu_max_freq_table_size) {
->  		dev_err(&pdev->dev, "unknown max CPU freq for speedo_id=%d\n",
->  			speedo_id);
->  		return -ENODEV;
-> @@ -121,12 +150,12 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	cvb = tegra_cvb_build_opp_table(tegra124_cpu_cvb_tables,
-> -					ARRAY_SIZE(tegra124_cpu_cvb_tables),
-> -					&align,
-> -					process_id, speedo_id, speedo_value,
-> -					cpu_max_freq_table[speedo_id],
-> -					soc->dev);
-> +	cvb = tegra_cvb_build_opp_table(fcpu_data->cpu_cvb_tables,
-> +				fcpu_data->cpu_cvb_tables_size,
-> +				&align,
-> +				process_id, speedo_id, speedo_value,
-> +				fcpu_data->cpu_max_freq_table[speedo_id],
-> +				soc->dev);
-
-This, and potentially other parts will conflict with some cleanup I
-recently did to this code. You may want to rebase on some linux-next
-earlier next week which should have those cleanup patches.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/7606091c/attachment.sig>
+> Best Regards
+>
+> Eric
+>>
+>> Robin.
+>>
+>>> +    phys_addr_t        addr;
+>>> +    dma_addr_t        iova;
+>>> +    size_t            size;
+>>> +};
+>>> +
+>>> +/* Reserved binding RB-tree manipulation */
+>>> +
+>>> +/* @d->reserved_lock must be held */
+>>> +static struct iommu_reserved_binding *find_reserved_binding(
+>>> +                    struct iommu_domain *d,
+>>> +                    phys_addr_t start, size_t size)
+>>> +{
+>>> +    struct rb_node *node = d->reserved_binding_list.rb_node;
+>>> +
+>>> +    while (node) {
+>>> +        struct iommu_reserved_binding *binding =
+>>> +            rb_entry(node, struct iommu_reserved_binding, node);
+>>> +
+>>> +        if (start + size <= binding->addr)
+>>> +            node = node->rb_left;
+>>> +        else if (start >= binding->addr + binding->size)
+>>> +            node = node->rb_right;
+>>> +        else
+>>> +            return binding;
+>>> +    }
+>>> +
+>>> +    return NULL;
+>>> +}
+>>> +
+>>> +/* @d->reserved_lock must be held */
+>>> +static void link_reserved_binding(struct iommu_domain *d,
+>>> +                  struct iommu_reserved_binding *new)
+>>> +{
+>>> +    struct rb_node **link = &d->reserved_binding_list.rb_node;
+>>> +    struct rb_node *parent = NULL;
+>>> +    struct iommu_reserved_binding *binding;
+>>> +
+>>> +    while (*link) {
+>>> +        parent = *link;
+>>> +        binding = rb_entry(parent, struct iommu_reserved_binding,
+>>> +                   node);
+>>> +
+>>> +        if (new->addr + new->size <= binding->addr)
+>>> +            link = &(*link)->rb_left;
+>>> +        else
+>>> +            link = &(*link)->rb_right;
+>>> +    }
+>>> +
+>>> +    rb_link_node(&new->node, parent, link);
+>>> +    rb_insert_color(&new->node, &d->reserved_binding_list);
+>>> +}
+>>> +
+>>> +/* @d->reserved_lock must be held */
+>>> +static void unlink_reserved_binding(struct iommu_domain *d,
+>>> +                    struct iommu_reserved_binding *old)
+>>> +{
+>>> +    rb_erase(&old->node, &d->reserved_binding_list);
+>>> +}
+>>> +
+>>>    int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
+>>>                         dma_addr_t iova, size_t size, int prot,
+>>>                         unsigned long order)
+>>>
+>>
+>
