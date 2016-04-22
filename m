@@ -1,61 +1,174 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 22 Apr 2016 08:17:14 +0200
-Subject: [PATCH RESEND v3 2/2] dmaengine: sun6i: Fix impossible settings of
- burst and bus width
-In-Reply-To: <cover.1461306176.git.moinejf@free.fr>
-References: <cover.1461306176.git.moinejf@free.fr>
-Message-ID: <8fad6ddb3e59fcb9732b00b934ef24e948d05dee.1461306176.git.moinejf@free.fr>
+From: yunhui.cui@nxp.com (Yunhui Cui)
+Date: Fri, 22 Apr 2016 06:32:38 +0000
+Subject: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+In-Reply-To: <DB5PR0401MB18454A04DF76E0EEDEF68A49976F0@DB5PR0401MB1845.eurprd04.prod.outlook.com>
+References: <1460605855-6689-1-git-send-email-B56489@freescale.com>,
+ <1460605855-6689-9-git-send-email-B56489@freescale.com>
+ <DB5PR0401MB18454AF685ADE37F1C39C088976D0@DB5PR0401MB1845.eurprd04.prod.outlook.com>,
+ <DB5PR0401MB1912F866F920C71BF1A26F29946E0@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+ <DB5PR0401MB184588E6C33FD167783C1D57976E0@DB5PR0401MB1845.eurprd04.prod.outlook.com>,
+ <DB5PR0401MB19129F49CF2709DBB3E9E8E9946F0@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+ <DB5PR0401MB18454A04DF76E0EEDEF68A49976F0@DB5PR0401MB1845.eurprd04.prod.outlook.com>
+Message-ID: <DB5PR0401MB191207A11CDFD4A237AD3E63946F0@DB5PR0401MB1912.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the commit 1f9cd915b64bb95f ("dmaengine: sun6i: Fix memcpy operation"),
-the signed values returned by convert_burst() and convert_buswidth()
-were stored in an unsigned value.
-Then, these values were considered as errors when non null.
 
-As a result, DMA transfers were rejected when the burst or buswidth
-had values different from 1, as 8 for the burst or 4 for the bus width.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- drivers/dma/sun6i-dma.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 2ec320d..3579ee7 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -281,25 +281,25 @@ static inline int sun6i_dma_cfg_lli(struct sun6i_dma_lli *lli,
- 				    dma_addr_t dst, u32 len,
- 				    struct dma_slave_config *config)
- {
--	u8 src_width, dst_width, src_burst, dst_burst;
-+	s8 src_width, dst_width, src_burst, dst_burst;
- 
- 	if (!config)
- 		return -EINVAL;
- 
- 	src_burst = convert_burst(config->src_maxburst);
--	if (src_burst)
-+	if (src_burst < 0)
- 		return src_burst;
- 
- 	dst_burst = convert_burst(config->dst_maxburst);
--	if (dst_burst)
-+	if (dst_burst < 0)
- 		return dst_burst;
- 
- 	src_width = convert_buswidth(config->src_addr_width);
--	if (src_width)
-+	if (src_width < 0)
- 		return src_width;
- 
- 	dst_width = convert_buswidth(config->dst_addr_width);
--	if (dst_width)
-+	if (dst_width < 0)
- 		return dst_width;
- 
- 	lli->cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
--- 
-2.8.1
+> -----Original Message-----
+> From: Han Xu
+> Sent: Friday, April 22, 2016 12:49 PM
+> To: Yunhui Cui; Yunhui Cui; dwmw2 at infradead.org;
+> computersforpeace at gmail.com; han.xu at freescale.com
+> Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
+> arm-kernel at lists.infradead.org; Yao Yuan
+> Subject: Re: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+> 
+> 
+> 
+> ________________________________________
+> From: Yunhui Cui
+> Sent: Thursday, April 21, 2016 9:52 PM
+> To: Han Xu; Yunhui Cui; dwmw2 at infradead.org; computersforpeace at gmail.com;
+> han.xu at freescale.com
+> Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
+> arm-kernel at lists.infradead.org; Yao Yuan
+> Subject: RE: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+> 
+> > -----Original Message-----
+> > From: Han Xu
+> > Sent: Thursday, April 21, 2016 11:48 PM
+> > To: Yunhui Cui; Yunhui Cui; dwmw2 at infradead.org;
+> > computersforpeace at gmail.com; han.xu at freescale.com
+> > Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org;
+> > linux- arm-kernel at lists.infradead.org; Yao Yuan
+> > Subject: Re: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+> >
+> >
+> >
+> > ________________________________________
+> > From: Yunhui Cui
+> > Sent: Thursday, April 21, 2016 3:41 AM
+> > To: Han Xu; Yunhui Cui; dwmw2 at infradead.org;
+> > computersforpeace at gmail.com; han.xu at freescale.com
+> > Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org;
+> > linux- arm-kernel at lists.infradead.org; Yao Yuan
+> > Subject: RE: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+> >
+> > On Thu, Apr 24, 2016 at 06:37:01 AM +0800, Han Xu wrote:
+> > > ________________________________________
+> > > From: Yunhui Cui <B56489@freescale.com>
+> > > Sent: Wednesday, April 13, 2016 9:50 PM
+> > > To: dwmw2 at infradead.org; computersforpeace at gmail.com;
+> > > han.xu at freescale.com
+> > > Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org;
+> > > linux- arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
+> > > Subject: [PATCH 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
+> > >
+> > > From: Yunhui Cui <yunhui.cui@nxp.com>
+> > >
+> > > A-009282: QuadSPI: QuadSPI data pre-fetch can result in incorrect
+> > > data
+> > > Affects: QuadSPI
+> > > Description: With AHB buffer prefetch enabled, the QuadSPI may
+> > > return incorrect data on the AHB interface. The buffer pre-fetch is
+> > > enabled if the fetch size as configured either in the LUT or in the
+> > > BUFxCR register is greater than 8 bytes.
+> > > Impact: Only 64 bit read allowed.
+> > > Workaround: Keep the read data size to 64 bits (8 Bytes), which
+> > > disables the prefetch on the AHB buffer, and prevents this issue
+> > > from
+> > occurring.
+> > >
+> > > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+> > > ---
+> > >  drivers/mtd/spi-nor/fsl-quadspi.c | 29
+> > > +++++++++++++++++++++++------
+> > >  1 file changed, 23 insertions(+), 6 deletions(-)
+> > >
+> > > diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c
+> > > b/drivers/mtd/spi-nor/fsl- quadspi.c index fea18b6..d9f3e50 100644
+> > > --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> > > +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> > > @@ -752,19 +752,36 @@ static void fsl_qspi_init_abh_read(struct
+> > > fsl_qspi
+> > > *q)  {
+> > >         void __iomem *base = q->iobase;
+> > >         int seqid;
+> > > +       const struct fsl_qspi_devtype_data *devtype_data =
+> > > + q->devtype_data;
+> > >
+> > >         /* AHB configuration for access buffer 0/1/2 .*/
+> > >         qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base +
+> > > QUADSPI_BUF0CR);
+> > >         qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base +
+> > > QUADSPI_BUF1CR);
+> > >         qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base +
+> > > QUADSPI_BUF2CR);
+> > > +
+> > >         /*
+> > > -        * Set ADATSZ with the maximum AHB buffer size to improve the
+> > > -        * read performance.
+> > > +        * Errata: A-009282: QuadSPI data prefetch may result in
+> > > incorrect data
+> > > +        * Workaround: Keep the read data size to 64 bits (8 bytes).
+> > > +        * This disables the prefetch on the AHB buffer and
+> > > +        * prevents this issue from occurring.
+> > >          */
+> > > -       qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
+> > > -                       ((q->devtype_data->ahb_buf_size / 8)
+> > > -                       << QUADSPI_BUF3CR_ADATSZ_SHIFT),
+> > > -                       base + QUADSPI_BUF3CR);
+> > > +       if (devtype_data->devtype == FSL_QUADSPI_LS2080A ||
+> > > +           devtype_data->devtype == FSL_QUADSPI_LS1021A) {
+> > >
+> > > Use QUIRK, not SoC name.
+> > [Yunhui] This is a SoC errata, we need distinguish according to the
+> > devtype_data->devtype
+> >
+> > It's the same thing and we have already done that before.
+> 
+> > [Yunhui] your mean that I should add such as the following code:
+>         #define QUADSPI_QUIRK_ERRATA_9282         (1 << 4)
+>         static inline int has_errata_num_a009282(struct fsl_qspi *q)
+>         {
+>                  return q->devtype_data->driver_data &
+> QUADSPI_QUIRK_ERRATA_9282;
+>         }
+> 
+> I mean QUIRK can be used even for HW limitation, but it's not necessary
+> to use ERRATA number as QUIRK name, you can name it with natural language,
+> such as QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT, and describe the reason in
+> comments.
+> [Yunhui] thanks, I will update it in v2.
+> > /*
+> >  * TKT253890, Controller needs driver to fill txfifo till 16 byte to
+> >  * trigger data transfer even though extra data will not transferred.
+> >  */
+> > #define QUADSPI_QUIRK_TKT253890         (1 << 2)
+> > /* Controller cannot wake up from wait mode, TKT245618 */
+> > #define QUADSPI_QUIRK_TKT245618         (1 << 3)
+> >
+> >
+> > > +
+> > > +               qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
+> > > +                               (1 << QUADSPI_BUF3CR_ADATSZ_SHIFT),
+> > > +                               base + QUADSPI_BUF3CR);
+> > > +
+> > > +       } else {
+> > > +               /*
+> > > +                * Set ADATSZ with the maximum AHB buffer size to
+> > > + improve
+> > > the
+> > > +                * read performance.
+> > > +               */
+> > > +               qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
+> > > +                               ((q->devtype_data->ahb_buf_size / 8)
+> > > +                               << QUADSPI_BUF3CR_ADATSZ_SHIFT),
+> > > +                               base + QUADSPI_BUF3CR);
+> > > +       }
+> > >
+> > >         /* We only use the buffer3 */
+> > >         qspi_writel(q, 0, base + QUADSPI_BUF0IND);
+> > > --
+> > > 2.1.0.27.g96db324
