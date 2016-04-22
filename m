@@ -1,14 +1,15 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 22 Apr 2016 18:02:52 +0800
-Subject: [RESEND PATCH 6/8] thermal: rockchip: add the notes for better reading
+Date: Fri, 22 Apr 2016 18:02:53 +0800
+Subject: [RESEND PATCH 7/8] ARM: dts: rockchip: move the rk3288 thermal data
+ into rk3288.dtsi
 In-Reply-To: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
 References: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1461319374-10024-7-git-send-email-wxt@rock-chips.com>
+Message-ID: <1461319374-10024-8-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To update the notes for keeping in mind that quickly in case
-someone re-read this driver in the future.
+In order to be standard to manage for rockchip SoCs,  move the thermal
+data into rk3288 dtsi, we needn't to add a new file for thermal.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
@@ -16,151 +17,218 @@ Cc: Eduardo Valentin <edubezval@gmail.com>
 Cc: Heiko Stuebner <heiko@sntech.de>
 ---
 
- drivers/thermal/rockchip_thermal.c | 74 +++++++++++++++++++++++++++-----------
- 1 file changed, 53 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/rk3288-thermal.dtsi | 118 ----------------------------------
+ arch/arm/boot/dts/rk3288.dtsi         |  73 ++++++++++++++++++++-
+ 2 files changed, 72 insertions(+), 119 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 3f1e5d4..297acdb 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -1,7 +1,5 @@
- /*
+diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+deleted file mode 100644
+index 651b962..0000000
+--- a/arch/arm/boot/dts/rk3288-thermal.dtsi
++++ /dev/null
+@@ -1,118 +0,0 @@
+-/*
+- * Device Tree Source for RK3288 SoC thermal
+- *
 - * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
 - *
-- * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-+ * Copyright (c) 2014-2016, Fuzhou Rockchip Electronics Co., Ltd
-  * Caesar Wang <wxt@rock-chips.com>
-  *
-  * This program is free software; you can redistribute it and/or modify it
-@@ -75,7 +73,7 @@ enum adc_sort_mode {
- #define SOC_MAX_SENSORS	2
- 
- /**
-- * struct chip_tsadc_table: hold information about chip-specific differences
-+ * struct chip_tsadc_table - hold information about chip-specific differences
-  * @id: conversion table
-  * @length: size of conversion table
-  * @data_mask: mask to apply on data inputs
-@@ -88,6 +86,20 @@ struct chip_tsadc_table {
- 	enum adc_sort_mode mode;
- };
- 
-+/**
-+ * struct rockchip_tsadc_chip - hold the private data of tsadc chip
-+ * @chn_id[SOC_MAX_SENSORS]: the sensor id of chip correspond to the channel
-+ * @chn_num: the channel number of tsadc chip
-+ * @tshut_temp: the hardware-controlled shutdown temperature value
-+ * @tshut_mode: the hardware-controlled shutdown mode (0:CRU 1:GPIO)
-+ * @tshut_polarity: the hardware-controlled active polarity (0:LOW 1:HIGH)
-+ * @initialize: SoC special initialize tsadc controller method
-+ * @irq_ack: clear the interrupt
-+ * @get_temp: get the temperature
-+ * @set_tshut_temp: set the hardware-controlled shutdown temperature
-+ * @set_tshut_mode: set the hardware-controlled shutdown mode
-+ * @table: the chip-specific conversion table
-+ */
- struct rockchip_tsadc_chip {
- 	/* The sensor id of chip correspond to the ADC channel */
- 	int chn_id[SOC_MAX_SENSORS];
-@@ -115,12 +127,32 @@ struct rockchip_tsadc_chip {
- 	struct chip_tsadc_table table;
- };
- 
-+/**
-+ * struct rockchip_thermal_sensor - hold the information of thermal sensor
-+ * @thermal:  pointer to the platform/configuration data
-+ * @tzd: pointer to a thermal zone
-+ * @id: identifier of the thermal sensor
-+ */
- struct rockchip_thermal_sensor {
- 	struct rockchip_thermal_data *thermal;
- 	struct thermal_zone_device *tzd;
- 	int id;
- };
- 
-+/**
-+ * struct rockchip_thermal_data - hold the private data of thermal driver
-+ * @chip: pointer to the platform/configuration data
-+ * @pdev: platform device of thermal
-+ * @reset: the reset controller of tsadc
-+ * @sensors[SOC_MAX_SENSORS]: the thermal sensor
-+ * @clk: the controller clock is divided by the exteral 24MHz
-+ * @pclk: the advanced peripherals bus clock
-+ * @grf: the general register file will be used to do static set by software
-+ * @regs: the base address of tsadc controller
-+ * @tshut_temp: the hardware-controlled shutdown temperature value
-+ * @tshut_mode: the hardware-controlled shutdown mode (0:CRU 1:GPIO)
-+ * @tshut_polarity: the hardware-controlled active polarity (0:LOW 1:HIGH)
-+ */
- struct rockchip_thermal_data {
- 	const struct rockchip_tsadc_chip *chip;
- 	struct platform_device *pdev;
-@@ -160,12 +192,7 @@ struct rockchip_thermal_data {
- #define TSADCV2_AUTO_EN				BIT(0)
- #define TSADCV2_AUTO_SRC_EN(chn)		BIT(4 + (chn))
- #define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
--/**
-- * TSADCV1_AUTO_Q_SEL_EN:
-- * whether select (1024 - tsadc_q) as output
-- * 1'b0:use tsadc_q as output(temperature-code is rising sequence)
-- * 1'b1:use(1024 - tsadc_q) as output (temperature-code is falling sequence)
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
 - */
-+
- #define TSADCV3_AUTO_Q_SEL_EN			BIT(1)
- 
- #define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
-@@ -196,18 +223,21 @@ struct rockchip_thermal_data {
- #define GRF_SARADC_TESTBIT_ON			(0x10001 << 2)
- #define GRF_TSADC_TESTBIT_H_ON			(0x10001 << 2)
- 
--struct tsadc_table {
--	u32 code;
--	int temp;
+-
+-#include <dt-bindings/thermal/thermal.h>
+-
+-reserve_thermal: reserve_thermal {
+-	polling-delay-passive = <1000>; /* milliseconds */
+-	polling-delay = <5000>; /* milliseconds */
+-
+-	thermal-sensors = <&tsadc 0>;
 -};
 -
- /**
-+ * struct tsadc_table - code to temperature conversion table
-+ * @code: the value of adc channel
-+ * @temp: the temperature
-  * Note:
-- * Code to Temperature mapping of the Temperature sensor is a piece wise linear
-+ * code to temperature mapping of the temperature sensor is a piece wise linear
-  * curve.Any temperature, code faling between to 2 give temperatures can be
-  * linearly interpolated.
-- * Code to Temperature mapping should be updated based on sillcon results.
-+ * Code to Temperature mapping should be updated based on manufacturer results.
-  */
-+struct tsadc_table {
-+	u32 code;
-+	int temp;
-+};
+-cpu_thermal: cpu_thermal {
+-	polling-delay-passive = <100>; /* milliseconds */
+-	polling-delay = <5000>; /* milliseconds */
+-
+-	thermal-sensors = <&tsadc 1>;
+-
+-	trips {
+-		cpu_alert0: cpu_alert0 {
+-			temperature = <70000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
+-		cpu_alert1: cpu_alert1 {
+-			temperature = <75000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
+-		cpu_crit: cpu_crit {
+-			temperature = <90000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "critical";
+-		};
+-	};
+-
+-	cooling-maps {
+-		map0 {
+-			trip = <&cpu_alert0>;
+-			cooling-device =
+-				<&cpu0 THERMAL_NO_LIMIT 6>;
+-		};
+-		map1 {
+-			trip = <&cpu_alert1>;
+-			cooling-device =
+-				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-		};
+-	};
+-};
+-
+-gpu_thermal: gpu_thermal {
+-	polling-delay-passive = <100>; /* milliseconds */
+-	polling-delay = <5000>; /* milliseconds */
+-
+-	thermal-sensors = <&tsadc 2>;
+-
+-	trips {
+-		gpu_alert0: gpu_alert0 {
+-			temperature = <70000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
+-		gpu_crit: gpu_crit {
+-			temperature = <90000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "critical";
+-		};
+-	};
+-
+-	cooling-maps {
+-		map0 {
+-			trip = <&gpu_alert0>;
+-			cooling-device =
+-				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-		};
+-	};
+-};
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 3071e94..0db8b35 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -454,7 +454,78 @@
+ 	};
+ 
+ 	thermal-zones {
+-		#include "rk3288-thermal.dtsi"
++		reserve_thermal: reserve_thermal {
++			polling-delay-passive = <1000>; /* milliseconds */
++			polling-delay = <5000>; /* milliseconds */
 +
- static const struct tsadc_table rk3228_code_table[] = {
- 	{0, -40000},
- 	{588, -40000},
-@@ -493,6 +523,7 @@ static void rk_tsadcv2_initialize(struct regmap *grf, void __iomem *regs,
++			thermal-sensors = <&tsadc 0>;
++		};
++
++		cpu_thermal: cpu_thermal {
++			polling-delay-passive = <100>; /* milliseconds */
++			polling-delay = <5000>; /* milliseconds */
++
++			thermal-sensors = <&tsadc 1>;
++
++			trips {
++				cpu_alert0: cpu_alert0 {
++					temperature = <70000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu_alert1: cpu_alert1 {
++					temperature = <75000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu_crit: cpu_crit {
++					temperature = <90000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device =
++						<&cpu0 THERMAL_NO_LIMIT 6>;
++				};
++				map1 {
++					trip = <&cpu_alert1>;
++					cooling-device =
++						<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
++
++		gpu_thermal: gpu_thermal {
++			polling-delay-passive = <100>; /* milliseconds */
++			polling-delay = <5000>; /* milliseconds */
++
++			thermal-sensors = <&tsadc 2>;
++
++			trips {
++				gpu_alert0: gpu_alert0 {
++					temperature = <70000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				gpu_crit: gpu_crit {
++					temperature = <90000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&gpu_alert0>;
++					cooling-device =
++						<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
+ 	};
  
- /**
-  * rk_tsadcv3_initialize - initialize TASDC Controller.
-+ *
-  * (1) The tsadc control power sequence.
-  *
-  * (2) Set TSADC_V2_AUTO_PERIOD:
-@@ -580,10 +611,11 @@ static void rk_tsadcv2_control(void __iomem *regs, bool enable)
- }
- 
- /**
-- * @rk_tsadcv3_control:
-- * TSADC controller works at auto mode, and some SoCs need set the tsadc_q_sel
-- * bit on TSADCV2_AUTO_CON[1]. The (1024 - tsadc_q) as output adc value if
-- * setting this bit to enable.
-+ * rk_tsadcv3_control - the tsadc controller is enabled or disabled.
-+ *
-+ * NOTE: TSADC controller works@auto mode, and some SoCs need set the
-+ * tsadc_q_sel bit on TSADCV2_AUTO_CON[1]. The (1024 - tsadc_q) as output
-+ * adc value if setting this bit to enable.
-  */
- static void rk_tsadcv3_control(void __iomem *regs, bool enable)
- {
+ 	tsadc: tsadc at ff280000 {
 -- 
 1.9.1
