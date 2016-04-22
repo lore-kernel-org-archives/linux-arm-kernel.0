@@ -1,59 +1,43 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 22 Apr 2016 11:13:59 -0600
-Subject: [PATCH V3 02/18] coresight: tmc: waiting for TMCReady bit before
- programming
+Date: Fri, 22 Apr 2016 11:14:01 -0600
+Subject: [PATCH V3 04/18] coresight: tmc: clearly define number of transfers
+ per burst
 In-Reply-To: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461345255-11758-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461345255-11758-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the TRM before programming the TMC in circular
-buffer mode (and that for any configuration, ETB, ETR, ETF),
-the TMCReady bit in the status register has to be set.
-
-This patch adds a check to make sure the state machine is in
-a state where it can be configured, and complains otherwise.
+This patch makes the name of the define reflect the amount of
+data tranfers per burst, in this case 16.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 3f646e29a99b..66fa7736d12f 100644
+index d211aeec49f8..8751d53fa078 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -180,6 +180,9 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- 
- 	CS_UNLOCK(drvdata->base);
- 
-+	/* Wait for TMCSReady bit to be set */
-+	tmc_wait_for_tmcready(drvdata);
-+
- 	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
-@@ -201,6 +204,9 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 
- 	CS_UNLOCK(drvdata->base);
- 
-+	/* Wait for TMCSReady bit to be set */
-+	tmc_wait_for_tmcready(drvdata);
-+
- 	writel_relaxed(drvdata->size / 4, drvdata->base + TMC_RSZ);
+@@ -67,7 +67,7 @@
+ #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+ #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
+ #define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
+-#define TMC_AXICTL_WR_BURST_LEN 0xF00
++#define TMC_AXICTL_WR_BURST_16	0xF00
+ /* TMC_FFCR - 0x304 */
+ #define TMC_FFCR_EN_FMT		BIT(0)
+ #define TMC_FFCR_EN_TI		BIT(1)
+@@ -211,7 +211,7 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
  	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
  
-@@ -230,6 +236,9 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
-+	/* Wait for TMCSReady bit to be set */
-+	tmc_wait_for_tmcready(drvdata);
-+
- 	writel_relaxed(TMC_MODE_HARDWARE_FIFO, drvdata->base + TMC_MODE);
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI,
- 		       drvdata->base + TMC_FFCR);
+ 	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
+-	axictl |= TMC_AXICTL_WR_BURST_LEN;
++	axictl |= TMC_AXICTL_WR_BURST_16;
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+ 	axictl &= ~TMC_AXICTL_SCT_GAT_MODE;
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
 -- 
 2.5.0
