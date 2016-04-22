@@ -1,47 +1,208 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 18:25:43 +0100
-Subject: [PATCH v2 6/6] efi/arm*: add support to dump the EFI page tables
-In-Reply-To: <CAKv+Gu-abf2g5htQSHA=ETnSfzVExFLwsjs2Kbs8fn86MfFv3Q@mail.gmail.com>
-References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
- <1461343688-8552-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160422170112.GS10606@leverpostej>
- <CAKv+Gu-abf2g5htQSHA=ETnSfzVExFLwsjs2Kbs8fn86MfFv3Q@mail.gmail.com>
-Message-ID: <20160422172513.GV10606@leverpostej>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 22 Apr 2016 19:30:34 +0200
+Subject: [PATCH v2 04/11] clocksource/moxart: Generalise timer for use on
+ other socs
+In-Reply-To: <1461225849-28074-5-git-send-email-joel@jms.id.au>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-5-git-send-email-joel@jms.id.au>
+Message-ID: <571A5FBA.9010204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 07:20:38PM +0200, Ard Biesheuvel wrote:
-> On 22 April 2016 at 19:01, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Apr 22, 2016 at 06:48:08PM +0200, Ard Biesheuvel wrote:
+On 04/21/2016 10:04 AM, Joel Stanley wrote:
+> The moxart timer IP is shared with another soc made by Aspeed.
+> Generalise the registers that differ so the same driver can be used for
+> both.
+>
+> As we now depend on CLKSRC_MMIO, create a Kconfig symbol for the driver
+> so we can express this dependency.
+>
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> ---
 
-> >> +static struct ptdump_info efi_ptdump_info = {
-> >> +     .mm             = &efi_mm,
-> >> +     .markers        = efi_addr_markers,
-> >> +     .base_addr      = 0,
-> >> +     .max_addr       = SZ_1G,
-> >> +};
-> >
-> > I see that max_addr isn't used for arm64, and for ARM it's only used in
-> > one place. It doesn't seem great to have that on arm64 given it's
-> > unused.
-> >
-> > Do we actually need max_addr? Is there any reason not to always dump
-> > whole tables?
-> >
-> > I guess you're trying to avoid dumping the kernel VA range on 32-bit?
-> 
-> Indeed. On ARM, the efi_page_tables dumps its copy of
-> kernel_page_tables. If that is OK (the information could potentially
-> be useful, I suppose) we can drop the max
+In the future, please Cc the maintainers.
 
-I'd argue it's always worth dumping the full tables (dropipng the max).
+>   .../bindings/timer/moxa,moxart-timer.txt           |  4 +-
+>   drivers/clocksource/Kconfig                        |  6 ++
+>   drivers/clocksource/Makefile                       |  2 +-
+>   drivers/clocksource/moxart_timer.c                 | 90 +++++++++++++++++-----
+>   4 files changed, 79 insertions(+), 23 deletions(-)
 
-For instance, we could have some bug that leaves the kernel VA range in
-the EFI tables inconsistent with what we expect/require, and having that
-exposed would make that clear.
+[ ... ]
 
-Regardless, arbitrarily limiting the VA range of the arm64 dump doesn't
-seem great.
+> +config MOXART_TIMER
+> +	def_bool ARCH_MOXART || ARCH_ASPEED
+> +	depends on ARM && OF
+> +	select CLKSRC_OF
+> +	select CLKSRC_MMIO
 
-Thanks,
-Mark.
+Refer to the other drivers to see how they are selected (eg. digicolor 
+or mtk).
+
+[ ... ]
+
+> -#define TIMEREG_CR_1_ENABLE	BIT(0)
+> -#define TIMEREG_CR_1_CLOCK	BIT(1)
+> -#define TIMEREG_CR_1_INT	BIT(2)
+> -#define TIMEREG_CR_2_ENABLE	BIT(3)
+> -#define TIMEREG_CR_2_CLOCK	BIT(4)
+> -#define TIMEREG_CR_2_INT	BIT(5)
+> -#define TIMEREG_CR_3_ENABLE	BIT(6)
+> -#define TIMEREG_CR_3_CLOCK	BIT(7)
+> -#define TIMEREG_CR_3_INT	BIT(8)
+> -#define TIMEREG_CR_COUNT_UP	BIT(9)
+> -
+> -#define TIMER1_ENABLE		(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
+> -#define TIMER1_DISABLE		(TIMEREG_CR_2_ENABLE)
+> +#define MOXART_CR_1_ENABLE	BIT(0)
+> +#define MOXART_CR_1_CLOCK	BIT(1)
+> +#define MOXART_CR_1_INT		BIT(2)
+> +#define MOXART_CR_2_ENABLE	BIT(3)
+> +#define MOXART_CR_2_CLOCK	BIT(4)
+> +#define MOXART_CR_2_INT		BIT(5)
+> +#define MOXART_CR_3_ENABLE	BIT(6)
+> +#define MOXART_CR_3_CLOCK	BIT(7)
+> +#define MOXART_CR_3_INT		BIT(8)
+> +#define MOXART_CR_COUNT_UP	BIT(9)
+> +
+> +#define MOXART_TIMER1_ENABLE	(MOXART_CR_2_ENABLE | MOXART_CR_1_ENABLE)
+> +#define MOXART_TIMER1_DISABLE	(MOXART_CR_2_ENABLE)
+> +
+> +/*
+> + * The ASpeed variant of the IP block has a different layout
+> + * for the control register
+> + */
+> +#define ASPEED_CR_1_ENABLE	BIT(0)
+> +#define ASPEED_CR_1_CLOCK	BIT(1)
+> +#define ASPEED_CR_1_INT		BIT(2)
+> +#define ASPEED_CR_2_ENABLE	BIT(4)
+> +#define ASPEED_CR_2_CLOCK	BIT(5)
+> +#define ASPEED_CR_2_INT		BIT(6)
+> +#define ASPEED_CR_3_ENABLE	BIT(8)
+> +#define ASPEED_CR_3_CLOCK	BIT(9)
+> +#define ASPEED_CR_3_INT		BIT(10)
+> +
+> +#define ASPEED_TIMER1_ENABLE	(ASPEED_CR_2_ENABLE | ASPEED_CR_1_ENABLE)
+> +#define ASPEED_TIMER1_DISABLE	(ASPEED_CR_2_ENABLE)
+
+You probably can remove all the unused macro definition here for both 
+MOXART and ASPEED to have something just a couple of definition.
+
+>   static void __iomem *base;
+>   static unsigned int clock_count_per_tick;
+> +static unsigned int t1_disable_val, t1_enable_val;
+
+It will be cleaner to:
+
+1. Factor out:
+	writel(TIMER1_DISABLE, base + TIMER_CR);
+	writel(TIMER1_ENABLE, base + TIMER_CR);
+
+diff --git a/drivers/clocksource/moxart_timer.c 
+b/drivers/clocksource/moxart_timer.c
+index 19857af..aede6f1 100644
+--- a/drivers/clocksource/moxart_timer.c
++++ b/drivers/clocksource/moxart_timer.c
+@@ -58,15 +58,25 @@
+  static void __iomem *base;
+  static unsigned int clock_count_per_tick;
+
+-static int moxart_shutdown(struct clock_event_device *evt)
++static inline void moxart_disable(struct clock_event_device *evt)
+  {
+         writel(TIMER1_DISABLE, base + TIMER_CR);
++}
++
++static inline void moxart_enable(struct clock_event_device *evt)
++{
++       writel(TIMER1_ENABLE, base + TIMER_CR);
++}
++
++static int moxart_shutdown(struct clock_event_device *evt)
++{
++       moxart_disable(evt);
+         return 0;
+  }
+
+  static int moxart_set_oneshot(struct clock_event_device *evt)
+  {
+-       writel(TIMER1_DISABLE, base + TIMER_CR);
++       moxart_disable(evt);
+         writel(~0, base + TIMER1_BASE + REG_LOAD);
+         return 0;
+  }
+@@ -74,7 +84,7 @@ static int moxart_set_oneshot(struct 
+clock_event_device *evt)
+  static int moxart_set_periodic(struct clock_event_device *evt)
+  {
+         writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
+-       writel(TIMER1_ENABLE, base + TIMER_CR);
++       moxart_enable(evt);
+         return 0;
+  }
+
+@@ -83,12 +93,12 @@ static int moxart_clkevt_next_event(unsigned long 
+cycles,
+  {
+         u32 u;
+
+-       writel(TIMER1_DISABLE, base + TIMER_CR);
++       moxart_disable(evt);
+
+         u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
+         writel(u, base + TIMER1_BASE + REG_MATCH1);
+
+-       writel(TIMER1_ENABLE, base + TIMER_CR);
++       moxart_enable(evt);
+
+         return 0;
+  }
+
+2. Encapsulate clkevt and use container_of
+
+-static void __iomem *base;
+-static unsigned int clock_count_per_tick;
++struct moxart_timer {
++       void __iomem *base;
++       unsigned int clock_count_per_tick;
++       struct clock_event_device clkevt;
++};
++
++static struct moxart_timer moxart_timer = {
++       .clkevt = {
++               .name                   = "moxart_timer",
++               .rating                 = 200,
++               .features               = CLOCK_EVT_FEAT_PERIODIC |
++                                               CLOCK_EVT_FEAT_ONESHOT,
++               .set_state_shutdown     = moxart_shutdown,
++               .set_state_periodic     = moxart_set_periodic,
++               .set_state_oneshot      = moxart_set_oneshot,
++               .tick_resume            = moxart_set_oneshot,
++               .set_next_event         = moxart_clkevt_next_event,
++       },
++};
++
++static inline struct moxart_timer *clkevt_to_moxart(struct 
+clock_event_device *evt)
++{
++       return container_of(evt, struct moxart_timer, clkevt);
++}
+
+  static inline void moxart_disable(struct clock_event_device *evt)
+  {
+-       writel(TIMER1_DISABLE, base + TIMER_CR);
++       writel(TIMER1_DISABLE, clkevt_to_moxart(evt)->base + TIMER_CR);
+  }
+
+3. And finally, add 't1_disable' / 't2_disable' to the structure.
+
+
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
