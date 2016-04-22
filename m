@@ -1,34 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Apr 2016 15:24:15 -0700
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <571A2357.3060006@ti.com>
-References: <20160413152829.GQ5995@atomide.com> <570F4804.4050006@ti.com>
- <20160414165514.GL5995@atomide.com> <570FF163.1050603@ti.com>
- <20160414203457.GM5995@atomide.com> <5710C10A.6040908@ti.com>
- <20160415151651.GP5995@atomide.com> <571145F6.2040508@ti.com>
- <20160418235152.GZ5995@atomide.com> <571A2357.3060006@ti.com>
-Message-ID: <20160422222415.GN5995@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 22 Apr 2016 15:24:47 -0700
+Subject: [PATCH 08/10] mvebu: Use dev_pm_opp_set_sharing_cpus() to mark
+ OPP tables as shared
+In-Reply-To: <3808dbeda9c233026ed78fa3ec94c0bbd898875c.1461228504.git.viresh.kumar@linaro.org>
+References: <cover.1461228504.git.viresh.kumar@linaro.org>
+ <3808dbeda9c233026ed78fa3ec94c0bbd898875c.1461228504.git.viresh.kumar@linaro.org>
+Message-ID: <20160422222447.GS13149@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160422 06:15]:
-> 
-> From the documents it is also clear that McBSPLP.sidetone is using the
-> McBSPLP's ICLK, but what is not explained in the TRM is that there are
-> internal clocks going from McBSP to sidetone for the data bus between them.
-> The iclk is needed so the core can kind of run independently from the clocks
-> coming from McBSPLP (for data exchange between the two modules).
-> If McBSP is not configured these clocks are not running which renders the
-> sidetone non operational.
+On 04/21, Viresh Kumar wrote:
+> @@ -683,10 +678,15 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+>  			clk_put(clk);
+>  			return ret;
+>  		}
+> +
+> +		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
+> +				(struct cpumask *) cpumask_of(cpu_dev->id));
 
-THe McBSP ick is not coming from McBSP, it's coming from the L4
-interconnect. Both McBSP are just consumers for that same clock.
-AFAIK there is no clock line going from McBSP to the sidetone.
+This cast doesn't look good. Why are we casting away const?
+Shouldn't dev_pm_opp_set_sharing_cpus() take a const mask anyway?
 
-> I can send a cut down series to fix the current sidetone hwmod (main_clk and
-> prevent it to look at the PRCM bit) plus reworking the pdata callback so we
-> can support both legacy and DT boot.
-
-OK sounds good to me :)
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
