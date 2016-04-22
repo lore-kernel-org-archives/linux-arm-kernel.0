@@ -1,61 +1,81 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 22 Apr 2016 10:11:55 +0100
-Subject: [PATCH v2 05/13] ARM: dts: db600c: add pmic regulator supplies
-In-Reply-To: <571682A1.9010000@codeaurora.org>
-References: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1460453642-5809-6-git-send-email-srinivas.kandagatla@linaro.org>
- <571682A1.9010000@codeaurora.org>
-Message-ID: <5719EADB.9090704@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 22 Apr 2016 11:14:36 +0200
+Subject: [PATCH 00/12] mtd: get rid of of_mtd.{c,h} and of_get_nand_xx()
+In-Reply-To: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160422111436.5d698888@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri,  1 Apr 2016 14:54:20 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> Hello,
+> 
+> of_mtd.{h,c} are providing the of_get_nand_xxx() helpers to help NAND
+> controller drivers parse some generic NAND DT properties.
+> An infrastructure has recently been added to NAND core to automatically
+> parse those properties when nand_scan_ident() is called, thus removing
+> the need for NAND controller drivers to manually parse them.
+> 
+> This series modifies drivers still making use of those helpers to rely
+> on NAND core initialization, and get rid of the of_mtd.{c,h} files by
+> moving the of_get_nand_xx() helpers into nand_base.c.
+
+Applied remaining patches.
+
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> Boris Brezillon (12):
+>   mtd: nand: remove unneeded of_mtd.h inclusions
+>   mtd: nand: atmel: rely on generic DT parsing done in nand_scan_ident()
+>   mtd: nand: omap2: rely on generic DT parsing done in nand_scan_ident()
+>   mtd: nand: brcm: rely on generic DT parsing done in nand_scan_ident()
+>   mtd: nand: davinci: rely on generic DT parsing done in
+>     nand_scan_ident()
+>   mtd: nand: gpmi: rely on generic DT parsing done in nand_scan_ident()
+>   mtd: nand: hisi504: rely on generic DT parsing done in
+>     nand_scan_ident()
+>   mtd: nand: lpc32xx: rely on generic DT parsing done in
+>     nand_scan_ident()
+>   mtd: nand: mxc: rely on generic DT parsing done in nand_scan_ident()
+>   mtd: nand: pxa3xx: rely on generic DT parsing done in
+>     nand_scan_ident()
+>   mtd: nand: sh_flctl: rely on generic DT parsing done in
+>     nand_scan_ident()
+>   mtd: nand: move of_get_nand_xxx() helpers into nand_base.c
+> 
+>  drivers/memory/omap-gpmc.c             |   7 --
+>  drivers/mtd/nand/atmel_nand.c          | 133 +++++++++++++++-------------
+>  drivers/mtd/nand/brcmnand/brcmnand.c   |   5 +-
+>  drivers/mtd/nand/davinci_nand.c        |  85 +++++++++---------
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  21 +++--
+>  drivers/mtd/nand/hisi504_nand.c        |  14 +--
+>  drivers/mtd/nand/jz4780_nand.c         |   1 -
+>  drivers/mtd/nand/lpc32xx_mlc.c         |   1 -
+>  drivers/mtd/nand/lpc32xx_slc.c         |  24 ++---
+>  drivers/mtd/nand/mxc_nand.c            |  50 +++++------
+>  drivers/mtd/nand/nand_base.c           |  99 ++++++++++++++++++++-
+>  drivers/mtd/nand/omap2.c               |   9 +-
+>  drivers/mtd/nand/pxa3xx_nand.c         |  28 +++---
+>  drivers/mtd/nand/qcom_nandc.c          |   1 -
+>  drivers/mtd/nand/sh_flctl.c            |  31 +++----
+>  drivers/mtd/nand/sunxi_nand.c          |   1 -
+>  drivers/mtd/nand/vf610_nfc.c           |   1 -
+>  drivers/of/Makefile                    |   1 -
+>  drivers/of/of_mtd.c                    | 155 ---------------------------------
+>  include/linux/of_mtd.h                 |  56 ------------
+>  20 files changed, 291 insertions(+), 432 deletions(-)
+>  delete mode 100644 drivers/of/of_mtd.c
+>  delete mode 100644 include/linux/of_mtd.h
+> 
 
 
-On 19/04/16 20:10, Stephen Boyd wrote:
-> On 04/12/2016 02:33 AM, Srinivas Kandagatla wrote:
->> This patch adds pmic regulator supplies connected on the board.
->> Rest of the invidual regulators would be added as and when required by
->> the devices.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
->> ---
->>   arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts | 62 +++++++++++++++++++++++++
->>   1 file changed, 62 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
->> index 57d4500..6695b00 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
->> @@ -9,7 +9,69 @@
->>   		serial1 = &gsbi1_serial;
->>   	};
->>
->> +	regulators {
->> +		compatible = "simple-bus";
->> +		vph: regulator-fixed at 1 {
->> +			compatible = "regulator-fixed";
->> +			regulator-min-microvolt = <4500000>;
->> +			regulator-max-microvolt = <4500000>;
->> +			regulator-name = "VPH";
->> +			regulator-type = "voltage";
->> +			regulator-boot-on;
->> +		};
->> +	};
->
-> Just curious why we added the vph supply? Is that for some framework
-> requirement? We haven't done this on other boards, although we probably
-> should if there's a good reason for it.
 
-This is an on board 12V TO 4.5V @5.5A DC/DC convertor for PMIC VPH 
-power. Yep we should do something similar on the other boards too. 
-Without this probably you would notice some error messages from 
-rpm_regulators about missing supply nodes.
-
-
-thanks,
-srini
-
-
-
->
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
