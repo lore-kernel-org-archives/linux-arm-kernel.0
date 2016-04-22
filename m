@@ -1,29 +1,38 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 22 Apr 2016 08:22:56 +0200
-Subject: [PATCH RESEND v3 0/2] dmaengine: sun6i: Fixes
-Message-ID: <cover.1461306176.git.moinejf@free.fr>
+Date: Fri, 22 Apr 2016 08:14:33 +0200
+Subject: [PATCH RESEND v3 1/2] dmaengine: sun6i: Fix the access of the IRQ
+ register
+In-Reply-To: <cover.1461306176.git.moinejf@free.fr>
+References: <cover.1461306176.git.moinejf@free.fr>
+Message-ID: <cc5b9a167bf70aaed35bee46c65866cb254c2921.1461306176.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series replaces part of the previous series
-'dmaengine: sun6i: Fixes and upgrade for audio transfers'.
-It contains only fixes for a normal use of the DMA driver.
+The IRQ register number is computed, but this number was not used
+and the register was the one indexed by the channel index instead.
+Then, only the first DMA channel was working.
 
-Changes since v2
-- Acked-by Maxime Ripard added
-- remove the audio requirements
-Changes since v1 (comments from Vinod Koul and Sergei Shtylyov - thanks)
-- typo fixes
-- change some comments
-- better handling of burst and bus width
-- remove useless code in the cyclic capability patch
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/dma/sun6i-dma.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Jean-Francois Moine (2):
-  dmaengine: sun6i: Fix the access of the IRQ register
-  dmaengine: sun6i: Fix impossible settings of burst and bus width
-
- drivers/dma/sun6i-dma.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index 2db12e4..2ec320d 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -381,9 +381,9 @@ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
+ 	irq_reg = pchan->idx / DMA_IRQ_CHAN_NR;
+ 	irq_offset = pchan->idx % DMA_IRQ_CHAN_NR;
+ 
+-	irq_val = readl(sdev->base + DMA_IRQ_EN(irq_offset));
++	irq_val = readl(sdev->base + DMA_IRQ_EN(irq_reg));
+ 	irq_val |= DMA_IRQ_QUEUE << (irq_offset * DMA_IRQ_CHAN_WIDTH);
+-	writel(irq_val, sdev->base + DMA_IRQ_EN(irq_offset));
++	writel(irq_val, sdev->base + DMA_IRQ_EN(irq_reg));
+ 
+ 	writel(pchan->desc->p_lli, pchan->base + DMA_CHAN_LLI_ADDR);
+ 	writel(DMA_CHAN_ENABLE_START, pchan->base + DMA_CHAN_ENABLE);
 -- 
 2.8.1
