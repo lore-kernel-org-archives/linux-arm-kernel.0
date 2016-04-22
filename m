@@ -1,123 +1,134 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Fri, 22 Apr 2016 14:39:50 +0800
-Subject: [PATCH v2 7/9] mtd: fsl-quadspi: Solve Micron Spansion flash command
- conflict
+Date: Fri, 22 Apr 2016 14:39:47 +0800
+Subject: [PATCH v2 4/9] mtd: spi-nor: fsl-quadspi: extend support for some
+ special requerment.
 In-Reply-To: <1461307192-866-1-git-send-email-B56489@freescale.com>
 References: <1461307192-866-1-git-send-email-B56489@freescale.com>
-Message-ID: <1461307192-866-7-git-send-email-B56489@freescale.com>
+Message-ID: <1461307192-866-4-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yunhui Cui <yunhui.cui@nxp.com>
 
-Add some lut_tables to support quad mode for flash n25q128
-on the board ls1021a-twr and solve flash Spansion and Micron
-command conflict.
-In switch {}, The value of command SPINOR_OP_RD_EVCR and
-SPINOR_OP_SPANSION_RDAR is the same. They have to share
-the same seq_id: SEQID_RDAR_OR_RD_EVCR.
+Add extra info in LUT table to support some special requerments.
+Spansion S25FS-S family flash need some special operations.
 
 Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 47 ++++++++++++++++++++++++++++++---------
- 1 file changed, 36 insertions(+), 11 deletions(-)
+ drivers/mtd/spi-nor/fsl-quadspi.c | 44 +++++++++++++++++++++++++++++++++++++--
+ include/linux/mtd/spi-nor.h       |  4 ++++
+ 2 files changed, 46 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 5d9d192..fea18b6 100644
+index 09adaa4..16ebabbd 100644
 --- a/drivers/mtd/spi-nor/fsl-quadspi.c
 +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -207,9 +207,9 @@
+@@ -205,6 +205,9 @@
  #define SEQID_RDCR		9
  #define SEQID_EN4B		10
  #define SEQID_BRWR		11
--#define SEQID_RDAR		12
-+#define SEQID_RDAR_OR_RD_EVCR	12
- #define SEQID_WRAR		13
--
-+#define SEQID_WD_EVCR           14
++#define SEQID_RDAR		12
++#define SEQID_WRAR		13
++
  
  #define QUADSPI_MIN_IOMAP SZ_4M
  
-@@ -393,6 +393,7 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	int rxfifo = q->devtype_data->rxfifo;
- 	u32 lut_base;
- 	int i;
-+	const struct fsl_qspi_devtype_data *devtype_data = q->devtype_data;
- 
- 	struct spi_nor *nor = &q->nor[0];
- 	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-@@ -489,16 +490,26 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+@@ -470,6 +473,28 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
  	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_BRWR),
  			base + QUADSPI_LUT(lut_base));
  
++	/*
++	 * Read any device register.
++	 * Used for Spansion S25FS-S family flash only.
++	 */
++	lut_base = SEQID_RDAR * 4;
++	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_RDAR) |
++			LUT1(ADDR, PAD1, ADDR24BIT),
++			base + QUADSPI_LUT(lut_base));
++	qspi_writel(q, LUT0(DUMMY, PAD1, 8) | LUT1(FSL_READ, PAD1, 1),
++			base + QUADSPI_LUT(lut_base + 1));
 +
- 	/*
--	 * Read any device register.
--	 * Used for Spansion S25FS-S family flash only.
-+	 * Flash Micron and Spansion command confilict
-+	 * use the same value 0x65. But it indicates different meaning.
- 	 */
--	lut_base = SEQID_RDAR * 4;
--	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_RDAR) |
--			LUT1(ADDR, PAD1, ADDR24BIT),
--			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, 8) | LUT1(FSL_READ, PAD1, 1),
--			base + QUADSPI_LUT(lut_base + 1));
-+	lut_base = SEQID_RDAR_OR_RD_EVCR * 4;
-+	if (devtype_data->devtype == FSL_QUADSPI_LS2080A) {
-+		/*
-+		* Read any device register.
-+		* Used for Spansion S25FS-S family flash only.
-+		*/
-+		qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_RDAR) |
-+			    LUT1(ADDR, PAD1, ADDR24BIT),
-+			    base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q, LUT0(DUMMY, PAD1, 8) | LUT1(FSL_READ, PAD1, 1),
-+			    base + QUADSPI_LUT(lut_base + 1));
-+	} else {
-+		qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_RD_EVCR),
-+			    base + QUADSPI_LUT(lut_base));
-+	}
- 
- 	/*
- 	 * Write any device register.
-@@ -511,6 +522,11 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 1),
- 			base + QUADSPI_LUT(lut_base + 1));
- 
-+	/* Write EVCR register */
-+	lut_base = SEQID_WD_EVCR * 4;
-+	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_WD_EVCR),
-+		    base + QUADSPI_LUT(lut_base));
++	/*
++	 * Write any device register.
++	 * Used for Spansion S25FS-S family flash only.
++	 */
++	lut_base = SEQID_WRAR * 4;
++	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_WRAR) |
++			LUT1(ADDR, PAD1, ADDR24BIT),
++			base + QUADSPI_LUT(lut_base));
++	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 1),
++			base + QUADSPI_LUT(lut_base + 1));
 +
  	fsl_qspi_lock_lut(q);
  }
  
-@@ -523,8 +539,15 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+@@ -477,9 +502,15 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+ {
+ 	switch (cmd) {
++	case SPINOR_OP_READ4_1_1_4:
+ 	case SPINOR_OP_READ_1_1_4:
  	case SPINOR_OP_READ_FAST:
- 	case SPINOR_OP_READ4_FAST:
++	case SPINOR_OP_READ4_FAST:
  		return SEQID_READ;
-+	/*
-+	 * Spansion & Micron use the same command value 0x65
-+	 * Spansion: SPINOR_OP_SPANSION_RDAR, read any register.
-+	 * Micron: SPINOR_OP_RD_EVCR,
-+	 * read enhanced volatile configuration register.
-+	 * case SPINOR_OP_RD_EVCR:
-+	 */
- 	case SPINOR_OP_SPANSION_RDAR:
--		return SEQID_RDAR;
-+		return SEQID_RDAR_OR_RD_EVCR;
- 	case SPINOR_OP_SPANSION_WRAR:
- 		return SEQID_WRAR;
++	case SPINOR_OP_SPANSION_RDAR:
++		return SEQID_RDAR;
++	case SPINOR_OP_SPANSION_WRAR:
++		return SEQID_WRAR;
  	case SPINOR_OP_WREN:
-@@ -550,6 +573,8 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- 		return SEQID_EN4B;
- 	case SPINOR_OP_BRWR:
- 		return SEQID_BRWR;
-+	case SPINOR_OP_WD_EVCR:
-+		return SEQID_WD_EVCR;
- 	default:
- 		if (cmd == q->nor[0].erase_opcode)
- 			return SEQID_SE;
+ 		return SEQID_WREN;
+ 	case SPINOR_OP_WRDI:
+@@ -491,6 +522,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+ 	case SPINOR_OP_CHIP_ERASE:
+ 		return SEQID_CHIP_ERASE;
+ 	case SPINOR_OP_PP:
++	case SPINOR_OP_PP_4B:
+ 		return SEQID_PP;
+ 	case SPINOR_OP_RDID:
+ 		return SEQID_RDID;
+@@ -830,8 +862,12 @@ static int fsl_qspi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
+ {
+ 	int ret;
+ 	struct fsl_qspi *q = nor->priv;
++	u32 to = 0;
++
++	if (opcode == SPINOR_OP_SPANSION_RDAR)
++		memcpy(&to, nor->cmd_buf, 4);
+ 
+-	ret = fsl_qspi_runcmd(q, opcode, 0, len);
++	ret = fsl_qspi_runcmd(q, opcode, to, len);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -843,9 +879,13 @@ static int fsl_qspi_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
+ {
+ 	struct fsl_qspi *q = nor->priv;
+ 	int ret;
++	u32 to = 0;
++
++	if (opcode == SPINOR_OP_SPANSION_WRAR)
++		memcpy(&to, nor->cmd_buf, 4);
+ 
+ 	if (!buf) {
+-		ret = fsl_qspi_runcmd(q, opcode, 0, 1);
++		ret = fsl_qspi_runcmd(q, opcode, to, 1);
+ 		if (ret)
+ 			return ret;
+ 
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index 3c36113..fd0631b 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -74,6 +74,10 @@
+ /* Used for Spansion flashes only. */
+ #define SPINOR_OP_BRWR		0x17	/* Bank register write */
+ 
++/* Used for Spansion S25FS-S family flash only. */
++#define SPINOR_OP_SPANSION_RDAR	0x65	/* Read any device register */
++#define SPINOR_OP_SPANSION_WRAR	0x71	/* Write any device register */
++
+ /* Used for Micron flashes only. */
+ #define SPINOR_OP_RD_EVCR      0x65    /* Read EVCR register */
+ #define SPINOR_OP_WD_EVCR      0x61    /* Write EVCR register */
 -- 
 2.1.0.27.g96db324
