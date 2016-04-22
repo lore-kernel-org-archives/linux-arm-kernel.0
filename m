@@ -1,150 +1,129 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 22 Apr 2016 16:03:34 +0300
-Subject: [PATCH net v2 2/3] drivers: net: cpsw: fix error messages when
- using phy-handle DT property
-In-Reply-To: <1461263172-10428-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
- <1461263172-10428-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <571A2126.2060708@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 22 Apr 2016 15:04:09 +0200
+Subject: [PATCH 02/11] clk: tegra: dfll: Move SoC specific data into
+ of_device_id
+In-Reply-To: <1461321071-6431-3-git-send-email-pchiu@nvidia.com>
+References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+ <1461321071-6431-3-git-send-email-pchiu@nvidia.com>
+Message-ID: <20160422130409.GK9047@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2016 09:26 PM, David Rivshin (Allworx) wrote:
-> From: David Rivshin <drivshin@allworx.com>
+On Fri, Apr 22, 2016 at 06:31:02PM +0800, Penny Chiu wrote:
+> Move all SoC specific fcpu data into of_device_id structure, and
+> move SoC fcpu data assignments from init function to probe
+> function.
 > 
-> The phy-handle, phy_id, and fixed-link properties are mutually exclusive,
-> and only one need be specified. However if phy-handle was specified, an
-> error message would complain about the lack of phy_id or fixed-link.
-> 
-> Also, if phy-handle was specified and the subsequent of_phy_connect()
-> failed, the error message still referenced slaved->data->phy_id, which
-> would be empty. Instead, use the name of the device_node as a useful
-> identifier.
-> 
-> Fixes: 9e42f715264f ("drivers: net: cpsw: add phy-handle parsing")
-> Signed-off-by: David Rivshin <drivshin@allworx.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Tested-by: Nicolas Chauvet <kwizart@gmail.com>
+> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
 > ---
-> If would like this for -stable it should apply cleanly as far back
-> as 4.5. It failes on 4.4 due to some context differences, but can be
-> applied with 'git am -C2'. Or, I can produce a separate patch against
-> linux-4.4.y if preferred.
+>  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 51 ++++++++++++++++++++++--------
+>  1 file changed, 37 insertions(+), 14 deletions(-)
 > 
-> Changes since v1 [1]:
-> - Rebased (no conflicts)
-> - Added Tested-by from Nicolas Chauvet
-> - Added Acked-by from Rob Herring for the binding change
-> 
-> [1] https://patchwork.ozlabs.org/patch/560324/
-> 
->   Documentation/devicetree/bindings/net/cpsw.txt |  4 ++--
->   drivers/net/ethernet/ti/cpsw.c                 | 17 +++++++++++++----
->   2 files changed, 15 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-> index 28a4781..3033c0f 100644
-> --- a/Documentation/devicetree/bindings/net/cpsw.txt
-> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-> @@ -46,16 +46,16 @@ Optional properties:
->   - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
->   - mac-address		: See ethernet.txt file in the same directory
->   - phy_id		: Specifies slave phy id
-
-May be the "phy_id" can be marked as deprecated? (while here)
-The recommended property now is "phy-handle".
-
->   - phy-handle		: See ethernet.txt file in the same directory
->   
->   Slave sub-nodes:
->   - fixed-link		: See fixed-link.txt file in the same directory
-> -			  Either the property phy_id, or the sub-node
-> -			  fixed-link can be specified
+> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> index 5e5958e..b577bc6 100644
+> --- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/err.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <soc/tegra/fuse.h>
+>  
+> @@ -28,8 +29,15 @@
+>  #include "clk-dfll.h"
+>  #include "cvb.h"
+>  
+> +struct dfll_fcpu_data {
+> +	const unsigned long *cpu_max_freq_table;
+> +	unsigned int cpu_max_freq_table_size;
+> +	const struct cvb_table *cpu_cvb_tables;
+> +	unsigned int cpu_cvb_tables_size;
+> +};
 > +
-> +Note: Exactly one of phy_id, phy-handle, or fixed-link must be specified.
->   
->   Note: "ti,hwmods" field is used to fetch the base address and irq
->   resources from TI, omap hwmod data base during device registration.
->   Future plan is to migrate hwmod data base contents into device tree
->   blob so that, all the required data will be used from device tree dts
->   file.
->   
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index d69cb3f..3c81413 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -1150,16 +1150,19 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
->   	if (slave->data->phy_node)
->   		slave->phy = of_phy_connect(priv->ndev, slave->data->phy_node,
->   				 &cpsw_adjust_link, 0, slave->data->phy_if);
->   	else
->   		slave->phy = phy_connect(priv->ndev, slave->data->phy_id,
->   				 &cpsw_adjust_link, slave->data->phy_if);
->   	if (IS_ERR(slave->phy)) {
-> -		dev_err(priv->dev, "phy %s not found on slave %d\n",
-> -			slave->data->phy_id, slave->slave_num);
-> +		dev_err(priv->dev, "phy \"%s\" not found on slave %d\n",
-> +			slave->data->phy_node ?
-> +				slave->data->phy_node->full_name :
-> +				slave->data->phy_id,
-> +			slave->slave_num);
+>  /* Maximum CPU frequency, indexed by CPU speedo id */
+> -static const unsigned long cpu_max_freq_table[] = {
+> +static const unsigned long tegra124_cpu_max_freq_table[] = {
+>  	[0] = 2014500000UL,
+>  	[1] = 2320500000UL,
+>  	[2] = 2116500000UL,
+> @@ -79,18 +87,39 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+>  	},
+>  };
+>  
+> +static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+> +	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
+> +	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
+> +	.cpu_cvb_tables = tegra124_cpu_cvb_tables,
+> +	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
+> +};
+> +
+> +static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
 
-Unfortunately,  there are some inconsistency between legacy and FDT API :(
-of_phy_connect() will return valid phy_device or NULL, but phy_connect()
-can return valid phy_device or ERR_PTR().
+There's no need to prefix this with tegra124_ since obviously the goal
+is to make this a table that works at least on Tegra210 as well.
 
+> +	{
+> +		.compatible = "nvidia,tegra124-dfll",
+> +		.data = &tegra124_dfll_fcpu_data
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
+> +
+>  static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+>  {
+>  	int process_id, speedo_id, speedo_value, ret;
+>  	struct rail_alignment align;
+>  	struct tegra_dfll_soc_data *soc;
+>  	const struct cvb_table *cvb;
+> +	const struct of_device_id *of_id;
+> +	const struct dfll_fcpu_data *fcpu_data;
+> +
+> +	of_id = of_match_device(tegra124_dfll_fcpu_of_match, &pdev->dev);
+> +	fcpu_data = of_id->data;
 
+You should be using of_device_get_match_data() nowadays. That allows you
+to do this in one step while at the same time allowing to keep the match
+tables where they are.
 
->   		slave->phy = NULL;
->   	} else {
->   		phy_attached_info(slave->phy);
->   
->   		phy_start(slave->phy);
->   
->   		/* Configure GMII_SEL register */
-> @@ -2030,15 +2033,19 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
->   		/* This is no slave child node, continue */
->   		if (strcmp(slave_node->name, "slave"))
->   			continue;
->   
->   		slave_data->phy_node = of_parse_phandle(slave_node,
->   							"phy-handle", 0);
->   		parp = of_get_property(slave_node, "phy_id", &lenp);
-> -		if (of_phy_is_fixed_link(slave_node)) {
-> +		if (slave_data->phy_node) {
-> +			dev_dbg(&pdev->dev,
-> +				"slave[%d] using phy-handle=\"%s\"\n",
-> +				i, slave_data->phy_node->full_name);
-> +		} else if (of_phy_is_fixed_link(slave_node)) {
->   			struct device_node *phy_node;
->   			struct phy_device *phy_dev;
->   
->   			/* In the case of a fixed PHY, the DT node associated
->   			 * to the PHY is the Ethernet MAC DT node.
->   			 */
->   			ret = of_phy_register_fixed_link(slave_node);
-> @@ -2067,15 +2074,17 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
->   			if (!mdio) {
->   				dev_err(&pdev->dev, "Missing mdio platform device\n");
->   				return -EINVAL;
->   			}
->   			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
->   				 PHY_ID_FMT, mdio->name, phyid);
->   		} else {
-> -			dev_err(&pdev->dev, "No slave[%d] phy_id or fixed-link property\n", i);
-> +			dev_err(&pdev->dev,
-> +				"No slave[%d] phy_id, phy-handle, or fixed-link property\n",
-> +				i);
->   			goto no_phy_slave;
->   		}
->   		slave_data->phy_if = of_get_phy_mode(slave_node);
->   		if (slave_data->phy_if < 0) {
->   			dev_err(&pdev->dev, "Missing or malformed slave[%d] phy-mode property\n",
->   				i);
->   			return slave_data->phy_if;
-> 
+>  
+>  	process_id = tegra_sku_info.cpu_process_id;
+>  	speedo_id = tegra_sku_info.cpu_speedo_id;
+>  	speedo_value = tegra_sku_info.cpu_speedo_value;
+>  
+> -	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
+> +	if (speedo_id >= fcpu_data->cpu_max_freq_table_size) {
+>  		dev_err(&pdev->dev, "unknown max CPU freq for speedo_id=%d\n",
+>  			speedo_id);
+>  		return -ENODEV;
+> @@ -121,12 +150,12 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	cvb = tegra_cvb_build_opp_table(tegra124_cpu_cvb_tables,
+> -					ARRAY_SIZE(tegra124_cpu_cvb_tables),
+> -					&align,
+> -					process_id, speedo_id, speedo_value,
+> -					cpu_max_freq_table[speedo_id],
+> -					soc->dev);
+> +	cvb = tegra_cvb_build_opp_table(fcpu_data->cpu_cvb_tables,
+> +				fcpu_data->cpu_cvb_tables_size,
+> +				&align,
+> +				process_id, speedo_id, speedo_value,
+> +				fcpu_data->cpu_max_freq_table[speedo_id],
+> +				soc->dev);
 
+This, and potentially other parts will conflict with some cleanup I
+recently did to this code. You may want to rebase on some linux-next
+earlier next week which should have those cleanup patches.
 
--- 
-regards,
--grygorii
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/7606091c/attachment.sig>
