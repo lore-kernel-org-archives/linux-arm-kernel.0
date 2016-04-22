@@ -1,35 +1,44 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Fri, 22 Apr 2016 10:50:05 +0530
-Subject: [PATCH v2 10/11] arm: Add Aspeed machine
-In-Reply-To: <1461279774.3135.21.camel@kernel.crashing.org>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-11-git-send-email-joel@jms.id.au>
- <6245614.OXDTEyrM2z@wuerfel>
- <1461277737.3135.14.camel@kernel.crashing.org>
- <1461279774.3135.21.camel@kernel.crashing.org>
-Message-ID: <20160422052005.GA4520@afzalpc>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Fri, 22 Apr 2016 13:21:31 +0800
+Subject: [PATCH v2 0/4] ARM64: dts: rockchip: add support for RK3399
+In-Reply-To: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1461302491-13233-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add dtsi file for RK3399 SoCs, and evb dts file for RK3399 evb.
 
-On Fri, Apr 22, 2016 at 09:02:54AM +1000, Benjamin Herrenschmidt wrote:
-> On Fri, 2016-04-22 at 08:28 +1000, Benjamin Herrenschmidt wrote:
+To make patch more easily to be reviewed, some nodes have been removed
+temporarily, after this base file been applied, more patches will be
+upstreamed independently.
 
-> > It may or may not be already correct, you don't necessarily have a
-> > serial enabled bootloader or it might be using a UART driver that
-> > doesn't use the 'standard' divisors etc... This just sanitizes it.
+Jianqun Xu (3):
+  ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+  ARM64: dts: rockchip: add RK3399 evaluation board
+  ARM64: dts: rockchip: add dts file for RK3399 evaluation board
 
-> On a second thought ... if we chose to not support random crap vendor
-> uboots, we could make it a requirement that this register is already
-> set appropriately by the bootloader to match what's in the device-tree
-> I suppose...
+Shawn Lin (1):
+  Documentation: rockchip-dw-mshc: add description for rk3399
 
-ARM Linux expects bootloader to initialize one serial port
-(Documentation/arm/Booting). Though mentioned as optional, recommended
-so far haven't seen one w/o that. And to debug at early boot stage
-like in assembly and where uart driver is not yet up, this helps in
-being able to debug w/o jtag.
+ Documentation/devicetree/bindings/arm/rockchip.txt |    6 +-
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    1 +
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |  122 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 1022 ++++++++++++++++++++
+ 5 files changed, 1151 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
 
-Regards
-afzal 
+--
+changes in v2:
+- split into more patches. (Heiko)
+- remove arm-pmu at first. (Marc, Heiko, Mark)
+- remove rga, emmc, usb3, mipi, edp, pd, i2c, gpu, thermal, tsadc, saradc, which will upstream independently
+- remove rk808 since without i2c, which will upstream independently
+- remove es8316 since without i2c, which will upstream independently
+- add rockchip-dw-mshc binding patch
+- add rockchip,rk3399-evb binding patch
+- fix codingstyle issues
+
+1.9.1
