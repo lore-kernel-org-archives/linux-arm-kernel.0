@@ -1,39 +1,36 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 22 Apr 2016 17:17:12 -0500
-Subject: [PATCH 8/8] arm64: dts: msm8916: Add SCM firmware node
-In-Reply-To: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
-References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1461363432-5730-9-git-send-email-andy.gross@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Apr 2016 15:17:35 -0700
+Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod changes for v4.7
+In-Reply-To: <alpine.DEB.2.02.1604170005480.13961@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1604170005480.13961@utopia.booyaka.com>
+Message-ID: <20160422221734.GL5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the devicetree node for the SCM firmware.
+* Paul Walmsley <paul@pwsan.com> [160416 17:07]:
+> Hi Tony
+> 
+> The following changes since commit 1cbabcb9807e31e87ef3a12af76ea025ceb582d3:
+> 
+>   ARM: DRA7: clockdomain: Implement timer workaround for errata i874 (2016-04-10 11:43:57 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.7/omap-hwmod-a
+> 
+> for you to fetch changes up to c20c8f750d9f8f8617f07ee2352d3ff560e66bc2:
+> 
+>   ARM: OMAP2+: hwmod: fix _idle() hwmod state sanity check sequence (2016-04-10 13:20:11 -0600)
+> 
+> ----------------------------------------------------------------
+> ARM: OMAP2+: first set of hwmod changes for v4.7
+> 
+> For the DRA7xx platform, add IP block data for the McASP, PWMSS,
+> and GPTimer12 IP blocks.  Add lock and unlock functions for the
+> RTC IP blocks on the DRA7xx, AM33xx, and AM43xx devices.  And add
+> a fix for the hwmod core for device driver unbind operations for
+> IP blocks with hardreset lines.
 
-Signed-off-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks pullling into omap-for-v4.7/soc.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 9681200..d912cd7 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -122,6 +122,16 @@
- 		hwlocks = <&tcsr_mutex 3>;
- 	};
- 
-+	firmware {
-+		compatible = "simple-bus";
-+
-+		scm {
-+			compatible = "qcom,scm-msm8916";
-+			clocks = <&gcc GCC_CRYPTO_CLK>, <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
-+			clock-names = "core", "bus", "iface";
-+		};
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.9.1
+Tony
