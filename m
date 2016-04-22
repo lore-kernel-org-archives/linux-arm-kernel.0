@@ -1,37 +1,42 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 22 Apr 2016 18:02:53 +0800
-Subject: [RESEND PATCH 7/8] ARM: dts: rockchip: move the rk3288 thermal data
- into rk3288.dtsi
+Date: Fri, 22 Apr 2016 18:02:54 +0800
+Subject: [RESEND PATCH 8/8] arm64: dts: rockchip: move the rk3368 thermal data
+ into rk3368.dtsi
 In-Reply-To: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
 References: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1461319374-10024-8-git-send-email-wxt@rock-chips.com>
+Message-ID: <1461319374-10024-9-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In order to be standard to manage for rockchip SoCs,  move the thermal
-data into rk3288 dtsi, we needn't to add a new file for thermal.
+data into rk3368 dtsi, we needn't to add a new file for thermal.
+
+Fixes commit f990238f859e
+("arm64: dts: rockchip: Add main thermal info to rk3368.dtsi")
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
 Cc: Eduardo Valentin <edubezval@gmail.com>
 Cc: Heiko Stuebner <heiko@sntech.de>
+
 ---
 
- arch/arm/boot/dts/rk3288-thermal.dtsi | 118 ----------------------------------
- arch/arm/boot/dts/rk3288.dtsi         |  73 ++++++++++++++++++++-
- 2 files changed, 72 insertions(+), 119 deletions(-)
- delete mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
+ arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112 -----------------------
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi         |  66 ++++++++++++-
+ 2 files changed, 65 insertions(+), 113 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
 
-diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
 deleted file mode 100644
-index 651b962..0000000
---- a/arch/arm/boot/dts/rk3288-thermal.dtsi
+index a10010f..0000000
+--- a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
 +++ /dev/null
-@@ -1,118 +0,0 @@
+@@ -1,112 +0,0 @@
 -/*
-- * Device Tree Source for RK3288 SoC thermal
+- * Device Tree Source for RK3368 SoC thermal
 - *
-- * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+- * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+- * Caesar Wang <wxt@rock-chips.com>
 - *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
@@ -74,32 +79,25 @@ index 651b962..0000000
 -
 -#include <dt-bindings/thermal/thermal.h>
 -
--reserve_thermal: reserve_thermal {
--	polling-delay-passive = <1000>; /* milliseconds */
--	polling-delay = <5000>; /* milliseconds */
--
--	thermal-sensors = <&tsadc 0>;
--};
--
 -cpu_thermal: cpu_thermal {
 -	polling-delay-passive = <100>; /* milliseconds */
 -	polling-delay = <5000>; /* milliseconds */
 -
--	thermal-sensors = <&tsadc 1>;
+-	thermal-sensors = <&tsadc 0>;
 -
 -	trips {
 -		cpu_alert0: cpu_alert0 {
--			temperature = <70000>; /* millicelsius */
--			hysteresis = <2000>; /* millicelsius */
--			type = "passive";
--		};
--		cpu_alert1: cpu_alert1 {
 -			temperature = <75000>; /* millicelsius */
 -			hysteresis = <2000>; /* millicelsius */
 -			type = "passive";
 -		};
+-		cpu_alert1: cpu_alert1 {
+-			temperature = <80000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
 -		cpu_crit: cpu_crit {
--			temperature = <90000>; /* millicelsius */
+-			temperature = <95000>; /* millicelsius */
 -			hysteresis = <2000>; /* millicelsius */
 -			type = "critical";
 -		};
@@ -109,12 +107,12 @@ index 651b962..0000000
 -		map0 {
 -			trip = <&cpu_alert0>;
 -			cooling-device =
--				<&cpu0 THERMAL_NO_LIMIT 6>;
+-				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 -		};
 -		map1 {
 -			trip = <&cpu_alert1>;
 -			cooling-device =
--				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-				<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 -		};
 -	};
 -};
@@ -123,16 +121,16 @@ index 651b962..0000000
 -	polling-delay-passive = <100>; /* milliseconds */
 -	polling-delay = <5000>; /* milliseconds */
 -
--	thermal-sensors = <&tsadc 2>;
+-	thermal-sensors = <&tsadc 1>;
 -
 -	trips {
 -		gpu_alert0: gpu_alert0 {
--			temperature = <70000>; /* millicelsius */
+-			temperature = <80000>; /* millicelsius */
 -			hysteresis = <2000>; /* millicelsius */
 -			type = "passive";
 -		};
 -		gpu_crit: gpu_crit {
--			temperature = <90000>; /* millicelsius */
+-			temperature = <1150000>; /* millicelsius */
 -			hysteresis = <2000>; /* millicelsius */
 -			type = "critical";
 -		};
@@ -142,45 +140,38 @@ index 651b962..0000000
 -		map0 {
 -			trip = <&gpu_alert0>;
 -			cooling-device =
--				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 -		};
 -	};
 -};
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 3071e94..0db8b35 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -454,7 +454,78 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 7056a0f..8b4a7c9 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -413,7 +413,71 @@
  	};
  
  	thermal-zones {
--		#include "rk3288-thermal.dtsi"
-+		reserve_thermal: reserve_thermal {
-+			polling-delay-passive = <1000>; /* milliseconds */
-+			polling-delay = <5000>; /* milliseconds */
-+
-+			thermal-sensors = <&tsadc 0>;
-+		};
-+
-+		cpu_thermal: cpu_thermal {
+-		#include "rk3368-thermal.dtsi"
++		cpu {
 +			polling-delay-passive = <100>; /* milliseconds */
 +			polling-delay = <5000>; /* milliseconds */
 +
-+			thermal-sensors = <&tsadc 1>;
++			thermal-sensors = <&tsadc 0>;
 +
 +			trips {
 +				cpu_alert0: cpu_alert0 {
-+					temperature = <70000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_alert1: cpu_alert1 {
 +					temperature = <75000>; /* millicelsius */
 +					hysteresis = <2000>; /* millicelsius */
 +					type = "passive";
 +				};
++				cpu_alert1: cpu_alert1 {
++					temperature = <80000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
 +				cpu_crit: cpu_crit {
-+					temperature = <90000>; /* millicelsius */
++					temperature = <95000>; /* millicelsius */
 +					hysteresis = <2000>; /* millicelsius */
 +					type = "critical";
 +				};
@@ -190,30 +181,30 @@ index 3071e94..0db8b35 100644
 +				map0 {
 +					trip = <&cpu_alert0>;
 +					cooling-device =
-+						<&cpu0 THERMAL_NO_LIMIT 6>;
++					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 +				};
 +				map1 {
 +					trip = <&cpu_alert1>;
 +					cooling-device =
-+						<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++					<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 +				};
 +			};
 +		};
 +
-+		gpu_thermal: gpu_thermal {
++		gpu {
 +			polling-delay-passive = <100>; /* milliseconds */
 +			polling-delay = <5000>; /* milliseconds */
 +
-+			thermal-sensors = <&tsadc 2>;
++			thermal-sensors = <&tsadc 1>;
 +
 +			trips {
 +				gpu_alert0: gpu_alert0 {
-+					temperature = <70000>; /* millicelsius */
++					temperature = <80000>; /* millicelsius */
 +					hysteresis = <2000>; /* millicelsius */
 +					type = "passive";
 +				};
 +				gpu_crit: gpu_crit {
-+					temperature = <90000>; /* millicelsius */
++					temperature = <115000>; /* millicelsius */
 +					hysteresis = <2000>; /* millicelsius */
 +					type = "critical";
 +				};
@@ -223,7 +214,7 @@ index 3071e94..0db8b35 100644
 +				map0 {
 +					trip = <&gpu_alert0>;
 +					cooling-device =
-+						<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 +				};
 +			};
 +		};
