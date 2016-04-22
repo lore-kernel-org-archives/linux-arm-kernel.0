@@ -1,36 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Apr 2016 14:32:09 +0100
-Subject: [PATCH v4 2/5] arm64: Allow a capability to be checked on a
- single CPU
-In-Reply-To: <1461324335-5081-3-git-send-email-suzuki.poulose@arm.com>
-References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
- <1461324335-5081-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160422133209.GJ2998@e104818-lin.cambridge.arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 22 Apr 2016 15:32:44 +0200
+Subject: [PATCH RFT V2 3/3] iio: mxs-lradc: implement suspend/resume
+ support
+In-Reply-To: <20160421210810.GC25466@dtor-ws>
+References: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
+ <1461269478-449-4-git-send-email-stefan.wahren@i2se.com>
+ <20160421210810.GC25466@dtor-ws>
+Message-ID: <571A27FC.4030301@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 12:25:32PM +0100, Suzuki K. Poulose wrote:
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1005,6 +1005,24 @@ static void __init setup_feature_capabilities(void)
->  	enable_cpu_capabilities(arm64_features);
->  }
->  
-> +/*
-> + * Check if the current CPU has a given feature capability.
-> + * Should be called from non-preemptible context.
-> + */
-> +bool this_cpu_has_cap(unsigned int cap)
-> +{
-> +	const struct arm64_cpu_capabilities *caps = arm64_features;
-> +
-> +	if (WARN_ON(preemptible()))
-> +		return false;
-> +
-> +	for (caps = arm64_features; caps->desc; caps++)
-> +		if (caps->capability == cap && caps->matches)
-> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
+Hi Dmitry,
 
-Nitpick: you don't need to initialise "caps" twice.
+Am 21.04.2016 um 23:08 schrieb Dmitry Torokhov:
+> On Thu, Apr 21, 2016 at 08:11:18PM +0000, Stefan Wahren wrote:
+>> This patch implements suspend/resume support for mxs-lradc.
+>> It's possible to use the touchscreen as wakeup source.
+>>
+>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> ---
+>>  drivers/iio/adc/mxs-lradc.c |   61 +++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 61 insertions(+)
+>>
+>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+>> index cfc558f..6bd387f 100644
+>> --- a/drivers/iio/adc/mxs-lradc.c
+>> +++ b/drivers/iio/adc/mxs-lradc.c
+>> @@ -29,6 +29,7 @@
+>>  #include <linux/of.h>
+>>  #include <linux/of_device.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/pm.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/stmp_device.h>
+>>  #include <linux/sysfs.h>
+>> @@ -1745,10 +1746,70 @@ static int mxs_lradc_remove(struct platform_device *pdev)
+>>  	return 0;
+>>  }
+>>  
+>> +static int __maybe_unused mxs_lradc_suspend(struct device *dev)
+>> +{
+>> +	struct iio_dev *iio = dev_get_drvdata(dev);
+>> +	struct mxs_lradc *lradc = iio_priv(iio);
+>> +	struct input_dev *input = lradc->ts_input;
+>> +	int ret = 0;
+>> +
+>> +	if (input) {
+>> +		mutex_lock(&input->mutex);
+>> +
+>> +		/* Enable touchscreen wakeup irq */
+>> +		if (input->users && device_may_wakeup(dev))
+>> +			ret = enable_irq_wake(lradc->irq[0]);
+>> +		else
+>> +			mxs_lradc_disable_ts(lradc);
+>> +
+>> +		mutex_unlock(&input->mutex);
+>> +	}
+>> +
+>> +	if (ret)
+>> +		return ret;
+> I'd rather we had it right after we do:
+>
+> 			ret = enable_irq_wake(lradc->irq[0]);
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+but we must unlock the mutex first before return. An option would be to
+place the return inside the input branch.
+
+Stefan
