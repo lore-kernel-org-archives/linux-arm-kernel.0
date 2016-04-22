@@ -1,41 +1,186 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 22 Apr 2016 17:39:53 +0200 (CEST)
-Subject: [PATCH v7 1/8] genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
-In-Reply-To: <571A1855.5020008@linaro.org>
-References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
- <1461085990-2547-2-git-send-email-eric.auger@linaro.org>
- <571A04A9.1010104@arm.com> <571A1855.5020008@linaro.org>
-Message-ID: <alpine.DEB.2.11.1604221739070.3941@nanos>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Fri, 22 Apr 2016 11:45:45 -0400
+Subject: [PATCH net v2 2/3] drivers: net: cpsw: fix error messages when
+ using phy-handle DT property
+In-Reply-To: <571A2126.2060708@ti.com>
+References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+ <1461263172-10428-1-git-send-email-drivshin.allworx@gmail.com>
+ <571A2126.2060708@ti.com>
+Message-ID: <20160422114545.57b477ad.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Apr 2016, Eric Auger wrote:
-> Robin,
-> On 04/22/2016 01:02 PM, Robin Murphy wrote:
-> > Hi Eric,
+On Fri, 22 Apr 2016 16:03:34 +0300
+Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+
+> On 04/21/2016 09:26 PM, David Rivshin (Allworx) wrote:
+> > From: David Rivshin <drivshin@allworx.com>
 > > 
-> > On 19/04/16 18:13, Eric Auger wrote:
-> >> Let's introduce a new msi_domain_info flag value, MSI_FLAG_IRQ_REMAPPING
-> >> meant to tell the domain supports IRQ REMAPPING, also known as Interrupt
-> >> Translation Service. On Intel HW this IRQ remapping capability is
-> >> abstracted on IOMMU side while on ARM it is abstracted on MSI controller
-> >> side. This flag will be used to know whether the MSI passthrough is
-> >> safe.
+> > The phy-handle, phy_id, and fixed-link properties are mutually exclusive,
+> > and only one need be specified. However if phy-handle was specified, an
+> > error message would complain about the lack of phy_id or fixed-link.
 > > 
-> > Perhaps a nitpick, but given the earlier confusion about what the IOMMU
-> > flag actually meant this prompts me to wonder if it's worth adjusting
-> > the general terminology before we propagate it further. What I think we
-> > actually care about is that one thing or the other "provides MSI
-> > isolation" rather than "supports MSI remapping", since the latter is all
-> > to easy to misinterpret the way we did in the SMMU drivers.
+> > Also, if phy-handle was specified and the subsequent of_phy_connect()
+> > failed, the error message still referenced slaved->data->phy_id, which
+> > would be empty. Instead, use the name of the device_node as a useful
+> > identifier.
+> > 
+> > Fixes: 9e42f715264f ("drivers: net: cpsw: add phy-handle parsing")
+> > Signed-off-by: David Rivshin <drivshin@allworx.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Tested-by: Nicolas Chauvet <kwizart@gmail.com>
+> > ---
+> > If would like this for -stable it should apply cleanly as far back
+> > as 4.5. It failes on 4.4 due to some context differences, but can be
+> > applied with 'git am -C2'. Or, I can produce a separate patch against
+> > linux-4.4.y if preferred.
+> > 
+> > Changes since v1 [1]:
+> > - Rebased (no conflicts)
+> > - Added Tested-by from Nicolas Chauvet
+> > - Added Acked-by from Rob Herring for the binding change
+> > 
+> > [1] https://patchwork.ozlabs.org/patch/560324/
+> > 
+> >   Documentation/devicetree/bindings/net/cpsw.txt |  4 ++--
+> >   drivers/net/ethernet/ti/cpsw.c                 | 17 +++++++++++++----
+> >   2 files changed, 15 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> > index 28a4781..3033c0f 100644
+> > --- a/Documentation/devicetree/bindings/net/cpsw.txt
+> > +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+> > @@ -46,16 +46,16 @@ Optional properties:
+> >   - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
+> >   - mac-address		: See ethernet.txt file in the same directory
+> >   - phy_id		: Specifies slave phy id  
 > 
-> The only concern I have is https://lkml.org/lkml/2016/4/18/283 attempts
-> to define a PCI bus flag dubbed PCI_BUS_FLAGS_MSI_REMAP combining the
-> iommu & msi layer info. In that sense x86 people may not be keen of
-> having different terminaologies. Anyway I will follow the consensus, if any.
+> May be the "phy_id" can be marked as deprecated? (while here)
+> The recommended property now is "phy-handle".
 
-Yes, please keep that consistent. It makes 'grep' much more conveniant.
+I can certainly do that. Perhaps something like this?
+ - phy_id		: Specifies slave phy id (deprecated, use phy-handle)
 
-Thanks,
+Rob, would you have any issues with bundling that?
 
-	tglx
+> 
+> >   - phy-handle		: See ethernet.txt file in the same directory
+> >   
+> >   Slave sub-nodes:
+> >   - fixed-link		: See fixed-link.txt file in the same directory
+> > -			  Either the property phy_id, or the sub-node
+> > -			  fixed-link can be specified
+> > +
+> > +Note: Exactly one of phy_id, phy-handle, or fixed-link must be specified.
+> >   
+> >   Note: "ti,hwmods" field is used to fetch the base address and irq
+> >   resources from TI, omap hwmod data base during device registration.
+> >   Future plan is to migrate hwmod data base contents into device tree
+> >   blob so that, all the required data will be used from device tree dts
+> >   file.
+> >   
+> > diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> > index d69cb3f..3c81413 100644
+> > --- a/drivers/net/ethernet/ti/cpsw.c
+> > +++ b/drivers/net/ethernet/ti/cpsw.c
+> > @@ -1150,16 +1150,19 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
+> >   	if (slave->data->phy_node)
+> >   		slave->phy = of_phy_connect(priv->ndev, slave->data->phy_node,
+> >   				 &cpsw_adjust_link, 0, slave->data->phy_if);
+> >   	else
+> >   		slave->phy = phy_connect(priv->ndev, slave->data->phy_id,
+> >   				 &cpsw_adjust_link, slave->data->phy_if);
+> >   	if (IS_ERR(slave->phy)) {
+> > -		dev_err(priv->dev, "phy %s not found on slave %d\n",
+> > -			slave->data->phy_id, slave->slave_num);
+> > +		dev_err(priv->dev, "phy \"%s\" not found on slave %d\n",
+> > +			slave->data->phy_node ?
+> > +				slave->data->phy_node->full_name :
+> > +				slave->data->phy_id,
+> > +			slave->slave_num);  
+> 
+> Unfortunately,  there are some inconsistency between legacy and FDT API :(
+> of_phy_connect() will return valid phy_device or NULL, but phy_connect()
+> can return valid phy_device or ERR_PTR().
+
+Good catch, I hadn't noticed that. It looks like that's actually a more 
+serious (pre-existing) bug: if of_phy_connect() returns NULL, we'd end 
+up dereferencing it and pagefaulting.
+
+How about moving the IS_ERR() check into the phy_connect() case like this:
+	if (slave->data->phy_node) {
+		slave->phy = of_phy_connect(priv->ndev, slave->data->phy_node,
+				 &cpsw_adjust_link, 0, slave->data->phy_if);
+	} else {
+		slave->phy = phy_connect(priv->ndev, slave->data->phy_id,
+				 &cpsw_adjust_link, slave->data->phy_if);
+		if (IS_ERR(slave->phy))
+			slave->phy = NULL;
+	}
+	if (!slave->phy) {
+		dev_err(priv->dev, "phy \"%s\" not found on slave %d\n",
+			slave->data->phy_node ?
+				slave->data->phy_node->full_name :
+				slave->data->phy_id,
+			slave->slave_num);  
+	} else {
+
+Since you say the phy_id case is deprecated anyways, I'm not too concerned
+about not printing the error code returned by phy_connect() in that case
+(especially since it never did so in the past). That lets us still avoid
+duplicating the dev_err() itself.
+
+
+> 
+> 
+> 
+> >   		slave->phy = NULL;
+> >   	} else {
+> >   		phy_attached_info(slave->phy);
+> >   
+> >   		phy_start(slave->phy);
+> >   
+> >   		/* Configure GMII_SEL register */
+> > @@ -2030,15 +2033,19 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+> >   		/* This is no slave child node, continue */
+> >   		if (strcmp(slave_node->name, "slave"))
+> >   			continue;
+> >   
+> >   		slave_data->phy_node = of_parse_phandle(slave_node,
+> >   							"phy-handle", 0);
+> >   		parp = of_get_property(slave_node, "phy_id", &lenp);
+> > -		if (of_phy_is_fixed_link(slave_node)) {
+> > +		if (slave_data->phy_node) {
+> > +			dev_dbg(&pdev->dev,
+> > +				"slave[%d] using phy-handle=\"%s\"\n",
+> > +				i, slave_data->phy_node->full_name);
+> > +		} else if (of_phy_is_fixed_link(slave_node)) {
+> >   			struct device_node *phy_node;
+> >   			struct phy_device *phy_dev;
+> >   
+> >   			/* In the case of a fixed PHY, the DT node associated
+> >   			 * to the PHY is the Ethernet MAC DT node.
+> >   			 */
+> >   			ret = of_phy_register_fixed_link(slave_node);
+> > @@ -2067,15 +2074,17 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+> >   			if (!mdio) {
+> >   				dev_err(&pdev->dev, "Missing mdio platform device\n");
+> >   				return -EINVAL;
+> >   			}
+> >   			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+> >   				 PHY_ID_FMT, mdio->name, phyid);
+> >   		} else {
+> > -			dev_err(&pdev->dev, "No slave[%d] phy_id or fixed-link property\n", i);
+> > +			dev_err(&pdev->dev,
+> > +				"No slave[%d] phy_id, phy-handle, or fixed-link property\n",
+> > +				i);
+> >   			goto no_phy_slave;
+> >   		}
+> >   		slave_data->phy_if = of_get_phy_mode(slave_node);
+> >   		if (slave_data->phy_if < 0) {
+> >   			dev_err(&pdev->dev, "Missing or malformed slave[%d] phy-mode property\n",
+> >   				i);
+> >   			return slave_data->phy_if;
+> >   
+> 
+> 
