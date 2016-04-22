@@ -1,25 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Apr 2016 14:50:15 +0100
-Subject: [PATCH v4 5/5] arm64: Fix behavior of maxcpus=N
-In-Reply-To: <1461324335-5081-6-git-send-email-suzuki.poulose@arm.com>
-References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
- <1461324335-5081-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160422135014.GM2998@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Apr 2016 14:51:18 +0100
+Subject: [PATCHv2 1/6] efi/runtime-wrappers: add {__,}efi_call_virt templates
+In-Reply-To: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
+References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1461333083-15529-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 12:25:35PM +0100, Suzuki K. Poulose wrote:
-> maxcpu=n sets the number of CPUs activated at boot time to a max of n,
-> but allowing the remaining CPUs to be brought up later if the user
-> decides to do so. However, on arm64 due to various reasons, we disallowed
-> hotplugging CPUs beyond n, by marking them not present. Now that
-> we have checks in place to make sure the hotplugged CPUs have compatible
-> features with system and requires no new errata, relax the restriction.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Currently each architecture must implement two macros, efi_call_virt and
+__efi_call_virt, which only differ by the presence or absence of a
+return type. Otherwise, the logic surrounding the call is identical.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+As each architecture must define the entire body of each, we can't place
+any generic manipulation (e.g. irq flag validation) in the middle.
+
+This patch adds template implementations of these macros. With these,
+arch code can implement three template macros, avoiding reptition for
+the void/non-void return cases:
+
+* arch_efi_call_virt_setup
+
+  Sets up the environment for the call (e.g. switching page tables,
+  allowing kernel-mode use of floating point, if required).
+
+* arch_efi_call_virt
+
+  Performs the call. The last expression in the macro must be the call
+  itself, allowing the logic to be shared by the void and non-void
+  cases.
+
+* arch_efi_call_virt_teardown
+
+  Restores the usual kernel environment once the call has returned.
+
+While the savings from repition are minimal, we additionally gain the
+ability to add common code around the call with the call environment set
+up. This can be used to detect common firmware issues (e.g. bad irq mask
+management).
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: linux-efi at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/firmware/efi/runtime-wrappers.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+index de69530..1b9fa54 100644
+--- a/drivers/firmware/efi/runtime-wrappers.c
++++ b/drivers/firmware/efi/runtime-wrappers.c
+@@ -20,6 +20,27 @@
+ #include <linux/spinlock.h>
+ #include <asm/efi.h>
+ 
++
++#ifndef efi_call_virt
++#define efi_call_virt(f, args...)					\
++({									\
++	efi_status_t __s;						\
++	arch_efi_call_virt_setup();					\
++	__s = arch_efi_call_virt(f, args);				\
++	arch_efi_call_virt_teardown();					\
++	__s;								\
++})
++#endif
++
++#ifndef __efi_call_virt
++#define __efi_call_virt(f, args...)					\
++({									\
++	arch_efi_call_virt_setup();					\
++	arch_efi_call_virt(f, args);					\
++	arch_efi_call_virt_teardown();					\
++})
++#endif
++
+ /*
+  * According to section 7.1 of the UEFI spec, Runtime Services are not fully
+  * reentrant, and there are particular combinations of calls that need to be
+-- 
+1.9.1
