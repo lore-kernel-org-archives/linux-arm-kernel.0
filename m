@@ -1,53 +1,75 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 22 Apr 2016 12:43:35 +0100
-Subject: [PATCH 2/3] ARM: nommu: change memory reserve for the vectors
+Date: Fri, 22 Apr 2016 12:43:34 +0100
+Subject: [PATCH 1/3] ARM: nommu: fix PMSAv7 setup
 In-Reply-To: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
 References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1461325416-29570-3-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1461325416-29570-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 
-Commit 19accfd3 (ARM: move vector stubs) moved the vector stubs in an
-additional page above the base vector one. This change wasn't taken into
-account by the nommu memreserve.
-This patch ensures that the kernel won't overwrite any vector stub on
-nommu.
+Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) broke the support for
+MPU on ARMv7-R. This patch adapts the code inside CONFIG_ARM_MPU to use
+memblocks appropriately.
+
+MPU initialisation only uses the first memory region, and removes all
+subsequent ones. Because looping over all regions that need removal is
+inefficient, and memblock_remove already handles memory ranges, we can
+flatten the 'for_each_memblock' part.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-[changed the MPU side too]
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/kernel/head-nommu.S |    2 +-
- arch/arm/mm/nommu.c          |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mm/nommu.c |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 9b8c5a1..fb1a69e 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -236,7 +236,7 @@ ENTRY(__setup_mpu)
- 	mov	r0, #CONFIG_VECTORS_BASE	@ Cover from VECTORS_BASE
- 	ldr	r5,=(MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL)
- 	/* Writing N to bits 5:1 (RSR_SZ) --> region size 2^N+1 */
--	mov	r6, #(((PAGE_SHIFT - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN)
-+	mov	r6, #(((2 * PAGE_SHIFT - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN)
- 
- 	setup_region r0, r5, r6, MPU_DATA_SIDE	@ VECTORS_BASE, PL0 NA, enabled
- 	beq	3f				@ Memory-map not unified
 diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 4d113fc..d5805e4 100644
+index 1dd1093..4d113fc 100644
 --- a/arch/arm/mm/nommu.c
 +++ b/arch/arm/mm/nommu.c
-@@ -286,7 +286,7 @@ void __init arm_mm_memblock_reserve(void)
- 	 * some architectures which the DRAM is the exception vector to trap,
- 	 * alloc_page breaks with error, although it is not NULL, but "0."
- 	 */
--	memblock_reserve(CONFIG_VECTORS_BASE, PAGE_SIZE);
-+	memblock_reserve(CONFIG_VECTORS_BASE, 2 * PAGE_SIZE);
- #else /* ifndef CONFIG_CPU_V7M */
- 	/*
- 	 * There is no dedicated vector page on V7-M. So nothing needs to be
+@@ -87,7 +87,6 @@ static unsigned long irbar_read(void)
+ /* MPU initialisation functions */
+ void __init sanity_check_meminfo_mpu(void)
+ {
+-	int i;
+ 	phys_addr_t phys_offset = PHYS_OFFSET;
+ 	phys_addr_t aligned_region_size, specified_mem_size, rounded_mem_size;
+ 	struct memblock_region *reg;
+@@ -110,11 +109,13 @@ void __init sanity_check_meminfo_mpu(void)
+ 		} else {
+ 			/*
+ 			 * memblock auto merges contiguous blocks, remove
+-			 * all blocks afterwards
++			 * all blocks afterwards in one go (we can't remove
++			 * blocks separately while iterating)
+ 			 */
+ 			pr_notice("Ignoring RAM after %pa, memory at %pa ignored\n",
+-				  &mem_start, &reg->base);
+-			memblock_remove(reg->base, reg->size);
++				  &mem_end, &reg->base);
++			memblock_remove(reg->base, 0 - reg->base);
++			break;
+ 		}
+ 	}
+ 
+@@ -144,7 +145,7 @@ void __init sanity_check_meminfo_mpu(void)
+ 		pr_warn("Truncating memory from %pa to %pa (MPU region constraints)",
+ 				&specified_mem_size, &aligned_region_size);
+ 		memblock_remove(mem_start + aligned_region_size,
+-				specified_mem_size - aligned_round_size);
++				specified_mem_size - aligned_region_size);
+ 
+ 		mem_end = mem_start + aligned_region_size;
+ 	}
+@@ -261,7 +262,7 @@ void __init mpu_setup(void)
+ 		return;
+ 
+ 	region_err = mpu_setup_region(MPU_RAM_REGION, PHYS_OFFSET,
+-					ilog2(meminfo.bank[0].size),
++					ilog2(memblock.memory.regions[0].size),
+ 					MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL);
+ 	if (region_err) {
+ 		panic("MPU region initialization failure! %d", region_err);
 -- 
 1.7.9.5
