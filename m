@@ -1,179 +1,150 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 22 Apr 2016 15:02:01 +0200
-Subject: [PATCH v7 03/10] iommu: introduce a reserved iova cookie
-In-Reply-To: <571A1AC5.9030905@arm.com>
-References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
- <1461084994-2355-4-git-send-email-eric.auger@linaro.org>
- <57177C31.9090004@arm.com> <5717AAC9.10505@linaro.org>
- <571A1AC5.9030905@arm.com>
-Message-ID: <571A20C9.9010508@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 22 Apr 2016 16:03:34 +0300
+Subject: [PATCH net v2 2/3] drivers: net: cpsw: fix error messages when
+ using phy-handle DT property
+In-Reply-To: <1461263172-10428-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+ <1461263172-10428-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <571A2126.2060708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-On 04/22/2016 02:36 PM, Robin Murphy wrote:
-> On 20/04/16 17:14, Eric Auger wrote:
->> Hi Robin,
->> On 04/20/2016 02:55 PM, Robin Murphy wrote:
->>> On 19/04/16 17:56, Eric Auger wrote:
->>>> This patch introduces some new fields in the iommu_domain struct,
->>>> dedicated to reserved iova management.
->>>>
->>>> In a similar way as DMA mapping IOVA window, we need to store
->>>> information related to a reserved IOVA window.
->>>>
->>>> The reserved_iova_cookie will store the reserved iova_domain
->>>> handle. An RB tree indexed by physical address is introduced to
->>>> store the host physical addresses bound to reserved IOVAs.
->>>>
->>>> Those physical addresses will correspond to MSI frame base
->>>> addresses, also referred to as doorbells. Their number should be
->>>> quite limited per domain.
->>>>
->>>> Also a spin_lock is introduced to protect accesses to the iova_domain
->>>> and RB tree. The choice of a spin_lock is driven by the fact the RB
->>>> tree will need to be accessed in MSI controller code not allowed to
->>>> sleep.
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>>
->>>> ---
->>>> v5 -> v6:
->>>> - initialize reserved_binding_list
->>>> - use a spinlock instead of a mutex
->>>> ---
->>>>    drivers/iommu/iommu.c | 2 ++
->>>>    include/linux/iommu.h | 6 ++++++
->>>>    2 files changed, 8 insertions(+)
->>>>
->>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>>> index b9df141..f70ef3b 100644
->>>> --- a/drivers/iommu/iommu.c
->>>> +++ b/drivers/iommu/iommu.c
->>>> @@ -1073,6 +1073,8 @@ static struct iommu_domain
->>>> *__iommu_domain_alloc(struct bus_type *bus,
->>>>
->>>>        domain->ops  = bus->iommu_ops;
->>>>        domain->type = type;
->>>> +    spin_lock_init(&domain->reserved_lock);
->>>> +    domain->reserved_binding_list = RB_ROOT;
->>>>
->>>>        return domain;
->>>>    }
->>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->>>> index b3e8c5b..60999db 100644
->>>> --- a/include/linux/iommu.h
->>>> +++ b/include/linux/iommu.h
->>>> @@ -24,6 +24,7 @@
->>>>    #include <linux/of.h>
->>>>    #include <linux/types.h>
->>>>    #include <linux/scatterlist.h>
->>>> +#include <linux/spinlock.h>
->>>>    #include <trace/events/iommu.h>
->>>>
->>>>    #define IOMMU_READ    (1 << 0)
->>>> @@ -83,6 +84,11 @@ struct iommu_domain {
->>>>        void *handler_token;
->>>>        struct iommu_domain_geometry geometry;
->>>>        void *iova_cookie;
->>>> +    void *reserved_iova_cookie;
->>>
->>> Why exactly do we need this? From your description, it's for the user of
->>> the domain to keep track of IOVA allocations in, but then that's
->>> precisely what the iova_cookie exists for.
->>
->> I was not sure whether both APIs could not be used concurrently, hence a
->> separate cookie. If we only consider MSI mapping use case I guess we are
->> either with a DMA domain or with a domain for VFIO and I would agree
->> with you, ie. we can reuse the same cookie.
+On 04/21/2016 09:26 PM, David Rivshin (Allworx) wrote:
+> From: David Rivshin <drivshin@allworx.com>
 > 
-> Unless somebody cooks up some paravirtualised monstrosity where the
-> guest driver somehow uses the host kernel's DMA mapping ops (thankfully,
-> I'm not sure how that would even be possible), then they should always
-> be mutually exclusive.
-
-OK thanks
+> The phy-handle, phy_id, and fixed-link properties are mutually exclusive,
+> and only one need be specified. However if phy-handle was specified, an
+> error message would complain about the lack of phy_id or fixed-link.
 > 
-> (That said, I should probably add a sanity check to
-> iommu_dma_put_cookie() to ensure it only touches the cookies of
-> IOMMU_DOMAIN_DMA domains...)
+> Also, if phy-handle was specified and the subsequent of_phy_connect()
+> failed, the error message still referenced slaved->data->phy_id, which
+> would be empty. Instead, use the name of the device_node as a useful
+> identifier.
 > 
->>>> +    /* rb tree indexed by PA, for reserved bindings only */
->>>> +    struct rb_root reserved_binding_list;
->>>
->>> Nit: that's more puzzling than helpful - "reserved binding" is
->>> particularly vague and nondescript, and makes me think of anything but
->>> MSI descriptors.
->> my heart is torn between advised genericity and MSI use case. My natural
->> short-sighted inclination would head me for an MSI mapping dedicated API
->> but I am following advices. As discussed with Alex there are
->> implementation details pretty related to MSI problematics I think (the
->> fact we store the "bindings" in an rb-tree/list, locking)
->>
->> If Marc & Alex I can retarget this API to be less generic.
->>
->>   Plus it's called a list but isn't a list (that said,
->>> given that we'd typically only expect a handful of entries, and lookups
->>> are hardly going to be a performance-critical bottleneck, would a simple
->>> list not suffice?)
->> I fully agree on that point. An rb-tree is overkill today for MSI use
->> case. Again if we were to use this API for anything else, this may
->> change the decision. But sure we can refactor afterwards upon needs. TBH
->> the rb-tree is inherited from vfio_iommu_type1 dma tree where that code
->> was originally located.
+> Fixes: 9e42f715264f ("drivers: net: cpsw: add phy-handle parsing")
+> Signed-off-by: David Rivshin <drivshin@allworx.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Tested-by: Nicolas Chauvet <kwizart@gmail.com>
+> ---
+> If would like this for -stable it should apply cleanly as far back
+> as 4.5. It failes on 4.4 due to some context differences, but can be
+> applied with 'git am -C2'. Or, I can produce a separate patch against
+> linux-4.4.y if preferred.
 > 
-> Thinking some more, how feasible would it be to handle the IOVA
-> management aspect within the existing tree, i.e. extend struct vfio_dma
-> so an entry can represent different types of thing - DMA pages, MSI
-> pages, arbitrary reservations - and link to more implementation-specific
-> data (e.g. a refcounted MSI descriptor stored elsewhere in the domain)
-> as necessary?
-it is feasible and  was approximately done there at the early ages of
-the series:
-https://lkml.org/lkml/2016/1/28/803 &
-https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016607.html
-
-Then with the intent of doing something reusable the trend was to put it
-in the iommu instead of vfio_iommu_typeX.
-
-I am currently trying to make the "msi-iommu api" implemented upon the
-dma-iommu api based on the simplifications that we discussed:
-- reuse iova_cookie for iova domain
-- add an opaque msi_cookie that hides the msi doorbell list + its spinlock
-- simplify locking by making sure the msi domain cannot disappear before
-the iommu domain destruction
-
-If you agree I would suggest to wait and see the outcome of this new
-design and make a shared decision based on that code? Should be
-available next week.
-
-Best Regards
-
-Eric
-
+> Changes since v1 [1]:
+> - Rebased (no conflicts)
+> - Added Tested-by from Nicolas Chauvet
+> - Added Acked-by from Rob Herring for the binding change
 > 
-> Robin.
+> [1] https://patchwork.ozlabs.org/patch/560324/
 > 
->>>
->>>> +    /* protects reserved cookie and rbtree manipulation */
->>>> +    spinlock_t reserved_lock;
->>>
->>> A cookie is an opaque structure, so any locking it needs would normally
->>> be hidden within. If on the other hand it's not meant to be opaque at
->>> this level, then it should probably be something more specific than a
->>> void * (if at all, as above).
->> agreed
->>
->> Thanks
->>
->> Eric
->>>
->>> Robin.
->>>
->>>>    };
->>>>
->>>>    enum iommu_cap {
->>>>
->>>
->>
+>   Documentation/devicetree/bindings/net/cpsw.txt |  4 ++--
+>   drivers/net/ethernet/ti/cpsw.c                 | 17 +++++++++++++----
+>   2 files changed, 15 insertions(+), 6 deletions(-)
 > 
+> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> index 28a4781..3033c0f 100644
+> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+> @@ -46,16 +46,16 @@ Optional properties:
+>   - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
+>   - mac-address		: See ethernet.txt file in the same directory
+>   - phy_id		: Specifies slave phy id
+
+May be the "phy_id" can be marked as deprecated? (while here)
+The recommended property now is "phy-handle".
+
+>   - phy-handle		: See ethernet.txt file in the same directory
+>   
+>   Slave sub-nodes:
+>   - fixed-link		: See fixed-link.txt file in the same directory
+> -			  Either the property phy_id, or the sub-node
+> -			  fixed-link can be specified
+> +
+> +Note: Exactly one of phy_id, phy-handle, or fixed-link must be specified.
+>   
+>   Note: "ti,hwmods" field is used to fetch the base address and irq
+>   resources from TI, omap hwmod data base during device registration.
+>   Future plan is to migrate hwmod data base contents into device tree
+>   blob so that, all the required data will be used from device tree dts
+>   file.
+>   
+> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> index d69cb3f..3c81413 100644
+> --- a/drivers/net/ethernet/ti/cpsw.c
+> +++ b/drivers/net/ethernet/ti/cpsw.c
+> @@ -1150,16 +1150,19 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
+>   	if (slave->data->phy_node)
+>   		slave->phy = of_phy_connect(priv->ndev, slave->data->phy_node,
+>   				 &cpsw_adjust_link, 0, slave->data->phy_if);
+>   	else
+>   		slave->phy = phy_connect(priv->ndev, slave->data->phy_id,
+>   				 &cpsw_adjust_link, slave->data->phy_if);
+>   	if (IS_ERR(slave->phy)) {
+> -		dev_err(priv->dev, "phy %s not found on slave %d\n",
+> -			slave->data->phy_id, slave->slave_num);
+> +		dev_err(priv->dev, "phy \"%s\" not found on slave %d\n",
+> +			slave->data->phy_node ?
+> +				slave->data->phy_node->full_name :
+> +				slave->data->phy_id,
+> +			slave->slave_num);
+
+Unfortunately,  there are some inconsistency between legacy and FDT API :(
+of_phy_connect() will return valid phy_device or NULL, but phy_connect()
+can return valid phy_device or ERR_PTR().
+
+
+
+>   		slave->phy = NULL;
+>   	} else {
+>   		phy_attached_info(slave->phy);
+>   
+>   		phy_start(slave->phy);
+>   
+>   		/* Configure GMII_SEL register */
+> @@ -2030,15 +2033,19 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+>   		/* This is no slave child node, continue */
+>   		if (strcmp(slave_node->name, "slave"))
+>   			continue;
+>   
+>   		slave_data->phy_node = of_parse_phandle(slave_node,
+>   							"phy-handle", 0);
+>   		parp = of_get_property(slave_node, "phy_id", &lenp);
+> -		if (of_phy_is_fixed_link(slave_node)) {
+> +		if (slave_data->phy_node) {
+> +			dev_dbg(&pdev->dev,
+> +				"slave[%d] using phy-handle=\"%s\"\n",
+> +				i, slave_data->phy_node->full_name);
+> +		} else if (of_phy_is_fixed_link(slave_node)) {
+>   			struct device_node *phy_node;
+>   			struct phy_device *phy_dev;
+>   
+>   			/* In the case of a fixed PHY, the DT node associated
+>   			 * to the PHY is the Ethernet MAC DT node.
+>   			 */
+>   			ret = of_phy_register_fixed_link(slave_node);
+> @@ -2067,15 +2074,17 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+>   			if (!mdio) {
+>   				dev_err(&pdev->dev, "Missing mdio platform device\n");
+>   				return -EINVAL;
+>   			}
+>   			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+>   				 PHY_ID_FMT, mdio->name, phyid);
+>   		} else {
+> -			dev_err(&pdev->dev, "No slave[%d] phy_id or fixed-link property\n", i);
+> +			dev_err(&pdev->dev,
+> +				"No slave[%d] phy_id, phy-handle, or fixed-link property\n",
+> +				i);
+>   			goto no_phy_slave;
+>   		}
+>   		slave_data->phy_if = of_get_phy_mode(slave_node);
+>   		if (slave_data->phy_if < 0) {
+>   			dev_err(&pdev->dev, "Missing or malformed slave[%d] phy-mode property\n",
+>   				i);
+>   			return slave_data->phy_if;
+> 
+
+
+-- 
+regards,
+-grygorii
