@@ -1,85 +1,80 @@
-From: dennis@ausil.us (Dennis Gilmore)
-Date: Fri, 22 Apr 2016 08:11:24 -0500
-Subject: bug in autoloading of imx-ipuv3-crtc
-In-Reply-To: <20160420230317.GT29108@pengutronix.de>
-References: <6926808.b0joqYQPQE@anubis.ausil.us>
- <1513165.9WxCa41tI1@anubis.ausil.us> <20160420230317.GT29108@pengutronix.de>
-Message-ID: <13533046.1iFyOjiAs0@anubis.ausil.us>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 22 Apr 2016 15:11:43 +0200
+Subject: [PATCH 03/11] clk: tegra: Add DFLL DVCO reset control for Tegra210
+In-Reply-To: <1461321071-6431-4-git-send-email-pchiu@nvidia.com>
+References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+ <1461321071-6431-4-git-send-email-pchiu@nvidia.com>
+Message-ID: <20160422131143.GL9047@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 21, 2016 1:03:17 AM CDT Uwe Kleine-K?nig wrote:
-> Hello,
+On Fri, Apr 22, 2016 at 06:31:03PM +0800, Penny Chiu wrote:
+> The DVCO present in the DFLL IP block has a separate reset line,
+> exposed via the CAR IP block.  This reset line is asserted upon SoC
+> reset.  Unless something (such as the DFLL driver) deasserts this
+> line, the DVCO will not oscillate, although reads and writes to the
+> DFLL IP block will complete.
 > 
-> On Tue, Apr 19, 2016 at 03:16:01PM -0500, Dennis Gilmore wrote:
-> > On Tuesday, April 19, 2016 2:27:17 PM CDT Dennis Gilmore wrote:
-> > > On Tuesday, April 19, 2016 7:50:49 PM CDT Russell King - ARM Linux 
-wrote:
-> > > > On Tue, Apr 19, 2016 at 01:34:23PM -0500, Dennis Gilmore wrote:
-> > > > > on all of my i.MX6 systems imx-ipuv3-crtc ius not getting
-> > > > > automatically
-> > > > > loaded.  Everything is built as a module
-> > > > > 
-> > > > > CONFIG_DRM_IMX=m
-> > > > > CONFIG_DRM_IMX_FB_HELPER=m
-> > > > > CONFIG_DRM_IMX_HDMI=m
-> > > > > CONFIG_DRM_IMX_IPUV3=m
-> > > > > CONFIG_DRM_IMX_LDB=m
-> > > > > CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
-> > > > > CONFIG_DRM_IMX_TVE=m
-> > > > > CONFIG_IMX_IPUV3_CORE=m
-> > > > > 
-> > > > > The result is that until I log in via serial or ssh and modprobe the
-> > > > > module there is no display.  I suspect that there is some devicetree
-> > > > > glue missing 4.4 and 4.5 seem to both be effected.
-> > > > 
-> > > > DT doesn't come into it for imx-ipuv3-crtc - these platform devices
-> > > > are
-> > > > created by drivers/gpu/ipu-v3/ipu-common.c itself.
-> > > > 
-> > > > drivers/gpu/drm/imx/ipuv3-crtc.c contains the proper module alias
-> > > > which
-> > > > should result in the module loaded at boot time when the
-> > > > imx-ipuv3-crtc
-> > > > devices are created.
-> > > > 
-> > > > Could the problem be that imx-ipu-v3 isn't being loaded?  However,
-> > > > again,
-> > > > it looks to me like everything is correct there.
-> > > > 
-> > > > Are you saying that this used to work in older kernel versions like
-> > > > 4.3,
-> > > > but stopped in 4.4?
-> > > 
-> > > yers it used to work and stopped working. I would need to go back and
-> > > test
-> > > old kernels to figure out where it broke.
-> > 
-> > after installing some old kernels it broke with 4.4-rc4 which included a
-> > patch with teh subject of "drm/imx: Remove of_node assignment from
-> > ipuv3-crtc driver probe"
+> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+> ---
+>  drivers/clk/tegra/clk-tegra210.c         | 68 ++++++++++++++++++++++++++++++++
+>  include/dt-bindings/reset/tegra210-car.h | 12 ++++++
+>  2 files changed, 80 insertions(+)
+>  create mode 100644 include/dt-bindings/reset/tegra210-car.h
 > 
-> Just to be sure: 4.4-rc4 with 407c9eba7897 ("drm/imx: Remove of_node
-> assignment from ipuv3-crtc driver probe") reverted works fine for you?
-> 
-> Best regards
-> Uwe
+> diff --git a/drivers/clk/tegra/clk-tegra210.c b/drivers/clk/tegra/clk-tegra210.c
+> index d3709b1..3d70b38 100644
+> --- a/drivers/clk/tegra/clk-tegra210.c
+> +++ b/drivers/clk/tegra/clk-tegra210.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/export.h>
+>  #include <linux/clk/tegra.h>
+>  #include <dt-bindings/clock/tegra210-car.h>
+> +#include <dt-bindings/reset/tegra210-car.h>
+>  
+>  #include "clk.h"
+>  #include "clk-id.h"
+> @@ -39,6 +40,9 @@
+>  #define CLK_SOURCE_CSITE 0x1d4
+>  #define CLK_SOURCE_EMC 0x19c
+>  
+> +#define RST_DFLL_DVCO 0x2f4
+> +#define DVFS_DFLL_RESET_SHIFT 0
 
-I reverted the 4 patches in that series
+It'd be more idiomatic to make this:
 
-407c9eba drm/imx: Remove of_node assignment from ipuv3-crtc driver probe
-304e6be6 gpu: ipu-v3: Assign of_node of child platform devices to 
-corresponding ports
-99ae78c3 gpu: ipu-v3: Remove reg_offset field
-c3ede03c gpu: ipu-v3: drop unused dmfc field from client platform data
+	#define DVFS_DFLL_RESET (1 << 0)
 
-and it then worked again.
+and use that below instead of hard-coding the 1 << and shifting by the
+define.
 
-Dennis
+> +
+>  #define PLLC_BASE 0x80
+>  #define PLLC_OUT 0x84
+>  #define PLLC_MISC0 0x88
+> @@ -2781,6 +2785,68 @@ static void __init tegra210_clock_apply_init_table(void)
+>  }
+>  
+>  /**
+> + * tegra210_car_barrier - wait for pending writes to the CAR to complete
+> + *
+> + * Wait for any outstanding writes to the CAR MMIO space from this CPU
+> + * to complete before continuing execution.  No return value.
+> + */
+> +static void tegra210_car_barrier(void)
+> +{
+> +	readl_relaxed(clk_base + RST_DFLL_DVCO);
+> +}
+
+If you use the plain readl() and writel() functions, do you still need
+the barrier? Or is there actually a requirement from the hardware to
+flush writes by reading from any of the registers?
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/c24659a7/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/d47054db/attachment.sig>
