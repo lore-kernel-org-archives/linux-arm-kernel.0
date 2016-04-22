@@ -1,34 +1,73 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 22 Apr 2016 10:03:40 -0500
-Subject: [PATCH] ARM: socfpga: dts: Add samtec VIN|ING board
-In-Reply-To: <1460550298-9533-1-git-send-email-marex@denx.de>
-References: <1460550298-9533-1-git-send-email-marex@denx.de>
-Message-ID: <571A3D4C.4050807@opensource.altera.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 22 Apr 2016 16:18:02 +0100
+Subject: [PATCH v2] drivers: firmware: psci: unify enable-method binding on
+ ARM {64, 32}-bit systems
+Message-ID: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2016 07:24 AM, Marek Vasut wrote:
-> Add support for board based on the popular Altera Cyclone V SoC.
-> This board has the following properties:
->  - 1 GiB of DRAM
->  - 1 Gigabit ethernet
->  - 1 USB gadget port
->  - 1 USB host port with an on-board hub
->  - 2 QSPI NORs connected to the Cadence QSPI core
->  - Multiple I2C EEPROMs and one I2C temperature sensor
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 310 +++++++++++++++++++++
->  2 files changed, 311 insertions(+)
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+Currently ARM CPUs DT bindings allows different enable-method value for
+PSCI based systems. On ARM 64-bit this property is required and must be
+"psci" while on ARM 32-bit systems this property is optional and must
+be "arm,psci" if present.
 
-Minor nit for next time. The arm-soc maintainers would like the commit
-head for DTS to be: "ARM: dts: <platform>".
+However, "arm,psci" has always been the compatible string for the PSCI
+node, and was never intended to be the enable-method. So this is a bug
+in the binding and not a deliberate attempt at specifying 32-bit
+differently.
 
-I fixed it up and applied.
+This is problematic if 32-bit OS is run on 64-bit system which has
+"psci" as enable-method rather than the expected "arm,psci".
 
-Thanks,
-Dinh
+So let's unify the value into "psci" and remove support for "arm,psci"
+before it finds any users.
+
+Reported-by: Soby Mathew <Soby.Mathew@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 -
+ drivers/firmware/psci.c                        | 2 +-
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+v2->v1:
+	- Added Mark and Lorenzo's ACKs
+	- Updated commit message to specify that it also conflicts with
+	  PSCI compatible(from Mark's reply on the thread)
+
+Hi ARM-SoC guys,
+
+Can you please pick up this single fix for PSCI binding/driver for v4.6 ?
+
+Regards,
+Sudeep
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ccc62f145306..3f0cbbb8395f 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -192,7 +192,6 @@ nodes to be present and contain the properties described below.
+ 			  can be one of:
+ 			    "allwinner,sun6i-a31"
+ 			    "allwinner,sun8i-a23"
+-			    "arm,psci"
+ 			    "arm,realview-smp"
+ 			    "brcm,bcm-nsp-smp"
+ 			    "brcm,brahma-b15"
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 11bfee8b79a9..b5d05807e6ec 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -360,7 +360,7 @@ static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+ 	.init = psci_dt_cpu_init_idle,
+ };
+ 
+-CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
++CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
+ #endif
+ #endif
+ 
+-- 
+1.9.1
