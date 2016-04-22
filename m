@@ -1,531 +1,892 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Fri, 22 Apr 2016 12:25:23 +0800
-Subject: [PATCH v7 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-Message-ID: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
+Date: Fri, 22 Apr 2016 12:25:29 +0800
+Subject: [PATCH v7 6/8] [media] vcodec: mediatek: Add Mediatek VP8 Video
+ Encoder Driver
+In-Reply-To: <1461299131-57851-6-git-send-email-tiffany.lin@mediatek.com>
+References: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-2-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-3-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-4-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-5-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-6-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1461299131-57851-7-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-==============
- Introduction
-==============
-
-The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
-Mediatek Video Codec is able to handle video encoding of in a range of formats.
-
-This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
-communicate with VPU.
-
-Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
-
-==================
- Device interface
-==================
-
-In principle the driver bases on v4l2 memory-to-memory framework:
-it provides a single video node and each opened file handle gets its own private context with separate
-buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. raw video
-frames) and CAPTURE (for destination buffers, i.e. encoded video frames).
-
-==============================
- VPU (Video Processor Unit)
-==============================
-The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
-It is able to handle video decoding/encoding in a range of formats.
-The driver provides with VPU firmware download, memory management and the communication interface between CPU and VPU.
-For VPU initialization, it will create virtual memory for CPU access and physical address for VPU hw device access. 
-When a decode/encode instance opens a device node, vpu driver will download vpu firmware to the device.
-A decode/encode instant will decode/encode a frame using VPU interface to interrupt vpu to handle decoding/encoding jobs.
-
-Please have a look at the code and comments will be very much appreciated.
-
-Change in v7:
-1. Rebase against the master branch of git://linuxtv.org/media_tree.git
-2. Add ycbcr_enc, quantization and xfer_func in try_fmt, g_fmt, s_fmt
-3. Merge h264_enc and vp8_enc to one venc directory
-
-Change in v6:
-1. Add synchronization access protect between irq handler and work thread
-2. Add DMA_ATTR_ALLOC_SINGLE_PAGES support
-3. S_FMT will return coded_width, coded_height, so user space could allocate correct size memory that HW required
-4. merge h264/vp8 enc ap and md32 ipi msg
-5. separate h264/vp8 enc gop_size and intra_period handle
-6. remove sizeimage relative code in work buffer function
-7. Refine makefile to build as an module
-8. Code clean up
-
-VPU Part
-1. export symbols for building VPU as an module
-2. change function from "wait_event_interruptible_timeout" to "wait_event_timeout" since
-   CPU needs to wait for ACK from VPU even if it was interrupted by a signal
-
-v4l2-compliance test output:
-localhost Encode # ./v4l2-compliance -d /dev/video1
-Driver Info:
-        Driver name   : mtk-vcodec-enc
-        Card type     : platform:mt8173
-        Bus info      : platform:mt8173
-        Driver version: 4.4.0
-        Capabilities  : 0x84204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-                Device Capabilities
-        Device Caps   : 0x04204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-
-Compliance test for device /dev/video1 (not using libv4l2):
-
-Required ioctls:
-        test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-        test second video open: OK
-        test VIDIOC_QUERYCAP: OK
-        test VIDIOC_G/S_PRIORITY: OK
-
-Debug ioctls:
-        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-        test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-        test VIDIOC_ENUMAUDIO: OK (Not Supported)
-        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDIO: OK (Not Supported)
-        Inputs: 0 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-        Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-        test VIDIOC_G/S_EDID: OK (Not Supported)
-
-        Control ioctls:
-                test VIDIOC_QUERYCTRL/MENU: OK
-                test VIDIOC_G/S_CTRL: OK
-                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-                Standard Controls: 12 Private Controls: 0
-
-        Format ioctls:
-                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-                test VIDIOC_G/S_PARM: OK
-                test VIDIOC_G_FBUF: OK (Not Supported)
-                test VIDIOC_G_FMT: OK
-                test VIDIOC_TRY_FMT: OK
-                test VIDIOC_S_FMT: OK
-                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-
-        Codec ioctls:
-                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-        Buffer ioctls:
-                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-                test VIDIOC_EXPBUF: OK
-Total: 38, Succeeded: 38, Failed: 0, Warnings: 0
-
-
-v4l2-compliance test output:
-localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1
- 
-Change in v5:
-Vcodec Part
-1. Pass checkpatch and v4l2-compliance test
-2. Remove unused g/s_selection for now
-3. add vidioc_g_parm support
-4. add vidioc_create_bufs and vidioc_prepare_buf support
-5. Remove instance check in fops_vcodec_open
-6. Fix comments for data structure and code
-7. Refine venc, venc_lt clock source name in devicetree and binding document
-8. Fix Author information and copyright information
-9. Refine code according to review comments
-
-VPU Part
-
-v4l2-compliance test output:
-localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1
-Driver Info:
-        Driver name   : mtk-vcodec-enc
-        Card type     : platform:mt8173
-        Bus info      : platform:mt8173
-        Driver version: 4.4.0
-        Capabilities  : 0x84204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-                Device Capabilities
-        Device Caps   : 0x04204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-
-Compliance test for device /dev/video1 (not using libv4l2):
-
-Required ioctls:
-        test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-        test second video open: OK
-        test VIDIOC_QUERYCAP: OK
-        test VIDIOC_G/S_PRIORITY: OK
-
-Debug ioctls:
-        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-        test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-        test VIDIOC_ENUMAUDIO: OK (Not Supported)
-        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDIO: OK (Not Supported)
-        Inputs: 0 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-        Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-        test VIDIOC_G/S_EDID: OK (Not Supported)
-
-        Control ioctls:
-                test VIDIOC_QUERYCTRL/MENU: OK
-                test VIDIOC_G/S_CTRL: OK
-                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-                Standard Controls: 12 Private Controls: 0
-
-        Format ioctls:
-                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-                test VIDIOC_G/S_PARM: OK
-                test VIDIOC_G_FBUF: OK (Not Supported)
-                test VIDIOC_G_FMT: OK
-                test VIDIOC_TRY_FMT: OK
-                test VIDIOC_S_FMT: OK
-                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-
-        Codec ioctls:
-                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-        Buffer ioctls:
-                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-                test VIDIOC_EXPBUF: OK
-
-
-Total: 38, Succeeded: 38, Failed: 0, Warnings: 0
-
-
-Change in v4:
-Vcodec Part
-1. Remove MTK_ENCODE_PARAM_SKIP_FRAME support
-2. Remove MTK_ENCODE_PARAM_FRAME_TYPE and change to use V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME[3]
-3. Refine Encoder HW clock source
-4. Refine debug log
-5. Add watchdog support
-6. With patch "media: v4l2-compat-ioctl32: fix missing length copy in put_v4l2_buffer32"[4],
-v4l2-compliance test passed[5] in v4.4-rc5 
-
-VPU Part
-1. These two patches were Acked-by: Rob Herring <robh <at> kernel.org> in v3
-   [PATCH v3 1/8] dt-bindings: Add a binding for Mediatek Video Processor
-   [PATCH v3 3/8] arm64: dts: mediatek: Add node for Mediatek Video Processor Unit
-   Because we were wrong about how the hardware works, there is no connection between VPU and IOMMU HW
-   We remove VPU attaching to IOMMU
-2. Support VPU running on 4GB DRAM system
-3. Support VPU watchdog reset
-4. Refine for coding style 
-
-[3]https://patchwork.linuxtv.org/patch/32670/
-[4] https://patchwork.linuxtv.org/patch/32631/
-[5]localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1
-Driver Info:
-        Driver name   : mtk-vcodec-en
-        Card type     : platform:mt817
-        Bus info      : platform:mt817
-        Driver version: 4.4.0
-        Capabilities  : 0x84204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-                Device Capabilities
-        Device Caps   : 0x04204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-
-Compliance test for device /dev/video1 (not using libv4l2):
-
-Required ioctls:
-        test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-        test second video open: OK
-        test VIDIOC_QUERYCAP: OK
-        test VIDIOC_G/S_PRIORITY: OK
-
-Debug ioctls:
-        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-        test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-        test VIDIOC_ENUMAUDIO: OK (Not Supported)
-        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDIO: OK (Not Supported)
-        Inputs: 0 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-        Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-        test VIDIOC_G/S_EDID: OK (Not Supported)
-
-        Control ioctls:
-                test VIDIOC_QUERYCTRL/MENU: OK
-                test VIDIOC_G/S_CTRL: OK
-                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-                Standard Controls: 12 Private Controls: 0
-
-        Format ioctls:
-                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-                test VIDIOC_G/S_PARM: OK (Not Supported)
-                test VIDIOC_G_FBUF: OK (Not Supported)
-                test VIDIOC_G_FMT: OK
-                test VIDIOC_TRY_FMT: OK
-                test VIDIOC_S_FMT: OK
-                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-
-        Codec ioctls:
-                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-        Buffer ioctls:
-                warn: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(475):
-VIDIOC_CREATE_BUFS not supported
-                warn: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(475):
-VIDIOC_CREATE_BUFS not supported
-                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-                test VIDIOC_EXPBUF: OK
-
-Total: 38, Succeeded: 38, Failed: 0, Warnings: 2
-
-Change in v3:
-1.Refine code to pass v4l2-compliance test, now it still has 2 issues 2.Refine code according to latest MTK
-IOMMU patches[1] 3.Remove MFC51 specific CIDs and add MTK specific CIDs for for keyframe and
-  skip I-frame
-4.Refine code according to review comments
-
-Below is the v1.6 version v4l2-compliance report for the mt8173 encoder driver.
-Now there are still 2 test fail in v1.6.
-For VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF, we directly use v4l2_m2m_ioctl_* functions, but it still
-fail. It pass in kernel 3.18 but fail in kernel 4.4.
-We will try v1.8 in next version.
-VIDIOC_EXPBUF is becuase we support all three memory types VB2_DMABUF, VB2_MMAP and VB2_USERPTR.
-VIDIOC_EXPBUF only allowed when only VB2_MMAP supported.
-localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1 Driver Info:
-        Driver name   : mtk-vcodec-en
-        Card type     : platform:mt817
-        Bus info      : platform:mt817
-        Driver version: 4.4.0
-        Capabilities  : 0x84204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-                Device Capabilities
-        Device Caps   : 0x04204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-
-Compliance test for device /dev/video1 (not using libv4l2):
-
-Required ioctls:
-        test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-        test second video open: OK
-        test VIDIOC_QUERYCAP: OK
-        test VIDIOC_G/S_PRIORITY: OK
-
-Debug ioctls:
-        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-        test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-        test VIDIOC_ENUMAUDIO: OK (Not Supported)
-        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDIO: OK (Not Supported)
-        Inputs: 0 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-        Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-        test VIDIOC_G/S_EDID: OK (Not Supported)
-
-        Control ioctls:
-                test VIDIOC_QUERYCTRL/MENU: OK
-                test VIDIOC_G/S_CTRL: OK
-                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-                Standard Controls: 11 Private Controls: 2
-
-        Format ioctls:
-                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-                test VIDIOC_G/S_PARM: OK (Not Supported)
-                test VIDIOC_G_FBUF: OK (Not Supported)
-                test VIDIOC_G_FMT: OK
-                test VIDIOC_TRY_FMT: OK
-                test VIDIOC_S_FMT: OK
-                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-
-        Codec ioctls:
-                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-        Buffer ioctls:
-                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(266): vp->length
-== 0
-                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(335):
-buf.check(Unqueued, i)
-                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(420):
-testQueryBuf(node, i, q.g_buffers())
-                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: FAIL
-                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
-                test VIDIOC_EXPBUF: FAIL
-Total: 38, Succeeded: 36, Failed: 2, Warnings: 0
-
-Change in v2:
-Vcodec Part
-1.Remove common and include directory in mtk-vcodec 2.Refine vb2ops_venc_start_streaming and
-vb2ops_venc_stop_streaming and state machine 3.Remove venc_if_init and venc_if_deinit 4.Refine
-debug message 5.Refine lab and vpu decription in mediatek-vcodec.txt
-
-VPU Part
-1. Modify VPU Kconfig
-2. Move encoder header files to other patch sets 3. Remove marcos for extended virtual/iova address 4.
-Change register and variable names 5. Add a reference counter for VPU watchdog 6. Remove one busy waiting
-in function vpu_ipi_send 7. Operate VPU clock in VPU driver (not called by encoder drivers) 8. Refine
-memory mapping, firmware download and extended memory allocation/free functions 9. Release more
-allocated resources in driver remove function
-
-
-Andrew-CT Chen (3):
-  dt-bindings: Add a binding for Mediatek Video Processor
-  [media] VPU: mediatek: support Mediatek VPU
-  arm64: dts: mediatek: Add node for Mediatek Video Processor Unit
-
-Tiffany Lin (5):
-  dt-bindings: Add a binding for Mediatek Video Encoder
-  [media] vcodec: mediatek: Add Mediatek V4L2 Video Encoder Driver
-  [media] vcodec: mediatek: Add Mediatek VP8 Video Encoder Driver
-  [media] vcodec: mediatek: Add Mediatek H264 Video Encoder Driver
-  arm64: dts: mediatek: Add Video Encoder for MT8173
-
- .../devicetree/bindings/media/mediatek-vcodec.txt  |   59 +
- .../devicetree/bindings/media/mediatek-vpu.txt     |   31 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   62 +
- drivers/media/platform/Kconfig                     |   29 +
- drivers/media/platform/Makefile                    |    4 +
- drivers/media/platform/mtk-vcodec/Makefile         |   19 +
- drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h |  339 +++++
- drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c | 1301 ++++++++++++++++++++
- drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.h |   59 +
- .../media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c |  467 +++++++
- .../media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c  |  137 +++
- .../media/platform/mtk-vcodec/mtk_vcodec_enc_pm.h  |   26 +
- .../media/platform/mtk-vcodec/mtk_vcodec_intr.c    |   56 +
- .../media/platform/mtk-vcodec/mtk_vcodec_intr.h    |   27 +
- .../media/platform/mtk-vcodec/mtk_vcodec_util.c    |   96 ++
- .../media/platform/mtk-vcodec/mtk_vcodec_util.h    |   87 ++
- .../media/platform/mtk-vcodec/venc/venc_h264_if.c  |  687 +++++++++++
- .../media/platform/mtk-vcodec/venc/venc_vp8_if.c   |  488 ++++++++
- drivers/media/platform/mtk-vcodec/venc_drv_base.h  |   62 +
- drivers/media/platform/mtk-vcodec/venc_drv_if.c    |  114 ++
- drivers/media/platform/mtk-vcodec/venc_drv_if.h    |  165 +++
- drivers/media/platform/mtk-vcodec/venc_ipi_msg.h   |  210 ++++
- drivers/media/platform/mtk-vcodec/venc_vpu_if.c    |  240 ++++
- drivers/media/platform/mtk-vcodec/venc_vpu_if.h    |   61 +
- drivers/media/platform/mtk-vpu/Makefile            |    3 +
- drivers/media/platform/mtk-vpu/mtk_vpu.c           |  950 ++++++++++++++
- drivers/media/platform/mtk-vpu/mtk_vpu.h           |  162 +++
- 27 files changed, 5941 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
- create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
- create mode 100644 drivers/media/platform/mtk-vcodec/Makefile
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.h
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.h
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.h
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
- create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
- create mode 100644 drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+Add vp8 encoder driver for MT8173
+
+Signed-off-by: PoChun Lin <pochun.lin@mediatek.com>
+Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+
+---
+ drivers/media/platform/mtk-vcodec/Makefile         |    6 +-
+ .../media/platform/mtk-vcodec/venc/venc_vp8_if.c   |  488 ++++++++++++++++++++
+ drivers/media/platform/mtk-vcodec/venc_drv_if.c    |    7 +-
+ drivers/media/platform/mtk-vcodec/venc_vpu_if.c    |  240 ++++++++++
+ drivers/media/platform/mtk-vcodec/venc_vpu_if.h    |   61 +++
+ 5 files changed, 800 insertions(+), 2 deletions(-)
  create mode 100644 drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
- create mode 100644 drivers/media/platform/mtk-vcodec/venc_drv_base.h
- create mode 100644 drivers/media/platform/mtk-vcodec/venc_drv_if.c
- create mode 100644 drivers/media/platform/mtk-vcodec/venc_drv_if.h
- create mode 100644 drivers/media/platform/mtk-vcodec/venc_ipi_msg.h
  create mode 100644 drivers/media/platform/mtk-vcodec/venc_vpu_if.c
  create mode 100644 drivers/media/platform/mtk-vcodec/venc_vpu_if.h
- create mode 100644 drivers/media/platform/mtk-vpu/Makefile
- create mode 100755 drivers/media/platform/mtk-vpu/mtk_vpu.c
- create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
 
+diff --git a/drivers/media/platform/mtk-vcodec/Makefile b/drivers/media/platform/mtk-vcodec/Makefile
+index d04433be..bf73a45 100644
+--- a/drivers/media/platform/mtk-vcodec/Makefile
++++ b/drivers/media/platform/mtk-vcodec/Makefile
+@@ -1,12 +1,16 @@
+ 
++
+ obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-enc.o mtk-vcodec-common.o
+ 
+ 
+ 
+-mtk-vcodec-enc-y := mtk_vcodec_enc.o \
++mtk-vcodec-enc-y := venc/venc_vp8_if.o \
++		venc/venc_h264_if.o \
++		mtk_vcodec_enc.o \
+ 		mtk_vcodec_enc_drv.o \
+ 		mtk_vcodec_enc_pm.o \
+ 		venc_drv_if.o \
++		venc_vpu_if.o \
+ 
+ mtk-vcodec-common-y := mtk_vcodec_intr.o \
+ 		mtk_vcodec_util.o\
+diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+new file mode 100644
+index 0000000..5389841
+--- /dev/null
++++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+@@ -0,0 +1,488 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Daniel Hsiao <daniel.hsiao@mediatek.com>
++ *         PoChun Lin <pochun.lin@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++
++#include "../mtk_vcodec_drv.h"
++#include "../mtk_vcodec_util.h"
++#include "../mtk_vcodec_intr.h"
++#include "../mtk_vcodec_enc.h"
++#include "../mtk_vcodec_enc_pm.h"
++#include "../venc_drv_base.h"
++#include "../venc_ipi_msg.h"
++#include "../venc_vpu_if.h"
++#include "mtk_vpu.h"
++
++#define VENC_BITSTREAM_FRAME_SIZE 0x0098
++#define VENC_BITSTREAM_HEADER_LEN 0x00e8
++
++/* This ac_tag is vp8 frame tag. */
++#define MAX_AC_TAG_SIZE 10
++
++/**
++ * enum venc_vp8_vpu_work_buf - vp8 encoder buffer index
++ */
++enum venc_vp8_vpu_work_buf {
++	VENC_VP8_VPU_WORK_BUF_LUMA,
++	VENC_VP8_VPU_WORK_BUF_LUMA2,
++	VENC_VP8_VPU_WORK_BUF_LUMA3,
++	VENC_VP8_VPU_WORK_BUF_CHROMA,
++	VENC_VP8_VPU_WORK_BUF_CHROMA2,
++	VENC_VP8_VPU_WORK_BUF_CHROMA3,
++	VENC_VP8_VPU_WORK_BUF_MV_INFO,
++	VENC_VP8_VPU_WORK_BUF_BS_HEADER,
++	VENC_VP8_VPU_WORK_BUF_PROB_BUF,
++	VENC_VP8_VPU_WORK_BUF_RC_INFO,
++	VENC_VP8_VPU_WORK_BUF_RC_CODE,
++	VENC_VP8_VPU_WORK_BUF_RC_CODE2,
++	VENC_VP8_VPU_WORK_BUF_RC_CODE3,
++	VENC_VP8_VPU_WORK_BUF_MAX,
++};
++
++/*
++ * struct venc_vp8_vpu_config - Structure for vp8 encoder configuration
++ * @input_fourcc: input fourcc
++ * @bitrate: target bitrate (in bps)
++ * @pic_w: picture width. Picture size is visible stream resolution, in pixels,
++ *         to be used for display purposes; must be smaller or equal to buffer
++ *         size.
++ * @pic_h: picture height
++ * @buf_w: buffer width (with 16 alignment). Buffer size is stream resolution
++ *         in pixels aligned to hardware requirements.
++ * @buf_h: buffer height (with 16 alignment)
++ * @gop_size: group of picture size (key frame)
++ * @framerate: frame rate in fps
++ * @ts_mode: temporal scalability mode (0: disable, 1: enable)
++ *	     support three temporal layers - 0: 7.5fps 1: 7.5fps 2: 15fps.
++ */
++struct venc_vp8_vpu_config {
++	u32 input_fourcc;
++	u32 bitrate;
++	u32 pic_w;
++	u32 pic_h;
++	u32 buf_w;
++	u32 buf_h;
++	u32 gop_size;
++	u32 framerate;
++	u32 ts_mode;
++};
++
++/*
++ * struct venc_vp8_vpu_buf -Structure for buffer information
++ * @align: buffer alignment (in bytes)
++ * @iova: IO virtual address
++ * @vpua: VPU side memory addr which is used by RC_CODE
++ * @size: buffer size (in bytes)
++ */
++struct venc_vp8_vpu_buf {
++	u32 align;
++	u32 iova;
++	u32 vpua;
++	u32 size;
++};
++
++/*
++ * struct venc_vp8_vsi - Structure for VPU driver control and info share
++ * This structure is allocated in VPU side and shared to AP side.
++ * @config: vp8 encoder configuration
++ * @work_bufs: working buffer information in VPU side
++ * The work_bufs here is for storing the 'size' info shared to AP side.
++ * The similar item in struct venc_vp8_inst is for memory allocation
++ * in AP side. The AP driver will copy the 'size' from here to the one in
++ * struct mtk_vcodec_mem, then invoke mtk_vcodec_mem_alloc to allocate
++ * the buffer. After that, bypass the 'dma_addr' to the 'iova' field here for
++ * register setting in VPU side.
++ * @sizeimage: image size for each plane
++ */
++struct venc_vp8_vsi {
++	struct venc_vp8_vpu_config config;
++	struct venc_vp8_vpu_buf work_bufs[VENC_VP8_VPU_WORK_BUF_MAX];
++	unsigned int sizeimage[MTK_VCODEC_MAX_PLANES];
++};
++
++/*
++ * struct venc_vp8_inst - vp8 encoder AP driver instance
++ * @hw_base: vp8 encoder hardware register base
++ * @work_bufs: working buffer
++ * @work_buf_allocated: working buffer allocated flag
++ * @frm_cnt: encoded frame count, it's used for I-frame judgement and
++ *	     reset when force intra cmd received.
++ * @ts_mode: temporal scalability mode (0: disable, 1: enable)
++ *	     support three temporal layers - 0: 7.5fps 1: 7.5fps 2: 15fps.
++ * @vpu_inst: VPU instance to exchange information between AP and VPU
++ * @vsi: driver structure allocated by VPU side and shared to AP side for
++ *	 control and info share
++ * @ctx: context for v4l2 layer integration
++ */
++struct venc_vp8_inst {
++	void __iomem *hw_base;
++	struct mtk_vcodec_mem work_bufs[VENC_VP8_VPU_WORK_BUF_MAX];
++	bool work_buf_allocated;
++	unsigned int frm_cnt;
++	unsigned int ts_mode;
++	struct venc_vpu_inst vpu_inst;
++	struct venc_vp8_vsi *vsi;
++	struct mtk_vcodec_ctx *ctx;
++};
++
++static inline void vp8_enc_write_reg(struct venc_vp8_inst *inst, u32 addr,
++				     u32 val)
++{
++	writel(val, inst->hw_base + addr);
++}
++
++static inline u32 vp8_enc_read_reg(struct venc_vp8_inst *inst, u32 addr)
++{
++	return readl(inst->hw_base + addr);
++}
++
++static void vp8_enc_free_work_buf(struct venc_vp8_inst *inst)
++{
++	int i;
++
++	mtk_vcodec_debug_enter(inst);
++
++	/* Buffers need to be freed by AP. */
++	for (i = 0; i < VENC_VP8_VPU_WORK_BUF_MAX; i++) {
++		if ((inst->work_bufs[i].size == 0))
++			continue;
++		mtk_vcodec_mem_free(inst->ctx, &inst->work_bufs[i]);
++	}
++
++	mtk_vcodec_debug_leave(inst);
++}
++
++static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
++{
++	int i;
++	int ret = 0;
++	struct venc_vp8_vpu_buf *wb = inst->vsi->work_bufs;
++
++	mtk_vcodec_debug_enter(inst);
++
++	for (i = 0; i < VENC_VP8_VPU_WORK_BUF_MAX; i++) {
++		if ((wb[i].size == 0))
++			continue;
++		/*
++		 * This 'wb' structure is set by VPU side and shared to AP for
++		 * buffer allocation and IO virtual addr mapping. For most of
++		 * the buffers, AP will allocate the buffer according to 'size'
++		 * field and store the IO virtual addr in 'iova' field. For the
++		 * RC_CODEx buffers, they are pre-allocated in the VPU side
++		 * because they are inside VPU SRAM, and save the VPU addr in
++		 * the 'vpua' field. The AP will translate the VPU addr to the
++		 * corresponding IO virtual addr and store in 'iova' field.
++		 */
++		inst->work_bufs[i].size = wb[i].size;
++		ret = mtk_vcodec_mem_alloc(inst->ctx, &inst->work_bufs[i]);
++		if (ret) {
++			mtk_vcodec_err(inst,
++				       "cannot alloc work_bufs[%d]", i);
++			goto err_alloc;
++		}
++		/*
++		 * This RC_CODEx is pre-allocated by VPU and saved in VPU addr.
++		 * So we need use memcpy to copy RC_CODEx from VPU addr into IO
++		 * virtual addr in 'iova' field for reg setting in VPU side.
++		 */
++		if (i == VENC_VP8_VPU_WORK_BUF_RC_CODE ||
++		    i == VENC_VP8_VPU_WORK_BUF_RC_CODE2 ||
++		    i == VENC_VP8_VPU_WORK_BUF_RC_CODE3) {
++			void *tmp_va;
++
++			tmp_va = vpu_mapping_dm_addr(inst->vpu_inst.dev,
++						     wb[i].vpua);
++			memcpy(inst->work_bufs[i].va, tmp_va, wb[i].size);
++		}
++		wb[i].iova = inst->work_bufs[i].dma_addr;
++
++		mtk_vcodec_debug(inst,
++				 "work_bufs[%d] va=0x%p,iova=0x%p,size=0x%lx",
++				 i, inst->work_bufs[i].va,
++				 (void *)inst->work_bufs[i].dma_addr,
++				 inst->work_bufs[i].size);
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
++
++err_alloc:
++	vp8_enc_free_work_buf(inst);
++
++	return ret;
++}
++
++static unsigned int vp8_enc_wait_venc_done(struct venc_vp8_inst *inst)
++{
++	unsigned int irq_status = 0;
++	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)inst->ctx;
++
++	if (!mtk_vcodec_wait_for_done_ctx(ctx, MTK_INST_IRQ_RECEIVED,
++					  WAIT_INTR_TIMEOUT_MS)) {
++		irq_status = ctx->irq_status;
++		mtk_vcodec_debug(inst, "isr return %x", irq_status);
++	}
++	return irq_status;
++}
++
++/*
++ * Compose ac_tag, bitstream header and bitstream payload into
++ * one bitstream buffer.
++ */
++static int vp8_enc_compose_one_frame(struct venc_vp8_inst *inst,
++				     struct mtk_vcodec_mem *bs_buf,
++				     unsigned int *bs_size)
++{
++	unsigned int not_key;
++	u32 bs_frm_size;
++	u32 bs_hdr_len;
++	unsigned int ac_tag_size;
++	u8 ac_tag[MAX_AC_TAG_SIZE];
++
++	bs_frm_size = vp8_enc_read_reg(inst, VENC_BITSTREAM_FRAME_SIZE);
++	bs_hdr_len = vp8_enc_read_reg(inst, VENC_BITSTREAM_HEADER_LEN);
++
++	/* if a frame is key frame, not_key is 0 */
++	not_key = !inst->vpu_inst.is_key_frm;
++	*(u32 *)ac_tag = __cpu_to_le32((bs_hdr_len << 5) | 0x10 | not_key);
++	/* key frame */
++	if (not_key == 0) {
++		ac_tag_size = MAX_AC_TAG_SIZE;
++		ac_tag[3] = 0x9d;
++		ac_tag[4] = 0x01;
++		ac_tag[5] = 0x2a;
++		ac_tag[6] = inst->vsi->config.pic_w;
++		ac_tag[7] = inst->vsi->config.pic_w >> 8;
++		ac_tag[8] = inst->vsi->config.pic_h;
++		ac_tag[9] = inst->vsi->config.pic_h >> 8;
++	} else {
++		ac_tag_size = 3;
++	}
++
++	if (bs_buf->size < bs_hdr_len + bs_frm_size + ac_tag_size) {
++		mtk_vcodec_err(inst, "bitstream buf size is too small(%ld)",
++			       bs_buf->size);
++		return -EINVAL;
++	}
++
++	/*
++	* (1) The vp8 bitstream header and body are generated by the HW vp8
++	* encoder separately at the same time. We cannot know the bitstream
++	* header length in advance.
++	* (2) From the vp8 spec, there is no stuffing byte allowed between the
++	* ac tag, bitstream header and bitstream body.
++	*/
++	memmove(bs_buf->va + bs_hdr_len + ac_tag_size,
++		bs_buf->va, bs_frm_size);
++	memcpy(bs_buf->va + ac_tag_size,
++	       inst->work_bufs[VENC_VP8_VPU_WORK_BUF_BS_HEADER].va,
++	       bs_hdr_len);
++	memcpy(bs_buf->va, ac_tag, ac_tag_size);
++	*bs_size = bs_frm_size + bs_hdr_len + ac_tag_size;
++
++	return 0;
++}
++
++static int vp8_enc_encode_frame(struct venc_vp8_inst *inst,
++				struct venc_frm_buf *frm_buf,
++				struct mtk_vcodec_mem *bs_buf,
++				unsigned int *bs_size)
++{
++	int ret = 0;
++	unsigned int irq_status;
++
++	mtk_vcodec_debug(inst, "->frm_cnt=%d", inst->frm_cnt);
++
++	ret = vpu_enc_encode(&inst->vpu_inst, 0, frm_buf, bs_buf, bs_size);
++	if (ret)
++		return ret;
++
++	irq_status = vp8_enc_wait_venc_done(inst);
++	if (irq_status != MTK_VENC_IRQ_STATUS_FRM) {
++		mtk_vcodec_err(inst, "irq_status=%d failed", irq_status);
++		return -EIO;
++	}
++
++	if (vp8_enc_compose_one_frame(inst, bs_buf, bs_size)) {
++		mtk_vcodec_err(inst, "vp8_enc_compose_one_frame failed");
++		return -EINVAL;
++	}
++
++	inst->frm_cnt++;
++	mtk_vcodec_debug(inst, "<-size=%d key_frm=%d", *bs_size,
++			 inst->vpu_inst.is_key_frm);
++
++	return ret;
++}
++
++static int vp8_enc_init(struct mtk_vcodec_ctx *ctx, unsigned long *handle)
++{
++	int ret = 0;
++	struct venc_vp8_inst *inst;
++
++	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
++	if (!inst)
++		return -ENOMEM;
++
++	inst->ctx = ctx;
++	inst->vpu_inst.ctx = ctx;
++	inst->vpu_inst.dev = ctx->dev->vpu_plat_dev;
++	inst->vpu_inst.id = IPI_VENC_VP8;
++	inst->hw_base = mtk_vcodec_get_reg_addr(inst->ctx, VENC_LT_SYS);
++
++	mtk_vcodec_debug_enter(inst);
++
++	ret = vpu_enc_init(&inst->vpu_inst);
++
++	inst->vsi = (struct venc_vp8_vsi *)inst->vpu_inst.vsi;
++
++	mtk_vcodec_debug_leave(inst);
++
++	if (ret)
++		kfree(inst);
++	else
++		(*handle) = (unsigned long)inst;
++
++	return ret;
++}
++
++static int vp8_enc_encode(unsigned long handle,
++			  enum venc_start_opt opt,
++			  struct venc_frm_buf *frm_buf,
++			  struct mtk_vcodec_mem *bs_buf,
++			  struct venc_done_result *result)
++{
++	int ret = 0;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)handle;
++	struct mtk_vcodec_ctx *ctx = inst->ctx;
++
++	mtk_vcodec_debug_enter(inst);
++
++	enable_irq(ctx->dev->enc_lt_irq);
++
++	switch (opt) {
++	case VENC_START_OPT_ENCODE_FRAME:
++		ret = vp8_enc_encode_frame(inst, frm_buf, bs_buf,
++					   &result->bs_size);
++		if (ret)
++			goto encode_err;
++		result->is_key_frm = inst->vpu_inst.is_key_frm;
++		break;
++
++	default:
++		mtk_vcodec_err(inst, "opt not support:%d", opt);
++		ret = -EINVAL;
++		break;
++	}
++
++encode_err:
++
++	disable_irq(ctx->dev->enc_lt_irq);
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
++}
++
++static int vp8_enc_set_param(unsigned long handle,
++			     enum venc_set_param_type type,
++			     struct venc_enc_param *enc_prm)
++{
++	int i;
++	int ret = 0;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)handle;
++
++	mtk_vcodec_debug(inst, "->type=%d", type);
++
++	switch (type) {
++	case VENC_SET_PARAM_ENC:
++		inst->vsi->config.input_fourcc = enc_prm->input_yuv_fmt;
++		inst->vsi->config.bitrate = enc_prm->bitrate;
++		inst->vsi->config.pic_w = enc_prm->width;
++		inst->vsi->config.pic_h = enc_prm->height;
++		inst->vsi->config.buf_w = enc_prm->buf_width;
++		inst->vsi->config.buf_h = enc_prm->buf_height;
++		inst->vsi->config.gop_size = enc_prm->gop_size;
++		inst->vsi->config.framerate = enc_prm->frm_rate;
++		inst->vsi->config.ts_mode = inst->ts_mode;
++		ret = vpu_enc_set_param(&inst->vpu_inst, type, enc_prm);
++		if (ret)
++			break;
++		if (inst->work_buf_allocated) {
++			vp8_enc_free_work_buf(inst);
++			inst->work_buf_allocated = false;
++		}
++		ret = vp8_enc_alloc_work_buf(inst);
++		if (ret)
++			break;
++		inst->work_buf_allocated = true;
++		for (i = 0; i < MTK_VCODEC_MAX_PLANES; i++) {
++			enc_prm->sizeimage[i] =
++				inst->vsi->sizeimage[i];
++			mtk_vcodec_debug(inst, "sizeimage[%d] size=0x%x", i,
++					 enc_prm->sizeimage[i]);
++		}
++		break;
++
++	/*
++	 * VENC_SET_PARAM_TS_MODE must be called before VENC_SET_PARAM_ENC
++	 */
++	case VENC_SET_PARAM_TS_MODE:
++		inst->ts_mode = 1;
++		mtk_vcodec_debug(inst, "set ts_mode");
++		break;
++
++	default:
++		ret = vpu_enc_set_param(&inst->vpu_inst, type, enc_prm);
++		break;
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
++}
++
++static int vp8_enc_deinit(unsigned long handle)
++{
++	int ret = 0;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)handle;
++
++	mtk_vcodec_debug_enter(inst);
++
++	ret = vpu_enc_deinit(&inst->vpu_inst);
++
++	if (inst->work_buf_allocated)
++		vp8_enc_free_work_buf(inst);
++
++	mtk_vcodec_debug_leave(inst);
++	kfree(inst);
++
++	return ret;
++}
++
++static struct venc_common_if venc_vp8_if = {
++	vp8_enc_init,
++	vp8_enc_encode,
++	vp8_enc_set_param,
++	vp8_enc_deinit,
++};
++
++struct venc_common_if *get_vp8_enc_comm_if(void)
++{
++	return &venc_vp8_if;
++}
+diff --git a/drivers/media/platform/mtk-vcodec/venc_drv_if.c b/drivers/media/platform/mtk-vcodec/venc_drv_if.c
+index e53b437..0ac6e49 100644
+--- a/drivers/media/platform/mtk-vcodec/venc_drv_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc_drv_if.c
+@@ -19,12 +19,15 @@
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ 
++#include "venc_drv_base.h"
+ #include "venc_drv_if.h"
++
+ #include "mtk_vcodec_enc.h"
+ #include "mtk_vcodec_enc_pm.h"
+ #include "mtk_vpu.h"
+ 
+-#include "venc_drv_base.h"
++
++struct venc_common_if *get_vp8_enc_comm_if(void);
+ 
+ int venc_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ {
+@@ -32,6 +35,8 @@ int venc_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ 
+ 	switch (fourcc) {
+ 	case V4L2_PIX_FMT_VP8:
++		ctx->enc_if = get_vp8_enc_comm_if();
++		break;
+ 	case V4L2_PIX_FMT_H264:
+ 	default:
+ 		return -EINVAL;
+diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+new file mode 100644
+index 0000000..02def5a
+--- /dev/null
++++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+@@ -0,0 +1,240 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: PoChun Lin <pochun.lin@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "mtk_vpu.h"
++#include "venc_ipi_msg.h"
++#include "venc_vpu_if.h"
++
++static void handle_enc_init_msg(struct venc_vpu_inst *vpu, void *data)
++{
++	struct venc_vpu_ipi_msg_init *msg = data;
++
++	vpu->inst_addr = msg->vpu_inst_addr;
++	vpu->vsi = vpu_mapping_dm_addr(vpu->dev, msg->vpu_inst_addr);
++}
++
++static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, void *data)
++{
++	struct venc_vpu_ipi_msg_enc *msg = data;
++
++	vpu->state = msg->state;
++	vpu->bs_size = msg->bs_size;
++	vpu->is_key_frm = msg->is_key_frm;
++}
++
++static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
++{
++	struct venc_vpu_ipi_msg_common *msg = data;
++	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
++
++	mtk_vcodec_debug(vpu, "msg_id %x inst %p status %d",
++			 msg->msg_id, vpu, msg->status);
++
++	switch (msg->msg_id) {
++	case VPU_IPIMSG_ENC_INIT_DONE:
++		handle_enc_init_msg(vpu, data);
++		break;
++	case VPU_IPIMSG_ENC_SET_PARAM_DONE:
++		break;
++	case VPU_IPIMSG_ENC_ENCODE_DONE:
++		handle_enc_encode_msg(vpu, data);
++		break;
++	case VPU_IPIMSG_ENC_DEINIT_DONE:
++		break;
++	default:
++		mtk_vcodec_err(vpu, "unknown msg id %x", msg->msg_id);
++		break;
++	}
++
++	vpu->signaled = 1;
++	vpu->failure = (msg->status != VENC_IPI_MSG_STATUS_OK);
++
++	mtk_vcodec_debug_leave(vpu);
++}
++
++static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
++			    int len)
++{
++	int status;
++
++	mtk_vcodec_debug_enter(vpu);
++
++	if (!vpu->dev) {
++		mtk_vcodec_err(vpu, "inst dev is NULL");
++		return -EINVAL;
++	}
++
++	status = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
++	if (status) {
++		uint32_t msg_id = *(uint32_t *)msg;
++
++		mtk_vcodec_err(vpu, "vpu_ipi_send msg_id %x len %d fail %d",
++			       msg_id, len, status);
++		return -EINVAL;
++	}
++	if (vpu->failure)
++		return -EINVAL;
++
++	mtk_vcodec_debug_leave(vpu);
++
++	return 0;
++}
++
++int vpu_enc_init(struct venc_vpu_inst *vpu)
++{
++	int status;
++	struct venc_ap_ipi_msg_init out;
++
++	mtk_vcodec_debug_enter(vpu);
++
++	init_waitqueue_head(&vpu->wq_hd);
++	vpu->signaled = 0;
++	vpu->failure = 0;
++
++	status = vpu_ipi_register(vpu->dev, vpu->id, vpu_enc_ipi_handler,
++				  NULL, NULL);
++	if (status) {
++		mtk_vcodec_err(vpu, "vpu_ipi_register fail %d", status);
++		return -EINVAL;
++	}
++
++	memset(&out, 0, sizeof(out));
++	out.msg_id = AP_IPIMSG_ENC_INIT;
++	out.venc_inst = (unsigned long)vpu;
++	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
++		mtk_vcodec_err(vpu, "AP_IPIMSG_ENC_INIT fail");
++		return -EINVAL;
++	}
++
++	mtk_vcodec_debug_leave(vpu);
++
++	return 0;
++}
++
++int vpu_enc_set_param(struct venc_vpu_inst *vpu,
++		      enum venc_set_param_type id,
++		      struct venc_enc_param *enc_param)
++{
++	struct venc_ap_ipi_msg_set_param out;
++
++	mtk_vcodec_debug(vpu, "id %d ->", id);
++
++	memset(&out, 0, sizeof(out));
++	out.msg_id = AP_IPIMSG_ENC_SET_PARAM;
++	out.vpu_inst_addr = vpu->inst_addr;
++	out.param_id = id;
++	switch (id) {
++	case VENC_SET_PARAM_ENC:
++		out.data_item = 0;
++		break;
++	case VENC_SET_PARAM_FORCE_INTRA:
++		out.data_item = 0;
++		break;
++	case VENC_SET_PARAM_ADJUST_BITRATE:
++		out.data_item = 1;
++		out.data[0] = enc_param->bitrate;
++		break;
++	case VENC_SET_PARAM_ADJUST_FRAMERATE:
++		out.data_item = 1;
++		out.data[0] = enc_param->frm_rate;
++		break;
++	case VENC_SET_PARAM_GOP_SIZE:
++		out.data_item = 1;
++		out.data[0] = enc_param->gop_size;
++		break;
++	case VENC_SET_PARAM_INTRA_PERIOD:
++		out.data_item = 1;
++		out.data[0] = enc_param->intra_period;
++		break;
++	case VENC_SET_PARAM_SKIP_FRAME:
++		out.data_item = 0;
++		break;
++	default:
++		mtk_vcodec_err(vpu, "id %d not supported", id);
++		return -EINVAL;
++	}
++	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
++		mtk_vcodec_err(vpu,
++			       "AP_IPIMSG_ENC_SET_PARAM %d fail", id);
++		return -EINVAL;
++	}
++
++	mtk_vcodec_debug(vpu, "id %d <-", id);
++
++	return 0;
++}
++
++int vpu_enc_encode(struct venc_vpu_inst *vpu, unsigned int bs_mode,
++		   struct venc_frm_buf *frm_buf,
++		   struct mtk_vcodec_mem *bs_buf,
++		   unsigned int *bs_size)
++{
++	struct venc_ap_ipi_msg_enc out;
++
++	mtk_vcodec_debug(vpu, "bs_mode %d ->", bs_mode);
++
++	memset(&out, 0, sizeof(out));
++	out.msg_id = AP_IPIMSG_ENC_ENCODE;
++	out.vpu_inst_addr = vpu->inst_addr;
++	out.bs_mode = bs_mode;
++	if (frm_buf) {
++		if ((frm_buf->fb_addr[0].dma_addr % 16 == 0) &&
++		    (frm_buf->fb_addr[1].dma_addr % 16 == 0) &&
++		    (frm_buf->fb_addr[2].dma_addr % 16 == 0)) {
++			out.input_addr[0] = frm_buf->fb_addr[0].dma_addr;
++			out.input_addr[1] = frm_buf->fb_addr[1].dma_addr;
++			out.input_addr[2] = frm_buf->fb_addr[2].dma_addr;
++		} else {
++			mtk_vcodec_err(vpu, "dma_addr not align to 16");
++			return -EINVAL;
++		}
++	}
++	if (bs_buf) {
++		out.bs_addr = bs_buf->dma_addr;
++		out.bs_size = bs_buf->size;
++	}
++	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
++		mtk_vcodec_err(vpu, "AP_IPIMSG_ENC_ENCODE %d fail",
++			       bs_mode);
++		return -EINVAL;
++	}
++
++	mtk_vcodec_debug(vpu, "state %d size %d key_frm %d",
++			 vpu->state, vpu->bs_size,
++			 vpu->is_key_frm);
++
++	mtk_vcodec_debug(vpu, "bs_mode %d <-", bs_mode);
++
++	return 0;
++}
++
++int vpu_enc_deinit(struct venc_vpu_inst *vpu)
++{
++	struct venc_ap_ipi_msg_deinit out;
++
++	mtk_vcodec_debug_enter(vpu);
++
++	memset(&out, 0, sizeof(out));
++	out.msg_id = AP_IPIMSG_ENC_DEINIT;
++	out.vpu_inst_addr = vpu->inst_addr;
++	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
++		mtk_vcodec_err(vpu, "AP_IPIMSG_ENC_DEINIT fail");
++		return -EINVAL;
++	}
++
++	mtk_vcodec_debug_leave(vpu);
++
++	return 0;
++}
+diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.h b/drivers/media/platform/mtk-vcodec/venc_vpu_if.h
+new file mode 100644
+index 0000000..215d1e0
+--- /dev/null
++++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: PoChun Lin <pochun.lin@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _VENC_VPU_IF_H_
++#define _VENC_VPU_IF_H_
++
++#include "mtk_vpu.h"
++#include "venc_drv_if.h"
++
++/*
++ * struct venc_vpu_inst - encoder VPU driver instance
++ * @wq_hd: wait queue used for vpu cmd trigger then wait vpu interrupt done
++ * @signaled: flag used for checking vpu interrupt done
++ * @failure: flag to show vpu cmd succeeds or not
++ * @state: enum venc_ipi_msg_enc_state
++ * @bs_size: bitstream size for skip frame case usage
++ * @is_key_frm: key frame flag
++ * @inst_addr: VPU instance addr
++ * @vsi: driver structure allocated by VPU side and shared to AP side for
++ *	 control and info share
++ * @id: the id of inter-processor interrupt
++ * @ctx: context for v4l2 layer integration
++ * @dev: device for v4l2 layer integration
++ */
++struct venc_vpu_inst {
++	wait_queue_head_t wq_hd;
++	int signaled;
++	int failure;
++	int state;
++	int bs_size;
++	int is_key_frm;
++	unsigned int inst_addr;
++	void *vsi;
++	enum ipi_id id;
++	struct mtk_vcodec_ctx *ctx;
++	struct platform_device *dev;
++};
++
++int vpu_enc_init(struct venc_vpu_inst *vpu);
++int vpu_enc_set_param(struct venc_vpu_inst *vpu,
++		      enum venc_set_param_type id,
++		      struct venc_enc_param *param);
++int vpu_enc_encode(struct venc_vpu_inst *vpu, unsigned int bs_mode,
++		   struct venc_frm_buf *frm_buf,
++		   struct mtk_vcodec_mem *bs_buf,
++		   unsigned int *bs_size);
++int vpu_enc_deinit(struct venc_vpu_inst *vpu);
++
++#endif
 -- 
 1.7.9.5
