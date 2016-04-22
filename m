@@ -1,34 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Apr 2016 10:00:52 +0100
-Subject: [PATCH v5] irqchip, gicv3-its, numa: Enable workaround for
- Cavium thunderx erratum 23144
-In-Reply-To: <5719DA41.60304@arm.com>
-References: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
- <20160421174042.GD24726@rric.localdomain> <5719DA41.60304@arm.com>
-Message-ID: <20160422090052.GA4236@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 22 Apr 2016 11:02:49 +0200
+Subject: [PATCH v7 1/9] clk: mediatek: Refine the makefile to support
+ multiple clock drivers
+In-Reply-To: <1460621514-65191-2-git-send-email-jamesjj.liao@mediatek.com>
+References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1460621514-65191-2-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <5719E8B9.4030908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 09:01:05AM +0100, Marc Zyngier wrote:
-> On 21/04/16 18:40, Robert Richter wrote:
-> > On 15.04.16 21:30:05, Robert Richter wrote:
-> >> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> >>
-> >> The erratum fixes the hang of ITS SYNC command by avoiding inter node
-> >> io and collections/cpu mapping on thunderx dual-socket platform.
-> >>
-> >> This fix is only applicable for Cavium's ThunderX dual-socket platform.
-> >>
-> >> This is based on NUMA v16 series.
-> >> Message-Id: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
-> > 
-> > Will, Catalin,
-> > 
-> > after NUMA base patches went into linux-next (many thanks), please
-> > consider this pass 1.x errata workaround for inclusion too.
-> 
-> I'll queue it as a fix once the NUMA patches are merged into mainline.
 
-Yeah, this can probably go in as -rc1 material if you're happy with it.
 
-Will
+On 14/04/16 10:11, James Liao wrote:
+> Add a Kconfig to define clock configuration for each SoC, and
+> modify the Makefile to build drivers that only selected in config.
+>
+> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> Tested-by: John Crispin <blogic@openwrt.org>
+> ---
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+>   drivers/clk/Kconfig           |  1 +
+>   drivers/clk/mediatek/Kconfig  | 23 +++++++++++++++++++++++
+>   drivers/clk/mediatek/Makefile |  6 +++---
+>   3 files changed, 27 insertions(+), 3 deletions(-)
+>   create mode 100644 drivers/clk/mediatek/Kconfig
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 16f7d33..d94302e 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -199,6 +199,7 @@ config COMMON_CLK_PXA
+>
+>   source "drivers/clk/bcm/Kconfig"
+>   source "drivers/clk/hisilicon/Kconfig"
+> +source "drivers/clk/mediatek/Kconfig"
+>   source "drivers/clk/mvebu/Kconfig"
+>   source "drivers/clk/qcom/Kconfig"
+>   source "drivers/clk/samsung/Kconfig"
+> diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
+> new file mode 100644
+> index 0000000..dc224e6
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/Kconfig
+> @@ -0,0 +1,23 @@
+> +#
+> +# MediaTek SoC drivers
+> +#
+> +config COMMON_CLK_MEDIATEK
+> +	bool
+> +	---help---
+> +	  Mediatek SoCs' clock support.
+> +
+> +config COMMON_CLK_MT8135
+> +	bool "Clock driver for Mediatek MT8135"
+> +	depends on COMMON_CLK
+> +	select COMMON_CLK_MEDIATEK
+> +	default ARCH_MEDIATEK
+> +	---help---
+> +	  This driver supports Mediatek MT8135 clocks.
+> +
+> +config COMMON_CLK_MT8173
+> +	bool "Clock driver for Mediatek MT8173"
+> +	depends on COMMON_CLK
+> +	select COMMON_CLK_MEDIATEK
+> +	default ARCH_MEDIATEK
+> +	---help---
+> +	  This driver supports Mediatek MT8173 clocks.
+> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+> index 95fdfac..32e7222 100644
+> --- a/drivers/clk/mediatek/Makefile
+> +++ b/drivers/clk/mediatek/Makefile
+> @@ -1,4 +1,4 @@
+> -obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
+> +obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
+>   obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+> -obj-y += clk-mt8135.o
+> -obj-y += clk-mt8173.o
+> +obj-$(CONFIG_COMMON_CLK_MT8135) += clk-mt8135.o
+> +obj-$(CONFIG_COMMON_CLK_MT8173) += clk-mt8173.o
+>
