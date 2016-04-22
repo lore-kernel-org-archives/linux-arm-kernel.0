@@ -1,91 +1,51 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Fri, 22 Apr 2016 14:39:48 +0800
-Subject: [PATCH v2 5/9] mtd: spi-nor: fsl-quadspi:Support qspi for ls2080a
+Date: Fri, 22 Apr 2016 14:39:52 +0800
+Subject: [PATCH v2 9/9] mtd: fsl-quadspi: add multi flash chip R/W on ls2080a
 In-Reply-To: <1461307192-866-1-git-send-email-B56489@freescale.com>
 References: <1461307192-866-1-git-send-email-B56489@freescale.com>
-Message-ID: <1461307192-866-5-git-send-email-B56489@freescale.com>
+Message-ID: <1461307192-866-9-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a hardware feature that qspi_amba_base is added
-internally by SOC design on ls2080a. So as to software, the driver
-need support to the feature.
+From: Yunhui Cui <yunhui.cui@nxp.com>
 
-Signed-off-by: Yunhui Cui <B56489@freescale.com>
+There is a hardware feature that qspi_amba_base is added
+internally by SOC design on ls2080a. so memmap_phy need not
+be added in driver. If memmap_phy is added, the flash A1
+addr space is [0, memmap_phy] which far more than flash size.
+The AMBA memory will be divided into four parts and assign to
+every chipselect. Every channel will has two valid chipselects.
+
 Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ drivers/mtd/spi-nor/fsl-quadspi.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 16ebabbd..5d9d192 100644
+index 6a022e7..b415663 100644
 --- a/drivers/mtd/spi-nor/fsl-quadspi.c
 +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -41,6 +41,8 @@
- #define QUADSPI_QUIRK_TKT253890		(1 << 2)
- /* Controller cannot wake up from wait mode, TKT245618 */
- #define QUADSPI_QUIRK_TKT245618         (1 << 3)
-+/* QSPI_AMBA_BASE is internally added by SOC design */
-+#define QUADSPI_AMBA_BASE_INTERNAL	(0x10000)
+@@ -736,11 +736,17 @@ static void fsl_qspi_set_map_addr(struct fsl_qspi *q)
+ {
+ 	int nor_size = q->nor_size;
+ 	void __iomem *base = q->iobase;
++	u32 mem_base;
  
- /* The registers */
- #define QUADSPI_MCR			0x00
-@@ -217,6 +219,7 @@ enum fsl_qspi_devtype {
- 	FSL_QUADSPI_IMX7D,
- 	FSL_QUADSPI_IMX6UL,
- 	FSL_QUADSPI_LS1021A,
-+	FSL_QUADSPI_LS2080A,
- };
- 
- struct fsl_qspi_devtype_data {
-@@ -270,6 +273,14 @@ static struct fsl_qspi_devtype_data ls1021a_data = {
- 	.driver_data = 0,
- };
- 
-+static struct fsl_qspi_devtype_data ls2080a_data = {
-+	.devtype = FSL_QUADSPI_LS2080A,
-+	.rxfifo = 128,
-+	.txfifo = 64,
-+	.ahb_buf_size = 1024,
-+	.driver_data = QUADSPI_AMBA_BASE_INTERNAL,
-+};
+-	qspi_writel(q, nor_size + q->memmap_phy, base + QUADSPI_SFA1AD);
+-	qspi_writel(q, nor_size * 2 + q->memmap_phy, base + QUADSPI_SFA2AD);
+-	qspi_writel(q, nor_size * 3 + q->memmap_phy, base + QUADSPI_SFB1AD);
+-	qspi_writel(q, nor_size * 4 + q->memmap_phy, base + QUADSPI_SFB2AD);
++	if (has_added_amba_base_internal(q))
++		mem_base = 0x0;
++	else
++		mem_base = q->memmap_phy;
 +
- #define FSL_QSPI_MAX_CHIP	4
- struct fsl_qspi {
- 	struct spi_nor nor[FSL_QSPI_MAX_CHIP];
-@@ -312,6 +323,11 @@ static inline int needs_wakeup_wait_mode(struct fsl_qspi *q)
- 	return q->devtype_data->driver_data & QUADSPI_QUIRK_TKT245618;
++	qspi_writel(q, nor_size + mem_base, base + QUADSPI_SFA1AD);
++	qspi_writel(q, nor_size * 2 + mem_base, base + QUADSPI_SFA2AD);
++	qspi_writel(q, nor_size * 3 + mem_base, base + QUADSPI_SFB1AD);
++	qspi_writel(q, nor_size * 4 + mem_base, base + QUADSPI_SFB2AD);
  }
  
-+static inline int has_added_amba_base_internal(struct fsl_qspi *q)
-+{
-+	return q->devtype_data->driver_data & QUADSPI_AMBA_BASE_INTERNAL;
-+}
-+
  /*
-  * R/W functions for big- or little-endian registers:
-  * The qSPI controller's endian is independent of the CPU core's endian.
-@@ -558,8 +574,11 @@ fsl_qspi_runcmd(struct fsl_qspi *q, u8 cmd, unsigned int addr, int len)
- 	/* save the reg */
- 	reg = qspi_readl(q, base + QUADSPI_MCR);
- 
--	qspi_writel(q, q->memmap_phy + q->chip_base_addr + addr,
--			base + QUADSPI_SFAR);
-+	if (has_added_amba_base_internal(q))
-+		qspi_writel(q, q->chip_base_addr + addr, base + QUADSPI_SFAR);
-+	else
-+		qspi_writel(q, q->memmap_phy + q->chip_base_addr + addr,
-+			    base + QUADSPI_SFAR);
- 	qspi_writel(q, QUADSPI_RBCT_WMRK_MASK | QUADSPI_RBCT_RXBRD_USEIPS,
- 			base + QUADSPI_RBCT);
- 	qspi_writel(q, reg | QUADSPI_MCR_CLR_RXF_MASK, base + QUADSPI_MCR);
-@@ -849,6 +868,7 @@ static const struct of_device_id fsl_qspi_dt_ids[] = {
- 	{ .compatible = "fsl,imx7d-qspi", .data = (void *)&imx7d_data, },
- 	{ .compatible = "fsl,imx6ul-qspi", .data = (void *)&imx6ul_data, },
- 	{ .compatible = "fsl,ls1021a-qspi", .data = (void *)&ls1021a_data, },
-+	{ .compatible = "fsl,ls2080a-qspi", .data = (void *)&ls2080a_data, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, fsl_qspi_dt_ids);
 -- 
 2.1.0.27.g96db324
