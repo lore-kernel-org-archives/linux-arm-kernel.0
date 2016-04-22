@@ -1,109 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 22 Apr 2016 11:12:55 -0500
-Subject: [PATCH v6 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
- device tree binding documentation
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A579D5E@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1460710374-25077-1-git-send-email-appanad@xilinx.com>
- <20160421134226.GA10399@rob-hp-laptop>
- <C246CAC1457055469EF09E3A7AC4E11A4A579D5E@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <CAL_JsqJMqze+ZRcRVJJUq_Ocs=YVKm2kcJ4g8is0shf5GjTZ5A@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 22 Apr 2016 11:22:25 -0500
+Subject: [PATCH v2.1 1/9] dt-binding: remoteproc: Introduce Qualcomm WCNSS
+ loader binding
+In-Reply-To: <1461259256-28529-1-git-send-email-bjorn.andersson@linaro.org>
+References: <1459222625-11440-2-git-send-email-bjorn.andersson@linaro.org>
+ <1461259256-28529-1-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <CAL_JsqLgehfMVXgDQdHaC6SJ7MU3oRKFn4ogLbtgp_31keX95g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 12:36 AM, Appana Durga Kedareswara Rao
-<appana.durga.rao@xilinx.com> wrote:
-> Hi Rob,
+On Thu, Apr 21, 2016 at 12:20 PM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 >
->         Thanks for the review...
+> The document defines the binding for a component that loads firmware for
+> and boots the Qualcomm WCNSS core.
 >
->> -----Original Message-----
->> From: Rob Herring [mailto:robh at kernel.org]
->> Sent: Thursday, April 21, 2016 7:12 PM
->> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>
->> Cc: pawel.moll at arm.com; mark.rutland at arm.com;
->> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
->> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
->> vinod.koul at intel.com; dan.j.williams at intel.com; Appana Durga Kedareswara
->> Rao <appanad@xilinx.com>; moritz.fischer at ettus.com;
->> laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Anirudha
->> Sarangi <anirudh@xilinx.com>; Punnaiah Choudary Kalluri
->> <punnaia@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->> dmaengine at vger.kernel.org
->> Subject: Re: [PATCH v6 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
->> device tree binding documentation
->>
->> On Fri, Apr 15, 2016 at 02:22:53PM +0530, Kedareswara rao Appana wrote:
->> > Device-tree binding documentation for Xilinx zynqmp dma engine used in
->> > Zynq UltraScale+ MPSoC.
->> >
->> > Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
->> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
->> > ---
->> > Changes in v6:
->> > - Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
->> >   from the binding doc as it allow broken combinations when dma-coherent
->> >   is set as suggested by Rob.
->> > - Fixed minor comments given by Rob related coding(lower case DT node
->> name).
->> > Changes in v5:
->> > - Use dma-coherent flag for coherent transfers as suggested by rob.
->> > - Removed unnecessary properties from binding doc as suggested by Rob.
->> > Changes in v4:
->> > - None
->> > Changes in v3:
->> > - None
->> > Changes in v2:
->> > - None.
->> >
->> >  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  | 44
->> ++++++++++++++++++++++
->> >  1 file changed, 44 insertions(+)
->> >  create mode 100644
->> Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
->> b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
->> > new file mode 100644
->> > index 0000000..f0f0b54
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
->> > @@ -0,0 +1,44 @@
->> > +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
->> > +memory to device and device to memory transfers. It also has flow
->> > +control and rate control support for slave/peripheral dma access.
->> > +
->> > +Required properties:
->> > +- compatible               : Should be "xlnx,zynqmp-dma-1.0"
->> > +- reg                      : Memory map for gdma/adma module access.
->> > +- interrupt-parent : Interrupt controller the interrupt is routed through
->> > +- interrupts               : Should contain DMA channel interrupt.
->> > +- xlnx,bus-width   : Axi buswidth in bits. Should contain 128 or 64
->>
->> I think how this is getting used by the driver is wrong.
->> {src,dst}_addr_widths are supposed to be a bitmask of supported slave
->> device register widths. You aren't doing a bitmask and you are also
->> saying you only support slaves with 8 or 16 byte data registers which is
->> somewhat rare. It may happen to work because 128/8 == BIT(4). However,
->> the documentation for the field is contradictory in that it says 1,2,4
->> or 8 byte widths are supported, but the enum has more sizes.
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
+>
+> Rob,
+>
+> I got your Ack on v2, but I would like to make a small amendment before merging
+> this.
 >
 >
-> The DMA supports an AXI bus width of 128/64 bits only.
-> Please refer IP data sheet. http://www.xilinx.com/support/documentation/user_guides/ug1085-zynq-ultrascale-trm.pdf Page No: 359(DMA Over fetch section).
+> As we discussed related to the WiFi binding I should reference the mmio
+> registers by a phandle to a DT node specifying the two necessary register
+> blocks (ccu & dxe).
+>
+> These two register blocks are part of the riva/pronto (the two major versions)
+> subsystem, that also contains the "pmu" register block, which is what I access
+> here.
+>
+> Further more, the ccu block contains valuable information for debugging
+> purposes that the implementation of this binding would find useful.
+>
+>
+> I would therefor like to double this node (in the dts) as both the
+> riva/pronto-pil and the target for the mmio phandle reference from the WiFi
+> node.
+>
+> This works fine, but unless using reg-names for defining the order or the regs
+> I get a messy ordering dependency between the two bindings. I do not know which
+> of the other 7-8 register blocks we will add for debugging, but with the below
+> change I can keep them in block order regardless of the order we implement them
+> in.
 
-I understand that. That should not really matter if the AXI master
-properly sets byte lane strobes other than defining max burst length
-which you already have defined elsewhere.
+You should know based on the compatible string what the number and
+order of register ranges are. reg is not something we want evolving
+over time.
 
-> That's why during probe we are making the dma_device supported source and destination address widths accordingly based on the DT property.
->
-> Snap shot of driver code from the probe:
->        struct dma_device *p;
->        p->dst_addr_widths = zdev->chan->bus_width / 8;
->        p->src_addr_widths = zdev->chan->bus_width / 8;
+> So, can I update the "reg" and add "reg-names" as below to the binding and
+> depend on reg-names for the ordering of reg? Or should I speculatively add all
+> ranges I know of to keep the order sane?
 
-Read what I wrote before and read the documentation for these fields.
-They are bitmasks.
+I'm okay with using this for convenience of the client not having to
+care which compatible the block is, but the above should still be met.
+
+Also, you could add a cell which is the index to the register range you need.
 
 Rob
