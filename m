@@ -1,45 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 23 Apr 2016 00:42:58 +0200
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <1c2cc13d812e04f231ddd4313e3ba6a54fb4632c.1461228504.git.viresh.kumar@linaro.org>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <1c2cc13d812e04f231ddd4313e3ba6a54fb4632c.1461228504.git.viresh.kumar@linaro.org>
-Message-ID: <7576455.rVXD0283Nr@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 23 Apr 2016 00:49:58 +0200
+Subject: [PATCH 0/2] Embedding Position Independent Executables
+In-Reply-To: <20160404095757.GR19428@n2100.arm.linux.org.uk>
+References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160404095757.GR19428@n2100.arm.linux.org.uk>
+Message-ID: <20160422224958.GD17051@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 14:29:02 Viresh Kumar wrote:
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 79d0a5d9da8e..f24f46776fbb 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -685,8 +685,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->                         dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
->                                 __func__, ret);
->         }
-> -
-> -       platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
->         return 0;
->  }
->  
-> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> index 69b2a222c84e..5704a92c52dc 100644
-> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> @@ -33,6 +33,8 @@ static const struct of_device_id machines[] = {
->  
->         { .compatible = "marvell,berlin", },
->  
-> +       { .compatible = "marvell,armadaxp", },
-> +
->         { .compatible = "samsung,exynos3250", },
->         { .compatible = "samsung,exynos4210", },
->         { .compatible = "samsung,exynos4212", },
+Hi,
 
-I think to make it clear that the ordering is significant here, I would leave this
-platform_device_register_simple() in armada_xp_pmsu_cpufreq_init().
+On 04/04/2016 at 10:57:57 +0100, Russell King - ARM Linux wrote :
+> [Manually reformatted your email so I can reply to it sensibly - please
+> don't make me have to do this again, next time I'll ignore your message
+> as it's too much effort, thanks]
+> 
 
-However, it might be helpful to move that function into a new file in
-drivers/cpufreq/ if that works.
+Well, I fixed my editor configuration so it doesn't happen anymore.
 
-	Arnd
+> On Sun, Apr 03, 2016 at 09:23:52AM +0200, Alexandre Belloni wrote:
+> > I've chosen to be less generic than what Russ did and only handle ARM.
+> > I reused the API he defined but I actually went closer to his first
+> > implementation by compiling and embedding a real PIE that doesn't
+> > actually need relocations (gcc seems to be better at it thanks to ASLR).
+> > 
+> > In this series, I'm also converting the AT91 suspend code to use that
+> > infrastructure as it is quite simple but I also toyed with more complex
+> > functions.
+> > 
+> > The current limitation is that is doesn't actually tries to handle big
+> > endian and I didn't test thumb (and this will probably require more work
+> > to get that working reliably).
+> > 
+> > Also, to be more useful prppoer handling of a stack has to be added
+> > (this is not too difficult and is planned) and will be enough to get
+> > rk3288 suspend/resume and DDR timing changes working.
+> 
+> Provided there is no linking back to the kernel image (which is enforced
+> by the --no-undefined flag), this at first glance looks okay, but what
+> is the motivation behind this change?  Just because there's "many series
+> trying to do this" isn't really a justification or a reason why we should
+> include this in the mainline kernel.
+> 
+
+I think Heiko clarified it but there are actually multiple platforms
+that will benefit from this infrastructure. I can name at least at91,
+rockchip, sunxi and am335x. On am335x, this has been solved by running
+that code on the cortex M3 instead of doing that from Linux but it
+forces to compile and load a firmware on the cortex M3 so it is not
+available for anything else.
+
+For now, I must admit that the code I'm converting is simple enough and
+may stay assembly but the final goal is to have DDR reconfiguration done
+using that infrastructure, allowing to write the code in C which I
+believe many maintainers find more readable.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
