@@ -1,118 +1,43 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Fri, 22 Apr 2016 16:59:31 +0300
-Subject: [PATCH v4] i2c: designware-platdrv: fix unbalanced clk enable and
- prepare
-In-Reply-To: <1461314971-5944-1-git-send-email-jszhang@marvell.com>
-References: <1461314971-5944-1-git-send-email-jszhang@marvell.com>
-Message-ID: <571A2E43.9030109@linux.intel.com>
+From: harald@ccbib.org (Harald Geyer)
+Date: Fri, 22 Apr 2016 13:52:27 +0000
+Subject: [PATCH 3/3] ARM: dts: imx28: Provide regulators for the current
+ sources of the LRADC
+In-Reply-To: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+Message-ID: <1461333147-11873-4-git-send-email-harald@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+This adds the devicetree nodes to make the mxs-lradc driver register
+regulator devices for the integrated current sources.
 
-On 04/22/2016 11:49 AM, Jisheng Zhang wrote:
-> If i2c_dw_probe() fails, we should disable and unprepare the clock,
-> otherwise the clock enable and prepare is left unbalanced.
->
-> In dw_i2c_plat_remove(), we'd better to not rely on runtime PM to
-> disable and unprepare the clock since CONFIG_PM may be disabled when
-> configuring the kernel. So we explicitly disable and unprepare the
-> clock in dw_i2c_plat_remove() rather than implicitly rely on
-> pm_runtime_put_sync(). To keep the device usage count balanced, we
-> call pm_runtime_put_noidle() to decrease the usage count.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   Since v3:
->    - use runtime PM rather than rpm in commit msg
->    - remove duplicated "(" in commit msg
->
->   Since v2:
->    - s/clk/clock
->    - describe why use pm_runtime_put_noidle()
->
->   Since v1:
->    - fix commit msg: "not rely on rpm" rather than "rely on rpm"
->    - call i2c_dw_plat_prepare_clk after pm_rumtime_disable()
->   drivers/i2c/busses/i2c-designware-platdrv.c | 16 ++++++++++------
->   1 file changed, 10 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index d656657..a771781 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -253,8 +253,11 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
->   	}
->
->   	r = i2c_dw_probe(dev);
-> -	if (r && !dev->pm_runtime_disabled)
-> -		pm_runtime_disable(&pdev->dev);
-> +	if (r) {
-> +		if (!dev->pm_runtime_disabled)
-> +			pm_runtime_disable(&pdev->dev);
-> +		i2c_dw_plat_prepare_clk(dev, false);
-> +	}
->
->   	return r;
->   }
-> @@ -264,15 +267,16 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
->   	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
->
->   	pm_runtime_get_sync(&pdev->dev);
-> +	pm_runtime_dont_use_autosuspend(&pdev->dev);
-> +	if (!dev->pm_runtime_disabled)
-> +		pm_runtime_disable(&pdev->dev);
-> +	pm_runtime_put_noidle(&pdev->dev);
->
->   	i2c_del_adapter(&dev->adapter);
->
->   	i2c_dw_disable(dev);
->
-> -	pm_runtime_dont_use_autosuspend(&pdev->dev);
-> -	pm_runtime_put_sync(&pdev->dev);
-> -	if (!dev->pm_runtime_disabled)
-> -		pm_runtime_disable(&pdev->dev);
-> +	i2c_dw_plat_prepare_clk(dev, false);
->
-This feels a bit an invasive change to me for unbalanced clock 
-enable/disable and I noticed this changes semantics how 
-drivers/acpi/acpi_lpss.c devices are shutdown when removing the driver. 
-Although I didn't notice does it cause any regression.
+Signed-off-by: Harald Geyer <harald@ccbib.org>
+---
+I couln't test this patch on actual HW, but it is a straight forward
+port from the imx23 case. With only a funny change in the node label,
+to match the naming convention of the IMX28 Reference Manual.
 
-Before patch:
-1. drivers/base/dd.c: __device_release_driver()
-    - pm_runtime_get_sync()
-      -> acpi_device_set_power(D0)
-         acpi_lpss_restore_ctx()
-         dw_i2c_plat_resume()
-2. dw_i2c_plat_remove()
-    - pm_runtime_dont_use_autosuspend()
-      pm_runtime_put_sync()
-      -> dw_i2c_plat_suspend()
-         acpi_lpss_save_ctx()
-         acpi_device_set_power(D3)
-3. __device_release_driver() continue
-    - dev->pm_domain->dismiss(dev)
-      -> acpi_lpss_dismiss() ... -> acpi_device_set_power(D3)
+ arch/arm/boot/dts/imx28.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-After patch:
-1. drivers/base/dd.c: __device_release_driver()
-  - pm_runtime_get_sync()
-    -> acpi_device_set_power(D0)
-       acpi_lpss_restore_ctx()
-       dw_i2c_plat_resume()
-2. dw_i2c_plat_remove()
-    - pm_runtime_dont_use_autosuspend()
-      pm_runtime_put_noidle()
-      * no device suspending and acpi_lpss_save_ctx()
-3. __device_release_driver() continue
-    - dev->pm_domain->dismiss(dev)
-    -> acpi_lpss_dismiss() ... -> acpi_device_set_power(D3)
-      * powers down here
-
-So after patch there is no acpi_lpss_save_ctx() call but I don't see 
-does it cause any issue here. Maybe it's better to track clock only. 
-What you think Andy?
-
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index f637ec9..38f8675 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -1070,6 +1070,14 @@
+ 				status = "disabled";
+ 				clocks = <&clks 41>;
+ 				#io-channel-cells = <1>;
++
++				isrc_lradc0: ISRC0 {
++					regulator-max-microamp = <300>;
++				};
++
++				isrc_lradc6: ISRC1 {
++					regulator-max-microamp = <300>;
++				};
+ 			};
+ 
+ 			spdif: spdif at 80054000 {
 -- 
-Jarkko
+2.1.4
