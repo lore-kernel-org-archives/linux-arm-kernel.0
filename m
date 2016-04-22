@@ -1,27 +1,31 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Apr 2016 10:14:58 +1000
-Subject: [PATCH v3] PCI: rcar-pcie: Remove Gen2 designation from Kconfig
-In-Reply-To: <CAMuHMdXtVvNERECxbp1EtJ1SNOQG-j_xtV3NpsGqgyDLmc7cOg@mail.gmail.com>
-References: <1461210715-29304-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXtVvNERECxbp1EtJ1SNOQG-j_xtV3NpsGqgyDLmc7cOg@mail.gmail.com>
-Message-ID: <20160422001455.GA25416@verge.net.au>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 21 Apr 2016 17:32:32 -0700
+Subject: arm: soc fixes for v4.6
+In-Reply-To: <57189CA2.3080401@gmail.com> (Matthias Brugger's message of "Thu,
+ 21 Apr 2016 11:25:54 +0200")
+References: <570E1BD5.4090305@gmail.com> <57189CA2.3080401@gmail.com>
+Message-ID: <7hr3dy4h5r.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 03:38:35PM +0200, Geert Uytterhoeven wrote:
-> On Thu, Apr 21, 2016 at 5:51 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > It appears that Gen2 is a misnomer for the R-Car PCIE driver
-> > which also supports Gen 1 and Gen 3 SoCs. Accordingly, drop Gen 2
-> > from the help text and Kconfig symbol.
-> >
-> > Also, re-arange the Kconfig symbol name to use PCIE as the prefix.
-> > This appears to be in keeping with other PCIE Kconfig symbols.
-> >
-> > Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Matthias Brugger <matthias.bgg@gmail.com> writes:
 
-Thanks, I have queued this up.
+> On 13/04/16 12:13, Matthias Brugger wrote:
+>> Hi all,
+>>
+>> Please merge the following fix to end the boot regression for v4.6.
+>>
+>> Thanks,
+>> Matthias
+>>
+>
+> Kindly ping on this patch. Mediatek mt8173 does not boot with v4.6-rc4
+> and needs this fix.
+>
+
+Oops, I merged this locally and even tested on mt8173-evb, but forgot to
+push it out.  It's now in fixes and merged into for-next.
+
+Thanks for the reminder,
+
+Kevin
