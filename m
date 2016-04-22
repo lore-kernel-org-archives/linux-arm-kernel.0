@@ -1,225 +1,49 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 22 Apr 2016 18:02:54 +0800
-Subject: [RESEND PATCH 8/8] arm64: dts: rockchip: move the rk3368 thermal data
- into rk3368.dtsi
-In-Reply-To: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
-References: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1461319374-10024-9-git-send-email-wxt@rock-chips.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 22 Apr 2016 11:18:04 +0100
+Subject: [PATCH v2 00/11] pwm: Add support for PWM Capture
+Message-ID: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be standard to manage for rockchip SoCs,  move the thermal
-data into rk3368 dtsi, we needn't to add a new file for thermal.
+The first part of this set extends the current PWM API to allow external
+code to request a PWM Capture.  Subsequent patches then make use of the
+new API by providing a userspace offering via /sysfs.  The final part of
+the set supplies PWM Capture functionality into the already existing STi
+PWM driver.
 
-Fixes commit f990238f859e
-("arm64: dts: rockchip: Add main thermal info to rk3368.dtsi")
+This patch-set has been tested end to end via /sysfs.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
+v1 => v2:
+  API change
+  - Use a struct to carry the result back to the caller
+  - Use 'struct pwm' to store device specific data
+  - Make timeout configurable
+  - Don't use clear_bit(), instead use raw bit logic
+  - Propagate return value of platform_get_irq()
+  - Don't cast to (void *)
+  - Move to subsystem terminology (channels => devices)
+  - Remove channel select feature
+  - Enable Capture IP during capture
 
----
+Lee Jones (11):
+  pwm: Add PWM Capture support
+  pwm: sti: Rename channel => device
+  pwm: sysfs: Add PWM Capture support
+  pwm: sti: Reorganise register names in preparation for new
+    functionality
+  pwm: sti: Only request clock rate when you need to
+  pwm: sti: Supply PWM Capture register addresses and bit locations
+  pwm: sti: Supply PWM Capture clock handling
+  pwm: sti: Initialise PWM Capture device data
+  pwm: sti: Add support for PWM Capture IRQs
+  pwm: sti: Add PWM Capture call-back
+  pwm: sti: Take the opportunity to conduct a little house keeping
 
- arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112 -----------------------
- arch/arm64/boot/dts/rockchip/rk3368.dtsi         |  66 ++++++++++++-
- 2 files changed, 65 insertions(+), 113 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+ drivers/pwm/core.c    |  27 ++++
+ drivers/pwm/pwm-sti.c | 411 +++++++++++++++++++++++++++++++++++++++++---------
+ drivers/pwm/sysfs.c   |  17 +++
+ include/linux/pwm.h   |  28 ++++
+ 4 files changed, 412 insertions(+), 71 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
-deleted file mode 100644
-index a10010f..0000000
---- a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
-+++ /dev/null
-@@ -1,112 +0,0 @@
--/*
-- * Device Tree Source for RK3368 SoC thermal
-- *
-- * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-- * Caesar Wang <wxt@rock-chips.com>
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-- */
--
--#include <dt-bindings/thermal/thermal.h>
--
--cpu_thermal: cpu_thermal {
--	polling-delay-passive = <100>; /* milliseconds */
--	polling-delay = <5000>; /* milliseconds */
--
--	thermal-sensors = <&tsadc 0>;
--
--	trips {
--		cpu_alert0: cpu_alert0 {
--			temperature = <75000>; /* millicelsius */
--			hysteresis = <2000>; /* millicelsius */
--			type = "passive";
--		};
--		cpu_alert1: cpu_alert1 {
--			temperature = <80000>; /* millicelsius */
--			hysteresis = <2000>; /* millicelsius */
--			type = "passive";
--		};
--		cpu_crit: cpu_crit {
--			temperature = <95000>; /* millicelsius */
--			hysteresis = <2000>; /* millicelsius */
--			type = "critical";
--		};
--	};
--
--	cooling-maps {
--		map0 {
--			trip = <&cpu_alert0>;
--			cooling-device =
--				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
--		};
--		map1 {
--			trip = <&cpu_alert1>;
--			cooling-device =
--				<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
--		};
--	};
--};
--
--gpu_thermal: gpu_thermal {
--	polling-delay-passive = <100>; /* milliseconds */
--	polling-delay = <5000>; /* milliseconds */
--
--	thermal-sensors = <&tsadc 1>;
--
--	trips {
--		gpu_alert0: gpu_alert0 {
--			temperature = <80000>; /* millicelsius */
--			hysteresis = <2000>; /* millicelsius */
--			type = "passive";
--		};
--		gpu_crit: gpu_crit {
--			temperature = <1150000>; /* millicelsius */
--			hysteresis = <2000>; /* millicelsius */
--			type = "critical";
--		};
--	};
--
--	cooling-maps {
--		map0 {
--			trip = <&gpu_alert0>;
--			cooling-device =
--				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
--		};
--	};
--};
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 7056a0f..8b4a7c9 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -413,7 +413,71 @@
- 	};
- 
- 	thermal-zones {
--		#include "rk3368-thermal.dtsi"
-+		cpu {
-+			polling-delay-passive = <100>; /* milliseconds */
-+			polling-delay = <5000>; /* milliseconds */
-+
-+			thermal-sensors = <&tsadc 0>;
-+
-+			trips {
-+				cpu_alert0: cpu_alert0 {
-+					temperature = <75000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_alert1: cpu_alert1 {
-+					temperature = <80000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_crit: cpu_crit {
-+					temperature = <95000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert0>;
-+					cooling-device =
-+					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+				map1 {
-+					trip = <&cpu_alert1>;
-+					cooling-device =
-+					<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+
-+		gpu {
-+			polling-delay-passive = <100>; /* milliseconds */
-+			polling-delay = <5000>; /* milliseconds */
-+
-+			thermal-sensors = <&tsadc 1>;
-+
-+			trips {
-+				gpu_alert0: gpu_alert0 {
-+					temperature = <80000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				gpu_crit: gpu_crit {
-+					temperature = <115000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&gpu_alert0>;
-+					cooling-device =
-+					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
- 	};
- 
- 	tsadc: tsadc at ff280000 {
 -- 
-1.9.1
+2.8.0
