@@ -1,115 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 11:32:50 +0100
-Subject: [PATCH v11 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <alpine.DEB.2.10.1604201033140.25611@sstabellini-ThinkPad-X260>
-References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
- <1460030614-16112-13-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.10.1604201033140.25611@sstabellini-ThinkPad-X260>
-Message-ID: <20160422103250.GC10606@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Apr 2016 11:36:15 +0100
+Subject: [PATCH v7 13/16] arm64: head.S: el2_setup() to accept sctlr_el1
+ as an argument
+In-Reply-To: <5717BDFD.4000005@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-14-git-send-email-james.morse@arm.com>
+ <20160420171204.GG11377@e104818-lin.cambridge.arm.com>
+ <5717BDFD.4000005@arm.com>
+Message-ID: <20160422103615.GC2998@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 10:34:41AM +0100, Stefano Stabellini wrote:
-> Hello Mark,
+On Wed, Apr 20, 2016 at 06:35:57PM +0100, James Morse wrote:
+> Hi Catalin,
 > 
-> do you think that this patch addresses your previous comments
-> (http://marc.info/?l=devicetree&m=145926913008544&w=2) appropriately?
+> On 20/04/16 18:12, Catalin Marinas wrote:
+> > On Fri, Apr 01, 2016 at 05:53:37PM +0100, James Morse wrote:
+> >> el2_setup() doesn't just configure el2, it configures el1 too. This
+> >> means we can't use it to re-configure el2 after resume from hibernate,
+> >> as we will be returned to el1 with the MMU turned off.
+> >>
+> >> Split the sctlr_el1 setting code up, so that el2_setup() accepts an
+> >> initial value as an argument. This value will be ignored if el2_setup()
+> >> is called at el1: the running value will be preserved with endian
+> >> correction.
+> >>
+> >> Hibernate can now call el2_setup() to re-configure el2, passing the
+> >> current sctlr_el1 as an argument.
+> > 
+> > I don't fully understand the description. The first paragraph says we
+> > can't use el2_setup to re-configure el2 after resume from hibernate
+> > while the last paragraph says that we can.
 > 
-> Thanks,
-> 
-> Stefano
-> 
-> On Thu, 7 Apr 2016, Shannon Zhao wrote:
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-> > a /hypervisor node in DT. So check if it needs to enable ACPI.
-> > 
-> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  arch/arm64/kernel/acpi.c | 14 ++++++++++----
-> >  1 file changed, 10 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> > index d1ce8e2..57ee317 100644
-> > --- a/arch/arm64/kernel/acpi.c
-> > +++ b/arch/arm64/kernel/acpi.c
-> > @@ -67,10 +67,15 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
-> >  {
-> >  	/*
-> >  	 * Return 1 as soon as we encounter a node at depth 1 that is
-> > -	 * not the /chosen node.
-> > +	 * not the /chosen node, or /hypervisor node with compatible
-> > +	 * string "xen,xen".
-> >  	 */
-> > -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> > -		return 1;
-> > +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> > +		if (strcmp(uname, "hypervisor") != 0 ||
-> > +		    !of_flat_dt_is_compatible(node, "xen,xen"))
-> > +			return 1;
-> > +	}
-> > +
-> >  	return 0;
-> >  }
+> Then I need to rephrase the middle paragraph. Is this any clearer:
+> This happens because el2_setup() generates a sctlr_el1 value needed for early
+> boot, (mmu off etc). Change el2_setup() to accept this as an argument, so that
+> hibernate can pass the current sctlr_el1 (with the mmu on), to el2_setup(), and
+> have it re-configure el2 without changing el1.
 
-Is the duplicate node checking logic I mentioned in that review gone?
-i.e. do we not need an is_xen_node() helper?
+I think I understand it now, it makes sense.
 
-Additionally, IMO, this would be easier to follow without the nested
-conditionals, e.g.
+> The motivation for this patch was resuming with a different kernel version,
+> which may have left el2 in an incompatible state. Running the original
+> el2_setup() was the only guaranteed way to know everything was set correctly.
+> If we definitely don't want to support this, then this patch can go, and the
+> minimum el2-reset code can be put into hibernate-asm.S.
 
-static int __init dt_scan_depth1_nodes(unsigned long node,
-				       const char *uname, int depth,
-				       void *data)
-{
-	/*
-	 * Ignore anything not directly under the root node; we'll
-	 * catch its parent instead.
-	 */
-	if (depth != 1)
-		return 0;
+I suggest we leave this patch as it is for now, I just didn't understand
+why it was needed.
 
-	if (strcmp(uname, "chosen") == 0)
-		return 0;
+With the slightly updated log:
 
-	if (strcmp(uname, "hypervisor") == 0 &&
-	    of_flat_dt_is_compatible(node, "xen,xen"))
-		return 0;
-
-	/*
-	 * This node at depth 1 is neither a chosen node nor a xen node,
-	 * which we do not expect.
-	 */
-	return 1;
-}
-
-Otherwise, this looks fine to me. FWIW, either way:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-As this is core arm64 code, I believe you'll need acks from Catalin
-and/or Will (and likewise for patch 15), unless I've missed those.
-
-Thanks,
-Mark.
-
-> >  
-> > @@ -184,7 +189,8 @@ void __init acpi_boot_table_init(void)
-> >  	/*
-> >  	 * Enable ACPI instead of device tree unless
-> >  	 * - ACPI has been disabled explicitly (acpi=off), or
-> > -	 * - the device tree is not empty (it has more than just a /chosen node)
-> > +	 * - the device tree is not empty (it has more than just a /chosen node,
-> > +	 *   and a /hypervisor node when running on Xen)
-> >  	 *   and ACPI has not been force enabled (acpi=force)
-> >  	 */
-> >  	if (param_acpi_off ||
-> > -- 
-> > 2.0.4
-> > 
-> > 
-> 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
