@@ -1,38 +1,99 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Apr 2016 08:43:16 +0100
-Subject: [PATCH 2/2 v5] irqchip/Layerscape: Add SCFG MSI controller support
-In-Reply-To: <CADRPPNRU=qy34p4hzYvzBPrt2uabSQfc0Xdd8K5v5B_JW01QJA@mail.gmail.com>
-References: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
- <1457321782-3245-2-git-send-email-Minghuan.Lian@nxp.com>
- <20160307095021.7f9f7484@arm.com>
- <CADRPPNRU=qy34p4hzYvzBPrt2uabSQfc0Xdd8K5v5B_JW01QJA@mail.gmail.com>
-Message-ID: <5719D614.1080400@arm.com>
+Date: Fri, 22 Apr 2016 08:44:07 +0100
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <57198351.2060608@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <5718AFB8.5070004@rock-chips.com> <20160421123018.096d4a75@arm.com>
+ <2131452.5tyGOfVRfi@diego> <20160421221228.359fab3c@arm.com>
+ <57198351.2060608@rock-chips.com>
+Message-ID: <5719D647.6000407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/16 06:33, Leo Li wrote:
-> On Mon, Mar 7, 2016 at 3:50 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On Mon, 7 Mar 2016 11:36:22 +0800
->> Minghuan Lian <Minghuan.Lian@nxp.com> wrote:
->>
->>> Some kind of NXP Layerscape SoC provides a MSI
->>> implementation which uses two SCFG registers MSIIR and
->>> MSIR to support 32 MSI interrupts for each PCIe controller.
->>> The patch is to support it.
->>>
->>> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
->>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> The DT binding still needs an Ack from the DT maintainers though (cc'd).
+On 22/04/16 02:50, jay.xu wrote:
+> Hi Marc:
 > 
-> Marc,
+> On 2016?04?22? 05:12, Marc Zyngier wrote:
+>> On Thu, 21 Apr 2016 22:24:09 +0200
+>> Heiko St?bner <heiko@sntech.de> wrote:
+>>
+>>> Am Donnerstag, 21. April 2016, 12:30:18 schrieb Marc Zyngier:
+>>>> On Thu, 21 Apr 2016 18:47:20 +0800
+>>>>
+>>>> "Huang, Tao" <huangtao@rock-chips.com> wrote:
+>>>>> Hi, Mark:
+>>>>>
+>>>>> On 2016?04?21? 18:19, Mark Rutland wrote:
+>>>>>> On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
+>>>>>>> +		cpu_l0: cpu at 0 {
+>>>>>>> +			device_type = "cpu";
+>>>>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>>>>> +			reg = <0x0 0x0>;
+>>>>>>> +			enable-method = "psci";
+>>>>>>> +			#cooling-cells = <2>; /* min followed by max */
+>>>>>>> +			clocks = <&cru ARMCLKL>;
+>>>>>>> +		};
+>>>>>>> +		cpu_b0: cpu at 100 {
+>>>>>>> +			device_type = "cpu";
+>>>>>>> +			compatible = "arm,cortex-a72", "arm,armv8";
+>>>>>>> +			reg = <0x0 0x100>;
+>>>>>>> +			enable-method = "psci";
+>>>>>>> +			#cooling-cells = <2>; /* min followed by max */
+>>>>>>> +			clocks = <&cru ARMCLKB>;
+>>>>>>> +		};
+>>>>>>> +
+>>>>>>> +	arm-pmu {
+>>>>>>> +		compatible = "arm,armv8-pmuv3";
+>>>>>>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>>>> +	};
+>>>>>> This is wrong, and must go. There should be a separate node for the PMU
+>>>>>> of each microarchitecture, with the appropriate compatible string to
+>>>>>> represent that (see the juno dts).
+>>>>> You are right. The first version we wrote is:
+>>>>>      pmu_a53 {
+>>>>>      
+>>>>>          compatible = "arm,cortex-a53-pmu";
+>>>>>          interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>>          interrupt-affinity = <&cpu_l0>,
+>>>>>          
+>>>>>                       <&cpu_l1>,
+>>>>>                       <&cpu_l2>,
+>>>>>                       <&cpu_l3>;
+>>>>>      
+>>>>>      };
+>>>>>      
+>>>>>      pmu_a72 {
+>>>>>      
+>>>>>          compatible = "arm,cortex-a72-pmu";
+>>>>>          interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>>          interrupt-affinity = <&cpu_b0>,
+>>>>>          
+>>>>>                       <&cpu_b1>;
+>>>>>      
+>>>>>      };
+>>>>>
+>>>>> but unfortunately, the arm pmu driver do not support PPI in two cluster
+>>>>> well,
+>>>>> so we have to replace with this implementation.
+>>>>>
+>>>>>> In this case things are messier as the same PPI number is being used
+>>>>>> across clusters. Marc (Cc'd) has been working on PPI partitions, which
+>>>>>> should allow us to support that.
+>>>>> Great! So what we can do right now? Wait this feature, and delete
+>>>>> arm-pmu node?
+>>>> I'd rather you have a look at the patches, test them with your HW,
+>>>> and comment on what doesn't work!
+>>> I would think we could do it in two tracks, testing and fixing but also letting
+>>> the rk3399 devicetrees move forward without the pmu at first :-) .
+>> Where would the fun be then? ;-)
+> thanks for your advices, and I will try to test the percpu-partition 
+> patches.
 > 
-> Who will be responsible to pick this driver?  I see you are also one
-> of the maintainers for irqchip.  Can you pick up the driver?  The
-> binding has already gotten ACKed by the device tree maintainer.
+> by the way, do you think it's better to let the dtsi be reviewed first,
+> then the percpu-partition patches could be tested by more people ?
 
-Can you point me to this Ack? I can't see any trace of it in my Inbox.
+Up to you. As long as what is in the DT is correct and Acked by the DT
+maintainers, I'm fine with it.
 
 Thanks,
 
