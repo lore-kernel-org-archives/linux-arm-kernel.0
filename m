@@ -1,81 +1,118 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 22 Apr 2016 11:14:12 -0600
-Subject: [PATCH V3 15/18] coresight: moving struct cs_buffers to header file
+Date: Fri, 22 Apr 2016 11:14:00 -0600
+Subject: [PATCH V3 03/18] coresight: tmc: re-implementing
+ tmc_read_prepare/unprepare() functions
 In-Reply-To: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461345255-11758-16-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461345255-11758-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That way we can re-use the structure in other drivers.
+In their current implementation the tmc_read_prepare/unprepare()
+are a lump of if/else that is difficult to read.  This patch is
+alleviating that by using a switch statement.  The latter also
+allows for a better control on the error path.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 20 --------------------
- drivers/hwtracing/coresight/coresight-priv.h  | 20 ++++++++++++++++++++
- 2 files changed, 20 insertions(+), 20 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 56 ++++++++++++++++++-----------
+ 1 file changed, 36 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index a974c39171a9..239800aa5e24 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -71,26 +71,6 @@
- #define ETB_FRAME_SIZE_WORDS	4
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 66fa7736d12f..d211aeec49f8 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -431,7 +431,7 @@ static const struct coresight_ops tmc_etf_cs_ops = {
  
- /**
-- * struct cs_buffer - keep track of a recording session' specifics
-- * @cur:	index of the current buffer
-- * @nr_pages:	max number of pages granted to us
-- * @offset:	offset within the current buffer
-- * @data_size:	how much we collected in this run
-- * @lost:	other than zero if we had a HW buffer wrap around
-- * @snapshot:	is this run in snapshot mode
-- * @data_pages:	a handle the ring buffer
-- */
--struct cs_buffers {
--	unsigned int		cur;
--	unsigned int		nr_pages;
--	unsigned long		offset;
--	local_t			data_size;
--	local_t			lost;
--	bool			snapshot;
--	void			**data_pages;
--};
--
--/**
-  * struct etb_drvdata - specifics associated to an ETB component
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 3b5dd95a3588..ad975c58080d 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -53,6 +53,26 @@ enum cs_mode {
- 	CS_MODE_PERF,
- };
- 
-+/**
-+ * struct cs_buffer - keep track of a recording session' specifics
-+ * @cur:	index of the current buffer
-+ * @nr_pages:	max number of pages granted to us
-+ * @offset:	offset within the current buffer
-+ * @data_size:	how much we collected in this run
-+ * @lost:	other than zero if we had a HW buffer wrap around
-+ * @snapshot:	is this run in snapshot mode
-+ * @data_pages:	a handle the ring buffer
-+ */
-+struct cs_buffers {
-+	unsigned int		cur;
-+	unsigned int		nr_pages;
-+	unsigned long		offset;
-+	local_t			data_size;
-+	local_t			lost;
-+	bool			snapshot;
-+	void			**data_pages;
-+};
-+
- static inline void CS_LOCK(void __iomem *addr)
+ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
  {
- 	do {
+-	int ret;
++	int ret = 0;
+ 	unsigned long flags;
+ 	enum tmc_mode mode;
+ 
+@@ -439,25 +439,31 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
+ 	if (!drvdata->enable)
+ 		goto out;
+ 
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++	switch (drvdata->config_type) {
++	case TMC_CONFIG_TYPE_ETB:
+ 		tmc_etb_disable_hw(drvdata);
+-	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+-		tmc_etr_disable_hw(drvdata);
+-	} else {
++		break;
++	case TMC_CONFIG_TYPE_ETF:
++		/* There is no point in reading a TMC in HW FIFO mode */
+ 		mode = readl_relaxed(drvdata->base + TMC_MODE);
+-		if (mode == TMC_MODE_CIRCULAR_BUFFER) {
+-			tmc_etb_disable_hw(drvdata);
+-		} else {
+-			ret = -ENODEV;
++		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
++			ret = -EINVAL;
+ 			goto err;
+ 		}
++
++		tmc_etb_disable_hw(drvdata);
++		break;
++	case TMC_CONFIG_TYPE_ETR:
++		tmc_etr_disable_hw(drvdata);
++		break;
++	default:
++		ret = -EINVAL;
++		goto err;
+ 	}
++
+ out:
+ 	drvdata->reading = true;
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+ 	dev_info(drvdata->dev, "TMC read start\n");
+-	return 0;
+ err:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 	return ret;
+@@ -472,20 +478,30 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
+ 	if (!drvdata->enable)
+ 		goto out;
+ 
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++	switch (drvdata->config_type) {
++	case TMC_CONFIG_TYPE_ETB:
+ 		tmc_etb_enable_hw(drvdata);
+-	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+-		tmc_etr_enable_hw(drvdata);
+-	} else {
++		break;
++	case TMC_CONFIG_TYPE_ETF:
++		/* Make sure we don't re-enable a TMC in HW FIFO mode */
+ 		mode = readl_relaxed(drvdata->base + TMC_MODE);
+-		if (mode == TMC_MODE_CIRCULAR_BUFFER)
+-			tmc_etb_enable_hw(drvdata);
++		if (mode != TMC_MODE_CIRCULAR_BUFFER)
++			goto err;
++
++		tmc_etb_enable_hw(drvdata);
++		break;
++	case TMC_CONFIG_TYPE_ETR:
++		tmc_etr_disable_hw(drvdata);
++		break;
++	default:
++		goto err;
+ 	}
++
+ out:
+ 	drvdata->reading = false;
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+ 	dev_info(drvdata->dev, "TMC read end\n");
++err:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ }
+ 
+ static int tmc_open(struct inode *inode, struct file *file)
 -- 
 2.5.0
