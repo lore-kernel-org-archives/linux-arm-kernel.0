@@ -1,165 +1,179 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 22 Apr 2016 16:03:10 +0300
-Subject: [PATCH net v2 1/3] drivers: net: cpsw: fix parsing of phy-handle
- DT property in dual_emac config
-In-Reply-To: <1461262794-9562-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
- <1461262794-9562-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <571A210E.2020607@ti.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 22 Apr 2016 15:02:01 +0200
+Subject: [PATCH v7 03/10] iommu: introduce a reserved iova cookie
+In-Reply-To: <571A1AC5.9030905@arm.com>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-4-git-send-email-eric.auger@linaro.org>
+ <57177C31.9090004@arm.com> <5717AAC9.10505@linaro.org>
+ <571A1AC5.9030905@arm.com>
+Message-ID: <571A20C9.9010508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2016 09:19 PM, David Rivshin (Allworx) wrote:
-> From: David Rivshin <drivshin@allworx.com>
->
-> Commit 9e42f715264ff158478fa30eaed847f6e131366b ("drivers: net: cpsw: add
-> phy-handle parsing") saved the "phy-handle" phandle into a new cpsw_priv
-> field. However, phy connections are per-slave, so the phy_node field should
-> be in cpsw_slave_data rather than cpsw_priv.
->
-> This would go unnoticed in a single emac configuration. But in dual_emac
-> mode, the last "phy-handle" property parsed for either slave would be used
-> by both of them, causing them both to refer to the same phy_device.
->
-> Fixes: 9e42f715264f ("drivers: net: cpsw: add phy-handle parsing")
-> Signed-off-by: David Rivshin <drivshin@allworx.com>
-> Tested-by: Nicolas Chauvet <kwizart@gmail.com>
-> ---
-> I would suggest this for -stable. It should apply cleanly as far back
-> as 4.4.
->
-> Changes since v1 [1]:
-> - Rebased (no conflicts)
-> - Added Tested-by from Nicolas Chauvet
->
-> [1] https://patchwork.ozlabs.org/patch/560326/
+Hi Robin,
+On 04/22/2016 02:36 PM, Robin Murphy wrote:
+> On 20/04/16 17:14, Eric Auger wrote:
+>> Hi Robin,
+>> On 04/20/2016 02:55 PM, Robin Murphy wrote:
+>>> On 19/04/16 17:56, Eric Auger wrote:
+>>>> This patch introduces some new fields in the iommu_domain struct,
+>>>> dedicated to reserved iova management.
+>>>>
+>>>> In a similar way as DMA mapping IOVA window, we need to store
+>>>> information related to a reserved IOVA window.
+>>>>
+>>>> The reserved_iova_cookie will store the reserved iova_domain
+>>>> handle. An RB tree indexed by physical address is introduced to
+>>>> store the host physical addresses bound to reserved IOVAs.
+>>>>
+>>>> Those physical addresses will correspond to MSI frame base
+>>>> addresses, also referred to as doorbells. Their number should be
+>>>> quite limited per domain.
+>>>>
+>>>> Also a spin_lock is introduced to protect accesses to the iova_domain
+>>>> and RB tree. The choice of a spin_lock is driven by the fact the RB
+>>>> tree will need to be accessed in MSI controller code not allowed to
+>>>> sleep.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>
+>>>> ---
+>>>> v5 -> v6:
+>>>> - initialize reserved_binding_list
+>>>> - use a spinlock instead of a mutex
+>>>> ---
+>>>>    drivers/iommu/iommu.c | 2 ++
+>>>>    include/linux/iommu.h | 6 ++++++
+>>>>    2 files changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>>> index b9df141..f70ef3b 100644
+>>>> --- a/drivers/iommu/iommu.c
+>>>> +++ b/drivers/iommu/iommu.c
+>>>> @@ -1073,6 +1073,8 @@ static struct iommu_domain
+>>>> *__iommu_domain_alloc(struct bus_type *bus,
+>>>>
+>>>>        domain->ops  = bus->iommu_ops;
+>>>>        domain->type = type;
+>>>> +    spin_lock_init(&domain->reserved_lock);
+>>>> +    domain->reserved_binding_list = RB_ROOT;
+>>>>
+>>>>        return domain;
+>>>>    }
+>>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>>> index b3e8c5b..60999db 100644
+>>>> --- a/include/linux/iommu.h
+>>>> +++ b/include/linux/iommu.h
+>>>> @@ -24,6 +24,7 @@
+>>>>    #include <linux/of.h>
+>>>>    #include <linux/types.h>
+>>>>    #include <linux/scatterlist.h>
+>>>> +#include <linux/spinlock.h>
+>>>>    #include <trace/events/iommu.h>
+>>>>
+>>>>    #define IOMMU_READ    (1 << 0)
+>>>> @@ -83,6 +84,11 @@ struct iommu_domain {
+>>>>        void *handler_token;
+>>>>        struct iommu_domain_geometry geometry;
+>>>>        void *iova_cookie;
+>>>> +    void *reserved_iova_cookie;
+>>>
+>>> Why exactly do we need this? From your description, it's for the user of
+>>> the domain to keep track of IOVA allocations in, but then that's
+>>> precisely what the iova_cookie exists for.
+>>
+>> I was not sure whether both APIs could not be used concurrently, hence a
+>> separate cookie. If we only consider MSI mapping use case I guess we are
+>> either with a DMA domain or with a domain for VFIO and I would agree
+>> with you, ie. we can reuse the same cookie.
+> 
+> Unless somebody cooks up some paravirtualised monstrosity where the
+> guest driver somehow uses the host kernel's DMA mapping ops (thankfully,
+> I'm not sure how that would even be possible), then they should always
+> be mutually exclusive.
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+OK thanks
+> 
+> (That said, I should probably add a sanity check to
+> iommu_dma_put_cookie() to ensure it only touches the cookies of
+> IOMMU_DOMAIN_DMA domains...)
+> 
+>>>> +    /* rb tree indexed by PA, for reserved bindings only */
+>>>> +    struct rb_root reserved_binding_list;
+>>>
+>>> Nit: that's more puzzling than helpful - "reserved binding" is
+>>> particularly vague and nondescript, and makes me think of anything but
+>>> MSI descriptors.
+>> my heart is torn between advised genericity and MSI use case. My natural
+>> short-sighted inclination would head me for an MSI mapping dedicated API
+>> but I am following advices. As discussed with Alex there are
+>> implementation details pretty related to MSI problematics I think (the
+>> fact we store the "bindings" in an rb-tree/list, locking)
+>>
+>> If Marc & Alex I can retarget this API to be less generic.
+>>
+>>   Plus it's called a list but isn't a list (that said,
+>>> given that we'd typically only expect a handful of entries, and lookups
+>>> are hardly going to be a performance-critical bottleneck, would a simple
+>>> list not suffice?)
+>> I fully agree on that point. An rb-tree is overkill today for MSI use
+>> case. Again if we were to use this API for anything else, this may
+>> change the decision. But sure we can refactor afterwards upon needs. TBH
+>> the rb-tree is inherited from vfio_iommu_type1 dma tree where that code
+>> was originally located.
+> 
+> Thinking some more, how feasible would it be to handle the IOVA
+> management aspect within the existing tree, i.e. extend struct vfio_dma
+> so an entry can represent different types of thing - DMA pages, MSI
+> pages, arbitrary reservations - and link to more implementation-specific
+> data (e.g. a refcounted MSI descriptor stored elsewhere in the domain)
+> as necessary?
+it is feasible and  was approximately done there at the early ages of
+the series:
+https://lkml.org/lkml/2016/1/28/803 &
+https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016607.html
 
->
->   drivers/net/ethernet/ti/cpsw.c | 13 ++++++-------
->   drivers/net/ethernet/ti/cpsw.h |  1 +
->   2 files changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 42fdfd4..d69cb3f 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -363,15 +363,14 @@ static inline void slave_write(struct cpsw_slave *slave, u32 val, u32 offset)
->   	__raw_writel(val, slave->regs + offset);
->   }
->
->   struct cpsw_priv {
->   	spinlock_t			lock;
->   	struct platform_device		*pdev;
->   	struct net_device		*ndev;
-> -	struct device_node		*phy_node;
->   	struct napi_struct		napi_rx;
->   	struct napi_struct		napi_tx;
->   	struct device			*dev;
->   	struct cpsw_platform_data	data;
->   	struct cpsw_ss_regs __iomem	*regs;
->   	struct cpsw_wr_regs __iomem	*wr_regs;
->   	u8 __iomem			*hw_stats;
-> @@ -1144,16 +1143,16 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
->
->   	if (priv->data.dual_emac)
->   		cpsw_add_dual_emac_def_ale_entries(priv, slave, slave_port);
->   	else
->   		cpsw_ale_add_mcast(priv->ale, priv->ndev->broadcast,
->   				   1 << slave_port, 0, 0, ALE_MCAST_FWD_2);
->
-> -	if (priv->phy_node)
-> -		slave->phy = of_phy_connect(priv->ndev, priv->phy_node,
-> +	if (slave->data->phy_node)
-> +		slave->phy = of_phy_connect(priv->ndev, slave->data->phy_node,
->   				 &cpsw_adjust_link, 0, slave->data->phy_if);
->   	else
->   		slave->phy = phy_connect(priv->ndev, slave->data->phy_id,
->   				 &cpsw_adjust_link, slave->data->phy_if);
->   	if (IS_ERR(slave->phy)) {
->   		dev_err(priv->dev, "phy %s not found on slave %d\n",
->   			slave->data->phy_id, slave->slave_num);
-> @@ -1936,20 +1935,19 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
->
->   	slave->data	= data;
->   	slave->regs	= regs + slave_reg_ofs;
->   	slave->sliver	= regs + sliver_reg_ofs;
->   	slave->port_vlan = data->dual_emac_res_vlan;
->   }
->
-> -static int cpsw_probe_dt(struct cpsw_priv *priv,
-> +static int cpsw_probe_dt(struct cpsw_platform_data *data,
->   			 struct platform_device *pdev)
->   {
->   	struct device_node *node = pdev->dev.of_node;
->   	struct device_node *slave_node;
-> -	struct cpsw_platform_data *data = &priv->data;
->   	int i = 0, ret;
->   	u32 prop;
->
->   	if (!node)
->   		return -EINVAL;
->
->   	if (of_property_read_u32(node, "slaves", &prop)) {
-> @@ -2029,15 +2027,16 @@ static int cpsw_probe_dt(struct cpsw_priv *priv,
->   		int lenp;
->   		const __be32 *parp;
->
->   		/* This is no slave child node, continue */
->   		if (strcmp(slave_node->name, "slave"))
->   			continue;
->
-> -		priv->phy_node = of_parse_phandle(slave_node, "phy-handle", 0);
-> +		slave_data->phy_node = of_parse_phandle(slave_node,
-> +							"phy-handle", 0);
->   		parp = of_get_property(slave_node, "phy_id", &lenp);
->   		if (of_phy_is_fixed_link(slave_node)) {
->   			struct device_node *phy_node;
->   			struct phy_device *phy_dev;
->
->   			/* In the case of a fixed PHY, the DT node associated
->   			 * to the PHY is the Ethernet MAC DT node.
-> @@ -2271,15 +2270,15 @@ static int cpsw_probe(struct platform_device *pdev)
->   	 * This may be required here for child devices.
->   	 */
->   	pm_runtime_enable(&pdev->dev);
->
->   	/* Select default pin state */
->   	pinctrl_pm_select_default_state(&pdev->dev);
->
-> -	if (cpsw_probe_dt(priv, pdev)) {
-> +	if (cpsw_probe_dt(&priv->data, pdev)) {
->   		dev_err(&pdev->dev, "cpsw: platform data missing\n");
->   		ret = -ENODEV;
->   		goto clean_runtime_disable_ret;
->   	}
->   	data = &priv->data;
->
->   	if (is_valid_ether_addr(data->slave_data[0].mac_addr)) {
-> diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-> index 442a703..e50afd1 100644
-> --- a/drivers/net/ethernet/ti/cpsw.h
-> +++ b/drivers/net/ethernet/ti/cpsw.h
-> @@ -14,14 +14,15 @@
->   #ifndef __CPSW_H__
->   #define __CPSW_H__
->
->   #include <linux/if_ether.h>
->   #include <linux/phy.h>
->
->   struct cpsw_slave_data {
-> +	struct device_node *phy_node;
->   	char		phy_id[MII_BUS_ID_SIZE];
->   	int		phy_if;
->   	u8		mac_addr[ETH_ALEN];
->   	u16		dual_emac_res_vlan;	/* Reserved VLAN for DualEMAC */
->   };
->
->   struct cpsw_platform_data {
->
+Then with the intent of doing something reusable the trend was to put it
+in the iommu instead of vfio_iommu_typeX.
 
+I am currently trying to make the "msi-iommu api" implemented upon the
+dma-iommu api based on the simplifications that we discussed:
+- reuse iova_cookie for iova domain
+- add an opaque msi_cookie that hides the msi doorbell list + its spinlock
+- simplify locking by making sure the msi domain cannot disappear before
+the iommu domain destruction
 
--- 
-regards,
--grygorii
+If you agree I would suggest to wait and see the outcome of this new
+design and make a shared decision based on that code? Should be
+available next week.
+
+Best Regards
+
+Eric
+
+> 
+> Robin.
+> 
+>>>
+>>>> +    /* protects reserved cookie and rbtree manipulation */
+>>>> +    spinlock_t reserved_lock;
+>>>
+>>> A cookie is an opaque structure, so any locking it needs would normally
+>>> be hidden within. If on the other hand it's not meant to be opaque at
+>>> this level, then it should probably be something more specific than a
+>>> void * (if at all, as above).
+>> agreed
+>>
+>> Thanks
+>>
+>> Eric
+>>>
+>>> Robin.
+>>>
+>>>>    };
+>>>>
+>>>>    enum iommu_cap {
+>>>>
+>>>
+>>
+> 
