@@ -1,60 +1,42 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 22 Apr 2016 18:22:32 -0500
-Subject: [v8, 6/7] MAINTAINERS: add entry for Freescale SoC specific driver
-In-Reply-To: <1461306464-19521-7-git-send-email-yangbo.lu@nxp.com>
-References: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
- <1461306464-19521-7-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1461367352.32510.218.camel@buserror.net>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 22 Apr 2016 16:23:31 -0700
+Subject: [PATCH 6/8] firmware: qcom: scm: Add memory allocation API
+In-Reply-To: <1461363432-5730-7-git-send-email-andy.gross@linaro.org>
+References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
+ <1461363432-5730-7-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160422232331.GG3202@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-04-22 at 14:27 +0800, Yangbo Lu wrote:
-> Add maintainer entry for Freescale SoC specific driver including
-> the QE library and the GUTS driver. Also add entry for GUTS driver
-> and add maintainer for QE library.
+On Fri 22 Apr 15:17 PDT 2016, Andy Gross wrote:
+
+> This patch adds APIs for the scm-32 and scm-64 to use for coherent memory
+> allocation.
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+
+This patch must come before the ARM64 implementation.
+
 > ---
-> Changes for v8:
-> 	- Added this patch
-> ---
->  MAINTAINERS | 16 +++++++++++++++-
->  1 file changed, 15 insertions(+), 1 deletion(-)
+>  drivers/firmware/qcom_scm.c | 17 +++++++++++++++++
+>  drivers/firmware/qcom_scm.h |  4 ++++
+>  2 files changed, 21 insertions(+)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 1d5b4be..d20aeb6 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4622,13 +4622,27 @@ F:	drivers/net/ethernet/freescale/fec_ptp.c
->  F:	drivers/net/ethernet/freescale/fec.h
->  F:	Documentation/devicetree/bindings/net/fsl-fec.txt
->  
-> +FREESCALE SOC SPECIFIC DRIVER
+> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+[..]
+> +
+> +void qcom_scm_free_buffer(size_t size, void *cpu_addr,
+> +				 dma_addr_t dma_addr)
+> +{
+> +	if (__scm)
 
-FREESCALE SOC DRIVERS
+This would be quite bad and the caller expects that the memory is
+released when you return from here. This should also only happen if the
+arch specific implementation is buggy, so just let it go BANG!
 
-> +M:	Scott Wood <oss@buserror.net>
+> +		dma_free_writecombine(__scm->dev, size, cpu_addr, dma_addr);
+> +}
+> +
 
-Please CC me at this address, not the NXP address that you sent this to...
-
-> +L:	linuxppc-dev at lists.ozlabs.org
-> +S:	Maintained
-> +F:	drivers/soc/fsl/
-> +F:	include/linux/fsl/
-
-This directory will contain drivers that work on PPC and ARM... I'm not 
-sure what to put here in terms of mailing lists (we could put both, but 
-people probably shouldn't spam both lists if only one arch is relevant 
-to the patch), and whom to make pull requests to.
- 
-> +FREESCALE GUTS DRIVER
-> +M:	Yangbo Lu <yangbo.lu@nxp.com>
-> +L:	linuxppc-dev at lists.ozlabs.org
-> +S:	Maintained
-> +F:	drivers/soc/fsl/guts.c
-
-What about the header?
-
-Does guts really need a separate maintainer from drivers/soc/fsl?
-
--Scott
+Regards,
+Bjorn
