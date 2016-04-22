@@ -1,55 +1,58 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 22 Apr 2016 12:43:36 +0100
-Subject: [PATCH 3/3] ARM: domain: move {set,get}_domain under config guard
-In-Reply-To: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1461325416-29570-4-git-send-email-vladimir.murzin@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 22 Apr 2016 12:44:21 +0100
+Subject: [PATCH 10/11] arm64: tegra: Add clock properties on cpu0 for
+ Tegra210
+In-Reply-To: <1461321071-6431-11-git-send-email-pchiu@nvidia.com>
+References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+ <1461321071-6431-11-git-send-email-pchiu@nvidia.com>
+Message-ID: <571A0E95.9040203@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Domains is not available on !MMU cores, like R/M class. However,
-currently guarding manages M-class only, for the R-class, in case
-of fault we get in recursive "undefined instruction" faulting because
-__show_regs() tries to get domain information.
+Hi Penny,
 
-Fix it by extending CONFIG_CPU_USE_DOMAINS on {set,get}_domain
-functions and providing stubs for the case where Domains is not
-supported.
+On 22/04/16 11:31, Penny Chiu wrote:
+> Add clocks, clock-names, and clock-latency into cpu0 node.
+> These properties will be used by cpufreq driver.
+> 
+> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> index 204d9cd..1a85857 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> @@ -782,6 +782,12 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a57";
+>  			reg = <0>;
+> +			clocks = <&tegra_car TEGRA210_CLK_CCLK_G>,
+> +				 <&tegra_car TEGRA210_CLK_PLL_X>,
+> +				 <&tegra_car TEGRA210_CLK_PLL_P_OUT4>,
+> +				 <&dfll>;
+> +			clock-names = "cpu_g", "pll_x", "pll_p", "dfll";
+> +			clock-latency = <300000>;
+>  		};
+>  
+>  		cpu at 1 {
+> 
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/include/asm/domain.h |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Can you include a patch with this series to update the binding
+documentation for the nvidia,tegra124-cpufreq.txt? I think that although
+there is no specific nvidia,tegra210-cpufreq compatible string the
+documentation should state that both tegra124 and tegra210 are supported
+so it is clear.
 
-diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
-index fc8ba16..a031bb9 100644
---- a/arch/arm/include/asm/domain.h
-+++ b/arch/arm/include/asm/domain.h
-@@ -84,6 +84,8 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+
- static inline unsigned int get_domain(void)
- {
- 	unsigned int domain;
-@@ -104,7 +106,6 @@ static inline void set_domain(unsigned val)
- 	isb();
- }
- 
--#ifdef CONFIG_CPU_USE_DOMAINS
- #define modify_domain(dom,type)					\
- 	do {							\
- 		unsigned int domain = get_domain();		\
-@@ -114,6 +115,8 @@ static inline void set_domain(unsigned val)
- 	} while (0)
- 
- #else
-+static inline unsigned int get_domain(void) { return 0;}
-+static inline void set_domain(unsigned val) { }
- static inline void modify_domain(unsigned dom, unsigned type)	{ }
- #endif
- 
--- 
-1.7.9.5
+Also I see the above binding no longer includes the "cpu_lp" for
+tegra210 which I understand we don't use here. However, the binding
+documentation should reflect this. Having said that, looking at the
+driver it appears the "cpu_lp" clock is not even used for tegra124. I
+wonder if we should drop this from the binding documentation and the
+tegra124.dtsi altogether?
+
+What about the "vdd-cpu-supply" property? Don't we need this?
+
+Cheers
+Jon
