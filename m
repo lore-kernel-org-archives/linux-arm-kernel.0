@@ -1,34 +1,44 @@
 From: harald@ccbib.org (Harald Geyer)
-Date: Fri, 22 Apr 2016 13:52:24 +0000
-Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
-Message-ID: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+Date: Fri, 22 Apr 2016 13:52:26 +0000
+Subject: [PATCH 2/3] ARM: dts: imx23: Provide regulators for the current
+ sources of the LRADC
+In-Reply-To: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+Message-ID: <1461333147-11873-3-git-send-email-harald@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 1/3 changes the driver and updates the binding documentation
-(I guess it is still in staging.)
+This adds the devicetree nodes to make the mxs-lradc driver register
+regulator devices for the integrated current sources.
 
-Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 boards.
-I'd like to get input whether this is actually desired. On boards where
-these regulators would never be enabled this costs a few extra bytes of
-RAM for allocation of the device data, because the nodes can't be easily
-removed in .dts files which are including the .dtsi files. The alternative
-is to add the new nodes to many .dts files, which would be a lot code
-duplication.
+Tested on an imx23-olinuxino board.
 
-Harald Geyer (3):
-  iio: mxs-lradc: Add regulators for current sources
-  ARM: dts: imx23: Provide regulators for the current sources of the
-    LRADC
-  ARM: dts: imx28: Provide regulators for the current sources of the
-    LRADC
+Signed-off-by: Harald Geyer <harald@ccbib.org>
+---
+Note: with this configuration the regulator devices will be present but
+disabled by default.
 
- .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
- arch/arm/boot/dts/imx23.dtsi                       |   8 ++
- arch/arm/boot/dts/imx28.dtsi                       |   8 ++
- drivers/iio/adc/Kconfig                            |   1 +
- drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
- 5 files changed, 198 insertions(+)
+ arch/arm/boot/dts/imx23.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 302d116..05ff6f1 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -471,6 +471,14 @@
+ 				status = "disabled";
+ 				clocks = <&clks 26>;
+ 				#io-channel-cells = <1>;
++
++				isrc_lradc0: ISRC0 {
++					regulator-max-microamp = <300>;
++				};
++
++				isrc_lradc1: ISRC1 {
++					regulator-max-microamp = <300>;
++				};
+ 			};
+ 
+ 			spdif at 80054000 {
 -- 
 2.1.4
