@@ -1,49 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 22 Apr 2016 08:55:07 +0200
-Subject: [PATCH] ARM: EXYNOS: set clock parents of registered clocks on
- power-on
-In-Reply-To: <1461270297-31390-1-git-send-email-vz@mleia.com>
-References: <1461270297-31390-1-git-send-email-vz@mleia.com>
-Message-ID: <5719CACB.2060702@samsung.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 22 Apr 2016 12:25:29 +0530
+Subject: [PATCH net v2 0/3] drivers: net: cpsw: phy-handle fixes
+In-Reply-To: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <5719CAE1.40801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2016 10:24 PM, Vladimir Zapolskiy wrote:
-> If any of the clocks from stored on power down list are not registered
-> by chance, on power-on the for-loop of reassigning the clock parents
-> back from "oscclk" exits and the remaining clocks don't have a chance
-> to restore an original parent clock.
+On Thursday 21 April 2016 11:20 PM, David Rivshin (Allworx) wrote:
+> From: David Rivshin <drivshin@allworx.com>
 > 
-> Fixes: 29e5eea06bc1 ("ARM: EXYNOS: Get current parent clock for power domain on/off")
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
-> Hi Krzysztof,
+> The first patch fixes a bug that makes dual_emac mode break if
+> either slave uses the phy-handle property in the devicetree.
 > 
-> this is a functional and _untested_ change, but I hope it is okay,
-> please review. Here "if (a) break; if (a) continue;" code is quite
-> confusing.
+> The second patch fixes some cosmetic problems with error messages,
+> and also makes the binding documentation more explicit.
 > 
->  arch/arm/mach-exynos/pm_domains.c | 3 ---
->  1 file changed, 3 deletions(-)
+> The third patch cleans up the fixed-link case to work like
+> the now-fixed phy-handle case.
 > 
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 7c21760..6a9993e 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -90,9 +90,6 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->  	if (power_on) {
->  		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
->  			if (IS_ERR(pd->clk[i]))
-> -				break;
-> -
-> -			if (IS_ERR(pd->clk[i]))
->  				continue; /* Skip on first power up */
+> I have tested on the following hardware configurations:
+>  - (EVMSK) dual emac, phy_id property in both slaves
+>  - (EVMSK) dual emac, phy-handle property in both slaves
+>  - (BeagleBoneBlack) single emac, phy_id property
+>  - (custom) single emac, fixed-link subnode
+> 
+> Nicolas Chauvet reported testing on an HP t410 (dm8148).
+> 
+> Markus Brunner reported testing v1 on the following [1]:
+>  - emac0 with phy_id and emac1 with fixed phy
+>  - emac0 with phy-handle and emac1 with fixed phy
+>  - emac0 with fixed phy and emac1 with fixed phy
+> 
+> 
 
-Nice finding! It looks like my mistake during rebasing (automatic
-conflict resolution). Anyway I am pretty sure that idea was here to
-continue on pd->pclk (not clk) error.
+Reviewed-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-I will confirm this and send appropriate patch with your reported-by.
-
-Best regards,
-Krzysztof
+Regards
+Mugunthan V N
