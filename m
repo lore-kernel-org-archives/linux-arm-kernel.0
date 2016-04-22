@@ -1,36 +1,79 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 22 Apr 2016 17:38:05 +0800
-Subject: [PATCH v7 4/8] dt-bindings: Add a binding for Mediatek Video
- Encoder
-In-Reply-To: <1461299131-57851-5-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <201604221712.5n3iXFJo%fengguang.wu@intel.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 22 Apr 2016 10:43:31 +0100
+Subject: [PATCH v2] arm-ccn: Fix building as a module
+Message-ID: <1461318211-25151-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+arm-ccn driver uses irq_set_affinity, which is not exported and
+hence cannot be built as a module, eventhough we have all the
+bits ready. This patch makes use of the exported helper
+irq_set_affinity_hint() instead. Also, the __free_irq expects
+the affinity_hint to be NULL when we free the irq. So set the
+affinity_hint to NULL at clean up.
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.6-rc4 next-20160421]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Now that we can build it as a module, update the Kconfig to
+reflect the change.
 
-url:    https://github.com/0day-ci/linux/commits/Tiffany-Lin/Add-MT8173-Video-Encoder-Driver-and-VPU-Driver/20160422-123111
-base:   git://linuxtv.org/media_tree.git master
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Applies on 4.6-rc4.
 
-All errors (new ones prefixed by >>):
-
->> ERROR: "max_pfn" [drivers/media/platform/mtk-vpu/mtk-vpu.ko] undefined!
-
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+Cc: arm at kernel.org
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Anrnd Bergmann <arnd@arndb.de>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 54453 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/e74910fe/attachment-0001.obj>
+ drivers/bus/Kconfig   |    2 +-
+ drivers/bus/arm-ccn.c |    7 ++++---
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index d4a3a31..3efc996 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -48,7 +48,7 @@ config ARM_CCI5xx_PMU
+ 	  If unsure, say Y
+ 
+ config ARM_CCN
+-	bool "ARM CCN driver support"
++	tristate "ARM CCN driver support"
+ 	depends on ARM || ARM64
+ 	depends on PERF_EVENTS
+ 	help
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index 7082c72..acc3eb5 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -1189,7 +1189,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
+ 		perf_pmu_migrate_context(&dt->pmu, cpu, target);
+ 		cpumask_set_cpu(target, &dt->cpu);
+ 		if (ccn->irq)
+-			WARN_ON(irq_set_affinity(ccn->irq, &dt->cpu) != 0);
++			WARN_ON(irq_set_affinity_hint(ccn->irq, &dt->cpu) != 0);
+ 	default:
+ 		break;
+ 	}
+@@ -1278,7 +1278,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
+ 
+ 	/* Also make sure that the overflow interrupt is handled by this CPU */
+ 	if (ccn->irq) {
+-		err = irq_set_affinity(ccn->irq, &ccn->dt.cpu);
++		err = irq_set_affinity_hint(ccn->irq, &ccn->dt.cpu);
+ 		if (err) {
+ 			dev_err(ccn->dev, "Failed to set interrupt affinity!\n");
+ 			goto error_set_affinity;
+@@ -1306,7 +1306,8 @@ static void arm_ccn_pmu_cleanup(struct arm_ccn *ccn)
+ {
+ 	int i;
+ 
+-	irq_set_affinity(ccn->irq, cpu_possible_mask);
++	if (ccn->irq)
++		irq_set_affinity_hint(ccn->irq, NULL);
+ 	unregister_cpu_notifier(&ccn->dt.cpu_nb);
+ 	for (i = 0; i < ccn->num_xps; i++)
+ 		writel(0, ccn->xp[i].base + CCN_XP_DT_CONTROL);
+-- 
+1.7.9.5
