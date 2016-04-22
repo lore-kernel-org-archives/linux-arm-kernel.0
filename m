@@ -1,142 +1,136 @@
 From: pchiu@nvidia.com (Penny Chiu)
-Date: Fri, 22 Apr 2016 18:31:03 +0800
-Subject: [PATCH 03/11] clk: tegra: Add DFLL DVCO reset control for Tegra210
+Date: Fri, 22 Apr 2016 18:31:04 +0800
+Subject: [PATCH 04/11] clk: tegra: Add Tegra210 support in DFLL driver
 In-Reply-To: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
 References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
-Message-ID: <1461321071-6431-4-git-send-email-pchiu@nvidia.com>
+Message-ID: <1461321071-6431-5-git-send-email-pchiu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DVCO present in the DFLL IP block has a separate reset line,
-exposed via the CAR IP block.  This reset line is asserted upon SoC
-reset.  Unless something (such as the DFLL driver) deasserts this
-line, the DVCO will not oscillate, although reads and writes to the
-DFLL IP block will complete.
+Add Tegra210 support and related CVB table in tegra124 DFLL driver,
+and also update the binding document.
 
 Signed-off-by: Penny Chiu <pchiu@nvidia.com>
 ---
- drivers/clk/tegra/clk-tegra210.c         | 68 ++++++++++++++++++++++++++++++++
- include/dt-bindings/reset/tegra210-car.h | 12 ++++++
- 2 files changed, 80 insertions(+)
- create mode 100644 include/dt-bindings/reset/tegra210-car.h
+ .../bindings/clock/nvidia,tegra124-dfll.txt        |  4 +-
+ drivers/clk/tegra/Makefile                         |  4 +-
+ drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         | 55 ++++++++++++++++++++++
+ 3 files changed, 61 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra210.c b/drivers/clk/tegra/clk-tegra210.c
-index d3709b1..3d70b38 100644
---- a/drivers/clk/tegra/clk-tegra210.c
-+++ b/drivers/clk/tegra/clk-tegra210.c
-@@ -24,6 +24,7 @@
- #include <linux/export.h>
- #include <linux/clk/tegra.h>
- #include <dt-bindings/clock/tegra210-car.h>
-+#include <dt-bindings/reset/tegra210-car.h>
+diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+index 84080a8..42a1fe6 100644
+--- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
++++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+@@ -11,7 +11,9 @@ communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
+ Currently only the I2C mode is supported by these bindings.
  
- #include "clk.h"
- #include "clk-id.h"
-@@ -39,6 +40,9 @@
- #define CLK_SOURCE_CSITE 0x1d4
- #define CLK_SOURCE_EMC 0x19c
+ Required properties:
+-- compatible : should be "nvidia,tegra124-dfll"
++- compatible : should be one of following:
++  - "nvidia,tegra124-dfll" for the Tegra124 SoC
++  - "nvidia,tegra210-dfll" for the Tegra210 SoC
+ - reg : Defines the following set of registers, in the order listed:
+         - registers for the DFLL control logic.
+         - registers for the I2C output logic.
+diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+index 97984c5..9b8e9de 100644
+--- a/drivers/clk/tegra/Makefile
++++ b/drivers/clk/tegra/Makefile
+@@ -17,7 +17,9 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
+ obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
+ obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
+-obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
++ifneq ($(filter y, $(CONFIG_ARCH_TEGRA_124_SOC) $(CONFIG_ARCH_TEGRA_210_SOC)),)
++obj-y					+= clk-tegra124-dfll-fcpu.o
++endif
+ obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.o
+ obj-y					+= cvb.o
+ obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= clk-tegra210.o
+diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+index b577bc6..6b3316c 100644
+--- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
++++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+@@ -44,6 +44,11 @@ static const unsigned long tegra124_cpu_max_freq_table[] = {
+ 	[3] = 2524500000UL,
+ };
  
-+#define RST_DFLL_DVCO 0x2f4
-+#define DVFS_DFLL_RESET_SHIFT 0
++static const unsigned long tegra210_cpu_max_freq_table[] = {
++	[0] = 1912500000UL,
++	[1] = 1912500000UL,
++};
 +
- #define PLLC_BASE 0x80
- #define PLLC_OUT 0x84
- #define PLLC_MISC0 0x88
-@@ -2781,6 +2785,68 @@ static void __init tegra210_clock_apply_init_table(void)
- }
+ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+ 	{
+ 		.speedo_id = -1,
+@@ -87,6 +92,45 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+ 	},
+ };
  
- /**
-+ * tegra210_car_barrier - wait for pending writes to the CAR to complete
-+ *
-+ * Wait for any outstanding writes to the CAR MMIO space from this CPU
-+ * to complete before continuing execution.  No return value.
-+ */
-+static void tegra210_car_barrier(void)
-+{
-+	readl_relaxed(clk_base + RST_DFLL_DVCO);
-+}
++static const struct cvb_table tegra210_cpu_cvb_tables[] = {
++	{
++		.speedo_id = -1,
++		.process_id = -1,
++		.min_millivolts = 850,
++		.max_millivolts = 1170,
++		.speedo_scale = 100,
++		.voltage_scale = 1000,
++		.cvb_table = {
++			{51000000UL,    {1007452, -23865, 370} },
++			{102000000UL,   {1007452, -23865, 370} },
++			{204000000UL,   {1007452, -23865, 370} },
++			{306000000UL,   {1052709, -24875, 370} },
++			{408000000UL,   {1099069, -25895, 370} },
++			{510000000UL,   {1146534, -26905, 370} },
++			{612000000UL,   {1195102, -27915, 370} },
++			{714000000UL,   {1244773, -28925, 370} },
++			{816000000UL,   {1295549, -29935, 370} },
++			{918000000UL,   {1347428, -30955, 370} },
++			{1020000000UL,  {1400411, -31965, 370} },
++			{1122000000UL,  {1454497, -32975, 370} },
++			{1224000000UL,  {1509687, -33985, 370} },
++			{1326000000UL,  {1565981, -35005, 370} },
++			{1428000000UL,  {1623379, -36015, 370} },
++			{1530000000UL,  {1681880, -37025, 370} },
++			{1632000000UL,  {1741485, -38035, 370} },
++			{1734000000UL,  {1802194, -39055, 370} },
++			{1836000000UL,  {1864006, -40065, 370} },
++			{1912500000UL,  {1910780, -40815, 370} },
++			{0,             {      0,      0,   0} },
++		},
++		.cpu_dfll_data = {
++			.tune0_low = 0xffead0ff,
++			.tune0_high = 0xffead0ff,
++			.tune1 = 0x20091d9,
++		}
++	},
++};
 +
-+/**
-+ * tegra210_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
-+ *
-+ * Assert the reset line of the DFLL's DVCO.  No return value.
-+ */
-+static void tegra210_clock_assert_dfll_dvco_reset(void)
-+{
-+	u32 v;
-+
-+	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
-+	v |= (1 << DVFS_DFLL_RESET_SHIFT);
-+	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
-+	tegra210_car_barrier();
-+}
-+
-+/**
-+ * tegra210_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
-+ *
-+ * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
-+ * operate.  No return value.
-+ */
-+static void tegra210_clock_deassert_dfll_dvco_reset(void)
-+{
-+	u32 v;
-+
-+	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
-+	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
-+	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
-+	tegra210_car_barrier();
-+}
-+
-+static int tegra210_reset_assert(unsigned long id)
-+{
-+	if (id == TEGRA210_RST_DFLL_DVCO)
-+		tegra210_clock_assert_dfll_dvco_reset();
-+	else
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static int tegra210_reset_deassert(unsigned long id)
-+{
-+	if (id == TEGRA210_RST_DFLL_DVCO)
-+		tegra210_clock_deassert_dfll_dvco_reset();
-+	else
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+/**
-  * tegra210_clock_init - Tegra210-specific clock initialization
-  * @np: struct device_node * of the DT node for the SoC CAR IP block
-  *
-@@ -2844,6 +2910,8 @@ static void __init tegra210_clock_init(struct device_node *np)
+ static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+ 	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
+ 	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
+@@ -94,11 +138,22 @@ static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+ 	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
+ };
  
- 	tegra_super_clk_gen5_init(clk_base, pmc_base, tegra210_clks,
- 				  &pll_x_params);
-+	tegra_init_special_resets(1, tegra210_reset_assert,
-+				tegra210_reset_deassert);
- 	tegra_add_of_provider(np);
- 	tegra_register_devclks(devclks, ARRAY_SIZE(devclks));
- 
-diff --git a/include/dt-bindings/reset/tegra210-car.h b/include/dt-bindings/reset/tegra210-car.h
-new file mode 100644
-index 0000000..a8632af
---- /dev/null
-+++ b/include/dt-bindings/reset/tegra210-car.h
-@@ -0,0 +1,12 @@
-+/*
-+ * This header provides Tegra210-specific constants for binding
-+ * nvidia,tegra210-car.
-+ */
++static const struct dfll_fcpu_data tegra210_dfll_fcpu_data = {
++	.cpu_max_freq_table = tegra210_cpu_max_freq_table,
++	.cpu_max_freq_table_size = ARRAY_SIZE(tegra210_cpu_max_freq_table),
++	.cpu_cvb_tables = tegra210_cpu_cvb_tables,
++	.cpu_cvb_tables_size = ARRAY_SIZE(tegra210_cpu_cvb_tables)
++};
 +
-+#ifndef _DT_BINDINGS_RESET_TEGRA210_CAR_H
-+#define _DT_BINDINGS_RESET_TEGRA210_CAR_H
-+
-+#define TEGRA210_RESET(x)		(7 * 32 + (x))
-+#define TEGRA210_RST_DFLL_DVCO		TEGRA210_RESET(0)
-+
-+#endif	/* _DT_BINDINGS_RESET_TEGRA210_CAR_H */
+ static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
+ 	{
+ 		.compatible = "nvidia,tegra124-dfll",
+ 		.data = &tegra124_dfll_fcpu_data
+ 	},
++	{
++		.compatible = "nvidia,tegra210-dfll",
++		.data = &tegra210_dfll_fcpu_data
++	},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
 -- 
 2.8.1
