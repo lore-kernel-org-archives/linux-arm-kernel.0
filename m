@@ -1,76 +1,62 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Fri, 22 Apr 2016 12:25:31 +0800
-Subject: [PATCH v7 8/8] arm64: dts: mediatek: Add Video Encoder for MT8173
-In-Reply-To: <1461299131-57851-8-git-send-email-tiffany.lin@mediatek.com>
+Date: Fri, 22 Apr 2016 12:25:24 +0800
+Subject: [PATCH v7 1/8] dt-bindings: Add a binding for Mediatek Video Processor
+In-Reply-To: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
 References: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-2-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-3-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-4-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-5-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-6-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-7-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-8-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1461299131-57851-9-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1461299131-57851-2-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add video encoder node for MT8173
+From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 
+Add a DT binding documentation of Video Processor Unit for the
+MT8173 SoC from Mediatek.
+
+Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   39 ++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ .../devicetree/bindings/media/mediatek-vpu.txt     |   31 ++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index ae147bb..348ce0e 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -717,6 +717,45 @@
- 			clock-names = "apb", "smi";
- 		};
- 
-+		vcodec_enc: vcodec at 18002000 {
-+			compatible = "mediatek,mt8173-vcodec-enc";
-+			reg = <0 0x18002000 0 0x1000>,	/* VENC_SYS */
-+			      <0 0x19002000 0 0x1000>;	/* VENC_LT_SYS */
-+			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
-+				     <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
-+			mediatek,larb = <&larb3>,
-+					<&larb5>;
-+			iommus = <&iommu M4U_PORT_VENC_RCPU>,
-+				 <&iommu M4U_PORT_VENC_REC>,
-+				 <&iommu M4U_PORT_VENC_BSDMA>,
-+				 <&iommu M4U_PORT_VENC_SV_COMV>,
-+				 <&iommu M4U_PORT_VENC_RD_COMV>,
-+				 <&iommu M4U_PORT_VENC_CUR_LUMA>,
-+				 <&iommu M4U_PORT_VENC_CUR_CHROMA>,
-+				 <&iommu M4U_PORT_VENC_REF_LUMA>,
-+				 <&iommu M4U_PORT_VENC_REF_CHROMA>,
-+				 <&iommu M4U_PORT_VENC_NBM_RDMA>,
-+				 <&iommu M4U_PORT_VENC_NBM_WDMA>,
-+				 <&iommu M4U_PORT_VENC_RCPU_SET2>,
-+				 <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
-+				 <&iommu M4U_PORT_VENC_BSDMA_SET2>,
-+				 <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
-+				 <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
-+				 <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
-+				 <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
-+				 <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
-+				 <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
-+			mediatek,vpu = <&vpu>;
-+			clocks = <&topckgen CLK_TOP_VENCPLL_D2>,
-+				 <&topckgen CLK_TOP_VENC_SEL>,
-+				 <&topckgen CLK_TOP_UNIVPLL1_D2>,
-+				 <&topckgen CLK_TOP_VENC_LT_SEL>;
-+			clock-names = "venc_sel_src",
-+				      "venc_sel",
-+				      "venc_lt_sel_src",
-+				      "venc_lt_sel";
-+		};
+diff --git a/Documentation/devicetree/bindings/media/mediatek-vpu.txt b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+new file mode 100644
+index 0000000..2a5bac3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+@@ -0,0 +1,31 @@
++* Mediatek Video Processor Unit
 +
- 		vencltsys: clock-controller at 19000000 {
- 			compatible = "mediatek,mt8173-vencltsys", "syscon";
- 			reg = <0 0x19000000 0 0x1000>;
++Video Processor Unit is a HW video controller. It controls HW Codec including
++H.264/VP8/VP9 Decode, H.264/VP8 Encode and Image Processor (scale/rotate/color convert).
++
++Required properties:
++  - compatible: "mediatek,mt8173-vpu"
++  - reg: Must contain an entry for each entry in reg-names.
++  - reg-names: Must include the following entries:
++    "tcm": tcm base
++    "cfg_reg": Main configuration registers base
++  - interrupts: interrupt number to the cpu.
++  - clocks : clock name from clock manager
++  - clock-names: must be main. It is the main clock of VPU
++
++Optional properties:
++  - memory-region: phandle to a node describing memory (see
++    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt)
++    to be used for VPU extended memory; if not present, VPU may be located
++    anywhere in the memory
++
++Example:
++	vpu: vpu at 10020000 {
++		compatible = "mediatek,mt8173-vpu";
++		reg = <0 0x10020000 0 0x30000>,
++		      <0 0x10050000 0 0x100>;
++		reg-names = "tcm", "cfg_reg";
++		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&topckgen TOP_SCP_SEL>;
++		clock-names = "main";
++	};
 -- 
 1.7.9.5
