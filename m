@@ -1,22 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 22 Apr 2016 16:30:15 +0530
-Subject: [PATCH 07/11] cpufreq: tegra124: Add Tegra210 support
-In-Reply-To: <1461321071-6431-8-git-send-email-pchiu@nvidia.com>
-References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
- <1461321071-6431-8-git-send-email-pchiu@nvidia.com>
-Message-ID: <20160422110015.GC22726@vireshk-i7>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 12:02:01 +0100
+Subject: [PATCH v7 1/8] genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
+In-Reply-To: <1461085990-2547-2-git-send-email-eric.auger@linaro.org>
+References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
+ <1461085990-2547-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <571A04A9.1010104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-04-16, 18:31, Penny Chiu wrote:
-> Add tegra210 support in tegra124 cpufreq driver.
-> 
-> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+Hi Eric,
+
+On 19/04/16 18:13, Eric Auger wrote:
+> Let's introduce a new msi_domain_info flag value, MSI_FLAG_IRQ_REMAPPING
+> meant to tell the domain supports IRQ REMAPPING, also known as Interrupt
+> Translation Service. On Intel HW this IRQ remapping capability is
+> abstracted on IOMMU side while on ARM it is abstracted on MSI controller
+> side. This flag will be used to know whether the MSI passthrough is
+> safe.
+
+Perhaps a nitpick, but given the earlier confusion about what the IOMMU 
+flag actually meant this prompts me to wonder if it's worth adjusting 
+the general terminology before we propagate it further. What I think we 
+actually care about is that one thing or the other "provides MSI 
+isolation" rather than "supports MSI remapping", since the latter is all 
+to easy to misinterpret the way we did in the SMMU drivers.
+
+Robin.
+
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>
 > ---
->  drivers/cpufreq/tegra124-cpufreq.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
--- 
-viresh
+>
+> v4 -> v5:
+> - seperate flag introduction from first user addition (ITS)
+> ---
+>   include/linux/msi.h | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 8b425c6..08441b1 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -270,6 +270,8 @@ enum {
+>   	MSI_FLAG_MULTI_PCI_MSI		= (1 << 3),
+>   	/* Support PCI MSIX interrupts */
+>   	MSI_FLAG_PCI_MSIX		= (1 << 4),
+> +	/* Support MSI IRQ remapping service */
+> +	MSI_FLAG_IRQ_REMAPPING		= (1 << 5),
+>   };
+>
+>   int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
+>
