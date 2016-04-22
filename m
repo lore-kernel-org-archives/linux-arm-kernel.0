@@ -1,83 +1,64 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 14:51:18 +0100
-Subject: [PATCHv2 1/6] efi/runtime-wrappers: add {__,}efi_call_virt templates
-In-Reply-To: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
-References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1461333083-15529-2-git-send-email-mark.rutland@arm.com>
+Date: Fri, 22 Apr 2016 14:51:17 +0100
+Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
+Message-ID: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently each architecture must implement two macros, efi_call_virt and
-__efi_call_virt, which only differ by the presence or absence of a
-return type. Otherwise, the logic surrounding the call is identical.
+Some firmware erroneously unmask IRQs (and potentially other architecture
+specific exceptions) during runtime services functions, in violation of both
+common sense and the UEFI specification. This can result in a number of issues
+if said exceptions are taken when they are expected to be masked, and
+additionally can confuse IRQ tracing if the original mask state is not
+restored prior to returning from firmware.
 
-As each architecture must define the entire body of each, we can't place
-any generic manipulation (e.g. irq flag validation) in the middle.
+In practice it's difficult to check that firmware never unmasks exceptions, but
+we can at least check that the IRQ flags are at least consistent upon entry to
+and return from a runtime services function call. This series implements said
+check in the shared EFI runtime wrappers code, after an initial round of
+refactoring such that this can be generic.
 
-This patch adds template implementations of these macros. With these,
-arch code can implement three template macros, avoiding reptition for
-the void/non-void return cases:
+I have left ia64 as-is, without this check, as ia64 doesn't currently use the
+generic runtime wrappers, has many special cases for the runtime calls which
+don't fit well with the generic code, and I don't expect a new, buggy ia64
+firmware to appear soon.
 
-* arch_efi_call_virt_setup
+The first time corruption of the IRQ flags is detected, we dump a stack trace,
+and set TAINT_FIRMWARE_WORKAROUND. Additionally, and in all subsequent cases,
+we log (with ratelimiting) the specific corruption of the flags, and restore
+the expected flags to avoid redundant warnings elsewhere.
 
-  Sets up the environment for the call (e.g. switching page tables,
-  allowing kernel-mode use of floating point, if required).
+Since v1 [1]:
+* Fix thinko: s/local_irq_save/local_save_flags/
+* Remove ifdefs after conversion
+* Remove reundant semicolon from x86 patch
+* Move efi_call_virt_check_flags before first use
+* Add Acked-bys and Reviewed-bys
 
-* arch_efi_call_virt
+Ard, I assume that your Reviewed-by still stands for the final patch, even
+though efi_call_virt_check_flags moved. Please shout if that's not the case!
 
-  Performs the call. The last expression in the macro must be the call
-  itself, allowing the logic to be shared by the void and non-void
-  cases.
+Hopefully you're also happy to extend that to the new patch removing the
+ifdefs once they become superfluous.
 
-* arch_efi_call_virt_teardown
+Thanks,
+Mark.
 
-  Restores the usual kernel environment once the call has returned.
+[1] https://lkml.org/lkml/2016/4/21/260
 
-While the savings from repition are minimal, we additionally gain the
-ability to add common code around the call with the call environment set
-up. This can be used to detect common firmware issues (e.g. bad irq mask
-management).
+Mark Rutland (6):
+  efi/runtime-wrappers: add {__,}efi_call_virt templates
+  arm64/efi: move to generic {__,}efi_call_virt
+  arm/efi: move to generic {__,}efi_call_virt
+  x86/efi: move to generic {__,}efi_call_virt
+  efi/runtime-wrappers: remove redundant ifdefs
+  efi/runtime-wrappers: detect FW irq flag corruption
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: linux-efi at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/firmware/efi/runtime-wrappers.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/include/asm/efi.h              | 20 ++++------------
+ arch/arm64/include/asm/efi.h            | 21 ++++++-----------
+ arch/x86/include/asm/efi.h              | 41 ++++++++++-----------------------
+ drivers/firmware/efi/runtime-wrappers.c | 38 ++++++++++++++++++++++++++++++
+ 4 files changed, 61 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
-index de69530..1b9fa54 100644
---- a/drivers/firmware/efi/runtime-wrappers.c
-+++ b/drivers/firmware/efi/runtime-wrappers.c
-@@ -20,6 +20,27 @@
- #include <linux/spinlock.h>
- #include <asm/efi.h>
- 
-+
-+#ifndef efi_call_virt
-+#define efi_call_virt(f, args...)					\
-+({									\
-+	efi_status_t __s;						\
-+	arch_efi_call_virt_setup();					\
-+	__s = arch_efi_call_virt(f, args);				\
-+	arch_efi_call_virt_teardown();					\
-+	__s;								\
-+})
-+#endif
-+
-+#ifndef __efi_call_virt
-+#define __efi_call_virt(f, args...)					\
-+({									\
-+	arch_efi_call_virt_setup();					\
-+	arch_efi_call_virt(f, args);					\
-+	arch_efi_call_virt_teardown();					\
-+})
-+#endif
-+
- /*
-  * According to section 7.1 of the UEFI spec, Runtime Services are not fully
-  * reentrant, and there are particular combinations of calls that need to be
 -- 
 1.9.1
