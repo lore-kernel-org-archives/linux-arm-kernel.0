@@ -1,106 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 18:07:56 +0100
-Subject: [PATCH v2 1/6] arm64: ptdump: use static initializers for
- vmemmap region boundaries
-In-Reply-To: <1461343688-8552-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
- <1461343688-8552-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160422170725.GT10606@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 18:08:46 +0100
+Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
+In-Reply-To: <20160421161859.GK929@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
+ <20160421161859.GK929@arm.com>
+Message-ID: <571A5A9E.7040305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 06:48:03PM +0200, Ard Biesheuvel wrote:
-> There is no need to initialize the vmemmap region boundaries dynamically,
-> since they are compile time constants. So just add these constants to the
-> global struct initializer, and drop the dynamic assignment and related code.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 21/04/16 17:18, Will Deacon wrote:
+> On Wed, Apr 13, 2016 at 06:13:00PM +0100, Robin Murphy wrote:
+>> Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
+>> accessor macros as conditional wrappers") makes the *_relaxed forms of
+>> I/O accessors universally available to drivers, in cases where writeq()
+>> is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
+>> end up falling back to writel() regardless of whether writel_relaxed()
+>> is available (identically for s/write/read/).
+>>
+>> Add corresponding relaxed forms of the nonatomic helpers to delegate
+>> to the equivalent 32-bit accessors as appropriate.
+>>
+>> CC: Arnd Bergmann <arnd@arndb.de>
+>> CC: Christoph Hellwig <hch@lst.de>
+>> CC: Darren Hart <dvhart@linux.intel.com>
+>> CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   include/linux/io-64-nonatomic-hi-lo.h | 25 +++++++++++++++++++++++++
+>>   include/linux/io-64-nonatomic-lo-hi.h | 25 +++++++++++++++++++++++++
+>>   2 files changed, 50 insertions(+)
+>>
+>> diff --git a/include/linux/io-64-nonatomic-hi-lo.h b/include/linux/io-64-nonatomic-hi-lo.h
+>> index 11d7e84..1a85566 100644
+>> --- a/include/linux/io-64-nonatomic-hi-lo.h
+>> +++ b/include/linux/io-64-nonatomic-hi-lo.h
+>> @@ -21,6 +21,23 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
+>>   	writel(val, addr);
+>>   }
+>>
+>> +static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
+>> +{
+>> +	const volatile u32 __iomem *p = addr;
+>> +	u32 low, high;
+>> +
+>> +	high = readl_relaxed(p + 1);
+>> +	low = readl_relaxed(p);
+>> +
+>> +	return low + ((u64)high << 32);
+>> +}
+>> +
+>> +static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
+>> +{
+>> +	writel_relaxed(val >> 32, addr + 4);
+>> +	writel_relaxed(val, addr);
+>> +}
+>
+> Could we not generate the _relaxed variants with some macro magic?
 
-There is a slight change in that we now print the VA boundaries for the
-reserved vmemmap range rather than the populated vmemmap range, but that
-makes more sense to me anyway. It's nice to see the sepaarate indices
-go.
+We _could_ - indeed I started doing that, but then decided that the 
+obfuscation of horrible macro-templated functions wasn't worth saving a 
+couple of hundred bytes in some code that isn't exactly difficult to 
+maintain and has needed touching once in 4 years.
 
-It may be worth defining VMEMMAP_END in the same header file as
-VMEMMAP_{START,SIZE}, but either way:
+If you did want to go down the macro route, I may as well also generate 
+both lo-hi and hi-lo headers all from a single template, it'd be really 
+clever... <alarm bells> ;)
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Robin.
 
-Mark.
-
-> ---
->  arch/arm64/mm/dump.c | 49 ++++++--------------
->  1 file changed, 13 insertions(+), 36 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index a21f47421b0c..493461159462 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -32,37 +32,21 @@ struct addr_marker {
->  	const char *name;
->  };
->  
-> -enum address_markers_idx {
-> -	MODULES_START_NR = 0,
-> -	MODULES_END_NR,
-> -	VMALLOC_START_NR,
-> -	VMALLOC_END_NR,
-> -	FIXADDR_START_NR,
-> -	FIXADDR_END_NR,
-> -	PCI_START_NR,
-> -	PCI_END_NR,
-> +static const struct addr_marker address_markers[] = {
-> +	{ MODULES_VADDR,		"Modules start" },
-> +	{ MODULES_END,			"Modules end" },
-> +	{ VMALLOC_START,		"vmalloc() Area" },
-> +	{ VMALLOC_END,			"vmalloc() End" },
-> +	{ FIXADDR_START,		"Fixmap start" },
-> +	{ FIXADDR_TOP,			"Fixmap end" },
-> +	{ PCI_IO_START,			"PCI I/O start" },
-> +	{ PCI_IO_END,			"PCI I/O end" },
->  #ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -	VMEMMAP_START_NR,
-> -	VMEMMAP_END_NR,
-> +	{ VMEMMAP_START,		"vmemmap start" },
-> +	{ VMEMMAP_START + VMEMMAP_SIZE,	"vmemmap end" },
->  #endif
-> -	KERNEL_SPACE_NR,
-> -};
-> -
-> -static struct addr_marker address_markers[] = {
-> -	{ MODULES_VADDR,	"Modules start" },
-> -	{ MODULES_END,		"Modules end" },
-> -	{ VMALLOC_START,	"vmalloc() Area" },
-> -	{ VMALLOC_END,		"vmalloc() End" },
-> -	{ FIXADDR_START,	"Fixmap start" },
-> -	{ FIXADDR_TOP,		"Fixmap end" },
-> -	{ PCI_IO_START,		"PCI I/O start" },
-> -	{ PCI_IO_END,		"PCI I/O end" },
-> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -	{ 0,			"vmemmap start" },
-> -	{ 0,			"vmemmap end" },
-> -#endif
-> -	{ PAGE_OFFSET,		"Linear Mapping" },
-> -	{ -1,			NULL },
-> +	{ PAGE_OFFSET,			"Linear Mapping" },
-> +	{ -1,				NULL },
->  };
->  
->  /*
-> @@ -347,13 +331,6 @@ static int ptdump_init(void)
->  			for (j = 0; j < pg_level[i].num; j++)
->  				pg_level[i].mask |= pg_level[i].bits[j].mask;
->  
-> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -	address_markers[VMEMMAP_START_NR].start_address =
-> -				(unsigned long)virt_to_page(PAGE_OFFSET);
-> -	address_markers[VMEMMAP_END_NR].start_address =
-> -				(unsigned long)virt_to_page(high_memory);
-> -#endif
-> -
->  	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
->  				 &ptdump_fops);
->  	return pe ? 0 : -ENOMEM;
-> -- 
-> 2.7.4
-> 
+>
+> Will
+>
