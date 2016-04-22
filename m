@@ -1,80 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 22 Apr 2016 15:11:43 +0200
-Subject: [PATCH 03/11] clk: tegra: Add DFLL DVCO reset control for Tegra210
-In-Reply-To: <1461321071-6431-4-git-send-email-pchiu@nvidia.com>
-References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
- <1461321071-6431-4-git-send-email-pchiu@nvidia.com>
-Message-ID: <20160422131143.GL9047@ulmo.ba.sec>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Apr 2016 14:11:51 +0100
+Subject: [v8, 1/7] Documentation: DT: update Freescale DCFG compatible
+In-Reply-To: <1461306464-19521-2-git-send-email-yangbo.lu@nxp.com>
+References: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
+ <1461306464-19521-2-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <20160422131151.GJ10606@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 06:31:03PM +0800, Penny Chiu wrote:
-> The DVCO present in the DFLL IP block has a separate reset line,
-> exposed via the CAR IP block.  This reset line is asserted upon SoC
-> reset.  Unless something (such as the DFLL driver) deasserts this
-> line, the DVCO will not oscillate, although reads and writes to the
-> DFLL IP block will complete.
+On Fri, Apr 22, 2016 at 02:27:38PM +0800, Yangbo Lu wrote:
+> Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead
+> of 'fsl,ls1021a-dcfg' to include more chips.
 > 
-> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 > ---
->  drivers/clk/tegra/clk-tegra210.c         | 68 ++++++++++++++++++++++++++++++++
->  include/dt-bindings/reset/tegra210-car.h | 12 ++++++
->  2 files changed, 80 insertions(+)
->  create mode 100644 include/dt-bindings/reset/tegra210-car.h
+> Changes for v8:
+> 	- Added this patch
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/clk/tegra/clk-tegra210.c b/drivers/clk/tegra/clk-tegra210.c
-> index d3709b1..3d70b38 100644
-> --- a/drivers/clk/tegra/clk-tegra210.c
-> +++ b/drivers/clk/tegra/clk-tegra210.c
-> @@ -24,6 +24,7 @@
->  #include <linux/export.h>
->  #include <linux/clk/tegra.h>
->  #include <dt-bindings/clock/tegra210-car.h>
-> +#include <dt-bindings/reset/tegra210-car.h>
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index 752a685..1d5f512 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -119,7 +119,7 @@ Freescale DCFG
+>  configuration and status for the device. Such as setting the secondary
+>  core start address and release the secondary core from holdoff and startup.
+>    Required properties:
+> -  - compatible: should be "fsl,ls1021a-dcfg"
+> +  - compatible: should be "fsl,<chip>-dcfg"
+
+Please list specific values expected for <chip>, while jusy saying
+<chip> may be more generic, it makes it practically impossible to search
+for the correct binding given a compatible string, and it's vague as to
+exaclty what <chip> should be.
+
+Thanks,
+Mark.
+
+
+
+>    - reg : should contain base address and length of DCFG memory-mapped registers
 >  
->  #include "clk.h"
->  #include "clk-id.h"
-> @@ -39,6 +40,9 @@
->  #define CLK_SOURCE_CSITE 0x1d4
->  #define CLK_SOURCE_EMC 0x19c
->  
-> +#define RST_DFLL_DVCO 0x2f4
-> +#define DVFS_DFLL_RESET_SHIFT 0
-
-It'd be more idiomatic to make this:
-
-	#define DVFS_DFLL_RESET (1 << 0)
-
-and use that below instead of hard-coding the 1 << and shifting by the
-define.
-
-> +
->  #define PLLC_BASE 0x80
->  #define PLLC_OUT 0x84
->  #define PLLC_MISC0 0x88
-> @@ -2781,6 +2785,68 @@ static void __init tegra210_clock_apply_init_table(void)
->  }
->  
->  /**
-> + * tegra210_car_barrier - wait for pending writes to the CAR to complete
-> + *
-> + * Wait for any outstanding writes to the CAR MMIO space from this CPU
-> + * to complete before continuing execution.  No return value.
-> + */
-> +static void tegra210_car_barrier(void)
-> +{
-> +	readl_relaxed(clk_base + RST_DFLL_DVCO);
-> +}
-
-If you use the plain readl() and writel() functions, do you still need
-the barrier? Or is there actually a requirement from the hardware to
-flush writes by reading from any of the registers?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/d47054db/attachment.sig>
+>  Example:
+> -- 
+> 2.1.0.27.g96db324
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
