@@ -1,56 +1,98 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 22 Apr 2016 16:58:46 +0530
-Subject: [PATCH V2 8/9] cpufreq: zynq: Use generic platdev driver
-In-Reply-To: <cover.1461324267.git.viresh.kumar@linaro.org>
-References: <cover.1461324267.git.viresh.kumar@linaro.org>
-Message-ID: <e0092fa19646f22d667a46854743076465bc5429.1461324267.git.viresh.kumar@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 12:31:04 +0100
+Subject: [PATCH v7 01/10] iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+In-Reply-To: <5717A738.9090904@linaro.org>
+References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
+ <1461084994-2355-2-git-send-email-eric.auger@linaro.org>
+ <57177A4E.4090804@arm.com> <5717A738.9090904@linaro.org>
+Message-ID: <571A0B78.6070509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
-device now, reuse that and remove similar code from platform code.
+On 20/04/16 16:58, Eric Auger wrote:
+> Hi Robin,
+> On 04/20/2016 02:47 PM, Robin Murphy wrote:
+>> Hi Eric,
+>>
+>> On 19/04/16 17:56, Eric Auger wrote:
+>>> Introduce a new DOMAIN_ATTR_MSI_MAPPING domain attribute. If supported,
+>>> this means the MSI addresses need to be mapped in the IOMMU.
+>>>
+>>> x86 IOMMUs typically don't expose the attribute since on x86, MSI write
+>>> transaction addresses always are within the 1MB PA region [FEE0_0000h -
+>>> FEF0_000h] window which directly targets the APIC configuration space and
+>>> hence bypass the sMMU. On ARM and PowerPC however MSI transactions are
+>>> conveyed through the IOMMU.
+>>
+>> What's stopping us from simply inferring this from the domain's IOMMU
+>> not advertising interrupt remapping capabilities?
+> My current understanding is it is not possible:
+> on x86 CAP_INTR_REMAP is not systematically exposed (the feature can be
+> disabled) and MSIs are never mapped in the IOMMU I think.
 
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-zynq/common.c          | 2 --
- drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Not sure I follow - if the feature is disabled such that the IOMMU 
+doesn't isolate MSIs, then it's no different a situation from the SMMU, no?
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 860ffb663f02..da876d28ccbc 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -110,7 +110,6 @@ static void __init zynq_init_late(void)
-  */
- static void __init zynq_init_machine(void)
- {
--	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
- 	struct soc_device_attribute *soc_dev_attr;
- 	struct soc_device *soc_dev;
- 	struct device *parent = NULL;
-@@ -145,7 +144,6 @@ static void __init zynq_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
- 
- 	platform_device_register(&zynq_cpuidle_device);
--	platform_device_register_full(&devinfo);
- }
- 
- static void __init zynq_timer_init(void)
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 24dde5e256d4..5ad29383e862 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -68,6 +68,8 @@ static const struct of_device_id machines[] __initconst = {
- 	{ .compatible = "ti,omap3", },
- 	{ .compatible = "ti,omap4", },
- 	{ .compatible = "ti,omap5", },
-+
-+	{ .compatible = "xlnx,zynq-7000", },
- };
- 
- static int __init cpufreq_dt_platdev_init(void)
--- 
-2.7.1.410.g6faf27b
+My point was that this logic:
+
+	if (IOMMU_CAP_INTR_REMAP)
+		we're good
+	else if (DOMAIN_ATTR_MSI_MAPPING)
+		if (acquire_msi_remapping_resources(domain))
+			we're good
+		else
+			oh no!
+	else
+		oh no!
+
+should be easily reducible to this:
+
+	if (IOMMU_CAP_INTR_REMAP)
+		we're good
+	else if (acquire_msi_remapping_resources(domain))
+		we're good
+	else
+		oh no!	// Don't care whether the domain ran out of
+			// resources or simply doesn't support it,
+			// either way we can't proceed.
+
+Robin.
+
+> Best Regards
+>
+> Eric
+>>
+>> Robin.
+>>
+>>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>
+>>> ---
+>>>
+>>> v4 -> v5:
+>>> - introduce the user in the next patch
+>>>
+>>> RFC v1 -> v1:
+>>> - the data field is not used
+>>> - for this attribute domain_get_attr simply returns 0 if the MSI_MAPPING
+>>>     capability if needed or <0 if not.
+>>> - removed struct iommu_domain_msi_maps
+>>> ---
+>>>    include/linux/iommu.h | 1 +
+>>>    1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>> index 62a5eae..b3e8c5b 100644
+>>> --- a/include/linux/iommu.h
+>>> +++ b/include/linux/iommu.h
+>>> @@ -113,6 +113,7 @@ enum iommu_attr {
+>>>        DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>>>        DOMAIN_ATTR_FSL_PAMUV1,
+>>>        DOMAIN_ATTR_NESTING,    /* two stages of translation */
+>>> +    DOMAIN_ATTR_MSI_MAPPING, /* Require MSIs mapping in iommu */
+>>>        DOMAIN_ATTR_MAX,
+>>>    };
+>>>
+>>>
+>>
+>
