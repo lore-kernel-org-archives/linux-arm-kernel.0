@@ -1,50 +1,56 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 22 Apr 2016 10:30:31 -0400
-Subject: [PATCH V6 08/13] PCI: generic, thunder: update to use generic
- ECAM API
-In-Reply-To: <5718A6AE.4080203@semihalf.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <3830999.dF71UWYsBP@wuerfel> <57189D2F.9070802@semihalf.com>
- <8950494.UV8UrWiFbx@wuerfel> <5718A6AE.4080203@semihalf.com>
-Message-ID: <571A3587.2020704@redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 22 Apr 2016 15:38:31 +0100
+Subject: [PATCH] drivers: firmware: psci: unify enable-method binding on ARM
+ {64, 32}-bit systems
+Message-ID: <1461335911-13233-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2016 06:08 AM, Tomasz Nowicki wrote:
-> On 21.04.2016 11:36, Arnd Bergmann wrote:
->> On Thursday 21 April 2016 11:28:15 Tomasz Nowicki wrote:
->>> On 19.04.2016 15:06, Arnd Bergmann wrote:
->>>> On Monday 18 April 2016 21:31:54 Tomasz Nowicki wrote:
->>>>>
->>>>> Basically the whole content of pci-thunder-ecam.c and
->>>>> pci-thunder-pem.c.
->>>>>
->>>>> pci-thunder-ecam.c contains config space accessors. Similar for
->>>>> pci-thunder-pem.c but it also has extra init call (it is now called
->>>>> thunder_pem_init) which finds and maps related registers.
->>>>
->>>> They seem to do much more than just override the accessors, they
->>>> actually
->>>> change the contents of the config space as well. Is that really
->>>> necessary
->>>> on ACPI based systems as well?
->>>
->>> Yes, the pci-thunder-ecam.c accessors are meant to emulate config space
->>> capabilities. They are necessary to synthesize EA capabilities (fixed
->>> PCI BARs), it wont work without this, for ACPI boot as well.
->>
->> Why is that? I thought the BARs never get reassigned when using ACPI,
->> so I'm surprised it's actually needed. Maybe I misunderstood what
->> you mean by fixed PCI BARs.
-> 
-> Yes, I meant something else. ThunderX has non-programmable PCI BAR
-> addresses. So it uses PCI EA (Extended allocation) capabilities to get
-> know PCI BARs addresses. But the early implementation (pass1.x) misses
-> EA capabilities hence we need to emulate it in config space accessors.
+Currently ARM CPUs DT bindings allows different enable-method value for
+PSCI based systems. On ARM 64-bit this property is required and must be
+"psci" while on ARM 32-bit systems this property is optional and must
+be "arm,psci".
 
-Aside: In case it's helpful, at least one enterprise vendor I know of is
-only supporting later silicon as a result of this. So IMO there's no
-need to worry about this issue on the early preproduction chips.
+This is problematic if 32-bit OS is run on 64-bit system which has
+"psci" as enable-method rather than the expected "arm,psci".
 
+So let's unify the value into "psci" and remove support for "arm,psci"
+before it finds any users.
+
+Reported-by: Soby Mathew <Soby.Mathew@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 -
+ drivers/firmware/psci.c                        | 2 +-
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ccc62f145306..3f0cbbb8395f 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -192,7 +192,6 @@ nodes to be present and contain the properties described below.
+ 			  can be one of:
+ 			    "allwinner,sun6i-a31"
+ 			    "allwinner,sun8i-a23"
+-			    "arm,psci"
+ 			    "arm,realview-smp"
+ 			    "brcm,bcm-nsp-smp"
+ 			    "brcm,brahma-b15"
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 11bfee8b79a9..b5d05807e6ec 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -360,7 +360,7 @@ static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+ 	.init = psci_dt_cpu_init_idle,
+ };
+ 
+-CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
++CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
+ #endif
+ #endif
+ 
 -- 
-Computer Architect | Sent from my Fedora powered laptop
+1.9.1
