@@ -1,37 +1,71 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 22 Apr 2016 12:05:48 +0100
-Subject: [PATCH v3 1/5] arm64: cpufeature: Add scope for capability check
-In-Reply-To: <1461250597-16712-2-git-send-email-suzuki.poulose@arm.com>
-References: <1461250597-16712-1-git-send-email-suzuki.poulose@arm.com>
- <1461250597-16712-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <571A058C.9000507@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 12:16:26 +0100
+Subject: [PATCH v7 6/7] iommu/arm-smmu: do not advertise
+ IOMMU_CAP_INTR_REMAP
+In-Reply-To: <1461086687-2658-7-git-send-email-eric.auger@linaro.org>
+References: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
+ <1461086687-2658-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <571A080A.4040406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/16 15:56, Suzuki K Poulose wrote:
-> Add scope parameter to the arm64_cpu_capabilities::matches(), so that
-> this can be reused for checking the capability on a given CPU vs the
-> system wide. The system uses the default scope associated with the
-> capability for initialising the CPU_HWCAPs and ELF_HWCAPs.
+Hi Eric, Alex,
+
+On 19/04/16 18:24, Eric Auger wrote:
+> Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu(-v3). Indeed the
+> irq_remapping capability is abstracted on irqchip side for ARM as
+> opposed to Intel IOMMU featuring IRQ remapping HW.
 >
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-  -71,7 +71,9 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+> So to check IRQ remapping capability, the msi domain needs to be
+> checked instead.
 >
->   /* meta feature for alternatives */
->   static bool __maybe_unused
-> -cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry);
-> +cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
-> +
-> +static u64 __raw_read_system_reg(u32 sys_id);
+> This commit needs to be applied after "vfio/type1: also check IRQ
+> remapping capability at msi domain" else the legacy interrupt
+> assignment gets broken with arm-smmu.
 
+Hmm, that smells of papering over a different problem. I may have missed 
+it, but I don't see anything changing legacy interrupt behaviour in this 
+series - are legacy INTx (or platform) interrupts intrinsically safe 
+because they're physically wired, or intrinsically unsafe because they 
+could be shared? If it's the latter then I don't see how the IOMMU or 
+MSI controller changes anything in that respect, and if it's the former 
+then surely we should support that right now without the SMMU having to 
+lie about MSI isolation? I started looking into it but I'm a bit lost...
 
-I missed getting rid of the above forward declaration, will respin the series.
+Robin.
 
-Thanks
-Suzuki
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>   drivers/iommu/arm-smmu-v3.c | 3 ++-
+>   drivers/iommu/arm-smmu.c    | 3 ++-
+>   2 files changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index afd0dac..1d0106c 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1386,7 +1386,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>   	case IOMMU_CAP_CACHE_COHERENCY:
+>   		return true;
+>   	case IOMMU_CAP_INTR_REMAP:
+> -		return true; /* MSIs are just memory writes */
+> +		/* interrupt translation handled at MSI controller level */
+> +		return false;
+>   	case IOMMU_CAP_NOEXEC:
+>   		return true;
+>   	default:
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 492339f..6232b2a 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1312,7 +1312,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>   		 */
+>   		return true;
+>   	case IOMMU_CAP_INTR_REMAP:
+> -		return true; /* MSIs are just memory writes */
+> +		/* interrupt translation handled at MSI controller level */
+> +		return false;
+>   	case IOMMU_CAP_NOEXEC:
+>   		return true;
+>   	default:
+>
