@@ -1,39 +1,62 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Fri, 22 Apr 2016 16:49:17 +0530
-Subject: [PATCH v6 7/7] arm64/perf: Add Broadcom Vulcan PMU support
-In-Reply-To: <20160421135450.GO6879@leverpostej>
-References: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
- <1461243525-13603-8-git-send-email-ashoks@broadcom.com>
- <20160421135450.GO6879@leverpostej>
-Message-ID: <CAKc_7PXng0zjbfm_w9=p+HKc693Mc50A439v2GRH1j9WC-cvdQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 22 Apr 2016 13:24:06 +0200
+Subject: [PATCH] ARM: tegra: fix naming in GPIO DT binding header
+In-Reply-To: <CACRpkdZxeV07_rb2xL+HRGp-ay1B-U=_tEbPCYqvM+ZYD-wpYQ@mail.gmail.com>
+References: <1459884307-24043-1-git-send-email-swarren@wwwdotorg.org>
+ <20160406172845.GC28843@ulmo.ba.sec>
+ <5705481D.3030700@wwwdotorg.org>
+ <CACRpkdZxeV07_rb2xL+HRGp-ay1B-U=_tEbPCYqvM+ZYD-wpYQ@mail.gmail.com>
+Message-ID: <20160422112406.GB9047@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 7:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Apr 21, 2016 at 05:58:45AM -0700, Ashok Kumar wrote:
->> +static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
->> +{
->> +     armv8_pmu_init(cpu_pmu);
->> +     cpu_pmu->name                   = "armv8_brcm_vulcan";
->
-> Are we happy with "brcm" being the exposed userspace name? It might be
-> better to have this as "armv8_broadcom_vulcan".
+On Mon, Apr 11, 2016 at 09:04:09AM +0200, Linus Walleij wrote:
+> On Wed, Apr 6, 2016 at 7:32 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > On 04/06/2016 11:28 AM, Thierry Reding wrote:
+> >>
+> >> On Tue, Apr 05, 2016 at 01:25:07PM -0600, Stephen Warren wrote:
+> >>>
+> >>> From: Stephen Warren <swarren@nvidia.com>
+> >>>
+> >>> According to the Tegra TRM, GPIOs are aggregated into /ports/ of 8 GPIOs,
+> >>> not into /banks/. Fix <dt-bindings/gpio/tegra-gpio.h> to correctly
+> >>> reflect
+> >>> this naming convention. While this seems like silly churn, it will become
+> >>> slightly more important once we introduce the GPIO binding for upcoming
+> >>> Tegra chips.
+> >>>
+> >>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >>> ---
+> >>>   include/dt-bindings/gpio/tegra-gpio.h | 68
+> >>> +++++++++++++++++------------------
+> >>>   1 file changed, 34 insertions(+), 34 deletions(-)
+> >>
+> >>
+> >> It's not clear to me where this should be applied. This is technically
+> >> part of the GPIO controller bindings, in which case it'd need to go via
+> >> the GPIO tree. I'm fine with taking it through the Tegra tree, too, but
+> >> in case you agree that it should go through the GPIO tree:
+> >>
+> >> Acked-by: Thierry Reding <treding@nvidia.com>
+> >
+> > I typically consider bindings part of the SoC code-base they related to, so
+> > I'd imagine this going through the Tegra tree. I didn't Cc LinusW on the
+> > patch because of that thinking and oversight, but have done so now just in
+> > case he feels strongly.
+> 
+> No strong opinion, only time I care is when we merge a new driver
+> and it #includes <dt-bindings/...>.
+> 
+> Take it through the tegra tree.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Broadcom uses "brcm" as the vendor prefix in device trees, and the
-cpu's compatible string is "brcm,vulcan", so this should be ok.
+Applied, thanks.
 
-It looks like the A53 and A57 entries have established a convention of
-calling the PMU  "armv8_<cpuname>". Otherwise, something very close
-to the PMU's OF compatible string would have been better here.
-
-> I'll leave that to you and Will. Either way:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-If needed:
-
-Acked-by: Jayachandran C <jchandra@broadcom.com>
-
-for the Broadcom Vulcan related changes in the whole series.
-
-JC.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/0f5b4c7d/attachment.sig>
