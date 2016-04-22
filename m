@@ -1,28 +1,30 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 22 Apr 2016 12:26:22 -0700
-Subject: [GIT PULL 2/2] bcm2835 defconfig changes for 4.7
-In-Reply-To: <1461184067-31925-2-git-send-email-eric@anholt.net>
-References: <1461184067-31925-1-git-send-email-eric@anholt.net>
- <1461184067-31925-2-git-send-email-eric@anholt.net>
-Message-ID: <571A7ADE.3040903@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 22 Apr 2016 14:33:53 -0500
+Subject: [PATCH v2 2/2] ARM: dts: dra7x: Support QSPI MODE-0 operation at
+ 64MHz
+In-Reply-To: <1461151980-28139-3-git-send-email-vigneshr@ti.com>
+References: <1461151980-28139-1-git-send-email-vigneshr@ti.com>
+ <1461151980-28139-3-git-send-email-vigneshr@ti.com>
+Message-ID: <20160422193353.GA15316@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/16 13:27, Eric Anholt wrote:
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+On Wed, Apr 20, 2016 at 05:03:00PM +0530, Vignesh R wrote:
+> According to Data Manual(SPRS915P) of AM57x, TI QSPI controller on
+> DRA74(rev 1.1+)/DRA72 EVM can support up to 64MHz in MODE-0, whereas
+> MODE-3 is limited to 48MHz. Hence, switch to MODE-0 for better
+> throughput.
 > 
-> are available in the git repository at:
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
 > 
->   https://github.com/anholt/linux tags/bcm2835-defconfig-next-2016-04-20
+> v2: rebased on linux-next 20160419 to include moving to
+> dra72-evm-common.dtsi
 > 
-> for you to fetch changes up to 3652bb35abf6ee11333cbec1d2855c1c0f9f6b27:
 > 
->   ARM: bcm2835: Enable NFS root support. (2016-04-04 11:03:30 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in changes for bcm2835_defconfig and
-> multi_v7_defconfig in 4.7.
+>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 7 +++++++
+>  arch/arm/boot/dts/dra7-evm.dts                    | 6 ++----
+>  arch/arm/boot/dts/dra72-evm-common.dtsi           | 6 ++----
+>  3 files changed, 11 insertions(+), 8 deletions(-)
 
-Also merged into defconfig/next, thanks Eric!
--- 
-Florian
+Acked-by: Rob Herring <robh@kernel.org>
