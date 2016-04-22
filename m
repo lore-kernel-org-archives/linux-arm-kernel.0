@@ -1,81 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 22 Apr 2016 11:14:36 +0200
-Subject: [PATCH 00/12] mtd: get rid of of_mtd.{c,h} and of_get_nand_xx()
-In-Reply-To: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160422111436.5d698888@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 22 Apr 2016 17:38:05 +0800
+Subject: [PATCH v7 4/8] dt-bindings: Add a binding for Mediatek Video
+ Encoder
+In-Reply-To: <1461299131-57851-5-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <201604221712.5n3iXFJo%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  1 Apr 2016 14:54:20 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi,
 
-> Hello,
-> 
-> of_mtd.{h,c} are providing the of_get_nand_xxx() helpers to help NAND
-> controller drivers parse some generic NAND DT properties.
-> An infrastructure has recently been added to NAND core to automatically
-> parse those properties when nand_scan_ident() is called, thus removing
-> the need for NAND controller drivers to manually parse them.
-> 
-> This series modifies drivers still making use of those helpers to rely
-> on NAND core initialization, and get rid of the of_mtd.{c,h} files by
-> moving the of_get_nand_xx() helpers into nand_base.c.
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.6-rc4 next-20160421]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Applied remaining patches.
+url:    https://github.com/0day-ci/linux/commits/Tiffany-Lin/Add-MT8173-Video-Encoder-Driver-and-VPU-Driver/20160422-123111
+base:   git://linuxtv.org/media_tree.git master
+config: i386-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Boris Brezillon (12):
->   mtd: nand: remove unneeded of_mtd.h inclusions
->   mtd: nand: atmel: rely on generic DT parsing done in nand_scan_ident()
->   mtd: nand: omap2: rely on generic DT parsing done in nand_scan_ident()
->   mtd: nand: brcm: rely on generic DT parsing done in nand_scan_ident()
->   mtd: nand: davinci: rely on generic DT parsing done in
->     nand_scan_ident()
->   mtd: nand: gpmi: rely on generic DT parsing done in nand_scan_ident()
->   mtd: nand: hisi504: rely on generic DT parsing done in
->     nand_scan_ident()
->   mtd: nand: lpc32xx: rely on generic DT parsing done in
->     nand_scan_ident()
->   mtd: nand: mxc: rely on generic DT parsing done in nand_scan_ident()
->   mtd: nand: pxa3xx: rely on generic DT parsing done in
->     nand_scan_ident()
->   mtd: nand: sh_flctl: rely on generic DT parsing done in
->     nand_scan_ident()
->   mtd: nand: move of_get_nand_xxx() helpers into nand_base.c
-> 
->  drivers/memory/omap-gpmc.c             |   7 --
->  drivers/mtd/nand/atmel_nand.c          | 133 +++++++++++++++-------------
->  drivers/mtd/nand/brcmnand/brcmnand.c   |   5 +-
->  drivers/mtd/nand/davinci_nand.c        |  85 +++++++++---------
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  21 +++--
->  drivers/mtd/nand/hisi504_nand.c        |  14 +--
->  drivers/mtd/nand/jz4780_nand.c         |   1 -
->  drivers/mtd/nand/lpc32xx_mlc.c         |   1 -
->  drivers/mtd/nand/lpc32xx_slc.c         |  24 ++---
->  drivers/mtd/nand/mxc_nand.c            |  50 +++++------
->  drivers/mtd/nand/nand_base.c           |  99 ++++++++++++++++++++-
->  drivers/mtd/nand/omap2.c               |   9 +-
->  drivers/mtd/nand/pxa3xx_nand.c         |  28 +++---
->  drivers/mtd/nand/qcom_nandc.c          |   1 -
->  drivers/mtd/nand/sh_flctl.c            |  31 +++----
->  drivers/mtd/nand/sunxi_nand.c          |   1 -
->  drivers/mtd/nand/vf610_nfc.c           |   1 -
->  drivers/of/Makefile                    |   1 -
->  drivers/of/of_mtd.c                    | 155 ---------------------------------
->  include/linux/of_mtd.h                 |  56 ------------
->  20 files changed, 291 insertions(+), 432 deletions(-)
->  delete mode 100644 drivers/of/of_mtd.c
->  delete mode 100644 include/linux/of_mtd.h
-> 
+All errors (new ones prefixed by >>):
 
+>> ERROR: "max_pfn" [drivers/media/platform/mtk-vpu/mtk-vpu.ko] undefined!
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 54453 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/e74910fe/attachment-0001.obj>
