@@ -1,167 +1,132 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Fri, 22 Apr 2016 13:51:47 +0800
-Subject: [PATCH RESEND v2 4/4] ARM64: dts: rockchip: add dts file for RK3399
- evaluation board
-In-Reply-To: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
-References: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1461304307-14113-5-git-send-email-jay.xu@rock-chips.com>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Fri, 22 Apr 2016 05:59:07 +0000
+Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+In-Reply-To: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <VI1PR0401MB18558325A80D252D2EC64A7BFF6F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add rk3399-evb.dts for RK3399 evaluation board.
-Tested on RK3399 evb.
+From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Friday, April 22, 2016 10:01 AM
+> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
+> <fugang.duan@nxp.com>; lznuaa at gmail.com
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
+> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
+> kernel at lists.infradead.org; johannes at sipsolutions.net;
+> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> arnd at arndb.de; holgerschurig at gmail.com; Troy Kisky
+> <troy.kisky@boundarydevices.com>
+> Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+> 
+> If dirty_tx isn't updated, then dma_unmap_single will be called twice.
+> 
+> This fixes a
+> [   58.420980] ------------[ cut here ]------------
+> [   58.425667] WARNING: CPU: 0 PID: 377 at /home/schurig/d/mkarm/linux-
+> 4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
+> [   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free DMA
+> memory it has not allocated [device address=0x0000000000000000] [size=66
+> bytes]
+> 
+> encountered by Holger
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> Tested-by: <holgerschurig@gmail.com>
+> ---
+>  drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> b/drivers/net/ethernet/freescale/fec_main.c
+> index 08243c2..b71654c 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev, u16
+> queue_id)
+>  					 fec16_to_cpu(bdp->cbd_datlen),
+>  					 DMA_TO_DEVICE);
+>  		bdp->cbd_bufaddr = cpu_to_fec32(0);
+> -		if (!skb) {
+> -			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+> -			continue;
+> -		}
+> +		if (!skb)
+> +			goto skb_done;
+> 
+>  		/* Check for errors. */
+>  		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC | @@ -1239,7
+> +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+> 
+>  		/* Free the sk buffer associated with this last transmit */
+>  		dev_kfree_skb_any(skb);
+> -
+> +skb_done:
+>  		/* Make sure the update to bdp and tx_skbuff are performed
+>  		 * before dirty_tx
+>  		 */
+> --
+> 2.5.0
 
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
-changes in v2:
-- remove rk808 since without i2c, which will upstream independently
-- remove es8316 since without i2c, which will upstream independently
-- fix codingstyle issues
+The patch is fine for me.
+Can you review below patch that also fix the issue. It can take much effort due to less rmb() and READ_ONCE() operation that is very sensitive for duplex Gbps test for i.MX6SX/i.MX7d SOC. (i.MX6SX can reach at 1.4Gbps, i.MX7D can reach at 1.8Gbps.)
 
- arch/arm64/boot/dts/rockchip/Makefile       |   1 +
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 122 ++++++++++++++++++++++++++++
- 2 files changed, 123 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1160,12 +1160,13 @@ static void
+ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+ {
+        struct  fec_enet_private *fep;
+-       struct bufdesc *bdp;
++       struct bufdesc *bdp, *bdp_t;
+        unsigned short status;
+        struct  sk_buff *skb;
+        struct fec_enet_priv_tx_q *txq;
+        struct netdev_queue *nq;
+        int     index = 0;
++       int     i, bdnum;
+        int     entries_free;
 
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index df37865..7037a16 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-new file mode 100644
-index 0000000..309f870
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -0,0 +1,122 @@
-+/*
-+ * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+        fep = netdev_priv(ndev);
+@@ -1187,20 +1188,28 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+                if (status & BD_ENET_TX_READY)
+                        break;
+
+-               index = fec_enet_get_bd_index(bdp, &txq->bd);
+-
++               bdp_t = bdp;
++               bdnum = 1;
++               index = fec_enet_get_bd_index(txq->tx_bd_base, bdp_t, fep);
+                skb = txq->tx_skbuff[index];
+-               txq->tx_skbuff[index] = NULL;
+-               if (!IS_TSO_HEADER(txq, fec32_to_cpu(bdp->cbd_bufaddr)))
+-                       dma_unmap_single(&fep->pdev->dev,
+-                                        fec32_to_cpu(bdp->cbd_bufaddr),
+-                                        fec16_to_cpu(bdp->cbd_datlen),
+-                                        DMA_TO_DEVICE);
+-               bdp->cbd_bufaddr = cpu_to_fec32(0);
+-               if (!skb) {
+-                       bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+-                       continue;
++               while (!skb) {
++                       bdp_t = fec_enet_get_nextdesc(bdp_t, &txq->bd);
++                       index = fec_enet_get_bd_index(txq->tx_bd_base, bdp_t, fep);
++                       skb = txq->tx_skbuff[index];
++                       bdnum++;
++               }
++               status = fec16_to_cpu(READ_ONCE(bdp->cbd_sc));
++               if (status & BD_ENET_TX_READY)
++                       break;
 +
-+/dts-v1/;
-+#include <dt-bindings/pwm/pwm.h>
-+#include "rk3399.dtsi"
-+
-+/ {
-+	compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
-+
-+	vdd_center: vdd-center {
-+		compatible = "pwm-regulator";
-+		pwms = <&pwm3 0 25000 0>;
-+		regulator-name = "vdd_center";
-+		regulator-min-microvolt = <800000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		status = "okay";
-+	};
-+
-+	vcc3v3_sys: vcc3v3-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3_sys";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&pwm0 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ohci {
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins =
-+				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		pmic_dvs2: pmic-dvs2 {
-+			rockchip,pins =
-+				<1 18 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+};
--- 
-1.9.1
++               for (i = 0; i < bdnum; i++) {
++                       if (!IS_TSO_HEADER(txq, bdp->cbd_bufaddr))
++                               dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
++                                                bdp->cbd_datlen, DMA_TO_DEVICE);
++                       bdp->cbd_bufaddr = 0;
++                       if (i < bdnum - 1)
++                               bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+                }
++               txq->tx_skbuff[index] = NULL;
+
+
+Regards,
+Andy
