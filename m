@@ -1,34 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 22 Apr 2016 09:53:50 +0200 (CEST)
-Subject: [PATCH 1/2] clocksource: sp804: Add support for OX810SE 24bit
- timer width
-In-Reply-To: <20160422074645.GA3974@linaro.org>
-References: <1459520559-13110-1-git-send-email-narmstrong@baylibre.com>
- <1459520559-13110-2-git-send-email-narmstrong@baylibre.com>
- <20160422074645.GA3974@linaro.org>
-Message-ID: <alpine.DEB.2.11.1604220953000.3941@nanos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Apr 2016 08:58:43 +0100
+Subject: [PATCH 2/2 v5] irqchip/Layerscape: Add SCFG MSI controller support
+In-Reply-To: <VI1PR04MB161534A98E15E93263B07DBFE86F0@VI1PR04MB1615.eurprd04.prod.outlook.com>
+References: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
+ <1457321782-3245-2-git-send-email-Minghuan.Lian@nxp.com>
+ <20160307095021.7f9f7484@arm.com>
+ <CADRPPNRU=qy34p4hzYvzBPrt2uabSQfc0Xdd8K5v5B_JW01QJA@mail.gmail.com>
+ <5719D614.1080400@arm.com>
+ <VI1PR04MB161534A98E15E93263B07DBFE86F0@VI1PR04MB1615.eurprd04.prod.outlook.com>
+Message-ID: <5719D9B3.1030705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Apr 2016, Daniel Lezcano wrote:
-
-> On Fri, Apr 01, 2016 at 04:22:38PM +0200, Neil Armstrong wrote:
-> > In order to support the Dual-Timer on the Oxford Semiconductor OX810SE SoC,
-> > implement variable counter width, keeping 32bit as default width.
-> > Add new compatible string oxsemi,ox810se-rps-timer in order to select
-> > the 24bit counter width.
-> > 
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > ---
-> >  drivers/clocksource/timer-sp804.c | 107 ++++++++++++++++++++++++--------------
-> >  include/clocksource/timer-sp804.h |  42 ++++++++++++---
-> >  2 files changed, 102 insertions(+), 47 deletions(-)
+On 22/04/16 08:53, Minghuan Lian wrote:
+> Hi Marc,
 > 
-> I will take those patches but this driver really deserves a cleanup.
+> Please see the link:
+> https://patchwork.kernel.org/patch/8649241/
+> 
+> Rob Herring has given the ACK.
+> 
+> I have submitted the v6 patch:  https://patchwork.kernel.org/patch/8649251/
+> Please apply the latest the patch after you review.
 
-If it deserves a cleanup, then this should happen _BEFORE_ we add new
-functionality to it.
+Thanks. I'll queue that for 4.7 together with Rob's ack.
 
 Thanks,
 
-	tglx
+	M.
+-- 
+Jazz is not dead. It just smells funny...
