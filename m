@@ -1,37 +1,82 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 22 Apr 2016 10:07:09 +0100
-Subject: [PATCH v5 00/11] qcom: Add support for TSENS driver
-In-Reply-To: <20160420235127.GC2558@localhost.localdomain>
-References: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
- <20160420235127.GC2558@localhost.localdomain>
-Message-ID: <5719E9BD.6090805@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 22 Apr 2016 11:07:28 +0200
+Subject: [PATCH v6 06/12] ARM: dts: r8a7793: Add SYSC PM Domains
+In-Reply-To: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
+References: <1461316054-27999-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1461316054-27999-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a device node for the System Controller.
+Hook up the first Cortex-A15 CPU core and the Cortex-A15 L2 cache/SCU to
+their respective PM Domains.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+v6:
+  - Add Acked-by,
 
-On 21/04/16 00:51, Eduardo Valentin wrote:
-> On Thu, Apr 14, 2016 at 03:01:48PM +0530, Rajendra Nayak wrote:
->> Current set of patches apply on 4.6-rc3. nvmem apis are currently
->> broken and hence need to pull in the fixes for it as proposed here [1]
->
->
-> Could you please clarify this a bit?
->
-> Do I understand properly that we need to wait until [1] gets merged to
-> get the driver functional again after applying this series?
+v5:
+  - Remove "power-domains" property again from the sysc node, as the
+    System Controller itself is not part of the Clock Domain,
 
-I think nvmem regression fixes should not stop TSENS driver from going 
-to mainline.
+v4:
+  - Add "power-domains" property to the sysc node, to refer to the SoC's
+    Clock Domain,
 
-I think you can take these patches if you are happy with them, I will 
-take care of the nvmem fixes.
+v3:
+  - Drop power area hiearchy from DT,
+  - Switch to "#power-domain-cells = <1>",
+  - Drop fallback compatibility strings,
 
-thanks,
-srini
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+v2:
+  - Change one-line summary prefix to match current arm-soc practices,
+  - Update compatible values.
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 6186179fd66db6b2..53e235e3279d08c1 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -11,6 +11,7 @@
+ #include <dt-bindings/clock/r8a7793-clock.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/power/r8a7793-sysc.h>
+ 
+ / {
+ 	compatible = "renesas,r8a7793";
+@@ -43,6 +44,7 @@
+ 			voltage-tolerance = <1>; /* 1% */
+ 			clocks = <&cpg_clocks R8A7793_CLK_Z>;
+ 			clock-latency = <300000>; /* 300 us */
++			power-domains = <&sysc R8A7793_PD_CA15_CPU0>;
+ 
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1500000 1000000>,
+@@ -76,6 +78,7 @@
+ 
+ 	L2_CA15: cache-controller at 0 {
+ 		compatible = "cache";
++		power-domains = <&sysc R8A7793_PD_CA15_SCU>;
+ 		cache-unified;
+ 		cache-level = <2>;
+ 	};
+@@ -1223,6 +1226,12 @@
+ 		};
+ 	};
+ 
++	sysc: system-controller at e6180000 {
++		compatible = "renesas,r8a7793-sysc";
++		reg = <0 0xe6180000 0 0x0200>;
++		#power-domain-cells = <1>;
++	};
++
+ 	ipmmu_sy0: mmu at e6280000 {
+ 		compatible = "renesas,ipmmu-r8a7793", "renesas,ipmmu-vmsa";
+ 		reg = <0 0xe6280000 0 0x1000>;
+-- 
+1.9.1
