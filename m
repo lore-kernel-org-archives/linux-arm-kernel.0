@@ -1,81 +1,43 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 22 Apr 2016 14:48:41 +0300
-Subject: [PATCH 06/23] mmc: sdhci: using common mmc_regulator_set_vqmmc()
-In-Reply-To: <1460741387-23815-7-git-send-email-aisheng.dong@nxp.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-7-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <571A0F99.20802@intel.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Fri, 22 Apr 2016 12:57:41 +0100 (BST)
+Subject: [PATCH v11 15/17] ARM64: XEN: Add a function to initialize Xen
+ specific UEFI runtime services
+In-Reply-To: <20160422105427.GG2998@e104818-lin.cambridge.arm.com>
+References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
+ <1460030614-16112-16-git-send-email-zhaoshenglong@huawei.com>
+ <20160422105427.GG2998@e104818-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.10.1604221257150.6744@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/16 20:29, Dong Aisheng wrote:
-> Instead of using private VCCQ regulator signal voltage switch code,
-> we switch to use the more robust common function mmc_regulator_set_vqmmc()
-> in MMC core which set the target voltage as close as possible to target
-> voltage.
+On Fri, 22 Apr 2016, Catalin Marinas wrote:
+> On Thu, Apr 07, 2016 at 08:03:32PM +0800, Shannon Zhao wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > When running on Xen hypervisor, runtime services are supported through
+> > hypercall. Add a Xen specific function to initialize runtime services.
+> > 
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/include/asm/xen/xen-ops.h   |  6 ++++++
+> >  arch/arm/xen/Makefile                |  1 +
+> >  arch/arm/xen/efi.c                   | 40 ++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/include/asm/xen/xen-ops.h |  6 ++++++
+> >  arch/arm64/xen/Makefile              |  1 +
+> >  drivers/xen/Kconfig                  |  2 +-
+> >  6 files changed, 55 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/include/asm/xen/xen-ops.h
+> >  create mode 100644 arch/arm/xen/efi.c
+> >  create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
 > 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> Don't have a board to test mmc_regulator_set_vqmmc() switch way,
-> need others to help verify.
-
-So was there a reason you wanted to change it?
-
-I agree mmc_regulator_set_vqmmc() looks superior, but we really need
-feedback from people using this code..
-
-> ---
->  drivers/mmc/host/sdhci.c | 39 ++-------------------------------------
->  1 file changed, 2 insertions(+), 37 deletions(-)
+> This looks like entirely Xen code, so I don't think it needs arm64
+> maintainers' approval. FWIW:
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 7f63f5d..2338aab 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1726,43 +1726,8 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->  	if (ret)
->  		return ret;
->  
-> -	if (IS_ERR(mmc->supply.vqmmc))
-> -		return 0;
-> -
-> -	switch (ios->signal_voltage) {
-> -	case MMC_SIGNAL_VOLTAGE_330:
-> -		ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
-> -					    3600000);
-> -		if (ret) {
-> -			pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
-> -				mmc_hostname(mmc));
-> -			return -EIO;
-> -		}
-> -
-> -		return 0;
-> -	case MMC_SIGNAL_VOLTAGE_180:
-> -		ret = regulator_set_voltage(mmc->supply.vqmmc,
-> -				1700000, 1950000);
-> -		if (ret) {
-> -			pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
-> -				mmc_hostname(mmc));
-> -			return -EIO;
-> -		}
-> -
-> -		return 0;
-> -	case MMC_SIGNAL_VOLTAGE_120:
-> -		ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
-> -					    1300000);
-> -		if (ret) {
-> -			pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
-> -				mmc_hostname(mmc));
-> -			return -EIO;
-> -		}
-> -		return 0;
-> -	default:
-> -		/* No signal voltage switch required */
-> -		return 0;
-> -	}
-> +	/* do regulator signal voltage switch if exist */
-> +	return mmc_regulator_set_vqmmc(mmc, ios);
->  }
->  
->  static int sdhci_card_busy(struct mmc_host *mmc)
-> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Thanks Catalin, I'll go ahead and queue the series up for 4.7.
+
+Cheers,
+
+Stefano
