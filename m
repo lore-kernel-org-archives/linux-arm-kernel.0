@@ -1,51 +1,20 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 18:09:32 +0100
-Subject: [PATCH v2 2/6] arm64: ptdump: add region marker for kasan shadow
- region
-In-Reply-To: <1461343688-8552-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
- <1461343688-8552-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160422170932.GU10606@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Apr 2016 18:10:09 +0100
+Subject: [PATCH 19/25] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <1459894127-17698-20-git-send-email-ynorov@caviumnetworks.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-20-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20160422171009.GR2998@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 06:48:04PM +0200, Ard Biesheuvel wrote:
-> Annotate the KASAN shadow region with boundary markers, so that its
-> mappings stand out in the page table dumper output.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Wed, Apr 06, 2016 at 01:08:41AM +0300, Yury Norov wrote:
+> Here new aarch32 ptrace syscall handler is introsuced to avoid run-time
+> detection of the task type.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+The reason for this patch isn't clear to me. What's wrong with the
+run-time detection? It's not some performance critical code.
 
-Mark.
-
-> ---
->  arch/arm64/mm/dump.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index 493461159462..8404190fe2bd 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -23,6 +23,7 @@
->  #include <linux/seq_file.h>
->  
->  #include <asm/fixmap.h>
-> +#include <asm/kasan.h>
->  #include <asm/memory.h>
->  #include <asm/pgtable.h>
->  #include <asm/pgtable-hwdef.h>
-> @@ -33,6 +34,10 @@ struct addr_marker {
->  };
->  
->  static const struct addr_marker address_markers[] = {
-> +#ifdef CONFIG_KASAN
-> +	{ KASAN_SHADOW_START,		"Kasan shadow start" },
-> +	{ KASAN_SHADOW_END,		"Kasan shadow end" },
-> +#endif
->  	{ MODULES_VADDR,		"Modules start" },
->  	{ MODULES_END,			"Modules end" },
->  	{ VMALLOC_START,		"vmalloc() Area" },
-> -- 
-> 2.7.4
-> 
+-- 
+Catalin
