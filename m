@@ -1,32 +1,27 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 22 Apr 2016 09:02:54 +1000
-Subject: [PATCH v2 10/11] arm: Add Aspeed machine
-In-Reply-To: <1461277737.3135.14.camel@kernel.crashing.org>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-11-git-send-email-joel@jms.id.au>
- <6245614.OXDTEyrM2z@wuerfel> <1461277737.3135.14.camel@kernel.crashing.org>
-Message-ID: <1461279774.3135.21.camel@kernel.crashing.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 22 Apr 2016 10:14:58 +1000
+Subject: [PATCH v3] PCI: rcar-pcie: Remove Gen2 designation from Kconfig
+In-Reply-To: <CAMuHMdXtVvNERECxbp1EtJ1SNOQG-j_xtV3NpsGqgyDLmc7cOg@mail.gmail.com>
+References: <1461210715-29304-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXtVvNERECxbp1EtJ1SNOQG-j_xtV3NpsGqgyDLmc7cOg@mail.gmail.com>
+Message-ID: <20160422001455.GA25416@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-04-22 at 08:28 +1000, Benjamin Herrenschmidt wrote:
-> It may or may not be already correct, you don't necessarily have a
-> serial enabled bootloader or it might be using a UART driver that
-> doesn't use the 'standard' divisors etc... This just sanitizes it.
+On Thu, Apr 21, 2016 at 03:38:35PM +0200, Geert Uytterhoeven wrote:
+> On Thu, Apr 21, 2016 at 5:51 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > It appears that Gen2 is a misnomer for the R-Car PCIE driver
+> > which also supports Gen 1 and Gen 3 SoCs. Accordingly, drop Gen 2
+> > from the help text and Kconfig symbol.
+> >
+> > Also, re-arange the Kconfig symbol name to use PCIE as the prefix.
+> > This appears to be in keeping with other PCIE Kconfig symbols.
+> >
+> > Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 > 
-> This register contains misc controls. That specific bit controls a
-> clock divisor by 13 from the main 24Mhz source, which provides a
-> reasonably "standard" 1.84 Mhz input to the UARTs.
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On a second thought ... if we chose to not support random crap vendor
-uboots, we could make it a requirement that this register is already
-set appropriately by the bootloader to match what's in the device-tree
-I suppose...
-
-That, along with a watchdog driver, would allow us to completely remove
-that init code.
-
-Joel, Jeremy, your call.
-
-Cheers,
-Ben.
+Thanks, I have queued this up.
