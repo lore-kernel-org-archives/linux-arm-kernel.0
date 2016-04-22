@@ -1,15 +1,15 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 22 Apr 2016 14:49:23 -0700
-Subject: [PATCH v2 05/13] clk: divider: Add hw based registration APIs
-In-Reply-To: <1461277324-27185-6-git-send-email-sboyd@codeaurora.org>
+Date: Fri, 22 Apr 2016 14:49:53 -0700
+Subject: [PATCH v2 06/13] clk: gate: Add hw based registration APIs
+In-Reply-To: <1461277324-27185-7-git-send-email-sboyd@codeaurora.org>
 References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
- <1461277324-27185-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20160422214923.GJ13149@codeaurora.org>
+ <1461277324-27185-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160422214953.GK13149@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/21, Stephen Boyd wrote:
-> Add registration APIs in the clk divider code to return struct
+> Add registration APIs in the clk gate code to return struct
 > clk_hw pointers instead of struct clk pointers. This way we hide
 > the struct clk pointer from providers unless they need to use
 > consumer facing APIs.
