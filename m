@@ -1,71 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 22 Apr 2016 12:16:26 +0100
-Subject: [PATCH v7 6/7] iommu/arm-smmu: do not advertise
- IOMMU_CAP_INTR_REMAP
-In-Reply-To: <1461086687-2658-7-git-send-email-eric.auger@linaro.org>
-References: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
- <1461086687-2658-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <571A080A.4040406@arm.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Fri, 22 Apr 2016 16:49:17 +0530
+Subject: [PATCH v6 7/7] arm64/perf: Add Broadcom Vulcan PMU support
+In-Reply-To: <20160421135450.GO6879@leverpostej>
+References: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
+ <1461243525-13603-8-git-send-email-ashoks@broadcom.com>
+ <20160421135450.GO6879@leverpostej>
+Message-ID: <CAKc_7PXng0zjbfm_w9=p+HKc693Mc50A439v2GRH1j9WC-cvdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric, Alex,
-
-On 19/04/16 18:24, Eric Auger wrote:
-> Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu(-v3). Indeed the
-> irq_remapping capability is abstracted on irqchip side for ARM as
-> opposed to Intel IOMMU featuring IRQ remapping HW.
+On Thu, Apr 21, 2016 at 7:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Apr 21, 2016 at 05:58:45AM -0700, Ashok Kumar wrote:
+>> +static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+>> +{
+>> +     armv8_pmu_init(cpu_pmu);
+>> +     cpu_pmu->name                   = "armv8_brcm_vulcan";
 >
-> So to check IRQ remapping capability, the msi domain needs to be
-> checked instead.
->
-> This commit needs to be applied after "vfio/type1: also check IRQ
-> remapping capability at msi domain" else the legacy interrupt
-> assignment gets broken with arm-smmu.
+> Are we happy with "brcm" being the exposed userspace name? It might be
+> better to have this as "armv8_broadcom_vulcan".
 
-Hmm, that smells of papering over a different problem. I may have missed 
-it, but I don't see anything changing legacy interrupt behaviour in this 
-series - are legacy INTx (or platform) interrupts intrinsically safe 
-because they're physically wired, or intrinsically unsafe because they 
-could be shared? If it's the latter then I don't see how the IOMMU or 
-MSI controller changes anything in that respect, and if it's the former 
-then surely we should support that right now without the SMMU having to 
-lie about MSI isolation? I started looking into it but I'm a bit lost...
+Broadcom uses "brcm" as the vendor prefix in device trees, and the
+cpu's compatible string is "brcm,vulcan", so this should be ok.
 
-Robin.
+It looks like the A53 and A57 entries have established a convention of
+calling the PMU  "armv8_<cpuname>". Otherwise, something very close
+to the PMU's OF compatible string would have been better here.
 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->   drivers/iommu/arm-smmu-v3.c | 3 ++-
->   drivers/iommu/arm-smmu.c    | 3 ++-
->   2 files changed, 4 insertions(+), 2 deletions(-)
+> I'll leave that to you and Will. Either way:
 >
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index afd0dac..1d0106c 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1386,7 +1386,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
->   	case IOMMU_CAP_CACHE_COHERENCY:
->   		return true;
->   	case IOMMU_CAP_INTR_REMAP:
-> -		return true; /* MSIs are just memory writes */
-> +		/* interrupt translation handled at MSI controller level */
-> +		return false;
->   	case IOMMU_CAP_NOEXEC:
->   		return true;
->   	default:
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 492339f..6232b2a 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1312,7 +1312,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
->   		 */
->   		return true;
->   	case IOMMU_CAP_INTR_REMAP:
-> -		return true; /* MSIs are just memory writes */
-> +		/* interrupt translation handled at MSI controller level */
-> +		return false;
->   	case IOMMU_CAP_NOEXEC:
->   		return true;
->   	default:
->
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+If needed:
+
+Acked-by: Jayachandran C <jchandra@broadcom.com>
+
+for the Broadcom Vulcan related changes in the whole series.
+
+JC.
