@@ -1,118 +1,67 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 22 Apr 2016 11:14:00 -0600
-Subject: [PATCH V3 03/18] coresight: tmc: re-implementing
- tmc_read_prepare/unprepare() functions
-In-Reply-To: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461345255-11758-4-git-send-email-mathieu.poirier@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Apr 2016 18:38:04 +0100
+Subject: [PATCH 6/7] iommu/arm-smmu: Decouple context format from kernel
+ config
+In-Reply-To: <20160421163019.GL929@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
+ <20160421163019.GL929@arm.com>
+Message-ID: <571A617C.3020102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In their current implementation the tmc_read_prepare/unprepare()
-are a lump of if/else that is difficult to read.  This patch is
-alleviating that by using a switch statement.  The latter also
-allows for a better control on the error path.
+On 21/04/16 17:30, Will Deacon wrote:
+> Hi Robin,
+>
+> On Wed, Apr 13, 2016 at 06:13:02PM +0100, Robin Murphy wrote:
+>> The way the driver currently forces an AArch32 or AArch64 context format
+>> based on the kernel config and SMMU architecture version is suboptimal,
+>> in that it makes it very hard to support oddball mix-and-match cases
+>> like the SMMUv1 64KB supplement, or situations where the reduced table
+>> depth of an AArch32 short descriptor context may be desirable under an
+>> AArch64 kernel. It also only happens to work on current implementations
+>> which do support all the relevant formats.
+>>
+>> Introduce an explicit notion of context format, so we can manage that
+>> independently and get rid of the inflexible #ifdeffery.
+>
+> Thanks for doing all of this! One comment on the page size stuff:
+>
+>> +	if (IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
+>> +		switch (PAGE_SIZE) {
+>> +		case SZ_64K:
+>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_64K) {
+>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+>> +				break;
+>> +			} /* else fall through */
+>> +		case SZ_16K:
+>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_16K) {
+>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+>> +				break;
+>> +			} /* else fall through */
+>> +		case SZ_4K:
+>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_4K)
+>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+>> +		}
+>> +	}
+>
+> The io-pgtable code (arm_lpae_restrict_pgsizes) already does something
+> *very* similar to this, using the pgsize_bitmap as input. Can you not
+> just choose the ARM_SMMU_CTX_FMT_AARCH64 here and set the pgsize_bitmap
+> to represent all page sizes supported by the hardware? That way, you should
+> end up with the best option coming back from the pgtable code (I do this
+> in the v3 driver, fwiw).
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc.c | 56 ++++++++++++++++++-----------
- 1 file changed, 36 insertions(+), 20 deletions(-)
+It took a while to come back to me, but the problem is that we can't 
+call alloc_io_pgtable_ops(fmt...) before choosing either ARM_64_LPAE_Sx 
+or ARM_32_LPAE_Sx for fmt, but if we commit to 64-bit we'll get stuck 
+later without the possibility of falling back to AArch32 if it turns out 
+we don't have a viable AArch64 granule. Plus we'd have to remove the 
+LPAE page sizes from the bitmap beforehand in the case we don't support 
+AARCH64_4K lest we end up with a phantom format the hardware doesn't 
+actually do, and it all starts getting rather horrible...
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 66fa7736d12f..d211aeec49f8 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -431,7 +431,7 @@ static const struct coresight_ops tmc_etf_cs_ops = {
- 
- static int tmc_read_prepare(struct tmc_drvdata *drvdata)
- {
--	int ret;
-+	int ret = 0;
- 	unsigned long flags;
- 	enum tmc_mode mode;
- 
-@@ -439,25 +439,31 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
- 	if (!drvdata->enable)
- 		goto out;
- 
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-+	switch (drvdata->config_type) {
-+	case TMC_CONFIG_TYPE_ETB:
- 		tmc_etb_disable_hw(drvdata);
--	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
--		tmc_etr_disable_hw(drvdata);
--	} else {
-+		break;
-+	case TMC_CONFIG_TYPE_ETF:
-+		/* There is no point in reading a TMC in HW FIFO mode */
- 		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode == TMC_MODE_CIRCULAR_BUFFER) {
--			tmc_etb_disable_hw(drvdata);
--		} else {
--			ret = -ENODEV;
-+		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-+			ret = -EINVAL;
- 			goto err;
- 		}
-+
-+		tmc_etb_disable_hw(drvdata);
-+		break;
-+	case TMC_CONFIG_TYPE_ETR:
-+		tmc_etr_disable_hw(drvdata);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		goto err;
- 	}
-+
- out:
- 	drvdata->reading = true;
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--
- 	dev_info(drvdata->dev, "TMC read start\n");
--	return 0;
- err:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 	return ret;
-@@ -472,20 +478,30 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
- 	if (!drvdata->enable)
- 		goto out;
- 
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-+	switch (drvdata->config_type) {
-+	case TMC_CONFIG_TYPE_ETB:
- 		tmc_etb_enable_hw(drvdata);
--	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
--		tmc_etr_enable_hw(drvdata);
--	} else {
-+		break;
-+	case TMC_CONFIG_TYPE_ETF:
-+		/* Make sure we don't re-enable a TMC in HW FIFO mode */
- 		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode == TMC_MODE_CIRCULAR_BUFFER)
--			tmc_etb_enable_hw(drvdata);
-+		if (mode != TMC_MODE_CIRCULAR_BUFFER)
-+			goto err;
-+
-+		tmc_etb_enable_hw(drvdata);
-+		break;
-+	case TMC_CONFIG_TYPE_ETR:
-+		tmc_etr_disable_hw(drvdata);
-+		break;
-+	default:
-+		goto err;
- 	}
-+
- out:
- 	drvdata->reading = false;
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--
- 	dev_info(drvdata->dev, "TMC read end\n");
-+err:
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- }
- 
- static int tmc_open(struct inode *inode, struct file *file)
--- 
-2.5.0
+Robin.
+
+> Will
+>
