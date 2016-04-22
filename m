@@ -1,56 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Apr 2016 14:17:19 +0100
-Subject: [GIT PULL] arm64 fixes for 4.6-rc5
-Message-ID: <20160422131716.GA23317@e104818-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 22 Apr 2016 15:23:25 +0200
+Subject: [PATCH 10/11] arm64: tegra: Add clock properties on cpu0 for
+ Tegra210
+In-Reply-To: <571A0E95.9040203@nvidia.com>
+References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+ <1461321071-6431-11-git-send-email-pchiu@nvidia.com>
+ <571A0E95.9040203@nvidia.com>
+Message-ID: <20160422132325.GN9047@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Apr 22, 2016 at 12:44:21PM +0100, Jon Hunter wrote:
+> Hi Penny,
+> 
+> On 22/04/16 11:31, Penny Chiu wrote:
+> > Add clocks, clock-names, and clock-latency into cpu0 node.
+> > These properties will be used by cpufreq driver.
+> > 
+> > Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+> > ---
+> >  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> > index 204d9cd..1a85857 100644
+> > --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> > +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> > @@ -782,6 +782,12 @@
+> >  			device_type = "cpu";
+> >  			compatible = "arm,cortex-a57";
+> >  			reg = <0>;
+> > +			clocks = <&tegra_car TEGRA210_CLK_CCLK_G>,
+> > +				 <&tegra_car TEGRA210_CLK_PLL_X>,
+> > +				 <&tegra_car TEGRA210_CLK_PLL_P_OUT4>,
+> > +				 <&dfll>;
+> > +			clock-names = "cpu_g", "pll_x", "pll_p", "dfll";
+> > +			clock-latency = <300000>;
+> >  		};
+> >  
+> >  		cpu at 1 {
+> > 
+> 
+> Can you include a patch with this series to update the binding
+> documentation for the nvidia,tegra124-cpufreq.txt? I think that although
+> there is no specific nvidia,tegra210-cpufreq compatible string the
+> documentation should state that both tegra124 and tegra210 are supported
+> so it is clear.
+> 
+> Also I see the above binding no longer includes the "cpu_lp" for
+> tegra210 which I understand we don't use here. However, the binding
+> documentation should reflect this. Having said that, looking at the
+> driver it appears the "cpu_lp" clock is not even used for tegra124. I
+> wonder if we should drop this from the binding documentation and the
+> tegra124.dtsi altogether?
+> 
+> What about the "vdd-cpu-supply" property? Don't we need this?
 
-Please pull the arm64 fixes below. Thanks.
+For some reason that seems to have moved into the clock at 70110000 node.
 
-The following changes since commit c3b46c73264b03000d1e18b22f5caf63332547c9:
-
-  Linux 4.6-rc4 (2016-04-17 19:13:32 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 882416c1e4d1c9d4c7b50e0f5c3fa9ef043cd710:
-
-  arm64: Fix EL1/EL2 early init inconsistencies with VHE (2016-04-21 18:34:23 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Cache invalidation fix for early CPU boot status update (incorrect
-  cacheline)
-
-- of_put_node() missing in the spin_table code
-
-- EL1/El2 early init inconsistency when Virtualisation Host Extensions
-  are present
-
-- RCU warning fix in the arm_pmu.c driver
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: fix invalidation of wrong __early_cpu_boot_status cacheline
-
-Dave Martin (1):
-      arm64: Fix EL1/EL2 early init inconsistencies with VHE
-
-Lorenzo Pieralisi (1):
-      drivers/perf: arm-pmu: fix RCU usage on pmu resume from low-power
-
-Masahiro Yamada (1):
-      arm64: spin-table: add missing of_node_put()
-
- arch/arm64/kernel/head.S           | 13 ++++++++++++-
- arch/arm64/kernel/smp_spin_table.c | 11 ++++++-----
- drivers/perf/arm_pmu.c             | 15 +++++++++++++--
- 3 files changed, 31 insertions(+), 8 deletions(-)
-
--- 
-Catalin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/0b020abe/attachment.sig>
