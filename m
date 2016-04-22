@@ -1,135 +1,113 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Apr 2016 11:18:05 +0100
-Subject: [[PATCH v2] 01/11] pwm: Add PWM Capture support
+Date: Fri, 22 Apr 2016 11:18:06 +0100
+Subject: [[PATCH v2] 02/11] pwm: sti: Rename channel => device
 In-Reply-To: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
 References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1461320295-20414-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1461320295-20414-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supply a PWM Capture call-back Op in order to pass back
-information obtained by running analysis on PWM a signal.
-This would normally (at least during testing) be called from
-the Sysfs routines with a view to printing out PWM Capture
-data which has been encoded into a string.
+This is to bring the terminology used in the STi PWM driver more
+into line with the PWM subsystem.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pwm/core.c  | 27 +++++++++++++++++++++++++++
- include/linux/pwm.h | 28 ++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+ drivers/pwm/pwm-sti.c | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 7831bc6..160784d 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -494,6 +494,33 @@ unlock:
- EXPORT_SYMBOL_GPL(pwm_set_polarity);
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index 92abbd5..3dae127 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -21,7 +21,7 @@
+ #include <linux/slab.h>
+ #include <linux/time.h>
  
- /**
-+ * pwm_capture() - capture and report a PWM signal
-+ * @pwm: PWM device
-+ * @result: struct to fill with capture result
-+ * @timeout_ms: time to wait, in milliseconds, before giving up on capture
-+ *
-+ * Returns: 0 on success or a negative error code on failure.
-+ */
-+int pwm_capture(struct pwm_device *pwm, struct pwm_capture *result,
-+		unsigned int timeout_ms)
-+{
-+	int err;
-+
-+	if (!pwm || !pwm->chip->ops)
-+		return -EINVAL;
-+
-+	if (!pwm->chip->ops->capture)
-+		return -ENOSYS;
-+
-+	mutex_lock(&pwm->lock);
-+	err = pwm->chip->ops->capture(pwm->chip, pwm, result, timeout_ms);
-+	mutex_unlock(&pwm->lock);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(pwm_capture);
-+
-+/**
-  * pwm_enable() - start a PWM output toggling
-  * @pwm: PWM device
-  *
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index cfc3ed4..49f9648 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -6,6 +6,7 @@
- #include <linux/of.h>
+-#define STI_DS_REG(ch)	(4 * (ch))	/* Channel's Duty Cycle register */
++#define STI_DS_REG(ch)	(4 * (ch))	/* Device's Duty Cycle register */
+ #define STI_PWMCR	0x50		/* Control/Config register */
+ #define STI_INTEN	0x54		/* Interrupt Enable/Disable register */
+ #define PWM_PRESCALE_LOW_MASK		0x0f
+@@ -40,7 +40,7 @@ enum {
  
- struct pwm_device;
-+struct pwm_capture;
- struct seq_file;
- 
- #if IS_ENABLED(CONFIG_PWM)
-@@ -33,6 +34,13 @@ int pwm_enable(struct pwm_device *pwm);
-  * pwm_disable - stop a PWM output toggling
-  */
- void pwm_disable(struct pwm_device *pwm);
-+
-+/*
-+ * pwm_capture - capture and report a PWM signal
-+ */
-+int pwm_capture(struct pwm_device *pwm,
-+		struct pwm_capture *result,
-+		unsigned int timeout_ms);
- #else
- static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
- {
-@@ -56,6 +64,13 @@ static inline int pwm_enable(struct pwm_device *pwm)
- static inline void pwm_disable(struct pwm_device *pwm)
- {
- }
-+
-+static inline int pwm_capture(struct pwm_device *pwm,
-+			      struct pwm_capture *result,
-+			      unsigned int timeout_ms)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- struct pwm_chip;
-@@ -107,6 +122,16 @@ struct pwm_device {
- 	enum pwm_polarity polarity;
+ struct sti_pwm_compat_data {
+ 	const struct reg_field *reg_fields;
+-	unsigned int num_chan;
++	unsigned int num_devs;
+ 	unsigned int max_pwm_cnt;
+ 	unsigned int max_prescale;
  };
+@@ -130,13 +130,13 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
  
-+/**
-+ * struct pwm_capture - PWM capture data
-+ * @period: period of the PWM signal (in nanoseconds)
-+ * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
-+ */
-+struct pwm_capture {
-+	unsigned long long period;
-+	unsigned long long duty_cycle;
-+};
-+
- static inline bool pwm_is_enabled(const struct pwm_device *pwm)
- {
- 	return test_bit(PWMF_ENABLED, &pwm->flags);
-@@ -150,6 +175,7 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
-  * @free: optional hook for freeing a PWM
-  * @config: configure duty cycles and period length for this PWM
-  * @set_polarity: configure the polarity of this PWM
-+ * @capture: capture and report PWM signal
-  * @enable: enable PWM output toggling
-  * @disable: disable PWM output toggling
-  * @dbg_show: optional routine to show contents in debugfs
-@@ -162,6 +188,8 @@ struct pwm_ops {
- 		      int duty_ns, int period_ns);
- 	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
- 			    enum pwm_polarity polarity);
-+	int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
-+		       struct pwm_capture *result, unsigned int timeout_ms);
- 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
- 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
- #ifdef CONFIG_DEBUG_FS
+ 	/* Allow configuration changes if one of the
+ 	 * following conditions satisfy.
+-	 * 1. No channels have been configured.
+-	 * 2. Only one channel has been configured and the new request
+-	 *    is for the same channel.
+-	 * 3. Only one channel has been configured and the new request is
+-	 *    for a new channel and period of the new channel is same as
++	 * 1. No devices have been configured.
++	 * 2. Only one device has been configured and the new request
++	 *    is for the same device.
++	 * 3. Only one device has been configured and the new request is
++	 *    for a new device and period of the new device is same as
+ 	 *    the current configured period.
+-	 * 4. More than one channels are configured and period of the new
++	 * 4. More than one devices are configured and period of the new
+ 	 *    requestis the same as the current period.
+ 	 */
+ 	if (!ncfg ||
+@@ -201,7 +201,7 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	int ret = 0;
+ 
+ 	/*
+-	 * Since we have a common enable for all PWM channels,
++	 * Since we have a common enable for all PWM devices,
+ 	 * do not enable if already enabled.
+ 	 */
+ 	mutex_lock(&pc->sti_pwm_lock);
+@@ -259,11 +259,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+ 	const struct reg_field *reg_fields;
+ 	struct device_node *np = dev->of_node;
+ 	struct sti_pwm_compat_data *cdata = pc->cdata;
+-	u32 num_chan;
++	u32 num_devs;
+ 
+-	of_property_read_u32(np, "st,pwm-num-chan", &num_chan);
+-	if (num_chan)
+-		cdata->num_chan = num_chan;
++	of_property_read_u32(np, "st,pwm-num-devs", &num_devs);
++	if (num_devs)
++		cdata->num_devs = num_devs;
+ 
+ 	reg_fields = cdata->reg_fields;
+ 
+@@ -330,7 +330,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	cdata->reg_fields   = &sti_pwm_regfields[0];
+ 	cdata->max_prescale = 0xff;
+ 	cdata->max_pwm_cnt  = 255;
+-	cdata->num_chan     = 1;
++	cdata->num_devs     = 1;
+ 
+ 	pc->cdata = cdata;
+ 	pc->dev = dev;
+@@ -362,7 +362,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	pc->chip.dev = dev;
+ 	pc->chip.ops = &sti_pwm_ops;
+ 	pc->chip.base = -1;
+-	pc->chip.npwm = pc->cdata->num_chan;
++	pc->chip.npwm = pc->cdata->num_devs;
+ 	pc->chip.can_sleep = true;
+ 
+ 	ret = pwmchip_add(&pc->chip);
+@@ -381,7 +381,7 @@ static int sti_pwm_remove(struct platform_device *pdev)
+ 	struct sti_pwm_chip *pc = platform_get_drvdata(pdev);
+ 	unsigned int i;
+ 
+-	for (i = 0; i < pc->cdata->num_chan; i++)
++	for (i = 0; i < pc->cdata->num_devs; i++)
+ 		pwm_disable(&pc->chip.pwms[i]);
+ 
+ 	clk_unprepare(pc->clk);
 -- 
 2.8.0
