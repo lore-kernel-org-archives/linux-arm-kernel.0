@@ -1,79 +1,68 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 22 Apr 2016 16:34:08 +0300
-Subject: [PATCH net v2 3/3] drivers: net: cpsw: use of_phy_connect() in
- fixed-link case
-In-Reply-To: <1461264066-12358-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461261035-5578-1-git-send-email-drivshin.allworx@gmail.com>
- <1461264066-12358-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <571A2850.30700@ti.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 22 Apr 2016 14:36:50 +0100
+Subject: [PATCH 10/11] arm64: tegra: Add clock properties on cpu0 for
+ Tegra210
+In-Reply-To: <20160422132325.GN9047@ulmo.ba.sec>
+References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+ <1461321071-6431-11-git-send-email-pchiu@nvidia.com>
+ <571A0E95.9040203@nvidia.com> <20160422132325.GN9047@ulmo.ba.sec>
+Message-ID: <571A28F2.5070203@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2016 09:41 PM, David Rivshin (Allworx) wrote:
-> From: David Rivshin <drivshin@allworx.com>
->
-> If a fixed-link DT subnode is used, the phy_device was looked up so
-> that a PHY ID string could be constructed and passed to phy_connect().
-> This is not necessary, as the device_node can be passed directly to
-> of_phy_connect() instead. This reuses the same codepath as if the
-> phy-handle DT property was used.
->
-> Signed-off-by: David Rivshin <drivshin@allworx.com>
-> Tested-by: Nicolas Chauvet <kwizart@gmail.com>
-> ---
->
-> Changes since v1 [1]:
-> - Rebased (trivial conflict, e5a03bfd modified the deleted snprintf)
-> - Added Tested-by from Nicolas Chauvet
->
-> [1] https://patchwork.ozlabs.org/patch/560327/
->
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+On 22/04/16 14:23, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Fri, Apr 22, 2016 at 12:44:21PM +0100, Jon Hunter wrote:
+>> Hi Penny,
+>>
+>> On 22/04/16 11:31, Penny Chiu wrote:
+>>> Add clocks, clock-names, and clock-latency into cpu0 node.
+>>> These properties will be used by cpufreq driver.
+>>>
+>>> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+>>> ---
+>>>  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 6 ++++++
+>>>  1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>>> index 204d9cd..1a85857 100644
+>>> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>>> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>>> @@ -782,6 +782,12 @@
+>>>  			device_type = "cpu";
+>>>  			compatible = "arm,cortex-a57";
+>>>  			reg = <0>;
+>>> +			clocks = <&tegra_car TEGRA210_CLK_CCLK_G>,
+>>> +				 <&tegra_car TEGRA210_CLK_PLL_X>,
+>>> +				 <&tegra_car TEGRA210_CLK_PLL_P_OUT4>,
+>>> +				 <&dfll>;
+>>> +			clock-names = "cpu_g", "pll_x", "pll_p", "dfll";
+>>> +			clock-latency = <300000>;
+>>>  		};
+>>>  
+>>>  		cpu at 1 {
+>>>
+>>
+>> Can you include a patch with this series to update the binding
+>> documentation for the nvidia,tegra124-cpufreq.txt? I think that although
+>> there is no specific nvidia,tegra210-cpufreq compatible string the
+>> documentation should state that both tegra124 and tegra210 are supported
+>> so it is clear.
+>>
+>> Also I see the above binding no longer includes the "cpu_lp" for
+>> tegra210 which I understand we don't use here. However, the binding
+>> documentation should reflect this. Having said that, looking at the
+>> driver it appears the "cpu_lp" clock is not even used for tegra124. I
+>> wonder if we should drop this from the binding documentation and the
+>> tegra124.dtsi altogether?
+>>
+>> What about the "vdd-cpu-supply" property? Don't we need this?
+> 
+> For some reason that seems to have moved into the clock at 70110000 node.
 
->
->   drivers/net/ethernet/ti/cpsw.c | 11 +----------
->   1 file changed, 1 insertion(+), 10 deletions(-)
->
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 3c81413..245f919 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -2038,30 +2038,21 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
->   							"phy-handle", 0);
->   		parp = of_get_property(slave_node, "phy_id", &lenp);
->   		if (slave_data->phy_node) {
->   			dev_dbg(&pdev->dev,
->   				"slave[%d] using phy-handle=\"%s\"\n",
->   				i, slave_data->phy_node->full_name);
->   		} else if (of_phy_is_fixed_link(slave_node)) {
-> -			struct device_node *phy_node;
-> -			struct phy_device *phy_dev;
-> -
->   			/* In the case of a fixed PHY, the DT node associated
->   			 * to the PHY is the Ethernet MAC DT node.
->   			 */
->   			ret = of_phy_register_fixed_link(slave_node);
->   			if (ret)
->   				return ret;
-> -			phy_node = of_node_get(slave_node);
-> -			phy_dev = of_phy_find_device(phy_node);
-> -			if (!phy_dev)
-> -				return -ENODEV;
-> -			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
-> -				 PHY_ID_FMT, phy_dev->mdio.bus->id,
-> -				 phy_dev->mdio.addr);
-> +			slave_data->phy_node = of_node_get(slave_node);
->   		} else if (parp) {
->   			u32 phyid;
->   			struct device_node *mdio_node;
->   			struct platform_device *mdio;
->
->   			if (lenp != (sizeof(__be32) * 2)) {
->   				dev_err(&pdev->dev, "Invalid slave[%d] phy_id property\n", i);
->
+Yes I saw that. I surprised that the cpufreq driver would probe without
+this, unless I am missing something ...
 
-
--- 
-regards,
--grygorii
+Jon
