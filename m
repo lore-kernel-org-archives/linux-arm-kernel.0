@@ -1,32 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Apr 2016 08:58:43 +0100
-Subject: [PATCH 2/2 v5] irqchip/Layerscape: Add SCFG MSI controller support
-In-Reply-To: <VI1PR04MB161534A98E15E93263B07DBFE86F0@VI1PR04MB1615.eurprd04.prod.outlook.com>
-References: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
- <1457321782-3245-2-git-send-email-Minghuan.Lian@nxp.com>
- <20160307095021.7f9f7484@arm.com>
- <CADRPPNRU=qy34p4hzYvzBPrt2uabSQfc0Xdd8K5v5B_JW01QJA@mail.gmail.com>
- <5719D614.1080400@arm.com>
- <VI1PR04MB161534A98E15E93263B07DBFE86F0@VI1PR04MB1615.eurprd04.prod.outlook.com>
-Message-ID: <5719D9B3.1030705@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Apr 2016 09:59:58 +0200
+Subject: [PATCH v6 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for
+ I/O devices
+In-Reply-To: <CAPDyKFqcDDq-FGd9-PgJmig-Csqrj6LxqKtm1pMf1fq-LtGKvw@mail.gmail.com>
+References: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
+ <1461153766-750-6-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFqcDDq-FGd9-PgJmig-Csqrj6LxqKtm1pMf1fq-LtGKvw@mail.gmail.com>
+Message-ID: <CAMuHMdVb46Get_+e0FzYhJMCwat-YaEDOcgFKqyGhtVBTOdJ8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/16 08:53, Minghuan Lian wrote:
-> Hi Marc,
-> 
-> Please see the link:
-> https://patchwork.kernel.org/patch/8649241/
-> 
-> Rob Herring has given the ACK.
-> 
-> I have submitted the v6 patch:  https://patchwork.kernel.org/patch/8649251/
-> Please apply the latest the patch after you review.
+Hi Ulf,
 
-Thanks. I'll queue that for 4.7 together with Rob's ack.
+On Fri, Apr 22, 2016 at 9:28 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> @@ -217,6 +218,8 @@ static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
+>>         return rcar_sysc_power_up(&pd->ch);
+>>  }
+>>
+>> +static bool has_cpg_mstp;
+>> +
+>
+> That's seems lazy. :-)
+>
+> Sure you can provide this as an input parameter to
+> rcar_sysc_pd_setup() instead, no?
 
-Thanks,
+This variable is intended to go away, once all R-Car SoCs have been converted
+to use the CPG/MSSR driver, and has_cpg_mstp will always be false.
+Then we can just remove those lines, instead of reworking the parameter
+passing.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+(I have to admit I just didn't think about using a parameter, but the
+ explanation above is still valid)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
