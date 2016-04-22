@@ -1,107 +1,96 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Apr 2016 14:51:21 +0100
-Subject: [PATCHv2 4/6] x86/efi: move to generic {__,}efi_call_virt
+Date: Fri, 22 Apr 2016 14:51:23 +0100
+Subject: [PATCHv2 6/6] efi/runtime-wrappers: detect FW irq flag corruption
 In-Reply-To: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
 References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1461333083-15529-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1461333083-15529-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now there's a common template for {__,}efi_call_virt, remove the
-duplicate logic from the x86 efi code.
+The UEFI spec allows runtime services to be called with interrupts
+masked or unmasked, and if a runtime service function needs to mask
+interrupts, it must restore the mask to its original state before
+returning (i.e. from the PoV of the OS, this does not change across a
+call). Firmware should never unmask exceptions, as these may then be
+taken by the OS unexpectedly.
+
+Unfortunately, some firmware has been seen to unmask IRQs (and
+potentially other maskable exceptions) across runtime services calls,
+leaving irq flags corrupted after returning from a runtime services
+function call. This may be detected by the IRQ tracing code, but often
+goes unnoticed, leaving a potentially disastrous bug hidden.
+
+This patch detects when the irq flags are corrupted by an EFI runtime
+services call, logging the call and specific corruption to the console.
+While restoring the expected value of the flags is insufficient to avoid
+problems, we do so to avoid redundant warnings from elsewhere (e.g. IRQ
+tracing).
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Ingo Molnar <mingo@redhat.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-efi at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/x86/include/asm/efi.h | 41 ++++++++++++-----------------------------
- 1 file changed, 12 insertions(+), 29 deletions(-)
+ drivers/firmware/efi/runtime-wrappers.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-index 53748c4..34bd38b 100644
---- a/arch/x86/include/asm/efi.h
-+++ b/arch/x86/include/asm/efi.h
-@@ -33,28 +33,16 @@
+I'm not sure about the LOCKDEP_NOW_UNRELIABLE here. If FW unmasks IRQs there's
+the potential for deadlock, but arguably by the time we've detected the flag
+corruption the danger has passed. I'm erring on the side of caution here
+setting it, but perhaps that's not the best idea?
+
+Mark.
+
+diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+index a2c8e70..19e30b7 100644
+--- a/drivers/firmware/efi/runtime-wrappers.c
++++ b/drivers/firmware/efi/runtime-wrappers.c
+@@ -16,23 +16,45 @@
  
- extern unsigned long asmlinkage efi_call_phys(void *, ...);
+ #include <linux/bug.h>
+ #include <linux/efi.h>
++#include <linux/irqflags.h>
+ #include <linux/mutex.h>
+ #include <linux/spinlock.h>
++#include <linux/stringify.h>
+ #include <asm/efi.h>
  
-+#define arch_efi_call_virt_setup()	kernel_fpu_begin()
-+#define arch_efi_call_virt_teardown()	kernel_fpu_end()
++static void efi_call_virt_check_flags(unsigned long flags, const char *call)
++{
++	unsigned long cur_flags;
 +
- /*
-  * Wrap all the virtual calls in a way that forces the parameters on the stack.
-  */
--
--/* Use this macro if your virtual returns a non-void value */
--#define efi_call_virt(f, args...) \
--({									\
--	efi_status_t __s;						\
--	kernel_fpu_begin();						\
--	__s = ((efi_##f##_t __attribute__((regparm(0)))*)		\
--		efi.systab->runtime->f)(args);				\
--	kernel_fpu_end();						\
--	__s;								\
--})
--
--/* Use this macro if your virtual call does not return any value */
--#define __efi_call_virt(f, args...) \
-+#define arch_efi_call_virt(f, args...)					\
++	local_save_flags(cur_flags);
++	if (!WARN_ON_ONCE(cur_flags != flags))
++		return;
++
++	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_NOW_UNRELIABLE);
++	pr_err_ratelimited(FW_BUG "IRQ flags corrupted (0x%08lx=>0x%08lx) by EFI %s\n",
++			   flags, cur_flags, call);
++	local_irq_restore(flags);
++}
++
+ #define efi_call_virt(f, args...)					\
  ({									\
--	kernel_fpu_begin();						\
- 	((efi_##f##_t __attribute__((regparm(0)))*)			\
- 		efi.systab->runtime->f)(args);				\
--	kernel_fpu_end();						\
+ 	efi_status_t __s;						\
++	unsigned long flags;						\
+ 	arch_efi_call_virt_setup();					\
++	local_save_flags(flags);					\
+ 	__s = arch_efi_call_virt(f, args);				\
++	efi_call_virt_check_flags(flags, __stringify(f));		\
+ 	arch_efi_call_virt_teardown();					\
+ 	__s;								\
  })
  
- #define efi_ioremap(addr, size, type, attr)	ioremap_cache(addr, size)
-@@ -78,10 +66,8 @@ struct efi_scratch {
- 	u64	phys_stack;
- } __packed;
- 
--#define efi_call_virt(f, ...)						\
-+#define arch_efi_call_virt_setup()					\
+ #define __efi_call_virt(f, args...)					\
  ({									\
--	efi_status_t __s;						\
--									\
- 	efi_sync_low_kernel_mappings();					\
- 	preempt_disable();						\
- 	__kernel_fpu_begin();						\
-@@ -91,9 +77,13 @@ struct efi_scratch {
- 		write_cr3((unsigned long)efi_scratch.efi_pgt);		\
- 		__flush_tlb_all();					\
- 	}								\
--									\
--	__s = efi_call((void *)efi.systab->runtime->f, __VA_ARGS__);	\
--									\
-+})
-+
-+#define arch_efi_call_virt(f, args...)					\
-+	efi_call((void *)efi.systab->runtime->f, args)			\
-+
-+#define arch_efi_call_virt_teardown()					\
-+({									\
- 	if (efi_scratch.use_pgd) {					\
- 		write_cr3(efi_scratch.prev_cr3);			\
- 		__flush_tlb_all();					\
-@@ -101,15 +91,8 @@ struct efi_scratch {
- 									\
- 	__kernel_fpu_end();						\
- 	preempt_enable();						\
--	__s;								\
++	unsigned long flags;						\
+ 	arch_efi_call_virt_setup();					\
++	local_save_flags(flags);					\
+ 	arch_efi_call_virt(f, args);					\
++	efi_call_virt_check_flags(flags, __stringify(f));		\
+ 	arch_efi_call_virt_teardown();					\
  })
- 
--/*
-- * All X86_64 virt calls return non-void values. Thus, use non-void call for
-- * virt calls that would be void on X86_32.
-- */
--#define __efi_call_virt(f, args...) efi_call_virt(f, args)
--
- extern void __iomem *__init efi_ioremap(unsigned long addr, unsigned long size,
- 					u32 type, u64 attribute);
  
 -- 
 1.9.1
