@@ -1,79 +1,57 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 22 Apr 2016 10:43:31 +0100
-Subject: [PATCH v2] arm-ccn: Fix building as a module
-Message-ID: <1461318211-25151-1-git-send-email-suzuki.poulose@arm.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 22 Apr 2016 18:02:46 +0800
+Subject: [RESEND PATCH 0/8] thermal: rockchip: Support rk3366/rk3399 SoCS and
+ fixes the driver
+Message-ID: <1461319374-10024-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-ccn driver uses irq_set_affinity, which is not exported and
-hence cannot be built as a module, eventhough we have all the
-bits ready. This patch makes use of the exported helper
-irq_set_affinity_hint() instead. Also, the __free_irq expects
-the affinity_hint to be NULL when we free the irq. So set the
-affinity_hint to NULL at clean up.
+Hello Eduardo, Heiko
+This series pacthes to support the rk3366/rk3399 SoCs thermal, and fixes the driver.
 
-Now that we can build it as a module, update the Kconfig to
-reflect the change.
+a83d083 thermal: rockchip: disable thermal->clk in err case
+5ea5556 thermal: rockchip: fixes the code_to_temp for tsadc driver
+da69a2 thermal: rockchip: update the tsadc table for rk3399
+571a5b5 thermal: rockchip: handle the power sequence for tsadc controller
+e9eb603 thermal: rockchip: Support RK3366 SoCs in the thermal driver
+bc0e86f thermal: rockchip: add the notes for better reading
+4dc79deb ARM: dts: rockchip: move the rk3288 thermal data into rk3288.dtsi
+5e66f50 arm64: dts: rockchip: move the rk3368 thermal data into rk3368.dtsi
 
-Applies on 4.6-rc4.
+Verified on url =
+https://github.com/Caesar-github/rockchip/tree/wip/fixes-rockchip-thermal
+Based on linux-next kernel for 20160422
 
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-Cc: arm at kernel.org
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Anrnd Bergmann <arnd@arndb.de>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Verified on rk3288/rk3366/rk3399 SoCs with rockchip inside kernel(develop4.4).
+
+The rk3399 dtsi has benn sent on https://patchwork.kernel.org/patch/8905841/.
+
 ---
- drivers/bus/Kconfig   |    2 +-
- drivers/bus/arm-ccn.c |    7 ++++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index d4a3a31..3efc996 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -48,7 +48,7 @@ config ARM_CCI5xx_PMU
- 	  If unsure, say Y
- 
- config ARM_CCN
--	bool "ARM CCN driver support"
-+	tristate "ARM CCN driver support"
- 	depends on ARM || ARM64
- 	depends on PERF_EVENTS
- 	help
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 7082c72..acc3eb5 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1189,7 +1189,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
- 		perf_pmu_migrate_context(&dt->pmu, cpu, target);
- 		cpumask_set_cpu(target, &dt->cpu);
- 		if (ccn->irq)
--			WARN_ON(irq_set_affinity(ccn->irq, &dt->cpu) != 0);
-+			WARN_ON(irq_set_affinity_hint(ccn->irq, &dt->cpu) != 0);
- 	default:
- 		break;
- 	}
-@@ -1278,7 +1278,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
- 
- 	/* Also make sure that the overflow interrupt is handled by this CPU */
- 	if (ccn->irq) {
--		err = irq_set_affinity(ccn->irq, &ccn->dt.cpu);
-+		err = irq_set_affinity_hint(ccn->irq, &ccn->dt.cpu);
- 		if (err) {
- 			dev_err(ccn->dev, "Failed to set interrupt affinity!\n");
- 			goto error_set_affinity;
-@@ -1306,7 +1306,8 @@ static void arm_ccn_pmu_cleanup(struct arm_ccn *ccn)
- {
- 	int i;
- 
--	irq_set_affinity(ccn->irq, cpu_possible_mask);
-+	if (ccn->irq)
-+		irq_set_affinity_hint(ccn->irq, NULL);
- 	unregister_cpu_notifier(&ccn->dt.cpu_nb);
- 	for (i = 0; i < ccn->num_xps; i++)
- 		writel(0, ccn->xp[i].base + CCN_XP_DT_CONTROL);
+
+
+Caesar Wang (6):
+  thermal: rockchip: fixes the code_to_temp for tsadc driver
+  thermal: rockchip: update the tsadc table for rk3399
+  thermal: rockchip: handle the power sequence for tsadc controller
+  thermal: rockchip: add the notes for better reading
+  ARM: dts: rockchip: move the rk3288 thermal data into rk3288.dtsi
+  arm64: dts: rockchip: move the rk3368 thermal data into rk3368.dtsi
+
+Elaine Zhang (1):
+  thermal: rockchip: Support RK3366 SoCs in the thermal driver
+
+Shawn Lin (1):
+  thermal: rockchip: disable thermal->clk in err case
+
+ arch/arm/boot/dts/rk3288-thermal.dtsi            | 118 ----------
+ arch/arm/boot/dts/rk3288.dtsi                    |  73 +++++-
+ arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112 ---------
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi         |  66 +++++-
+ drivers/thermal/rockchip_thermal.c               | 279 +++++++++++++++++------
+ 5 files changed, 352 insertions(+), 296 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
+ delete mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+
 -- 
-1.7.9.5
+1.9.1
