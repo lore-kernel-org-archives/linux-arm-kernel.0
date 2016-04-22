@@ -1,74 +1,60 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 22 Apr 2016 12:25:35 +0100
-Subject: [PATCH v4 5/5] arm64: Fix behavior of maxcpus=N
-In-Reply-To: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
-References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1461324335-5081-6-git-send-email-suzuki.poulose@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 22 Apr 2016 16:58:40 +0530
+Subject: [PATCH V2 2/9] cpufreq: berlin: Use generic platdev driver
+In-Reply-To: <cover.1461324267.git.viresh.kumar@linaro.org>
+References: <cover.1461324267.git.viresh.kumar@linaro.org>
+Message-ID: <64733ec5d702497b80c8f5a96baaa86aa5281efa.1461324267.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-maxcpu=n sets the number of CPUs activated at boot time to a max of n,
-but allowing the remaining CPUs to be brought up later if the user
-decides to do so. However, on arm64 due to various reasons, we disallowed
-hotplugging CPUs beyond n, by marking them not present. Now that
-we have checks in place to make sure the hotplugged CPUs have compatible
-features with system and requires no new errata, relax the restriction.
+The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+device now, reuse that and remove similar code from platform code.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/kernel/smp.c |   18 +-----------------
- 1 file changed, 1 insertion(+), 17 deletions(-)
+ arch/arm/mach-berlin/berlin.c        | 6 ------
+ drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b2d5f4e..fa9dbaa 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -647,33 +647,18 @@ void __init smp_init_cpus(void)
- void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int err;
--	unsigned int cpu, ncores = num_possible_cpus();
-+	unsigned int cpu;
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+index 25d73870ccca..ac181c6797ee 100644
+--- a/arch/arm/mach-berlin/berlin.c
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -18,11 +18,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
  
- 	init_cpu_topology();
+-static void __init berlin_init_late(void)
+-{
+-	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+-}
+-
+ static const char * const berlin_dt_compat[] = {
+ 	"marvell,berlin",
+ 	NULL,
+@@ -30,7 +25,6 @@ static const char * const berlin_dt_compat[] = {
  
- 	smp_store_cpu_info(smp_processor_id());
- 
+ DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+ 	.dt_compat	= berlin_dt_compat,
+-	.init_late	= berlin_init_late,
  	/*
--	 * are we trying to boot more cores than exist?
--	 */
--	if (max_cpus > ncores)
--		max_cpus = ncores;
--
--	/* Don't bother if we're effectively UP */
--	if (max_cpus <= 1)
--		return;
--
--	/*
- 	 * Initialise the present map (which describes the set of CPUs
- 	 * actually populated at the present time) and release the
- 	 * secondaries from the bootloader.
--	 *
--	 * Make sure we online@most (max_cpus - 1) additional CPUs.
- 	 */
--	max_cpus--;
- 	for_each_possible_cpu(cpu) {
--		if (max_cpus == 0)
--			break;
+ 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+ 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 00da8c8bee6c..3e1c8211c213 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -12,6 +12,8 @@
+ #include <linux/platform_device.h>
  
- 		if (cpu == smp_processor_id())
- 			continue;
-@@ -686,7 +671,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 			continue;
- 
- 		set_cpu_present(cpu, true);
--		max_cpus--;
- 	}
- }
- 
+ static const struct of_device_id machines[] __initconst = {
++	{ .compatible = "marvell,berlin", },
++
+ 	{ .compatible = "samsung,exynos3250", },
+ 	{ .compatible = "samsung,exynos4210", },
+ 	{ .compatible = "samsung,exynos4212", },
 -- 
-1.7.9.5
+2.7.1.410.g6faf27b
