@@ -1,27 +1,95 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 22 Apr 2016 10:36:34 +0930
-Subject: [PATCH v2 04/11] clocksource/moxart: Generalise timer for use on
- other socs
-In-Reply-To: <4840688.ZUmiMtO0cR@wuerfel>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-5-git-send-email-joel@jms.id.au>
- <4840688.ZUmiMtO0cR@wuerfel>
-Message-ID: <CACPK8Xcsk0vcb2hV7pVL4L=dvj7PHMg4V=Mk+r_w4bA9OQY0pQ@mail.gmail.com>
+From: jay.xu@rock-chips.com (jay.xu)
+Date: Fri, 22 Apr 2016 09:50:09 +0800
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <20160421221228.359fab3c@arm.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <5718AFB8.5070004@rock-chips.com> <20160421123018.096d4a75@arm.com>
+ <2131452.5tyGOfVRfi@diego> <20160421221228.359fab3c@arm.com>
+Message-ID: <57198351.2060608@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 5:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 April 2016 17:34:02 Joel Stanley wrote:
->> The moxart timer IP is shared with another soc made by Aspeed.
+Hi Marc:
+
+On 2016?04?22? 05:12, Marc Zyngier wrote:
+> On Thu, 21 Apr 2016 22:24:09 +0200
+> Heiko St?bner <heiko@sntech.de> wrote:
 >
-> Any idea where the IP block came from? Moxart contains a lot of
-> licensed IP from faraday-tech. If this is one of them, we could
-> maybe rename the driver accordingly.
+>> Am Donnerstag, 21. April 2016, 12:30:18 schrieb Marc Zyngier:
+>>> On Thu, 21 Apr 2016 18:47:20 +0800
+>>>
+>>> "Huang, Tao" <huangtao@rock-chips.com> wrote:
+>>>> Hi, Mark:
+>>>>
+>>>> On 2016?04?21? 18:19, Mark Rutland wrote:
+>>>>> On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
+>>>>>> +		cpu_l0: cpu at 0 {
+>>>>>> +			device_type = "cpu";
+>>>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>>>> +			reg = <0x0 0x0>;
+>>>>>> +			enable-method = "psci";
+>>>>>> +			#cooling-cells = <2>; /* min followed by max */
+>>>>>> +			clocks = <&cru ARMCLKL>;
+>>>>>> +		};
+>>>>>> +		cpu_b0: cpu at 100 {
+>>>>>> +			device_type = "cpu";
+>>>>>> +			compatible = "arm,cortex-a72", "arm,armv8";
+>>>>>> +			reg = <0x0 0x100>;
+>>>>>> +			enable-method = "psci";
+>>>>>> +			#cooling-cells = <2>; /* min followed by max */
+>>>>>> +			clocks = <&cru ARMCLKB>;
+>>>>>> +		};
+>>>>>> +
+>>>>>> +	arm-pmu {
+>>>>>> +		compatible = "arm,armv8-pmuv3";
+>>>>>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>>> +	};
+>>>>> This is wrong, and must go. There should be a separate node for the PMU
+>>>>> of each microarchitecture, with the appropriate compatible string to
+>>>>> represent that (see the juno dts).
+>>>> You are right. The first version we wrote is:
+>>>>      pmu_a53 {
+>>>>      
+>>>>          compatible = "arm,cortex-a53-pmu";
+>>>>          interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>          interrupt-affinity = <&cpu_l0>,
+>>>>          
+>>>>                       <&cpu_l1>,
+>>>>                       <&cpu_l2>,
+>>>>                       <&cpu_l3>;
+>>>>      
+>>>>      };
+>>>>      
+>>>>      pmu_a72 {
+>>>>      
+>>>>          compatible = "arm,cortex-a72-pmu";
+>>>>          interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>          interrupt-affinity = <&cpu_b0>,
+>>>>          
+>>>>                       <&cpu_b1>;
+>>>>      
+>>>>      };
+>>>>
+>>>> but unfortunately, the arm pmu driver do not support PPI in two cluster
+>>>> well,
+>>>> so we have to replace with this implementation.
+>>>>
+>>>>> In this case things are messier as the same PPI number is being used
+>>>>> across clusters. Marc (Cc'd) has been working on PPI partitions, which
+>>>>> should allow us to support that.
+>>>> Great! So what we can do right now? Wait this feature, and delete
+>>>> arm-pmu node?
+>>> I'd rather you have a look at the patches, test them with your HW,
+>>> and comment on what doesn't work!
+>> I would think we could do it in two tracks, testing and fixing but also letting
+>> the rk3399 devicetrees move forward without the pmu at first :-) .
+> Where would the fun be then? ;-)
+thanks for your advices, and I will try to test the percpu-partition 
+patches.
 
-Faraday would be a good bet, given that aspeed use their ethernet mac IP.
+by the way, do you think it's better to let the dtsi be reviewed first,
+then the percpu-partition patches could be tested by more people ?
 
-I'll ask around.
-
-Cheers,
-
-Joel
+Jianqun
+>
+> 	M.
