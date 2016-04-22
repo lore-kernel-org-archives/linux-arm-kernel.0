@@ -1,56 +1,63 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 22 Apr 2016 15:38:31 +0100
-Subject: [PATCH] drivers: firmware: psci: unify enable-method binding on ARM
- {64, 32}-bit systems
-Message-ID: <1461335911-13233-1-git-send-email-sudeep.holla@arm.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 22 Apr 2016 10:40:29 -0400
+Subject: [PATCH V6 09/13] pci, acpi: Support for ACPI based generic PCI
+ host controller
+In-Reply-To: <57189824.7080908@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-10-git-send-email-tn@semihalf.com>
+ <CAKc_7PXLbX+wxesGVKni7tkKPUbfo7AgfPNxA+Uc25ctOWRk=Q@mail.gmail.com>
+ <57189824.7080908@semihalf.com>
+Message-ID: <571A37DD.4070003@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently ARM CPUs DT bindings allows different enable-method value for
-PSCI based systems. On ARM 64-bit this property is required and must be
-"psci" while on ARM 32-bit systems this property is optional and must
-be "arm,psci".
+On 04/21/2016 05:06 AM, Tomasz Nowicki wrote:
+> On 20.04.2016 21:12, Jayachandran C wrote:
+>> On Fri, Apr 15, 2016 at 10:36 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
 
-This is problematic if 32-bit OS is run on 64-bit system which has
-"psci" as enable-method rather than the expected "arm,psci".
+>>> This patch is heavily based on the updated version from Jayachandran C:
+>>> https://lkml.org/lkml/2016/4/11/908
+>>> git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+>>
+>> This is a little bit unusual because I had not posted the v3 patch
+>> to the mailing list yet, but you posted a variant of it The git
+>> repository
+>> should not be in the commit comment because it is a temporary location.
+> 
+> We all agree this too important for everybody to delay this series. So
+> main motivation is to keep all discussion&patches within one unified
+> series. I would like to finally find direction we need to go. Stating
+> another discussion based on my previous patch set v5 confused people,
+> they do no know who is driving this. Again, lets cooperate to move it
+> forward within one patch set.
 
-So let's unify the value into "psci" and remove support for "arm,psci"
-before it finds any users.
+We need one person in the driver's seat here for this patch series. I
+believe the intention is that this is Tomasz, with others cooperating
+and assisting. The previous alternative patch series did serve to cause
+confusion, and worse, they made it look like the ARM vendors can't work
+together. That ends. Right now. I've raised this individually with each
+of you (and with all of the other vendors), as well as inside Linaro.
+There will be one person driving this, and everyone else will help.
 
-Reported-by: Soby Mathew <Soby.Mathew@arm.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- Documentation/devicetree/bindings/arm/cpus.txt | 1 -
- drivers/firmware/psci.c                        | 2 +-
- 2 files changed, 1 insertion(+), 2 deletions(-)
+> I agree with you we need maintainers to join this discussion.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index ccc62f145306..3f0cbbb8395f 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -192,7 +192,6 @@ nodes to be present and contain the properties described below.
- 			  can be one of:
- 			    "allwinner,sun6i-a31"
- 			    "allwinner,sun8i-a23"
--			    "arm,psci"
- 			    "arm,realview-smp"
- 			    "brcm,bcm-nsp-smp"
- 			    "brcm,brahma-b15"
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 11bfee8b79a9..b5d05807e6ec 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -360,7 +360,7 @@ static struct cpuidle_ops psci_cpuidle_ops __initdata = {
- 	.init = psci_dt_cpu_init_idle,
- };
- 
--CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
-+CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
- #endif
- #endif
- 
+Please. I really want to lend support to the sense of urgency of getting
+something merged that provides the basic ACPI based ECAM functionality
+on ARMv8 systems. Until that happens, there are vendors who are going to
+have to delay various other activities around ARM server until it is
+done (because of the lack of an upstream patch is a critical blocker -
+this isn't embedded, and we don't work that way).
+
+This is incredibly critical and central to the successful adoption of
+larger ARMv8 servers over the next year or so, all of which will rely
+upon PCIe, using ACPI. We therefore need all hands on deck, and all
+vendors getting overwhelmingly excited about making this patch series a
+success. As an aside, to help the engineering orgs within these vendors
+understand how much I need motion on this thread, I'm buzzing in their
+ears multiple times per week specifically on engagement on this thread.
+We need this done. If Bjorn or anyone else needs something, tell us.
+
+Jon.
+
 -- 
-1.9.1
+Computer Architect | Sent from my Fedora powered laptop
