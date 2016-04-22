@@ -1,216 +1,275 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 22 Apr 2016 08:49:55 +0200
-Subject: [PATCH v5 3/3] dmaengine: sun6i: Add cyclic capability
-In-Reply-To: <cover.1461307982.git.moinejf@free.fr>
-References: <cover.1461307982.git.moinejf@free.fr>
-Message-ID: <f2e8f84750757588f80c934a995c181d42905dde.1461307982.git.moinejf@free.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 22 Apr 2016 14:58:25 +0800
+Subject: [PATCH resend v2 3/9] mfd: axp20x: Add support for AXP809 PMIC
+In-Reply-To: <20160411082409.GG4592@x1>
+References: <1459243352-23344-1-git-send-email-wens@csie.org>
+ <1459243352-23344-4-git-send-email-wens@csie.org> <20160411082409.GG4592@x1>
+Message-ID: <CAGb2v65oT8NwWp2nx9_qc-YcR1W8WteBh7zn6a3q4snHoXRfhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA cyclic transfers are required by audio streaming.
+Hi Lee,
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- drivers/dma/sun6i-dma.c | 129 +++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 122 insertions(+), 7 deletions(-)
+On Mon, Apr 11, 2016 at 4:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 29 Mar 2016, Chen-Yu Tsai wrote:
+>
+>> The X-Powers AXP809 is a new PMIC that is paired with Allwinner's A80
+>> SoC, along with a slave AXP806 PMIC.
+>>
+>> This PMIC is quite similar to the earlier AXP223, though the interrupts
+>> and regulator have changed a bit.
+>>
+>> This patch adds support for the interrupts and power button of the PMIC.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/mfd/axp20x-rsb.c   |  1 +
+>>  drivers/mfd/axp20x.c       | 79 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/mfd/axp20x.h | 59 ++++++++++++++++++++++++++++++++++
+>>  3 files changed, 139 insertions(+)
+>
+> Applied, thanks.
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 821fc4f..f0c4a53 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -146,6 +146,8 @@ struct sun6i_vchan {
- 	struct dma_slave_config	cfg;
- 	struct sun6i_pchan	*phy;
- 	u8			port;
-+	u8			irq_type;
-+	bool			cyclic;
- };
- 
- struct sun6i_dma_dev {
-@@ -254,6 +256,30 @@ static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
- 	return addr_width >> 1;
- }
- 
-+static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
-+{
-+	struct sun6i_desc *txd = pchan->desc;
-+	struct sun6i_dma_lli *lli;
-+	size_t bytes;
-+	dma_addr_t pos;
-+
-+	pos = readl(pchan->base + DMA_CHAN_LLI_ADDR);
-+	bytes = readl(pchan->base + DMA_CHAN_CUR_CNT);
-+
-+	if (pos == LLI_LAST_ITEM)
-+		return bytes;
-+
-+	for (lli = txd->v_lli; lli; lli = lli->v_lli_next) {
-+		if (lli->p_lli_next == pos) {
-+			for (lli = lli->v_lli_next; lli; lli = lli->v_lli_next)
-+				bytes += lli->len;
-+			break;
-+		}
-+	}
-+
-+	return bytes;
-+}
-+
- static void *sun6i_dma_lli_add(struct sun6i_dma_lli *prev,
- 			       struct sun6i_dma_lli *next,
- 			       dma_addr_t next_phy,
-@@ -342,8 +368,12 @@ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
- 	irq_reg = pchan->idx / DMA_IRQ_CHAN_NR;
- 	irq_offset = pchan->idx % DMA_IRQ_CHAN_NR;
- 
-+	vchan->irq_type = vchan->cyclic ? DMA_IRQ_PKG : DMA_IRQ_QUEUE;
-+
- 	irq_val = readl(sdev->base + DMA_IRQ_EN(irq_reg));
--	irq_val |= DMA_IRQ_QUEUE << (irq_offset * DMA_IRQ_CHAN_WIDTH);
-+	irq_val &= ~((DMA_IRQ_HALF | DMA_IRQ_PKG | DMA_IRQ_QUEUE) <<
-+			(irq_offset * DMA_IRQ_CHAN_WIDTH));
-+	irq_val |= vchan->irq_type << (irq_offset * DMA_IRQ_CHAN_WIDTH);
- 	writel(irq_val, sdev->base + DMA_IRQ_EN(irq_reg));
- 
- 	writel(pchan->desc->p_lli, pchan->base + DMA_CHAN_LLI_ADDR);
-@@ -440,11 +470,12 @@ static irqreturn_t sun6i_dma_interrupt(int irq, void *dev_id)
- 		writel(status, sdev->base + DMA_IRQ_STAT(i));
- 
- 		for (j = 0; (j < DMA_IRQ_CHAN_NR) && status; j++) {
--			if (status & DMA_IRQ_QUEUE) {
--				pchan = sdev->pchans + j;
--				vchan = pchan->vchan;
--
--				if (vchan) {
-+			pchan = sdev->pchans + j;
-+			vchan = pchan->vchan;
-+			if (vchan && (status & vchan->irq_type)) {
-+				if (vchan->cyclic) {
-+					vchan_cyclic_callback(&pchan->desc->vd);
-+				} else {
- 					spin_lock(&vchan->vc.lock);
- 					vchan_cookie_complete(&pchan->desc->vd);
- 					pchan->done = pchan->desc;
-@@ -650,6 +681,78 @@ err_lli_free:
- 	return NULL;
- }
- 
-+static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_cyclic(
-+					struct dma_chan *chan,
-+					dma_addr_t buf_addr,
-+					size_t buf_len,
-+					size_t period_len,
-+					enum dma_transfer_direction dir,
-+					unsigned long flags)
-+{
-+	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-+	struct dma_slave_config *sconfig = &vchan->cfg;
-+	struct sun6i_dma_lli *v_lli, *prev = NULL;
-+	struct sun6i_desc *txd;
-+	dma_addr_t p_lli;
-+	u32 lli_cfg;
-+	unsigned int i, periods = buf_len / period_len;
-+	int ret;
-+
-+	ret = set_config(sdev, sconfig, dir, &lli_cfg);
-+	if (ret) {
-+		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
-+		return NULL;
-+	}
-+
-+	txd = kzalloc(sizeof(*txd), GFP_NOWAIT);
-+	if (!txd)
-+		return NULL;
-+
-+	for (i = 0; i < periods; i++) {
-+		v_lli = dma_pool_alloc(sdev->pool, GFP_NOWAIT, &p_lli);
-+		if (!v_lli) {
-+			dev_err(sdev->slave.dev, "Failed to alloc lli memory\n");
-+			goto err_lli_free;
-+		}
-+
-+		v_lli->len = period_len;
-+		v_lli->para = NORMAL_WAIT;
-+
-+		if (dir == DMA_MEM_TO_DEV) {
-+			v_lli->src = buf_addr + period_len * i;
-+			v_lli->dst = sconfig->dst_addr;
-+			v_lli->cfg = lli_cfg |
-+				DMA_CHAN_CFG_DST_IO_MODE |
-+				DMA_CHAN_CFG_SRC_LINEAR_MODE |
-+				DMA_CHAN_CFG_SRC_DRQ(DRQ_SDRAM) |
-+				DMA_CHAN_CFG_DST_DRQ(vchan->port);
-+		} else {
-+			v_lli->src = sconfig->src_addr;
-+			v_lli->dst = buf_addr + period_len * i;
-+			v_lli->cfg = lli_cfg |
-+				DMA_CHAN_CFG_DST_LINEAR_MODE |
-+				DMA_CHAN_CFG_SRC_IO_MODE |
-+				DMA_CHAN_CFG_DST_DRQ(DRQ_SDRAM) |
-+				DMA_CHAN_CFG_SRC_DRQ(vchan->port);
-+		}
-+
-+		prev = sun6i_dma_lli_add(prev, v_lli, p_lli, txd);
-+	}
-+
-+	prev->p_lli_next = txd->p_lli;		/* cyclic list */
-+
-+	vchan->cyclic = true;
-+
-+	return vchan_tx_prep(&vchan->vc, &txd->vd, flags);
-+
-+err_lli_free:
-+	for (prev = txd->v_lli; prev; prev = prev->v_lli_next)
-+		dma_pool_free(sdev->pool, prev, virt_to_phys(prev));
-+	kfree(txd);
-+	return NULL;
-+}
-+
- static int sun6i_dma_config(struct dma_chan *chan,
- 			    struct dma_slave_config *config)
- {
-@@ -719,6 +822,16 @@ static int sun6i_dma_terminate_all(struct dma_chan *chan)
- 
- 	spin_lock_irqsave(&vchan->vc.lock, flags);
- 
-+	if (vchan->cyclic) {
-+		vchan->cyclic = false;
-+		if (pchan && pchan->desc) {
-+			struct virt_dma_desc *vd = &pchan->desc->vd;
-+			struct virt_dma_chan *vc = &vchan->vc;
-+
-+			list_add_tail(&vd->node, &vc->desc_completed);
-+		}
-+	}
-+
- 	vchan_get_all_descriptors(&vchan->vc, &head);
- 
- 	if (pchan) {
-@@ -766,7 +879,7 @@ static enum dma_status sun6i_dma_tx_status(struct dma_chan *chan,
- 	} else if (!pchan || !pchan->desc) {
- 		bytes = 0;
- 	} else {
--		bytes = readl(pchan->base + DMA_CHAN_CUR_CNT);
-+		bytes = sun6i_get_chan_size(pchan);
- 	}
- 
- 	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-@@ -970,6 +1083,7 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_PRIVATE, sdc->slave.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, sdc->slave.cap_mask);
- 	dma_cap_set(DMA_SLAVE, sdc->slave.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, sdc->slave.cap_mask);
- 
- 	INIT_LIST_HEAD(&sdc->slave.channels);
- 	sdc->slave.device_free_chan_resources	= sun6i_dma_free_chan_resources;
-@@ -977,6 +1091,7 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_issue_pending		= sun6i_dma_issue_pending;
- 	sdc->slave.device_prep_slave_sg		= sun6i_dma_prep_slave_sg;
- 	sdc->slave.device_prep_dma_memcpy	= sun6i_dma_prep_dma_memcpy;
-+	sdc->slave.device_prep_dma_cyclic	= sun6i_dma_prep_dma_cyclic;
- 	sdc->slave.copy_align			= DMAENGINE_ALIGN_4_BYTES;
- 	sdc->slave.device_config		= sun6i_dma_config;
- 	sdc->slave.device_pause			= sun6i_dma_pause;
--- 
-2.8.1
+Could you also merge the MAINTAINERS patch ("MAINTAINERS: Add entry for
+X-Powers AXP family PMIC drivers") and push an immutable tree for Mark
+to merge the regulator patch?
+
+Thanks again.
+
+ChenYu
+
+>
+>> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+>> index 28c20247c112..a407527bcd09 100644
+>> --- a/drivers/mfd/axp20x-rsb.c
+>> +++ b/drivers/mfd/axp20x-rsb.c
+>> @@ -61,6 +61,7 @@ static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
+>>
+>>  static const struct of_device_id axp20x_rsb_of_match[] = {
+>>       { .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
+>> +     { .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
+>>       { },
+>>  };
+>>  MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
+>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>> index a57d6e940610..1ce923277cc8 100644
+>> --- a/drivers/mfd/axp20x.c
+>> +++ b/drivers/mfd/axp20x.c
+>> @@ -37,6 +37,7 @@ static const char * const axp20x_model_names[] = {
+>>       "AXP221",
+>>       "AXP223",
+>>       "AXP288",
+>> +     "AXP809",
+>>  };
+>>
+>>  static const struct regmap_range axp152_writeable_ranges[] = {
+>> @@ -85,6 +86,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
+>>       .n_yes_ranges   = ARRAY_SIZE(axp20x_volatile_ranges),
+>>  };
+>>
+>> +/* AXP22x ranges are shared with the AXP809, as they cover the same range */
+>>  static const struct regmap_range axp22x_writeable_ranges[] = {
+>>       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>>       regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+>> @@ -211,6 +213,20 @@ static struct resource axp288_fuel_gauge_resources[] = {
+>>       },
+>>  };
+>>
+>> +static struct resource axp809_pek_resources[] = {
+>> +     {
+>> +             .name   = "PEK_DBR",
+>> +             .start  = AXP809_IRQ_PEK_RIS_EDGE,
+>> +             .end    = AXP809_IRQ_PEK_RIS_EDGE,
+>> +             .flags  = IORESOURCE_IRQ,
+>> +     }, {
+>> +             .name   = "PEK_DBF",
+>> +             .start  = AXP809_IRQ_PEK_FAL_EDGE,
+>> +             .end    = AXP809_IRQ_PEK_FAL_EDGE,
+>> +             .flags  = IORESOURCE_IRQ,
+>> +     },
+>> +};
+>> +
+>>  static const struct regmap_config axp152_regmap_config = {
+>>       .reg_bits       = 8,
+>>       .val_bits       = 8,
+>> @@ -378,6 +394,41 @@ static const struct regmap_irq axp288_regmap_irqs[] = {
+>>       INIT_REGMAP_IRQ(AXP288, BC_USB_CHNG,            5, 1),
+>>  };
+>>
+>> +static const struct regmap_irq axp809_regmap_irqs[] = {
+>> +     INIT_REGMAP_IRQ(AXP809, ACIN_OVER_V,            0, 7),
+>> +     INIT_REGMAP_IRQ(AXP809, ACIN_PLUGIN,            0, 6),
+>> +     INIT_REGMAP_IRQ(AXP809, ACIN_REMOVAL,           0, 5),
+>> +     INIT_REGMAP_IRQ(AXP809, VBUS_OVER_V,            0, 4),
+>> +     INIT_REGMAP_IRQ(AXP809, VBUS_PLUGIN,            0, 3),
+>> +     INIT_REGMAP_IRQ(AXP809, VBUS_REMOVAL,           0, 2),
+>> +     INIT_REGMAP_IRQ(AXP809, VBUS_V_LOW,             0, 1),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_PLUGIN,            1, 7),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_REMOVAL,           1, 6),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_ENT_ACT_MODE,      1, 5),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_EXIT_ACT_MODE,     1, 4),
+>> +     INIT_REGMAP_IRQ(AXP809, CHARG,                  1, 3),
+>> +     INIT_REGMAP_IRQ(AXP809, CHARG_DONE,             1, 2),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_HIGH,     2, 7),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_HIGH_END, 2, 6),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_LOW,      2, 5),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_LOW_END,  2, 4),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_HIGH,     2, 3),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_HIGH_END, 2, 2),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_LOW,      2, 1),
+>> +     INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_LOW_END,  2, 0),
+>> +     INIT_REGMAP_IRQ(AXP809, DIE_TEMP_HIGH,          3, 7),
+>> +     INIT_REGMAP_IRQ(AXP809, LOW_PWR_LVL1,           3, 1),
+>> +     INIT_REGMAP_IRQ(AXP809, LOW_PWR_LVL2,           3, 0),
+>> +     INIT_REGMAP_IRQ(AXP809, TIMER,                  4, 7),
+>> +     INIT_REGMAP_IRQ(AXP809, PEK_RIS_EDGE,           4, 6),
+>> +     INIT_REGMAP_IRQ(AXP809, PEK_FAL_EDGE,           4, 5),
+>> +     INIT_REGMAP_IRQ(AXP809, PEK_SHORT,              4, 4),
+>> +     INIT_REGMAP_IRQ(AXP809, PEK_LONG,               4, 3),
+>> +     INIT_REGMAP_IRQ(AXP809, PEK_OVER_OFF,           4, 2),
+>> +     INIT_REGMAP_IRQ(AXP809, GPIO1_INPUT,            4, 1),
+>> +     INIT_REGMAP_IRQ(AXP809, GPIO0_INPUT,            4, 0),
+>> +};
+>> +
+>>  static const struct regmap_irq_chip axp152_regmap_irq_chip = {
+>>       .name                   = "axp152_irq_chip",
+>>       .status_base            = AXP152_IRQ1_STATE,
+>> @@ -428,6 +479,18 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+>>
+>>  };
+>>
+>> +static const struct regmap_irq_chip axp809_regmap_irq_chip = {
+>> +     .name                   = "axp809",
+>> +     .status_base            = AXP20X_IRQ1_STATE,
+>> +     .ack_base               = AXP20X_IRQ1_STATE,
+>> +     .mask_base              = AXP20X_IRQ1_EN,
+>> +     .mask_invert            = true,
+>> +     .init_ack_masked        = true,
+>> +     .irqs                   = axp809_regmap_irqs,
+>> +     .num_irqs               = ARRAY_SIZE(axp809_regmap_irqs),
+>> +     .num_regs               = 5,
+>> +};
+>> +
+>>  static struct mfd_cell axp20x_cells[] = {
+>>       {
+>>               .name           = "axp20x-pek",
+>> @@ -572,6 +635,16 @@ static struct mfd_cell axp288_cells[] = {
+>>       },
+>>  };
+>>
+>> +static struct mfd_cell axp809_cells[] = {
+>> +     {
+>> +             .name                   = "axp20x-pek",
+>> +             .num_resources          = ARRAY_SIZE(axp809_pek_resources),
+>> +             .resources              = axp809_pek_resources,
+>> +     }, {
+>> +             .name                   = "axp20x-regulator",
+>> +     },
+>> +};
+>> +
+>>  static struct axp20x_dev *axp20x_pm_power_off;
+>>  static void axp20x_power_off(void)
+>>  {
+>> @@ -631,6 +704,12 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+>>               axp20x->regmap_cfg = &axp288_regmap_config;
+>>               axp20x->regmap_irq_chip = &axp288_regmap_irq_chip;
+>>               break;
+>> +     case AXP809_ID:
+>> +             axp20x->nr_cells = ARRAY_SIZE(axp809_cells);
+>> +             axp20x->cells = axp809_cells;
+>> +             axp20x->regmap_cfg = &axp22x_regmap_config;
+>> +             axp20x->regmap_irq_chip = &axp809_regmap_irq_chip;
+>> +             break;
+>>       default:
+>>               dev_err(dev, "unsupported AXP20X ID %lu\n", axp20x->variant);
+>>               return -EINVAL;
+>> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+>> index d82e7d51372b..0be4982f08fe 100644
+>> --- a/include/linux/mfd/axp20x.h
+>> +++ b/include/linux/mfd/axp20x.h
+>> @@ -20,6 +20,7 @@ enum {
+>>       AXP221_ID,
+>>       AXP223_ID,
+>>       AXP288_ID,
+>> +     AXP809_ID,
+>>       NR_AXP20X_VARIANTS,
+>>  };
+>>
+>> @@ -264,6 +265,29 @@ enum {
+>>       AXP22X_REG_ID_MAX,
+>>  };
+>>
+>> +enum {
+>> +     AXP809_DCDC1 = 0,
+>> +     AXP809_DCDC2,
+>> +     AXP809_DCDC3,
+>> +     AXP809_DCDC4,
+>> +     AXP809_DCDC5,
+>> +     AXP809_DC1SW,
+>> +     AXP809_DC5LDO,
+>> +     AXP809_ALDO1,
+>> +     AXP809_ALDO2,
+>> +     AXP809_ALDO3,
+>> +     AXP809_ELDO1,
+>> +     AXP809_ELDO2,
+>> +     AXP809_ELDO3,
+>> +     AXP809_DLDO1,
+>> +     AXP809_DLDO2,
+>> +     AXP809_RTC_LDO,
+>> +     AXP809_LDO_IO0,
+>> +     AXP809_LDO_IO1,
+>> +     AXP809_SW,
+>> +     AXP809_REG_ID_MAX,
+>> +};
+>> +
+>>  /* IRQs */
+>>  enum {
+>>       AXP152_IRQ_LDO0IN_CONNECT = 1,
+>> @@ -390,6 +414,41 @@ enum axp288_irqs {
+>>       AXP288_IRQ_BC_USB_CHNG,
+>>  };
+>>
+>> +enum axp809_irqs {
+>> +     AXP809_IRQ_ACIN_OVER_V = 1,
+>> +     AXP809_IRQ_ACIN_PLUGIN,
+>> +     AXP809_IRQ_ACIN_REMOVAL,
+>> +     AXP809_IRQ_VBUS_OVER_V,
+>> +     AXP809_IRQ_VBUS_PLUGIN,
+>> +     AXP809_IRQ_VBUS_REMOVAL,
+>> +     AXP809_IRQ_VBUS_V_LOW,
+>> +     AXP809_IRQ_BATT_PLUGIN,
+>> +     AXP809_IRQ_BATT_REMOVAL,
+>> +     AXP809_IRQ_BATT_ENT_ACT_MODE,
+>> +     AXP809_IRQ_BATT_EXIT_ACT_MODE,
+>> +     AXP809_IRQ_CHARG,
+>> +     AXP809_IRQ_CHARG_DONE,
+>> +     AXP809_IRQ_BATT_CHG_TEMP_HIGH,
+>> +     AXP809_IRQ_BATT_CHG_TEMP_HIGH_END,
+>> +     AXP809_IRQ_BATT_CHG_TEMP_LOW,
+>> +     AXP809_IRQ_BATT_CHG_TEMP_LOW_END,
+>> +     AXP809_IRQ_BATT_ACT_TEMP_HIGH,
+>> +     AXP809_IRQ_BATT_ACT_TEMP_HIGH_END,
+>> +     AXP809_IRQ_BATT_ACT_TEMP_LOW,
+>> +     AXP809_IRQ_BATT_ACT_TEMP_LOW_END,
+>> +     AXP809_IRQ_DIE_TEMP_HIGH,
+>> +     AXP809_IRQ_LOW_PWR_LVL1,
+>> +     AXP809_IRQ_LOW_PWR_LVL2,
+>> +     AXP809_IRQ_TIMER,
+>> +     AXP809_IRQ_PEK_RIS_EDGE,
+>> +     AXP809_IRQ_PEK_FAL_EDGE,
+>> +     AXP809_IRQ_PEK_SHORT,
+>> +     AXP809_IRQ_PEK_LONG,
+>> +     AXP809_IRQ_PEK_OVER_OFF,
+>> +     AXP809_IRQ_GPIO1_INPUT,
+>> +     AXP809_IRQ_GPIO0_INPUT,
+>> +};
+>> +
+>>  #define AXP288_TS_ADC_H              0x58
+>>  #define AXP288_TS_ADC_L              0x59
+>>  #define AXP288_GP_ADC_H              0x5a
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
