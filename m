@@ -1,41 +1,90 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Apr 2016 18:48:02 +0200
-Subject: [PATCH v2 0/6] arm64/ARM pt dumper changes 
-Message-ID: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri, 22 Apr 2016 18:48:03 +0200
+Subject: [PATCH v2 1/6] arm64: ptdump: use static initializers for vmemmap
+ region boundaries
+In-Reply-To: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1461343688-8552-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series updates the kernel page table dumper to:
-- not initialize the vmemmap region markers dynamically
-- show region boundaries for the kasan shadow region
-- include the UEFI runtime services mappings
+There is no need to initialize the vmemmap region boundaries dynamically,
+since they are compile time constants. So just add these constants to the
+global struct initializer, and drop the dynamic assignment and related code.
 
-Changes since v1:
-- incorporated Mark Rutland's patches to split into separate sysfs files
-- give ARM the same treatment so that we can export the UEFI page tables in
-  code that is shared between ARM and arm64
-- added file to use char arrays rather than char pointer in the marker and
-  prot_bits arrays (arm64)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/dump.c | 49 ++++++--------------
+ 1 file changed, 13 insertions(+), 36 deletions(-)
 
-Ard Biesheuvel (4):
-  arm64: ptdump: use static initializers for vmemmap region boundaries
-  arm64: ptdump: add region marker for kasan shadow region
-  arm64: ptdump: fold string literals into address_markers[] and
-    pte_bits[]
-  arm: mm: dump: make page table dumping reusable
-
-Mark Rutland (2):
-  arm64: mm: dump: make page table dumping reusable
-  efi/arm*: add support to dump the EFI page tables
-
- arch/arm/include/asm/ptdump.h      | 44 +++++++++
- arch/arm/mm/dump.c                 | 60 ++++++++-----
- arch/arm64/include/asm/ptdump.h    | 44 +++++++++
- arch/arm64/mm/dump.c               | 94 +++++++++-----------
- drivers/firmware/efi/arm-runtime.c | 21 +++++
- 5 files changed, 188 insertions(+), 75 deletions(-)
- create mode 100644 arch/arm/include/asm/ptdump.h
- create mode 100644 arch/arm64/include/asm/ptdump.h
-
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index a21f47421b0c..493461159462 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -32,37 +32,21 @@ struct addr_marker {
+ 	const char *name;
+ };
+ 
+-enum address_markers_idx {
+-	MODULES_START_NR = 0,
+-	MODULES_END_NR,
+-	VMALLOC_START_NR,
+-	VMALLOC_END_NR,
+-	FIXADDR_START_NR,
+-	FIXADDR_END_NR,
+-	PCI_START_NR,
+-	PCI_END_NR,
++static const struct addr_marker address_markers[] = {
++	{ MODULES_VADDR,		"Modules start" },
++	{ MODULES_END,			"Modules end" },
++	{ VMALLOC_START,		"vmalloc() Area" },
++	{ VMALLOC_END,			"vmalloc() End" },
++	{ FIXADDR_START,		"Fixmap start" },
++	{ FIXADDR_TOP,			"Fixmap end" },
++	{ PCI_IO_START,			"PCI I/O start" },
++	{ PCI_IO_END,			"PCI I/O end" },
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	VMEMMAP_START_NR,
+-	VMEMMAP_END_NR,
++	{ VMEMMAP_START,		"vmemmap start" },
++	{ VMEMMAP_START + VMEMMAP_SIZE,	"vmemmap end" },
+ #endif
+-	KERNEL_SPACE_NR,
+-};
+-
+-static struct addr_marker address_markers[] = {
+-	{ MODULES_VADDR,	"Modules start" },
+-	{ MODULES_END,		"Modules end" },
+-	{ VMALLOC_START,	"vmalloc() Area" },
+-	{ VMALLOC_END,		"vmalloc() End" },
+-	{ FIXADDR_START,	"Fixmap start" },
+-	{ FIXADDR_TOP,		"Fixmap end" },
+-	{ PCI_IO_START,		"PCI I/O start" },
+-	{ PCI_IO_END,		"PCI I/O end" },
+-#ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	{ 0,			"vmemmap start" },
+-	{ 0,			"vmemmap end" },
+-#endif
+-	{ PAGE_OFFSET,		"Linear Mapping" },
+-	{ -1,			NULL },
++	{ PAGE_OFFSET,			"Linear Mapping" },
++	{ -1,				NULL },
+ };
+ 
+ /*
+@@ -347,13 +331,6 @@ static int ptdump_init(void)
+ 			for (j = 0; j < pg_level[i].num; j++)
+ 				pg_level[i].mask |= pg_level[i].bits[j].mask;
+ 
+-#ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	address_markers[VMEMMAP_START_NR].start_address =
+-				(unsigned long)virt_to_page(PAGE_OFFSET);
+-	address_markers[VMEMMAP_END_NR].start_address =
+-				(unsigned long)virt_to_page(high_memory);
+-#endif
+-
+ 	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+ 				 &ptdump_fops);
+ 	return pe ? 0 : -ENOMEM;
 -- 
 2.7.4
