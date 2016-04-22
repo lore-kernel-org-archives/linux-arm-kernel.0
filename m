@@ -1,337 +1,143 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Fri, 22 Apr 2016 18:11:02 +0200
-Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
-In-Reply-To: <1461333147-11873-2-git-send-email-harald@ccbib.org>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
- <1461333147-11873-2-git-send-email-harald@ccbib.org>
-Message-ID: <a9431e81a361a19254bbcceae8930d22@ccbib.org>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 22 Apr 2016 09:11:34 -0700
+Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+In-Reply-To: <VI1PR0401MB18558325A80D252D2EC64A7BFF6F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+References: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18558325A80D252D2EC64A7BFF6F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+Message-ID: <571A4D36.2000506@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCing Mark and Liam.
+On 4/21/2016 10:59 PM, Fugang Duan wrote:
+> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Friday, April 22, 2016 10:01 AM
+>> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
+>> <fugang.duan@nxp.com>; lznuaa at gmail.com
+>> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
+>> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
+>> kernel at lists.infradead.org; johannes at sipsolutions.net;
+>> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+>> arnd at arndb.de; holgerschurig at gmail.com; Troy Kisky
+>> <troy.kisky@boundarydevices.com>
+>> Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+>>
+>> If dirty_tx isn't updated, then dma_unmap_single will be called twice.
+>>
+>> This fixes a
+>> [   58.420980] ------------[ cut here ]------------
+>> [   58.425667] WARNING: CPU: 0 PID: 377 at /home/schurig/d/mkarm/linux-
+>> 4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
+>> [   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free DMA
+>> memory it has not allocated [device address=0x0000000000000000] [size=66
+>> bytes]
+>>
+>> encountered by Holger
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> Tested-by: <holgerschurig@gmail.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
+>>  1 file changed, 3 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>> b/drivers/net/ethernet/freescale/fec_main.c
+>> index 08243c2..b71654c 100644
+>> --- a/drivers/net/ethernet/freescale/fec_main.c
+>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>> @@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev, u16
+>> queue_id)
+>>  					 fec16_to_cpu(bdp->cbd_datlen),
+>>  					 DMA_TO_DEVICE);
+>>  		bdp->cbd_bufaddr = cpu_to_fec32(0);
+>> -		if (!skb) {
+>> -			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+>> -			continue;
+>> -		}
+>> +		if (!skb)
+>> +			goto skb_done;
+>>
+>>  		/* Check for errors. */
+>>  		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC | @@ -1239,7
+>> +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+>>
+>>  		/* Free the sk buffer associated with this last transmit */
+>>  		dev_kfree_skb_any(skb);
+>> -
+>> +skb_done:
+>>  		/* Make sure the update to bdp and tx_skbuff are performed
+>>  		 * before dirty_tx
+>>  		 */
+>> --
+>> 2.5.0
+> 
+> The patch is fine for me.
+> Can you review below patch that also fix the issue. It can take much effort due to less rmb() and READ_ONCE() operation that is very sensitive for duplex Gbps test for i.MX6SX/i.MX7d SOC. (i.MX6SX can reach at 1.4Gbps, i.MX7D can reach at 1.8Gbps.)
 
-I guess I shouldn't rely blindly on get_maintainer.pl ...
 
-On 22.04.2016 15:52, Harald Geyer wrote:
-> The hardware has two current sources ISRC0 and ISRC1 to allow 
-> measuring
-> resistors without additional circuitry. This commit makes them 
-> available
-> as regulators.
->
-> Tested on an imx233-olinuxino board.
->
-> Signed-off-by: Harald Geyer <harald@ccbib.org>
-> ---
-> The current regulator API doesn't fit this type of device very well:
-> Typically
-> consumers will want to set a defined current, ie. min_uA == max_uA, 
-> but they
-> can't without help from configuration data, because the valid values 
-> aren't
-> reported by the API for current regulators. I have been thinking 
-> about
-> extending the API, but currently AFAIK no such consumers exist and 
-> most
-> users, like myself, will force the regulator to a defined value in
-> devicetree anyway.
->
->  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
->  drivers/iio/adc/Kconfig                            |   1 +
->  drivers/iio/adc/mxs-lradc.c                        | 152
-> +++++++++++++++++++++
->  3 files changed, 182 insertions(+)
->
-> diff --git
-> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> index 555fb11..983952c 100644
-> --- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> +++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> @@ -19,6 +19,15 @@ Optional properties:
->  - fsl,settling: delay between plate switch to next sample. Allowed 
-> value is
->                  1 ... 2047. It counts at 2 kHz and its default is
->                  10 (= 5 ms)
-> +- ISRC0: A node describing the regulator of internal current source 
-> 0
-> +- ISRC1: A node describing the regulator of internal current source 
-> 1
-> +
-> +Required properties for the ISRCx sub-nodes:
-> +- regulator-max-microamp: See standard regulator binding 
-> documentation.
-> +                          Valid values are from 0 to 300 in steps of 
-> 20.
-> +
-> +Optional properties for the ISRCx sub-nodes:
-> +Any standard regulator properties that apply to current regulators.
->
->  Example for i.MX23 SoC:
->
-> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
->  		fsl,ave-ctrl = <4>;
->  		fsl,ave-delay = <2>;
->  		fsl,settling = <10>;
-> +
-> +		isrc_lradc0: ISRC0 {
-> +			regulator-max-microamp = <300>;
-> +		};
-> +
-> +		isrc_lradc1: ISRC1 {
-> +			regulator-max-microamp = <120>;
-> +			regulator-min-microamp = <120>;
-> +			regulator-always-on;
-> +		};
->  	};
->
->  Example for i.MX28 SoC:
-> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
->  		fsl,ave-ctrl = <4>;
->  		fsl,ave-delay = <2>;
->  		fsl,settling = <10>;
-> +
-> +		isrc_lradc0: ISRC0 {
-> +			regulator-max-microamp = <300>;
-> +		};
-> +
-> +		isrc_lradc6: ISRC1 {
-> +			regulator-max-microamp = <120>;
-> +			regulator-min-microamp = <120>;
-> +			regulator-always-on;
-> +		};
->  	};
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 5937030..1968d1c 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -319,6 +319,7 @@ config MXS_LRADC
->          tristate "Freescale i.MX23/i.MX28 LRADC"
->          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
->          depends on INPUT
-> +        depends on REGULATOR
->          select STMP_DEVICE
->          select IIO_BUFFER
->          select IIO_TRIGGERED_BUFFER
-> diff --git a/drivers/iio/adc/mxs-lradc.c 
-> b/drivers/iio/adc/mxs-lradc.c
-> index 33051b8..f22f339 100644
-> --- a/drivers/iio/adc/mxs-lradc.c
-> +++ b/drivers/iio/adc/mxs-lradc.c
-> @@ -40,6 +40,10 @@
->  #include <linux/iio/triggered_buffer.h>
->  #include <linux/iio/sysfs.h>
->
-> +#include <linux/regulator/driver.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/regulator/of_regulator.h>
-> +
->  #define DRIVER_NAME		"mxs-lradc"
->
->  #define LRADC_MAX_DELAY_CHANS	4
-> @@ -261,6 +265,9 @@ struct mxs_lradc {
->  	unsigned		over_sample_delay;
->  	/* time in clocks to wait after the plates where switched */
->  	unsigned		settling_delay;
-> +
-> +	struct regulator_desc isrc0;
-> +	struct regulator_desc isrc1;
->  };
->
->  #define	LRADC_CTRL0				0x00
-> @@ -305,6 +312,11 @@ struct mxs_lradc {
->  #define	LRADC_CTRL2				0x20
->  #define	LRADC_CTRL2_DIVIDE_BY_TWO_OFFSET	24
->  #define	LRADC_CTRL2_TEMPSENSE_PWD		BIT(15)
-> +#define	LRADC_CTRL2_TEMP_SENSOR_IENABLE1	BIT(9)
-> +#define	LRADC_CTRL2_TEMP_SENSOR_IENABLE0	BIT(8)
-> +#define	LRADC_CTRL2_TEMP_ISRC1_OFFSET		4
-> +#define	LRADC_CTRL2_TEMP_ISRC0_OFFSET		0
-> +#define	LRADC_CTRL2_TEMP_ISRC_MASK		0x0f
->
->  #define	LRADC_STATUS				0x40
->  #define	LRADC_STATUS_TOUCH_DETECT_RAW		BIT(0)
-> @@ -1383,6 +1395,109 @@ static const struct iio_buffer_setup_ops
-> mxs_lradc_buffer_ops = {
->  	.validate_scan_mask = &mxs_lradc_validate_scan_mask,
->  };
->
-> +static int mxs_lradc_regulator_is_enabled(struct regulator_dev *dev)
-> +{
-> +	struct mxs_lradc *lradc = rdev_get_drvdata(dev);
-> +	int reg = readl(lradc->base + LRADC_CTRL2);
-> +
-> +	if (dev->desc == &lradc->isrc0)
-> +		return reg & LRADC_CTRL2_TEMP_SENSOR_IENABLE0;
-> +	else if (dev->desc == &lradc->isrc1)
-> +		return reg & LRADC_CTRL2_TEMP_SENSOR_IENABLE1;
-> +
-> +	/* This should never happen */
-> +	return -ENODEV;
-> +}
-> +
-> +#define LRADC_REGVALUE2uA(regval, offset) \
-> +	(20 * ((regval >> offset) & LRADC_CTRL2_TEMP_ISRC_MASK))
-> +
-> +static int mxs_lradc_regulator_get_current_limit(struct 
-> regulator_dev *dev)
-> +{
-> +	struct mxs_lradc *lradc = rdev_get_drvdata(dev);
-> +	int reg = readl(lradc->base + LRADC_CTRL2);
-> +
-> +	if (dev->desc == &lradc->isrc0)
-> +		return LRADC_REGVALUE2uA(reg, LRADC_CTRL2_TEMP_ISRC0_OFFSET);
-> +	else if (dev->desc == &lradc->isrc1)
-> +		return LRADC_REGVALUE2uA(reg, LRADC_CTRL2_TEMP_ISRC1_OFFSET);
-> +
-> +	/* This should never happen */
-> +	return -ENODEV;
-> +}
-> +
-> +static int mxs_lradc_regulator_enable(struct regulator_dev *dev)
-> +{
-> +	struct mxs_lradc *lradc = rdev_get_drvdata(dev);
-> +
-> +	if (dev->desc == &lradc->isrc0)
-> +		mxs_lradc_reg_set(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0,
-> +				  LRADC_CTRL2);
-> +	else if (dev->desc == &lradc->isrc1)
-> +		mxs_lradc_reg_set(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
-> +				  LRADC_CTRL2);
-> +	else
-> +		/* This should never happen */
-> +		return -ENODEV;
-> +
-> +	return 0;
-> +}
-> +
-> +static int mxs_lradc_regulator_disable(struct regulator_dev *dev)
-> +{
-> +	struct mxs_lradc *lradc = rdev_get_drvdata(dev);
-> +
-> +	if (dev->desc == &lradc->isrc0)
-> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0,
-> +				    LRADC_CTRL2);
-> +	else if (dev->desc == &lradc->isrc1)
-> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
-> +				    LRADC_CTRL2);
-> +	else
-> +		/* This should never happen */
-> +		return -ENODEV;
-> +
-> +	return 0;
-> +}
-> +
-> +static int mxs_lradc_regulator_set_current_limit(struct 
-> regulator_dev *dev,
-> +						 int min_uA, int max_uA)
-> +{
-> +	struct mxs_lradc *lradc = rdev_get_drvdata(dev);
-> +	int offset, value;
-> +
-> +	if (dev->desc == &lradc->isrc0)
-> +		offset = LRADC_CTRL2_TEMP_ISRC0_OFFSET;
-> +	else if (dev->desc == &lradc->isrc1)
-> +		offset = LRADC_CTRL2_TEMP_ISRC1_OFFSET;
-> +	else
-> +		/* This should never happen */
-> +		return -ENODEV;
-> +
-> +	value = min_uA / 20;
-> +	if (min_uA % 20)
-> +		value++;
-> +	if (value * 20 > max_uA)
-> +		return -EINVAL;
-> +	if (value & ~LRADC_CTRL2_TEMP_ISRC_MASK)
-> +		/* This should never happen */
-> +		return -EPERM;
-> +
-> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_ISRC_MASK << offset,
-> +			    LRADC_CTRL2);
-> +	mxs_lradc_reg_set(lradc, value << offset, LRADC_CTRL2);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct regulator_ops mxs_lradc_regulator_current_ops = {
-> +	.enable = mxs_lradc_regulator_enable,
-> +	.is_enabled = mxs_lradc_regulator_is_enabled,
-> +	.disable = mxs_lradc_regulator_disable,
-> +	.get_current_limit = mxs_lradc_regulator_get_current_limit,
-> +	.set_current_limit = mxs_lradc_regulator_set_current_limit,
-> +};
-> +
->  /*
->   * Driver initialization
->   */
-> @@ -1519,6 +1634,10 @@ static void mxs_lradc_hw_stop(struct mxs_lradc 
-> *lradc)
->
->  	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
->  		mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
-> +
-> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0 |
-> +					LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
-> +			    LRADC_CTRL2);
->  }
->
->  static const struct of_device_id mxs_lradc_dt_ids[] = {
-> @@ -1592,6 +1711,32 @@ static int mxs_lradc_probe_touchscreen(struct
-> mxs_lradc *lradc,
->  	return 0;
->  }
->
-> +static void mxs_lradc_reg_helper(struct device_node *np, const char 
-> *name,
-> +				 struct regulator_config *conf,
-> +				 struct regulator_desc *desc)
-> +{
-> +	struct regulator_dev *ret;
-> +
-> +	conf->of_node = of_get_child_by_name(np, name);
-> +	if (!conf->of_node)
-> +		return;
-> +
-> +	desc->name = name;
-> +	desc->owner = THIS_MODULE;
-> +	desc->type = REGULATOR_CURRENT;
-> +	desc->ops = &mxs_lradc_regulator_current_ops;
-> +
-> +	conf->init_data = of_get_regulator_init_data(conf->dev, 
-> conf->of_node,
-> +						     desc);
-> +	ret = devm_regulator_register(conf->dev, desc, conf);
-> +	if (IS_ERR(ret))
-> +		/* Just pretend the regulator isn't there */
-> +		dev_err(conf->dev, "Failed to register regulator %s: %ld\n",
-> +			desc->name, PTR_ERR(ret));
-> +
-> +	of_node_put(conf->of_node);
-> +}
-> +
->  static int mxs_lradc_probe(struct platform_device *pdev)
+
+If  "READ_ONCE(bdp->cbd_sc)" is really that expensive, then you should skip the 1st read as well and
+only do it after skb presence is verified. But some numbers would really help sell the patch.
+Also, I comment as to why the code is reorganized would be warranted
+
+
+> 
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -1160,12 +1160,13 @@ static void
+>  fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
 >  {
->  	const struct of_device_id *of_id =
-> @@ -1603,6 +1748,7 @@ static int mxs_lradc_probe(struct
-> platform_device *pdev)
->  	struct mxs_lradc *lradc;
->  	struct iio_dev *iio;
->  	struct resource *iores;
-> +	struct regulator_config regconf;
->  	int ret = 0, touch_ret;
->  	int i, s;
->  	u64 scale_uv;
-> @@ -1727,6 +1873,12 @@ static int mxs_lradc_probe(struct
-> platform_device *pdev)
->  		goto err_ts;
->  	}
->
-> +	/* Setup regulator devices for current source. */
-> +	regconf.dev = dev;
-> +	regconf.driver_data = lradc;
-> +	mxs_lradc_reg_helper(node, "ISRC0", &regconf, &lradc->isrc0);
-> +	mxs_lradc_reg_helper(node, "ISRC1", &regconf, &lradc->isrc1);
+>         struct  fec_enet_private *fep;
+> -       struct bufdesc *bdp;
+> +       struct bufdesc *bdp, *bdp_t;
+>         unsigned short status;
+>         struct  sk_buff *skb;
+>         struct fec_enet_priv_tx_q *txq;
+>         struct netdev_queue *nq;
+>         int     index = 0;
+> +       int     i, bdnum;
+>         int     entries_free;
+> 
+>         fep = netdev_priv(ndev);
+> @@ -1187,20 +1188,28 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+>                 if (status & BD_ENET_TX_READY)
+>                         break;
+> 
+> -               index = fec_enet_get_bd_index(bdp, &txq->bd);
+> -
+> +               bdp_t = bdp;
+> +               bdnum = 1;
+> +               index = fec_enet_get_bd_index(txq->tx_bd_base, bdp_t, fep);
+>                 skb = txq->tx_skbuff[index];
+> -               txq->tx_skbuff[index] = NULL;
+> -               if (!IS_TSO_HEADER(txq, fec32_to_cpu(bdp->cbd_bufaddr)))
+> -                       dma_unmap_single(&fep->pdev->dev,
+> -                                        fec32_to_cpu(bdp->cbd_bufaddr),
+> -                                        fec16_to_cpu(bdp->cbd_datlen),
+> -                                        DMA_TO_DEVICE);
+> -               bdp->cbd_bufaddr = cpu_to_fec32(0);
+> -               if (!skb) {
+> -                       bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+> -                       continue;
+> +               while (!skb) {
+> +                       bdp_t = fec_enet_get_nextdesc(bdp_t, &txq->bd);
+> +                       index = fec_enet_get_bd_index(txq->tx_bd_base, bdp_t, fep);
+> +                       skb = txq->tx_skbuff[index];
+> +                       bdnum++;
+> +               }
+> +               status = fec16_to_cpu(READ_ONCE(bdp->cbd_sc));
+> +               if (status & BD_ENET_TX_READY)
+> +                       break;
 > +
->  	return 0;
->
->  err_ts:
+> +               for (i = 0; i < bdnum; i++) {
+> +                       if (!IS_TSO_HEADER(txq, bdp->cbd_bufaddr))
+> +                               dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
+> +                                                bdp->cbd_datlen, DMA_TO_DEVICE);
+> +                       bdp->cbd_bufaddr = 0;
+> +                       if (i < bdnum - 1)
+> +                               bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+>                 }
+> +               txq->tx_skbuff[index] = NULL;
+> 
+> 
+> Regards,
+> Andy
+> 
