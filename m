@@ -1,49 +1,135 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Apr 2016 11:18:04 +0100
-Subject: [PATCH v2 00/11] pwm: Add support for PWM Capture
-Message-ID: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 22 Apr 2016 11:18:05 +0100
+Subject: [[PATCH v2] 01/11] pwm: Add PWM Capture support
+In-Reply-To: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
+References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1461320295-20414-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first part of this set extends the current PWM API to allow external
-code to request a PWM Capture.  Subsequent patches then make use of the
-new API by providing a userspace offering via /sysfs.  The final part of
-the set supplies PWM Capture functionality into the already existing STi
-PWM driver.
+Supply a PWM Capture call-back Op in order to pass back
+information obtained by running analysis on PWM a signal.
+This would normally (at least during testing) be called from
+the Sysfs routines with a view to printing out PWM Capture
+data which has been encoded into a string.
 
-This patch-set has been tested end to end via /sysfs.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/pwm/core.c  | 27 +++++++++++++++++++++++++++
+ include/linux/pwm.h | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
 
-v1 => v2:
-  API change
-  - Use a struct to carry the result back to the caller
-  - Use 'struct pwm' to store device specific data
-  - Make timeout configurable
-  - Don't use clear_bit(), instead use raw bit logic
-  - Propagate return value of platform_get_irq()
-  - Don't cast to (void *)
-  - Move to subsystem terminology (channels => devices)
-  - Remove channel select feature
-  - Enable Capture IP during capture
-
-Lee Jones (11):
-  pwm: Add PWM Capture support
-  pwm: sti: Rename channel => device
-  pwm: sysfs: Add PWM Capture support
-  pwm: sti: Reorganise register names in preparation for new
-    functionality
-  pwm: sti: Only request clock rate when you need to
-  pwm: sti: Supply PWM Capture register addresses and bit locations
-  pwm: sti: Supply PWM Capture clock handling
-  pwm: sti: Initialise PWM Capture device data
-  pwm: sti: Add support for PWM Capture IRQs
-  pwm: sti: Add PWM Capture call-back
-  pwm: sti: Take the opportunity to conduct a little house keeping
-
- drivers/pwm/core.c    |  27 ++++
- drivers/pwm/pwm-sti.c | 411 +++++++++++++++++++++++++++++++++++++++++---------
- drivers/pwm/sysfs.c   |  17 +++
- include/linux/pwm.h   |  28 ++++
- 4 files changed, 412 insertions(+), 71 deletions(-)
-
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 7831bc6..160784d 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -494,6 +494,33 @@ unlock:
+ EXPORT_SYMBOL_GPL(pwm_set_polarity);
+ 
+ /**
++ * pwm_capture() - capture and report a PWM signal
++ * @pwm: PWM device
++ * @result: struct to fill with capture result
++ * @timeout_ms: time to wait, in milliseconds, before giving up on capture
++ *
++ * Returns: 0 on success or a negative error code on failure.
++ */
++int pwm_capture(struct pwm_device *pwm, struct pwm_capture *result,
++		unsigned int timeout_ms)
++{
++	int err;
++
++	if (!pwm || !pwm->chip->ops)
++		return -EINVAL;
++
++	if (!pwm->chip->ops->capture)
++		return -ENOSYS;
++
++	mutex_lock(&pwm->lock);
++	err = pwm->chip->ops->capture(pwm->chip, pwm, result, timeout_ms);
++	mutex_unlock(&pwm->lock);
++
++	return err;
++}
++EXPORT_SYMBOL_GPL(pwm_capture);
++
++/**
+  * pwm_enable() - start a PWM output toggling
+  * @pwm: PWM device
+  *
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index cfc3ed4..49f9648 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -6,6 +6,7 @@
+ #include <linux/of.h>
+ 
+ struct pwm_device;
++struct pwm_capture;
+ struct seq_file;
+ 
+ #if IS_ENABLED(CONFIG_PWM)
+@@ -33,6 +34,13 @@ int pwm_enable(struct pwm_device *pwm);
+  * pwm_disable - stop a PWM output toggling
+  */
+ void pwm_disable(struct pwm_device *pwm);
++
++/*
++ * pwm_capture - capture and report a PWM signal
++ */
++int pwm_capture(struct pwm_device *pwm,
++		struct pwm_capture *result,
++		unsigned int timeout_ms);
+ #else
+ static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
+ {
+@@ -56,6 +64,13 @@ static inline int pwm_enable(struct pwm_device *pwm)
+ static inline void pwm_disable(struct pwm_device *pwm)
+ {
+ }
++
++static inline int pwm_capture(struct pwm_device *pwm,
++			      struct pwm_capture *result,
++			      unsigned int timeout_ms)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ struct pwm_chip;
+@@ -107,6 +122,16 @@ struct pwm_device {
+ 	enum pwm_polarity polarity;
+ };
+ 
++/**
++ * struct pwm_capture - PWM capture data
++ * @period: period of the PWM signal (in nanoseconds)
++ * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
++ */
++struct pwm_capture {
++	unsigned long long period;
++	unsigned long long duty_cycle;
++};
++
+ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
+ {
+ 	return test_bit(PWMF_ENABLED, &pwm->flags);
+@@ -150,6 +175,7 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+  * @free: optional hook for freeing a PWM
+  * @config: configure duty cycles and period length for this PWM
+  * @set_polarity: configure the polarity of this PWM
++ * @capture: capture and report PWM signal
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
+  * @dbg_show: optional routine to show contents in debugfs
+@@ -162,6 +188,8 @@ struct pwm_ops {
+ 		      int duty_ns, int period_ns);
+ 	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			    enum pwm_polarity polarity);
++	int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
++		       struct pwm_capture *result, unsigned int timeout_ms);
+ 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+ 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
+ #ifdef CONFIG_DEBUG_FS
 -- 
 2.8.0
