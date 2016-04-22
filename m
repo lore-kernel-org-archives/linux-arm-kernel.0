@@ -1,32 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 22 Apr 2016 15:32:30 -0500
-Subject: [PATCH RESEND v2 1/4] Documentation: rockchip-dw-mshc: add
- description for rk3399
-In-Reply-To: <1461304307-14113-2-git-send-email-jay.xu@rock-chips.com>
+Date: Fri, 22 Apr 2016 15:33:24 -0500
+Subject: [PATCH RESEND v2 3/4] ARM64: dts: rockchip: add RK3399
+ evaluation board
+In-Reply-To: <1461304307-14113-4-git-send-email-jay.xu@rock-chips.com>
 References: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
- <1461304307-14113-2-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160422203230.GA14057@rob-hp-laptop>
+ <1461304307-14113-4-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20160422203324.GA14812@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 01:51:44PM +0800, Jianqun Xu wrote:
-> From: Shawn Lin <shawn.lin@rock-chips.com>
+On Fri, Apr 22, 2016 at 01:51:46PM +0800, Jianqun Xu wrote:
+> The RK3399 evaluation board is designed with pmic
+> rk808 on top board.
 > 
-> Add "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc" for
-> dwmmc on rk3399 platform.
-> 
-> Change-Id: Ieefafab5f0e9650271e823659e2bec1556c4a9bc
-
-Drop this Gerrit tag.
-
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 > ---
 > changes in v2:
 > - new add patch
 > 
->  Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
->  1 file changed, 1 insertion(+)
-
-With that,
+>  Documentation/devicetree/bindings/arm/rockchip.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
