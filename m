@@ -1,36 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Apr 2016 15:17:35 -0700
-Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod changes for v4.7
-In-Reply-To: <alpine.DEB.2.02.1604170005480.13961@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1604170005480.13961@utopia.booyaka.com>
-Message-ID: <20160422221734.GL5995@atomide.com>
+Date: Fri, 22 Apr 2016 15:24:15 -0700
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <571A2357.3060006@ti.com>
+References: <20160413152829.GQ5995@atomide.com> <570F4804.4050006@ti.com>
+ <20160414165514.GL5995@atomide.com> <570FF163.1050603@ti.com>
+ <20160414203457.GM5995@atomide.com> <5710C10A.6040908@ti.com>
+ <20160415151651.GP5995@atomide.com> <571145F6.2040508@ti.com>
+ <20160418235152.GZ5995@atomide.com> <571A2357.3060006@ti.com>
+Message-ID: <20160422222415.GN5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [160416 17:07]:
-> Hi Tony
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160422 06:15]:
 > 
-> The following changes since commit 1cbabcb9807e31e87ef3a12af76ea025ceb582d3:
-> 
->   ARM: DRA7: clockdomain: Implement timer workaround for errata i874 (2016-04-10 11:43:57 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.7/omap-hwmod-a
-> 
-> for you to fetch changes up to c20c8f750d9f8f8617f07ee2352d3ff560e66bc2:
-> 
->   ARM: OMAP2+: hwmod: fix _idle() hwmod state sanity check sequence (2016-04-10 13:20:11 -0600)
-> 
-> ----------------------------------------------------------------
-> ARM: OMAP2+: first set of hwmod changes for v4.7
-> 
-> For the DRA7xx platform, add IP block data for the McASP, PWMSS,
-> and GPTimer12 IP blocks.  Add lock and unlock functions for the
-> RTC IP blocks on the DRA7xx, AM33xx, and AM43xx devices.  And add
-> a fix for the hwmod core for device driver unbind operations for
-> IP blocks with hardreset lines.
+> From the documents it is also clear that McBSPLP.sidetone is using the
+> McBSPLP's ICLK, but what is not explained in the TRM is that there are
+> internal clocks going from McBSP to sidetone for the data bus between them.
+> The iclk is needed so the core can kind of run independently from the clocks
+> coming from McBSPLP (for data exchange between the two modules).
+> If McBSP is not configured these clocks are not running which renders the
+> sidetone non operational.
 
-Thanks pullling into omap-for-v4.7/soc.
+THe McBSP ick is not coming from McBSP, it's coming from the L4
+interconnect. Both McBSP are just consumers for that same clock.
+AFAIK there is no clock line going from McBSP to the sidetone.
+
+> I can send a cut down series to fix the current sidetone hwmod (main_clk and
+> prevent it to look at the PRCM bit) plus reworking the pdata callback so we
+> can support both legacy and DT boot.
+
+OK sounds good to me :)
 
 Tony
