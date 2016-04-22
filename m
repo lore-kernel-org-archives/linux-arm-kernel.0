@@ -1,68 +1,32 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 22 Apr 2016 14:36:50 +0100
-Subject: [PATCH 10/11] arm64: tegra: Add clock properties on cpu0 for
- Tegra210
-In-Reply-To: <20160422132325.GN9047@ulmo.ba.sec>
-References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
- <1461321071-6431-11-git-send-email-pchiu@nvidia.com>
- <571A0E95.9040203@nvidia.com> <20160422132325.GN9047@ulmo.ba.sec>
-Message-ID: <571A28F2.5070203@nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Apr 2016 14:40:53 +0100
+Subject: [PATCH v4 4/5] arm64: Verify CPU errata work arounds on
+ hotplugged CPU
+In-Reply-To: <1461324335-5081-5-git-send-email-suzuki.poulose@arm.com>
+References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
+ <1461324335-5081-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160422134053.GL2998@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 22/04/16 14:23, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+On Fri, Apr 22, 2016 at 12:25:34PM +0100, Suzuki K. Poulose wrote:
+> CPU Errata work arounds are detected and applied to the
+> kernel code at boot time and the data is then freed up.
+> If a new hotplugged CPU requires a work around which
+> was not applied at boot time, there is nothing we can
+> do but simply fail the booting.
 > 
-> On Fri, Apr 22, 2016 at 12:44:21PM +0100, Jon Hunter wrote:
->> Hi Penny,
->>
->> On 22/04/16 11:31, Penny Chiu wrote:
->>> Add clocks, clock-names, and clock-latency into cpu0 node.
->>> These properties will be used by cpufreq driver.
->>>
->>> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
->>> ---
->>>  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 6 ++++++
->>>  1 file changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
->>> index 204d9cd..1a85857 100644
->>> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
->>> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
->>> @@ -782,6 +782,12 @@
->>>  			device_type = "cpu";
->>>  			compatible = "arm,cortex-a57";
->>>  			reg = <0>;
->>> +			clocks = <&tegra_car TEGRA210_CLK_CCLK_G>,
->>> +				 <&tegra_car TEGRA210_CLK_PLL_X>,
->>> +				 <&tegra_car TEGRA210_CLK_PLL_P_OUT4>,
->>> +				 <&dfll>;
->>> +			clock-names = "cpu_g", "pll_x", "pll_p", "dfll";
->>> +			clock-latency = <300000>;
->>>  		};
->>>  
->>>  		cpu at 1 {
->>>
->>
->> Can you include a patch with this series to update the binding
->> documentation for the nvidia,tegra124-cpufreq.txt? I think that although
->> there is no specific nvidia,tegra210-cpufreq compatible string the
->> documentation should state that both tegra124 and tegra210 are supported
->> so it is clear.
->>
->> Also I see the above binding no longer includes the "cpu_lp" for
->> tegra210 which I understand we don't use here. However, the binding
->> documentation should reflect this. Having said that, looking at the
->> driver it appears the "cpu_lp" clock is not even used for tegra124. I
->> wonder if we should drop this from the binding documentation and the
->> tegra124.dtsi altogether?
->>
->> What about the "vdd-cpu-supply" property? Don't we need this?
-> 
-> For some reason that seems to have moved into the clock at 70110000 node.
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Andre Przywara <andre.przywara@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Yes I saw that. I surprised that the cpufreq driver would probe without
-this, unless I am missing something ...
+I think Will commented on this previously. Was a decision made to leave
+this patch as it is and subsequently add support for enabling local
+workarounds for hot-plugged CPUs? I'm fine with this given that most
+per-CPU workarounds like undocumented bits are set by firmware. But I'd
+like to see it done properly once we have a workaround that needs
+per-CPU enabling.
 
-Jon
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
