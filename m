@@ -1,38 +1,60 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 22 Apr 2016 08:37:54 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
-In-Reply-To: <cover.1461209970.git.horms+renesas@verge.net.au> (Simon Horman's
- message of "Thu, 21 Apr 2016 13:44:30 +1000")
-References: <cover.1461209970.git.horms+renesas@verge.net.au>
-Message-ID: <7hmvol4pt9.fsf@baylibre.com>
+Date: Fri, 22 Apr 2016 08:38:37 -0700
+Subject: [GIT PULL] omap fixes against v4.6-rc2
+In-Reply-To: <20160419195147.GE5973@atomide.com> (Tony Lindgren's message of
+ "Tue, 19 Apr 2016 12:51:47 -0700")
+References: <20160408191854.GZ16484@atomide.com>
+ <20160419145400.GC5995@atomide.com>
+ <20160419195147.GE5973@atomide.com>
+Message-ID: <7hinz94ps2.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman <horms+renesas@verge.net.au> writes:
+Tony Lindgren <tony@atomide.com> writes:
 
-> Hi Olof, Hi Kevin, Hi Arnd,
+> * Tony Lindgren <tony@atomide.com> [160419 07:55]:
+>> * Tony Lindgren <tony@atomide.com> [160408 12:22]:
+>> >       ARM: OMAP: Catch callers of revision information prior to it being populated
+>> 
+>> And this one causes bogus runtime warnings with other SoCs
+>> as reported by Guenter Roeck. I'll revert this and post
+>> an updated pull request shortly.
 >
-> Please consider these Renesas ARM based SoC fixes for v4.6.
+> And below is the updated pull request with just the above
+> commit reverted.
 >
+> Regards,
 >
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> Tony
 >
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> 8< -------------------
+> The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+>
+>   Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.6
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc2-v2-signed
 >
-> for you to fetch changes up to c531fb27e9699eaee478ee5686a3cca5dee73602:
+> for you to fetch changes up to 3d51ae172d759198b2e47e104c31a92d20d17927:
 >
->   ARM: shmobile: timer: Fix preset_lpj leading to too short delays (2016-04-20 08:52:55 +1000)
+>   Revert "ARM: OMAP: Catch callers of revision information prior to it being populated" (2016-04-19 08:01:05 -0700)
 >
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC Fixes for v4.6
+> Fixes for omaps against v4.6-rc2, mostly to fix suspend for beagle-x15
+> that broke when we added runtime based SoC revision detection earlier.
 >
-> * Correct preset_lpj calculation which may lead to too short delays
-> * Correct handling of optional clocks on r8a7791 to restore
->   access to the serial port the porter board
+> It seems suspend worked earlier as things were only partially initialized,
+> while now we initialize things properly for dra7.
+>
+> Note that the "ARM: OMAP: Catch callers of revision information prior
+> to it being populated" had to be reverted as it caused bogus warnings
+> for other SoCs because omap initcalls bail out based on revision being
+> set to 0 for other SoCs. These initcalls will mostly just disappear
+> when we drop support for omap3 legacy booting.
+>
+> Also included is a fix for dra7 sys_32k_ck clock source that is not
+> enabled on boot making system fall back to using emulated clock.
 >
 > ----------------------------------------------------------------
 
