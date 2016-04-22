@@ -1,55 +1,33 @@
-From: pchiu@nvidia.com (Penny Chiu)
-Date: Fri, 22 Apr 2016 18:31:00 +0800
-Subject: [PATCH 00/11] arm64: tegra: Add Tegra DFLL for Tegra210 Jetson TX1
-Message-ID: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 22 Apr 2016 13:28:06 +0300
+Subject: [PATCH 03/23] mmc: core: fix a comment typo
+In-Reply-To: <1460741387-23815-4-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5719FCB6.6010601@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implements the DFLL/CL-DVFS clock source on Tegra210
-based on Tegra124 DFLL driver, Tegra210 support on Tegra124 cpufreq
-driver, and exposes DFLL HW as a PWM controller and provides DFLL_PWM
-driver to generate PWM signals to control an OpenVReg (PWM regulator)
-for CPU rail.
+On 15/04/16 20:29, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-This patch series has been tested on the Jetson TX1.
+I'll leave this one up to Ulf.
 
-Penny Chiu (11):
-  clk: tegra: dfll: Fix voltage comparison
-  clk: tegra: dfll: Move SoC specific data into of_device_id
-  clk: tegra: Add DFLL DVCO reset control for Tegra210
-  clk: tegra: Add Tegra210 support in DFLL driver
-  pwm: tegra-dfll: Add driver for Tegra DFLL PWM controller
-  clk: tegra: dfll: Add PWM inferface
-  cpufreq: tegra124: Add Tegra210 support
-  arm64: tegra: Add PWM regulator for CPU rail on Jetson TX1
-  arm64: tegra: Add DFLL clock node on Jetson TX1
-  arm64: tegra: Add clock properties on cpu0 for Tegra210
-  arm64: config: Enable CPUFreq-DT, Tegra DFLL PWM, and PWM regulator
-
- .../bindings/clock/nvidia,tegra124-dfll.txt        |  21 +-
- .../bindings/pwm/nvidia,tegra-dfll-pwm.txt         |  48 +++
- arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi     |  56 +++
- arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts |  23 ++
- arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  21 +
- arch/arm64/configs/defconfig                       |   4 +
- drivers/clk/tegra/Makefile                         |   4 +-
- drivers/clk/tegra/clk-dfll.c                       | 422 +++++++++++++++------
- drivers/clk/tegra/clk-dfll.h                       |   1 +
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         | 127 ++++++-
- drivers/clk/tegra/clk-tegra210.c                   |  68 ++++
- drivers/clk/tegra/cvb.c                            |  12 +-
- drivers/clk/tegra/cvb.h                            |   8 +-
- drivers/cpufreq/tegra124-cpufreq.c                 |   3 +-
- drivers/pwm/Kconfig                                |  10 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-tegra-dfll.c                       | 322 ++++++++++++++++
- include/dt-bindings/reset/tegra210-car.h           |  12 +
- include/soc/tegra/pwm-tegra-dfll.h                 |  27 ++
- 19 files changed, 1046 insertions(+), 144 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/nvidia,tegra-dfll-pwm.txt
- create mode 100644 drivers/pwm/pwm-tegra-dfll.c
- create mode 100644 include/dt-bindings/reset/tegra210-car.h
- create mode 100644 include/soc/tegra/pwm-tegra-dfll.h
-
--- 
-2.8.1
+> ---
+>  drivers/mmc/core/mmc_ops.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 62355bd..d220bbd 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -553,7 +553,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  
+>  		/*
+>  		 * We are not allowed to issue a status command and the host
+> -		 * does'nt support MMC_CAP_WAIT_WHILE_BUSY, then we can only
+> +		 * doesn't support MMC_CAP_WAIT_WHILE_BUSY, then we can only
+>  		 * rely on waiting for the stated timeout to be sufficient.
+>  		 */
+>  		if (!send_status) {
+> 
