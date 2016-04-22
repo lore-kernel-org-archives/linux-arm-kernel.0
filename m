@@ -1,26 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Apr 2016 14:29:55 +0100
-Subject: [PATCH v4 1/5] arm64: cpufeature: Add scope for capability check
-In-Reply-To: <1461324335-5081-2-git-send-email-suzuki.poulose@arm.com>
-References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
- <1461324335-5081-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160422132955.GI2998@e104818-lin.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 22 Apr 2016 15:31:46 +0200
+Subject: [PATCH v2 2/2] i2c: exynos5: Fix possible ABBA deadlock by
+ keeping I2C clock prepared
+In-Reply-To: <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
+References: <1460855693-28225-1-git-send-email-javier@osg.samsung.com>
+ <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <20160422133146.GC1538@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 12:25:31PM +0100, Suzuki K. Poulose wrote:
-> Add scope parameter to the arm64_cpu_capabilities::matches(), so that
-> this can be reused for checking the capability on a given CPU vs the
-> system wide. The system uses the default scope associated with the
-> capability for initialising the CPU_HWCAPs and ELF_HWCAPs.
+On Sat, Apr 16, 2016 at 09:14:53PM -0400, Javier Martinez Canillas wrote:
+> The exynos5 I2C controller driver always prepares and enables a clock
+> before using it and then disables unprepares it when the clock is not
+> used anymore.
 > 
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> But this can cause a possible ABBA deadlock in some scenarios since a
+> driver that uses regmap to access its I2C registers, will first grab
+> the regmap lock and then the I2C xfer function will grab the prepare
+> lock when preparing the I2C clock. But since the clock driver also
+> uses regmap for I2C accesses, preparing a clock will first grab the
+> prepare lock and then the regmap lock when using the regmap API.
+> 
+> An example of this happens on the Exynos5422 Odroid XU4 board where a
+> s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
+> share the same I2C regmap.
+> 
+> The possible deadlock is reported by the kernel lockdep:
+> 
+>   Possible unsafe locking scenario:
+> 
+>         CPU0                    CPU1
 
-In case Will hasn't queued the patches yet:
+Squashed both patches into one for easier backporting, added stable and
+applied to for-current, thanks!
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/99210813/attachment.sig>
