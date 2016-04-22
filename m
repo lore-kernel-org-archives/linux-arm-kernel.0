@@ -1,51 +1,137 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 22 Apr 2016 15:16:26 +0200
-Subject: [PATCH] ARM: dts: omap3: Fix ISP syscon register offset
-In-Reply-To: <5719A9E3.1000902@gmail.com>
-References: <1460787628-17316-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <5719A9E3.1000902@gmail.com>
-Message-ID: <20160422131626.GA7534@earth>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 22 Apr 2016 15:16:37 +0200
+Subject: [PATCH 04/11] clk: tegra: Add Tegra210 support in DFLL driver
+In-Reply-To: <1461321071-6431-5-git-send-email-pchiu@nvidia.com>
+References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
+ <1461321071-6431-5-git-send-email-pchiu@nvidia.com>
+Message-ID: <20160422131637.GM9047@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 22, 2016 at 06:31:04PM +0800, Penny Chiu wrote:
+> Add Tegra210 support and related CVB table in tegra124 DFLL driver,
+> and also update the binding document.
+> 
+> Signed-off-by: Penny Chiu <pchiu@nvidia.com>
+> ---
+>  .../bindings/clock/nvidia,tegra124-dfll.txt        |  4 +-
+>  drivers/clk/tegra/Makefile                         |  4 +-
+>  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         | 55 ++++++++++++++++++++++
+>  3 files changed, 61 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> index 84080a8..42a1fe6 100644
+> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> @@ -11,7 +11,9 @@ communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
+>  Currently only the I2C mode is supported by these bindings.
+>  
+>  Required properties:
+> -- compatible : should be "nvidia,tegra124-dfll"
+> +- compatible : should be one of following:
+> +  - "nvidia,tegra124-dfll" for the Tegra124 SoC
+> +  - "nvidia,tegra210-dfll" for the Tegra210 SoC
+>  - reg : Defines the following set of registers, in the order listed:
+>          - registers for the DFLL control logic.
+>          - registers for the I2C output logic.
+> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+> index 97984c5..9b8e9de 100644
+> --- a/drivers/clk/tegra/Makefile
+> +++ b/drivers/clk/tegra/Makefile
+> @@ -17,7 +17,9 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
+>  obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
+>  obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
+>  obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
+> -obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
+> +ifneq ($(filter y, $(CONFIG_ARCH_TEGRA_124_SOC) $(CONFIG_ARCH_TEGRA_210_SOC)),)
+> +obj-y					+= clk-tegra124-dfll-fcpu.o
+> +endif
 
-On Fri, Apr 22, 2016 at 07:34:43AM +0300, Ivaylo Dimitrov wrote:
-> On 16.04.2016 09:20, Ivaylo Dimitrov wrote:
-> >According to the TRM, SCM CONTROL_CSIRXFE register is on offset 0x6c
-> >
-> >Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-> >---
-> >  arch/arm/boot/dts/omap34xx.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> >diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
-> >index 5cdba1f..e446562 100644
-> >--- a/arch/arm/boot/dts/omap34xx.dtsi
-> >+++ b/arch/arm/boot/dts/omap34xx.dtsi
-> >@@ -46,7 +46,7 @@
-> >  			       0x480bd800 0x017c>;
-> >  			interrupts = <24>;
-> >  			iommus = <&mmu_isp>;
-> >-			syscon = <&scm_conf 0xdc>;
-> >+			syscon = <&scm_conf 0x6c>;
-> >  			ti,phy-type = <OMAP3ISP_PHY_TYPE_COMPLEX_IO>;
-> >  			#clock-cells = <1>;
-> >  			ports {
-> >
+This is better written as:
 
-You may want to add the hint, that 0xdc (the old, wrong "offset")
-represents the last few bits of the register address. I guess
-somebody didn't notice, that scm_conf does not start at a register
-address ending with 00 (like most other modules).
+	obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
+	obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= clk-tegra124-dfll-fcpu.o
 
-Reviewed-By: Sebastian Reichel <sre@kernel.org>
+This works because obj-* variables are sorted using make's $(sort)
+function, which lexically sorts and removes duplicates.
 
--- Sebastian
+> +static const unsigned long tegra210_cpu_max_freq_table[] = {
+> +	[0] = 1912500000UL,
+> +	[1] = 1912500000UL,
+> +};
+> +
+>  static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+>  	{
+>  		.speedo_id = -1,
+> @@ -87,6 +92,45 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+>  	},
+>  };
+>  
+> +static const struct cvb_table tegra210_cpu_cvb_tables[] = {
+> +	{
+> +		.speedo_id = -1,
+> +		.process_id = -1,
+> +		.min_millivolts = 850,
+> +		.max_millivolts = 1170,
+> +		.speedo_scale = 100,
+> +		.voltage_scale = 1000,
+> +		.cvb_table = {
+> +			{51000000UL,    {1007452, -23865, 370} },
+> +			{102000000UL,   {1007452, -23865, 370} },
+> +			{204000000UL,   {1007452, -23865, 370} },
+> +			{306000000UL,   {1052709, -24875, 370} },
+> +			{408000000UL,   {1099069, -25895, 370} },
+> +			{510000000UL,   {1146534, -26905, 370} },
+> +			{612000000UL,   {1195102, -27915, 370} },
+> +			{714000000UL,   {1244773, -28925, 370} },
+> +			{816000000UL,   {1295549, -29935, 370} },
+> +			{918000000UL,   {1347428, -30955, 370} },
+> +			{1020000000UL,  {1400411, -31965, 370} },
+> +			{1122000000UL,  {1454497, -32975, 370} },
+> +			{1224000000UL,  {1509687, -33985, 370} },
+> +			{1326000000UL,  {1565981, -35005, 370} },
+> +			{1428000000UL,  {1623379, -36015, 370} },
+> +			{1530000000UL,  {1681880, -37025, 370} },
+> +			{1632000000UL,  {1741485, -38035, 370} },
+> +			{1734000000UL,  {1802194, -39055, 370} },
+> +			{1836000000UL,  {1864006, -40065, 370} },
+> +			{1912500000UL,  {1910780, -40815, 370} },
+> +			{0,             {      0,      0,   0} },
+> +		},
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +};
+> +
+>  static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+>  	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
+>  	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
+> @@ -94,11 +138,22 @@ static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+>  	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
+>  };
+>  
+> +static const struct dfll_fcpu_data tegra210_dfll_fcpu_data = {
+> +	.cpu_max_freq_table = tegra210_cpu_max_freq_table,
+> +	.cpu_max_freq_table_size = ARRAY_SIZE(tegra210_cpu_max_freq_table),
+> +	.cpu_cvb_tables = tegra210_cpu_cvb_tables,
+> +	.cpu_cvb_tables_size = ARRAY_SIZE(tegra210_cpu_cvb_tables)
+> +};
+
+I think it would be better to keep all Tegra124 and Tegra210 data
+together, so you should first list the Tegra124 maximum frequencies,
+followed by the Tegra124 CVB table and the Tegra124 DFLL FCPU data,
+then the same for Tegra210 data. That way we can make sure all new
+appears in one hunk in a patch, which makes review and maintenance a
+lot easier.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/c05cb73e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/d9be1498/attachment.sig>
