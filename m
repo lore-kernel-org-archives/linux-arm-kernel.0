@@ -1,43 +1,36 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 22 Apr 2016 15:31:46 +0200
-Subject: [PATCH v2 2/2] i2c: exynos5: Fix possible ABBA deadlock by
- keeping I2C clock prepared
-In-Reply-To: <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
-References: <1460855693-28225-1-git-send-email-javier@osg.samsung.com>
- <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <20160422133146.GC1538@katana>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Apr 2016 14:32:09 +0100
+Subject: [PATCH v4 2/5] arm64: Allow a capability to be checked on a
+ single CPU
+In-Reply-To: <1461324335-5081-3-git-send-email-suzuki.poulose@arm.com>
+References: <1461324335-5081-1-git-send-email-suzuki.poulose@arm.com>
+ <1461324335-5081-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160422133209.GJ2998@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 16, 2016 at 09:14:53PM -0400, Javier Martinez Canillas wrote:
-> The exynos5 I2C controller driver always prepares and enables a clock
-> before using it and then disables unprepares it when the clock is not
-> used anymore.
-> 
-> But this can cause a possible ABBA deadlock in some scenarios since a
-> driver that uses regmap to access its I2C registers, will first grab
-> the regmap lock and then the I2C xfer function will grab the prepare
-> lock when preparing the I2C clock. But since the clock driver also
-> uses regmap for I2C accesses, preparing a clock will first grab the
-> prepare lock and then the regmap lock when using the regmap API.
-> 
-> An example of this happens on the Exynos5422 Odroid XU4 board where a
-> s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
-> share the same I2C regmap.
-> 
-> The possible deadlock is reported by the kernel lockdep:
-> 
->   Possible unsafe locking scenario:
-> 
->         CPU0                    CPU1
+On Fri, Apr 22, 2016 at 12:25:32PM +0100, Suzuki K. Poulose wrote:
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1005,6 +1005,24 @@ static void __init setup_feature_capabilities(void)
+>  	enable_cpu_capabilities(arm64_features);
+>  }
+>  
+> +/*
+> + * Check if the current CPU has a given feature capability.
+> + * Should be called from non-preemptible context.
+> + */
+> +bool this_cpu_has_cap(unsigned int cap)
+> +{
+> +	const struct arm64_cpu_capabilities *caps = arm64_features;
+> +
+> +	if (WARN_ON(preemptible()))
+> +		return false;
+> +
+> +	for (caps = arm64_features; caps->desc; caps++)
+> +		if (caps->capability == cap && caps->matches)
+> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
 
-Squashed both patches into one for easier backporting, added stable and
-applied to for-current, thanks!
+Nitpick: you don't need to initialise "caps" twice.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160422/99210813/attachment.sig>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
