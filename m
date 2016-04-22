@@ -1,95 +1,51 @@
-From: jay.xu@rock-chips.com (jay.xu)
-Date: Fri, 22 Apr 2016 09:50:09 +0800
-Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
-In-Reply-To: <20160421221228.359fab3c@arm.com>
-References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
- <5718AFB8.5070004@rock-chips.com> <20160421123018.096d4a75@arm.com>
- <2131452.5tyGOfVRfi@diego> <20160421221228.359fab3c@arm.com>
-Message-ID: <57198351.2060608@rock-chips.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 21 Apr 2016 19:00:34 -0700
+Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+Message-ID: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc:
+If dirty_tx isn't updated, then dma_unmap_single
+will be called twice.
 
-On 2016?04?22? 05:12, Marc Zyngier wrote:
-> On Thu, 21 Apr 2016 22:24:09 +0200
-> Heiko St?bner <heiko@sntech.de> wrote:
->
->> Am Donnerstag, 21. April 2016, 12:30:18 schrieb Marc Zyngier:
->>> On Thu, 21 Apr 2016 18:47:20 +0800
->>>
->>> "Huang, Tao" <huangtao@rock-chips.com> wrote:
->>>> Hi, Mark:
->>>>
->>>> On 2016?04?21? 18:19, Mark Rutland wrote:
->>>>> On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
->>>>>> +		cpu_l0: cpu at 0 {
->>>>>> +			device_type = "cpu";
->>>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
->>>>>> +			reg = <0x0 0x0>;
->>>>>> +			enable-method = "psci";
->>>>>> +			#cooling-cells = <2>; /* min followed by max */
->>>>>> +			clocks = <&cru ARMCLKL>;
->>>>>> +		};
->>>>>> +		cpu_b0: cpu at 100 {
->>>>>> +			device_type = "cpu";
->>>>>> +			compatible = "arm,cortex-a72", "arm,armv8";
->>>>>> +			reg = <0x0 0x100>;
->>>>>> +			enable-method = "psci";
->>>>>> +			#cooling-cells = <2>; /* min followed by max */
->>>>>> +			clocks = <&cru ARMCLKB>;
->>>>>> +		};
->>>>>> +
->>>>>> +	arm-pmu {
->>>>>> +		compatible = "arm,armv8-pmuv3";
->>>>>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
->>>>>> +	};
->>>>> This is wrong, and must go. There should be a separate node for the PMU
->>>>> of each microarchitecture, with the appropriate compatible string to
->>>>> represent that (see the juno dts).
->>>> You are right. The first version we wrote is:
->>>>      pmu_a53 {
->>>>      
->>>>          compatible = "arm,cortex-a53-pmu";
->>>>          interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
->>>>          interrupt-affinity = <&cpu_l0>,
->>>>          
->>>>                       <&cpu_l1>,
->>>>                       <&cpu_l2>,
->>>>                       <&cpu_l3>;
->>>>      
->>>>      };
->>>>      
->>>>      pmu_a72 {
->>>>      
->>>>          compatible = "arm,cortex-a72-pmu";
->>>>          interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
->>>>          interrupt-affinity = <&cpu_b0>,
->>>>          
->>>>                       <&cpu_b1>;
->>>>      
->>>>      };
->>>>
->>>> but unfortunately, the arm pmu driver do not support PPI in two cluster
->>>> well,
->>>> so we have to replace with this implementation.
->>>>
->>>>> In this case things are messier as the same PPI number is being used
->>>>> across clusters. Marc (Cc'd) has been working on PPI partitions, which
->>>>> should allow us to support that.
->>>> Great! So what we can do right now? Wait this feature, and delete
->>>> arm-pmu node?
->>> I'd rather you have a look at the patches, test them with your HW,
->>> and comment on what doesn't work!
->> I would think we could do it in two tracks, testing and fixing but also letting
->> the rk3399 devicetrees move forward without the pmu at first :-) .
-> Where would the fun be then? ;-)
-thanks for your advices, and I will try to test the percpu-partition 
-patches.
+This fixes a
+[   58.420980] ------------[ cut here ]------------
+[   58.425667] WARNING: CPU: 0 PID: 377 at /home/schurig/d/mkarm/linux-4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
+[   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free DMA memory it has not allocated [device address=0x0000000000000000] [size=66 bytes]
 
-by the way, do you think it's better to let the dtsi be reviewed first,
-then the percpu-partition patches could be tested by more people ?
+encountered by Holger
 
-Jianqun
->
-> 	M.
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+Tested-by: <holgerschurig@gmail.com>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 08243c2..b71654c 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+ 					 fec16_to_cpu(bdp->cbd_datlen),
+ 					 DMA_TO_DEVICE);
+ 		bdp->cbd_bufaddr = cpu_to_fec32(0);
+-		if (!skb) {
+-			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+-			continue;
+-		}
++		if (!skb)
++			goto skb_done;
+ 
+ 		/* Check for errors. */
+ 		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
+@@ -1239,7 +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+ 
+ 		/* Free the sk buffer associated with this last transmit */
+ 		dev_kfree_skb_any(skb);
+-
++skb_done:
+ 		/* Make sure the update to bdp and tx_skbuff are performed
+ 		 * before dirty_tx
+ 		 */
+-- 
+2.5.0
