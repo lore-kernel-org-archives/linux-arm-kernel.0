@@ -1,60 +1,131 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 22 Apr 2016 16:58:40 +0530
-Subject: [PATCH V2 2/9] cpufreq: berlin: Use generic platdev driver
+Date: Fri, 22 Apr 2016 16:58:41 +0530
+Subject: [PATCH V2 3/9] cpufreq: imx: Use generic platdev driver
 In-Reply-To: <cover.1461324267.git.viresh.kumar@linaro.org>
 References: <cover.1461324267.git.viresh.kumar@linaro.org>
-Message-ID: <64733ec5d702497b80c8f5a96baaa86aa5281efa.1461324267.git.viresh.kumar@linaro.org>
+Message-ID: <8f9d83e29dc104584bb95bc0010c96721fecd176.1461324267.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
 device now, reuse that and remove similar code from platform code.
 
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Note that the complete routine imx27_dt_init() is removed as
+
+of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+
+has same effect as a NULL .init_machine machine callback pointer.
+
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Lucas Stach <l.stach@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-berlin/berlin.c        | 6 ------
- drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
- 2 files changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/imx27-dt.c         | 10 ----------
+ arch/arm/mach-imx/mach-imx51.c       |  3 ---
+ arch/arm/mach-imx/mach-imx53.c       |  2 --
+ arch/arm/mach-imx/mach-imx7d.c       |  6 ------
+ drivers/cpufreq/cpufreq-dt-platdev.c |  5 +++++
+ 5 files changed, 5 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
-index 25d73870ccca..ac181c6797ee 100644
---- a/arch/arm/mach-berlin/berlin.c
-+++ b/arch/arm/mach-berlin/berlin.c
-@@ -18,11 +18,6 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
+index bd42d1bd10af..530a728c2acc 100644
+--- a/arch/arm/mach-imx/imx27-dt.c
++++ b/arch/arm/mach-imx/imx27-dt.c
+@@ -18,15 +18,6 @@
+ #include "common.h"
+ #include "mx27.h"
  
--static void __init berlin_init_late(void)
+-static void __init imx27_dt_init(void)
+-{
+-	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+-
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-
+-	platform_device_register_full(&devinfo);
+-}
+-
+ static const char * const imx27_dt_board_compat[] __initconst = {
+ 	"fsl,imx27",
+ 	NULL
+@@ -36,6 +27,5 @@ DT_MACHINE_START(IMX27_DT, "Freescale i.MX27 (Device Tree Support)")
+ 	.map_io		= mx27_map_io,
+ 	.init_early	= imx27_init_early,
+ 	.init_irq	= mx27_init_irq,
+-	.init_machine	= imx27_dt_init,
+ 	.dt_compat	= imx27_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
+index 6883fbaf9484..10a82a4f1e58 100644
+--- a/arch/arm/mach-imx/mach-imx51.c
++++ b/arch/arm/mach-imx/mach-imx51.c
+@@ -50,13 +50,10 @@ static void __init imx51_ipu_mipi_setup(void)
+ 
+ static void __init imx51_dt_init(void)
+ {
+-	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+-
+ 	imx51_ipu_mipi_setup();
+ 	imx_src_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	platform_device_register_full(&devinfo);
+ }
+ 
+ static void __init imx51_init_late(void)
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 86316a979297..18b5c5c136db 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -40,8 +40,6 @@ static void __init imx53_dt_init(void)
+ static void __init imx53_init_late(void)
+ {
+ 	imx53_pm_init();
+-
+-	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+ }
+ 
+ static const char * const imx53_dt_board_compat[] __initconst = {
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+index 5a27f20c9a82..b450f525a670 100644
+--- a/arch/arm/mach-imx/mach-imx7d.c
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -105,11 +105,6 @@ static void __init imx7d_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static void __init imx7d_init_late(void)
 -{
 -	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
 -}
 -
- static const char * const berlin_dt_compat[] = {
- 	"marvell,berlin",
+ static const char *const imx7d_dt_compat[] __initconst = {
+ 	"fsl,imx7d",
  	NULL,
-@@ -30,7 +25,6 @@ static const char * const berlin_dt_compat[] = {
+@@ -117,7 +112,6 @@ static const char *const imx7d_dt_compat[] __initconst = {
  
- DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
- 	.dt_compat	= berlin_dt_compat,
--	.init_late	= berlin_init_late,
- 	/*
- 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
- 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+ DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
+ 	.init_irq	= imx7d_init_irq,
+-	.init_late	= imx7d_init_late,
+ 	.init_machine	= imx7d_init_machine,
+ 	.dt_compat	= imx7d_dt_compat,
+ MACHINE_END
 diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 00da8c8bee6c..3e1c8211c213 100644
+index 3e1c8211c213..3843314389c7 100644
 --- a/drivers/cpufreq/cpufreq-dt-platdev.c
 +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -12,6 +12,8 @@
+@@ -12,6 +12,11 @@
  #include <linux/platform_device.h>
  
  static const struct of_device_id machines[] __initconst = {
-+	{ .compatible = "marvell,berlin", },
++	{ .compatible = "fsl,imx27", },
++	{ .compatible = "fsl,imx51", },
++	{ .compatible = "fsl,imx53", },
++	{ .compatible = "fsl,imx7d", },
 +
+ 	{ .compatible = "marvell,berlin", },
+ 
  	{ .compatible = "samsung,exynos3250", },
- 	{ .compatible = "samsung,exynos4210", },
- 	{ .compatible = "samsung,exynos4212", },
 -- 
 2.7.1.410.g6faf27b
