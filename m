@@ -1,119 +1,49 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 22 Apr 2016 14:27:44 +0800
-Subject: [v8, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
-References: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1461306464-19521-8-git-send-email-yangbo.lu@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Apr 2016 08:41:24 +0200
+Subject: [PATCH 5/8] cpufreq: shmobile: Use generic platdev driver
+In-Reply-To: <20160422032142.GN29799@vireshk-i7>
+References: <cover.1461228081.git.viresh.kumar@linaro.org>
+ <ab29df38f70453e67089e3f3dbb9085336eef1c2.1461228081.git.viresh.kumar@linaro.org>
+ <CAMuHMdUnzgr==S86Wiz0fGk2gSWW2=j+maiq3=3x9Ozy7AoOZw@mail.gmail.com>
+ <20160422032142.GN29799@vireshk-i7>
+Message-ID: <CAMuHMdWXH+Oud+ZZbYFUcTN1a0v9_BJbP5cMLxx0tRWHzx4ADQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eSDHC of T4240-R1.0-R2.0 has incorrect vender version and spec version.
-Acturally the right version numbers should be VVN=0x13 and SVN = 0x1.
-This patch adds the GUTS driver support for eSDHC driver to get SVR(System
-version register). And fix host version to avoid that incorrect version
-numbers break down the ADMA data transfer.
+Hi Viresh,
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Scott Wood <oss@buserror.net>
----
-Changes for v2:
-	- Got SVR through iomap instead of dts
-Changes for v3:
-	- Managed GUTS through syscon instead of iomap in eSDHC driver
-Changes for v4:
-	- Got SVR by GUTS driver instead of SYSCON
-Changes for v5:
-	- Changed to get SVR through API fsl_guts_get_svr()
-	- Combined patch 4, patch 5 and patch 6 into one
-Changes for v6:
-	- Added 'Acked-by: Ulf Hansson'
-Changes for v7:
-	- None
-Changes for v8:
-	- Added 'Acked-by: Scott Wood'
----
- drivers/mmc/host/Kconfig          |  1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+On Fri, Apr 22, 2016 at 5:21 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 21-04-16, 15:04, Geert Uytterhoeven wrote:
+>> On Thu, Apr 21, 2016 at 10:43 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+>> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+>> > @@ -29,6 +29,18 @@ static const struct of_device_id machines[] = {
+>> >         { .compatible = "samsung,exynos5800", },
+>> >  #endif
+>> >
+>>
+>> I think an #ifdef CONFIG_ARCH_RENESAS block wouldn't hurt, likewise
+>> for the other SoCs.
+>> Soon you'll have this file filled with lots of compatible values for random\
+>> SoCs...
+>
+> This is going to be done once per boot and this shouldn't hurt. And for new
+> platforms we may do things differently as they are going to use opp-v2 bindings.
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index e657af0..d480742 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -143,6 +143,7 @@ config MMC_SDHCI_OF_ESDHC
- 	depends on MMC_SDHCI_PLTFM
- 	depends on PPC || ARCH_MXC || ARCH_LAYERSCAPE
- 	select MMC_SDHCI_IO_ACCESSORS
-+	select FSL_GUTS
- 	help
- 	  This selects the Freescale eSDHC controller support.
- 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index 3f34d35..68cc020 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -18,6 +18,8 @@
- #include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-+#include <linux/fsl/svr.h>
-+#include <linux/fsl/guts.h>
- #include <linux/mmc/host.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -28,6 +30,8 @@
- struct sdhci_esdhc {
- 	u8 vendor_ver;
- 	u8 spec_ver;
-+	u32 soc_ver;
-+	u8 soc_rev;
- };
- 
- /**
-@@ -73,6 +77,8 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
- static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 				     int spec_reg, u32 value)
- {
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	u16 ret;
- 	int shift = (spec_reg & 0x2) * 8;
- 
-@@ -80,6 +86,13 @@ static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 		ret = value & 0xffff;
- 	else
- 		ret = (value >> shift) & 0xffff;
-+
-+	/* Workaround for T4240-R1.0-R2.0 eSDHC which has incorrect
-+	 * vendor version and spec version information.
-+	 */
-+	if ((spec_reg == SDHCI_HOST_VERSION) &&
-+	    (esdhc->soc_ver == SVR_T4240) && (esdhc->soc_rev <= 0x20))
-+		ret = (VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) | SDHCI_SPEC_200;
- 	return ret;
- }
- 
-@@ -567,10 +580,20 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_esdhc *esdhc;
- 	u16 host_ver;
-+	u32 svr;
- 
- 	pltfm_host = sdhci_priv(host);
- 	esdhc = sdhci_pltfm_priv(pltfm_host);
- 
-+	fsl_guts_init();
-+	svr = fsl_guts_get_svr();
-+	if (svr) {
-+		esdhc->soc_ver = SVR_SOC_VER(svr);
-+		esdhc->soc_rev = SVR_REV(svr);
-+	} else {
-+		dev_err(&pdev->dev, "Failed to get SVR value!\n");
-+	}
-+
- 	host_ver = sdhci_readw(host, SDHCI_HOST_VERSION);
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
--- 
-2.1.0.27.g96db324
+I was mainly thinking about kernel size.
+If this is done once per boot, the array should be __initconst,
+(looking at the code
+in next) which is fine as cpufreq_dt_platdev_init() is already __init.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
