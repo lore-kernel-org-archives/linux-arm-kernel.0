@@ -1,87 +1,238 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Apr 2016 18:15:35 +1000
-Subject: [PATCH v6 00/11] soc: renesas: Add R-Car SYSC PM Domain Support
-In-Reply-To: <CAMuHMdVWONBiKYo1w4HwhPQV1oZvw2Kgya7Gxb=NCHXvnr48Tw@mail.gmail.com>
- <1810583.ixTcHKGr3L@avalon>
-Message-ID: <20160422081531.GA5453@verge.net.au>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 22 Apr 2016 10:18:44 +0200
+Subject: [PATCH 9/9] arm64: dts: rockchip: move the rk3368 thermal data
+ into rk3368.dtsi
+In-Reply-To: <1460950562-20652-10-git-send-email-wxt@rock-chips.com>
+References: <1460950562-20652-1-git-send-email-wxt@rock-chips.com>
+ <1460950562-20652-10-git-send-email-wxt@rock-chips.com>
+Message-ID: <8615749.P3ApjY2l50@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent, Hi Geert,
+Am Montag, 18. April 2016, 11:36:01 schrieb Caesar Wang:
+> In order to be standard to manage for rockchip SoCs,  move the thermal
+> data into rk3368 dtsi, we needn't to add a new file for thermal.
+> 
+> Fixes commit f990238f859e
+> ("arm64: dts: rockchip: Add main thermal info to rk3368.dtsi")
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
 
-On Fri, Apr 22, 2016 at 07:12:23AM +0300, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Friday 22 Apr 2016 10:33:11 Simon Horman wrote:
-> > On Thu, Apr 21, 2016 at 05:14:40PM +0200, Geert Uytterhoeven wrote:
-> > > On Thu, Apr 21, 2016 at 5:28 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > > On Wed, Apr 20, 2016 at 02:02:35PM +0200, Geert Uytterhoeven wrote:
-> > > >> This patch series introduces a DT-based driver for the R-Car System
-> > > >> Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
-> > > >> SoCs.
-> > > >> 
-> > > >> This is a dependency for the enablement of DU and VSP on R-Car H3, as
-> > > >> the VSPs are located in a PM Domain.
+I'm pondering this change for some days now and am still undecided :-) 
+On the one hand you're right ... this doesn't need to be its own file on the 
+other hand it creates churn, but I'm inclined to pick it up.
 
-[...]
+Can you at least provide another patch doing the same for rk3288, so that we 
+really standardize on one form for Rockchip SoCs?
 
-> > I do wonder, as we are almost at the closing point for queuing up changes
-> > for v4.7 if, assuming the above patches are scheduled for inclusion in
-> > v4.7-rc1, it might not be better for me to queue up this series for v4.8.
-> 
-> Then that would delay a bunch of multimedia patch by one more kernel cycle, 
-> which I was hoping to avoid.
 
-On Fri, Apr 22, 2016 at 09:02:01AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Apr 22, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Apr 21, 2016 at 05:14:40PM +0200, Geert Uytterhoeven wrote:
-> >> On Thu, Apr 21, 2016 at 5:28 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Wed, Apr 20, 2016 at 02:02:35PM +0200, Geert Uytterhoeven wrote:
-> >> >> This patch series introduces a DT-based driver for the R-Car System
-> >> >> Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
-> >> >> SoCs.
-> >> >>
-> >> >> This is a dependency for the enablement of DU and VSP on R-Car H3, as
-> >> >> the VSPs are located in a PM Domain.
+Thanks
+Heiko
 
-[...]
 
-> > To my mind I need some kind of assurance from the clk maintainers that the
-> > patches are stable there - in particular that the commit ids won't change.
 > 
-> As the clock maintainer pulled the same tag instead of applying emailed
-> patches, the commit IDs won't change, even if he has to rework the clk-next
-> branch and repull.
+> ---
 > 
-> > And that both they and the ARM-SoC maintainers are happy with me pulling
-> > it into my tree for this purpose.
+>  arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112
+> ----------------------- arch/arm64/boot/dts/rockchip/rk3368.dtsi         | 
+> 66 ++++++++++++- 2 files changed, 65 insertions(+), 113 deletions(-)
+>  delete mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
 > 
-> I also mentioned that in the pull request. Pulling in a stable branch is
-> standard procedure: the code fails to compile if you don't merge
-> tags/clk-renesas-for-v4.7-tag2 first.
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi deleted file mode 100644
+> index a10010f..0000000
+> --- a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+> +++ /dev/null
+> @@ -1,112 +0,0 @@
+> -/*
+> - * Device Tree Source for RK3368 SoC thermal
+> - *
+> - * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+> - * Caesar Wang <wxt@rock-chips.com>
+> - *
+> - * This file is dual-licensed: you can use it either under the terms
+> - * of the GPL or the X11 license, at your option. Note that this dual
+> - * licensing only applies to this file, and not this project as a
+> - * whole.
+> - *
+> - *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License, or (at your option) any later version.
+> - *
+> - *     This file is distributed in the hope that it will be useful,
+> - *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - *     GNU General Public License for more details.
+> - *
+> - * Or, alternatively,
+> - *
+> - *  b) Permission is hereby granted, free of charge, to any person
+> - *     obtaining a copy of this software and associated documentation
+> - *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use,
+> - *     copy, modify, merge, publish, distribute, sublicense, and/or
+> - *     sell copies of the Software, and to permit persons to whom the
+> - *     Software is furnished to do so, subject to the following
+> - *     conditions:
+> - *
+> - *     The above copyright notice and this permission notice shall be
+> - *     included in all copies or substantial portions of the Software.
+> - *
+> - *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> - *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> - *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> - *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> - *     OTHER DEALINGS IN THE SOFTWARE.
+> - */
+> -
+> -#include <dt-bindings/thermal/thermal.h>
+> -
+> -cpu_thermal: cpu_thermal {
+> -	polling-delay-passive = <100>; /* milliseconds */
+> -	polling-delay = <5000>; /* milliseconds */
+> -
+> -	thermal-sensors = <&tsadc 0>;
+> -
+> -	trips {
+> -		cpu_alert0: cpu_alert0 {
+> -			temperature = <75000>; /* millicelsius */
+> -			hysteresis = <2000>; /* millicelsius */
+> -			type = "passive";
+> -		};
+> -		cpu_alert1: cpu_alert1 {
+> -			temperature = <80000>; /* millicelsius */
+> -			hysteresis = <2000>; /* millicelsius */
+> -			type = "passive";
+> -		};
+> -		cpu_crit: cpu_crit {
+> -			temperature = <95000>; /* millicelsius */
+> -			hysteresis = <2000>; /* millicelsius */
+> -			type = "critical";
+> -		};
+> -	};
+> -
+> -	cooling-maps {
+> -		map0 {
+> -			trip = <&cpu_alert0>;
+> -			cooling-device =
+> -				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> -		};
+> -		map1 {
+> -			trip = <&cpu_alert1>;
+> -			cooling-device =
+> -				<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> -		};
+> -	};
+> -};
+> -
+> -gpu_thermal: gpu_thermal {
+> -	polling-delay-passive = <100>; /* milliseconds */
+> -	polling-delay = <5000>; /* milliseconds */
+> -
+> -	thermal-sensors = <&tsadc 1>;
+> -
+> -	trips {
+> -		gpu_alert0: gpu_alert0 {
+> -			temperature = <80000>; /* millicelsius */
+> -			hysteresis = <2000>; /* millicelsius */
+> -			type = "passive";
+> -		};
+> -		gpu_crit: gpu_crit {
+> -			temperature = <1150000>; /* millicelsius */
+> -			hysteresis = <2000>; /* millicelsius */
+> -			type = "critical";
+> -		};
+> -	};
+> -
+> -	cooling-maps {
+> -		map0 {
+> -			trip = <&gpu_alert0>;
+> -			cooling-device =
+> -				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> -		};
+> -	};
+> -};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3368.dtsi index 7056a0f..8b4a7c9 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -413,7 +413,71 @@
+>  	};
 > 
-> > I do wonder, as we are almost at the closing point for queuing up changes
-> > for v4.7 if, assuming the above patches are scheduled for inclusion in
-> > v4.7-rc1, it might not be better for me to queue up this series for v4.8.
-> >
-> > I could do that sooner rather than later in the devel branch of the renesas
-> > tree if you like.
+>  	thermal-zones {
+> -		#include "rk3368-thermal.dtsi"
+> +		cpu {
+> +			polling-delay-passive = <100>; /* milliseconds */
+> +			polling-delay = <5000>; /* milliseconds */
+> +
+> +			thermal-sensors = <&tsadc 0>;
+> +
+> +			trips {
+> +				cpu_alert0: cpu_alert0 {
+> +					temperature = <75000>; /* millicelsius */
+> +					hysteresis = <2000>; /* millicelsius */
+> +					type = "passive";
+> +				};
+> +				cpu_alert1: cpu_alert1 {
+> +					temperature = <80000>; /* millicelsius */
+> +					hysteresis = <2000>; /* millicelsius */
+> +					type = "passive";
+> +				};
+> +				cpu_crit: cpu_crit {
+> +					temperature = <95000>; /* millicelsius */
+> +					hysteresis = <2000>; /* millicelsius */
+> +					type = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +				map0 {
+> +					trip = <&cpu_alert0>;
+> +					cooling-device =
+> +					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +				};
+> +				map1 {
+> +					trip = <&cpu_alert1>;
+> +					cooling-device =
+> +					<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +				};
+> +			};
+> +		};
+> +
+> +		gpu {
+> +			polling-delay-passive = <100>; /* milliseconds */
+> +			polling-delay = <5000>; /* milliseconds */
+> +
+> +			thermal-sensors = <&tsadc 1>;
+> +
+> +			trips {
+> +				gpu_alert0: gpu_alert0 {
+> +					temperature = <80000>; /* millicelsius */
+> +					hysteresis = <2000>; /* millicelsius */
+> +					type = "passive";
+> +				};
+> +				gpu_crit: gpu_crit {
+> +					temperature = <115000>; /* millicelsius */
+> +					hysteresis = <2000>; /* millicelsius */
+> +					type = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +				map0 {
+> +					trip = <&gpu_alert0>;
+> +					cooling-device =
+> +					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +				};
+> +			};
+> +		};
+>  	};
 > 
-> v4.7-rc1 is still more than one month in the future.
-> 
-> As Laurent said, that would delay multimedia work by one more kernel cycle,
-> as R-Car SYSC PM Domains already missed v4.6.
-> In addition, it would mean continued rebasing/updating of "[PATCH v5 00/12]
-> ARM/arm64: dts: rcar: Add SYSC PM domains" in renesas-drivers, as it touches
-> all R-Car DTSes all over the place.
-> 
-> Thanks for reconsidering!
-
-Thanks for your feedback. I now have a better understanding of the
-situation both in regards to the state of the branch and the dependencies
-on it.
-
-I have reconsidered and queued up this series for v4.7.
-It is now present in the next branch of the renesas tree.
+>  	tsadc: tsadc at ff280000 {
