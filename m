@@ -1,42 +1,30 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 23 Apr 2016 12:59:00 -0700
-Subject: [GIT PULL 4/4] Broadcom drivers changes for 4.7
-In-Reply-To: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
-References: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1461441540-5095-4-git-send-email-f.fainelli@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 23 Apr 2016 22:09:21 +0200
+Subject: [PATCH 1/2] arm64: dts: uniphier: fix I2C nodes of PH1-LD20
+In-Reply-To: <1460716247-28049-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1460716247-28049-1-git-send-email-yamada.masahiro@socionext.com>
+ <1460716247-28049-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <4326944.O9ELFsuto4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+On Friday 15 April 2016 19:30:46 Masahiro Yamada wrote:
+> The I2C hardware blocks on this SoC are connected as follows:
+> 
+>   I2C0: external connection
+>   I2C1: external connection
+>   I2C2: internal connection
+>   I2C3: external connection
+>   I2C4: external connection
+>   I2C5: internal connection
+>   I2C6: no connection (not accessible)
+> 
+> Delete pinctrl from Ch2, add pinctrl to Ch4, and remove the Ch6 node.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> 
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-are available in the git repository at:
+Applied patch 1/2 to the fixes branch now, thanks!
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.7/drivers
-
-for you to fetch changes up to b0ec633c28d42281c03b41dbc92a4448a481f2f3:
-
-  bus: brcmstb_gisb: Rework dependencies (2016-04-18 14:20:30 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs drivers changes:
-
-- Justin adds a soc_dev driver to properly report to user-space the Broadcom
-  STB SoC family, product and revision
-
-- Florian reworks how the brcmstb_gisb driver dependency is done to enable it
-  on Broadcom STB MIPS-based SoCs and remove a select in
-  arch/arm/mach-bcm/Kconfig
-
-----------------------------------------------------------------
-Florian Fainelli (1):
-      bus: brcmstb_gisb: Rework dependencies
-
-Justin Chen (1):
-      soc: brcmstb: add SoC driver to brcmstb
-
- arch/arm/mach-bcm/Kconfig    |  2 +-
- drivers/bus/Kconfig          |  1 +
- drivers/soc/brcmstb/common.c | 58 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 60 insertions(+), 1 deletion(-)
+	Arnd
