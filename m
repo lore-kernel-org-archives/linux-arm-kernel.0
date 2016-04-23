@@ -1,81 +1,140 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Sat, 23 Apr 2016 12:33:51 -0500
-Subject: [PATCH 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
-In-Reply-To: <CAL_JsqK0LYCozBohs5QCvuPRR-3s2SMHf7DgwSyVe4Vyeyw9ew@mail.gmail.com>
-References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
- <1461363432-5730-2-git-send-email-andy.gross@linaro.org>
- <CAL_JsqK0LYCozBohs5QCvuPRR-3s2SMHf7DgwSyVe4Vyeyw9ew@mail.gmail.com>
-Message-ID: <20160423173351.GA3246@hector.attlocal.net>
+From: dalias@libc.org (Rich Felker)
+Date: Sat, 23 Apr 2016 14:03:19 -0400
+Subject: [PATCH] of: iommu: make of_iommu_init() postcore_initcall_sync
+In-Reply-To: <1461403987-10697-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1461403987-10697-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160423180319.GC21636@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 23, 2016 at 11:56:50AM -0500, Rob Herring wrote:
-> On Fri, Apr 22, 2016 at 5:17 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> > This patch adds the device tree support for the Qualcomm SCM firmware.
-> >
-> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > ---
-> >  .../devicetree/bindings/firmware/qcom,scm.txt      | 31 ++++++++++++++++++++++
-> >  1 file changed, 31 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> > new file mode 100644
-> > index 0000000..57b9b3a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> > @@ -0,0 +1,31 @@
-> > +QCOM Secure Channel Manager (SCM)
-> > +
-> > +Qualcomm processors include an interface to communicate to the secure firmware.
-> > +This interface allows for clients to request different types of actions.  These
-> > +can include CPU power up/down, HDCP requests, loading of firmware, and other
-> > +assorted actions.
-> > +
-> > +Required properties:
-> > +- compatible: must contain one of the following:
-> > + * "qcom,scm-apq8064" for APQ8064
-> > + * "qcom,scm-apq8084" for MSM8084
-> > + * "qcom,scm-msm8916" for MSM8916
-> > + * "qcom,scm-msm8974" for MSM8974
-> > +- clocks: One to three clocks may be required based on compatible.
-> > + * Only core clock required for "qcom,scm-apq8064"
-> > + * Core, iface, and bus clocks required for all other compatibles.
-> > +- clock-names: Must contain "core" for the core clock, "iface" for the interface
-> > +  clock and "bus" for the bus clock per the requirements of the compatible.
-> > +
-> > +Example for MSM8916:
-> > +
-> > +       firmware {
-> > +               compatible = "simple-bus";
+On Sat, Apr 23, 2016 at 05:33:07PM +0800, Kefeng Wang wrote:
+> The of_iommu_init() is called multiple times by arch code,
+> make it postcore_initcall_sync, then we can drop relevant
+> calls fully.
 > 
-> Firmware is a bus? Really? Let's not put hacks in the DT just so you
-> get automatic probing.
-
-So something like:
-
-        firmware {
-                compatible = "qcom,scm-apq8084";
-                clocks = <&gcc GCC_CE1_CLK> , <&gcc GCC_CE1_AXI_CLK>, <&gcc GCC_CE1_AHB_CLK>;
-                clock-names = "core", "bus", "iface";
-        };
-
-Seems to work fine.
-
-> > +
-> > +               scm {
-> > +                       compatible = "qcom,scm-msm8916";
-> > +                       clocks = <&gcc GCC_CRYPTO_CLK> , <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
-> > +                       clock-names = "core", "bus", "iface";
+> Note, the IOMMUs should have a chance to perform some basic
+> initialisation before we start adding masters to them. So
+> postcore_initcall_sync is good choice, it ensures of_iommu_init()
+> called before of_platform_populate.
 > 
-> Generally, /firmware defines an interface to firmware. I don't think
-> clocks belong here. This implies that non-secure world can turn off
-> clocks to secure world?
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-The caller into the SCM is on the hook for making sure the clocks are turned on.
-The firmware people decided to not manage the clocks.  In a perfect world, they
-would turn on their own clocks and it would all be self contained.  Sadly, it
-isn't going to change.
+Acked-by: Rich Felker <dalias@libc.org>
 
-The alternative is every device that makes scm calls needs to manage the clocks
-for the firmware.
+> ---
+>  arch/arm/kernel/setup.c     | 2 --
+>  arch/arm64/kernel/setup.c   | 2 --
+>  arch/sh/boards/of-generic.c | 2 --
+>  drivers/iommu/of_iommu.c    | 5 ++++-
+>  include/linux/of_iommu.h    | 2 --
+>  5 files changed, 4 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 2c4bea3..18a29a0 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -19,7 +19,6 @@
+>  #include <linux/bootmem.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/screen_info.h>
+> -#include <linux/of_iommu.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/init.h>
+>  #include <linux/kexec.h>
+> @@ -902,7 +901,6 @@ static int __init customize_machine(void)
+>  	 * machine from the device tree, if no callback is provided,
+>  	 * otherwise we would always need an init_machine callback.
+>  	 */
+> -	of_iommu_init();
+>  	if (machine_desc->init_machine)
+>  		machine_desc->init_machine();
+>  #ifdef CONFIG_OF
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 9dc6776..e20b64f 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -39,7 +39,6 @@
+>  #include <linux/fs.h>
+>  #include <linux/proc_fs.h>
+>  #include <linux/memblock.h>
+> -#include <linux/of_iommu.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/efi.h>
+> @@ -365,7 +364,6 @@ void __init setup_arch(char **cmdline_p)
+>  static int __init arm64_device_init(void)
+>  {
+>  	if (of_have_populated_dt()) {
+> -		of_iommu_init();
+>  		of_platform_populate(NULL, of_default_bus_match_table,
+>  				     NULL, NULL);
+>  	} else if (acpi_disabled) {
+> diff --git a/arch/sh/boards/of-generic.c b/arch/sh/boards/of-generic.c
+> index bf3a166..b4d4313 100644
+> --- a/arch/sh/boards/of-generic.c
+> +++ b/arch/sh/boards/of-generic.c
+> @@ -11,7 +11,6 @@
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/of_fdt.h>
+> -#include <linux/of_iommu.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/irqchip.h>
+>  #include <linux/clk-provider.h>
+> @@ -185,7 +184,6 @@ static int __init sh_of_device_init(void)
+>  {
+>  	pr_info("SH generic board support: populating platform devices\n");
+>  	if (of_have_populated_dt()) {
+> -		of_iommu_init();
+>  		of_platform_populate(NULL, of_default_bus_match_table,
+>  				     NULL, NULL);
+>  	} else {
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 5fea665..04cc80f 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -174,7 +174,7 @@ err_put_node:
+>  	return NULL;
+>  }
+>  
+> -void __init of_iommu_init(void)
+> +static int __init of_iommu_init(void)
+>  {
+>  	struct device_node *np;
+>  	const struct of_device_id *match, *matches = &__iommu_of_table;
+> @@ -186,4 +186,7 @@ void __init of_iommu_init(void)
+>  			pr_err("Failed to initialise IOMMU %s\n",
+>  				of_node_full_name(np));
+>  	}
+> +
+> +	return 0;
+>  }
+> +postcore_initcall_sync(of_iommu_init);
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index ffbe470..e2c2e71 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -11,7 +11,6 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+>  			     int index, unsigned long *busno, dma_addr_t *addr,
+>  			     size_t *size);
+>  
+> -extern void of_iommu_init(void);
+>  extern struct iommu_ops *of_iommu_configure(struct device *dev,
+>  					struct device_node *master_np);
+>  
+> @@ -24,7 +23,6 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>  	return -EINVAL;
+>  }
+>  
+> -static inline void of_iommu_init(void) { }
+>  static inline struct iommu_ops *of_iommu_configure(struct device *dev,
+>  					 struct device_node *master_np)
+>  {
+> -- 
+> 2.6.0.GIT
