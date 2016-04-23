@@ -1,81 +1,46 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sat, 23 Apr 2016 07:18:15 -0700
-Subject: [PATCH 4/8] firmware: qcom: scm: Add support for ARM64 SoCs
-In-Reply-To: <20160423045248.GD6968@hector.attlocal.net>
-References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
- <1461363432-5730-5-git-send-email-andy.gross@linaro.org>
- <20160422234105.GH3202@tuxbot>
- <20160423045248.GD6968@hector.attlocal.net>
-Message-ID: <20160423141815.GL3202@tuxbot>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 23 Apr 2016 16:22:23 +0200
+Subject: [PATCH v4 4/5] dt-bindings: arm: add DT binding for Marvell
+ CP110 system controller
+In-Reply-To: <CAMuHMdVYtXEZF0+G3W+Q8cDcBFB55s1ru6N6J3tgFy9BcGZiXw@mail.gmail.com>
+References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1459070777-18049-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160328194756.GA28967@rob-hp-laptop>
+ <20160413180122.4f997a9a@free-electrons.com>
+ <CAMuHMdVYtXEZF0+G3W+Q8cDcBFB55s1ru6N6J3tgFy9BcGZiXw@mail.gmail.com>
+Message-ID: <20160423162223.16e3ca28@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 22 Apr 21:52 PDT 2016, Andy Gross wrote:
+Hello,
 
-> On Fri, Apr 22, 2016 at 04:41:05PM -0700, Bjorn Andersson wrote:
-> > On Fri 22 Apr 15:17 PDT 2016, Andy Gross wrote:
-[..]
-> > > diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-> > > index 8e1eeb8..7d7b12b 100644
-> > [..]
-> > >  
-> > > +static void qcom_scm_init(void)
-> > > +{
-> > > +	__qcom_scm_init();
-> > > +}
-> > > +
-> > >  static int qcom_scm_probe(struct platform_device *pdev)
-> > >  {
-> > >  	struct qcom_scm *scm;
-> > > @@ -208,6 +213,8 @@ static int qcom_scm_probe(struct platform_device *pdev)
-> > >  	__scm = scm;
-> > >  	__scm->dev = &pdev->dev;
-> > >  
-> > > +	qcom_scm_init();
-> > > +
-> > 
-> > Why don't you call __qcom_scm_init() directly here?
+On Thu, 14 Apr 2016 21:19:54 +0200, Geert Uytterhoeven wrote:
+
+> From my experience with clock drivers for Renesas SoCs, life is much easier
+> when handling all of this (clock names, parents, ...) in C. The same is true
+> BTW for PM Domains.
 > 
-> Yeah that would save some stack ops.
-> 
-> As a side note, what do you think about just making the first transaction on the
-> scm-64 side do this init to figure out 32/64 calling convention?
-> 
-> That would eliminate this mess.
-> 
+> The clock controllers of r8a7791 and r8a7795 are very similar, and could
+> be handled similarly.
+> Compare the DT hierarchy for CPG and MSTP/MSSR in
+> arch/arm/boot/dts/r8a7791.dtsi and arch/arm64/boot/dts/renesas/r8a7795.dtsi.
 
-We will have quite a bunch of entry points in this API, so it will
-probably be messier to have them all call some potential-init function.
+Thanks for your feedback. However in practice, there will ultimately be
+two instances of this clock controller, as some variants of the SoC
+will contain two CP parts. Due to this, it is going to be quite
+convenient to have the clock names configurable from the DT, as I will
+be able to give the same clock on the master CP and the slave CP a
+different name.
 
-Perhaps if it's possible to push it to the __qcom_scm_call{,_atomic}.
-But I'm not sure we want those to be more complicated just to save this
-one call...
+That's actually why my binding documentation uses names like
+"cpm-<foo>" for all the clocks, where "cpm" stands for "CP Master". In
+the future, another instance will have clocks named "cps-<foo>" for "CP
+Slave".
 
-> > >  	return 0;
-> > >  }
-> > >  
-> > > diff --git a/drivers/firmware/qcom_scm.h b/drivers/firmware/qcom_scm.h
-> > [..]
-> > > +#define QCOM_SCM_V2_EBUSY	-12
-> > >  #define QCOM_SCM_ENOMEM		-5
-> > >  #define QCOM_SCM_EOPNOTSUPP	-4
-> > >  #define QCOM_SCM_EINVAL_ADDR	-3
-> > > @@ -56,6 +58,8 @@ static inline int qcom_scm_remap_error(int err)
-> > >  		return -EOPNOTSUPP;
-> > >  	case QCOM_SCM_ENOMEM:
-> > >  		return -ENOMEM;
-> > > +	case QCOM_SCM_V2_EBUSY:
-> > > +		return err;
-> > 
-> > I don't think return -ENOMEM is the right thing to do here.
-> 
-> -EBUSY?
-> 
+Best regards,
 
-That seems better.
-
-> > >  	return -EINVAL;
-> > >  }
-
-Regards,
-Bjorn
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
