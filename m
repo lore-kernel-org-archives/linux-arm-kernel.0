@@ -1,85 +1,361 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Sat, 23 Apr 2016 15:40:18 -0500
-Subject: [GIT PULL] Qualcomm Device Tree Updates for v4.7
-Message-ID: <1461444018-11041-1-git-send-email-andy.gross@linaro.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 23 Apr 2016 22:08:57 +0100
+Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
+In-Reply-To: <f4c00c5c2242f6a951f1f8d8eca56357@ccbib.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <1461333147-11873-2-git-send-email-harald@ccbib.org>
+ <571A4831.2020604@denx.de>
+ <CAL7P5jKYp0JrF2MHdLkLTBvgYb0KSDwPEMuNPGxcctcxCRnazg@mail.gmail.com>
+ <f4c00c5c2242f6a951f1f8d8eca56357@ccbib.org>
+Message-ID: <571BE469.6070705@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+On 22/04/16 20:23, Harald Geyer wrote:
+> [CCing Mark and Liam again]
+> 
+> On 22.04.2016 19:00, Ksenija Stanojevi? wrote:
+>> On Fri, Apr 22, 2016 at 5:50 PM, Marek Vasut <marex@denx.de> wrote:
+>>> On 04/22/2016 03:52 PM, Harald Geyer wrote:
+>>>> The hardware has two current sources ISRC0 and ISRC1 to allow measuring
+>>>> resistors without additional circuitry. This commit makes them available
+>>>> as regulators.
+>>>>
+>>>> Tested on an imx233-olinuxino board.
+>>>>
+>>>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+>>>> ---
+>>>> The current regulator API doesn't fit this type of device very well: Typically
+>>>> consumers will want to set a defined current, ie. min_uA == max_uA, but they
+>>>> can't without help from configuration data, because the valid values aren't
+>>>> reported by the API for current regulators. I have been thinking about
+>>>> extending the API, but currently AFAIK no such consumers exist and most
+>>>> users, like myself, will force the regulator to a defined value in
+>>>> devicetree anyway.
+>>>
+>>> I am tempted to block this patch and ask you to properly split the
+>>> mxs-lradc driver into MFD with touchscreen and IIO part and only then
+>>> add the regulator bits. The lradc is becoming a katamari of ad-hoc
+>>> misplaced functionality.
+> 
+> I know. However I'm afraid working this into a proper MFD is above my skills
+> and I don't feel responsible for the status quo either.
+> 
+>> I almost finished, I already split the driver into MFD, sorry for the delay.
+>
+> Wow, looks like I have a lot of luck today.
+Indeed!  Glad to here you have this underway Ksenija.  Let me know if you want
+any other patches held until this is done.
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+For now I'm assuming that Stefan's series won't cause too much trouble, so I'll
+probably apply those, but will hold anything more major until your patches show
+up.
 
-are available in the git repository at:
+Thanks,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dt-for-4.7
-
-for you to fetch changes up to 3db63602505fa30f9d8faa1512fc71dae0cbf71b:
-
-  device-tree: nexus7: Add bq27541 battery interface to dts (2016-04-20 15:03:16 -0500)
-
-----------------------------------------------------------------
-Qualcomm Device Tree Changes for v4.7
-
-* Add DB600C support
-* Add IPQ4019 support
-* Add additional nodes for APQ8064
-* Fix APQ8064 pinctrls for i2c/spi
-* Add MSM8974 nodes for smp2p and smd
-* Modify MSM8974 memory reserve for rfsa and rmtfs
-* Add support for BQ27541 on Nexus7
-
-----------------------------------------------------------------
-Bjorn Andersson (6):
-      ARM: dts: msm8974: Split efs in rfsa and rmtfs
-      ARM: dts: msm8974: Add node for second i2c from blsp1
-      ARM: dts: msm8974: Add modem smp2p and smd nodes
-      ARM: dts: qcom: apq8064: Add syscon for sic-non-secure
-      ARM: dts: qcom: apq8064: Add complete smsm node
-      ARM: dts: qcom: apq8064: Add smd node and all edges
-
-John Stultz (1):
-      device-tree: nexus7: Add bq27541 battery interface to dts
-
-Matthew McClintock (10):
-      qcom: ipq4019: Add basic board/dts support for IPQ4019 SoC
-      dts: ipq4019: Add support for IPQ4019 DK01 board
-      qcom: ipq4019: add acc and saw nodes to bring up secondary cores
-      qcom: ipq4019: add watchdog node to ipq4019 SoC and DK01 device tree
-      qcom: ipq4019: add support for reset via qcom,ps-hold
-      qcom: ipq4019: add spi node to ipq4019 SoC and DK01 device tree
-      qcom: ipq4019: add i2c node to ipq4019 SoC and DK01 device tree
-      qcom: ipq4019: add cpu operating points for cpufreq support
-      qcom: ipq4019: add crypto nodes to ipq4019 SoC and DK01 device tree
-      qcom: ipq4019: add DMA nodes to ipq4019 SoC and DK01 device tree
-
-Srinivas Kandagatla (13):
-      ARM: dts: apq8064: fix the pinctrls for i2c and spi
-      ARM: dts: apq8064: add support to gsbi1 uart
-      ARM: dts: apq8064: add gsbi7 i2c support
-      ARM: dts: db600c: add board support with serial
-      ARM: dts: db600c: add pmic regulator supplies
-      ARM: dts: db600c: Add eMMC and SD card support
-      ARM: dts: db600c: add usb support
-      ARM: dts: db600c: add pcie support
-      ARM: dts: db600c: add on board sata support.
-      ARM: dts: db600c: Add on board leds support
-      ARM: dts: db600c: add i2c support
-      ARM: dts: db600c: add spi support
-      ARM: dts: db600c: add support to magnetometer
-
- arch/arm/boot/dts/Makefile                         |   2 +
- .../boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi   |  52 +++
- arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts    | 349 +++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts |   6 +
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
- arch/arm/boot/dts/qcom-apq8064.dtsi                | 135 +++++++-
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts    |  22 ++
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi      | 112 +++++++
- arch/arm/boot/dts/qcom-ipq4019.dtsi                | 267 ++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi                |  52 ++-
- 10 files changed, 1028 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
+Jonathan
+> 
+>> Can this wait a  little bit?
+> 
+> Sure. I now have a working kernel for my purposes, so no hurry on my part.
+> CC my when you submit your code or maybe even pick my patch into your series,
+> if you feel like it.
+> 
+> Thanks,
+> Harald
+> 
+>> Thanks,
+>> Ksenija
+>>
+>>>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>>>>  drivers/iio/adc/Kconfig                            |   1 +
+>>>>  drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
+>>>>  3 files changed, 182 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>>> index 555fb11..983952c 100644
+>>>> --- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>>> +++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>>> @@ -19,6 +19,15 @@ Optional properties:
+>>>>  - fsl,settling: delay between plate switch to next sample. Allowed value is
+>>>>                  1 ... 2047. It counts at 2 kHz and its default is
+>>>>                  10 (= 5 ms)
+>>>> +- ISRC0: A node describing the regulator of internal current source 0
+>>>> +- ISRC1: A node describing the regulator of internal current source 1
+>>>> +
+>>>> +Required properties for the ISRCx sub-nodes:
+>>>> +- regulator-max-microamp: See standard regulator binding documentation.
+>>>> +                          Valid values are from 0 to 300 in steps of 20.
+>>>> +
+>>>> +Optional properties for the ISRCx sub-nodes:
+>>>> +Any standard regulator properties that apply to current regulators.
+>>>>
+>>>>  Example for i.MX23 SoC:
+>>>>
+>>>> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
+>>>>               fsl,ave-ctrl = <4>;
+>>>>               fsl,ave-delay = <2>;
+>>>>               fsl,settling = <10>;
+>>>> +
+>>>> +             isrc_lradc0: ISRC0 {
+>>>> +                     regulator-max-microamp = <300>;
+>>>> +             };
+>>>> +
+>>>> +             isrc_lradc1: ISRC1 {
+>>>> +                     regulator-max-microamp = <120>;
+>>>> +                     regulator-min-microamp = <120>;
+>>>> +                     regulator-always-on;
+>>>> +             };
+>>>>       };
+>>>>
+>>>>  Example for i.MX28 SoC:
+>>>> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
+>>>>               fsl,ave-ctrl = <4>;
+>>>>               fsl,ave-delay = <2>;
+>>>>               fsl,settling = <10>;
+>>>> +
+>>>> +             isrc_lradc0: ISRC0 {
+>>>> +                     regulator-max-microamp = <300>;
+>>>> +             };
+>>>> +
+>>>> +             isrc_lradc6: ISRC1 {
+>>>> +                     regulator-max-microamp = <120>;
+>>>> +                     regulator-min-microamp = <120>;
+>>>> +                     regulator-always-on;
+>>>> +             };
+>>>>       };
+>>>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>>>> index 5937030..1968d1c 100644
+>>>> --- a/drivers/iio/adc/Kconfig
+>>>> +++ b/drivers/iio/adc/Kconfig
+>>>> @@ -319,6 +319,7 @@ config MXS_LRADC
+>>>>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>>>>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+>>>>          depends on INPUT
+>>>> +        depends on REGULATOR
+>>>>          select STMP_DEVICE
+>>>>          select IIO_BUFFER
+>>>>          select IIO_TRIGGERED_BUFFER
+>>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+>>>> index 33051b8..f22f339 100644
+>>>> --- a/drivers/iio/adc/mxs-lradc.c
+>>>> +++ b/drivers/iio/adc/mxs-lradc.c
+>>>> @@ -40,6 +40,10 @@
+>>>>  #include <linux/iio/triggered_buffer.h>
+>>>>  #include <linux/iio/sysfs.h>
+>>>>
+>>>> +#include <linux/regulator/driver.h>
+>>>> +#include <linux/regulator/machine.h>
+>>>> +#include <linux/regulator/of_regulator.h>
+>>>> +
+>>>>  #define DRIVER_NAME          "mxs-lradc"
+>>>>
+>>>>  #define LRADC_MAX_DELAY_CHANS        4
+>>>> @@ -261,6 +265,9 @@ struct mxs_lradc {
+>>>>       unsigned                over_sample_delay;
+>>>>       /* time in clocks to wait after the plates where switched */
+>>>>       unsigned                settling_delay;
+>>>> +
+>>>> +     struct regulator_desc isrc0;
+>>>> +     struct regulator_desc isrc1;
+>>>>  };
+>>>>
+>>>>  #define      LRADC_CTRL0                             0x00
+>>>> @@ -305,6 +312,11 @@ struct mxs_lradc {
+>>>>  #define      LRADC_CTRL2                             0x20
+>>>>  #define      LRADC_CTRL2_DIVIDE_BY_TWO_OFFSET        24
+>>>>  #define      LRADC_CTRL2_TEMPSENSE_PWD               BIT(15)
+>>>> +#define      LRADC_CTRL2_TEMP_SENSOR_IENABLE1        BIT(9)
+>>>> +#define      LRADC_CTRL2_TEMP_SENSOR_IENABLE0        BIT(8)
+>>>> +#define      LRADC_CTRL2_TEMP_ISRC1_OFFSET           4
+>>>> +#define      LRADC_CTRL2_TEMP_ISRC0_OFFSET           0
+>>>> +#define      LRADC_CTRL2_TEMP_ISRC_MASK              0x0f
+>>>>
+>>>>  #define      LRADC_STATUS                            0x40
+>>>>  #define      LRADC_STATUS_TOUCH_DETECT_RAW           BIT(0)
+>>>> @@ -1383,6 +1395,109 @@ static const struct iio_buffer_setup_ops mxs_lradc_buffer_ops = {
+>>>>       .validate_scan_mask = &mxs_lradc_validate_scan_mask,
+>>>>  };
+>>>>
+>>>> +static int mxs_lradc_regulator_is_enabled(struct regulator_dev *dev)
+>>>> +{
+>>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>>> +     int reg = readl(lradc->base + LRADC_CTRL2);
+>>>> +
+>>>> +     if (dev->desc == &lradc->isrc0)
+>>>> +             return reg & LRADC_CTRL2_TEMP_SENSOR_IENABLE0;
+>>>> +     else if (dev->desc == &lradc->isrc1)
+>>>> +             return reg & LRADC_CTRL2_TEMP_SENSOR_IENABLE1;
+>>>> +
+>>>> +     /* This should never happen */
+>>>> +     return -ENODEV;
+>>>> +}
+>>>> +
+>>>> +#define LRADC_REGVALUE2uA(regval, offset) \
+>>>> +     (20 * ((regval >> offset) & LRADC_CTRL2_TEMP_ISRC_MASK))
+>>>> +
+>>>> +static int mxs_lradc_regulator_get_current_limit(struct regulator_dev *dev)
+>>>> +{
+>>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>>> +     int reg = readl(lradc->base + LRADC_CTRL2);
+>>>> +
+>>>> +     if (dev->desc == &lradc->isrc0)
+>>>> +             return LRADC_REGVALUE2uA(reg, LRADC_CTRL2_TEMP_ISRC0_OFFSET);
+>>>> +     else if (dev->desc == &lradc->isrc1)
+>>>> +             return LRADC_REGVALUE2uA(reg, LRADC_CTRL2_TEMP_ISRC1_OFFSET);
+>>>> +
+>>>> +     /* This should never happen */
+>>>> +     return -ENODEV;
+>>>> +}
+>>>> +
+>>>> +static int mxs_lradc_regulator_enable(struct regulator_dev *dev)
+>>>> +{
+>>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>>> +
+>>>> +     if (dev->desc == &lradc->isrc0)
+>>>> +             mxs_lradc_reg_set(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0,
+>>>> +                               LRADC_CTRL2);
+>>>> +     else if (dev->desc == &lradc->isrc1)
+>>>> +             mxs_lradc_reg_set(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
+>>>> +                               LRADC_CTRL2);
+>>>> +     else
+>>>> +             /* This should never happen */
+>>>> +             return -ENODEV;
+>>>> +
+>>>> +     return 0;
+>>>> +}
+>>>> +
+>>>> +static int mxs_lradc_regulator_disable(struct regulator_dev *dev)
+>>>> +{
+>>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>>> +
+>>>> +     if (dev->desc == &lradc->isrc0)
+>>>> +             mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0,
+>>>> +                                 LRADC_CTRL2);
+>>>> +     else if (dev->desc == &lradc->isrc1)
+>>>> +             mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
+>>>> +                                 LRADC_CTRL2);
+>>>> +     else
+>>>> +             /* This should never happen */
+>>>> +             return -ENODEV;
+>>>> +
+>>>> +     return 0;
+>>>> +}
+>>>> +
+>>>> +static int mxs_lradc_regulator_set_current_limit(struct regulator_dev *dev,
+>>>> +                                              int min_uA, int max_uA)
+>>>> +{
+>>>> +     struct mxs_lradc *lradc = rdev_get_drvdata(dev);
+>>>> +     int offset, value;
+>>>> +
+>>>> +     if (dev->desc == &lradc->isrc0)
+>>>> +             offset = LRADC_CTRL2_TEMP_ISRC0_OFFSET;
+>>>> +     else if (dev->desc == &lradc->isrc1)
+>>>> +             offset = LRADC_CTRL2_TEMP_ISRC1_OFFSET;
+>>>> +     else
+>>>> +             /* This should never happen */
+>>>> +             return -ENODEV;
+>>>> +
+>>>> +     value = min_uA / 20;
+>>>> +     if (min_uA % 20)
+>>>> +             value++;
+>>>> +     if (value * 20 > max_uA)
+>>>> +             return -EINVAL;
+>>>> +     if (value & ~LRADC_CTRL2_TEMP_ISRC_MASK)
+>>>> +             /* This should never happen */
+>>>> +             return -EPERM;
+>>>> +
+>>>> +     mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_ISRC_MASK << offset,
+>>>> +                         LRADC_CTRL2);
+>>>> +     mxs_lradc_reg_set(lradc, value << offset, LRADC_CTRL2);
+>>>> +
+>>>> +     return 0;
+>>>> +}
+>>>> +
+>>>> +static struct regulator_ops mxs_lradc_regulator_current_ops = {
+>>>> +     .enable = mxs_lradc_regulator_enable,
+>>>> +     .is_enabled = mxs_lradc_regulator_is_enabled,
+>>>> +     .disable = mxs_lradc_regulator_disable,
+>>>> +     .get_current_limit = mxs_lradc_regulator_get_current_limit,
+>>>> +     .set_current_limit = mxs_lradc_regulator_set_current_limit,
+>>>> +};
+>>>> +
+>>>>  /*
+>>>>   * Driver initialization
+>>>>   */
+>>>> @@ -1519,6 +1634,10 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
+>>>>
+>>>>       for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
+>>>>               mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
+>>>> +
+>>>> +     mxs_lradc_reg_clear(lradc, LRADC_CTRL2_TEMP_SENSOR_IENABLE0 |
+>>>> +                                     LRADC_CTRL2_TEMP_SENSOR_IENABLE1,
+>>>> +                         LRADC_CTRL2);
+>>>>  }
+>>>>
+>>>>  static const struct of_device_id mxs_lradc_dt_ids[] = {
+>>>> @@ -1592,6 +1711,32 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
+>>>>       return 0;
+>>>>  }
+>>>>
+>>>> +static void mxs_lradc_reg_helper(struct device_node *np, const char *name,
+>>>> +                              struct regulator_config *conf,
+>>>> +                              struct regulator_desc *desc)
+>>>> +{
+>>>> +     struct regulator_dev *ret;
+>>>> +
+>>>> +     conf->of_node = of_get_child_by_name(np, name);
+>>>> +     if (!conf->of_node)
+>>>> +             return;
+>>>> +
+>>>> +     desc->name = name;
+>>>> +     desc->owner = THIS_MODULE;
+>>>> +     desc->type = REGULATOR_CURRENT;
+>>>> +     desc->ops = &mxs_lradc_regulator_current_ops;
+>>>> +
+>>>> +     conf->init_data = of_get_regulator_init_data(conf->dev, conf->of_node,
+>>>> +                                                  desc);
+>>>> +     ret = devm_regulator_register(conf->dev, desc, conf);
+>>>> +     if (IS_ERR(ret))
+>>>> +             /* Just pretend the regulator isn't there */
+>>>> +             dev_err(conf->dev, "Failed to register regulator %s: %ld\n",
+>>>> +                     desc->name, PTR_ERR(ret));
+>>>> +
+>>>> +     of_node_put(conf->of_node);
+>>>> +}
+>>>> +
+>>>>  static int mxs_lradc_probe(struct platform_device *pdev)
+>>>>  {
+>>>>       const struct of_device_id *of_id =
+>>>> @@ -1603,6 +1748,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>>>>       struct mxs_lradc *lradc;
+>>>>       struct iio_dev *iio;
+>>>>       struct resource *iores;
+>>>> +     struct regulator_config regconf;
+>>>>       int ret = 0, touch_ret;
+>>>>       int i, s;
+>>>>       u64 scale_uv;
+>>>> @@ -1727,6 +1873,12 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>>>>               goto err_ts;
+>>>>       }
+>>>>
+>>>> +     /* Setup regulator devices for current source. */
+>>>> +     regconf.dev = dev;
+>>>> +     regconf.driver_data = lradc;
+>>>> +     mxs_lradc_reg_helper(node, "ISRC0", &regconf, &lradc->isrc0);
+>>>> +     mxs_lradc_reg_helper(node, "ISRC1", &regconf, &lradc->isrc1);
+>>>> +
+>>>>       return 0;
+>>>>
+>>>>  err_ts:
+>>>>
+>>>
+>>>
+>>> -- 
+>>> Best regards,
+>>> Marek Vasut
+>>> -- 
+>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
