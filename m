@@ -1,26 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Apr 2016 01:31:28 +0200
-Subject: [PATCH v2] ARM: dts: artpec: update clock bindings in artpec6.dtsi
-In-Reply-To: <1457946103-13853-1-git-send-email-larper@axis.com>
-References: <1457946103-13853-1-git-send-email-larper@axis.com>
-Message-ID: <201604240131.28836.arnd@arndb.de>
+Date: Sun, 24 Apr 2016 01:43:04 +0200
+Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
+In-Reply-To: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <201604240143.04330.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 March 2016, Lars Persson wrote:
-> The clock binding for the main clock controller was changed to an
-> indexed controller style binding on request of the clk
-> maintainers. This updates the dtsi to use the new bindings.
+On Friday 01 April 2016, Vladimir Murzin wrote:
+> Hi,
 > 
-> Signed-off-by: Lars Persson <larper@axis.com>
-> ---
-> v2: Use numerical clock indexes to enable merge before the clock driver bindings
-> are in the tree.
+> This patch series provides the basic support for running ucLinux on V2M-MPS2
+> platform.
 > 
->  arch/arm/boot/dts/artpec6.dtsi | 99 +++++++++---------------------------------
->  1 file changed, 20 insertions(+), 79 deletions(-)
+> With these patches applied ucLinux can be run on both HW and FVP models
+> with Cortex-M3/M4/M7 configurations.
+> 
+> Board description:
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.100112_0100_03_en/arm_versatile_express_cortex_m_prototyping_system_(v2m_mps2)_technical_reference_manual_100112_0100_03_en.pdf
+> 
+> Application notes (cover Cortex-M3/M4/M7):
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.dai0385a/DAI0385A_cortex_m3_on_v2m_mps2.pdf
+> http://infocenter.arm.com/help/topic/com.arm.doc.dai0386a/DAI0386A_cortex_m4_on_v2m_mps2.pdf
+> http://infocenter.arm.com/help/topic/com.arm.doc.dai0399a/DAI0399A_cortex_m7_on_v2m_mps2.pdf
+> http://infocenter.arm.com/help/topic/com.arm.doc.dai0400a/DAI0400A_cortex_m7_on_v2m_mps2.pdf
+> 
+> Cortex-M System Design Kit (referenced as CMDK from documents above):
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0479c/DDI0479C_cortex_m_system_design_kit_r1p0_trm.pdf
+> 
+> I'd be happy to hear any feedback/comments on this series!
+> 
 
-I found this patch while going through stuff that had not been applied yet.
-Is this still the latest version that we should apply for v4.7?
+The whole series looks good to me, please submit the patches to the
+appropriate maintainers for inclusion separately:
+
+* patches 1-2 to the clocksource maintainers
+* patches 3-5 to the serial driver maintainers
+* patches 6-10 to the vexpress maintainers
+
+I think everyone is already on Cc here, but they don't want to pick the
+patches out of the series separately. I expect to get the patches for
+arm-soc as part of the vexpress pull requests (dt, defconfig, and core).
 
 	Arnd
