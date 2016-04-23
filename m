@@ -1,65 +1,36 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 23 Apr 2016 19:57:57 +0000
-Subject: [PATCH V3 1/3] iio: mxs-lradc: simplify TS registration
-In-Reply-To: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
-References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1461441479-23218-2-git-send-email-stefan.wahren@i2se.com>
+Date: Sat, 23 Apr 2016 19:57:56 +0000
+Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
+Message-ID: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simplifies the TS registration of mxs-lradc by
-using devm_input_allocate_device.
+This patch series simplifies TS handling of mxs-lradc.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Reviewed-by: Marek Vasut <marex@denx.de>
----
- drivers/iio/adc/mxs-lradc.c |   10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+These patches has been tested with i.MX23 and i.MX28 but without
+a touchscreen. I added only a bogus touchscreen in devicetree.
 
-diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-index ad26da1..3d1d370 100644
---- a/drivers/iio/adc/mxs-lradc.c
-+++ b/drivers/iio/adc/mxs-lradc.c
-@@ -1120,18 +1120,16 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
- {
- 	struct input_dev *input;
- 	struct device *dev = lradc->dev;
--	int ret;
- 
- 	if (!lradc->use_touchscreen)
- 		return 0;
- 
--	input = input_allocate_device();
-+	input = devm_input_allocate_device(dev);
- 	if (!input)
- 		return -ENOMEM;
- 
- 	input->name = DRIVER_NAME;
- 	input->id.bustype = BUS_HOST;
--	input->dev.parent = dev;
- 	input->open = mxs_lradc_ts_open;
- 	input->close = mxs_lradc_ts_close;
- 
-@@ -1146,11 +1144,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
- 
- 	lradc->ts_input = input;
- 	input_set_drvdata(input, lradc);
--	ret = input_register_device(input);
--	if (ret)
--		input_free_device(lradc->ts_input);
- 
--	return ret;
-+	return input_register_device(input);
- }
- 
- static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
-@@ -1159,7 +1154,6 @@ static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
- 		return;
- 
- 	mxs_lradc_disable_ts(lradc);
--	input_unregister_device(lradc->ts_input);
- }
- 
- /*
+It would be nice if someone with a real touchscreen could test it.
+
+Changes in V3:
+- remove dev.parent assignment as suggested by Dimitry
+- add new patch to remove mxs_lradc_ts_unregister
+- remove PM implementation from series in order to wait until 
+  Ksenija has split the driver
+
+Changes in V2:
+- rebase on iio/testing since patch 2 and 3 from V1 has been applied
+- also remove input_unregister_device in patch 1
+- use mask of virtual channels for IRQ disabling in patch 2
+
+Stefan Wahren (3):
+  iio: mxs-lradc: simplify TS registration
+  iio: mxs-lradc: remove mxs_lradc_ts_unregister
+  iio: mxs-lradc: disable only masked channels in     
+    mxs_lradc_hw_stop
+
+ drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
+ 1 file changed, 6 insertions(+), 28 deletions(-)
+
 -- 
 1.7.9.5
