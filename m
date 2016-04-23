@@ -1,133 +1,68 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Sat, 23 Apr 2016 17:05:14 +0800
-Subject: [PATCH v2 net-next 10/13] net: hns: add attribute port-mode-offset
- for dsaf port node
+Date: Sat, 23 Apr 2016 17:05:06 +0800
+Subject: [PATCH v2 net-next 02/13] net: hns: set debug port irq index to 0
 In-Reply-To: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1461402317-136499-11-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1461402317-136499-3-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Port mode offset for each dsaf port is different. The current code is not
-so readability. This patch adds configuration named port-mode-offset to
-make the code simple and more readability. If port-mode-offset isn't
-exists, default value 0 will be used.
+From: Daode Huang <huangdaode@hisilicon.com>
+
+As debug ports are moved from service dsaf to debug dsaf,
+the interrupts offset should start from 0, So this patch
+re-defines the offset index of debug ports.
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
-Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
 ---
-change log:
- PATCH v2:
-  - put DT bindings in separate patches.
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c | 8 +-------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h | 5 +----
+ 2 files changed, 2 insertions(+), 11 deletions(-)
 
- PATCH v1:
-  - first submit
----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 10 +++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |  1 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 44 ++++++++++------------
- 3 files changed, 30 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-index 52d757d..1c8fdd3 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-@@ -665,6 +665,7 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
- 	mac_cb->max_frm = MAC_DEFAULT_MTU;
- 	mac_cb->tx_pause_frm_time = MAC_DEFAULT_PAUSE_TIME;
- 	mac_cb->port_rst_off = mac_cb->mac_id;
-+	mac_cb->port_mode_off = 0;
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
+index 121ba4e..054f391 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
+@@ -445,20 +445,14 @@ static int hns_rcb_get_port_in_comm(
  
- 	/* if the dsaf node doesn't contain a port subnode, get phy-handle
- 	 * from dsaf node
-@@ -703,6 +704,15 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
- 			mac_cb->mac_id);
- 	}
- 
-+	ret = fwnode_property_read_u32(mac_cb->fw_port,
-+				       "port-mode-offset",
-+				       &mac_cb->port_mode_off);
-+	if (ret) {
-+		dev_dbg(mac_cb->dev,
-+			"mac%d port-mode-offset not found, use default value.\n",
-+			mac_cb->mac_id);
-+	}
-+
- 	syscon = syscon_node_to_regmap(
- 			of_parse_phandle(to_of_node(mac_cb->fw_port),
- 					 "cpld-syscon", 0));
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-index 7be7104..97ce9a7 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-@@ -319,6 +319,7 @@ struct hns_mac_cb {
- 	struct regmap *cpld_ctrl;
- 	u32 cpld_ctrl_reg;
- 	u32 port_rst_off;
-+	u32 port_mode_off;
- 	struct mac_entry_idx addr_entry_idx[DSAF_MAX_VM_NUM];
- 	u8 sfp_prsnt;
- 	u8 cpld_led_value;
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index e549a11..a837bb9 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -265,37 +265,31 @@ phy_interface_t hns_mac_get_phy_if(struct hns_mac_cb *mac_cb)
+ #define SERVICE_RING_IRQ_IDX(v1) \
+ 	((v1) ? HNS_SERVICE_RING_IRQ_IDX : HNSV2_SERVICE_RING_IRQ_IDX)
+-#define DEBUG_RING_IRQ_IDX(v1) \
+-	((v1) ? HNS_DEBUG_RING_IRQ_IDX : HNSV2_DEBUG_RING_IRQ_IDX)
+-#define DEBUG_RING_IRQ_OFFSET(v1) \
+-	((v1) ? HNS_DEBUG_RING_IRQ_OFFSET : HNSV2_DEBUG_RING_IRQ_OFFSET)
+ static int hns_rcb_get_base_irq_idx(struct rcb_common_cb *rcb_common)
  {
- 	u32 mode;
- 	u32 reg;
--	u32 shift;
--	u32 phy_offset;
- 	bool is_ver1 = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver);
- 	int mac_id = mac_cb->mac_id;
--	phy_interface_t phy_if = PHY_INTERFACE_MODE_NA;
-+	phy_interface_t phy_if;
+-	int comm_index = rcb_common->comm_index;
+ 	bool is_ver1 = AE_IS_VER1(rcb_common->dsaf_dev->dsaf_ver);
  
--	if (is_ver1 && HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev)) {
--		phy_if = PHY_INTERFACE_MODE_SGMII;
--	} else if (mac_id >= 0 && mac_id <= 3 &&
--		   !HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev)) {
--		reg = is_ver1 ? HNS_MAC_HILINK4_REG : HNS_MAC_HILINK4V2_REG;
--		mode = dsaf_read_sub(mac_cb->dsaf_dev, reg);
--		/* mac_id 0, 1, 2, 3 ---> hilink4 lane 0, 1, 2, 3 */
--		shift = is_ver1 ? 0 : mac_id;
--		if (dsaf_get_bit(mode, shift))
--			phy_if = PHY_INTERFACE_MODE_XGMII;
-+	if (is_ver1) {
-+		if (HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev))
-+			return PHY_INTERFACE_MODE_SGMII;
-+
-+		if (mac_id >= 0 && mac_id <= 3)
-+			reg = HNS_MAC_HILINK4_REG;
- 		else
--			phy_if = PHY_INTERFACE_MODE_SGMII;
--	} else {
--		reg = is_ver1 ? HNS_MAC_HILINK3_REG : HNS_MAC_HILINK3V2_REG;
--		mode = dsaf_read_sub(mac_cb->dsaf_dev, reg);
--		/* mac_id 4, 5,---> hilink3 lane 2, 3
--		 * debug port 0(6), 1(7) ---> hilink3 lane 0, 1
--		 */
--		phy_offset = mac_cb->dsaf_dev->reset_offset - 1;
--		shift = is_ver1 ? 0 : mac_id >= 4 ? mac_id - 2 : phy_offset;
--		if (dsaf_get_bit(mode, shift))
--			phy_if = PHY_INTERFACE_MODE_XGMII;
-+			reg = HNS_MAC_HILINK3_REG;
-+	} else{
-+		if (!HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev) && mac_id <= 3)
-+			reg = HNS_MAC_HILINK4V2_REG;
- 		else
--			phy_if = PHY_INTERFACE_MODE_SGMII;
-+			reg = HNS_MAC_HILINK3V2_REG;
- 	}
-+
-+	mode = dsaf_read_sub(mac_cb->dsaf_dev, reg);
-+	if (dsaf_get_bit(mode, mac_cb->port_mode_off))
-+		phy_if = PHY_INTERFACE_MODE_XGMII;
-+	else
-+		phy_if = PHY_INTERFACE_MODE_SGMII;
-+
- 	return phy_if;
+ 	if (!HNS_DSAF_IS_DEBUG(rcb_common->dsaf_dev))
+ 		return SERVICE_RING_IRQ_IDX(is_ver1);
+ 	else
+-		return  DEBUG_RING_IRQ_IDX(is_ver1) +
+-			(comm_index - 1) * DEBUG_RING_IRQ_OFFSET(is_ver1);
++		return  HNS_DEBUG_RING_IRQ_IDX;
  }
  
+ #define RCB_COMM_BASE_TO_RING_BASE(base, ringid)\
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+index cffd244..8782608 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+@@ -10,12 +10,9 @@
+ #ifndef _DSAF_REG_H_
+ #define _DSAF_REG_H_
+ 
+-#define HNS_DEBUG_RING_IRQ_IDX 55
++#define HNS_DEBUG_RING_IRQ_IDX 0
+ #define HNS_SERVICE_RING_IRQ_IDX 59
+-#define HNS_DEBUG_RING_IRQ_OFFSET 2
+-#define HNSV2_DEBUG_RING_IRQ_IDX 409
+ #define HNSV2_SERVICE_RING_IRQ_IDX 25
+-#define HNSV2_DEBUG_RING_IRQ_OFFSET 9
+ 
+ #define DSAF_MAX_PORT_NUM_PER_CHIP 8
+ #define DSAF_SERVICE_PORT_NUM_PER_DSAF 6
 -- 
 1.9.1
