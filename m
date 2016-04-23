@@ -1,68 +1,66 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Sat, 23 Apr 2016 17:05:06 +0800
-Subject: [PATCH v2 net-next 02/13] net: hns: set debug port irq index to 0
+Date: Sat, 23 Apr 2016 17:05:16 +0800
+Subject: [PATCH v2 net-next 12/13] Documentation: Bindings: add port-idx-in-ae
+ for enet node
 In-Reply-To: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1461402317-136499-3-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1461402317-136499-13-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
+This patch adds description for port-idx-in-ae attribute.
 
-As debug ports are moved from service dsaf to debug dsaf,
-the interrupts offset should start from 0, So this patch
-re-defines the offset index of debug ports.
-
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c | 8 +-------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h | 5 +----
- 2 files changed, 2 insertions(+), 11 deletions(-)
+ .../devicetree/bindings/net/hisilicon-hns-nic.txt  | 30 +++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
-index 121ba4e..054f391 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
-@@ -445,20 +445,14 @@ static int hns_rcb_get_port_in_comm(
+diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+index e6a9d1c..b9ff4ba 100644
+--- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
++++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+@@ -36,6 +36,34 @@ Required properties:
+                        | | | | | |
+                       external port
  
- #define SERVICE_RING_IRQ_IDX(v1) \
- 	((v1) ? HNS_SERVICE_RING_IRQ_IDX : HNSV2_SERVICE_RING_IRQ_IDX)
--#define DEBUG_RING_IRQ_IDX(v1) \
--	((v1) ? HNS_DEBUG_RING_IRQ_IDX : HNSV2_DEBUG_RING_IRQ_IDX)
--#define DEBUG_RING_IRQ_OFFSET(v1) \
--	((v1) ? HNS_DEBUG_RING_IRQ_OFFSET : HNSV2_DEBUG_RING_IRQ_OFFSET)
- static int hns_rcb_get_base_irq_idx(struct rcb_common_cb *rcb_common)
- {
--	int comm_index = rcb_common->comm_index;
- 	bool is_ver1 = AE_IS_VER1(rcb_common->dsaf_dev->dsaf_ver);
++  This attribute is remained for compatible purpose. It is not recommended to
++  use it in new code.
++
++- port-idx-in-ae: is the index of port provided by AE.
++  In NIC mode of DSAF, all 6 PHYs of service DSAF are taken as ethernet ports
++  to the CPU. The port-idx-in-ae can be 0 to 5. Here is the diagram:
++            +-----+---------------+
++            |            CPU      |
++            +-+-+-+---+-+-+-+-+-+-+
++              |    |   | | | | | |
++           debug debug   service
++           port  port     port
++           (0)   (0)     (0-5)
++
++  In Switch mode of DSAF, all 6 PHYs of service DSAF are taken as physical
++  ports connected to a LAN Switch while the CPU side assume itself have one
++  single NIC connected to this switch. In this case, the port-idx-in-ae
++  will be 0 only.
++            +-----+-----+------+------+
++            |                CPU      |
++            +-+-+-+-+-+-+-+-+-+-+-+-+-+
++              |    |     service| port(0)
++            debug debug  +------------+
++            port  port   |   switch   |
++            (0)   (0)    +-+-+-+-+-+-++
++                          | | | | | |
++                         external port
++
+ - local-mac-address: mac addr of the ethernet interface
  
- 	if (!HNS_DSAF_IS_DEBUG(rcb_common->dsaf_dev))
- 		return SERVICE_RING_IRQ_IDX(is_ver1);
- 	else
--		return  DEBUG_RING_IRQ_IDX(is_ver1) +
--			(comm_index - 1) * DEBUG_RING_IRQ_OFFSET(is_ver1);
-+		return  HNS_DEBUG_RING_IRQ_IDX;
- }
- 
- #define RCB_COMM_BASE_TO_RING_BASE(base, ringid)\
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index cffd244..8782608 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -10,12 +10,9 @@
- #ifndef _DSAF_REG_H_
- #define _DSAF_REG_H_
- 
--#define HNS_DEBUG_RING_IRQ_IDX 55
-+#define HNS_DEBUG_RING_IRQ_IDX 0
- #define HNS_SERVICE_RING_IRQ_IDX 59
--#define HNS_DEBUG_RING_IRQ_OFFSET 2
--#define HNSV2_DEBUG_RING_IRQ_IDX 409
- #define HNSV2_SERVICE_RING_IRQ_IDX 25
--#define HNSV2_DEBUG_RING_IRQ_OFFSET 9
- 
- #define DSAF_MAX_PORT_NUM_PER_CHIP 8
- #define DSAF_SERVICE_PORT_NUM_PER_DSAF 6
+ Example:
+@@ -43,6 +71,6 @@ Example:
+ 	ethernet at 0{
+ 		compatible = "hisilicon,hns-nic-v1";
+ 		ae-handle = <&dsaf0>;
+-		port-id = <0>;
++		port-idx-in-ae = <0>;
+ 		local-mac-address = [a2 14 e4 4b 56 76];
+ 	};
 -- 
 1.9.1
