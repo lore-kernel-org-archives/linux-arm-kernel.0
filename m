@@ -1,36 +1,75 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 23 Apr 2016 19:57:56 +0000
-Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
-Message-ID: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 23 Apr 2016 12:58:57 -0700
+Subject: [GIT PULL 1/4] Broadcom devicetree changes for 4.7
+Message-ID: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series simplifies TS handling of mxs-lradc.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-These patches has been tested with i.MX23 and i.MX28 but without
-a touchscreen. I added only a bogus touchscreen in devicetree.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-It would be nice if someone with a real touchscreen could test it.
+are available in the git repository at:
 
-Changes in V3:
-- remove dev.parent assignment as suggested by Dimitry
-- add new patch to remove mxs_lradc_ts_unregister
-- remove PM implementation from series in order to wait until 
-  Ksenija has split the driver
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.7/devicetree
 
-Changes in V2:
-- rebase on iio/testing since patch 2 and 3 from V1 has been applied
-- also remove input_unregister_device in patch 1
-- use mask of virtual channels for IRQ disabling in patch 2
+for you to fetch changes up to 3db62afd11738f896ef83132022a40be74961860:
 
-Stefan Wahren (3):
-  iio: mxs-lradc: simplify TS registration
-  iio: mxs-lradc: remove mxs_lradc_ts_unregister
-  iio: mxs-lradc: disable only masked channels in     
-    mxs_lradc_hw_stop
+  Merge tag 'bcm2835-dt-next-2016-04-20' into devicetree/next (2016-04-22 12:22:04 -0700)
 
- drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
- 1 file changed, 6 insertions(+), 28 deletions(-)
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoC Device Tree changes:
 
--- 
-1.7.9.5
+- Rafal adds proper VCC GPIO to be fed to the USB host controllers for known
+  BCM5301x devices needing that, he also enables earlycon, and enables the
+  SPI-NOR flashes on relevant devices
+
+- Eric adds the VideoCore 4 Device Tree nodes to the BCM283x Device Tree and
+  provides a DRM patch to kick out the simplefb framebuffer to avoid conflicts
+
+- Stephan adds proper CPU nodes for the ARM processor on the BCM2835 SoC Device
+  Tree
+
+- Martin provides a binding fix for the DMA channel interrupt numbers and
+  description
+
+----------------------------------------------------------------
+Eric Anholt (2):
+      drm/vc4: Kick out the simplefb framebuffer before we set up KMS.
+      ARM: bcm2835: Add VC4 to the device tree.
+
+Florian Fainelli (1):
+      Merge tag 'bcm2835-dt-next-2016-04-20' into devicetree/next
+
+Martin Sperl (1):
+      dt/bindings: bcm2835: correct description for DMA-int
+
+Rafa? Mi?ecki (3):
+      ARM: BCM5301X: Set vcc-gpio for USB controllers of few devices
+      ARM: BCM5301X: Enable earlycon on tested devices
+      ARM: BCM5301X: Add DT entry for SPI controller and NOR flash
+
+Stefan Wahren (1):
+      ARM: bcm2835: add CPU node for ARM core
+
+ .../brcm,bcm2835-armctrl-ic.txt                    |  4 +-
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-a.dts                |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  9 +++++
+ arch/arm/boot/dts/bcm2835.dtsi                     | 11 +++++
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  4 ++
+ arch/arm/boot/dts/bcm283x.dtsi                     | 47 ++++++++++++++++++++++
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 10 ++++-
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       |  6 ++-
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 17 +++-----
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      |  6 ++-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts |  2 +-
+ arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts  |  5 +++
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts        |  8 ++++
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      |  6 ++-
+ arch/arm/boot/dts/bcm5301x.dtsi                    | 32 +++++++++++++++
+ drivers/gpu/drm/vc4/vc4_drv.c                      | 20 +++++++++
+ 20 files changed, 188 insertions(+), 19 deletions(-)
