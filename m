@@ -1,30 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 23 Apr 2016 22:09:21 +0200
-Subject: [PATCH 1/2] arm64: dts: uniphier: fix I2C nodes of PH1-LD20
-In-Reply-To: <1460716247-28049-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1460716247-28049-1-git-send-email-yamada.masahiro@socionext.com>
- <1460716247-28049-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <4326944.O9ELFsuto4@wuerfel>
+Date: Sat, 23 Apr 2016 22:17:11 +0200
+Subject: [GIT PULL] Qualcomm Fixes for v4.6-rc2
+In-Reply-To: <1459651508-5160-1-git-send-email-andy.gross@linaro.org>
+References: <1459651508-5160-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <8531141.g5ITagLIPZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 April 2016 19:30:46 Masahiro Yamada wrote:
-> The I2C hardware blocks on this SoC are connected as follows:
+On Saturday 02 April 2016 21:45:08 Andy Gross wrote:
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
->   I2C0: external connection
->   I2C1: external connection
->   I2C2: internal connection
->   I2C3: external connection
->   I2C4: external connection
->   I2C5: internal connection
->   I2C6: no connection (not accessible)
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
-> Delete pinctrl from Ch2, add pinctrl to Ch4, and remove the Ch6 node.
+> are available in the git repository at:
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.6-rc2
+> 
+> for you to fetch changes up to 10c0f0e92f019ab8d0c17da3696e35b0eef4ec16:
+> 
+>   Revert "dts: msm8974: Add dma channels for blsp2_i2c1 node" (2016-04-02 21:27:36 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm Fixes for v4.6-rc2
+> 
+> * Revert BAM usage on MSM8974 boards
 > 
 
-
-Applied patch 1/2 to the fixes branch now, thanks!
+Pulled into the fixes branch now.
 
 	Arnd
