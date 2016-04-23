@@ -1,58 +1,63 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sat, 23 Apr 2016 11:23:39 -0400
-Subject: [PATCH V6 09/13] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <571A37DD.4070003@redhat.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-10-git-send-email-tn@semihalf.com>
- <CAKc_7PXLbX+wxesGVKni7tkKPUbfo7AgfPNxA+Uc25ctOWRk=Q@mail.gmail.com>
- <57189824.7080908@semihalf.com> <571A37DD.4070003@redhat.com>
-Message-ID: <571B937B.7050905@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 23 Apr 2016 11:56:50 -0500
+Subject: [PATCH 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <1461363432-5730-2-git-send-email-andy.gross@linaro.org>
+References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
+ <1461363432-5730-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAL_JsqK0LYCozBohs5QCvuPRR-3s2SMHf7DgwSyVe4Vyeyw9ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2016 10:40 AM, Jon Masters wrote:
-> On 04/21/2016 05:06 AM, Tomasz Nowicki wrote:
->> On 20.04.2016 21:12, Jayachandran C wrote:
->>> On Fri, Apr 15, 2016 at 10:36 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> 
->>>> This patch is heavily based on the updated version from Jayachandran C:
->>>> https://lkml.org/lkml/2016/4/11/908
->>>> git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
->>>
->>> This is a little bit unusual because I had not posted the v3 patch
->>> to the mailing list yet, but you posted a variant of it The git
->>> repository
->>> should not be in the commit comment because it is a temporary location.
->>
->> We all agree this too important for everybody to delay this series. So
->> main motivation is to keep all discussion&patches within one unified
->> series. I would like to finally find direction we need to go. Stating
->> another discussion based on my previous patch set v5 confused people,
->> they do no know who is driving this. Again, lets cooperate to move it
->> forward within one patch set.
-> 
-> We need one person in the driver's seat here for this patch series. I
-> believe the intention is that this is Tomasz, with others cooperating
-> and assisting. The previous alternative patch series did serve to cause
-> confusion, and worse, they made it look like the ARM vendors can't work
-> together. That ends. Right now. I've raised this individually with each
-> of you (and with all of the other vendors), as well as inside Linaro.
-> There will be one person driving this, and everyone else will help.
+On Fri, Apr 22, 2016 at 5:17 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> This patch adds the device tree support for the Qualcomm SCM firmware.
+>
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>  .../devicetree/bindings/firmware/qcom,scm.txt      | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+>
+> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> new file mode 100644
+> index 0000000..57b9b3a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> @@ -0,0 +1,31 @@
+> +QCOM Secure Channel Manager (SCM)
+> +
+> +Qualcomm processors include an interface to communicate to the secure firmware.
+> +This interface allows for clients to request different types of actions.  These
+> +can include CPU power up/down, HDCP requests, loading of firmware, and other
+> +assorted actions.
+> +
+> +Required properties:
+> +- compatible: must contain one of the following:
+> + * "qcom,scm-apq8064" for APQ8064
+> + * "qcom,scm-apq8084" for MSM8084
+> + * "qcom,scm-msm8916" for MSM8916
+> + * "qcom,scm-msm8974" for MSM8974
+> +- clocks: One to three clocks may be required based on compatible.
+> + * Only core clock required for "qcom,scm-apq8064"
+> + * Core, iface, and bus clocks required for all other compatibles.
+> +- clock-names: Must contain "core" for the core clock, "iface" for the interface
+> +  clock and "bus" for the bus clock per the requirements of the compatible.
+> +
+> +Example for MSM8916:
+> +
+> +       firmware {
+> +               compatible = "simple-bus";
 
-As a quick update, since yesterday I have confirmed that several
-different microarchitecture implementations (different PCIe) have tested
-and validated this patch series. Those minimally include:
+Firmware is a bus? Really? Let's not put hacks in the DT just so you
+get automatic probing.
 
-* Cavium Networks ThunderX
-* Qualcomm Technologies Inc QDF2XXX
-* AMD A1100 ("Seattle")
+> +
+> +               scm {
+> +                       compatible = "qcom,scm-msm8916";
+> +                       clocks = <&gcc GCC_CRYPTO_CLK> , <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
+> +                       clock-names = "core", "bus", "iface";
 
-Another is working on testing over the weekend. Still waiting for an ARM
-tested-by on Juno I think. I will personally be testing this and future
-releases on all of the above mentioned hw.
+Generally, /firmware defines an interface to firmware. I don't think
+clocks belong here. This implies that non-secure world can turn off
+clocks to secure world?
 
-Jon.
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+Rob
