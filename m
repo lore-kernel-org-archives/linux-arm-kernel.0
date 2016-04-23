@@ -1,57 +1,98 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 23 Apr 2016 11:45:34 +0200
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
- pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
-In-Reply-To: <20160415152215.GR5995@atomide.com>
-References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
- <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
- <20160415152215.GR5995@atomide.com>
-Message-ID: <CACRpkdZa=v1iKZ=eiY11V3qZV9pPqtoi6vHm2Pu4ctWTFiy0TA@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Sat, 23 Apr 2016 17:43:50 +0800
+Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
+In-Reply-To: <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
+References: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
+Message-ID: <1461404630.7081.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 5:22 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [160415 02:29]:
->> On Thu, Apr 14, 2016 at 6:59 AM, Keerthy <j-keerthy@ti.com> wrote:
->>
->> > pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
->> > ranging from 1 to MAX. This leads to a corner case where we try to request
->> > the pin number = MAX and fails.
->> >
->> > bit_pos value is being calculted using ffs. pin_num_from_lsb uses
->> > bit_pos value. pins array is populated with:
->> >
->> > pin + pin_num_from_lsb.
->> >
->> > The above is 1 more than usual bit indices as bit_pos uses ffs to compute
->> > first set bit. Hence the last of the pins array is populated with the MAX
->> > value and not MAX - 1 which causes error when we call pin_request.
->> >
->> > mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
->> > Consequently val_pos and submask are correct.
->> >
->> > Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
->> >
->> > fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
->> > Signed-off-by: Keerthy <j-keerthy@ti.com>
->> > ---
->> >
->> > Changes in v2:
->> >
->> >   * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
->> >
->> > Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
->>
->> Patch applied for fixes with Tony's ACK.
->>
->> Should it also be tagged for stable?
->
-> Probably a good idea, I can see somebody pulling hair out because
-> of this in various product trees.
+Hi,
+On Fri, 2016-04-22 at 14:24 +0200, Ulf Hansson wrote:
+> On 18 April 2016 at 09:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > there are 2 points will cause could not call mmc_request_done()
+> > and eventually cause the caller thread blocked.
+> >
+> > A. if card was busy, cancel_delayed_work() will return false because
+> > the delay work has not been scheduled, in this case, need put
+> > mod_delayed_work() in front of msdc_cmd_is_ready()
+> >
+> > B. if a request really need more than 5s(Some Sandisk TF card), it will
+> > use cancel_delayed_work() to cancel itself, and also return false, so use
+> > in_interrupt() to avoid this case
+> >
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  drivers/mmc/host/mtk-sd.c | 11 ++++++++---
+> >  1 file changed, 8 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> > index b17f30d..1511b1b 100644
+> > --- a/drivers/mmc/host/mtk-sd.c
+> > +++ b/drivers/mmc/host/mtk-sd.c
+> > @@ -724,7 +724,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
+> >         bool ret;
+> >
+> >         ret = cancel_delayed_work(&host->req_timeout);
+> > -       if (!ret) {
+> > +       if (!ret && in_interrupt()) {
+> >                 /* delay work already running */
+> >                 return;
+> >         }
+> > @@ -824,7 +824,12 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+> >         }
+> >
+> >         if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+> > -               tmo = jiffies + msecs_to_jiffies(20);
+> > +               /*
+> > +                * 2550ms is from EXT_CSD[248], after switch to hs200,
+> > +                * using CMD13 to polling card status, it will get response
+> > +                * of 0x800, but EMMC still pull-low DAT0.
+> > +                */
+> 
+> Seems like you are solving a eMMC specific issue on your driver?
+> 
+> Perhaps we should try to use a card quirk instead?
 
-Ooops sorry I totally missed to add that :(
+Actually, this is a Bug of __mmc_switch(), Per JEDEC Spec, while switch
+speed mode, should not use CMD13 to get card status, as it's response
+cannot reflect that if card was busy now, for this CMD6 switch HS200
+case, I tried some Samsung/Sandisk/KSI eMMC, issue CMD13 will always get
+0x800, even eMMC has already changed to transfer state and DAT0 is high,
+the response of CMD13 is also 0x800, and will never be 0x900.
+So, in __mmc_switch(), it's a bug to use CMD13 to know that if card has
+already changed to transfer state.
+But, Our host do not support MMC_CAP_WAIT_WHILE_BUSY, that's why we hit
+this issue.
 
-Please ask Greg to take it as a selected stable patch.
-
-Yours,
-Linus Walleij
+May you give some advice for this ?
+Thx!
+> 
+> 
+> > +               tmo = jiffies + msecs_to_jiffies(2550);
+> >                 /* R1B or with data, should check SDCBUSY */
+> >                 while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
+> >                                 time_before(jiffies, tmo))
+> > @@ -847,6 +852,7 @@ static void msdc_start_command(struct msdc_host *host,
+> >         WARN_ON(host->cmd);
+> >         host->cmd = cmd;
+> >
+> > +       mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
+> >         if (!msdc_cmd_is_ready(host, mrq, cmd))
+> >                 return;
+> >
+> > @@ -858,7 +864,6 @@ static void msdc_start_command(struct msdc_host *host,
+> >
+> >         cmd->error = 0;
+> >         rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
+> > -       mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
+> >
+> >         sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+> >         writel(cmd->arg, host->base + SDC_ARG);
+> > --
+> > 1.8.1.1.dirty
+> >
+> 
+> Kind regards
+> Uffe
