@@ -1,112 +1,140 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Sat, 23 Apr 2016 17:05:04 +0800
-Subject: [PATCH v2 net-next 00/13] net: hns: add support of debug dsaf device
-Message-ID: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+Date: Sat, 23 Apr 2016 17:05:17 +0800
+Subject: [PATCH v2 net-next 13/13] dts: hisi: update hns dst for separating
+ dsaf dev support
+In-Reply-To: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1461402317-136499-14-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two kinds of dsaf device in hns, one is for service ports,
-contains crossbar in it, can work under different mode. Another is for
-debug port, only can work under single port mode. The current code only
-declares a dsaf device for both service ports and debug ports.It is not so
-readability. This patch separates it to three platform devices to make the
-code more simple and readability.
+Because debug dsaf port was separated from service dsaf port, this patch
+updates the related configurations of hns dts, changes it to match with
+the new binding files. This also removes enet nodes which don't exist in
+d02 board.
 
-The diagram of all port in one platform device(old):
-                                        CPU
-                                         |
-                                         |        DSAF(one platform device)
-    --------------------------------------------------------------      /
-    |                           |                  |      |      |     /
-    |                          PPE                PPE    PPE     |    /
-    |                           |                  |      |      |   /
-    |                           |                  |      |      |  /
-    |                        crossbar              |      |      | /
-    |                           |                  |      |      |/
-    |    -----------------------------------       |      |      |
-    |    |      |      |      |      |      |      |      |      |
-    |    |      |      |      |      |      |      |      |      |
-    |   MAC    MAC    MAC    MAC    MAC    MAC    MAC    MAC     |
-    |    |      |      |      |      |      |      |      |      |
-    --------------------------------------------------------------
-         |      |      |      |      |      |      |      |
-        PHY    PHY    PHY    PHY    PHY    PHY    PHY    PHY
-
-The diagram of separating ports to three platform(new):
-                                                         CPU
-                                                          |
-                                    -----------------------------------
-                                    |                     |           |
-    ----------------------------------------------    ---------   ---------
-    |                         |                  |    |       |   |   |   |
-    |                        PPE                 |    |  PPE  |   |  PPE  |
-    |                         |                  |    |   |   |   |   |   |
-    |                         |                  |    |   |   |   |   |   |
-    |                      crossbar              |    |   |   |   |   |   |
-    |                         |                  |    |   |   |   |   |   |
-    |   ----------------------------------       |    |   |   |   |   |   |
-    |   |     |     |      |      |      |       |    |   |   |   |   |   |
-    |   |     |     |      |      |      |       |    |   |   |   |   |   |
-    |  MAC   MAC   MAC    MAC    MAC    MAC      |    |  MAC  |   |  MAC  |
-    |   |     |     |      |      |      |       |    |   |   |   |   |   |
-    ----------------------------------------------    ---------   ---------
-        |     |     |      |      |      |    \        /  |        /  |
-       PHY   PHY   PHY    PHY    PHY    PHY    \      /  PHY      /  PHY
-                                                \    /           /
-                                                 \  /           /
-                                             DSAF(three platform device)
-
-We take the compatibility into consideration, and it works well by using the
-old dts file(tested on d02 board).
-
-For more details, please see individual patches.
-
-MBR.
-
+Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
 ---
-change log:
- Series V2:
-  - 1) put DT bindings in separate patches(patch 11 and 12).
-    2) add modification of hns dts(patch 13).
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi | 72 ++++++++++++----------------
+ 1 file changed, 30 insertions(+), 42 deletions(-)
 
- Series V1:
-  - first submit
-
-Daode Huang (2):
-  net: hns: set debug port irq index to 0
-  net: hns: sort the header file by alphabetical order
-
-Yisen Zhuang (11):
-  net: hns: add a new dsaf mode for debug port
-  net: hns: add attribute port-idx-in-ae in enet node.
-  net: hns: add attribute reset-field-offset for dsaf node
-  net: hns: add syscon operation for dsaf
-  net: hns: separate debug dsaf device from service dsaf device
-  net: hns: add attribute cpld_ctrl for dsaf port node
-  net: hns: add attribute port-rst-offset for dsaf port node
-  net: hns: add attribute port-mode-offset for dsaf port node
-  Documentation: Bindings: Update DT binding for separating dsaf dev
-    support
-  Documentation: Bindings: add port-idx-in-ae for enet node
-  dts: hisi: update hns dst for separating dsaf dev support
-
- .../devicetree/bindings/net/hisilicon-hns-dsaf.txt |  59 +++++-
- .../devicetree/bindings/net/hisilicon-hns-nic.txt  |  30 ++-
- arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       |  72 +++----
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  73 ++-----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 230 ++++++++++++++-------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |  12 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 134 +++++++-----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  16 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 171 +++++++++------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |  61 ++----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |   1 -
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  | 187 +++++++----------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |   2 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  38 ++--
- drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  17 +-
- drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   3 +
- 16 files changed, 610 insertions(+), 496 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+index 933cba3..058cb78 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+@@ -28,13 +28,13 @@ soc0: soc at 000000000 {
+ 		mode = "6port-16rss";
+ 		interrupt-parent = <&mbigen_dsa>;
+ 
+-		reg = <0x0 0xC0000000 0x0 0x420000
+-		       0x0 0xC2000000 0x0 0x300000
+-		       0x0 0xc5000000 0x0 0x890000
++		reg = <0x0 0xc5000000 0x0 0x890000
+ 		       0x0 0xc7000000 0x0 0x60000
+ 		       >;
+ 
+-		phy-handle = <0 0 0 0 &soc0_phy0 &soc0_phy1 0 0>;
++		reg-names = "ppe-base","dsaf-base";
++		subctrl-syscon = <&dsaf_subctrl>;
++		reset-field-offset = <0>;
+ 		interrupts = <
+ 			/* [14] ge fifo err 8 / xge 6**/
+ 			149 0x4 150 0x4 151 0x4 152 0x4
+@@ -122,12 +122,31 @@ soc0: soc@000000000 {
+ 		buf-size = <4096>;
+ 		desc-num = <1024>;
+ 		dma-coherent;
++
++		port at 0 {
++			port-id = <0>;
++			serdes-syscon = <&serdes_ctrl0>;
++		};
++		port at 1 {
++			port-id = <1>;
++			serdes-syscon = <&serdes_ctrl0>;
++		};
++		port at 4 {
++			port-id = <4>;
++			phy-handle = <&soc0_phy0>;
++			serdes-syscon = <&serdes_ctrl1>;
++		};
++		port at 5 {
++			port-id = <5>;
++			phy-handle = <&soc0_phy1>;
++			serdes-syscon = <&serdes_ctrl1>;
++		};
+ 	};
+ 
+ 	eth0: ethernet at 0{
+ 		compatible = "hisilicon,hns-nic-v1";
+ 		ae-handle = <&dsaf0>;
+-		port-id = <0>;
++		port-idx-in-ae = <0>;
+ 		local-mac-address = [00 00 00 01 00 58];
+ 		status = "disabled";
+ 		dma-coherent;
+@@ -135,56 +154,25 @@ soc0: soc at 000000000 {
+ 	eth1: ethernet at 1{
+ 		compatible = "hisilicon,hns-nic-v1";
+ 		ae-handle = <&dsaf0>;
+-		port-id = <1>;
++		port-idx-in-ae = <1>;
++		local-mac-address = [00 00 00 01 00 59];
+ 		status = "disabled";
+ 		dma-coherent;
+ 	};
+-	eth2: ethernet at 2{
++	eth2: ethernet at 4{
+ 		compatible = "hisilicon,hns-nic-v1";
+ 		ae-handle = <&dsaf0>;
+-		port-id = <2>;
++		port-idx-in-ae = <4>;
+ 		local-mac-address = [00 00 00 01 00 5a];
+ 		status = "disabled";
+ 		dma-coherent;
+ 	};
+-	eth3: ethernet at 3{
++	eth3: ethernet at 5{
+ 		compatible = "hisilicon,hns-nic-v1";
+ 		ae-handle = <&dsaf0>;
+-		port-id = <3>;
++		port-idx-in-ae = <5>;
+ 		local-mac-address = [00 00 00 01 00 5b];
+ 		status = "disabled";
+ 		dma-coherent;
+ 	};
+-	eth4: ethernet at 4{
+-		compatible = "hisilicon,hns-nic-v1";
+-		ae-handle = <&dsaf0>;
+-		port-id = <4>;
+-		local-mac-address = [00 00 00 01 00 5c];
+-		status = "disabled";
+-		dma-coherent;
+-	};
+-	eth5: ethernet at 5{
+-		compatible = "hisilicon,hns-nic-v1";
+-		ae-handle = <&dsaf0>;
+-		port-id = <5>;
+-		local-mac-address = [00 00 00 01 00 5d];
+-		status = "disabled";
+-		dma-coherent;
+-	};
+-	eth6: ethernet at 6{
+-		compatible = "hisilicon,hns-nic-v1";
+-		ae-handle = <&dsaf0>;
+-		port-id = <6>;
+-		local-mac-address = [00 00 00 01 00 5e];
+-		status = "disabled";
+-		dma-coherent;
+-	};
+-	eth7: ethernet at 7{
+-		compatible = "hisilicon,hns-nic-v1";
+-		ae-handle = <&dsaf0>;
+-		port-id = <7>;
+-		local-mac-address = [00 00 00 01 00 5f];
+-		status = "disabled";
+-		dma-coherent;
+-	};
+ };
 -- 
 1.9.1
