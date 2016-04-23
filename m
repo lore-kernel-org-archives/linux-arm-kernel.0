@@ -1,45 +1,94 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 22 Apr 2016 17:21:51 -0700
-Subject: [GIT PULL] omap fixes for v4.6-rc cycle
-In-Reply-To: <20160414203619.GR5973@atomide.com> (Tony Lindgren's message of
- "Thu, 14 Apr 2016 13:36:19 -0700")
-References: <20160414203619.GR5973@atomide.com>
-Message-ID: <7hmvoltbs0.fsf@baylibre.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 23 Apr 2016 03:30:50 +0300
+Subject: [PATCH v6 00/11] soc: renesas: Add R-Car SYSC PM Domain Support
+In-Reply-To: <20160422081531.GA5453@verge.net.au>
+References: <20160422081531.GA5453@verge.net.au>
+Message-ID: <2153312.KdOjkoV82j@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Hi Simon,
 
-> The following changes since commit 19e831b272e6db5884be085be66e44da975c73a9:
->
->   Merge branch 'fixes-rc2' into omap-for-v4.6/fixes (2016-04-08 09:18:00 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc3
->
-> for you to fetch changes up to 1560d15861769c23fd981e2d60dc7fd790b21e1e:
->
->   ARM: OMAP3: Fix external abort on 36xx waking from off mode idle (2016-04-14 08:27:30 -0700)
->
-> ----------------------------------------------------------------
-> Fixes for omaps for v4.6-rc cycle:
->
-> - Clockdomain fix for dra7 timer interrupts
->
-> - Two fixes for GPMC EDMA binding, I missed the need for a merge with
->   GPMC changes and EDMA changes
->
-> - Fix beagle-x15 eSATA by dropping misconfigured extcon_usb1
->
-> - Fix occasional external aborts on 36xx with PM that we've been
->   chasing for past few months. It turned out to be duplicate restore
->   of INTC registers that can in some cases cause us to hit erratum 1.106.
->
-> ----------------------------------------------------------------
+On Friday 22 Apr 2016 18:15:35 Simon Horman wrote:
+> On Fri, Apr 22, 2016 at 07:12:23AM +0300, Laurent Pinchart wrote:
+> > On Friday 22 Apr 2016 10:33:11 Simon Horman wrote:
+> >> On Thu, Apr 21, 2016 at 05:14:40PM +0200, Geert Uytterhoeven wrote:
+> >>> On Thu, Apr 21, 2016 at 5:28 AM, Simon Horman wrote:
+> >>>> On Wed, Apr 20, 2016 at 02:02:35PM +0200, Geert Uytterhoeven wrote:
+> >>>>> This patch series introduces a DT-based driver for the R-Car System
+> >>>>> Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car
+> >>>>> Gen3 SoCs.
+> >>>>> 
+> >>>>> This is a dependency for the enablement of DU and VSP on R-Car H3,
+> >>>>> as the VSPs are located in a PM Domain.
+> 
+> [...]
+> 
+> >> I do wonder, as we are almost at the closing point for queuing up
+> >> changes for v4.7 if, assuming the above patches are scheduled for
+> >> inclusion in v4.7-rc1, it might not be better for me to queue up this
+> >> series for v4.8.
+> > 
+> > Then that would delay a bunch of multimedia patch by one more kernel
+> > cycle, which I was hoping to avoid.
+> 
+> On Fri, Apr 22, 2016 at 09:02:01AM +0200, Geert Uytterhoeven wrote:
+> > On Fri, Apr 22, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> On Thu, Apr 21, 2016 at 05:14:40PM +0200, Geert Uytterhoeven wrote:
+> >>> On Thu, Apr 21, 2016 at 5:28 AM, Simon Horman wrote:
+> >>>> On Wed, Apr 20, 2016 at 02:02:35PM +0200, Geert Uytterhoeven wrote:
+> >>>>> This patch series introduces a DT-based driver for the R-Car System
+> >>>>> Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
+> >>>>> SoCs.
+> >>>>> 
+> >>>>> This is a dependency for the enablement of DU and VSP on R-Car H3,
+> >>>>> as the VSPs are located in a PM Domain.
+> 
+> [...]
+> 
+> >> To my mind I need some kind of assurance from the clk maintainers that
+> >> the patches are stable there - in particular that the commit ids won't
+> >> change.
+> > 
+> > As the clock maintainer pulled the same tag instead of applying emailed
+> > patches, the commit IDs won't change, even if he has to rework the
+> > clk-next branch and repull.
+> > 
+> >> And that both they and the ARM-SoC maintainers are happy with me pulling
+> >> it into my tree for this purpose.
+> > 
+> > I also mentioned that in the pull request. Pulling in a stable branch is
+> > standard procedure: the code fails to compile if you don't merge
+> > tags/clk-renesas-for-v4.7-tag2 first.
+> >
+> >> I do wonder, as we are almost at the closing point for queuing up
+> >> changes for v4.7 if, assuming the above patches are scheduled for
+> >> inclusion in v4.7-rc1, it might not be better for me to queue up this
+> >> series for v4.8.
+> >> 
+> >> I could do that sooner rather than later in the devel branch of the
+> >> renesas tree if you like.
+> > 
+> > v4.7-rc1 is still more than one month in the future.
+> > 
+> > As Laurent said, that would delay multimedia work by one more kernel
+> > cycle, as R-Car SYSC PM Domains already missed v4.6.
+> > In addition, it would mean continued rebasing/updating of "[PATCH v5
+> > 00/12] ARM/arm64: dts: rcar: Add SYSC PM domains" in renesas-drivers, as
+> > it touches all R-Car DTSes all over the place.
+> > 
+> > Thanks for reconsidering!
+> 
+> Thanks for your feedback. I now have a better understanding of the
+> situation both in regards to the state of the branch and the dependencies
+> on it.
+> 
+> I have reconsidered and queued up this series for v4.7.
+> It is now present in the next branch of the renesas tree.
 
-Pulled into fixes,
+Thanks a lot.
 
-Thanks,
+-- 
+Regards,
 
-Kevin
+Laurent Pinchart
