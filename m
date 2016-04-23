@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 23 Apr 2016 12:58:59 -0700
-Subject: [GIT PULL 3/4] Broadcom defconfig changes for 4.7
+Date: Sat, 23 Apr 2016 12:59:00 -0700
+Subject: [GIT PULL 4/4] Broadcom drivers changes for 4.7
 In-Reply-To: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
 References: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1461441540-5095-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1461441540-5095-4-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,34 +13,30 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.7/defconfig
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.7/drivers
 
-for you to fetch changes up to b72541b33825807d247b6455364db9cd3ca5d6ad:
+for you to fetch changes up to b0ec633c28d42281c03b41dbc92a4448a481f2f3:
 
-  Merge tag 'bcm2835-defconfig-next-2016-04-20' into defconfig/next (2016-04-22 12:25:34 -0700)
-
-----------------------------------------------------------------
-This pull request contains defconfig changes for Broadcom ARM-based SoCs:
-
-- Eric enables more BCM2835 peripherals in multi_v7_defconfig: watchdog, I2S,
-  switches from the sdhci-bcm2835 to the sdhci-iproc driver, DWC2 USB controller
-
-- Eric also enables more BCM2835 peripherals in bcm2835_defconfig: VC4, NFS root
-  Power Management support, switching sdhci-bcm2835 for sdhci-iproc
+  bus: brcmstb_gisb: Rework dependencies (2016-04-18 14:20:30 -0700)
 
 ----------------------------------------------------------------
-Eric Anholt (7):
-      ARM: multi_v7_defconfig: Add more BCM2835 support
-      ARM: multi_v7_defconfig: Switch BCM2835 to sdhci-iproc.c for MMC
-      ARM: multi_v7_defconfig: Build in DWC2 USB support
-      ARM: bcm2835: Switch BCM2835 to sdhci-iproc.c for MMC
-      ARM: bcm2835: Enable CONFIG_PM.
-      ARM: bcm2835: Enable the VC4 graphics driver in the defconfig
-      ARM: bcm2835: Enable NFS root support.
+This pull request contains Broadcom ARM-based SoCs drivers changes:
 
+- Justin adds a soc_dev driver to properly report to user-space the Broadcom
+  STB SoC family, product and revision
+
+- Florian reworks how the brcmstb_gisb driver dependency is done to enable it
+  on Broadcom STB MIPS-based SoCs and remove a select in
+  arch/arm/mach-bcm/Kconfig
+
+----------------------------------------------------------------
 Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2016-04-20' into defconfig/next
+      bus: brcmstb_gisb: Rework dependencies
 
- arch/arm/configs/bcm2835_defconfig  | 11 +++++++----
- arch/arm/configs/multi_v7_defconfig |  5 +++--
- 2 files changed, 10 insertions(+), 6 deletions(-)
+Justin Chen (1):
+      soc: brcmstb: add SoC driver to brcmstb
+
+ arch/arm/mach-bcm/Kconfig    |  2 +-
+ drivers/bus/Kconfig          |  1 +
+ drivers/soc/brcmstb/common.c | 58 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 60 insertions(+), 1 deletion(-)
