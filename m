@@ -1,32 +1,81 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sat, 23 Apr 2016 15:20:57 +0530
-Subject: [PATCH 0/2] Embedding Position Independent Executables
-In-Reply-To: <20160422224958.GD17051@piout.net>
-References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160404095757.GR19428@n2100.arm.linux.org.uk>
- <20160422224958.GD17051@piout.net>
-Message-ID: <20160423095057.GA2630@afzalpc>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Sat, 23 Apr 2016 07:18:15 -0700
+Subject: [PATCH 4/8] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <20160423045248.GD6968@hector.attlocal.net>
+References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
+ <1461363432-5730-5-git-send-email-andy.gross@linaro.org>
+ <20160422234105.GH3202@tuxbot>
+ <20160423045248.GD6968@hector.attlocal.net>
+Message-ID: <20160423141815.GL3202@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri 22 Apr 21:52 PDT 2016, Andy Gross wrote:
 
-On Sat, Apr 23, 2016 at 12:49:58AM +0200, Alexandre Belloni wrote:
+> On Fri, Apr 22, 2016 at 04:41:05PM -0700, Bjorn Andersson wrote:
+> > On Fri 22 Apr 15:17 PDT 2016, Andy Gross wrote:
+[..]
+> > > diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+> > > index 8e1eeb8..7d7b12b 100644
+> > [..]
+> > >  
+> > > +static void qcom_scm_init(void)
+> > > +{
+> > > +	__qcom_scm_init();
+> > > +}
+> > > +
+> > >  static int qcom_scm_probe(struct platform_device *pdev)
+> > >  {
+> > >  	struct qcom_scm *scm;
+> > > @@ -208,6 +213,8 @@ static int qcom_scm_probe(struct platform_device *pdev)
+> > >  	__scm = scm;
+> > >  	__scm->dev = &pdev->dev;
+> > >  
+> > > +	qcom_scm_init();
+> > > +
+> > 
+> > Why don't you call __qcom_scm_init() directly here?
+> 
+> Yeah that would save some stack ops.
+> 
+> As a side note, what do you think about just making the first transaction on the
+> scm-64 side do this init to figure out 32/64 calling convention?
+> 
+> That would eliminate this mess.
+> 
 
-> I think Heiko clarified it but there are actually multiple platforms
-> that will benefit from this infrastructure. I can name at least at91,
-> rockchip, sunxi and am335x. On am335x, this has been solved by running
-> that code on the cortex M3 instead of doing that from Linux but it
-> forces to compile and load a firmware on the cortex M3 so it is not
-> available for anything else.
+We will have quite a bunch of entry points in this API, so it will
+probably be messier to have them all call some potential-init function.
 
-afaik on am335x, it has been solved so far by not yet supporting
-suspend-resume in mainline ;)
+Perhaps if it's possible to push it to the __qcom_scm_call{,_atomic}.
+But I'm not sure we want those to be more complicated just to save this
+one call...
 
-afaiu, am335x suspend-resume has 2 parts, one run in A8 & other in M3.
-Saving & restoring RAM config, putting to self refresh in addition to
-wfi invocation is handled by A8 code running in OCMC, while M3 cuts A8
-clock & does other PM things that can't be done in A8.
+> > >  	return 0;
+> > >  }
+> > >  
+> > > diff --git a/drivers/firmware/qcom_scm.h b/drivers/firmware/qcom_scm.h
+> > [..]
+> > > +#define QCOM_SCM_V2_EBUSY	-12
+> > >  #define QCOM_SCM_ENOMEM		-5
+> > >  #define QCOM_SCM_EOPNOTSUPP	-4
+> > >  #define QCOM_SCM_EINVAL_ADDR	-3
+> > > @@ -56,6 +58,8 @@ static inline int qcom_scm_remap_error(int err)
+> > >  		return -EOPNOTSUPP;
+> > >  	case QCOM_SCM_ENOMEM:
+> > >  		return -ENOMEM;
+> > > +	case QCOM_SCM_V2_EBUSY:
+> > > +		return err;
+> > 
+> > I don't think return -ENOMEM is the right thing to do here.
+> 
+> -EBUSY?
+> 
 
-Regards
-afzal
+That seems better.
+
+> > >  	return -EINVAL;
+> > >  }
+
+Regards,
+Bjorn
