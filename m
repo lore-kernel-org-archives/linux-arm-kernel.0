@@ -1,160 +1,193 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Sat, 23 Apr 2016 12:49:24 +0900
-Subject: [PATCH v5 4/4] printk/nmi: flush NMI messages on the system panic
-In-Reply-To: <1461239325-22779-5-git-send-email-pmladek@suse.com>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-5-git-send-email-pmladek@suse.com>
-Message-ID: <20160423034924.GA535@swordfish>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 22 Apr 2016 23:43:52 -0500
+Subject: [PATCH 2/8] firmware: qcom: scm: Convert SCM to platform driver
+In-Reply-To: <20160422231111.GD3202@tuxbot>
+References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
+ <1461363432-5730-3-git-send-email-andy.gross@linaro.org>
+ <20160422231111.GD3202@tuxbot>
+Message-ID: <20160423044352.GA6968@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Petr,
+On Fri, Apr 22, 2016 at 04:11:11PM -0700, Bjorn Andersson wrote:
+> On Fri 22 Apr 15:17 PDT 2016, Andy Gross wrote:
+> 
+> [..]
+> > diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+> [..]
+> > +static struct qcom_scm *__scm;
+> > +
+> > +static int qcom_scm_clk_enable(void)
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = clk_prepare_enable(__scm->core_clk);
+> > +	if (ret)
+> > +		goto bail;
+> > +
+> > +	if (__scm->iface_clk) {
+> 
+> No need for this check, the clk api accepts NULL.
 
-On (04/21/16 13:48), Petr Mladek wrote:
->  extern void printk_nmi_flush(void);
-> +extern void printk_nmi_flush_on_panic(void);
->  #else
->  static inline void printk_nmi_flush(void) { }
-> +static inline void printk_nmi_flush_on_panic(void) { }
-[..]
-> +void printk_nmi_flush_on_panic(void)
-> +{
-> +	/*
-> +	 * Make sure that we could access the main ring buffer.
-> +	 * Do not risk a double release when more CPUs are up.
-> +	 */
-> +	if (in_nmi() && raw_spin_is_locked(&logbuf_lock)) {
-> +		if (num_online_cpus() > 1)
-> +			return;
-> +
-> +		debug_locks_off();
-> +		raw_spin_lock_init(&logbuf_lock);
-> +	}
-> +
-> +	printk_nmi_flush();
-> +}
-[..]
-> -static DEFINE_RAW_SPINLOCK(logbuf_lock);
-> +DEFINE_RAW_SPINLOCK(logbuf_lock);
+Ah ok.  I wondered about that and then didn't check to see.
 
-just an idea,
+> > +		ret = clk_prepare_enable(__scm->iface_clk);
+> > +		if (ret)
+> > +			goto disable_core;
+> > +	}
+> > +
+> > +	if (__scm->bus_clk) {
+> 
+> dito
+> 
+> > +		ret = clk_prepare_enable(__scm->bus_clk);
+> > +		if (ret)
+> > +			goto disable_iface;
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +disable_iface:
+> > +	if (__scm->iface_clk)
+> 
+> dito
+> 
+> > +		clk_disable_unprepare(__scm->iface_clk);
+> > +disable_core:
+> > +	if (__scm->bus_clk)
+> 
+> and here
+> 
+> > +		clk_disable_unprepare(__scm->core_clk);
+> > +bail:
+> > +	return ret;
+> > +}
+> > +
+> > +static void qcom_scm_clk_disable(void)
+> > +{
+> > +	clk_disable_unprepare(__scm->core_clk);
+> > +	if (__scm->iface_clk)
+> 
+> and here
+> 
+> > +		clk_disable_unprepare(__scm->iface_clk);
+> > +	if (__scm->bus_clk)
+> 
+> and here
+> 
+> > +		clk_disable_unprepare(__scm->bus_clk);
+> > +}
+> > +
+> >  /**
+> >   * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
+> >   * @entry: Entry point function for the cpus
+> > @@ -72,11 +121,17 @@ EXPORT_SYMBOL(qcom_scm_cpu_power_down);
+> >   */
+> >  bool qcom_scm_hdcp_available(void)
+> >  {
+> > -	int ret;
+> > +	int ret = qcom_scm_clk_enable();
+> > +
+> > +	if (ret)
+> > +		goto clk_err;
+> 
+> Just return here.
 
-how about doing it a bit differently?
+right.
 
+> 
+> >  
+> >  	ret = __qcom_scm_is_call_available(QCOM_SCM_SVC_HDCP,
+> > -		QCOM_SCM_CMD_HDCP);
+> > +						QCOM_SCM_CMD_HDCP);
+> > +
+> > +	qcom_scm_clk_disable();
+> >  
+> > +clk_err:
+> >  	return (ret > 0) ? true : false;
+> 
+> Unnecessary parenthesis.
 
-move printk_nmi_flush_on_panic() to printk.c, and place it next to
-printk_flush_on_panic() (so we will have two printk "flush-on-panic"
-functions sitting together). /* printk_nmi_flush() is in printk.h,
-so it's visible to printk anyway */
+will fix that.
 
-it also will let us keep logbuf_lock static, it's a bit too internal
-to printk to expose it, I think.
+> 
+> >  }
+> >  EXPORT_SYMBOL(qcom_scm_hdcp_available);
+> > @@ -91,6 +146,89 @@ EXPORT_SYMBOL(qcom_scm_hdcp_available);
+> >   */
+> >  int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
+> >  {
+> > -	return __qcom_scm_hdcp_req(req, req_cnt, resp);
+> > +	int ret = qcom_scm_clk_enable();
+> > +
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = __qcom_scm_hdcp_req(req, req_cnt, resp);
+> > +	qcom_scm_clk_disable();
+> > +	return ret;
+> >  }
+> >  EXPORT_SYMBOL(qcom_scm_hdcp_req);
+> > +
+> > +/**
+> > + * qcom_scm_is_available() - Checks if SCM is available
+> > + */
+> > +bool qcom_scm_is_available(void)
+> > +{
+> > +	return !!__scm;
+> > +}
+> > +EXPORT_SYMBOL(qcom_scm_is_available);
+> > +
+> > +static int qcom_scm_probe(struct platform_device *pdev)
+> > +{
+> > +	struct qcom_scm *scm;
+> > +	long rate;
+> > +	int ret;
+> > +
+> > +	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
+> > +	if (!scm)
+> > +		return -ENOMEM;
+> > +
+> > +	scm->core_clk = devm_clk_get(&pdev->dev, "core");
+> > +	if (IS_ERR(scm->core_clk)) {
+> > +		if (PTR_ERR(scm->core_clk) != -EPROBE_DEFER)
+> > +			dev_err(&pdev->dev, "failed to acquire core clk\n");
+> > +		return PTR_ERR(scm->core_clk);
+> > +	}
+> > +
+> > +	if (of_device_is_compatible(pdev->dev.of_node, "qcom,scm-apq8064")) {
+> 
+> Shouldn't this be reversed?
 
+Right, I inverted this.  Will fix.
 
-IOW, something like this?
+> 
+> > +		scm->iface_clk = devm_clk_get(&pdev->dev, "iface");
+> > +		if (IS_ERR(scm->iface_clk)) {
+> > +			if (PTR_ERR(scm->iface_clk) != -EPROBE_DEFER)
+> > +				dev_err(&pdev->dev, "failed to acquire iface clk\n");
+> > +			return PTR_ERR(scm->iface_clk);
+> > +		}
+> > +
+> > +		scm->bus_clk = devm_clk_get(&pdev->dev, "bus");
+> > +		if (IS_ERR(scm->bus_clk)) {
+> > +			if (PTR_ERR(scm->bus_clk) != -EPROBE_DEFER)
+> > +				dev_err(&pdev->dev, "failed to acquire bus clk\n");
+> > +			return PTR_ERR(scm->bus_clk);
+> > +		}
+> > +	}
+> > +
+> > +	/* vote for max clk rate for highest performance */
+> > +	rate = clk_round_rate(scm->core_clk, INT_MAX);
+> > +	ret = clk_set_rate(scm->core_clk, rate);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	__scm = scm;
+> > +	__scm->dev = &pdev->dev;
+> > +
+> > +	return 0;
+> > +}
+> > +
 
----
-
- kernel/printk/internal.h |  2 --
- kernel/printk/nmi.c      | 27 ---------------------------
- kernel/printk/printk.c   | 29 ++++++++++++++++++++++++++++-
- 3 files changed, 28 insertions(+), 30 deletions(-)
-
-diff --git a/kernel/printk/internal.h b/kernel/printk/internal.h
-index 7fd2838..341bedc 100644
---- a/kernel/printk/internal.h
-+++ b/kernel/printk/internal.h
-@@ -22,8 +22,6 @@ int __printf(1, 0) vprintk_default(const char *fmt, va_list args);
- 
- #ifdef CONFIG_PRINTK_NMI
- 
--extern raw_spinlock_t logbuf_lock;
--
- /*
-  * printk() could not take logbuf_lock in NMI context. Instead,
-  * it temporary stores the strings into a per-CPU buffer.
-diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
-index b69eb8a..b68a9864 100644
---- a/kernel/printk/nmi.c
-+++ b/kernel/printk/nmi.c
-@@ -204,33 +204,6 @@ void printk_nmi_flush(void)
- 		__printk_nmi_flush(&per_cpu(nmi_print_seq, cpu).work);
- }
- 
--/**
-- * printk_nmi_flush_on_panic - flush all per-cpu nmi buffers when the system
-- *	goes down.
-- *
-- * Similar to printk_nmi_flush() but it can be called even in NMI context when
-- * the system goes down. It does the best effort to get NMI messages into
-- * the main ring buffer.
-- *
-- * Note that it could try harder when there is only one CPU online.
-- */
--void printk_nmi_flush_on_panic(void)
--{
--	/*
--	 * Make sure that we could access the main ring buffer.
--	 * Do not risk a double release when more CPUs are up.
--	 */
--	if (in_nmi() && raw_spin_is_locked(&logbuf_lock)) {
--		if (num_online_cpus() > 1)
--			return;
--
--		debug_locks_off();
--		raw_spin_lock_init(&logbuf_lock);
--	}
--
--	printk_nmi_flush();
--}
--
- void __init printk_nmi_init(void)
- {
- 	int cpu;
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 0a0e789..1509baa 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -245,7 +245,7 @@ __packed __aligned(4)
-  * within the scheduler's rq lock. It must be released before calling
-  * console_unlock() or anything else that might wake up a process.
-  */
--DEFINE_RAW_SPINLOCK(logbuf_lock);
-+static DEFINE_RAW_SPINLOCK(logbuf_lock);
- 
- #ifdef CONFIG_PRINTK
- DECLARE_WAIT_QUEUE_HEAD(log_wait);
-@@ -2447,6 +2447,33 @@ void console_unblank(void)
- }
- 
- /**
-+ * printk_nmi_flush_on_panic - flush all per-cpu nmi buffers when the system
-+ *	goes down.
-+ *
-+ * Similar to printk_nmi_flush() but it can be called even in NMI context when
-+ * the system goes down. It does the best effort to get NMI messages into
-+ * the main ring buffer.
-+ *
-+ * Note that it could try harder when there is only one CPU online.
-+ */
-+void printk_nmi_flush_on_panic(void)
-+{
-+	/*
-+	 * Make sure that we could access the main ring buffer.
-+	 * Do not risk a double release when more CPUs are up.
-+	 */
-+	if (in_nmi() && raw_spin_is_locked(&logbuf_lock)) {
-+		if (num_online_cpus() > 1)
-+			return;
-+
-+		debug_locks_off();
-+		raw_spin_lock_init(&logbuf_lock);
-+	}
-+
-+	printk_nmi_flush();
-+}
-+
-+/**
-  * console_flush_on_panic - flush console content on panic
-  *
-  * Immediately output all pending messages no matter what.
+Thanks for reviewing!
