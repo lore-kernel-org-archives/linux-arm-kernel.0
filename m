@@ -1,98 +1,32 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Sat, 23 Apr 2016 17:43:50 +0800
-Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
-In-Reply-To: <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
-References: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
-Message-ID: <1461404630.7081.9.camel@mhfsdcap03>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Sat, 23 Apr 2016 15:20:57 +0530
+Subject: [PATCH 0/2] Embedding Position Independent Executables
+In-Reply-To: <20160422224958.GD17051@piout.net>
+References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160404095757.GR19428@n2100.arm.linux.org.uk>
+ <20160422224958.GD17051@piout.net>
+Message-ID: <20160423095057.GA2630@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-On Fri, 2016-04-22 at 14:24 +0200, Ulf Hansson wrote:
-> On 18 April 2016 at 09:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > there are 2 points will cause could not call mmc_request_done()
-> > and eventually cause the caller thread blocked.
-> >
-> > A. if card was busy, cancel_delayed_work() will return false because
-> > the delay work has not been scheduled, in this case, need put
-> > mod_delayed_work() in front of msdc_cmd_is_ready()
-> >
-> > B. if a request really need more than 5s(Some Sandisk TF card), it will
-> > use cancel_delayed_work() to cancel itself, and also return false, so use
-> > in_interrupt() to avoid this case
-> >
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/mtk-sd.c | 11 ++++++++---
-> >  1 file changed, 8 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index b17f30d..1511b1b 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -724,7 +724,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
-> >         bool ret;
-> >
-> >         ret = cancel_delayed_work(&host->req_timeout);
-> > -       if (!ret) {
-> > +       if (!ret && in_interrupt()) {
-> >                 /* delay work already running */
-> >                 return;
-> >         }
-> > @@ -824,7 +824,12 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
-> >         }
-> >
-> >         if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
-> > -               tmo = jiffies + msecs_to_jiffies(20);
-> > +               /*
-> > +                * 2550ms is from EXT_CSD[248], after switch to hs200,
-> > +                * using CMD13 to polling card status, it will get response
-> > +                * of 0x800, but EMMC still pull-low DAT0.
-> > +                */
-> 
-> Seems like you are solving a eMMC specific issue on your driver?
-> 
-> Perhaps we should try to use a card quirk instead?
 
-Actually, this is a Bug of __mmc_switch(), Per JEDEC Spec, while switch
-speed mode, should not use CMD13 to get card status, as it's response
-cannot reflect that if card was busy now, for this CMD6 switch HS200
-case, I tried some Samsung/Sandisk/KSI eMMC, issue CMD13 will always get
-0x800, even eMMC has already changed to transfer state and DAT0 is high,
-the response of CMD13 is also 0x800, and will never be 0x900.
-So, in __mmc_switch(), it's a bug to use CMD13 to know that if card has
-already changed to transfer state.
-But, Our host do not support MMC_CAP_WAIT_WHILE_BUSY, that's why we hit
-this issue.
+On Sat, Apr 23, 2016 at 12:49:58AM +0200, Alexandre Belloni wrote:
 
-May you give some advice for this ?
-Thx!
-> 
-> 
-> > +               tmo = jiffies + msecs_to_jiffies(2550);
-> >                 /* R1B or with data, should check SDCBUSY */
-> >                 while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
-> >                                 time_before(jiffies, tmo))
-> > @@ -847,6 +852,7 @@ static void msdc_start_command(struct msdc_host *host,
-> >         WARN_ON(host->cmd);
-> >         host->cmd = cmd;
-> >
-> > +       mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
-> >         if (!msdc_cmd_is_ready(host, mrq, cmd))
-> >                 return;
-> >
-> > @@ -858,7 +864,6 @@ static void msdc_start_command(struct msdc_host *host,
-> >
-> >         cmd->error = 0;
-> >         rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
-> > -       mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
-> >
-> >         sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
-> >         writel(cmd->arg, host->base + SDC_ARG);
-> > --
-> > 1.8.1.1.dirty
-> >
-> 
-> Kind regards
-> Uffe
+> I think Heiko clarified it but there are actually multiple platforms
+> that will benefit from this infrastructure. I can name at least at91,
+> rockchip, sunxi and am335x. On am335x, this has been solved by running
+> that code on the cortex M3 instead of doing that from Linux but it
+> forces to compile and load a firmware on the cortex M3 so it is not
+> available for anything else.
+
+afaik on am335x, it has been solved so far by not yet supporting
+suspend-resume in mainline ;)
+
+afaiu, am335x suspend-resume has 2 parts, one run in A8 & other in M3.
+Saving & restoring RAM config, putting to self refresh in addition to
+wfi invocation is handled by A8 code running in OCMC, while M3 cuts A8
+clock & does other PM things that can't be done in A8.
+
+Regards
+afzal
