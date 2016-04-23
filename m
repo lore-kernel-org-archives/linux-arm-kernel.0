@@ -1,20 +1,43 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sat, 23 Apr 2016 12:24:31 +0530
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160423065431.GA5840@afzalpc>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Sat, 23 Apr 2016 10:51:18 +0300
+Subject: [PATCH 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <1461363432-5730-2-git-send-email-andy.gross@linaro.org>
+References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
+ <1461363432-5730-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <571B2976.9070106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andy,
 
-On Fri, Apr 22, 2016 at 12:43:33PM +0100, Vladimir Murzin wrote:
+On 04/23/2016 01:17 AM, Andy Gross wrote:
+> This patch adds the device tree support for the Qualcomm SCM firmware.
+> 
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>  .../devicetree/bindings/firmware/qcom,scm.txt      | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> new file mode 100644
+> index 0000000..57b9b3a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> @@ -0,0 +1,31 @@
+> +QCOM Secure Channel Manager (SCM)
+> +
+> +Qualcomm processors include an interface to communicate to the secure firmware.
+> +This interface allows for clients to request different types of actions.  These
+> +can include CPU power up/down, HDCP requests, loading of firmware, and other
+> +assorted actions.
+> +
+> +Required properties:
+> +- compatible: must contain one of the following:
+> + * "qcom,scm-apq8064" for APQ8064
+> + * "qcom,scm-apq8084" for MSM8084
 
-> Small set of fixes discovered with R-class cores.
+s/MSM8084/APQ8084
 
-just curious, is Cortex-R supported on mainline ?, thought it was not
-supported, but subject & changelogs gave such a feeling.
-
-Regards
-afzal
+regards,
+Stan
