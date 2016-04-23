@@ -1,53 +1,57 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 23 Apr 2016 11:43:58 +0200
-Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
-Message-ID: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+Date: Sat, 23 Apr 2016 11:45:34 +0200
+Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
+ pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
+In-Reply-To: <20160415152215.GR5995@atomide.com>
+References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
+ <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
+ <20160415152215.GR5995@atomide.com>
+Message-ID: <CACRpkdZa=v1iKZ=eiY11V3qZV9pPqtoi6vHm2Pu4ctWTFiy0TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On Fri, Apr 15, 2016 at 5:22 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [160415 02:29]:
+>> On Thu, Apr 14, 2016 at 6:59 AM, Keerthy <j-keerthy@ti.com> wrote:
+>>
+>> > pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
+>> > ranging from 1 to MAX. This leads to a corner case where we try to request
+>> > the pin number = MAX and fails.
+>> >
+>> > bit_pos value is being calculted using ffs. pin_num_from_lsb uses
+>> > bit_pos value. pins array is populated with:
+>> >
+>> > pin + pin_num_from_lsb.
+>> >
+>> > The above is 1 more than usual bit indices as bit_pos uses ffs to compute
+>> > first set bit. Hence the last of the pins array is populated with the MAX
+>> > value and not MAX - 1 which causes error when we call pin_request.
+>> >
+>> > mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
+>> > Consequently val_pos and submask are correct.
+>> >
+>> > Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
+>> >
+>> > fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
+>> > Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> > ---
+>> >
+>> > Changes in v2:
+>> >
+>> >   * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
+>> >
+>> > Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
+>>
+>> Patch applied for fixes with Tony's ACK.
+>>
+>> Should it also be tagged for stable?
+>
+> Probably a good idea, I can see somebody pulling hair out because
+> of this in various product trees.
 
-these two patches move the ARM character LCD driver from
-misc drivers to the auxdisplay subsystem where it belongs and
-updates the defconfig for the RealView accordingly.
+Ooops sorry I totally missed to add that :(
 
-Please pull it into some cleanup branch in the ARM SoC
-tree.
-
-I tried to get some ACK from the auxdisplay maintainer but no
-reaction.
+Please ask Greg to take it as a selected stable patch.
 
 Yours,
 Linus Walleij
-
-The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
-
-  Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/move-auxdisplay
-
-for you to fetch changes up to 700ce70081d4f5ac7bc4fbfba209072152f96c89:
-
-  ARM: realview: update defconfig to match new subsystem (2016-04-23
-11:38:25 +0200)
-
-----------------------------------------------------------------
-This moves the ARM RealView auxilary display out of
-the misc drivers and into the new auxdisplay subsystem.
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      auxdisplay: move the ARM LCD driver into auxdisplay
-      ARM: realview: update defconfig to match new subsystem
-
- arch/arm/configs/realview_defconfig        |  3 ++-
- drivers/auxdisplay/Kconfig                 | 10 ++++++++++
- drivers/auxdisplay/Makefile                |  1 +
- drivers/{misc => auxdisplay}/arm-charlcd.c |  0
- drivers/misc/Kconfig                       | 10 ----------
- drivers/misc/Makefile                      |  1 -
- 6 files changed, 13 insertions(+), 12 deletions(-)
- rename drivers/{misc => auxdisplay}/arm-charlcd.c (100%)
