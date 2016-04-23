@@ -1,66 +1,103 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Sat, 23 Apr 2016 17:05:16 +0800
-Subject: [PATCH v2 net-next 12/13] Documentation: Bindings: add port-idx-in-ae
- for enet node
+Date: Sat, 23 Apr 2016 17:05:10 +0800
+Subject: [PATCH v2 net-next 06/13] net: hns: sort the header file by
+ alphabetical order
 In-Reply-To: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1461402317-136499-13-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1461402317-136499-7-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds description for port-idx-in-ae attribute.
+From: Daode Huang <huangdaode@hisilicon.com>
 
+This patch tunes the header file by the alphabetical order.
+
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
 ---
- .../devicetree/bindings/net/hisilicon-hns-nic.txt  | 30 +++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 12 ++++++------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 12 ++++++------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  4 ++--
+ 3 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-index e6a9d1c..b9ff4ba 100644
---- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-+++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-@@ -36,6 +36,34 @@ Required properties:
-                        | | | | | |
-                       external port
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+index 353b9e7..3730385 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+@@ -7,18 +7,18 @@
+  * (at your option) any later version.
+  */
  
-+  This attribute is remained for compatible purpose. It is not recommended to
-+  use it in new code.
-+
-+- port-idx-in-ae: is the index of port provided by AE.
-+  In NIC mode of DSAF, all 6 PHYs of service DSAF are taken as ethernet ports
-+  to the CPU. The port-idx-in-ae can be 0 to 5. Here is the diagram:
-+            +-----+---------------+
-+            |            CPU      |
-+            +-+-+-+---+-+-+-+-+-+-+
-+              |    |   | | | | | |
-+           debug debug   service
-+           port  port     port
-+           (0)   (0)     (0-5)
-+
-+  In Switch mode of DSAF, all 6 PHYs of service DSAF are taken as physical
-+  ports connected to a LAN Switch while the CPU side assume itself have one
-+  single NIC connected to this switch. In this case, the port-idx-in-ae
-+  will be 0 only.
-+            +-----+-----+------+------+
-+            |                CPU      |
-+            +-+-+-+-+-+-+-+-+-+-+-+-+-+
-+              |    |     service| port(0)
-+            debug debug  +------------+
-+            port  port   |   switch   |
-+            (0)   (0)    +-+-+-+-+-+-++
-+                          | | | | | |
-+                         external port
-+
- - local-mac-address: mac addr of the ethernet interface
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/netdevice.h>
+-#include <linux/phy_fixed.h>
+ #include <linux/interrupt.h>
+-#include <linux/platform_device.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/netdevice.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/phy_fixed.h>
++#include <linux/platform_device.h>
  
- Example:
-@@ -43,6 +71,6 @@ Example:
- 	ethernet at 0{
- 		compatible = "hisilicon,hns-nic-v1";
- 		ae-handle = <&dsaf0>;
--		port-id = <0>;
-+		port-idx-in-ae = <0>;
- 		local-mac-address = [a2 14 e4 4b 56 76];
- 	};
+-#include "hns_dsaf_misc.h"
+ #include "hns_dsaf_main.h"
++#include "hns_dsaf_misc.h"
+ #include "hns_dsaf_rcb.h"
+ 
+ #define MAC_EN_FLAG_V		0xada0328
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index b418d42..98e0e83 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -7,22 +7,22 @@
+  * (at your option) any later version.
+  */
+ 
+-#include <linux/module.h>
+-#include <linux/kernel.h>
++#include <linux/device.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
+ #include <linux/netdevice.h>
+-#include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+-#include <linux/device.h>
++#include <linux/platform_device.h>
+ #include <linux/vmalloc.h>
+ 
++#include "hns_dsaf_mac.h"
+ #include "hns_dsaf_main.h"
+-#include "hns_dsaf_rcb.h"
+ #include "hns_dsaf_ppe.h"
+-#include "hns_dsaf_mac.h"
++#include "hns_dsaf_rcb.h"
+ 
+ const char *g_dsaf_mode_match[DSAF_MODE_MAX] = {
+ 	[DSAF_MODE_DISABLE_2PORT_64VM] = "2port-64vf",
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+index 91e0382..67c8b9e 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+@@ -7,10 +7,10 @@
+  * (at your option) any later version.
+  */
+ 
+-#include "hns_dsaf_misc.h"
+ #include "hns_dsaf_mac.h"
+-#include "hns_dsaf_reg.h"
++#include "hns_dsaf_misc.h"
+ #include "hns_dsaf_ppe.h"
++#include "hns_dsaf_reg.h"
+ 
+ void hns_cpld_set_led(struct hns_mac_cb *mac_cb, int link_status,
+ 		      u16 speed, int data)
 -- 
 1.9.1
