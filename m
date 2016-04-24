@@ -1,31 +1,24 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat, 23 Apr 2016 22:02:35 -0500
-Subject: [PATCH v6 06/10] irqchip/gic-v3: Gather all ACPI specific data in
- a single structure
-In-Reply-To: <1460388780-914-7-git-send-email-julien.grall@arm.com>
+Date: Sat, 23 Apr 2016 22:05:30 -0500
+Subject: [PATCH v6 07/10] irqchip/gic-v3: Parse and export virtual GIC
+ information
+In-Reply-To: <1460388780-914-8-git-send-email-julien.grall@arm.com>
 References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
- <1460388780-914-7-git-send-email-julien.grall@arm.com>
-Message-ID: <571C374B.503@codeaurora.org>
+ <1460388780-914-8-git-send-email-julien.grall@arm.com>
+Message-ID: <571C37FA.2020802@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 04/11/2016 10:32 AM, Julien Grall wrote:
-> The ACPI code requires to use global variables in order to collect
-> information from the tables.
->
-> To make clear those variables are ACPI specific, gather all of them in a
-> single structure.
->
-> Furthermore, even if some of the variables are not marked with
-> __initdata, they are all only used during the initialization. Therefore,
-> the new variable, which hold the structure, can be marked with
-> __initdata.
+> Fill up the recently introduced gic_kvm_info with the hardware
+> information used for virtualization.
 >
 > Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 >
 Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 
