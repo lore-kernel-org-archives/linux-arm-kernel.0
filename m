@@ -1,21 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Apr 2016 23:38:36 +0200
-Subject: [PATCH v2] ARM: dts: uniphier: add NAND pinmux node
-In-Reply-To: <1461204683-28753-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1461204683-28753-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <5582504.7Bof4GJREi@wuerfel>
+Date: Sun, 24 Apr 2016 23:40:47 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC R-Car SYSC Updates for v4.7
+In-Reply-To: <cover.1461210185.git.horms+renesas@verge.net.au>
+References: <cover.1461210185.git.horms+renesas@verge.net.au>
+Message-ID: <4901266.5hHvo6PbjV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2016 11:11:23 Masahiro Yamada wrote:
-> This commit adds pin-mux nodes for the NAND controller.
-> Some SoCs support 2 chip selects and the others only support
-> 1 chip select.
+On Thursday 21 April 2016 13:44:48 Simon Horman wrote:
+> Renesas ARM Based SoC R-Car SYSC Updates for v4.7
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> * Add DT bindings for the R-Car System Controller.
+>   An implementation is intended to follow.
 > 
 
-Applied to next/dt, thanks!
+This seems to best fit into next/dt, but we can also stick it into other
+branches if it's needed as a dependency.
+
+Pulled now, thanks!
 
 	Arnd
