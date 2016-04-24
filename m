@@ -1,9 +1,9 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 24 Apr 2016 20:28:09 +0100
-Subject: [PATCH 05/12] nvmem: vif610-ocotp: remove nvmem regmap dependency
+Date: Sun, 24 Apr 2016 20:28:11 +0100
+Subject: [PATCH 07/12] nvmem: rockchip-efuse: remove nvmem regmap dependency
 In-Reply-To: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1461526096-29584-6-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1461526096-29584-8-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,106 +12,118 @@ instead of regmap.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/vf610-ocotp.c | 44 ++++++++++----------------------------------
- 1 file changed, 10 insertions(+), 34 deletions(-)
+ drivers/nvmem/rockchip-efuse.c | 49 ++++++++----------------------------------
+ 1 file changed, 9 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
-index 8641319..72e4faa 100644
---- a/drivers/nvmem/vf610-ocotp.c
-+++ b/drivers/nvmem/vf610-ocotp.c
-@@ -25,7 +25,6 @@
- #include <linux/nvmem-provider.h>
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index a009795..4d3f391 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -23,7 +23,6 @@
+ #include <linux/slab.h>
  #include <linux/of.h>
  #include <linux/platform_device.h>
 -#include <linux/regmap.h>
- #include <linux/slab.h>
  
- /* OCOTP Register Offsets */
-@@ -152,23 +151,16 @@ static int vf610_get_fuse_address(int base_addr_offset)
- 	return -EINVAL;
- }
+ #define EFUSE_A_SHIFT			6
+ #define EFUSE_A_MASK			0x3ff
+@@ -41,17 +40,9 @@ struct rockchip_efuse_chip {
+ 	struct clk *clk;
+ };
  
--static int vf610_ocotp_write(void *context, const void *data, size_t count)
--{
+-static int rockchip_efuse_write(void *context, const void *data, size_t count)
++static int rockchip_efuse_read(void *context, unsigned int offset,
++			       void *val, size_t bytes)
+ {
+-	/* Nothing TBD, Read-Only */
 -	return 0;
 -}
 -
--static int vf610_ocotp_read(void *context,
--			const void *off, size_t reg_size,
--			void *val, size_t val_size)
-+static int vf610_ocotp_read(void *context, unsigned int offset,
-+			void *val, size_t bytes)
- {
- 	struct vf610_ocotp *ocotp = context;
- 	void __iomem *base = ocotp->base;
--	unsigned int offset = *(u32 *)off;
- 	u32 reg, *buf = val;
- 	int fuse_addr;
+-static int rockchip_efuse_read(void *context,
+-			       const void *reg, size_t reg_size,
+-			       void *val, size_t val_size)
+-{
+-	unsigned int offset = *(u32 *)reg;
+ 	struct rockchip_efuse_chip *efuse = context;
+ 	u8 *buf = val;
  	int ret;
+@@ -64,12 +55,12 @@ static int rockchip_efuse_read(void *context,
  
--	while (val_size > 0) {
-+	while (bytes > 0) {
- 		fuse_addr = vf610_get_fuse_address(offset);
- 		if (fuse_addr > 0) {
- 			writel(ocotp->timing, base + OCOTP_TIMING);
-@@ -205,29 +197,19 @@ static int vf610_ocotp_read(void *context,
- 		}
- 
- 		buf++;
--		val_size--;
--		offset += reg_size;
-+		bytes -= 4;
-+		offset += 4;
+ 	writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
+ 	udelay(1);
+-	while (val_size) {
++	while (bytes--) {
+ 		writel(readl(efuse->base + REG_EFUSE_CTRL) &
+ 			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
+ 			     efuse->base + REG_EFUSE_CTRL);
+ 		writel(readl(efuse->base + REG_EFUSE_CTRL) |
+-			     ((offset & EFUSE_A_MASK) << EFUSE_A_SHIFT),
++			     ((offset++ & EFUSE_A_MASK) << EFUSE_A_SHIFT),
+ 			     efuse->base + REG_EFUSE_CTRL);
+ 		udelay(1);
+ 		writel(readl(efuse->base + REG_EFUSE_CTRL) |
+@@ -79,9 +70,6 @@ static int rockchip_efuse_read(void *context,
+ 		writel(readl(efuse->base + REG_EFUSE_CTRL) &
+ 		     (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
+ 		udelay(1);
+-
+-		val_size -= 1;
+-		offset += 1;
  	}
  
+ 	/* Switch to standby mode */
+@@ -92,22 +80,11 @@ static int rockchip_efuse_read(void *context,
  	return 0;
  }
  
--static struct regmap_bus vf610_ocotp_bus = {
--	.read = vf610_ocotp_read,
--	.write = vf610_ocotp_write,
+-static struct regmap_bus rockchip_efuse_bus = {
+-	.read = rockchip_efuse_read,
+-	.write = rockchip_efuse_write,
 -	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
 -	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 -};
 -
--static struct regmap_config ocotp_regmap_config = {
+-static struct regmap_config rockchip_efuse_regmap_config = {
 -	.reg_bits = 32,
--	.val_bits = 32,
--	.reg_stride = 4,
+-	.reg_stride = 1,
+-	.val_bits = 8,
 -};
 -
- static struct nvmem_config ocotp_config = {
- 	.name = "ocotp",
+ static struct nvmem_config econfig = {
+ 	.name = "rockchip-efuse",
  	.owner = THIS_MODULE,
-+	.stride = 4,
-+	.word_size = 4,
-+	.reg_read = vf610_ocotp_read,
++	.stride = 1,
++	.word_size = 1,
+ 	.read_only = true,
  };
  
- static const struct of_device_id ocotp_of_match[] = {
-@@ -247,7 +229,6 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+@@ -121,7 +98,6 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
  {
- 	struct device *dev = &pdev->dev;
  	struct resource *res;
+ 	struct nvmem_device *nvmem;
 -	struct regmap *regmap;
- 	struct vf610_ocotp *ocotp_dev;
+ 	struct rockchip_efuse_chip *efuse;
  
- 	ocotp_dev = devm_kzalloc(&pdev->dev,
-@@ -267,13 +248,8 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
- 		return PTR_ERR(ocotp_dev->clk);
- 	}
+ 	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
+@@ -139,16 +115,9 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 		return PTR_ERR(efuse->clk);
  
--	ocotp_regmap_config.max_register = resource_size(res);
--	regmap = devm_regmap_init(dev,
--		&vf610_ocotp_bus, ocotp_dev, &ocotp_regmap_config);
+ 	efuse->dev = &pdev->dev;
+-
+-	rockchip_efuse_regmap_config.max_register = resource_size(res) - 1;
+-
+-	regmap = devm_regmap_init(efuse->dev, &rockchip_efuse_bus,
+-				  efuse, &rockchip_efuse_regmap_config);
 -	if (IS_ERR(regmap)) {
--		dev_err(dev, "regmap init failed\n");
+-		dev_err(efuse->dev, "regmap init failed\n");
 -		return PTR_ERR(regmap);
 -	}
-+	ocotp_config.size = resource_size(res);
-+	ocotp_config.priv = ocotp_dev;
- 	ocotp_config.dev = dev;
- 
- 	ocotp_dev->nvmem = nvmem_register(&ocotp_config);
+-
++	econfig.size = resource_size(res);
++	econfig.reg_read = rockchip_efuse_read;
++	econfig.priv = efuse;
+ 	econfig.dev = efuse->dev;
+ 	nvmem = nvmem_register(&econfig);
+ 	if (IS_ERR(nvmem))
 -- 
 2.5.0
