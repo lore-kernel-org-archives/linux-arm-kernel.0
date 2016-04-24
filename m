@@ -1,229 +1,124 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 24 Apr 2016 20:28:06 +0100
-Subject: [PATCH 02/12] eeprom: at24: remove nvmem regmap dependency
+Date: Sun, 24 Apr 2016 20:28:08 +0100
+Subject: [PATCH 04/12] nvmem: qfprom: remove nvmem regmap dependency
 In-Reply-To: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1461526096-29584-3-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1461526096-29584-5-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves to nvmem support in the driver to use callback instead
-of regmap.
+This patch moves to nvmem support in the driver to use callback instead of
+regmap.
 
+Reported-by: Rajendra Nayak <rjendra@qti.qualcomm.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/misc/eeprom/Kconfig |   1 -
- drivers/misc/eeprom/at24.c  | 103 ++++++++++----------------------------------
- 2 files changed, 22 insertions(+), 82 deletions(-)
+ drivers/nvmem/Kconfig  |  1 -
+ drivers/nvmem/qfprom.c | 56 +++++++++++++++++++++++++++++++++-----------------
+ 2 files changed, 37 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
-index cfc493c..2d70464 100644
---- a/drivers/misc/eeprom/Kconfig
-+++ b/drivers/misc/eeprom/Kconfig
-@@ -3,7 +3,6 @@ menu "EEPROM support"
- config EEPROM_AT24
- 	tristate "I2C EEPROMs / RAMs / ROMs from most vendors"
- 	depends on I2C && SYSFS
--	select REGMAP
- 	select NVMEM
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index 36f4f4b..a87273b 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -60,7 +60,6 @@ config QCOM_QFPROM
+ 	tristate "QCOM QFPROM Support"
+ 	depends on ARCH_QCOM || COMPILE_TEST
+ 	depends on HAS_IOMEM
+-	select REGMAP_MMIO
  	help
- 	  Enable this driver to get read/write support to most I2C EEPROMs
-diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
-index 089d694..de550a6 100644
---- a/drivers/misc/eeprom/at24.c
-+++ b/drivers/misc/eeprom/at24.c
-@@ -23,7 +23,6 @@
- #include <linux/acpi.h>
- #include <linux/i2c.h>
+ 	  Say y here to enable QFPROM support. The QFPROM provides access
+ 	  functions for QFPROM data to rest of the drivers via nvmem interface.
+diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+index 3829e5f..b5305f0 100644
+--- a/drivers/nvmem/qfprom.c
++++ b/drivers/nvmem/qfprom.c
+@@ -13,21 +13,35 @@
+ 
+ #include <linux/device.h>
+ #include <linux/module.h>
++#include <linux/io.h>
  #include <linux/nvmem-provider.h>
+ #include <linux/platform_device.h>
 -#include <linux/regmap.h>
- #include <linux/platform_data/at24.h>
  
- /*
-@@ -69,7 +68,6 @@ struct at24_data {
- 	unsigned write_max;
- 	unsigned num_addresses;
- 
--	struct regmap_config regmap_config;
- 	struct nvmem_config nvmem_config;
- 	struct nvmem_device *nvmem;
- 
-@@ -252,10 +250,10 @@ static ssize_t at24_eeprom_read(struct at24_data *at24, char *buf,
- 	return -ETIMEDOUT;
- }
- 
--static ssize_t at24_read(struct at24_data *at24,
--		char *buf, loff_t off, size_t count)
-+static int at24_read(void *priv, unsigned int off, void *val, size_t count)
- {
--	ssize_t retval = 0;
-+	struct at24_data *at24 = priv;
-+	char *buf = val;
- 
- 	if (unlikely(!count))
- 		return count;
-@@ -267,23 +265,21 @@ static ssize_t at24_read(struct at24_data *at24,
- 	mutex_lock(&at24->lock);
- 
- 	while (count) {
--		ssize_t	status;
-+		int	status;
- 
- 		status = at24_eeprom_read(at24, buf, off, count);
--		if (status <= 0) {
--			if (retval == 0)
--				retval = status;
--			break;
-+		if (status < 0) {
-+			mutex_unlock(&at24->lock);
-+			return status;
- 		}
- 		buf += status;
- 		off += status;
- 		count -= status;
--		retval += status;
- 	}
- 
- 	mutex_unlock(&at24->lock);
- 
--	return retval;
-+	return 0;
- }
- 
- /*
-@@ -372,13 +368,13 @@ static ssize_t at24_eeprom_write(struct at24_data *at24, const char *buf,
- 	return -ETIMEDOUT;
- }
- 
--static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
--			  size_t count)
-+static int at24_write(void *priv, unsigned int off, void *val, size_t count)
- {
--	ssize_t retval = 0;
-+	struct at24_data *at24 = priv;
-+	char *buf = val;
- 
- 	if (unlikely(!count))
--		return count;
-+		return -EINVAL;
- 
- 	/*
- 	 * Write data to chip, protecting against concurrent updates
-@@ -387,70 +383,23 @@ static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
- 	mutex_lock(&at24->lock);
- 
- 	while (count) {
--		ssize_t	status;
-+		int status;
- 
- 		status = at24_eeprom_write(at24, buf, off, count);
--		if (status <= 0) {
--			if (retval == 0)
--				retval = status;
--			break;
-+		if (status < 0) {
-+			mutex_unlock(&at24->lock);
-+			return status;
- 		}
- 		buf += status;
- 		off += status;
- 		count -= status;
--		retval += status;
- 	}
- 
- 	mutex_unlock(&at24->lock);
- 
--	return retval;
--}
--
--/*-------------------------------------------------------------------------*/
--
--/*
-- * Provide a regmap interface, which is registered with the NVMEM
-- * framework
--*/
--static int at24_regmap_read(void *context, const void *reg, size_t reg_size,
--			    void *val, size_t val_size)
--{
--	struct at24_data *at24 = context;
--	off_t offset = *(u32 *)reg;
--	int err;
--
--	err = at24_read(at24, val, offset, val_size);
--	if (err)
--		return err;
--	return 0;
--}
--
--static int at24_regmap_write(void *context, const void *data, size_t count)
--{
--	struct at24_data *at24 = context;
--	const char *buf;
--	u32 offset;
--	size_t len;
--	int err;
--
--	memcpy(&offset, data, sizeof(offset));
--	buf = (const char *)data + sizeof(offset);
--	len = count - sizeof(offset);
--
--	err = at24_write(at24, buf, offset, len);
--	if (err)
--		return err;
- 	return 0;
- }
- 
--static const struct regmap_bus at24_regmap_bus = {
--	.read = at24_regmap_read,
--	.write = at24_regmap_write,
--	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+-static struct regmap_config qfprom_regmap_config = {
+-	.reg_bits = 32,
+-	.val_bits = 8,
+-	.reg_stride = 1,
+-	.val_format_endian = REGMAP_ENDIAN_LITTLE,
 -};
--
--/*-------------------------------------------------------------------------*/
--
- #ifdef CONFIG_OF
- static void at24_get_ofdata(struct i2c_client *client,
- 		struct at24_platform_data *chip)
-@@ -482,7 +431,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 	struct at24_data *at24;
- 	int err;
- 	unsigned i, num_addresses;
++static int qfprom_reg_read(void *context,
++			unsigned int reg, void *_val, size_t bytes)
++{
++	void __iomem *base = context;
++	u32 *val = _val;
++	int i = 0, words = bytes / 4;
+ 
+-static struct nvmem_config econfig = {
+-	.name = "qfprom",
+-	.owner = THIS_MODULE,
+-};
++	while (words--)
++		*val++ = readl(base + reg + (i++ * 4));
++
++	return 0;
++}
++
++static int qfprom_reg_write(void *context,
++			 unsigned int reg, void *_val, size_t bytes)
++{
++	void __iomem *base = context;
++	u32 *val = _val;
++	int i = 0, words = bytes / 4;
++
++	while (words--)
++		writel(*val++, base + reg + (i++ * 4));
++
++	return 0;
++}
+ 
+ static int qfprom_remove(struct platform_device *pdev)
+ {
+@@ -36,12 +50,20 @@ static int qfprom_remove(struct platform_device *pdev)
+ 	return nvmem_unregister(nvmem);
+ }
+ 
++static struct nvmem_config econfig = {
++	.name = "qfprom",
++	.owner = THIS_MODULE,
++	.stride = 4,
++	.word_size = 1,
++	.reg_read = qfprom_reg_read,
++	.reg_write = qfprom_reg_write,
++};
++
+ static int qfprom_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+ 	struct nvmem_device *nvmem;
 -	struct regmap *regmap;
+ 	void __iomem *base;
  
- 	if (client->dev.platform_data) {
- 		chip = *(struct at24_platform_data *)client->dev.platform_data;
-@@ -612,19 +560,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 		}
- 	}
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -49,14 +71,10 @@ static int qfprom_probe(struct platform_device *pdev)
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
  
--	at24->regmap_config.reg_bits = 32;
--	at24->regmap_config.val_bits = 8;
--	at24->regmap_config.reg_stride = 1;
--	at24->regmap_config.max_register = chip.byte_len - 1;
+-	qfprom_regmap_config.max_register = resource_size(res) - 1;
 -
--	regmap = devm_regmap_init(&client->dev, &at24_regmap_bus, at24,
--				  &at24->regmap_config);
+-	regmap = devm_regmap_init_mmio(dev, base, &qfprom_regmap_config);
 -	if (IS_ERR(regmap)) {
--		dev_err(&client->dev, "regmap init failed\n");
--		err = PTR_ERR(regmap);
--		goto err_clients;
+-		dev_err(dev, "regmap init failed\n");
+-		return PTR_ERR(regmap);
 -	}
--
- 	at24->nvmem_config.name = dev_name(&client->dev);
- 	at24->nvmem_config.dev = &client->dev;
- 	at24->nvmem_config.read_only = !writable;
-@@ -632,6 +567,12 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 	at24->nvmem_config.owner = THIS_MODULE;
- 	at24->nvmem_config.compat = true;
- 	at24->nvmem_config.base_dev = &client->dev;
-+	at24->nvmem_config.reg_read = at24_read;
-+	at24->nvmem_config.reg_write = at24_write;
-+	at24->nvmem_config.priv = at24;
-+	at24->nvmem_config.stride = 4;
-+	at24->nvmem_config.word_size = 1;
-+	at24->nvmem_config.size = chip.byte_len;
- 
- 	at24->nvmem = nvmem_register(&at24->nvmem_config);
- 
++	econfig.size = resource_size(res);
+ 	econfig.dev = dev;
++	econfig.priv = base;
++
+ 	nvmem = nvmem_register(&econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
 -- 
 2.5.0
