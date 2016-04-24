@@ -1,57 +1,123 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 24 Apr 2016 11:15:16 +0200
-Subject: [PATCH v4 4/5] dt-bindings: arm: add DT binding for Marvell CP110
- system controller
-In-Reply-To: <20160423162223.16e3ca28@free-electrons.com>
-References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1459070777-18049-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160328194756.GA28967@rob-hp-laptop>
- <20160413180122.4f997a9a@free-electrons.com>
- <CAMuHMdVYtXEZF0+G3W+Q8cDcBFB55s1ru6N6J3tgFy9BcGZiXw@mail.gmail.com>
- <20160423162223.16e3ca28@free-electrons.com>
-Message-ID: <CAMuHMdUPMcuQVd-5Gw7Be5eL24yoM_uN-1NBp-0JCcbcipAVig@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 24 Apr 2016 17:17:36 +0800
+Subject: [PATCH 02/23] mmc: sdhci: move sdhci_get_cd() forward to avoid
+ declaration
+In-Reply-To: <5719FCAB.1050806@intel.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-3-git-send-email-aisheng.dong@nxp.com>
+ <5719FCAB.1050806@intel.com>
+Message-ID: <CAA+hA=R_8KfwZutxYp4tBx0bkSrJYsUcR7c1fWjAVFUxqwpByw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Sat, Apr 23, 2016 at 4:22 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> On Thu, 14 Apr 2016 21:19:54 +0200, Geert Uytterhoeven wrote:
->> From my experience with clock drivers for Renesas SoCs, life is much easier
->> when handling all of this (clock names, parents, ...) in C. The same is true
->> BTW for PM Domains.
->>
->> The clock controllers of r8a7791 and r8a7795 are very similar, and could
->> be handled similarly.
->> Compare the DT hierarchy for CPG and MSTP/MSSR in
->> arch/arm/boot/dts/r8a7791.dtsi and arch/arm64/boot/dts/renesas/r8a7795.dtsi.
+On Fri, Apr 22, 2016 at 6:27 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 15/04/16 20:29, Dong Aisheng wrote:
+>> Move sdhci_get_cd() to avoid needing to declare this function
+>> before use.
 >
-> Thanks for your feedback. However in practice, there will ultimately be
-> two instances of this clock controller, as some variants of the SoC
-> will contain two CP parts. Due to this, it is going to be quite
-> convenient to have the clock names configurable from the DT, as I will
-> be able to give the same clock on the master CP and the slave CP a
-> different name.
+> In fact, we shouldn't be calling host functions directly. i.e. the call
+> should be host->mmc->ops->get_cd().
+>
+> However the caller sdhci_do_reset() is called under spinlock so it should
+> not be calling ->get_cd at all.
+>
+> What that means is that we really need to get rid of
+> SDHCI_QUIRK_NO_CARD_NO_RESET, after which this patch wouldn't be needed, so
+> let's leave it for now.
+>
 
-You could still prefix the names by e.g. an instance number.
+Yes, i agree we need get rid of SDHCI_QUIRK_NO_CARD_NO_RESET.
+However, after that, we still need to remove the sdhci_get_cd
+pre-declaration, right?
 
-> That's actually why my binding documentation uses names like
-> "cpm-<foo>" for all the clocks, where "cpm" stands for "CP Master". In
-> the future, another instance will have clocks named "cps-<foo>" for "CP
-> Slave".
+Regards
+Dong Aisheng
 
-So the names are actually part of the binding, while nothing really relies
-on the actual names, right? Clocks are referred to by clock specifier (phandle
-+ some optonal bits).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>>
+>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> ---
+>>  drivers/mmc/host/sdhci.c | 55 ++++++++++++++++++++++++------------------------
+>>  1 file changed, 27 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>> index be52a3a..839aa4c 100644
+>> --- a/drivers/mmc/host/sdhci.c
+>> +++ b/drivers/mmc/host/sdhci.c
+>> @@ -53,7 +53,6 @@ static void sdhci_finish_data(struct sdhci_host *);
+>>  static void sdhci_finish_command(struct sdhci_host *);
+>>  static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+>>  static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
+>> -static int sdhci_get_cd(struct mmc_host *mmc);
+>>
+>>  #ifdef CONFIG_PM
+>>  static void sdhci_runtime_pm_bus_on(struct sdhci_host *host);
+>> @@ -161,6 +160,33 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
+>>       sdhci_set_card_detection(host, false);
+>>  }
+>>
+>> +static int sdhci_get_cd(struct mmc_host *mmc)
+>> +{
+>> +     struct sdhci_host *host = mmc_priv(mmc);
+>> +     int gpio_cd = mmc_gpio_get_cd(mmc);
+>> +
+>> +     if (host->flags & SDHCI_DEVICE_DEAD)
+>> +             return 0;
+>> +
+>> +     /* If nonremovable, assume that the card is always present. */
+>> +     if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+>> +             return 1;
+>> +
+>> +     /*
+>> +      * Try slot gpio detect, if defined it take precedence
+>> +      * over build in controller functionality
+>> +      */
+>> +     if (!IS_ERR_VALUE(gpio_cd))
+>> +             return !!gpio_cd;
+>> +
+>> +     /* If polling, assume that the card is always present. */
+>> +     if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+>> +             return 1;
+>> +
+>> +     /* Host native card detect */
+>> +     return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+>> +}
+>> +
+>>  void sdhci_reset(struct sdhci_host *host, u8 mask)
+>>  {
+>>       unsigned long timeout;
+>> @@ -1551,33 +1577,6 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>       spin_unlock_irqrestore(&host->lock, flags);
+>>  }
+>>
+>> -static int sdhci_get_cd(struct mmc_host *mmc)
+>> -{
+>> -     struct sdhci_host *host = mmc_priv(mmc);
+>> -     int gpio_cd = mmc_gpio_get_cd(mmc);
+>> -
+>> -     if (host->flags & SDHCI_DEVICE_DEAD)
+>> -             return 0;
+>> -
+>> -     /* If nonremovable, assume that the card is always present. */
+>> -     if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+>> -             return 1;
+>> -
+>> -     /*
+>> -      * Try slot gpio detect, if defined it take precedence
+>> -      * over build in controller functionality
+>> -      */
+>> -     if (!IS_ERR_VALUE(gpio_cd))
+>> -             return !!gpio_cd;
+>> -
+>> -     /* If polling, assume that the card is always present. */
+>> -     if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+>> -             return 1;
+>> -
+>> -     /* Host native card detect */
+>> -     return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+>> -}
+>> -
+>>  static int sdhci_check_ro(struct sdhci_host *host)
+>>  {
+>>       unsigned long flags;
+>>
+>
