@@ -1,101 +1,108 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 24 Apr 2016 17:25:17 +0800
-Subject: [PATCH 06/23] mmc: sdhci: using common mmc_regulator_set_vqmmc()
-In-Reply-To: <571A0F99.20802@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-7-git-send-email-aisheng.dong@nxp.com>
- <571A0F99.20802@intel.com>
-Message-ID: <CAA+hA=T-KoDhQj5YaTif1UtNRDk0H_4wsYAsER+EC_tzSfMNPg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 24 Apr 2016 11:25:52 +0200
+Subject: [PATCH 1/5] leds: triggers: Allow to switch the trigger to
+ "panic" on a kernel panic
+In-Reply-To: <1459801326-5541-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459801326-5541-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <20160424092551.GB23015@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 7:48 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 15/04/16 20:29, Dong Aisheng wrote:
->> Instead of using private VCCQ regulator signal voltage switch code,
->> we switch to use the more robust common function mmc_regulator_set_vqmmc()
->> in MMC core which set the target voltage as close as possible to target
->> voltage.
->>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->> Don't have a board to test mmc_regulator_set_vqmmc() switch way,
->> need others to help verify.
->
-> So was there a reason you wanted to change it?
->
+On Mon 2016-04-04 17:22:02, Ezequiel Garcia wrote:
+> This commit adds a new led_cdev flag LED_BLINK_AT_PANIC, which
+> allows to mark a specific LED to be switched to the "panic"
+> trigger, on a kernel panic.
+> 
+> This is useful to allow the user to assign a regular trigger
+> to a given LED, and still blink that LED on a kernel panic.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 
-Yes, main reason is we already have common mmc_regulator_set_vqmmc(),
-we don't want to maintain two copies of it. And the common one is more robust.
 
-The original one is more error prone since it may set a margine IO voltage
-which may more easy to lead an potential IO error.
-e.g. if vqmmc is capable of 1.7V, then our host will set to 1.7v
-rather than 1.8v
-which is a mininum allowed IO voltage range(1.7v ~ 1.95v) defined by spec.
+>  drivers/leds/led-triggers.c | 52 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/leds.h        |  1 +
 
-> I agree mmc_regulator_set_vqmmc() looks superior, but we really need
-> feedback from people using this code..
->
+Could we get this out of the core? I'm pretty sure most users are not
+interested...
 
-Yes, although from code inspection, there's no functionality change,
-but tests from others using it will be appreciated.
+								Pavel
+								
+> +/*
+> + * This is a called in a special context by the atomic panic
+> + * notifier. This means the trigger can be changed without
+> + * worrying about locking.
+> + */
+> +static void led_trigger_set_panic(struct led_classdev *led_cdev)
+> +{
+> +	struct led_trigger *trig;
+> +
+> +	list_for_each_entry(trig, &trigger_list, next_trig) {
+> +		if (strcmp("panic", trig->name))
+> +			continue;
+> +		if (led_cdev->trigger)
+> +			list_del(&led_cdev->trig_list);
+> +		list_add_tail(&led_cdev->trig_list, &trig->led_cdevs);
+> +		led_cdev->trigger = trig;
+> +		if (trig->activate)
+> +			trig->activate(led_cdev);
+> +		break;
+> +	}
+> +}
+> +
+> +static int led_trigger_panic_notifier(struct notifier_block *nb,
+> +				      unsigned long code, void *unused)
+> +{
+> +	struct led_classdev *led_cdev;
+> +
+> +	list_for_each_entry(led_cdev, &leds_list, node)
+> +		if (led_cdev->flags & LED_BLINK_AT_PANIC)
+> +			led_trigger_set_panic(led_cdev);
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block led_trigger_panic_nb = {
+> +	.notifier_call = led_trigger_panic_notifier,
+> +};
+> +
+>  void led_trigger_set_default(struct led_classdev *led_cdev)
+>  {
+>  	struct led_trigger *trig;
+> @@ -356,6 +393,21 @@ void led_trigger_unregister_simple(struct led_trigger *trig)
+>  }
+>  EXPORT_SYMBOL_GPL(led_trigger_unregister_simple);
+>  
+> +static int __init leds_trigger_init(void)
+> +{
+> +	atomic_notifier_chain_register(&panic_notifier_list,
+> +				       &led_trigger_panic_nb);
+> +	return 0;
+> +}
+> +
+> +static void __exit leds_trigger_exit(void)
+> +{
+> +	atomic_notifier_chain_unregister(&panic_notifier_list,
+> +					 &led_trigger_panic_nb);
+> +}
+> +module_init(leds_trigger_init);
+> +module_exit(leds_trigger_exit);
+> +
+>  MODULE_AUTHOR("Richard Purdie");
+>  MODULE_LICENSE("GPL");
+>  MODULE_DESCRIPTION("LED Triggers Core");
+> diff --git a/include/linux/leds.h b/include/linux/leds.h
+> index f203a8f89d30..7f1428bb1e69 100644
+> --- a/include/linux/leds.h
+> +++ b/include/linux/leds.h
+> @@ -50,6 +50,7 @@ struct led_classdev {
+>  #define LED_SYSFS_DISABLE	(1 << 22)
+>  #define LED_DEV_CAP_FLASH	(1 << 23)
+>  #define LED_HW_PLUGGABLE	(1 << 24)
+> +#define LED_BLINK_AT_PANIC	(1 << 25)
+>  
+>  	/* Set LED brightness level
+>  	 * Must not sleep. Use brightness_set_blocking for drivers
 
-Regards
-Dong Aisheng
-
->> ---
->>  drivers/mmc/host/sdhci.c | 39 ++-------------------------------------
->>  1 file changed, 2 insertions(+), 37 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->> index 7f63f5d..2338aab 100644
->> --- a/drivers/mmc/host/sdhci.c
->> +++ b/drivers/mmc/host/sdhci.c
->> @@ -1726,43 +1726,8 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->>       if (ret)
->>               return ret;
->>
->> -     if (IS_ERR(mmc->supply.vqmmc))
->> -             return 0;
->> -
->> -     switch (ios->signal_voltage) {
->> -     case MMC_SIGNAL_VOLTAGE_330:
->> -             ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
->> -                                         3600000);
->> -             if (ret) {
->> -                     pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
->> -                             mmc_hostname(mmc));
->> -                     return -EIO;
->> -             }
->> -
->> -             return 0;
->> -     case MMC_SIGNAL_VOLTAGE_180:
->> -             ret = regulator_set_voltage(mmc->supply.vqmmc,
->> -                             1700000, 1950000);
->> -             if (ret) {
->> -                     pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
->> -                             mmc_hostname(mmc));
->> -                     return -EIO;
->> -             }
->> -
->> -             return 0;
->> -     case MMC_SIGNAL_VOLTAGE_120:
->> -             ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
->> -                                         1300000);
->> -             if (ret) {
->> -                     pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
->> -                             mmc_hostname(mmc));
->> -                     return -EIO;
->> -             }
->> -             return 0;
->> -     default:
->> -             /* No signal voltage switch required */
->> -             return 0;
->> -     }
->> +     /* do regulator signal voltage switch if exist */
->> +     return mmc_regulator_set_vqmmc(mmc, ios);
->>  }
->>
->>  static int sdhci_card_busy(struct mmc_host *mmc)
->>
->
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
