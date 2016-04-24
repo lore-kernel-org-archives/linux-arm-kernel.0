@@ -1,124 +1,210 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 24 Apr 2016 20:28:08 +0100
-Subject: [PATCH 04/12] nvmem: qfprom: remove nvmem regmap dependency
+Date: Sun, 24 Apr 2016 20:28:07 +0100
+Subject: [PATCH 03/12] eeprom: at25: remove nvmem regmap dependency
 In-Reply-To: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1461526096-29584-5-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1461526096-29584-4-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves to nvmem support in the driver to use callback instead of
-regmap.
+This patch moves to nvmem support in the driver to use callback instead
+of regmap.
 
-Reported-by: Rajendra Nayak <rjendra@qti.qualcomm.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/Kconfig  |  1 -
- drivers/nvmem/qfprom.c | 56 +++++++++++++++++++++++++++++++++-----------------
- 2 files changed, 37 insertions(+), 20 deletions(-)
+ drivers/misc/eeprom/Kconfig |  1 -
+ drivers/misc/eeprom/at25.c  | 89 ++++++++++-----------------------------------
+ 2 files changed, 19 insertions(+), 71 deletions(-)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 36f4f4b..a87273b 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -60,7 +60,6 @@ config QCOM_QFPROM
- 	tristate "QCOM QFPROM Support"
- 	depends on ARCH_QCOM || COMPILE_TEST
- 	depends on HAS_IOMEM
--	select REGMAP_MMIO
+diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
+index 2d70464..c4e41c2 100644
+--- a/drivers/misc/eeprom/Kconfig
++++ b/drivers/misc/eeprom/Kconfig
+@@ -31,7 +31,6 @@ config EEPROM_AT24
+ config EEPROM_AT25
+ 	tristate "SPI EEPROMs from most vendors"
+ 	depends on SPI && SYSFS
+-	select REGMAP
+ 	select NVMEM
  	help
- 	  Say y here to enable QFPROM support. The QFPROM provides access
- 	  functions for QFPROM data to rest of the drivers via nvmem interface.
-diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
-index 3829e5f..b5305f0 100644
---- a/drivers/nvmem/qfprom.c
-+++ b/drivers/nvmem/qfprom.c
-@@ -13,21 +13,35 @@
+ 	  Enable this driver to get read/write support to most SPI EEPROMs,
+diff --git a/drivers/misc/eeprom/at25.c b/drivers/misc/eeprom/at25.c
+index fa36a6e..a2858b3 100644
+--- a/drivers/misc/eeprom/at25.c
++++ b/drivers/misc/eeprom/at25.c
+@@ -17,7 +17,6 @@
+ #include <linux/sched.h>
  
- #include <linux/device.h>
- #include <linux/module.h>
-+#include <linux/io.h>
  #include <linux/nvmem-provider.h>
- #include <linux/platform_device.h>
 -#include <linux/regmap.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/eeprom.h>
+ #include <linux/property.h>
+@@ -34,7 +33,6 @@ struct at25_data {
+ 	struct mutex		lock;
+ 	struct spi_eeprom	chip;
+ 	unsigned		addrlen;
+-	struct regmap_config	regmap_config;
+ 	struct nvmem_config	nvmem_config;
+ 	struct nvmem_device	*nvmem;
+ };
+@@ -65,14 +63,11 @@ struct at25_data {
  
--static struct regmap_config qfprom_regmap_config = {
--	.reg_bits = 32,
--	.val_bits = 8,
--	.reg_stride = 1,
--	.val_format_endian = REGMAP_ENDIAN_LITTLE,
--};
-+static int qfprom_reg_read(void *context,
-+			unsigned int reg, void *_val, size_t bytes)
-+{
-+	void __iomem *base = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
+ #define	io_limit	PAGE_SIZE	/* bytes */
  
--static struct nvmem_config econfig = {
--	.name = "qfprom",
--	.owner = THIS_MODULE,
--};
-+	while (words--)
-+		*val++ = readl(base + reg + (i++ * 4));
-+
-+	return 0;
-+}
-+
-+static int qfprom_reg_write(void *context,
-+			 unsigned int reg, void *_val, size_t bytes)
-+{
-+	void __iomem *base = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		writel(*val++, base + reg + (i++ * 4));
-+
-+	return 0;
-+}
- 
- static int qfprom_remove(struct platform_device *pdev)
+-static ssize_t
+-at25_ee_read(
+-	struct at25_data	*at25,
+-	char			*buf,
+-	unsigned		offset,
+-	size_t			count
+-)
++static int at25_ee_read(void *priv, unsigned int offset,
++			void *val, size_t count)
  {
-@@ -36,12 +50,20 @@ static int qfprom_remove(struct platform_device *pdev)
- 	return nvmem_unregister(nvmem);
++	struct at25_data *at25 = priv;
++	char *buf = val;
+ 	u8			command[EE_MAXADDRLEN + 1];
+ 	u8			*cp;
+ 	ssize_t			status;
+@@ -81,11 +76,11 @@ at25_ee_read(
+ 	u8			instr;
+ 
+ 	if (unlikely(offset >= at25->chip.byte_len))
+-		return 0;
++		return -EINVAL;
+ 	if ((offset + count) > at25->chip.byte_len)
+ 		count = at25->chip.byte_len - offset;
+ 	if (unlikely(!count))
+-		return count;
++		return -EINVAL;
+ 
+ 	cp = command;
+ 
+@@ -131,28 +126,14 @@ at25_ee_read(
+ 		count, offset, (int) status);
+ 
+ 	mutex_unlock(&at25->lock);
+-	return status ? status : count;
++	return status;
  }
  
-+static struct nvmem_config econfig = {
-+	.name = "qfprom",
-+	.owner = THIS_MODULE,
-+	.stride = 4,
-+	.word_size = 1,
-+	.reg_read = qfprom_reg_read,
-+	.reg_write = qfprom_reg_write,
-+};
-+
- static int qfprom_probe(struct platform_device *pdev)
+-static int at25_regmap_read(void *context, const void *reg, size_t reg_size,
+-			    void *val, size_t val_size)
++static int at25_ee_write(void *priv, unsigned int off, void *val, size_t count)
  {
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
--	struct regmap *regmap;
- 	void __iomem *base;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -49,14 +71,10 @@ static int qfprom_probe(struct platform_device *pdev)
- 	if (IS_ERR(base))
- 		return PTR_ERR(base);
- 
--	qfprom_regmap_config.max_register = resource_size(res) - 1;
+-	struct at25_data *at25 = context;
+-	off_t offset = *(u32 *)reg;
+-	int err;
 -
--	regmap = devm_regmap_init_mmio(dev, base, &qfprom_regmap_config);
+-	err = at25_ee_read(at25, val, offset, val_size);
+-	if (err)
+-		return err;
+-	return 0;
+-}
+-
+-static ssize_t
+-at25_ee_write(struct at25_data *at25, const char *buf, loff_t off,
+-	      size_t count)
+-{
+-	ssize_t			status = 0;
+-	unsigned		written = 0;
++	struct at25_data *at25 = priv;
++	const char *buf = val;
++	int			status = 0;
+ 	unsigned		buf_size;
+ 	u8			*bounce;
+ 
+@@ -161,7 +142,7 @@ at25_ee_write(struct at25_data *at25, const char *buf, loff_t off,
+ 	if ((off + count) > at25->chip.byte_len)
+ 		count = at25->chip.byte_len - off;
+ 	if (unlikely(!count))
+-		return count;
++		return -EINVAL;
+ 
+ 	/* Temp buffer starts with command and address */
+ 	buf_size = at25->chip.page_size;
+@@ -256,40 +237,15 @@ at25_ee_write(struct at25_data *at25, const char *buf, loff_t off,
+ 		off += segment;
+ 		buf += segment;
+ 		count -= segment;
+-		written += segment;
+ 
+ 	} while (count > 0);
+ 
+ 	mutex_unlock(&at25->lock);
+ 
+ 	kfree(bounce);
+-	return written ? written : status;
++	return status;
+ }
+ 
+-static int at25_regmap_write(void *context, const void *data, size_t count)
+-{
+-	struct at25_data *at25 = context;
+-	const char *buf;
+-	u32 offset;
+-	size_t len;
+-	int err;
+-
+-	memcpy(&offset, data, sizeof(offset));
+-	buf = (const char *)data + sizeof(offset);
+-	len = count - sizeof(offset);
+-
+-	err = at25_ee_write(at25, buf, offset, len);
+-	if (err)
+-		return err;
+-	return 0;
+-}
+-
+-static const struct regmap_bus at25_regmap_bus = {
+-	.read = at25_regmap_read,
+-	.write = at25_regmap_write,
+-	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+-};
+-
+ /*-------------------------------------------------------------------------*/
+ 
+ static int at25_fw_to_chip(struct device *dev, struct spi_eeprom *chip)
+@@ -349,7 +305,6 @@ static int at25_probe(struct spi_device *spi)
+ {
+ 	struct at25_data	*at25 = NULL;
+ 	struct spi_eeprom	chip;
+-	struct regmap		*regmap;
+ 	int			err;
+ 	int			sr;
+ 	int			addrlen;
+@@ -394,18 +349,6 @@ static int at25_probe(struct spi_device *spi)
+ 	spi_set_drvdata(spi, at25);
+ 	at25->addrlen = addrlen;
+ 
+-	at25->regmap_config.reg_bits = 32;
+-	at25->regmap_config.val_bits = 8;
+-	at25->regmap_config.reg_stride = 1;
+-	at25->regmap_config.max_register = chip.byte_len - 1;
+-
+-	regmap = devm_regmap_init(&spi->dev, &at25_regmap_bus, at25,
+-				  &at25->regmap_config);
 -	if (IS_ERR(regmap)) {
--		dev_err(dev, "regmap init failed\n");
+-		dev_err(&spi->dev, "regmap init failed\n");
 -		return PTR_ERR(regmap);
 -	}
-+	econfig.size = resource_size(res);
- 	econfig.dev = dev;
-+	econfig.priv = base;
-+
- 	nvmem = nvmem_register(&econfig);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
+-
+ 	at25->nvmem_config.name = dev_name(&spi->dev);
+ 	at25->nvmem_config.dev = &spi->dev;
+ 	at25->nvmem_config.read_only = chip.flags & EE_READONLY;
+@@ -413,6 +356,12 @@ static int at25_probe(struct spi_device *spi)
+ 	at25->nvmem_config.owner = THIS_MODULE;
+ 	at25->nvmem_config.compat = true;
+ 	at25->nvmem_config.base_dev = &spi->dev;
++	at25->nvmem_config.reg_read = at25_ee_read;
++	at25->nvmem_config.reg_write = at25_ee_write;
++	at25->nvmem_config.priv = at25;
++	at25->nvmem_config.stride = 4;
++	at25->nvmem_config.word_size = 1;
++	at25->nvmem_config.size = chip.byte_len;
+ 
+ 	at25->nvmem = nvmem_register(&at25->nvmem_config);
+ 	if (IS_ERR(at25->nvmem))
 -- 
 2.5.0
