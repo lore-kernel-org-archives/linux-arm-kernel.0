@@ -1,83 +1,31 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 24 Apr 2016 18:47:52 +0800
-Subject: [PATCH 10/23] mmc: core: disable auto retune during card
- detection process
-In-Reply-To: <571A1D85.3020200@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-11-git-send-email-aisheng.dong@nxp.com>
- <571A1D85.3020200@intel.com>
-Message-ID: <CAA+hA=R9JfV4ScuM=OZ3VHdSiQiMO9io8mQQDNXfkTwNv7RVvg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 24 Apr 2016 14:18:06 -0400 (EDT)
+Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
+In-Reply-To: <1461230323-27891-2-git-send-email-pramod.kumar@broadcom.com>
+References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
+ <1461230323-27891-2-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <20160424.141806.786009616301278103.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 8:48 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 15/04/16 20:29, Dong Aisheng wrote:
->> During card detection process, mmc core may sends commands
->> to detect if card is still exist in mmc_rescan for removable
->> card which may trigger mmc retuning process after a bit time
->> of runtime pm suspend.
->> Obviously this retuning process is meaningless for card remove
->> case, so we disable mmc_retune in mmc_detect_change() for it.
->> For card insert case, the mmc_retune will be enabled normally
->> in its card initialization process later in mmc_execute_tuning().
->> So disable it at first has no side effection.
->
-> We don't assume that the card has been removed, which is why we send
-> commands to find out if it is still there.  If it is still there, this
-> change will have incorrectly disabled re-tuning.
->
+From: Pramod Kumar <pramod.kumar@broadcom.com>
+Date: Thu, 21 Apr 2016 14:48:38 +0530
 
-Do you mean the 'fake' card remove interrupt like caused by glitch?
-Yes, if that the card is still exist and re-tuning is wrongly disabled.
+> +struct shared_mdio_master *shared_mdio_alloc_master(struct device *parent,
+> +						    struct device_node *node)
+> +{
+> +	int ret = 0;
+> +	struct shared_mdio_master *master;
 
-So we could re-enable re-tuning for this special case?
-Something like:
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 41b1e76..e1990a8 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -2607,6 +2607,8 @@ void mmc_rescan(struct work_struct *work)
+Always order local variable declarations in reverse christmas tree
+(longest to shortest line) order.
 
-        /* if there still is a card present, stop here */
-        if (host->bus_ops != NULL) {
-+               if (tuning_is_enabled_before())
-+                       mmc_retune_enable(host);
-                mmc_bus_put(host);
-                goto out;
-        }
+> +static int shared_mdio_driver_probe(struct device *dev)
+> +{
+> +	int rc;
+> +	struct shared_mdio_master *master = to_shared_mdio_master(dev);
+> +	struct shared_mdio_driver *drv = to_shared_mdio_driver(dev->driver);
 
+Likewise.
 
-> Do you have an actual problem with the way it works now?
->
-
-No actual problems now.
-I just observe a lot tuning commands keep sending although the card is already
-removed which seems a bit meaningless.
-And most tuning execution process is executed with sin_lock_irqsave, i'm not
-sure if the mass tuning commands may affect the system when CPU is busy.
-What do you think?
-
-Regards
-Dong Aisheng
-
->>
->> CC: stable <stable@vger.kernel.org>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->>  drivers/mmc/core/core.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
->> index 52bfaf0..76d0802 100644
->> --- a/drivers/mmc/core/core.c
->> +++ b/drivers/mmc/core/core.c
->> @@ -1888,6 +1888,7 @@ static void _mmc_detect_change(struct mmc_host *host, unsigned long delay,
->>               pm_wakeup_event(mmc_dev(host), 5000);
->>
->>       host->detect_change = 1;
->> +     mmc_retune_disable(host);
->>       mmc_schedule_delayed_work(&host->detect, delay);
->>  }
->>
->>
->
+Please audit your entire submission for this issue.
