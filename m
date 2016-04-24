@@ -1,9 +1,9 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 24 Apr 2016 20:28:13 +0100
-Subject: [PATCH 09/12] nvmem: imx-ocotp: remove nvmem regmap dependency
+Date: Sun, 24 Apr 2016 20:28:10 +0100
+Subject: [PATCH 06/12] nvmem: sunxi-sid: remove nvmem regmap dependency
 In-Reply-To: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1461526096-29584-10-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1461526096-29584-7-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,114 +12,119 @@ instead of regmap.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/imx-ocotp.c | 55 ++++++++++-------------------------------------
- 1 file changed, 11 insertions(+), 44 deletions(-)
+ drivers/nvmem/Kconfig     |  1 -
+ drivers/nvmem/sunxi_sid.c | 54 ++++++++---------------------------------------
+ 2 files changed, 9 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7796eb..75e66ef 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -22,7 +22,6 @@
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index a87273b..377bc21 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -81,7 +81,6 @@ config ROCKCHIP_EFUSE
+ config NVMEM_SUNXI_SID
+ 	tristate "Allwinner SoCs SID support"
+ 	depends on ARCH_SUNXI
+-	select REGMAP_MMIO
+ 	help
+ 	  This is a driver for the 'security ID' available on various Allwinner
+ 	  devices.
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index bc88b40..1567ccc 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -21,13 +21,14 @@
+ #include <linux/nvmem-provider.h>
  #include <linux/of.h>
- #include <linux/of_device.h>
  #include <linux/platform_device.h>
 -#include <linux/regmap.h>
  #include <linux/slab.h>
+ #include <linux/random.h>
  
- struct ocotp_priv {
-@@ -31,59 +30,34 @@ struct ocotp_priv {
- 	unsigned int nregs;
+ static struct nvmem_config econfig = {
+ 	.name = "sunxi-sid",
+ 	.read_only = true,
++	.stride = 4,
++	.word_size = 1,
+ 	.owner = THIS_MODULE,
  };
  
--static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
+@@ -51,54 +52,23 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
+ 	return sid_key; /* Only return the last byte */
+ }
+ 
+-static int sunxi_sid_read(void *context,
+-			  const void *reg, size_t reg_size,
 -			  void *val, size_t val_size)
-+static int imx_ocotp_read(void *context, unsigned int offset,
++static int sunxi_sid_read(void *context, unsigned int offset,
 +			  void *val, size_t bytes)
  {
- 	struct ocotp_priv *priv = context;
+ 	struct sunxi_sid *sid = context;
 -	unsigned int offset = *(u32 *)reg;
- 	unsigned int count;
-+	u32 *buf = val;
- 	int i;
- 	u32 index;
+ 	u8 *buf = val;
  
- 	index = offset >> 2;
--	count = val_size >> 2;
-+	count = bytes >> 2;
- 
- 	if (count > (priv->nregs - index))
- 		count = priv->nregs - index;
- 
--	for (i = index; i < (index + count); i++) {
--		*(u32 *)val = readl(priv->base + 0x400 + i * 0x10);
--		val += 4;
+-	while (val_size) {
+-		*buf++ = sunxi_sid_read_byte(sid, offset);
+-		val_size--;
+-		offset++;
 -	}
-+	for (i = index; i < (index + count); i++)
-+		*buf++ = readl(priv->base + 0x400 + i * 0x10);
+-
+-	return 0;
+-}
++	while (bytes--)
++		*buf++ = sunxi_sid_read_byte(sid, offset++);
  
+-static int sunxi_sid_write(void *context, const void *data, size_t count)
+-{
+-	/* Unimplemented, dummy to keep regmap core happy */
  	return 0;
  }
  
--static int imx_ocotp_write(void *context, const void *data, size_t count)
--{
--	/* Not implemented */
--	return 0;
--}
--
--static struct regmap_bus imx_ocotp_bus = {
--	.read = imx_ocotp_read,
--	.write = imx_ocotp_write,
+-static struct regmap_bus sunxi_sid_bus = {
+-	.read = sunxi_sid_read,
+-	.write = sunxi_sid_write,
 -	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
 -	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 -};
 -
--static bool imx_ocotp_writeable_reg(struct device *dev, unsigned int reg)
+-static bool sunxi_sid_writeable_reg(struct device *dev, unsigned int reg)
 -{
 -	return false;
 -}
 -
--static struct regmap_config imx_ocotp_regmap_config = {
+-static struct regmap_config sunxi_sid_regmap_config = {
 -	.reg_bits = 32,
--	.val_bits = 32,
--	.reg_stride = 4,
--	.writeable_reg = imx_ocotp_writeable_reg,
--	.name = "imx-ocotp",
+-	.val_bits = 8,
+-	.reg_stride = 1,
+-	.writeable_reg = sunxi_sid_writeable_reg,
 -};
 -
- static struct nvmem_config imx_ocotp_nvmem_config = {
- 	.name = "imx-ocotp",
- 	.read_only = true,
-+	.word_size = 4,
-+	.stride = 4,
- 	.owner = THIS_MODULE,
-+	.reg_read = imx_ocotp_read,
- };
- 
- static const struct of_device_id imx_ocotp_dt_ids[] = {
-@@ -99,7 +73,6 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	const struct of_device_id *of_id;
+ static int sunxi_sid_probe(struct platform_device *pdev)
+ {
  	struct device *dev = &pdev->dev;
  	struct resource *res;
--	struct regmap *regmap;
- 	struct ocotp_priv *priv;
  	struct nvmem_device *nvmem;
+-	struct regmap *regmap;
+ 	struct sunxi_sid *sid;
+ 	int ret, i, size;
+ 	char *randomness;
+@@ -113,16 +83,10 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 		return PTR_ERR(sid->base);
  
-@@ -114,15 +87,9 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 
- 	of_id = of_match_device(imx_ocotp_dt_ids, dev);
- 	priv->nregs = (unsigned int)of_id->data;
--	imx_ocotp_regmap_config.max_register = 4 * priv->nregs - 4;
+ 	size = resource_size(res) - 1;
+-	sunxi_sid_regmap_config.max_register = size;
 -
--	regmap = devm_regmap_init(dev, &imx_ocotp_bus, priv,
--				  &imx_ocotp_regmap_config);
+-	regmap = devm_regmap_init(dev, &sunxi_sid_bus, sid,
+-				  &sunxi_sid_regmap_config);
 -	if (IS_ERR(regmap)) {
 -		dev_err(dev, "regmap init failed\n");
 -		return PTR_ERR(regmap);
 -	}
-+	imx_ocotp_nvmem_config.size = 4 * priv->nregs;
- 	imx_ocotp_nvmem_config.dev = dev;
-+	imx_ocotp_nvmem_config.priv = priv;
- 	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
+-
++	econfig.size = resource_size(res);
+ 	econfig.dev = dev;
++	econfig.reg_read = sunxi_sid_read;
++	econfig.priv = sid;
+ 	nvmem = nvmem_register(&econfig);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
 -- 
