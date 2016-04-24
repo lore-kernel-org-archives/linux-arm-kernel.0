@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Apr 2016 23:24:30 +0200
-Subject: [GIT PULL] Nomadik DTS changes for v4.7
-In-Reply-To: <CACRpkdbMtUfnSKZHj4D3h+ChKq+V8hqVvNYSShvekAiMLk6tDA@mail.gmail.com>
-References: <CACRpkdbMtUfnSKZHj4D3h+ChKq+V8hqVvNYSShvekAiMLk6tDA@mail.gmail.com>
-Message-ID: <8373195.tFQGvosCMi@wuerfel>
+Date: Sun, 24 Apr 2016 23:26:42 +0200
+Subject: [GIT PULL 3/3] DaVinci DT updates for v4.7
+In-Reply-To: <1460722488-5921-3-git-send-email-nsekhar@ti.com>
+References: <1460722488-5921-1-git-send-email-nsekhar@ti.com>
+ <1460722488-5921-3-git-send-email-nsekhar@ti.com>
+Message-ID: <5912959.2EDBk10lcg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 April 2016 22:04:36 Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Friday 15 April 2016 17:44:48 Sekhar Nori wrote:
+> Device-Tree updates for DaVinci. This
+> contains some clean-up and fixes of
+> device-tree data and addition of i2c1
+> node for DA850.
 > 
-> here are a few Nomadik DTS edits for v4.7:
-> - Activate the accelerometer on NHK15
-> - Some DMA support
-> 
-> As it also says in the signed tag.
 > 
 
 Pulled into next/dt, thanks!
