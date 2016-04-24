@@ -1,27 +1,36 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat, 23 Apr 2016 22:33:54 -0500
-Subject: [PATCH v6 10/10] clocksource: arm_arch_timer: Remove
- arch_timer_get_timecounter
-In-Reply-To: <1460388780-914-11-git-send-email-julien.grall@arm.com>
-References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
- <1460388780-914-11-git-send-email-julien.grall@arm.com>
-Message-ID: <571C3EA2.1030001@codeaurora.org>
+From: lars.persson@axis.com (Lars Persson)
+Date: Sun, 24 Apr 2016 07:23:01 +0000
+Subject: [PATCH v2] ARM: dts: artpec: update clock bindings in artpec6.dtsi
+In-Reply-To: <201604240131.28836.arnd@arndb.de>
+References: <1457946103-13853-1-git-send-email-larper@axis.com>,
+ <201604240131.28836.arnd@arndb.de>
+Message-ID: <B0C201BA-39DF-4746-AFF7-80AF2E645429@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+> 24 apr. 2016 kl. 01:31 skrev Arnd Bergmann <arnd@arndb.de>:
+> 
+>> On Monday 14 March 2016, Lars Persson wrote:
+>> The clock binding for the main clock controller was changed to an
+>> indexed controller style binding on request of the clk
+>> maintainers. This updates the dtsi to use the new bindings.
+>> 
+>> Signed-off-by: Lars Persson <larper@axis.com>
+>> ---
+>> v2: Use numerical clock indexes to enable merge before the clock driver bindings
+>> are in the tree.
+>> 
+>> arch/arm/boot/dts/artpec6.dtsi | 99 +++++++++---------------------------------
+>> 1 file changed, 20 insertions(+), 79 deletions(-)
+> 
+> I found this patch while going through stuff that had not been applied yet.
+> Is this still the latest version that we should apply for v4.7?
+> 
+>    Arnd
 
-On 04/11/2016 10:33 AM, Julien Grall wrote:
-> The only call of arch_timer_get_timecounter (in KVM) has been removed.
->
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Yes it the latest. The clock driver will hit the tree in 4.7-rc1, not until then can we use the binding header file.
 
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
+Thanks.
 
-Using the Qualcomm Technologies QDF2XXX server.
-
--- 
-Shanker Donthineni
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+- Lars
