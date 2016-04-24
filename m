@@ -1,28 +1,27 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat, 23 Apr 2016 21:57:10 -0500
-Subject: [PATCH v6 02/10] clocksource: arm_arch_timer: Extend
- arch_timer_kvm_info to get the virtual IRQ
-In-Reply-To: <1460388780-914-3-git-send-email-julien.grall@arm.com>
+Date: Sat, 23 Apr 2016 21:58:37 -0500
+Subject: [PATCH v6 03/10] irqchip/gic-v2: Gather ACPI specific data in a
+ single structure
+In-Reply-To: <1460388780-914-4-git-send-email-julien.grall@arm.com>
 References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
- <1460388780-914-3-git-send-email-julien.grall@arm.com>
-Message-ID: <571C3606.3030101@codeaurora.org>
+ <1460388780-914-4-git-send-email-julien.grall@arm.com>
+Message-ID: <571C365D.80605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 04/11/2016 10:32 AM, Julien Grall wrote:
-> Currently, the firmware table is parsed by the virtual timer code in
-> order to retrieve the virtual timer interrupt. However, this is already
-> done by the arch timer driver.
+> The ACPI code requires to use global variables in order to collect
+> information from the tables.
 >
-> To avoid code duplication, extend arch_timer_kvm_info to get the virtual
-> IRQ.
->
-> Note that the KVM code will be modified in a subsequent patch.
+> For now, a single global variable is used, but more will be added in a
+> subsequent patch. To make clear they are ACPI specific, gather all the
+> information in a single structure.
 >
 > Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Acked-by: Christofer Dall <christoffer.dall@linaro.org>
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 >
 Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 
