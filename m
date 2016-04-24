@@ -1,27 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Apr 2016 23:57:46 +0200
-Subject: [GIT PULL 1/4] Broadcom devicetree changes for 4.7
-In-Reply-To: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
-References: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <8783809.6sQz9I7Goh@wuerfel>
+Date: Mon, 25 Apr 2016 00:00:53 +0200
+Subject: [GIT PULL] Qualcomm Device Tree Updates for v4.7
+In-Reply-To: <1461444018-11041-1-git-send-email-andy.gross@linaro.org>
+References: <1461444018-11041-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <11848611.5yAHZdUjJc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 23 April 2016 12:58:57 Florian Fainelli wrote:
-> This pull request contains Broadcom ARM-based SoC Device Tree changes:
+On Saturday 23 April 2016 15:40:18 Andy Gross wrote:
+> Qualcomm Device Tree Changes for v4.7
 > 
-> - Rafal adds proper VCC GPIO to be fed to the USB host controllers for known
->   BCM5301x devices needing that, he also enables earlycon, and enables the
->   SPI-NOR flashes on relevant devices
-> 
-> - Eric adds the VideoCore 4 Device Tree nodes to the BCM283x Device Tree and
->   provides a DRM patch to kick out the simplefb framebuffer to avoid conflicts
-> 
-> - Stephan adds proper CPU nodes for the ARM processor on the BCM2835 SoC Device
->   Tree
-> 
-> - Martin provides a binding fix for the DMA channel interrupt numbers and
->   description
+> * Add DB600C support
+> * Add IPQ4019 support
+> * Add additional nodes for APQ8064
+> * Fix APQ8064 pinctrls for i2c/spi
+> * Add MSM8974 nodes for smp2p and smd
+> * Modify MSM8974 memory reserve for rfsa and rmtfs
+> * Add support for BQ27541 on Nexus7
 > 
 
 Pulled into next/dt, thanks!
