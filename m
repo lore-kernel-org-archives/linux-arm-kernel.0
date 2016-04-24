@@ -1,118 +1,89 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 24 Apr 2016 11:29:51 +0200
-Subject: [PATCH 1/5] leds: triggers: Allow to switch the trigger to
- "panic" on a kernel panic
-In-Reply-To: <20160424092551.GB23015@amd>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459801326-5541-2-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20160424092551.GB23015@amd>
-Message-ID: <20160424092951.GA25596@amd>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 24 Apr 2016 17:56:06 +0800
+Subject: [PATCH 07/23] mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do
+ voltage switch
+In-Reply-To: <571A1970.7010800@intel.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-8-git-send-email-aisheng.dong@nxp.com>
+ <571A1970.7010800@intel.com>
+Message-ID: <CAA+hA=S4yy8=z3EXS9ZO5V6+WQDV7K0d29vUpcFkB5q6f+Eo8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2016-04-24 11:25:51, Pavel Machek wrote:
-> On Mon 2016-04-04 17:22:02, Ezequiel Garcia wrote:
-> > This commit adds a new led_cdev flag LED_BLINK_AT_PANIC, which
-> > allows to mark a specific LED to be switched to the "panic"
-> > trigger, on a kernel panic.
-> > 
-> > This is useful to allow the user to assign a regular trigger
-> > to a given LED, and still blink that LED on a kernel panic.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> 
-> 
-> >  drivers/leds/led-triggers.c | 52 +++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/leds.h        |  1 +
-> 
-> Could we get this out of the core? I'm pretty sure most users are not
-> interested...
+On Fri, Apr 22, 2016 at 8:30 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 15/04/16 20:29, Dong Aisheng wrote:
+>> Currently when card type supports EXT_CSD_CARD_TYPE_DDR_1_8V
+>> which means it can work on DDR mode with either 3.3v IO or 1.8v
+>> IO voltage. MMC core will first try 1.8v then 3.3v if host claims
+>> MMC_CAP_1_8V_DDR support.
+>> However the host driver voltage switch code does not check NO_1_8_V
+>> quirk which may set a wrong 1.8v and causes the card fixed to 3.3v
+>> VIO un-work.
+>>
+>> Checking 1.8V quirk before setting it to avoid such issue.
+>
+> We need to look forward to when SDHCI_QUIRK2_NO_1_8_V doesn't exist.
+>
 
-Thinking about it some more....
+Yes, i did try to clean up SDHCI_QUIRK2_NO_1_8_V.
+However, it seems not that simply.
+Currently we may still need it before we got a better way.
 
-This is not really a trigger. This is very special. Maybe hard-coded
-handling, like we do for keyboard leds on x86 would be suitable?
+My point is whether we should stop fixing the exist issue in SDHCI driver
+just caused by we want to clean up it later?
 
+> There are two possibilities:
+>
+> 1. Add MMC_CAP_3_3V_DDR and support to core and use that instead of
+> MMC_CAP_1_8V_DDR.  You'll need Ulf's feedback on that.
+>
 
-> 
-> 								Pavel
-> 								
-> > +/*
-> > + * This is a called in a special context by the atomic panic
-> > + * notifier. This means the trigger can be changed without
-> > + * worrying about locking.
-> > + */
-> > +static void led_trigger_set_panic(struct led_classdev *led_cdev)
-> > +{
-> > +	struct led_trigger *trig;
-> > +
-> > +	list_for_each_entry(trig, &trigger_list, next_trig) {
-> > +		if (strcmp("panic", trig->name))
-> > +			continue;
-> > +		if (led_cdev->trigger)
-> > +			list_del(&led_cdev->trig_list);
-> > +		list_add_tail(&led_cdev->trig_list, &trig->led_cdevs);
-> > +		led_cdev->trigger = trig;
-> > +		if (trig->activate)
-> > +			trig->activate(led_cdev);
-> > +		break;
-> > +	}
-> > +}
-> > +
-> > +static int led_trigger_panic_notifier(struct notifier_block *nb,
-> > +				      unsigned long code, void *unused)
-> > +{
-> > +	struct led_classdev *led_cdev;
-> > +
-> > +	list_for_each_entry(led_cdev, &leds_list, node)
-> > +		if (led_cdev->flags & LED_BLINK_AT_PANIC)
-> > +			led_trigger_set_panic(led_cdev);
-> > +	return NOTIFY_DONE;
-> > +}
-> > +
-> > +static struct notifier_block led_trigger_panic_nb = {
-> > +	.notifier_call = led_trigger_panic_notifier,
-> > +};
-> > +
-> >  void led_trigger_set_default(struct led_classdev *led_cdev)
-> >  {
-> >  	struct led_trigger *trig;
-> > @@ -356,6 +393,21 @@ void led_trigger_unregister_simple(struct led_trigger *trig)
-> >  }
-> >  EXPORT_SYMBOL_GPL(led_trigger_unregister_simple);
-> >  
-> > +static int __init leds_trigger_init(void)
-> > +{
-> > +	atomic_notifier_chain_register(&panic_notifier_list,
-> > +				       &led_trigger_panic_nb);
-> > +	return 0;
-> > +}
-> > +
-> > +static void __exit leds_trigger_exit(void)
-> > +{
-> > +	atomic_notifier_chain_unregister(&panic_notifier_list,
-> > +					 &led_trigger_panic_nb);
-> > +}
-> > +module_init(leds_trigger_init);
-> > +module_exit(leds_trigger_exit);
-> > +
-> >  MODULE_AUTHOR("Richard Purdie");
-> >  MODULE_LICENSE("GPL");
-> >  MODULE_DESCRIPTION("LED Triggers Core");
-> > diff --git a/include/linux/leds.h b/include/linux/leds.h
-> > index f203a8f89d30..7f1428bb1e69 100644
-> > --- a/include/linux/leds.h
-> > +++ b/include/linux/leds.h
-> > @@ -50,6 +50,7 @@ struct led_classdev {
-> >  #define LED_SYSFS_DISABLE	(1 << 22)
-> >  #define LED_DEV_CAP_FLASH	(1 << 23)
-> >  #define LED_HW_PLUGGABLE	(1 << 24)
-> > +#define LED_BLINK_AT_PANIC	(1 << 25)
-> >  
-> >  	/* Set LED brightness level
-> >  	 * Must not sleep. Use brightness_set_blocking for drivers
-> 
+Yes, we can do it.
+But the point is for DDR50/SD3.0/SDIO3.0/HS200/HS400 cards we have
+the same situation and still need QUIRK2_NO_1_8_V.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+And i somehow a bit wonder whether we should retrieve the speed mode
+support from device tree since it's actually controller capability.
+IO range capability is another thing.
+
+Probably we may start another topic to discuss it specificly.
+
+> 2. Replace ->start_signal_voltage_switch() i.e.
+>
+> host->mmc_host_ops.start_signal_voltage_switch =
+> esdhci_start_signal_voltage_switch;
+>
+> You will also need to change all calls to
+> sdhci_start_signal_voltage_switch() with
+> host->mmc->ops->start_signal_voltage_switch(), but that needs to be done anyway.
+>
+
+esdhc can fully use the common sdhci_start_signal_voltag_switch.
+Since it's already support QUIRK_NO_1_8_V, we don't want to
+invent imx voltage swith currently, but fix and use it first.
+
+Regards
+Dong Aisheng
+
+>>
+>> CC: stable <stable@vger.kernel.org>
+>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> ---
+>>  drivers/mmc/host/sdhci.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>> index 2338aab..96ccb15 100644
+>> --- a/drivers/mmc/host/sdhci.c
+>> +++ b/drivers/mmc/host/sdhci.c
+>> @@ -1683,6 +1683,8 @@ static int sdhci_do_signal_voltage_switch(struct sdhci_host *host,
+>>
+>>               return -EAGAIN;
+>>       case MMC_SIGNAL_VOLTAGE_180:
+>> +             if (host->quirks2 & SDHCI_QUIRK2_NO_1_8_V)
+>> +                     return -EINVAL;
+>>               /*
+>>                * Enable 1.8V Signal Enable in the Host Control2
+>>                * register
+>>
+>
