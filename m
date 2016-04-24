@@ -1,108 +1,34 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 24 Apr 2016 18:00:28 +0800
-Subject: [PATCH 08/23] mmc: sdhci: rename quirk
- SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12
-In-Reply-To: <571A1A34.40004@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-9-git-send-email-aisheng.dong@nxp.com>
- <571A1A34.40004@intel.com>
-Message-ID: <CAA+hA=QtexWh4H_FvjajNqDskBTZxKJXsgkUaW-AoubgbbWnfQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 24 Apr 2016 12:08:30 +0200
+Subject: [PATCH v1] ARM: dts: omap3-n900: Specify peripherals LDO
+ regulators initial mode
+In-Reply-To: <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <20160417122933.GA8093@earth>
+ <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160424100830.GC23015@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 8:33 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 15/04/16 20:29, Dong Aisheng wrote:
->> Rename ACMD12 quirk to SDHCI_QUIRK_MULTIBLOCK_ACMD12 to avoid confusion
->> since it's needed for both read and write.
->
-> I am not in favour of renaming unless the original name is really really
-> bad.  In this case it is a quirk which we anyway expect to remove at some
-> point, so let's leave it alone for now.
->
+On Sun 2016-04-17 17:29:23, Ivaylo Dimitrov wrote:
+> Without that, regulators are left in the mode last set by the bootloader or
+> by the kernel the device was rebooted from. This leads to various problems,
+> like non-working peripherals.
+> 
+> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
 
-It is really confusing when i first see it. So i made this patch.
-We could clear it later.
-And i think it's more like a capability rather than a quirk.
+Reviewed-by: Pavel Machek <pavel@ucw.cz>
 
-Anyway, it's up to you whether we should pick it.
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -329,6 +329,7 @@
+>  	regulator-name = "V28";
+>  	regulator-min-microvolt = <2800000>;
+>  	regulator-max-microvolt = <2800000>;
+> +	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+>  	regulator-always-on; /* due to battery cover sensor */
+>  };
+>  
 
-Regards
-Dong Aisheng
-
->>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->>  drivers/mmc/host/sdhci-pci-o2micro.c | 2 +-
->>  drivers/mmc/host/sdhci-pltfm.c       | 2 +-
->>  drivers/mmc/host/sdhci-s3c.c         | 2 +-
->>  drivers/mmc/host/sdhci.c             | 2 +-
->>  drivers/mmc/host/sdhci.h             | 2 +-
->>  5 files changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-pci-o2micro.c b/drivers/mmc/host/sdhci-pci-o2micro.c
->> index d48f031..1ed1f995 100644
->> --- a/drivers/mmc/host/sdhci-pci-o2micro.c
->> +++ b/drivers/mmc/host/sdhci-pci-o2micro.c
->> @@ -162,7 +162,7 @@ int sdhci_pci_o2_probe_slot(struct sdhci_pci_slot *slot)
->>       case PCI_DEVICE_ID_O2_FUJIN2:
->>               reg = sdhci_readl(host, O2_SD_VENDOR_SETTING);
->>               if (reg & 0x1)
->> -                     host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
->> +                     host->quirks |= SDHCI_QUIRK_MULTIBLOCK_ACMD12;
->>
->>               if (chip->pdev->device != PCI_DEVICE_ID_O2_FUJIN2)
->>                       break;
->> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
->> index 072bb27..206057a 100644
->> --- a/drivers/mmc/host/sdhci-pltfm.c
->> +++ b/drivers/mmc/host/sdhci-pltfm.c
->> @@ -74,7 +74,7 @@ void sdhci_get_of_property(struct platform_device *pdev)
->>       u32 bus_width;
->>
->>       if (of_get_property(np, "sdhci,auto-cmd12", NULL))
->> -             host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
->> +             host->quirks |= SDHCI_QUIRK_MULTIBLOCK_ACMD12;
->>
->>       if (of_get_property(np, "sdhci,1-bit-only", NULL) ||
->>           (of_property_read_u32(np, "bus-width", &bus_width) == 0 &&
->> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
->> index 70c724b..756b9bb 100644
->> --- a/drivers/mmc/host/sdhci-s3c.c
->> +++ b/drivers/mmc/host/sdhci-s3c.c
->> @@ -564,7 +564,7 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
->>       host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ;
->>
->>       /* This host supports the Auto CMD12 */
->> -     host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
->> +     host->quirks |= SDHCI_QUIRK_MULTIBLOCK_ACMD12;
->>
->>       /* Samsung SoCs need BROKEN_ADMA_ZEROLEN_DESC */
->>       host->quirks |= SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC;
->> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->> index 96ccb15..40e3551 100644
->> --- a/drivers/mmc/host/sdhci.c
->> +++ b/drivers/mmc/host/sdhci.c
->> @@ -2988,7 +2988,7 @@ int sdhci_add_host(struct sdhci_host *host)
->>       mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
->>       mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
->>
->> -     if (host->quirks & SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12)
->> +     if (host->quirks & SDHCI_QUIRK_MULTIBLOCK_ACMD12)
->>               host->flags |= SDHCI_AUTO_CMD12;
->>
->>       /* Auto-CMD23 stuff only works in ADMA or PIO. */
->> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
->> index 0f39f4f..afa4de8 100644
->> --- a/drivers/mmc/host/sdhci.h
->> +++ b/drivers/mmc/host/sdhci.h
->> @@ -379,7 +379,7 @@ struct sdhci_host {
->>  /* Controller is missing device caps. Use caps provided by host */
->>  #define SDHCI_QUIRK_MISSING_CAPS                     (1<<27)
->>  /* Controller uses Auto CMD12 command to stop the transfer */
->> -#define SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12           (1<<28)
->> +#define SDHCI_QUIRK_MULTIBLOCK_ACMD12                        (1<<28)
->>  /* Controller doesn't have HISPD bit field in HI-SPEED SD card */
->>  #define SDHCI_QUIRK_NO_HISPD_BIT                     (1<<29)
->>  /* Controller treats ADMA descriptors with length 0000h incorrectly */
->>
->
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
