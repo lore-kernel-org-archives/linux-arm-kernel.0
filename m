@@ -1,18 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Apr 2016 23:36:59 +0200
-Subject: [GIT PULL] ARM: imx: device tree updates for 4.7, take 1
-In-Reply-To: <20160418055943.GY28903@tiger>
-References: <20160418055943.GY28903@tiger>
-Message-ID: <6260396.hV3VnknUa0@wuerfel>
+Date: Sun, 24 Apr 2016 23:38:36 +0200
+Subject: [PATCH v2] ARM: dts: uniphier: add NAND pinmux node
+In-Reply-To: <1461204683-28753-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1461204683-28753-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <5582504.7Bof4GJREi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 13:59:43 Shawn Guo wrote:
-> My device tree branch contains the majority of the patches I send you
-> for each merge window.  Per request from Arnd, I'm sending the branch in
-> two rounds.  This is the first take.  The second one will come to you
-> around -rc6 time, and it should have less patches than the first one.
+On Thursday 21 April 2016 11:11:23 Masahiro Yamada wrote:
+> This commit adds pin-mux nodes for the NAND controller.
+> Some SoCs support 2 chip selects and the others only support
+> 1 chip select.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
 
-Thanks a lot, pulled into next/dt,
+Applied to next/dt, thanks!
 
 	Arnd
