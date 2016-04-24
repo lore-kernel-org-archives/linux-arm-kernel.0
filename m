@@ -1,40 +1,31 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Sun, 24 Apr 2016 20:57:44 +0100
-Subject: [PATCH] efi/arm-init: reserve rather than unmap the memory map
- for ARM as well
-In-Reply-To: <1461165635-8041-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1461165635-8041-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160424195744.GL2829@codeblueprint.co.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 24 Apr 2016 22:37:06 +0200
+Subject: [PATCH] i2c/omap: drop the lock hard irq context
+In-Reply-To: <1459778123-16267-1-git-send-email-grygorii.strashko@ti.com>
+References: <1459778123-16267-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20160424203706.GB4317@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr, at 05:20:35PM, Ard Biesheuvel wrote:
-> Now that ARM has a fully functional memremap() implementation, there is
-> no longer a need to remove the UEFI memory map from the linear mapping
-> in order to be able to create a permanent mapping for it using generic
-> code.
+On Mon, Apr 04, 2016 at 04:55:23PM +0300, Grygorii Strashko wrote:
+> From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 > 
-> So remove the 'IS_ENABLED(CONFIG_ARM)' conditional we added in commit
-> 7cc8cbcf82d1 ("efi/arm64: Don't apply MEMBLOCK_NOMAP to UEFI memory map
-> mapping"), and revert to using memblock_reserve() for both ARM and arm64
+> The lock is taken while reading two registers. On RT the first lock is
+> taken in hard irq where it might sleep and in the threaded irq.
+> The threaded irq runs in oneshot mode so the hard irq does not run until
+> the thread the completes so there is no reason to grab the lock.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> This is the permanent fix I alluded to in the commit log for the patch
-> mentioned above. Russell has pulled the memremap() patches so this is
-> good to go for v4.7
-> 
-> Note that current efi-next already has a conflict with v4.6-rc4 (where
-> that patch landed) which will get even worse with this on top, so it may
-> make sense to rebase efi-next onto v4.6-rc4 before pulling this
-> (but note that this patch depends on 'efi/arm*: Use memremap() to create
-> the persistent memmap mapping', so please don't reorder them to maintain
-> bisectability)
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> [grygorii.strashko at ti.com: drop locking from isr completely and remove
+> lock field from struct omap_i2c_dev]
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Good notes, thanks Ard.
+Applied to for-next, thanks!
 
-I applied this for v4.7 but please check the result since there was a
-conflict with the GOP framebuffer patches,
-
-  https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=b2757153ee7cfce23f760036b0c85bd0ec99cf50
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160424/e7ea5251/attachment.sig>
