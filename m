@@ -1,32 +1,40 @@
 From: colin.king@canonical.com (Colin King)
-Date: Sun, 24 Apr 2016 23:02:09 +0100
-Subject: [PATCH] pinctrl: sirf/atlas7: trivial fix of spelling mistake on
- flagged
-Message-ID: <1461535329-19935-1-git-send-email-colin.king@canonical.com>
+Date: Sun, 24 Apr 2016 23:44:13 +0100
+Subject: [PATCH] clk: rockchip: trivial fix of spelling mistake on unsuccessful
+Message-ID: <1461537853-10569-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Ian King <colin.king@canonical.com>
 
-fix spelling mistake, flaged -> flagged
+fix spelling mistake, unsucessful -> unsuccessful
 
 Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- drivers/pinctrl/sirf/pinctrl-atlas7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/rockchip/clk-pll.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-index 3d233fc..168c0f5 100644
---- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
-+++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-@@ -5798,7 +5798,7 @@ static void atlas7_gpio_handle_irq(struct irq_desc *desc)
- 
- 	status = readl(ATLAS7_GPIO_INT_STATUS(bank));
- 	if (!status) {
--		pr_warn("%s: gpio [%s] status %#x no interrupt is flaged\n",
-+		pr_warn("%s: gpio [%s] status %#x no interrupt is flagged\n",
- 			__func__, gc->label, status);
- 		handle_bad_irq(desc);
- 		return;
+diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+index 128a6b2..8ac73bc 100644
+--- a/drivers/clk/rockchip/clk-pll.c
++++ b/drivers/clk/rockchip/clk-pll.c
+@@ -236,7 +236,7 @@ static int rockchip_rk3036_pll_set_params(struct rockchip_clk_pll *pll,
+ 	/* wait for the pll to lock */
+ 	ret = rockchip_pll_wait_lock(pll);
+ 	if (ret) {
+-		pr_warn("%s: pll update unsucessful, trying to restore old params\n",
++		pr_warn("%s: pll update unsuccessful, trying to restore old params\n",
+ 			__func__);
+ 		rockchip_rk3036_pll_set_params(pll, &cur);
+ 	}
+@@ -475,7 +475,7 @@ static int rockchip_rk3066_pll_set_params(struct rockchip_clk_pll *pll,
+ 	/* wait for the pll to lock */
+ 	ret = rockchip_pll_wait_lock(pll);
+ 	if (ret) {
+-		pr_warn("%s: pll update unsucessful, trying to restore old params\n",
++		pr_warn("%s: pll update unsuccessful, trying to restore old params\n",
+ 			__func__);
+ 		rockchip_rk3066_pll_set_params(pll, &cur);
+ 	}
 -- 
 2.7.4
