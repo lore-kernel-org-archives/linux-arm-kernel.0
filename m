@@ -1,123 +1,101 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 24 Apr 2016 17:17:36 +0800
-Subject: [PATCH 02/23] mmc: sdhci: move sdhci_get_cd() forward to avoid
- declaration
-In-Reply-To: <5719FCAB.1050806@intel.com>
+Date: Sun, 24 Apr 2016 17:25:17 +0800
+Subject: [PATCH 06/23] mmc: sdhci: using common mmc_regulator_set_vqmmc()
+In-Reply-To: <571A0F99.20802@intel.com>
 References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-3-git-send-email-aisheng.dong@nxp.com>
- <5719FCAB.1050806@intel.com>
-Message-ID: <CAA+hA=R_8KfwZutxYp4tBx0bkSrJYsUcR7c1fWjAVFUxqwpByw@mail.gmail.com>
+ <1460741387-23815-7-git-send-email-aisheng.dong@nxp.com>
+ <571A0F99.20802@intel.com>
+Message-ID: <CAA+hA=T-KoDhQj5YaTif1UtNRDk0H_4wsYAsER+EC_tzSfMNPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 6:27 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+On Fri, Apr 22, 2016 at 7:48 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
 > On 15/04/16 20:29, Dong Aisheng wrote:
->> Move sdhci_get_cd() to avoid needing to declare this function
->> before use.
+>> Instead of using private VCCQ regulator signal voltage switch code,
+>> we switch to use the more robust common function mmc_regulator_set_vqmmc()
+>> in MMC core which set the target voltage as close as possible to target
+>> voltage.
+>>
+>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> ---
+>> Don't have a board to test mmc_regulator_set_vqmmc() switch way,
+>> need others to help verify.
 >
-> In fact, we shouldn't be calling host functions directly. i.e. the call
-> should be host->mmc->ops->get_cd().
->
-> However the caller sdhci_do_reset() is called under spinlock so it should
-> not be calling ->get_cd at all.
->
-> What that means is that we really need to get rid of
-> SDHCI_QUIRK_NO_CARD_NO_RESET, after which this patch wouldn't be needed, so
-> let's leave it for now.
+> So was there a reason you wanted to change it?
 >
 
-Yes, i agree we need get rid of SDHCI_QUIRK_NO_CARD_NO_RESET.
-However, after that, we still need to remove the sdhci_get_cd
-pre-declaration, right?
+Yes, main reason is we already have common mmc_regulator_set_vqmmc(),
+we don't want to maintain two copies of it. And the common one is more robust.
+
+The original one is more error prone since it may set a margine IO voltage
+which may more easy to lead an potential IO error.
+e.g. if vqmmc is capable of 1.7V, then our host will set to 1.7v
+rather than 1.8v
+which is a mininum allowed IO voltage range(1.7v ~ 1.95v) defined by spec.
+
+> I agree mmc_regulator_set_vqmmc() looks superior, but we really need
+> feedback from people using this code..
+>
+
+Yes, although from code inspection, there's no functionality change,
+but tests from others using it will be appreciated.
 
 Regards
 Dong Aisheng
 
->>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 >> ---
->>  drivers/mmc/host/sdhci.c | 55 ++++++++++++++++++++++++------------------------
->>  1 file changed, 27 insertions(+), 28 deletions(-)
+>>  drivers/mmc/host/sdhci.c | 39 ++-------------------------------------
+>>  1 file changed, 2 insertions(+), 37 deletions(-)
 >>
 >> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->> index be52a3a..839aa4c 100644
+>> index 7f63f5d..2338aab 100644
 >> --- a/drivers/mmc/host/sdhci.c
 >> +++ b/drivers/mmc/host/sdhci.c
->> @@ -53,7 +53,6 @@ static void sdhci_finish_data(struct sdhci_host *);
->>  static void sdhci_finish_command(struct sdhci_host *);
->>  static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
->>  static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
->> -static int sdhci_get_cd(struct mmc_host *mmc);
+>> @@ -1726,43 +1726,8 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>>       if (ret)
+>>               return ret;
 >>
->>  #ifdef CONFIG_PM
->>  static void sdhci_runtime_pm_bus_on(struct sdhci_host *host);
->> @@ -161,6 +160,33 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
->>       sdhci_set_card_detection(host, false);
->>  }
->>
->> +static int sdhci_get_cd(struct mmc_host *mmc)
->> +{
->> +     struct sdhci_host *host = mmc_priv(mmc);
->> +     int gpio_cd = mmc_gpio_get_cd(mmc);
->> +
->> +     if (host->flags & SDHCI_DEVICE_DEAD)
->> +             return 0;
->> +
->> +     /* If nonremovable, assume that the card is always present. */
->> +     if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
->> +             return 1;
->> +
->> +     /*
->> +      * Try slot gpio detect, if defined it take precedence
->> +      * over build in controller functionality
->> +      */
->> +     if (!IS_ERR_VALUE(gpio_cd))
->> +             return !!gpio_cd;
->> +
->> +     /* If polling, assume that the card is always present. */
->> +     if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
->> +             return 1;
->> +
->> +     /* Host native card detect */
->> +     return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
->> +}
->> +
->>  void sdhci_reset(struct sdhci_host *host, u8 mask)
->>  {
->>       unsigned long timeout;
->> @@ -1551,33 +1577,6 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>       spin_unlock_irqrestore(&host->lock, flags);
->>  }
->>
->> -static int sdhci_get_cd(struct mmc_host *mmc)
->> -{
->> -     struct sdhci_host *host = mmc_priv(mmc);
->> -     int gpio_cd = mmc_gpio_get_cd(mmc);
->> -
->> -     if (host->flags & SDHCI_DEVICE_DEAD)
+>> -     if (IS_ERR(mmc->supply.vqmmc))
 >> -             return 0;
 >> -
->> -     /* If nonremovable, assume that the card is always present. */
->> -     if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
->> -             return 1;
+>> -     switch (ios->signal_voltage) {
+>> -     case MMC_SIGNAL_VOLTAGE_330:
+>> -             ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
+>> -                                         3600000);
+>> -             if (ret) {
+>> -                     pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
+>> -                             mmc_hostname(mmc));
+>> -                     return -EIO;
+>> -             }
 >> -
->> -     /*
->> -      * Try slot gpio detect, if defined it take precedence
->> -      * over build in controller functionality
->> -      */
->> -     if (!IS_ERR_VALUE(gpio_cd))
->> -             return !!gpio_cd;
+>> -             return 0;
+>> -     case MMC_SIGNAL_VOLTAGE_180:
+>> -             ret = regulator_set_voltage(mmc->supply.vqmmc,
+>> -                             1700000, 1950000);
+>> -             if (ret) {
+>> -                     pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
+>> -                             mmc_hostname(mmc));
+>> -                     return -EIO;
+>> -             }
 >> -
->> -     /* If polling, assume that the card is always present. */
->> -     if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
->> -             return 1;
->> -
->> -     /* Host native card detect */
->> -     return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
->> -}
->> -
->>  static int sdhci_check_ro(struct sdhci_host *host)
->>  {
->>       unsigned long flags;
+>> -             return 0;
+>> -     case MMC_SIGNAL_VOLTAGE_120:
+>> -             ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
+>> -                                         1300000);
+>> -             if (ret) {
+>> -                     pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
+>> -                             mmc_hostname(mmc));
+>> -                     return -EIO;
+>> -             }
+>> -             return 0;
+>> -     default:
+>> -             /* No signal voltage switch required */
+>> -             return 0;
+>> -     }
+>> +     /* do regulator signal voltage switch if exist */
+>> +     return mmc_regulator_set_vqmmc(mmc, ios);
+>>  }
+>>
+>>  static int sdhci_card_busy(struct mmc_host *mmc)
 >>
 >
