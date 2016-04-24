@@ -1,23 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 00:01:46 +0200
-Subject: [PATCH v2] ARM: dts: artpec: update clock bindings in artpec6.dtsi
-In-Reply-To: <1457946103-13853-1-git-send-email-larper@axis.com>
-References: <1457946103-13853-1-git-send-email-larper@axis.com>
-Message-ID: <8943044.6HVM79N0NL@wuerfel>
+From: colin.king@canonical.com (Colin King)
+Date: Sun, 24 Apr 2016 23:02:09 +0100
+Subject: [PATCH] pinctrl: sirf/atlas7: trivial fix of spelling mistake on
+ flagged
+Message-ID: <1461535329-19935-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 March 2016 10:01:43 Lars Persson wrote:
-> The clock binding for the main clock controller was changed to an
-> indexed controller style binding on request of the clk
-> maintainers. This updates the dtsi to use the new bindings.
-> 
-> Signed-off-by: Lars Persson <larper@axis.com>
-> ---
-> v2: Use numerical clock indexes to enable merge before the clock driver bindings
-> are in the tree.
-> 
+From: Colin Ian King <colin.king@canonical.com>
 
-Applied to next/dt for v4.7, thanks!
+fix spelling mistake, flaged -> flagged
 
-	Arnd
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/sirf/pinctrl-atlas7.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+index 3d233fc..168c0f5 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+@@ -5798,7 +5798,7 @@ static void atlas7_gpio_handle_irq(struct irq_desc *desc)
+ 
+ 	status = readl(ATLAS7_GPIO_INT_STATUS(bank));
+ 	if (!status) {
+-		pr_warn("%s: gpio [%s] status %#x no interrupt is flaged\n",
++		pr_warn("%s: gpio [%s] status %#x no interrupt is flagged\n",
+ 			__func__, gc->label, status);
+ 		handle_bad_irq(desc);
+ 		return;
+-- 
+2.7.4
