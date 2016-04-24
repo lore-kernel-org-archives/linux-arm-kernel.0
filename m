@@ -1,30 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Apr 2016 23:18:58 +0200
-Subject: [GIT PULL 2/5] ARM: dts: exynos: DT for v4.7
-In-Reply-To: <1460541682-32417-3-git-send-email-k.kozlowski@samsung.com>
-References: <1460541682-32417-1-git-send-email-k.kozlowski@samsung.com>
- <1460541682-32417-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5773702.Vl2lnk0PfR@wuerfel>
+Date: Sun, 24 Apr 2016 23:22:25 +0200
+Subject: [GIT PULL v2] ARM: mvebu: dt for v4.7 (#1)
+In-Reply-To: <87lh4gyux7.fsf@free-electrons.com>
+References: <87lh4gyux7.fsf@free-electrons.com>
+Message-ID: <38744048.UFxeMSeooN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 April 2016 12:01:19 Krzysztof Kozlowski wrote:
-> Samsung Device Tree updates and improvements for v4.7:
-> 1. Enable accelerated AES (Security SubSystem) on Exynos4412-based boards.
-> 2. Enable HDMI CEC on Exynos4412-based Odroid.
-> 3. Add regulator supplies for eMMC/SD on Odroid XU3/XU4.
-> 4. Fix DTC unit name warnings.
-> 5. Merge topic branch of new Artik5 board.
+On Thursday 14 April 2016 19:14:28 Gregory CLEMENT wrote:
+> mvebu dt for 4.7 (part 1)
+> 
+> - add hardware monitor support in the NSA320 device tree
+> - update makefile with kirkwood-ds112.dtb and kirkwood-nsa320.dtb
+> - fix GPIO config on the Linksys boards
+> - various Kirkwood DT warning fixup from the newer DT compiler
+> 
 > 
 
-Pulled into next/dt. Thanks for splitting this into a separate branch
-aside from the Artik5 stuff, that makes sense. Two minor things you
-could have done even better:
-
-- split out the DTC unit name warning fixes into yet another branch,
-  as there are lots of them and they are unrelated to the rest
-
-- not merge the Artik5 changes into this, but let us deal with
-  any conflicts ourselves.
+Pulled into next/dt, thanks!
 
 	Arnd
