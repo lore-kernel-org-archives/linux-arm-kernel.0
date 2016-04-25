@@ -1,49 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 17:53:02 +0200
-Subject: [GIT PULL 1/5] ARM: dts: exynos: Artik5 topic branch for v4.7
-In-Reply-To: <571DDCE5.5020201@samsung.com>
-References: <1460541682-32417-1-git-send-email-k.kozlowski@samsung.com>
- <7068458.f0qaFCRyGK@wuerfel> <571DDCE5.5020201@samsung.com>
-Message-ID: <5431726.aFYokxb3m1@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 25 Apr 2016 17:55:08 +0200
+Subject: [PATCH] kbuild: fix call to adjust_autoksyms.sh when output directory
+ specified
+Message-ID: <1461599708-1397-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 11:01:25 Krzysztof Kozlowski wrote:
-> On 04/24/2016 11:15 PM, Arnd Bergmann wrote:
-> > On Wednesday 13 April 2016 12:01:18 Krzysztof Kozlowski wrote:
-> >> Topic branch for Device Tree changes for Exynos 3250 for v4.7:
-> >>
-> >> Merge necessary new clocks from Sylwester (used by new board) and add support
-> >> for Exynos3250-based Artik5 board.
-> >>
-> > 
-> > Merged into next/dt, thanks!
-> > 
-> > I see that you have modified the include/dt-bindings/clock/exynos3250.h
-> > file. Two questions about that:
-> > 
-> > - How is this going to get synchronized with the respective driver changes
-> >   in a way that avoids breaking the build of the clk tree? Do you just
-> >   wait another merge window for that?
-> 
-> Mentioned include/dt-bindings change comes from clk tree, merged here
-> (see "Merge tag 'clk-v4.7-exynos3250' of
-> git://linuxtv.org/snawrocki/samsung into
-> for-v4.7/dt-exynos3250-artik5"). I assume that any driver related
-> changes in clk tree would be on top of that commit.
+When a different output directory is specified during the build process (with
+O= or KBUILD_OUTPUT), the call to adjust_autoksyms.sh script fails with the
+following error:
+/bin/sh scripts/adjust_autoksyms.sh \
+	  "make KBUILD_MODULES=1 -f ../Makefile autoksyms_recursive"
+	  /bin/sh: scripts/adjust_autoksyms.sh: No such file or directory
+	  make[2]: *** [vmlinux] Error 127
+	  make[1]: *** [sub-make] Error 2
+	  make: *** [__sub-make] Error 2
+
+Using the absolute path with $(srctree) variable solves the problem.
+
+This is in case the CONFIG_TRIM_UNUSED_KSYMS option is specified.
+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Fixes: 23121ca2b56b ("kbuild: create/adjust generated/autoksyms.h")
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+---
+Hi Nicolas,
+
+I found this issue while running on today's Linux-next with my ARM
+cross-compiler.
+I suspect it's the proper way to fix the issue but I may miss some of the
+details of the top kernel Makefile.
+It does work for my separated output directory setup and I verified it still
+compiles an in-sources setup as well (even if it's obvious...).
+
+Bye,
 
 
-Ok
+ Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> > - Are there any other clocks that you should define now so you don't run
-> >   into dependency problems later?
-> 
-> Indeed we might have similar for Exynos5422 and devfreq but I already
-> talked with Sylwester about it. He pushed such changes to clk folks and
-> prepared a tag for me - just in case:
-> https://lkml.org/lkml/2016/4/15/561
-> 
-
-Very good, thanks!
-
-	Arnd
+diff --git a/Makefile b/Makefile
+index c3937c5ae3b8..1c26b410ba7b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -934,7 +934,7 @@ quiet_cmd_link-vmlinux = LINK    $@
+ # execute if the rest of the kernel build went well.
+ vmlinux: scripts/link-vmlinux.sh $(vmlinux-deps) FORCE
+ ifdef CONFIG_TRIM_UNUSED_KSYMS
+-	$(Q)$(CONFIG_SHELL) scripts/adjust_autoksyms.sh \
++	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/adjust_autoksyms.sh \
+ 	  "$(MAKE) KBUILD_MODULES=1 -f $(srctree)/Makefile autoksyms_recursive"
+ endif
+ ifdef CONFIG_HEADERS_CHECK
+@@ -949,13 +949,13 @@ endif
+ 	+$(call if_changed,link-vmlinux)
+ 
+ autoksyms_recursive: $(vmlinux-deps)
+-	$(Q)$(CONFIG_SHELL) scripts/adjust_autoksyms.sh \
++	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/adjust_autoksyms.sh \
+ 	  "$(MAKE) KBUILD_MODULES=1 -f $(srctree)/Makefile autoksyms_recursive"
+ PHONY += autoksyms_recursive
+ 
+ # standalone target for easier testing
+ include/generated/autoksyms.h: FORCE
+-	$(Q)$(CONFIG_SHELL) scripts/adjust_autoksyms.sh true
++	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/adjust_autoksyms.sh true
+ 
+ # Build samples along the rest of the kernel
+ ifdef CONFIG_SAMPLES
+-- 
+2.1.3
