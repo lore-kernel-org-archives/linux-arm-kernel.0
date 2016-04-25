@@ -1,43 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 14:19:07 +0100
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <20160425120222.GA2552@hardcore>
-References: <cover.1457539621.git.jglauber@cavium.com>
- <20160404121954.GA9300@hardcore> <20160425112207.GL16065@arm.com>
- <20160425120222.GA2552@hardcore>
-Message-ID: <20160425131907.GB30830@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Apr 2016 15:22:52 +0200
+Subject: [PATCH v4 11/11] ARM: sun5i: chip: Enable the TV Encoder
+In-Reply-To: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1461590572-4027-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 02:02:22PM +0200, Jan Glauber wrote:
-> On Mon, Apr 25, 2016 at 12:22:07PM +0100, Will Deacon wrote:
-> > On Mon, Apr 04, 2016 at 02:19:54PM +0200, Jan Glauber wrote:
-> > > can you have a look at these patches?
-> > 
-> > Looks like Mark reviewed this last week -- are you planning to respin?
-> 
-> Yes, of course. I just had no time yet and I'm a bit lost on how to
-> proceed without using the NUMA node information which Mark did not like
-> to be used.
-> 
-> The only way to know which device is on which node would be to look
-> at the PCI topology (which is also the source of the NUMA node_id).
-> We could do this manually in order to not depend on CONFIG_NUMA,
-> but I would like to know if that is acceptable before respinning the
-> patches.
+The CHIP has a composite output available muxed with the microphone in the
+micro-jack plug.
 
-That doesn't feel like it really addresses Mark's concerns -- it's just
-another way to get the information that isn't a first-class PMU topology
-description from firmware.
+Enable the composite output in its DTS.
 
-Now, I don't actually mind using the NUMA topology so much in the cases
-where it genuinely correlates with the PMU topology. My objection is more
-that we end up sticking everything on node 0 if !CONFIG_NUMA, which could
-result in working with an incorrect PMU topology and passing all of that
-through to userspace.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-So I'd prefer either making the driver depend on NUMA, or at the very least
-failing to probe  the PMU if we discover a socketed system and NUMA is not
-selected. Do either of those work as a compromise?
-
-Will
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index f6898c6b84d4..a8d8b4582397 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -66,6 +66,10 @@
+ 	};
+ };
+ 
++&be0 {
++	status = "okay";
++};
++
+ &codec {
+ 	status = "okay";
+ };
+@@ -188,6 +192,14 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
++&tve0 {
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_b>;
+-- 
+2.8.1
