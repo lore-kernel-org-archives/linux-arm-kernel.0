@@ -1,54 +1,66 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 25 Apr 2016 11:51:53 +0100
-Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
-In-Reply-To: <20160425104009.GD25087@leverpostej>
-References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
- <20160424212241.GO2829@codeblueprint.co.uk>
- <20160425101527.GP2829@codeblueprint.co.uk>
- <CAKv+Gu8OfqdJp-VhC3o-tie4mRZXsF5ESKkZbsjnBHDY4xbXvQ@mail.gmail.com>
- <20160425102821.GQ2829@codeblueprint.co.uk>
- <20160425104009.GD25087@leverpostej>
-Message-ID: <20160425105153.GR2829@codeblueprint.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Apr 2016 11:53:40 +0100
+Subject: [PATCH] make dt_scan_depth1_nodes more readable
+In-Reply-To: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
+References: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
+Message-ID: <20160425105340.GE16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr, at 11:40:09AM, Mark Rutland wrote:
+On Mon, Apr 25, 2016 at 11:25:11AM +0100, Stefano Stabellini wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
 > 
-> It looks like irqs_disabled_flags() will do what you expect, and ignore
-> everything but the interrupt flag.
+> Improve the readability of dt_scan_depth1_nodes by removing the nested
+> conditionals.
 > 
-> However, for ARM that will ignore the other exceptions we've seen FW
-> erroneously unmask (e.g. FIQ), which is unfortunate, as fiddling with
-> those is just as disastrous.
- 
-Bah, right.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+> 
+> ---
+> 
+> Note: this patch is based on xentip/for-linus-4.7
 
-> Would you be happy with an arch_efi_call_check_flags(before, after),
-> instead? That way we can make the flags we check arch-specific.
+So how should I merge it? :/
 
-Could we just make the flag mask arch-specific instead of the call
-since the rest of efi_call_virt_check_flags() is good?
+Will
 
-Something like this (uncompiled, untested, half-baked),
-
----
-
-diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
-index c38b1cfc26e2..057d00bee7d6 100644
---- a/drivers/firmware/efi/runtime-wrappers.c
-+++ b/drivers/firmware/efi/runtime-wrappers.c
-@@ -25,9 +25,12 @@
- static void efi_call_virt_check_flags(unsigned long flags, const char *call)
- {
- 	unsigned long cur_flags;
-+	bool mismatch;
- 
- 	local_save_flags(cur_flags);
--	if (!WARN_ON_ONCE(cur_flags != flags))
-+
-+	mismatch = (cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK;
-+	if (!WARN_ON_ONCE(mismatch))
- 		return;
- 
- 	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_NOW_UNRELIABLE);
+> 
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 57ee317..6884c76 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -66,17 +66,24 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>  				       void *data)
+>  {
+>  	/*
+> -	 * Return 1 as soon as we encounter a node at depth 1 that is
+> -	 * not the /chosen node, or /hypervisor node with compatible
+> -	 * string "xen,xen".
+> +	 * Ignore anything not directly under the root node; we'll
+> +	 * catch its parent instead.
+>  	 */
+> -	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+> -		if (strcmp(uname, "hypervisor") != 0 ||
+> -		    !of_flat_dt_is_compatible(node, "xen,xen"))
+> -			return 1;
+> -	}
+> +	if (depth != 1)
+> +		return 0;
+>  
+> -	return 0;
+> +	if (strcmp(uname, "chosen") == 0)
+> +		return 0;
+> +
+> +	if (strcmp(uname, "hypervisor") == 0 &&
+> +	    of_flat_dt_is_compatible(node, "xen,xen"))
+> +		return 0;
+> +
+> +	/*
+> +	 * This node at depth 1 is neither a chosen node nor a xen node,
+> +	 * which we do not expect.
+> +	 */
+> +	return 1;
+>  }
+>  
+>  /*
+> 
