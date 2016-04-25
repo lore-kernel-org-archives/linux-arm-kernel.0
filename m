@@ -1,47 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Apr 2016 16:00:31 -0700
-Subject: [PATCH] soc: brcmstb: select SOC_BUS
-In-Reply-To: <1461625017-1939162-1-git-send-email-arnd@arndb.de>
-References: <1461625017-1939162-1-git-send-email-arnd@arndb.de>
-Message-ID: <571EA18F.2030401@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 Apr 2016 17:07:48 -0600
+Subject: [PATCH] coresight: etm4x: Add DT implementation.
+In-Reply-To: <1461401148-188382-1-git-send-email-lipengcheng8@huawei.com>
+References: <1461401148-188382-1-git-send-email-lipengcheng8@huawei.com>
+Message-ID: <CANLsYkwL-7bWEN6Suehgg8hBT5tLCRxHieGUwDe+vdgko0yt5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 15:55, Arnd Bergmann wrote:
-> The newly added code for the SoC bus fails to link if the
-> bus is not built:
-> 
-> drivers/soc/built-in.o: In function `brcmstb_soc_device_init':
-> :(.init.text+0x110): undefined reference to `soc_device_register'
-> 
-> This adds a 'select' statement to avoid the error.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 23 April 2016 at 02:45, lipengcheng <lipengcheng8@huawei.com> wrote:
+> Add DT implementation for A72 board.
 
-Fixes: cef4bafcea2c ("soc: brcmstb: add SoC driver to brcmstb")
+This patch has nothing to do with the device tree...  You are adding
+the a cell ID for the CS ETMv4 found on the Maia processor.
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-
-Thanks!
-
+>
+> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+> Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
 > ---
->  drivers/soc/brcmstb/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/soc/brcmstb/Kconfig b/drivers/soc/brcmstb/Kconfig
-> index 39cab3b..7fec3b4 100644
-> --- a/drivers/soc/brcmstb/Kconfig
-> +++ b/drivers/soc/brcmstb/Kconfig
-> @@ -1,6 +1,7 @@
->  menuconfig SOC_BRCMSTB
->  	bool "Broadcom STB SoC drivers"
->  	depends on ARM
-> +	select SOC_BUS
->  	help
->  	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
->  	  This option alone enables only some support code, while the drivers
-> 
+>  drivers/hwtracing/coresight/coresight-etm4x.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index 6396b28..462f0dc 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -825,6 +825,11 @@ static struct amba_id etm4_ids[] = {
+>                 .mask   = 0x000fffff,
+>                 .data   = "ETM 4.0",
+>         },
+> +       {       /* ETM 4.0 - A72, Maia, HiSilicon */
+> +               .id = 0x000bb95a,
+> +               .mask = 0x000fffff,
+> +               .data = "ETM 4.0",
+> +       },
+>         { 0, 0},
+>  };
 
+Applied, with a modified subject and commit log description.
 
--- 
-Florian
+Thanks,
+Mathieu
+>
+> --
+> 1.8.3.2
+>
