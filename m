@@ -1,27 +1,25 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Apr 2016 08:05:57 -0500
-Subject: [PATCH v6 7/7] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <1461343238-29274-8-git-send-email-fcooper@ti.com>
-References: <1461343238-29274-1-git-send-email-fcooper@ti.com>
- <1461343238-29274-8-git-send-email-fcooper@ti.com>
-Message-ID: <20160425130557.GA11485@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Apr 2016 14:06:37 +0100
+Subject: [PATCH v6 5/7] arm64/perf: Access pmu register using
+ <read/write>_sys_reg
+In-Reply-To: <1461243525-13603-6-git-send-email-ashoks@broadcom.com>
+References: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
+ <1461243525-13603-6-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160425130637.GA29160@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 11:40:38AM -0500, Franklin S Cooper Jr wrote:
-> From: Vignesh R <vigneshr@ti.com>
+On Thu, Apr 21, 2016 at 05:58:43AM -0700, Ashok Kumar wrote:
+> changed pmu register access to make use of <read/write>_sys_reg
+> from sysreg.h instead of accessing them directly.
 > 
-> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
-> for dt bindings.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> [fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 > ---
->  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
->  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
->  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
->  arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
->  4 files changed, 122 insertions(+), 1 deletion(-)
+>  arch/arm64/kernel/perf_event.c | 33 ++++++++++++++++-----------------
+>  1 file changed, 16 insertions(+), 17 deletions(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+This doesn't apply on top of -rc1 + the first four patches in your series.
+What am I missing?
+
+Will
