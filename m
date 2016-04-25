@@ -1,38 +1,84 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Apr 2016 16:37:59 +0200
-Subject: [PATCH 0/2] Support MPS2 Timer
-In-Reply-To: <1461573944-2728-1-git-send-email-vladimir.murzin@arm.com>
-References: <1461573944-2728-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160425143759.GD3974@linaro.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 Apr 2016 08:38:29 -0600
+Subject: [PATCH V3 12/18] coresight: tmc: dump system memory content only
+ when needed
+In-Reply-To: <571DFC95.10006@arm.com>
+References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
+ <1461345255-11758-13-git-send-email-mathieu.poirier@linaro.org>
+ <571DFC95.10006@arm.com>
+Message-ID: <CANLsYky_TK9PkwSPnQzmaV5Y0fD0jQvRS2FgTB9b6Om8TDfWXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 09:45:42AM +0100, Vladimir Murzin wrote:
-> Hi,
-> 
-> These patches allow to use simple 32 bits general purpose countdown
-> timers found on MPS2 platform.
-> 
-> Following [1], please, consider to merge them into clocksource tree.
-> 
-> [1] https://lkml.org/lkml/2016/4/23/190
-> 
-> Thanks!
-> 
-> Vladimir Murzin (2):
->   dt-bindings: document the MPS2 timer bindings
->   clockevents/drivers: add MPS2 Timer driver
-> 
->  .../devicetree/bindings/timer/arm,mps2-timer.txt   |   28 ++
->  drivers/clocksource/Kconfig                        |    6 +
->  drivers/clocksource/Makefile                       |    1 +
->  drivers/clocksource/mps2-timer.c                   |  275 ++++++++++++++++++++
->  4 files changed, 310 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
->  create mode 100644 drivers/clocksource/mps2-timer.c
+On 25 April 2016 at 05:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 22/04/16 18:14, Mathieu Poirier wrote:
+>>
+>> Calling tmc_etf/etr_dump_hw() is required only when operating from
+>> sysFS.  When working from Perf, the system memory is harvested
+>> from the AUX trace API.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 7 ++++++-
+>>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 ++++++-
+>>   2 files changed, 12 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> index d090a9745c73..25fad93b68d4 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> @@ -74,7 +74,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata
+>> *drvdata)
+>>         CS_UNLOCK(drvdata->base);
+>>
+>>         tmc_flush_and_stop(drvdata);
+>> -       tmc_etb_dump_hw(drvdata);
+>> +       /*
+>> +        * When operating in sysFS mode the content of the buffer needs to
+>> be
+>> +        * read before the TMC is disabled.
+>> +        */
+>> +       if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+>> +               tmc_etb_dump_hw(drvdata);
+>>         tmc_disable_hw(drvdata);
+>>
+>>         CS_LOCK(drvdata->base);
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> index 8bbbf3ab1387..4b000f4003a2 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> @@ -76,7 +76,12 @@ static void tmc_etr_disable_hw(struct tmc_drvdata
+>> *drvdata)
+>>         CS_UNLOCK(drvdata->base);
+>>
+>>         tmc_flush_and_stop(drvdata);
+>> -       tmc_etr_dump_hw(drvdata);
+>> +       /*
+>> +        * When operating in sysFS mode the content of the buffer needs to
+>> be
+>> +        * read before the TMC is disabled.
+>> +        */
+>> +       if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+>> +               tmc_etr_dump_hw(drvdata);
+>>         tmc_disable_hw(drvdata);
+>
+>
+> Nit: It would be cleaner if tmc_etX_disable_hw accepted a bool parameter to
+> decide
+> whether to dump the hw data or not. That way, the callers can make the
+> decision,
+> leaving the disable_hw code unaware of the mode checks.
 
-Applied for 4.7.
+My goal in pushing the functionality to tmc_etX_disable_hw() was to
+especially keep the the higher layers unaware of sink buffer
+management specifics.  There is two ways to look at this and we simply
+landed on different sides of the fence.  I'm not strongly opinionated
+on this, I'll modify if you're really keen on this.
 
-Thanks !
+Thanks,
+Mathieu
 
-  -- Daniel
+>
+> Suzuki
