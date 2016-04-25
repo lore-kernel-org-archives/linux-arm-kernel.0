@@ -1,73 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 25 Apr 2016 17:55:08 +0200
-Subject: [PATCH] kbuild: fix call to adjust_autoksyms.sh when output directory
- specified
-Message-ID: <1461599708-1397-1-git-send-email-nicolas.ferre@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 25 Apr 2016 17:55:03 +0200
+Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
+In-Reply-To: <5536968.ADFL5hRmGD@wuerfel>
+References: <cover.1461228504.git.viresh.kumar@linaro.org>
+ <17150729.NF4MViUffk@wuerfel> <20160425152914.GI6104@vireshk-i7>
+ <5536968.ADFL5hRmGD@wuerfel>
+Message-ID: <20160425175503.28ef34d9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a different output directory is specified during the build process (with
-O= or KBUILD_OUTPUT), the call to adjust_autoksyms.sh script fails with the
-following error:
-/bin/sh scripts/adjust_autoksyms.sh \
-	  "make KBUILD_MODULES=1 -f ../Makefile autoksyms_recursive"
-	  /bin/sh: scripts/adjust_autoksyms.sh: No such file or directory
-	  make[2]: *** [vmlinux] Error 127
-	  make[1]: *** [sub-make] Error 2
-	  make: *** [__sub-make] Error 2
+Hello,
 
-Using the absolute path with $(srctree) variable solves the problem.
+On Mon, 25 Apr 2016 17:46:53 +0200, Arnd Bergmann wrote:
 
-This is in case the CONFIG_TRIM_UNUSED_KSYMS option is specified.
+> > What code are you talking about? Initializing the OPPs or adding the
+> > cpufreq-dt device? The first one (or whatever is left now in that
+> > function) can stay anywhere, even as a cpufreq driver. I was talking
+> > about the fact that we don't have a sequence problem to solve here.
+> 
+> My line of thinking was that the armada_xp_pmsu_cpufreq_init()
+> function makes sense by itself and feels like it should be
+> one file in drivers/cpufreq, including the creation of the device.
+> 
+> Even without the argument of the sequencing, they two parts sort
+> of belong together because the cpufreq-dt driver depends on both
+> of them being run before it can function. It's also the same amount
+> of code, as you are replacing one line in armada_xp_pmsu_cpufreq_init
+> with one line in "struct of_device_id machines".
+> 
+> It's not really that important, just a feeling I had that it could
+> be done better. Unless the mvebu maintainers feel strongly about
+> it, just do as you prefer.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Fixes: 23121ca2b56b ("kbuild: create/adjust generated/autoksyms.h")
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
----
-Hi Nicolas,
+As a mvebu folk, I don't really have a strong opinion on this. We also
+have some cpufreq device registration code in
+arch/arm/mach-mvebu/kirkwood.c for the older Kirkwood platform, though
+this one uses a custom cpufreq driver and not the generic cpufreq-dt
+driver.
 
-I found this issue while running on today's Linux-next with my ARM
-cross-compiler.
-I suspect it's the proper way to fix the issue but I may miss some of the
-details of the top kernel Makefile.
-It does work for my separated output directory setup and I verified it still
-compiles an in-sources setup as well (even if it's obvious...).
+Ideally, in the grand direction of removing as much things as possible
+from mach-<foo> directories, it would be great to move such
+initializations somewhere else. But cpufreq is not by far not the only
+reason why we still have code in mach-<foo>, at least in the mvebu land.
 
-Bye,
-
-
- Makefile | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/Makefile b/Makefile
-index c3937c5ae3b8..1c26b410ba7b 100644
---- a/Makefile
-+++ b/Makefile
-@@ -934,7 +934,7 @@ quiet_cmd_link-vmlinux = LINK    $@
- # execute if the rest of the kernel build went well.
- vmlinux: scripts/link-vmlinux.sh $(vmlinux-deps) FORCE
- ifdef CONFIG_TRIM_UNUSED_KSYMS
--	$(Q)$(CONFIG_SHELL) scripts/adjust_autoksyms.sh \
-+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/adjust_autoksyms.sh \
- 	  "$(MAKE) KBUILD_MODULES=1 -f $(srctree)/Makefile autoksyms_recursive"
- endif
- ifdef CONFIG_HEADERS_CHECK
-@@ -949,13 +949,13 @@ endif
- 	+$(call if_changed,link-vmlinux)
- 
- autoksyms_recursive: $(vmlinux-deps)
--	$(Q)$(CONFIG_SHELL) scripts/adjust_autoksyms.sh \
-+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/adjust_autoksyms.sh \
- 	  "$(MAKE) KBUILD_MODULES=1 -f $(srctree)/Makefile autoksyms_recursive"
- PHONY += autoksyms_recursive
- 
- # standalone target for easier testing
- include/generated/autoksyms.h: FORCE
--	$(Q)$(CONFIG_SHELL) scripts/adjust_autoksyms.sh true
-+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/adjust_autoksyms.sh true
- 
- # Build samples along the rest of the kernel
- ifdef CONFIG_SAMPLES
+Thomas
 -- 
-2.1.3
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
