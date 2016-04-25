@@ -1,113 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 25 Apr 2016 11:13:27 +0100
-Subject: [PATCH 2/7] KVM: arm/arm64: directly pass virtual IRQ number on
- injecting mapped IRQ
-In-Reply-To: <57190945.3020005@linaro.org>
-References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
- <1460729047-6346-3-git-send-email-andre.przywara@arm.com>
- <57190945.3020005@linaro.org>
-Message-ID: <571DEDC7.9060708@arm.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Mon, 25 Apr 2016 11:14:07 +0100
+Subject: [PATCH 1/2] ARM: PIE infrastructure
+In-Reply-To: <20160422231503.GE17051@piout.net>
+References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1459668234-16033-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160404100052.GS19428@n2100.arm.linux.org.uk>
+ <20160422231503.GE17051@piout.net>
+Message-ID: <20160425101406.GR24713@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Sat, Apr 23, 2016 at 01:15:03AM +0200, Alexandre Belloni wrote:
+> On 04/04/2016 at 11:00:52 +0100, Russell King - ARM Linux wrote :
+> > > + /* Copy chunk specific code/data */
+> > > + fncpy((char *)chunk->addr, code_start, code_sz);
+> >
+> > Sorry, NAK.  This abuses fncpy().  There is extensive documentation on
+> > the proper use of this in asm/fncpy.h, and anything that does not
+> > conform, or which uses memcpy() to copy functions, gets an immediate
+> > NAK from me.  fncpy() exists to avoid people doing broken things, and
+> > it's written in such a way to help people get it right.
+>
+> Well, do you want me to iterate and use fncpy on all the functions from
+> the generated binary?
+>
+> I'm not sure this is necessary as the generated binary is self contained
+> and doing so will force me to also ensure the offsets are kept the same.
+> Doing only one copy is much more convenient. However, I still need to
+> ensure the destination address is properly 8-byte aligned and the
+> flush_icache_range().
+> I understand this is abusing fncpy() but it does want I need (still, I'm
+> planning to avoid the BUG() by always passing a properly aligned
+> destination address).
 
-thanks for looking at the patches!
+fncpy was only intented for a single, self-contained function.  It bakes
+in assumptions that are not going to apply to PIEs in general.
 
-On 21/04/16 18:09, Eric Auger wrote:
-> Hi Andre,
-> On 04/15/2016 04:04 PM, Andre Przywara wrote:
->> When we want to inject a hardware mapped IRQ into a guest, we actually
->> only need the virtual IRQ number from the irq_phys_map.
->> So let's pass this number directly from the arch timer to the VGIC
->> to avoid using the map as a parameter.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/arm_vgic.h    | 2 +-
->>  virt/kvm/arm/arch_timer.c | 2 +-
->>  virt/kvm/arm/vgic.c       | 6 +++---
->>  3 files changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 281caf8..c4574da 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -341,7 +341,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>  			bool level);
->>  int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->> -			       struct irq_phys_map *map, bool level);
->> +			       unsigned int virt_irq, bool level);
->>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index a9ad4fe..eb56f1e 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -140,7 +140,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
->>  	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
->>  				   timer->irq.level);
->>  	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
->> -					 timer->map,
->> +					 timer->map->virt_irq,
->>  					 timer->irq.level);
->>  	WARN_ON(ret);
->>  }
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 7282881..9937d41 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -1667,7 +1667,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>   * kvm_vgic_inject_mapped_irq - Inject a physically mapped IRQ to the vgic
->>   * @kvm:     The VM structure pointer
->>   * @cpuid:   The CPU for PPIs
->> - * @map:     Pointer to a irq_phys_map structure describing the mapping
->> + * @virt_irq: The virtual IRQ to be injected
->>   * @level:   Edge-triggered:  true:  to trigger the interrupt
->>   *			      false: to ignore the call
->>   *	     Level-sensitive  true:  raise the input signal
->> @@ -1678,7 +1678,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>   * being HIGH and 0 being LOW and all devices being active-HIGH.
->>   */
->>  int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->> -			       struct irq_phys_map *map, bool level)
->> +			       unsigned int virt_irq, bool level)
->>  {
-> Could make sense to merge kvm_vgic_inject_mapped_irq and
-> kvm_vgic_inject_irq and just add a bool argument telling whether the
-> request comes from the userspace (if I remember well we wanted to
-> prevent the userspace from injecting a mapping irq). This would avoid
-> duplication. We can make it later though.
+The main purpose of this was to avoid (possibly buggy) reinvention of
+this bit of code in every driver or board file that needed to copy a
+function to SRAM.
 
-Yes, actually I merge both of them in the new VGIC series (44/45: [1]).
-But this mini-series aims to stay as close as possible to the original
-code, so I think we will properly unify this once the old VGIC gets removed.
+The PIE mechanism supersedes this approach, in that it should completely
+hide the mechanics of copying to SRAM from the users of PIEs -- so its
+worth the PIE infrastructure having it's own code to do this.
+Since PIEs will have their own requirements that go beyond what fncpy
+does, using fncpy to implement the PIE infrastructure is a misfactorage.
 
-But thanks for the heads up with the userspace injection and mapped
-IRQs, I was wondering the other day what the differences between the two
-actually were. This may mean I have to rework the 44/45 patch.
+In particular, what is the alignment requirement for a PIE?  It can be
+anything that ELF allows, not simply "8".
 
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+The "thumb bit" is obviously also meaningless for section base
+addresses.
 
-Merci!
-
-Cheers,
-Andre.
-
-[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2016-April/019671.html
-
->>  	int ret;
->>  
->> @@ -1686,7 +1686,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->>  	if (ret)
->>  		return ret;
->>  
->> -	return vgic_update_irq_pending(kvm, cpuid, map->virt_irq, level);
->> +	return vgic_update_irq_pending(kvm, cpuid, virt_irq, level);
->>  }
->>  
->>  static irqreturn_t vgic_maintenance_handler(int irq, void *data)
->>
-> 
+Cheers
+---Dave
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
