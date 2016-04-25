@@ -1,67 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 14:53:49 +0200
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <20160425030041.GF22726@vireshk-i7>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <7576455.rVXD0283Nr@wuerfel> <20160425030041.GF22726@vireshk-i7>
-Message-ID: <6893237.FoNPbfW3DC@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Apr 2016 13:54:41 +0100
+Subject: [PATCH] make dt_scan_depth1_nodes more readable
+In-Reply-To: <alpine.DEB.2.10.1604251221250.24872@sstabellini-ThinkPad-X260>
+References: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
+ <20160425105340.GE16065@arm.com>
+ <alpine.DEB.2.10.1604251204380.24872@sstabellini-ThinkPad-X260>
+ <20160425111938.GK16065@arm.com>
+ <alpine.DEB.2.10.1604251221250.24872@sstabellini-ThinkPad-X260>
+Message-ID: <20160425125440.GN16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 08:30:41 Viresh Kumar wrote:
-> On 23-04-16, 00:42, Arnd Bergmann wrote:
-> > On Thursday 21 April 2016 14:29:02 Viresh Kumar wrote:
-> > > diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> > > index 79d0a5d9da8e..f24f46776fbb 100644
-> > > --- a/arch/arm/mach-mvebu/pmsu.c
-> > > +++ b/arch/arm/mach-mvebu/pmsu.c
-> > > @@ -685,8 +685,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
-> > >                         dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
-> > >                                 __func__, ret);
-> > >         }
-> > > -
-> > > -       platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> > >         return 0;
-> > >  }
-> > >  
-> > > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > > index 69b2a222c84e..5704a92c52dc 100644
-> > > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> > > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > > @@ -33,6 +33,8 @@ static const struct of_device_id machines[] = {
-> > >  
-> > >         { .compatible = "marvell,berlin", },
-> > >  
-> > > +       { .compatible = "marvell,armadaxp", },
-> > > +
-> > >         { .compatible = "samsung,exynos3250", },
-> > >         { .compatible = "samsung,exynos4210", },
-> > >         { .compatible = "samsung,exynos4212", },
+On Mon, Apr 25, 2016 at 12:24:03PM +0100, Stefano Stabellini wrote:
+> On Mon, 25 Apr 2016, Will Deacon wrote:
+> > On Mon, Apr 25, 2016 at 12:04:53PM +0100, Stefano Stabellini wrote:
+> > > On Mon, 25 Apr 2016, Will Deacon wrote:
+> > > > On Mon, Apr 25, 2016 at 11:25:11AM +0100, Stefano Stabellini wrote:
+> > > > > From: Mark Rutland <mark.rutland@arm.com>
+> > > > > 
+> > > > > Improve the readability of dt_scan_depth1_nodes by removing the nested
+> > > > > conditionals.
+> > > > > 
+> > > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > > > Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+> > > > > 
+> > > > > ---
+> > > > > 
+> > > > > Note: this patch is based on xentip/for-linus-4.7
+> > > > 
+> > > > So how should I merge it? :/
+> > > 
+> > > I think that if you would like to merge it, it would be easier this time
+> > > for me to carry it in my tree. Otherwise you would have to base your
+> > > for-linus-4.7 on xentip/for-linus-4.7 and send the pull request after
+> > > the Xen pull request -- undesirable.
 > > 
-> > I think to make it clear that the ordering is significant here, I would leave this
-> > platform_device_register_simple() in armada_xp_pmsu_cpufreq_init().
-> > 
-> > However, it might be helpful to move that function into a new file in
-> > drivers/cpufreq/ if that works.
+> > Ok, doesn't look like we'll run into conflicts. I just find it weird that
+> > you'd have a patch with no functional change as a dependency, hence my
+> > preference to queue it in the arm64 tree (where conflicts are more likely).
+>  
+> I see, that makes sense. In that case, would you be happy to take:
 > 
-> We just can't get wrong with the ordering here, as this is done from
-> device_initcall() and so that point is out of question.
-
-I realize that the ordering is fixed through the way that the kernel
-is linked, my worry is more about someone changing the code in some
-way because it's not obvious from reading the code that the
-dependency exists. If either the armada_xp_pmsu_cpufreq_init()
-initcall gets changed so it does not always get called, or the
-cpufreq_dt_platdev_init() initcall gets changed so it comes a little
-earlier, things will break.
-
-> The other thing that can happen is that armada_xp_pmsu_cpufreq_init()
-> call can fail. In that case, most of the times cpufreq-dt ->init()
-> will fail as well, so even that is fine for me.
+> https://git.kernel.org/cgit/linux/kernel/git/xen/tip.git/commit/?h=for-linus-4.7&id=df115bb0a0b8ad2f6dc62f8d094c21e77b367e7c
 > 
-> And, so I think we can keep this patch as is.
+> in your tree? That would get rid of any cross dependecies between the
+> two tree.
 
-What are the downsides of moving armada_xp_pmsu_cpufreq_init()
-into drivers/cpufreq?
+I can take that and the other patch on top too.
 
-	Arnd
+Will
