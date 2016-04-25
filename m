@@ -1,61 +1,45 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Apr 2016 09:58:41 +0100
-Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
-In-Reply-To: <201604240143.04330.arnd@arndb.de>
-References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
- <201604240143.04330.arnd@arndb.de>
-Message-ID: <571DDC41.5020302@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 25 Apr 2016 11:01:25 +0200
+Subject: [GIT PULL 1/5] ARM: dts: exynos: Artik5 topic branch for v4.7
+In-Reply-To: <7068458.f0qaFCRyGK@wuerfel>
+References: <1460541682-32417-1-git-send-email-k.kozlowski@samsung.com>
+ <1460541682-32417-2-git-send-email-k.kozlowski@samsung.com>
+ <7068458.f0qaFCRyGK@wuerfel>
+Message-ID: <571DDCE5.5020201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/16 00:43, Arnd Bergmann wrote:
-> On Friday 01 April 2016, Vladimir Murzin wrote:
->> Hi,
+On 04/24/2016 11:15 PM, Arnd Bergmann wrote:
+> On Wednesday 13 April 2016 12:01:18 Krzysztof Kozlowski wrote:
+>> Topic branch for Device Tree changes for Exynos 3250 for v4.7:
 >>
->> This patch series provides the basic support for running ucLinux on V2M-MPS2
->> platform.
->>
->> With these patches applied ucLinux can be run on both HW and FVP models
->> with Cortex-M3/M4/M7 configurations.
->>
->> Board description:
->>
->> http://infocenter.arm.com/help/topic/com.arm.doc.100112_0100_03_en/arm_versatile_express_cortex_m_prototyping_system_(v2m_mps2)_technical_reference_manual_100112_0100_03_en.pdf
->>
->> Application notes (cover Cortex-M3/M4/M7):
->>
->> http://infocenter.arm.com/help/topic/com.arm.doc.dai0385a/DAI0385A_cortex_m3_on_v2m_mps2.pdf
->> http://infocenter.arm.com/help/topic/com.arm.doc.dai0386a/DAI0386A_cortex_m4_on_v2m_mps2.pdf
->> http://infocenter.arm.com/help/topic/com.arm.doc.dai0399a/DAI0399A_cortex_m7_on_v2m_mps2.pdf
->> http://infocenter.arm.com/help/topic/com.arm.doc.dai0400a/DAI0400A_cortex_m7_on_v2m_mps2.pdf
->>
->> Cortex-M System Design Kit (referenced as CMDK from documents above):
->>
->> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0479c/DDI0479C_cortex_m_system_design_kit_r1p0_trm.pdf
->>
->> I'd be happy to hear any feedback/comments on this series!
+>> Merge necessary new clocks from Sylwester (used by new board) and add support
+>> for Exynos3250-based Artik5 board.
 >>
 > 
-> The whole series looks good to me, please submit the patches to the
-> appropriate maintainers for inclusion separately:
+> Merged into next/dt, thanks!
 > 
-> * patches 1-2 to the clocksource maintainers
-> * patches 3-5 to the serial driver maintainers
-> * patches 6-10 to the vexpress maintainers
+> I see that you have modified the include/dt-bindings/clock/exynos3250.h
+> file. Two questions about that:
 > 
-> I think everyone is already on Cc here, but they don't want to pick the
-> patches out of the series separately. I expect to get the patches for
-> arm-soc as part of the vexpress pull requests (dt, defconfig, and core).
+> - How is this going to get synchronized with the respective driver changes
+>   in a way that avoids breaking the build of the clk tree? Do you just
+>   wait another merge window for that?
 
-Thanks Arnd!
-
-I've just split patches per your request and sent them to appropriate
-maintainers.
-
-Cheers
-Vladimir
+Mentioned include/dt-bindings change comes from clk tree, merged here
+(see "Merge tag 'clk-v4.7-exynos3250' of
+git://linuxtv.org/snawrocki/samsung into
+for-v4.7/dt-exynos3250-artik5"). I assume that any driver related
+changes in clk tree would be on top of that commit.
 
 > 
-> 	Arnd
-> 
-> 
+> - Are there any other clocks that you should define now so you don't run
+>   into dependency problems later?
+
+Indeed we might have similar for Exynos5422 and devfreq but I already
+talked with Sylwester about it. He pushed such changes to clk folks and
+prepared a tag for me - just in case:
+https://lkml.org/lkml/2016/4/15/561
+
+Best regards,
+Krzysztof
