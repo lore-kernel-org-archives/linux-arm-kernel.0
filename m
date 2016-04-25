@@ -1,82 +1,29 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 25 Apr 2016 11:29:56 +0200
-Subject: [PATCH] ARM: dts: exynos: Enable PRNG and SSS for all Exynos4 devices
-Message-ID: <1461576596-27844-1-git-send-email-k.kozlowski@samsung.com>
+From: eric.engestrom@imgtec.com (Eric Engestrom)
+Date: Mon, 25 Apr 2016 10:47:55 +0100
+Subject: [PATCH 2/4] drivers: firmware: psci: remove duplicate const qualifier
+In-Reply-To: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+Message-ID: <1461577678-29517-2-git-send-email-eric.engestrom@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no external dependency for Security SubSystem (SSS) block so
-the nodes for Pseudo Random Number Generator and AES hardware
-acceleration can be enabled always for all Exynos4 devices.
-
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Eric Engestrom <eric.engestrom@imgtec.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi                  | 2 --
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 4 ----
- arch/arm/boot/dts/exynos4412-trats2.dts         | 8 --------
- 3 files changed, 14 deletions(-)
+ drivers/firmware/psci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index ffaceea74d79..5495b2bbc006 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -987,7 +987,6 @@
- 		interrupts = <0 112 0>;
- 		clocks = <&clock CLK_SSS>;
- 		clock-names = "secss";
--		status = "disabled";
- 	};
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 11bfee8..0ab477ba 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -563,7 +563,7 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	return err;
+ }
  
- 	prng: rng at 10830400 {
-@@ -995,7 +994,6 @@
- 		reg = <0x10830400 0x200>;
- 		clocks = <&clock CLK_SSS>;
- 		clock-names = "secss";
--		status = "disabled";
- 	};
- 
- 	register-debug {
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index acd7e7b5fd13..cab0f07d7d28 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -496,10 +496,6 @@
- 	status = "okay";
- };
- 
--&sss {
--	status = "okay";
--};
--
- &tmu {
- 	vtmu-supply = <&ldo10_reg>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 27dbf1687754..5d1eaea3f778 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -1234,10 +1234,6 @@
- 	status = "okay";
- };
- 
--&prng {
--	status = "okay";
--};
--
- &rtc {
- 	status = "okay";
- 	clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
-@@ -1286,10 +1282,6 @@
- 	};
- };
- 
--&sss {
--	status = "okay";
--};
--
- &tmu {
- 	vtmu-supply = <&ldo10_reg>;
- 	status = "okay";
+-static const struct of_device_id const psci_of_match[] __initconst = {
++static const struct of_device_id psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+ 	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
 -- 
-1.9.1
+2.7.4
