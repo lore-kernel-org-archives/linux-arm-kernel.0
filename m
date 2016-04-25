@@ -1,174 +1,63 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Apr 2016 16:09:55 +0100
-Subject: [PATCH V3 14/18] coresight: tmc: keep track of memory width
-In-Reply-To: <CANLsYkw59pvjc-Q6oVX+wB40nrzjuZ8V0hgdKT=sK=sH+HY-gw@mail.gmail.com>
+Date: Mon, 25 Apr 2016 16:11:26 +0100
+Subject: [PATCH V3 13/18] coresight: tmc: make sysFS and Perf mode
+ mutually exclusive
+In-Reply-To: <CANLsYkxJB2HzsDqwdKBJmUfVgnH7q7dF6+GQFhuSF+6-LzB_9Q@mail.gmail.com>
 References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-15-git-send-email-mathieu.poirier@linaro.org>
- <571E2C89.7010003@arm.com>
- <CANLsYkw59pvjc-Q6oVX+wB40nrzjuZ8V0hgdKT=sK=sH+HY-gw@mail.gmail.com>
-Message-ID: <571E3343.9090705@arm.com>
+ <1461345255-11758-14-git-send-email-mathieu.poirier@linaro.org>
+ <571E2A7F.2070802@arm.com>
+ <CANLsYkywBS2_wXHsjELRy-s5y36W5_U29csBfTt0h=40TNbU-A@mail.gmail.com>
+ <571E2F16.3010706@arm.com>
+ <CANLsYkxJB2HzsDqwdKBJmUfVgnH7q7dF6+GQFhuSF+6-LzB_9Q@mail.gmail.com>
+Message-ID: <571E339E.9080306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 15:55, Mathieu Poirier wrote:
-> On 25 April 2016 at 08:41, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> On 22/04/16 18:14, Mathieu Poirier wrote:
+On 25/04/16 16:05, Mathieu Poirier wrote:
+> On 25 April 2016 at 08:52, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 25/04/16 15:48, Mathieu Poirier wrote:
 >>>
->>> Accessing the HW configuration register each time the memory
->>> width is needed simply doesn't make sense.  It is much more
->>> efficient to read the value once and keep a reference for
->>> later use.
->>>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>    drivers/hwtracing/coresight/coresight-tmc-etf.c | 14 +---------
->>>    drivers/hwtracing/coresight/coresight-tmc.c     | 34
->>> +++++++++++++++++++++++++
->>>    drivers/hwtracing/coresight/coresight-tmc.h     | 10 +++++---
->>>    3 files changed, 41 insertions(+), 17 deletions(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>> index cc88c15ba45c..981c5ca75e36 100644
->>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>> @@ -41,25 +41,13 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->>>
->>>    static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
->>>    {
->>> -       enum tmc_mem_intf_width memwidth;
->>> -       u8 memwords;
->>>          char *bufp;
->>>          u32 read_data;
->>>          int i;
->>>
->>> -       memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID),
->>> 8, 10);
->>> -       if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
->>> -               memwords = 1;
->>> -       else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
->>> -               memwords = 2;
->>> -       else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
->>> -               memwords = 4;
->>> -       else
->>> -               memwords = 8;
->>> -
->>>          bufp = drvdata->buf;
->>>          while (1) {
->>> -               for (i = 0; i < memwords; i++) {
->>> +               for (i = 0; i < drvdata->memwidth; i++) {
->>>                          read_data = readl_relaxed(drvdata->base +
->>> TMC_RRD);
->>>                          if (read_data == 0xFFFFFFFF)
->>>                                  return;
->>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
->>> b/drivers/hwtracing/coresight/coresight-tmc.c
->>> index 55806352b1f1..cb030a09659d 100644
->>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
->>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
->>> @@ -193,6 +193,39 @@ static const struct file_operations tmc_fops = {
->>>          .llseek         = no_llseek,
->>>    };
->>>
->>> +static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
->>> +{
->>> +       enum tmc_mem_intf_width memwidth;
->>> +
->>> +       /*
->>> +        * Excerpt from the TRM:
->>> +        *
->>> +        * DEVID::MEMWIDTH[10:8]
->>> +        * 0x2 Memory interface databus is 32 bits wide.
->>> +        * 0x3 Memory interface databus is 64 bits wide.
->>> +        * 0x4 Memory interface databus is 128 bits wide.
->>> +        * 0x5 Memory interface databus is 256 bits wide.
->>> +        */
->>> +       switch (BMVAL(devid, 8, 10)) {
->>> +       case 0x2:
->>> +               memwidth = TMC_MEM_INTF_WIDTH_32BITS;
->>> +               break;
->>> +       case 0x3:
->>> +               memwidth = TMC_MEM_INTF_WIDTH_64BITS;
->>> +               break;
->>> +       case 0x4:
->>> +               memwidth = TMC_MEM_INTF_WIDTH_128BITS;
->>> +               break;
->>> +       case 0x5:
->>> +               memwidth = TMC_MEM_INTF_WIDTH_256BITS;
->>> +               break;
->>> +       default:
->>> +               memwidth = 0;
->>> +       }
->>> +
->>> +       return memwidth;
->>> +}
->>> +
->>>    #define coresight_tmc_simple_func(name, offset)                       \
->>>          coresight_simple_func(struct tmc_drvdata, name, offset)
->>>
->>> @@ -306,6 +339,7 @@ static int tmc_probe(struct amba_device *adev, const
->>> struct amba_id *id)
->>>
->>>          devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
->>>          drvdata->config_type = BMVAL(devid, 6, 7);
->>> +       drvdata->memwidth = tmc_get_memwidth(devid);
->>>
->>>          if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
->>>                  if (np)
->>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h
->>> b/drivers/hwtracing/coresight/coresight-tmc.h
->>> index 9b4c215d2b6b..12a097f3d06c 100644
->>> --- a/drivers/hwtracing/coresight/coresight-tmc.h
->>> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
->>> @@ -81,10 +81,10 @@ enum tmc_mode {
->>>    };
->>>
->>>    enum tmc_mem_intf_width {
->>> -       TMC_MEM_INTF_WIDTH_32BITS       = 0x2,
->>> -       TMC_MEM_INTF_WIDTH_64BITS       = 0x3,
->>> -       TMC_MEM_INTF_WIDTH_128BITS      = 0x4,
->>> -       TMC_MEM_INTF_WIDTH_256BITS      = 0x5,
->>> +       TMC_MEM_INTF_WIDTH_32BITS       = 1,
->>> +       TMC_MEM_INTF_WIDTH_64BITS       = 2,
->>> +       TMC_MEM_INTF_WIDTH_128BITS      = 4,
->>> +       TMC_MEM_INTF_WIDTH_256BITS      = 8,
->>>    };
+>>> On 25 April 2016 at 08:32, Suzuki K Poulose <Suzuki.Poulose@arm.com>
+>>> wrote:
+>>>>
+>>>> On 22/04/16 18:14, Mathieu Poirier wrote:
 >>
 >>
->> I think this would cause confusion for the reader. It would be good to
->> leave the definitions above as before and tmc_get_memwidth() doing:
+>>>>> +       spin_lock_irqsave(&drvdata->spinlock, flags);
+>>>>> +       if (drvdata->reading) {
+>>>>> +               ret = -EINVAL;
+>>>>> +               goto out;
+>>>>> +       }
+>>>>> +
+>>>>> +       val = local_xchg(&drvdata->mode, mode);
+>>>>> +       /*
+>>>>> +        * In Perf mode there can be only one writer per sink.  There
+>>>>> +        * is also no need to continue if the ETR is already operated
+>>>>> +        * from sysFS.
+>>>>> +        */
+>>>>> +       if (val != CS_MODE_DISABLED) {
+>>>>
+>>>>
+>>>>
+>>>> Could val be CS_MODE_PERF ? In other words, should we be checking :
+>>>>           if (val == CS_MODE_SYSFS)  instead ?
+>>>
+>>>
+>>> If we check for CS_MODE_SYSFS we also have to check for CS_MODE_PERF,
+>>> which is two checks rather than a single one with the current
+>>> solution.
 >>
->> i.e,
->>          case TMC_MEM_INTF_WIDTH_32BITS:
->>                  memwidth = 1;
->>                  break;
 >>
->> But we still store the memwidth in bytes.
+>> I am confused now. The comment says, we want to check for sysfs mode and
+>> don't continue in that case. So, we shouldn't be worried about PERF mode.
 >
-> If we proceed this way we have to do a case statement on hard coded
-> values (or introduce a new enumeration) in tmc_update_etf_buffer(). In
+> You are correct about the sysFS part, but the first sentence of the
+> comment also mention that in perf mode there can only be one writer
+> per sink.  Otherwise ring buffers for one session would end up with
+> traces from other ongoing sessions, and that is not taking into
+> account the buffer management nightmares it would cause.
 
-But then we are doing that already with this patch in tmc_get_memwidth already.
-My point is, we expect named symbols for values defined in the standards, so that
-you don't make a mistake when dealing with them. It is really difficult to track
-down a bug if we do make a mistake.
-
-> my opinion the current solution scales better.
-
-I would prefer doing a hardcoded check in tmc_update_etf_buffer() like :
-
-+		/*
-+		 * The value written to RRP must be byte-address aligned to
-+		 * the width of the trace memory databus _and_ to a frame
-+		 * boundary (16 byte), whichever is the biggest. For example,
-+		 * for 32-bit, 64-bit and 128-bit wide trace memory, the four
-+		 * LSBs must be 0s. For 256-bit wide trace memory, the five
-+		 * LSBs must be 0s.
-+		 */
-+		if (drvdata->memwidth == 8)
-+			mask = GENMASK(31, 6);
-+		else
-+			mask = GENMASK(31, 5);
-
+OK, in either case, val == CS_MODE_SYSFS is much better check there, to
+what we want to do
 
 Suzuki
