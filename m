@@ -1,37 +1,87 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 25 Apr 2016 16:59:22 +0100
-Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
-In-Reply-To: <20160425142735.GA14974@leverpostej>
-References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
- <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
- <571E25B1.8070305@arm.com>
- <20160425141557.GA2829@codeblueprint.co.uk>
- <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
- <20160425142435.GB2829@codeblueprint.co.uk>
- <20160425142735.GA14974@leverpostej>
-Message-ID: <20160425155922.GC2829@codeblueprint.co.uk>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 25 Apr 2016 21:28:14 +0530
+Subject: [RFC 9/9] drivers: iommu: arm-smmu: Set iommu_ops in probe
+In-Reply-To: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1461599894-1969-10-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr, at 03:27:35PM, Mark Rutland wrote:
-> 
-> I have no strong preference so long as the code is correct.
-> 
-> Another option is to get rid of the bool entirely:
-> 
-> 	flags ^= cur_flags;
-> 	if (!WARN_ON(flags & ARCH_EFI_IRQ_FLAGS_MASK))
-> 		return;
+iommu_ops should be set after the iommu is probed.
+This ensures that the iommu is really ready when master's
+iommu ops are set during their probe or else deferred.
 
-OK, let's do the following because we need flags to be preserved for
-printing,
-
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
+ drivers/iommu/arm-smmu.c | 34 ++--------------------------------
+ 1 file changed, 2 insertions(+), 32 deletions(-)
 
-	unsigned long cur_flags, mismatch;
-
-	local_save_flags(cur_flags);
-
-	mismatch = flags ^ cur_flags;
-	if (!WARN_ON_ONCE(mismatch & ARCH_EFI_IRQ_FLAGS_MASK))
-		return;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 2d65de4..f103d35 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1919,6 +1919,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	if (of_property_read_bool(dev->of_node, "mmu-masters"))
+ 		arm_smmu_probe_mmu_masters(smmu);
+ 	arm_smmu_device_reset(smmu);
++	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
+ 	return 0;
+ 
+ out_free_irqs:
+@@ -1957,24 +1958,13 @@ static struct platform_driver arm_smmu_driver = {
+ 	.remove	= arm_smmu_device_remove,
+ };
+ 
+-static int __init arm_smmu_init(void)
++static int __init arm_smmu_of_init(struct device_node *np)
+ {
+-	struct device_node *np;
+ 	static bool done;
+ 	int ret;
+ 
+ 	if (done)
+ 		return 0;
+-	/*
+-	 * Play nice with systems that don't have an ARM SMMU by checking that
+-	 * an ARM SMMU exists in the system before proceeding with the driver
+-	 * and IOMMU bus operation registration.
+-	 */
+-	np = of_find_matching_node(NULL, arm_smmu_of_match);
+-	if (!np)
+-		return 0;
+-
+-	of_node_put(np);
+ 
+ 	ret = platform_driver_register(&arm_smmu_driver);
+ 	if (ret)
+@@ -2002,28 +1992,8 @@ static void __exit arm_smmu_exit(void)
+ {
+ 	return platform_driver_unregister(&arm_smmu_driver);
+ }
+-
+-subsys_initcall(arm_smmu_init);
+ module_exit(arm_smmu_exit);
+ 
+-static int __init arm_smmu_of_init(struct device_node *np)
+-{
+-	struct arm_smmu_device *smmu;
+-	struct platform_device *pdev;
+-	int ret = arm_smmu_init();
+-
+-	if (ret)
+-		return ret;
+-
+-	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+-	if (!pdev)
+-		return -ENODEV;
+-
+-	smmu = platform_get_drvdata(pdev);
+-	of_iommu_set_ops(np, &arm_smmu_ops);
+-
+-	return 0;
+-}
+ IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
+ IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
+ IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", arm_smmu_of_init);
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
