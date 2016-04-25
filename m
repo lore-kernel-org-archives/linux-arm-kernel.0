@@ -1,58 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 25 Apr 2016 20:59:14 +0530
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <17150729.NF4MViUffk@wuerfel>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <6893237.FoNPbfW3DC@wuerfel> <20160425125605.GG6104@vireshk-i7>
- <17150729.NF4MViUffk@wuerfel>
-Message-ID: <20160425152914.GI6104@vireshk-i7>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Apr 2016 17:33:36 +0200
+Subject: [PATCH 2/6] Documentation: DT binding doc for iProc Shared MDIO
+ Controller.
+In-Reply-To: <1461230323-27891-3-git-send-email-pramod.kumar@broadcom.com>
+References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
+ <1461230323-27891-3-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <20160425153336.GK6575@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25-04-16, 17:26, Arnd Bergmann wrote:
-> On Monday 25 April 2016 18:26:05 Viresh Kumar wrote:
-> > On 25-04-16, 14:53, Arnd Bergmann wrote:
-> > > On Monday 25 April 2016 08:30:41 Viresh Kumar wrote:
-> > 
-> > > I realize that the ordering is fixed through the way that the kernel
-> > > is linked, my worry is more about someone changing the code in some
-> > > way because it's not obvious from reading the code that the
-> > > dependency exists. If either the armada_xp_pmsu_cpufreq_init()
-> > > initcall gets changed so it does not always get called, or the
-> > > cpufreq_dt_platdev_init() initcall gets changed so it comes a little
-> > > earlier, things will break.
-> > 
-> > cpufreq-dt will just error out in that case, because it wouldn't find
-> > any OPPs registered to the OPP-core. It *shouldn't* crash and if it
-> > does, then we have a problem to fix.
-> 
-> Ok.
-> 
-> > > > The other thing that can happen is that armada_xp_pmsu_cpufreq_init()
-> > > > call can fail. In that case, most of the times cpufreq-dt ->init()
-> > > > will fail as well, so even that is fine for me.
-> > > > 
-> > > > And, so I think we can keep this patch as is.
-> > > 
-> > > What are the downsides of moving armada_xp_pmsu_cpufreq_init()
-> > > into drivers/cpufreq?
-> > 
-> > More special code :)
-> 
-> Of course the special code still exists, it seems more like neither of
-> us wants to have it in the portion of the kernel that he maintains ;-)
+> +Example:
+> +iproc_mdio: iproc_mdio at 663f0000 {
+> +	compatible = "brcm,iproc-shared-mdio";
+> +	reg = <0x6602023c 0x14>;
+> +	reg-names = "mdio";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	sata-master at 6 {
+> +		compatible = "brcm,iproc-ns2-sata-phy";
+> +		reg = <0x6>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		brcm,phy-internal;
+> +
+> +		sata_phy0: sata-phy at 1 {
+> +			reg = <0x1>;
+> +			#phy-cells = <0>;
+> +		};
+> +
+> +		sata_phy1: sata-phy at 2 {
+> +			reg = <0x2>;
+> +			#phy-cells = <0>;
+> +		};
+> +	};
+> +
+> +	eth-master at 0 {
+> +		compatible = "brcm,iproc-mdio-master-eth";
+> +		reg = <0x0>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		gphy0: eth-phy at 10 {
+> +			reg = <0x10>;
+> +			phy-mode = "mii";
+> +		};
+> +	};
+> +};
 
-Hehe.. But after $subject patch, we don't have any special code for
-creating the device, isn't it?
+So looking at this, you have an MDIO bus, an MDIO mux on top of that,
+and then some MDIO devices on the muxed busses. You don't need a whole
+new framework for this. You need a new mdio-mux driver, but the
+existing MDIO framework should do what you need.
 
-> Maybe the mvebu maintainers have a preference where they'd like the
-> code to be, they are the ones that are most impacted if anything
-> goes wrong.
-
-What code are you talking about? Initializing the OPPs or adding the
-cpufreq-dt device? The first one (or whatever is left now in that
-function) can stay anywhere, even as a cpufreq driver. I was talking
-about the fact that we don't have a sequence problem to solve here.
-
--- 
-viresh
+	 Andrew
