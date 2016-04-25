@@ -1,136 +1,300 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 25 Apr 2016 18:08:43 -0500
-Subject: [Patch v2 6/8] firmware: qcom: scm: Use atomic SCM for cold boot
+Date: Mon, 25 Apr 2016 18:08:42 -0500
+Subject: [Patch v2 5/8] firmware: qcom: scm: Add support for ARM64 SoCs
 In-Reply-To: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
 References: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1461625725-32425-7-git-send-email-andy.gross@linaro.org>
+Message-ID: <1461625725-32425-6-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the cold_set_boot_addr function to use atomic SCM
-calls.  This removes the need for memory allocation and instead places
-all arguments in registers.
+From: Kumar Gala <galak@codeaurora.org>
 
+Add an implementation of the SCM interface that works on ARM64 SoCs.  This
+is used by things like determine if we have HDCP support or not on the
+system.
+
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Andy Gross <andy.gross@linaro.org>
 ---
- drivers/firmware/qcom_scm-32.c | 47 ++++++++++++++++++++----------------------
- 1 file changed, 22 insertions(+), 25 deletions(-)
+ drivers/firmware/qcom_scm-32.c |   4 +
+ drivers/firmware/qcom_scm-64.c | 187 +++++++++++++++++++++++++++++++++++++++--
+ drivers/firmware/qcom_scm.c    |   2 +
+ drivers/firmware/qcom_scm.h    |   5 ++
+ 4 files changed, 191 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
-index 0d2a3f8..419df4d 100644
+index 9e3dc2f..0d2a3f8 100644
 --- a/drivers/firmware/qcom_scm-32.c
 +++ b/drivers/firmware/qcom_scm-32.c
-@@ -294,34 +294,39 @@ out:
- 				(n & 0xf))
- 
- /**
-- * qcom_scm_call_atomic1() - Send an atomic SCM command with one argument
-+ * qcom_scm_call_atomic() - Send an atomic SCM command with one argument
-  * @svc_id: service identifier
-  * @cmd_id: command identifier
-+ * @arglen: number of arguments
-  * @arg1: first argument
-+ * @arg2: second argument (optional - fill with 0 if unused)
-  *
-  * This shall only be used with commands that are guaranteed to be
-  * uninterruptable, atomic and SMP safe.
-  */
--static s32 qcom_scm_call_atomic1(u32 svc, u32 cmd, u32 arg1)
-+static s32 qcom_scm_call_atomic(u32 svc, u32 cmd, u32 arglen, u32 arg1,
-+				u32 arg2)
- {
- 	int context_id;
- 
--	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, 1);
-+	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, arglen);
- 	register u32 r1 asm("r1") = (u32)&context_id;
- 	register u32 r2 asm("r2") = arg1;
-+	register u32 r3 asm("r3") = arg2;
- 
- 	asm volatile(
- 			__asmeq("%0", "r0")
- 			__asmeq("%1", "r0")
- 			__asmeq("%2", "r1")
- 			__asmeq("%3", "r2")
-+			__asmeq("%4", "r3")
- #ifdef REQUIRES_SEC
- 			".arch_extension sec\n"
- #endif
- 			"smc    #0      @ switch to secure world\n"
- 			: "=r" (r0)
--			: "r" (r0), "r" (r1), "r" (r2)
--			: "r3");
-+			: "r" (r0), "r" (r1), "r" (r2), "r" (r3)
-+			);
- 	return r0;
+@@ -482,3 +482,7 @@ int __qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
+ 	return qcom_scm_call(QCOM_SCM_SVC_HDCP, QCOM_SCM_CMD_HDCP,
+ 		req, req_cnt * sizeof(*req), resp, sizeof(*resp));
  }
++
++void __qcom_scm_init(void)
++{
++}
+diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
+index bb6555f..90e6f19 100644
+--- a/drivers/firmware/qcom_scm-64.c
++++ b/drivers/firmware/qcom_scm-64.c
+@@ -12,12 +12,135 @@
  
-@@ -361,22 +366,6 @@ u32 qcom_scm_get_version(void)
- }
- EXPORT_SYMBOL(qcom_scm_get_version);
+ #include <linux/io.h>
+ #include <linux/errno.h>
++#include <linux/delay.h>
++#include <linux/mutex.h>
++#include <linux/slab.h>
++#include <linux/types.h>
+ #include <linux/qcom_scm.h>
++#include <linux/arm-smccc.h>
++
++#include "qcom_scm.h"
++
++#define QCOM_SCM_FNID(s, c) ((((s) & 0xFF) << 8) | ((c) & 0xFF))
++
++#define MAX_QCOM_SCM_ARGS 10
++#define MAX_QCOM_SCM_RETS 3
++
++#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
++			   (((a) & 0xff) << 4) | \
++			   (((b) & 0xff) << 6) | \
++			   (((c) & 0xff) << 8) | \
++			   (((d) & 0xff) << 10) | \
++			   (((e) & 0xff) << 12) | \
++			   (((f) & 0xff) << 14) | \
++			   (((g) & 0xff) << 16) | \
++			   (((h) & 0xff) << 18) | \
++			   (((i) & 0xff) << 20) | \
++			   (((j) & 0xff) << 22) | \
++			   (num & 0xffff))
++
++#define QCOM_SCM_ARGS(...) QCOM_SCM_ARGS_IMPL(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
++
++/**
++ * struct qcom_scm_desc
++ * @arginfo:	Metadata describing the arguments in args[]
++ * @args:	The array of arguments for the secure syscall
++ * @res:	The values returned by the secure syscall
++ */
++struct qcom_scm_desc {
++	u32 arginfo;
++	u64 args[MAX_QCOM_SCM_ARGS];
++	struct arm_smccc_res res;
++};
++
++static u64 qcom_smccc_convention = -1;
++static DEFINE_MUTEX(qcom_scm_lock);
++
++#define QCOM_SCM_EBUSY_WAIT_MS 30
++#define QCOM_SCM_EBUSY_MAX_RETRY 20
++
++#define N_EXT_QCOM_SCM_ARGS 7
++#define FIRST_EXT_ARG_IDX 3
++#define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
++
++/**
++ * qcom_scm_call() - Invoke a syscall in the secure world
++ * @svc_id:	service identifier
++ * @cmd_id:	command identifier
++ * @fn_id:	The function ID for this syscall
++ * @desc:	Descriptor structure containing arguments and return values
++ *
++ * Sends a command to the SCM and waits for the command to finish processing.
++ * This should *only* be called in pre-emptible context.
++*/
++static int qcom_scm_call(u32 svc_id, u32 cmd_id, struct qcom_scm_desc *desc)
++{
++	int arglen = desc->arginfo & 0xf;
++	int ret, retry_count = 0, i;
++	u32 fn_id = QCOM_SCM_FNID(svc_id, cmd_id);
++	u64 cmd, x5 = desc->args[FIRST_EXT_ARG_IDX];
++	dma_addr_t args_phys;
++	void *args_virt = NULL;
++	size_t alloc_size;
++
++	if (unlikely(arglen > N_REGISTER_ARGS)) {
++		alloc_size = N_EXT_QCOM_SCM_ARGS * sizeof(u64);
++		args_virt = qcom_scm_alloc_buffer(alloc_size, &args_phys,
++						  GFP_KERNEL);
++		if (!args_virt)
++			return qcom_scm_remap_error(-ENOMEM);
++
++		if (qcom_smccc_convention == ARM_SMCCC_SMC_32) {
++			__le32 *args = args_virt;
++
++			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
++				args[i] = cpu_to_le32(desc->args[i +
++						      FIRST_EXT_ARG_IDX]);
++		} else {
++			__le64 *args = args_virt;
++
++			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
++				args[i] = cpu_to_le64(desc->args[i +
++						      FIRST_EXT_ARG_IDX]);
++		}
++
++		x5 = args_phys;
++	}
++
++	do {
++		mutex_lock(&qcom_scm_lock);
++
++		cmd = ARM_SMCCC_CALL_VAL(ARM_SMCCC_STD_CALL,
++					 qcom_smccc_convention,
++					 ARM_SMCCC_OWNER_SIP, fn_id);
++
++		do {
++			arm_smccc_smc(cmd, arglen, desc->args[0], desc->args[1],
++				      desc->args[2], x5, 0, 0, &desc->res);
++		} while (desc->res.a0 == QCOM_SCM_INTERRUPTED);
++
++		mutex_unlock(&qcom_scm_lock);
++
++		if (desc->res.a0 == QCOM_SCM_V2_EBUSY) {
++			if (retry_count++ > QCOM_SCM_EBUSY_MAX_RETRY)
++				break;
++			msleep(QCOM_SCM_EBUSY_WAIT_MS);
++		}
++	}  while (desc->res.a0 == QCOM_SCM_V2_EBUSY);
++
++	if (args_virt)
++		qcom_scm_free_buffer(alloc_size, args_virt, args_phys);
++
++	if (desc->res.a0 < 0)
++		return qcom_scm_remap_error(ret);
++
++	return 0;
++}
  
--/*
-- * Set the cold/warm boot address for one of the CPU cores.
-- */
--static int qcom_scm_set_boot_addr(u32 addr, int flags)
--{
--	struct {
--		__le32 flags;
--		__le32 addr;
--	} cmd;
--
--	cmd.addr = cpu_to_le32(addr);
--	cmd.flags = cpu_to_le32(flags);
--	return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
--			&cmd, sizeof(cmd), NULL, 0);
--}
--
  /**
   * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
-  * @entry: Entry point function for the cpus
-@@ -406,7 +395,8 @@ int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
- 			set_cpu_present(cpu, false);
- 	}
- 
--	return qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
-+	return qcom_scm_call_atomic(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR, 2,
-+				    flags, virt_to_phys(entry));
- }
+- * @entry: Entry point function for the cpus
+- * @cpus: The cpumask of cpus that will use the entry point
++ * @entry:	Entry point function for the cpus
++ * @cpus:	The cpumask of cpus that will use the entry point
+  *
+  * Set the cold boot address of the cpus. Any cpu outside the supported
+  * range would be removed from the cpu present mask.
+@@ -29,8 +152,8 @@ int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
  
  /**
-@@ -422,6 +412,10 @@ int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
- 	int ret;
- 	int flags = 0;
- 	int cpu;
-+	struct {
-+		__le32 flags;
-+		__le32 addr;
-+	} cmd;
+  * qcom_scm_set_warm_boot_addr() - Set the warm boot address for cpus
+- * @entry: Entry point function for the cpus
+- * @cpus: The cpumask of cpus that will use the entry point
++ * @entry:	Entry point function for the cpus
++ * @cpus:	The cpumask of cpus that will use the entry point
+  *
+  * Set the Linux entry point for the SCM to transfer control to when coming
+  * out of a power down. CPU power down may be executed on cpuidle or hotplug.
+@@ -42,7 +165,7 @@ int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
  
- 	/*
- 	 * Reassign only if we are switching from hotplug entry point
-@@ -437,7 +431,10 @@ int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
- 	if (!flags)
- 		return 0;
- 
--	ret = qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
-+	cmd.addr = cpu_to_le32(virt_to_phys(entry));
-+	cmd.flags = cpu_to_le32(flags);
-+	ret = qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
-+			    &cmd, sizeof(cmd), NULL, 0);
- 	if (!ret) {
- 		for_each_cpu(cpu, cpus)
- 			qcom_scm_wb[cpu].entry = entry;
-@@ -456,8 +453,8 @@ int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
-  */
- void __qcom_scm_cpu_power_down(u32 flags)
- {
--	qcom_scm_call_atomic1(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC,
--			flags & QCOM_SCM_FLUSH_FLAG_MASK);
-+	qcom_scm_call_atomic(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC, 1,
-+			flags & QCOM_SCM_FLUSH_FLAG_MASK, 0);
- }
+ /**
+  * qcom_scm_cpu_power_down() - Power down the cpu
+- * @flags - Flags to flush cache
++ * @flags:	Flags to flush cache
+  *
+  * This is an end point to power down cpu. If there was a pending interrupt,
+  * the control would return from this function, otherwise, the cpu jumps to the
+@@ -54,10 +177,60 @@ void __qcom_scm_cpu_power_down(u32 flags)
  
  int __qcom_scm_is_call_available(u32 svc_id, u32 cmd_id)
+ {
+-	return -ENOTSUPP;
++	int ret;
++	struct qcom_scm_desc desc = {0};
++
++	desc.arginfo = QCOM_SCM_ARGS(1);
++	desc.args[0] = QCOM_SCM_FNID(svc_id, cmd_id) |
++			(ARM_SMCCC_OWNER_SIP << ARM_SMCCC_OWNER_SHIFT);
++
++	ret = qcom_scm_call(QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD,
++			    &desc);
++
++	return ret ? : desc.res.a1;
+ }
+ 
+ int __qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
+ {
+-	return -ENOTSUPP;
++	int ret;
++	struct qcom_scm_desc desc = {0};
++
++	if (req_cnt > QCOM_SCM_HDCP_MAX_REQ_CNT)
++		return -ERANGE;
++
++	desc.args[0] = req[0].addr;
++	desc.args[1] = req[0].val;
++	desc.args[2] = req[1].addr;
++	desc.args[3] = req[1].val;
++	desc.args[4] = req[2].addr;
++	desc.args[5] = req[2].val;
++	desc.args[6] = req[3].addr;
++	desc.args[7] = req[3].val;
++	desc.args[8] = req[4].addr;
++	desc.args[9] = req[4].val;
++	desc.arginfo = QCOM_SCM_ARGS(10);
++
++	ret = qcom_scm_call(QCOM_SCM_SVC_HDCP, QCOM_SCM_CMD_HDCP, &desc);
++	*resp = desc.res.a1;
++
++	return ret;
++}
++
++void __qcom_scm_init(void)
++{
++	u64 cmd;
++	struct arm_smccc_res res;
++	u32 function = QCOM_SCM_FNID(QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD);
++
++	/* First try a SMC64 call */
++	cmd = ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_64,
++				 ARM_SMCCC_OWNER_SIP, function);
++
++	arm_smccc_smc(cmd, QCOM_SCM_ARGS(1), cmd & (~BIT(ARM_SMCCC_TYPE_SHIFT)),
++		      0, 0, 0, 0, 0, &res);
++
++	if (!res.a0 && res.a1)
++		qcom_smccc_convention = ARM_SMCCC_SMC_64;
++	else
++		qcom_smccc_convention = ARM_SMCCC_SMC_32;
+ }
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index 8f78938..03c9d05 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -216,6 +216,8 @@ static int qcom_scm_probe(struct platform_device *pdev)
+ 	__scm = scm;
+ 	__scm->dev = &pdev->dev;
+ 
++	__qcom_scm_init();
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/firmware/qcom_scm.h b/drivers/firmware/qcom_scm.h
+index 848c7de..58fd454 100644
+--- a/drivers/firmware/qcom_scm.h
++++ b/drivers/firmware/qcom_scm.h
+@@ -40,7 +40,10 @@ extern void *qcom_scm_alloc_buffer(size_t size, dma_addr_t *dma_addr,
+ 				    gfp_t gfp);
+ extern void qcom_scm_free_buffer(size_t size, void *virt_addr,
+ 				 dma_addr_t dma_addr);
++extern void __qcom_scm_init(void);
++
+ /* common error codes */
++#define QCOM_SCM_V2_EBUSY	-12
+ #define QCOM_SCM_ENOMEM		-5
+ #define QCOM_SCM_EOPNOTSUPP	-4
+ #define QCOM_SCM_EINVAL_ADDR	-3
+@@ -60,6 +63,8 @@ static inline int qcom_scm_remap_error(int err)
+ 		return -EOPNOTSUPP;
+ 	case QCOM_SCM_ENOMEM:
+ 		return -ENOMEM;
++	case QCOM_SCM_V2_EBUSY:
++		return -EBUSY;
+ 	}
+ 	return -EINVAL;
+ }
 -- 
 1.9.1
