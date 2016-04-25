@@ -1,44 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Apr 2016 14:27:31 +1000
-Subject: [PATCH 13/22] ARM: dts: sh73a0: Correct interrupt type for ARM TWD
+Date: Mon, 25 Apr 2016 14:27:33 +1000
+Subject: [PATCH 15/22] ARM: dts: r8a7790: Use USB3.0 fallback compatibility
+ string
 In-Reply-To: <cover.1461558315.git.horms+renesas@verge.net.au>
 References: <cover.1461558315.git.horms+renesas@verge.net.au>
-Message-ID: <a4a72b473e2897265a0fecbd5f6b5a92ea62585f.1461558315.git.horms+renesas@verge.net.au>
+Message-ID: <92cc7798edf105b0684a4a154fc7bac9955a4766.1461558315.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Use recently added fallback compatibility string in r8a7790 device tree.
 
-The ARM TWD interrupt is a private peripheral interrupt (PPI), and per
-the ARM GIC documentation, whether the type for PPIs can be set is
-IMPLEMENTATION DEFINED.
-
-For SH-Mobile AG5 devices the PPI type cannot be set, and so when we
-attempt to set the type for the ARM TWD interrupt it fails.  This has
-gone unnoticed because it fails silently, and because we cannot
-re-configure the type it has had no impact. Nevertheless fix the type
-for the TWD interrupt so that it matches the hardware configuration.
-
-Based on patches by Jon Hunter for Tegra20/30 and OMAP4.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7790.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 639ea2d76970..c4f434cdec60 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -43,7 +43,7 @@
- 	timer at f0000600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0xf0000600 0x20>;
--		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_EDGE_RISING)>;
- 		clocks = <&twd_clk>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 7cf52e6da956..7486fcf985c4 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1513,7 +1513,7 @@
  	};
  
+ 	xhci: usb at ee000000 {
+-		compatible = "renesas,xhci-r8a7790";
++		compatible = "renesas,xhci-r8a7790", "renesas,rcar-gen2-xhci";
+ 		reg = <0 0xee000000 0 0xc00>;
+ 		interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7790_CLK_SSUSB>;
 -- 
 2.7.0.rc3.207.g0ac5344
