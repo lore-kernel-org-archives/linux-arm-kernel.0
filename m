@@ -1,169 +1,198 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Apr 2016 15:22:51 +0200
-Subject: [PATCH v4 10/11] ARM: sun5i: r8: Add display blocks to the DTSI
-In-Reply-To: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1461590572-4027-11-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 25 Apr 2016 15:22:41 +0200
+Subject: [PATCH v4 00/11] drm: Add Allwinner A10 display engine support
+Message-ID: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TCON, tv-encoder and display engine backends and frontends are combined
-to create our display pipeline.
+Hi everyone,
 
-Add them to the R8 DTSI. It's supposed to be perfectly compatible with the
-A10s and A13, but since we haven't tested it on them yet, it's safer to
-just enable it on the R8. Eventually, it should be moved to sun5i.dtsi
+The Allwinner SoCs (except for the very latest ones) all share the
+same set of controllers, loosely coupled together to form the display
+pipeline.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-r8.dtsi | 137 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 137 insertions(+)
+Depending on the SoC, the number of instances of the controller will
+change (2 instances of each in the A10, only one in the A13, for
+example), and the output availables will change too (HDMI, composite,
+VGA on the A20, none of them on the A13).
 
-diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
-index 691d3de75b35..a42b5404893e 100644
---- a/arch/arm/boot/dts/sun5i-r8.dtsi
-+++ b/arch/arm/boot/dts/sun5i-r8.dtsi
-@@ -57,4 +57,141 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	soc at 01c00000 {
-+		tve0: tv-encoder at 01c0a000 {
-+			compatible = "allwinner,sun4i-a10-tv-encoder";
-+			reg = <0x01c0a000 0x1000>;
-+			clocks = <&ahb_gates 34>;
-+			resets = <&tcon_ch0_clk 0>;
-+			status = "disabled";
-+
-+			port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tve0_in_tcon0: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_tve0>;
-+				};
-+			};
-+		};
-+
-+		tcon0: lcd-controller at 01c0c000 {
-+			compatible = "allwinner,sun5i-a13-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <44>;
-+			resets = <&tcon_ch0_clk 1>;
-+			reset-names = "lcd";
-+			clocks = <&ahb_gates 36>,
-+				 <&tcon_ch0_clk>,
-+				 <&tcon_ch1_clk>;
-+			clock-names = "ahb",
-+				      "tcon-ch0",
-+				      "tcon-ch1";
-+			clock-output-names = "tcon-pixel-clock";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon0_out_tve0: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tve0_in_tcon0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		fe0: display-frontend at 01e00000 {
-+			compatible = "allwinner,sun5i-a13-display-frontend";
-+			reg = <0x01e00000 0x20000>;
-+			interrupts = <47>;
-+			clocks = <&ahb_gates 46>, <&de_fe_clk>,
-+				 <&dram_gates 25>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&de_fe_clk>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				fe0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					fe0_out_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_in_fe0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		be0: display-backend at 01e60000 {
-+			compatible = "allwinner,sun5i-a13-display-backend";
-+			reg = <0x01e60000 0x10000>;
-+			clocks = <&ahb_gates 44>, <&de_be_clk>,
-+				 <&dram_gates 26>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&de_be_clk>;
-+			status = "disabled";
-+
-+			assigned-clocks = <&de_be_clk>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				be0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					be0_in_fe0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&fe0_out_be0>;
-+					};
-+				};
-+
-+				be0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					be0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_be0>;
-+					};
-+				};
-+			};
-+		};
-+	};
-+
-+	display-engine {
-+		compatible = "allwinner,sun5i-a13-display-engine";
-+		pipelines = <&fe0>;
-+	};
- };
+On most featured SoCs, it looks like that:
+
++--------------------------------------------+
+|                    RAM                     |
++--------------------------------------------+
+      |            |      |            |
+      v            |      |            v
++----------------+ |      | +----------------+
+|    Frontend    | |      | |    Frontend    |
++----------------+ |      | +----------------+
+        |          |      |         |
+        v          |      |         v
++----------------+ |      | +----------------+
+|    Backend     |<+      +>|    Backend     |
++----------------+          +----------------+
+        |                           |
+        v                           v
++----------------+          +----------------+---> LVDS
+|      TCON      |          |      TCON      |---> RGB
++----------------+          +----------------+
+      |       +---+       +---+          |
+      |           |       |              |
+      v           v       v              v
++------------+  +------------+  +------------+---> VGA
+| TV Encoder |  |    HDMI    |  | TV Encoder |---> Composite
++------------+  +------------+  +------------+
+
+The current code only assumes that there is a single instance of all
+the controllers. It also supports only the RGB and Composite
+interfaces.
+
+Let me know what you think,
+Maxime
+
+Changes from v3:
+  - Fixed a circular dependency issue found when building as a module
+  - Changed a bit the mode_valid checks
+  - Fixed an issue with the timings generated by the display engine
+
+  - Changed the DT bindings according to Rob feedback (removed the
+    allwinner,panel property, documented the endpoints indices, always
+    use the frontend as the pipeline entrypoint)
+
+  - Changed the display clocks according to Stephen comments (marked
+    structures as const, changed a variable name)
+
+Changes from v2:
+  - Rebased on top of next-20160318
+
+  - Dropped the generic clock regmap conversion and implemented a
+    custom clock for our pixel clock, backed by a regmap
+  - Added the reset bits for the tcon channel 0 and display clocks
+  - Used the new generic gates compatible for the DRAM gates
+  - Few clock fixes (missing iounmap, return error checks, etc)
+  - Found out that the TCON channel 1 clock was not operating properly
+    because of some weird rounding down and up between the various
+    generic clocks involved. Rewrote it using custom operations
+
+  - Removed some TODO that were still there
+  - Converted our panel DT description to the OF graph instead of a
+    custom property
+  - Tested the driver on a setup where U-Boot was not initialising the
+    display, or initialising it on a different output, and fixed a
+    number of associated bugs (mostly related to missing
+    initialisation bits, missing reset handles, and so on)
+  - Fixed the layer code that was assuming that the X and Y
+    coordinates were in pixels, leading to a miscalculation of the
+    buffer address when those coordinates where set.
+  - Added the missing EXPORT_SYMBOL calls
+
+  - Fixed our VBLANK interrupt code that was completely broken (and
+    not usable, which is why it was unnoticed)
+
+Changes from v1:
+  - Rebased on top of 4.4
+
+  - Merged the clock drivers for the display and TCON channel 0 clocks
+  - Replaced the container_of calls in the display reset clocks to an
+    inline function
+  - Checked the return code of of_clk_parent_fill in the clocks
+    drivers
+  - Checked the return code of of_clk_add_provider in the tcon-ch1 and
+    PLL3 clocks
+  - Added missing clocks headers
+  - Created a composite clock unregister function
+
+  - Moved the binding documentation to
+    Documentation/devicetree/bindings/display
+  - Added the clocks binding documentation
+  - Added the Olimex vendor to the list of DT vendors
+  - Moved to the OF graph representation and the component framework
+
+  - Moved the reset cells count check into the reset framework to
+    avoid duplicating the code in every xlate implementation.
+  - Made the reset_ops const
+
+  - Reworked the DRM cmdline mode parsing code to allow named mode
+  - Fixed the TV mode lookup when the mode name is not present (for
+    example because it was given by the userspace)
+
+  - Made the driver outputs optional (to avoid crashing when a board
+    doesn't have either a panel or a composite output enabled)
+  - Added multiple plane support with transparency
+  - Moved the backend registers writes commit in the CRTC atomic_flush
+    callback
+  - Removed the load / unload functions
+  - Removed the enabled booleans in my private structure and removed
+    the implicit call to disable_unused_functions in the DRM core to
+    push it in the drivers.
+  - Fixed a few bitmasks on some bitfields definition
+  - Fixed the RGB connector mode validation that was not testing the
+    right values				  
+
+Maxime Ripard (11):
+  clk: sunxi: Add display and TCON0 clocks driver
+  ARM: sun5i: a13: Add display and TCON clocks
+  drm: fb: Add seq_file definition
+  drm: sun4i: Add DT bindings documentation
+  drm: Add Allwinner A10 Display Engine support
+  drm: sun4i: Add RGB output
+  drm: sun4i: Add composite output
+  drm: sun4i: tv: Add PAL output standard
+  drm: sun4i: tv: Add NTSC output standard
+  ARM: sun5i: r8: Add display blocks to the DTSI
+  ARM: sun5i: chip: Enable the TV Encoder
+
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
+ .../bindings/display/sunxi/sun4i-drm.txt           | 258 ++++++++
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |  39 +-
+ arch/arm/boot/dts/sun5i-r8-chip.dts                |  12 +
+ arch/arm/boot/dts/sun5i-r8.dtsi                    | 142 ++++-
+ drivers/clk/sunxi/Makefile                         |   1 +
+ drivers/clk/sunxi/clk-sun4i-display.c              | 261 ++++++++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   3 +-
+ drivers/gpu/drm/sun4i/Kconfig                      |  14 +
+ drivers/gpu/drm/sun4i/Makefile                     |  13 +
+ drivers/gpu/drm/sun4i/sun4i_backend.c              | 364 +++++++++++
+ drivers/gpu/drm/sun4i/sun4i_backend.h              | 165 +++++
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 | 120 ++++
+ drivers/gpu/drm/sun4i/sun4i_crtc.h                 |  30 +
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c             | 160 +++++
+ drivers/gpu/drm/sun4i/sun4i_dotclock.h             |  21 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  | 357 +++++++++++
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |  30 +
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c          |  54 ++
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.h          |  19 +
+ drivers/gpu/drm/sun4i/sun4i_layer.c                | 161 +++++
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |  30 +
+ drivers/gpu/drm/sun4i/sun4i_rgb.c                  | 250 ++++++++
+ drivers/gpu/drm/sun4i/sun4i_rgb.h                  |  18 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 561 ++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 | 186 ++++++
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   | 708 +++++++++++++++++++++
+ include/drm/drm_fb_cma_helper.h                    |   2 +
+ 29 files changed, 3978 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+ create mode 100644 drivers/clk/sunxi/clk-sun4i-display.c
+ create mode 100644 drivers/gpu/drm/sun4i/Kconfig
+ create mode 100644 drivers/gpu/drm/sun4i/Makefile
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_backend.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_backend.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_crtc.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_crtc.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_dotclock.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_dotclock.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_drv.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_drv.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_framebuffer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_layer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_layer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_rgb.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_rgb.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_tcon.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_tcon.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_tv.c
+
 -- 
 2.8.1
