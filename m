@@ -1,70 +1,32 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 25 Apr 2016 12:52:48 -0500
-Subject: [PATCHv2 7/7] ARM: dts: Add Arria10 Ethernet EDAC devicetree entry
-In-Reply-To: <1461606768-14404-1-git-send-email-tthayer@opensource.altera.com>
-References: <1461606768-14404-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1461606768-14404-8-git-send-email-tthayer@opensource.altera.com>
+Date: Mon, 25 Apr 2016 12:52:41 -0500
+Subject: [PATCHv2 0/7]  Add EDAC peripheral init functions & Ethernet EDAC
+Message-ID: <1461606768-14404-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-Add the device tree entries needed to support the Altera Ethernet
-FIFO buffer EDAC on the Arria10 chip.
+This patch set adds the memory initialization functions for Altera's
+Arria10 peripherals, the first of which is the Ethernet EDAC. The
+ECC memory init functions are common to all the peripheral memory
+buffers.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2  No change
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |   36 ++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Thor Thayer (7):
+  EDAC, altera: Check parent status for Arria10 EDAC block
+  EDAC, altera: Add panic flag check to A10 IRQ
+  EDAC, altera: Move Arria10 IRQ function
+  Documentation: dt: socfpga: Add Arria10 Ethernet binding
+  EDAC, altera: Add Arria10 ECC memory init functions
+  EDAC, altera: Add Arria10 Ethernet EDAC support
+  ARM: dts: Add Arria10 Ethernet EDAC devicetree entry
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 27cc497..6195ade 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -617,6 +617,42 @@
- 				compatible = "altr,socfpga-a10-ocram-ecc";
- 				reg = <0xff8c3000 0x400>;
- 			};
-+
-+			emac0-rx-ecc at ff8c0800 {
-+				compatible = "altr,socfpga-a10-emac0-rx-ecc";
-+				reg = <0xff8c0800 0x400>;
-+				parent = <&gmac0>;
-+			};
-+
-+			emac0-tx-ecc at ff8c0c00 {
-+				compatible = "altr,socfpga-a10-emac0-tx-ecc";
-+				reg = <0xff8c0c00 0x400>;
-+				parent = <&gmac0>;
-+			};
-+
-+			emac1-rx-ecc at ff8c1000 {
-+				compatible = "altr,socfpga-a10-emac1-rx-ecc";
-+				reg = <0xff8c1000 0x400>;
-+				parent = <&gmac1>;
-+			};
-+
-+			emac1-tx-ecc at ff8c1400 {
-+				compatible = "altr,socfpga-a10-emac1-tx-ecc";
-+				reg = <0xff8c1400 0x400>;
-+				parent = <&gmac1>;
-+			};
-+
-+			emac2-rx-ecc at ff8c1800 {
-+				compatible = "altr,socfpga-a10-emac2-rx-ecc";
-+				reg = <0xff8c1800 0x400>;
-+				parent = <&gmac2>;
-+			};
-+
-+			emac2-tx-ecc at ff8c1c00 {
-+				compatible = "altr,socfpga-a10-emac2-tx-ecc";
-+				reg = <0xff8c1c00 0x400>;
-+				parent = <&gmac2>;
-+			};
- 		};
- 
- 		rst: rstmgr at ffd05000 {
+ .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++
+ arch/arm/boot/dts/socfpga_arria10.dtsi             |   36 ++
+ drivers/edac/Kconfig                               |    7 +
+ drivers/edac/altera_edac.c                         |  373 ++++++++++++++++++--
+ drivers/edac/altera_edac.h                         |   23 ++
+ 5 files changed, 443 insertions(+), 20 deletions(-)
+
 -- 
 1.7.9.5
