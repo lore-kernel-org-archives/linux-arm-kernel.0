@@ -1,68 +1,131 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Apr 2016 10:04:15 +0100
-Subject: [PATCH 03/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
- engine driver support
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A57989B@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-4-git-send-email-peter.griffin@linaro.org>
- <C246CAC1457055469EF09E3A7AC4E11A4A57989B@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160425090415.GB20365@dell>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 25 Apr 2016 12:07:15 +0300
+Subject: [PATCH v4] i2c: designware-platdrv: fix unbalanced clk enable
+ and prepare
+In-Reply-To: <571A2E43.9030109@linux.intel.com>
+References: <1461314971-5944-1-git-send-email-jszhang@marvell.com>
+ <571A2E43.9030109@linux.intel.com>
+Message-ID: <1461575235.17131.3.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2016, Appana Durga Kedareswara Rao wrote:
-> > -----Original Message-----
-> > From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
-> > owner at vger.kernel.org] On Behalf Of Peter Griffin
-> > Sent: Thursday, April 21, 2016 4:34 PM
-> > To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > srinivas.kandagatla at gmail.com; maxime.coquelin at st.com;
-> > patrice.chotard at st.com; vinod.koul at intel.com
-> > Cc: peter.griffin at linaro.org; lee.jones at linaro.org;
-> > dmaengine at vger.kernel.org; devicetree at vger.kernel.org; arnd at arndb.de;
-> > broonie at kernel.org; ludovic.barre at st.com
-> > Subject: [PATCH 03/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
-> > engine driver support
-
-What is this text?  If you wish to contribute to upstream mailing
-lists, please fix your email client.  Also, please read:
-
-  Documentation/email-clients.txt
-
-> > This patch adds support for the Flexible Direct Memory Access (FDMA) core
-> > driver. The FDMA is a slim core CPU with a dedicated firmware.
-> > It is a general purpose DMA controller capable of supporting 16
-> > independent DMA channels. Data moves maybe from memory to memory
-> > or between memory and paced latency critical real time targets and it
-> > is found on al STi based chipsets.
-> > 
-> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  drivers/dma/Kconfig   |  12 +
-> >  drivers/dma/Makefile  |   1 +
-> >  drivers/dma/st_fdma.c | 967
-> > ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 980 insertions(+)
-> >  create mode 100644 drivers/dma/st_fdma.c
-
-[...]
-> > +static int st_fdma_clk_enable(struct st_fdma_dev *fdev)
-> > +{
-> > +	int i, ret;
-> > +
-> > +	for (i = 0; i < CLK_MAX_NUM; i++) {
-> > +		ret = clk_prepare_enable(fdev->clks[i]);
-> > +		if (ret < 0)
+On Fri, 2016-04-22 at 16:59 +0300, Jarkko Nikula wrote:
+> Hi
 > 
-> You should disable and unprepared the other clocks...
+> On 04/22/2016 11:49 AM, Jisheng Zhang wrote:
+> > 
+> > If i2c_dw_probe() fails, we should disable and unprepare the clock,
+> > otherwise the clock enable and prepare is left unbalanced.
+> > 
+> > In dw_i2c_plat_remove(), we'd better to not rely on runtime PM to
+> > disable and unprepare the clock since CONFIG_PM may be disabled when
+> > configuring the kernel. So we explicitly disable and unprepare the
+> > clock in dw_i2c_plat_remove() rather than implicitly rely on
+> > pm_runtime_put_sync(). To keep the device usage count balanced, we
+> > call pm_runtime_put_noidle() to decrease the usage count.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> > ? Since v3:
+> > ???- use runtime PM rather than rpm in commit msg
+> > ???- remove duplicated "(" in commit msg
+> > 
+> > ? Since v2:
+> > ???- s/clk/clock
+> > ???- describe why use pm_runtime_put_noidle()
+> > 
+> > ? Since v1:
+> > ???- fix commit msg: "not rely on rpm" rather than "rely on rpm"
+> > ???- call i2c_dw_plat_prepare_clk after pm_rumtime_disable()
+> > ? drivers/i2c/busses/i2c-designware-platdrv.c | 16 ++++++++++------
+> > ? 1 file changed, 10 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+> > b/drivers/i2c/busses/i2c-designware-platdrv.c
+> > index d656657..a771781 100644
+> > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> > @@ -253,8 +253,11 @@ static int dw_i2c_plat_probe(struct
+> > platform_device *pdev)
+> > ??	}
+> > 
+> > ??	r = i2c_dw_probe(dev);
+> > -	if (r && !dev->pm_runtime_disabled)
+> > -		pm_runtime_disable(&pdev->dev);
+> > +	if (r) {
+> > +		if (!dev->pm_runtime_disabled)
+> > +			pm_runtime_disable(&pdev->dev);
+> > +		i2c_dw_plat_prepare_clk(dev, false);
+> > +	}
+> > 
+> > ??	return r;
+> > ? }
+> > @@ -264,15 +267,16 @@ static int dw_i2c_plat_remove(struct
+> > platform_device *pdev)
+> > ??	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+> > 
+> > ??	pm_runtime_get_sync(&pdev->dev);
+> > +	pm_runtime_dont_use_autosuspend(&pdev->dev);
+> > +	if (!dev->pm_runtime_disabled)
+> > +		pm_runtime_disable(&pdev->dev);
+> > +	pm_runtime_put_noidle(&pdev->dev);
+> > 
+> > ??	i2c_del_adapter(&dev->adapter);
+> > 
+> > ??	i2c_dw_disable(dev);
+> > 
+> > -	pm_runtime_dont_use_autosuspend(&pdev->dev);
+> > -	pm_runtime_put_sync(&pdev->dev);
+> > -	if (!dev->pm_runtime_disabled)
+> > -		pm_runtime_disable(&pdev->dev);
+> > +	i2c_dw_plat_prepare_clk(dev, false);
+> > 
+> This feels a bit an invasive change to me for unbalanced clock?
+> enable/disable and I noticed this changes semantics how?
+> drivers/acpi/acpi_lpss.c devices are shutdown when removing the
+> driver.?
+> Although I didn't notice does it cause any regression.
+> 
+> Before patch:
+> 1. drivers/base/dd.c: __device_release_driver()
+> ????- pm_runtime_get_sync()
+> ??????-> acpi_device_set_power(D0)
+> ?????????acpi_lpss_restore_ctx()
+> ?????????dw_i2c_plat_resume()
+> 2. dw_i2c_plat_remove()
+> ????- pm_runtime_dont_use_autosuspend()
+> ??????pm_runtime_put_sync()
+> ??????-> dw_i2c_plat_suspend()
+> ?????????acpi_lpss_save_ctx()
+> ?????????acpi_device_set_power(D3)
+> 3. __device_release_driver() continue
+> ????- dev->pm_domain->dismiss(dev)
+> ??????-> acpi_lpss_dismiss() ... -> acpi_device_set_power(D3)
+> 
+> After patch:
+> 1. drivers/base/dd.c: __device_release_driver()
+> ? - pm_runtime_get_sync()
+> ????-> acpi_device_set_power(D0)
+> ???????acpi_lpss_restore_ctx()
+> ???????dw_i2c_plat_resume()
+> 2. dw_i2c_plat_remove()
+> ????- pm_runtime_dont_use_autosuspend()
+> ??????pm_runtime_put_noidle()
+> ??????* no device suspending and acpi_lpss_save_ctx()
+> 3. __device_release_driver() continue
+> ????- dev->pm_domain->dismiss(dev)
+> ????-> acpi_lpss_dismiss() ... -> acpi_device_set_power(D3)
+> ??????* powers down here
+> 
+> So after patch there is no acpi_lpss_save_ctx() call but I don't see?
+> does it cause any issue here. Maybe it's better to track clock only.?
+> What you think Andy?
 
-Replying to a 1000 line email and not snipping (especially for a one
-single-line comment), it considered bad etiquette.  Please remove all
-unrelated text in future.
+Now it looks like two fixes in one patch. From the commit message I
+didn't get the relation between change runtime PM call (one to the
+other) and clock (un)preparation.
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
