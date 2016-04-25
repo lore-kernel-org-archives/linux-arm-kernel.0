@@ -1,58 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 17:35:28 +0200
-Subject: [PATCH 2/5] Kbuild: disable 'maybe-uninitialized' warning for
- CONFIG_PROFILE_ALL_BRANCHES
-In-Reply-To: <1461598531-2190169-1-git-send-email-arnd@arndb.de>
-References: <1461598531-2190169-1-git-send-email-arnd@arndb.de>
-Message-ID: <1461598531-2190169-3-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Apr 2016 17:41:21 +0200
+Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
+In-Reply-To: <571E3781.3070609@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <5485134.l18Z1dlVmn@wuerfel> <571E3781.3070609@arm.com>
+Message-ID: <4658440.AyDy7GFvoa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_PROFILE_ALL_BRANCHES confuses gcc-5.x to the degree that it prints
-incorrect warnings about a lot of variables that it thinks can be used
-uninitialized, e.g.:
+On Monday 25 April 2016 16:28:01 Robin Murphy wrote:
+> >>>
+> >>> We _could_ - indeed I started doing that, but then decided that the
+> >>> obfuscation of horrible macro-templated functions wasn't worth saving a
+> >>> couple of hundred bytes in some code that isn't exactly difficult to
+> >>> maintain and has needed touching once in 4 years.
+> >>>
+> >>> If you did want to go down the macro route, I may as well also generate both
+> >>> lo-hi and hi-lo headers all from a single template, it'd be really clever...
+> >>> <alarm bells>
+> >>
+> >> I certainly wasn't suggesting any more than the obvious macroisation,
+> >> but I'll leave it up to Arnd, as I think this falls on his lap.
+> >
+> > I'd prefer the open-coded variant as well.
+> 
+> By that, do you mean sticking with the smmu_writeq() implementation in 
+> the driver and dropping this patch, or merging this patch as-is without 
+> further macro-magic?
+> 
 
-i2c/busses/i2c-diolan-u2c.c: In function 'diolan_usb_xfer':
-i2c/busses/i2c-diolan-u2c.c:391:16: warning: 'byte' may be used uninitialized in this function
-iio/gyro/itg3200_core.c: In function 'itg3200_probe':
-iio/gyro/itg3200_core.c:213:6: warning: 'val' may be used uninitialized in this function
-leds/leds-lp55xx-common.c: In function 'lp55xx_update_bits':
-leds/leds-lp55xx-common.c:350:6: warning: 'tmp' may be used uninitialized in this function
-misc/bmp085.c: In function 'show_pressure':
-misc/bmp085.c:363:10: warning: 'pressure' may be used uninitialized in this function
-power/ds2782_battery.c: In function 'ds2786_get_capacity':
-power/ds2782_battery.c:214:17: warning: 'raw' may be used uninitialized in this function
+Sorry, that was really ambiguous on my end. I meant leaving patch 4/7
+as it is in the version you posted.
 
-These are all false positives that either rob someone's time when trying
-to figure out whether they are real, or they get people to send wrong
-patches to shut up the warnings.
+However, leaving the open-coded writel_relaxed() in the driver or just
+using the non-relaxed hi_lo_readq() would be totally fine too.
 
-Nobody normally wants to run a CONFIG_PROFILE_ALL_BRANCHES kernel in
-production, so disabling the whole class of warnings for this configuration
-has no serious downsides either.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Steven Rostedt <rostedtgoodmis.org>
----
- Makefile | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/Makefile b/Makefile
-index c5a3db5aebd1..e595d1f626b8 100644
---- a/Makefile
-+++ b/Makefile
-@@ -624,7 +624,11 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
- ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
- KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
- else
--KBUILD_CFLAGS	+= -O2
-+ifdef CONFIG_PROFILE_ALL_BRANCHES
-+KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
-+else
-+KBUILD_CFLAGS   += -O2
-+endif
- endif
- 
- # Tell gcc to never replace conditional load with a non-conditional one
--- 
-2.7.0
+	Arnd
