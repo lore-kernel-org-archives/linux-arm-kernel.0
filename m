@@ -1,20 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 22:50:02 +0200
-Subject: [GIT PULL 3/3] arm64: tegra: Changes for v4.7-rc1
-In-Reply-To: <1460731323-31001-3-git-send-email-thierry.reding@gmail.com>
-References: <1460731323-31001-1-git-send-email-thierry.reding@gmail.com>
- <1460731323-31001-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <6352175.TgYXCIh8h9@wuerfel>
+Date: Mon, 25 Apr 2016 22:51:21 +0200
+Subject: [GIT PULL] arm64: dts: juno: DT updates for v4.7
+In-Reply-To: <571129F8.3040609@arm.com>
+References: <571129F8.3040609@arm.com>
+Message-ID: <61561602.F7zjlBctvy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 April 2016 16:42:03 Thierry Reding wrote:
-> arm64: tegra: Changes for v4.7-rc1
+On Friday 15 April 2016 18:50:48 Sudeep Holla wrote:
+> ARMv8 Juno DT updates for v4.7
 > 
-> A couple of cleanups and fixes to various device trees, enable power and
-> volume keys on Jetson TX1, use stdout-path to define the serial port (so
-> it doesn't have to be specified on the kernel command-line) and add
-> Google Pixel C (a.k.a. Smaug) support.
+> Just one update: Support for external expansion bus useful for
+> additional hardware e.g.LogicTile Express daughterboards (Brian Starkey)
 > 
 
 Pulled into next/dt64, thanks!
