@@ -1,33 +1,43 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 26 Apr 2016 00:28:03 +0200
-Subject: [PATCH v2 3/3] i2c: s3c2410: Cleanup indentation and comment style
-In-Reply-To: <1461222291-5642-3-git-send-email-k.kozlowski@samsung.com>
-References: <1461222291-5642-1-git-send-email-k.kozlowski@samsung.com>
- <1461222291-5642-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160425222802.GN1550@katana>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 25 Apr 2016 16:35:04 -0600
+Subject: [RFC] Is /dev/port useful on arm64?
+Message-ID: <571E9B98.4050505@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 09:04:51AM +0200, Krzysztof Kozlowski wrote:
-> Improve the readability by:
->  - fixing indentation,
->  - switching to proper block comments,
->  - removing spurious blank lines,
->  - checkpatch: void function return statements are not generally useful,
->  - checkpatch: braces {} are not necessary for any arm of this
->    statement,
->  - checkpatch: missing a blank line after declarations.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
+In examining a bug report where lm_sensors fails on arm64 (and panics the
+kernel, which is kind of annoying), it turns out it is trying to read
+information from an ISA port using the /dev/port device.
 
-Applied to for-next, thanks!
+It's easy enough to disable this; you can:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/c4794d39/attachment.sig>
+   -- set CONFIG_DEVPORT=n for arm64 (in arch/arm64/Kconfig)
+
+   -- or, redefine the macro arch_has_dev_port() to:
+
+	#define arch_has_dev_port()	(0)
+
+      in arch/arm64/include/asm/io.h
+
+However, /dev/port is used for both ISA and PCI IO ports.  So, this led me
+to what may be a dumb question: is there really a need for PCI support in
+/dev/port for arm64?
+
+Supporting ISA just seems silly, at least from an ARMv8 server standpoint,
+but PCI is less clear to me.  Anyone have opinions one way or the other?
+
+It seems like it would be a waste of time to do the work to make sure the
+PCI ports work correctly only to find out they will never be used, but I
+can't think of anyone that actually needs them.
+
+Thanks.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
