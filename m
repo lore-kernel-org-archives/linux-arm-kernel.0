@@ -1,52 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 14:54:09 +0100
-Subject: [PATCHv3 2/5] arm64/efi: enable runtime call flag checking
-In-Reply-To: <1461591994-14918-3-git-send-email-mark.rutland@arm.com>
-References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
- <1461591994-14918-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160425135409.GE30830@arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 25 Apr 2016 15:54:18 +0200
+Subject: [PATCH 3/3] ASoC: bcm2835: Register also as PCM device
+In-Reply-To: <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
+References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
+ <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <571E218A.7050508@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 02:46:31PM +0100, Mark Rutland wrote:
-> Define ARCH_EFI_IRQ_FLAGS_MASK for arm64, which will enable the generic
-> runtime wrapper code to detect when firmware erroneously modifies flags
-> over a runtime services function call.
+On 04/25/2016 03:39 PM, kernel at martin.sperl.org wrote:
+> From: Matthias Reichl <hias@horus.com>
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-efi at vger.kernel.org
+> Register i2s also as pcm device.
+
+This is not really what this patch does.
+
+> 
+> Code ported from bcm2708-i2s driver in Raspberry Pi tree.
+>
+> Signed-off-by: Florian Meier <florian.meier@koalo.de>
+> Signed-off-by: Matthias Reichl <hias@horus.com>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 > ---
->  arch/arm64/include/asm/efi.h | 3 +++
->  1 file changed, 3 insertions(+)
+>  sound/soc/bcm/bcm2835-i2s.c | 25 ++++++++++++++++++++++++-
+>  1 file changed, 24 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index f4f71224..b44603e 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -4,6 +4,7 @@
->  #include <asm/io.h>
->  #include <asm/mmu_context.h>
->  #include <asm/neon.h>
-> +#include <asm/ptrace.h>
->  #include <asm/tlbflush.h>
+> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+> index a0026e2..8e93295 100644
+> --- a/sound/soc/bcm/bcm2835-i2s.c
+> +++ b/sound/soc/bcm/bcm2835-i2s.c
+> @@ -632,6 +632,27 @@ static const struct snd_soc_component_driver bcm2835_i2s_component = {
+>  	.name		= "bcm2835-i2s-comp",
+>  };
 >  
->  #ifdef CONFIG_EFI
-> @@ -33,6 +34,8 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
->  	kernel_neon_end();						\
->  })
+> +static const struct snd_pcm_hardware bcm2835_pcm_hardware = {
+> +	.info			= SNDRV_PCM_INFO_INTERLEAVED |
+> +				  SNDRV_PCM_INFO_JOINT_DUPLEX |
+> +				  SNDRV_PCM_INFO_MMAP |
+> +				  SNDRV_PCM_INFO_MMAP_VALID,
+> +	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
+> +				  SNDRV_PCM_FMTBIT_S24_LE |
+> +				  SNDRV_PCM_FMTBIT_S32_LE,
+> +	.period_bytes_min	= 32,
+> +	.period_bytes_max	= 64 * PAGE_SIZE,
+> +	.periods_min		= 2,
+> +	.periods_max		= 255,
+> +	.buffer_bytes_max	= 128 * PAGE_SIZE,
+> +};
+> +
+> +static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
+> +	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
+> +	.pcm_hardware = &bcm2835_pcm_hardware,
+> +	.prealloc_buffer_size = 256 * PAGE_SIZE,
+> +};
+
+The generic dmaengine PCM driver auto-discovers these things, no need to
+provide them. The code is OK as it is.
+
+> +
+>  static int bcm2835_i2s_probe(struct platform_device *pdev)
+>  {
+>  	struct bcm2835_i2s_dev *dev;
+> @@ -704,7 +725,9 @@ static int bcm2835_i2s_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
 >  
-> +#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-
-I look forward to the day when the firmware returns in big-endian AArch32 ;)
-
-Anyway, this looks good to me:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+> -	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+> +	ret = devm_snd_dmaengine_pcm_register(
+> +		&pdev->dev, &bcm2835_dmaengine_pcm_config,
+> +		SND_DMAENGINE_PCM_FLAG_COMPAT);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
+>  		return ret;
+> 
