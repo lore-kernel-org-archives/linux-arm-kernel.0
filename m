@@ -1,48 +1,127 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 25 Apr 2016 11:15:27 +0100
-Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
-In-Reply-To: <20160424212241.GO2829@codeblueprint.co.uk>
-References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
- <20160424212241.GO2829@codeblueprint.co.uk>
-Message-ID: <20160425101527.GP2829@codeblueprint.co.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 25 Apr 2016 11:15:35 +0100
+Subject: [PATCH 3/5] ARM: dts: introduce MPS2 AN385/AN386
+In-Reply-To: <571DE21A.5010502@suse.com>
+References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
+ <1461574157-23580-4-git-send-email-vladimir.murzin@arm.com>
+ <571DE21A.5010502@suse.com>
+Message-ID: <571DEE47.3090208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Apr, at 10:22:41PM, Matt Fleming wrote:
+On 25/04/16 10:23, Matthias Brugger wrote:
 > 
-> I like this series a lot (well, ignoring the fact that the firmware is
-> trying to eat itself). The runtime call code is much cleaner now, and
-> this is a great precedent for any future multi-architecture quirks we
-> may need.
 > 
-> Queued for v4.7, thanks everyone!
+> On 25/04/16 10:49, Vladimir Murzin wrote:
+>> Application Notes 385 and 386 shares the same memory map and features
+>> except the CPU is used. AN385 is supplied with Cortex-M3 CPU and AN386
+>> is supplied with Cortex-M4.
+>>
+>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile       |    1 +
+>>   arch/arm/boot/dts/mps2-an385.dts |   92 +++++++++++++++
+>>   arch/arm/boot/dts/mps2.dtsi      |  241
+>> ++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 334 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/mps2-an385.dts
+>>   create mode 100644 arch/arm/boot/dts/mps2.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 95c1923..1efa5a2 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -253,6 +253,7 @@ dtb-$(CONFIG_ARCH_MMP) += \
+>>   dtb-$(CONFIG_MACH_MESON8B) += \
+>>       meson8b-mxq.dtb \
+>>       meson8b-odroidc1.dtb
+>> +dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
+>>   dtb-$(CONFIG_ARCH_MOXART) += \
+>>       moxart-uc7112lx.dtb
+>>   dtb-$(CONFIG_SOC_IMX1) += \
+>> diff --git a/arch/arm/boot/dts/mps2-an385.dts
+>> b/arch/arm/boot/dts/mps2-an385.dts
+>> new file mode 100644
+>> index 0000000..d7cb594
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/mps2-an385.dts
+>> @@ -0,0 +1,92 @@
+>> +/*
+>> + * Copyright (C) 2015 ARM Limited
+>> + *
+>> + * Author: Vladimir Murzin <vladimir.murzin@arm.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of
+>> the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "mps2.dtsi"
+>> +
+>> +/ {
+>> +    model = "ARM MPS2 Application Note 385/386";
+>> +    compatible = "arm,mps2";
+>> +
+>> +    aliases {
+>> +        serial0 = &uart0;
+>> +    };
+>> +
+>> +    chosen {
+>> +        bootargs = "rdinit=/sbin/init earlycon";
+> 
+> The rootfs should be independent from the board.
+> In my opinion, this type of bootargs should not be part of the DTS.
 
-Hmm... Booting this series with Qemu and OVMF results in lots of
-warnings,
+I have no strong opinion on this, but quick grep shows plenty places
+where the same happens, and even [1] has rootfs specific option as an
+example. So if there is no strong call to remove rdinit from bootargs,
+I'd prefer to keep it as it makes testing easier for me.
 
-[    0.102173] ------------[ cut here ]------------
-[    0.103000] WARNING: CPU: 0 PID: 0 at /dev/shm/mfleming/git/efi/drivers/firmware/efi/runtime-wrappers.c:30 efi_call_virt_check_flags+0x69/0x90
-[    0.103505] Modules linked in:
-[    0.104519] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4+ #1
-[    0.105000]  0000000000000000 ffffffff81e03e30 ffffffff8132206f 0000000000000000
-[    0.105000]  0000000000000000 ffffffff81e03e70 ffffffff8105a47c 0000001e0000000a
-[    0.105000]  0000000000000246 0000000000000286 ffffffff81bed975 ffffffff81e03f10
-[    0.105000] Call Trace:
-[    0.105000]  [<ffffffff8132206f>] dump_stack+0x4d/0x6e
-[    0.105000]  [<ffffffff8105a47c>] __warn+0xcc/0xf0
-[    0.105000]  [<ffffffff8105a558>] warn_slowpath_null+0x18/0x20
-[    0.105000]  [<ffffffff8164e5a9>] efi_call_virt_check_flags+0x69/0x90
-[    0.105000]  [<ffffffff8164f9d2>] virt_efi_set_variable+0x82/0x190
-[    0.105000]  [<ffffffff81054555>] efi_delete_dummy_variable+0x75/0x80
-[    0.105000]  [<ffffffff81f599f6>] efi_enter_virtual_mode+0x463/0x472
-[    0.105000]  [<ffffffff81f41f82>] start_kernel+0x38f/0x415
-[    0.105000]  [<ffffffff81f419e1>] ? set_init_arg+0x55/0x55
-[    0.105000]  [<ffffffff81f415ee>] x86_64_start_reservations+0x2a/0x2c
-[    0.105000]  [<ffffffff81f416da>] x86_64_start_kernel+0xea/0xed
-[    0.107181] ---[ end trace 0081cc453369d969 ]---
-[    0.107499] Disabling lock debugging due to kernel taint
-[    0.108226] [Firmware Bug]: IRQ flags corrupted (0x00000246=>0x00000286) by EFI set_variable
+[1] Documentation/devicetree/booting-without-of.txt
 
-Has anyone tested this series on x86 to ensure that this is a rare
-case? I'll go and test some physical x86 machines now.
+Cheers
+Vladimir
+
+> 
+> Regards,
+> Matthias
+> 
+> 
