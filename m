@@ -1,43 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 21:08:40 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable Denali NAND controller
-In-Reply-To: <570F8B6E.7040303@osg.samsung.com>
-References: <1460620464-15896-1-git-send-email-yamada.masahiro@socionext.com>
- <570F8B6E.7040303@osg.samsung.com>
-Message-ID: <490300676.HzBTqkBDEO@wuerfel>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Mon, 25 Apr 2016 12:10:04 -0700
+Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
+In-Reply-To: <20160425142619.GJ28777@bigcity.dyn.berto.se>
+References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160311125846.GF1111@bigcity.dyn.berto.se>
+ <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
+ <20160321152601.GA11674@infradead.org>
+ <20160413132916.GC19650@bigcity.dyn.berto.se>
+ <20160421134942.GA3325@infradead.org>
+ <20160425142619.GJ28777@bigcity.dyn.berto.se>
+Message-ID: <20160425191004.GA13906@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 April 2016 08:22:06 Javier Martinez Canillas wrote:
-> On 04/14/2016 03:54 AM, Masahiro Yamada wrote:
-> > This NAND controller device is used on UniPhier SoCs (and I know
-> > it is also used on SoC FPGA).
-> > 
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > ---
-> > 
-> >  arch/arm/configs/multi_v7_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> > index 2823490..ef1d642 100644
-> > --- a/arch/arm/configs/multi_v7_defconfig
-> > +++ b/arch/arm/configs/multi_v7_defconfig
-> > @@ -183,6 +183,7 @@ CONFIG_MTD_CMDLINE_PARTS=y
-> >  CONFIG_MTD_BLOCK=y
-> >  CONFIG_MTD_M25P80=y
-> >  CONFIG_MTD_NAND=y
-> > +CONFIG_MTD_NAND_DENALI_DT=y
-> >  CONFIG_MTD_NAND_ATMEL=y
-> >  CONFIG_MTD_NAND_BRCMNAND=y
-> >  CONFIG_MTD_NAND_VF610_NFC=y
-> > 
-> 
-> Patch looks good to me.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
+On Mon, Apr 25, 2016 at 04:26:19PM +0200, Niklas S?derlund wrote:
+> I have followed the call path from the usage in 
+> drivers/dma/sh/rcar-dmac.c and made sure the dma_addr_t is not used in a 
+> bad way.
 
-Applied to next/defconfig, thanks,
-
-	Arnd
+The dma-debug routines are called from the generic code in
+include/linux/dma-mapping.h, and from my reading of the other patches
+in your series you are calling it for these as well.
