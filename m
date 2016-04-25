@@ -1,148 +1,39 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 25 Apr 2016 09:40:52 +0200
-Subject: [PATCH v7 2/8] [media] VPU: mediatek: support Mediatek VPU
-In-Reply-To: <1461299131-57851-3-git-send-email-tiffany.lin@mediatek.com>
-References: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-2-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-3-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <571DCA04.8000703@xs4all.nl>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 25 Apr 2016 08:55:57 +0100
+Subject: [PATCH 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <20160423065431.GA5840@afzalpc>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <20160423065431.GA5840@afzalpc>
+Message-ID: <571DCD8D.8070605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2016 06:25 AM, Tiffany Lin wrote:
-> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+On 23/04/16 07:54, Afzal Mohammed wrote:
+> Hi,
 > 
-> The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
-> It is able to handle video decoding/encoding of in a range of formats.
-> The driver provides with VPU firmware download, memory management and
-> the communication interface between CPU and VPU.
-> For VPU initialization, it will create virtual memory for CPU access and
-> IOMMU address for vcodec hw device access. When a decode/encode instance
-> opens a device node, vpu driver will download vpu firmware to the device.
-> A decode/encode instant will decode/encode a frame using VPU
-> interface to interrupt vpu to handle decoding/encoding jobs.
+> On Fri, Apr 22, 2016 at 12:43:33PM +0100, Vladimir Murzin wrote:
 > 
-> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+>> Small set of fixes discovered with R-class cores.
 > 
-> ---
->  drivers/media/platform/Kconfig           |   13 +
->  drivers/media/platform/Makefile          |    2 +
->  drivers/media/platform/mtk-vpu/Makefile  |    3 +
->  drivers/media/platform/mtk-vpu/mtk_vpu.c |  950 ++++++++++++++++++++++++++++++
->  drivers/media/platform/mtk-vpu/mtk_vpu.h |  162 +++++
->  5 files changed, 1130 insertions(+)
->  create mode 100644 drivers/media/platform/mtk-vpu/Makefile
->  create mode 100755 drivers/media/platform/mtk-vpu/mtk_vpu.c
->  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
+> just curious, is Cortex-R supported on mainline ?, thought it was not
+> supported, but subject & changelogs gave such a feeling.
+
+Hi,
+
+I believe it is supported since c90ad5c "ARM: add Cortex-R7 Processor
+Info" although overtime it got blocked (at least for Vexpress) with
+Kconfig changes. There was attempt [1] to sort it out, but looks like
+these patches went nowhere, so I'm trying to re-start with the fixes
+coming first.
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/174256.html
+
+Cheers
+Vladimir
+
 > 
-
-
-> +int vpu_load_firmware(struct platform_device *pdev)
-> +{
-> +	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-> +	struct device *dev = &pdev->dev;
-> +	struct vpu_run *run = &vpu->run;
-> +	const struct firmware *vpu_fw;
-> +	int ret;
-> +
-> +	if (!pdev) {
-> +		dev_err(dev, "VPU platform device is invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = vpu_clock_enable(vpu);
-> +	if (ret) {
-> +		dev_err(dev, "enable clock failed %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	mutex_lock(&vpu->vpu_mutex);
-> +
-> +	if (vpu_running(vpu)) {
-> +		mutex_unlock(&vpu->vpu_mutex);
-> +		vpu_clock_disable(vpu);
-> +		dev_warn(dev, "vpu is running already\n");
-
-This warning should be dropped. Currently vpu_load_firmware is called
-every time the video device is opened and no one else has the video device
-open. So calling this multiple times is perfectly normal and the log shouldn't
-be spammed with warnings.
-
-I would recommend adding a fw_loaded bool to struct mtk_vpu and just
-check that at the beginning of this function and just return 0 if it is true.
-
-Then you don't need to enable the vpu clock either.
-
-I hope I understand the hw correctly, though.
-
-Assuming you can do this, then this code from the v4l driver needs an
-additional comment:
-
->>> +	if (v4l2_fh_is_singular(&ctx->fh)) {
-
-Add a comment here that says that vpu_load_firmware checks if it was
-loaded already and does nothing in that case.
-
->>> +		ret = vpu_load_firmware(dev->vpu_plat_dev);
->>> +		if (ret < 0) {
->>> +			/*
->>> +			  * Return 0 if downloading firmware successfully,
->>> +			  * otherwise it is failed
->>> +			  */
->>> +			mtk_v4l2_err("vpu_load_firmware failed!");
->>> +			goto err_load_fw;
->>> +		}
-
-That makes it clear to the reader (i.e. me :-) ) that you can safely call
-vpu_load_firmware multiple times.
-
-Regards,
-
-	Hans
-
-> +		return 0;
-> +	}
-> +
-> +	run->signaled = false;
-> +	dev_dbg(vpu->dev, "firmware request\n");
-> +	/* Downloading program firmware to device*/
-> +	ret = load_requested_vpu(vpu, vpu_fw, P_FW);
-> +	if (ret < 0) {
-> +		dev_err(dev, "Failed to request %s, %d\n", VPU_P_FW, ret);
-> +		goto OUT_LOAD_FW;
-> +	}
-> +
-> +	/* Downloading data firmware to device */
-> +	ret = load_requested_vpu(vpu, vpu_fw, D_FW);
-> +	if (ret < 0) {
-> +		dev_err(dev, "Failed to request %s, %d\n", VPU_D_FW, ret);
-> +		goto OUT_LOAD_FW;
-> +	}
-> +
-> +	/* boot up vpu */
-> +	vpu_cfg_writel(vpu, 0x1, VPU_RESET);
-> +
-> +	ret = wait_event_interruptible_timeout(run->wq,
-> +					       run->signaled,
-> +					       msecs_to_jiffies(INIT_TIMEOUT_MS)
-> +					       );
-> +	if (ret == 0) {
-> +		ret = -ETIME;
-> +		dev_err(dev, "wait vpu initialization timout!\n");
-> +		goto OUT_LOAD_FW;
-> +	} else if (-ERESTARTSYS == ret) {
-> +		dev_err(dev, "wait vpu interrupted by a signal!\n");
-> +		goto OUT_LOAD_FW;
-> +	}
-> +
-> +	ret = 0;
-> +	dev_info(dev, "vpu is ready. Fw version %s\n", run->fw_ver);
-> +
-> +OUT_LOAD_FW:
-> +	mutex_unlock(&vpu->vpu_mutex);
-> +	vpu_clock_disable(vpu);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(vpu_load_firmware);
+> Regards
+> afzal
+> 
+> 
