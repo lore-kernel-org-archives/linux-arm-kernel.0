@@ -1,73 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 12:02:20 +0100
-Subject: [PATCH 6/7] iommu/arm-smmu: Decouple context format from kernel
- config
-In-Reply-To: <571A617C.3020102@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
- <20160421163019.GL929@arm.com> <571A617C.3020102@arm.com>
-Message-ID: <20160425110219.GH16065@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 25 Apr 2016 12:04:55 +0100
+Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
+In-Reply-To: <20160425105153.GR2829@codeblueprint.co.uk>
+References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
+ <20160424212241.GO2829@codeblueprint.co.uk>
+ <20160425101527.GP2829@codeblueprint.co.uk>
+ <CAKv+Gu8OfqdJp-VhC3o-tie4mRZXsF5ESKkZbsjnBHDY4xbXvQ@mail.gmail.com>
+ <20160425102821.GQ2829@codeblueprint.co.uk>
+ <20160425104009.GD25087@leverpostej>
+ <20160425105153.GR2829@codeblueprint.co.uk>
+Message-ID: <20160425110455.GF25087@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 06:38:04PM +0100, Robin Murphy wrote:
-> On 21/04/16 17:30, Will Deacon wrote:
-> >Hi Robin,
-> >
-> >On Wed, Apr 13, 2016 at 06:13:02PM +0100, Robin Murphy wrote:
-> >>The way the driver currently forces an AArch32 or AArch64 context format
-> >>based on the kernel config and SMMU architecture version is suboptimal,
-> >>in that it makes it very hard to support oddball mix-and-match cases
-> >>like the SMMUv1 64KB supplement, or situations where the reduced table
-> >>depth of an AArch32 short descriptor context may be desirable under an
-> >>AArch64 kernel. It also only happens to work on current implementations
-> >>which do support all the relevant formats.
-> >>
-> >>Introduce an explicit notion of context format, so we can manage that
-> >>independently and get rid of the inflexible #ifdeffery.
-> >
-> >Thanks for doing all of this! One comment on the page size stuff:
-> >
-> >>+	if (IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
-> >>+		switch (PAGE_SIZE) {
-> >>+		case SZ_64K:
-> >>+			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_64K) {
-> >>+				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
-> >>+				break;
-> >>+			} /* else fall through */
-> >>+		case SZ_16K:
-> >>+			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_16K) {
-> >>+				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
-> >>+				break;
-> >>+			} /* else fall through */
-> >>+		case SZ_4K:
-> >>+			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_4K)
-> >>+				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
-> >>+		}
-> >>+	}
-> >
-> >The io-pgtable code (arm_lpae_restrict_pgsizes) already does something
-> >*very* similar to this, using the pgsize_bitmap as input. Can you not
-> >just choose the ARM_SMMU_CTX_FMT_AARCH64 here and set the pgsize_bitmap
-> >to represent all page sizes supported by the hardware? That way, you should
-> >end up with the best option coming back from the pgtable code (I do this
-> >in the v3 driver, fwiw).
+On Mon, Apr 25, 2016 at 11:51:53AM +0100, Matt Fleming wrote:
+> On Mon, 25 Apr, at 11:40:09AM, Mark Rutland wrote:
+> > 
+> > It looks like irqs_disabled_flags() will do what you expect, and ignore
+> > everything but the interrupt flag.
+> > 
+> > However, for ARM that will ignore the other exceptions we've seen FW
+> > erroneously unmask (e.g. FIQ), which is unfortunate, as fiddling with
+> > those is just as disastrous.
+>  
+> Bah, right.
 > 
-> It took a while to come back to me, but the problem is that we can't call
-> alloc_io_pgtable_ops(fmt...) before choosing either ARM_64_LPAE_Sx or
-> ARM_32_LPAE_Sx for fmt, but if we commit to 64-bit we'll get stuck later
-> without the possibility of falling back to AArch32 if it turns out we don't
-> have a viable AArch64 granule.
+> > Would you be happy with an arch_efi_call_check_flags(before, after),
+> > instead? That way we can make the flags we check arch-specific.
+> 
+> Could we just make the flag mask arch-specific instead of the call
+> since the rest of efi_call_virt_check_flags() is good?
 
-In what case would you not have a viable AArch64 granule, but the option
-of falling back to AArch32 makes things work?
+Yup, I meant that arch_efi_call_check_flags would only do the flag
+comparison, only replacing the bit currently in the WARN_ON_ONCE().
 
-> Plus we'd have to remove the LPAE page sizes
-> from the bitmap beforehand in the case we don't support AARCH64_4K lest we
-> end up with a phantom format the hardware doesn't actually do, and it all
-> starts getting rather horrible...
+> Something like this (uncompiled, untested, half-baked),
+> 
+> ---
+> 
+> diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+> index c38b1cfc26e2..057d00bee7d6 100644
+> --- a/drivers/firmware/efi/runtime-wrappers.c
+> +++ b/drivers/firmware/efi/runtime-wrappers.c
+> @@ -25,9 +25,12 @@
+>  static void efi_call_virt_check_flags(unsigned long flags, const char *call)
+>  {
+>  	unsigned long cur_flags;
+> +	bool mismatch;
+>  
+>  	local_save_flags(cur_flags);
+> -	if (!WARN_ON_ONCE(cur_flags != flags))
+> +
+> +	mismatch = (cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK;
+> +	if (!WARN_ON_ONCE(mismatch))
+>  		return;
 
-I'm not following. The io-pgtable code shouldn't give you back a phanton
-format.
+This style also works for me.
 
-Will
+Should I respin patch 6 as a series doing the above?
+
+I assume that the first 5 patches are fine as-is.
+
+Thanks,
+Mark.
