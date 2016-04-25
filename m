@@ -1,50 +1,86 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 25 Apr 2016 16:48:24 +0200
-Subject: [PATCH 1/2] clocksource: sp804: Add support for OX810SE 24bit
- timer width
-In-Reply-To: <alpine.DEB.2.11.1604220953000.3941@nanos>
-References: <1459520559-13110-1-git-send-email-narmstrong@baylibre.com>
- <1459520559-13110-2-git-send-email-narmstrong@baylibre.com>
- <20160422074645.GA3974@linaro.org> <alpine.DEB.2.11.1604220953000.3941@nanos>
-Message-ID: <571E2E38.3060401@baylibre.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 25 Apr 2016 15:49:04 +0100
+Subject: [PATCH V3 12/18] coresight: tmc: dump system memory content only
+ when needed
+In-Reply-To: <CANLsYky_TK9PkwSPnQzmaV5Y0fD0jQvRS2FgTB9b6Om8TDfWXQ@mail.gmail.com>
+References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
+ <1461345255-11758-13-git-send-email-mathieu.poirier@linaro.org>
+ <571DFC95.10006@arm.com>
+ <CANLsYky_TK9PkwSPnQzmaV5Y0fD0jQvRS2FgTB9b6Om8TDfWXQ@mail.gmail.com>
+Message-ID: <571E2E60.50207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2016 09:53 AM, Thomas Gleixner wrote:
-> On Fri, 22 Apr 2016, Daniel Lezcano wrote:
-> 
->> On Fri, Apr 01, 2016 at 04:22:38PM +0200, Neil Armstrong wrote:
->>> In order to support the Dual-Timer on the Oxford Semiconductor OX810SE SoC,
->>> implement variable counter width, keeping 32bit as default width.
->>> Add new compatible string oxsemi,ox810se-rps-timer in order to select
->>> the 24bit counter width.
+On 25/04/16 15:38, Mathieu Poirier wrote:
+> On 25 April 2016 at 05:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 22/04/16 18:14, Mathieu Poirier wrote:
 >>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> Calling tmc_etf/etr_dump_hw() is required only when operating from
+>>> sysFS.  When working from Perf, the system memory is harvested
+>>> from the AUX trace API.
+>>>
+>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>> ---
->>>  drivers/clocksource/timer-sp804.c | 107 ++++++++++++++++++++++++--------------
->>>  include/clocksource/timer-sp804.h |  42 ++++++++++++---
->>>  2 files changed, 102 insertions(+), 47 deletions(-)
+>>>    drivers/hwtracing/coresight/coresight-tmc-etf.c | 7 ++++++-
+>>>    drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 ++++++-
+>>>    2 files changed, 12 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>> index d090a9745c73..25fad93b68d4 100644
+>>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>> @@ -74,7 +74,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata
+>>> *drvdata)
+>>>          CS_UNLOCK(drvdata->base);
+>>>
+>>>          tmc_flush_and_stop(drvdata);
+>>> -       tmc_etb_dump_hw(drvdata);
+>>> +       /*
+>>> +        * When operating in sysFS mode the content of the buffer needs to
+>>> be
+>>> +        * read before the TMC is disabled.
+>>> +        */
+>>> +       if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+>>> +               tmc_etb_dump_hw(drvdata);
+>>>          tmc_disable_hw(drvdata);
+>>>
+>>>          CS_LOCK(drvdata->base);
+>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>>> b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>>> index 8bbbf3ab1387..4b000f4003a2 100644
+>>> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>>> @@ -76,7 +76,12 @@ static void tmc_etr_disable_hw(struct tmc_drvdata
+>>> *drvdata)
+>>>          CS_UNLOCK(drvdata->base);
+>>>
+>>>          tmc_flush_and_stop(drvdata);
+>>> -       tmc_etr_dump_hw(drvdata);
+>>> +       /*
+>>> +        * When operating in sysFS mode the content of the buffer needs to
+>>> be
+>>> +        * read before the TMC is disabled.
+>>> +        */
+>>> +       if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+>>> +               tmc_etr_dump_hw(drvdata);
+>>>          tmc_disable_hw(drvdata);
 >>
->> I will take those patches but this driver really deserves a cleanup.
-> 
-> If it deserves a cleanup, then this should happen _BEFORE_ we add new
-> functionality to it.
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+>>
+>> Nit: It would be cleaner if tmc_etX_disable_hw accepted a bool parameter to
+>> decide
+>> whether to dump the hw data or not. That way, the callers can make the
+>> decision,
+>> leaving the disable_hw code unaware of the mode checks.
+>
+> My goal in pushing the functionality to tmc_etX_disable_hw() was to
+> especially keep the the higher layers unaware of sink buffer
+> management specifics.  There is two ways to look at this and we simply
+> landed on different sides of the fence.  I'm not strongly opinionated
+> on this, I'll modify if you're really keen on this.
 
-Hi Thomas, Daniel,
+I am not, you can retain as it is.
 
-Sure this driver should have a cleanup, but it still depends on old legacy vexpress calls.
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-The reason I submitted a change and a small cleanup over this driver is because the high
-similarities of the HW and avoiding adding a brand new driver cloning much of its
-functionalities.
-
-I propose to study an eventual cleanup, but could this change be submitted for 4.7 since
-it's part of a base platform support serie ?
-
-Thanks,
-Neil
+Suzuki
