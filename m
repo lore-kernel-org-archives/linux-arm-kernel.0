@@ -1,104 +1,184 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Mon, 25 Apr 2016 11:15:29 +0100 (BST)
-Subject: [PATCH v11 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <20160422103250.GC10606@leverpostej>
-References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
- <1460030614-16112-13-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.10.1604201033140.25611@sstabellini-ThinkPad-X260>
- <20160422103250.GC10606@leverpostej>
-Message-ID: <alpine.DEB.2.10.1604251111290.4855@sstabellini-ThinkPad-X260>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Mon, 25 Apr 2016 18:19:28 +0800
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <20160425100531.GC25087@leverpostej>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+ <20160421101930.GG6879@leverpostej> <5718AFB8.5070004@rock-chips.com>
+ <20160421123018.096d4a75@arm.com> <571DE803.3010902@rock-chips.com>
+ <20160425100531.GC25087@leverpostej>
+Message-ID: <571DEF30.90604@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Apr 2016, Mark Rutland wrote:
-> On Wed, Apr 20, 2016 at 10:34:41AM +0100, Stefano Stabellini wrote:
-> > Hello Mark,
-> > 
-> > do you think that this patch addresses your previous comments
-> > (http://marc.info/?l=devicetree&m=145926913008544&w=2) appropriately?
-> > 
-> > Thanks,
-> > 
-> > Stefano
-> > 
-> > On Thu, 7 Apr 2016, Shannon Zhao wrote:
-> > > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > > 
-> > > When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-> > > a /hypervisor node in DT. So check if it needs to enable ACPI.
-> > > 
-> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > ---
-> > >  arch/arm64/kernel/acpi.c | 14 ++++++++++----
-> > >  1 file changed, 10 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> > > index d1ce8e2..57ee317 100644
-> > > --- a/arch/arm64/kernel/acpi.c
-> > > +++ b/arch/arm64/kernel/acpi.c
-> > > @@ -67,10 +67,15 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
-> > >  {
-> > >  	/*
-> > >  	 * Return 1 as soon as we encounter a node at depth 1 that is
-> > > -	 * not the /chosen node.
-> > > +	 * not the /chosen node, or /hypervisor node with compatible
-> > > +	 * string "xen,xen".
-> > >  	 */
-> > > -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> > > -		return 1;
-> > > +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> > > +		if (strcmp(uname, "hypervisor") != 0 ||
-> > > +		    !of_flat_dt_is_compatible(node, "xen,xen"))
-> > > +			return 1;
-> > > +	}
-> > > +
-> > >  	return 0;
-> > >  }
-> 
-> Is the duplicate node checking logic I mentioned in that review gone?
-> i.e. do we not need an is_xen_node() helper?
+Hi, Mark:
+On 2016?04?25? 18:05, Mark Rutland wrote:
+> On Mon, Apr 25, 2016 at 05:48:51PM +0800, Huang, Tao wrote:
+>> Hi, Marc:
+>> On 2016?04?21? 19:30, Marc Zyngier wrote:
+>>> On Thu, 21 Apr 2016 18:47:20 +0800
+>>> "Huang, Tao" <huangtao@rock-chips.com> wrote:
+>>>
+>>>> Hi, Mark:
+>>>> On 2016?04?21? 18:19, Mark Rutland wrote:
+>>>>> On Thu, Apr 21, 2016 at 11:58:12AM +0800, Jianqun Xu wrote:
+>>>>>> +		cpu_l0: cpu at 0 {
+>>>>>> +			device_type = "cpu";
+>>>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>>>> +			reg = <0x0 0x0>;
+>>>>>> +			enable-method = "psci";
+>>>>>> +			#cooling-cells = <2>; /* min followed by max */
+>>>>>> +			clocks = <&cru ARMCLKL>;
+>>>>>> +		};
+>>>>>> +		cpu_b0: cpu at 100 {
+>>>>>> +			device_type = "cpu";
+>>>>>> +			compatible = "arm,cortex-a72", "arm,armv8";
+>>>>>> +			reg = <0x0 0x100>;
+>>>>>> +			enable-method = "psci";
+>>>>>> +			#cooling-cells = <2>; /* min followed by max */
+>>>>>> +			clocks = <&cru ARMCLKB>;
+>>>>>> +		};
+>>>>>> +
+>>>>>> +	arm-pmu {
+>>>>>> +		compatible = "arm,armv8-pmuv3";
+>>>>>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>>> +	};
+>>>>> This is wrong, and must go. There should be a separate node for the PMU
+>>>>> of each microarchitecture, with the appropriate compatible string to
+>>>>> represent that (see the juno dts).
+>>>> You are right. The first version we wrote is:
+>>>>     pmu_a53 {
+>>>>         compatible = "arm,cortex-a53-pmu";
+>>>>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>         interrupt-affinity = <&cpu_l0>,
+>>>>                      <&cpu_l1>,
+>>>>                      <&cpu_l2>,
+>>>>                      <&cpu_l3>;
+>>>>     };
+>>>>
+>>>>     pmu_a72 {
+>>>>         compatible = "arm,cortex-a72-pmu";
+>>>>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
+>>>>         interrupt-affinity = <&cpu_b0>,
+>>>>                      <&cpu_b1>;
+>>>>     };
+>>>> but unfortunately, the arm pmu driver do not support PPI in two cluster
+>>>> well,
+>>>> so we have to replace with this implementation.
+>>>>> In this case things are messier as the same PPI number is being used
+>>>>> across clusters. Marc (Cc'd) has been working on PPI partitions, which
+>>>>> should allow us to support that.
+>>>> Great! So what we can do right now? Wait this feature, and delete
+>>>> arm-pmu node?
+>>> I'd rather you have a look at the patches, test them with your HW,
+>>> and comment on what doesn't work!
+>>>
+>>> You can find the patches over there:
+>>>
+>>> https://lkml.org/lkml/2016/4/11/182
+>>>
+>>> and on the following branch:
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>>> irq/percpu-partition
+>> I tested these patches. Because our kernel is based on v4.4, so I back
+>> port most changes about
+>> include/linux/irqdomain.h
+>> kernel/irq/irqdomain.c
+>> drivers/irqchip/irq-gic-v3.c
+>> and change rk3399.dtsi base on your arm,gic-v3.txt:
+>>
+>>      gic: interrupt-controller at fee00000 {
+>>          compatible = "arm,gic-v3";
+>> -        #interrupt-cells = <3>;
+>> +        #interrupt-cells = <4>;
+>>          #address-cells = <2>;
+>>          #size-cells = <2>;
+>> ...
+>> +
+>> +        ppi-partitions {
+>> +            part0: interrupt-partition-0 {
+>> +                affinity = <&cpu_l0 &cpu_l1 &cpu_l2 &cpu_l3>;
+>> +            };
+>> +
+>> +            part1: interrupt-partition-1 {
+>> +                affinity = <&cpu_b0 &cpu_b1>;
+>> +            };
+>> +        };
+>>
+>> and change every interrupts from three cells to four cells, such as
+>>      saradc: saradc at ff100000 {
+>>          compatible = "rockchip,rk3399-saradc";
+>>          reg = <0x0 0xff100000 0x0 0x100>;
+>> -        interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+>> +        interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH 0>;
+>>          #io-channel-cells = <1>;
+>>          clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
+>>          clock-names = "saradc", "apb_pclk";
+>>
+>> and pmu define as:
+>>     pmu_a53 {
+>>         compatible = "arm,cortex-a53-pmu";
+>>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW &part0>;
+>>         interrupt-affinity = <&cpu_l0>,
+>>                      <&cpu_l1>,
+>>                      <&cpu_l2>,
+>>                      <&cpu_l3>;
+>>     };
+>>
+>>     pmu_a72 {
+>>         compatible = "arm,cortex-a72-pmu", "arm,cortex-a57-pmu";
+> That Cortex-A57 PMU fallback should just go. We already have Cortex-A72
+> PMU support upstream, and I believe there are sufficient differences
+> such that the Cortex-A72 PMU is not a strict superset of the Cortex-A57
+> PMU.
+As I say, I tested on v4.4, I don't back port
+arch/arm64/kernel/perf_event.c, so I use "arm,cortex-a57-pmu". Upstream
+will use "arm,cortex-a72-pmu" only.
+BTW, I don't see any differences between A72/A57 in source code:
 
-Given the simplicity of just calling of_flat_dt_is_compatible(node,
-"xen,xen"), I think we can do without the helper. Also the function in
-the previous patch also checks for the Xen version which is not needed
-here.
+static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
+{
+        armv8_pmu_init(cpu_pmu);
+        cpu_pmu->name                   = "armv8_cortex_a57";
+        cpu_pmu->map_event              = armv8_a57_map_event;
+        cpu_pmu->pmu.attr_groups        = armv8_pmuv3_attr_groups;
+        return armv8pmu_probe_num_events(cpu_pmu);
+}
 
+static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+{
+        armv8_pmu_init(cpu_pmu);
+        cpu_pmu->name                   = "armv8_cortex_a72";
+        cpu_pmu->map_event              = armv8_a57_map_event;
+        cpu_pmu->pmu.attr_groups        = armv8_pmuv3_attr_groups;
+        return armv8pmu_probe_num_events(cpu_pmu);
+}
 
-> Additionally, IMO, this would be easier to follow without the nested
-> conditionals, e.g.
-> 
-> static int __init dt_scan_depth1_nodes(unsigned long node,
-> 				       const char *uname, int depth,
-> 				       void *data)
-> {
-> 	/*
-> 	 * Ignore anything not directly under the root node; we'll
-> 	 * catch its parent instead.
-> 	 */
-> 	if (depth != 1)
-> 		return 0;
-> 
-> 	if (strcmp(uname, "chosen") == 0)
-> 		return 0;
-> 
-> 	if (strcmp(uname, "hypervisor") == 0 &&
-> 	    of_flat_dt_is_compatible(node, "xen,xen"))
-> 		return 0;
-> 
-> 	/*
-> 	 * This node at depth 1 is neither a chosen node nor a xen node,
-> 	 * which we do not expect.
-> 	 */
-> 	return 1;
-> }
-> 
-> Otherwise, this looks fine to me. FWIW, either way:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+static const struct of_device_id armv8_pmu_of_device_ids[] = {
+...
+        {.compatible = "arm,cortex-a57-pmu",    .data = armv8_a57_pmu_init},
+        {.compatible = "arm,cortex-a72-pmu",    .data = armv8_a72_pmu_init},
+...
+        {},
+};
 
-That is easier to read. For simplicity, I'll submit a patch with you as
-author, on top of the existing, to make this change. I'll use your
-Signed-off-by, if that's OK.
+>
+>>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW &part1>;
+>>         interrupt-affinity = <&cpu_b0>,
+>>                      <&cpu_b1>;
+>>     };
+>>
+>> It can boot. And I test with Android simpleperf stat and perf top, it works!
+>> So these patches work on RK3399.
+> There is still work to do in the driver, as Marc pointed out.
+>
+> While it may appear to work, it will be requesting percpu IRQs on wrong
+> CPUs (e.g. see how cpu_pmu_request_irq calls cpu_pmu_enable_percpu_irq,
+> on each CPU), and we will need to update the binding codument to cover
+> this case.
+I also set interrupt-affinity, maybe this avoid problem. I add some
+debug print on driver, I believe irq is request on right cpus.
+
+Thanks,
+Huang Tao
