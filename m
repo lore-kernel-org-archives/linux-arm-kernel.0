@@ -1,24 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 23:48:05 +0200
-Subject: [PATCH 2/2] drivers: firmware: psci: make two helper functions
- static
-In-Reply-To: <1461147628-22844-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1461147628-22844-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1461147628-22844-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <9014396.Tqm30NRfMR@wuerfel>
+Date: Mon, 25 Apr 2016 23:49:19 +0200
+Subject: [GIT PULL 4/4] Broadcom drivers changes for 4.7
+In-Reply-To: <1461441540-5095-4-git-send-email-f.fainelli@gmail.com>
+References: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
+ <1461441540-5095-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <6002710.ZtNXPrPtLO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 April 2016 11:20:28 Lorenzo Pieralisi wrote:
-> From: Jisheng Zhang <jszhang@marvell.com>
+On Saturday 23 April 2016 12:59:00 Florian Fainelli wrote:
+> This pull request contains Broadcom ARM-based SoCs drivers changes:
 > 
-> psci_power_state_loses_context() and psci_power_state_is_valid are only
-> used internally now, so make them static.
+> - Justin adds a soc_dev driver to properly report to user-space the Broadcom
+>   STB SoC family, product and revision
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> - Florian reworks how the brcmstb_gisb driver dependency is done to enable it
+>   on Broadcom STB MIPS-based SoCs and remove a select in
+>   arch/arm/mach-bcm/Kconfig
 > 
 
-Applied both patches to next/drivers, thanks!
+Pulled into next/drivers, thanks!
 
 	Arnd
