@@ -1,53 +1,52 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 25 Apr 2016 13:27:36 -0300
-Subject: [PATCH 1/5] leds: triggers: Allow to switch the trigger to
- "panic" on a kernel panic
-In-Reply-To: <571DBFAE.7060605@samsung.com>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459801326-5541-2-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20160424092551.GB23015@amd> <20160424092951.GA25596@amd>
- <571DBFAE.7060605@samsung.com>
-Message-ID: <CAAEAJfC=O1akKKdW-9P7OkFZyDfE-ApbWhdYr7HPhszDrFcV1Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Apr 2016 17:27:49 +0100
+Subject: [PATCH resend v2 1/9] MAINTAINERS: Add entry for X-Powers AXP
+ family PMIC drivers
+In-Reply-To: <1459243352-23344-2-git-send-email-wens@csie.org>
+References: <1459243352-23344-1-git-send-email-wens@csie.org>
+ <1459243352-23344-2-git-send-email-wens@csie.org>
+Message-ID: <20160425162749.GO2713@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2016 at 03:56, Jacek Anaszewski <j.anaszewski@samsung.com> wrote:
-> On 04/24/2016 11:29 AM, Pavel Machek wrote:
->>
->> On Sun 2016-04-24 11:25:51, Pavel Machek wrote:
->>>
->>> On Mon 2016-04-04 17:22:02, Ezequiel Garcia wrote:
->>>>
->>>> This commit adds a new led_cdev flag LED_BLINK_AT_PANIC, which
->>>> allows to mark a specific LED to be switched to the "panic"
->>>> trigger, on a kernel panic.
->>>>
->>>> This is useful to allow the user to assign a regular trigger
->>>> to a given LED, and still blink that LED on a kernel panic.
->>>>
->>>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->>>
->>>
->>>
->>>>   drivers/leds/led-triggers.c | 52
->>>> +++++++++++++++++++++++++++++++++++++++++++++
->>>>   include/linux/leds.h        |  1 +
->>>
->>>
->>> Could we get this out of the core? I'm pretty sure most users are not
->>> interested...
->
->
-> Good point.
->
+On Tue, 29 Mar 2016, Chen-Yu Tsai wrote:
 
-Not sure how we can get it out of the core, and still implement it.
+> Add an entry for X-Powers AXP family PMIC drivers and list myself
+> as maintainer.
+> 
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Ramakrishna Pallala <ramakrishna.pallala@intel.com>
+> Cc: Todd Brandt <todd.e.brandt@linux.intel.com>
+> Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-The goal is to run-time switch user-specified LEDs and blink them when
-the kernel panics, and so it needs to mess up with some core private
-structures.
+Applied, thanks.
 
-Unless we don't want this feature at all.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 03e00c7c88eb..53f2bdfa20c4 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -12147,6 +12147,12 @@ F:	include/linux/workqueue.h
+>  F:	kernel/workqueue.c
+>  F:	Documentation/workqueue.txt
+>  
+> +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
+> +M:	Chen-Yu Tsai <wens@csie.org>
+> +L:	linux-kernel at vger.kernel.org
+> +S:	Maintained
+> +N:	axp[128]
+> +
+>  X.25 NETWORK LAYER
+>  M:	Andrew Hendry <andrew.hendry@gmail.com>
+>  L:	linux-x25 at vger.kernel.org
+
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
