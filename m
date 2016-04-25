@@ -1,51 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Apr 2016 18:26:56 +0100
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160425172656.GI9614@e104818-lin.cambridge.arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 25 Apr 2016 12:28:46 -0500
+Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
+ PCIe controller
+In-Reply-To: <20160425154611.3e7e9dc9@free-electrons.com>
+References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160425154611.3e7e9dc9@free-electrons.com>
+Message-ID: <20160425172846.GB1759@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 01:08:42AM +0300, Yury Norov wrote:
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -715,9 +715,13 @@ ENDPROC(ret_from_fork)
->   */
->  	.align	6
->  el0_svc:
-> -	adrp	stbl, sys_call_table		// load syscall table pointer
->  	uxtw	scno, w8			// syscall number in w8
->  	mov	sc_nr, #__NR_syscalls
-> +#ifdef CONFIG_ARM64_ILP32
-> +	ldr	x16, [tsk, #TI_FLAGS]
-> +	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> +#endif
+Hi Thomas,
 
-There is another ldr x16, [tsk, #TI_FLAGS] load further down in the
-el0_svc_naked block. We should rework these a bit to avoid loading the
-same location twice unnecessarily. E.g. move the ldr x16 just before
-el0_svc_naked and branch one line after in case of the ILP32 syscall.
+On Mon, Apr 25, 2016 at 03:46:11PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Thu, 14 Apr 2016 17:36:15 +0200, Thomas Petazzoni wrote:
+> 
+> > Thomas Petazzoni (2):
+> >   dt-bindings: pci: add DT binding for Marvell Armada 7K/8K PCIe
+> >     controller
+> >   pci: host: new driver for Marvell Armada 7K/8K PCIe controller
+> > 
+> >  .../devicetree/bindings/pci/pci-armada8k.txt       |  38 +++
+> >  drivers/pci/host/Kconfig                           |  11 +
+> >  drivers/pci/host/Makefile                          |   1 +
+> >  drivers/pci/host/pcie-armada8k.c                   | 261 +++++++++++++++++++++
+> >  4 files changed, 311 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
+> >  create mode 100644 drivers/pci/host/pcie-armada8k.c
+> 
+> Bjorn, any comment about this additional PCIe host driver? The
+> corresponding Device Tree binding has been approved by Rob Herring. The
+> driver itself is fairly trivial as it relies on the common Designware
+> logic.
 
-> +	adrp	stbl, sys_call_table		// load syscall table pointer
->  el0_svc_naked:					// compat entry point
->  	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
->  	enable_dbg_and_irq
-> @@ -737,6 +741,12 @@ ni_sys:
->  	b	ret_fast_syscall
->  ENDPROC(el0_svc)
->  
-> +#ifdef CONFIG_ARM64_ILP32
-> +el0_ilp32_svc:
-> +	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
-> +	b el0_svc_naked
-> +#endif
-> +
->  	/*
->  	 * This is the really slow path.  We're going to be doing context
->  	 * switches, and waiting for our parent to respond.
+It *is* pretty trivial.  The reason I'm hesitating is because we have
+all these DesignWare-based drivers (dra7xx, exynos, imx6, ks, ls,
+dw_plat, hisi, qcom, spear13xx, and now armada8k), and they're
+*mostly* similar, but they differ in minor, annoying ways.  This is
+becoming a significant maintenance burden for me, and I'd like to
+figure out how to mitigate that.
 
--- 
-Catalin
+For now, I don't have any great ideas except that it would be nice to
+remove needless variations.  The following is a typical code
+structure, but it's not universally followed:
+
+  XXX_pcie_probe
+    XXX_add_pcie_port
+      dw_pcie_host_init
+        XXX_pcie_host_init
+	  dw_pcie_setup_rc
+	  XXX_pcie_establish_link
+
+There's a hodge-podge of ways to get related resources (clocks and
+PHYs) and initialize them.  IRQ setup is not really consistent across
+all the drivers.  It's sort of disappointing that most of these
+drivers have a "dbi_base" resource, but they use different DT property
+names for it.
+
+The armada8k driver doesn't have a DRV_add_pcie_port() function or a
+DRV_pcie_establish_link() function, and it has its own "wait for link"
+timeout loop instead of using dw_pcie_wait_for_link().
+
+How about if you just shuffle those bits around into
+an armada8k_add_pcie_port() and an armada8k_pcie_establish_link(), and
+we'll call that good for now?
+
+Bjorn
