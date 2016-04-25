@@ -1,56 +1,53 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 25 Apr 2016 11:26:19 -0500
-Subject: [PATCH v2 3/4] ARM: davinci: disable mdio and eth0 in da850.dtsi
-In-Reply-To: <571E1C13.9050204@ti.com>
-References: <1460826020-1256-1-git-send-email-david@lechnology.com>
- <1460826020-1256-4-git-send-email-david@lechnology.com>
- <571E1C13.9050204@ti.com>
-Message-ID: <571E452B.7080004@lechnology.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Mon, 25 Apr 2016 13:27:36 -0300
+Subject: [PATCH 1/5] leds: triggers: Allow to switch the trigger to
+ "panic" on a kernel panic
+In-Reply-To: <571DBFAE.7060605@samsung.com>
+References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459801326-5541-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <20160424092551.GB23015@amd> <20160424092951.GA25596@amd>
+ <571DBFAE.7060605@samsung.com>
+Message-ID: <CAAEAJfC=O1akKKdW-9P7OkFZyDfE-ApbWhdYr7HPhszDrFcV1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2016 08:30 AM, Sekhar Nori wrote:
-> Hi David,
->
-> On Saturday 16 April 2016 10:30 PM, David Lechner wrote:
->> All other devices are disabled by default and not all boards will use
->> these devices, so these should be disabled too..
+On 25 April 2016 at 03:56, Jacek Anaszewski <j.anaszewski@samsung.com> wrote:
+> On 04/24/2016 11:29 AM, Pavel Machek wrote:
 >>
->> da850-evm.dtb already had status = "okay" for these devices.
->> da850-enbw-cmc.dts did not, so they were added.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> Tested-by: Kevin Hilman <khilman@baylibre.com>
+>> On Sun 2016-04-24 11:25:51, Pavel Machek wrote:
+>>>
+>>> On Mon 2016-04-04 17:22:02, Ezequiel Garcia wrote:
+>>>>
+>>>> This commit adds a new led_cdev flag LED_BLINK_AT_PANIC, which
+>>>> allows to mark a specific LED to be switched to the "panic"
+>>>> trigger, on a kernel panic.
+>>>>
+>>>> This is useful to allow the user to assign a regular trigger
+>>>> to a given LED, and still blink that LED on a kernel panic.
+>>>>
+>>>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+>>>
+>>>
+>>>
+>>>>   drivers/leds/led-triggers.c | 52
+>>>> +++++++++++++++++++++++++++++++++++++++++++++
+>>>>   include/linux/leds.h        |  1 +
+>>>
+>>>
+>>> Could we get this out of the core? I'm pretty sure most users are not
+>>> interested...
 >
-> I applied this and other patches in this series. One nit-pick though.
-> The commit description should be independently readable and not only as
-> continuation of the headline. Even if this means repeating portion of
-> the headline. I fixed this for most of the patches in this series. For
-> example, for this patch, I have:
 >
->      ARM: dts: da850: disable mdio and eth0 in da850.dtsi
->
->      Disable mdio and eth0 in da850.dtsi file. All other
->      devices are disabled by default and not all boards
->      will use these devices, so these should be disabled too.
->
->      da850-evm.dtb already had status = "okay" for these devices.
->      da850-enbw-cmc.dts did not, so they were added.
->
->      Signed-off-by: David Lechner <david@lechnology.com>
->      Tested-by: Kevin Hilman <khilman@baylibre.com>
->      [nsekhar at ti.com: commit description updates]
->      Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->
-> Its a minor change and I wont reply to all the patches with the changes
-> I made. But I pushed the updated v4.7/dt branch in my tree. Do take a
-> look at the commit description there.
->
-> Thanks,
-> Sekhar
->
+> Good point.
 >
 
+Not sure how we can get it out of the core, and still implement it.
 
-I had a look at the commits. I'll be sure to follow that advice in the 
-future.
+The goal is to run-time switch user-specified LEDs and blink them when
+the kernel panics, and so it needs to mess up with some core private
+structures.
+
+Unless we don't want this feature at all.
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
