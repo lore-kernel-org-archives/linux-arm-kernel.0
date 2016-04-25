@@ -1,58 +1,85 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 25 Apr 2016 21:28:05 +0530
-Subject: [RFC 0/9] IOMMU probe deferral support
-Message-ID: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+Date: Mon, 25 Apr 2016 21:28:08 +0530
+Subject: [RFC 3/9] of: dma: Make of_dma_deconfigure() public
+In-Reply-To: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1461599894-1969-4-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is mostly a repost of the probe deferral series from
-Laurent Pinchart [1]. Added a check to fix boot with ACPI.
-Adapted arm-smmu driver to work with deferred probing and added
-a new api for the below reason. This is based on the generic iommu binding
-series from Robin Murphy <robin.murphy@arm.com>.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Now associating a group with an master has become mandatory and happens
-when the master is added to the bus using BUS_ADD_DEVICE from iommu core.
-But the iommu has to be ready before this using early iommu registration
-and also master should have been added to the iommu using xlate. So, when
-trying to get rid of the early registration and using late probing for iommu
-devices to sort out the probing order, the newly added api is meant to be
-called during the late probing to add the master to the iommu. add_iommu_group
-could be modified to do the same though.
+As part of moving DMA initializing to probe time the
+of_dma_deconfigure() function will need to be called from different
+source files. Make it public and move it to drivers/of/device.c where
+the of_dma_configure() function is.
 
-The one issue here is the DRIVER_BIND notifier from iommu core
-might be called at a wrong point since the addition of a group to the device
-happens after this.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/of/device.c       | 12 ++++++++++++
+ drivers/of/platform.c     |  5 -----
+ include/linux/of_device.h |  3 +++
+ 3 files changed, 15 insertions(+), 5 deletions(-)
 
-Will be good to know the right direction to proceed on this fully.
-
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
-
-Laurent Pinchart (6):
-  arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
-  of: dma: Move range size workaround to of_dma_get_range()
-  of: dma: Make of_dma_deconfigure() public
-  of: dma: Split of_configure_dma() into mask and ops configuration
-  drivers: platform: Configure dma operations at probe time
-  iommu: of: Handle IOMMU lookup failure with deferred probing or error
-
-Sricharan R (3):
-  drivers: iommu: Add a new add device api
-  drivers: of: call iommu_bus_add_dev after iommu_configure_ops
-  drivers: iommu: arm-smmu: Set iommu_ops in probe
-
- arch/arm/mm/dma-mapping.c |  9 ++++++
- drivers/base/platform.c   | 13 ++++++++
- drivers/iommu/arm-smmu.c  | 34 ++------------------
- drivers/iommu/iommu.c     | 12 +++++++
- drivers/iommu/of_iommu.c  | 16 ++++++++--
- drivers/of/address.c      | 20 ++++++++++--
- drivers/of/device.c       | 81 +++++++++++++++++++++++++++++++----------------
- drivers/of/platform.c     | 16 ++++------
- drivers/pci/probe.c       |  3 +-
- include/linux/iommu.h     |  1 +
- include/linux/of_device.h | 14 ++++++--
- 11 files changed, 141 insertions(+), 78 deletions(-)
-
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index fc7597c..c3e01fe 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -136,6 +136,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ }
+ EXPORT_SYMBOL_GPL(of_dma_configure);
+ 
++/**
++ * of_dma_deconfigure - Clean up DMA configuration
++ * @dev:	Device for which to clean up DMA configuration
++ *
++ * Clean up all configuration performed by of_dma_configure_ops() and free all
++ * resources that have been allocated.
++ */
++void of_dma_deconfigure(struct device *dev)
++{
++	arch_teardown_dma_ops(dev);
++}
++
+ int of_device_register(struct platform_device *pdev)
+ {
+ 	device_initialize(&pdev->dev);
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 8d103e4..329801b 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -151,11 +151,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ }
+ EXPORT_SYMBOL(of_device_alloc);
+ 
+-static void of_dma_deconfigure(struct device *dev)
+-{
+-	arch_teardown_dma_ops(dev);
+-}
+-
+ /**
+  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+  * @np: pointer to node to create device for
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index cc7dd687..d20a31a 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -56,6 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ }
+ 
+ void of_dma_configure(struct device *dev, struct device_node *np);
++void of_dma_deconfigure(struct device *dev);
+ #else /* CONFIG_OF */
+ 
+ static inline int of_driver_match_device(struct device *dev,
+@@ -100,6 +101,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ }
+ static inline void of_dma_configure(struct device *dev, struct device_node *np)
+ {}
++static inline void of_dma_deconfigure(struct device *dev)
++{}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_OF_DEVICE_H */
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
