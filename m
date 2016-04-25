@@ -1,62 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Apr 2016 21:21:03 +0200
-Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <20160425172846.GB1759@localhost>
-References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160425154611.3e7e9dc9@free-electrons.com>
- <20160425172846.GB1759@localhost>
-Message-ID: <20160425212103.0f646a3a@free-electrons.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 25 Apr 2016 22:21:34 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+Message-ID: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Now not all DMA paremters configured properly for "xhci-hcd" platform
+device which is created manually. For example: dma_pfn_offset, dam_ops
+and iommu configuration will not corresponds "dwc3" devices
+configuration. As result, this will cause problems like wrong DMA
+addresses translation on platforms with LPAE enabled like Keystone 2.
 
-On Mon, 25 Apr 2016 12:28:46 -0500, Bjorn Helgaas wrote:
+When platform is using DT boot mode the DMA configuration will be
+parsed and applied from DT, so, to fix this issue, reuse
+of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
+from DWC3 device node.
 
-> It *is* pretty trivial.  The reason I'm hesitating is because we have
-> all these DesignWare-based drivers (dra7xx, exynos, imx6, ks, ls,
-> dw_plat, hisi, qcom, spear13xx, and now armada8k), and they're
-> *mostly* similar, but they differ in minor, annoying ways.  This is
-> becoming a significant maintenance burden for me, and I'd like to
-> figure out how to mitigate that.
+Cc: David Fisher <david.fisher1@synopsys.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: "Thang Q. Nguyen" <tqnguyen@apm.com>
+Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/usb/dwc3/host.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-Understood.
-
-> For now, I don't have any great ideas except that it would be nice to
-> remove needless variations.  The following is a typical code
-> structure, but it's not universally followed:
-> 
->   XXX_pcie_probe
->     XXX_add_pcie_port
->       dw_pcie_host_init
->         XXX_pcie_host_init
-> 	  dw_pcie_setup_rc
-> 	  XXX_pcie_establish_link
-
-Indeed, the first step towards having more common code is to make the
-code to be factorized look as similar as possible.
-
-> There's a hodge-podge of ways to get related resources (clocks and
-> PHYs) and initialize them.  IRQ setup is not really consistent across
-> all the drivers.  It's sort of disappointing that most of these
-> drivers have a "dbi_base" resource, but they use different DT property
-> names for it.
-> 
-> The armada8k driver doesn't have a DRV_add_pcie_port() function or a
-> DRV_pcie_establish_link() function, and it has its own "wait for link"
-> timeout loop instead of using dw_pcie_wait_for_link().
-> 
-> How about if you just shuffle those bits around into
-> an armada8k_add_pcie_port() and an armada8k_pcie_establish_link(), and
-> we'll call that good for now?
-
-I'll take a stab at that tomorrow and send an updated version.
-
-Thanks for the feedback!
-
-Thomas
+diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+index c679f63..93c8ef9 100644
+--- a/drivers/usb/dwc3/host.c
++++ b/drivers/usb/dwc3/host.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/platform_device.h>
+ #include <linux/usb/xhci_pdriver.h>
++#include <linux/of_device.h>
+ 
+ #include "core.h"
+ 
+@@ -32,12 +33,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 		return -ENOMEM;
+ 	}
+ 
+-	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+-
+ 	xhci->dev.parent	= dwc->dev;
+-	xhci->dev.dma_mask	= dwc->dev->dma_mask;
+-	xhci->dev.dma_parms	= dwc->dev->dma_parms;
+-
+ 	dwc->xhci = xhci;
+ 
+ 	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
+@@ -62,6 +58,15 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+ 			  dev_name(&xhci->dev));
+ 
++	if (IS_ENABLED(CONFIG_OF) && dwc->dev->of_node) {
++		of_dma_configure(&xhci->dev, dwc->dev->of_node);
++	} else {
++		dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
++
++		xhci->dev.dma_mask	= dwc->dev->dma_mask;
++		xhci->dev.dma_parms	= dwc->dev->dma_parms;
++	}
++
+ 	ret = platform_device_add(xhci);
+ 	if (ret) {
+ 		dev_err(dwc->dev, "failed to register xHCI device\n");
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.8.1
