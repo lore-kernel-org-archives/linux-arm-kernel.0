@@ -1,57 +1,48 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 25 Apr 2016 11:14:07 +0100
-Subject: [PATCH 1/2] ARM: PIE infrastructure
-In-Reply-To: <20160422231503.GE17051@piout.net>
-References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1459668234-16033-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20160404100052.GS19428@n2100.arm.linux.org.uk>
- <20160422231503.GE17051@piout.net>
-Message-ID: <20160425101406.GR24713@e103592.cambridge.arm.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 25 Apr 2016 11:15:27 +0100
+Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
+In-Reply-To: <20160424212241.GO2829@codeblueprint.co.uk>
+References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
+ <20160424212241.GO2829@codeblueprint.co.uk>
+Message-ID: <20160425101527.GP2829@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 23, 2016 at 01:15:03AM +0200, Alexandre Belloni wrote:
-> On 04/04/2016 at 11:00:52 +0100, Russell King - ARM Linux wrote :
-> > > + /* Copy chunk specific code/data */
-> > > + fncpy((char *)chunk->addr, code_start, code_sz);
-> >
-> > Sorry, NAK.  This abuses fncpy().  There is extensive documentation on
-> > the proper use of this in asm/fncpy.h, and anything that does not
-> > conform, or which uses memcpy() to copy functions, gets an immediate
-> > NAK from me.  fncpy() exists to avoid people doing broken things, and
-> > it's written in such a way to help people get it right.
->
-> Well, do you want me to iterate and use fncpy on all the functions from
-> the generated binary?
->
-> I'm not sure this is necessary as the generated binary is self contained
-> and doing so will force me to also ensure the offsets are kept the same.
-> Doing only one copy is much more convenient. However, I still need to
-> ensure the destination address is properly 8-byte aligned and the
-> flush_icache_range().
-> I understand this is abusing fncpy() but it does want I need (still, I'm
-> planning to avoid the BUG() by always passing a properly aligned
-> destination address).
+On Sun, 24 Apr, at 10:22:41PM, Matt Fleming wrote:
+> 
+> I like this series a lot (well, ignoring the fact that the firmware is
+> trying to eat itself). The runtime call code is much cleaner now, and
+> this is a great precedent for any future multi-architecture quirks we
+> may need.
+> 
+> Queued for v4.7, thanks everyone!
 
-fncpy was only intented for a single, self-contained function.  It bakes
-in assumptions that are not going to apply to PIEs in general.
+Hmm... Booting this series with Qemu and OVMF results in lots of
+warnings,
 
-The main purpose of this was to avoid (possibly buggy) reinvention of
-this bit of code in every driver or board file that needed to copy a
-function to SRAM.
+[    0.102173] ------------[ cut here ]------------
+[    0.103000] WARNING: CPU: 0 PID: 0 at /dev/shm/mfleming/git/efi/drivers/firmware/efi/runtime-wrappers.c:30 efi_call_virt_check_flags+0x69/0x90
+[    0.103505] Modules linked in:
+[    0.104519] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4+ #1
+[    0.105000]  0000000000000000 ffffffff81e03e30 ffffffff8132206f 0000000000000000
+[    0.105000]  0000000000000000 ffffffff81e03e70 ffffffff8105a47c 0000001e0000000a
+[    0.105000]  0000000000000246 0000000000000286 ffffffff81bed975 ffffffff81e03f10
+[    0.105000] Call Trace:
+[    0.105000]  [<ffffffff8132206f>] dump_stack+0x4d/0x6e
+[    0.105000]  [<ffffffff8105a47c>] __warn+0xcc/0xf0
+[    0.105000]  [<ffffffff8105a558>] warn_slowpath_null+0x18/0x20
+[    0.105000]  [<ffffffff8164e5a9>] efi_call_virt_check_flags+0x69/0x90
+[    0.105000]  [<ffffffff8164f9d2>] virt_efi_set_variable+0x82/0x190
+[    0.105000]  [<ffffffff81054555>] efi_delete_dummy_variable+0x75/0x80
+[    0.105000]  [<ffffffff81f599f6>] efi_enter_virtual_mode+0x463/0x472
+[    0.105000]  [<ffffffff81f41f82>] start_kernel+0x38f/0x415
+[    0.105000]  [<ffffffff81f419e1>] ? set_init_arg+0x55/0x55
+[    0.105000]  [<ffffffff81f415ee>] x86_64_start_reservations+0x2a/0x2c
+[    0.105000]  [<ffffffff81f416da>] x86_64_start_kernel+0xea/0xed
+[    0.107181] ---[ end trace 0081cc453369d969 ]---
+[    0.107499] Disabling lock debugging due to kernel taint
+[    0.108226] [Firmware Bug]: IRQ flags corrupted (0x00000246=>0x00000286) by EFI set_variable
 
-The PIE mechanism supersedes this approach, in that it should completely
-hide the mechanics of copying to SRAM from the users of PIEs -- so its
-worth the PIE infrastructure having it's own code to do this.
-Since PIEs will have their own requirements that go beyond what fncpy
-does, using fncpy to implement the PIE infrastructure is a misfactorage.
-
-In particular, what is the alignment requirement for a PIE?  It can be
-anything that ELF allows, not simply "8".
-
-The "thumb bit" is obviously also meaningless for section base
-addresses.
-
-Cheers
----Dave
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Has anyone tested this series on x86 to ensure that this is a rare
+case? I'll go and test some physical x86 machines now.
