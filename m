@@ -1,196 +1,91 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 25 Apr 2016 15:13:45 +0200
-Subject: [PATCH v8 5/8] [media] vcodec: mediatek: Add Mediatek V4L2 Video
- Encoder Driver
-In-Reply-To: <1461587438-59886-6-git-send-email-tiffany.lin@mediatek.com>
-References: <1461587438-59886-1-git-send-email-tiffany.lin@mediatek.com>
- <1461587438-59886-2-git-send-email-tiffany.lin@mediatek.com>
- <1461587438-59886-3-git-send-email-tiffany.lin@mediatek.com>
- <1461587438-59886-4-git-send-email-tiffany.lin@mediatek.com>
- <1461587438-59886-5-git-send-email-tiffany.lin@mediatek.com>
- <1461587438-59886-6-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <571E1809.3060100@xs4all.nl>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Apr 2016 08:14:07 -0500
+Subject: [PATCH 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <20160423173351.GA3246@hector.attlocal.net>
+References: <1461363432-5730-1-git-send-email-andy.gross@linaro.org>
+ <1461363432-5730-2-git-send-email-andy.gross@linaro.org>
+ <CAL_JsqK0LYCozBohs5QCvuPRR-3s2SMHf7DgwSyVe4Vyeyw9ew@mail.gmail.com>
+ <20160423173351.GA3246@hector.attlocal.net>
+Message-ID: <20160425131407.GA12241@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2016 02:30 PM, Tiffany Lin wrote:
-> Add v4l2 layer encoder driver for MT8173
+On Sat, Apr 23, 2016 at 12:33:51PM -0500, Andy Gross wrote:
+> On Sat, Apr 23, 2016 at 11:56:50AM -0500, Rob Herring wrote:
+> > On Fri, Apr 22, 2016 at 5:17 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> > > This patch adds the device tree support for the Qualcomm SCM firmware.
+> > >
+> > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > > ---
+> > >  .../devicetree/bindings/firmware/qcom,scm.txt      | 31 ++++++++++++++++++++++
+> > >  1 file changed, 31 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> > > new file mode 100644
+> > > index 0000000..57b9b3a
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> > > @@ -0,0 +1,31 @@
+> > > +QCOM Secure Channel Manager (SCM)
+> > > +
+> > > +Qualcomm processors include an interface to communicate to the secure firmware.
+> > > +This interface allows for clients to request different types of actions.  These
+> > > +can include CPU power up/down, HDCP requests, loading of firmware, and other
+> > > +assorted actions.
+> > > +
+> > > +Required properties:
+> > > +- compatible: must contain one of the following:
+> > > + * "qcom,scm-apq8064" for APQ8064
+> > > + * "qcom,scm-apq8084" for MSM8084
+> > > + * "qcom,scm-msm8916" for MSM8916
+> > > + * "qcom,scm-msm8974" for MSM8974
+> > > +- clocks: One to three clocks may be required based on compatible.
+> > > + * Only core clock required for "qcom,scm-apq8064"
+> > > + * Core, iface, and bus clocks required for all other compatibles.
+> > > +- clock-names: Must contain "core" for the core clock, "iface" for the interface
+> > > +  clock and "bus" for the bus clock per the requirements of the compatible.
+> > > +
+> > > +Example for MSM8916:
+> > > +
+> > > +       firmware {
+> > > +               compatible = "simple-bus";
+> > 
+> > Firmware is a bus? Really? Let's not put hacks in the DT just so you
+> > get automatic probing.
 > 
-> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> So something like:
 > 
-> ---
->  drivers/media/platform/Kconfig                     |   16 +
->  drivers/media/platform/Makefile                    |    2 +
->  drivers/media/platform/mtk-vcodec/Makefile         |   14 +
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h |  339 +++++
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c | 1303 ++++++++++++++++++++
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.h |   58 +
->  .../media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c |  456 +++++++
->  .../media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c  |  137 ++
->  .../media/platform/mtk-vcodec/mtk_vcodec_enc_pm.h  |   26 +
->  .../media/platform/mtk-vcodec/mtk_vcodec_intr.c    |   56 +
->  .../media/platform/mtk-vcodec/mtk_vcodec_intr.h    |   27 +
->  .../media/platform/mtk-vcodec/mtk_vcodec_util.c    |   96 ++
->  .../media/platform/mtk-vcodec/mtk_vcodec_util.h    |   87 ++
->  drivers/media/platform/mtk-vcodec/venc_drv_base.h  |   62 +
->  drivers/media/platform/mtk-vcodec/venc_drv_if.c    |  107 ++
->  drivers/media/platform/mtk-vcodec/venc_drv_if.h    |  165 +++
->  drivers/media/platform/mtk-vcodec/venc_ipi_msg.h   |  210 ++++
->  17 files changed, 3161 insertions(+)
->  create mode 100644 drivers/media/platform/mtk-vcodec/Makefile
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
->  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/venc_drv_base.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/venc_drv_if.c
->  create mode 100644 drivers/media/platform/mtk-vcodec/venc_drv_if.h
->  create mode 100644 drivers/media/platform/mtk-vcodec/venc_ipi_msg.h
+>         firmware {
+>                 compatible = "qcom,scm-apq8084";
+>                 clocks = <&gcc GCC_CE1_CLK> , <&gcc GCC_CE1_AXI_CLK>, <&gcc GCC_CE1_AHB_CLK>;
+>                 clock-names = "core", "bus", "iface";
+>         };
 > 
+> Seems to work fine.
 
-...
+Yes, because the top level nodes are probed. But then you can't have any 
+other firmware nodes. You are going to have to call of_platform_populate 
+on the /firmware node or create the device yourself. If there are other 
+users of /firmware needing to probe, then we can perhaps do it 
+generically.
 
-> +static int fops_vcodec_open(struct file *file)
-> +{
-> +	struct mtk_vcodec_dev *dev = video_drvdata(file);
-> +	struct mtk_vcodec_ctx *ctx = NULL;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&dev->dev_mutex);
 
-I would move this to after the kzalloc, since that doesn't need to be
-called with the mutex held.
+> > > +
+> > > +               scm {
+> > > +                       compatible = "qcom,scm-msm8916";
+> > > +                       clocks = <&gcc GCC_CRYPTO_CLK> , <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
+> > > +                       clock-names = "core", "bus", "iface";
+> > 
+> > Generally, /firmware defines an interface to firmware. I don't think
+> > clocks belong here. This implies that non-secure world can turn off
+> > clocks to secure world?
+> 
+> The caller into the SCM is on the hook for making sure the clocks are turned on.
+> The firmware people decided to not manage the clocks.  In a perfect world, they
+> would turn on their own clocks and it would all be self contained.  Sadly, it
+> isn't going to change.
 
-> +
-> +	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-> +	if (!ctx) {
+Okay. Seems like a security problem to me though.
 
-And then you can just do return -ENOMEM here.
-
-> +		ret = -ENOMEM;
-> +		goto err_alloc;
-> +	}
-> +
-> +	ctx->idx = dev->curr_max_idx;
-
-I'd do:
-
-	/*
-	 * Use simple counter to uniquely identify this context. Only
-	 * used for logging.
-	 */
-	ctx->idx = dev->curr_max_idx++;
-
-I would also prefer that it is call 'id' instead of idx, since that's really
-what it is, just an ID.
-
-And the counter is then id_counter instead of curr_max_idx.
-
-> +	v4l2_fh_init(&ctx->fh, video_devdata(file));
-> +	file->private_data = &ctx->fh;
-> +	v4l2_fh_add(&ctx->fh);
-> +	INIT_LIST_HEAD(&ctx->list);
-> +	ctx->dev = dev;
-> +	init_waitqueue_head(&ctx->queue);
-> +
-> +	ctx->type = MTK_INST_ENCODER;
-> +	ret = mtk_vcodec_enc_ctrls_setup(ctx);
-> +	if (ret) {
-> +		mtk_v4l2_err("Failed to setup controls() (%d)",
-> +				ret);
-> +		goto err_ctrls_setup;
-> +	}
-> +	ctx->m2m_ctx = v4l2_m2m_ctx_init(dev->m2m_dev_enc, ctx,
-> +				&mtk_vcodec_enc_queue_init);
-> +	if (IS_ERR(ctx->m2m_ctx)) {
-> +		ret = PTR_ERR(ctx->m2m_ctx);
-> +		mtk_v4l2_err("Failed to v4l2_m2m_ctx_init() (%d)",
-> +				ret);
-> +		goto err_m2m_ctx_init;
-> +	}
-> +	mtk_vcodec_enc_set_default_params(ctx);
-> +
-> +	if (v4l2_fh_is_singular(&ctx->fh)) {
-> +		/*
-> +		 * vpu_load_firmware checks if it was loaded already and
-> +		 * does nothing in that case
-> +		 */
-> +		ret = vpu_load_firmware(dev->vpu_plat_dev);
-> +		if (ret < 0) {
-> +			/*
-> +			 * Return 0 if downloading firmware successfully,
-> +			 * otherwise it is failed
-> +			 */
-> +			mtk_v4l2_err("vpu_load_firmware failed!");
-> +			goto err_load_fw;
-> +		}
-> +
-> +		dev->enc_capability =
-> +			vpu_get_venc_hw_capa(dev->vpu_plat_dev);
-> +		mtk_v4l2_debug(0, "encoder capability %x", dev->enc_capability);
-> +	}
-> +
-> +	mtk_v4l2_debug(2, "Create instance [%d]@%p m2m_ctx=%p ",
-> +			ctx->idx, ctx, ctx->m2m_ctx);
-> +	dev->curr_max_idx = (dev->curr_max_idx + 1) & 0xffffffffffffffff;
-
-and drop this line.
-
-> +	dev->num_instances++;
-> +	list_add(&ctx->list, &dev->ctx_list);
-> +
-> +	mutex_unlock(&dev->dev_mutex);
-> +	mtk_v4l2_debug(0, "%s encoder [%d]", dev_name(&dev->plat_dev->dev),
-> +			ctx->idx);
-> +	return ret;
-> +
-> +	/* Deinit when failure occurred */
-> +err_load_fw:
-> +	v4l2_m2m_ctx_release(ctx->m2m_ctx);
-> +err_m2m_ctx_init:
-> +	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
-> +err_ctrls_setup:
-> +	v4l2_fh_del(&ctx->fh);
-> +	v4l2_fh_exit(&ctx->fh);
-> +	kfree(ctx);
-> +err_alloc:
-> +	mutex_unlock(&dev->dev_mutex);
-> +
-> +	return ret;
-> +}
-> +
-> +static int fops_vcodec_release(struct file *file)
-> +{
-> +	struct mtk_vcodec_dev *dev = video_drvdata(file);
-> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
-> +
-> +	mtk_v4l2_debug(1, "[%d] encoder", ctx->idx);
-> +	mutex_lock(&dev->dev_mutex);
-> +
-> +	mtk_vcodec_enc_release(ctx);
-> +	v4l2_fh_del(&ctx->fh);
-> +	v4l2_fh_exit(&ctx->fh);
-> +	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
-> +	v4l2_m2m_ctx_release(ctx->m2m_ctx);
-> +
-> +	list_del_init(&ctx->list);
-> +	dev->num_instances--;
-> +	kfree(ctx);
-> +	mutex_unlock(&dev->dev_mutex);
-> +	return 0;
-> +}
-
-Tiffany, besides these very small items here is there anything else you are waiting for?
-I'm thinking that if you fix these small issues, merge Julia Lawall's fixes and repost,
-then I can make a pull request. Mauro will still have to review it as well, but I have no
-more comments.
-
-Regards,
-
-	Hans
+Rob
