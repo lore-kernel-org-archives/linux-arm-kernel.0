@@ -1,18 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 21:18:27 +0200
-Subject: [GIT PULL 5/5] arm64: defconfig for v4.7
-In-Reply-To: <1460541682-32417-6-git-send-email-k.kozlowski@samsung.com>
-References: <1460541682-32417-1-git-send-email-k.kozlowski@samsung.com>
- <1460541682-32417-6-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <8450792.yHDXgHazkN@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 25 Apr 2016 21:18:40 +0200
+Subject: [PATCH 3/4] dmaengine: pxa_dma: remove duplicate const qualifier
+In-Reply-To: <1461577678-29517-3-git-send-email-eric.engestrom@imgtec.com>
+ (Eric Engestrom's message of "Mon, 25 Apr 2016 10:47:56 +0100")
+References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+ <1461577678-29517-3-git-send-email-eric.engestrom@imgtec.com>
+Message-ID: <87eg9tsdin.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 April 2016 12:01:22 Krzysztof Kozlowski wrote:
-> Defconfig ARM64 changes for Exynos based boards for v4.7:
-> 1. Enable the PL330 DMA driver.
-> 
+Eric Engestrom <eric.engestrom@imgtec.com> writes:
 
-Pulled into next/arm64, thanks!
+> Signed-off-by: Eric Engestrom <eric.engestrom@imgtec.com>
+> ---
+>  drivers/dma/pxa_dma.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-	Arnd
+-- 
+Robert
