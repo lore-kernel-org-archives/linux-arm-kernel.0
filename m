@@ -1,53 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Apr 2016 14:27:28 +1000
-Subject: [PATCH 10/22] ARM: dts: r8a7793: add CAN nodes to device tree
+Date: Mon, 25 Apr 2016 14:27:30 +1000
+Subject: [PATCH 12/22] ARM: dts: r8a7794: Add IIC nodes
 In-Reply-To: <cover.1461558315.git.horms+renesas@verge.net.au>
 References: <cover.1461558315.git.horms+renesas@verge.net.au>
-Message-ID: <a0e300ceb5259e8584ff67971981ac22580ef550.1461558315.git.horms+renesas@verge.net.au>
+Message-ID: <aa9b992ea2d3c2cc48712c21d1e680318d4156e2.1461558315.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CAN nodes to r8a7793 device tree.
+Add IIC nodes to r8a7794 device tree.
 
-Based on work by Sergei Shtylyov for the r8a7791 SoC.
+Based on similar work for the r8a7793 by Laurent Pinchart.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 0e609bdafaa9..bddc31283bd9 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -806,6 +806,28 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8b2060c87a76..b0bce43779f1 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -26,6 +26,8 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++		i2c7 = &i2c7;
+ 		spi0 = &qspi;
+ 		vin0 = &vin0;
+ 		vin1 = &vin1;
+@@ -629,6 +631,32 @@
+ 		status = "disabled";
  	};
  
-+	can0: can at e6e80000 {
-+		compatible = "renesas,can-r8a7793", "renesas,rcar-gen2-can";
-+		reg = <0 0xe6e80000 0 0x1000>;
-+		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7793_CLK_RCAN0>,
-+			 <&cpg_clocks R8A7793_CLK_RCAN>, <&can_clk>;
-+		clock-names = "clkp1", "clkp2", "can_clk";
++	i2c6: i2c at e6500000 {
++		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
++		reg = <0 0xe6500000 0 0x425>;
++		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_IIC0>;
++		dmas = <&dmac0 0x61>, <&dmac0 0x62>;
++		dma-names = "tx", "rx";
 +		power-domains = <&cpg_clocks>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		status = "disabled";
 +	};
 +
-+	can1: can at e6e88000 {
-+		compatible = "renesas,can-r8a7793", "renesas,rcar-gen2-can";
-+		reg = <0 0xe6e88000 0 0x1000>;
-+		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7793_CLK_RCAN1>,
-+			 <&cpg_clocks R8A7793_CLK_RCAN>, <&can_clk>;
-+		clock-names = "clkp1", "clkp2", "can_clk";
++	i2c7: i2c at e6510000 {
++		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
++		reg = <0 0xe6510000 0 0x425>;
++		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_IIC1>;
++		dmas = <&dmac0 0x65>, <&dmac0 0x66>;
++		dma-names = "tx", "rx";
 +		power-domains = <&cpg_clocks>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		status = "disabled";
 +	};
 +
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
+ 	mmcif0: mmc at ee200000 {
+ 		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
 -- 
 2.7.0.rc3.207.g0ac5344
