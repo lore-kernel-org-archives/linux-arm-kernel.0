@@ -1,62 +1,76 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Apr 2016 12:16:37 +0100
-Subject: [PATCH V3 12/18] coresight: tmc: dump system memory content only
- when needed
-In-Reply-To: <1461345255-11758-13-git-send-email-mathieu.poirier@linaro.org>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-13-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <571DFC95.10006@arm.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 25 Apr 2016 12:19:23 +0100
+Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
+In-Reply-To: <20160425110455.GF25087@leverpostej>
+References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
+ <20160424212241.GO2829@codeblueprint.co.uk>
+ <20160425101527.GP2829@codeblueprint.co.uk>
+ <CAKv+Gu8OfqdJp-VhC3o-tie4mRZXsF5ESKkZbsjnBHDY4xbXvQ@mail.gmail.com>
+ <20160425102821.GQ2829@codeblueprint.co.uk>
+ <20160425104009.GD25087@leverpostej>
+ <20160425105153.GR2829@codeblueprint.co.uk>
+ <20160425110455.GF25087@leverpostej>
+Message-ID: <20160425111923.GS2829@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/16 18:14, Mathieu Poirier wrote:
-> Calling tmc_etf/etr_dump_hw() is required only when operating from
-> sysFS.  When working from Perf, the system memory is harvested
-> from the AUX trace API.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-tmc-etf.c | 7 ++++++-
->   drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 ++++++-
->   2 files changed, 12 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index d090a9745c73..25fad93b68d4 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -74,7 +74,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
->   	CS_UNLOCK(drvdata->base);
->
->   	tmc_flush_and_stop(drvdata);
-> -	tmc_etb_dump_hw(drvdata);
-> +	/*
-> +	 * When operating in sysFS mode the content of the buffer needs to be
-> +	 * read before the TMC is disabled.
-> +	 */
-> +	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-> +		tmc_etb_dump_hw(drvdata);
->   	tmc_disable_hw(drvdata);
->
->   	CS_LOCK(drvdata->base);
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 8bbbf3ab1387..4b000f4003a2 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -76,7 +76,12 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
->   	CS_UNLOCK(drvdata->base);
->
->   	tmc_flush_and_stop(drvdata);
-> -	tmc_etr_dump_hw(drvdata);
-> +	/*
-> +	 * When operating in sysFS mode the content of the buffer needs to be
-> +	 * read before the TMC is disabled.
-> +	 */
-> +	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-> +		tmc_etr_dump_hw(drvdata);
->   	tmc_disable_hw(drvdata);
+On Mon, 25 Apr, at 12:04:55PM, Mark Rutland wrote:
+> On Mon, Apr 25, 2016 at 11:51:53AM +0100, Matt Fleming wrote:
+> > On Mon, 25 Apr, at 11:40:09AM, Mark Rutland wrote:
+> > > 
+> > > It looks like irqs_disabled_flags() will do what you expect, and ignore
+> > > everything but the interrupt flag.
+> > > 
+> > > However, for ARM that will ignore the other exceptions we've seen FW
+> > > erroneously unmask (e.g. FIQ), which is unfortunate, as fiddling with
+> > > those is just as disastrous.
+> >  
+> > Bah, right.
+> > 
+> > > Would you be happy with an arch_efi_call_check_flags(before, after),
+> > > instead? That way we can make the flags we check arch-specific.
+> > 
+> > Could we just make the flag mask arch-specific instead of the call
+> > since the rest of efi_call_virt_check_flags() is good?
+> 
+> Yup, I meant that arch_efi_call_check_flags would only do the flag
+> comparison, only replacing the bit currently in the WARN_ON_ONCE().
+> 
+> > Something like this (uncompiled, untested, half-baked),
+> > 
+> > ---
+> > 
+> > diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+> > index c38b1cfc26e2..057d00bee7d6 100644
+> > --- a/drivers/firmware/efi/runtime-wrappers.c
+> > +++ b/drivers/firmware/efi/runtime-wrappers.c
+> > @@ -25,9 +25,12 @@
+> >  static void efi_call_virt_check_flags(unsigned long flags, const char *call)
+> >  {
+> >  	unsigned long cur_flags;
+> > +	bool mismatch;
+> >  
+> >  	local_save_flags(cur_flags);
+> > -	if (!WARN_ON_ONCE(cur_flags != flags))
+> > +
+> > +	mismatch = (cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK;
+> > +	if (!WARN_ON_ONCE(mismatch))
+> >  		return;
+> 
+> This style also works for me.
+ 
+Cool. One thing that occurred to me after I sent it is that
+technically we should either,
 
-Nit: It would be cleaner if tmc_etX_disable_hw accepted a bool parameter to decide
-whether to dump the hw data or not. That way, the callers can make the decision,
-leaving the disable_hw code unaware of the mode checks.
+  1) make 'mismatch' an int or
+  2) do mismatch = !!((cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK)
 
-Suzuki
+Either is fine with me, I just don't want to leave the implicit
+conversion to C's type system.
+
+> Should I respin patch 6 as a series doing the above?
+> 
+> I assume that the first 5 patches are fine as-is.
+
+Yep, they're fine. Sure, go ahead and respin patch 6.
