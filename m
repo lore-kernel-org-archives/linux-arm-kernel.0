@@ -1,71 +1,62 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 25 Apr 2016 21:47:40 +0300
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <20160425181913.GA30125@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
- <20160425172656.GI9614@e104818-lin.cambridge.arm.com>
- <20160425181913.GA30125@yury-N73SV>
-Message-ID: <20160425184740.GA2559@yury-N73SV>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 25 Apr 2016 12:49:38 -0600
+Subject: [PATCH v4] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <20160419111545.GB9571@red-moon>
+References: <1461007942-20969-1-git-send-email-al.stone@linaro.org>
+ <20160419111545.GB9571@red-moon>
+Message-ID: <571E66C2.3000007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 09:19:13PM +0300, Yury Norov wrote:
-> On Mon, Apr 25, 2016 at 06:26:56PM +0100, Catalin Marinas wrote:
-> > On Wed, Apr 06, 2016 at 01:08:42AM +0300, Yury Norov wrote:
-> > > --- a/arch/arm64/kernel/entry.S
-> > > +++ b/arch/arm64/kernel/entry.S
-> > > @@ -715,9 +715,13 @@ ENDPROC(ret_from_fork)
-> > >   */
-> > >  	.align	6
-> > >  el0_svc:
-> > > -	adrp	stbl, sys_call_table		// load syscall table pointer
-> > >  	uxtw	scno, w8			// syscall number in w8
-> > >  	mov	sc_nr, #__NR_syscalls
-> > > +#ifdef CONFIG_ARM64_ILP32
-> > > +	ldr	x16, [tsk, #TI_FLAGS]
-> > > +	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> > > +#endif
-> > 
-> > There is another ldr x16, [tsk, #TI_FLAGS] load further down in the
-> > el0_svc_naked block. We should rework these a bit to avoid loading the
-> > same location twice unnecessarily. E.g. move the ldr x16 just before
-> > el0_svc_naked and branch one line after in case of the ILP32 syscall.
-> > 
+On 04/19/2016 05:15 AM, Lorenzo Pieralisi wrote:
+> On Mon, Apr 18, 2016 at 01:32:22PM -0600, Al Stone wrote:
+>> The ACPI 6.1 specification was recently released at the end of January
+>> 2016, but the arm64 kernel documentation for the use of ACPI was written
+>> for the 5.1 version of the spec.  There were significant additions to the
+>> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+>> added to make it easier to define processors and low power idle states,
+>> as well as the 6.1 addition allowing regular interrupts (not just from
+>> GPIO) be used to signal ACPI general purpose events.
+>>
+>> This patch reflects going back through and examining the specs in detail
+>> and updating content appropriately.  Whilst there, a few odds and ends of
+>> typos were caught as well.  This brings the documentation up to date with
+>> ACPI 6.1 for arm64.
+>>
+[snip...]
+
+>> @@ -185,9 +185,22 @@ tables (all section numbers refer to the ACPI 5.1 specfication):
+>>      -- If PCI is supported, the MCFG (Memory mapped ConFiGuration
+>>         Table), section 5.2.6, specifically Table 5-31.
+>>  
+>> +    -- If booting without a console=<device> kernel parameter is
+>> +       supported, the SPCR (Serial Port Console Redirection table),
+>> +       section 5.2.6, specifically Table 5-31.
+>> +
+>> +    -- If virtualization is supported, the IORT (Input Output Remapping
+>> +       Table, section 5.2.6, specifically Table 5-31.
 > 
-> Yes, I thiks we can refactor it. Thanks for a catch.
+> Why only "If virtualization is supported" ? Missing closing bracket.
 
-Now it's better, I think
+Hrm.  I guess that is an unnecessary qualification.
 
+> I still question sections of this document that IMHO do not belong
+> in the kernel documentation (but in the ACPI specs - eg _PRx methods
+> usage), anyway the information seems accurate so, pending changes above:
+> 
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index cf4d1ae..21312bb 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -715,16 +715,22 @@ ENDPROC(ret_from_fork)
-  */
- 	.align	6
- el0_svc:
--	adrp	stbl, sys_call_table		// load syscall table pointer
- 	uxtw	scno, w8			// syscall number in w8
- 	mov	sc_nr, #__NR_syscalls
-+	ldr	x16, [tsk, #TI_FLAGS]
-+#ifdef CONFIG_ARM64_ILP32
-+	tbz	x16, #TIF_32BIT_AARCH64, el0_lp64_svc // We are using ILP32
-+	adrp	stbl, sys_call_ilp32_table	// load ilp32 syscall table pointer
-+	b el0_svc_naked
-+el0_lp64_svc:
-+#endif
-+	adrp	stbl, sys_call_table		// load syscall table pointer
- el0_svc_naked:					// compat entry point
- 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
- 	enable_dbg_and_irq
- 	ct_user_exit 1
- 
--	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
--	tst	x16, #_TIF_SYSCALL_WORK
-+	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
- 	b.ne	__sys_trace
- 	cmp     scno, sc_nr                     // check upper syscall limit
- 	b.hs	ni_sys
+Thanks, Lorenzo.  The suggested changes all seem fine; I'll include them
+in a v5.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
