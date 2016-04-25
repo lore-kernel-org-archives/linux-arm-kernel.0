@@ -1,33 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 25 Apr 2016 17:20:38 +0200
-Subject: [PATCH 0/6] Add Shared MDIO framework for iProc based SoCs
-In-Reply-To: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160425152038.GJ6575@lunn.ch>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 25 Apr 2016 20:56:43 +0530
+Subject: [PATCH 06/14] dmaengine: bcm2835: DT spelling
+ s/interrupts-names/interrupt-names/
+In-Reply-To: <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
+References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
+ <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160425152643.GZ2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 02:48:37PM +0530, Pramod Kumar wrote:
-> Broadcom iProc based SoCs uses MDIO bus for programming PHYs belonging to
-> different I/O subsystem like USB, SATA, PCIe, ETHERNET etc. Every subsystem
-> is referred as "Master" When a master is selected, all PHYs belonging to
-> this subsystem get active on the MDIO bus and responds to MDIO transaction.
-> In this way one MDIO controller is shared among all masters hence named as
-> "Shared MDIO controller".
+On Wed, Apr 20, 2016 at 05:32:11PM +0200, Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
+
+This change does not apply for me, can you please split it up and send the
+sound ones thru sound tree
+
+-- 
+~Vinod
+
+>  drivers/dma/bcm2835-dma.c                                 | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> We have two important entities in "Shared MDIO Bus" framework:
-> 1) shared_mdio_master and
-> 2) shared_mdio_driver.
+> diff --git a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
+> index 55b53e1fd72c9d6e..e0b6165c9cfcec19 100644
+> --- a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
+> +++ b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
+> @@ -43,7 +43,7 @@ mcbsp0: mcbsp at 1d10000 {
+>  		<0x00310000 0x1000>;
+>  	reg-names = "mpu", "dat";
+>  	interrupts = <97 98>;
+> -	interrupts-names = "rx", "tx";
+> +	interrupt-names = "rx", "tx";
+>  	dmas = <&edma0 3 1
+>  		&edma0 2 1>;
+>  	dma-names = "tx", "rx";
+> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+> index 974015193b93cdb3..d724393e904e9a41 100644
+> --- a/drivers/dma/bcm2835-dma.c
+> +++ b/drivers/dma/bcm2835-dma.c
+> @@ -974,7 +974,7 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+>  
+>  		/* legacy device tree case handling */
+>  		dev_warn_once(&pdev->dev,
+> -			      "missing interrupts-names property in device tree - legacy interpretation is used");
+> +			      "missing interrupt-names property in device tree - legacy interpretation is used");
+>  		/*
+>  		 * in case of channel >= 11
+>  		 * use the 11th interrupt and that is shared
+> -- 
+> 1.9.1
 > 
-> The shared MDIO controller driver is registered as platform driver and it
-> creates shared_mdio_master instances and adds them to "Shared MDIO Bus"
-> framework.
-
-Hi Pramod
-
-What i'm missing is an explanation why the existing MDIO bus framework
-cannot be used. I recently made it more generic so that you can hang
-any type of device off it, not just PHYs.
-
-    Thanks
-	Andrew
