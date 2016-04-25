@@ -1,25 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 14:06:37 +0100
-Subject: [PATCH v6 5/7] arm64/perf: Access pmu register using
- <read/write>_sys_reg
-In-Reply-To: <1461243525-13603-6-git-send-email-ashoks@broadcom.com>
-References: <1461243525-13603-1-git-send-email-ashoks@broadcom.com>
- <1461243525-13603-6-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160425130637.GA29160@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 25 Apr 2016 18:38:54 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: enable SPI and NOR as modules
+In-Reply-To: <1460681393-15000-1-git-send-email-khilman@baylibre.com>
+References: <1460681393-15000-1-git-send-email-khilman@baylibre.com>
+Message-ID: <571E16E6.6020305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 05:58:43AM -0700, Ashok Kumar wrote:
-> changed pmu register access to make use of <read/write>_sys_reg
-> from sysreg.h instead of accessing them directly.
+On Friday 15 April 2016 06:19 AM, Kevin Hilman wrote:
+> Enable SPI driver and SPI NOR flash support as modules.
 > 
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested with SPI NOR flash on DA850-EVM.  Basic boot test only to confirm
+> NOR flash device detection.
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 > ---
->  arch/arm64/kernel/perf_event.c | 33 ++++++++++++++++-----------------
->  1 file changed, 16 insertions(+), 17 deletions(-)
+> Also boot tested on dm365-evm.
+> 
+> Tested on top of Sekhar's master branch, based on v4.6-rc1
 
-This doesn't apply on top of -rc1 + the first four patches in your series.
-What am I missing?
+Applied.
 
-Will
+Thanks,
+Sekhar
