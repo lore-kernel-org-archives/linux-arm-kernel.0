@@ -1,411 +1,199 @@
-From: wuchengli@chromium.org (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
-Date: Mon, 25 Apr 2016 13:42:05 +0800
-Subject: [PATCH v7 5/8] [media] vcodec: mediatek: Add Mediatek V4L2 Video
- Encoder Driver
-In-Reply-To: <1461561405.11415.12.camel@mtksdaap41>
-References: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-2-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-3-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-4-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-5-git-send-email-tiffany.lin@mediatek.com>
- <1461299131-57851-6-git-send-email-tiffany.lin@mediatek.com>
- <571A2B70.7040402@xs4all.nl> <1461561405.11415.12.camel@mtksdaap41>
-Message-ID: <CAOMLVLj+zM2-s2_O4G0hXH+SWPk1j=VwUZtA3y5wvEyd1VkAEQ@mail.gmail.com>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Mon, 25 Apr 2016 06:28:29 +0000
+Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+In-Reply-To: <HE1PR0401MB1849C9460B0FCC6A0FB2CDBEFF620@HE1PR0401MB1849.eurprd04.prod.outlook.com>
+References: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18558325A80D252D2EC64A7BFF6F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <571A4D36.2000506@boundarydevices.com>
+ <HE1PR0401MB1849C9460B0FCC6A0FB2CDBEFF620@HE1PR0401MB1849.eurprd04.prod.outlook.com>
+Message-ID: <HE1PR0401MB1849A7E7FD5BAA1F27ED9606FF620@HE1PR0401MB1849.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Fugang Duan <fugang.duan@nxp.com>  Sent: Monday, April 25, 2016 9:58 AM
+> To: Troy Kisky <troy.kisky@boundarydevices.com>; netdev at vger.kernel.org;
+> davem at davemloft.net; lznuaa at gmail.com
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
+> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
+> kernel at lists.infradead.org; johannes at sipsolutions.net;
+> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> arnd at arndb.de; holgerschurig at gmail.com
+> Subject: RE: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+> 
+> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Saturday, April 23,
+> 2016 12:12 AM
+> > To: Fugang Duan <fugang.duan@nxp.com>; netdev at vger.kernel.org;
+> > davem at davemloft.net; lznuaa at gmail.com
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
+> > andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
+> > kernel at lists.infradead.org; johannes at sipsolutions.net;
+> > stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> > arnd at arndb.de; holgerschurig at gmail.com
+> > Subject: Re: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
 > >
-> > ...
+> > On 4/21/2016 10:59 PM, Fugang Duan wrote:
+> > > From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Friday,
+> > > April 22, 2016 10:01 AM
+> > >> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
+> > >> <fugang.duan@nxp.com>; lznuaa at gmail.com
+> > >> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
+> > >> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
+> > >> kernel at lists.infradead.org; johannes at sipsolutions.net;
+> > >> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> > >> arnd at arndb.de; holgerschurig at gmail.com; Troy Kisky
+> > >> <troy.kisky@boundarydevices.com>
+> > >> Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
+> > >>
+> > >> If dirty_tx isn't updated, then dma_unmap_single will be called twice.
+> > >>
+> > >> This fixes a
+> > >> [   58.420980] ------------[ cut here ]------------
+> > >> [   58.425667] WARNING: CPU: 0 PID: 377 at
+> /home/schurig/d/mkarm/linux-
+> > >> 4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
+> > >> [   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free
+> > DMA
+> > >> memory it has not allocated [device address=0x0000000000000000]
+> > >> [size=66 bytes]
+> > >>
+> > >> encountered by Holger
+> > >>
+> > >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > >> Tested-by: <holgerschurig@gmail.com>
+> > >> ---
+> > >>  drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
+> > >>  1 file changed, 3 insertions(+), 5 deletions(-)
+> > >>
+> > >> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> > >> b/drivers/net/ethernet/freescale/fec_main.c
+> > >> index 08243c2..b71654c 100644
+> > >> --- a/drivers/net/ethernet/freescale/fec_main.c
+> > >> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> > >> @@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev,
+> > u16
+> > >> queue_id)
+> > >>  					 fec16_to_cpu(bdp->cbd_datlen),
+> > >>  					 DMA_TO_DEVICE);
+> > >>  		bdp->cbd_bufaddr = cpu_to_fec32(0);
+> > >> -		if (!skb) {
+> > >> -			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+> > >> -			continue;
+> > >> -		}
+> > >> +		if (!skb)
+> > >> +			goto skb_done;
+> > >>
+> > >>  		/* Check for errors. */
+> > >>  		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC | @@ -1239,7
+> > >> +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+> > >>
+> > >>  		/* Free the sk buffer associated with this last transmit */
+> > >>  		dev_kfree_skb_any(skb);
+> > >> -
+> > >> +skb_done:
+> > >>  		/* Make sure the update to bdp and tx_skbuff are performed
+> > >>  		 * before dirty_tx
+> > >>  		 */
+> > >> --
+> > >> 2.5.0
+> > >
+> > > The patch is fine for me.
+> > > Can you review below patch that also fix the issue. It can take much
+> > > effort due to less rmb() and READ_ONCE() operation that is very
+> > > sensitive for duplex Gbps test for i.MX6SX/i.MX7d SOC. (i.MX6SX can
+> > > reach at 1.4Gbps, i.MX7D can reach at 1.8Gbps.)
 > >
-> > > +static int fops_vcodec_open(struct file *file)
-> > > +{
-> > > +   struct video_device *vfd = video_devdata(file);
-> > > +   struct mtk_vcodec_dev *dev = video_drvdata(file);
-> > > +   struct mtk_vcodec_ctx *ctx = NULL;
-> > > +   int ret = 0;
-> > > +
-> > > +   if (dev->instance_mask == ~0UL) {
-> > > +           /* ffz Undefined if no zero exists, err handling here */
-> > > +           mtk_v4l2_err("Too many open contexts");
-> > > +           ret = -EBUSY;
-> > > +           goto err_alloc;
 > >
-> > I'm not happy seeing this here. You should always be able to open the device.
-> > I would expect to see a check like this in e.g. start_streaming, since that's
-> > where you start to use the hardware for real, and checking if you have enough
-> > resources there is perfectly fine.
 > >
-> > If this is an artificial constraint (i.e. not based on a real hardware limitation),
-> > then it should perhaps just be dropped. Such constraints tend to be pointless.
-> > If you want to encode 20 streams simultaneously, then why not? It will be very
-> > slow, but that's not this driver's problem :-)
+> > If  "READ_ONCE(bdp->cbd_sc)" is really that expensive, then you should
+> > skip the 1st read as well and only do it after skb presence is
+> > verified. But some numbers would really help sell the patch.
+> > Also, I comment as to why the code is reorganized would be warranted
 > >
-> We use ffz to get instance index.
-> This only make sure that instance id is correct since in ffz
-> description,
-> "Undefined if no zero exists, so code should check against ~0UL first."
-> In this case, it may not be able to move to start_streaming.
-> Any suggestion that how we do this?
-The instance index is only used for printing the debug information.
-No? If that's the case, you can remove instance index and print
-mtk_vcodec_ctx address for debugging.
->
->
-> > > +   }
-> > > +
-> > > +   mutex_lock(&dev->dev_mutex);
-> > > +
-> > > +   ctx = devm_kzalloc(&dev->plat_dev->dev, sizeof(*ctx), GFP_KERNEL);
+> I will do the performance test on i.MX7d to compare the data for the two
+> patches.
+> Wait my result...
+> 
+> Thanks.
+> 
+I did simple test for tcp bidirectional test on i.MX7d platform:
+With my patch:
+[  3]  0.0-20.0 sec  1.79 GBytes   770 Mbits/sec
+[  5]  0.0-20.0 sec  1.93 GBytes   828 Mbits/sec
+
+With your patch on this thread:
+[  3]  0.0-20.0 sec  1.75 GBytes   750 Mbits/sec
+[  5]  0.0-20.0 sec  1.78 GBytes   762 Mbits/sec
+And then turn of tso feature (ethtool -K eth0 tso off):
+[  3]  0.0-20.0 sec  1.57 GBytes   673 Mbits/sec
+[  5]  0.0-20.0 sec  1.58 GBytes   677 Mbits/sec
+Then turn off sg (ethtool -K eth0 sg off):
+[  3]  0.0-20.0 sec  1.09 GBytes   469 Mbits/sec
+[  5]  0.0-20.0 sec  1.09 GBytes   468 Mbits/sec
+
+It seems there have more tcp segments during iperf testing. I think rmb() is expensive, to reduce rmb() in one tcp frame can increase little performance.
+
 > >
-> > Why is this a devm_ call? It is not managed by a device, so it seems to me that
-> > a regular kzalloc is good enough here.
-> >
-> > > +   if (!ctx) {
-> > > +           ret = -ENOMEM;
-> > > +           goto err_alloc;
-> > > +   }
+> > >
+> > > --- a/drivers/net/ethernet/freescale/fec_main.c
+> > > +++ b/drivers/net/ethernet/freescale/fec_main.c
+> > > @@ -1160,12 +1160,13 @@ static void
+> > >  fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)  {
+> > >         struct  fec_enet_private *fep;
+> > > -       struct bufdesc *bdp;
+> > > +       struct bufdesc *bdp, *bdp_t;
+> > >         unsigned short status;
+> > >         struct  sk_buff *skb;
+> > >         struct fec_enet_priv_tx_q *txq;
+> > >         struct netdev_queue *nq;
+> > >         int     index = 0;
+> > > +       int     i, bdnum;
+> > >         int     entries_free;
+> > >
+> > >         fep = netdev_priv(ndev);
+> > > @@ -1187,20 +1188,28 @@ fec_enet_tx_queue(struct net_device *ndev,
+> > u16 queue_id)
+> > >                 if (status & BD_ENET_TX_READY)
+> > >                         break;
+> > >
+> > > -               index = fec_enet_get_bd_index(bdp, &txq->bd);
+> > > -
+> > > +               bdp_t = bdp;
+> > > +               bdnum = 1;
+> > > +               index = fec_enet_get_bd_index(txq->tx_bd_base,
+> > > + bdp_t, fep);
+> > >                 skb = txq->tx_skbuff[index];
+> > > -               txq->tx_skbuff[index] = NULL;
+> > > -               if (!IS_TSO_HEADER(txq, fec32_to_cpu(bdp->cbd_bufaddr)))
+> > > -                       dma_unmap_single(&fep->pdev->dev,
+> > > -                                        fec32_to_cpu(bdp->cbd_bufaddr),
+> > > -                                        fec16_to_cpu(bdp->cbd_datlen),
+> > > -                                        DMA_TO_DEVICE);
+> > > -               bdp->cbd_bufaddr = cpu_to_fec32(0);
+> > > -               if (!skb) {
+> > > -                       bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+> > > -                       continue;
+> > > +               while (!skb) {
+> > > +                       bdp_t = fec_enet_get_nextdesc(bdp_t, &txq->bd);
+> > > +                       index = fec_enet_get_bd_index(txq->tx_bd_base, bdp_t, fep);
+> > > +                       skb = txq->tx_skbuff[index];
+> > > +                       bdnum++;
+> > > +               }
+> > > +               status = fec16_to_cpu(READ_ONCE(bdp->cbd_sc));
+> > > +               if (status & BD_ENET_TX_READY)
+> > > +                       break;
 > > > +
-> > > +   ctx->idx = ffz(dev->instance_mask);
-> > > +   v4l2_fh_init(&ctx->fh, video_devdata(file));
-> > > +   file->private_data = &ctx->fh;
-> > > +   v4l2_fh_add(&ctx->fh);
-> > > +   INIT_LIST_HEAD(&ctx->list);
-> > > +   ctx->dev = dev;
-> > > +   init_waitqueue_head(&ctx->queue);
-> > > +
-> > > +   if (vfd == dev->vfd_enc) {
-> > > +           ctx->type = MTK_INST_ENCODER;
-> > > +           ret = mtk_vcodec_enc_ctrls_setup(ctx);
-> > > +           if (ret) {
-> > > +                   mtk_v4l2_err("Failed to setup controls() (%d)",
-> > > +                                  ret);
-> > > +                   goto err_ctrls_setup;
-> > > +           }
-> > > +           ctx->m2m_ctx = v4l2_m2m_ctx_init(dev->m2m_dev_enc, ctx,
-> > > +                                            &mtk_vcodec_enc_queue_init);
-> > > +           if (IS_ERR(ctx->m2m_ctx)) {
-> > > +                   ret = PTR_ERR(ctx->m2m_ctx);
-> > > +                   mtk_v4l2_err("Failed to v4l2_m2m_ctx_init() (%d)",
-> > > +                                  ret);
-> > > +                   goto err_m2m_ctx_init;
-> > > +           }
-> > > +           mtk_vcodec_enc_set_default_params(ctx);
-> > > +   } else {
-> > > +           mtk_v4l2_err("Invalid vfd !");
-> >
-> > This shouldn't be possible at all. I would just drop the 'if (vfd == dev->vfd_enc)' check.
-> Got it, will remove in next version.
->
-> >
-> > > +           ret = -ENOENT;
-> > > +           goto err_m2m_ctx_init;
-> > > +   }
-> > > +
-> > > +   if (v4l2_fh_is_singular(&ctx->fh)) {
-> > > +           ret = vpu_load_firmware(dev->vpu_plat_dev);
-> > > +           if (ret < 0) {
-> > > +                   /*
-> > > +                     * Return 0 if downloading firmware successfully,
-> > > +                     * otherwise it is failed
-> > > +                     */
-> > > +                   mtk_v4l2_err("vpu_load_firmware failed!");
-> > > +                   goto err_load_fw;
-> > > +           }
-> >
-> > The fw load seems to be a one-time thing, but here it is done every time
-> > someone opens the device and nobody else had it open.
-> >
-> > If this is a one time thing, then using a bool 'loaded_fw' makes more sense.
-> >
-> More than one module use vpu firmware, encoder/decoder/mdp...etc.
-> If this is first encode instance, we need to check and load vpu
-> firmware.
-> vpu_load_firmware will check and load firmware when necessary.
->
-> best regards,
-> Tiffany
-> > > +
-> > > +           dev->enc_capability =
-> > > +                   vpu_get_venc_hw_capa(dev->vpu_plat_dev);
-> > > +           mtk_v4l2_debug(0, "encoder capability %x", dev->enc_capability);
-> > > +   }
-> > > +
-> > > +   mtk_v4l2_debug(2, "Create instance [%d]@%p m2m_ctx=%p ",
-> > > +                    ctx->idx, ctx, ctx->m2m_ctx);
-> > > +   set_bit(ctx->idx, &dev->instance_mask);
-> > > +   dev->num_instances++;
-> > > +   list_add(&ctx->list, &dev->ctx_list);
-> > > +
-> > > +   mutex_unlock(&dev->dev_mutex);
-> > > +   mtk_v4l2_debug(0, "%s encoder [%d]", dev_name(&dev->plat_dev->dev),
-> > > +                              ctx->idx);
-> > > +   return ret;
-> > > +
-> > > +   /* Deinit when failure occurred */
-> > > +err_load_fw:
-> > > +   v4l2_m2m_ctx_release(ctx->m2m_ctx);
-> > > +err_m2m_ctx_init:
-> > > +   v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
-> > > +err_ctrls_setup:
-> > > +   v4l2_fh_del(&ctx->fh);
-> > > +   v4l2_fh_exit(&ctx->fh);
-> > > +   devm_kfree(&dev->plat_dev->dev, ctx);
-> > > +err_alloc:
-> > > +   mutex_unlock(&dev->dev_mutex);
-> > > +
-> > > +   return ret;
-> > > +}
-> > > +
-> > > +static int fops_vcodec_release(struct file *file)
-> > > +{
-> > > +   struct mtk_vcodec_dev *dev = video_drvdata(file);
-> > > +   struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
-> > > +
-> > > +   mtk_v4l2_debug(1, "[%d] encoder", ctx->idx);
-> > > +   mutex_lock(&dev->dev_mutex);
-> > > +
-> > > +   mtk_vcodec_enc_release(ctx);
-> > > +   v4l2_fh_del(&ctx->fh);
-> > > +   v4l2_fh_exit(&ctx->fh);
-> > > +   v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
-> > > +   v4l2_m2m_ctx_release(ctx->m2m_ctx);
-> > > +
-> > > +   list_del_init(&ctx->list);
-> > > +   dev->num_instances--;
-> > > +   clear_bit(ctx->idx, &dev->instance_mask);
-> > > +   devm_kfree(&dev->plat_dev->dev, ctx);
-> > > +   mutex_unlock(&dev->dev_mutex);
-> > > +   return 0;
-> > > +}
-> > > +
-> > > +static const struct v4l2_file_operations mtk_vcodec_fops = {
-> > > +   .owner                          = THIS_MODULE,
-> > > +   .open                           = fops_vcodec_open,
-> > > +   .release                        = fops_vcodec_release,
-> > > +   .poll                           = v4l2_m2m_fop_poll,
-> > > +   .unlocked_ioctl                 = video_ioctl2,
-> > > +   .mmap                           = v4l2_m2m_fop_mmap,
-> > > +};
-> > > +
-> > > +static int mtk_vcodec_probe(struct platform_device *pdev)
-> > > +{
-> > > +   struct mtk_vcodec_dev *dev;
-> > > +   struct video_device *vfd_enc;
-> > > +   struct resource *res;
-> > > +   int i, j, ret;
-> > > +   DEFINE_DMA_ATTRS(attrs);
-> > > +
-> > > +   dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
-> > > +   if (!dev)
-> > > +           return -ENOMEM;
-> > > +
-> > > +   INIT_LIST_HEAD(&dev->ctx_list);
-> > > +   dev->plat_dev = pdev;
-> > > +
-> > > +   dev->vpu_plat_dev = vpu_get_plat_device(dev->plat_dev);
-> > > +   if (dev->vpu_plat_dev == NULL) {
-> > > +           mtk_v4l2_err("[VPU] vpu device in not ready");
-> > > +           return -EPROBE_DEFER;
-> > > +   }
-> > > +
-> > > +   vpu_wdt_reg_handler(dev->vpu_plat_dev, mtk_vcodec_enc_reset_handler,
-> > > +                                           dev, VPU_RST_ENC);
-> > > +
-> > > +   ret = mtk_vcodec_init_enc_pm(dev);
-> > > +   if (ret < 0) {
-> > > +           dev_err(&pdev->dev, "Failed to get mt vcodec clock source!");
-> > > +           return ret;
-> > > +   }
-> > > +
-> > > +   for (i = VENC_SYS, j = 0; i < NUM_MAX_VCODEC_REG_BASE; i++, j++) {
-> > > +           res = platform_get_resource(pdev, IORESOURCE_MEM, j);
-> > > +           if (res == NULL) {
-> > > +                   dev_err(&pdev->dev, "get memory resource failed.");
-> > > +                   ret = -ENXIO;
-> > > +                   goto err_res;
-> > > +           }
-> > > +           dev->reg_base[i] = devm_ioremap_resource(&pdev->dev, res);
-> > > +           if (IS_ERR(dev->reg_base[i])) {
-> > > +                   dev_err(&pdev->dev,
-> > > +                           "devm_ioremap_resource %d failed.", i);
-> > > +                   ret = PTR_ERR(dev->reg_base[i]);
-> > > +                   goto err_res;
-> > > +           }
-> > > +           mtk_v4l2_debug(2, "reg[%d] base=0x%p", i, dev->reg_base[i]);
-> > > +   }
-> > > +
-> > > +   res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> > > +   if (res == NULL) {
-> > > +           dev_err(&pdev->dev, "failed to get irq resource");
-> > > +           ret = -ENOENT;
-> > > +           goto err_res;
-> > > +   }
-> > > +
-> > > +   dev->enc_irq = platform_get_irq(pdev, 0);
-> > > +   ret = devm_request_irq(&pdev->dev, dev->enc_irq,
-> > > +                          mtk_vcodec_enc_irq_handler,
-> > > +                          0, pdev->name, dev);
-> > > +   if (ret) {
-> > > +           dev_err(&pdev->dev, "Failed to install dev->enc_irq %d (%d)",
-> > > +                   dev->enc_irq,
-> > > +                   ret);
-> > > +           ret = -EINVAL;
-> > > +           goto err_res;
-> > > +   }
-> > > +
-> > > +   dev->enc_lt_irq = platform_get_irq(pdev, 1);
-> > > +   ret = devm_request_irq(&pdev->dev,
-> > > +                          dev->enc_lt_irq, mtk_vcodec_enc_lt_irq_handler,
-> > > +                          0, pdev->name, dev);
-> > > +   if (ret) {
-> > > +           dev_err(&pdev->dev,
-> > > +                   "Failed to install dev->enc_lt_irq %d (%d)",
-> > > +                   dev->enc_lt_irq, ret);
-> > > +           ret = -EINVAL;
-> > > +           goto err_res;
-> > > +   }
-> > > +
-> > > +   disable_irq(dev->enc_irq);
-> > > +   disable_irq(dev->enc_lt_irq); /* VENC_LT */
-> > > +   mutex_init(&dev->enc_mutex);
-> > > +   mutex_init(&dev->dev_mutex);
-> > > +   spin_lock_init(&dev->irqlock);
-> > > +
-> > > +   snprintf(dev->v4l2_dev.name, sizeof(dev->v4l2_dev.name), "%s",
-> > > +            "[MTK_V4L2_VENC]");
-> > > +
-> > > +   ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
-> > > +   if (ret) {
-> > > +           mtk_v4l2_err("v4l2_device_register err=%d", ret);
-> > > +           goto err_res;
-> > > +   }
-> > > +
-> > > +   init_waitqueue_head(&dev->queue);
-> > > +
-> > > +   /* allocate video device for encoder and register it */
-> > > +   vfd_enc = video_device_alloc();
-> > > +   if (!vfd_enc) {
-> > > +           mtk_v4l2_err("Failed to allocate video device");
-> > > +           ret = -ENOMEM;
-> > > +           goto err_enc_alloc;
-> > > +   }
-> > > +   vfd_enc->fops           = &mtk_vcodec_fops;
-> > > +   vfd_enc->ioctl_ops      = &mtk_venc_ioctl_ops;
-> > > +   vfd_enc->release        = video_device_release;
-> > > +   vfd_enc->lock           = &dev->dev_mutex;
-> > > +   vfd_enc->v4l2_dev       = &dev->v4l2_dev;
-> > > +   vfd_enc->vfl_dir        = VFL_DIR_M2M;
-> > > +   vfd_enc->device_caps    = V4L2_CAP_VIDEO_M2M_MPLANE |
-> > > +                                           V4L2_CAP_STREAMING;
-> > > +
-> > > +   snprintf(vfd_enc->name, sizeof(vfd_enc->name), "%s",
-> > > +            MTK_VCODEC_ENC_NAME);
-> > > +   video_set_drvdata(vfd_enc, dev);
-> > > +   dev->vfd_enc = vfd_enc;
-> > > +   platform_set_drvdata(pdev, dev);
-> > > +
-> > > +   dev->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
-> > > +   if (IS_ERR(dev->alloc_ctx)) {
-> > > +           dev->alloc_ctx = NULL;
-> > > +           mtk_v4l2_err("Failed to alloc vb2 dma context 0");
-> > > +           ret = PTR_ERR(dev->alloc_ctx);
-> > > +           goto err_vb2_ctx_init;
-> > > +   }
-> > > +
-> > > +   dev->m2m_dev_enc = v4l2_m2m_init(&mtk_venc_m2m_ops);
-> > > +   if (IS_ERR(dev->m2m_dev_enc)) {
-> > > +           mtk_v4l2_err("Failed to init mem2mem enc device");
-> > > +           ret = PTR_ERR(dev->m2m_dev_enc);
-> > > +           goto err_enc_mem_init;
-> > > +   }
-> > > +
-> > > +   dev->encode_workqueue =
-> > > +                   alloc_ordered_workqueue(MTK_VCODEC_ENC_NAME,
-> > > +                                                           WQ_MEM_RECLAIM |
-> > > +                                                           WQ_FREEZABLE);
-> > > +   if (!dev->encode_workqueue) {
-> > > +           mtk_v4l2_err("Failed to create encode workqueue");
-> > > +           ret = -EINVAL;
-> > > +           goto err_event_workq;
-> > > +   }
-> > > +
-> > > +   ret = video_register_device(vfd_enc, VFL_TYPE_GRABBER, 1);
-> > > +   if (ret) {
-> > > +           mtk_v4l2_err("Failed to register video device");
-> > > +           goto err_enc_reg;
-> > > +   }
-> > > +
-> > > +   /* Avoid the iommu eat big hunks */
-> > > +   dma_set_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, &attrs);
-> > > +
-> > > +   mtk_v4l2_debug(0, "encoder registered as /dev/video%d",
-> > > +                    vfd_enc->num);
-> > > +
-> > > +   return 0;
-> > > +
-> > > +err_enc_reg:
-> > > +   destroy_workqueue(dev->encode_workqueue);
-> > > +err_event_workq:
-> > > +   v4l2_m2m_release(dev->m2m_dev_enc);
-> > > +err_enc_mem_init:
-> > > +   vb2_dma_contig_cleanup_ctx(dev->alloc_ctx);
-> > > +err_vb2_ctx_init:
-> > > +   video_unregister_device(vfd_enc);
-> > > +err_enc_alloc:
-> > > +   v4l2_device_unregister(&dev->v4l2_dev);
-> > > +err_res:
-> > > +   mtk_vcodec_release_enc_pm(dev);
-> > > +   return ret;
-> > > +}
-> > > +
-> > > +static const struct of_device_id mtk_vcodec_enc_match[] = {
-> > > +   {.compatible = "mediatek,mt8173-vcodec-enc",},
-> > > +   {},
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, mtk_vcodec_enc_match);
-> > > +
-> > > +static int mtk_vcodec_enc_remove(struct platform_device *pdev)
-> > > +{
-> > > +   struct mtk_vcodec_dev *dev = platform_get_drvdata(pdev);
-> > > +
-> > > +   mtk_v4l2_debug_enter();
-> > > +   flush_workqueue(dev->encode_workqueue);
-> > > +   destroy_workqueue(dev->encode_workqueue);
-> > > +   if (dev->m2m_dev_enc)
-> > > +           v4l2_m2m_release(dev->m2m_dev_enc);
-> > > +   if (dev->alloc_ctx)
-> > > +           vb2_dma_contig_cleanup_ctx(dev->alloc_ctx);
-> > > +
-> > > +   if (dev->vfd_enc)
-> > > +           video_unregister_device(dev->vfd_enc);
-> > > +
-> > > +   v4l2_device_unregister(&dev->v4l2_dev);
-> > > +   mtk_vcodec_release_enc_pm(dev);
-> > > +   return 0;
-> > > +}
-> > > +
-> > > +static struct platform_driver mtk_vcodec_enc_driver = {
-> > > +   .probe  = mtk_vcodec_probe,
-> > > +   .remove = mtk_vcodec_enc_remove,
-> > > +   .driver = {
-> > > +           .name   = MTK_VCODEC_ENC_NAME,
-> > > +           .owner  = THIS_MODULE,
-> > > +           .of_match_table = mtk_vcodec_enc_match,
-> > > +   },
-> > > +};
-> > > +
-> > > +module_platform_driver(mtk_vcodec_enc_driver);
-> > > +
-> > > +
-> > > +MODULE_LICENSE("GPL v2");
-> > > +MODULE_DESCRIPTION("Mediatek video codec V4L2 encoder driver");
-> >
-> > Regards,
-> >
-> >       Hans
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > +               for (i = 0; i < bdnum; i++) {
+> > > +                       if (!IS_TSO_HEADER(txq, bdp->cbd_bufaddr))
+> > > +                               dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
+> > > +                                                bdp->cbd_datlen, DMA_TO_DEVICE);
+> > > +                       bdp->cbd_bufaddr = 0;
+> > > +                       if (i < bdnum - 1)
+> > > +                               bdp = fec_enet_get_nextdesc(bdp,
+> > > + &txq->bd);
+> > >                 }
+> > > +               txq->tx_skbuff[index] = NULL;
+> > >
+> > >
+> > > Regards,
+> > > Andy
+> > >
