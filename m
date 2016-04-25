@@ -1,199 +1,272 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Mon, 25 Apr 2016 06:28:29 +0000
-Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-In-Reply-To: <HE1PR0401MB1849C9460B0FCC6A0FB2CDBEFF620@HE1PR0401MB1849.eurprd04.prod.outlook.com>
-References: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB18558325A80D252D2EC64A7BFF6F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <571A4D36.2000506@boundarydevices.com>
- <HE1PR0401MB1849C9460B0FCC6A0FB2CDBEFF620@HE1PR0401MB1849.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR0401MB1849A7E7FD5BAA1F27ED9606FF620@HE1PR0401MB1849.eurprd04.prod.outlook.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Mon, 25 Apr 2016 14:53:02 +0800
+Subject: [PATCH v2] serial: amba-pl011: complete support to ZTE uart
+In-Reply-To: <570CF1B3.8080305@linaro.org>
+References: <1458717126-20814-1-git-send-email-jun.nie@linaro.org>
+ <CABymUCN_Os0gxoWjfwB_8V4kEkwBqKcrCCRjH8+-gm-Xt3-tYQ@mail.gmail.com>
+ <570CF1B3.8080305@linaro.org>
+Message-ID: <CABymUCPvayLkc5h-3e0671pEEO_SshNJazk7W0B_oAUfL-6r0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fugang Duan <fugang.duan@nxp.com>  Sent: Monday, April 25, 2016 9:58 AM
-> To: Troy Kisky <troy.kisky@boundarydevices.com>; netdev at vger.kernel.org;
-> davem at davemloft.net; lznuaa at gmail.com
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> arnd at arndb.de; holgerschurig at gmail.com
-> Subject: RE: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-> 
-> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Saturday, April 23,
-> 2016 12:12 AM
-> > To: Fugang Duan <fugang.duan@nxp.com>; netdev at vger.kernel.org;
-> > davem at davemloft.net; lznuaa at gmail.com
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> > andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> > kernel at lists.infradead.org; johannes at sipsolutions.net;
-> > stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> > arnd at arndb.de; holgerschurig at gmail.com
-> > Subject: Re: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-> >
-> > On 4/21/2016 10:59 PM, Fugang Duan wrote:
-> > > From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Friday,
-> > > April 22, 2016 10:01 AM
-> > >> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
-> > >> <fugang.duan@nxp.com>; lznuaa at gmail.com
-> > >> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> > >> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> > >> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> > >> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> > >> arnd at arndb.de; holgerschurig at gmail.com; Troy Kisky
-> > >> <troy.kisky@boundarydevices.com>
-> > >> Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-> > >>
-> > >> If dirty_tx isn't updated, then dma_unmap_single will be called twice.
-> > >>
-> > >> This fixes a
-> > >> [   58.420980] ------------[ cut here ]------------
-> > >> [   58.425667] WARNING: CPU: 0 PID: 377 at
-> /home/schurig/d/mkarm/linux-
-> > >> 4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
-> > >> [   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free
-> > DMA
-> > >> memory it has not allocated [device address=0x0000000000000000]
-> > >> [size=66 bytes]
-> > >>
-> > >> encountered by Holger
-> > >>
-> > >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > >> Tested-by: <holgerschurig@gmail.com>
-> > >> ---
-> > >>  drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
-> > >>  1 file changed, 3 insertions(+), 5 deletions(-)
-> > >>
-> > >> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> > >> b/drivers/net/ethernet/freescale/fec_main.c
-> > >> index 08243c2..b71654c 100644
-> > >> --- a/drivers/net/ethernet/freescale/fec_main.c
-> > >> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> > >> @@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev,
-> > u16
-> > >> queue_id)
-> > >>  					 fec16_to_cpu(bdp->cbd_datlen),
-> > >>  					 DMA_TO_DEVICE);
-> > >>  		bdp->cbd_bufaddr = cpu_to_fec32(0);
-> > >> -		if (!skb) {
-> > >> -			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
-> > >> -			continue;
-> > >> -		}
-> > >> +		if (!skb)
-> > >> +			goto skb_done;
-> > >>
-> > >>  		/* Check for errors. */
-> > >>  		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC | @@ -1239,7
-> > >> +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
-> > >>
-> > >>  		/* Free the sk buffer associated with this last transmit */
-> > >>  		dev_kfree_skb_any(skb);
-> > >> -
-> > >> +skb_done:
-> > >>  		/* Make sure the update to bdp and tx_skbuff are performed
-> > >>  		 * before dirty_tx
-> > >>  		 */
-> > >> --
-> > >> 2.5.0
-> > >
-> > > The patch is fine for me.
-> > > Can you review below patch that also fix the issue. It can take much
-> > > effort due to less rmb() and READ_ONCE() operation that is very
-> > > sensitive for duplex Gbps test for i.MX6SX/i.MX7d SOC. (i.MX6SX can
-> > > reach at 1.4Gbps, i.MX7D can reach at 1.8Gbps.)
-> >
-> >
-> >
-> > If  "READ_ONCE(bdp->cbd_sc)" is really that expensive, then you should
-> > skip the 1st read as well and only do it after skb presence is
-> > verified. But some numbers would really help sell the patch.
-> > Also, I comment as to why the code is reorganized would be warranted
-> >
-> I will do the performance test on i.MX7d to compare the data for the two
-> patches.
-> Wait my result...
-> 
-> Thanks.
-> 
-I did simple test for tcp bidirectional test on i.MX7d platform:
-With my patch:
-[  3]  0.0-20.0 sec  1.79 GBytes   770 Mbits/sec
-[  5]  0.0-20.0 sec  1.93 GBytes   828 Mbits/sec
+2016-04-12 21:01 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+> On 2016?04?01? 17:53, Jun Nie wrote:
+>>
+>> 2016-03-23 15:12 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+>>>
+>>> Complete support to ZTE uart with adding specific registers
+>>> mask.
+>>> We use a magic amba periphid value as pl011 device on ZTE
+>>> does not have a periphid value in register. The magic value
+>>> should also be feed via device tree "arm,primecell-periphid"
+>>> property to match pl011 driver and get ZTE uart data.
+>>>
+>>> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+>>> ---
+>>>   drivers/tty/serial/amba-pl011.c | 73
+>>> +++++++++++++++++++++++++++++++++--------
+>>>   include/linux/amba/serial.h     |  4 +++
+>>>   2 files changed, 64 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/amba-pl011.c
+>>> b/drivers/tty/serial/amba-pl011.c
+>>> index 7c198e0..696ee0c 100644
+>>> --- a/drivers/tty/serial/amba-pl011.c
+>>> +++ b/drivers/tty/serial/amba-pl011.c
+>>> @@ -93,6 +93,10 @@ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
+>>>   struct vendor_data {
+>>>          const u16               *reg_offset;
+>>>          unsigned int            ifls;
+>>> +       unsigned int            fr_busy;
+>>> +       unsigned int            fr_dsr;
+>>> +       unsigned int            fr_cts;
+>>> +       unsigned int            fr_ri;
+>>>          bool                    access_32b;
+>>>          bool                    oversampling;
+>>>          bool                    dma_threshold;
+>>> @@ -111,6 +115,10 @@ static unsigned int get_fifosize_arm(struct
+>>> amba_device *dev)
+>>>   static struct vendor_data vendor_arm = {
+>>>          .reg_offset             = pl011_std_offsets,
+>>>          .ifls                   = UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
+>>> +       .fr_busy                = UART01x_FR_BUSY,
+>>> +       .fr_dsr                 = UART01x_FR_DSR,
+>>> +       .fr_cts                 = UART01x_FR_CTS,
+>>> +       .fr_ri                  = UART011_FR_RI,
+>>>          .oversampling           = false,
+>>>          .dma_threshold          = false,
+>>>          .cts_event_workaround   = false,
+>>> @@ -121,6 +129,10 @@ static struct vendor_data vendor_arm = {
+>>>
+>>>   static struct vendor_data vendor_sbsa = {
+>>>          .reg_offset             = pl011_std_offsets,
+>>> +       .fr_busy                = UART01x_FR_BUSY,
+>>> +       .fr_dsr                 = UART01x_FR_DSR,
+>>> +       .fr_cts                 = UART01x_FR_CTS,
+>>> +       .fr_ri                  = UART011_FR_RI,
+>>>          .oversampling           = false,
+>>>          .dma_threshold          = false,
+>>>          .cts_event_workaround   = false,
+>>> @@ -163,6 +175,10 @@ static unsigned int get_fifosize_st(struct
+>>> amba_device *dev)
+>>>   static struct vendor_data vendor_st = {
+>>>          .reg_offset             = pl011_st_offsets,
+>>>          .ifls                   =
+>>> UART011_IFLS_RX_HALF|UART011_IFLS_TX_HALF,
+>>> +       .fr_busy                = UART01x_FR_BUSY,
+>>> +       .fr_dsr                 = UART01x_FR_DSR,
+>>> +       .fr_cts                 = UART01x_FR_CTS,
+>>> +       .fr_ri                  = UART011_FR_RI,
+>>>          .oversampling           = true,
+>>>          .dma_threshold          = true,
+>>>          .cts_event_workaround   = true,
+>>> @@ -187,11 +203,25 @@ static const u16 pl011_zte_offsets[REG_ARRAY_SIZE]
+>>> = {
+>>>          [REG_DMACR] = ZX_UART011_DMACR,
+>>>   };
+>>>
+>>> +static unsigned int get_fifosize_zte(struct amba_device *dev)
+>>> +{
+>>> +       return 16;
+>>> +}
+>>> +
+>>>   static struct vendor_data vendor_zte __maybe_unused = {
+>>>          .reg_offset             = pl011_zte_offsets,
+>>>          .access_32b             = true,
+>>>          .ifls                   = UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
+>>> -       .get_fifosize           = get_fifosize_arm,
+>>> +       .fr_busy                = ZX_UART01x_FR_BUSY,
+>>> +       .fr_dsr                 = ZX_UART01x_FR_DSR,
+>>> +       .fr_cts                 = ZX_UART01x_FR_CTS,
+>>> +       .fr_ri                  = ZX_UART011_FR_RI,
+>>> +       .oversampling           = false,
+>>> +       .dma_threshold          = false,
+>>> +       .cts_event_workaround   = false,
+>>> +       .always_enabled         = false,
+>>> +       .fixed_options          = false,
+>>> +       .get_fifosize           = get_fifosize_zte,
+>>>   };
+>>>
+>>>   /* Deals with DMA transactions */
+>>> @@ -236,6 +266,10 @@ struct uart_amba_port {
+>>>          unsigned int            im;             /* interrupt mask */
+>>>          unsigned int            old_status;
+>>>          unsigned int            fifosize;       /* vendor-specific */
+>>> +       unsigned int            fr_busy;        /* vendor-specific */
+>>> +       unsigned int            fr_dsr;         /* vendor-specific */
+>>> +       unsigned int            fr_cts;         /* vendor-specific */
+>>> +       unsigned int            fr_ri;          /* vendor-specific */
+>>>          unsigned int            old_cr;         /* state during shutdown
+>>> */
+>>>          bool                    autorts;
+>>>          unsigned int            fixed_baud;     /* vendor-set fixed baud
+>>> rate */
+>>> @@ -1166,7 +1200,7 @@ static void pl011_dma_shutdown(struct
+>>> uart_amba_port *uap)
+>>>                  return;
+>>>
+>>>          /* Disable RX and TX DMA */
+>>> -       while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
+>>> +       while (pl011_read(uap, REG_FR) & uap->fr_busy)
+>>>                  cpu_relax();
+>>>
+>>>          spin_lock_irq(&uap->port.lock);
+>>> @@ -1415,11 +1449,11 @@ static void pl011_modem_status(struct
+>>> uart_amba_port *uap)
+>>>          if (delta & UART01x_FR_DCD)
+>>>                  uart_handle_dcd_change(&uap->port, status &
+>>> UART01x_FR_DCD);
+>>>
+>>> -       if (delta & UART01x_FR_DSR)
+>>> +       if (delta & uap->fr_dsr)
+>>>                  uap->port.icount.dsr++;
+>>>
+>>> -       if (delta & UART01x_FR_CTS)
+>>> -               uart_handle_cts_change(&uap->port, status &
+>>> UART01x_FR_CTS);
+>>> +       if (delta & uap->fr_cts)
+>>> +               uart_handle_cts_change(&uap->port, status & uap->fr_cts);
+>>>
+>>>          wake_up_interruptible(&uap->port.state->port.delta_msr_wait);
+>>>   }
+>>> @@ -1492,7 +1526,7 @@ static unsigned int pl011_tx_empty(struct uart_port
+>>> *port)
+>>>          struct uart_amba_port *uap =
+>>>              container_of(port, struct uart_amba_port, port);
+>>>          unsigned int status = pl011_read(uap, REG_FR);
+>>> -       return status & (UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 :
+>>> TIOCSER_TEMT;
+>>> +       return status & (uap->fr_busy | UART01x_FR_TXFF) ? 0 :
+>>> TIOCSER_TEMT;
+>>>   }
+>>>
+>>>   static unsigned int pl011_get_mctrl(struct uart_port *port)
+>>> @@ -1507,9 +1541,9 @@ static unsigned int pl011_get_mctrl(struct
+>>> uart_port *port)
+>>>                  result |= tiocmbit
+>>>
+>>>          TIOCMBIT(UART01x_FR_DCD, TIOCM_CAR);
+>>> -       TIOCMBIT(UART01x_FR_DSR, TIOCM_DSR);
+>>> -       TIOCMBIT(UART01x_FR_CTS, TIOCM_CTS);
+>>> -       TIOCMBIT(UART011_FR_RI, TIOCM_RNG);
+>>> +       TIOCMBIT(uap->fr_dsr, TIOCM_DSR);
+>>> +       TIOCMBIT(uap->fr_cts, TIOCM_CTS);
+>>> +       TIOCMBIT(uap->fr_ri, TIOCM_RNG);
+>>>   #undef TIOCMBIT
+>>>          return result;
+>>>   }
+>>> @@ -2086,7 +2120,7 @@ static int pl011_verify_port(struct uart_port
+>>> *port, struct serial_struct *ser)
+>>>          return ret;
+>>>   }
+>>>
+>>> -static struct uart_ops amba_pl011_pops = {
+>>> +static const struct uart_ops amba_pl011_pops = {
+>>>          .tx_empty       = pl011_tx_empty,
+>>>          .set_mctrl      = pl011_set_mctrl,
+>>>          .get_mctrl      = pl011_get_mctrl,
+>>> @@ -2190,7 +2224,7 @@ pl011_console_write(struct console *co, const char
+>>> *s, unsigned int count)
+>>>           *      Finally, wait for transmitter to become empty
+>>>           *      and restore the TCR
+>>>           */
+>>> -       while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
+>>> +       while (pl011_read(uap, REG_FR) & uap->fr_busy)
+>>>                  cpu_relax();
+>>>          if (!uap->vendor->always_enabled)
+>>>                  pl011_write(old_cr, uap, REG_CR);
+>>> @@ -2472,8 +2506,12 @@ static int pl011_probe(struct amba_device *dev,
+>>> const struct amba_id *id)
+>>>                  return PTR_ERR(uap->clk);
+>>>
+>>>          uap->reg_offset = vendor->reg_offset;
+>>> -       uap->vendor = vendor;
+>>> -       uap->fifosize = vendor->get_fifosize(dev);
+>>> +       uap->vendor     = vendor;
+>>> +       uap->fifosize   = vendor->get_fifosize(dev);
+>>> +       uap->fr_busy    = vendor->fr_busy;
+>>> +       uap->fr_dsr     = vendor->fr_dsr;
+>>> +       uap->fr_cts     = vendor->fr_cts;
+>>> +       uap->fr_ri      = vendor->fr_ri;
+>>>          uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
+>>>          uap->port.irq = dev->irq[0];
+>>>          uap->port.ops = &amba_pl011_pops;
+>>> @@ -2555,6 +2593,10 @@ static int sbsa_uart_probe(struct platform_device
+>>> *pdev)
+>>>          uap->reg_offset = vendor_sbsa.reg_offset;
+>>>          uap->vendor     = &vendor_sbsa;
+>>>          uap->fifosize   = 32;
+>>> +       uap->fr_busy    = vendor_sbsa.fr_busy;
+>>> +       uap->fr_dsr     = vendor_sbsa.fr_dsr;
+>>> +       uap->fr_cts     = vendor_sbsa.fr_cts;
+>>> +       uap->fr_ri      = vendor_sbsa.fr_ri;
+>>>          uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 :
+>>> UPIO_MEM;
+>>>          uap->port.irq   = platform_get_irq(pdev, 0);
+>>>          uap->port.ops   = &sbsa_uart_pops;
+>>> @@ -2615,6 +2657,11 @@ static struct amba_id pl011_ids[] = {
+>>>                  .mask   = 0x00ffffff,
+>>>                  .data   = &vendor_st,
+>>>          },
+>>> +       {
+>>> +               .id     = 0xfefefe,
+>>> +               .mask   = 0xffffff,
+>>> +               .data   = &vendor_zte,
+>>> +       },
+>>>          { 0, 0 },
+>>>   };
+>>>
+>>> diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
+>>> index d76a19b..750f2ef 100644
+>>> --- a/include/linux/amba/serial.h
+>>> +++ b/include/linux/amba/serial.h
+>>> @@ -103,6 +103,10 @@
+>>>   #define UART01x_FR_DSR                 0x002
+>>>   #define UART01x_FR_CTS                 0x001
+>>>   #define UART01x_FR_TMSK                (UART01x_FR_TXFF +
+>>> UART01x_FR_BUSY)
+>>> +#define ZX_UART01x_FR_BUSY     0x300
+>>> +#define ZX_UART01x_FR_DSR      0x008
+>>> +#define ZX_UART01x_FR_CTS      0x002
+>>> +#define ZX_UART011_FR_RI       0x001
+>>>
+>>>   #define UART011_CR_CTSEN       0x8000  /* CTS hardware flow control */
+>>>   #define UART011_CR_RTSEN       0x4000  /* RTS hardware flow control */
+>>> --
+>>> 1.9.1
+>>>
+>
+> Russell,
+>
+> Do you have any comments to these change?
+>
+> Jun
 
-With your patch on this thread:
-[  3]  0.0-20.0 sec  1.75 GBytes   750 Mbits/sec
-[  5]  0.0-20.0 sec  1.78 GBytes   762 Mbits/sec
-And then turn of tso feature (ethtool -K eth0 tso off):
-[  3]  0.0-20.0 sec  1.57 GBytes   673 Mbits/sec
-[  5]  0.0-20.0 sec  1.58 GBytes   677 Mbits/sec
-Then turn off sg (ethtool -K eth0 sg off):
-[  3]  0.0-20.0 sec  1.09 GBytes   469 Mbits/sec
-[  5]  0.0-20.0 sec  1.09 GBytes   468 Mbits/sec
+Greg,
 
-It seems there have more tcp segments during iperf testing. I think rmb() is expensive, to reduce rmb() in one tcp frame can increase little performance.
+Do you have any idea on how to drive review on this patch? Seems
+maintainer Russell is too busy and missing for this thread and others
+do not have comments. Your comments are appreciated!
 
-> >
-> > >
-> > > --- a/drivers/net/ethernet/freescale/fec_main.c
-> > > +++ b/drivers/net/ethernet/freescale/fec_main.c
-> > > @@ -1160,12 +1160,13 @@ static void
-> > >  fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)  {
-> > >         struct  fec_enet_private *fep;
-> > > -       struct bufdesc *bdp;
-> > > +       struct bufdesc *bdp, *bdp_t;
-> > >         unsigned short status;
-> > >         struct  sk_buff *skb;
-> > >         struct fec_enet_priv_tx_q *txq;
-> > >         struct netdev_queue *nq;
-> > >         int     index = 0;
-> > > +       int     i, bdnum;
-> > >         int     entries_free;
-> > >
-> > >         fep = netdev_priv(ndev);
-> > > @@ -1187,20 +1188,28 @@ fec_enet_tx_queue(struct net_device *ndev,
-> > u16 queue_id)
-> > >                 if (status & BD_ENET_TX_READY)
-> > >                         break;
-> > >
-> > > -               index = fec_enet_get_bd_index(bdp, &txq->bd);
-> > > -
-> > > +               bdp_t = bdp;
-> > > +               bdnum = 1;
-> > > +               index = fec_enet_get_bd_index(txq->tx_bd_base,
-> > > + bdp_t, fep);
-> > >                 skb = txq->tx_skbuff[index];
-> > > -               txq->tx_skbuff[index] = NULL;
-> > > -               if (!IS_TSO_HEADER(txq, fec32_to_cpu(bdp->cbd_bufaddr)))
-> > > -                       dma_unmap_single(&fep->pdev->dev,
-> > > -                                        fec32_to_cpu(bdp->cbd_bufaddr),
-> > > -                                        fec16_to_cpu(bdp->cbd_datlen),
-> > > -                                        DMA_TO_DEVICE);
-> > > -               bdp->cbd_bufaddr = cpu_to_fec32(0);
-> > > -               if (!skb) {
-> > > -                       bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
-> > > -                       continue;
-> > > +               while (!skb) {
-> > > +                       bdp_t = fec_enet_get_nextdesc(bdp_t, &txq->bd);
-> > > +                       index = fec_enet_get_bd_index(txq->tx_bd_base, bdp_t, fep);
-> > > +                       skb = txq->tx_skbuff[index];
-> > > +                       bdnum++;
-> > > +               }
-> > > +               status = fec16_to_cpu(READ_ONCE(bdp->cbd_sc));
-> > > +               if (status & BD_ENET_TX_READY)
-> > > +                       break;
-> > > +
-> > > +               for (i = 0; i < bdnum; i++) {
-> > > +                       if (!IS_TSO_HEADER(txq, bdp->cbd_bufaddr))
-> > > +                               dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
-> > > +                                                bdp->cbd_datlen, DMA_TO_DEVICE);
-> > > +                       bdp->cbd_bufaddr = 0;
-> > > +                       if (i < bdnum - 1)
-> > > +                               bdp = fec_enet_get_nextdesc(bdp,
-> > > + &txq->bd);
-> > >                 }
-> > > +               txq->tx_skbuff[index] = NULL;
-> > >
-> > >
-> > > Regards,
-> > > Andy
-> > >
+Thanks!
+Jun
