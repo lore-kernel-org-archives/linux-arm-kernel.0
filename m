@@ -1,40 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 00:18:45 +0200
-Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
-In-Reply-To: <20160425115758.GA4874@lukather>
-References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
- <20160425115758.GA4874@lukather>
-Message-ID: <8373519.0RWpCDubQ0@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 26 Apr 2016 00:20:45 +0200
+Subject: [PATCH v2 1/2] i2c: s3c2410: Print errno code in error logs
+In-Reply-To: <1461163076-5959-1-git-send-email-javier@osg.samsung.com>
+References: <1461163076-5959-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20160425222045.GJ1550@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 13:57:58 Maxime Ripard wrote:
-> Hi,
+On Wed, Apr 20, 2016 at 10:37:55AM -0400, Javier Martinez Canillas wrote:
+> The driver not always prints the error code in case of a failure but this
+> information can be very useful for debugging. So let's print if available.
 > 
-> On Sat, Apr 23, 2016 at 11:43:58AM +0200, Linus Walleij wrote:
-> > Hi ARM SoC guys,
-> > 
-> > these two patches move the ARM character LCD driver from
-> > misc drivers to the auxdisplay subsystem where it belongs and
-> > updates the defconfig for the RealView accordingly.
-> > 
-> > Please pull it into some cleanup branch in the ARM SoC
-> > tree.
-> > 
-> > I tried to get some ACK from the auxdisplay maintainer but no
-> > reaction.
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > 
-> Auxdisplay is not a new framework, but rather a very old one.
-> 
-> It got introduced in 2.6.21, and only received a couple of drivers
-> since.
-> 
-> It seems to be quite redundant with fbdev deferred_io, which itself is
-> almost deprecated these days.
 
-I'm holding off on this pull request for now then.
+Applied to for-next, thanks!
 
-I'd certainly like to see the driver get moved out of drivers/misc,
-let me know once there has been an agreement of where it should go.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/0a40324d/attachment.sig>
