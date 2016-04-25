@@ -1,154 +1,56 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Apr 2016 11:20:15 +0100
-Subject: [PATCH V3 09/18] coresight: tmc: allocating memory when needed
-In-Reply-To: <1461345255-11758-10-git-send-email-mathieu.poirier@linaro.org>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-10-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <571DEF5F.5060109@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 25 Apr 2016 12:21:18 +0200
+Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
+In-Reply-To: <20160425101527.GP2829@codeblueprint.co.uk>
+References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
+ <20160424212241.GO2829@codeblueprint.co.uk>
+ <20160425101527.GP2829@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu8OfqdJp-VhC3o-tie4mRZXsF5ESKkZbsjnBHDY4xbXvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/16 18:14, Mathieu Poirier wrote:
->   static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
->   {
-> +	bool used = false;
-> +	char *buf = NULL;
->   	unsigned long flags;
->   	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+(+ Laszlo)
+
+On 25 April 2016 at 12:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Sun, 24 Apr, at 10:22:41PM, Matt Fleming wrote:
+>>
+>> I like this series a lot (well, ignoring the fact that the firmware is
+>> trying to eat itself). The runtime call code is much cleaner now, and
+>> this is a great precedent for any future multi-architecture quirks we
+>> may need.
+>>
+>> Queued for v4.7, thanks everyone!
 >
-> +	 /* This shouldn't be happening */
-> +	if (WARN_ON(mode != CS_MODE_SYSFS))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * If a buffer is already allocated *keep holding* the lock and
-> +	 * jump to the fast path.  Otherwise release the lock and allocate
-> +	 * memory to work with.
-> +	 */
->   	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (drvdata->buf)
-> +		goto fast_path;
-> +
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +
-> +	/* Allocating the memory here while outside of the spinlock */
-> +	buf = kzalloc(drvdata->size, GFP_KERNEL);
-> +	if (!buf)
-> +		return -ENOMEM;
-> +
-> +	/* Let's try again */
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +fast_path:
-
-nit: As I mentioned in the previous series, could we not avoid the goto in the middle of the
-function,by doing :
-
-	if (!drvdata->buf) {
-		unlock();
-		buf = alloc();
-		if (!buf) return -ENOMEM;
-		lock();
-	}
-
-
->   	if (drvdata->reading) {
->   		spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +		/*
-> +		 * Free allocated memory outside of the spinlock.  There is
-> +		 * no need to assert the validity of 'buf' since calling
-> +		 * kfree(NULL) is safe.
-> +		 */
-> +		kfree(buf);
->   		return -EBUSY;
->   	}
-
-It would be good to unify the exit points as we do similar steps.
-	if (drvdata->reading) {
-		rc = -EBUSY;
-		goto out;
-	}
+> Hmm... Booting this series with Qemu and OVMF results in lots of
+> warnings,
 >
-> +	/*
-> +	 * If drvdata::buf isn't NULL, memory was allocated for a previous
-> +	 * trace run but wasn't read.  If so simply zero-out the memory.
-> +	 * Otherwise use the memory allocated above.
-> +	 *
-> +	 * The memory is freed when users read the buffer using the
-> +	 * /dev/xyz.{etf|etb} interface.  See tmc_read_unprepare_etf() for
-> +	 * details.
-> +	 */
-> +	if (drvdata->buf) {
-> +		memset(drvdata->buf, 0, drvdata->size);
-> +	} else {
-> +		used = true;
-> +		drvdata->buf = buf;
-> +	}
-> +
->   	tmc_etb_enable_hw(drvdata);
->   	drvdata->enable = true;
-
-out:
-
->   	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> [ 0.102173] ------------[ cut here ]------------
+> [ 0.103000] WARNING: CPU: 0 PID: 0 at /dev/shm/mfleming/git/efi/drivers/firmware/efi/runtime-wrappers.c:30 efi_call_virt_check_flags+0x69/0x90
+> [ 0.103505] Modules linked in:
+> [ 0.104519] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4+ #1
+> [    0.105000]  0000000000000000 ffffffff81e03e30 ffffffff8132206f 0000000000000000
+> [    0.105000]  0000000000000000 ffffffff81e03e70 ffffffff8105a47c 0000001e0000000a
+> [    0.105000]  0000000000000246 0000000000000286 ffffffff81bed975 ffffffff81e03f10
+> [    0.105000] Call Trace:
+> [    0.105000]  [<ffffffff8132206f>] dump_stack+0x4d/0x6e
+> [    0.105000]  [<ffffffff8105a47c>] __warn+0xcc/0xf0
+> [    0.105000]  [<ffffffff8105a558>] warn_slowpath_null+0x18/0x20
+> [    0.105000]  [<ffffffff8164e5a9>] efi_call_virt_check_flags+0x69/0x90
+> [    0.105000]  [<ffffffff8164f9d2>] virt_efi_set_variable+0x82/0x190
+> [    0.105000]  [<ffffffff81054555>] efi_delete_dummy_variable+0x75/0x80
+> [    0.105000]  [<ffffffff81f599f6>] efi_enter_virtual_mode+0x463/0x472
+> [    0.105000]  [<ffffffff81f41f82>] start_kernel+0x38f/0x415
+> [    0.105000]  [<ffffffff81f419e1>] ? set_init_arg+0x55/0x55
+> [    0.105000]  [<ffffffff81f415ee>] x86_64_start_reservations+0x2a/0x2c
+> [    0.105000]  [<ffffffff81f416da>] x86_64_start_kernel+0xea/0xed
+> [    0.107181] ---[ end trace 0081cc453369d969 ]---
+> [    0.107499] Disabling lock debugging due to kernel taint
+> [    0.108226] [Firmware Bug]: IRQ flags corrupted (0x00000246=>0x00000286) by EFI set_variable
 >
-> +	/* Free memory outside the spinlock if need be */
-> +	if (!used && buf)
-> +		kfree(buf);
-> +
-	if (!rc)
-	   	dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
-    	return rc
+> Has anyone tested this series on x86 to ensure that this is a rare
+> case? I'll go and test some physical x86 machines now.
 
-
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 3483d139a4ac..474c70c089f3 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-
->   static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
->   {
-> +	bool used = false;
->   	unsigned long flags;
-> +	void __iomem *vaddr = NULL;
-> +	dma_addr_t paddr;
->   	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->
-> +	 /* This shouldn't be happening */
-> +	if (WARN_ON(mode != CS_MODE_SYSFS))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * If a buffer is already allocated *keep holding* the lock and
-> +	 * jump to the fast path.  Otherwise release the lock and allocate
-> +	 * memory to work with.
-> +	 */
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (drvdata->vaddr)
-> +		goto fast_path;
-> +
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +
-> +	/*
-> +	 * Contiguous  memory can't be allocated while a spinlock is held.
-> +	 * As such allocate memory here and free it if a buffer has already
-> +	 * been allocated (from a previous session).
-> +	 */
-> +	vaddr = dma_alloc_coherent(drvdata->dev, drvdata->size,
-> +				   &paddr, GFP_KERNEL);
-> +	if (!vaddr)
-> +		return -ENOMEM;
-> +
-> +	/* Let's try again */
->   	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +fast_path:
-
-nit: Same as above.
-
-I am not too particular about the above changes, but would be good to have them
-reader friendly.
-
-Either way,
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Suzuki
+I suppose that it is quite likely that this issue occurs in the wild
+if it is present in OVMF. Could anyone check which flag is actually
+clobbered here?
