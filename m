@@ -1,119 +1,140 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 25 Apr 2016 02:04:52 +0100
-Subject: [PATCH v3] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
-Message-ID: <1461546292-21110-1-git-send-email-andre.przywara@arm.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Mon, 25 Apr 2016 09:47:15 +0800
+Subject: [PATCH RESEND v2 4/4] ARM64: dts: rockchip: add dts file for
+ RK3399 evaluation board
+In-Reply-To: <1461304307-14113-5-git-send-email-jay.xu@rock-chips.com>
+References: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
+ <1461304307-14113-5-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <571D7723.1020707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner NMI irqchip driver requires GENERIC_IRQ_CHIP, but
-we can't select it directly, because there is no specific Kconfig entry
-for the driver. Compiling this NMI driver with certain arm64
-configurations thus fails due to the missing dependency:
 
-drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
-drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
-drivers/built-in.o: In function `irq_domain_add_linear':
-include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
-drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
-drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
-drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
-drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
-drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
-drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
 
-Add separate Kconfig options for both Allwinner specific irqchip
-drivers and select GENERIC_IRQ_CHIP for the NMI driver.
-The older sun4i IRQ driver only gets selected when support for these
-specific SoCs is compiled, while the NMI driver is selected for all
-Allwinner SoCs (copying the current behaviour and covering future SoCs
-automatically).
+? 2016?04?22? 13:51, Jianqun Xu ??:
+> This patch add rk3399-evb.dts for RK3399 evaluation board.
+> Tested on RK3399 evb.
+>
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+> changes in v2:
+> - remove rk808 since without i2c, which will upstream independently
+> - remove es8316 since without i2c, which will upstream independently
+> - fix codingstyle issues
+>
+>   arch/arm64/boot/dts/rockchip/Makefile       |   1 +
+>   arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 122 ++++++++++++++++++++++++++++
+>   2 files changed, 123 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+> index df37865..7037a16 100644
+> --- a/arch/arm64/boot/dts/rockchip/Makefile
+> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> @@ -1,6 +1,7 @@
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
+>   
+>   always		:= $(dtb-y)
+>   subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> new file mode 100644
+> index 0000000..309f870
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> @@ -0,0 +1,122 @@
+> +/*
+> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/pwm/pwm.h>
+> +#include "rk3399.dtsi"
+> +
+> +/ {
+> +	compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
 
-Reported-by: Suzuki K Poulose <Suzuki.Poulose@arm.com>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Hi,
+I pick them up in my github. 
+(https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0425)
 
-this is a new approach to the problem that Suzuki tried to address
-already.
-It separates the sun4i IRQ controller driver and the NMI driver as
-Maxime requested.
-While there should be no difference for the NMI driver, the sun4i
-driver now only gets selected for certain SoCs, which is admittedly
-a bold call for -rc5. If people find this too risky, I can bring the
-sun4i in line with the NMI driver (selected for all ARCH_SUNXI) for
-this release and re-create the more selective dependency as a merge
-window patch, so that it gets more testing.
-Please let me know.
+Can we add the following strings to match the loader (coreboot)?
+  No matter, we can match the loader(coreboot) to bring up the evb board 
+on now or in the future.
 
-Cheers,
-Andre.
+...,"google,rk3399evb-rev3", 
+google,rk3399evb-rev2",google,rk3399evb-rev1","google,rk3399evb-rev0"
 
- arch/arm/mach-sunxi/Kconfig | 3 ++-
- drivers/irqchip/Kconfig     | 8 ++++++++
- drivers/irqchip/Makefile    | 4 ++--
- 3 files changed, 12 insertions(+), 3 deletions(-)
+Bring up my evb board:
+...
+Compat preference: google,rk3399evb-rev0
+Config conf at 4, kernel kernel at 1, fdt fdt at 4, compat google,rk3399evb-rev0 
+(match) rockchip,rk3399-evb rockchip,rk3399
+Config conf at 3, kernel kernel at 1, fdt fdt at 3, compat rockchip,r88 
+rockchip,rk3368
+Config conf at 2, kernel kernel at 1, fdt fdt at 2, compat geekbuying,geekbox 
+rockchip,rk3368
+Config conf at 1 (default), kernel kernel at 1, fdt fdt at 1, compat 
+rockchip,rk3368-evb-act8846 rockchip,rk3368
+Choosing best match conf at 4.
+Shutting down all USB controllers.
+Exiting depthcharge with code 4 at timestamp: 6031792
+WARNING: Skipping low memory range [0x0:0x500000]!
+Relocating kernel to 0x680000
+jumping to kernel
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 
+4.6.0-rc4-next-20160422-00016-g0ac0bfb-dirty (wxt at nb) (gcc version 
+4.9.x-google 20140827 (prerelease) (GCC) ) #16 SMP PR
+....
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index c124d65..c092bc2 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select CLKSRC_MMIO
--	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select SUN4I_TIMER
- 	select RESET_CONTROLLER
-@@ -14,11 +13,13 @@ if ARCH_SUNXI
- config MACH_SUN4I
- 	bool "Allwinner A10 (sun4i) SoCs support"
- 	default ARCH_SUNXI
-+	select SUN4I_IRQCHIP
- 
- config MACH_SUN5I
- 	bool "Allwinner A10s / A13 (sun5i) SoCs support"
- 	default ARCH_SUNXI
- 	select SUN5I_HSTIMER
-+	select SUN4I_IRQCHIP
- 
- config MACH_SUN6I
- 	bool "Allwinner A31 (sun6i) SoCs support"
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 3e12479..94f3f42 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -165,6 +165,14 @@ config ST_IRQCHIP
- 	help
- 	  Enables SysCfg Controlled IRQs on STi based platforms.
- 
-+config SUN4I_IRQCHIP
-+	bool
-+
-+config SUNXI_NMI
-+	bool "Allwinner SoC NMI controller"
-+	default ARCH_SUNXI
-+	select GENERIC_IRQ_CHIP
-+
- config TANGO_IRQ
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index b03cfcb..34f2964 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -19,8 +19,8 @@ obj-$(CONFIG_CLPS711X_IRQCHIP)		+= irq-clps711x.o
- obj-$(CONFIG_OR1K_PIC)			+= irq-or1k-pic.o
- obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
- obj-$(CONFIG_OMAP_IRQCHIP)		+= irq-omap-intc.o
--obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
--obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
-+obj-$(CONFIG_SUN4I_IRQCHIP)		+= irq-sun4i.o
-+obj-$(CONFIG_SUNXI_NMI)			+= irq-sunxi-nmi.o
- obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
- obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
- obj-$(CONFIG_REALVIEW_DT)		+= irq-gic-realview.o
+
+--
+<cut>
+
+
+-
+Caesar
+
 -- 
-2.7.4
+Thanks,
+Caesar
