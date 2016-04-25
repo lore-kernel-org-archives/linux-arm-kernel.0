@@ -1,50 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Apr 2016 17:55:03 +0200
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <5536968.ADFL5hRmGD@wuerfel>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <17150729.NF4MViUffk@wuerfel> <20160425152914.GI6104@vireshk-i7>
- <5536968.ADFL5hRmGD@wuerfel>
-Message-ID: <20160425175503.28ef34d9@free-electrons.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 25 Apr 2016 11:56:22 -0400
+Subject: [PATCH v2 1/4] dt-bindings: interrupt-controllers: add
+ description of SIC1 and SIC2
+In-Reply-To: <20160425145124.GA23792@rob-hp-laptop>
+References: <1461545990-25560-1-git-send-email-vz@mleia.com>
+ <1461546023-25614-1-git-send-email-vz@mleia.com>
+ <20160425145124.GA23792@rob-hp-laptop>
+Message-ID: <1461599782.6934.0.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, 25 Apr 2016 17:46:53 +0200, Arnd Bergmann wrote:
-
-> > What code are you talking about? Initializing the OPPs or adding the
-> > cpufreq-dt device? The first one (or whatever is left now in that
-> > function) can stay anywhere, even as a cpufreq driver. I was talking
-> > about the fact that we don't have a sequence problem to solve here.
+On Mon, 2016-04-25 at 09:51 -0500, Rob Herring wrote:
+> On Mon, Apr 25, 2016 at 04:00:23AM +0300, Vladimir Zapolskiy wrote:
+> > NXP LPC32xx has three interrupt controllers, namely root Main
+> > Interrupt Controller (MIC) and two supplementary Sub Interrupt
+> > Controllers (SIC1 and SIC2), four interrupt outputs from SIC1 and SIC2
+> > are connected to MIC.
+> > 
+> > Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> > ---
+> > Changes from v1 to v2:
+> > * removed introduced optional "interrupt-controller-name" property,
+> >   for users the name of a controller will be constructed from mic/sic
+> >   and controller physical address,
+> > * removed introduced optional "wakeup-sources" property, a list of
+> >   mappings between a hardware interrupt and its correspondent wakeup source
+> >   to exit CPU STOP mode will be discussed later on,
+> > * other negligible changes (rewording, small letters in unit address etc.)
+> > 
+> >  .../interrupt-controller/nxp,lpc3220-mic.txt       | 70 ++++++++++++++--------
+> >  1 file changed, 46 insertions(+), 24 deletions(-)
 > 
-> My line of thinking was that the armada_xp_pmsu_cpufreq_init()
-> function makes sense by itself and feels like it should be
-> one file in drivers/cpufreq, including the creation of the device.
-> 
-> Even without the argument of the sequencing, they two parts sort
-> of belong together because the cpufreq-dt driver depends on both
-> of them being run before it can function. It's also the same amount
-> of code, as you are replacing one line in armada_xp_pmsu_cpufreq_init
-> with one line in "struct of_device_id machines".
-> 
-> It's not really that important, just a feeling I had that it could
-> be done better. Unless the mvebu maintainers feel strongly about
-> it, just do as you prefer.
+> Acked-by: Rob Herring <robh@kernel.org>
 
-As a mvebu folk, I don't really have a strong opinion on this. We also
-have some cpufreq device registration code in
-arch/arm/mach-mvebu/kirkwood.c for the older Kirkwood platform, though
-this one uses a custom cpufreq driver and not the generic cpufreq-dt
-driver.
+Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
 
-Ideally, in the grand direction of removing as much things as possible
-from mach-<foo> directories, it would be great to move such
-initializations somewhere else. But cpufreq is not by far not the only
-reason why we still have code in mach-<foo>, at least in the mvebu land.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
