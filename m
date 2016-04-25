@@ -1,86 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Apr 2016 10:28:43 +0100
-Subject: [PATCH v7 07/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <571DE077.8060601@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-8-git-send-email-james.morse@arm.com>
- <571656E9.5050402@arm.com> <57166CC9.4030804@arm.com>
- <57175BD7.30902@arm.com> <571765D1.9070207@arm.com>
- <20160425084111.GA19515@linaro.org> <571DE077.8060601@arm.com>
-Message-ID: <571DE34B.1010300@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 25 Apr 2016 11:29:56 +0200
+Subject: [PATCH] ARM: dts: exynos: Enable PRNG and SSS for all Exynos4 devices
+Message-ID: <1461576596-27844-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 10:16, James Morse wrote:
-> Hi,
-> 
-> On 25/04/16 09:41, AKASHI Takahiro wrote:
->> On Wed, Apr 20, 2016 at 12:19:45PM +0100, James Morse wrote:
->>> On 20/04/16 11:37, Marc Zyngier wrote:
->>>> On 19/04/16 18:37, James Morse wrote:
->>>>> It looks like x86 uses the extable to work around this, their vmx_vcpu_run() has:
->>>>>> 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
->>>>> Where __ex ends up calling ____kvm_handle_fault_on_reboot(), with a nearby comment:
->>>>>> * Hardware virtualization extension instructions may fault if a
->>>>>> * reboot turns off virtualization while processes are running.
->>>>>> * Trap the fault and ignore the instruction if that happens.
->>>>
->>>> I very much like that approach, to be honest. Tearing down a CPU is
->>>> something exceptional, so let's make it an actual exception.
->>>>
->>>> It is now pretty easy to discriminate between KVM functions and stub
->>>> functions thanks to your earlier patch, so if we end up calling the
->>>> hyp-stub because we've torn down KVM's EL2, let's just return an
->>>> appropriate error code (ARM_EXCEPTION_HYP_GONE), and handle it at EL1.
->>>
->>> Okay. kexec uses kvm_call_hyp() against the hyp-stub to do the kernel-copy and
->>> hand over to purgatory, but we could change that to a new 'special' builtin
->>> call, something like HVC_KEXEC_CALL_HYP. It never calls it with kvm loaded, so
->>> there is no reason the calls have to be same.
->>>
->>> Given hibernate doesn't hit this issue, I will drop this hunk from this version
->>> of the patch, and repost hibernate incorporating the feedback so far. I will
->>> provide a patch for kexec to do the above.
->>
->> Thanks, but you don' have to.
-> 
-> I was wrong with the 'hibernate doesn't hit this issue', with this patch we
-> re-install the hyp-stub during system reboot, and race with the scheduler.
-> ('reboot -f' while running a guest).
-> 
-> 
->> If the fix below is acceptable, we will merge it to our next kexec/kdump
->> patch series.
-> 
-> I'm testing something that looks very similar at the moment.
-> 
-> 
->> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> index eba89e4..31b5224 100644
->> --- a/arch/arm64/kvm/handle_exit.c
->> +++ b/arch/arm64/kvm/handle_exit.c
->> @@ -186,6 +186,10 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>  		exit_handler = kvm_get_exit_handler(vcpu);
->>  
->>  		return exit_handler(vcpu, run);
->> +	case ARM_EXCEPTION_HYP_GONE:
->> +		/* due to kexec reboot */
->> +		run->exit_reason = KVM_EXIT_SHUTDOWN;
->> +		return 0;
-> 
-> Is it fair to throw this back out to user space? While the hypervisor doesn't
-> have long to live, it may not be expecting this exit_reason. I couldn't see a
-> value for 'suprise cpu removal', and it looks like the x86 code causes the vcpu
-> to spin round enter guest...
+There is no external dependency for Security SubSystem (SSS) block so
+the nodes for Pseudo Random Number Generator and AES hardware
+acceleration can be enabled always for all Exynos4 devices.
 
-Yeah, KVM_EXIT_SHUTDOWN is a vcpu reset (which on x86 is caused by a
-triple fault). KVM_EXIT_FAIL_ENTRY seems slightly better.
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi                  | 2 --
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 4 ----
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 8 --------
+ 3 files changed, 14 deletions(-)
 
-As for getting back to userspace, I don't see that as a problem (though
-the documentation on that part of the API is... sparse).
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index ffaceea74d79..5495b2bbc006 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -987,7 +987,6 @@
+ 		interrupts = <0 112 0>;
+ 		clocks = <&clock CLK_SSS>;
+ 		clock-names = "secss";
+-		status = "disabled";
+ 	};
+ 
+ 	prng: rng at 10830400 {
+@@ -995,7 +994,6 @@
+ 		reg = <0x10830400 0x200>;
+ 		clocks = <&clock CLK_SSS>;
+ 		clock-names = "secss";
+-		status = "disabled";
+ 	};
+ 
+ 	register-debug {
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index acd7e7b5fd13..cab0f07d7d28 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -496,10 +496,6 @@
+ 	status = "okay";
+ };
+ 
+-&sss {
+-	status = "okay";
+-};
+-
+ &tmu {
+ 	vtmu-supply = <&ldo10_reg>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 27dbf1687754..5d1eaea3f778 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -1234,10 +1234,6 @@
+ 	status = "okay";
+ };
+ 
+-&prng {
+-	status = "okay";
+-};
+-
+ &rtc {
+ 	status = "okay";
+ 	clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
+@@ -1286,10 +1282,6 @@
+ 	};
+ };
+ 
+-&sss {
+-	status = "okay";
+-};
+-
+ &tmu {
+ 	vtmu-supply = <&ldo10_reg>;
+ 	status = "okay";
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
