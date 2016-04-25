@@ -1,52 +1,36 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Apr 2016 13:03:17 +0100
-Subject: [PATCH 3/5] ARM: dts: introduce MPS2 AN385/AN386
-In-Reply-To: <5670114.66Ur0mq4Xc@wuerfel>
-References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
- <571DE21A.5010502@suse.com> <571DEE47.3090208@arm.com>
- <5670114.66Ur0mq4Xc@wuerfel>
-Message-ID: <571E0785.1060200@arm.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Mon, 25 Apr 2016 14:02:22 +0200
+Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20160425112207.GL16065@arm.com>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <20160404121954.GA9300@hardcore> <20160425112207.GL16065@arm.com>
+Message-ID: <20160425120222.GA2552@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 12:32, Arnd Bergmann wrote:
-> On Monday 25 April 2016 11:15:35 Vladimir Murzin wrote:
->>>> +
->>>> +#include "mps2.dtsi"
->>>> +
->>>> +/ {
->>>> +    model = "ARM MPS2 Application Note 385/386";
->>>> +    compatible = "arm,mps2";
->>>> +
->>>> +    aliases {
->>>> +        serial0 = &uart0;
->>>> +    };
->>>> +
->>>> +    chosen {
->>>> +        bootargs = "rdinit=/sbin/init earlycon";
->>>
->>> The rootfs should be independent from the board.
->>> In my opinion, this type of bootargs should not be part of the DTS.
->>
->> I have no strong opinion on this, but quick grep shows plenty places
->> where the same happens, and even [1] has rootfs specific option as an
->> example. So if there is no strong call to remove rdinit from bootargs,
->> I'd prefer to keep it as it makes testing easier for me.
->>
->> [1] Documentation/devicetree/booting-without-of.txt
->>
-> 
-> I think "rdinit=/sbin/init" is redundant, that is what we try running
-> anyway, so I don't see any downside in removing it.
+Hi Will,
 
-Fair point.
-
-@Sudeep could you fixup it locally or I need to respin?
-
-Cheers
-Vladimir
-
+On Mon, Apr 25, 2016 at 12:22:07PM +0100, Will Deacon wrote:
+> Hi Jan,
 > 
-> 	Arnd
+> On Mon, Apr 04, 2016 at 02:19:54PM +0200, Jan Glauber wrote:
+> > Hi Mark,
+> > 
+> > can you have a look at these patches?
 > 
+> Looks like Mark reviewed this last week -- are you planning to respin?
 > 
+> Will
+
+Yes, of course. I just had no time yet and I'm a bit lost on how to
+proceed without using the NUMA node information which Mark did not like
+to be used.
+
+The only way to know which device is on which node would be to look
+at the PCI topology (which is also the source of the NUMA node_id).
+We could do this manually in order to not depend on CONFIG_NUMA,
+but I would like to know if that is acceptable before respinning the
+patches.
+
+Thanks!
+Jan
