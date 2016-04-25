@@ -1,72 +1,20 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 25 Apr 2016 14:00:41 -0700
-Subject: [PATCH V3 2/3] iio: mxs-lradc: remove mxs_lradc_ts_unregister
-In-Reply-To: <1461441479-23218-3-git-send-email-stefan.wahren@i2se.com>
-References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
- <1461441479-23218-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20160425210041.GB26059@dtor-ws>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 25 Apr 2016 23:02:16 +0200
+Subject: [PATCH 2/6] clk: rockchip: rk3399: add some frequencies on the
+ PLL table
+In-Reply-To: <1461150414-29638-3-git-send-email-zhengxing@rock-chips.com>
+References: <1461150414-29638-1-git-send-email-zhengxing@rock-chips.com>
+ <1461150414-29638-3-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1481626.EOa9TdCJMI@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 23, 2016 at 07:57:58PM +0000, Stefan Wahren wrote:
-> After using devm_input_allocate_device for registration
-> the function mxs_lradc_ts_unregister isn't necessary anymore
-> since mxs_lradc_ts_close already does the job.
+Am Mittwoch, 20. April 2016, 19:06:50 schrieb Xing Zheng:
+> This patch add some necessary frequencies for the RK3399 clock.
 > 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+applied to my clk-branch for v4.7
 
-> ---
->  drivers/iio/adc/mxs-lradc.c |   13 +------------
->  1 file changed, 1 insertion(+), 12 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-> index 3d1d370..90242ba 100644
-> --- a/drivers/iio/adc/mxs-lradc.c
-> +++ b/drivers/iio/adc/mxs-lradc.c
-> @@ -1148,14 +1148,6 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->  	return input_register_device(input);
->  }
->  
-> -static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
-> -{
-> -	if (!lradc->use_touchscreen)
-> -		return;
-> -
-> -	mxs_lradc_disable_ts(lradc);
-> -}
-> -
->  /*
->   * IRQ Handling
->   */
-> @@ -1715,13 +1707,11 @@ static int mxs_lradc_probe(struct platform_device *pdev)
->  	ret = iio_device_register(iio);
->  	if (ret) {
->  		dev_err(dev, "Failed to register IIO device\n");
-> -		goto err_ts;
-> +		return ret;
->  	}
->  
->  	return 0;
->  
-> -err_ts:
-> -	mxs_lradc_ts_unregister(lradc);
->  err_ts_register:
->  	mxs_lradc_hw_stop(lradc);
->  err_dev:
-> @@ -1739,7 +1729,6 @@ static int mxs_lradc_remove(struct platform_device *pdev)
->  	struct mxs_lradc *lradc = iio_priv(iio);
->  
->  	iio_device_unregister(iio);
-> -	mxs_lradc_ts_unregister(lradc);
->  	mxs_lradc_hw_stop(lradc);
->  	mxs_lradc_trigger_remove(iio);
->  	iio_triggered_buffer_cleanup(iio);
-> -- 
-> 1.7.9.5
-> 
-
--- 
-Dmitry
+Thanks
+Heiko
