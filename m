@@ -1,94 +1,57 @@
 From: eric@engestrom.ch (Eric Engestrom)
-Date: Mon, 25 Apr 2016 01:23:59 +0100
-Subject: [PATCH 02/41] Documentation: sysfs: fix spelling mistakes
+Date: Mon, 25 Apr 2016 01:24:06 +0100
+Subject: [PATCH 09/41] Documentation: dt: clock: fix spelling mistakes
 In-Reply-To: <1461543878-3639-1-git-send-email-eric@engestrom.ch>
 References: <1461543878-3639-1-git-send-email-eric@engestrom.ch>
-Message-ID: <1461543878-3639-3-git-send-email-eric@engestrom.ch>
+Message-ID: <1461543878-3639-10-git-send-email-eric@engestrom.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Eric Engestrom <eric@engestrom.ch>
 ---
- Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x      | 2 +-
- Documentation/ABI/testing/sysfs-bus-event_source-devices-events  | 4 ++--
- Documentation/ABI/testing/sysfs-bus-event_source-devices-hv_24x7 | 2 +-
- Documentation/ABI/testing/sysfs-driver-tegra-fuse                | 2 +-
- Documentation/ABI/testing/sysfs-fs-xfs                           | 2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt | 2 +-
+ Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt | 2 +-
+ Documentation/devicetree/bindings/clock/st/st,clkgen.txt        | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index 2355ed8..19b83f4 100644
---- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -378,7 +378,7 @@ Date:		April 2015
- KernelVersion:	4.01
- Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(R) Returns the maximum size of the data value, data address,
--		VMID, context ID and instuction address in the trace unit
-+		VMID, context ID and instruction address in the trace unit
- 		(0x1E8).  The value is taken directly from the HW.
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+index 0c2bf5e..7f36853 100644
+--- a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+@@ -16,7 +16,7 @@ Required Properties:
+ Optional Properties:
  
- What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr3
-diff --git a/Documentation/ABI/testing/sysfs-bus-event_source-devices-events b/Documentation/ABI/testing/sysfs-bus-event_source-devices-events
-index 505f080..77de58d 100644
---- a/Documentation/ABI/testing/sysfs-bus-event_source-devices-events
-+++ b/Documentation/ABI/testing/sysfs-bus-event_source-devices-events
-@@ -47,7 +47,7 @@ Description:	Per-pmu performance monitoring events specific to the running syste
- 		If a <term> is specified alone (without an assigned value), it
- 		is implied that 0x1 is assigned to that <term>.
+ - rockchip,grf: phandle to the syscon managing the "general register files"
+-  If missing pll rates are not changable, due to the missing pll lock status.
++  If missing pll rates are not changeable, due to the missing pll lock status.
  
--		Examples (each of these lines would be in a seperate file):
-+		Examples (each of these lines would be in a separate file):
+ Each clock is assigned an identifier and client nodes can use this identifier
+ to specify the clock which they consume. All available clocks are defined as
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
+index c9fbb76..8cb47c3 100644
+--- a/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
+@@ -15,7 +15,7 @@ Required Properties:
+ Optional Properties:
  
- 			event=0x2abc
- 			event=0x423,inv,cmask=0x3
-@@ -83,7 +83,7 @@ Description:	Perf event scaling factors
+ - rockchip,grf: phandle to the syscon managing the "general register files"
+-  If missing pll rates are not changable, due to the missing pll lock status.
++  If missing pll rates are not changeable, due to the missing pll lock status.
  
- 		A string representing a floating point value expressed in
- 		scientific notation to be multiplied by the event count
--		recieved from the kernel to match the unit specified in the
-+		received from the kernel to match the unit specified in the
- 		<event>.unit file.
+ Each clock is assigned an identifier and client nodes can use this identifier
+ to specify the clock which they consume. All available clocks are defined as
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
+index 78978f1..426bdda 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
+@@ -40,7 +40,7 @@ address is common of all subnode.
+ 	};
  
- 		Example:
-diff --git a/Documentation/ABI/testing/sysfs-bus-event_source-devices-hv_24x7 b/Documentation/ABI/testing/sysfs-bus-event_source-devices-hv_24x7
-index f893337..ec27c6c 100644
---- a/Documentation/ABI/testing/sysfs-bus-event_source-devices-hv_24x7
-+++ b/Documentation/ABI/testing/sysfs-bus-event_source-devices-hv_24x7
-@@ -4,7 +4,7 @@ Contact:	Linux on PowerPC Developer List <linuxppc-dev@lists.ozlabs.org>
- Description:
- 		Provides access to the binary "24x7 catalog" provided by the
- 		hypervisor on POWER7 and 8 systems. This catalog lists events
--		avaliable from the powerpc "hv_24x7" pmu. Its format is
-+		available from the powerpc "hv_24x7" pmu. Its format is
- 		documented here:
- 		https://raw.githubusercontent.com/jmesmon/catalog-24x7/master/hv-24x7-catalog.h
+ This binding uses the common clock binding[1].
+-Each subnode should use the binding discribe in [2]..[7]
++Each subnode should use the binding describe in [2]..[7]
  
-diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
-index 69f5af6..b8936fa 100644
---- a/Documentation/ABI/testing/sysfs-driver-tegra-fuse
-+++ b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
-@@ -3,7 +3,7 @@ Date:		February 2014
- Contact:	Peter De Schrijver <pdeschrijver@nvidia.com>
- Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
- 		and Tegra124 SoC's from NVIDIA. The efuses contain write once
--		data programmed at the factory. The data is layed out in 32bit
-+		data programmed at the factory. The data is laid out in 32bit
- 		words in LSB first format. Each bit represents a single value
- 		as decoded from the fuse registers. Bits order/assignment
- 		exactly matches the HW registers, including any unused bits.
-diff --git a/Documentation/ABI/testing/sysfs-fs-xfs b/Documentation/ABI/testing/sysfs-fs-xfs
-index ea0cc8c..f704925 100644
---- a/Documentation/ABI/testing/sysfs-fs-xfs
-+++ b/Documentation/ABI/testing/sysfs-fs-xfs
-@@ -33,7 +33,7 @@ Contact:	xfs at oss.sgi.com
- Description:
- 		The current state of the log write grant head. It
- 		represents the total log reservation of all currently
--		oustanding transactions, including regrants due to
-+		outstanding transactions, including regrants due to
- 		rolling transactions. The grant head is exported in
- 		"cycle:bytes" format.
- Users:		xfstests
+ [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+ [2] Documentation/devicetree/bindings/clock/st,clkgen-divmux.txt
 -- 
 2.8.0
