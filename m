@@ -1,32 +1,42 @@
-From: prime.zeng@huawei.com (Zeng Tao)
-Date: Mon, 25 Apr 2016 11:37:33 +0800
-Subject: [PATCH] arm64: fix /proc/cpuinfo for elf32
-Message-ID: <1461555453-60440-1-git-send-email-prime.zeng@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 25 Apr 2016 14:08:11 +1000
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.7
+Message-ID: <cover.1461542941.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For elf32 thread, personality is used for arm32,
-and thread_flag for arm64.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Here personality is used for arm64, so fix it.
+Please consider these Renesas ARM based SoC updates for v4.7.
 
-Signed-off-by: Zeng Tao <prime.zeng@huawei.com>
----
- arch/arm64/kernel/cpuinfo.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This pull request is based on "[GIT PULL v2] Renesas ARM Based SoC Fixes
+for v4.6", tagged as renesas-fixes-for-v4.6, which I have previously sent
+a pull request for.
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 84c8684..f739398 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -126,7 +126,7 @@ static int c_show(struct seq_file *m, void *v)
- 		 * software which does already (at least for 32-bit).
- 		 */
- 		seq_puts(m, "Features\t:");
--		if (personality(current->personality) == PER_LINUX32) {
-+		if (test_thread_flag(TIF_32BIT)) {
- #ifdef CONFIG_COMPAT
- 			for (j = 0; compat_hwcap_str[j]; j++)
- 				if (compat_elf_hwcap & (1 << j))
--- 
-1.9.1
+The reason is that this series depends on c531fb27e969 ("ARM: shmobile:
+timer: Fix preset_lpj leading to too short delays")
+
+
+The following changes since commit c531fb27e9699eaee478ee5686a3cca5dee73602:
+
+  ARM: shmobile: timer: Fix preset_lpj leading to too short delays (2016-04-20 08:52:55 +1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.7
+
+for you to fetch changes up to a4b8c18c40704c28be62af4606cc6758c9ff3dba:
+
+  ARM: shmobile: timer: Drop support for Cortex A8 (2016-04-20 08:55:09 +1000)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Updates for v4.7
+
+Drop support for Cortex A8 in timer code
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: timer: Drop support for Cortex A8
+
+ arch/arm/mach-shmobile/timer.c | 52 ++++++++++++++++--------------------------
+ 1 file changed, 20 insertions(+), 32 deletions(-)
