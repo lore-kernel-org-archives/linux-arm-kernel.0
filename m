@@ -1,213 +1,114 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 25 Apr 2016 11:19:26 +0200
-Subject: [PATCH v8] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <1460711612-5268-1-git-send-email-m.szyprowski@samsung.com>
-References: <1460711612-5268-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFqnnjdQgXNjA30AAi--+0NP74gWFjuYfrsvUGTV=yK=Hw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 25 Apr 2016 10:19:11 +0100
+Subject: [PATCH v7 15/16] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+In-Reply-To: <20160422102954.GB2998@e104818-lin.cambridge.arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-16-git-send-email-james.morse@arm.com>
+ <20160422102954.GB2998@e104818-lin.cambridge.arm.com>
+Message-ID: <571DE10F.10905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2016 at 11:13, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> To read pid/cid registers, the probed device need to be properly turned on.
-> When it is inside a power domain, the bus code should ensure that the
-> given power domain is enabled before trying to access device's registers.
-> However in some cases power domain (or clocks) might not be yet available.
-> Returning -EPROBE_DEFER is not a solution in such case, because callers
-> don't handle this special error code. Instead such devices are added to the
-> special list and their registration is retried from periodic worker until
-> all resources are available.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
-> Changelog:
->
-> v8:
-> - replaced notifier with periodic workqueue on Greg request
->
-> v7: https://lkml.org/lkml/2016/4/13/201
-> - replaced late_initcall approach with a notifier registered to device core
->
-> v6: https://lkml.org/lkml/2016/4/12/414
-> - got back to v1-style approach on Russell King request to avoid ABI break
-> - use list for storing deferred devices and retry their registration from
->   late_initcall
->
-> v5: https://lkml.org/lkml/2016/2/10/179
-> - added 2 more patches to avoid regression with existing drivers (nvdimm and
->   sa1111), for more information, see https://lkml.org/lkml/2015/12/17/390
-> - changed thread name to "AMBA: add complete support for power domains"
->
-> v4: https://lkml.org/lkml/2015/12/2/52
-> - fixed more issues pointed by Ulf Hansson and Russell King
->
-> v3: https://lkml.org/lkml/2015/12/1/334
-> - fixed issues pointed by Ulf Hansson
-> - dropped patch for exynos4210 dts, because it already got queued for merging
->
-> v2: https://lkml.org/lkml/2015/11/26/229
-> - added 2 patches from 'On-demand device probing' thread
->   (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
->   from amba_device_add() to amba_match()
-> - moved dev_pm_domain_attach() to amba_match(), which is allowed to
->   return -EPROBE_DEFER
->
-> v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
-> - initial version
-> ---
->  drivers/amba/bus.c | 100 +++++++++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 90 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index f0099360039e..a5b5c87e2114 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -336,16 +336,7 @@ static void amba_device_release(struct device *dev)
->         kfree(d);
->  }
->
-> -/**
-> - *     amba_device_add - add a previously allocated AMBA device structure
-> - *     @dev: AMBA device allocated by amba_device_alloc
-> - *     @parent: resource parent for this devices resources
-> - *
-> - *     Claim the resource, and read the device cell ID if not already
-> - *     initialized.  Register the AMBA device with the Linux device
-> - *     manager.
-> - */
-> -int amba_device_add(struct amba_device *dev, struct resource *parent)
-> +static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
->  {
->         u32 size;
->         void __iomem *tmp;
-> @@ -373,6 +364,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->                 goto err_release;
->         }
->
-> +       ret = dev_pm_domain_attach(&dev->dev, true);
-> +       if (ret == -EPROBE_DEFER) {
-> +               iounmap(tmp);
-> +               goto err_release;
-> +       }
-> +
->         ret = amba_get_enable_pclk(dev);
->         if (ret == 0) {
->                 u32 pid, cid;
-> @@ -398,6 +395,7 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->         }
->
->         iounmap(tmp);
-> +       dev_pm_domain_detach(&dev->dev, true);
->
->         if (ret)
->                 goto err_release;
-> @@ -421,6 +419,88 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->   err_out:
->         return ret;
->  }
-> +
-> +/*
-> + * Registration of AMBA device require reading its pid and cid registers.
-> + * To do this, the device must be turned on (if it is a part of power domain)
-> + * and have clocks enabled. However in some cases those resources might not be
-> + * yet available. Returning EPROBE_DEFER is not a solution in such case,
-> + * because callers don't handle this special error code. Instead such devices
-> + * are added to the special list and their registration is retried from
-> + * periodic worker, until all resources are available and registration succeeds.
-> + */
-> +struct deferred_device {
-> +       struct amba_device *dev;
-> +       struct resource *parent;
-> +       struct list_head node;
-> +};
-> +
-> +static LIST_HEAD(deferred_devices);
-> +static DEFINE_MUTEX(deferred_devices_lock);
-> +
-> +static void amba_deferred_retry_func(struct work_struct *dummy);
-> +static DECLARE_DELAYED_WORK(deferred_retry_work, amba_deferred_retry_func);
-> +
-> +#define DEFERRED_DEVICE_TIMEOUT (msecs_to_jiffies(5 * 1000))
-> +
-> +static void amba_deferred_retry_func(struct work_struct *dummy)
-> +{
-> +       struct deferred_device *ddev, *tmp;
-> +
-> +       mutex_lock(&deferred_devices_lock);
-> +
-> +       list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
-> +               int ret = amba_device_try_add(ddev->dev, ddev->parent);
-> +
-> +               if (ret == -EPROBE_DEFER)
-> +                       continue;
-> +
-> +               list_del_init(&ddev->node);
-> +               kfree(ddev);
-> +       }
-> +
-> +       if (!list_empty(&deferred_devices))
-> +               schedule_delayed_work(&deferred_retry_work,
-> +                                     DEFERRED_DEVICE_TIMEOUT);
-> +
-> +       mutex_unlock(&deferred_devices_lock);
-> +}
-> +
-> +/**
-> + *     amba_device_add - add a previously allocated AMBA device structure
-> + *     @dev: AMBA device allocated by amba_device_alloc
-> + *     @parent: resource parent for this devices resources
-> + *
-> + *     Claim the resource, and read the device cell ID if not already
-> + *     initialized.  Register the AMBA device with the Linux device
-> + *     manager.
-> + */
-> +int amba_device_add(struct amba_device *dev, struct resource *parent)
-> +{
-> +       int ret = amba_device_try_add(dev, parent);
-> +
-> +       if (ret == -EPROBE_DEFER) {
-> +               struct deferred_device *ddev;
-> +
-> +               ddev = kmalloc(sizeof(*ddev), GFP_KERNEL);
-> +               if (!ddev)
-> +                       return -ENOMEM;
-> +
-> +               ddev->dev = dev;
-> +               ddev->parent = parent;
-> +               ret = 0;
-> +
-> +               mutex_lock(&deferred_devices_lock);
-> +
-> +               if (list_empty(&deferred_devices))
-> +                       schedule_delayed_work(&deferred_retry_work,
-> +                                             DEFERRED_DEVICE_TIMEOUT);
-> +               list_add_tail(&ddev->node, &deferred_devices);
-> +
-> +               mutex_unlock(&deferred_devices_lock);
-> +       }
-> +       return ret;
-> +}
->  EXPORT_SYMBOL_GPL(amba_device_add);
->
->  static struct amba_device *
-> --
-> 1.9.2
->
+Hi Catalin,
 
-Overall this looks okay to me! Even if I don't really like the
-approach, it seems like this is the only viable option there is right
-now.
+Thanks for your comments,
 
-One minor improvement that I could think of, is to use also a late
-initcall in conjunction with the delayed work. So, instead of
-scheduling a work unconditionally when -EPROBE_DEFER is returned from
-amba_device_try_add(), you can postpone the *first* re-try to be done
-from a late initcall.
+On 22/04/16 11:29, Catalin Marinas wrote:
+> On Fri, Apr 01, 2016 at 05:53:39PM +0100, James Morse wrote:
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/hibernate-asm.S
 
-Of course, as devices may be added also after the late initcall, you
-need to keep a flag which tells amba_device_add() whether it can rely
-on the late initcall to re-try, or if it needs to schedule a work by
-itself.
+>> +	copy_page	x0, x1, x2, x3, x4, x5, x6, x7, x8, x9
+>> +
+>> +	add	x1, x10, #PAGE_SIZE
+>> +	/* Clean the copied page to PoU - based on flush_icache_range() */
+>> +	dcache_line_size x2, x3
+>> +	sub	x3, x2, #1
+>> +	bic	x4, x10, x3
+>> +2:	dc	cvau, x4	/* clean D line / unified line */
+>> +	add	x4, x4, x2
+>> +	cmp	x4, x1
+>> +	b.lo	2b
+>> +
+>> +	ldr	x19, [x19, #HIBERN_PBE_NEXT]
+>> +	cbnz	x19, 1b
+>> +
+>> +
+>> +	/* switch to the restored kernels page tables, to reconfigure el2 */
+>> +	msr	ttbr1_el1, x21  /* physical address of swapper page tables */
+>> +	isb
+>> +	tlbi	vmalle1is	/* invalidate intermediate caching entries */
+>> +	ic	ialluis
+>> +	dsb	ish		/* also waits for PoU cleaning to finish */
+>> +	isb
+> 
+> The waiting for PoU cleaning needs to happen before the IC instruction.
 
-Kind regards
-Uffe
+Done, to check I understand why:
+The 'ic ialluis' may finish before the PoU cleaning, sharing a barrier means in
+this case we may speculatively load stale values back into the icache while we
+wait for the cleaning to finish.
+
+[ ... ]
+
+>> +
+>> +	/* Load our new page tables */
+>> +	asm volatile("msr	ttbr0_el1, %0;"
+>> +		     "isb;"
+>> +		     "tlbi	vmalle1is;"
+>> +		     "dsb	ish" : : "r"(virt_to_phys(pgd)));
+> 
+> Do we expect anything to have used ttbr0_el1 at this point?
+
+EFI for the virt_efi_get_time() call when we setup the rtc. There may also be
+device drivers out there that try to load firmware before the
+late_initcall_sync() call that triggers resume.
+
+[ ... ]
+
+>> +int swsusp_arch_suspend(void)
+>> +{
+>> +	int ret = 0;
+>> +	unsigned long flags;
+>> +	struct sleep_stack_data state;
+>> +
+>> +	local_dbg_save(flags);
+>> +
+>> +	if (__cpu_suspend_enter(&state)) {
+>> +		ret = swsusp_save();
+>> +	} else {
+>> +		void *lm_kernel_start;
+>> +
+>> +		/* Clean kernel to PoC for secondary core startup */
+>> +		lm_kernel_start = LMADDR(KERNEL_START);
+>> +		__flush_dcache_area(lm_kernel_start, KERNEL_END - KERNEL_START);
+> 
+> We don't need to use LMADDR here. The KERNEL_START is already mapped at
+> the caches are PIPT (-like), so flushing any of the aliases would do.
+
+With kaslr the range KERNEL_START -> KERNEL_END has holes in it. I think this is
+where the __init text or alternatives used to be. Cleaning the corresponding
+range in the linear map avoids the fault...
+
+
+> But I'm not sure we even need to flush the whole kernel. The secondary
+> cores would only execute certain areas before they enable the MMU, at
+> which point they have visibility over the whole cache. Is this needed
+> for secondary core startup on resume from hibernate?
+
+I haven't hit this as an issue, but I think its needed for any mmu-off code.
+The list is:
+*  secondary startup after resume
+*  hyp-stub and kvm's el2-init code,
+*  and cpu_resume() (if a core goes into idle soon after resume).
+
+I agree cleaning the whole kernel is excessive. I guess the right thing to do is
+to collect all these functions into a single section and clean that.
+
+[ ... ]
+
+Thanks for the detailed comments!
+
+
+James
