@@ -1,519 +1,87 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 25 Apr 2016 18:10:42 +0100
-Subject: [PATCH v8 05/13] arm64: kvm: allows kvm cpu hotplug
+Date: Mon, 25 Apr 2016 18:10:48 +0100
+Subject: [PATCH v8 11/13] PM / Hibernate: Call flush_icache_range() on pages
+ restored in-place
 In-Reply-To: <1461604250-12789-1-git-send-email-james.morse@arm.com>
 References: <1461604250-12789-1-git-send-email-james.morse@arm.com>
-Message-ID: <1461604250-12789-6-git-send-email-james.morse@arm.com>
+Message-ID: <1461604250-12789-12-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Some architectures require code written to memory as if it were data to be
+'cleaned' from any data caches before the processor can fetch them as new
+instructions.
 
-The current kvm implementation on arm64 does cpu-specific initialization
-at system boot, and has no way to gracefully shutdown a core in terms of
-kvm. This prevents kexec from rebooting the system at EL2.
+During resume from hibernate, the snapshot code copies some pages directly,
+meaning these architectures do not get a chance to perform their cache
+maintenance. Modify the read and decompress code to call
+flush_icache_range() on all pages that are restored, so that the restored
+in-place pages are guaranteed to be executable on these architectures.
 
-This patch adds a cpu tear-down function and also puts an existing cpu-init
-code into a separate function, kvm_arch_hardware_disable() and
-kvm_arch_hardware_enable() respectively.
-We don't need the arm64 specific cpu hotplug hook any more.
-
-Since this patch modifies common code between arm and arm64, one stub
-definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
-compilation errors.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-[Rebase, added separate VHE init/exit path, changed resets use of
- kvm_call_hyp() to the __version, en/disabled hardware in init_subsystems(),
- added icache maintenance to __kvm_hyp_reset() and removed lr restore, removed
- guest-enter after teardown handling]
 Signed-off-by: James Morse <james.morse@arm.com>
-
-CC: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
-N.B. this patch conflicts with 06a71a24bae5 ("arm64: KVM: unregister notifiers
-in hyp mode teardown path") in v4.6-rc4. See the cover letter for details.
+ kernel/power/swap.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Changes since v7:
- * Moved the kvm-torn-down guest entry handling into handle_exit(),
- * Added an exception type for hyp-stub to return to any kvm_call_hyp() caller
-
- arch/arm/include/asm/kvm_host.h   |  10 +++-
- arch/arm/include/asm/kvm_mmu.h    |   1 +
- arch/arm/kvm/arm.c                | 119 +++++++++++++++++++++++---------------
- arch/arm/kvm/mmu.c                |   5 ++
- arch/arm64/include/asm/kvm_asm.h  |   3 +
- arch/arm64/include/asm/kvm_host.h |  13 ++++-
- arch/arm64/include/asm/kvm_mmu.h  |   1 +
- arch/arm64/kernel/hyp-stub.S      |   5 +-
- arch/arm64/kvm/handle_exit.c      |   7 +++
- arch/arm64/kvm/hyp-init.S         |  38 ++++++++++++
- arch/arm64/kvm/reset.c            |  14 +++++
- 11 files changed, 164 insertions(+), 52 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 385070180c25..738d5eee91de 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -265,6 +265,15 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
- 
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start)
-+{
-+	/*
-+	 * TODO
-+	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
-+	 */
-+}
-+
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
-@@ -277,7 +286,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
--static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index da44be9db4fa..f17a8d41822c 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index b5384311dec4..1687e1450c3a 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -16,7 +16,6 @@
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
- 
--#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/err.h>
-@@ -66,6 +65,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
- static bool vgic_present;
- 
-+static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
-+
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
- {
- 	BUG_ON(preemptible());
-@@ -90,11 +91,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
- 	return &kvm_arm_running_vcpu;
- }
- 
--int kvm_arch_hardware_enable(void)
--{
--	return 0;
--}
--
- int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
- {
- 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
-@@ -1033,11 +1029,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	}
- }
- 
--static void cpu_init_stage2(void *dummy)
--{
--	__cpu_init_stage2();
--}
--
- static void cpu_init_hyp_mode(void *dummy)
- {
- 	phys_addr_t boot_pgd_ptr;
-@@ -1065,43 +1056,87 @@ static void cpu_hyp_reinit(void)
- {
- 	if (is_kernel_in_hyp_mode()) {
- 		/*
--		 * cpu_init_stage2() is safe to call even if the PM
-+		 * __cpu_init_stage2() is safe to call even if the PM
- 		 * event was cancelled before the CPU was reset.
- 		 */
--		cpu_init_stage2(NULL);
-+		__cpu_init_stage2();
- 	} else {
- 		if (__hyp_get_vectors() == hyp_default_vectors)
- 			cpu_init_hyp_mode(NULL);
- 	}
- }
- 
--static int hyp_init_cpu_notify(struct notifier_block *self,
--			       unsigned long action, void *cpu)
-+static void cpu_hyp_reset(void)
-+{
-+	phys_addr_t boot_pgd_ptr;
-+	phys_addr_t phys_idmap_start;
-+
-+	if (!is_kernel_in_hyp_mode()) {
-+		boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-+		phys_idmap_start = kvm_get_idmap_start();
-+
-+		__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
-+	}
-+}
-+
-+static void _kvm_arch_hardware_enable(void *discard)
- {
--	switch (action) {
--	case CPU_STARTING:
--	case CPU_STARTING_FROZEN:
-+	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
- 		cpu_hyp_reinit();
-+		__this_cpu_write(kvm_arm_hardware_enabled, 1);
- 	}
-+}
-+
-+int kvm_arch_hardware_enable(void)
-+{
-+	_kvm_arch_hardware_enable(NULL);
-+	return 0;
-+}
- 
--	return NOTIFY_OK;
-+static void _kvm_arch_hardware_disable(void *discard)
-+{
-+	if (__this_cpu_read(kvm_arm_hardware_enabled)) {
-+		cpu_hyp_reset();
-+		__this_cpu_write(kvm_arm_hardware_enabled, 0);
-+	}
- }
- 
--static struct notifier_block hyp_init_cpu_nb = {
--	.notifier_call = hyp_init_cpu_notify,
--};
-+void kvm_arch_hardware_disable(void)
-+{
-+	_kvm_arch_hardware_disable(NULL);
-+}
- 
- #ifdef CONFIG_CPU_PM
- static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT) {
--		cpu_hyp_reinit();
-+	/*
-+	 * kvm_arm_hardware_enabled is left with its old value over
-+	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
-+	 * re-enable hyp.
-+	 */
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			/*
-+			 * don't update kvm_arm_hardware_enabled here
-+			 * so that the hardware will be re-enabled
-+			 * when we resume. See below.
-+			 */
-+			cpu_hyp_reset();
-+
-+		return NOTIFY_OK;
-+	case CPU_PM_EXIT:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			/* The hardware was enabled before suspend. */
-+			cpu_hyp_reinit();
-+
- 		return NOTIFY_OK;
--	}
- 
--	return NOTIFY_DONE;
-+	default:
-+		return NOTIFY_DONE;
-+	}
- }
- 
- static struct notifier_block hyp_init_cpu_pm_nb = {
-@@ -1136,18 +1171,12 @@ static int init_common_resources(void)
- 
- static int init_subsystems(void)
- {
--	int err;
-+	int err = 0;
- 
- 	/*
--	 * Register CPU Hotplug notifier
-+	 * Enable hardware so that subsystem initialisation can access EL2.
- 	 */
--	cpu_notifier_register_begin();
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--	cpu_notifier_register_done();
--	if (err) {
--		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
--		return err;
--	}
-+	on_each_cpu(_kvm_arch_hardware_enable, NULL, 1);
- 
- 	/*
- 	 * Register CPU lower-power notifier
-@@ -1165,9 +1194,10 @@ static int init_subsystems(void)
- 	case -ENODEV:
- 	case -ENXIO:
- 		vgic_present = false;
-+		err = 0;
- 		break;
- 	default:
--		return err;
-+		goto out;
- 	}
- 
- 	/*
-@@ -1175,12 +1205,15 @@ static int init_subsystems(void)
- 	 */
- 	err = kvm_timer_hyp_init();
- 	if (err)
--		return err;
-+		goto out;
- 
- 	kvm_perf_init();
- 	kvm_coproc_table_init();
- 
--	return 0;
-+out:
-+	on_each_cpu(_kvm_arch_hardware_disable, NULL, 1);
-+
-+	return err;
- }
- 
- static void teardown_hyp_mode(void)
-@@ -1197,11 +1230,6 @@ static void teardown_hyp_mode(void)
- 
- static int init_vhe_mode(void)
- {
--	/*
--	 * Execute the init code on each CPU.
--	 */
--	on_each_cpu(cpu_init_stage2, NULL, 1);
--
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
- 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-@@ -1288,11 +1316,6 @@ static int init_hyp_mode(void)
- 		}
- 	}
- 
--	/*
--	 * Execute the init code on each CPU.
--	 */
--	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
--
- #ifndef CONFIG_HOTPLUG_CPU
- 	free_boot_hyp_pgd();
- #endif
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 58dbd5c439df..7d86e15b5d85 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1666,6 +1666,11 @@ phys_addr_t kvm_get_idmap_vector(void)
- 	return hyp_idmap_vector;
- }
- 
-+phys_addr_t kvm_get_idmap_start(void)
-+{
-+	return hyp_idmap_start;
-+}
-+
- int kvm_mmu_init(void)
- {
- 	int err;
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index eb7490d232a0..a88da136f332 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -22,6 +22,8 @@
- 
- #define ARM_EXCEPTION_IRQ	  0
- #define ARM_EXCEPTION_TRAP	  1
-+/* The hyp-stub will return this for any kvm_call_hyp() call */
-+#define ARM_EXCEPTION_HYP_GONE	  2
- 
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
-@@ -40,6 +42,7 @@ struct kvm_vcpu;
- 
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
-+extern char __kvm_hyp_reset[];
- 
- extern char __kvm_hyp_vector[];
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index b7e82a795ac9..b6f194d9f6b2 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -46,6 +46,7 @@
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
- int kvm_arch_dev_ioctl_check_extension(long ext);
-+phys_addr_t kvm_hyp_reset_entry(void);
- 
- struct kvm_arch {
- 	/* The VMID generation used for the virt. memory system */
-@@ -352,7 +353,17 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 		       hyp_stack_ptr, vector_ptr);
- }
- 
--static inline void kvm_arch_hardware_disable(void) {}
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start)
-+{
-+	/*
-+	 * Call reset code, and switch back to stub hyp vectors.
-+	 * Uses __kvm_call_hyp() to avoid kaslr's kvm_ksym_ref() translation.
-+	 */
-+	__kvm_call_hyp((void *)kvm_hyp_reset_entry(),
-+		       boot_pgd_ptr, phys_idmap_start);
-+}
-+
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 22732a5e3119..e8d39d4f86b6 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -109,6 +109,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 894fb40fb378..8727f4490772 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -23,6 +23,7 @@
- 
- #include <asm/assembler.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
- #include <asm/ptrace.h>
- #include <asm/virt.h>
- 
-@@ -70,8 +71,8 @@ el1_sync:
- 	msr	vbar_el2, x1
- 	b	9f
- 
--	/* Unrecognised call type */
--2:	mov     x0, xzr
-+	/* Someone called kvm_call_hyp() against the hyp-stub... */
-+2:	mov     x0, #ARM_EXCEPTION_HYP_GONE
- 
- 9:	eret
- ENDPROC(el1_sync)
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index eba89e42f0ed..3246c4aba5b1 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -186,6 +186,13 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		exit_handler = kvm_get_exit_handler(vcpu);
- 
- 		return exit_handler(vcpu, run);
-+	case ARM_EXCEPTION_HYP_GONE:
-+		/*
-+		 * EL2 has been reset to the hyp-stub. This happens when a guest
-+		 * is pre-empted by kvm_reboot()'s shutdown call.
-+		 */
-+		run->exit_reason = KVM_EXIT_FAIL_ENTRY;
-+		return 0;
- 	default:
- 		kvm_pr_unimpl("Unsupported exception type: %d",
- 			      exception_index);
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 5ce1b47ef770..44ec4cb23ae7 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -139,6 +139,44 @@ merged:
- 	eret
- ENDPROC(__kvm_hyp_init)
- 
-+	/*
-+	 * x0: HYP boot pgd
-+	 * x1: HYP phys_idmap_start
-+	 */
-+ENTRY(__kvm_hyp_reset)
-+	/* We're in trampoline code in VA, switch back to boot page tables */
-+	msr	ttbr0_el2, x0
-+	isb
-+
-+	/* Ensure the PA branch doesn't find a stale tlb entry or stale code. */
-+	ic	iallu
-+	tlbi	alle2
-+	dsb	sy
-+	isb
-+
-+	/* Branch into PA space */
-+	adr	x0, 1f
-+	bfi	x1, x0, #0, #PAGE_SHIFT
-+	br	x1
-+
-+	/* We're now in idmap, disable MMU */
-+1:	mrs	x0, sctlr_el2
-+	ldr	x1, =SCTLR_ELx_FLAGS
-+	bic	x0, x0, x1		// Clear SCTL_M and etc
-+	msr	sctlr_el2, x0
-+	isb
-+
-+	/* Invalidate the old TLBs */
-+	tlbi	alle2
-+	dsb	sy
-+
-+	/* Install stub vectors */
-+	adr_l	x0, __hyp_stub_vectors
-+	msr	vbar_el2, x0
-+
-+	eret
-+ENDPROC(__kvm_hyp_reset)
-+
- 	.ltorg
- 
- 	.popsection
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 9677bf069bcc..4062e6dd4cc1 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -29,7 +29,9 @@
- #include <asm/cputype.h>
- #include <asm/ptrace.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_mmu.h>
+diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+index 12cd989dadf6..a30645d2e93f 100644
+--- a/kernel/power/swap.c
++++ b/kernel/power/swap.c
+@@ -37,6 +37,14 @@
+ #define HIBERNATE_SIG	"S1SUSPEND"
  
  /*
-  * ARMv8 Reset Values
-@@ -130,3 +132,15 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset timer */
- 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
- }
++ * When reading an {un,}compressed image, we may restore pages in place,
++ * in which case some architectures need these pages cleaning before they
++ * can be executed. We don't know which pages these may be, so clean the lot.
++ */
++bool clean_pages_on_read = false;
++bool clean_pages_on_decompress = false;
 +
-+extern char __hyp_idmap_text_start[];
++/*
+  *	The swap map is a data structure used for keeping track of each page
+  *	written to a swap partition.  It consists of many swap_map_page
+  *	structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
+@@ -241,6 +249,9 @@ static void hib_end_io(struct bio *bio)
+ 
+ 	if (bio_data_dir(bio) == WRITE)
+ 		put_page(page);
++	else if (clean_pages_on_read)
++		flush_icache_range((unsigned long)page_address(page),
++				   (unsigned long)page_address(page) + PAGE_SIZE);
+ 
+ 	if (bio->bi_error && !hb->error)
+ 		hb->error = bio->bi_error;
+@@ -1049,6 +1060,7 @@ static int load_image(struct swap_map_handle *handle,
+ 
+ 	hib_init_batch(&hb);
+ 
++	clean_pages_on_read = true;
+ 	printk(KERN_INFO "PM: Loading image data pages (%u pages)...\n",
+ 		nr_to_read);
+ 	m = nr_to_read / 10;
+@@ -1124,6 +1136,10 @@ static int lzo_decompress_threadfn(void *data)
+ 		d->unc_len = LZO_UNC_SIZE;
+ 		d->ret = lzo1x_decompress_safe(d->cmp + LZO_HEADER, d->cmp_len,
+ 		                               d->unc, &d->unc_len);
++		if (clean_pages_on_decompress)
++			flush_icache_range((unsigned long)d->unc,
++					   (unsigned long)d->unc + d->unc_len);
 +
-+phys_addr_t kvm_hyp_reset_entry(void)
-+{
-+	unsigned long offset;
+ 		atomic_set(&d->stop, 1);
+ 		wake_up(&d->done);
+ 	}
+@@ -1189,6 +1205,8 @@ static int load_image_lzo(struct swap_map_handle *handle,
+ 	}
+ 	memset(crc, 0, offsetof(struct crc_data, go));
+ 
++	clean_pages_on_decompress = true;
 +
-+	offset = (unsigned long)__kvm_hyp_reset
-+		 - ((unsigned long)__hyp_idmap_text_start & PAGE_MASK);
-+
-+	return TRAMPOLINE_VA + offset;
-+}
+ 	/*
+ 	 * Start the decompression threads.
+ 	 */
 -- 
 2.8.0.rc3
