@@ -1,42 +1,72 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Apr 2016 15:46:11 +0200
-Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160425154611.3e7e9dc9@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 25 Apr 2016 14:46:29 +0100
+Subject: [PATCHv3 0/5] efi: detect erroneous firmware IRQ manipulation
+Message-ID: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Note: this is largely a rework of the final patch from v2 [2], which now has a
+per-arch component (and hence additional patches). The rest of v2 has already
+been picked up, and hence dropped from this posting.
 
-On Thu, 14 Apr 2016 17:36:15 +0200, Thomas Petazzoni wrote:
+Some firmware erroneously unmask IRQs (and potentially other architecture
+specific exceptions) during runtime services functions, in violation of both
+common sense and the UEFI specification. This can result in a number of issues
+if said exceptions are taken when they are expected to be masked, and
+additionally can confuse IRQ tracing if the original mask state is not
+restored prior to returning from firmware.
 
-> Thomas Petazzoni (2):
->   dt-bindings: pci: add DT binding for Marvell Armada 7K/8K PCIe
->     controller
->   pci: host: new driver for Marvell Armada 7K/8K PCIe controller
-> 
->  .../devicetree/bindings/pci/pci-armada8k.txt       |  38 +++
->  drivers/pci/host/Kconfig                           |  11 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pcie-armada8k.c                   | 261 +++++++++++++++++++++
->  4 files changed, 311 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
->  create mode 100644 drivers/pci/host/pcie-armada8k.c
+In practice it's difficult to check that firmware never unmasks exceptions, but
+we can at least check that the IRQ flags are at least consistent upon entry to
+and return from a runtime services function call. This series implements said
+check in the shared EFI runtime wrappers code, after an initial round of
+refactoring (patches 1-5 of [2]).
 
-Bjorn, any comment about this additional PCIe host driver? The
-corresponding Device Tree binding has been approved by Rob Herring. The
-driver itself is fairly trivial as it relies on the common Designware
-logic.
+I have left ia64 as-is, without this check, as ia64 doesn't currently use the
+generic runtime wrappers, has many special cases for the runtime calls which
+don't fit well with the generic code, and I don't expect a new, buggy ia64
+firmware to appear soon.
 
-DO not hesitate to let me know if any adaptation/change is needed. I'd
-really like to have this merged for the 4.7 merge window.
+The first time corruption of the IRQ flags is detected, we dump a stack trace,
+and set TAINT_FIRMWARE_WORKAROUND. Additionally, and in all subsequent cases,
+we log (with ratelimiting) the specific corruption of the flags, and restore
+the expected flags to avoid redundant warnings elsewhere.
 
-Thanks!
+Since v1 [1]:
+* Fix thinko: s/local_irq_save/local_save_flags/
+* Remove ifdefs after conversion
+* Remove reundant semicolon from x86 patch
+* Move efi_call_virt_check_flags before first use
+* Add Acked-bys and Reviewed-bys
 
-Thomas
+Since v2 [2]:
+* Drop the refactoring patches (1-5), which Matt has queued
+* Add per-arch ARCH_EFI_IRQ_FLAGS_MASK, as discussed for v2 [3,4]
+
+As with v2, this has been build-tested for each target, but other than arm64 I
+don't have a good platform for testing. Hopefully this causes fewer explosions
+than v2.
+
+Thanks,
+Mark.
+
+[1] https://lkml.org/lkml/2016/4/21/260
+[2] https://lkml.org/lkml/2016/4/22/542
+[3] https://lkml.org/lkml/2016/4/25/230
+[4] https://lkml.org/lkml/2016/4/25/243
+
+Mark Rutland (5):
+  efi/runtime-wrappers: detect FW irq flag corruption
+  arm64/efi: enable runtime call flag checking
+  arm/efi: enable runtime call flag checking
+  x86/efi: enable runtime call flag checking
+  efi/runtime-wrappers: remove ARCH_EFI_IRQ_FLAGS_MASK ifdef
+
+ arch/arm/include/asm/efi.h              |  5 +++++
+ arch/arm64/include/asm/efi.h            |  3 +++
+ arch/x86/include/asm/efi.h              |  4 +++-
+ drivers/firmware/efi/runtime-wrappers.c | 25 +++++++++++++++++++++++++
+ 4 files changed, 36 insertions(+), 1 deletion(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
