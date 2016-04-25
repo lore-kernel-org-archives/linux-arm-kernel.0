@@ -1,20 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 12:22:07 +0100
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <20160404121954.GA9300@hardcore>
-References: <cover.1457539621.git.jglauber@cavium.com>
- <20160404121954.GA9300@hardcore>
-Message-ID: <20160425112207.GL16065@arm.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 25 Apr 2016 12:24:03 +0100 (BST)
+Subject: [PATCH] make dt_scan_depth1_nodes more readable
+In-Reply-To: <20160425111938.GK16065@arm.com>
+References: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
+ <20160425105340.GE16065@arm.com>
+ <alpine.DEB.2.10.1604251204380.24872@sstabellini-ThinkPad-X260>
+ <20160425111938.GK16065@arm.com>
+Message-ID: <alpine.DEB.2.10.1604251221250.24872@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
-
-On Mon, Apr 04, 2016 at 02:19:54PM +0200, Jan Glauber wrote:
-> Hi Mark,
+On Mon, 25 Apr 2016, Will Deacon wrote:
+> On Mon, Apr 25, 2016 at 12:04:53PM +0100, Stefano Stabellini wrote:
+> > On Mon, 25 Apr 2016, Will Deacon wrote:
+> > > On Mon, Apr 25, 2016 at 11:25:11AM +0100, Stefano Stabellini wrote:
+> > > > From: Mark Rutland <mark.rutland@arm.com>
+> > > > 
+> > > > Improve the readability of dt_scan_depth1_nodes by removing the nested
+> > > > conditionals.
+> > > > 
+> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > > Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+> > > > 
+> > > > ---
+> > > > 
+> > > > Note: this patch is based on xentip/for-linus-4.7
+> > > 
+> > > So how should I merge it? :/
+> > 
+> > I think that if you would like to merge it, it would be easier this time
+> > for me to carry it in my tree. Otherwise you would have to base your
+> > for-linus-4.7 on xentip/for-linus-4.7 and send the pull request after
+> > the Xen pull request -- undesirable.
 > 
-> can you have a look at these patches?
+> Ok, doesn't look like we'll run into conflicts. I just find it weird that
+> you'd have a patch with no functional change as a dependency, hence my
+> preference to queue it in the arm64 tree (where conflicts are more likely).
+ 
+I see, that makes sense. In that case, would you be happy to take:
 
-Looks like Mark reviewed this last week -- are you planning to respin?
+https://git.kernel.org/cgit/linux/kernel/git/xen/tip.git/commit/?h=for-linus-4.7&id=df115bb0a0b8ad2f6dc62f8d094c21e77b367e7c
 
-Will
+in your tree? That would get rid of any cross dependecies between the
+two tree.
