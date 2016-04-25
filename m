@@ -1,110 +1,62 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Apr 2016 14:08:17 +1000
-Subject: [PATCH] ARM: shmobile: timer: Drop support for Cortex A8
-In-Reply-To: <cover.1461542941.git.horms+renesas@verge.net.au>
-References: <cover.1461542941.git.horms+renesas@verge.net.au>
-Message-ID: <a4b8c18c40704c28be62af4606cc6758c9ff3dba.1461542941.git.horms+renesas@verge.net.au>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Mon, 25 Apr 2016 09:39:38 +0530
+Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
+In-Reply-To: <20160424.141806.786009616301278103.davem@davemloft.net>
+References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
+ <1461230323-27891-2-git-send-email-pramod.kumar@broadcom.com>
+ <20160424.141806.786009616301278103.davem@davemloft.net>
+Message-ID: <5876c521a46dbb4bd1b0c22bc64ec1a5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi David,
 
-Commit edf4100906044225 ("ARM: shmobile: sh7372 dtsi: Remove Legacy
-file") removed the DTS for the last shmobile SoC with a Cortex A8 CPU
-core (sh7372 aka SH-Mobile AP4), hence drop support for it in the
-loops-per-jiffy preset code.
+Thanks for providing input over the patch.  Will address the comment as
+described below.
 
-As "div" is always 1 for supported contemporary ARM processors, we can
-simplify the code:
-  - Absorb shmobile_setup_delay_hz(), which was always called with
-    mult = div = 1,
-  - Return earlier if the Cortex A7/A15 arch timer exists and support is
-    enabled.
+> -----Original Message-----
+> From: David Miller [mailto:davem at davemloft.net]
+> Sent: 24 April 2016 23:48
+> To: pramod.kumar at broadcom.com
+> Cc: robh+dt at kernel.org; catalin.marinas at arm.com; will.deacon at arm.com;
+> yamada.masahiro at socionext.com; wens at csie.org; bcm-kernel-feedback-
+> list at broadcom.com; pawel.moll at arm.com; mark.rutland at arm.com;
+> arnd at arndb.de; suzuki.poulose at arm.com; punit.agrawal at arm.com;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; netdev at vger.kernel.org; anup.patel at broadcom.com
+> Subject: Re: [PATCH 1/6] bus: Add shared MDIO bus framework
+>
+> From: Pramod Kumar <pramod.kumar@broadcom.com>
+> Date: Thu, 21 Apr 2016 14:48:38 +0530
+>
+> > +struct shared_mdio_master *shared_mdio_alloc_master(struct device
+> *parent,
+> > +						    struct device_node
+*node)
+> > +{
+> > +	int ret = 0;
+> > +	struct shared_mdio_master *master;
+>
+> Always order local variable declarations in reverse christmas tree
+(longest to
+> shortest line) order.
+>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/timer.c | 52 ++++++++++++++++--------------------------
- 1 file changed, 20 insertions(+), 32 deletions(-)
+Sure. Next patch will address this.
 
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index 67d79f9c6bad..6196a6380385 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -20,28 +20,9 @@
- 
- #include "common.h"
- 
--static void __init shmobile_setup_delay_hz(unsigned int max_cpu_core_hz,
--					   unsigned int mult, unsigned int div)
--{
--	/* calculate a worst-case loops-per-jiffy value
--	 * based on maximum cpu core hz setting and the
--	 * __delay() implementation in arch/arm/lib/delay.S
--	 *
--	 * this will result in a longer delay than expected
--	 * when the cpu core runs on lower frequencies.
--	 */
--
--	unsigned int value = HZ * div / mult;
--
--	if (!preset_lpj)
--		preset_lpj = max_cpu_core_hz / value;
--}
--
- void __init shmobile_init_delay(void)
- {
- 	struct device_node *np, *cpus;
--	unsigned int div = 0;
--	bool has_arch_timer = false;
- 	u32 max_freq = 0;
- 
- 	cpus = of_find_node_by_path("/cpus");
-@@ -51,25 +32,32 @@ void __init shmobile_init_delay(void)
- 	for_each_child_of_node(cpus, np) {
- 		u32 freq;
- 
-+		if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER) &&
-+		    (of_device_is_compatible(np, "arm,cortex-a7") ||
-+		     of_device_is_compatible(np, "arm,cortex-a15"))) {
-+			of_node_put(np);
-+			of_node_put(cpus);
-+			return;
-+		}
-+
- 		if (!of_property_read_u32(np, "clock-frequency", &freq))
- 			max_freq = max(max_freq, freq);
--
--		if (of_device_is_compatible(np, "arm,cortex-a8")) {
--			div = 2;
--		} else if (of_device_is_compatible(np, "arm,cortex-a9")) {
--			div = 1;
--		} else if (of_device_is_compatible(np, "arm,cortex-a7") ||
--			 of_device_is_compatible(np, "arm,cortex-a15")) {
--			div = 1;
--			has_arch_timer = true;
--		}
- 	}
- 
- 	of_node_put(cpus);
- 
--	if (!max_freq || !div)
-+	if (!max_freq)
- 		return;
- 
--	if (!has_arch_timer || !IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
--		shmobile_setup_delay_hz(max_freq, 1, div);
-+	/*
-+	 * Calculate a worst-case loops-per-jiffy value
-+	 * based on maximum cpu core hz setting and the
-+	 * __delay() implementation in arch/arm/lib/delay.S.
-+	 *
-+	 * This will result in a longer delay than expected
-+	 * when the cpu core runs on lower frequencies.
-+	 */
-+
-+	if (!preset_lpj)
-+		preset_lpj = max_freq / HZ;
- }
--- 
-2.7.0.rc3.207.g0ac5344
+> > +static int shared_mdio_driver_probe(struct device *dev) {
+> > +	int rc;
+> > +	struct shared_mdio_master *master = to_shared_mdio_master(dev);
+> > +	struct shared_mdio_driver *drv =
+to_shared_mdio_driver(dev->driver);
+>
+> Likewise.
+
+Sure.
+
+> Please audit your entire submission for this issue.
+
+Sure. I'll audit the entire patch set for above issue.
+
+Regards,
+Pramod
