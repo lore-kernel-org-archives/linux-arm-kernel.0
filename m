@@ -1,73 +1,36 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Mon, 25 Apr 2016 12:04:53 +0100 (BST)
-Subject: [PATCH] make dt_scan_depth1_nodes more readable
-In-Reply-To: <20160425105340.GE16065@arm.com>
-References: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
- <20160425105340.GE16065@arm.com>
-Message-ID: <alpine.DEB.2.10.1604251204380.24872@sstabellini-ThinkPad-X260>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Apr 2016 12:07:57 +0100
+Subject: [PATCH v2 4/6] arm64: mm: dump: make page table dumping reusable
+In-Reply-To: <1461343688-8552-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1461343688-8552-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160425110757.GI16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2016, Will Deacon wrote:
-> On Mon, Apr 25, 2016 at 11:25:11AM +0100, Stefano Stabellini wrote:
-> > From: Mark Rutland <mark.rutland@arm.com>
-> > 
-> > Improve the readability of dt_scan_depth1_nodes by removing the nested
-> > conditionals.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
-> > 
-> > ---
-> > 
-> > Note: this patch is based on xentip/for-linus-4.7
+Hi Ard, Mark,
+
+On Fri, Apr 22, 2016 at 06:48:06PM +0200, Ard Biesheuvel wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
 > 
-> So how should I merge it? :/
-
-I think that if you would like to merge it, it would be easier this time
-for me to carry it in my tree. Otherwise you would have to base your
-for-linus-4.7 on xentip/for-linus-4.7 and send the pull request after
-the Xen pull request -- undesirable.
-
-
-> > 
-> > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> > index 57ee317..6884c76 100644
-> > --- a/arch/arm64/kernel/acpi.c
-> > +++ b/arch/arm64/kernel/acpi.c
-> > @@ -66,17 +66,24 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
-> >  				       void *data)
-> >  {
-> >  	/*
-> > -	 * Return 1 as soon as we encounter a node at depth 1 that is
-> > -	 * not the /chosen node, or /hypervisor node with compatible
-> > -	 * string "xen,xen".
-> > +	 * Ignore anything not directly under the root node; we'll
-> > +	 * catch its parent instead.
-> >  	 */
-> > -	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> > -		if (strcmp(uname, "hypervisor") != 0 ||
-> > -		    !of_flat_dt_is_compatible(node, "xen,xen"))
-> > -			return 1;
-> > -	}
-> > +	if (depth != 1)
-> > +		return 0;
-> >  
-> > -	return 0;
-> > +	if (strcmp(uname, "chosen") == 0)
-> > +		return 0;
-> > +
-> > +	if (strcmp(uname, "hypervisor") == 0 &&
-> > +	    of_flat_dt_is_compatible(node, "xen,xen"))
-> > +		return 0;
-> > +
-> > +	/*
-> > +	 * This node at depth 1 is neither a chosen node nor a xen node,
-> > +	 * which we do not expect.
-> > +	 */
-> > +	return 1;
-> >  }
-> >  
-> >  /*
-> > 
+> For debugging purposes, it would be nice if we could export page tables
+> other than the swapper_pg_dir to userspace. To enable this, this patch
+> refactors the arm64 page table dumping code such that multiple tables
+> may be registered with the framework, and exported under debugfs.
 > 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/ptdump.h | 44 ++++++++++++++++++++
+>  arch/arm64/mm/dump.c            | 32 ++++++++------
+>  2 files changed, 64 insertions(+), 12 deletions(-)
+
+Could you reorder this with patch 3, please? I'm unsure about the benefit
+of the very specific string literal changes, but the ptdump stuff here
+certainly looks beneficial.
+
+I can queue the first two patches as-is.
+
+Thanks.
+
+Will
