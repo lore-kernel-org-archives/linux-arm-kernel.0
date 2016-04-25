@@ -1,51 +1,57 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Mon, 25 Apr 2016 16:56:27 +0100
-Subject: [PATCH v4 00/11] drm: Add Allwinner A10 display engine support
-In-Reply-To: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACvgo50CDGL1jdP4kkbnNtnLGrgSa-b74RJu6NnPuq1=Q9Zsmg@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 25 Apr 2016 21:28:06 +0530
+Subject: [RFC 1/9] arm: dma-mapping: Don't override dma_ops in
+ arch_setup_dma_ops()
+In-Reply-To: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1461599894-1969-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-On 25 April 2016 at 14:22, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+The arch_setup_dma_ops() function is in charge of setting dma_ops with a
+call to set_dma_ops(). set_dma_ops() is also called from
 
->  Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
->  .../bindings/display/sunxi/sun4i-drm.txt           | 258 ++++++++
->  arch/arm/boot/dts/sun5i-a13.dtsi                   |  39 +-
->  arch/arm/boot/dts/sun5i-r8-chip.dts                |  12 +
->  arch/arm/boot/dts/sun5i-r8.dtsi                    | 142 ++++-
->  drivers/clk/sunxi/Makefile                         |   1 +
->  drivers/clk/sunxi/clk-sun4i-display.c              | 261 ++++++++
->  drivers/gpu/drm/Kconfig                            |   2 +
->  drivers/gpu/drm/Makefile                           |   3 +-
->  drivers/gpu/drm/sun4i/Kconfig                      |  14 +
->  drivers/gpu/drm/sun4i/Makefile                     |  13 +
->  drivers/gpu/drm/sun4i/sun4i_backend.c              | 364 +++++++++++
->  drivers/gpu/drm/sun4i/sun4i_backend.h              | 165 +++++
->  drivers/gpu/drm/sun4i/sun4i_crtc.c                 | 120 ++++
->  drivers/gpu/drm/sun4i/sun4i_crtc.h                 |  30 +
->  drivers/gpu/drm/sun4i/sun4i_dotclock.c             | 160 +++++
->  drivers/gpu/drm/sun4i/sun4i_dotclock.h             |  21 +
->  drivers/gpu/drm/sun4i/sun4i_drv.c                  | 357 +++++++++++
->  drivers/gpu/drm/sun4i/sun4i_drv.h                  |  30 +
->  drivers/gpu/drm/sun4i/sun4i_framebuffer.c          |  54 ++
->  drivers/gpu/drm/sun4i/sun4i_framebuffer.h          |  19 +
->  drivers/gpu/drm/sun4i/sun4i_layer.c                | 161 +++++
->  drivers/gpu/drm/sun4i/sun4i_layer.h                |  30 +
->  drivers/gpu/drm/sun4i/sun4i_rgb.c                  | 250 ++++++++
->  drivers/gpu/drm/sun4i/sun4i_rgb.h                  |  18 +
->  drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 561 ++++++++++++++++
->  drivers/gpu/drm/sun4i/sun4i_tcon.h                 | 186 ++++++
->  drivers/gpu/drm/sun4i/sun4i_tv.c                   | 708 +++++++++++++++++++++
->  include/drm/drm_fb_cma_helper.h                    |   2 +
+- highbank and mvebu bus notifiers
+- dmabounce (to be replaced with swiotlb)
+- arm_iommu_attach_device
 
-Having a look at the diff stat, can we please have an entry in
-MAINTAINERS for this driver ? Don't bother re-spinning the whole
-series just for that and add the patch on top [for the pull request].
+(arm_iommu_attach_device is itself called from IOMMU and bus master
+device drivers)
 
-Thank you !
+To allow the arch_setup_dma_ops() call to be moved from device add time
+to device probe time we must ensure that dma_ops already setup by any of
+the above callers will not be overriden.
 
--Emil
+Aftering replacing dmabounce with swiotlb, converting IOMMU drivers to
+of_xlate and taking care of highbank and mvebu, the workaround should be
+removed.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/mm/dma-mapping.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 0eca381..ccf60a2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2126,6 +2126,15 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	struct dma_map_ops *dma_ops;
+ 
+ 	dev->archdata.dma_coherent = coherent;
++
++	/*
++	 * Don't override the dma_ops if they have already been set. Ideally
++	 * this should be the only location where dma_ops are set, remove this
++	 * check when all other callers of set_dma_ops will have disappeared.
++	 */
++	if (dev->archdata.dma_ops)
++		return;
++
+ 	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+ 		dma_ops = arm_get_iommu_dma_map_ops(coherent);
+ 	else
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
