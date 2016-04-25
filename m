@@ -1,46 +1,67 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 25 Apr 2016 13:39:39 +0000
-Subject: [PATCH 2/3] ASoC: bcm2835: setup clock only if CPU is clock master
+Date: Mon, 25 Apr 2016 13:39:40 +0000
+Subject: [PATCH 3/3] ASoC: bcm2835: Register also as PCM device
 In-Reply-To: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
 References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1461591580-7565-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Reichl <hias@horus.com>
 
-We only need to enable the clock if we are a clock master.
+Register i2s also as pcm device.
 
 Code ported from bcm2708-i2s driver in Raspberry Pi tree.
-Original work by Zoltan Szenczi.
 
+Signed-off-by: Florian Meier <florian.meier@koalo.de>
 Signed-off-by: Matthias Reichl <hias@horus.com>
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- sound/soc/bcm/bcm2835-i2s.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ sound/soc/bcm/bcm2835-i2s.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
 diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index d2663e7..a0026e2 100644
+index a0026e2..8e93295 100644
 --- a/sound/soc/bcm/bcm2835-i2s.c
 +++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -276,8 +276,15 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
- 		/* otherwise calculate a fitting block ratio */
- 		bclk_ratio = 2 * data_length;
-
--	/* set target clock rate*/
--	clk_set_rate(dev->clk, sampling_rate * bclk_ratio);
-+	/* Clock should only be set up here if CPU is clock master */
-+	switch (dev->fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-+	case SND_SOC_DAIFMT_CBS_CFS:
-+	case SND_SOC_DAIFMT_CBS_CFM:
-+		clk_set_rate(dev->clk, sampling_rate * bclk_ratio);
-+		break;
-+	default:
-+		break;
-+	}
-
- 	/* Setup the frame format */
- 	format = BCM2835_I2S_CHEN;
---
+@@ -632,6 +632,27 @@ static const struct snd_soc_component_driver bcm2835_i2s_component = {
+ 	.name		= "bcm2835-i2s-comp",
+ };
+ 
++static const struct snd_pcm_hardware bcm2835_pcm_hardware = {
++	.info			= SNDRV_PCM_INFO_INTERLEAVED |
++				  SNDRV_PCM_INFO_JOINT_DUPLEX |
++				  SNDRV_PCM_INFO_MMAP |
++				  SNDRV_PCM_INFO_MMAP_VALID,
++	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
++				  SNDRV_PCM_FMTBIT_S24_LE |
++				  SNDRV_PCM_FMTBIT_S32_LE,
++	.period_bytes_min	= 32,
++	.period_bytes_max	= 64 * PAGE_SIZE,
++	.periods_min		= 2,
++	.periods_max		= 255,
++	.buffer_bytes_max	= 128 * PAGE_SIZE,
++};
++
++static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
++	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
++	.pcm_hardware = &bcm2835_pcm_hardware,
++	.prealloc_buffer_size = 256 * PAGE_SIZE,
++};
++
+ static int bcm2835_i2s_probe(struct platform_device *pdev)
+ {
+ 	struct bcm2835_i2s_dev *dev;
+@@ -704,7 +725,9 @@ static int bcm2835_i2s_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
++	ret = devm_snd_dmaengine_pcm_register(
++		&pdev->dev, &bcm2835_dmaengine_pcm_config,
++		SND_DMAENGINE_PCM_FLAG_COMPAT);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
+ 		return ret;
+-- 
 2.1.4
