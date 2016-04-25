@@ -1,73 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 25 Apr 2016 14:14:12 -0700
-Subject: [PATCH RFT V2 3/3] iio: mxs-lradc: implement suspend/resume
- support
-In-Reply-To: <571A27FC.4030301@i2se.com>
-References: <1461269478-449-1-git-send-email-stefan.wahren@i2se.com>
- <1461269478-449-4-git-send-email-stefan.wahren@i2se.com>
- <20160421210810.GC25466@dtor-ws> <571A27FC.4030301@i2se.com>
-Message-ID: <20160425211412.GF26059@dtor-ws>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 25 Apr 2016 15:21:26 -0600
+Subject: [PATCH v5 0/1] ARM64: ACPI: Update documentation for latest
+ specification version
+Message-ID: <1461619287-27211-1-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 03:32:44PM +0200, Stefan Wahren wrote:
-> Hi Dmitry,
-> 
-> Am 21.04.2016 um 23:08 schrieb Dmitry Torokhov:
-> > On Thu, Apr 21, 2016 at 08:11:18PM +0000, Stefan Wahren wrote:
-> >> This patch implements suspend/resume support for mxs-lradc.
-> >> It's possible to use the touchscreen as wakeup source.
-> >>
-> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >> ---
-> >>  drivers/iio/adc/mxs-lradc.c |   61 +++++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 61 insertions(+)
-> >>
-> >> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-> >> index cfc558f..6bd387f 100644
-> >> --- a/drivers/iio/adc/mxs-lradc.c
-> >> +++ b/drivers/iio/adc/mxs-lradc.c
-> >> @@ -29,6 +29,7 @@
-> >>  #include <linux/of.h>
-> >>  #include <linux/of_device.h>
-> >>  #include <linux/platform_device.h>
-> >> +#include <linux/pm.h>
-> >>  #include <linux/slab.h>
-> >>  #include <linux/stmp_device.h>
-> >>  #include <linux/sysfs.h>
-> >> @@ -1745,10 +1746,70 @@ static int mxs_lradc_remove(struct platform_device *pdev)
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +static int __maybe_unused mxs_lradc_suspend(struct device *dev)
-> >> +{
-> >> +	struct iio_dev *iio = dev_get_drvdata(dev);
-> >> +	struct mxs_lradc *lradc = iio_priv(iio);
-> >> +	struct input_dev *input = lradc->ts_input;
-> >> +	int ret = 0;
-> >> +
-> >> +	if (input) {
-> >> +		mutex_lock(&input->mutex);
-> >> +
-> >> +		/* Enable touchscreen wakeup irq */
-> >> +		if (input->users && device_may_wakeup(dev))
-> >> +			ret = enable_irq_wake(lradc->irq[0]);
-> >> +		else
-> >> +			mxs_lradc_disable_ts(lradc);
-> >> +
-> >> +		mutex_unlock(&input->mutex);
-> >> +	}
-> >> +
-> >> +	if (ret)
-> >> +		return ret;
-> > I'd rather we had it right after we do:
-> >
-> > 			ret = enable_irq_wake(lradc->irq[0]);
-> 
-> but we must unlock the mutex first before return. An option would be to
-> place the return inside the input branch.
+The ACPI 6.1 specification was recently released at the end of January
+2016, but the arm64 kernel documentation for the use of ACPI was written
+for the 5.1 version of the spec.  There were significant additions to the
+spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+added to make it easier to define processors and low power idle states,
+as well as the 6.1 addition allowing regular interrupts (not just from
+GPIO) be used to signal ACPI general purpose events.
 
-Ah, right, ignore me then.
+This patch reflects going back through and examining the specs in detail
+and updating content appropriately.  Whilst there, a few odds and ends of
+typos were caught as well.  This brings the documentation up to date with
+ACPI 6.1 for arm64.
+
+Changes for v5:
+   -- Miscellaneous typos and corrections (Lorenzo Pieralisi)
+   -- Add linux-acpi@ ML to the distribution list (Alexey Klimov)
+   -- Corrections to CPPC information (Alexey Klimov)
+   -- ACK from Lorenzo Pieralisi
+   -- Updated bibliographic info (Al Stone)
+
+Changes for v4:
+   -- Clarify that IORT can sometimes be optional (Jon Masters).
+   -- Remove "Use as needed" descriptions of ACPI objects; they provide
+      no substantive information and doing so simplifies maintenance of
+      this document over time.  These have been replaced with a simpler
+      notice that states that unless otherwise noted, do what the ACPI
+      specification says is needed.
+   -- Corrected the _OSI object usage recommendation; it described kernel
+      behavior that does not exist (Al Stone).
+
+Changes for v3:
+   -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+   -- Whitespace cleanup as pointed out by checkpatch
+
+Changes for v2:
+   -- Clean up white space (Harb Abdulhahmid)
+   -- Clarification on _CCA usage (Harb Abdulhamid)
+   -- IORT moved to required from recommended (Hanjun Guo)
+   -- Clarify IORT description (Hanjun Guo)
+
+
+Al Stone (1):
+  ARM64: ACPI: Update documentation for latest specification version
+
+ Documentation/arm64/acpi_object_usage.txt | 343 ++++++++++++++++--------------
+ Documentation/arm64/arm-acpi.txt          |  40 ++--
+ 2 files changed, 213 insertions(+), 170 deletions(-)
 
 -- 
-Dmitry
+2.5.5
