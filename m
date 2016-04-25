@@ -1,68 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 25 Apr 2016 10:18:39 +0200
-Subject: Build regressions/improvements in v4.6-rc5
-In-Reply-To: <1461572127-14630-1-git-send-email-geert@linux-m68k.org>
-References: <1461572127-14630-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdX4LJ-OVTijYn-VB0B5djM4n3G=1NrHg8WaJoNq_NXMzg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 25 Apr 2016 10:30:14 +0200
+Subject: [PATCH v6 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for
+ I/O devices
+In-Reply-To: <CAMuHMdVb46Get_+e0FzYhJMCwat-YaEDOcgFKqyGhtVBTOdJ8A@mail.gmail.com>
+References: <1461153766-750-1-git-send-email-geert+renesas@glider.be>
+ <1461153766-750-6-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFqcDDq-FGd9-PgJmig-Csqrj6LxqKtm1pMf1fq-LtGKvw@mail.gmail.com>
+ <CAMuHMdVb46Get_+e0FzYhJMCwat-YaEDOcgFKqyGhtVBTOdJ8A@mail.gmail.com>
+Message-ID: <CAPDyKFq0mXp24LoJX1AbaDV8=mhpapQy6Dz-SZNfvETs8ZZr4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 10:15 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.6-rc5[1] to v4.6-rc4[3], the summaries are:
->   - build errors: +15/-5
+On 22 April 2016 at 09:59, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Ulf,
+>
+> On Fri, Apr 22, 2016 at 9:28 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> @@ -217,6 +218,8 @@ static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
+>>>         return rcar_sysc_power_up(&pd->ch);
+>>>  }
+>>>
+>>> +static bool has_cpg_mstp;
+>>> +
+>>
+>> That's seems lazy. :-)
+>>
+>> Sure you can provide this as an input parameter to
+>> rcar_sysc_pd_setup() instead, no?
+>
+> This variable is intended to go away, once all R-Car SoCs have been converted
+> to use the CPG/MSSR driver, and has_cpg_mstp will always be false.
+> Then we can just remove those lines, instead of reworking the parameter
+> passing.
 
-  + /home/kisskb/slave/src/arch/arm/mach-sa1100/assabet.c: error:
-'PMD_MASK' undeclared (first use in this function):  => 496:38
-  + /home/kisskb/slave/src/arch/arm/mach-sa1100/assabet.c: error:
-'pmdval_t' undeclared (first use in this function):  => 498:13
-  + /home/kisskb/slave/src/arch/arm/mach-sa1100/assabet.c: error:
-implicit declaration of function 'flush_pmd_entry'
-[-Werror=implicit-function-declaration]:  => 503:2
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-'COPYPAGE_MINICACHE' undeclared (first use in this function):  =>
-77:14
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-'L_PTE_MT_MINICACHE' undeclared (first use in this function):  =>
-77:47
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-'L_PTE_PRESENT' undeclared (first use in this function):  => 77:47
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-'L_PTE_YOUNG' undeclared (first use in this function):  => 77:47
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-implicit declaration of function '__flush_dcache_page'
-[-Werror=implicit-function-declaration]:  => 73:3
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-implicit declaration of function 'mk_pte'
-[-Werror=implicit-function-declaration]:  => 77:2
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-implicit declaration of function 'set_top_pte'
-[-Werror=implicit-function-declaration]:  => 77:2
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error: unknown
-field 'cpu_clear_user_highpage' specified in initializer:  => 113:2
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error: unknown
-field 'cpu_copy_user_highpage' specified in initializer:  => 114:2
-  + /home/kisskb/slave/src/arch/arm/mm/copypage-v4mc.c: error:
-variable 'v4_mc_user_fns' has initializer but incomplete type:  =>
-112:8
+Okay, that seems like a reasonable way forward.
 
-arm-randconfig
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-  + error: bytcr_rt5640.c: undefined reference to
-`sst_acpi_find_name_from_hid':  => .text+0xa68aa)
-
-i386-randconfig
-
-> [1] http://kisskb.ellerman.id.au/kisskb/head/10230/ (all 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/10194/ (all 262 configs)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Kind regards
+Uffe
