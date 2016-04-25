@@ -1,31 +1,45 @@
-From: alexandre.torgue@gmail.com (Alexandre TORGUE)
-Date: Mon, 25 Apr 2016 13:54:02 +0200
-Subject: [PATCH v6 6/6] ARM: dts: stm32f429: Update Ethernet node on Eval board
-In-Reply-To: <1461585242-32401-1-git-send-email-alexandre.torgue@gmail.com>
-References: <1461585242-32401-1-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <1461585242-32401-7-git-send-email-alexandre.torgue@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Apr 2016 13:57:58 +0200
+Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
+In-Reply-To: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+Message-ID: <20160425115758.GA4874@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update new pinctrl phandle name and use new node name.
+Hi,
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+On Sat, Apr 23, 2016 at 11:43:58AM +0200, Linus Walleij wrote:
+> Hi ARM SoC guys,
+> 
+> these two patches move the ARM character LCD driver from
+> misc drivers to the auxdisplay subsystem where it belongs and
+> updates the defconfig for the RealView accordingly.
+> 
+> Please pull it into some cleanup branch in the ARM SoC
+> tree.
+> 
+> I tried to get some ACK from the auxdisplay maintainer but no
+> reaction.
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 6bfc595..9a72445 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -94,9 +94,9 @@
- 	clock-frequency = <25000000>;
- };
- 
--&ethernet0 {
-+&mac {
- 	status = "okay";
--	pinctrl-0	= <&ethernet0_mii>;
-+	pinctrl-0	= <&ethernet_mii>;
- 	pinctrl-names	= "default";
- 	phy-mode	= "mii-id";
- 	mdio0 {
+Auxdisplay is not a new framework, but rather a very old one.
+
+It got introduced in 2.6.21, and only received a couple of drivers
+since.
+
+It seems to be quite redundant with fbdev deferred_io, which itself is
+almost deprecated these days.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160425/23188532/attachment.sig>
