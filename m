@@ -1,18 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 21:10:52 +0200
-Subject: [GIT PULL v2] ARM: mvebu: defconfig for v4.7 (#1)
-In-Reply-To: <87mvowyv0x.fsf@free-electrons.com>
-References: <87mvowyv0x.fsf@free-electrons.com>
-Message-ID: <5066729.5VIcharec3@wuerfel>
+Date: Mon, 25 Apr 2016 21:12:10 +0200
+Subject: [GIT PULL 3/4] Broadcom defconfig changes for 4.7
+In-Reply-To: <1461441540-5095-3-git-send-email-f.fainelli@gmail.com>
+References: <1461441540-5095-1-git-send-email-f.fainelli@gmail.com>
+ <1461441540-5095-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <4947044.GuiSTQMvS9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 April 2016 19:12:14 Gregory CLEMENT wrote:
-> mvebu defconfig for 4.7 (part 1)
+On Saturday 23 April 2016 12:58:59 Florian Fainelli wrote:
+> This pull request contains defconfig changes for Broadcom ARM-based SoCs:
 > 
-> - Use the new cryto engine(mv_cesa) in the mvebu and multi-arm
->   defcongig files
-> - Attach mvebu_*_defconfig to the mvebu maintainers
+> - Eric enables more BCM2835 peripherals in multi_v7_defconfig: watchdog, I2S,
+>   switches from the sdhci-bcm2835 to the sdhci-iproc driver, DWC2 USB controller
+> 
+> - Eric also enables more BCM2835 peripherals in bcm2835_defconfig: VC4, NFS root
+>   Power Management support, switching sdhci-bcm2835 for sdhci-iproc
+> 
 > 
 
 Pulled into next/defconfig, thanks!
