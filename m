@@ -1,45 +1,60 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Mon, 25 Apr 2016 12:24:03 +0100 (BST)
-Subject: [PATCH] make dt_scan_depth1_nodes more readable
-In-Reply-To: <20160425111938.GK16065@arm.com>
-References: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
- <20160425105340.GE16065@arm.com>
- <alpine.DEB.2.10.1604251204380.24872@sstabellini-ThinkPad-X260>
- <20160425111938.GK16065@arm.com>
-Message-ID: <alpine.DEB.2.10.1604251221250.24872@sstabellini-ThinkPad-X260>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 25 Apr 2016 13:26:07 +0200
+Subject: [PATCH v2 6/6] efi/arm*: add support to dump the EFI page tables
+In-Reply-To: <20160422172513.GV10606@leverpostej>
+References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1461343688-8552-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160422170112.GS10606@leverpostej>
+ <CAKv+Gu-abf2g5htQSHA=ETnSfzVExFLwsjs2Kbs8fn86MfFv3Q@mail.gmail.com>
+ <20160422172513.GV10606@leverpostej>
+Message-ID: <CAKv+Gu9fOnKK66Ee7N_5UXbZh_cZbQ0AnnPLHQhm8qCb-r5gVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2016, Will Deacon wrote:
-> On Mon, Apr 25, 2016 at 12:04:53PM +0100, Stefano Stabellini wrote:
-> > On Mon, 25 Apr 2016, Will Deacon wrote:
-> > > On Mon, Apr 25, 2016 at 11:25:11AM +0100, Stefano Stabellini wrote:
-> > > > From: Mark Rutland <mark.rutland@arm.com>
-> > > > 
-> > > > Improve the readability of dt_scan_depth1_nodes by removing the nested
-> > > > conditionals.
-> > > > 
-> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
-> > > > 
-> > > > ---
-> > > > 
-> > > > Note: this patch is based on xentip/for-linus-4.7
-> > > 
-> > > So how should I merge it? :/
-> > 
-> > I think that if you would like to merge it, it would be easier this time
-> > for me to carry it in my tree. Otherwise you would have to base your
-> > for-linus-4.7 on xentip/for-linus-4.7 and send the pull request after
-> > the Xen pull request -- undesirable.
-> 
-> Ok, doesn't look like we'll run into conflicts. I just find it weird that
-> you'd have a patch with no functional change as a dependency, hence my
-> preference to queue it in the arm64 tree (where conflicts are more likely).
- 
-I see, that makes sense. In that case, would you be happy to take:
+On 22 April 2016 at 19:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Apr 22, 2016 at 07:20:38PM +0200, Ard Biesheuvel wrote:
+>> On 22 April 2016 at 19:01, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Apr 22, 2016 at 06:48:08PM +0200, Ard Biesheuvel wrote:
+>
+>> >> +static struct ptdump_info efi_ptdump_info = {
+>> >> +     .mm             = &efi_mm,
+>> >> +     .markers        = efi_addr_markers,
+>> >> +     .base_addr      = 0,
+>> >> +     .max_addr       = SZ_1G,
+>> >> +};
+>> >
+>> > I see that max_addr isn't used for arm64, and for ARM it's only used in
+>> > one place. It doesn't seem great to have that on arm64 given it's
+>> > unused.
+>> >
+>> > Do we actually need max_addr? Is there any reason not to always dump
+>> > whole tables?
+>> >
+>> > I guess you're trying to avoid dumping the kernel VA range on 32-bit?
+>>
+>> Indeed. On ARM, the efi_page_tables dumps its copy of
+>> kernel_page_tables. If that is OK (the information could potentially
+>> be useful, I suppose) we can drop the max
+>
+> I'd argue it's always worth dumping the full tables (dropipng the max).
+>
+> For instance, we could have some bug that leaves the kernel VA range in
+> the EFI tables inconsistent with what we expect/require, and having that
+> exposed would make that clear.
+>
 
-https://git.kernel.org/cgit/linux/kernel/git/xen/tip.git/commit/?h=for-linus-4.7&id=df115bb0a0b8ad2f6dc62f8d094c21e77b367e7c
+Well, the problem here is that we only sync the EFI page tables with
+the kernel page tables in switch_mm() (if they turn out to be out of
+sync). This means we should either sync them in this code path as
+well, or remove the kernel VA range from the output, since we'll be
+dumping known stale data otherwise.
 
-in your tree? That would get rid of any cross dependecies between the
-two tree.
+> Regardless, arbitrarily limiting the VA range of the arm64 dump doesn't
+> seem great.
+>
+
+True. [0 .. TASK_SIZE) looks like a useful and not arbitrary range to
+limit the EFI page table output to. Unfortunately, TASK_SIZE resolves
+to a value that depends on TIF_32BIT, so will still need some
+preprocessor conditional to select between TASK_SIZE_64 (on arm64) and
+TASK_SIZE (on ARM)
