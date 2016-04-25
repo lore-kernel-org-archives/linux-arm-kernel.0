@@ -1,40 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 17:11:01 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Apr 2016 18:11:55 +0200
 Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
-In-Reply-To: <4658440.AyDy7GFvoa@wuerfel>
+In-Reply-To: <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
 References: <cover.1460391217.git.robin.murphy@arm.com>
- <5485134.l18Z1dlVmn@wuerfel> <571E3781.3070609@arm.com>
- <4658440.AyDy7GFvoa@wuerfel>
-Message-ID: <20160425161101.GC2122@arm.com>
+ <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
+Message-ID: <6110512.c3CSTNRIy3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 05:41:21PM +0200, Arnd Bergmann wrote:
-> On Monday 25 April 2016 16:28:01 Robin Murphy wrote:
-> > >>>
-> > >>> We _could_ - indeed I started doing that, but then decided that the
-> > >>> obfuscation of horrible macro-templated functions wasn't worth saving a
-> > >>> couple of hundred bytes in some code that isn't exactly difficult to
-> > >>> maintain and has needed touching once in 4 years.
-> > >>>
-> > >>> If you did want to go down the macro route, I may as well also generate both
-> > >>> lo-hi and hi-lo headers all from a single template, it'd be really clever...
-> > >>> <alarm bells>
-> > >>
-> > >> I certainly wasn't suggesting any more than the obvious macroisation,
-> > >> but I'll leave it up to Arnd, as I think this falls on his lap.
-> > >
-> > > I'd prefer the open-coded variant as well.
-> > 
-> > By that, do you mean sticking with the smmu_writeq() implementation in 
-> > the driver and dropping this patch, or merging this patch as-is without 
-> > further macro-magic?
-> > 
+On Wednesday 13 April 2016 18:13:00 Robin Murphy wrote:
+> Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
+> accessor macros as conditional wrappers") makes the *_relaxed forms of
+> I/O accessors universally available to drivers, in cases where writeq()
+> is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
+> end up falling back to writel() regardless of whether writel_relaxed()
+> is available (identically for s/write/read/).
 > 
-> Sorry, that was really ambiguous on my end. I meant leaving patch 4/7
-> as it is in the version you posted.
+> Add corresponding relaxed forms of the nonatomic helpers to delegate
+> to the equivalent 32-bit accessors as appropriate.
+> 
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Christoph Hellwig <hch@lst.de>
+> CC: Darren Hart <dvhart@linux.intel.com>
+> CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
 
-I'm happy with that. Could I have your ack, so that I can queue it with
-the related SMMU patches, please?
-
-Will
+Acked-by: Arnd Bergmann <arnd@arndb.de>
