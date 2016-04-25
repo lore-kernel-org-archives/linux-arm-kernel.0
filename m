@@ -1,69 +1,45 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 25 Apr 2016 12:28:46 -0500
-Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <20160425154611.3e7e9dc9@free-electrons.com>
-References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160425154611.3e7e9dc9@free-electrons.com>
-Message-ID: <20160425172846.GB1759@localhost>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 25 Apr 2016 19:38:55 +0200
+Subject: [PULL REQUEST v2] ARM: OXNAS pull request for 4.7
+Message-ID: <1461605935-19775-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+This is the ARM pull request for the OXNAS platform.
+It also includes one-line change into irq-versatile-fpga.
 
-On Mon, Apr 25, 2016 at 03:46:11PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Thu, 14 Apr 2016 17:36:15 +0200, Thomas Petazzoni wrote:
-> 
-> > Thomas Petazzoni (2):
-> >   dt-bindings: pci: add DT binding for Marvell Armada 7K/8K PCIe
-> >     controller
-> >   pci: host: new driver for Marvell Armada 7K/8K PCIe controller
-> > 
-> >  .../devicetree/bindings/pci/pci-armada8k.txt       |  38 +++
-> >  drivers/pci/host/Kconfig                           |  11 +
-> >  drivers/pci/host/Makefile                          |   1 +
-> >  drivers/pci/host/pcie-armada8k.c                   | 261 +++++++++++++++++++++
-> >  4 files changed, 311 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
-> >  create mode 100644 drivers/pci/host/pcie-armada8k.c
-> 
-> Bjorn, any comment about this additional PCIe host driver? The
-> corresponding Device Tree binding has been approved by Rob Herring. The
-> driver itself is fairly trivial as it relies on the common Designware
-> logic.
+The following changes since commit c3b46c73264b03000d1e18b22f5caf63332547c9:
 
-It *is* pretty trivial.  The reason I'm hesitating is because we have
-all these DesignWare-based drivers (dra7xx, exynos, imx6, ks, ls,
-dw_plat, hisi, qcom, spear13xx, and now armada8k), and they're
-*mostly* similar, but they differ in minor, annoying ways.  This is
-becoming a significant maintenance burden for me, and I'd like to
-figure out how to mitigate that.
+  Linux 4.6-rc4 (2016-04-17 19:13:32 -0700)
 
-For now, I don't have any great ideas except that it would be nice to
-remove needless variations.  The following is a typical code
-structure, but it's not universally followed:
+are available in the git repository at:
 
-  XXX_pcie_probe
-    XXX_add_pcie_port
-      dw_pcie_host_init
-        XXX_pcie_host_init
-	  dw_pcie_setup_rc
-	  XXX_pcie_establish_link
+  https://github.com/superna9999/linux.git tags/ox810se-arm-v4.6-rc4
 
-There's a hodge-podge of ways to get related resources (clocks and
-PHYs) and initialize them.  IRQ setup is not really consistent across
-all the drivers.  It's sort of disappointing that most of these
-drivers have a "dbi_base" resource, but they use different DT property
-names for it.
+for you to fetch changes up to 34e9a2d6bea252563b333bd8368c5145fa5a9fad:
 
-The armada8k driver doesn't have a DRV_add_pcie_port() function or a
-DRV_pcie_establish_link() function, and it has its own "wait for link"
-timeout loop instead of using dw_pcie_wait_for_link().
+  MAINTAINERS: add maintainer entry for ARM/OXNAS platform (2016-04-18 11:39:41 +0200)
 
-How about if you just shuffle those bits around into
-an armada8k_add_pcie_port() and an armada8k_pcie_establish_link(), and
-we'll call that good for now?
+----------------------------------------------------------------
+ARM: Add OXNAS Platform Support
 
-Bjorn
+Changes since v1 pull request : http://lkml.kernel.org/r/1459521689-13962-1-git-send-email-narmstrong at baylibre.com
+- rebase on 4.6 rc4
+
+Changes since original v3 patchset :
+- Get rid of PLX Technology
+
+v3 patchset : http://lkml.kernel.org/r/1458838215-23314-1-git-send-email-narmstrong at baylibre.com
+
+----------------------------------------------------------------
+Neil Armstrong (3):
+      irqchip: versatile-fpga: add new compatible for OX810SE SoC
+      ARM: Add new mach-oxnas
+      MAINTAINERS: add maintainer entry for ARM/OXNAS platform
+
+ MAINTAINERS                          |  9 +++++++++
+ arch/arm/Kconfig                     |  2 ++
+ arch/arm/mach-oxnas/Kconfig          | 24 ++++++++++++++++++++++++
+ drivers/irqchip/irq-versatile-fpga.c |  1 +
+ 4 files changed, 36 insertions(+)
+ create mode 100644 arch/arm/mach-oxnas/Kconfig
