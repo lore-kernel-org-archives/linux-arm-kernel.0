@@ -1,39 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 14:59:13 +0200
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <571DCD8D.8070605@arm.com>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
- <20160423065431.GA5840@afzalpc> <571DCD8D.8070605@arm.com>
-Message-ID: <55296515.n2D97kIgVc@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Apr 2016 08:03:08 -0500
+Subject: [PATCH v6 3/7] ARM: dts: am437x/am33xx/da850: Add new ECAP and
+ EPWM bindings
+In-Reply-To: <1461343238-29274-4-git-send-email-fcooper@ti.com>
+References: <1461343238-29274-1-git-send-email-fcooper@ti.com>
+ <1461343238-29274-4-git-send-email-fcooper@ti.com>
+Message-ID: <20160425130308.GA7802@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 08:55:57 Vladimir Murzin wrote:
-> On 23/04/16 07:54, Afzal Mohammed wrote:
-> > Hi,
-> > 
-> > On Fri, Apr 22, 2016 at 12:43:33PM +0100, Vladimir Murzin wrote:
-> > 
-> >> Small set of fixes discovered with R-class cores.
-> > 
-> > just curious, is Cortex-R supported on mainline ?, thought it was not
-> > supported, but subject & changelogs gave such a feeling.
+On Fri, Apr 22, 2016 at 11:40:34AM -0500, Franklin S Cooper Jr wrote:
+> Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
+> provide the various required clocks.
 > 
-> Hi,
+> For AM437 and AM335x, add the required clocks explicitly to DT. The
+> hwmod entries for ECAP and EPWM will be removed and this will prevent
+> anything from breaking.
 > 
-> I believe it is supported since c90ad5c "ARM: add Cortex-R7 Processor
-> Info" although overtime it got blocked (at least for Vexpress) with
-> Kconfig changes. There was attempt [1] to sort it out, but looks like
-> these patches went nowhere, so I'm trying to re-start with the fixes
-> coming first.
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/174256.html
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt         | 12 +++--
+>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 12 +++--
+>  arch/arm/boot/dts/am33xx.dtsi                      | 30 +++++++++---
+>  arch/arm/boot/dts/am4372.dtsi                      | 54 ++++++++++++++++++----
+>  arch/arm/boot/dts/da850.dtsi                       | 15 ++++--
+>  5 files changed, 95 insertions(+), 28 deletions(-)
 
-Good to know, thanks for working on this!
+[...]
 
-What hardware platform do you use? It would be nice to make it a little
-more explicit which platforms can use the ARMv7-R, or an ARMv7-A with
-the MMU disabled.
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 12fcde4..e858460 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -672,18 +672,26 @@
+>  			status = "disabled";
+>  
+>  			ecap0: ecap at 48300100 {
+> -				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
+> +				compatible = "ti,am4372-ecap",
 
-	Arnd
+This doesn't appear to be documented.
+
+> +					     "ti,am3352-ecap",
+> +					     "ti,am33xx-ecap";
+>  				#pwm-cells = <3>;
+>  				reg = <0x48300100 0x80>;
+>  				ti,hwmods = "ecap0";
+> +				clocks = <&l4ls_gclk>;
+> +				clock-names = "fck";
+>  				status = "disabled";
+>  			};
+>  
+>  			ehrpwm0: pwm at 48300200 {
+> -				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+> +				compatible = "ti,am4372-ehrpwm",
+
+ditto.
+
+> +					     "ti,am3352-ehrpwm",
+> +					     "ti,am33xx-ehrpwm";
+>  				#pwm-cells = <3>;
+>  				reg = <0x48300200 0x80>;
+>  				ti,hwmods = "ehrpwm0";
+> +				clocks = <&ehrpwm0_tbclk>, <&l4ls_gclk>;
+> +				clock-names = "tbclk", "fck";
+>  				status = "disabled";
+>  			};
+>  		};
