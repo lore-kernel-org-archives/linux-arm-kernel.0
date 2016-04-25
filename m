@@ -1,47 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 17:26:38 +0200
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <20160425125605.GG6104@vireshk-i7>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <6893237.FoNPbfW3DC@wuerfel> <20160425125605.GG6104@vireshk-i7>
-Message-ID: <17150729.NF4MViUffk@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 25 Apr 2016 16:28:01 +0100
+Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
+In-Reply-To: <5485134.l18Z1dlVmn@wuerfel>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <571A5A9E.7040305@arm.com> <20160425133242.GC30830@arm.com>
+ <5485134.l18Z1dlVmn@wuerfel>
+Message-ID: <571E3781.3070609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 18:26:05 Viresh Kumar wrote:
-> On 25-04-16, 14:53, Arnd Bergmann wrote:
-> > On Monday 25 April 2016 08:30:41 Viresh Kumar wrote:
-> 
-> > I realize that the ordering is fixed through the way that the kernel
-> > is linked, my worry is more about someone changing the code in some
-> > way because it's not obvious from reading the code that the
-> > dependency exists. If either the armada_xp_pmsu_cpufreq_init()
-> > initcall gets changed so it does not always get called, or the
-> > cpufreq_dt_platdev_init() initcall gets changed so it comes a little
-> > earlier, things will break.
-> 
-> cpufreq-dt will just error out in that case, because it wouldn't find
-> any OPPs registered to the OPP-core. It *shouldn't* crash and if it
-> does, then we have a problem to fix.
+Hi Arnd,
 
-Ok.
+On 25/04/16 16:21, Arnd Bergmann wrote:
+> On Monday 25 April 2016 14:32:42 Will Deacon wrote:
+>>>>>
+>>>>> +static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
+>>>>> +{
+>>>>> +   const volatile u32 __iomem *p = addr;
+>>>>> +   u32 low, high;
+>>>>> +
+>>>>> +   high = readl_relaxed(p + 1);
+>>>>> +   low = readl_relaxed(p);
+>>>>> +
+>>>>> +   return low + ((u64)high << 32);
+>>>>> +}
+>>>>> +
+>>>>> +static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
+>>>>> +{
+>>>>> +   writel_relaxed(val >> 32, addr + 4);
+>>>>> +   writel_relaxed(val, addr);
+>>>>> +}
+>>>>
+>>>> Could we not generate the _relaxed variants with some macro magic?
+>>>
+>>> We _could_ - indeed I started doing that, but then decided that the
+>>> obfuscation of horrible macro-templated functions wasn't worth saving a
+>>> couple of hundred bytes in some code that isn't exactly difficult to
+>>> maintain and has needed touching once in 4 years.
+>>>
+>>> If you did want to go down the macro route, I may as well also generate both
+>>> lo-hi and hi-lo headers all from a single template, it'd be really clever...
+>>> <alarm bells>
+>>
+>> I certainly wasn't suggesting any more than the obvious macroisation,
+>> but I'll leave it up to Arnd, as I think this falls on his lap.
+>
+> I'd prefer the open-coded variant as well.
 
-> > > The other thing that can happen is that armada_xp_pmsu_cpufreq_init()
-> > > call can fail. In that case, most of the times cpufreq-dt ->init()
-> > > will fail as well, so even that is fine for me.
-> > > 
-> > > And, so I think we can keep this patch as is.
-> > 
-> > What are the downsides of moving armada_xp_pmsu_cpufreq_init()
-> > into drivers/cpufreq?
-> 
-> More special code :)
+By that, do you mean sticking with the smmu_writeq() implementation in 
+the driver and dropping this patch, or merging this patch as-is without 
+further macro-magic?
 
-Of course the special code still exists, it seems more like neither of
-us wants to have it in the portion of the kernel that he maintains ;-)
+Thanks,
+Robin.
 
-Maybe the mvebu maintainers have a preference where they'd like the
-code to be, they are the ones that are most impacted if anything
-goes wrong.
-
-	Arnd
+>
+> 	Arnd
+>
