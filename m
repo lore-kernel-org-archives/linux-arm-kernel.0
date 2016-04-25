@@ -1,61 +1,73 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 25 Apr 2016 06:59:14 -0400
-Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
-In-Reply-To: <20160425095715.GA2366@piout.net>
-References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
- <1461577678-29517-4-git-send-email-eric.engestrom@imgtec.com>
- <20160425095715.GA2366@piout.net>
-Message-ID: <1461581954.24648.16.camel@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Apr 2016 12:02:20 +0100
+Subject: [PATCH 6/7] iommu/arm-smmu: Decouple context format from kernel
+ config
+In-Reply-To: <571A617C.3020102@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
+ <20160421163019.GL929@arm.com> <571A617C.3020102@arm.com>
+Message-ID: <20160425110219.GH16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On Mon, 2016-04-25 at 11:57 +0200, Alexandre Belloni wrote:
-> Hi,
+On Fri, Apr 22, 2016 at 06:38:04PM +0100, Robin Murphy wrote:
+> On 21/04/16 17:30, Will Deacon wrote:
+> >Hi Robin,
+> >
+> >On Wed, Apr 13, 2016 at 06:13:02PM +0100, Robin Murphy wrote:
+> >>The way the driver currently forces an AArch32 or AArch64 context format
+> >>based on the kernel config and SMMU architecture version is suboptimal,
+> >>in that it makes it very hard to support oddball mix-and-match cases
+> >>like the SMMUv1 64KB supplement, or situations where the reduced table
+> >>depth of an AArch32 short descriptor context may be desirable under an
+> >>AArch64 kernel. It also only happens to work on current implementations
+> >>which do support all the relevant formats.
+> >>
+> >>Introduce an explicit notion of context format, so we can manage that
+> >>independently and get rid of the inflexible #ifdeffery.
+> >
+> >Thanks for doing all of this! One comment on the page size stuff:
+> >
+> >>+	if (IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
+> >>+		switch (PAGE_SIZE) {
+> >>+		case SZ_64K:
+> >>+			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_64K) {
+> >>+				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+> >>+				break;
+> >>+			} /* else fall through */
+> >>+		case SZ_16K:
+> >>+			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_16K) {
+> >>+				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+> >>+				break;
+> >>+			} /* else fall through */
+> >>+		case SZ_4K:
+> >>+			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_4K)
+> >>+				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+> >>+		}
+> >>+	}
+> >
+> >The io-pgtable code (arm_lpae_restrict_pgsizes) already does something
+> >*very* similar to this, using the pgsize_bitmap as input. Can you not
+> >just choose the ARM_SMMU_CTX_FMT_AARCH64 here and set the pgsize_bitmap
+> >to represent all page sizes supported by the hardware? That way, you should
+> >end up with the best option coming back from the pgtable code (I do this
+> >in the v3 driver, fwiw).
 > 
-> this requires a commit message.
-> 
-> Also, you should think about separating those changes in multiple patches
-> to ease inclusion in the kernel.
-> 
-> On 25/04/2016 at 10:47:57 +0100, Eric Engestrom wrote :
-> > Signed-off-by: Eric Engestrom <eric.engestrom@imgtec.com>
-> > ---
-> >  arch/arm/mach-at91/pm.c                 | 2 +-
-> >  arch/arm/mach-bcm/bcm_kona_smc.c        | 2 +-
-> >  arch/arm/mach-clps711x/board-autcpu12.c | 2 +-
-> >  arch/arm/mach-cns3xxx/core.c            | 2 +-
-> >  arch/arm/mach-davinci/da8xx-dt.c        | 2 +-
-> >  arch/arm/mach-lpc32xx/phy3250.c         | 2 +-
-> >  arch/arm/mach-mxs/mach-mxs.c            | 2 +-
-> >  arch/arm/mach-omap2/prm_common.c        | 2 +-
-> >  arch/arm/mach-omap2/vc.c                | 2 +-
-> >  arch/arm/mach-spear/time.c              | 2 +-
-> >  10 files changed, 10 insertions(+), 10 deletions(-)
-> > 
-...
+> It took a while to come back to me, but the problem is that we can't call
+> alloc_io_pgtable_ops(fmt...) before choosing either ARM_64_LPAE_Sx or
+> ARM_32_LPAE_Sx for fmt, but if we commit to 64-bit we'll get stuck later
+> without the possibility of falling back to AArch32 if it turns out we don't
+> have a viable AArch64 granule.
 
-> > diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-> > index b2f9e22..1ae7230 100644
-> > --- a/arch/arm/mach-lpc32xx/phy3250.c
-> > +++ b/arch/arm/mach-lpc32xx/phy3250.c
-> > @@ -159,7 +159,7 @@ static struct lpc32xx_mlc_platform_data lpc32xx_mlc_data = {
-> >  	.dma_filter = pl08x_filter_id,
-> >  };
-> >  
-> > -static const struct of_dev_auxdata const lpc32xx_auxdata_lookup[] __initconst = {
-> > +static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
-> >  	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", NULL),
-> >  	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", NULL),
-> >  	OF_DEV_AUXDATA("arm,pl110", 0x31040000, "dev:clcd", &lpc32xx_clcd_data),
+In what case would you not have a viable AArch64 granule, but the option
+of falling back to AArch32 makes things work?
 
-A patch was already submitted for the LPC32xx:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/493312/
+> Plus we'd have to remove the LPAE page sizes
+> from the bitmap beforehand in the case we don't support AARCH64_4K lest we
+> end up with a phantom format the hardware doesn't actually do, and it all
+> starts getting rather horrible...
 
-...
-> > -- 
-> > 2.7.4
-> > 
-> 
-Sylvain
+I'm not following. The io-pgtable code shouldn't give you back a phanton
+format.
+
+Will
