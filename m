@@ -1,47 +1,48 @@
 From: mbrugger@suse.com (Matthias Brugger)
-Date: Mon, 25 Apr 2016 11:23:38 +0200
-Subject: [PATCH 3/5] ARM: dts: introduce MPS2 AN385/AN386
-In-Reply-To: <1461574157-23580-4-git-send-email-vladimir.murzin@arm.com>
+Date: Mon, 25 Apr 2016 11:24:34 +0200
+Subject: [PATCH 4/5] ARM: dts: introduce MPS2 AN399/AN400
+In-Reply-To: <1461574157-23580-5-git-send-email-vladimir.murzin@arm.com>
 References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
- <1461574157-23580-4-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <571DE21A.5010502@suse.com>
+ <1461574157-23580-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <571DE252.6080402@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 25/04/16 10:49, Vladimir Murzin wrote:
-> Application Notes 385 and 386 shares the same memory map and features
-> except the CPU is used. AN385 is supplied with Cortex-M3 CPU and AN386
-> is supplied with Cortex-M4.
+> Application Notes 399 and 400 shares the same memory map and
+> features. Both are shipped with Cortex-M7 and have the same  peripheral
+> as AN385/AN386, but with different location of PSRAM and Ethernet
+> controller.
 >
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > ---
->   arch/arm/boot/dts/Makefile       |    1 +
->   arch/arm/boot/dts/mps2-an385.dts |   92 +++++++++++++++
->   arch/arm/boot/dts/mps2.dtsi      |  241 ++++++++++++++++++++++++++++++++++++++
->   3 files changed, 334 insertions(+)
->   create mode 100644 arch/arm/boot/dts/mps2-an385.dts
->   create mode 100644 arch/arm/boot/dts/mps2.dtsi
+>   arch/arm/boot/dts/Makefile       |    4 +-
+>   arch/arm/boot/dts/mps2-an399.dts |   92 ++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 95 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/mps2-an399.dts
 >
 > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 95c1923..1efa5a2 100644
+> index 1efa5a2..c7a78c9 100644
 > --- a/arch/arm/boot/dts/Makefile
 > +++ b/arch/arm/boot/dts/Makefile
-> @@ -253,6 +253,7 @@ dtb-$(CONFIG_ARCH_MMP) += \
+> @@ -253,7 +253,9 @@ dtb-$(CONFIG_ARCH_MMP) += \
 >   dtb-$(CONFIG_MACH_MESON8B) += \
 >   	meson8b-mxq.dtb \
 >   	meson8b-odroidc1.dtb
-> +dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
+> -dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
+> +dtb-$(CONFIG_ARCH_MPS2) += \
+> +	mps2-an385.dtb \
+> +	mps2-an399.dtb
 >   dtb-$(CONFIG_ARCH_MOXART) += \
 >   	moxart-uc7112lx.dtb
 >   dtb-$(CONFIG_SOC_IMX1) += \
-> diff --git a/arch/arm/boot/dts/mps2-an385.dts b/arch/arm/boot/dts/mps2-an385.dts
+> diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
 > new file mode 100644
-> index 0000000..d7cb594
+> index 0000000..776595f
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/mps2-an385.dts
+> +++ b/arch/arm/boot/dts/mps2-an399.dts
 > @@ -0,0 +1,92 @@
 > +/*
 > + * Copyright (C) 2015 ARM Limited
@@ -92,7 +93,7 @@ On 25/04/16 10:49, Vladimir Murzin wrote:
 > +#include "mps2.dtsi"
 > +
 > +/ {
-> +	model = "ARM MPS2 Application Note 385/386";
+> +	model = "ARM MPS2 Application Note 399/400";
 > +	compatible = "arm,mps2";
 > +
 > +	aliases {
@@ -102,8 +103,4 @@ On 25/04/16 10:49, Vladimir Murzin wrote:
 > +	chosen {
 > +		bootargs = "rdinit=/sbin/init earlycon";
 
-The rootfs should be independent from the board.
-In my opinion, this type of bootargs should not be part of the DTS.
-
-Regards,
-Matthias
+Same here.
