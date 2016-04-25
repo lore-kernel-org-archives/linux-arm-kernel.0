@@ -1,33 +1,61 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Apr 2016 09:49:17 +0100
-Subject: [PATCH 5/5] MAINTAINERS: Update ARM Versatile Express platform entry
-In-Reply-To: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
-References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1461574157-23580-6-git-send-email-vladimir.murzin@arm.com>
+Date: Mon, 25 Apr 2016 09:58:41 +0100
+Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
+In-Reply-To: <201604240143.04330.arnd@arndb.de>
+References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+ <201604240143.04330.arnd@arndb.de>
+Message-ID: <571DDC41.5020302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update ARM Versatile Express entry to cover bits needed for
-Cortex-M Prototyping System (MPS2 platform). So patches for the latter
-are collected by existing Vexpress and Juno maintainers (Liviu, Sudeep,
-Lorenzo) and find their way upstream via Vexpess and/or Juno trees.
+On 24/04/16 00:43, Arnd Bergmann wrote:
+> On Friday 01 April 2016, Vladimir Murzin wrote:
+>> Hi,
+>>
+>> This patch series provides the basic support for running ucLinux on V2M-MPS2
+>> platform.
+>>
+>> With these patches applied ucLinux can be run on both HW and FVP models
+>> with Cortex-M3/M4/M7 configurations.
+>>
+>> Board description:
+>>
+>> http://infocenter.arm.com/help/topic/com.arm.doc.100112_0100_03_en/arm_versatile_express_cortex_m_prototyping_system_(v2m_mps2)_technical_reference_manual_100112_0100_03_en.pdf
+>>
+>> Application notes (cover Cortex-M3/M4/M7):
+>>
+>> http://infocenter.arm.com/help/topic/com.arm.doc.dai0385a/DAI0385A_cortex_m3_on_v2m_mps2.pdf
+>> http://infocenter.arm.com/help/topic/com.arm.doc.dai0386a/DAI0386A_cortex_m4_on_v2m_mps2.pdf
+>> http://infocenter.arm.com/help/topic/com.arm.doc.dai0399a/DAI0399A_cortex_m7_on_v2m_mps2.pdf
+>> http://infocenter.arm.com/help/topic/com.arm.doc.dai0400a/DAI0400A_cortex_m7_on_v2m_mps2.pdf
+>>
+>> Cortex-M System Design Kit (referenced as CMDK from documents above):
+>>
+>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0479c/DDI0479C_cortex_m_system_design_kit_r1p0_trm.pdf
+>>
+>> I'd be happy to hear any feedback/comments on this series!
+>>
+> 
+> The whole series looks good to me, please submit the patches to the
+> appropriate maintainers for inclusion separately:
+> 
+> * patches 1-2 to the clocksource maintainers
+> * patches 3-5 to the serial driver maintainers
+> * patches 6-10 to the vexpress maintainers
+> 
+> I think everyone is already on Cc here, but they don't want to pick the
+> patches out of the series separately. I expect to get the patches for
+> arm-soc as part of the vexpress pull requests (dt, defconfig, and core).
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- MAINTAINERS |    1 +
- 1 file changed, 1 insertion(+)
+Thanks Arnd!
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 03e00c7..9f07e7c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1771,6 +1771,7 @@ F:	*/*/vexpress*
- F:	*/*/*/vexpress*
- F:	drivers/clk/versatile/clk-vexpress-osc.c
- F:	drivers/clocksource/versatile.c
-+N:	mps2
- 
- ARM/VFP SUPPORT
- M:	Russell King <linux@arm.linux.org.uk>
--- 
-1.7.9.5
+I've just split patches per your request and sent them to appropriate
+maintainers.
+
+Cheers
+Vladimir
+
+> 
+> 	Arnd
+> 
+> 
