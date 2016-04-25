@@ -1,102 +1,43 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 25 Apr 2016 14:14:57 +0100
-Subject: [PATCH 6/7] iommu/arm-smmu: Decouple context format from kernel
- config
-In-Reply-To: <20160425110219.GH16065@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
- <20160421163019.GL929@arm.com> <571A617C.3020102@arm.com>
- <20160425110219.GH16065@arm.com>
-Message-ID: <571E1851.2030400@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Apr 2016 14:19:07 +0100
+Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20160425120222.GA2552@hardcore>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <20160404121954.GA9300@hardcore> <20160425112207.GL16065@arm.com>
+ <20160425120222.GA2552@hardcore>
+Message-ID: <20160425131907.GB30830@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 12:02, Will Deacon wrote:
-> On Fri, Apr 22, 2016 at 06:38:04PM +0100, Robin Murphy wrote:
->> On 21/04/16 17:30, Will Deacon wrote:
->>> Hi Robin,
->>>
->>> On Wed, Apr 13, 2016 at 06:13:02PM +0100, Robin Murphy wrote:
->>>> The way the driver currently forces an AArch32 or AArch64 context format
->>>> based on the kernel config and SMMU architecture version is suboptimal,
->>>> in that it makes it very hard to support oddball mix-and-match cases
->>>> like the SMMUv1 64KB supplement, or situations where the reduced table
->>>> depth of an AArch32 short descriptor context may be desirable under an
->>>> AArch64 kernel. It also only happens to work on current implementations
->>>> which do support all the relevant formats.
->>>>
->>>> Introduce an explicit notion of context format, so we can manage that
->>>> independently and get rid of the inflexible #ifdeffery.
->>>
->>> Thanks for doing all of this! One comment on the page size stuff:
->>>
->>>> +	if (IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
->>>> +		switch (PAGE_SIZE) {
->>>> +		case SZ_64K:
->>>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_64K) {
->>>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
->>>> +				break;
->>>> +			} /* else fall through */
->>>> +		case SZ_16K:
->>>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_16K) {
->>>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
->>>> +				break;
->>>> +			} /* else fall through */
->>>> +		case SZ_4K:
->>>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_4K)
->>>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
->>>> +		}
->>>> +	}
->>>
->>> The io-pgtable code (arm_lpae_restrict_pgsizes) already does something
->>> *very* similar to this, using the pgsize_bitmap as input. Can you not
->>> just choose the ARM_SMMU_CTX_FMT_AARCH64 here and set the pgsize_bitmap
->>> to represent all page sizes supported by the hardware? That way, you should
->>> end up with the best option coming back from the pgtable code (I do this
->>> in the v3 driver, fwiw).
->>
->> It took a while to come back to me, but the problem is that we can't call
->> alloc_io_pgtable_ops(fmt...) before choosing either ARM_64_LPAE_Sx or
->> ARM_32_LPAE_Sx for fmt, but if we commit to 64-bit we'll get stuck later
->> without the possibility of falling back to AArch32 if it turns out we don't
->> have a viable AArch64 granule.
->
-> In what case would you not have a viable AArch64 granule, but the option
-> of falling back to AArch32 makes things work?
+On Mon, Apr 25, 2016 at 02:02:22PM +0200, Jan Glauber wrote:
+> On Mon, Apr 25, 2016 at 12:22:07PM +0100, Will Deacon wrote:
+> > On Mon, Apr 04, 2016 at 02:19:54PM +0200, Jan Glauber wrote:
+> > > can you have a look at these patches?
+> > 
+> > Looks like Mark reviewed this last week -- are you planning to respin?
+> 
+> Yes, of course. I just had no time yet and I'm a bit lost on how to
+> proceed without using the NUMA node information which Mark did not like
+> to be used.
+> 
+> The only way to know which device is on which node would be to look
+> at the PCI topology (which is also the source of the NUMA node_id).
+> We could do this manually in order to not depend on CONFIG_NUMA,
+> but I would like to know if that is acceptable before respinning the
+> patches.
 
-A 4KB page kernel with MMU-401, whose only supported AArch64 granule is 
-supposedly 64KB.
+That doesn't feel like it really addresses Mark's concerns -- it's just
+another way to get the information that isn't a first-class PMU topology
+description from firmware.
 
->> Plus we'd have to remove the LPAE page sizes
->> from the bitmap beforehand in the case we don't support AARCH64_4K lest we
->> end up with a phantom format the hardware doesn't actually do, and it all
->> starts getting rather horrible...
->
-> I'm not following. The io-pgtable code shouldn't give you back a phanton
-> format.
+Now, I don't actually mind using the NUMA topology so much in the cases
+where it genuinely correlates with the PMU topology. My objection is more
+that we end up sticking everything on node 0 if !CONFIG_NUMA, which could
+result in working with an incorrect PMU topology and passing all of that
+through to userspace.
 
-If you call alloc_io_pgtable_ops() with ARM_64_LPAE_S2 and an unmolested 
-MMU-401 pgsize_bitmap, you get back a 4K granule v8 pagetable, which per 
-a strict reading of the TRM isn't supported (although does appear to 
-work in practice...)
+So I'd prefer either making the driver depend on NUMA, or at the very least
+failing to probe  the PMU if we discover a socketed system and NUMA is not
+selected. Do either of those work as a compromise?
 
-Consider also a stage 1 SMMU supporting all formats but only with 4K 
-granules: with a 64K page arm64 kernel, the presence of AARCH64_4K 
-support would lead us into arm_64_lpae_alloc_pgtable_s1(), which would 
-be tricked into giving us back a 64K granule v8 format by the short 
-descriptor large page size matching PAGE_SIZE, and things would 
-definitely go downhill from there.
-
-Given that, I think the only truly safe thing to do is to pass an 
-explicit granule in the io_pgtable_cfg and just get rid of the 
-bitmap-based guessing in arm_lpae_restrict_pgsizes() - otherwise, we'd 
-still have to pre-restrict the bitmap, making it pretty much redundant 
-anyway. I'll have a hack at that - in the meantime please feel free to 
-queue patches 1-3 if you're happy with them, as that part is still 
-feature-complete without all this context stuff.
-
-Robin.
-
->
-> Will
->
+Will
