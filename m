@@ -1,61 +1,44 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Mon, 25 Apr 2016 10:01:20 +0200
-Subject: clk: bcm2835: what is the best way to limit the selection of parent
- clocks in the device-tree
-Message-ID: <571DCED0.9010008@martin.sperl.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 25 Apr 2016 10:08:15 +0200
+Subject: [PATCH] efi/arm-init: reserve rather than unmap the memory map
+ for ARM as well
+In-Reply-To: <20160424195744.GL2829@codeblueprint.co.uk>
+References: <1461165635-8041-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160424195744.GL2829@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu99AHbV2F9RPj_QS7yvx0P5u9tq_zkpAoTdjf88+gXkVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 24 April 2016 at 21:57, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Wed, 20 Apr, at 05:20:35PM, Ard Biesheuvel wrote:
+>> Now that ARM has a fully functional memremap() implementation, there is
+>> no longer a need to remove the UEFI memory map from the linear mapping
+>> in order to be able to create a permanent mapping for it using generic
+>> code.
+>>
+>> So remove the 'IS_ENABLED(CONFIG_ARM)' conditional we added in commit
+>> 7cc8cbcf82d1 ("efi/arm64: Don't apply MEMBLOCK_NOMAP to UEFI memory map
+>> mapping"), and revert to using memblock_reserve() for both ARM and arm64
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> This is the permanent fix I alluded to in the commit log for the patch
+>> mentioned above. Russell has pulled the memremap() patches so this is
+>> good to go for v4.7
+>>
+>> Note that current efi-next already has a conflict with v4.6-rc4 (where
+>> that patch landed) which will get even worse with this on top, so it may
+>> make sense to rebase efi-next onto v4.6-rc4 before pulling this
+>> (but note that this patch depends on 'efi/arm*: Use memremap() to create
+>> the persistent memmap mapping', so please don't reorder them to maintain
+>> bisectability)
+>
+> Good notes, thanks Ard.
+>
+> I applied this for v4.7 but please check the result since there was a
+> conflict with the GOP framebuffer patches,
+>
+>   https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=b2757153ee7cfce23f760036b0c85bd0ec99cf50
 
-On the raspberry pi the pcm (and other) clock has multiple parent
-clocks that the driver may select from to get the "best fit" clock.
-
-This list of parents of valid for each clock is hard-coded in the driver.
-
-But this "standard" list of parents includes some clocks that are
-independently controlled by the firmware with - unfortunately for
-now - no notification of changes going back to the linux kernel.
-This is mostly needed for powermanagement and ARM clock
-modifications as well as to avoid overheating.
-
-So how is the best way to define those parent clocks one wants to
-use for an individual clock?
-
-As far as I can tell none of the default dt-properties really fit.
-
-So I wonder if something like the following would be acceptable:
-cprman: cprman at 7e101000 {
-     compatible = "brcm,bcm2835-cprman";
-     #clock-cells = <1>;
-     reg = <0x7e101000 0x2000>;
-     clocks = <&clk_osc>;
-     /* limit parent clock selection for the PCM clock */
-     pcm_clk at BCM2835_CLOCK_PCM {
-         reg = <BCM2835_CLOCK_PCM>;
-         clock-parent-names = "gnd", "xosc", "plla_per", "plld_per";
-     };
-};
-
-As an alternative it could also be defined on the consumer side:
-i2s: i2s at 7e203000 {
-     compatible = "brcm,bcm2835-i2s";
-     reg = <0x7e203000 0x24>;
-     clocks = <&cprman BCM2835_CLOCK_PCM>;
-     clock-parent-names = "gnd", "xosc", "plla_per", "plld_per";
-};
-This variant might need to be made "clock-parent-names-0",
-"clock-parent-names-1", ... (analogous to "pinctrl-0") to allow
-distinct parents for distinct clocks.
-
-Is something like this acceptable?
-
-If not, what approach could be taken to achieve the required
-(except for hard-coding the selection it in the driver)?
-
-If it is the second, then I guess the implementation would need
-to go into the core framework while for the first the logic could
-also stay within the driver.
-
-Thanks,
-                 Martin
+Looks fine, thanks
