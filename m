@@ -1,30 +1,121 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 18:11:55 +0200
-Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
-In-Reply-To: <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
-Message-ID: <6110512.c3CSTNRIy3@wuerfel>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 25 Apr 2016 18:15:25 +0200
+Subject: [PATCH 05/45] KVM: arm/arm64: vgic-new: Add acccessor to new
+ struct vgic_irq instance
+In-Reply-To: <1460740316-8755-6-git-send-email-andre.przywara@arm.com>
+References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+ <1460740316-8755-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160425161525.b4hqjrrharfdsdgo@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 April 2016 18:13:00 Robin Murphy wrote:
-> Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
-> accessor macros as conditional wrappers") makes the *_relaxed forms of
-> I/O accessors universally available to drivers, in cases where writeq()
-> is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
-> end up falling back to writel() regardless of whether writel_relaxed()
-> is available (identically for s/write/read/).
-> 
-> Add corresponding relaxed forms of the nonatomic helpers to delegate
-> to the equivalent 32-bit accessors as appropriate.
-> 
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Christoph Hellwig <hch@lst.de>
-> CC: Darren Hart <dvhart@linux.intel.com>
-> CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
+Hi Andre,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+I'm just randomly jumping in here because I spotted a typo in $SUBJECT.
+'accessor' has too many c's. Also, just curious, but if the author is
+from Linaro (hi Christoffer), then why do the new files this patch adds
+have ARM copyrights?
+
+Thanks,
+drew
+ 
+
+On Fri, Apr 15, 2016 at 06:11:16PM +0100, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> The new VGIC implementation centers around a struct vgic_irq instance
+> per virtual IRQ.
+> Provide a function to retrieve the right instance for a given IRQ
+> number and (in case of private interrupts) the right VCPU.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
+>  2 files changed, 63 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic.h
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> new file mode 100644
+> index 0000000..fb45537
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include "vgic.h"
+> +
+> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
+> +
+> +struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+> +			      u32 intid)
+> +{
+> +	/* SGIs and PPIs */
+> +	if (intid <= VGIC_MAX_PRIVATE)
+> +		return &vcpu->arch.vgic_cpu.private_irqs[intid];
+> +
+> +	/* SPIs */
+> +	if (intid <= VGIC_MAX_SPI)
+> +		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
+> +
+> +	/* LPIs are not yet covered */
+> +	if (intid >= VGIC_MIN_LPI)
+> +		return NULL;
+> +
+> +	WARN(1, "Looking up struct vgic_irq for reserved INTID");
+> +	return NULL;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> new file mode 100644
+> index 0000000..61b8d22
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __KVM_ARM_VGIC_NEW_H__
+> +#define __KVM_ARM_VGIC_NEW_H__
+> +
+> +struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+> +			      u32 intid);
+> +
+> +#endif
+> -- 
+> 2.7.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
