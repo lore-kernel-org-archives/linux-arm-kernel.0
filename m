@@ -1,52 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Apr 2016 17:27:49 +0100
-Subject: [PATCH resend v2 1/9] MAINTAINERS: Add entry for X-Powers AXP
- family PMIC drivers
-In-Reply-To: <1459243352-23344-2-git-send-email-wens@csie.org>
-References: <1459243352-23344-1-git-send-email-wens@csie.org>
- <1459243352-23344-2-git-send-email-wens@csie.org>
-Message-ID: <20160425162749.GO2713@dell>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 25 Apr 2016 18:30:58 +0200
+Subject: [PATCH 06/14] dmaengine: bcm2835: DT spelling
+ s/interrupts-names/interrupt-names/
+In-Reply-To: <20160425152643.GZ2274@localhost>
+References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
+ <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
+ <20160425152643.GZ2274@localhost>
+Message-ID: <CAMuHMdWsAj2Tmp3hQQAwZaB39j0KM=kcsobf+NtnrAG-aX5ohg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Mar 2016, Chen-Yu Tsai wrote:
+Hi Vinod,
 
-> Add an entry for X-Powers AXP family PMIC drivers and list myself
-> as maintainer.
-> 
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Ramakrishna Pallala <ramakrishna.pallala@intel.com>
-> Cc: Todd Brandt <todd.e.brandt@linux.intel.com>
-> Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
+On Mon, Apr 25, 2016 at 5:26 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Apr 20, 2016 at 05:32:11PM +0200, Geert Uytterhoeven wrote:
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
+>
+> This change does not apply for me, can you please split it up and send the
+> sound ones thru sound tree
 
-Applied, thanks.
+Sorry, I seem to have mixed two unrelated drivers.
+Will split and resend...
 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 03e00c7c88eb..53f2bdfa20c4 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -12147,6 +12147,12 @@ F:	include/linux/workqueue.h
->  F:	kernel/workqueue.c
->  F:	Documentation/workqueue.txt
->  
-> +X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS
-> +M:	Chen-Yu Tsai <wens@csie.org>
-> +L:	linux-kernel at vger.kernel.org
-> +S:	Maintained
-> +N:	axp[128]
-> +
->  X.25 NETWORK LAYER
->  M:	Andrew Hendry <andrew.hendry@gmail.com>
->  L:	linux-x25 at vger.kernel.org
+Gr{oetje,eeting}s,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
