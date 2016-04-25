@@ -1,44 +1,111 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Apr 2016 14:27:32 +1000
-Subject: [PATCH 14/22] ARM: dts: r8a7779: Correct interrupt type for ARM TWD
-In-Reply-To: <cover.1461558315.git.horms+renesas@verge.net.au>
-References: <cover.1461558315.git.horms+renesas@verge.net.au>
-Message-ID: <e6c2488251b1c7e62f3e43907ca3f6fd016b1353.1461558315.git.horms+renesas@verge.net.au>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Mon, 25 Apr 2016 10:13:16 +0530
+Subject: [PATCH 5/6] Documentation: Binding doc for ethernet master in NS2
+In-Reply-To: <20160422201351.GA3048@rob-hp-laptop>
+References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
+ <1461230323-27891-6-git-send-email-pramod.kumar@broadcom.com>
+ <20160422201351.GA3048@rob-hp-laptop>
+Message-ID: <9d799bfef311ca7ec5d4c3953f615140@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Rob,
 
-The ARM TWD interrupt is a private peripheral interrupt (PPI), and per
-the ARM GIC documentation, whether the type for PPIs can be set is
-IMPLEMENTATION DEFINED.
+Thanks for review and providing your valuable comments.
 
-For R-Car H1 devices the PPI type cannot be set, and so when we attempt
-to set the type for the ARM TWD interrupt it fails.  This has gone
-unnoticed because it fails silently, and because we cannot re-configure
-the type it has had no impact. Nevertheless fix the type for the TWD
-interrupt so that it matches the hardware configuration.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: 23 April 2016 01:44
+> To: Pramod Kumar
+> Cc: Catalin Marinas; Will Deacon; Masahiro Yamada; Chen-Yu Tsai; BCM
+Kernel
+> Feedback; Pawel Moll; Mark Rutland; Arnd Bergmann; Suzuki K Poulose;
+Punit
+> Agrawal; devicetree at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; netdev at vger.kernel.org
+> Subject: Re: [PATCH 5/6] Documentation: Binding doc for ethernet master
+in
+> NS2
+>
+> On Thu, Apr 21, 2016 at 02:48:42PM +0530, Pramod Kumar wrote:
+> > Adding binding doc for ethernet master present in shared MDIO
+> > controller.
+> >
+> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+> > Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> > Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> > ---
+> >  .../bindings/net/brcm,iproc-mdio-shared.txt        | 32
+> ++++++++++++++++++++++
+> >  1 file changed, 32 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
+> > b/Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
+> > new file mode 100644
+> > index 0000000..1ffdd4b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
+> > @@ -0,0 +1,32 @@
+> > +Broadcom Ethernet master for shared mdio controller
+> > +
+> > +Required properties:
+> > +- compatible: must be "brcm,iproc-mdio-master-eth"
+> > +- reg: master id of Ethernet block
+> > +- address-cells: should be 1
+> > +- size-cells: should be 0
+> > +
+> > +Sub-nodes:
+> > +  Each port's PHY should be represented as a sub-node.
+> > +
+> > +Sub-nodes required properties:
+> > +- reg: the PHY number
+> > +- phy-mode: media type connecting the PHY and MAC.
+> > +
+> > +
+> > +Example:
+> > +	eth-master at 0 {
+>
+> Is this a child of something?
+>
 
-Based on patches by Jon Hunter for Tegra20/30 and OMAP4.
+This is an Shared MDIO master node as described in cover letter and is the
+child node of iProc_shared_mdio plarform driver.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7779.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 60bc1e66bba9..5c1d48d712a1 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -67,7 +67,7 @@
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0xf0000600 0x20>;
- 		interrupts = <GIC_PPI 13
--			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
- 		clocks = <&cpg_clocks R8A7779_CLK_ZS>;
- 	};
- 
--- 
-2.7.0.rc3.207.g0ac5344
+> Why is this not just an mdio bus underneath the ethernet controller? How
+is this
+> accessed?
+
+This is the part for Shared MDIO controller which is shared among other
+subsystem as well hence defined here. This works as glue layer between
+This controller and legacy MDIO framework and register the MDIO bus to
+legacy framework.
+When any read/write request is issue from Legacy MDIO controller framework
+it gets propagated to Shared controller platform driver via this driver
+and finally platform driver issue MDIO transaction over bus.
+
+>
+> > +		compatible = "brcm,iproc-mdio-master-eth";
+> > +		reg = <0x0>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		gphy0: eth-phy at 10 {
+> > +			reg = <0x10>;
+> > +			phy-mode = "mii";
+> > +		};
+> > +		status = "ok"
+> > +	};
+> > +
+> > +For more info on ethernet phy binding, please,refer to:
+> > +Documentation/devicetree/bindings/net/phy.txt
+> > +Documentation/devicetree/bindings/net/ethernet.txt
+> > --
+> > 1.9.1
+> >
+
+Regards,
+Pramod
