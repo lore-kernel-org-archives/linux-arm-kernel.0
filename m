@@ -1,114 +1,157 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 25 Apr 2016 10:19:11 +0100
-Subject: [PATCH v7 15/16] arm64: kernel: Add support for
- hibernate/suspend-to-disk
-In-Reply-To: <20160422102954.GB2998@e104818-lin.cambridge.arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-16-git-send-email-james.morse@arm.com>
- <20160422102954.GB2998@e104818-lin.cambridge.arm.com>
-Message-ID: <571DE10F.10905@arm.com>
+From: andrew-ct.chen@mediatek.com (andrew-ct chen)
+Date: Mon, 25 Apr 2016 17:22:03 +0800
+Subject: [PATCH v7 2/8] [media] VPU: mediatek: support Mediatek VPU
+In-Reply-To: <571DCA04.8000703@xs4all.nl>
+References: <1461299131-57851-1-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-2-git-send-email-tiffany.lin@mediatek.com>
+ <1461299131-57851-3-git-send-email-tiffany.lin@mediatek.com>
+ <571DCA04.8000703@xs4all.nl>
+Message-ID: <1461576123.15167.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-Thanks for your comments,
-
-On 22/04/16 11:29, Catalin Marinas wrote:
-> On Fri, Apr 01, 2016 at 05:53:39PM +0100, James Morse wrote:
->> --- /dev/null
->> +++ b/arch/arm64/kernel/hibernate-asm.S
-
->> +	copy_page	x0, x1, x2, x3, x4, x5, x6, x7, x8, x9
->> +
->> +	add	x1, x10, #PAGE_SIZE
->> +	/* Clean the copied page to PoU - based on flush_icache_range() */
->> +	dcache_line_size x2, x3
->> +	sub	x3, x2, #1
->> +	bic	x4, x10, x3
->> +2:	dc	cvau, x4	/* clean D line / unified line */
->> +	add	x4, x4, x2
->> +	cmp	x4, x1
->> +	b.lo	2b
->> +
->> +	ldr	x19, [x19, #HIBERN_PBE_NEXT]
->> +	cbnz	x19, 1b
->> +
->> +
->> +	/* switch to the restored kernels page tables, to reconfigure el2 */
->> +	msr	ttbr1_el1, x21  /* physical address of swapper page tables */
->> +	isb
->> +	tlbi	vmalle1is	/* invalidate intermediate caching entries */
->> +	ic	ialluis
->> +	dsb	ish		/* also waits for PoU cleaning to finish */
->> +	isb
+On Mon, 2016-04-25 at 09:40 +0200, Hans Verkuil wrote:
+> On 04/22/2016 06:25 AM, Tiffany Lin wrote:
+> > From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> > 
+> > The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
+> > It is able to handle video decoding/encoding of in a range of formats.
+> > The driver provides with VPU firmware download, memory management and
+> > the communication interface between CPU and VPU.
+> > For VPU initialization, it will create virtual memory for CPU access and
+> > IOMMU address for vcodec hw device access. When a decode/encode instance
+> > opens a device node, vpu driver will download vpu firmware to the device.
+> > A decode/encode instant will decode/encode a frame using VPU
+> > interface to interrupt vpu to handle decoding/encoding jobs.
+> > 
+> > Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > 
+> > ---
+> >  drivers/media/platform/Kconfig           |   13 +
+> >  drivers/media/platform/Makefile          |    2 +
+> >  drivers/media/platform/mtk-vpu/Makefile  |    3 +
+> >  drivers/media/platform/mtk-vpu/mtk_vpu.c |  950 ++++++++++++++++++++++++++++++
+> >  drivers/media/platform/mtk-vpu/mtk_vpu.h |  162 +++++
+> >  5 files changed, 1130 insertions(+)
+> >  create mode 100644 drivers/media/platform/mtk-vpu/Makefile
+> >  create mode 100755 drivers/media/platform/mtk-vpu/mtk_vpu.c
+> >  create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
+> > 
 > 
-> The waiting for PoU cleaning needs to happen before the IC instruction.
-
-Done, to check I understand why:
-The 'ic ialluis' may finish before the PoU cleaning, sharing a barrier means in
-this case we may speculatively load stale values back into the icache while we
-wait for the cleaning to finish.
-
-[ ... ]
-
->> +
->> +	/* Load our new page tables */
->> +	asm volatile("msr	ttbr0_el1, %0;"
->> +		     "isb;"
->> +		     "tlbi	vmalle1is;"
->> +		     "dsb	ish" : : "r"(virt_to_phys(pgd)));
 > 
-> Do we expect anything to have used ttbr0_el1 at this point?
-
-EFI for the virt_efi_get_time() call when we setup the rtc. There may also be
-device drivers out there that try to load firmware before the
-late_initcall_sync() call that triggers resume.
-
-[ ... ]
-
->> +int swsusp_arch_suspend(void)
->> +{
->> +	int ret = 0;
->> +	unsigned long flags;
->> +	struct sleep_stack_data state;
->> +
->> +	local_dbg_save(flags);
->> +
->> +	if (__cpu_suspend_enter(&state)) {
->> +		ret = swsusp_save();
->> +	} else {
->> +		void *lm_kernel_start;
->> +
->> +		/* Clean kernel to PoC for secondary core startup */
->> +		lm_kernel_start = LMADDR(KERNEL_START);
->> +		__flush_dcache_area(lm_kernel_start, KERNEL_END - KERNEL_START);
+> > +int vpu_load_firmware(struct platform_device *pdev)
+> > +{
+> > +	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
+> > +	struct device *dev = &pdev->dev;
+> > +	struct vpu_run *run = &vpu->run;
+> > +	const struct firmware *vpu_fw;
+> > +	int ret;
+> > +
+> > +	if (!pdev) {
+> > +		dev_err(dev, "VPU platform device is invalid\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	ret = vpu_clock_enable(vpu);
+> > +	if (ret) {
+> > +		dev_err(dev, "enable clock failed %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	mutex_lock(&vpu->vpu_mutex);
+> > +
+> > +	if (vpu_running(vpu)) {
+> > +		mutex_unlock(&vpu->vpu_mutex);
+> > +		vpu_clock_disable(vpu);
+> > +		dev_warn(dev, "vpu is running already\n");
 > 
-> We don't need to use LMADDR here. The KERNEL_START is already mapped at
-> the caches are PIPT (-like), so flushing any of the aliases would do.
+> This warning should be dropped. Currently vpu_load_firmware is called
+> every time the video device is opened and no one else has the video device
+> open. So calling this multiple times is perfectly normal and the log shouldn't
+> be spammed with warnings.
+> 
+> I would recommend adding a fw_loaded bool to struct mtk_vpu and just
+> check that at the beginning of this function and just return 0 if it is true.
+> 
+> Then you don't need to enable the vpu clock either.
+> 
+> I hope I understand the hw correctly, though.
+> 
+> Assuming you can do this, then this code from the v4l driver needs an
+> additional comment:
 
-With kaslr the range KERNEL_START -> KERNEL_END has holes in it. I think this is
-where the __init text or alternatives used to be. Cleaning the corresponding
-range in the linear map avoids the fault...
+We will change this in next version.
 
+> 
+> >>> +	if (v4l2_fh_is_singular(&ctx->fh)) {
+> 
+> Add a comment here that says that vpu_load_firmware checks if it was
+> loaded already and does nothing in that case.
 
-> But I'm not sure we even need to flush the whole kernel. The secondary
-> cores would only execute certain areas before they enable the MMU, at
-> which point they have visibility over the whole cache. Is this needed
-> for secondary core startup on resume from hibernate?
+We will change this in next version. Thanks
 
-I haven't hit this as an issue, but I think its needed for any mmu-off code.
-The list is:
-*  secondary startup after resume
-*  hyp-stub and kvm's el2-init code,
-*  and cpu_resume() (if a core goes into idle soon after resume).
-
-I agree cleaning the whole kernel is excessive. I guess the right thing to do is
-to collect all these functions into a single section and clean that.
-
-[ ... ]
-
-Thanks for the detailed comments!
-
-
-James
+> 
+> >>> +		ret = vpu_load_firmware(dev->vpu_plat_dev);
+> >>> +		if (ret < 0) {
+> >>> +			/*
+> >>> +			  * Return 0 if downloading firmware successfully,
+> >>> +			  * otherwise it is failed
+> >>> +			  */
+> >>> +			mtk_v4l2_err("vpu_load_firmware failed!");
+> >>> +			goto err_load_fw;
+> >>> +		}
+> 
+> That makes it clear to the reader (i.e. me :-) ) that you can safely call
+> vpu_load_firmware multiple times.
+> 
+> Regards,
+> 
+> 	Hans
+> 
+> > +		return 0;
+> > +	}
+> > +
+> > +	run->signaled = false;
+> > +	dev_dbg(vpu->dev, "firmware request\n");
+> > +	/* Downloading program firmware to device*/
+> > +	ret = load_requested_vpu(vpu, vpu_fw, P_FW);
+> > +	if (ret < 0) {
+> > +		dev_err(dev, "Failed to request %s, %d\n", VPU_P_FW, ret);
+> > +		goto OUT_LOAD_FW;
+> > +	}
+> > +
+> > +	/* Downloading data firmware to device */
+> > +	ret = load_requested_vpu(vpu, vpu_fw, D_FW);
+> > +	if (ret < 0) {
+> > +		dev_err(dev, "Failed to request %s, %d\n", VPU_D_FW, ret);
+> > +		goto OUT_LOAD_FW;
+> > +	}
+> > +
+> > +	/* boot up vpu */
+> > +	vpu_cfg_writel(vpu, 0x1, VPU_RESET);
+> > +
+> > +	ret = wait_event_interruptible_timeout(run->wq,
+> > +					       run->signaled,
+> > +					       msecs_to_jiffies(INIT_TIMEOUT_MS)
+> > +					       );
+> > +	if (ret == 0) {
+> > +		ret = -ETIME;
+> > +		dev_err(dev, "wait vpu initialization timout!\n");
+> > +		goto OUT_LOAD_FW;
+> > +	} else if (-ERESTARTSYS == ret) {
+> > +		dev_err(dev, "wait vpu interrupted by a signal!\n");
+> > +		goto OUT_LOAD_FW;
+> > +	}
+> > +
+> > +	ret = 0;
+> > +	dev_info(dev, "vpu is ready. Fw version %s\n", run->fw_ver);
+> > +
+> > +OUT_LOAD_FW:
+> > +	mutex_unlock(&vpu->vpu_mutex);
+> > +	vpu_clock_disable(vpu);
+> > +
+> > +	return ret;
+> > +}
+> > +EXPORT_SYMBOL_GPL(vpu_load_firmware);
+> 
