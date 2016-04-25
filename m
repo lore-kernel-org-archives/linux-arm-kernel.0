@@ -1,18 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 01:14:34 +0200
-Subject: [PATCH] soc: brcmstb: Unmap sun_top_ctrl_base on errors
-In-Reply-To: <1461625693-22793-1-git-send-email-f.fainelli@gmail.com>
-References: <1461625693-22793-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <6953436.B3Mfs8t6Nm@wuerfel>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 25 Apr 2016 16:22:23 -0700
+Subject: [PATCH RESEND v2 3/4] ARM64: dts: rockchip: add RK3399
+ evaluation board
+In-Reply-To: <1461304307-14113-4-git-send-email-jay.xu@rock-chips.com>
+References: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
+ <1461304307-14113-4-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20160425232223.GA59576@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 16:08:09 Florian Fainelli wrote:
-> Do not leak a ioremap()'d cookie around, unmaping it in case of errors
+On Fri, Apr 22, 2016 at 01:51:46PM +0800, Jianqun Xu wrote:
+> The RK3399 evaluation board is designed with pmic
+> rk808 on top board.
 > 
-> Fixes: cef4bafcea2c ("soc: brcmstb: add SoC driver to brcmstb")
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+> changes in v2:
+> - new add patch
 
-I've applied it on top now, along with my fix, thanks!
-
-	Arnd
+FWIW, the $subject is a bit confusing. Probaly should be "Documentation:
+...". But otherwise, LGTM.
