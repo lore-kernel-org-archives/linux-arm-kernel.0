@@ -1,40 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 13:32:39 +0200
-Subject: [PATCH 3/5] ARM: dts: introduce MPS2 AN385/AN386
-In-Reply-To: <571DEE47.3090208@arm.com>
-References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
- <571DE21A.5010502@suse.com> <571DEE47.3090208@arm.com>
-Message-ID: <5670114.66Ur0mq4Xc@wuerfel>
+Date: Mon, 25 Apr 2016 13:38:18 +0200
+Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
+In-Reply-To: <20160425103911.GO32731@imgtec.com>
+References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+ <20160425095715.GA2366@piout.net> <20160425103911.GO32731@imgtec.com>
+Message-ID: <4641918.pNBP5iAK01@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 11:15:35 Vladimir Murzin wrote:
-> >> +
-> >> +#include "mps2.dtsi"
-> >> +
-> >> +/ {
-> >> +    model = "ARM MPS2 Application Note 385/386";
-> >> +    compatible = "arm,mps2";
-> >> +
-> >> +    aliases {
-> >> +        serial0 = &uart0;
-> >> +    };
-> >> +
-> >> +    chosen {
-> >> +        bootargs = "rdinit=/sbin/init earlycon";
+On Monday 25 April 2016 11:39:11 Eric Engestrom wrote:
+> On Mon, Apr 25, 2016 at 11:57:15AM +0200, Alexandre Belloni wrote:
+> > Hi,
 > > 
-> > The rootfs should be independent from the board.
-> > In my opinion, this type of bootargs should not be part of the DTS.
+> > this requires a commit message.
 > 
-> I have no strong opinion on this, but quick grep shows plenty places
-> where the same happens, and even [1] has rootfs specific option as an
-> example. So if there is no strong call to remove rdinit from bootargs,
-> I'd prefer to keep it as it makes testing easier for me.
-> 
-> [1] Documentation/devicetree/booting-without-of.txt
-> 
+> OK? This seems rather pointless in this case (and even more so for the
+> typo fix I sent yesterday), but I guess you have some general rule to
+> enforce. Would this do then?
+> "The second `const` is unnecessary, and is simply ignored by most compilers."
 
-I think "rdinit=/sbin/init" is redundant, that is what we try running
-anyway, so I don't see any downside in removing it.
+Maybe say you you found it (llvm, sparse, coccinelle?), and why this
+is causing a problem for anyone. If it's just unnecessary but not
+harmful, I'd probably ignore the patch.
+
+> > Also, you should think about separating those changes in multiple patches
+> > to ease inclusion in the kernel.
+> 
+> I'll resend patch #4 as multiple patches. What the way proper to convey
+> that *multiple* new patches replace *one* old one? Is it enough to just
+> send those as a reply to this one?
+
+That's fine. Having multiple patches here is slightly better than just
+one, but I'd also be fine with just taking the large patch because it
+is an identical trivial change in multiple files.
 
 	Arnd
