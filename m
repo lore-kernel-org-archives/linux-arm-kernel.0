@@ -1,168 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Apr 2016 15:32:31 +0100
-Subject: [PATCH V3 13/18] coresight: tmc: make sysFS and Perf mode
- mutually exclusive
-In-Reply-To: <1461345255-11758-14-git-send-email-mathieu.poirier@linaro.org>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-14-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <571E2A7F.2070802@arm.com>
+From: niso@kth.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Mon, 25 Apr 2016 16:26:19 +0200
+Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
+In-Reply-To: <20160421134942.GA3325@infradead.org>
+References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160311125846.GF1111@bigcity.dyn.berto.se>
+ <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
+ <20160321152601.GA11674@infradead.org>
+ <20160413132916.GC19650@bigcity.dyn.berto.se>
+ <20160421134942.GA3325@infradead.org>
+Message-ID: <20160425142619.GJ28777@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/16 18:14, Mathieu Poirier wrote:
-> The sysFS and Perf access methods can't be allowed to interfere
-> with one another.  As such introducing guards to access
-> functions that prevents moving forward if a TMC is already
-> being used.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-tmc-etf.c | 60 +++++++++++++++++++++-
->   drivers/hwtracing/coresight/coresight-tmc-etr.c | 68 +++++++++++++++++++++++--
->   2 files changed, 121 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 25fad93b68d4..cc88c15ba45c 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -111,7 +111,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
->   	CS_LOCK(drvdata->base);
->   }
->
-> -static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
-> +static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
->   {
->   	bool used = false;
->   	char *buf = NULL;
-> @@ -190,6 +190,54 @@ spin_unlock:
->   	return 0;
->   }
->
-> +static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
-> +{
-> +	int ret = 0;
-> +	long val;
-> +	unsigned long flags;
-> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	 /* This shouldn't be happening */
-> +	if (WARN_ON(mode != CS_MODE_PERF))
-> +		return -EINVAL;
-> +
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (drvdata->reading) {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	val = local_xchg(&drvdata->mode, mode);
-> +	/*
-> +	 * In Perf mode there can be only one writer per sink.  There
-> +	 * is also no need to continue if the ETB/ETR is already operated
-> +	 * from sysFS.
-> +	 */
-> +	if (val != CS_MODE_DISABLED) {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	tmc_etb_enable_hw(drvdata);
-> +out:
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +
-> +	return ret;
-> +}
-> +
-> +static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
-> +{
-> +	switch (mode) {
-> +	case CS_MODE_SYSFS:
-> +		return tmc_enable_etf_sink_sysfs(csdev, mode);
-> +	case CS_MODE_PERF:
-> +		return tmc_enable_etf_sink_perf(csdev, mode);
-> +	}
-> +
-> +	/* We shouldn't be here */
-> +	return -EINVAL;
-> +}
-> +
->   static void tmc_disable_etf_sink(struct coresight_device *csdev)
->   {
->   	long val;
-> @@ -272,6 +320,7 @@ const struct coresight_ops tmc_etf_cs_ops = {
->
->   int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
->   {
-> +	long val;
->   	enum tmc_mode mode;
->   	int ret = 0;
->   	unsigned long flags;
-> @@ -290,6 +339,13 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
->   		goto out;
->   	}
->
-> +	val = local_read(&drvdata->mode);
-> +	/* Don't interfere if operated from Perf */
-> +	if (val == CS_MODE_PERF) {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
->   	/* If drvdata::buf is NULL the trace data has been read already */
->   	if (drvdata->buf == NULL) {
->   		ret = -EINVAL;
-> @@ -297,7 +353,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
->   	}
->
->   	/* Disable the TMC if need be */
-> -	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-> +	if (val == CS_MODE_SYSFS)
->   		tmc_etb_disable_hw(drvdata);
->
->   	drvdata->reading = true;
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 4b000f4003a2..a9a94a09186a 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -87,7 +87,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
->   	CS_LOCK(drvdata->base);
->   }
->
-> -static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
-> +static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
->   {
->   	bool used = false;
->   	long val;
-> @@ -167,6 +167,54 @@ spin_unlock:
->   	return 0;
->   }
->
-> +static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
-> +{
-> +	int ret = 0;
-> +	long val;
-> +	unsigned long flags;
-> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	 /* This shouldn't be happening */
-> +	if (WARN_ON(mode != CS_MODE_PERF))
-> +		return -EINVAL;
-> +
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (drvdata->reading) {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	val = local_xchg(&drvdata->mode, mode);
-> +	/*
-> +	 * In Perf mode there can be only one writer per sink.  There
-> +	 * is also no need to continue if the ETR is already operated
-> +	 * from sysFS.
-> +	 */
-> +	if (val != CS_MODE_DISABLED) {
+Hi Christoph,
 
-Could val be CS_MODE_PERF ? In other words, should we be checking :
-	if (val == CS_MODE_SYSFS)  instead ?
+On 2016-04-21 06:49:42 -0700, Christoph Hellwig wrote:
+> On Wed, Apr 13, 2016 at 03:29:17PM +0200, Niklas S?derlund wrote:
+> > > Yes, it would be good to do an audit of all the ARM dma_ops as well
+> > > as generic code like drivers/base/dma-*.c, lib/dma-debug.c and
+> > > include/linux/dma-*.h
+> 
+> What about things like the phys_addr() helper in lib/dma-debug.c?  That
+> was in fact what prompted my question for an audit, and it seems
+> to not even feature on your list.  What patterns / symbols did you look
+> for?
 
-Suzuki
+
+I have followed the call path from the usage in 
+drivers/dma/sh/rcar-dmac.c and made sure the dma_addr_t is not used in a 
+bad way.
+
+I also looked at the dma-mapping API and ruled out that the only 
+function that make sens to use with a dma_addr_t from dma_map_resource() 
+are dma_unmap_resource() and dma_mapping_error(). With that I can't see 
+how a dma_addr_t would end up in lib/dma-debug.c. But I might be missing 
+something?
+
+In the big picture do you feel the approach I have is the correct way to 
+solve my problem? Provided we can work out this issues ofc?
+
+-- 
+Regards,
+Niklas S?derlund
