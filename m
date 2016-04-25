@@ -1,66 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 11:53:40 +0100
-Subject: [PATCH] make dt_scan_depth1_nodes more readable
-In-Reply-To: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
-References: <alpine.DEB.2.10.1604251121590.4855@sstabellini-ThinkPad-X260>
-Message-ID: <20160425105340.GE16065@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Apr 2016 11:54:24 +0100
+Subject: [PATCH v3 1/2] mfd: mt6397: irq domain should initialize before
+ mfd_add_devices()
+In-Reply-To: <1460709030-23820-1-git-send-email-henryc.chen@mediatek.com>
+References: <1460709030-23820-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20160425105424.GA2713@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 11:25:11AM +0100, Stefano Stabellini wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
+On Fri, 15 Apr 2016, Henry Chen wrote:
+
+> Some sub driver like RTC module need irq domain from parent to create
+> irq mapping when driver initialize. so move mt6397_irq_init() before
+> mfd_add_devices().
 > 
-> Improve the readability of dt_scan_depth1_nodes by removing the nested
-> conditionals.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
-> 
+> Acked-by: John Crispin <blogic@openwrt.org>
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 > ---
-> 
-> Note: this patch is based on xentip/for-linus-4.7
+> This series fixed the below warning based on "Linux kernel v4.6-rc1"
+> WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
+> irq_create_mapping+0xc4/0xd0
+>  
+> Changes in V2: Add two patch for error handle checking.
+> Changes in V3: Add interrupt as required properties to dt-bindings doc
+> ---
+>  drivers/mfd/mt6397-core.c | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
 
-So how should I merge it? :/
+Applied, thanks.
 
-Will
-
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 57ee317..6884c76 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -66,17 +66,24 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->  				       void *data)
->  {
->  	/*
-> -	 * Return 1 as soon as we encounter a node at depth 1 that is
-> -	 * not the /chosen node, or /hypervisor node with compatible
-> -	 * string "xen,xen".
-> +	 * Ignore anything not directly under the root node; we'll
-> +	 * catch its parent instead.
->  	 */
-> -	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> -		if (strcmp(uname, "hypervisor") != 0 ||
-> -		    !of_flat_dt_is_compatible(node, "xen,xen"))
-> -			return 1;
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index 8e8d932..b2faf56 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -267,15 +267,23 @@ static int mt6397_probe(struct platform_device *pdev)
+>  	ret = regmap_read(pmic->regmap, MT6397_CID, &id);
+>  	if (ret) {
+>  		dev_err(pmic->dev, "Failed to read chip id: %d\n", ret);
+> -		goto fail_irq;
+> +		return ret;
+>  	}
+>  
+> +	pmic->irq = platform_get_irq(pdev, 0);
+> +	if (pmic->irq <= 0)
+> +		return pmic->irq;
+> +
+>  	switch (id & 0xff) {
+>  	case MT6323_CID_CODE:
+>  		pmic->int_con[0] = MT6323_INT_CON0;
+>  		pmic->int_con[1] = MT6323_INT_CON1;
+>  		pmic->int_status[0] = MT6323_INT_STATUS0;
+>  		pmic->int_status[1] = MT6323_INT_STATUS1;
+> +		ret = mt6397_irq_init(pmic);
+> +		if (ret)
+> +			return ret;
+> +
+>  		ret = mfd_add_devices(&pdev->dev, -1, mt6323_devs,
+>  				ARRAY_SIZE(mt6323_devs), NULL, 0, NULL);
+>  		break;
+> @@ -286,6 +294,10 @@ static int mt6397_probe(struct platform_device *pdev)
+>  		pmic->int_con[1] = MT6397_INT_CON1;
+>  		pmic->int_status[0] = MT6397_INT_STATUS0;
+>  		pmic->int_status[1] = MT6397_INT_STATUS1;
+> +		ret = mt6397_irq_init(pmic);
+> +		if (ret)
+> +			return ret;
+> +
+>  		ret = mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+>  				ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
+>  		break;
+> @@ -296,14 +308,6 @@ static int mt6397_probe(struct platform_device *pdev)
+>  		break;
+>  	}
+>  
+> -	pmic->irq = platform_get_irq(pdev, 0);
+> -	if (pmic->irq > 0) {
+> -		ret = mt6397_irq_init(pmic);
+> -		if (ret)
+> -			return ret;
 > -	}
-> +	if (depth != 1)
-> +		return 0;
->  
-> -	return 0;
-> +	if (strcmp(uname, "chosen") == 0)
-> +		return 0;
-> +
-> +	if (strcmp(uname, "hypervisor") == 0 &&
-> +	    of_flat_dt_is_compatible(node, "xen,xen"))
-> +		return 0;
-> +
-> +	/*
-> +	 * This node at depth 1 is neither a chosen node nor a xen node,
-> +	 * which we do not expect.
-> +	 */
-> +	return 1;
->  }
->  
->  /*
-> 
+> -
+> -fail_irq:
+>  	if (ret) {
+>  		irq_domain_remove(pmic->irq_domain);
+>  		dev_err(&pdev->dev, "failed to add child devices: %d\n", ret);
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
