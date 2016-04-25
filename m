@@ -1,74 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Apr 2016 14:32:42 +0100
-Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
-In-Reply-To: <571A5A9E.7040305@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
- <20160421161859.GK929@arm.com> <571A5A9E.7040305@arm.com>
-Message-ID: <20160425133242.GC30830@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 25 Apr 2016 15:32:52 +0200
+Subject: [PATCH] PM / Runtime: Defer resuming of the device in
+ pm_runtime_force_resume()
+In-Reply-To: <3340490.Br5NVWnCR9@avalon>
+References: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
+ <3340490.Br5NVWnCR9@avalon>
+Message-ID: <CAPDyKFoQp+-t=c8-Y6+f9U+WJHMEtwGUQ=+PaVNc1-vUkV8CEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 06:08:46PM +0100, Robin Murphy wrote:
-> On 21/04/16 17:18, Will Deacon wrote:
-> >On Wed, Apr 13, 2016 at 06:13:00PM +0100, Robin Murphy wrote:
-> >>Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
-> >>accessor macros as conditional wrappers") makes the *_relaxed forms of
-> >>I/O accessors universally available to drivers, in cases where writeq()
-> >>is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
-> >>end up falling back to writel() regardless of whether writel_relaxed()
-> >>is available (identically for s/write/read/).
-> >>
-> >>Add corresponding relaxed forms of the nonatomic helpers to delegate
-> >>to the equivalent 32-bit accessors as appropriate.
-> >>
-> >>CC: Arnd Bergmann <arnd@arndb.de>
-> >>CC: Christoph Hellwig <hch@lst.de>
-> >>CC: Darren Hart <dvhart@linux.intel.com>
-> >>CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
-> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >>---
-> >>  include/linux/io-64-nonatomic-hi-lo.h | 25 +++++++++++++++++++++++++
-> >>  include/linux/io-64-nonatomic-lo-hi.h | 25 +++++++++++++++++++++++++
-> >>  2 files changed, 50 insertions(+)
-> >>
-> >>diff --git a/include/linux/io-64-nonatomic-hi-lo.h b/include/linux/io-64-nonatomic-hi-lo.h
-> >>index 11d7e84..1a85566 100644
-> >>--- a/include/linux/io-64-nonatomic-hi-lo.h
-> >>+++ b/include/linux/io-64-nonatomic-hi-lo.h
-> >>@@ -21,6 +21,23 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
-> >>  	writel(val, addr);
-> >>  }
-> >>
-> >>+static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
-> >>+{
-> >>+	const volatile u32 __iomem *p = addr;
-> >>+	u32 low, high;
-> >>+
-> >>+	high = readl_relaxed(p + 1);
-> >>+	low = readl_relaxed(p);
-> >>+
-> >>+	return low + ((u64)high << 32);
-> >>+}
-> >>+
-> >>+static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
-> >>+{
-> >>+	writel_relaxed(val >> 32, addr + 4);
-> >>+	writel_relaxed(val, addr);
-> >>+}
-> >
-> >Could we not generate the _relaxed variants with some macro magic?
-> 
-> We _could_ - indeed I started doing that, but then decided that the
-> obfuscation of horrible macro-templated functions wasn't worth saving a
-> couple of hundred bytes in some code that isn't exactly difficult to
-> maintain and has needed touching once in 4 years.
-> 
-> If you did want to go down the macro route, I may as well also generate both
-> lo-hi and hi-lo headers all from a single template, it'd be really clever...
-> <alarm bells> ;)
+On 21 April 2016 at 19:31, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Ulf,
+>
+> Thank you for the patch.
+>
+> On Thursday 21 Apr 2016 12:34:02 Ulf Hansson wrote:
+>> When the pm_runtime_force_suspend|resume() helpers were invented, we still
+>> had CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP as separate Kconfig options.
+>>
+>> To make sure these helpers worked for all combinations and without
+>> introducing too much of complexity, the device was always resumed in
+>> pm_runtime_force_resume().
+>>
+>> More precisely, when CONFIG_PM_SLEEP was set and CONFIG_PM_RUNTIME was
+>> unset, we needed to resume the device as the subsystem/driver couldn't
+>> rely on using runtime PM to do it.
+>>
+>> As the CONFIG_PM_RUNTIME option was merged into CONFIG_PM a while ago, it
+>> removed this combination, of using CONFIG_PM_SLEEP without the earlier
+>> CONFIG_PM_RUNTIME.
+>>
+>> For this reason we can now rely on the subsystem/driver to use runtime PM
+>> to resume the device, instead of forcing that to be done in all cases. In
+>> other words, let's defer this to a later point when it's actually needed.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>
+>> Note, this patch is based upon another not yet queued patch [1]. The reason
+>> is simply because that [1] is a more important patch as it fixes a problem.
+>> It was posted to linux-pm April 8th and I expect it (or a new revision of
+>> it) to be applied before $subject patch.
+>>
+>> [1]
+>> https://patchwork.kernel.org/patch/8782851
+>>
+>> ---
+>>  drivers/base/power/runtime.c | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+>> index b746904..a190ca0 100644
+>> --- a/drivers/base/power/runtime.c
+>> +++ b/drivers/base/power/runtime.c
+>> @@ -1506,6 +1506,17 @@ int pm_runtime_force_resume(struct device *dev)
+>>               goto out;
+>>       }
+>>
+>> +     /*
+>> +      * The PM core increases the runtime PM usage count in the system PM
+>> +      * prepare phase. If the count is greather than 1 at this point, someone
+>> +      * else has also increased it. In such case, let's make sure to runtime
+>> +      * resume the device as that is likely what is expected. In other case
+>> +      * we trust the subsystem/driver to runtime resume the device when it's
+>> +      * actually needed.
+>> +      */
+>> +     if (atomic_read(&dev->power.usage_count) < 2)
+>> +             goto out;
+>> +
+>>       ret = pm_runtime_set_active(dev);
+>>       if (ret)
+>>               goto out;
+>
+> This works in the sense that it prevents devices from being PM resumed at
+> system resume time if not needed. However, devices that are part of a PM
+> domain and that were idle before system suspend are suspended twice (with
+> their .runtime_suspend() handler called twice), which is not good at all.
+>
+> The first suspend occurs at system suspend time, with
+> pm_runtime_force_suspend() rightfully suspending the device as the device is
+> active (due to being woken up by pm_genpd_prepare()). The second suspend
+> occurs at resume time due to device_complete() calling pm_runtime_put().
+>
+> I've tracked the issue to the fact that pm_genpd_complete() calls
+> pm_runtime_set_active() regardless of whether the device was PM resumed or
+> not. As pm_runtime_force_suspend() doesn't resume devices with this patch
+> applied, the pm_runtime_put() call from device_complete() will try to runtime
+> suspend the device a second time as the state is incorrectly set to
+> RPM_ACTIVE.
+>
+> With the current genpd implementation this patch isn't needed (and neither is
+> my patch), as genpd expects the device to be always active when the system is
+> resumed. However, when genpd isn't used, pm_runtime_force_resume() needs to
+> skip resuming devices that were suspended before system suspend. This patch
+> looks good to me to fix that problem.
+>
+> Do we need to fix genpd first ?
 
-I certainly wasn't suggesting any more than the obvious macroisation,
-but I'll leave it up to Arnd, as I think this falls on his lap.
+Following you reasoning, I agree!
 
-Will
+Let's put this patch on hold for a little while. I am already working
+on changing genpd, so it shouldn't take long before I can post some
+additional genpd patches improving the behaviour.
+
+Kind regards
+Uffe
