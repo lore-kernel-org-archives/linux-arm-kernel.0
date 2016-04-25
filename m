@@ -1,45 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 25 Apr 2016 17:25:58 +0300
-Subject: [PATCH 1/6] arm64: dts: r8a7795: Don't disable referenced
- optional clocks
-In-Reply-To: <1461593315-21307-2-git-send-email-geert+renesas@glider.be>
-References: <1461593315-21307-1-git-send-email-geert+renesas@glider.be>
- <1461593315-21307-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <7f571e04-2e61-8299-5374-bddfe788da68@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 25 Apr 2016 15:27:35 +0100
+Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
+In-Reply-To: <20160425142435.GB2829@codeblueprint.co.uk>
+References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
+ <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
+ <571E25B1.8070305@arm.com>
+ <20160425141557.GA2829@codeblueprint.co.uk>
+ <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
+ <20160425142435.GB2829@codeblueprint.co.uk>
+Message-ID: <20160425142735.GA14974@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Apr 25, 2016 at 03:24:35PM +0100, Matt Fleming wrote:
+> On Mon, 25 Apr, at 04:18:41PM, Ard Biesheuvel wrote:
+> > On 25 April 2016 at 16:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > > On Mon, 25 Apr, at 03:12:01PM, Robin Murphy wrote:
+> > >> >+static void efi_call_virt_check_flags(unsigned long flags, const char *call)
+> > >> >+{
+> > >> >+    unsigned long cur_flags;
+> > >> >+    bool mismatch;
+> > >> >+
+> > >> >+    local_save_flags(cur_flags);
+> > >> >+
+> > >> >+    mismatch = !!((cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK);
+> > >>
+> > >> nit: the assignment itself is already a conversion to bool, so the
+> > >> excitement is redundant here.
+> > >
+> > > This was intentional. I asked Mark to make this change so that it's
+> > > explicit for the developer that we're performing the type conversion.
+> > 
+> > But replacing an implicit boolean cast with an explicit one makes
+> > little sense, no? Don't we simply want '!= 0' here if you need a
+> > boolean expression?
+> 
+> Aha but '!!' is fewer characters to type!!
+> 
+> I'm not that bothered as long as we don't stuff an int into a bool
+> without giving the programmer some idea we're doing that. It's not
+> about the compiler getting it wrong, more about a developer
+> introducing a bug when they change the code in the future. 
+> 
+> Unless anyone objects, I'll fix this up to use '!= 0' when I apply it.
 
-On 4/25/2016 5:08 PM, Geert Uytterhoeven wrote:
+I have no strong preference so long as the code is correct.
 
-> clk_get() on a disabled clock node will return -EPROBE_DEFER, which can
-> cause drivers to be deferred forever if such clocks are referenced in
-> their devices' clocks properties.
->
-> Update the various disabled external clock nodes to default to a
-> frequency of 0, but don't disable them, to prevent this.
->
-> Reported-by: J?rg Billeter <j@bitron.ch>
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 1 +
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 5 +----
->  2 files changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> index 63d51059ae639e9d..263abaede2a82780 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> @@ -619,6 +619,7 @@
->  };
->
->  &pcie_bus_clk {
-> +	clock-frequency = <100000000>;
->  	status = "okay";
+Another option is to get rid of the bool entirely:
 
-    This line is no longer needed.
+	flags ^= cur_flags;
+	if (!WARN_ON(flags & ARCH_EFI_IRQ_FLAGS_MASK))
+		return;
 
-[...]
-
-MBR, Sergei
+Mark.
