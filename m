@@ -1,50 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Apr 2016 14:46:34 +0100
-Subject: [PATCHv3 5/5] efi/runtime-wrappers: remove ARCH_EFI_IRQ_FLAGS_MASK
- ifdef
-In-Reply-To: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
-References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1461591994-14918-6-git-send-email-mark.rutland@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Apr 2016 08:49:38 -0500
+Subject: [PATCH 10/41] Documentation: dt: display: fix spelling mistake
+In-Reply-To: <1461543878-3639-11-git-send-email-eric@engestrom.ch>
+References: <1461543878-3639-1-git-send-email-eric@engestrom.ch>
+ <1461543878-3639-11-git-send-email-eric@engestrom.ch>
+Message-ID: <20160425134938.GA8194@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that arm, arm64, and x86 all provide ARCH_EFI_IRQ_FLAGS_MASK, we can
-get rid of the trivial and now unused implementation of
-efi_call_virt_check_flags.
+On Mon, Apr 25, 2016 at 01:24:07AM +0100, Eric Engestrom wrote:
+> Signed-off-by: Eric Engestrom <eric@engestrom.ch>
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: linux-efi at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/firmware/efi/runtime-wrappers.c | 7 -------
- 1 file changed, 7 deletions(-)
+Applied, thanks.
 
-diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
-index 1f0277e..a51b2c3 100644
---- a/drivers/firmware/efi/runtime-wrappers.c
-+++ b/drivers/firmware/efi/runtime-wrappers.c
-@@ -22,10 +22,6 @@
- #include <linux/stringify.h>
- #include <asm/efi.h>
- 
--/*
-- * Temporary scaffolding until all users provide ARCH_EFI_IRQ_FLAGS_MASK.
-- */
--#ifdef ARCH_EFI_IRQ_FLAGS_MASK
- static void efi_call_virt_check_flags(unsigned long flags, const char *call)
- {
- 	unsigned long cur_flags;
-@@ -42,9 +38,6 @@ static void efi_call_virt_check_flags(unsigned long flags, const char *call)
- 			   flags, cur_flags, call);
- 	local_irq_restore(flags);
- }
--#else /* ARCH_EFI_IRQ_FLAGS_MASK */
--static inline void efi_call_virt_check_flags(unsigned long flags, const char *call) {}
--#endif /* ARCH_EFI_IRQ_FLAGS_MASK */
- 
- #define efi_call_virt(f, args...)					\
- ({									\
--- 
-1.9.1
+Rob
+
+> ---
+>  Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+> index 22756b3..a782659 100644
+> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+> @@ -41,7 +41,7 @@ Video interfaces:
+>    endpoint node connected from mic node (reg = 0):
+>      - remote-endpoint: specifies the endpoint in mic node. This node is required
+>  		       for Exynos5433 mipi dsi. So mic can access to panel node
+> -		       thoughout this dsi node.
+> +		       throughout this dsi node.
+>    endpoint node connected to panel node (reg = 1):
+>      - remote-endpoint: specifies the endpoint in panel node. This node is
+>  		       required in all kinds of exynos mipi dsi to represent
+> -- 
+> 2.8.0
+> 
