@@ -1,65 +1,36 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 25 Apr 2016 13:07:19 +0100
-Subject: Tegra baseline test results for v4.6-rc5
-Message-ID: <571E0877.10403@nvidia.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Mon, 25 Apr 2016 14:07:31 +0200
+Subject: [PATCH] kbuild: drop redundant "PHONY += FORCE"
+In-Reply-To: <CAK7LNATv51PRc9bGU7Q8_oTk9=C5ryfu7vMsKbG5drcgVbf1-Q@mail.gmail.com>
+References: <1460081770-29437-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160420084710.GF15339@pobox.suse.cz>
+ <CAK7LNATv51PRc9bGU7Q8_oTk9=C5ryfu7vMsKbG5drcgVbf1-Q@mail.gmail.com>
+Message-ID: <571E0883.5020904@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.6-rc5.
-Logs and other details at:
+On 2016-04-20 10:56, Masahiro Yamada wrote:
+> Hi Michal,
+> 
+> 2016-04-20 17:47 GMT+09:00 Michal Marek <mmarek@suse.cz>:
+>> On Fri, Apr 08, 2016 at 11:16:10AM +0900, Masahiro Yamada wrote:
+>>> "PHONY += FORCE" is already cared by scripts/Makefile.build,
+>>> which these files are included from.
+>>
+>> arch/ia64/Makefile is in fact included via the main Makefile. But this
+>> one also has the PHONY += FORCE statement. Maybe we should initialize
+>> PHONY with FORCE in Kbuild.include. Nevertheless, this patch is correct.
+>>
+>> Michal
+> 
+> Ah, right.
+> 
+> If it is not too late and you do not mind,
+> could you rephrase the git-log?
 
-    https://nvtb.github.io//linux/test_v4.6-rc5/20160424163103/
+Hi Masahiro,
 
+I'd rather not rewrite the git log. It was just a minor nitpick and
+there is not so much going on in arch/ia64 to cause confusion.
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.6-rc4 (c3b46c73264b03000d1e18b22f5caf63332547c9)):
-   text     data      bss    total  kernel
-    +82        0        0      +82  defconfig
-  +2456        0        0    +2456  multi_v7_defconfig
-  +2136        0        0    +2136  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.6-rc4 (c3b46c73264b03000d1e18b22f5caf63332547c9))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Michal
