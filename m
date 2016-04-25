@@ -1,65 +1,59 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Sun, 24 Apr 2016 20:00:51 -0700
-Subject: [PATCH 09/41] Documentation: dt: clock: fix spelling mistakes
-In-Reply-To: <1461543878-3639-10-git-send-email-eric@engestrom.ch>
-References: <1461543878-3639-1-git-send-email-eric@engestrom.ch>
- <1461543878-3639-10-git-send-email-eric@engestrom.ch>
-Message-ID: <571D8863.3030202@infradead.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 25 Apr 2016 08:30:41 +0530
+Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
+In-Reply-To: <7576455.rVXD0283Nr@wuerfel>
+References: <cover.1461228504.git.viresh.kumar@linaro.org>
+ <1c2cc13d812e04f231ddd4313e3ba6a54fb4632c.1461228504.git.viresh.kumar@linaro.org>
+ <7576455.rVXD0283Nr@wuerfel>
+Message-ID: <20160425030041.GF22726@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/16 17:24, Eric Engestrom wrote:
-> Signed-off-by: Eric Engestrom <eric@engestrom.ch>
-> ---
->  Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt | 2 +-
->  Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt | 2 +-
->  Documentation/devicetree/bindings/clock/st/st,clkgen.txt        | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+On 23-04-16, 00:42, Arnd Bergmann wrote:
+> On Thursday 21 April 2016 14:29:02 Viresh Kumar wrote:
+> > diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> > index 79d0a5d9da8e..f24f46776fbb 100644
+> > --- a/arch/arm/mach-mvebu/pmsu.c
+> > +++ b/arch/arm/mach-mvebu/pmsu.c
+> > @@ -685,8 +685,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+> >                         dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
+> >                                 __func__, ret);
+> >         }
+> > -
+> > -       platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> >         return 0;
+> >  }
+> >  
+> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > index 69b2a222c84e..5704a92c52dc 100644
+> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > @@ -33,6 +33,8 @@ static const struct of_device_id machines[] = {
+> >  
+> >         { .compatible = "marvell,berlin", },
+> >  
+> > +       { .compatible = "marvell,armadaxp", },
+> > +
+> >         { .compatible = "samsung,exynos3250", },
+> >         { .compatible = "samsung,exynos4210", },
+> >         { .compatible = "samsung,exynos4212", },
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
-> index 0c2bf5e..7f36853 100644
-> --- a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
-> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
-> @@ -16,7 +16,7 @@ Required Properties:
->  Optional Properties:
->  
->  - rockchip,grf: phandle to the syscon managing the "general register files"
-> -  If missing pll rates are not changable, due to the missing pll lock status.
-> +  If missing pll rates are not changeable, due to the missing pll lock status.
->  
->  Each clock is assigned an identifier and client nodes can use this identifier
->  to specify the clock which they consume. All available clocks are defined as
-> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
-> index c9fbb76..8cb47c3 100644
-> --- a/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
-> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
-> @@ -15,7 +15,7 @@ Required Properties:
->  Optional Properties:
->  
->  - rockchip,grf: phandle to the syscon managing the "general register files"
-> -  If missing pll rates are not changable, due to the missing pll lock status.
-> +  If missing pll rates are not changeable, due to the missing pll lock status.
->  
->  Each clock is assigned an identifier and client nodes can use this identifier
->  to specify the clock which they consume. All available clocks are defined as
-> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-> index 78978f1..426bdda 100644
-> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-> @@ -40,7 +40,7 @@ address is common of all subnode.
->  	};
->  
->  This binding uses the common clock binding[1].
-> -Each subnode should use the binding discribe in [2]..[7]
-> +Each subnode should use the binding describe in [2]..[7]
-
-described ?
-
->  
->  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->  [2] Documentation/devicetree/bindings/clock/st,clkgen-divmux.txt
+> I think to make it clear that the ordering is significant here, I would leave this
+> platform_device_register_simple() in armada_xp_pmsu_cpufreq_init().
 > 
+> However, it might be helpful to move that function into a new file in
+> drivers/cpufreq/ if that works.
 
+We just can't get wrong with the ordering here, as this is done from
+device_initcall() and so that point is out of question.
+
+The other thing that can happen is that armada_xp_pmsu_cpufreq_init()
+call can fail. In that case, most of the times cpufreq-dt ->init()
+will fail as well, so even that is fine for me.
+
+And, so I think we can keep this patch as is.
+
+Do you agree ?
 
 -- 
-~Randy
+viresh
