@@ -1,49 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 17:46:53 +0200
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <20160425152914.GI6104@vireshk-i7>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <17150729.NF4MViUffk@wuerfel> <20160425152914.GI6104@vireshk-i7>
-Message-ID: <5536968.ADFL5hRmGD@wuerfel>
+Date: Mon, 25 Apr 2016 17:53:02 +0200
+Subject: [GIT PULL 1/5] ARM: dts: exynos: Artik5 topic branch for v4.7
+In-Reply-To: <571DDCE5.5020201@samsung.com>
+References: <1460541682-32417-1-git-send-email-k.kozlowski@samsung.com>
+ <7068458.f0qaFCRyGK@wuerfel> <571DDCE5.5020201@samsung.com>
+Message-ID: <5431726.aFYokxb3m1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 April 2016 20:59:14 Viresh Kumar wrote:
-> On 25-04-16, 17:26, Arnd Bergmann wrote:
-> > On Monday 25 April 2016 18:26:05 Viresh Kumar wrote:
-> > > On 25-04-16, 14:53, Arnd Bergmann wrote:
-> > > > What are the downsides of moving armada_xp_pmsu_cpufreq_init()
-> > > > into drivers/cpufreq?
-> > > 
-> > > More special code :)
+On Monday 25 April 2016 11:01:25 Krzysztof Kozlowski wrote:
+> On 04/24/2016 11:15 PM, Arnd Bergmann wrote:
+> > On Wednesday 13 April 2016 12:01:18 Krzysztof Kozlowski wrote:
+> >> Topic branch for Device Tree changes for Exynos 3250 for v4.7:
+> >>
+> >> Merge necessary new clocks from Sylwester (used by new board) and add support
+> >> for Exynos3250-based Artik5 board.
+> >>
 > > 
-> > Of course the special code still exists, it seems more like neither of
-> > us wants to have it in the portion of the kernel that he maintains ;-)
+> > Merged into next/dt, thanks!
+> > 
+> > I see that you have modified the include/dt-bindings/clock/exynos3250.h
+> > file. Two questions about that:
+> > 
+> > - How is this going to get synchronized with the respective driver changes
+> >   in a way that avoids breaking the build of the clk tree? Do you just
+> >   wait another merge window for that?
 > 
-> Hehe.. But after $subject patch, we don't have any special code for
-> creating the device, isn't it?
+> Mentioned include/dt-bindings change comes from clk tree, merged here
+> (see "Merge tag 'clk-v4.7-exynos3250' of
+> git://linuxtv.org/snawrocki/samsung into
+> for-v4.7/dt-exynos3250-artik5"). I assume that any driver related
+> changes in clk tree would be on top of that commit.
+
+
+Ok
+
+> > - Are there any other clocks that you should define now so you don't run
+> >   into dependency problems later?
 > 
-> > Maybe the mvebu maintainers have a preference where they'd like the
-> > code to be, they are the ones that are most impacted if anything
-> > goes wrong.
+> Indeed we might have similar for Exynos5422 and devfreq but I already
+> talked with Sylwester about it. He pushed such changes to clk folks and
+> prepared a tag for me - just in case:
+> https://lkml.org/lkml/2016/4/15/561
 > 
-> What code are you talking about? Initializing the OPPs or adding the
-> cpufreq-dt device? The first one (or whatever is left now in that
-> function) can stay anywhere, even as a cpufreq driver. I was talking
-> about the fact that we don't have a sequence problem to solve here.
 
-My line of thinking was that the armada_xp_pmsu_cpufreq_init()
-function makes sense by itself and feels like it should be
-one file in drivers/cpufreq, including the creation of the device.
-
-Even without the argument of the sequencing, they two parts sort
-of belong together because the cpufreq-dt driver depends on both
-of them being run before it can function. It's also the same amount
-of code, as you are replacing one line in armada_xp_pmsu_cpufreq_init
-with one line in "struct of_device_id machines".
-
-It's not really that important, just a feeling I had that it could
-be done better. Unless the mvebu maintainers feel strongly about
-it, just do as you prefer.
+Very good, thanks!
 
 	Arnd
