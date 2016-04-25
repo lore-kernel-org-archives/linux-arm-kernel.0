@@ -1,34 +1,39 @@
-From: eric.engestrom@imgtec.com (Eric Engestrom)
-Date: Mon, 25 Apr 2016 13:58:09 +0100
-Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
-In-Reply-To: <4641918.pNBP5iAK01@wuerfel>
-References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
- <20160425095715.GA2366@piout.net>
- <20160425103911.GO32731@imgtec.com> <4641918.pNBP5iAK01@wuerfel>
-Message-ID: <20160425125809.GP32731@imgtec.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Apr 2016 14:59:13 +0200
+Subject: [PATCH 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <571DCD8D.8070605@arm.com>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <20160423065431.GA5840@afzalpc> <571DCD8D.8070605@arm.com>
+Message-ID: <55296515.n2D97kIgVc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 01:38:18PM +0200, Arnd Bergmann wrote:
-> Maybe say you you found it (llvm, sparse, coccinelle?), and why this
-> is causing a problem for anyone. If it's just unnecessary but not
-> harmful, I'd probably ignore the patch.
+On Monday 25 April 2016 08:55:57 Vladimir Murzin wrote:
+> On 23/04/16 07:54, Afzal Mohammed wrote:
+> > Hi,
+> > 
+> > On Fri, Apr 22, 2016 at 12:43:33PM +0100, Vladimir Murzin wrote:
+> > 
+> >> Small set of fixes discovered with R-class cores.
+> > 
+> > just curious, is Cortex-R supported on mainline ?, thought it was not
+> > supported, but subject & changelogs gave such a feeling.
+> 
+> Hi,
+> 
+> I believe it is supported since c90ad5c "ARM: add Cortex-R7 Processor
+> Info" although overtime it got blocked (at least for Vexpress) with
+> Kconfig changes. There was attempt [1] to sort it out, but looks like
+> these patches went nowhere, so I'm trying to re-start with the fixes
+> coming first.
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/174256.html
 
-$ grep -rE '(^|\W)const(\s+\w+)+\s+const\s'
+Good to know, thanks for working on this!
 
-I just happened to notice some unnecessary const in our internal code,
-so I grep'ed for it in a couple big OSS projects to see how common it
-was. Since I found only a few, I decided to remove them, but like I said
-it just gets ignored by all the compilers I know, so there's absolutely
-no harm in leaving this dead code around.
+What hardware platform do you use? It would be nice to make it a little
+more explicit which platforms can use the ARMv7-R, or an ARMv7-A with
+the MMU disabled.
 
-
-> That's fine. Having multiple patches here is slightly better than just
-> one, but I'd also be fine with just taking the large patch because it
-> is an identical trivial change in multiple files.
-
-So, do you want me to split them up? I'd prefer not having to (slightly
-less work for me :P), but it doesn't really make much of a difference
-either way.
-
-Cheers
+	Arnd
