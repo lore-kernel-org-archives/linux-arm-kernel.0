@@ -1,94 +1,169 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Apr 2016 15:22:43 +0200
-Subject: [PATCH v4 02/11] ARM: sun5i: a13: Add display and TCON clocks
+Date: Mon, 25 Apr 2016 15:22:51 +0200
+Subject: [PATCH v4 10/11] ARM: sun5i: r8: Add display blocks to the DTSI
 In-Reply-To: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1461590572-4027-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1461590572-4027-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the display and TCON (channel 0 and channel 1) clocks that are going
-to be needed to drive the display engine, tcon and TV encoders.
+The TCON, tv-encoder and display engine backends and frontends are combined
+to create our display pipeline.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Add them to the R8 DTSI. It's supposed to be perfectly compatible with the
+A10s and A13, but since we haven't tested it on them yet, it's safer to
+just enable it on the R8. Eventually, it should be moved to sun5i.dtsi
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi | 39 +++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/sun5i-r8.dtsi  |  5 +++--
- 2 files changed, 40 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun5i-r8.dtsi | 137 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 137 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 39f23b1ebc8f..263d46dbc7e6 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -61,8 +61,8 @@
- 			compatible = "allwinner,simple-framebuffer",
- 				     "simple-framebuffer";
- 			allwinner,pipeline = "de_be0-lcd0";
--			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>,
--				 <&dram_gates 26>;
-+			clocks = <&ahb_gates 36>, <&ahb_gates 44>, <&de_be_clk>,
-+				 <&tcon_ch0_clk>, <&dram_gates 26>;
- 			status = "disabled";
- 		};
- 	};
-@@ -170,6 +170,41 @@
- 					     "dram_ace",
- 					     "dram_iep";
- 		};
-+
-+		de_be_clk: clk at 01c20104 {
-+			#clock-cells = <0>;
-+			#reset-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-display-clk";
-+			reg = <0x01c20104 0x4>;
-+			clocks = <&pll3>, <&pll7>, <&pll5 1>;
-+			clock-output-names = "de-be";
-+		};
-+
-+		de_fe_clk: clk at 01c2010c {
-+			#clock-cells = <0>;
-+			#reset-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-display-clk";
-+			reg = <0x01c2010c 0x4>;
-+			clocks = <&pll3>, <&pll7>, <&pll5 1>;
-+			clock-output-names = "de-fe";
-+		};
-+
-+		tcon_ch0_clk: clk at 01c20118 {
-+			#clock-cells = <0>;
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
-+			reg = <0x01c20118 0x4>;
-+			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
-+			clock-output-names = "tcon-ch0-sclk";
-+		};
-+
-+		tcon_ch1_clk: clk at 01c2012c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
-+			reg = <0x01c2012c 0x4>;
-+			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
-+			clock-output-names = "tcon-ch1-sclk";
-+		};
- 	};
- 
- 	soc at 01c00000 {
 diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
-index e346ba76db5d..691d3de75b35 100644
+index 691d3de75b35..a42b5404893e 100644
 --- a/arch/arm/boot/dts/sun5i-r8.dtsi
 +++ b/arch/arm/boot/dts/sun5i-r8.dtsi
-@@ -51,8 +51,9 @@
- 			compatible = "allwinner,simple-framebuffer",
- 				     "simple-framebuffer";
- 			allwinner,pipeline = "de_be0-lcd0-tve0";
--			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
--				 <&ahb_gates 44>, <&dram_gates 26>;
-+			clocks = <&ahb_gates 34>, <&ahb_gates 36>,
-+				 <&ahb_gates 44>, <&de_be_clk>,
-+				 <&tcon_ch1_clk>, <&dram_gates 26>;
+@@ -57,4 +57,141 @@
  			status = "disabled";
  		};
  	};
++
++	soc at 01c00000 {
++		tve0: tv-encoder at 01c0a000 {
++			compatible = "allwinner,sun4i-a10-tv-encoder";
++			reg = <0x01c0a000 0x1000>;
++			clocks = <&ahb_gates 34>;
++			resets = <&tcon_ch0_clk 0>;
++			status = "disabled";
++
++			port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tve0_in_tcon0: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&tcon0_out_tve0>;
++				};
++			};
++		};
++
++		tcon0: lcd-controller at 01c0c000 {
++			compatible = "allwinner,sun5i-a13-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <44>;
++			resets = <&tcon_ch0_clk 1>;
++			reset-names = "lcd";
++			clocks = <&ahb_gates 36>,
++				 <&tcon_ch0_clk>,
++				 <&tcon_ch1_clk>;
++			clock-names = "ahb",
++				      "tcon-ch0",
++				      "tcon-ch1";
++			clock-output-names = "tcon-pixel-clock";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					tcon0_out_tve0: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&tve0_in_tcon0>;
++					};
++				};
++			};
++		};
++
++		fe0: display-frontend at 01e00000 {
++			compatible = "allwinner,sun5i-a13-display-frontend";
++			reg = <0x01e00000 0x20000>;
++			interrupts = <47>;
++			clocks = <&ahb_gates 46>, <&de_fe_clk>,
++				 <&dram_gates 25>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&de_fe_clk>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				fe0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					fe0_out_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_in_fe0>;
++					};
++				};
++			};
++		};
++
++		be0: display-backend at 01e60000 {
++			compatible = "allwinner,sun5i-a13-display-backend";
++			reg = <0x01e60000 0x10000>;
++			clocks = <&ahb_gates 44>, <&de_be_clk>,
++				 <&dram_gates 26>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&de_be_clk>;
++			status = "disabled";
++
++			assigned-clocks = <&de_be_clk>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				be0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					be0_in_fe0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&fe0_out_be0>;
++					};
++				};
++
++				be0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					be0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_be0>;
++					};
++				};
++			};
++		};
++	};
++
++	display-engine {
++		compatible = "allwinner,sun5i-a13-display-engine";
++		pipelines = <&fe0>;
++	};
+ };
 -- 
 2.8.1
