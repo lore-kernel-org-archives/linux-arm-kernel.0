@@ -1,54 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 25 Apr 2016 20:56:43 +0530
-Subject: [PATCH 06/14] dmaengine: bcm2835: DT spelling
- s/interrupts-names/interrupt-names/
-In-Reply-To: <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
-References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
- <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160425152643.GZ2274@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Apr 2016 17:21:34 +0200
+Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
+In-Reply-To: <20160425133242.GC30830@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <571A5A9E.7040305@arm.com> <20160425133242.GC30830@arm.com>
+Message-ID: <5485134.l18Z1dlVmn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 05:32:11PM +0200, Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
-
-This change does not apply for me, can you please split it up and send the
-sound ones thru sound tree
-
--- 
-~Vinod
-
->  drivers/dma/bcm2835-dma.c                                 | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+On Monday 25 April 2016 14:32:42 Will Deacon wrote:
+> > >>
+> > >>+static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
+> > >>+{
+> > >>+   const volatile u32 __iomem *p = addr;
+> > >>+   u32 low, high;
+> > >>+
+> > >>+   high = readl_relaxed(p + 1);
+> > >>+   low = readl_relaxed(p);
+> > >>+
+> > >>+   return low + ((u64)high << 32);
+> > >>+}
+> > >>+
+> > >>+static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
+> > >>+{
+> > >>+   writel_relaxed(val >> 32, addr + 4);
+> > >>+   writel_relaxed(val, addr);
+> > >>+}
+> > >
+> > >Could we not generate the _relaxed variants with some macro magic?
+> > 
+> > We _could_ - indeed I started doing that, but then decided that the
+> > obfuscation of horrible macro-templated functions wasn't worth saving a
+> > couple of hundred bytes in some code that isn't exactly difficult to
+> > maintain and has needed touching once in 4 years.
+> > 
+> > If you did want to go down the macro route, I may as well also generate both
+> > lo-hi and hi-lo headers all from a single template, it'd be really clever...
+> > <alarm bells> 
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-> index 55b53e1fd72c9d6e..e0b6165c9cfcec19 100644
-> --- a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-> +++ b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-> @@ -43,7 +43,7 @@ mcbsp0: mcbsp at 1d10000 {
->  		<0x00310000 0x1000>;
->  	reg-names = "mpu", "dat";
->  	interrupts = <97 98>;
-> -	interrupts-names = "rx", "tx";
-> +	interrupt-names = "rx", "tx";
->  	dmas = <&edma0 3 1
->  		&edma0 2 1>;
->  	dma-names = "tx", "rx";
-> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-> index 974015193b93cdb3..d724393e904e9a41 100644
-> --- a/drivers/dma/bcm2835-dma.c
-> +++ b/drivers/dma/bcm2835-dma.c
-> @@ -974,7 +974,7 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
->  
->  		/* legacy device tree case handling */
->  		dev_warn_once(&pdev->dev,
-> -			      "missing interrupts-names property in device tree - legacy interpretation is used");
-> +			      "missing interrupt-names property in device tree - legacy interpretation is used");
->  		/*
->  		 * in case of channel >= 11
->  		 * use the 11th interrupt and that is shared
-> -- 
-> 1.9.1
-> 
+> I certainly wasn't suggesting any more than the obvious macroisation,
+> but I'll leave it up to Arnd, as I think this falls on his lap.
+
+I'd prefer the open-coded variant as well.
+
+	Arnd
