@@ -1,26 +1,48 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Mon, 25 Apr 2016 19:00:12 +0530
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <55296515.n2D97kIgVc@wuerfel>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
- <20160423065431.GA5840@afzalpc> <571DCD8D.8070605@arm.com>
- <55296515.n2D97kIgVc@wuerfel>
-Message-ID: <20160425133012.GA4085@afzalpc>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 25 Apr 2016 19:00:59 +0530
+Subject: [PATCH v2 3/4] ARM: davinci: disable mdio and eth0 in da850.dtsi
+In-Reply-To: <1460826020-1256-4-git-send-email-david@lechnology.com>
+References: <1460826020-1256-1-git-send-email-david@lechnology.com>
+ <1460826020-1256-4-git-send-email-david@lechnology.com>
+Message-ID: <571E1C13.9050204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi David,
 
-On Mon, Apr 25, 2016 at 02:59:13PM +0200, Arnd Bergmann wrote:
-> On Monday 25 April 2016 08:55:57 Vladimir Murzin wrote:
+On Saturday 16 April 2016 10:30 PM, David Lechner wrote:
+> All other devices are disabled by default and not all boards will use
+> these devices, so these should be disabled too..
+> 
+> da850-evm.dtb already had status = "okay" for these devices.
+> da850-enbw-cmc.dts did not, so they were added.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
 
-> What hardware platform do you use? It would be nice to make it a little
-> more explicit which platforms can use the ARMv7-R, or an ARMv7-A with
-> the MMU disabled.
+I applied this and other patches in this series. One nit-pick though.
+The commit description should be independently readable and not only as
+continuation of the headline. Even if this means repeating portion of
+the headline. I fixed this for most of the patches in this series. For
+example, for this patch, I have:
 
-And for compiling user space, which toolchain is being used ? (i am
-quite shaky on this question, since !MMU, assuming that the normal one
-used for Cortex-A userspace can't be used)
+    ARM: dts: da850: disable mdio and eth0 in da850.dtsi
 
-Regards
-afzal
+    Disable mdio and eth0 in da850.dtsi file. All other
+    devices are disabled by default and not all boards
+    will use these devices, so these should be disabled too.
+
+    da850-evm.dtb already had status = "okay" for these devices.
+    da850-enbw-cmc.dts did not, so they were added.
+
+    Signed-off-by: David Lechner <david@lechnology.com>
+    Tested-by: Kevin Hilman <khilman@baylibre.com>
+    [nsekhar at ti.com: commit description updates]
+    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+
+Its a minor change and I wont reply to all the patches with the changes
+I made. But I pushed the updated v4.7/dt branch in my tree. Do take a
+look at the commit description there.
+
+Thanks,
+Sekhar
