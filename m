@@ -1,145 +1,121 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 25 Apr 2016 09:47:38 -0700
-Subject: [PATCH v5 00/14]  ACPI NUMA support for ARM64
-In-Reply-To: <20160425111338.GJ16065@arm.com>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com>
-Message-ID: <571E4A2A.8070908@caviumnetworks.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 25 Apr 2016 19:52:58 +0300
+Subject: [PATCH] PM / Runtime: Defer resuming of the device in
+ pm_runtime_force_resume()
+In-Reply-To: <CAPDyKFoQp+-t=c8-Y6+f9U+WJHMEtwGUQ=+PaVNc1-vUkV8CEw@mail.gmail.com>
+References: <1461234842-22820-1-git-send-email-ulf.hansson@linaro.org>
+ <3340490.Br5NVWnCR9@avalon>
+ <CAPDyKFoQp+-t=c8-Y6+f9U+WJHMEtwGUQ=+PaVNc1-vUkV8CEw@mail.gmail.com>
+Message-ID: <5465506.Z3sjI0lQh6@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2016 04:13 AM, Will Deacon wrote:
-> Hi David,
->
-> On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
->> set introduce the ACPI based configuration to provide NUMA
->> information.
->>
->> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
->> NUMA domain information from SRAT and SLIT table, so parse those two
->> tables to get mappings from cpu/mem to numa node configuration and
->> system locality.
->
-> Whilst I've queued the main NUMA series for arm64, I'd really like to
-> see more movement on the generic header file cleanups that you posted
-> separately:
->
-> http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
+Hi Ulf,
 
-FWIW:  Those patches should still apply.  I am carrying them in my 
-development trees, and have not changed them in any way.
+On Monday 25 Apr 2016 15:32:52 Ulf Hansson wrote:
+> On 21 April 2016 at 19:31, Laurent Pinchart wrote:
+> > On Thursday 21 Apr 2016 12:34:02 Ulf Hansson wrote:
+> >> When the pm_runtime_force_suspend|resume() helpers were invented, we
+> >> still had CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP as separate Kconfig
+> >> options.
+> >> 
+> >> To make sure these helpers worked for all combinations and without
+> >> introducing too much of complexity, the device was always resumed in
+> >> pm_runtime_force_resume().
+> >> 
+> >> More precisely, when CONFIG_PM_SLEEP was set and CONFIG_PM_RUNTIME was
+> >> unset, we needed to resume the device as the subsystem/driver couldn't
+> >> rely on using runtime PM to do it.
+> >> 
+> >> As the CONFIG_PM_RUNTIME option was merged into CONFIG_PM a while ago, it
+> >> removed this combination, of using CONFIG_PM_SLEEP without the earlier
+> >> CONFIG_PM_RUNTIME.
+> >> 
+> >> For this reason we can now rely on the subsystem/driver to use runtime PM
+> >> to resume the device, instead of forcing that to be done in all cases. In
+> >> other words, let's defer this to a later point when it's actually needed.
+> >> 
+> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> ---
+> >> 
+> >> Note, this patch is based upon another not yet queued patch [1]. The
+> >> reason is simply because that [1] is a more important patch as it fixes a
+> >> problem. It was posted to linux-pm April 8th and I expect it (or a new
+> >> revision of it) to be applied before $subject patch.
+> >> 
+> >> [1]
+> >> https://patchwork.kernel.org/patch/8782851
+> >> 
+> >> ---
+> >> 
+> >>  drivers/base/power/runtime.c | 11 +++++++++++
+> >>  1 file changed, 11 insertions(+)
+> >> 
+> >> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> >> index b746904..a190ca0 100644
+> >> --- a/drivers/base/power/runtime.c
+> >> +++ b/drivers/base/power/runtime.c
+> >> @@ -1506,6 +1506,17 @@ int pm_runtime_force_resume(struct device *dev)
+> >>               goto out;
+> >>       }
+> >> 
+> >> +     /*
+> >> +      * The PM core increases the runtime PM usage count in the system
+> >> +      * PM prepare phase. If the count is greather than 1 at this point,
+> >> +      * someone else has also increased it. In such case, let's make
+> >> +      * sure to runtime resume the device as that is likely what is
+> >> +      * expected. In other case we trust the subsystem/driver to runtime
+> >> +      * resume the device when it's actually needed.
+> >> +      */
+> >> +     if (atomic_read(&dev->power.usage_count) < 2)
+> >> +             goto out;
+> >> +
+> >>       ret = pm_runtime_set_active(dev);
+> >>       if (ret)
+> >>               goto out;
+> > 
+> > This works in the sense that it prevents devices from being PM resumed at
+> > system resume time if not needed. However, devices that are part of a PM
+> > domain and that were idle before system suspend are suspended twice (with
+> > their .runtime_suspend() handler called twice), which is not good at all.
+> > 
+> > The first suspend occurs at system suspend time, with
+> > pm_runtime_force_suspend() rightfully suspending the device as the device
+> > is active (due to being woken up by pm_genpd_prepare()). The second
+> > suspend occurs at resume time due to device_complete() calling
+> > pm_runtime_put().
+> > 
+> > I've tracked the issue to the fact that pm_genpd_complete() calls
+> > pm_runtime_set_active() regardless of whether the device was PM resumed or
+> > not. As pm_runtime_force_suspend() doesn't resume devices with this patch
+> > applied, the pm_runtime_put() call from device_complete() will try to
+> > runtime suspend the device a second time as the state is incorrectly set
+> > to RPM_ACTIVE.
+> > 
+> > With the current genpd implementation this patch isn't needed (and neither
+> > is my patch), as genpd expects the device to be always active when the
+> > system is resumed. However, when genpd isn't used,
+> > pm_runtime_force_resume() needs to skip resuming devices that were
+> > suspended before system suspend. This patch looks good to me to fix that
+> > problem.
+> > 
+> > Do we need to fix genpd first ?
+> 
+> Following you reasoning, I agree!
+> 
+> Let's put this patch on hold for a little while. I am already working
+> on changing genpd, so it shouldn't take long before I can post some
+> additional genpd patches improving the behaviour.
 
->
-> Given that this ACPI series already requires some significant cross-arch
-> interaction (which is actually good!), perhaps extending the clean-up
-> patches to encompass some of the ACPI bits might make sense, and we can
-> get that queued as a pre-requisite.
+I'd like to see something merged for v4.7 if possible. I agree that my patch 
+isn't a long term solution (we want to avoid adding additional fields to the 
+device power structure), but it has the benefit of being available now and 
+fixing the problem I ran into with drivers that would be broken on v4.7 
+without a fix. Do you think you could get a better fix ready in time for v4.7 
+? If so I'm fine with dropping this patch, but otherwise I'd prefer to get it 
+merged and reverted as part of your better implementation for v4.8.
 
-The cleanup patches you mention above are really independent of the ACPI 
-things.  I have applied them both before and after the ACPI patches, and 
-both seem to work.  With a quick perusal of the ACPI patches nothing 
-jumps out at me as being a candidate for inclusion in the header file 
-cleanup series.
+-- 
+Regards,
 
-If you think it would be a good idea, I can repost the cleanup series.
-
-David Daney
-
-
->
-> Will
->
->> v5 updates:
->>
->>   - Fixed ia64 build failure by gating some unused functions with #if
->>     CONFIG_{X86,ARM64}.
->>
->>   - Fixed section mismatch errors for X86 case.
->>
->>   - Removed unneeded #include from some files.
->>
->>   - Tested to build cleanly on ARM64, X86_64, IA64
->>
->> v4 updates:
->>
->>   - Updated from Hanjun Guo's v3 patches.
->>
->>   - Rebased on top of v16 of device-tree NUMA patches.
->>
->>   - Reordered some of the changes so that we don't introduce code and
->>     then change it several times in the patch set.  New code is
->>     introduced in its final form.  Code reused from x86 is first moved
->>     with no change, and then a separate patch to make any needed
->>     changes.
->>
->>   - code that is used only by ia64, moved to architecture specific
->>     files.
->>
->> v3 updates:
->>   - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
->>     that for acpi/numa.c (patch 2/12)
->>
->>   - Remove the duplicate NULL check for table print (patch 3/12)
->>
->>   - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
->>     dummy function for acpi_numa_arch_fixup()
->>
->>   - Solve the problem that the mapping from logical cpu to numa node
->>     is wrong which spotted out by Lorenzo
->>
->>   - cleanups for x86 and move acpi_numa_slit_init() and some other
->>     functions to common place, then reduce the duplicate of x86
->>     and arm64 (patch 7-12/12).
->>
->>   - rebased on top of 4.4 and Ganapat's v9 patch set.
->>
->> [1]: https://lkml.org/lkml/2016/4/8/571
->>
->> David Daney (1):
->>    acpi, numa, srat: Improve SRAT error detection and add messages.
->>
->> Hanjun Guo (11):
->>    acpi, numa: Use pr_fmt() instead of printk
->>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
->>    acpi, numa: remove duplicate NULL check
->>    acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
->>    arm64, numa: rework numa_add_memblk()
->>    x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
->>    acpi, numa: move bad_srat() and srat_disabled() to
->>      drivers/acpi/numa.c
->>    acpi, numa: remove unneeded acpi_numa=1
->>    acpi, numa: Move acpi_numa_memory_affinity_init() to
->>      drivers/acpi/numa.c
->>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
->>    acpi, numa: Enable ACPI based NUMA on ARM64
->>
->> Robert Richter (2):
->>    acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
->>    arm64, acpi, numa: Default enable ACPI_NUMA with NUMA
->>
->>   arch/arm64/include/asm/acpi.h |   8 ++
->>   arch/arm64/include/asm/numa.h |   2 +
->>   arch/arm64/kernel/Makefile    |   1 +
->>   arch/arm64/kernel/acpi_numa.c | 149 ++++++++++++++++++++++++++++
->>   arch/arm64/kernel/smp.c       |   2 +
->>   arch/arm64/mm/numa.c          |  17 ++--
->>   arch/ia64/include/asm/acpi.h  |   3 +
->>   arch/ia64/kernel/acpi.c       |   2 +-
->>   arch/ia64/kernel/setup.c      |   1 +
->>   arch/x86/include/asm/acpi.h   |   1 -
->>   arch/x86/mm/numa.c            |   2 +-
->>   arch/x86/mm/srat.c            | 116 +---------------------
->>   drivers/acpi/Kconfig          |   4 +-
->>   drivers/acpi/numa.c           | 224 ++++++++++++++++++++++++++++++++----------
->>   drivers/of/of_numa.c          |   4 +-
->>   include/acpi/acpi_numa.h      |   4 +
->>   include/linux/acpi.h          |  18 +++-
->>   17 files changed, 375 insertions(+), 183 deletions(-)
->>   create mode 100644 arch/arm64/kernel/acpi_numa.c
->>
->> --
->> 1.7.11.7
->>
+Laurent Pinchart
