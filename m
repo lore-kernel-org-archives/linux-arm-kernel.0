@@ -1,16 +1,19 @@
 From: al.stone@linaro.org (Al Stone)
-Date: Mon, 25 Apr 2016 12:49:38 -0600
+Date: Mon, 25 Apr 2016 13:01:47 -0600
 Subject: [PATCH v4] ARM64: ACPI: Update documentation for latest
  specification version
-In-Reply-To: <20160419111545.GB9571@red-moon>
-References: <1461007942-20969-1-git-send-email-al.stone@linaro.org>
- <20160419111545.GB9571@red-moon>
-Message-ID: <571E66C2.3000007@linaro.org>
+In-Reply-To: <20160421133740.GA24209@arm.com>
+References: <20160421133740.GA24209@arm.com>
+Message-ID: <571E699B.9090906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2016 05:15 AM, Lorenzo Pieralisi wrote:
-> On Mon, Apr 18, 2016 at 01:32:22PM -0600, Al Stone wrote:
+On 04/21/2016 07:37 AM, Alexey Klimov wrote:
+> Hi Al,
+> 
+> I hope you don't mind if I put few minor questions here.
+> 
+> On Mon, Apr 18, 2016 at 8:32 PM, Al Stone <al.stone@linaro.org> wrote:
 >> The ACPI 6.1 specification was recently released at the end of January
 >> 2016, but the arm64 kernel documentation for the use of ACPI was written
 >> for the 5.1 version of the spec.  There were significant additions to the
@@ -23,33 +26,112 @@ On 04/19/2016 05:15 AM, Lorenzo Pieralisi wrote:
 >> and updating content appropriately.  Whilst there, a few odds and ends of
 >> typos were caught as well.  This brings the documentation up to date with
 >> ACPI 6.1 for arm64.
+> 
+> Why linux-acpi is not in the destination list?
+
+No particular reason; I can add it to the next version, but this was meant
+to be arm64-specific documentation that just happens to be a user of ACPI.
+There are no changes to ACPI itself implied or intended.
+
+>> Changes for v4:
+>>    -- Clarify that IORT can sometimes be optional (Jon Masters).
+>>    -- Remove "Use as needed" descriptions of ACPI objects; they provide
+>>       no substantive information and doing so simplifies maintenance of
+>>       this document over time.  These have been replaced with a simpler
+>>       notice that states that unless otherwise noted, do what the APCI
+>>       specification says is needed.
+>>    -- Corrected the _OSI object usage recommendation; it described kernel
+>>       behavior that does not exist (Al Stone).
 >>
-[snip...]
-
->> @@ -185,9 +185,22 @@ tables (all section numbers refer to the ACPI 5.1 specfication):
->>      -- If PCI is supported, the MCFG (Memory mapped ConFiGuration
->>         Table), section 5.2.6, specifically Table 5-31.
->>  
->> +    -- If booting without a console=<device> kernel parameter is
->> +       supported, the SPCR (Serial Port Console Redirection table),
->> +       section 5.2.6, specifically Table 5-31.
+>> Changes for v3:
+>>    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+>>    -- Whitespace cleanup as pointed out by checkpatch
+>>
+>> Changes for v2:
+>>    -- Clean up white space (Harb Abdulhahmid)
+>>    -- Clarification on _CCA usage (Harb Abdulhamid)
+>>    -- IORT moved to required from recommended (Hanjun Guo)
+>>    -- Clarify IORT description (Hanjun Guo)
+>>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Jonathan Corbet <corbet@lwn.net>
+>> ---
+>>  Documentation/arm64/acpi_object_usage.txt | 347 ++++++++++++++++--------------
+>>  Documentation/arm64/arm-acpi.txt          |  28 ++-
+>>  2 files changed, 212 insertions(+), 163 deletions(-)
+>>
+>> diff --git a/Documentation/arm64/acpi_object_usage.txt
+>> b/Documentation/arm64/acpi_object_usage.txt
+>> index a6e1a18..3891750 100644
+>> --- a/Documentation/arm64/acpi_object_usage.txt
+>> +++ b/Documentation/arm64/acpi_object_usage.txt
+>> @@ -13,14 +13,18 @@ For ACPI on arm64, tables also fall into the
+>> following categories:
+> 
+> [..]
+> 
+>>         == Memory-mapped ConFiGuration space ==
+>> @@ -176,14 +192,38 @@ MPST   Section 5.2.21 (signature == "MPST")
+>>         == Memory Power State Table ==
+>>         Optional, not currently supported.
+>>
+>> +MSCT   Section 5.2.19 (signature == "MSCT")
+>> +       == Maximum System Characteristic Table ==
+>> +       Optional, not currently supported.
 >> +
->> +    -- If virtualization is supported, the IORT (Input Output Remapping
->> +       Table, section 5.2.6, specifically Table 5-31.
+>>  MSDM   Signature Reserved (signature == "MSDM")
+>>         == Microsoft Data Management table ==
+>>         Microsoft only table, will not be supported.
+>>
+>> -MSCT   Section 5.2.19 (signature == "MSCT")
+>> -       == Maximum System Characteristic Table ==
+>> +NFIT   Section 5.2.25 (signature == "NFIT")
+>> +       == NVDIMM Firmware Interface Table ==
+>>         Optional, not currently supported.
+>>
+>> +OEMx   Signature of "OEMx" only
+>> +       == OEM Specific Tables ==
+>> +       All tables starting with a signature of "OEM" are reserved for OEM
+>> +       use.  Since these are not meant to be of general use but are limited
+>> +       to very specific end users, they are not recommended for use and are
+>> +       not supported by the kernel for arm64.
+>> +
+>> +PCCT   Section 14.1 (signature == "PCCT)
+>> +       == Platform Communications Channel Table ==
+>> +       Recommend for use on arm64, and required when using CPPC to control
+>> +       power on the platform.
 > 
-> Why only "If virtualization is supported" ? Missing closing bracket.
-
-Hrm.  I guess that is an unnecessary qualification.
-
-> I still question sections of this document that IMHO do not belong
-> in the kernel documentation (but in the ACPI specs - eg _PRx methods
-> usage), anyway the information seems accurate so, pending changes above:
+> Could you please check corectness of this sentence?
 > 
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> If I remember correctly CPPC may operate via PCC interface but there is no
+> strict requirement to implement control mechanism via PCC.
+
+On double checking, no, it is not a strict requirement to use PCC.  So this
+should probably be something like:
+
+	Recommended for use on arm64; use of PCC is recommended when using
+	CPPC.
+
+>> using CPPC to control power on the platform
+> 
+> Sorry, I think I need to disagree.
+> Main description of CPPC says that CPPC defines mechanism to manage performance
+> of logical processor.
+
+Ah.  Yup, CPPC is just for processors.  Thanks for catching that.
+
+> What do you think about "to control performance on the platform"?
+> (or maybe "to control performance and power on the platform")
+> 
+> Thanks,
+> Alexey
 > 
 
-Thanks, Lorenzo.  The suggested changes all seem fine; I'll include them
-in a v5.
+Perhaps just "using CPPC to control performance and power for platform
+processors" -- there are of course all the other portions of ACPI to
+control device power, but not related to CPPC.
 
 -- 
 ciao,
