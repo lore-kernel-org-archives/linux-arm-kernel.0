@@ -1,80 +1,72 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Apr 2016 11:40:09 +0100
-Subject: [PATCHv2 0/6] efi: detect erroneous firmware IRQ manipulation
-In-Reply-To: <20160425102821.GQ2829@codeblueprint.co.uk>
-References: <1461333083-15529-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu8FGpZK4yDito2jKTbjuyE2jojj5tZhCa2qUwKdWL9+ng@mail.gmail.com>
- <20160424212241.GO2829@codeblueprint.co.uk>
- <20160425101527.GP2829@codeblueprint.co.uk>
- <CAKv+Gu8OfqdJp-VhC3o-tie4mRZXsF5ESKkZbsjnBHDY4xbXvQ@mail.gmail.com>
- <20160425102821.GQ2829@codeblueprint.co.uk>
-Message-ID: <20160425104009.GD25087@leverpostej>
+Date: Mon, 25 Apr 2016 11:47:46 +0100
+Subject: [PATCH] ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+In-Reply-To: <571DEF30.90604@rock-chips.com>
+References: <1461122150-9042-1-git-send-email-jay.xu@rock-chips.com>
+ <1461211092-26331-1-git-send-email-jay.xu@rock-chips.com>
+ <20160421101930.GG6879@leverpostej>
+ <5718AFB8.5070004@rock-chips.com> <20160421123018.096d4a75@arm.com>
+ <571DE803.3010902@rock-chips.com>
+ <20160425100531.GC25087@leverpostej>
+ <571DEF30.90604@rock-chips.com>
+Message-ID: <20160425104746.GE25087@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 11:28:21AM +0100, Matt Fleming wrote:
-> On Mon, 25 Apr, at 12:21:18PM, Ard Biesheuvel wrote:
-> > (+ Laszlo)
-> > 
-> > On 25 April 2016 at 12:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > > On Sun, 24 Apr, at 10:22:41PM, Matt Fleming wrote:
-> > >>
-> > >> I like this series a lot (well, ignoring the fact that the firmware is
-> > >> trying to eat itself). The runtime call code is much cleaner now, and
-> > >> this is a great precedent for any future multi-architecture quirks we
-> > >> may need.
-> > >>
-> > >> Queued for v4.7, thanks everyone!
-> > >
-> > > Hmm... Booting this series with Qemu and OVMF results in lots of
-> > > warnings,
-> > >
-> > > [ 0.102173] ------------[ cut here ]------------
-> > > [ 0.103000] WARNING: CPU: 0 PID: 0 at /dev/shm/mfleming/git/efi/drivers/firmware/efi/runtime-wrappers.c:30 efi_call_virt_check_flags+0x69/0x90
-> > > [ 0.103505] Modules linked in:
-> > > [ 0.104519] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4+ #1
-> > > [    0.105000]  0000000000000000 ffffffff81e03e30 ffffffff8132206f 0000000000000000
-> > > [    0.105000]  0000000000000000 ffffffff81e03e70 ffffffff8105a47c 0000001e0000000a
-> > > [    0.105000]  0000000000000246 0000000000000286 ffffffff81bed975 ffffffff81e03f10
-> > > [    0.105000] Call Trace:
-> > > [    0.105000]  [<ffffffff8132206f>] dump_stack+0x4d/0x6e
-> > > [    0.105000]  [<ffffffff8105a47c>] __warn+0xcc/0xf0
-> > > [    0.105000]  [<ffffffff8105a558>] warn_slowpath_null+0x18/0x20
-> > > [    0.105000]  [<ffffffff8164e5a9>] efi_call_virt_check_flags+0x69/0x90
-> > > [    0.105000]  [<ffffffff8164f9d2>] virt_efi_set_variable+0x82/0x190
-> > > [    0.105000]  [<ffffffff81054555>] efi_delete_dummy_variable+0x75/0x80
-> > > [    0.105000]  [<ffffffff81f599f6>] efi_enter_virtual_mode+0x463/0x472
-> > > [    0.105000]  [<ffffffff81f41f82>] start_kernel+0x38f/0x415
-> > > [    0.105000]  [<ffffffff81f419e1>] ? set_init_arg+0x55/0x55
-> > > [    0.105000]  [<ffffffff81f415ee>] x86_64_start_reservations+0x2a/0x2c
-> > > [    0.105000]  [<ffffffff81f416da>] x86_64_start_kernel+0xea/0xed
-> > > [    0.107181] ---[ end trace 0081cc453369d969 ]---
-> > > [    0.107499] Disabling lock debugging due to kernel taint
-> > > [    0.108226] [Firmware Bug]: IRQ flags corrupted (0x00000246=>0x00000286) by EFI set_variable
-> > >
-> > > Has anyone tested this series on x86 to ensure that this is a rare
-> > > case? I'll go and test some physical x86 machines now.
-> > 
-> > I suppose that it is quite likely that this issue occurs in the wild
-> > if it is present in OVMF. Could anyone check which flag is actually
-> > clobbered here?
-> 
-> X86_EFLAGS_ZF (zero flag) gets turned off and X86_EFLAGS_SF (signed
-> flag) gets turned on. Which is totally legitimate and isn't grounds
-> for a warning... 
-> 
-> I think the function we want to use instead of local_save_flags() is
-> irqs_disabled_flags().
+On Mon, Apr 25, 2016 at 06:19:28PM +0800, Huang, Tao wrote:
+> Hi, Mark:
+> On 2016?04?25? 18:05, Mark Rutland wrote:
+> > On Mon, Apr 25, 2016 at 05:48:51PM +0800, Huang, Tao wrote:
+> >> and pmu define as:
+> >>     pmu_a53 {
+> >>         compatible = "arm,cortex-a53-pmu";
+> >>         interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW &part0>;
+> >>         interrupt-affinity = <&cpu_l0>,
+> >>                      <&cpu_l1>,
+> >>                      <&cpu_l2>,
+> >>                      <&cpu_l3>;
+> >>     };
+> >>
+> >>     pmu_a72 {
+> >>         compatible = "arm,cortex-a72-pmu", "arm,cortex-a57-pmu";
+> > That Cortex-A57 PMU fallback should just go. We already have Cortex-A72
+> > PMU support upstream, and I believe there are sufficient differences
+> > such that the Cortex-A72 PMU is not a strict superset of the Cortex-A57
+> > PMU.
+> As I say, I tested on v4.4, I don't back port
+> arch/arm64/kernel/perf_event.c, so I use "arm,cortex-a57-pmu". Upstream
+> will use "arm,cortex-a72-pmu" only.
+> BTW, I don't see any differences between A72/A57 in source code:
 
-It looks like irqs_disabled_flags() will do what you expect, and ignore
-everything but the interrupt flag.
+The PMU name is exposed to userspace, so the user will be told they have
+a Cortex-A57 PMU, with all of the IMPLEMENTATION DEFINED events that
+implies.
 
-However, for ARM that will ignore the other exceptions we've seen FW
-erroneously unmask (e.g. FIQ), which is unfortunate, as fiddling with
-those is just as disastrous.
+We don't handle those IMPLEMENTATION DEFINED events in the kernel, but
+for the sake of the userspace ABI, we should not expose the Cortex-A72
+PMU as a Cortex-A57 PMU.
 
-Would you be happy with an arch_efi_call_check_flags(before, after),
-instead? That way we can make the flags we check arch-specific.
+Given the code is otherwise identical, it should be relatively simple to
+backport the A72 support.
+
+> >> It can boot. And I test with Android simpleperf stat and perf top, it works!
+> >> So these patches work on RK3399.
+> > There is still work to do in the driver, as Marc pointed out.
+> >
+> > While it may appear to work, it will be requesting percpu IRQs on wrong
+> > CPUs (e.g. see how cpu_pmu_request_irq calls cpu_pmu_enable_percpu_irq,
+> > on each CPU), and we will need to update the binding codument to cover
+> > this case.
+> I also set interrupt-affinity, maybe this avoid problem. I add some
+> debug print on driver, I believe irq is request on right cpus.
+
+Unfortunately, that's not entirely the case.
+
+As I mentioned above, cpu_pmu_request_irq calls
+cpu_pmu_enable_percpu_irq on each CPU (i.e. all CPUs in the system),
+regardless of the affinity.
+
+That may happen to work, but it's not something I'm keen on relying on.
 
 Thanks,
 Mark.
