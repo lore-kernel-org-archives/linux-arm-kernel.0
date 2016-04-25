@@ -1,59 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 25 Apr 2016 08:30:41 +0530
-Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
-In-Reply-To: <7576455.rVXD0283Nr@wuerfel>
-References: <cover.1461228504.git.viresh.kumar@linaro.org>
- <1c2cc13d812e04f231ddd4313e3ba6a54fb4632c.1461228504.git.viresh.kumar@linaro.org>
- <7576455.rVXD0283Nr@wuerfel>
-Message-ID: <20160425030041.GF22726@vireshk-i7>
+From: prime.zeng@huawei.com (Zeng Tao)
+Date: Mon, 25 Apr 2016 11:37:33 +0800
+Subject: [PATCH] arm64: fix /proc/cpuinfo for elf32
+Message-ID: <1461555453-60440-1-git-send-email-prime.zeng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-04-16, 00:42, Arnd Bergmann wrote:
-> On Thursday 21 April 2016 14:29:02 Viresh Kumar wrote:
-> > diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> > index 79d0a5d9da8e..f24f46776fbb 100644
-> > --- a/arch/arm/mach-mvebu/pmsu.c
-> > +++ b/arch/arm/mach-mvebu/pmsu.c
-> > @@ -685,8 +685,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
-> >                         dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
-> >                                 __func__, ret);
-> >         }
-> > -
-> > -       platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> >         return 0;
-> >  }
-> >  
-> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > index 69b2a222c84e..5704a92c52dc 100644
-> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > @@ -33,6 +33,8 @@ static const struct of_device_id machines[] = {
-> >  
-> >         { .compatible = "marvell,berlin", },
-> >  
-> > +       { .compatible = "marvell,armadaxp", },
-> > +
-> >         { .compatible = "samsung,exynos3250", },
-> >         { .compatible = "samsung,exynos4210", },
-> >         { .compatible = "samsung,exynos4212", },
-> 
-> I think to make it clear that the ordering is significant here, I would leave this
-> platform_device_register_simple() in armada_xp_pmsu_cpufreq_init().
-> 
-> However, it might be helpful to move that function into a new file in
-> drivers/cpufreq/ if that works.
+For elf32 thread, personality is used for arm32,
+and thread_flag for arm64.
 
-We just can't get wrong with the ordering here, as this is done from
-device_initcall() and so that point is out of question.
+Here personality is used for arm64, so fix it.
 
-The other thing that can happen is that armada_xp_pmsu_cpufreq_init()
-call can fail. In that case, most of the times cpufreq-dt ->init()
-will fail as well, so even that is fine for me.
+Signed-off-by: Zeng Tao <prime.zeng@huawei.com>
+---
+ arch/arm64/kernel/cpuinfo.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-And, so I think we can keep this patch as is.
-
-Do you agree ?
-
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 84c8684..f739398 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -126,7 +126,7 @@ static int c_show(struct seq_file *m, void *v)
+ 		 * software which does already (at least for 32-bit).
+ 		 */
+ 		seq_puts(m, "Features\t:");
+-		if (personality(current->personality) == PER_LINUX32) {
++		if (test_thread_flag(TIF_32BIT)) {
+ #ifdef CONFIG_COMPAT
+ 			for (j = 0; compat_hwcap_str[j]; j++)
+ 				if (compat_elf_hwcap & (1 << j))
 -- 
-viresh
+1.9.1
