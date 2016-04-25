@@ -1,162 +1,518 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 25 Apr 2016 04:00:41 +0300
-Subject: [PATCH v2 3/4] arm: dts: lpc32xx: reparent SIC1 and SIC2 interrupts
- from MIC
+Date: Mon, 25 Apr 2016 04:00:44 +0300
+Subject: [PATCH v2 4/4] ARM: lpc32xx: remove legacy irq controller driver
 In-Reply-To: <1461545990-25560-1-git-send-email-vz@mleia.com>
 References: <1461545990-25560-1-git-send-email-vz@mleia.com>
-Message-ID: <1461546041-25713-1-git-send-email-vz@mleia.com>
+Message-ID: <1461546044-25758-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change adds separate device nodes for SIC1 and SIC2 interrupt
-controllers and reparents all defined SIC1 and SIC2 interrupt
-producers to the correspondent interrupt controller, this is needed to
-perform switching to a new LPC32xx MIC/SIC interrupt controller driver.
+New NXP LPC32xx irq chip driver is used instead of a legacy one.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
 Changes from v1 to v2:
-* squashed two step change in lpc32xx.dtsi - new irqchip driver can be
-  used (i.e. board boots with access to userspace) with old DTS file,
-  so there is no need to fix DTS firstly and then switch to a new driver,
-* removed "interrupt-controller-name" and "wakeup-sources" properties
-  from all interrupt controllers,
-* removed outdated comment.
+* none, this is a new change
 
- arch/arm/boot/dts/lpc32xx.dtsi | 58 +++++++++++++++++++++++++++++-------------
- 1 file changed, 41 insertions(+), 17 deletions(-)
+ arch/arm/mach-lpc32xx/Makefile |   2 +-
+ arch/arm/mach-lpc32xx/irq.c    | 477 -----------------------------------------
+ 2 files changed, 1 insertion(+), 478 deletions(-)
+ delete mode 100644 arch/arm/mach-lpc32xx/irq.c
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 73c4746..4570ddc 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -92,7 +92,8 @@
- 			ohci: ohci at 0 {
- 				compatible = "nxp,ohci-nxp", "usb-ohci";
- 				reg = <0x0 0x300>;
--				interrupts = <59 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&usbclk LPC32XX_USB_CLK_HOST>;
- 				status = "disabled";
- 			};
-@@ -100,10 +101,11 @@
- 			usbd: usbd at 0 {
- 				compatible = "nxp,lpc3220-udc";
- 				reg = <0x0 0x300>;
--				interrupts = <61 IRQ_TYPE_LEVEL_HIGH>,
--					     <62 IRQ_TYPE_LEVEL_HIGH>,
--					     <60 IRQ_TYPE_LEVEL_HIGH>,
--					     <58 IRQ_TYPE_LEVEL_LOW>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <29 IRQ_TYPE_LEVEL_HIGH>,
-+					     <30 IRQ_TYPE_LEVEL_HIGH>,
-+					     <28 IRQ_TYPE_LEVEL_HIGH>,
-+					     <26 IRQ_TYPE_LEVEL_LOW>;
- 				clocks = <&usbclk LPC32XX_USB_CLK_DEVICE>;
- 				status = "disabled";
- 			};
-@@ -111,7 +113,8 @@
- 			i2cusb: i2c at 300 {
- 				compatible = "nxp,pnx-i2c";
- 				reg = <0x300 0x100>;
--				interrupts = <63 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <31 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&usbclk LPC32XX_USB_CLK_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -263,7 +266,8 @@
- 			i2c1: i2c at 400A0000 {
- 				compatible = "nxp,pnx-i2c";
- 				reg = <0x400A0000 0x100>;
--				interrupts = <51 IRQ_TYPE_LEVEL_LOW>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				pnx,timeout = <0x64>;
-@@ -273,7 +277,8 @@
- 			i2c2: i2c at 400A8000 {
- 				compatible = "nxp,pnx-i2c";
- 				reg = <0x400A8000 0x100>;
--				interrupts = <50 IRQ_TYPE_LEVEL_LOW>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				pnx,timeout = <0x64>;
-@@ -314,12 +319,6 @@
- 				};
- 			};
+diff --git a/arch/arm/mach-lpc32xx/Makefile b/arch/arm/mach-lpc32xx/Makefile
+index c70709a..79b6b07 100644
+--- a/arch/arm/mach-lpc32xx/Makefile
++++ b/arch/arm/mach-lpc32xx/Makefile
+@@ -2,6 +2,6 @@
+ # Makefile for the linux kernel.
+ #
  
+-obj-y	:= irq.o common.o serial.o
++obj-y	:= common.o serial.o
+ obj-y	+= pm.o suspend.o
+ obj-y	+= phy3250.o
+diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
+deleted file mode 100644
+index 2ae431e..0000000
+--- a/arch/arm/mach-lpc32xx/irq.c
++++ /dev/null
+@@ -1,477 +0,0 @@
+-/*
+- * arch/arm/mach-lpc32xx/irq.c
+- *
+- * Author: Kevin Wells <kevin.wells@nxp.com>
+- *
+- * Copyright (C) 2010 NXP Semiconductors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/irqdomain.h>
+-#include <linux/module.h>
+-
+-#include <mach/irqs.h>
+-#include <mach/hardware.h>
+-#include <mach/platform.h>
+-#include "common.h"
+-
+-/*
+- * Default value representing the Activation polarity of all internal
+- * interrupt sources
+- */
+-#define MIC_APR_DEFAULT		0x3FF0EFE0
+-#define SIC1_APR_DEFAULT	0xFBD27186
+-#define SIC2_APR_DEFAULT	0x801810C0
+-
+-/*
+- * Default value representing the Activation Type of all internal
+- * interrupt sources. All are level sensitive.
+- */
+-#define MIC_ATR_DEFAULT		0x00000000
+-#define SIC1_ATR_DEFAULT	0x00026000
+-#define SIC2_ATR_DEFAULT	0x00000000
+-
+-static struct irq_domain *lpc32xx_mic_domain;
+-static struct device_node *lpc32xx_mic_np;
+-
+-struct lpc32xx_event_group_regs {
+-	void __iomem *enab_reg;
+-	void __iomem *edge_reg;
+-	void __iomem *maskstat_reg;
+-	void __iomem *rawstat_reg;
+-};
+-
+-static const struct lpc32xx_event_group_regs lpc32xx_event_int_regs = {
+-	.enab_reg = LPC32XX_CLKPWR_INT_ER,
+-	.edge_reg = LPC32XX_CLKPWR_INT_AP,
+-	.maskstat_reg = LPC32XX_CLKPWR_INT_SR,
+-	.rawstat_reg = LPC32XX_CLKPWR_INT_RS,
+-};
+-
+-static const struct lpc32xx_event_group_regs lpc32xx_event_pin_regs = {
+-	.enab_reg = LPC32XX_CLKPWR_PIN_ER,
+-	.edge_reg = LPC32XX_CLKPWR_PIN_AP,
+-	.maskstat_reg = LPC32XX_CLKPWR_PIN_SR,
+-	.rawstat_reg = LPC32XX_CLKPWR_PIN_RS,
+-};
+-
+-struct lpc32xx_event_info {
+-	const struct lpc32xx_event_group_regs *event_group;
+-	u32 mask;
+-};
+-
+-/*
+- * Maps an IRQ number to and event mask and register
+- */
+-static const struct lpc32xx_event_info lpc32xx_events[NR_IRQS] = {
+-	[IRQ_LPC32XX_GPI_08] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_08_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_09] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_09_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_19] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_19_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_07] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_07_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_00] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_00_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_01] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_01_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_02] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_02_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_03] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_03_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_04] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_04_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_05] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_05_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_06] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_06_BIT,
+-	},
+-	[IRQ_LPC32XX_GPI_28] = {
+-		.event_group = &lpc32xx_event_pin_regs,
+-		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_28_BIT,
+-	},
+-	[IRQ_LPC32XX_GPIO_00] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_00_BIT,
+-	},
+-	[IRQ_LPC32XX_GPIO_01] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_01_BIT,
+-	},
+-	[IRQ_LPC32XX_GPIO_02] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_02_BIT,
+-	},
+-	[IRQ_LPC32XX_GPIO_03] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_03_BIT,
+-	},
+-	[IRQ_LPC32XX_GPIO_04] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_04_BIT,
+-	},
+-	[IRQ_LPC32XX_GPIO_05] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_05_BIT,
+-	},
+-	[IRQ_LPC32XX_KEY] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_KEY_BIT,
+-	},
+-	[IRQ_LPC32XX_ETHERNET] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_MAC_BIT,
+-	},
+-	[IRQ_LPC32XX_USB_OTG_ATX] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_USBATXINT_BIT,
+-	},
+-	[IRQ_LPC32XX_USB_HOST] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_USB_BIT,
+-	},
+-	[IRQ_LPC32XX_RTC] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_RTC_BIT,
+-	},
+-	[IRQ_LPC32XX_MSTIMER] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_MSTIMER_BIT,
+-	},
+-	[IRQ_LPC32XX_TS_AUX] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_TS_AUX_BIT,
+-	},
+-	[IRQ_LPC32XX_TS_P] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_TS_P_BIT,
+-	},
+-	[IRQ_LPC32XX_TS_IRQ] = {
+-		.event_group = &lpc32xx_event_int_regs,
+-		.mask = LPC32XX_CLKPWR_INTSRC_ADC_BIT,
+-	},
+-};
+-
+-static void get_controller(unsigned int irq, unsigned int *base,
+-	unsigned int *irqbit)
+-{
+-	if (irq < 32) {
+-		*base = LPC32XX_MIC_BASE;
+-		*irqbit = 1 << irq;
+-	} else if (irq < 64) {
+-		*base = LPC32XX_SIC1_BASE;
+-		*irqbit = 1 << (irq - 32);
+-	} else {
+-		*base = LPC32XX_SIC2_BASE;
+-		*irqbit = 1 << (irq - 64);
+-	}
+-}
+-
+-static void lpc32xx_mask_irq(struct irq_data *d)
+-{
+-	unsigned int reg, ctrl, mask;
+-
+-	get_controller(d->hwirq, &ctrl, &mask);
+-
+-	reg = __raw_readl(LPC32XX_INTC_MASK(ctrl)) & ~mask;
+-	__raw_writel(reg, LPC32XX_INTC_MASK(ctrl));
+-}
+-
+-static void lpc32xx_unmask_irq(struct irq_data *d)
+-{
+-	unsigned int reg, ctrl, mask;
+-
+-	get_controller(d->hwirq, &ctrl, &mask);
+-
+-	reg = __raw_readl(LPC32XX_INTC_MASK(ctrl)) | mask;
+-	__raw_writel(reg, LPC32XX_INTC_MASK(ctrl));
+-}
+-
+-static void lpc32xx_ack_irq(struct irq_data *d)
+-{
+-	unsigned int ctrl, mask;
+-
+-	get_controller(d->hwirq, &ctrl, &mask);
+-
+-	__raw_writel(mask, LPC32XX_INTC_RAW_STAT(ctrl));
+-
+-	/* Also need to clear pending wake event */
+-	if (lpc32xx_events[d->hwirq].mask != 0)
+-		__raw_writel(lpc32xx_events[d->hwirq].mask,
+-			lpc32xx_events[d->hwirq].event_group->rawstat_reg);
+-}
+-
+-static void __lpc32xx_set_irq_type(unsigned int irq, int use_high_level,
+-	int use_edge)
+-{
+-	unsigned int reg, ctrl, mask;
+-
+-	get_controller(irq, &ctrl, &mask);
+-
+-	/* Activation level, high or low */
+-	reg = __raw_readl(LPC32XX_INTC_POLAR(ctrl));
+-	if (use_high_level)
+-		reg |= mask;
+-	else
+-		reg &= ~mask;
+-	__raw_writel(reg, LPC32XX_INTC_POLAR(ctrl));
+-
+-	/* Activation type, edge or level */
+-	reg = __raw_readl(LPC32XX_INTC_ACT_TYPE(ctrl));
+-	if (use_edge)
+-		reg |= mask;
+-	else
+-		reg &= ~mask;
+-	__raw_writel(reg, LPC32XX_INTC_ACT_TYPE(ctrl));
+-
+-	/* Use same polarity for the wake events */
+-	if (lpc32xx_events[irq].mask != 0) {
+-		reg = __raw_readl(lpc32xx_events[irq].event_group->edge_reg);
+-
+-		if (use_high_level)
+-			reg |= lpc32xx_events[irq].mask;
+-		else
+-			reg &= ~lpc32xx_events[irq].mask;
+-
+-		__raw_writel(reg, lpc32xx_events[irq].event_group->edge_reg);
+-	}
+-}
+-
+-static int lpc32xx_set_irq_type(struct irq_data *d, unsigned int type)
+-{
+-	switch (type) {
+-	case IRQ_TYPE_EDGE_RISING:
+-		/* Rising edge sensitive */
+-		__lpc32xx_set_irq_type(d->hwirq, 1, 1);
+-		irq_set_handler_locked(d, handle_edge_irq);
+-		break;
+-
+-	case IRQ_TYPE_EDGE_FALLING:
+-		/* Falling edge sensitive */
+-		__lpc32xx_set_irq_type(d->hwirq, 0, 1);
+-		irq_set_handler_locked(d, handle_edge_irq);
+-		break;
+-
+-	case IRQ_TYPE_LEVEL_LOW:
+-		/* Low level sensitive */
+-		__lpc32xx_set_irq_type(d->hwirq, 0, 0);
+-		irq_set_handler_locked(d, handle_level_irq);
+-		break;
+-
+-	case IRQ_TYPE_LEVEL_HIGH:
+-		/* High level sensitive */
+-		__lpc32xx_set_irq_type(d->hwirq, 1, 0);
+-		irq_set_handler_locked(d, handle_level_irq);
+-		break;
+-
+-	/* Other modes are not supported */
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static int lpc32xx_irq_wake(struct irq_data *d, unsigned int state)
+-{
+-	unsigned long eventreg;
+-
+-	if (lpc32xx_events[d->hwirq].mask != 0) {
+-		eventreg = __raw_readl(lpc32xx_events[d->hwirq].
+-			event_group->enab_reg);
+-
+-		if (state)
+-			eventreg |= lpc32xx_events[d->hwirq].mask;
+-		else {
+-			eventreg &= ~lpc32xx_events[d->hwirq].mask;
+-
 -			/*
--			 * MIC Interrupt controller includes:
--			 *   MIC @40008000
--			 *   SIC1 @4000C000
--			 *   SIC2 @40010000
+-			 * When disabling the wakeup, clear the latched
+-			 * event
 -			 */
- 			mic: interrupt-controller at 40008000 {
- 				compatible = "nxp,lpc3220-mic";
- 				interrupt-controller;
-@@ -327,6 +326,28 @@
- 				#interrupt-cells = <2>;
- 			};
- 
-+			sic1: interrupt-controller at 4000c000 {
-+				compatible = "nxp,lpc3220-sic";
-+				reg = <0x4000c000 0x4000>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+
-+				interrupt-parent = <&mic>;
-+				interrupts = <0 IRQ_TYPE_LEVEL_LOW>,
-+					     <30 IRQ_TYPE_LEVEL_LOW>;
-+				};
-+
-+			sic2: interrupt-controller at 40010000 {
-+				compatible = "nxp,lpc3220-sic";
-+				reg = <0x40010000 0x4000>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+
-+				interrupt-parent = <&mic>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_LOW>,
-+					     <31 IRQ_TYPE_LEVEL_LOW>;
-+			};
-+
- 			uart1: serial at 40014000 {
- 				compatible = "nxp,lpc3220-hsuart";
- 				reg = <0x40014000 0x1000>;
-@@ -351,7 +372,8 @@
- 			rtc: rtc at 40024000 {
- 				compatible = "nxp,lpc3220-rtc";
- 				reg = <0x40024000 0x1000>;
--				interrupts = <52 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_RTC>;
- 			};
- 
-@@ -404,7 +426,8 @@
- 			adc: adc at 40048000 {
- 				compatible = "nxp,lpc3220-adc";
- 				reg = <0x40048000 0x1000>;
--				interrupts = <39 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_ADC>;
- 				status = "disabled";
- 			};
-@@ -412,7 +435,8 @@
- 			tsc: tsc at 40048000 {
- 				compatible = "nxp,lpc3220-tsc";
- 				reg = <0x40048000 0x1000>;
--				interrupts = <39 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_ADC>;
- 				status = "disabled";
- 			};
+-			__raw_writel(lpc32xx_events[d->hwirq].mask,
+-				lpc32xx_events[d->hwirq].
+-				event_group->rawstat_reg);
+-		}
+-
+-		__raw_writel(eventreg,
+-			lpc32xx_events[d->hwirq].event_group->enab_reg);
+-
+-		return 0;
+-	}
+-
+-	/* Clear event */
+-	__raw_writel(lpc32xx_events[d->hwirq].mask,
+-		lpc32xx_events[d->hwirq].event_group->rawstat_reg);
+-
+-	return -ENODEV;
+-}
+-
+-static void __init lpc32xx_set_default_mappings(unsigned int apr,
+-	unsigned int atr, unsigned int offset)
+-{
+-	unsigned int i;
+-
+-	/* Set activation levels for each interrupt */
+-	i = 0;
+-	while (i < 32) {
+-		__lpc32xx_set_irq_type(offset + i, ((apr >> i) & 0x1),
+-			((atr >> i) & 0x1));
+-		i++;
+-	}
+-}
+-
+-static struct irq_chip lpc32xx_irq_chip = {
+-	.name = "MIC",
+-	.irq_ack = lpc32xx_ack_irq,
+-	.irq_mask = lpc32xx_mask_irq,
+-	.irq_unmask = lpc32xx_unmask_irq,
+-	.irq_set_type = lpc32xx_set_irq_type,
+-	.irq_set_wake = lpc32xx_irq_wake
+-};
+-
+-static void lpc32xx_sic1_handler(struct irq_desc *desc)
+-{
+-	unsigned long ints = __raw_readl(LPC32XX_INTC_STAT(LPC32XX_SIC1_BASE));
+-
+-	while (ints != 0) {
+-		int irqno = fls(ints) - 1;
+-
+-		ints &= ~(1 << irqno);
+-
+-		generic_handle_irq(LPC32XX_SIC1_IRQ(irqno));
+-	}
+-}
+-
+-static void lpc32xx_sic2_handler(struct irq_desc *desc)
+-{
+-	unsigned long ints = __raw_readl(LPC32XX_INTC_STAT(LPC32XX_SIC2_BASE));
+-
+-	while (ints != 0) {
+-		int irqno = fls(ints) - 1;
+-
+-		ints &= ~(1 << irqno);
+-
+-		generic_handle_irq(LPC32XX_SIC2_IRQ(irqno));
+-	}
+-}
+-
+-static int __init __lpc32xx_mic_of_init(struct device_node *node,
+-					struct device_node *parent)
+-{
+-	lpc32xx_mic_np = node;
+-
+-	return 0;
+-}
+-
+-static const struct of_device_id mic_of_match[] __initconst = {
+-	{ .compatible = "nxp,lpc3220-mic", .data = __lpc32xx_mic_of_init },
+-	{ }
+-};
+-
+-void __init lpc32xx_init_irq(void)
+-{
+-	unsigned int i;
+-
+-	/* Setup MIC */
+-	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_MIC_BASE));
+-	__raw_writel(MIC_APR_DEFAULT, LPC32XX_INTC_POLAR(LPC32XX_MIC_BASE));
+-	__raw_writel(MIC_ATR_DEFAULT, LPC32XX_INTC_ACT_TYPE(LPC32XX_MIC_BASE));
+-
+-	/* Setup SIC1 */
+-	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
+-	__raw_writel(SIC1_APR_DEFAULT, LPC32XX_INTC_POLAR(LPC32XX_SIC1_BASE));
+-	__raw_writel(SIC1_ATR_DEFAULT,
+-				LPC32XX_INTC_ACT_TYPE(LPC32XX_SIC1_BASE));
+-
+-	/* Setup SIC2 */
+-	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
+-	__raw_writel(SIC2_APR_DEFAULT, LPC32XX_INTC_POLAR(LPC32XX_SIC2_BASE));
+-	__raw_writel(SIC2_ATR_DEFAULT,
+-				LPC32XX_INTC_ACT_TYPE(LPC32XX_SIC2_BASE));
+-
+-	/* Configure supported IRQ's */
+-	for (i = 0; i < NR_IRQS; i++) {
+-		irq_set_chip_and_handler(i, &lpc32xx_irq_chip,
+-					 handle_level_irq);
+-		irq_clear_status_flags(i, IRQ_NOREQUEST);
+-	}
+-
+-	/* Set default mappings */
+-	lpc32xx_set_default_mappings(MIC_APR_DEFAULT, MIC_ATR_DEFAULT, 0);
+-	lpc32xx_set_default_mappings(SIC1_APR_DEFAULT, SIC1_ATR_DEFAULT, 32);
+-	lpc32xx_set_default_mappings(SIC2_APR_DEFAULT, SIC2_ATR_DEFAULT, 64);
+-
+-	/* Initially disable all wake events */
+-	__raw_writel(0, LPC32XX_CLKPWR_P01_ER);
+-	__raw_writel(0, LPC32XX_CLKPWR_INT_ER);
+-	__raw_writel(0, LPC32XX_CLKPWR_PIN_ER);
+-
+-	/*
+-	 * Default wake activation polarities, all pin sources are low edge
+-	 * triggered
+-	 */
+-	__raw_writel(LPC32XX_CLKPWR_INTSRC_TS_P_BIT |
+-		LPC32XX_CLKPWR_INTSRC_MSTIMER_BIT |
+-		LPC32XX_CLKPWR_INTSRC_RTC_BIT,
+-		LPC32XX_CLKPWR_INT_AP);
+-	__raw_writel(0, LPC32XX_CLKPWR_PIN_AP);
+-
+-	/* Clear latched wake event states */
+-	__raw_writel(__raw_readl(LPC32XX_CLKPWR_PIN_RS),
+-		LPC32XX_CLKPWR_PIN_RS);
+-	__raw_writel(__raw_readl(LPC32XX_CLKPWR_INT_RS),
+-		LPC32XX_CLKPWR_INT_RS);
+-
+-	of_irq_init(mic_of_match);
+-
+-	lpc32xx_mic_domain = irq_domain_add_legacy(lpc32xx_mic_np, NR_IRQS,
+-						   0, 0, &irq_domain_simple_ops,
+-						   NULL);
+-	if (!lpc32xx_mic_domain)
+-		panic("Unable to add MIC irq domain\n");
+-
+-	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
+-	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
+-	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
+-}
 -- 
 2.1.4
