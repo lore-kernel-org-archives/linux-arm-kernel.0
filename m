@@ -1,154 +1,110 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Apr 2016 08:55:20 -0600
-Subject: [PATCH V3 14/18] coresight: tmc: keep track of memory width
-In-Reply-To: <571E2C89.7010003@arm.com>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-15-git-send-email-mathieu.poirier@linaro.org>
- <571E2C89.7010003@arm.com>
-Message-ID: <CANLsYkw59pvjc-Q6oVX+wB40nrzjuZ8V0hgdKT=sK=sH+HY-gw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 25 Apr 2016 16:59:33 +0200
+Subject: 4.6-rc5 on arm (nokia n900): spinlock bad magic on CPU#0,
+In-Reply-To: <20160425112028.GA22359@amd>
+References: <20160425112028.GA22359@amd>
+Message-ID: <20160425145933.GA10740@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2016 at 08:41, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 22/04/16 18:14, Mathieu Poirier wrote:
->>
->> Accessing the HW configuration register each time the memory
->> width is needed simply doesn't make sense.  It is much more
->> efficient to read the value once and keep a reference for
->> later use.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 14 +---------
->>   drivers/hwtracing/coresight/coresight-tmc.c     | 34
->> +++++++++++++++++++++++++
->>   drivers/hwtracing/coresight/coresight-tmc.h     | 10 +++++---
->>   3 files changed, 41 insertions(+), 17 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> index cc88c15ba45c..981c5ca75e36 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> @@ -41,25 +41,13 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->>
->>   static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
->>   {
->> -       enum tmc_mem_intf_width memwidth;
->> -       u8 memwords;
->>         char *bufp;
->>         u32 read_data;
->>         int i;
->>
->> -       memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID),
->> 8, 10);
->> -       if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
->> -               memwords = 1;
->> -       else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
->> -               memwords = 2;
->> -       else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
->> -               memwords = 4;
->> -       else
->> -               memwords = 8;
->> -
->>         bufp = drvdata->buf;
->>         while (1) {
->> -               for (i = 0; i < memwords; i++) {
->> +               for (i = 0; i < drvdata->memwidth; i++) {
->>                         read_data = readl_relaxed(drvdata->base +
->> TMC_RRD);
->>                         if (read_data == 0xFFFFFFFF)
->>                                 return;
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
->> b/drivers/hwtracing/coresight/coresight-tmc.c
->> index 55806352b1f1..cb030a09659d 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
->> @@ -193,6 +193,39 @@ static const struct file_operations tmc_fops = {
->>         .llseek         = no_llseek,
->>   };
->>
->> +static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
->> +{
->> +       enum tmc_mem_intf_width memwidth;
->> +
->> +       /*
->> +        * Excerpt from the TRM:
->> +        *
->> +        * DEVID::MEMWIDTH[10:8]
->> +        * 0x2 Memory interface databus is 32 bits wide.
->> +        * 0x3 Memory interface databus is 64 bits wide.
->> +        * 0x4 Memory interface databus is 128 bits wide.
->> +        * 0x5 Memory interface databus is 256 bits wide.
->> +        */
->> +       switch (BMVAL(devid, 8, 10)) {
->> +       case 0x2:
->> +               memwidth = TMC_MEM_INTF_WIDTH_32BITS;
->> +               break;
->> +       case 0x3:
->> +               memwidth = TMC_MEM_INTF_WIDTH_64BITS;
->> +               break;
->> +       case 0x4:
->> +               memwidth = TMC_MEM_INTF_WIDTH_128BITS;
->> +               break;
->> +       case 0x5:
->> +               memwidth = TMC_MEM_INTF_WIDTH_256BITS;
->> +               break;
->> +       default:
->> +               memwidth = 0;
->> +       }
->> +
->> +       return memwidth;
->> +}
->> +
->>   #define coresight_tmc_simple_func(name, offset)                       \
->>         coresight_simple_func(struct tmc_drvdata, name, offset)
->>
->> @@ -306,6 +339,7 @@ static int tmc_probe(struct amba_device *adev, const
->> struct amba_id *id)
->>
->>         devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
->>         drvdata->config_type = BMVAL(devid, 6, 7);
->> +       drvdata->memwidth = tmc_get_memwidth(devid);
->>
->>         if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
->>                 if (np)
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h
->> b/drivers/hwtracing/coresight/coresight-tmc.h
->> index 9b4c215d2b6b..12a097f3d06c 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc.h
->> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
->> @@ -81,10 +81,10 @@ enum tmc_mode {
->>   };
->>
->>   enum tmc_mem_intf_width {
->> -       TMC_MEM_INTF_WIDTH_32BITS       = 0x2,
->> -       TMC_MEM_INTF_WIDTH_64BITS       = 0x3,
->> -       TMC_MEM_INTF_WIDTH_128BITS      = 0x4,
->> -       TMC_MEM_INTF_WIDTH_256BITS      = 0x5,
->> +       TMC_MEM_INTF_WIDTH_32BITS       = 1,
->> +       TMC_MEM_INTF_WIDTH_64BITS       = 2,
->> +       TMC_MEM_INTF_WIDTH_128BITS      = 4,
->> +       TMC_MEM_INTF_WIDTH_256BITS      = 8,
->>   };
->
->
-> I think this would cause confusion for the reader. It would be good to
-> leave the definitions above as before and tmc_get_memwidth() doing:
->
-> i.e,
->         case TMC_MEM_INTF_WIDTH_32BITS:
->                 memwidth = 1;
->                 break;
->
-> But we still store the memwidth in bytes.
+Hi!
 
-If we proceed this way we have to do a case statement on hard coded
-values (or introduce a new enumeration) in tmc_update_etf_buffer(). In
-my opinion the current solution scales better.
+> First time such thing happened, normally N900 is very stable.
 
-Mathieu
+Second time, within a day. It seems rather repeatable. I tested 4.4
+rather heavily, and seen any backtraces... 
+
+Oh, and some saboteur seemed to turn on ipv6 on my wifi. Probably
+unrelated....
+
+Best regards,
+								Pavel
 
 
->
-> Suzuki
+[  157.867431] DSS: dss_save_context
+[  157.867462] DSS: context saved
+[  322.248291] BUG: spinlock bad magic on CPU#0, kworker/u2:3/2693
+[  322.248687]  lock: 0xce670f40, .magic: 00000000, .owner: <none>/-1,
+.owner_cpu: 0
+[  322.249114] CPU: 0 PID: 2693 Comm: kworker/u2:3 Not tainted
+4.6.0-rc5-176733-g8b658a3-dirty #244
+[  322.249603] Hardware name: Nokia RX-51 board
+[  322.249877] Workqueue: phy1 wl1251_irq_work
+[  322.250183] [<c010eebc>] (unwind_backtrace) from [<c010b150>]
+(show_stack+0x10/0x14)
+[  322.250640] [<c010b150>] (show_stack) from [<c04232b0>]
+(dump_stack+0x8c/0xac)
+[  322.251068] [<c04232b0>] (dump_stack) from [<c017cf78>]
+(do_raw_spin_lock+0x198/0x1b8)
+[  322.251495] [<c017cf78>] (do_raw_spin_lock) from [<c084ed98>]
+(_raw_spin_lock_irqsave+0x10/0x18)
+[  322.251922] [<c084ed98>] (_raw_spin_lock_irqsave) from [<c05aaf20>]
+(wl1251_op_tx+0x38/0x5c)
+[  322.252380] [<c05aaf20>] (wl1251_op_tx) from [<c0818788>]
+(ieee80211_tx_frags+0xd0/0x3d4)
+[  322.252807] [<c0818788>] (ieee80211_tx_frags) from [<c0818af8>]
+(__ieee80211_tx+0x6c/0x134)
+[  322.253234] [<c0818af8>] (__ieee80211_tx) from [<c081a034>]
+(ieee80211_tx+0xb4/0xdc)
+[  322.253631] [<c081a034>] (ieee80211_tx) from [<c081ad38>]
+(__ieee80211_subif_start_xmit+0x540/0x6d0)
+[  322.254089] [<c081ad38>] (__ieee80211_subif_start_xmit) from
+[<c081aed4>] (ieee80211_subif_start_xmit+0xc/0x14)
+[  322.254608] [<c081aed4>] (ieee80211_subif_start_xmit) from
+[<c06a5f40>] (dev_hard_start_xmit+0x228/0x440)
+[  322.255096] [<c06a5f40>] (dev_hard_start_xmit) from [<c06c60f0>]
+(sch_direct_xmit+0xf4/0x220)
+[  322.255523] [<c06c60f0>] (sch_direct_xmit) from [<c06a6500>]
+(__dev_queue_xmit+0x25c/0x62c)
+[  322.255981] [<c06a6500>] (__dev_queue_xmit) from [<c06d80bc>]
+(ip_finish_output2+0x1a0/0x3d0)
+[  322.256408] [<c06d80bc>] (ip_finish_output2) from [<c06d91a8>]
+(ip_output+0x130/0x144)
+[  322.256805] [<c06d91a8>] (ip_output) from [<c06d8854>]
+(ip_local_out+0x38/0x3c)
+[  322.257202] [<c06d8854>] (ip_local_out) from [<c06f1010>]
+(tcp_transmit_skb+0x510/0x984)
+[  322.257598] [<c06f1010>] (tcp_transmit_skb) from [<c06edc9c>]
+(tcp_rcv_established+0x360/0x728)
+[  322.258056] [<c06edc9c>] (tcp_rcv_established) from [<c06f6a24>]
+(tcp_v4_do_rcv+0x14c/0x1b0)
+[  322.258483] [<c06f6a24>] (tcp_v4_do_rcv) from [<c06f9034>]
+(tcp_v4_rcv+0xc3c/0xc58)
+[  322.258880] [<c06f9034>] (tcp_v4_rcv) from [<c06d3358>]
+(ip_local_deliver_finish+0x5c/0x29c)
+[  322.268096] [<c06d3358>] (ip_local_deliver_finish) from
+[<c06d3790>] (ip_local_deliver+0xd0/0xd8)
+[  322.277374] [<c06d3790>] (ip_local_deliver) from [<c06d3094>]
+(ip_rcv_finish+0x1f0/0x458)
+[  322.286590] [<c06d3094>] (ip_rcv_finish) from [<c06d3b34>]
+(ip_rcv+0x39c/0x56c)
+[  322.295715] [<c06d3b34>] (ip_rcv) from [<c069e2d0>]
+(__netif_receive_skb_core+0x2e8/0x958)
+[  322.304809] [<c069e2d0>] (__netif_receive_skb_core) from
+[<c06a2b4c>] (netif_receive_skb_internal+0x30/0xa0)
+[  322.323059] [<c06a2b4c>] (netif_receive_skb_internal) from
+[<c0812490>] (ieee80211_deliver_skb+0x184/0x1bc)
+[  322.341827] [<c0812490>] (ieee80211_deliver_skb) from [<c08136e0>]
+(ieee80211_rx_handlers+0xe9c/0x201c)
+[  322.360961] [<c08136e0>] (ieee80211_rx_handlers) from [<c0814a18>]
+(ieee80211_prepare_and_rx_handle+0x1b8/0x9b4)
+[  322.380493] [<c0814a18>] (ieee80211_prepare_and_rx_handle) from
+[<c0815894>] (ieee80211_rx_napi+0x680/0x7f0)
+[  322.400390] [<c0815894>] (ieee80211_rx_napi) from [<c05ad0c0>]
+(wl1251_rx+0x324/0x49c)
+[  322.410522] [<c05ad0c0>] (wl1251_rx) from [<c05ab660>]
+(wl1251_irq_work+0x154/0x1b0)
+[  322.420532] [<c05ab660>] (wl1251_irq_work) from [<c014ce64>]
+(process_one_work+0x130/0x428)
+[  322.430450] [<c014ce64>] (process_one_work) from [<c014d2f0>]
+(worker_thread+0x15c/0x490)
+[  322.440277] [<c014d2f0>] (worker_thread) from [<c01522f4>]
+(kthread+0xd4/0xf0)
+[  322.449951] [<c01522f4>] (kthread) from [<c0107918>]
+(ret_from_fork+0x14/0x3c)
+pavel at n900:/my$
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
