@@ -1,32 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Apr 2016 09:51:24 -0500
-Subject: [PATCH v2 1/4] dt-bindings: interrupt-controllers: add
- description of SIC1 and SIC2
-In-Reply-To: <1461546023-25614-1-git-send-email-vz@mleia.com>
-References: <1461545990-25560-1-git-send-email-vz@mleia.com>
- <1461546023-25614-1-git-send-email-vz@mleia.com>
-Message-ID: <20160425145124.GA23792@rob-hp-laptop>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 25 Apr 2016 15:52:06 +0100
+Subject: [PATCH V3 13/18] coresight: tmc: make sysFS and Perf mode
+ mutually exclusive
+In-Reply-To: <CANLsYkywBS2_wXHsjELRy-s5y36W5_U29csBfTt0h=40TNbU-A@mail.gmail.com>
+References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
+ <1461345255-11758-14-git-send-email-mathieu.poirier@linaro.org>
+ <571E2A7F.2070802@arm.com>
+ <CANLsYkywBS2_wXHsjELRy-s5y36W5_U29csBfTt0h=40TNbU-A@mail.gmail.com>
+Message-ID: <571E2F16.3010706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 04:00:23AM +0300, Vladimir Zapolskiy wrote:
-> NXP LPC32xx has three interrupt controllers, namely root Main
-> Interrupt Controller (MIC) and two supplementary Sub Interrupt
-> Controllers (SIC1 and SIC2), four interrupt outputs from SIC1 and SIC2
-> are connected to MIC.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
-> Changes from v1 to v2:
-> * removed introduced optional "interrupt-controller-name" property,
->   for users the name of a controller will be constructed from mic/sic
->   and controller physical address,
-> * removed introduced optional "wakeup-sources" property, a list of
->   mappings between a hardware interrupt and its correspondent wakeup source
->   to exit CPU STOP mode will be discussed later on,
-> * other negligible changes (rewording, small letters in unit address etc.)
-> 
->  .../interrupt-controller/nxp,lpc3220-mic.txt       | 70 ++++++++++++++--------
->  1 file changed, 46 insertions(+), 24 deletions(-)
+On 25/04/16 15:48, Mathieu Poirier wrote:
+> On 25 April 2016 at 08:32, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 22/04/16 18:14, Mathieu Poirier wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+>>> +       spin_lock_irqsave(&drvdata->spinlock, flags);
+>>> +       if (drvdata->reading) {
+>>> +               ret = -EINVAL;
+>>> +               goto out;
+>>> +       }
+>>> +
+>>> +       val = local_xchg(&drvdata->mode, mode);
+>>> +       /*
+>>> +        * In Perf mode there can be only one writer per sink.  There
+>>> +        * is also no need to continue if the ETR is already operated
+>>> +        * from sysFS.
+>>> +        */
+>>> +       if (val != CS_MODE_DISABLED) {
+>>
+>>
+>> Could val be CS_MODE_PERF ? In other words, should we be checking :
+>>          if (val == CS_MODE_SYSFS)  instead ?
+>
+> If we check for CS_MODE_SYSFS we also have to check for CS_MODE_PERF,
+> which is two checks rather than a single one with the current
+> solution.
+
+I am confused now. The comment says, we want to check for sysfs mode and
+don't continue in that case. So, we shouldn't be worried about PERF mode.
+
+Suzuki
