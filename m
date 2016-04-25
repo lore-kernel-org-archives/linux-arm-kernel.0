@@ -1,189 +1,50 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Apr 2016 08:48:11 -0600
-Subject: [PATCH V3 13/18] coresight: tmc: make sysFS and Perf mode
- mutually exclusive
-In-Reply-To: <571E2A7F.2070802@arm.com>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-14-git-send-email-mathieu.poirier@linaro.org>
- <571E2A7F.2070802@arm.com>
-Message-ID: <CANLsYkywBS2_wXHsjELRy-s5y36W5_U29csBfTt0h=40TNbU-A@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 25 Apr 2016 16:48:24 +0200
+Subject: [PATCH 1/2] clocksource: sp804: Add support for OX810SE 24bit
+ timer width
+In-Reply-To: <alpine.DEB.2.11.1604220953000.3941@nanos>
+References: <1459520559-13110-1-git-send-email-narmstrong@baylibre.com>
+ <1459520559-13110-2-git-send-email-narmstrong@baylibre.com>
+ <20160422074645.GA3974@linaro.org> <alpine.DEB.2.11.1604220953000.3941@nanos>
+Message-ID: <571E2E38.3060401@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2016 at 08:32, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 22/04/16 18:14, Mathieu Poirier wrote:
+On 04/22/2016 09:53 AM, Thomas Gleixner wrote:
+> On Fri, 22 Apr 2016, Daniel Lezcano wrote:
+> 
+>> On Fri, Apr 01, 2016 at 04:22:38PM +0200, Neil Armstrong wrote:
+>>> In order to support the Dual-Timer on the Oxford Semiconductor OX810SE SoC,
+>>> implement variable counter width, keeping 32bit as default width.
+>>> Add new compatible string oxsemi,ox810se-rps-timer in order to select
+>>> the 24bit counter width.
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> ---
+>>>  drivers/clocksource/timer-sp804.c | 107 ++++++++++++++++++++++++--------------
+>>>  include/clocksource/timer-sp804.h |  42 ++++++++++++---
+>>>  2 files changed, 102 insertions(+), 47 deletions(-)
 >>
->> The sysFS and Perf access methods can't be allowed to interfere
->> with one another.  As such introducing guards to access
->> functions that prevents moving forward if a TMC is already
->> being used.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 60
->> +++++++++++++++++++++-
->>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 68
->> +++++++++++++++++++++++--
->>   2 files changed, 121 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> index 25fad93b68d4..cc88c15ba45c 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> @@ -111,7 +111,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata
->> *drvdata)
->>         CS_LOCK(drvdata->base);
->>   }
->>
->> -static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
->> +static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32
->> mode)
->>   {
->>         bool used = false;
->>         char *buf = NULL;
->> @@ -190,6 +190,54 @@ spin_unlock:
->>         return 0;
->>   }
->>
->> +static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32
->> mode)
->> +{
->> +       int ret = 0;
->> +       long val;
->> +       unsigned long flags;
->> +       struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->> +
->> +        /* This shouldn't be happening */
->> +       if (WARN_ON(mode != CS_MODE_PERF))
->> +               return -EINVAL;
->> +
->> +       spin_lock_irqsave(&drvdata->spinlock, flags);
->> +       if (drvdata->reading) {
->> +               ret = -EINVAL;
->> +               goto out;
->> +       }
->> +
->> +       val = local_xchg(&drvdata->mode, mode);
->> +       /*
->> +        * In Perf mode there can be only one writer per sink.  There
->> +        * is also no need to continue if the ETB/ETR is already operated
->> +        * from sysFS.
->> +        */
->> +       if (val != CS_MODE_DISABLED) {
->> +               ret = -EINVAL;
->> +               goto out;
->> +       }
->> +
->> +       tmc_etb_enable_hw(drvdata);
->> +out:
->> +       spin_unlock_irqrestore(&drvdata->spinlock, flags);
->> +
->> +       return ret;
->> +}
->> +
->> +static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
->> +{
->> +       switch (mode) {
->> +       case CS_MODE_SYSFS:
->> +               return tmc_enable_etf_sink_sysfs(csdev, mode);
->> +       case CS_MODE_PERF:
->> +               return tmc_enable_etf_sink_perf(csdev, mode);
->> +       }
->> +
->> +       /* We shouldn't be here */
->> +       return -EINVAL;
->> +}
->> +
->>   static void tmc_disable_etf_sink(struct coresight_device *csdev)
->>   {
->>         long val;
->> @@ -272,6 +320,7 @@ const struct coresight_ops tmc_etf_cs_ops = {
->>
->>   int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
->>   {
->> +       long val;
->>         enum tmc_mode mode;
->>         int ret = 0;
->>         unsigned long flags;
->> @@ -290,6 +339,13 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
->>                 goto out;
->>         }
->>
->> +       val = local_read(&drvdata->mode);
->> +       /* Don't interfere if operated from Perf */
->> +       if (val == CS_MODE_PERF) {
->> +               ret = -EINVAL;
->> +               goto out;
->> +       }
->> +
->>         /* If drvdata::buf is NULL the trace data has been read already */
->>         if (drvdata->buf == NULL) {
->>                 ret = -EINVAL;
->> @@ -297,7 +353,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
->>         }
->>
->>         /* Disable the TMC if need be */
->> -       if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
->> +       if (val == CS_MODE_SYSFS)
->>                 tmc_etb_disable_hw(drvdata);
->>
->>         drvdata->reading = true;
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> b/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> index 4b000f4003a2..a9a94a09186a 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> @@ -87,7 +87,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata
->> *drvdata)
->>         CS_LOCK(drvdata->base);
->>   }
->>
->> -static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
->> +static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32
->> mode)
->>   {
->>         bool used = false;
->>         long val;
->> @@ -167,6 +167,54 @@ spin_unlock:
->>         return 0;
->>   }
->>
->> +static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32
->> mode)
->> +{
->> +       int ret = 0;
->> +       long val;
->> +       unsigned long flags;
->> +       struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->> +
->> +        /* This shouldn't be happening */
->> +       if (WARN_ON(mode != CS_MODE_PERF))
->> +               return -EINVAL;
->> +
->> +       spin_lock_irqsave(&drvdata->spinlock, flags);
->> +       if (drvdata->reading) {
->> +               ret = -EINVAL;
->> +               goto out;
->> +       }
->> +
->> +       val = local_xchg(&drvdata->mode, mode);
->> +       /*
->> +        * In Perf mode there can be only one writer per sink.  There
->> +        * is also no need to continue if the ETR is already operated
->> +        * from sysFS.
->> +        */
->> +       if (val != CS_MODE_DISABLED) {
->
->
-> Could val be CS_MODE_PERF ? In other words, should we be checking :
->         if (val == CS_MODE_SYSFS)  instead ?
+>> I will take those patches but this driver really deserves a cleanup.
+> 
+> If it deserves a cleanup, then this should happen _BEFORE_ we add new
+> functionality to it.
+> 
+> Thanks,
+> 
+> 	tglx
+> 
 
-If we check for CS_MODE_SYSFS we also have to check for CS_MODE_PERF,
-which is two checks rather than a single one with the current
-solution.
+Hi Thomas, Daniel,
 
-Mathieu
+Sure this driver should have a cleanup, but it still depends on old legacy vexpress calls.
 
->
-> Suzuki
+The reason I submitted a change and a small cleanup over this driver is because the high
+similarities of the HW and avoiding adding a brand new driver cloning much of its
+functionalities.
+
+I propose to study an eventual cleanup, but could this change be submitted for 4.7 since
+it's part of a base platform support serie ?
+
+Thanks,
+Neil
