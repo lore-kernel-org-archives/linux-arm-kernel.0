@@ -1,24 +1,11 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 25 Apr 2016 17:31:15 +0100
-Subject: [GIT PULL v2 1/2] ARM: vexpress: addition of MPS2 platform support
- for v4.7
-Message-ID: <1461601876-25288-1-git-send-email-sudeep.holla@arm.com>
+Date: Mon, 25 Apr 2016 17:31:16 +0100
+Subject: [GIT PULL v2 2/2] ARM: vexpress: Updates for v4.7
+In-Reply-To: <1461601876-25288-1-git-send-email-sudeep.holla@arm.com>
+References: <1461601876-25288-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1461601876-25288-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi ARM-SoC guys,
-
-Based on Arnd, suggestion this PR splits the previous one[1] into two
-and drops clocksource and serial driver changes so that they can be
-merged via respective trees independently.
-
-Please pull !
-
-Regards,
-Sudeep
-
-[1] http://www.spinics.net/lists/arm-kernel/msg497696.html
----
 
 The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
@@ -26,42 +13,32 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-for-v4.7/mps2
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-for-v4.7/updates
 
-for you to fetch changes up to 4ef726d2f0e2f788bdf72f6cde64fcaaa26dcb66:
+for you to fetch changes up to 2b4e38fd7c12d37ee1887834eb45ae30b5e8f4e3:
 
-  MAINTAINERS: Update ARM Versatile Express platform entry (2016-04-25 14:11:16 +0100)
-
-----------------------------------------------------------------
-ARMv7 Cortex-M Prototyping System (MPS2) support
-
-Basic support for ARM Versatile Express Cortex-M Prototyping System
-(V2M-MPS2). ucLinux can be now run on both the hardware and FVP models
-with Cortex-M3/M4/M7 configurations (Vladimir Murzin)
+  ARM: dts: vexpress: Add external expansion bus to DT (2016-04-25 11:01:14 +0100)
 
 ----------------------------------------------------------------
-Vladimir Murzin (5):
-      ARM: vexpress/mps2: introduce MPS2 platform
-      ARM: configs: add MPS2 defconfig
-      ARM: dts: introduce MPS2 AN385/AN386
-      ARM: dts: introduce MPS2 AN399/AN400
-      MAINTAINERS: Update ARM Versatile Express platform entry
+ARMv7 Vexpress updates/fixes for v4.7
 
- MAINTAINERS                          |   1 +
- arch/arm/Kconfig                     |  12 ++
- arch/arm/Makefile                    |   1 +
- arch/arm/boot/dts/Makefile           |   3 +
- arch/arm/boot/dts/mps2-an385.dts     |  92 +++++++++++++
- arch/arm/boot/dts/mps2-an399.dts     |  92 +++++++++++++
- arch/arm/boot/dts/mps2.dtsi          | 241 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/mps2_defconfig      | 109 ++++++++++++++++
- arch/arm/mach-vexpress/Makefile      |   4 +-
- arch/arm/mach-vexpress/Makefile.boot |   3 +
- arch/arm/mach-vexpress/v2m-mps2.c    |  21 +++
- 11 files changed, 578 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/mps2-an385.dts
- create mode 100644 arch/arm/boot/dts/mps2-an399.dts
- create mode 100644 arch/arm/boot/dts/mps2.dtsi
- create mode 100644 arch/arm/configs/mps2_defconfig
- create mode 100644 arch/arm/mach-vexpress/Makefile.boot
- create mode 100644 arch/arm/mach-vexpress/v2m-mps2.c
+1. Support for external expansion bus useful for additional hardware
+   e.g. LogicTile Express daughterboards (Brian Starkey)
+
+2. Fix for device node name unit-address presence/absence warnings
+   enabled in recently update DTC (Sudeep Holla)
+
+----------------------------------------------------------------
+Brian Starkey (1):
+      ARM: dts: vexpress: Add external expansion bus to DT
+
+Sudeep Holla (1):
+      ARM: dts: vexpress: fix node name unit-address presence warnings
+
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi     | 44 +++++++++++-----------
+ arch/arm/boot/dts/vexpress-v2m.dtsi         | 44 +++++++++++-----------
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts | 47 +++++++++++++++---------
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  | 57 ++++++++++++++++++-----------
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts     | 37 +++++++++++++------
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts      | 41 ++++++++++++++-------
+ 6 files changed, 161 insertions(+), 109 deletions(-)
