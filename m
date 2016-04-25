@@ -1,47 +1,134 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Apr 2016 09:49:12 +0100
-Subject: [PATCH 0/5] Support MPS2 platform
-Message-ID: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
+Date: Mon, 25 Apr 2016 09:49:14 +0100
+Subject: [PATCH 2/5] ARM: configs: add MPS2 defconfig
+In-Reply-To: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
+References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1461574157-23580-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds a new config for MPS2 platform.
 
-These patches add basic support for ARM Versatile Express Cortex-M
-Prototyping System (V2M-MPS2). ucLinux can be now run on both the
-hardware and FVP models with Cortex-M3/M4/M7 configurations
-
-Following [1], please, consider to merge them into vexpress tree.
-
-[1] https://lkml.org/lkml/2016/4/23/190
-
-Thanks!
-
-Vladimir Murzin (5):
-  ARM: vexpress/mps2: introduce MPS2 platform
-  ARM: configs: add MPS2 defconfig
-  ARM: dts: introduce MPS2 AN385/AN386
-  ARM: dts: introduce MPS2 AN399/AN400
-  MAINTAINERS: Update ARM Versatile Express platform entry
-
- MAINTAINERS                          |    1 +
- arch/arm/Kconfig                     |   12 ++
- arch/arm/Makefile                    |    1 +
- arch/arm/boot/dts/Makefile           |    3 +
- arch/arm/boot/dts/mps2-an385.dts     |   92 +++++++++++++
- arch/arm/boot/dts/mps2-an399.dts     |   92 +++++++++++++
- arch/arm/boot/dts/mps2.dtsi          |  241 ++++++++++++++++++++++++++++++++++
- arch/arm/configs/mps2_defconfig      |  109 +++++++++++++++
- arch/arm/mach-vexpress/Makefile      |    4 +-
- arch/arm/mach-vexpress/Makefile.boot |    3 +
- arch/arm/mach-vexpress/v2m-mps2.c    |   21 +++
- 11 files changed, 578 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/mps2-an385.dts
- create mode 100644 arch/arm/boot/dts/mps2-an399.dts
- create mode 100644 arch/arm/boot/dts/mps2.dtsi
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/configs/mps2_defconfig |  109 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
  create mode 100644 arch/arm/configs/mps2_defconfig
- create mode 100644 arch/arm/mach-vexpress/Makefile.boot
- create mode 100644 arch/arm/mach-vexpress/v2m-mps2.c
 
+diff --git a/arch/arm/configs/mps2_defconfig b/arch/arm/configs/mps2_defconfig
+new file mode 100644
+index 0000000..19d119f
+--- /dev/null
++++ b/arch/arm/configs/mps2_defconfig
+@@ -0,0 +1,109 @@
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_EXPERT=y
++# CONFIG_UID16 is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_BLOCK is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_MPS2=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x21000000
++CONFIG_DRAM_SIZE=0x1000000
++CONFIG_PREEMPT_VOLUNTARY=y
++# CONFIG_ATAGS is not set
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_COREDUMP is not set
++# CONFIG_SUSPEND is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CORE is not set
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_EZCHIP is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_HISILICON is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_QUALCOMM is not set
++# CONFIG_NET_VENDOR_RENESAS is not set
++# CONFIG_NET_VENDOR_ROCKER is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++CONFIG_SMSC911X=y
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NONSTANDARD=y
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_MPS2_UART_CONSOLE=y
++CONFIG_SERIAL_MPS2_UART=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
++CONFIG_MFD_SYSCON=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_SYSCON=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_ONESHOT=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=y
++CONFIG_LEDS_TRIGGER_CPU=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_ARM_TIMER_SP804=y
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_NFS_V4_2=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_FS=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++CONFIG_MEMTEST=y
 -- 
 1.7.9.5
