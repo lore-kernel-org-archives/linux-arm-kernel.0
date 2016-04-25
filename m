@@ -1,55 +1,33 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 25 Apr 2016 15:33:02 +0100
-Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
-In-Reply-To: <20160425142435.GB2829@codeblueprint.co.uk>
-References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
- <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
- <571E25B1.8070305@arm.com> <20160425141557.GA2829@codeblueprint.co.uk>
- <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
- <20160425142435.GB2829@codeblueprint.co.uk>
-Message-ID: <571E2A9E.3010407@arm.com>
+From: eric.engestrom@imgtec.com (Eric Engestrom)
+Date: Mon, 25 Apr 2016 15:37:31 +0100
+Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
+In-Reply-To: <alpine.LFD.2.20.1604250953200.5091@knanqh.ubzr>
+References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+ <20160425095715.GA2366@piout.net>
+ <20160425103911.GO32731@imgtec.com> <4641918.pNBP5iAK01@wuerfel>
+ <20160425125809.GP32731@imgtec.com>
+ <alpine.LFD.2.20.1604250953200.5091@knanqh.ubzr>
+Message-ID: <20160425143731.GR32731@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 15:24, Matt Fleming wrote:
-> On Mon, 25 Apr, at 04:18:41PM, Ard Biesheuvel wrote:
->> On 25 April 2016 at 16:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->>> On Mon, 25 Apr, at 03:12:01PM, Robin Murphy wrote:
->>>>> +static void efi_call_virt_check_flags(unsigned long flags, const char *call)
->>>>> +{
->>>>> +    unsigned long cur_flags;
->>>>> +    bool mismatch;
->>>>> +
->>>>> +    local_save_flags(cur_flags);
->>>>> +
->>>>> +    mismatch = !!((cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK);
->>>>
->>>> nit: the assignment itself is already a conversion to bool, so the
->>>> excitement is redundant here.
->>>
->>> This was intentional. I asked Mark to make this change so that it's
->>> explicit for the developer that we're performing the type conversion.
->>
->> But replacing an implicit boolean cast with an explicit one makes
->> little sense, no? Don't we simply want '!= 0' here if you need a
->> boolean expression?
->
-> Aha but '!!' is fewer characters to type!!
->
-> I'm not that bothered as long as we don't stuff an int into a bool
-> without giving the programmer some idea we're doing that. It's not
-> about the compiler getting it wrong, more about a developer
-> introducing a bug when they change the code in the future.
->
-> Unless anyone objects, I'll fix this up to use '!= 0' when I apply it.
+On Mon, Apr 25, 2016 at 10:12:16AM -0400, Nicolas Pitre wrote:
+> Beware.
+> 
+> I added many of those exactly because gcc did not ignore them when 
+> compiling with LTO where the lack of a const qualifier to qualify the 
+> actual array content, and not only the reference to that content, 
+> generated build errors due to section mismatches from the __initconst 
+> annotation.
 
-Agreed - the belt and braces approach isn't necessarily bad if the cost
-of cocking it up is significant, and !=0 is as explicit as you can get.
-After all, if Joe Random Hacker can't infer the behaviour from looking 4
-lines up to see the variable definition, then I wouldn't count on him
-understanding !! either ;)
+I believe the first `const` does that, without the need for a second.
 
-Thanks,
-Robin.
+> So this is a NAK from me unless you may confirm that LTO builds are 
+> unaffected by your changes.
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+I can't confirm it (haven't tried), and don't care enough to do it :]
+I guess I'm just dropping the patch then. Like I said, it can't hurt to
+leave them in.
+
+Cheers,
+Eric
