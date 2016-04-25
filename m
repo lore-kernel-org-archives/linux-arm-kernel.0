@@ -1,48 +1,54 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Apr 2016 14:46:31 +0100
-Subject: [PATCHv3 2/5] arm64/efi: enable runtime call flag checking
+Date: Mon, 25 Apr 2016 14:46:32 +0100
+Subject: [PATCHv3 3/5] arm/efi: enable runtime call flag checking
 In-Reply-To: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
 References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1461591994-14918-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1461591994-14918-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define ARCH_EFI_IRQ_FLAGS_MASK for arm64, which will enable the generic
+Define ARCH_EFI_IRQ_FLAGS_MASK for arm, which will enable the generic
 runtime wrapper code to detect when firmware erroneously modifies flags
 over a runtime services function call.
 
+We check all allocated flags, barring those which firmware has
+legitimate reason to modify (condition flags and IT state). While in
+practice corruption of some flags (e.g. J) would already be fatal, we
+include these for consistency and documentation purposes.
+
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Leif Lindholm <leif.lindholm@linaro.org>
 Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-efi at vger.kernel.org
 ---
- arch/arm64/include/asm/efi.h | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/include/asm/efi.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index f4f71224..b44603e 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -4,6 +4,7 @@
- #include <asm/io.h>
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+index e1461fc..b05ff68 100644
+--- a/arch/arm/include/asm/efi.h
++++ b/arch/arm/include/asm/efi.h
+@@ -17,6 +17,7 @@
+ #include <asm/mach/map.h>
  #include <asm/mmu_context.h>
- #include <asm/neon.h>
+ #include <asm/pgtable.h>
 +#include <asm/ptrace.h>
- #include <asm/tlbflush.h>
  
  #ifdef CONFIG_EFI
-@@ -33,6 +34,8 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
- 	kernel_neon_end();						\
+ void efi_init(void);
+@@ -33,6 +34,10 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
+ 	__f(args);							\
  })
  
-+#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
++#define ARCH_EFI_IRQ_FLAGS_MASK \
++	(PSR_J_BIT | PSR_E_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | \
++	 PSR_T_BIT | MODE_MASK)
 +
- /* arch specific definitions used by the stub code */
- 
- /*
+ static inline void efi_set_pgd(struct mm_struct *mm)
+ {
+ 	check_and_switch_context(mm, NULL);
 -- 
 1.9.1
