@@ -1,106 +1,86 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Mon, 25 Apr 2016 11:24:34 +0200
-Subject: [PATCH 4/5] ARM: dts: introduce MPS2 AN399/AN400
-In-Reply-To: <1461574157-23580-5-git-send-email-vladimir.murzin@arm.com>
-References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
- <1461574157-23580-5-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <571DE252.6080402@suse.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Apr 2016 10:28:43 +0100
+Subject: [PATCH v7 07/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <571DE077.8060601@arm.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+ <1459529620-22150-8-git-send-email-james.morse@arm.com>
+ <571656E9.5050402@arm.com> <57166CC9.4030804@arm.com>
+ <57175BD7.30902@arm.com> <571765D1.9070207@arm.com>
+ <20160425084111.GA19515@linaro.org> <571DE077.8060601@arm.com>
+Message-ID: <571DE34B.1010300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25/04/16 10:16, James Morse wrote:
+> Hi,
+> 
+> On 25/04/16 09:41, AKASHI Takahiro wrote:
+>> On Wed, Apr 20, 2016 at 12:19:45PM +0100, James Morse wrote:
+>>> On 20/04/16 11:37, Marc Zyngier wrote:
+>>>> On 19/04/16 18:37, James Morse wrote:
+>>>>> It looks like x86 uses the extable to work around this, their vmx_vcpu_run() has:
+>>>>>> 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
+>>>>> Where __ex ends up calling ____kvm_handle_fault_on_reboot(), with a nearby comment:
+>>>>>> * Hardware virtualization extension instructions may fault if a
+>>>>>> * reboot turns off virtualization while processes are running.
+>>>>>> * Trap the fault and ignore the instruction if that happens.
+>>>>
+>>>> I very much like that approach, to be honest. Tearing down a CPU is
+>>>> something exceptional, so let's make it an actual exception.
+>>>>
+>>>> It is now pretty easy to discriminate between KVM functions and stub
+>>>> functions thanks to your earlier patch, so if we end up calling the
+>>>> hyp-stub because we've torn down KVM's EL2, let's just return an
+>>>> appropriate error code (ARM_EXCEPTION_HYP_GONE), and handle it at EL1.
+>>>
+>>> Okay. kexec uses kvm_call_hyp() against the hyp-stub to do the kernel-copy and
+>>> hand over to purgatory, but we could change that to a new 'special' builtin
+>>> call, something like HVC_KEXEC_CALL_HYP. It never calls it with kvm loaded, so
+>>> there is no reason the calls have to be same.
+>>>
+>>> Given hibernate doesn't hit this issue, I will drop this hunk from this version
+>>> of the patch, and repost hibernate incorporating the feedback so far. I will
+>>> provide a patch for kexec to do the above.
+>>
+>> Thanks, but you don' have to.
+> 
+> I was wrong with the 'hibernate doesn't hit this issue', with this patch we
+> re-install the hyp-stub during system reboot, and race with the scheduler.
+> ('reboot -f' while running a guest).
+> 
+> 
+>> If the fix below is acceptable, we will merge it to our next kexec/kdump
+>> patch series.
+> 
+> I'm testing something that looks very similar at the moment.
+> 
+> 
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index eba89e4..31b5224 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -186,6 +186,10 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  		exit_handler = kvm_get_exit_handler(vcpu);
+>>  
+>>  		return exit_handler(vcpu, run);
+>> +	case ARM_EXCEPTION_HYP_GONE:
+>> +		/* due to kexec reboot */
+>> +		run->exit_reason = KVM_EXIT_SHUTDOWN;
+>> +		return 0;
+> 
+> Is it fair to throw this back out to user space? While the hypervisor doesn't
+> have long to live, it may not be expecting this exit_reason. I couldn't see a
+> value for 'suprise cpu removal', and it looks like the x86 code causes the vcpu
+> to spin round enter guest...
 
+Yeah, KVM_EXIT_SHUTDOWN is a vcpu reset (which on x86 is caused by a
+triple fault). KVM_EXIT_FAIL_ENTRY seems slightly better.
 
-On 25/04/16 10:49, Vladimir Murzin wrote:
-> Application Notes 399 and 400 shares the same memory map and
-> features. Both are shipped with Cortex-M7 and have the same  peripheral
-> as AN385/AN386, but with different location of PSRAM and Ethernet
-> controller.
->
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->   arch/arm/boot/dts/Makefile       |    4 +-
->   arch/arm/boot/dts/mps2-an399.dts |   92 ++++++++++++++++++++++++++++++++++++++
->   2 files changed, 95 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/mps2-an399.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 1efa5a2..c7a78c9 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -253,7 +253,9 @@ dtb-$(CONFIG_ARCH_MMP) += \
->   dtb-$(CONFIG_MACH_MESON8B) += \
->   	meson8b-mxq.dtb \
->   	meson8b-odroidc1.dtb
-> -dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
-> +dtb-$(CONFIG_ARCH_MPS2) += \
-> +	mps2-an385.dtb \
-> +	mps2-an399.dtb
->   dtb-$(CONFIG_ARCH_MOXART) += \
->   	moxart-uc7112lx.dtb
->   dtb-$(CONFIG_SOC_IMX1) += \
-> diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
-> new file mode 100644
-> index 0000000..776595f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mps2-an399.dts
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Copyright (C) 2015 ARM Limited
-> + *
-> + * Author: Vladimir Murzin <vladimir.murzin@arm.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "mps2.dtsi"
-> +
-> +/ {
-> +	model = "ARM MPS2 Application Note 399/400";
-> +	compatible = "arm,mps2";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "rdinit=/sbin/init earlycon";
+As for getting back to userspace, I don't see that as a problem (though
+the documentation on that part of the API is... sparse).
 
-Same here.
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
