@@ -1,28 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Apr 2016 08:04:31 -0500
-Subject: [PATCH v6 5/7] ARM: dts: am437x/am33xx: Remove hwmod entries for
- ECAP and EPWM nodes
-In-Reply-To: <1461343238-29274-6-git-send-email-fcooper@ti.com>
+Date: Mon, 25 Apr 2016 08:05:57 -0500
+Subject: [PATCH v6 7/7] ARM: dts: DRA7: Add dt nodes for PWMSS
+In-Reply-To: <1461343238-29274-8-git-send-email-fcooper@ti.com>
 References: <1461343238-29274-1-git-send-email-fcooper@ti.com>
- <1461343238-29274-6-git-send-email-fcooper@ti.com>
-Message-ID: <20160425130431.GA10953@rob-hp-laptop>
+ <1461343238-29274-8-git-send-email-fcooper@ti.com>
+Message-ID: <20160425130557.GA11485@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 11:40:36AM -0500, Franklin S Cooper Jr wrote:
-> Previous patches switched the ECAP and EPWM to use the new bindings.
-> These bindings explicitly adds the various required clocks via DT rather
-> than depending on hwmod.
+On Fri, Apr 22, 2016 at 11:40:38AM -0500, Franklin S Cooper Jr wrote:
+> From: Vignesh R <vigneshr@ti.com>
 > 
-> Therefore, it is safe to remove the hwmod entries since they are no longer
-> needed.
+> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
+> for dt bindings.
 > 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> [fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
 > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt   | 3 ---
->  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 3 ---
->  arch/arm/boot/dts/am33xx.dtsi                          | 6 ------
->  arch/arm/boot/dts/am4372.dtsi                          | 9 ---------
->  4 files changed, 21 deletions(-)
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
+>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
+>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
+>  arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
+>  4 files changed, 122 insertions(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
