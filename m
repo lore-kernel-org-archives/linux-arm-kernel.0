@@ -1,70 +1,27 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 25 Apr 2016 22:21:34 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-Message-ID: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Apr 2016 21:21:50 +0200
+Subject: [GIT PULL v2] arm64: hisilicon: config changes for 4.7
+In-Reply-To: <5714F86A.40001@hisilicon.com>
+References: <5714F86A.40001@hisilicon.com>
+Message-ID: <6854260.KJI50JSxh6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now not all DMA paremters configured properly for "xhci-hcd" platform
-device which is created manually. For example: dma_pfn_offset, dam_ops
-and iommu configuration will not corresponds "dwc3" devices
-configuration. As result, this will cause problems like wrong DMA
-addresses translation on platforms with LPAE enabled like Keystone 2.
+On Monday 18 April 2016 16:08:26 Wei Xu wrote:
+> Please help to pull the following changes.
+> 
+> I based this pull request on v4.6-rc4 instead of rc1 to avoid the
+> duplication that some configurations have been enabled.
+> 
+> 
 
-When platform is using DT boot mode the DMA configuration will be
-parsed and applied from DT, so, to fix this issue, reuse
-of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
-from DWC3 device node.
+Hi Wei,
 
-Cc: David Fisher <david.fisher1@synopsys.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "Thang Q. Nguyen" <tqnguyen@apm.com>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/usb/dwc3/host.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+Unfortunately basing it on top of -rc4 causes us more problems than
+it solves. If at all possible, can you rebase on top of -rc3 or earlier?
 
-diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-index c679f63..93c8ef9 100644
---- a/drivers/usb/dwc3/host.c
-+++ b/drivers/usb/dwc3/host.c
-@@ -17,6 +17,7 @@
- 
- #include <linux/platform_device.h>
- #include <linux/usb/xhci_pdriver.h>
-+#include <linux/of_device.h>
- 
- #include "core.h"
- 
-@@ -32,12 +33,7 @@ int dwc3_host_init(struct dwc3 *dwc)
- 		return -ENOMEM;
- 	}
- 
--	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
--
- 	xhci->dev.parent	= dwc->dev;
--	xhci->dev.dma_mask	= dwc->dev->dma_mask;
--	xhci->dev.dma_parms	= dwc->dev->dma_parms;
--
- 	dwc->xhci = xhci;
- 
- 	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
-@@ -62,6 +58,15 @@ int dwc3_host_init(struct dwc3 *dwc)
- 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
- 			  dev_name(&xhci->dev));
- 
-+	if (IS_ENABLED(CONFIG_OF) && dwc->dev->of_node) {
-+		of_dma_configure(&xhci->dev, dwc->dev->of_node);
-+	} else {
-+		dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
-+
-+		xhci->dev.dma_mask	= dwc->dev->dma_mask;
-+		xhci->dev.dma_parms	= dwc->dev->dma_parms;
-+	}
-+
- 	ret = platform_device_add(xhci);
- 	if (ret) {
- 		dev_err(dwc->dev, "failed to register xHCI device\n");
--- 
-2.8.1
+The problem is backmerging code from mainline into arm-soc, as that
+makes it ambiguous later when we send the pull request to Linus regarding
+which changes are coming from us or not.
+
+	Arnd
