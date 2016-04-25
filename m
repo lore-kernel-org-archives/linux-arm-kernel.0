@@ -1,59 +1,175 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 25 Apr 2016 16:28:01 +0100
-Subject: [PATCH 4/7] io-64-nonatomic: Add relaxed accessor variants
-In-Reply-To: <5485134.l18Z1dlVmn@wuerfel>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <571A5A9E.7040305@arm.com> <20160425133242.GC30830@arm.com>
- <5485134.l18Z1dlVmn@wuerfel>
-Message-ID: <571E3781.3070609@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 25 Apr 2016 16:28:58 +0100
+Subject: [PATCH V3 14/18] coresight: tmc: keep track of memory width
+In-Reply-To: <CANLsYky5fcnyvLwVwme1AmQ5vbCCu-DOkhdGwz7FgwZnLUV3CA@mail.gmail.com>
+References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
+ <1461345255-11758-15-git-send-email-mathieu.poirier@linaro.org>
+ <571E2C89.7010003@arm.com>
+ <CANLsYkw59pvjc-Q6oVX+wB40nrzjuZ8V0hgdKT=sK=sH+HY-gw@mail.gmail.com>
+ <571E3343.9090705@arm.com>
+ <CANLsYky5fcnyvLwVwme1AmQ5vbCCu-DOkhdGwz7FgwZnLUV3CA@mail.gmail.com>
+Message-ID: <571E37BA.5080703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 25/04/16 16:21, Arnd Bergmann wrote:
-> On Monday 25 April 2016 14:32:42 Will Deacon wrote:
->>>>>
->>>>> +static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
->>>>> +{
->>>>> +   const volatile u32 __iomem *p = addr;
->>>>> +   u32 low, high;
->>>>> +
->>>>> +   high = readl_relaxed(p + 1);
->>>>> +   low = readl_relaxed(p);
->>>>> +
->>>>> +   return low + ((u64)high << 32);
->>>>> +}
->>>>> +
->>>>> +static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
->>>>> +{
->>>>> +   writel_relaxed(val >> 32, addr + 4);
->>>>> +   writel_relaxed(val, addr);
->>>>> +}
+On 25/04/16 16:25, Mathieu Poirier wrote:
+> On 25 April 2016 at 09:09, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 25/04/16 15:55, Mathieu Poirier wrote:
+>>>
+>>> On 25 April 2016 at 08:41, Suzuki K Poulose <Suzuki.Poulose@arm.com>
+>>> wrote:
 >>>>
->>>> Could we not generate the _relaxed variants with some macro magic?
+>>>> On 22/04/16 18:14, Mathieu Poirier wrote:
+>>>>>
+>>>>>
+>>>>> Accessing the HW configuration register each time the memory
+>>>>> width is needed simply doesn't make sense.  It is much more
+>>>>> efficient to read the value once and keep a reference for
+>>>>> later use.
+>>>>>
+>>>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>>>> ---
+>>>>>     drivers/hwtracing/coresight/coresight-tmc-etf.c | 14 +---------
+>>>>>     drivers/hwtracing/coresight/coresight-tmc.c     | 34
+>>>>> +++++++++++++++++++++++++
+>>>>>     drivers/hwtracing/coresight/coresight-tmc.h     | 10 +++++---
+>>>>>     3 files changed, 41 insertions(+), 17 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>>>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>>>> index cc88c15ba45c..981c5ca75e36 100644
+>>>>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>>>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>>>>> @@ -41,25 +41,13 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+>>>>>
+>>>>>     static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+>>>>>     {
+>>>>> -       enum tmc_mem_intf_width memwidth;
+>>>>> -       u8 memwords;
+>>>>>           char *bufp;
+>>>>>           u32 read_data;
+>>>>>           int i;
+>>>>>
+>>>>> -       memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID),
+>>>>> 8, 10);
+>>>>> -       if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
+>>>>> -               memwords = 1;
+>>>>> -       else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
+>>>>> -               memwords = 2;
+>>>>> -       else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
+>>>>> -               memwords = 4;
+>>>>> -       else
+>>>>> -               memwords = 8;
+>>>>> -
+>>>>>           bufp = drvdata->buf;
+>>>>>           while (1) {
+>>>>> -               for (i = 0; i < memwords; i++) {
+>>>>> +               for (i = 0; i < drvdata->memwidth; i++) {
+>>>>>                           read_data = readl_relaxed(drvdata->base +
+>>>>> TMC_RRD);
+>>>>>                           if (read_data == 0xFFFFFFFF)
+>>>>>                                   return;
+>>>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
+>>>>> b/drivers/hwtracing/coresight/coresight-tmc.c
+>>>>> index 55806352b1f1..cb030a09659d 100644
+>>>>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+>>>>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+>>>>> @@ -193,6 +193,39 @@ static const struct file_operations tmc_fops = {
+>>>>>           .llseek         = no_llseek,
+>>>>>     };
+>>>>>
+>>>>> +static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
+>>>>> +{
+>>>>> +       enum tmc_mem_intf_width memwidth;
+>>>>> +
+>>>>> +       /*
+>>>>> +        * Excerpt from the TRM:
+>>>>> +        *
+>>>>> +        * DEVID::MEMWIDTH[10:8]
+>>>>> +        * 0x2 Memory interface databus is 32 bits wide.
+>>>>> +        * 0x3 Memory interface databus is 64 bits wide.
+>>>>> +        * 0x4 Memory interface databus is 128 bits wide.
+>>>>> +        * 0x5 Memory interface databus is 256 bits wide.
+>>>>> +        */
+>>>>> +       switch (BMVAL(devid, 8, 10)) {
+>>>>> +       case 0x2:
+>>>>> +               memwidth = TMC_MEM_INTF_WIDTH_32BITS;
+>>>>> +               break;
+>>>>> +       case 0x3:
+>>>>> +               memwidth = TMC_MEM_INTF_WIDTH_64BITS;
+>>>>> +               break;
+>>>>> +       case 0x4:
+>>>>> +               memwidth = TMC_MEM_INTF_WIDTH_128BITS;
+>>>>> +               break;
+>>>>> +       case 0x5:
+>>>>> +               memwidth = TMC_MEM_INTF_WIDTH_256BITS;
+>>>>> +               break;
+>>>>> +       default:
+>>>>> +               memwidth = 0;
+>>>>> +       }
+>>>>> +
+>>>>> +       return memwidth;
+>>>>> +}
+>>>>> +
+>>>>>     #define coresight_tmc_simple_func(name, offset)
+>>>>> \
+>>>>>           coresight_simple_func(struct tmc_drvdata, name, offset)
+>>>>>
+>>>>> @@ -306,6 +339,7 @@ static int tmc_probe(struct amba_device *adev, const
+>>>>> struct amba_id *id)
+>>>>>
+>>>>>           devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
+>>>>>           drvdata->config_type = BMVAL(devid, 6, 7);
+>>>>> +       drvdata->memwidth = tmc_get_memwidth(devid);
+>>>>>
+>>>>>           if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+>>>>>                   if (np)
+>>>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h
+>>>>> b/drivers/hwtracing/coresight/coresight-tmc.h
+>>>>> index 9b4c215d2b6b..12a097f3d06c 100644
+>>>>> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+>>>>> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+>>>>> @@ -81,10 +81,10 @@ enum tmc_mode {
+>>>>>     };
+>>>>>
+>>>>>     enum tmc_mem_intf_width {
+>>>>> -       TMC_MEM_INTF_WIDTH_32BITS       = 0x2,
+>>>>> -       TMC_MEM_INTF_WIDTH_64BITS       = 0x3,
+>>>>> -       TMC_MEM_INTF_WIDTH_128BITS      = 0x4,
+>>>>> -       TMC_MEM_INTF_WIDTH_256BITS      = 0x5,
+>>>>> +       TMC_MEM_INTF_WIDTH_32BITS       = 1,
+>>>>> +       TMC_MEM_INTF_WIDTH_64BITS       = 2,
+>>>>> +       TMC_MEM_INTF_WIDTH_128BITS      = 4,
+>>>>> +       TMC_MEM_INTF_WIDTH_256BITS      = 8,
+>>>>>     };
+>>>>
+>>>>
+>>>>
+>>>> I think this would cause confusion for the reader. It would be good to
+>>>> leave the definitions above as before and tmc_get_memwidth() doing:
+>>>>
+>>>> i.e,
+>>>>           case TMC_MEM_INTF_WIDTH_32BITS:
+>>>>                   memwidth = 1;
+>>>>                   break;
+>>>>
+>>>> But we still store the memwidth in bytes.
 >>>
->>> We _could_ - indeed I started doing that, but then decided that the
->>> obfuscation of horrible macro-templated functions wasn't worth saving a
->>> couple of hundred bytes in some code that isn't exactly difficult to
->>> maintain and has needed touching once in 4 years.
 >>>
->>> If you did want to go down the macro route, I may as well also generate both
->>> lo-hi and hi-lo headers all from a single template, it'd be really clever...
->>> <alarm bells>
+>>> If we proceed this way we have to do a case statement on hard coded
+>>> values (or introduce a new enumeration) in tmc_update_etf_buffer(). In
 >>
->> I certainly wasn't suggesting any more than the obvious macroisation,
->> but I'll leave it up to Arnd, as I think this falls on his lap.
+>>
+>> But then we are doing that already with this patch in tmc_get_memwidth
+>> already.
 >
-> I'd prefer the open-coded variant as well.
+> Right.  With my approach we use hard coded values once and named
+> symbols every time we need access to memwidth.  With your approach we
+> use name symbols once and hard coded values (along with a lengthy
+> comment) every time memwidth is accessed.
 
-By that, do you mean sticking with the smmu_writeq() implementation in 
-the driver and dropping this patch, or merging this patch as-is without 
-further macro-magic?
+That lengthy comment already exists as part of your patch. All I was saying
+is you could reduce the switch..case for width to an if () for hard coded
+value check, which is only done for mask generation.
 
-Thanks,
-Robin.
-
->
-> 	Arnd
->
+Suzuki
