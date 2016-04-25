@@ -1,35 +1,68 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 25 Apr 2016 11:02:15 +0200
-Subject: [GIT PULL 2/5] ARM: dts: exynos: DT for v4.7
-In-Reply-To: <5773702.Vl2lnk0PfR@wuerfel>
-References: <1460541682-32417-1-git-send-email-k.kozlowski@samsung.com>
- <1460541682-32417-3-git-send-email-k.kozlowski@samsung.com>
- <5773702.Vl2lnk0PfR@wuerfel>
-Message-ID: <571DDD17.9090402@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Apr 2016 10:04:15 +0100
+Subject: [PATCH 03/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ engine driver support
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A57989B@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-4-git-send-email-peter.griffin@linaro.org>
+ <C246CAC1457055469EF09E3A7AC4E11A4A57989B@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160425090415.GB20365@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2016 11:18 PM, Arnd Bergmann wrote:
-> On Wednesday 13 April 2016 12:01:19 Krzysztof Kozlowski wrote:
->> Samsung Device Tree updates and improvements for v4.7:
->> 1. Enable accelerated AES (Security SubSystem) on Exynos4412-based boards.
->> 2. Enable HDMI CEC on Exynos4412-based Odroid.
->> 3. Add regulator supplies for eMMC/SD on Odroid XU3/XU4.
->> 4. Fix DTC unit name warnings.
->> 5. Merge topic branch of new Artik5 board.
->>
-> 
-> Pulled into next/dt. Thanks for splitting this into a separate branch
-> aside from the Artik5 stuff, that makes sense. Two minor things you
-> could have done even better:
-> 
-> - split out the DTC unit name warning fixes into yet another branch,
->   as there are lots of them and they are unrelated to the rest
-> 
-> - not merge the Artik5 changes into this, but let us deal with
->   any conflicts ourselves.
+On Thu, 21 Apr 2016, Appana Durga Kedareswara Rao wrote:
+> > -----Original Message-----
+> > From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
+> > owner at vger.kernel.org] On Behalf Of Peter Griffin
+> > Sent: Thursday, April 21, 2016 4:34 PM
+> > To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > srinivas.kandagatla at gmail.com; maxime.coquelin at st.com;
+> > patrice.chotard at st.com; vinod.koul at intel.com
+> > Cc: peter.griffin at linaro.org; lee.jones at linaro.org;
+> > dmaengine at vger.kernel.org; devicetree at vger.kernel.org; arnd at arndb.de;
+> > broonie at kernel.org; ludovic.barre at st.com
+> > Subject: [PATCH 03/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
+> > engine driver support
 
-Thanks for both hints. Noted.
+What is this text?  If you wish to contribute to upstream mailing
+lists, please fix your email client.  Also, please read:
 
-Best regards,
-Krzysztof
+  Documentation/email-clients.txt
+
+> > This patch adds support for the Flexible Direct Memory Access (FDMA) core
+> > driver. The FDMA is a slim core CPU with a dedicated firmware.
+> > It is a general purpose DMA controller capable of supporting 16
+> > independent DMA channels. Data moves maybe from memory to memory
+> > or between memory and paced latency critical real time targets and it
+> > is found on al STi based chipsets.
+> > 
+> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  drivers/dma/Kconfig   |  12 +
+> >  drivers/dma/Makefile  |   1 +
+> >  drivers/dma/st_fdma.c | 967
+> > ++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 980 insertions(+)
+> >  create mode 100644 drivers/dma/st_fdma.c
+
+[...]
+> > +static int st_fdma_clk_enable(struct st_fdma_dev *fdev)
+> > +{
+> > +	int i, ret;
+> > +
+> > +	for (i = 0; i < CLK_MAX_NUM; i++) {
+> > +		ret = clk_prepare_enable(fdev->clks[i]);
+> > +		if (ret < 0)
+> 
+> You should disable and unprepared the other clocks...
+
+Replying to a 1000 line email and not snipping (especially for a one
+single-line comment), it considered bad etiquette.  Please remove all
+unrelated text in future.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
