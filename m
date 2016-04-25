@@ -1,271 +1,51 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 25 Apr 2016 12:52:47 -0500
-Subject: [PATCHv2 6/7] EDAC, altera: Add Arria10 Ethernet EDAC support
+Date: Mon, 25 Apr 2016 12:52:42 -0500
+Subject: [PATCHv2 1/7] EDAC, altera: Check parent status for Arria10 EDAC block
 In-Reply-To: <1461606768-14404-1-git-send-email-tthayer@opensource.altera.com>
 References: <1461606768-14404-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1461606768-14404-7-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1461606768-14404-2-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-Add Altera Arria10 Ethernet FIFO memory EDAC support.
+In preparation for the Arria10 ECC modules, check the status
+of the parent in the device tree to ensure the block is enabled.
+Skip if no parent phandle is set in the device tree.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2  Remove (void *) cast from altr_edac_device_of_match[]
-    Addition of panic flag to private data.
+v2  No change
 ---
- drivers/edac/Kconfig       |    7 ++
- drivers/edac/altera_edac.c |  159 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/edac/altera_edac.h |   14 ++++
- 3 files changed, 180 insertions(+)
+ drivers/edac/altera_edac.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-index 6ca7474..d0c1dab 100644
---- a/drivers/edac/Kconfig
-+++ b/drivers/edac/Kconfig
-@@ -391,6 +391,13 @@ config EDAC_ALTERA_OCRAM
- 	  Support for error detection and correction on the
- 	  Altera On-Chip RAM Memory for Altera SoCs.
- 
-+config EDAC_ALTERA_ETHERNET
-+	bool "Altera Ethernet FIFO ECC"
-+	depends on EDAC_ALTERA=y
-+	help
-+	  Support for error detection and correction on the
-+	  Altera Ethernet FIFO Memory for Altera SoCs.
-+
- config EDAC_SYNOPSYS
- 	tristate "Synopsys DDR Memory Controller"
- 	depends on EDAC_MM_EDAC && ARCH_ZYNQ
 diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 49a5239..3860880 100644
+index 5b4d223..b127e77 100644
 --- a/drivers/edac/altera_edac.c
 +++ b/drivers/edac/altera_edac.c
-@@ -553,6 +553,12 @@ const struct edac_device_prv_data ocramecc_data;
- const struct edac_device_prv_data l2ecc_data;
- const struct edac_device_prv_data a10_ocramecc_data;
- const struct edac_device_prv_data a10_l2ecc_data;
-+const struct edac_device_prv_data a10_enet0rxecc_data;
-+const struct edac_device_prv_data a10_enet0txecc_data;
-+const struct edac_device_prv_data a10_enet1rxecc_data;
-+const struct edac_device_prv_data a10_enet1txecc_data;
-+const struct edac_device_prv_data a10_enet2rxecc_data;
-+const struct edac_device_prv_data a10_enet2txecc_data;
+@@ -1108,6 +1108,7 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
+ 	struct resource res;
+ 	int edac_idx;
+ 	int rc = 0;
++	struct device_node *parent;
+ 	const struct edac_device_prv_data *prv;
+ 	/* Get matching node and check for valid result */
+ 	const struct of_device_id *pdev_id =
+@@ -1120,6 +1121,14 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
+ 	if (IS_ERR_OR_NULL(prv))
+ 		return -ENODEV;
  
- static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
- {
-@@ -693,6 +699,20 @@ static const struct of_device_id altr_edac_device_of_match[] = {
- 	{ .compatible = "altr,socfpga-ocram-ecc", .data = &ocramecc_data },
- 	{ .compatible = "altr,socfpga-a10-ocram-ecc", .data = &a10_ocramecc_data },
- #endif
-+#ifdef CONFIG_EDAC_ALTERA_ETHERNET
-+	{ .compatible = "altr,socfpga-a10-emac0-rx-ecc",
-+	  .data = &a10_enet0rxecc_data },
-+	{ .compatible = "altr,socfpga-a10-emac0-tx-ecc",
-+	  .data = &a10_enet0txecc_data },
-+	{ .compatible = "altr,socfpga-a10-emac1-rx-ecc",
-+	  .data = &a10_enet1rxecc_data },
-+	{ .compatible = "altr,socfpga-a10-emac1-tx-ecc",
-+	  .data = &a10_enet1txecc_data },
-+	{ .compatible = "altr,socfpga-a10-emac2-rx-ecc",
-+	  .data = &a10_enet2rxecc_data },
-+	{ .compatible = "altr,socfpga-a10-emac2-tx-ecc",
-+	  .data = &a10_enet2txecc_data },
-+#endif
- 	{},
- };
- MODULE_DEVICE_TABLE(of, altr_edac_device_of_match);
-@@ -1205,6 +1225,132 @@ const struct edac_device_prv_data a10_l2ecc_data = {
- 
- #endif	/* CONFIG_EDAC_ALTERA_L2C */
- 
-+/********************* Ethernet Device Functions ********************/
-+
-+#ifdef CONFIG_EDAC_ALTERA_ETHERNET
-+
-+const struct edac_device_prv_data a10_enet0rxecc_data = {
-+	.setup = altr_check_ecc_deps,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.irq_status_mask = A10_SYSMGR_ECC_INTSTAT_EMAC0RX,
-+	.dbgfs_name = "altr_emac0rx_trigger",
-+	.ecc_enable_mask = ALTR_A10_ETHERNET_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	.panic = false,
-+};
-+
-+const struct edac_device_prv_data a10_enet0txecc_data = {
-+	.setup = altr_check_ecc_deps,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.irq_status_mask = A10_SYSMGR_ECC_INTSTAT_EMAC0TX,
-+	.dbgfs_name = "altr_emac0tx_trigger",
-+	.ecc_enable_mask = ALTR_A10_ETHERNET_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	.panic = false,
-+};
-+
-+const struct edac_device_prv_data a10_enet1rxecc_data = {
-+	.setup = altr_check_ecc_deps,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.irq_status_mask = A10_SYSMGR_ECC_INTSTAT_EMAC1RX,
-+	.dbgfs_name = "altr_emac1rx_trigger",
-+	.ecc_enable_mask = ALTR_A10_ETHERNET_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	.panic = false,
-+};
-+
-+const struct edac_device_prv_data a10_enet1txecc_data = {
-+	.setup = altr_check_ecc_deps,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.irq_status_mask = A10_SYSMGR_ECC_INTSTAT_EMAC1TX,
-+	.dbgfs_name = "altr_emac1tx_trigger",
-+	.ecc_enable_mask = ALTR_A10_ETHERNET_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	.panic = false,
-+};
-+
-+const struct edac_device_prv_data a10_enet2rxecc_data = {
-+	.setup = altr_check_ecc_deps,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.irq_status_mask = A10_SYSMGR_ECC_INTSTAT_EMAC2RX,
-+	.dbgfs_name = "altr_emac2rx_trigger",
-+	.ecc_enable_mask = ALTR_A10_ETHERNET_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	.panic = false,
-+};
-+
-+const struct edac_device_prv_data a10_enet2txecc_data = {
-+	.setup = altr_check_ecc_deps,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.irq_status_mask = A10_SYSMGR_ECC_INTSTAT_EMAC2TX,
-+	.dbgfs_name = "altr_emac2tx_trigger",
-+	.ecc_enable_mask = ALTR_A10_ETHERNET_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+	.panic = false,
-+};
-+
-+static const struct a10_ecc_init_vars a10_enet_ecc_init[] = {
-+	{"altr,socfpga-a10-emac0-rx-ecc", A10_SYSMGR_ECC_INTSTAT_EMAC0RX},
-+	{"altr,socfpga-a10-emac0-tx-ecc", A10_SYSMGR_ECC_INTSTAT_EMAC0TX},
-+	{"altr,socfpga-a10-emac1-rx-ecc", A10_SYSMGR_ECC_INTSTAT_EMAC1RX},
-+	{"altr,socfpga-a10-emac1-tx-ecc", A10_SYSMGR_ECC_INTSTAT_EMAC1TX},
-+	{"altr,socfpga-a10-emac2-rx-ecc", A10_SYSMGR_ECC_INTSTAT_EMAC2RX},
-+	{"altr,socfpga-a10-emac2-tx-ecc", A10_SYSMGR_ECC_INTSTAT_EMAC2TX},
-+};
-+
-+static int __init socfpga_init_ethernet_ecc(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(a10_enet_ecc_init); i++) {
-+		altr_init_a10_ecc_block(a10_enet_ecc_init[i].ecc_str,
-+					a10_enet_ecc_init[i].irq_mask,
-+					ALTR_A10_ETHERNET_ECC_EN_CTL, 0);
++	/* If there is a parent parameter, exit if it is not available. */
++	parent = of_parse_phandle(np, "parent", 0);
++	if (parent && !of_device_is_available(parent)) {
++		of_node_put(parent);
++		return -ENODEV;
 +	}
++	of_node_put(parent);
 +
-+	return 0;
-+}
-+
-+early_initcall(socfpga_init_ethernet_ecc);
-+
-+#endif	/* CONFIG_EDAC_ALTERA_ETHERNET */
-+
- /********************* Arria10 EDAC Device Functions *************************/
+ 	if (!devres_open_group(edac->dev, altr_edac_a10_device_add, GFP_KERNEL))
+ 		return -ENOMEM;
  
- /*
-@@ -1416,6 +1562,19 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
- 		else if (of_device_is_compatible(child,
- 						 "altr,socfpga-a10-ocram-ecc"))
- 			altr_edac_a10_device_add(edac, child);
-+		else if ((of_device_is_compatible(child,
-+					"altr,socfpga-a10-emac0-rx-ecc")) ||
-+			 (of_device_is_compatible(child,
-+					"altr,socfpga-a10-emac0-tx-ecc")) ||
-+			 (of_device_is_compatible(child,
-+					"altr,socfpga-a10-emac1-rx-ecc")) ||
-+			 (of_device_is_compatible(child,
-+					"altr,socfpga-a10-emac1-tx-ecc")) ||
-+			 (of_device_is_compatible(child,
-+					"altr,socfpga-a10-emac2-rx-ecc")) ||
-+			 (of_device_is_compatible(child,
-+					"altr,socfpga-a10-emac2-tx-ecc")))
-+			altr_edac_a10_device_add(edac, child);
- 	}
- 
- 	return 0;
-diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index a4f1539..fa0fe19 100644
---- a/drivers/edac/altera_edac.h
-+++ b/drivers/edac/altera_edac.h
-@@ -260,6 +260,12 @@ struct altr_sdram_mc_data {
- #define A10_SYSMGR_ECC_INTSTAT_DERR_OFST  0xA0
- #define A10_SYSMGR_ECC_INTSTAT_L2         BIT(0)
- #define A10_SYSMGR_ECC_INTSTAT_OCRAM      BIT(1)
-+#define A10_SYSMGR_ECC_INTSTAT_EMAC0RX    BIT(4)
-+#define A10_SYSMGR_ECC_INTSTAT_EMAC0TX    BIT(5)
-+#define A10_SYSMGR_ECC_INTSTAT_EMAC1RX    BIT(6)
-+#define A10_SYSMGR_ECC_INTSTAT_EMAC1TX    BIT(7)
-+#define A10_SYSMGR_ECC_INTSTAT_EMAC2RX    BIT(8)
-+#define A10_SYSMGR_ECC_INTSTAT_EMAC2TX    BIT(9)
- 
- #define A10_SYSGMR_MPU_CLEAR_L2_ECC_OFST  0xA8
- #define A10_SYSGMR_MPU_CLEAR_L2_ECC_SB    BIT(15)
-@@ -285,6 +291,9 @@ struct altr_sdram_mc_data {
- /* Arria 10 OCRAM ECC Management Group Defines */
- #define ALTR_A10_OCRAM_ECC_EN_CTL       (BIT(1) | BIT(0))
- 
-+/* Arria 10 Ethernet ECC Management Group Defines */
-+#define ALTR_A10_ETHERNET_ECC_EN_CTL    BIT(0)
-+
- /* A10 ECC Controller memory initialization timeout */
- #define ALTR_A10_ECC_INIT_WATCHDOG_10US      10000
- 
-@@ -332,4 +341,9 @@ struct altr_arria10_edac {
- 	struct list_head	a10_ecc_devices;
- };
- 
-+struct a10_ecc_init_vars {
-+	u8 ecc_str[32];
-+	u32 irq_mask;
-+};
-+
- #endif	/* #ifndef _ALTERA_EDAC_H */
 -- 
 1.7.9.5
