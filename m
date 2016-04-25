@@ -1,44 +1,55 @@
-From: niso@kth.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Mon, 25 Apr 2016 16:26:19 +0200
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <20160421134942.GA3325@infradead.org>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160311125846.GF1111@bigcity.dyn.berto.se>
- <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
- <20160321152601.GA11674@infradead.org>
- <20160413132916.GC19650@bigcity.dyn.berto.se>
- <20160421134942.GA3325@infradead.org>
-Message-ID: <20160425142619.GJ28777@bigcity.dyn.berto.se>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 25 Apr 2016 15:33:02 +0100
+Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
+In-Reply-To: <20160425142435.GB2829@codeblueprint.co.uk>
+References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
+ <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
+ <571E25B1.8070305@arm.com> <20160425141557.GA2829@codeblueprint.co.uk>
+ <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
+ <20160425142435.GB2829@codeblueprint.co.uk>
+Message-ID: <571E2A9E.3010407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+On 25/04/16 15:24, Matt Fleming wrote:
+> On Mon, 25 Apr, at 04:18:41PM, Ard Biesheuvel wrote:
+>> On 25 April 2016 at 16:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>>> On Mon, 25 Apr, at 03:12:01PM, Robin Murphy wrote:
+>>>>> +static void efi_call_virt_check_flags(unsigned long flags, const char *call)
+>>>>> +{
+>>>>> +    unsigned long cur_flags;
+>>>>> +    bool mismatch;
+>>>>> +
+>>>>> +    local_save_flags(cur_flags);
+>>>>> +
+>>>>> +    mismatch = !!((cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK);
+>>>>
+>>>> nit: the assignment itself is already a conversion to bool, so the
+>>>> excitement is redundant here.
+>>>
+>>> This was intentional. I asked Mark to make this change so that it's
+>>> explicit for the developer that we're performing the type conversion.
+>>
+>> But replacing an implicit boolean cast with an explicit one makes
+>> little sense, no? Don't we simply want '!= 0' here if you need a
+>> boolean expression?
+>
+> Aha but '!!' is fewer characters to type!!
+>
+> I'm not that bothered as long as we don't stuff an int into a bool
+> without giving the programmer some idea we're doing that. It's not
+> about the compiler getting it wrong, more about a developer
+> introducing a bug when they change the code in the future.
+>
+> Unless anyone objects, I'll fix this up to use '!= 0' when I apply it.
 
-On 2016-04-21 06:49:42 -0700, Christoph Hellwig wrote:
-> On Wed, Apr 13, 2016 at 03:29:17PM +0200, Niklas S?derlund wrote:
-> > > Yes, it would be good to do an audit of all the ARM dma_ops as well
-> > > as generic code like drivers/base/dma-*.c, lib/dma-debug.c and
-> > > include/linux/dma-*.h
-> 
-> What about things like the phys_addr() helper in lib/dma-debug.c?  That
-> was in fact what prompted my question for an audit, and it seems
-> to not even feature on your list.  What patterns / symbols did you look
-> for?
+Agreed - the belt and braces approach isn't necessarily bad if the cost
+of cocking it up is significant, and !=0 is as explicit as you can get.
+After all, if Joe Random Hacker can't infer the behaviour from looking 4
+lines up to see the variable definition, then I wouldn't count on him
+understanding !! either ;)
 
+Thanks,
+Robin.
 
-I have followed the call path from the usage in 
-drivers/dma/sh/rcar-dmac.c and made sure the dma_addr_t is not used in a 
-bad way.
-
-I also looked at the dma-mapping API and ruled out that the only 
-function that make sens to use with a dma_addr_t from dma_map_resource() 
-are dma_unmap_resource() and dma_mapping_error(). With that I can't see 
-how a dma_addr_t would end up in lib/dma-debug.c. But I might be missing 
-something?
-
-In the big picture do you feel the approach I have is the correct way to 
-solve my problem? Provided we can work out this issues ofc?
-
--- 
-Regards,
-Niklas S?derlund
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
