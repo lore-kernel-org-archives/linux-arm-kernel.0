@@ -1,36 +1,67 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 25 Apr 2016 18:30:58 +0200
-Subject: [PATCH 06/14] dmaengine: bcm2835: DT spelling
- s/interrupts-names/interrupt-names/
-In-Reply-To: <20160425152643.GZ2274@localhost>
-References: <1461166339-11109-1-git-send-email-geert+renesas@glider.be>
- <1461166339-11109-7-git-send-email-geert+renesas@glider.be>
- <20160425152643.GZ2274@localhost>
-Message-ID: <CAMuHMdWsAj2Tmp3hQQAwZaB39j0KM=kcsobf+NtnrAG-aX5ohg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 25 Apr 2016 17:31:15 +0100
+Subject: [GIT PULL v2 1/2] ARM: vexpress: addition of MPS2 platform support
+ for v4.7
+Message-ID: <1461601876-25288-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi ARM-SoC guys,
 
-On Mon, Apr 25, 2016 at 5:26 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Wed, Apr 20, 2016 at 05:32:11PM +0200, Geert Uytterhoeven wrote:
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->>  Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
->
-> This change does not apply for me, can you please split it up and send the
-> sound ones thru sound tree
+Based on Arnd, suggestion this PR splits the previous one[1] into two
+and drops clocksource and serial driver changes so that they can be
+merged via respective trees independently.
 
-Sorry, I seem to have mixed two unrelated drivers.
-Will split and resend...
+Please pull !
 
-Gr{oetje,eeting}s,
+Regards,
+Sudeep
 
-                        Geert
+[1] http://www.spinics.net/lists/arm-kernel/msg497696.html
+---
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-for-v4.7/mps2
+
+for you to fetch changes up to 4ef726d2f0e2f788bdf72f6cde64fcaaa26dcb66:
+
+  MAINTAINERS: Update ARM Versatile Express platform entry (2016-04-25 14:11:16 +0100)
+
+----------------------------------------------------------------
+ARMv7 Cortex-M Prototyping System (MPS2) support
+
+Basic support for ARM Versatile Express Cortex-M Prototyping System
+(V2M-MPS2). ucLinux can be now run on both the hardware and FVP models
+with Cortex-M3/M4/M7 configurations (Vladimir Murzin)
+
+----------------------------------------------------------------
+Vladimir Murzin (5):
+      ARM: vexpress/mps2: introduce MPS2 platform
+      ARM: configs: add MPS2 defconfig
+      ARM: dts: introduce MPS2 AN385/AN386
+      ARM: dts: introduce MPS2 AN399/AN400
+      MAINTAINERS: Update ARM Versatile Express platform entry
+
+ MAINTAINERS                          |   1 +
+ arch/arm/Kconfig                     |  12 ++
+ arch/arm/Makefile                    |   1 +
+ arch/arm/boot/dts/Makefile           |   3 +
+ arch/arm/boot/dts/mps2-an385.dts     |  92 +++++++++++++
+ arch/arm/boot/dts/mps2-an399.dts     |  92 +++++++++++++
+ arch/arm/boot/dts/mps2.dtsi          | 241 +++++++++++++++++++++++++++++++++++
+ arch/arm/configs/mps2_defconfig      | 109 ++++++++++++++++
+ arch/arm/mach-vexpress/Makefile      |   4 +-
+ arch/arm/mach-vexpress/Makefile.boot |   3 +
+ arch/arm/mach-vexpress/v2m-mps2.c    |  21 +++
+ 11 files changed, 578 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/mps2-an385.dts
+ create mode 100644 arch/arm/boot/dts/mps2-an399.dts
+ create mode 100644 arch/arm/boot/dts/mps2.dtsi
+ create mode 100644 arch/arm/configs/mps2_defconfig
+ create mode 100644 arch/arm/mach-vexpress/Makefile.boot
+ create mode 100644 arch/arm/mach-vexpress/v2m-mps2.c
