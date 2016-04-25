@@ -1,60 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 25 Apr 2016 13:26:07 +0200
-Subject: [PATCH v2 6/6] efi/arm*: add support to dump the EFI page tables
-In-Reply-To: <20160422172513.GV10606@leverpostej>
-References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
- <1461343688-8552-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160422170112.GS10606@leverpostej>
- <CAKv+Gu-abf2g5htQSHA=ETnSfzVExFLwsjs2Kbs8fn86MfFv3Q@mail.gmail.com>
- <20160422172513.GV10606@leverpostej>
-Message-ID: <CAKv+Gu9fOnKK66Ee7N_5UXbZh_cZbQ0AnnPLHQhm8qCb-r5gVg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Apr 2016 13:32:39 +0200
+Subject: [PATCH 3/5] ARM: dts: introduce MPS2 AN385/AN386
+In-Reply-To: <571DEE47.3090208@arm.com>
+References: <1461574157-23580-1-git-send-email-vladimir.murzin@arm.com>
+ <571DE21A.5010502@suse.com> <571DEE47.3090208@arm.com>
+Message-ID: <5670114.66Ur0mq4Xc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2016 at 19:25, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Apr 22, 2016 at 07:20:38PM +0200, Ard Biesheuvel wrote:
->> On 22 April 2016 at 19:01, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Fri, Apr 22, 2016 at 06:48:08PM +0200, Ard Biesheuvel wrote:
->
->> >> +static struct ptdump_info efi_ptdump_info = {
->> >> +     .mm             = &efi_mm,
->> >> +     .markers        = efi_addr_markers,
->> >> +     .base_addr      = 0,
->> >> +     .max_addr       = SZ_1G,
->> >> +};
->> >
->> > I see that max_addr isn't used for arm64, and for ARM it's only used in
->> > one place. It doesn't seem great to have that on arm64 given it's
->> > unused.
->> >
->> > Do we actually need max_addr? Is there any reason not to always dump
->> > whole tables?
->> >
->> > I guess you're trying to avoid dumping the kernel VA range on 32-bit?
->>
->> Indeed. On ARM, the efi_page_tables dumps its copy of
->> kernel_page_tables. If that is OK (the information could potentially
->> be useful, I suppose) we can drop the max
->
-> I'd argue it's always worth dumping the full tables (dropipng the max).
->
-> For instance, we could have some bug that leaves the kernel VA range in
-> the EFI tables inconsistent with what we expect/require, and having that
-> exposed would make that clear.
->
+On Monday 25 April 2016 11:15:35 Vladimir Murzin wrote:
+> >> +
+> >> +#include "mps2.dtsi"
+> >> +
+> >> +/ {
+> >> +    model = "ARM MPS2 Application Note 385/386";
+> >> +    compatible = "arm,mps2";
+> >> +
+> >> +    aliases {
+> >> +        serial0 = &uart0;
+> >> +    };
+> >> +
+> >> +    chosen {
+> >> +        bootargs = "rdinit=/sbin/init earlycon";
+> > 
+> > The rootfs should be independent from the board.
+> > In my opinion, this type of bootargs should not be part of the DTS.
+> 
+> I have no strong opinion on this, but quick grep shows plenty places
+> where the same happens, and even [1] has rootfs specific option as an
+> example. So if there is no strong call to remove rdinit from bootargs,
+> I'd prefer to keep it as it makes testing easier for me.
+> 
+> [1] Documentation/devicetree/booting-without-of.txt
+> 
 
-Well, the problem here is that we only sync the EFI page tables with
-the kernel page tables in switch_mm() (if they turn out to be out of
-sync). This means we should either sync them in this code path as
-well, or remove the kernel VA range from the output, since we'll be
-dumping known stale data otherwise.
+I think "rdinit=/sbin/init" is redundant, that is what we try running
+anyway, so I don't see any downside in removing it.
 
-> Regardless, arbitrarily limiting the VA range of the arm64 dump doesn't
-> seem great.
->
-
-True. [0 .. TASK_SIZE) looks like a useful and not arbitrary range to
-limit the EFI page table output to. Unfortunately, TASK_SIZE resolves
-to a value that depends on TIF_32BIT, so will still need some
-preprocessor conditional to select between TASK_SIZE_64 (on arm64) and
-TASK_SIZE (on ARM)
+	Arnd
