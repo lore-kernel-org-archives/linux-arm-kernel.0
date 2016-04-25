@@ -1,175 +1,58 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Apr 2016 16:28:58 +0100
-Subject: [PATCH V3 14/18] coresight: tmc: keep track of memory width
-In-Reply-To: <CANLsYky5fcnyvLwVwme1AmQ5vbCCu-DOkhdGwz7FgwZnLUV3CA@mail.gmail.com>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-15-git-send-email-mathieu.poirier@linaro.org>
- <571E2C89.7010003@arm.com>
- <CANLsYkw59pvjc-Q6oVX+wB40nrzjuZ8V0hgdKT=sK=sH+HY-gw@mail.gmail.com>
- <571E3343.9090705@arm.com>
- <CANLsYky5fcnyvLwVwme1AmQ5vbCCu-DOkhdGwz7FgwZnLUV3CA@mail.gmail.com>
-Message-ID: <571E37BA.5080703@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 25 Apr 2016 20:59:14 +0530
+Subject: [PATCH 10/10] cpufreq: mvebu: Use generic platdev driver
+In-Reply-To: <17150729.NF4MViUffk@wuerfel>
+References: <cover.1461228504.git.viresh.kumar@linaro.org>
+ <6893237.FoNPbfW3DC@wuerfel> <20160425125605.GG6104@vireshk-i7>
+ <17150729.NF4MViUffk@wuerfel>
+Message-ID: <20160425152914.GI6104@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 16:25, Mathieu Poirier wrote:
-> On 25 April 2016 at 09:09, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> On 25/04/16 15:55, Mathieu Poirier wrote:
->>>
->>> On 25 April 2016 at 08:41, Suzuki K Poulose <Suzuki.Poulose@arm.com>
->>> wrote:
->>>>
->>>> On 22/04/16 18:14, Mathieu Poirier wrote:
->>>>>
->>>>>
->>>>> Accessing the HW configuration register each time the memory
->>>>> width is needed simply doesn't make sense.  It is much more
->>>>> efficient to read the value once and keep a reference for
->>>>> later use.
->>>>>
->>>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>>> ---
->>>>>     drivers/hwtracing/coresight/coresight-tmc-etf.c | 14 +---------
->>>>>     drivers/hwtracing/coresight/coresight-tmc.c     | 34
->>>>> +++++++++++++++++++++++++
->>>>>     drivers/hwtracing/coresight/coresight-tmc.h     | 10 +++++---
->>>>>     3 files changed, 41 insertions(+), 17 deletions(-)
->>>>>
->>>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>>>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>>>> index cc88c15ba45c..981c5ca75e36 100644
->>>>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>>>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->>>>> @@ -41,25 +41,13 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->>>>>
->>>>>     static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
->>>>>     {
->>>>> -       enum tmc_mem_intf_width memwidth;
->>>>> -       u8 memwords;
->>>>>           char *bufp;
->>>>>           u32 read_data;
->>>>>           int i;
->>>>>
->>>>> -       memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID),
->>>>> 8, 10);
->>>>> -       if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
->>>>> -               memwords = 1;
->>>>> -       else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
->>>>> -               memwords = 2;
->>>>> -       else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
->>>>> -               memwords = 4;
->>>>> -       else
->>>>> -               memwords = 8;
->>>>> -
->>>>>           bufp = drvdata->buf;
->>>>>           while (1) {
->>>>> -               for (i = 0; i < memwords; i++) {
->>>>> +               for (i = 0; i < drvdata->memwidth; i++) {
->>>>>                           read_data = readl_relaxed(drvdata->base +
->>>>> TMC_RRD);
->>>>>                           if (read_data == 0xFFFFFFFF)
->>>>>                                   return;
->>>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
->>>>> b/drivers/hwtracing/coresight/coresight-tmc.c
->>>>> index 55806352b1f1..cb030a09659d 100644
->>>>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
->>>>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
->>>>> @@ -193,6 +193,39 @@ static const struct file_operations tmc_fops = {
->>>>>           .llseek         = no_llseek,
->>>>>     };
->>>>>
->>>>> +static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
->>>>> +{
->>>>> +       enum tmc_mem_intf_width memwidth;
->>>>> +
->>>>> +       /*
->>>>> +        * Excerpt from the TRM:
->>>>> +        *
->>>>> +        * DEVID::MEMWIDTH[10:8]
->>>>> +        * 0x2 Memory interface databus is 32 bits wide.
->>>>> +        * 0x3 Memory interface databus is 64 bits wide.
->>>>> +        * 0x4 Memory interface databus is 128 bits wide.
->>>>> +        * 0x5 Memory interface databus is 256 bits wide.
->>>>> +        */
->>>>> +       switch (BMVAL(devid, 8, 10)) {
->>>>> +       case 0x2:
->>>>> +               memwidth = TMC_MEM_INTF_WIDTH_32BITS;
->>>>> +               break;
->>>>> +       case 0x3:
->>>>> +               memwidth = TMC_MEM_INTF_WIDTH_64BITS;
->>>>> +               break;
->>>>> +       case 0x4:
->>>>> +               memwidth = TMC_MEM_INTF_WIDTH_128BITS;
->>>>> +               break;
->>>>> +       case 0x5:
->>>>> +               memwidth = TMC_MEM_INTF_WIDTH_256BITS;
->>>>> +               break;
->>>>> +       default:
->>>>> +               memwidth = 0;
->>>>> +       }
->>>>> +
->>>>> +       return memwidth;
->>>>> +}
->>>>> +
->>>>>     #define coresight_tmc_simple_func(name, offset)
->>>>> \
->>>>>           coresight_simple_func(struct tmc_drvdata, name, offset)
->>>>>
->>>>> @@ -306,6 +339,7 @@ static int tmc_probe(struct amba_device *adev, const
->>>>> struct amba_id *id)
->>>>>
->>>>>           devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
->>>>>           drvdata->config_type = BMVAL(devid, 6, 7);
->>>>> +       drvdata->memwidth = tmc_get_memwidth(devid);
->>>>>
->>>>>           if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
->>>>>                   if (np)
->>>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h
->>>>> b/drivers/hwtracing/coresight/coresight-tmc.h
->>>>> index 9b4c215d2b6b..12a097f3d06c 100644
->>>>> --- a/drivers/hwtracing/coresight/coresight-tmc.h
->>>>> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
->>>>> @@ -81,10 +81,10 @@ enum tmc_mode {
->>>>>     };
->>>>>
->>>>>     enum tmc_mem_intf_width {
->>>>> -       TMC_MEM_INTF_WIDTH_32BITS       = 0x2,
->>>>> -       TMC_MEM_INTF_WIDTH_64BITS       = 0x3,
->>>>> -       TMC_MEM_INTF_WIDTH_128BITS      = 0x4,
->>>>> -       TMC_MEM_INTF_WIDTH_256BITS      = 0x5,
->>>>> +       TMC_MEM_INTF_WIDTH_32BITS       = 1,
->>>>> +       TMC_MEM_INTF_WIDTH_64BITS       = 2,
->>>>> +       TMC_MEM_INTF_WIDTH_128BITS      = 4,
->>>>> +       TMC_MEM_INTF_WIDTH_256BITS      = 8,
->>>>>     };
->>>>
->>>>
->>>>
->>>> I think this would cause confusion for the reader. It would be good to
->>>> leave the definitions above as before and tmc_get_memwidth() doing:
->>>>
->>>> i.e,
->>>>           case TMC_MEM_INTF_WIDTH_32BITS:
->>>>                   memwidth = 1;
->>>>                   break;
->>>>
->>>> But we still store the memwidth in bytes.
->>>
->>>
->>> If we proceed this way we have to do a case statement on hard coded
->>> values (or introduce a new enumeration) in tmc_update_etf_buffer(). In
->>
->>
->> But then we are doing that already with this patch in tmc_get_memwidth
->> already.
->
-> Right.  With my approach we use hard coded values once and named
-> symbols every time we need access to memwidth.  With your approach we
-> use name symbols once and hard coded values (along with a lengthy
-> comment) every time memwidth is accessed.
+On 25-04-16, 17:26, Arnd Bergmann wrote:
+> On Monday 25 April 2016 18:26:05 Viresh Kumar wrote:
+> > On 25-04-16, 14:53, Arnd Bergmann wrote:
+> > > On Monday 25 April 2016 08:30:41 Viresh Kumar wrote:
+> > 
+> > > I realize that the ordering is fixed through the way that the kernel
+> > > is linked, my worry is more about someone changing the code in some
+> > > way because it's not obvious from reading the code that the
+> > > dependency exists. If either the armada_xp_pmsu_cpufreq_init()
+> > > initcall gets changed so it does not always get called, or the
+> > > cpufreq_dt_platdev_init() initcall gets changed so it comes a little
+> > > earlier, things will break.
+> > 
+> > cpufreq-dt will just error out in that case, because it wouldn't find
+> > any OPPs registered to the OPP-core. It *shouldn't* crash and if it
+> > does, then we have a problem to fix.
+> 
+> Ok.
+> 
+> > > > The other thing that can happen is that armada_xp_pmsu_cpufreq_init()
+> > > > call can fail. In that case, most of the times cpufreq-dt ->init()
+> > > > will fail as well, so even that is fine for me.
+> > > > 
+> > > > And, so I think we can keep this patch as is.
+> > > 
+> > > What are the downsides of moving armada_xp_pmsu_cpufreq_init()
+> > > into drivers/cpufreq?
+> > 
+> > More special code :)
+> 
+> Of course the special code still exists, it seems more like neither of
+> us wants to have it in the portion of the kernel that he maintains ;-)
 
-That lengthy comment already exists as part of your patch. All I was saying
-is you could reduce the switch..case for width to an if () for hard coded
-value check, which is only done for mask generation.
+Hehe.. But after $subject patch, we don't have any special code for
+creating the device, isn't it?
 
-Suzuki
+> Maybe the mvebu maintainers have a preference where they'd like the
+> code to be, they are the ones that are most impacted if anything
+> goes wrong.
+
+What code are you talking about? Initializing the OPPs or adding the
+cpufreq-dt device? The first one (or whatever is left now in that
+function) can stay anywhere, even as a cpufreq driver. I was talking
+about the fact that we don't have a sequence problem to solve here.
+
+-- 
+viresh
