@@ -1,60 +1,91 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 25 Apr 2016 21:28:12 +0530
-Subject: [RFC 7/9] drivers: iommu: Add a new add device api
+Date: Mon, 25 Apr 2016 21:28:10 +0530
+Subject: [RFC 5/9] drivers: platform: Configure dma operations at probe time
 In-Reply-To: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
 References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1461599894-1969-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1461599894-1969-6-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Associating a master with an group happens when the master is added to the bus,
-notified with BUS_ADD_DEVICE. But the iommu has to be ready before this
-using early iommu registration and also master should have been added to the
-iommu using xlate. So, when trying to get rid of the early registration and
-using late probing for iommu devices to sort out the probing order, the newly
-added api is meant to be called during the late probing to add the master
-to iommu.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Configuring DMA ops at probe time will allow deferring device probe when
+the IOMMU isn't available yet.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/iommu/iommu.c | 12 ++++++++++++
- include/linux/iommu.h |  1 +
- 2 files changed, 13 insertions(+)
+ drivers/base/platform.c | 13 +++++++++++++
+ drivers/of/platform.c   |  7 +++----
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index bfd4f7c..a0dd01f 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -900,6 +900,18 @@ static int remove_iommu_group(struct device *dev, void *data)
- 	return 0;
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index f437afa..17e64a4 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -557,6 +557,12 @@ static int platform_drv_probe(struct device *_dev)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	if (of_have_populated_dt()) {
++		ret = of_dma_configure_ops(_dev, _dev->of_node);
++		if (ret < 0)
++			goto done;
++	}
++
+ 	ret = dev_pm_domain_attach(_dev, true);
+ 	if (ret != -EPROBE_DEFER) {
+ 		if (drv->probe) {
+@@ -569,6 +575,11 @@ static int platform_drv_probe(struct device *_dev)
+ 		}
+ 	}
+ 
++	if (of_have_populated_dt()) {
++		if (ret)
++			of_dma_deconfigure(_dev);
++	}
++done:
+ 	if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
+ 		dev_warn(_dev, "probe deferral not supported\n");
+ 		ret = -ENXIO;
+@@ -591,6 +602,8 @@ static int platform_drv_remove(struct device *_dev)
+ 	if (drv->remove)
+ 		ret = drv->remove(dev);
+ 	dev_pm_domain_detach(_dev, true);
++	if (of_have_populated_dt())
++		of_dma_deconfigure(_dev);
+ 
+ 	return ret;
  }
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 17ee8d5..12bbc8e1 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -180,11 +180,9 @@ static struct platform_device *of_platform_device_create_pdata(
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 	of_dma_configure_masks(&dev->dev, dev->dev.of_node);
+-	of_dma_configure_ops(&dev->dev, dev->dev.of_node);
+ 	of_msi_configure(&dev->dev, dev->dev.of_node);
  
-+int iommu_bus_add_dev(struct device *dev)
-+{
-+	const struct iommu_ops *ops = dev->bus->iommu_ops;
-+	int ret = -ENODEV;
-+
-+	if (ops->add_device)
-+		ret = ops->add_device(dev);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(iommu_bus_add_dev);
-+
- static int iommu_bus_notifier(struct notifier_block *nb,
- 			      unsigned long action, void *data)
- {
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a5c539f..018cfc8 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -271,6 +271,7 @@ struct device *iommu_device_create(struct device *parent, void *drvdata,
- void iommu_device_destroy(struct device *dev);
- int iommu_device_link(struct device *dev, struct device *link);
- void iommu_device_unlink(struct device *dev, struct device *link);
-+int iommu_bus_add_dev(struct device *dev);
+ 	if (of_device_add(dev) != 0) {
+-		of_dma_deconfigure(&dev->dev);
+ 		platform_device_put(dev);
+ 		goto err_clear_flag;
+ 	}
+@@ -481,11 +479,12 @@ static int of_platform_device_destroy(struct device *dev, void *data)
+ 	if (dev->bus == &platform_bus_type)
+ 		platform_device_unregister(to_platform_device(dev));
+ #ifdef CONFIG_ARM_AMBA
+-	else if (dev->bus == &amba_bustype)
++	else if (dev->bus == &amba_bustype) {
+ 		amba_device_unregister(to_amba_device(dev));
++		of_dma_deconfigure(dev);
++	}
+ #endif
  
- /* Window handling function prototypes */
- extern int iommu_domain_window_enable(struct iommu_domain *domain, u32 wnd_nr,
+-	of_dma_deconfigure(dev);
+ 	of_node_clear_flag(dev->of_node, OF_POPULATED);
+ 	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
+ 	return 0;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
