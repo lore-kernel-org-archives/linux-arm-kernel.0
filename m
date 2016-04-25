@@ -1,39 +1,30 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Apr 2016 08:55:57 +0100
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <20160423065431.GA5840@afzalpc>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
- <20160423065431.GA5840@afzalpc>
-Message-ID: <571DCD8D.8070605@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Apr 2016 09:56:54 +0200
+Subject: [PATCH] ARM: dts: sun7i: Enable S/PDIF on the Cubietruck
+In-Reply-To: <1461538978-3137-1-git-send-email-christopher.spinrath@rwth-aachen.de>
+References: <1461538978-3137-1-git-send-email-christopher.spinrath@rwth-aachen.de>
+Message-ID: <20160425075654.GI25817@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/16 07:54, Afzal Mohammed wrote:
-> Hi,
+On Mon, Apr 25, 2016 at 01:02:58AM +0200, christopher.spinrath at rwth-aachen.de wrote:
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 > 
-> On Fri, Apr 22, 2016 at 12:43:33PM +0100, Vladimir Murzin wrote:
+> Enable the S/PDIF transmitter present on the Cubietruck.
 > 
->> Small set of fixes discovered with R-class cores.
-> 
-> just curious, is Cortex-R supported on mainline ?, thought it was not
-> supported, but subject & changelogs gave such a feeling.
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-Hi,
+Applied, thanks!
+Maxime
 
-I believe it is supported since c90ad5c "ARM: add Cortex-R7 Processor
-Info" although overtime it got blocked (at least for Vexpress) with
-Kconfig changes. There was attempt [1] to sort it out, but looks like
-these patches went nowhere, so I'm trying to re-start with the fixes
-coming first.
-
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/174256.html
-
-Cheers
-Vladimir
-
-> 
-> Regards
-> afzal
-> 
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160425/770a6bec/attachment-0001.sig>
