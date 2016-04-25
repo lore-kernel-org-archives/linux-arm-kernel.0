@@ -1,111 +1,136 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Mon, 25 Apr 2016 10:13:16 +0530
-Subject: [PATCH 5/6] Documentation: Binding doc for ethernet master in NS2
-In-Reply-To: <20160422201351.GA3048@rob-hp-laptop>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <1461230323-27891-6-git-send-email-pramod.kumar@broadcom.com>
- <20160422201351.GA3048@rob-hp-laptop>
-Message-ID: <9d799bfef311ca7ec5d4c3953f615140@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 25 Apr 2016 05:10:30 +0000 (UTC)
+Subject: OMAP baseline test results for v4.6-rc5
+Message-ID: <alpine.DEB.2.02.1604250509550.21733@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-Thanks for review and providing your valuable comments.
+Here are some basic OMAP test results for Linux v4.6-rc5.
+Logs and other details at:
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 23 April 2016 01:44
-> To: Pramod Kumar
-> Cc: Catalin Marinas; Will Deacon; Masahiro Yamada; Chen-Yu Tsai; BCM
-Kernel
-> Feedback; Pawel Moll; Mark Rutland; Arnd Bergmann; Suzuki K Poulose;
-Punit
-> Agrawal; devicetree at vger.kernel.org;
-linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; netdev at vger.kernel.org
-> Subject: Re: [PATCH 5/6] Documentation: Binding doc for ethernet master
-in
-> NS2
->
-> On Thu, Apr 21, 2016 at 02:48:42PM +0530, Pramod Kumar wrote:
-> > Adding binding doc for ethernet master present in shared MDIO
-> > controller.
-> >
-> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> > Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> > Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> > ---
-> >  .../bindings/net/brcm,iproc-mdio-shared.txt        | 32
-> ++++++++++++++++++++++
-> >  1 file changed, 32 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
-> > b/Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
-> > new file mode 100644
-> > index 0000000..1ffdd4b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/brcm,iproc-mdio-shared.txt
-> > @@ -0,0 +1,32 @@
-> > +Broadcom Ethernet master for shared mdio controller
-> > +
-> > +Required properties:
-> > +- compatible: must be "brcm,iproc-mdio-master-eth"
-> > +- reg: master id of Ethernet block
-> > +- address-cells: should be 1
-> > +- size-cells: should be 0
-> > +
-> > +Sub-nodes:
-> > +  Each port's PHY should be represented as a sub-node.
-> > +
-> > +Sub-nodes required properties:
-> > +- reg: the PHY number
-> > +- phy-mode: media type connecting the PHY and MAC.
-> > +
-> > +
-> > +Example:
-> > +	eth-master at 0 {
->
-> Is this a child of something?
->
-
-This is an Shared MDIO master node as described in cover letter and is the
-child node of iProc_shared_mdio plarform driver.
+    http://www.pwsan.com/omap/testlogs/test_v4.6-rc5/20160424184502/
 
 
-> Why is this not just an mdio bus underneath the ethernet controller? How
-is this
-> accessed?
+Test summary
+------------
 
-This is the part for Shared MDIO controller which is shared among other
-subsystem as well hence defined here. This works as glue layer between
-This controller and legacy MDIO framework and register the MDIO bus to
-legacy framework.
-When any read/write request is issue from Legacy MDIO controller framework
-it gets propagated to Shared controller platform driver via this driver
-and finally platform driver issue MDIO transaction over bus.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
->
-> > +		compatible = "brcm,iproc-mdio-master-eth";
-> > +		reg = <0x0>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		gphy0: eth-phy at 10 {
-> > +			reg = <0x10>;
-> > +			phy-mode = "mii";
-> > +		};
-> > +		status = "ok"
-> > +	};
-> > +
-> > +For more info on ethernet phy binding, please,refer to:
-> > +Documentation/devicetree/bindings/net/phy.txt
-> > +Documentation/devicetree/bindings/net/ethernet.txt
-> > --
-> > 1.9.1
-> >
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-Regards,
-Pramod
+Build: zImage:
+    Pass (18/18): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_ti81xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 1/18): multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/18): 2430sdp
+    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
+    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
+		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
+		  cmt3517, 5430es2uevm, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 2/18): 4430es2panda, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  3530es3beagle, 3530es31beagle, 2430sdp, 5430es2uevm
+    Pass ( 3/11): 4460pandaes, 3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
+    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
+    Pass ( 1/ 4): 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/18): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 3/21): omap1_defconfig, omap2plus_defconfig,
+		  multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.6-rc4 (c3b46c73264b03000d1e18b22f5caf63332547c9)):
+   text     data      bss    total  kernel
+  +1459        0        0    +1459  omap1_defconfig
+  +1495        0        0    +1495  omap1_defconfig_1510innovator_only
+  +1451        0        0    +1451  omap1_defconfig_5912osk_only
+  +2456        0        0    +2456  multi_v7_defconfig
+  +2347        0        0    +2347  omap2plus_defconfig
+  +2003        0        0    +2003  omap2plus_defconfig_2430sdp_only
+  +2315        0        0    +2315  omap2plus_defconfig_am33xx_only
+  +2311        0        0    +2311  omap2plus_defconfig_am43xx_only
+  +2347        0        0    +2347  omap2plus_defconfig_cpupm
+  +2247        0        0    +2247  omap2plus_defconfig_dra7xx_only
+    +60        0        0      +60  omap2plus_defconfig_n800_multi_omap2xxx
+    +28        0        0      +28  omap2plus_defconfig_n800_only_a
+  +2279        0        0    +2279  omap2plus_defconfig_no_pm
+  +2283        0        0    +2283  omap2plus_defconfig_omap2_4_only
+  +2311        0        0    +2311  omap2plus_defconfig_omap3_4_only
+  +2247        0        0    +2247  omap2plus_defconfig_omap5_only
+  +2215        0        0    +2215  omap2plus_defconfig_ti81xx_only
+    -12        0        0      -12  rmk_omap3430_ldp_allnoconfig
+   +265       -8        0     +257  rmk_omap3430_ldp_oldconfig
+   -220        0     +208      -12  rmk_omap4430_sdp_allnoconfig
+   +409        0        0     +409  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.6-rc4 (c3b46c73264b03000d1e18b22f5caf63332547c9))
+  avail  rsrvd   high  freed  board          kconfig
+     4k    -4k      .      .  37xxevm        omap2plus_defconfig
+     4k    -4k      .      .  4460varsomom   omap2plus_defconfig
