@@ -1,72 +1,105 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Apr 2016 14:46:29 +0100
-Subject: [PATCHv3 0/5] efi: detect erroneous firmware IRQ manipulation
-Message-ID: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
+Date: Mon, 25 Apr 2016 14:46:30 +0100
+Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
+In-Reply-To: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
+References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note: this is largely a rework of the final patch from v2 [2], which now has a
-per-arch component (and hence additional patches). The rest of v2 has already
-been picked up, and hence dropped from this posting.
+The UEFI spec allows runtime services to be called with interrupts
+masked or unmasked, and if a runtime service function needs to mask
+interrupts, it must restore the mask to its original state before
+returning (i.e. from the PoV of the OS, this does not change across a
+call). Firmware should never unmask exceptions, as these may then be
+taken by the OS unexpectedly.
 
-Some firmware erroneously unmask IRQs (and potentially other architecture
-specific exceptions) during runtime services functions, in violation of both
-common sense and the UEFI specification. This can result in a number of issues
-if said exceptions are taken when they are expected to be masked, and
-additionally can confuse IRQ tracing if the original mask state is not
-restored prior to returning from firmware.
+Unfortunately, some firmware has been seen to unmask IRQs (and
+potentially other maskable exceptions) across runtime services calls,
+leaving irq flags corrupted after returning from a runtime services
+function call. This may be detected by the IRQ tracing code, but often
+goes unnoticed, leaving a potentially disastrous bug hidden.
 
-In practice it's difficult to check that firmware never unmasks exceptions, but
-we can at least check that the IRQ flags are at least consistent upon entry to
-and return from a runtime services function call. This series implements said
-check in the shared EFI runtime wrappers code, after an initial round of
-refactoring (patches 1-5 of [2]).
+This patch detects when the irq flags are corrupted by an EFI runtime
+services call, logging the call and specific corruption to the console.
+While restoring the expected value of the flags is insufficient to avoid
+problems, we do so to avoid redundant warnings from elsewhere (e.g. IRQ
+tracing).
 
-I have left ia64 as-is, without this check, as ia64 doesn't currently use the
-generic runtime wrappers, has many special cases for the runtime calls which
-don't fit well with the generic code, and I don't expect a new, buggy ia64
-firmware to appear soon.
+The set of bits in flags which we want to check is architecture-specific
+(e.g. we want to check FIQ on arm64, but not the zero flag on x86), so
+each arch must provide ARCH_EFI_IRQ_FLAGS_MASK to describe those. In the
+absence of this mask, the check is a no-op, and we redundantly save the
+flags twice, but that will be short-lived as subsequent patches
+will implement this and remove the scaffolding.
 
-The first time corruption of the IRQ flags is detected, we dump a stack trace,
-and set TAINT_FIRMWARE_WORKAROUND. Additionally, and in all subsequent cases,
-we log (with ratelimiting) the specific corruption of the flags, and restore
-the expected flags to avoid redundant warnings elsewhere.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: linux-efi at vger.kernel.org
+---
+ drivers/firmware/efi/runtime-wrappers.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Since v1 [1]:
-* Fix thinko: s/local_irq_save/local_save_flags/
-* Remove ifdefs after conversion
-* Remove reundant semicolon from x86 patch
-* Move efi_call_virt_check_flags before first use
-* Add Acked-bys and Reviewed-bys
-
-Since v2 [2]:
-* Drop the refactoring patches (1-5), which Matt has queued
-* Add per-arch ARCH_EFI_IRQ_FLAGS_MASK, as discussed for v2 [3,4]
-
-As with v2, this has been build-tested for each target, but other than arm64 I
-don't have a good platform for testing. Hopefully this causes fewer explosions
-than v2.
-
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2016/4/21/260
-[2] https://lkml.org/lkml/2016/4/22/542
-[3] https://lkml.org/lkml/2016/4/25/230
-[4] https://lkml.org/lkml/2016/4/25/243
-
-Mark Rutland (5):
-  efi/runtime-wrappers: detect FW irq flag corruption
-  arm64/efi: enable runtime call flag checking
-  arm/efi: enable runtime call flag checking
-  x86/efi: enable runtime call flag checking
-  efi/runtime-wrappers: remove ARCH_EFI_IRQ_FLAGS_MASK ifdef
-
- arch/arm/include/asm/efi.h              |  5 +++++
- arch/arm64/include/asm/efi.h            |  3 +++
- arch/x86/include/asm/efi.h              |  4 +++-
- drivers/firmware/efi/runtime-wrappers.c | 25 +++++++++++++++++++++++++
- 4 files changed, 36 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+index a2c8e70..1f0277e 100644
+--- a/drivers/firmware/efi/runtime-wrappers.c
++++ b/drivers/firmware/efi/runtime-wrappers.c
+@@ -16,23 +16,55 @@
+ 
+ #include <linux/bug.h>
+ #include <linux/efi.h>
++#include <linux/irqflags.h>
+ #include <linux/mutex.h>
+ #include <linux/spinlock.h>
++#include <linux/stringify.h>
+ #include <asm/efi.h>
+ 
++/*
++ * Temporary scaffolding until all users provide ARCH_EFI_IRQ_FLAGS_MASK.
++ */
++#ifdef ARCH_EFI_IRQ_FLAGS_MASK
++static void efi_call_virt_check_flags(unsigned long flags, const char *call)
++{
++	unsigned long cur_flags;
++	bool mismatch;
++
++	local_save_flags(cur_flags);
++
++	mismatch = !!((cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK);
++	if (!WARN_ON_ONCE(mismatch))
++		return;
++
++	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_NOW_UNRELIABLE);
++	pr_err_ratelimited(FW_BUG "IRQ flags corrupted (0x%08lx=>0x%08lx) by EFI %s\n",
++			   flags, cur_flags, call);
++	local_irq_restore(flags);
++}
++#else /* ARCH_EFI_IRQ_FLAGS_MASK */
++static inline void efi_call_virt_check_flags(unsigned long flags, const char *call) {}
++#endif /* ARCH_EFI_IRQ_FLAGS_MASK */
++
+ #define efi_call_virt(f, args...)					\
+ ({									\
+ 	efi_status_t __s;						\
++	unsigned long flags;						\
+ 	arch_efi_call_virt_setup();					\
++	local_save_flags(flags);					\
+ 	__s = arch_efi_call_virt(f, args);				\
++	efi_call_virt_check_flags(flags, __stringify(f));		\
+ 	arch_efi_call_virt_teardown();					\
+ 	__s;								\
+ })
+ 
+ #define __efi_call_virt(f, args...)					\
+ ({									\
++	unsigned long flags;						\
+ 	arch_efi_call_virt_setup();					\
++	local_save_flags(flags);					\
+ 	arch_efi_call_virt(f, args);					\
++	efi_call_virt_check_flags(flags, __stringify(f));		\
+ 	arch_efi_call_virt_teardown();					\
+ })
+ 
 -- 
 1.9.1
