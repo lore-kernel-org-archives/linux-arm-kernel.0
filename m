@@ -1,71 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Apr 2016 11:57:50 +0100
-Subject: [PATCH v3 2/2] dt-bindings: ARM: Mediatek: add interrupt as
- required properties to the mt6397/mt6323 doc
-In-Reply-To: <1460709030-23820-2-git-send-email-henryc.chen@mediatek.com>
-References: <1460709030-23820-1-git-send-email-henryc.chen@mediatek.com>
- <1460709030-23820-2-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <20160425105750.GB2713@dell>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 25 Apr 2016 06:59:14 -0400
+Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
+In-Reply-To: <20160425095715.GA2366@piout.net>
+References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+ <1461577678-29517-4-git-send-email-eric.engestrom@imgtec.com>
+ <20160425095715.GA2366@piout.net>
+Message-ID: <1461581954.24648.16.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Apr 2016, Henry Chen wrote:
+Hi Eric,
 
-> MT6397/MT6323 have one interrupt line connected to the main SoC.
-> Interrupt should be required feature of pmic, each sub module also
-> need it to complete their function or error detect, add it as
-> required properties on dts file.
+On Mon, 2016-04-25 at 11:57 +0200, Alexandre Belloni wrote:
+> Hi,
 > 
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+> this requires a commit message.
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> index 949c85f..a96529e 100644
-> --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> @@ -15,7 +15,13 @@ Documentation/devicetree/bindings/soc/pwrap.txt
->  This document describes the binding for MFD device and its sub module.
->  
->  Required properties:
-> -compatible: "mediatek,mt6397" or "mediatek,mt6323"
-> +- compatible: "mediatek,mt6397" or "mediatek,mt6323"
-> +- interrupts: mt6323/mt6397 have one interrupt line connecteded to the main SoC
-> +- interrupt-parent: The parent interrupt controller
-> +- interrupt-controller : marks the device node as an interrupt controller
+> Also, you should think about separating those changes in multiple patches
+> to ease inclusion in the kernel.
+> 
+> On 25/04/2016 at 10:47:57 +0100, Eric Engestrom wrote :
+> > Signed-off-by: Eric Engestrom <eric.engestrom@imgtec.com>
+> > ---
+> >  arch/arm/mach-at91/pm.c                 | 2 +-
+> >  arch/arm/mach-bcm/bcm_kona_smc.c        | 2 +-
+> >  arch/arm/mach-clps711x/board-autcpu12.c | 2 +-
+> >  arch/arm/mach-cns3xxx/core.c            | 2 +-
+> >  arch/arm/mach-davinci/da8xx-dt.c        | 2 +-
+> >  arch/arm/mach-lpc32xx/phy3250.c         | 2 +-
+> >  arch/arm/mach-mxs/mach-mxs.c            | 2 +-
+> >  arch/arm/mach-omap2/prm_common.c        | 2 +-
+> >  arch/arm/mach-omap2/vc.c                | 2 +-
+> >  arch/arm/mach-spear/time.c              | 2 +-
+> >  10 files changed, 10 insertions(+), 10 deletions(-)
+> > 
+...
 
-Nit: All sentences should start with an upper case char.
+> > diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+> > index b2f9e22..1ae7230 100644
+> > --- a/arch/arm/mach-lpc32xx/phy3250.c
+> > +++ b/arch/arm/mach-lpc32xx/phy3250.c
+> > @@ -159,7 +159,7 @@ static struct lpc32xx_mlc_platform_data lpc32xx_mlc_data = {
+> >  	.dma_filter = pl08x_filter_id,
+> >  };
+> >  
+> > -static const struct of_dev_auxdata const lpc32xx_auxdata_lookup[] __initconst = {
+> > +static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
+> >  	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", NULL),
+> >  	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", NULL),
+> >  	OF_DEV_AUXDATA("arm,pl110", 0x31040000, "dev:clcd", &lpc32xx_clcd_data),
 
-The device node is not an interrupt controller -- it's a device node.
+A patch was already submitted for the LPC32xx:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/493312/
 
-The device the device node represents is the interrupt controller.
-
-Look at how others describe this property, it's pretty well used.
-
-> +- #interrupt-cells: the number of cells to describe an IRQ, this should be 2.
-
-Nit: Captial letter.
-
-> +  The first cell is the IRQ number.
-> +  The second cell is the flags, encoded as the trigger masks from
->  
->  Optional subnodes:
->  
-> @@ -43,6 +49,10 @@ Example:
->  
->  		pmic {
->  			compatible = "mediatek,mt6397";
-> +			interrupt-parent = <&pio>;
-> +			interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
->  
->  			codec: mt6397codec {
->  				compatible = "mediatek,mt6397-codec";
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+...
+> > -- 
+> > 2.7.4
+> > 
+> 
+Sylvain
