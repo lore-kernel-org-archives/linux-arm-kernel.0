@@ -1,45 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Apr 2016 17:03:25 +0100
-Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
-In-Reply-To: <20160425155922.GC2829@codeblueprint.co.uk>
-References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
- <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
- <571E25B1.8070305@arm.com>
- <20160425141557.GA2829@codeblueprint.co.uk>
- <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
- <20160425142435.GB2829@codeblueprint.co.uk>
- <20160425142735.GA14974@leverpostej>
- <20160425155922.GC2829@codeblueprint.co.uk>
-Message-ID: <20160425160324.GB24831@leverpostej>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 25 Apr 2016 12:05:01 -0400
+Subject: [PATCH v2 3/4] arm: dts: lpc32xx: reparent SIC1 and SIC2
+ interrupts from MIC
+In-Reply-To: <1461546041-25713-1-git-send-email-vz@mleia.com>
+References: <1461545990-25560-1-git-send-email-vz@mleia.com>
+ <1461546041-25713-1-git-send-email-vz@mleia.com>
+Message-ID: <1461600301.6934.5.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 04:59:22PM +0100, Matt Fleming wrote:
-> On Mon, 25 Apr, at 03:27:35PM, Mark Rutland wrote:
-> > 
-> > I have no strong preference so long as the code is correct.
-> > 
-> > Another option is to get rid of the bool entirely:
-> > 
-> > 	flags ^= cur_flags;
-> > 	if (!WARN_ON(flags & ARCH_EFI_IRQ_FLAGS_MASK))
-> > 		return;
+Hi Vladimir,
+
+On Mon, 2016-04-25 at 04:00 +0300, Vladimir Zapolskiy wrote:
+> The change adds separate device nodes for SIC1 and SIC2 interrupt
+> controllers and reparents all defined SIC1 and SIC2 interrupt
+> producers to the correspondent interrupt controller, this is needed to
+> perform switching to a new LPC32xx MIC/SIC interrupt controller driver.
 > 
-> OK, let's do the following because we need flags to be preserved for
-> printing,
-> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 > ---
+> Changes from v1 to v2:
+> * squashed two step change in lpc32xx.dtsi - new irqchip driver can be
+>   used (i.e. board boots with access to userspace) with old DTS file,
+>   so there is no need to fix DTS firstly and then switch to a new driver,
+> * removed "interrupt-controller-name" and "wakeup-sources" properties
+>   from all interrupt controllers,
+> * removed outdated comment.
 > 
-> 	unsigned long cur_flags, mismatch;
+>  arch/arm/boot/dts/lpc32xx.dtsi | 58 +++++++++++++++++++++++++++++-------------
+>  1 file changed, 41 insertions(+), 17 deletions(-)
 > 
-> 	local_save_flags(cur_flags);
-> 
-> 	mismatch = flags ^ cur_flags;
-> 	if (!WARN_ON_ONCE(mismatch & ARCH_EFI_IRQ_FLAGS_MASK))
-> 		return;
-> 
+> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+> index 73c4746..4570ddc 100644
+> --- a/arch/arm/boot/dts/lpc32xx.dtsi
+> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+> @@ -92,7 +92,8 @@
 
-Sure; that looks good to me.
+...
+>  
+> -			/*
+> -			 * MIC Interrupt controller includes:
+> -			 *   MIC @40008000
+> -			 *   SIC1 @4000C000
+> -			 *   SIC2 @40010000
+> -			 */
+>  			mic: interrupt-controller at 40008000 {
+>  				compatible = "nxp,lpc3220-mic";
+>  				interrupt-controller;
+> @@ -327,6 +326,28 @@
 
-Cheers,
-Mark.
+I think your are missing one change in your patch,
+the mic register range should be 0x4000, not 0xC000.
+
+Everything else is OK.
+
+>  				#interrupt-cells = <2>;
+>  			};
+>  
+> +			sic1: interrupt-controller at 4000c000 {
+> +				compatible = "nxp,lpc3220-sic";
+> +				reg = <0x4000c000 0x4000>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +
+> +				interrupt-parent = <&mic>;
+> +				interrupts = <0 IRQ_TYPE_LEVEL_LOW>,
+> +					     <30 IRQ_TYPE_LEVEL_LOW>;
+> +				};
+> +
+> +			sic2: interrupt-controller at 40010000 {
+> +				compatible = "nxp,lpc3220-sic";
+> +				reg = <0x40010000 0x4000>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +
+> +				interrupt-parent = <&mic>;
+> +				interrupts = <1 IRQ_TYPE_LEVEL_LOW>,
+> +					     <31 IRQ_TYPE_LEVEL_LOW>;
+> +			};
+> +
+...
+
+Sylvain
