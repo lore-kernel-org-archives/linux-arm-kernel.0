@@ -1,40 +1,29 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 25 Apr 2016 18:33:24 +0800
-Subject: [PATCH 2/4] drivers: firmware: psci: remove duplicate const
- qualifier
-In-Reply-To: <1461577678-29517-2-git-send-email-eric.engestrom@imgtec.com>
+From: eric.engestrom@imgtec.com (Eric Engestrom)
+Date: Mon, 25 Apr 2016 11:39:11 +0100
+Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
+In-Reply-To: <20160425095715.GA2366@piout.net>
 References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
- <1461577678-29517-2-git-send-email-eric.engestrom@imgtec.com>
-Message-ID: <20160425183324.7209cdc4@xhacker>
+ <1461577678-29517-4-git-send-email-eric.engestrom@imgtec.com>
+ <20160425095715.GA2366@piout.net>
+Message-ID: <20160425103911.GO32731@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On Mon, 25 Apr 2016 10:47:55 +0100 Eric Engestrom wrote:
-
-> Signed-off-by: Eric Engestrom <eric.engestrom@imgtec.com>
-> ---
->  drivers/firmware/psci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, Apr 25, 2016 at 11:57:15AM +0200, Alexandre Belloni wrote:
+> Hi,
 > 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 11bfee8..0ab477ba 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -563,7 +563,7 @@ static int __init psci_0_1_init(struct device_node *np)
->  	return err;
->  }
->  
-> -static const struct of_device_id const psci_of_match[] __initconst = {
-> +static const struct of_device_id psci_of_match[] __initconst = {
+> this requires a commit message.
 
-A previous resend patch ;)
+OK? This seems rather pointless in this case (and even more so for the
+typo fix I sent yesterday), but I guess you have some general rule to
+enforce. Would this do then?
+"The second `const` is unnecessary, and is simply ignored by most compilers."
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/417068.html
+> Also, you should think about separating those changes in multiple patches
+> to ease inclusion in the kernel.
 
-And IIRC, the maintainer has merged it.
+I'll resend patch #4 as multiple patches. What the way proper to convey
+that *multiple* new patches replace *one* old one? Is it enough to just
+send those as a reply to this one?
 
->  	{ .compatible = "arm,psci",	.data = psci_0_1_init},
->  	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
->  	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
+Cheers
