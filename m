@@ -1,43 +1,74 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 25 Apr 2016 15:24:35 +0100
-Subject: [PATCHv3 1/5] efi/runtime-wrappers: detect FW irq flag corruption
-In-Reply-To: <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
-References: <1461591994-14918-1-git-send-email-mark.rutland@arm.com>
- <1461591994-14918-2-git-send-email-mark.rutland@arm.com>
- <571E25B1.8070305@arm.com>
- <20160425141557.GA2829@codeblueprint.co.uk>
- <CAKv+Gu8yH4u0-DNezUTk5b1DQJdEaH4RxR7YMQcwmkuRmEaNEw@mail.gmail.com>
-Message-ID: <20160425142435.GB2829@codeblueprint.co.uk>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 Apr 2016 08:25:12 -0600
+Subject: [PATCH V3 10/18] coresight: tmc: getting the right read_count on
+ tmc_open()
+In-Reply-To: <571DF5D4.8070300@arm.com>
+References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
+ <1461345255-11758-11-git-send-email-mathieu.poirier@linaro.org>
+ <571DF5D4.8070300@arm.com>
+Message-ID: <CANLsYkz3Vs12qrr3v+7Xk9QX_iwPQUKq112+ZvqAvZnma2EhBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr, at 04:18:41PM, Ard Biesheuvel wrote:
-> On 25 April 2016 at 16:15, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > On Mon, 25 Apr, at 03:12:01PM, Robin Murphy wrote:
-> >> >+static void efi_call_virt_check_flags(unsigned long flags, const char *call)
-> >> >+{
-> >> >+    unsigned long cur_flags;
-> >> >+    bool mismatch;
-> >> >+
-> >> >+    local_save_flags(cur_flags);
-> >> >+
-> >> >+    mismatch = !!((cur_flags ^ flags) & ARCH_EFI_IRQ_FLAGS_MASK);
-> >>
-> >> nit: the assignment itself is already a conversion to bool, so the
-> >> excitement is redundant here.
-> >
-> > This was intentional. I asked Mark to make this change so that it's
-> > explicit for the developer that we're performing the type conversion.
-> 
-> But replacing an implicit boolean cast with an explicit one makes
-> little sense, no? Don't we simply want '!= 0' here if you need a
-> boolean expression?
+On 25 April 2016 at 04:47, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 22/04/16 18:14, Mathieu Poirier wrote:
+>>
+>> In function tmc_open(), if tmc_read_prepare() fails variable
+>> drvdata->read_count is not decremented, causing unwanted
+>> access to drvdata->buf and very likely, a crash dump.
+>>
+>> By moving the incrementation to a place where we know things
+>> are stable this kind of situation is avoided.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Reviewed-by: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
+>> b/drivers/hwtracing/coresight/coresight-tmc.c
+>> index e8e12a9b917a..55806352b1f1 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+>> @@ -121,13 +121,14 @@ static int tmc_open(struct inode *inode, struct file
+>> *file)
+>>                                                    struct tmc_drvdata,
+>> miscdev);
+>>         int ret = 0;
+>>
+>
+> On a second thought, I think there could be a race here.
+>
+>
+>> -       if (drvdata->read_count++)
+>> +       if (drvdata->read_count)
+>>                 goto out;
+>>
+>>         ret = tmc_read_prepare(drvdata);
+>>         if (ret)
+>>                 return ret;
+>>   out:
+>
+>
+> What prevents someone else doing a release() on the file when we get here,
+> without
+> incrementing the read_count ? Also, read_count accesses are not protected.
+> Either should
+> be covered by the drvdata->spinlock or convert it to atomic.
 
-Aha but '!!' is fewer characters to type!!
+I agree - I'll move it to an atomic type.
 
-I'm not that bothered as long as we don't stuff an int into a bool
-without giving the programmer some idea we're doing that. It's not
-about the compiler getting it wrong, more about a developer
-introducing a bug when they change the code in the future. 
+Thanks,
+Mathieu
 
-Unless anyone objects, I'll fix this up to use '!= 0' when I apply it.
+>
+>
+>
+>> +       drvdata->read_count++;
+>>         nonseekable_open(inode, file);
+>
+>
+>
+> Cheers
+> Suzuki
