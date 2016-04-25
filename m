@@ -1,28 +1,18 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 25 Apr 2016 16:11:16 -0700
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.7 -
- part1
-In-Reply-To: <6233421.dTets4tfD3@wuerfel>
-References: <CADaLNDnB=XqSkTb4v_kVv1MkzOKLWjNfXP_+orkn9b8P=Q=NVw@mail.gmail.com>
- <6233421.dTets4tfD3@wuerfel>
-Message-ID: <CADaLND=TDcBxrPaLmOct1CnrEQ8jyWmYYceUNjmSgTYge4bwVA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2016 01:14:34 +0200
+Subject: [PATCH] soc: brcmstb: Unmap sun_top_ctrl_base on errors
+In-Reply-To: <1461625693-22793-1-git-send-email-f.fainelli@gmail.com>
+References: <1461625693-22793-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <6953436.B3Mfs8t6Nm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 1:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 18 April 2016 16:20:48 Duc Dang wrote:
->> First part of X-Gene DTS changes queued for v4.7.
->>
->> This patch set only includes a single change to
->> fix the compatible string for SATA controllers on
->> X-Gene v2 SOC platforms.
->>
->
-> Pulled into next/dt64, thanks!
+On Monday 25 April 2016 16:08:09 Florian Fainelli wrote:
+> Do not leak a ioremap()'d cookie around, unmaping it in case of errors
+> 
+> Fixes: cef4bafcea2c ("soc: brcmstb: add SoC driver to brcmstb")
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Thanks, Arnd.
+I've applied it on top now, along with my fix, thanks!
 
-Regards,
-Duc Dang.
->
->         Arnd
+	Arnd
