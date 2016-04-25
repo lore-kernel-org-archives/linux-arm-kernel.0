@@ -1,67 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Apr 2016 14:27:30 +1000
-Subject: [PATCH 12/22] ARM: dts: r8a7794: Add IIC nodes
+Date: Mon, 25 Apr 2016 14:27:21 +1000
+Subject: [PATCH 03/22] ARM: dts: r8a7790: Add SCIF2 clock
 In-Reply-To: <cover.1461558315.git.horms+renesas@verge.net.au>
 References: <cover.1461558315.git.horms+renesas@verge.net.au>
-Message-ID: <aa9b992ea2d3c2cc48712c21d1e680318d4156e2.1461558315.git.horms+renesas@verge.net.au>
+Message-ID: <38805823377d762ec46f2430f29ef0cb8b3937d4.1461558315.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add IIC nodes to r8a7794 device tree.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Based on similar work for the r8a7793 by Laurent Pinchart.
+Based on Rev. 2.00 of the R-Car Gen2 datasheet.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi            | 6 +++---
+ include/dt-bindings/clock/r8a7790-clock.h | 1 +
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 8b2060c87a76..b0bce43779f1 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -26,6 +26,8 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		i2c6 = &i2c6;
-+		i2c7 = &i2c7;
- 		spi0 = &qspi;
- 		vin0 = &vin0;
- 		vin1 = &vin1;
-@@ -629,6 +631,32 @@
- 		status = "disabled";
- 	};
- 
-+	i2c6: i2c at e6500000 {
-+		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
-+		reg = <0 0xe6500000 0 0x425>;
-+		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7794_CLK_IIC0>;
-+		dmas = <&dmac0 0x61>, <&dmac0 0x62>;
-+		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c7: i2c at e6510000 {
-+		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
-+		reg = <0 0xe6510000 0 0x425>;
-+		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7794_CLK_IIC1>;
-+		dmas = <&dmac0 0x65>, <&dmac0 0x66>;
-+		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	mmcif0: mmc at ee200000 {
- 		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
- 		reg = <0 0xee200000 0 0x80>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 60db8e4f5790..6f4fdfccdcfd 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1302,19 +1302,19 @@
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+-			clocks = <&hp_clk>, <&cp_clk>, <&mmc1_clk>, <&sd3_clk>,
++			clocks = <&hp_clk>, <&cp_clk>, <&mmc1_clk>, <&p_clk>, <&sd3_clk>,
+ 				 <&sd2_clk>, <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>, <&mmc0_clk>,
+ 				 <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>,
+ 				 <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+-				R8A7790_CLK_IIC2 R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
++				R8A7790_CLK_IIC2 R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SCIF2 R8A7790_CLK_SDHI3
+ 				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0 R8A7790_CLK_MMCIF0
+ 				R8A7790_CLK_IIC0 R8A7790_CLK_PCIEC R8A7790_CLK_IIC1 R8A7790_CLK_SSUSB R8A7790_CLK_CMT1
+ 				R8A7790_CLK_USBDMAC0 R8A7790_CLK_USBDMAC1
+ 			>;
+ 			clock-output-names =
+-				"iic2", "tpu0", "mmcif1", "sdhi3",
++				"iic2", "tpu0", "mmcif1", "scif2", "sdhi3",
+ 				"sdhi2", "sdhi1", "sdhi0", "mmcif0",
+ 				"iic0", "pciec", "iic1", "ssusb", "cmt1",
+ 				"usbdmac0", "usbdmac1";
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index 7b1ad8922eec..fa5e8da809f2 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -66,6 +66,7 @@
+ #define R8A7790_CLK_IIC2		0
+ #define R8A7790_CLK_TPU0		4
+ #define R8A7790_CLK_MMCIF1		5
++#define R8A7790_CLK_SCIF2		10
+ #define R8A7790_CLK_SDHI3		11
+ #define R8A7790_CLK_SDHI2		12
+ #define R8A7790_CLK_SDHI1		13
 -- 
 2.7.0.rc3.207.g0ac5344
