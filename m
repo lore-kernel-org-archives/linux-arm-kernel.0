@@ -1,25 +1,145 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Apr 2016 17:38:40 +0100
-Subject: [PATCH 0/8] arm64: kaslr cleanups and improvements
-In-Reply-To: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160425163840.GG9614@e104818-lin.cambridge.arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 25 Apr 2016 09:47:38 -0700
+Subject: [PATCH v5 00/14]  ACPI NUMA support for ARM64
+In-Reply-To: <20160425111338.GJ16065@arm.com>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160425111338.GJ16065@arm.com>
+Message-ID: <571E4A2A.8070908@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 05:09:40PM +0200, Ard Biesheuvel wrote:
-> Ard Biesheuvel (8):
->   arm64: kernel: don't export local symbols from head.S
->   arm64: kernel: use literal for relocated address of
->     __secondary_switched
->   arm64: kernel: perform relocation processing from ID map
->   arm64: introduce mov_q macro to move a constant into a 64-bit register
->   arm64: kernel: replace early 64-bit literal loads with move-immediates
->   arm64: don't map TEXT_OFFSET bytes below the kernel if we can avoid it
->   arm64: relocatable: deal with physically misaligned kernel images
->   arm64: kaslr: increase randomization granularity
+On 04/25/2016 04:13 AM, Will Deacon wrote:
+> Hi David,
+>
+> On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
+>> set introduce the ACPI based configuration to provide NUMA
+>> information.
+>>
+>> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
+>> NUMA domain information from SRAT and SLIT table, so parse those two
+>> tables to get mappings from cpu/mem to numa node configuration and
+>> system locality.
+>
+> Whilst I've queued the main NUMA series for arm64, I'd really like to
+> see more movement on the generic header file cleanups that you posted
+> separately:
+>
+> http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
 
-I went through these patches and there is indeed a nice clean-up. The
-increased KASLR granularity also looks fine. So, for the series:
+FWIW:  Those patches should still apply.  I am carrying them in my 
+development trees, and have not changed them in any way.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Given that this ACPI series already requires some significant cross-arch
+> interaction (which is actually good!), perhaps extending the clean-up
+> patches to encompass some of the ACPI bits might make sense, and we can
+> get that queued as a pre-requisite.
+
+The cleanup patches you mention above are really independent of the ACPI 
+things.  I have applied them both before and after the ACPI patches, and 
+both seem to work.  With a quick perusal of the ACPI patches nothing 
+jumps out at me as being a candidate for inclusion in the header file 
+cleanup series.
+
+If you think it would be a good idea, I can repost the cleanup series.
+
+David Daney
+
+
+>
+> Will
+>
+>> v5 updates:
+>>
+>>   - Fixed ia64 build failure by gating some unused functions with #if
+>>     CONFIG_{X86,ARM64}.
+>>
+>>   - Fixed section mismatch errors for X86 case.
+>>
+>>   - Removed unneeded #include from some files.
+>>
+>>   - Tested to build cleanly on ARM64, X86_64, IA64
+>>
+>> v4 updates:
+>>
+>>   - Updated from Hanjun Guo's v3 patches.
+>>
+>>   - Rebased on top of v16 of device-tree NUMA patches.
+>>
+>>   - Reordered some of the changes so that we don't introduce code and
+>>     then change it several times in the patch set.  New code is
+>>     introduced in its final form.  Code reused from x86 is first moved
+>>     with no change, and then a separate patch to make any needed
+>>     changes.
+>>
+>>   - code that is used only by ia64, moved to architecture specific
+>>     files.
+>>
+>> v3 updates:
+>>   - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
+>>     that for acpi/numa.c (patch 2/12)
+>>
+>>   - Remove the duplicate NULL check for table print (patch 3/12)
+>>
+>>   - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
+>>     dummy function for acpi_numa_arch_fixup()
+>>
+>>   - Solve the problem that the mapping from logical cpu to numa node
+>>     is wrong which spotted out by Lorenzo
+>>
+>>   - cleanups for x86 and move acpi_numa_slit_init() and some other
+>>     functions to common place, then reduce the duplicate of x86
+>>     and arm64 (patch 7-12/12).
+>>
+>>   - rebased on top of 4.4 and Ganapat's v9 patch set.
+>>
+>> [1]: https://lkml.org/lkml/2016/4/8/571
+>>
+>> David Daney (1):
+>>    acpi, numa, srat: Improve SRAT error detection and add messages.
+>>
+>> Hanjun Guo (11):
+>>    acpi, numa: Use pr_fmt() instead of printk
+>>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>>    acpi, numa: remove duplicate NULL check
+>>    acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>>    arm64, numa: rework numa_add_memblk()
+>>    x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>>    acpi, numa: move bad_srat() and srat_disabled() to
+>>      drivers/acpi/numa.c
+>>    acpi, numa: remove unneeded acpi_numa=1
+>>    acpi, numa: Move acpi_numa_memory_affinity_init() to
+>>      drivers/acpi/numa.c
+>>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>>    acpi, numa: Enable ACPI based NUMA on ARM64
+>>
+>> Robert Richter (2):
+>>    acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+>>    arm64, acpi, numa: Default enable ACPI_NUMA with NUMA
+>>
+>>   arch/arm64/include/asm/acpi.h |   8 ++
+>>   arch/arm64/include/asm/numa.h |   2 +
+>>   arch/arm64/kernel/Makefile    |   1 +
+>>   arch/arm64/kernel/acpi_numa.c | 149 ++++++++++++++++++++++++++++
+>>   arch/arm64/kernel/smp.c       |   2 +
+>>   arch/arm64/mm/numa.c          |  17 ++--
+>>   arch/ia64/include/asm/acpi.h  |   3 +
+>>   arch/ia64/kernel/acpi.c       |   2 +-
+>>   arch/ia64/kernel/setup.c      |   1 +
+>>   arch/x86/include/asm/acpi.h   |   1 -
+>>   arch/x86/mm/numa.c            |   2 +-
+>>   arch/x86/mm/srat.c            | 116 +---------------------
+>>   drivers/acpi/Kconfig          |   4 +-
+>>   drivers/acpi/numa.c           | 224 ++++++++++++++++++++++++++++++++----------
+>>   drivers/of/of_numa.c          |   4 +-
+>>   include/acpi/acpi_numa.h      |   4 +
+>>   include/linux/acpi.h          |  18 +++-
+>>   17 files changed, 375 insertions(+), 183 deletions(-)
+>>   create mode 100644 arch/arm64/kernel/acpi_numa.c
+>>
+>> --
+>> 1.7.11.7
+>>
