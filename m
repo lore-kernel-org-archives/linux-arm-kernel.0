@@ -1,40 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Apr 2016 15:13:10 +0200
-Subject: [PATCH] ARM: debug: remove extraneous DEBUG_HI3716_UART option
-Message-ID: <1461590006-1395429-1-git-send-email-arnd@arndb.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 25 Apr 2016 14:14:57 +0100
+Subject: [PATCH 6/7] iommu/arm-smmu: Decouple context format from kernel
+ config
+In-Reply-To: <20160425110219.GH16065@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
+ <20160421163019.GL929@arm.com> <571A617C.3020102@arm.com>
+ <20160425110219.GH16065@arm.com>
+Message-ID: <571E1851.2030400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEBUG_HI3716_UART was supposed to be renamed to DEBUG_HIX5HD2_UART, but
-accidentally both got left in place, which results in a build error when
-CONFIG_DEBUG_UART_PHYS is not set as it should be.
+On 25/04/16 12:02, Will Deacon wrote:
+> On Fri, Apr 22, 2016 at 06:38:04PM +0100, Robin Murphy wrote:
+>> On 21/04/16 17:30, Will Deacon wrote:
+>>> Hi Robin,
+>>>
+>>> On Wed, Apr 13, 2016 at 06:13:02PM +0100, Robin Murphy wrote:
+>>>> The way the driver currently forces an AArch32 or AArch64 context format
+>>>> based on the kernel config and SMMU architecture version is suboptimal,
+>>>> in that it makes it very hard to support oddball mix-and-match cases
+>>>> like the SMMUv1 64KB supplement, or situations where the reduced table
+>>>> depth of an AArch32 short descriptor context may be desirable under an
+>>>> AArch64 kernel. It also only happens to work on current implementations
+>>>> which do support all the relevant formats.
+>>>>
+>>>> Introduce an explicit notion of context format, so we can manage that
+>>>> independently and get rid of the inflexible #ifdeffery.
+>>>
+>>> Thanks for doing all of this! One comment on the page size stuff:
+>>>
+>>>> +	if (IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
+>>>> +		switch (PAGE_SIZE) {
+>>>> +		case SZ_64K:
+>>>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_64K) {
+>>>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+>>>> +				break;
+>>>> +			} /* else fall through */
+>>>> +		case SZ_16K:
+>>>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_16K) {
+>>>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+>>>> +				break;
+>>>> +			} /* else fall through */
+>>>> +		case SZ_4K:
+>>>> +			if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_4K)
+>>>> +				cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+>>>> +		}
+>>>> +	}
+>>>
+>>> The io-pgtable code (arm_lpae_restrict_pgsizes) already does something
+>>> *very* similar to this, using the pgsize_bitmap as input. Can you not
+>>> just choose the ARM_SMMU_CTX_FMT_AARCH64 here and set the pgsize_bitmap
+>>> to represent all page sizes supported by the hardware? That way, you should
+>>> end up with the best option coming back from the pgtable code (I do this
+>>> in the v3 driver, fwiw).
+>>
+>> It took a while to come back to me, but the problem is that we can't call
+>> alloc_io_pgtable_ops(fmt...) before choosing either ARM_64_LPAE_Sx or
+>> ARM_32_LPAE_Sx for fmt, but if we commit to 64-bit we'll get stuck later
+>> without the possibility of falling back to AArch32 if it turns out we don't
+>> have a viable AArch64 granule.
+>
+> In what case would you not have a viable AArch64 granule, but the option
+> of falling back to AArch32 makes things work?
 
-This removes the old symbol.
+A 4KB page kernel with MMU-401, whose only supported AArch64 granule is 
+supposedly 64KB.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 12aae3097454 ("ARM: debug: Rename Hi3716 to HIX5HD2")
----
- arch/arm/Kconfig.debug | 8 --------
- 1 file changed, 8 deletions(-)
+>> Plus we'd have to remove the LPAE page sizes
+>> from the bitmap beforehand in the case we don't support AARCH64_4K lest we
+>> end up with a phantom format the hardware doesn't actually do, and it all
+>> starts getting rather horrible...
+>
+> I'm not following. The io-pgtable code shouldn't give you back a phanton
+> format.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6993978cfd6f..2afd38766707 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -268,14 +268,6 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on HI3620 UART.
- 
--	config DEBUG_HI3716_UART
--		bool "Hisilicon Hi3716 Debug UART"
--		depends on ARCH_HI3xxx
--		select DEBUG_UART_PL01X
--		help
--		  Say Y here if you want kernel low-level debugging support
--		  on HI3716 UART.
--
- 	config DEBUG_HIGHBANK_UART
- 		bool "Kernel low-level debugging messages via Highbank UART"
- 		depends on ARCH_HIGHBANK
--- 
-2.7.0
+If you call alloc_io_pgtable_ops() with ARM_64_LPAE_S2 and an unmolested 
+MMU-401 pgsize_bitmap, you get back a 4K granule v8 pagetable, which per 
+a strict reading of the TRM isn't supported (although does appear to 
+work in practice...)
+
+Consider also a stage 1 SMMU supporting all formats but only with 4K 
+granules: with a 64K page arm64 kernel, the presence of AARCH64_4K 
+support would lead us into arm_64_lpae_alloc_pgtable_s1(), which would 
+be tricked into giving us back a 64K granule v8 format by the short 
+descriptor large page size matching PAGE_SIZE, and things would 
+definitely go downhill from there.
+
+Given that, I think the only truly safe thing to do is to pass an 
+explicit granule in the io_pgtable_cfg and just get rid of the 
+bitmap-based guessing in arm_lpae_restrict_pgsizes() - otherwise, we'd 
+still have to pre-restrict the bitmap, making it pretty much redundant 
+anyway. I'll have a hack at that - in the meantime please feel free to 
+queue patches 1-3 if you're happy with them, as that part is still 
+feature-complete without all this context stuff.
+
+Robin.
+
+>
+> Will
+>
