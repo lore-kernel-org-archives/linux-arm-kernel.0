@@ -1,70 +1,95 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 26 Apr 2016 21:03:25 +0800
-Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <20160426121547.GL27312@arm.com>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com> <571E4A2A.8070908@caviumnetworks.com>
- <571EFD1B.1070609@linaro.org> <20160426121547.GL27312@arm.com>
-Message-ID: <571F671D.70401@linaro.org>
+From: hias@horus.com (Matthias Reichl)
+Date: Tue, 26 Apr 2016 15:09:14 +0200
+Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
+ device
+In-Reply-To: <571F2B09.1000107@metafoo.de>
+References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
+ <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
+ <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
+ <571F2B09.1000107@metafoo.de>
+Message-ID: <20160426130914.GA2015@delle.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/4/26 20:15, Will Deacon wrote:
-> On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
->> On 2016/4/26 0:47, David Daney wrote:
->>> On 04/25/2016 04:13 AM, Will Deacon wrote:
->>>> On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
->>>>> From: David Daney <david.daney@cavium.com>
->>>>>
->>>>> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
->>>>> set introduce the ACPI based configuration to provide NUMA
->>>>> information.
->>>>>
->>>>> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
->>>>> NUMA domain information from SRAT and SLIT table, so parse those two
->>>>> tables to get mappings from cpu/mem to numa node configuration and
->>>>> system locality.
->>>>
->>>> Whilst I've queued the main NUMA series for arm64, I'd really like to
->>>> see more movement on the generic header file cleanups that you posted
->>>> separately:
->>>>
->>>> http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
->>>>
->>>
->>> FWIW:  Those patches should still apply.  I am carrying them in my
->>> development trees, and have not changed them in any way.
->
-> What's your plan for getting them merged?
+Hi Lars,
 
-This patch set touches lots of ACPI related file in arch/x86,
-arch/ia64, and drivers/acpi/ (also arch/arm64), I think it can be
-merged via ACPI tree by Rafael with your ack to ARM64 code, does
-it make sense?
+first of all thanks a lot for your detailled feedback!
 
->
->>>> Given that this ACPI series already requires some significant cross-arch
->>>> interaction (which is actually good!), perhaps extending the clean-up
->>>> patches to encompass some of the ACPI bits might make sense, and we can
->>>> get that queued as a pre-requisite.
->>>
->>> The cleanup patches you mention above are really independent of the ACPI
->>> things.  I have applied them both before and after the ACPI patches, and
->>> both seem to work.  With a quick perusal of the ACPI patches nothing
->>> jumps out at me as being a candidate for inclusion in the header file
->>> cleanup series.
->>
->> I agree. My patch set is ACPI related enablement, cleanups and
->> consolidations, it would be good to merge as a single patch set
->> as it's self-contained.
->
-> Up to you. I just thought you might want to avoid having two sets of
-> cross-arch changes and the associated merging headaches that go with
-> that.
+On Tue, Apr 26, 2016 at 10:47:05AM +0200, Lars-Peter Clausen wrote:
+> >>> +	.periods_min		= 2,
+> >>> +	.periods_max		= 255,
+> >>> +	.buffer_bytes_max	= 128 * PAGE_SIZE,
+> >>> +};
+> >>> +
+> >>> +static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
+> >>> +	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
+> >>> +	.pcm_hardware = &bcm2835_pcm_hardware,
+> >>> +	.prealloc_buffer_size = 256 * PAGE_SIZE,
+> >>> +};
+> >>
+> >> The generic dmaengine PCM driver auto-discovers these things, no need to
+> >> provide them. The code is OK as it is.
+> > 
+> > With the auto-discover code we loose the S16_LE format.
+> > 
+> > If I understood the code in dmaengine_pcm_set_runtime_hwparams
+> > correctly, this is because the DMA controller doesn't support
+> > 16bit transfers (only multiples of 32bit are allowed).
+> > 
+> > But since the I2S driver needs exactly 2 channels S16_LE actually
+> > works fine (one 32bit transfer per frame).
+> > 
+> > Do you know of a better way to get S16_LE support? It could well
+> > be that I missed something important...
+> 
+> With your patch we should just get an error when trying to configure a
+> stream with 16-bit samples since when setting up the DMA controller the
+> generic code will still choose a 16-bit device port size and this will be
+> rejected by the DMA controller.
 
-Good point, as I suggested above, it can go with ACPI tree if it's ok
-to you and Rafael. The problem we have now is that dt based core NUMA
-support for ARM64 is queued in your tree, that would be the headache.
+We had that code in downstream RPi kernel for ages (IIRC since
+3.10) and so far it worked fine.
 
-Thanks
-Hanjun
+I traced the code for the S16_LE case to find out why:
+
+snd_hwparams_to_dma_slave_config() sets src/dst_addr_width to 16bit.
+
+But immediately afterwards snd_dmaengine_pcm_set_config_from_dai_data()
+overrides addr_width to 32bit.
+
+bcm2835-i2s only supports 32bit access to the FIFO/data register
+and dma_data.addr_width is set to 32bit in the I2S driver - that
+code is also in mainline since the initial bcm2835-i2s commit.
+
+Of course all this only works because the number of channels
+is always 2.
+
+> When you look at peripherals that have DMA support there are basically two
+> types.
+> 
+> Type A expect that each write (same applies for read) to the memory mapped
+> FIFO corresponds to exactly one sample. So if the sample width is 16-bit a
+> 16-bit write is done, if the sample width is 32-bit a 32-bit write is done.
+> In this case it is up to the DMA controller to fragment the byte stream into
+> individual samples.
+> 
+> Type B on the other hand has a fixed port width (usually the bus size) and
+> expects that each write to the memory mapped FIFO uses the port width. It
+> then internally unpacks the data into the sample data. E.g. if the FIFO is
+> 32-bit wide and the sample width is 16-bit it will unpack the 32-bit entry
+> into two samples.
+> 
+> Currently the generic code only supports type A. It would be great if you
+> could add support for type B to support the BCM2835 I2S controller properly.
+
+Do you have a particular solution in mind?
+
+Introducing a flag to just auto-add some packed formats would be
+easy, but a generic, robust solution might be tricky. We'd have
+to make sure that unsupported configurations (like an odd number
+of 16bit channels on 32bit-only setups) get rejected or we might
+be in trouble.
+
+so long,
+
+Hias
