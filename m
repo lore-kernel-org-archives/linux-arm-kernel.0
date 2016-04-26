@@ -1,88 +1,131 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 26 Apr 2016 12:42:15 -0700
+Date: Tue, 26 Apr 2016 13:06:13 -0700
 Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
  idle
-In-Reply-To: <20160426151725.657ae70c@gandalf.local.home>
+In-Reply-To: <20160426195158.GR5995@atomide.com>
 References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
  <20160426150031.GP5995@atomide.com>
  <20160426175214.GJ3715@linux.vnet.ibm.com>
  <20160426182939.GO5995@atomide.com>
- <20160426151725.657ae70c@gandalf.local.home>
-Message-ID: <20160426194215.GL3715@linux.vnet.ibm.com>
+ <20160426190755.GK3715@linux.vnet.ibm.com>
+ <20160426193949.GP5995@atomide.com>
+ <20160426154414.7bb33de4@gandalf.local.home>
+ <20160426195158.GR5995@atomide.com>
+Message-ID: <20160426200613.GO3715@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 03:17:25PM -0400, Steven Rostedt wrote:
-> On Tue, 26 Apr 2016 11:29:39 -0700
-> Tony Lindgren <tony@atomide.com> wrote:
+On Tue, Apr 26, 2016 at 12:51:59PM -0700, Tony Lindgren wrote:
+> * Steven Rostedt <rostedt@goodmis.org> [160426 12:45]:
+> > *Whack* *Whack* *Whack*!!!
+> > 
+> > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> > ---
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index fb74dc1f7520..4fa43c02d682 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -682,12 +682,12 @@ static void clk_core_disable(struct clk_core *core)
+> >  	if (--core->enable_count > 0)
+> >  		return;
+> >  
+> > -	trace_clk_disable(core);
+> > +	trace_clk_disable_rcuidle(core);
+> >  
+> >  	if (core->ops->disable)
+> >  		core->ops->disable(core->hw);
+> >  
+> > -	trace_clk_disable_complete(core);
+> > +	trace_clk_disable_complete_rcuidle(core);
+> >  
+> >  	clk_core_disable(core->parent);
+> >  }
 > 
-> > * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 10:53]:
-> > > Does the following patch help?  
-> > 
-> > It just changes the output.. See below.
-> > 
-> > > It is quite possible that there are quite a few more of these.  If this
-> > > is the case, then one way to make the kernel list more of them on a
-> > > given boot is to build with CONFIG_PROVE_RCU_REPEATEDLY=y.  
-> > 
-> > OK
-> > 
-> > Regards,
-> > 
-> > Tony
-> > 
-> > 8< ------------------
-> > CPU: Testing write buffer coherency: ok
-> > CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> > 
-> > 
-> > RCU used illegally from idle CPU!
-> > rcu_scheduler_active = 1, debug_locks = 0
-> > RCU used illegally from extended quiescent state!
-> > no locks held by swapper/1/0.
-> > 
-> > stack backtrace:
-> > CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.6.0-rc5-next-20160426+ #1113
-> > Hardware name: Generic OMAP4 (Flattened Device Tree)
-> > [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-> > [<c010c3a8>] (show_stack) from [<c047ff88>] (dump_stack+0xb0/0xe4)
-> > [<c047ff88>] (dump_stack) from [<c012c014>] (pwrdm_set_next_pwrst+0x100/0x1d4)
-> > [<c012c014>] (pwrdm_set_next_pwrst) from [<c0126120>] (omap4_enter_lowpower+0xc8/0x230)
-> > [<c0126120>] (omap4_enter_lowpower) from [<c0126c24>] (omap_enter_idle_coupled+0x6c/0x254)
-> > [<c0126c24>] (omap_enter_idle_coupled) from [<c0601dfc>] (cpuidle_enter_state+0x80/0x3d4)
-> > [<c0601dfc>] (cpuidle_enter_state) from [<c0603d30>] (cpuidle_enter_state_coupled+0x348/0x390)
-> > [<c0603d30>] (cpuidle_enter_state_coupled) from [<c0183d34>] (cpu_startup_entry+0x198/0x3a0)
-> > [<c0183d34>] (cpu_startup_entry) from [<8010162c>] (0x8010162c)
-> > hw-breakpoint: Failed to enable monitor mode on CPU 0.
-> 
-> Time to play "Whack-a-Mole"(TM)
+> Now the mole shows up here!
 
-Indeed!  ;-)
-
-> Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-
-Given the similarity with the following:
-
-	http://lkml.kernel.org/g/20160425171239.GE3874 at linux.vnet.ibm.com
-
-May I apply your Reviewed-by?
+And the patch shows up here!
 
 							Thanx, Paul
 
-> ---
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 78af6d8cf2e2..12b66b5bcc55 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -523,8 +523,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-> 
->  	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
->  		/* Trace the pwrdm desired target state */
-> -		trace_power_domain_target(pwrdm->name, pwrst,
-> -					  smp_processor_id());
-> +		trace_power_domain_target_rcuidle(pwrdm->name, pwrst,
-> +						  smp_processor_id());
->  		/* Program the pwrdm desired target state */
->  		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
->  	}
-> 
+------------------------------------------------------------------------
+
+commit d824fb6beb6e23ade51806e11a882528dc15ae98
+Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Date:   Tue Apr 26 13:03:51 2016 -0700
+
+    arm: Whack another event-trace-from-idle mole
+    
+    This commit appends a few _rcuidle suffixes to fix the following
+    RCU-used-from-idle bug:
+    
+    > ===============================
+    > [ INFO: suspicious RCU usage. ]
+    > 4.6.0-rc5-next-20160426+ #1116 Not tainted
+    > -------------------------------
+    > include/trace/events/rpm.h:95 suspicious rcu_dereference_check() usage!
+    >
+    > other info that might help us debug this:
+    >
+    >
+    > RCU used illegally from idle CPU!
+    > rcu_scheduler_active = 1, debug_locks = 0
+    > RCU used illegally from extended quiescent state!
+    > 1 lock held by swapper/0/0:
+    >  #0:  (&(&dev->power.lock)->rlock){-.-...}, at: [<c052cc2c>] __rpm_callback+0x58/0x60
+    >
+    > stack backtrace:
+    > CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1116
+    > Hardware name: Generic OMAP36xx (Flattened Device Tree)
+    > [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
+    > [<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
+    > [<c047fd68>] (dump_stack) from [<c052d5d0>] (rpm_suspend+0x580/0x768)
+    > [<c052d5d0>] (rpm_suspend) from [<c052ec58>] (__pm_runtime_suspend+0x64/0x84)
+    > [<c052ec58>] (__pm_runtime_suspend) from [<c04bf25c>] (omap2_gpio_prepare_for_idle+0x5c/0x70)
+    > [<c04bf25c>] (omap2_gpio_prepare_for_idle) from [<c0125568>] (omap_sram_idle+0x140/0x244)
+    > [<c0125568>] (omap_sram_idle) from [<c01269dc>] (omap3_enter_idle_bm+0xfc/0x1ec)
+    > [<c01269dc>] (omap3_enter_idle_bm) from [<c0601bdc>] (cpuidle_enter_state+0x80/0x3d4)
+    > [<c0601bdc>] (cpuidle_enter_state) from [<c0183b08>] (cpu_startup_entry+0x198/0x3a0)
+    > [<c0183b08>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
+    > [<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
+    
+    In the immortal words of Steven Rostedt, "*Whack* *Whack* *Whack*!!!"
+    
+    Reported-by: Tony Lindgren <tony@atomide.com>
+    Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+    Cc: Tony Lindgren <tony@atomide.com>
+    Cc: Russell King <linux@arm.linux.org.uk>
+    Cc: Steven Rostedt <rostedt@goodmis.org>
+    Cc: <linux-omap@vger.kernel.org>
+    Cc: <linux-arm-kernel@lists.infradead.org>
+
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index d9358c202763..af4c38d41aff 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -301,7 +301,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+ 	int (*callback)(struct device *);
+ 	int retval;
+ 
+-	trace_rpm_idle(dev, rpmflags);
++	trace_rpm_idle_rcuidle(dev, rpmflags);
+ 	retval = rpm_check_suspend_allowed(dev);
+ 	if (retval < 0)
+ 		;	/* Conditions are wrong. */
+@@ -337,7 +337,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+ 			dev->power.request_pending = true;
+ 			queue_work(pm_wq, &dev->power.work);
+ 		}
+-		trace_rpm_return_int(dev, _THIS_IP_, 0);
++		trace_rpm_return_int_rcuidle(dev, _THIS_IP_, 0);
+ 		return 0;
+ 	}
+ 
+@@ -352,7 +352,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+ 	wake_up_all(&dev->power.wait_queue);
+ 
+  out:
+-	trace_rpm_return_int(dev, _THIS_IP_, retval);
++	trace_rpm_return_int_rcuidle(dev, _THIS_IP_, retval);
+ 	return retval ? retval : rpm_suspend(dev, rpmflags | RPM_AUTO);
+ }
+ 
