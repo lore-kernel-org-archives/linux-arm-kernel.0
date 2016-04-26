@@ -1,34 +1,35 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 26 Apr 2016 21:55:30 +0530
-Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
-In-Reply-To: <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
-References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
- <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
- <20160426033029.GB2274@localhost>
- <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
-Message-ID: <20160426162529.GK2274@localhost>
+Date: Tue, 26 Apr 2016 22:00:20 +0530
+Subject: [PATCH 3/4] dmaengine: pxa_dma: remove duplicate const qualifier
+In-Reply-To: <1461577678-29517-3-git-send-email-eric.engestrom@imgtec.com>
+References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
+ <1461577678-29517-3-git-send-email-eric.engestrom@imgtec.com>
+Message-ID: <20160426163019.GM2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org wrote:
-> On 2016-04-25 23:30, Vinod Koul wrote:
-> >On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
-> >
-> >>+static int hidma_chan_stats(struct seq_file *s, void *unused)
-> >>+{
-> >>+	struct hidma_chan *mchan = s->private;
-> >>+	struct hidma_desc *mdesc;
-> >>+	struct hidma_dev *dmadev = mchan->dmadev;
-> >>+
-> >>+	pm_runtime_get_sync(dmadev->ddev.dev);
-> >
-> >debug shouldn't power up device, why do you want to do that
+On Mon, Apr 25, 2016 at 10:47:56AM +0100, Eric Engestrom wrote:
+> Signed-off-by: Eric Engestrom <eric.engestrom@imgtec.com>
+> ---
+>  drivers/dma/pxa_dma.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> 
-> Clocks are turned off while the hw is idle. I can?t reach hw
-> registers without restoring power.
+> diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+> index 77c1c44..315901d 100644
+> --- a/drivers/dma/pxa_dma.c
+> +++ b/drivers/dma/pxa_dma.c
+> @@ -1321,7 +1321,7 @@ static int pxad_init_phys(struct platform_device *op,
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id const pxad_dt_ids[] = {
+> +static const struct of_device_id pxad_dt_ids[] = {
+>  	{ .compatible = "marvell,pdma-1.0", },
+>  	{}
+>  };
 
-Hmm, have you thought about using regmap?
+Applied, thanks
+
 
 -- 
 ~Vinod
