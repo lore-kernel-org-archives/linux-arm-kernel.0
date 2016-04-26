@@ -1,69 +1,73 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 26 Apr 2016 16:09:51 +0200
-Subject: [[PATCH v2] 1/8] ARM: dts: STi: STiH407: Provide generic (safe)
- DVFS configuration
-In-Reply-To: <1461251267-14897-1-git-send-email-lee.jones@linaro.org>
-References: <1461251267-14897-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <571F76AF.6040808@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Apr 2016 15:17:23 +0100
+Subject: [PATCH V2 4/5] iommu/msm: use generic ARMV7S short descriptor
+ pagetable ops
+In-Reply-To: <1459952975-1250-5-git-send-email-sricharan@codeaurora.org>
+References: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
+ <1459952975-1250-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160426141723.GA1793@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-     Series is applied, thanks for having done the changes.
-
-     Note that I had to rework all the commit titles, because of the 
-double brackets ("[[PATCH v2] 1/8]").
-     Something wrong with your script?
-
-Thanks,
-Maxime
-
-On 04/21/2016 05:07 PM, Lee Jones wrote:
-> You'll notice that the voltage cell is populated with 0's.  Voltage
-> information is very platform specific, even depends on 'cut' and
-> 'substrate' versions.  Thus it is left blank for a generic (safe)
-> implementation.  If other nodes/properties are provided by the
-> bootloader, the ST CPUFreq driver will over-ride these generic
-> values.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+On Wed, Apr 06, 2016 at 07:59:34PM +0530, Sricharan R wrote:
+> This iommu uses the armv7 short descriptor format. So use the
+> generic ARMV7S pagetable ops instead of rewriting the same stuff
+> in the driver.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->   arch/arm/boot/dts/stih407-family.dtsi | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 81f8121..9fa1e58 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -22,15 +22,29 @@
->   			device_type = "cpu";
->   			compatible = "arm,cortex-a9";
->   			reg = <0>;
+>  drivers/iommu/Kconfig     |   1 +
+>  drivers/iommu/msm_iommu.c | 378 ++++++++++------------------------------------
+>  2 files changed, 80 insertions(+), 299 deletions(-)
+
+Nice diffstat!
+
+> +static void __flush_iotlb(void *cookie)
+>  {
+> -	struct msm_priv *priv = to_msm_priv(domain);
+> +	struct msm_priv *priv = cookie;
+>  	struct msm_iommu_dev *iommu = NULL;
+>  	struct msm_iommu_ctx_dev *master;
+>  	int ret = 0;
+>  
+> -#ifndef CONFIG_IOMMU_PGTABLES_L2
+> -	unsigned long *fl_table = priv->pgtable;
+> -	int i;
+> -
+> -	if (!list_empty(&priv->list_attached)) {
+> -		dmac_flush_range(fl_table, fl_table + SZ_16K);
+> -
+> -		for (i = 0; i < NUM_FL_PTE; i++)
+> -			if ((fl_table[i] & 0x03) == FL_TYPE_TABLE) {
+> -				void *sl_table = __va(fl_table[i] &
+> -								FL_BASE_MASK);
+> -				dmac_flush_range(sl_table, sl_table + SZ_4K);
+> -			}
+> -	}
+> -#endif
+> -
+>  	list_for_each_entry(iommu, &priv->list_attached, dom_node) {
+>  		ret = __enable_clocks(iommu);
+>  		if (ret)
+> @@ -162,9 +144,26 @@ static int __flush_iotlb(struct iommu_domain *domain)
+>  		__disable_clocks(iommu);
+>  	}
+>  fail:
+> -	return ret;
+> +	return;
+> +}
 > +
->   			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
->   			cpu-release-addr = <0x94100A4>;
-> +
-> +					 /* kHz     uV   */
-> +			operating-points = <1500000 0
-> +					    1200000 0
-> +					    800000  0
-> +					    500000  0>;
->   		};
->   		cpu at 1 {
->   			device_type = "cpu";
->   			compatible = "arm,cortex-a9";
->   			reg = <1>;
-> +
->   			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
->   			cpu-release-addr = <0x94100A4>;
-> +
-> +					 /* kHz     uV   */
-> +			operating-points = <1500000 0
-> +					    1200000 0
-> +					    800000  0
-> +					    500000  0>;
->   		};
->   	};
->   
+> +static void __flush_iotlb_range(unsigned long iova, size_t size,
+> +				size_t granule, bool leaf, void *cookie)
+> +{
+> +	__flush_iotlb(cookie);
+
+Can you really not do better than this? __flush_iotlb does a TLBIALL afaict,
+whereas you have the address range here and drivers/iommu/msm_iommu_hw-8xxx.h
+has entries for things like TLBIVA[A]...
+
+You might even be able to make SET_CTX_REG use writel_relaxed and stick
+a DSB in the sync callback (assuming that's sufficient to complete
+the maintenance on your device).
+
+Will
