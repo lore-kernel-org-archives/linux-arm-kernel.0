@@ -1,35 +1,42 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 26 Apr 2016 13:22:32 +0200
-Subject: clk: bcm2835: what is the best way to limit the selection of
- parent clocks in the device-tree
-In-Reply-To: <571DCED0.9010008@martin.sperl.org>
-References: <571DCED0.9010008@martin.sperl.org>
-Message-ID: <571F4F78.6000504@i2se.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 26 Apr 2016 12:22:49 +0100
+Subject: [PATCH v2] drivers: firmware: psci: unify enable-method binding
+ on ARM {64, 32}-bit systems
+In-Reply-To: <20160426190257.7b2e6a9a@xhacker>
+References: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
+ <571F4632.6090003@arm.com> <31757054.8aSO57qemx@wuerfel>
+ <20160426190257.7b2e6a9a@xhacker>
+Message-ID: <571F4F89.70006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Hi Jisheng,
 
-Am 25.04.2016 um 10:01 schrieb Martin Sperl:
-> Hi!
+On 26/04/16 12:02, Jisheng Zhang wrote:
+> Dear Arnd, Sudeep,
 >
-> On the raspberry pi the pcm (and other) clock has multiple parent
-> clocks that the driver may select from to get the "best fit" clock.
+> On Tue, 26 Apr 2016 12:49:00 +0200 Arnd Bergmann wrote:
 >
-> This list of parents of valid for each clock is hard-coded in the driver.
->
-> But this "standard" list of parents includes some clocks that are
-> independently controlled by the firmware with - unfortunately for
-> now - no notification of changes going back to the linux kernel.
-> This is mostly needed for powermanagement and ARM clock
-> modifications as well as to avoid overheating.
->
-> So how is the best way to define those parent clocks one wants to
-> use for an individual clock?
 
-since the device tree should describe the hardware this should be kept
-in the driver. So we can't get into trouble if the firmware change it's
-behavior.
+[...]
 
-Regards
-Stefan
+>>
+>> Applied to the fixes branch. I have to admit that I don't understand
+>> how the compatible string is really used here, so I have to trust that
+>> this cannot break any existing machine.
+>
+> To be honest, this breaks some Marvell DEBU's 32 bit SoCs' kernel, but these
+
+Sorry for that, but it's better to fix it in the firmware/DT.
+As I mentioned earlier it was never honored in the kernel before v4.6,
+so technically nothing is broken yet :)
+
+> SoCs' support are not mainlined yet, so it's fine to fix it as early as
+> possible.
+>
+
+Good to hear that. Thanks indeed.
+
+-- 
+Regards,
+Sudeep
