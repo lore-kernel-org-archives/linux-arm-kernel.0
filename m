@@ -1,90 +1,52 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 27 Apr 2016 00:10:29 +0300
-Subject: [PATCH v2 2/7] ARM: dts: lpc32xx: ea3250: add NAND partitions device
- node
-In-Reply-To: <1461705034-355-1-git-send-email-vz@mleia.com>
-References: <1461705034-355-1-git-send-email-vz@mleia.com>
-Message-ID: <1461705034-355-3-git-send-email-vz@mleia.com>
+Date: Wed, 27 Apr 2016 00:10:27 +0300
+Subject: [PATCH v2 0/7] ARM: dts: lpc32xx: nonfunctional updates to ea3250 and
+ phy3250 dts
+Message-ID: <1461705034-355-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To declare MTD OF partitions NAND controller device node should have
-a special 'partitions' subnode, the change removes a debug message
-from mtd/ofpart on boot:
+The change updates DTS files of PHY3250 and EA3250 boards powered by
+NXP LPC3250 SoC:
+* flatten board DTS files by exploiting device node labels,
+* add 'partitions' device node for MTD OF,
+* correct Atmel vendor prefix,
+* rename board DTS files by adding SoC name prefix.
 
-  nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
-  Trying to parse direct subnodes as partitions.
+The change is wanted to have to prevent similar issues on copy-paste
+in case if more DTS files for LPC32xx boards are submitted.
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
-* on conversion added missing 'compatible = "fixed-partitions";',
-  thanks to Sylvain for finding
+No functional changes are intended.
 
- arch/arm/boot/dts/ea3250.dts | 42 +++++++++++++++++++++++-------------------
- 1 file changed, 23 insertions(+), 19 deletions(-)
+Changes from v1 to v2:
+* on move of NAND partitions to a 'partitions' subnode added missing
+  'compatible = "fixed-partitions";' properties,
+* since file renaming closes two subseries of changes, rebased the
+  rest on top the changes above,
+* added Acked-by tag to the changes acknowledged by Sylvain.
 
-diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
-index 7cf815a..9637ac5 100644
---- a/arch/arm/boot/dts/ea3250.dts
-+++ b/arch/arm/boot/dts/ea3250.dts
-@@ -213,8 +213,6 @@
- 
- /* 128MB Flash via SLC NAND controller */
- &slc {
--	#address-cells = <1>;
--	#size-cells = <1>;
- 	status = "okay";
- 
- 	nxp,wdr-clks = <14>;
-@@ -228,26 +226,32 @@
- 	nand-on-flash-bbt;
- 	gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
- 
--	mtd0 at 00000000 {
--		label = "ea3250-boot";
--		reg = <0x00000000 0x00080000>;
--		read-only;
--	};
-+	partitions {
-+		compatible = "fixed-partitions";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
- 
--	mtd1 at 00080000 {
--		label = "ea3250-uboot";
--		reg = <0x00080000 0x000c0000>;
--		read-only;
--	};
-+		mtd0 at 00000000 {
-+			label = "ea3250-boot";
-+			reg = <0x00000000 0x00080000>;
-+			read-only;
-+		};
- 
--	mtd2 at 00140000 {
--		label = "ea3250-kernel";
--		reg = <0x00140000 0x00400000>;
--	};
-+		mtd1 at 00080000 {
-+			label = "ea3250-uboot";
-+			reg = <0x00080000 0x000c0000>;
-+			read-only;
-+		};
- 
--	mtd3 at 00540000 {
--		label = "ea3250-rootfs";
--		reg = <0x00540000 0x07ac0000>;
-+		mtd2 at 00140000 {
-+			label = "ea3250-kernel";
-+			reg = <0x00140000 0x00400000>;
-+		};
-+
-+		mtd3 at 00540000 {
-+			label = "ea3250-rootfs";
-+			reg = <0x00540000 0x07ac0000>;
-+		};
- 	};
- };
- 
+Thanks to Sylvain for review and finding an issue which is
+by the way seems to be a checkpatch's false negative.
+
+v1 of the changeset can be found here:
+
+  http://www.spinics.net/lists/devicetree/msg124209.html
+
+Vladimir Zapolskiy (7):
+  ARM: dts: lpc32xx: ea3250: avoid extension of device nodes by absolute path
+  ARM: dts: lpc32xx: ea3250: add NAND partitions device node
+  ARM: dts: lpc32xx: ea3250: fix Atmel at24 eeprom vendor
+  ARM: dts: lpc32xx: ea3250: add SoC name prefix to board dts file
+  ARM: dts: lpc32xx: phy3250: avoid extension of device nodes by absolute path
+  ARM: dts: lpc32xx: phy3250: add NAND partitions device node
+  ARM: dts: lpc32xx: phy3250: add SoC name prefix to board dts file
+
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ .../boot/dts/{ea3250.dts => lpc3250-ea3250.dts}    | 230 ++++++++---------
+ .../boot/dts/{phy3250.dts => lpc3250-phy3250.dts}  | 286 ++++++++++-----------
+ 3 files changed, 258 insertions(+), 261 deletions(-)
+ rename arch/arm/boot/dts/{ea3250.dts => lpc3250-ea3250.dts} (61%)
+ rename arch/arm/boot/dts/{phy3250.dts => lpc3250-phy3250.dts} (43%)
+
 -- 
 2.1.4
