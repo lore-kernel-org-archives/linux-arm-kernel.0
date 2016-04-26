@@ -1,34 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Apr 2016 09:58:35 +0200
-Subject: [PATCH v3 07/11] arm64: dts: marvell: use the proper I2C controller
- compatible string for 7K/8K
+Date: Tue, 26 Apr 2016 09:58:39 +0200
+Subject: [PATCH v3 11/11] MAINTAINERS: update entry for Marvell ARM platform
+ maintainers
 In-Reply-To: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1461657519-11939-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1461657519-11939-12-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C controller found in the Marvell Armada 7K/8K provides the
-bridge/offloading features, so the Device Tree should use the
-marvell,mv78230-i2c compatible string instead of marvell,mv64xxx-i2c.
+The Marvell platform support is no longer limited to Armada 370, 375,
+38x and XP, but now also includes the 32-bits Armada 39x and the
+64-bits Armada 3700 and 7K/8K.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 2 +-
+ MAINTAINERS | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 38be192..20d256b 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -184,7 +184,7 @@
- 			};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 03e00c7..d03f276 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1310,7 +1310,7 @@ ARM/MAGICIAN MACHINE SUPPORT
+ M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
  
- 			i2c0: i2c at 511000 {
--				compatible = "marvell,mv64xxx-i2c";
-+				compatible = "marvell,mv78230-i2c";
- 				reg = <0x511000 0x20>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+-ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
++ARM/Marvell Kirkwood and Armada 370, 375, 38x, 39x, XP, 3700, 7K/8K SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
+ M:	Gregory Clement <gregory.clement@free-electrons.com>
 -- 
 2.6.4
