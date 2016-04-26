@@ -1,30 +1,33 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 26 Apr 2016 21:09:08 +0200
-Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
- device
-In-Reply-To: <20160426180542.GA767@camel2.lan>
-References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
- <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
- <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
- <571F2B09.1000107@metafoo.de> <20160426130914.GA2015@delle.lan>
- <571F6B95.1000709@metafoo.de> <20160426151841.GA5433@camel2.lan>
- <571F89A4.6070008@metafoo.de> <20160426180542.GA767@camel2.lan>
-Message-ID: <571FBCD4.3010407@metafoo.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Apr 2016 21:09:26 +0200
+Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
+ PCIe controller
+In-Reply-To: <20160426170004.GA27803@localhost>
+References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160425154611.3e7e9dc9@free-electrons.com>
+ <20160425172846.GB1759@localhost>
+ <20160426104208.150cbbd0@free-electrons.com>
+ <20160426170004.GA27803@localhost>
+Message-ID: <20160426210926.7028d15d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2016 08:05 PM, Matthias Reichl wrote:
-[...]
+Hello,
+
+On Tue, 26 Apr 2016 12:00:04 -0500, Bjorn Helgaas wrote:
+
+> > So my v3 implements what you suggested, and creates a
+> > armada8k_add_pcie_port() to make it consistent with the other drivers,
+> > but long term, I'm not sure this particular function is really useful.
 > 
-> Ok, I think I got you now and I have to say that solution is really elegant.
-> I wouldn't have thought that it could be that simple. V2 of the patch
-> is below.
+> I agree completely with everything you said.  I would be thrilled if
+> somebody were to make this more sensible, as long as we did it to
+> *all* the drivers, not just one.
 
-Looks good. One minor thing inline below. Please split this into two
-patches, one adding support for the flag and the other using it in the bcm
-diver and then send them to the ASoC maintainers.
+OK. I'll see if I can come up with a few patches. Thanks!
 
-[...]
-> +		hw.formats = GENMASK_ULL((int)SNDRV_PCM_FORMAT_LAST-1, 0);
-
-setting it to 0 is OK. 0 is a special case that means all formats supported.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
