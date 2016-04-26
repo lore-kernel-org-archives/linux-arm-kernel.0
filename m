@@ -1,44 +1,64 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 26 Apr 2016 16:45:10 -0500
-Subject: [PATCH v3 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <20160426210850.13cc8a0e@free-electrons.com>
-References: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160426173144.GB27803@localhost>
- <20160426210850.13cc8a0e@free-electrons.com>
-Message-ID: <20160426214510.GA6789@localhost>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 26 Apr 2016 16:10:17 -0600
+Subject: [PATCH V4 01/18] coresight: tmc: modifying naming convention
+In-Reply-To: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461708634-6327-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 09:08:50PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue, 26 Apr 2016 12:31:44 -0500, Bjorn Helgaas wrote:
-> 
-> > >  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
-> > >  create mode 100644 drivers/pci/host/pcie-armada8k.c
-> > 
-> > Thanks, Thomas, I applied these to pci/host-armada for v4.7.
-> 
-> Thanks!
-> 
-> > I added the tweaks below to use dev_dbg() instead of pr_debug(), use
-> > dw_pcie_wait_for_link() instead of another hand-coded timeout loop,
-> > and fix a typo and remove unused constants.
-> 
-> Looks all good, thanks for applying! Just one tiny question below.
-> 
-> >  	/*
-> >  	 * Interrupts are directly handled by the device driver of the
-> > -	 * PCI device. However, there are also latched into the PCIe
-> > +	 * PCI device.  However, they are also latched into the PCIe
-> 
-> Any reason to have two spaces after the dot here?
+According to the TMC architectural state machine, the 'stopped'
+state is reached when bit 2 (TMCReady) of the TMC Status register
+turns to '1'.  The code is correct but the naming convention isn't.
 
-Only habit because my eighth-grade typing teacher in 1979 did it that
-way, and (I think) vim does it that way by default.  Poor reasons,
-both, and definitely trumped by consistency with the rest of the file,
-which does use a single space in both other instances.  I removed the
-extra space :)
+The 'Triggered' bit occupies position '1' of the TMC Status register
+and has nothing to do with the indication of the TMC entering the
+stopped state. As such renaming function "tmc_wait_for_triggered()"
+and changing the #define to reflect what the code is really doing.
 
-Bjorn
+This patch has no effect other than clarifying the semantic.
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 2b42ecbd8831..3f646e29a99b 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -77,7 +77,7 @@
+ #define TMC_FFCR_TRIGON_TRIGIN	BIT(8)
+ #define TMC_FFCR_STOP_ON_FLUSH	BIT(12)
+ 
+-#define TMC_STS_TRIGGERED_BIT	2
++#define TMC_STS_TMCREADY_BIT	2
+ #define TMC_FFCR_FLUSHMAN_BIT	6
+ 
+ enum tmc_config_type {
+@@ -132,11 +132,11 @@ struct tmc_drvdata {
+ 	u32			trigger_cntr;
+ };
+ 
+-static void tmc_wait_for_ready(struct tmc_drvdata *drvdata)
++static void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
+ {
+ 	/* Ensure formatter, unformatter and hardware fifo are empty */
+ 	if (coresight_timeout(drvdata->base,
+-			      TMC_STS, TMC_STS_TRIGGERED_BIT, 1)) {
++			      TMC_STS, TMC_STS_TMCREADY_BIT, 1)) {
+ 		dev_err(drvdata->dev,
+ 			"timeout observed when probing at offset %#x\n",
+ 			TMC_STS);
+@@ -160,7 +160,7 @@ static void tmc_flush_and_stop(struct tmc_drvdata *drvdata)
+ 			TMC_FFCR);
+ 	}
+ 
+-	tmc_wait_for_ready(drvdata);
++	tmc_wait_for_tmcready(drvdata);
+ }
+ 
+ static void tmc_enable_hw(struct tmc_drvdata *drvdata)
+-- 
+2.5.0
