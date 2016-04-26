@@ -1,50 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 11:29:39 -0700
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426175214.GJ3715@linux.vnet.ibm.com>
-References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <20160426150031.GP5995@atomide.com>
- <20160426175214.GJ3715@linux.vnet.ibm.com>
-Message-ID: <20160426182939.GO5995@atomide.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 26 Apr 2016 21:36:47 +0300
+Subject: [PATCH 2/7] ARM: dts: lpc32xx: ea3250: add NAND partitions device
+ node
+In-Reply-To: <1461689925.9433.14.camel@localhost>
+References: <1461631050-10479-1-git-send-email-vz@mleia.com>
+ <1461631050-10479-3-git-send-email-vz@mleia.com>
+ <1461689925.9433.14.camel@localhost>
+Message-ID: <571FB53F.1050407@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 10:53]:
-> Does the following patch help?
+Hi Sylvain,
 
-It just changes the output.. See below.
+On 26.04.2016 19:58, Sylvain Lemieux wrote:
+> Hi Vladimir,
+> 
+> On Tue, 2016-04-26 at 03:37 +0300, Vladimir Zapolskiy wrote:
+>> To declare MTD OF partitions NAND controller device node should have
+>> a special 'partitions' subnode, the change removes a debug message
+>> from mtd/ofpart on boot:
+>>
+>>   nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
+>>   Trying to parse direct subnodes as partitions.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  arch/arm/boot/dts/ea3250.dts | 41 ++++++++++++++++++++++-------------------
+>>  1 file changed, 22 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
+>> index 7cf815a..58bcda9 100644
+>> --- a/arch/arm/boot/dts/ea3250.dts
+>> +++ b/arch/arm/boot/dts/ea3250.dts
+>> @@ -213,8 +213,6 @@
+>>  
+>>  /* 128MB Flash via SLC NAND controller */
+>>  &slc {
+>> -	#address-cells = <1>;
+>> -	#size-cells = <1>;
+>>  	status = "okay";
+>>  
+>>  	nxp,wdr-clks = <14>;
+>> @@ -228,26 +226,31 @@
+>>  	nand-on-flash-bbt;
+>>  	gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
+>>  
+>> -	mtd0 at 00000000 {
+>> -		label = "ea3250-boot";
+>> -		reg = <0x00000000 0x00080000>;
+>> -		read-only;
+>> -	};
+>> +	partitions {
+> 
+> You may want to add the compatible property to the partitions here:
+> +		compatible = "fixed-partitions";
+> 
+> Refer to commit e488ca9f8d4f62c2dc36bfa5c32f68e7f05ab381 for details.
+> 
+> This suggestion is also valid for patch #6.
+> 
+> Note:
+> This change was required to use the "partitions" subnode
+> on my custom LPC3250 board definition.
 
-> It is quite possible that there are quite a few more of these.  If this
-> is the case, then one way to make the kernel list more of them on a
-> given boot is to build with CONFIG_PROVE_RCU_REPEATEDLY=y.
+I agree, will fix it shortly, thank you!
 
-OK
-
-Regards,
-
-Tony
-
-8< ------------------
-CPU: Testing write buffer coherency: ok
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>>  
+> ...
 
 
-RCU used illegally from idle CPU!
-rcu_scheduler_active = 1, debug_locks = 0
-RCU used illegally from extended quiescent state!
-no locks held by swapper/1/0.
-
-stack backtrace:
-CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.6.0-rc5-next-20160426+ #1113
-Hardware name: Generic OMAP4 (Flattened Device Tree)
-[<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-[<c010c3a8>] (show_stack) from [<c047ff88>] (dump_stack+0xb0/0xe4)
-[<c047ff88>] (dump_stack) from [<c012c014>] (pwrdm_set_next_pwrst+0x100/0x1d4)
-[<c012c014>] (pwrdm_set_next_pwrst) from [<c0126120>] (omap4_enter_lowpower+0xc8/0x230)
-[<c0126120>] (omap4_enter_lowpower) from [<c0126c24>] (omap_enter_idle_coupled+0x6c/0x254)
-[<c0126c24>] (omap_enter_idle_coupled) from [<c0601dfc>] (cpuidle_enter_state+0x80/0x3d4)
-[<c0601dfc>] (cpuidle_enter_state) from [<c0603d30>] (cpuidle_enter_state_coupled+0x348/0x390)
-[<c0603d30>] (cpuidle_enter_state_coupled) from [<c0183d34>] (cpu_startup_entry+0x198/0x3a0)
-[<c0183d34>] (cpu_startup_entry) from [<8010162c>] (0x8010162c)
-hw-breakpoint: Failed to enable monitor mode on CPU 0.
+--
+With best wishes,
+Vladimir
