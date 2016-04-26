@@ -1,104 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 26 Apr 2016 11:59:41 +0200
-Subject: [PATCH v4 09/11] drm: sun4i: tv: Add NTSC output standard
-In-Reply-To: <1461590572-4027-10-git-send-email-maxime.ripard@free-electrons.com>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
- <1461590572-4027-10-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160426115941.14e2b0fb@bbrezillon>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 26 Apr 2016 11:02:32 +0100
+Subject: [GIT PULL v3] arm64: hisilicon: config changes for 4.7
+Message-ID: <571F3CB8.3000904@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2016 15:22:50 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi Arnd, Hi Olof, Hi Kevin,
 
-> Add the settings to support the NTSC standard.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Please help to pull the following changes.
 
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+I rebased this pull request on v4.6-rc3 but I found
+it is same with the v2 that based on v4.6-rc4.
+Is it OK or should I base on earlier -rc version like rc1?
 
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tv.c | 45 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-> index ccf275a90132..bc047f923508 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-> @@ -178,24 +178,69 @@ struct sun4i_tv {
->  	struct sun4i_drv	*drv;
->  };
->  
-> +struct video_levels ntsc_video_levels = {
-> +	.black = 282,	.blank = 240,
-> +};
-> +
->  struct video_levels pal_video_levels = {
->  	.black = 252,	.blank = 252,
->  };
->  
-> +struct burst_levels ntsc_burst_levels = {
-> +	.cb = 79,	.cr = 0,
-> +};
-> +
->  struct burst_levels pal_burst_levels = {
->  	.cb = 40,	.cr = 40,
->  };
->  
-> +struct color_gains ntsc_color_gains = {
-> +	.cb = 160,	.cr = 160,
-> +};
-> +
->  struct color_gains pal_color_gains = {
->  	.cb = 224,	.cr = 224,
->  };
->  
-> +struct resync_parameters ntsc_resync_parameters = {
-> +	.field = false,	.line = 14,	.pixel = 12,
-> +};
-> +
->  struct resync_parameters pal_resync_parameters = {
->  	.field = true,	.line = 13,	.pixel = 12,
->  };
->  
->  struct tv_mode tv_modes[] = {
->  	{
-> +		.name		= "NTSC",
-> +		.mode		= SUN4I_TVE_CFG0_RES_480i,
-> +		.chroma_freq	= 0x21f07c1f,
-> +		.yc_en		= true,
-> +		.dac3_en	= true,
-> +		.dac_bit25_en	= true,
-> +
-> +		.back_porch	= 118,
-> +		.front_porch	= 32,
-> +		.line_number	= 525,
-> +
-> +		.hdisplay	= 720,
-> +		.hfront_porch	= 18,
-> +		.hsync_len	= 2,
-> +		.hback_porch	= 118,
-> +
-> +		.vdisplay	= 480,
-> +		.vfront_porch	= 26,
-> +		.vsync_len	= 2,
-> +		.vback_porch	= 17,
-> +
-> +		.vblank_level	= 240,
-> +
-> +		.color_gains	= &ntsc_color_gains,
-> +		.burst_levels	= &ntsc_burst_levels,
-> +		.video_levels	= &ntsc_video_levels,
-> +		.resync_params	= &ntsc_resync_parameters,
-> +	},
-> +	{
->  		.name		= "PAL",
->  		.mode		= SUN4I_TVE_CFG0_RES_576i,
->  		.chroma_freq	= 0x2a098acb,
+Thanks!
 
+Best Regards,
+Wei
 
+---
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
+
+  Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7v3
+
+for you to fetch changes up to 2b905d3a8d7e40c3486abbf585419fafa220a8f8:
+
+  arm64: Kconfig: select sp804 timer for ARCH_HISI (2016-04-26 10:39:09 +0100)
+
+----------------------------------------------------------------
+ARM64: Hi6220: configure updates for 4.7 based on rc3
+
+- Enable Hi655x PMIC and regulator
+- Enable SPI_SPIDEV as module
+- Enable several common USB-Ethernet dongles
+- Enable configs for WLAN and TI WL1835 as modules
+- Enable ARM SP804 for ARCH_HISI
+
+----------------------------------------------------------------
+Akira Tsukamoto (1):
+      arm64: defconfig: enable several common USB network adapters
+
+Guodong Xu (3):
+      arm64: defconfig: Enable the PMIC and regulator for Hi6220 and 96boards HiKey
+      arm64: defconfig: add CONFIG_SPI_SPIDEV as module
+      arm64: defconfig: enable configs for WLAN and TI WL1835 as modules
+
+Leo Yan (1):
+      arm64: Kconfig: select sp804 timer for ARCH_HISI
+
+ arch/arm64/Kconfig.platforms |  1 +
+ arch/arm64/configs/defconfig | 21 +++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
