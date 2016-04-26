@@ -1,159 +1,62 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 26 Apr 2016 22:30:48 +0530
-Subject: [PATCH 04/18] dmaengine: st_fdma: Add xp70 firmware loading
- mechanism.
-In-Reply-To: <1461236675-10176-5-git-send-email-peter.griffin@linaro.org>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-5-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160426170048.GS2274@localhost>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 26 Apr 2016 12:55:18 -0400
+Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
+In-Reply-To: <20160426162529.GK2274@localhost>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
+ <20160426033029.GB2274@localhost>
+ <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
+ <20160426162529.GK2274@localhost>
+Message-ID: <571F9D76.2060809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 12:04:21PM +0100, Peter Griffin wrote:
-> +static int
-> +st_fdma_elf_sanity_check(struct st_fdma_dev *fdev, const struct firmware *fw)
-> +{
-> +	const char *fw_name = fdev->fw_name;
-> +	struct elf32_hdr *ehdr;
-> +	char class;
-> +
-> +	if (!fw) {
-> +		dev_err(fdev->dev, "failed to load %s\n", fw_name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (fw->size < sizeof(*ehdr)) {
-> +		dev_err(fdev->dev, "Image is too small\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	ehdr = (struct elf32_hdr *)fw->data;
-> +
-> +	/* We only support ELF32 at this point */
-> +	class = ehdr->e_ident[EI_CLASS];
-> +	if (class != ELFCLASS32) {
-> +		dev_err(fdev->dev, "Unsupported class: %d\n", class);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
-> +		dev_err(fdev->dev, "Unsupported firmware endianness"
-> +			"(%d) expected (%d)\n", ehdr->e_ident[EI_DATA],
-> +			ELFDATA2LSB);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (fw->size < ehdr->e_shoff + sizeof(struct elf32_shdr)) {
-> +		dev_err(fdev->dev, "Image is too small (%u)\n", fw->size);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
-> +		dev_err(fdev->dev, "Image is corrupted (bad magic)\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (ehdr->e_phnum != fdev->drvdata->num_mem) {
-> +		dev_err(fdev->dev, "spurious nb of segments (%d) expected (%d)"
-> +			"\n", ehdr->e_phnum, fdev->drvdata->num_mem);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (ehdr->e_type != ET_EXEC) {
-> +		dev_err(fdev->dev, "Unsupported ELF header type (%d) expected"
-> +			" (%d)\n", ehdr->e_type, ET_EXEC);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (ehdr->e_machine != EM_SLIM) {
-> +		dev_err(fdev->dev, "Unsupported ELF header machine (%d) "
-> +			"expected (%d)\n", ehdr->e_machine, EM_SLIM);
-> +		return -EINVAL;
-> +	}
-> +	if (ehdr->e_phoff > fw->size) {
-> +		dev_err(fdev->dev, "Firmware size is too small\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int
-> +st_fdma_elf_load_segments(struct st_fdma_dev *fdev, const struct firmware *fw)
-> +{
-> +	struct device *dev = fdev->dev;
-> +	struct elf32_hdr *ehdr;
-> +	struct elf32_phdr *phdr;
-> +	int i, mem_loaded = 0;
-> +	const u8 *elf_data = fw->data;
-> +
-> +	ehdr = (struct elf32_hdr *)elf_data;
-> +	phdr = (struct elf32_phdr *)(elf_data + ehdr->e_phoff);
-> +
-> +	/*
-> +	 * go through the available ELF segments
-> +	 * the program header's paddr member to contain device addresses.
-> +	 * We then go through the physically contiguous memory regions which we
-> +	 * allocated (and mapped) earlier on the probe,
-> +	 * and "translate" device address to kernel addresses,
-> +	 * so we can copy the segments where they are expected.
-> +	 */
-> +	for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
-> +		u32 da = phdr->p_paddr;
-> +		u32 memsz = phdr->p_memsz;
-> +		u32 filesz = phdr->p_filesz;
-> +		u32 offset = phdr->p_offset;
-> +		void *dst;
-> +
-> +		if (phdr->p_type != PT_LOAD)
-> +			continue;
-> +
-> +		dev_dbg(dev, "phdr: type %d da %#x ofst:%#x memsz %#x filesz %#x\n",
-> +			phdr->p_type, da, offset, memsz, filesz);
-> +
-> +		if (filesz > memsz) {
-> +			dev_err(dev, "bad phdr filesz 0x%x memsz 0x%x\n",
-> +				filesz, memsz);
-> +			break;
-> +		}
-> +
-> +		if (offset + filesz > fw->size) {
-> +			dev_err(dev, "truncated fw: need 0x%x avail 0x%zx\n",
-> +				offset + filesz, fw->size);
-> +			break;
-> +		}
-> +
-> +		dst = st_fdma_seg_to_mem(fdev, da, memsz);
-> +		if (!dst) {
-> +			dev_err(dev, "bad phdr da 0x%x mem 0x%x\n", da, memsz);
-> +			break;
-> +		}
-> +
-> +		if (phdr->p_filesz)
-> +			memcpy(dst, elf_data + phdr->p_offset, filesz);
-> +
-> +		if (memsz > filesz)
-> +			memset(dst + filesz, 0, memsz - filesz);
-> +
-> +		mem_loaded++;
-> +	}
-> +
-> +	return (mem_loaded != fdev->drvdata->num_mem) ? -EIO : 0;
-> +}
+On 4/26/2016 12:25 PM, Vinod Koul wrote:
+> On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org wrote:
+>> On 2016-04-25 23:30, Vinod Koul wrote:
+>>> On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
+>>>
+>>>> +static int hidma_chan_stats(struct seq_file *s, void *unused)
+>>>> +{
+>>>> +	struct hidma_chan *mchan = s->private;
+>>>> +	struct hidma_desc *mdesc;
+>>>> +	struct hidma_dev *dmadev = mchan->dmadev;
+>>>> +
+>>>> +	pm_runtime_get_sync(dmadev->ddev.dev);
+>>>
+>>> debug shouldn't power up device, why do you want to do that
+>>
+>>
+>> Clocks are turned off while the hw is idle. I can?t reach hw
+>> registers without restoring power.
+> 
+> Hmm, have you thought about using regmap?
+> 
 
-Above two seem to be generic code and should be moved to core, this way
-other drivers using ELF firmware binaries can reuse...
+To be honest, I didn't know what regmap is but I just read some code
+and looked at how it is used. Feel free to correct me if I got it 
+wrong. 
 
-> @@ -738,6 +925,15 @@ static int st_fdma_slave_config(struct dma_chan *chan,
->  				struct dma_slave_config *slave_cfg)
->  {
->  	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
-> +	int ret;
-> +
-> +	if (!atomic_read(&fchan->fdev->fw_loaded)) {
-> +		ret = st_fdma_get_fw(fchan->fdev);
+Regmap seems to be designed for *slow* speed peripherals to improve frequent
+accesses by the SW. It looks like it is used by MFD, SPI and I2C drivers.
 
-this seems quite an odd place to load firmware, can you explain why
+It seems to cache the register contents and flush/invalidate them only when
+needed.
+
+The MMIO version seems to be assuming the presence of device-tree like CLK
+API which doesn't exist on ACPI systems and is not portable.
+
+My reaction is that it is a lot of code with no added functionality to what
+HIDMA driver is trying to achieve. 
+
+Given that the use case here is only for debug purposes; I think it is OK 
+to keep this runtime call here. I don't want to add any overhead into the
+existing code just to support the debug use case.  
+
+None of my register read/writes are slow. This file will only be used to 
+troubleshoot customer issues.
 
 -- 
-~Vinod
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
