@@ -1,64 +1,54 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 26 Apr 2016 09:15:31 +0200
-Subject: [PATCH 1/5] leds: triggers: Allow to switch the trigger to "panic"
- on a kernel panic
-In-Reply-To: <CAAEAJfC=O1akKKdW-9P7OkFZyDfE-ApbWhdYr7HPhszDrFcV1Q@mail.gmail.com>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459801326-5541-2-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20160424092551.GB23015@amd> <20160424092951.GA25596@amd>
- <571DBFAE.7060605@samsung.com>
- <CAAEAJfC=O1akKKdW-9P7OkFZyDfE-ApbWhdYr7HPhszDrFcV1Q@mail.gmail.com>
-Message-ID: <571F1593.8000400@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 26 Apr 2016 09:30:45 +0200
+Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7
+In-Reply-To: <4737327.YB9LJZXs32@wuerfel>
+References: <cover.1461558315.git.horms+renesas@verge.net.au>
+ <4737327.YB9LJZXs32@wuerfel>
+Message-ID: <CAMuHMdV_DN4YEzP1urC9LmKga6rkstGNDv20i96qnb=kS1+skw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi Arnd,
 
-On 04/25/2016 06:27 PM, Ezequiel Garcia wrote:
-> On 25 April 2016 at 03:56, Jacek Anaszewski <j.anaszewski@samsung.com> wrote:
->> On 04/24/2016 11:29 AM, Pavel Machek wrote:
->>>
->>> On Sun 2016-04-24 11:25:51, Pavel Machek wrote:
->>>>
->>>> On Mon 2016-04-04 17:22:02, Ezequiel Garcia wrote:
->>>>>
->>>>> This commit adds a new led_cdev flag LED_BLINK_AT_PANIC, which
->>>>> allows to mark a specific LED to be switched to the "panic"
->>>>> trigger, on a kernel panic.
->>>>>
->>>>> This is useful to allow the user to assign a regular trigger
->>>>> to a given LED, and still blink that LED on a kernel panic.
->>>>>
->>>>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->>>>
->>>>
->>>>
->>>>>    drivers/leds/led-triggers.c | 52
->>>>> +++++++++++++++++++++++++++++++++++++++++++++
->>>>>    include/linux/leds.h        |  1 +
->>>>
->>>>
->>>> Could we get this out of the core? I'm pretty sure most users are not
->>>> interested...
+On Mon, Apr 25, 2016 at 11:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 25 April 2016 14:27:31 Simon Horman wrote:
+>> Renesas ARM Based SoC DT Updates for v4.7
 >>
->>
->> Good point.
->>
+>> * Configure NMI key as wakeup source in DT of kzm9g board
+>> * Add SDHI support to DT of gose board
+>> * Add support of UHS-I SDR-50 for SDHI to DT of r8a7790 SoC
+>> * Correct interrupt type for ARM TWD in DT of r8a7779 and sh73a0 SoCs
+>> * Add IIC support to DT of r8a7794 SoC
+>> * Add CAN support to DT of r8a7793 and r8a7794 SoCs
+>> * Add SCIF2 support to r8a7790 device tree
+>> * Use CAN, JPU and USB3.0 fallback compatibility string
+>>   in DT of r8a7791 and r8a7790 SoCs
 >
-> Not sure how we can get it out of the core, and still implement it.
->
-> The goal is to run-time switch user-specified LEDs and blink them when
-> the kernel panics, and so it needs to mess up with some core private
-> structures.
->
-> Unless we don't want this feature at all.
->
+> Pulled into next/dt, thanks!
 
-It seems that the entire added code can be easily moved to a separate
-module, let's say led-panic-notifier.c ? It should select
-LEDS_TRIGGER_PANIC, as it would make no sense to have the former enabled
-without the latter.
+Commit 93fafa81cad3da9c ("Merge branches 'next/dt' and 'next/dt64' into
+for-next") accidentally re-added the line
 
--- 
-Best regards,
-Jacek Anaszewski
+        clock-output-names = "can_clk";
+
+to arch/arm/boot/dts/r8a7791.dtsi, which was removed in commit
+f617604fe5d74b9c ("ARM: dts: r8a7791: Remove unnecessary
+clock-output-names properties") before.  It seems the same wrong
+conflict resolution was made before in commit ef3b08c6c0d85753 ("Merge
+branch 'fixes' into for-next").
+
+While this won't cause failures, can you please remove the offending
+line?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
