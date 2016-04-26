@@ -1,54 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Apr 2016 09:58:32 +0200
-Subject: [PATCH v3 04/11] arm64: dts: marvell: add UART aliases and define
- stdout-path
+Date: Tue, 26 Apr 2016 09:58:31 +0200
+Subject: [PATCH v3 03/11] arm64: dts: marvell: rename armada-ap806 XOR nodes
 In-Reply-To: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1461657519-11939-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1461657519-11939-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the necessary UART aliases to the main Armada 7K/8K
-.dtsi file, and uses them to define the /chosen/stdout-path property
-on the Armada 7040 DB board.
+From: Andreas F?rber <afaerber@suse.de>
 
-Suggested-by: Andreas F?rber <afaerber@suse.de>
+Node names should not contain an instance number, the unit address
+serves to distinguish nodes of the same name. So rename the XOR nodes
+to just xor@<address>.
+
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+[Thomas:
+ - remove labels, they are really not needed for XOR engines.
+ - remove the Fixes: tag, as this is not a fix.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 4 ++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi  | 5 +++++
- 2 files changed, 9 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index ee57783..4b01744 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -51,6 +51,10 @@
- 	compatible = "marvell,armada7040-db", "marvell,armada7040",
- 		     "marvell,armada-ap806-quad", "marvell,armada-ap806";
- 
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
- 	memory at 00000000 {
- 		device_type = "memory";
- 		reg = <0x0 0x0 0x0 0x80000000>;
 diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index ca42c36..9e2c1f9 100644
+index 3ecf9b1..ca42c36 100644
 --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
 +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -54,6 +54,11 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+@@ -135,7 +135,7 @@
+ 				marvell,spi-base = <128>, <136>, <144>, <152>;
+ 			};
  
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-0.2";
- 		method = "smc";
+-			xor0 at 400000 {
++			xor at 400000 {
+ 				compatible = "marvell,mv-xor-v2";
+ 				reg = <0x400000 0x1000>,
+ 				      <0x410000 0x1000>;
+@@ -143,7 +143,7 @@
+ 				dma-coherent;
+ 			};
+ 
+-			xor1 at 420000 {
++			xor at 420000 {
+ 				compatible = "marvell,mv-xor-v2";
+ 				reg = <0x420000 0x1000>,
+ 				      <0x430000 0x1000>;
+@@ -151,7 +151,7 @@
+ 				dma-coherent;
+ 			};
+ 
+-			xor2 at 440000 {
++			xor at 440000 {
+ 				compatible = "marvell,mv-xor-v2";
+ 				reg = <0x440000 0x1000>,
+ 				      <0x450000 0x1000>;
+@@ -159,7 +159,7 @@
+ 				dma-coherent;
+ 			};
+ 
+-			xor3 at 460000 {
++			xor at 460000 {
+ 				compatible = "marvell,mv-xor-v2";
+ 				reg = <0x460000 0x1000>,
+ 				      <0x470000 0x1000>;
 -- 
 2.6.4
