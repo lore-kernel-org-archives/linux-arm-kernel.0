@@ -1,51 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 19:53:39 +0200
-Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
-In-Reply-To: <571FA3F6.7000903@gmail.com>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <20160426121335.GC11668@lunn.ch> <571FA3F6.7000903@gmail.com>
-Message-ID: <5167289.0a4LBoWhyX@wuerfel>
+From: Linux.HWI@garmin.com (J.D. Schroeder)
+Date: Tue, 26 Apr 2016 12:54:28 -0500
+Subject: [PATCH 2/3] ARM: DRA7x: dts: Fix the 32kHz clock calculation
+In-Reply-To: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
+References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
+Message-ID: <1461693269-19436-3-git-send-email-Linux.HWI@garmin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 April 2016 10:23:02 Florian Fainelli wrote:
-> On 26/04/16 05:13, Andrew Lunn wrote:
-> >> 4. Apart from these, by using MDIO mux framework we are making our
-> >> non-ethernet PHYs dependent on Linux network drivers which is not
-> >> acceptable. What if some product line does not need network subsystem at
-> >> all?
-> > 
-> > This is your only valid point. However, does Broadcom have a product
-> > line which does not include networking? Is not Broadcom a network SoC
-> > vendor?
-> 
-> But even with that, there is no reason why we could not decouple the
-> PHYLIB MDIO framework from PHYLIB and make it available as a more
-> standalone subsystem which can be utilized when you have a mix of MDIO
-> devices like here.
+From: "J.D. Schroeder" <jay.schroeder@garmin.com>
 
-[adding Kishon Vijay Abraham]
+This commit fixes the 32kHz clock (sys_32k_ck) calculation to be
+correctly based on the SYS_CLK1 (sys_clkin1) frequency. Based on the
+TRM CTRL_CORE_BOOTSTRAP[9:8] SPEEDSELECT, set by the SYSBOOT[9:8]
+board jumpers according to the SYS_CLK1 frequency, the frequency of
+the 32kHz FUNC_32K_CLK is set to SYS_CLK1/610. The following
+sys_32k_ck frequencies get used for different SYS_CLK1 frequencies:
+        0b00: Unknown  -> 32768 Hz crystal from CLKIN_32K pin
+        0b01: 20   MHz -> 32787 Hz clock (SYS_CLK1/610)
+        0b10: 27   MHz -> 44262 Hz clock (SYS_CLK1/610)
+        0b11: 19.2 MHz -> 31475 Hz clock (SYS_CLK1/610)
 
-We should also consider how this fits in with drivers/phy/, which is
-the generic framework for all PHY devices that are not for ethernet.
+Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
+Reviewed-by: Ben McCauley <ben.mccauley@garmin.com>
+---
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 28 ++++++++++++++++++++++------
+ 1 file changed, 22 insertions(+), 6 deletions(-)
 
-The most straightforward way that you mention would be to allow
-generic PHY devices to be probed on an MIO bus or mux. This should
-just work using mdio_module_driver(), as Andrew already explained.
-
-A more complex problem would be having a PHY driver for a device
-that can be either an ethernet phy or some other phy. With today's
-frameworks that would require two separate drivers, one in drivers/phy
-and one in drivers/net/phy/. If that turns out to be a common problem,
-we might want to come up with a way to nest one on top of the other,
-or merge two two device structures (struct phy_device and struct phy).
-
-> I am not clear on how common a shared MDIO bus is on other SoCs, but the
-> other Broadcom SoCs I am familiar with have dedicated MDIO buses
-> instances per type of PHY (PCIe, BUSB, Ethernet), thus making the split
-> a ton easier.
-
-I think most commonly, the other PHYs are not on MDIO at all, but are
-integrated inside of the SoC as an MMIO based device.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 9d1a583..a514fc3 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -98,12 +98,6 @@
+ 		clock-frequency = <32768>;
+ 	};
+ 
+-	sys_32k_ck: sys_32k_ck {
+-		#clock-cells = <0>;
+-		compatible = "fixed-clock";
+-		clock-frequency = <32768>;
+-	};
+-
+ 	virt_12000000_ck: virt_12000000_ck {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+@@ -2177,4 +2171,26 @@
+ 		ti,bit-shift = <22>;
+ 		reg = <0x0558>;
+ 	};
++
++	sys_32kin: sys_32kin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <32768>;
++	};
++
++	sys_clkin1_32k_div: sys_clkin1_32k_div {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&sys_clkin1>;
++		clock-mult = <1>;
++		clock-div = <610>;
++	};
++
++	sys_32k_ck: sys_32k_ck {
++		#clock-cells = <0>;
++		compatible = "ti,mux-clock";
++		clocks = <&sys_32kin>, <&sys_clkin1_32k_div>, <&sys_clkin1_32k_div>, <&sys_clkin1_32k_div>;
++		ti,bit-shift = <8>;
++		reg = <0x06c4>;
++	};
+ };
+-- 
+1.9.1
