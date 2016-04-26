@@ -1,46 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Apr 2016 16:00:51 +0200
-Subject: [PATCH] regulator: axp20x: Fix LDO4 linear voltage range
-Message-ID: <1461679251-25538-1-git-send-email-maxime.ripard@free-electrons.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 26 Apr 2016 16:09:51 +0200
+Subject: [[PATCH v2] 1/8] ARM: dts: STi: STiH407: Provide generic (safe)
+ DVFS configuration
+In-Reply-To: <1461251267-14897-1-git-send-email-lee.jones@linaro.org>
+References: <1461251267-14897-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <571F76AF.6040808@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current linear voltage range for the LDO4 regulator found in the APX20X
-PMICs assumes that the voltage is linear between 2.5 and 3.1V.
+Hi Lee,
 
-However, the PMIC can output up to 3.3V on that regulator by skipping the
-2.6V and 2.9V steps.
+     Series is applied, thanks for having done the changes.
 
-Fix the ranges to read and set the proper voltages.
+     Note that I had to rework all the commit titles, because of the 
+double brackets ("[[PATCH v2] 1/8]").
+     Something wrong with your script?
 
-Fixes: 13d57e64352a ("regulator: axp20x: Use linear voltage ranges for AXP20X LDO4")
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Hi Mark,
-
-This patch fixes a commit merged into 4.6-rc1, so it should probably go in
-the next -rc release.
-
-Thanks!
+Thanks,
 Maxime
 
- drivers/regulator/axp20x-regulator.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 40cd894e4df5..29ab0985b46e 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -157,7 +157,9 @@ static struct regulator_ops axp20x_ops_sw = {
- static const struct regulator_linear_range axp20x_ldo4_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(1250000, 0x0, 0x0, 0),
- 	REGULATOR_LINEAR_RANGE(1300000, 0x1, 0x8, 100000),
--	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0xf, 100000),
-+	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0x9, 0),
-+	REGULATOR_LINEAR_RANGE(2700000, 0xa, 0xb, 100000),
-+	REGULATOR_LINEAR_RANGE(3000000, 0xc, 0xf, 100000),
- };
- 
- static const struct regulator_desc axp20x_regulators[] = {
--- 
-2.8.1
+On 04/21/2016 05:07 PM, Lee Jones wrote:
+> You'll notice that the voltage cell is populated with 0's.  Voltage
+> information is very platform specific, even depends on 'cut' and
+> 'substrate' versions.  Thus it is left blank for a generic (safe)
+> implementation.  If other nodes/properties are provided by the
+> bootloader, the ST CPUFreq driver will over-ride these generic
+> values.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> ---
+>   arch/arm/boot/dts/stih407-family.dtsi | 14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 81f8121..9fa1e58 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -22,15 +22,29 @@
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a9";
+>   			reg = <0>;
+> +
+>   			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
+>   			cpu-release-addr = <0x94100A4>;
+> +
+> +					 /* kHz     uV   */
+> +			operating-points = <1500000 0
+> +					    1200000 0
+> +					    800000  0
+> +					    500000  0>;
+>   		};
+>   		cpu at 1 {
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a9";
+>   			reg = <1>;
+> +
+>   			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
+>   			cpu-release-addr = <0x94100A4>;
+> +
+> +					 /* kHz     uV   */
+> +			operating-points = <1500000 0
+> +					    1200000 0
+> +					    800000  0
+> +					    500000  0>;
+>   		};
+>   	};
+>   
