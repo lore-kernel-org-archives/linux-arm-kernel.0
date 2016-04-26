@@ -1,84 +1,45 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 26 Apr 2016 13:51:13 +0800
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <20160426012341.GB8870@tiger>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160421034520.GA19965@shlinux2.ap.freescale.net>
- <20160426012341.GB8870@tiger>
-Message-ID: <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Tue, 26 Apr 2016 11:36:04 +0530
+Subject: [PATCH v2 2/2] phy: Group vendor specific phy drivers
+In-Reply-To: <1459951665-28708-2-git-send-email-gautam.vivek@samsung.com>
+References: <1459951665-28708-1-git-send-email-gautam.vivek@samsung.com>
+ <1459951665-28708-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAFp+6iHGSuTGbyWv4dV3GCNr=7VDRnBpcodwnoeB1i0zocUg5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Kishon,
 
-On Tue, Apr 26, 2016 at 9:23 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Apr 21, 2016 at 11:45:20AM +0800, Dong Aisheng wrote:
->> On Fri, Jan 29, 2016 at 02:49:23PM -0800, Stefan Agner wrote:
->> > If a clock gets enabled early during boot time, it can lead to a PLL
->> > startup. The wait_lock function makes sure that the PLL is really
->> > stareted up before it gets used. However, the function sleeps which
->> > leads to scheduling and an error:
->> > bad: scheduling from the idle thread!
->> > ...
->> >
->> > Use udelay in case IRQ's are still disabled.
->> >
->> > Signed-off-by: Stefan Agner <stefan@agner.ch>
->> > ---
->> >  drivers/clk/imx/clk-pllv3.c | 5 ++++-
->> >  1 file changed, 4 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
->> > index c05c43d..b5ff561 100644
->> > --- a/drivers/clk/imx/clk-pllv3.c
->> > +++ b/drivers/clk/imx/clk-pllv3.c
->> > @@ -63,7 +63,10 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
->> >                     break;
->> >             if (time_after(jiffies, timeout))
->> >                     break;
->> > -           usleep_range(50, 500);
->> > +           if (unlikely(irqs_disabled()))
->>
->> This causes a bit confusion that clk_pllv3_prepare is sleepable.
->> But this line indicates it's possible to be called in irq context.
->> Although it's only happened during kernel boot phase where irq is
->> still not enabled.
->> It seems schedule_debug() somehow did not catch it during early boot
->> phase. Maybe schedule guys can help explain.
->>
->> My question is if it's really worthy to introduce this confusion
->> to fix the issue since the delay is minor?
+
+On Wed, Apr 6, 2016 at 7:37 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Adding vendor specific directories in phy to group
+> phy drivers under their respective vendor umbrella.
 >
-> I do not understand why it's confusing.  The code already obviously
-> indicates this is a special handling for cases where irq is still not
-> enabled, rather than for irq context.
+> Also updated the MAINTAINERS file to reflect the correct
+> directory structure for phy drivers.
 >
-
-The code itself has nothing telling it's a special handling for the
-case where irq is
-still not enabled.
-Even it tells, it may still cause confusing by adding complexity in
-clk_pllv3_prepare()
-which actually should be called in non-atomic context as it could sleep.
-
-> The patch is to fix the "bad: scheduling from the idle thread!" warning
-> rather than minimize the delay.  Do you have an opinion on how to fix
-> the warning?
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
 >
+> Changes from v1:
+>  - Updated the MAINTAINERS file to reflect the same change
+>    in directory structure.
+>  - Removed PHY_PLAT config as pointed out by Kishon.
+>    So we don't require the second patch in the v1 of this series:
+>    [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
+>  - Renamed sunxi --> allwinner; rcar --> renesas.
+>  - Fixed error coming with qcom Makefile.
 
-I just wonder maybe we could simply just using udelay(50) instead of
-usleep_range(50, 500) to eliminate the confusing since it's minor cast.
-What do you think of it?
+Does this change looks okay now ?
+I think you must be planning to take this in after 4.7 rc1 is out, isn't it ?
 
->> Furthermore, shouldn't it be udelay(500)?
->
-> 500 is for the worst case of sleep, and 50 is good enough for delay.
->
+[skip]
 
-Yes, you''re right.
-We have a loop, so 50ns one time should be good.
 
-> Shawn
-
-Regards
-Dong Aisheng
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
