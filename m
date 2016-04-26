@@ -1,52 +1,56 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 26 Apr 2016 18:10:00 +0300
-Subject: [PATCH V17 1/3] dmaengine: qcom_hidma: implement lower level
- hardware interface
-In-Reply-To: <571F8397.5000803@codeaurora.org>
-References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
- <1460384473-5775-2-git-send-email-okaya@codeaurora.org>
- <20160426032805.GA2274@localhost> <571F8397.5000803@codeaurora.org>
-Message-ID: <CAHp75VeZQnhaiSDuGJtgcKtek7yUwgQWd3J5QSJbdisehmBGqA@mail.gmail.com>
+From: han.xu@nxp.com (Han Xu)
+Date: Tue, 26 Apr 2016 15:14:09 +0000
+Subject: [PATCH v2] gpmi-nand: Handle ECC Errors in erased pages
+In-Reply-To: <20160426075128.GC2351@lws-christ>
+References: <1461587712-16403-1-git-send-email-mpa@pengutronix.de>,
+ <20160426075128.GC2351@lws-christ>
+Message-ID: <AM4PR0401MB1841FB9B17767D5667243C2097630@AM4PR0401MB1841.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 6:04 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 4/25/2016 11:28 PM, Vinod Koul wrote:
->> On Mon, Apr 11, 2016 at 10:21:11AM -0400, Sinan Kaya wrote:
 
->>> +    while (cause) {
->>> +            if ((cause & BIT(HIDMA_IRQ_TR_CH_INVALID_TRE_BIT_POS)) ||
->>> +                (cause & BIT(HIDMA_IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)) ||
->>> +                (cause & BIT(HIDMA_IRQ_EV_CH_WR_RESP_BIT_POS)) ||
->>> +                (cause & BIT(HIDMA_IRQ_TR_CH_DATA_RD_ER_BIT_POS)) ||
->>> +                (cause & BIT(HIDMA_IRQ_TR_CH_DATA_WR_ER_BIT_POS))) {
->>
->> Switch please
+
+________________________________________
+From: Stefan Christ <s.christ@phytec.de>
+Sent: Tuesday, April 26, 2016 1:51 AM
+To: Markus Pargmann
+Cc: Han Xu; David Woodhouse; Boris BREZILLON; Fabio Estevam; linux-mtd at lists.infradead.org; kernel at pengutronix.de; Huang Shijie; Brian Norris; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH v2] gpmi-nand: Handle ECC Errors in erased pages
+
+Hi,
+
+On Mon, Apr 25, 2016 at 02:35:12PM +0200, Markus Pargmann wrote:
+> ECC is only calculated for written pages. As erased pages are not
+> actively written the ECC is always invalid. For this purpose the
+> Hardware BCH unit is able to check for erased pages and does not raise
+> an ECC error in this case. This behaviour can be influenced using the
+> BCH_MODE register which sets the number of allowed bitflips in an erased
+> page. Unfortunately the unit is not capable of fixing the bitflips in
+> memory.
 >
-> Cause is a combined status register. Let's say it contains 0x41. I need to check
-> if bit 0 or bit 6 is set in this value for each case condition. The value is not 0x40
-> or 0x1.
+> To avoid complete software checks for erased pages, we can simply check
+> buffers with uncorrectable ECC errors because we know that any erased
+> page with errors is uncorrectable by the BCH unit.
 >
-> I created macro like this instead.
+> This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
+> to correct erased pages. To have the valid data in the buffer before
+> using them, this patch moves the read_page_swap_end() call before the
+> ECC status checking for-loop.
 >
-> +#define HIDMA_IS_ERR_INTERRUPT(cause)                          \
-> +       (cause & BIT(HIDMA_IRQ_TR_CH_INVALID_TRE_BIT_POS))   || \
-> +       (cause & BIT(HIDMA_IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)) || \
-> +       (cause & BIT(HIDMA_IRQ_EV_CH_WR_RESP_BIT_POS))       || \
-> +       (cause & BIT(HIDMA_IRQ_TR_CH_DATA_RD_ER_BIT_POS))    || \
-> +       (cause & BIT(HIDMA_IRQ_TR_CH_DATA_WR_ER_BIT_POS))
-
-This looks overheaded.
-
-#define HIDMA_XXX (BIT(a) | BIT (b) ... BIT(n))
-
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> [Squashed patches by Stefan and Boris to check ECC area]
+> Cc: Stefan Christ <s.christ@phytec.de>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 >
-> and replaced the if statement as follows
->
-> if (HIDMA_IS_ERR_INTERRUPT(cause)) {
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-if (cause & HIDMA_XXX) {
+Tested-by: Stefan Christ <s.christ@phytec.de>
 
--- 
-With Best Regards,
-Andy Shevchenko
+I verified the fix again on our board.
+
+Also tested on my side.
+
+Acked-by: Han xu <han.xu@nxp.com>
+
+Mit freundlichen Gr??en / Kind regards,
+        Stefan Christ
