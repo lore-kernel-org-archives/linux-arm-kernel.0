@@ -1,40 +1,61 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 26 Apr 2016 08:26:03 -0400
-Subject: [PATCH v3 3/4] arm: dts: lpc32xx: reparent SIC1 and SIC2
- interrupts from MIC
-In-Reply-To: <1461618143-12310-1-git-send-email-vz@mleia.com>
-References: <1461546041-25713-1-git-send-email-vz@mleia.com>
- <1461618143-12310-1-git-send-email-vz@mleia.com>
-Message-ID: <1461673563.18338.20.camel@localhost>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Apr 2016 14:27:18 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2: add shutdown controller node
+Message-ID: <1461673638-14644-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Add the SAMA5D2-Compatible Shutdown Controller node to sama5d2.dtsi
+and the use of it in the sama5d2 Xplained board dts file.
 
-On Tue, 2016-04-26 at 00:02 +0300, Vladimir Zapolskiy wrote:
-> The change adds separate device nodes for SIC1 and SIC2 interrupt
-> controllers and reparents all defined SIC1 and SIC2 interrupt
-> producers to the correspondent interrupt controller, this is needed to
-> perform switching to a new LPC32xx MIC/SIC interrupt controller driver.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
-> Changes from v2 to v3:
-> * fix io region size for MIC controller after moving SIC1/SIC2
->   controllers out,
-> * move MIC 'reg' property up to follow 'compatible' property.
-> 
-> Changes from v1 to v2:
-> * squashed two step change in lpc32xx.dtsi - new irqchip driver can be
->   used (i.e. board boots with access to userspace) with old DTS file,
->   so there is no need to fix DTS firstly and then switch to a new driver,
-> * removed "interrupt-controller-name" and "wakeup-sources" properties
->   from all interrupt controllers,
-> * removed outdated comment.
-> 
->  arch/arm/boot/dts/lpc32xx.dtsi | 60 +++++++++++++++++++++++++++++-------------
->  1 file changed, 42 insertions(+), 18 deletions(-)
-> 
-Please use capital letter for the word ARM in the patch title.
+Enable the RTC wakeup event and the "wake up" button support through the
+input "0" that is present on the board.
 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 9 +++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              | 9 +++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 21c780fab761..eb4f1ac96271 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -234,6 +234,15 @@
+ 				};
+ 			};
+ 
++			shdwc at f8048010 {
++				atmel,shdwc-debouncer = <976>;
++
++				input at 0 {
++					reg = <0>;
++					atmel,wakeup-type = "low";
++				};
++			};
++
+ 			watchdog at f8048040 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 12cc1d34097d..43015c2ad395 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1030,6 +1030,15 @@
+ 				clocks = <&clk32k>;
+ 			};
+ 
++			shdwc at f8048010 {
++				compatible = "atmel,sama5d2-shdwc";
++				reg = <0xf8048010 0x10>;
++				clocks = <&clk32k>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				atmel,wakeup-rtc-timer;
++			};
++
+ 			pit: timer at f8048030 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xf8048030 0x10>;
+-- 
+2.1.3
