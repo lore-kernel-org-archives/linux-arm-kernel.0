@@ -1,31 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Apr 2016 18:15:47 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: add the Atmel sama5d2-compatible
- ADC driver
-In-Reply-To: <c1ec7d16df28a0f9d72c1106f21f1f013a0011c1.1461687187.git.nicolas.ferre@atmel.com>
-References: <c1ec7d16df28a0f9d72c1106f21f1f013a0011c1.1461687187.git.nicolas.ferre@atmel.com>
-Message-ID: <666b73f612875185cca22613788be0598f3ccc98.1461687187.git.nicolas.ferre@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 09:17:04 -0700
+Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
+ pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
+In-Reply-To: <CACRpkdZa=v1iKZ=eiY11V3qZV9pPqtoi6vHm2Pu4ctWTFiy0TA@mail.gmail.com>
+References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
+ <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
+ <20160415152215.GR5995@atomide.com>
+ <CACRpkdZa=v1iKZ=eiY11V3qZV9pPqtoi6vHm2Pu4ctWTFiy0TA@mail.gmail.com>
+Message-ID: <20160426161704.GU5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new sama5d2-compatible ADC driver as a module.
+* Linus Walleij <linus.walleij@linaro.org> [160423 02:46]:
+> On Fri, Apr 15, 2016 at 5:22 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Linus Walleij <linus.walleij@linaro.org> [160415 02:29]:
+> >> Patch applied for fixes with Tony's ACK.
+> >>
+> >> Should it also be tagged for stable?
+> >
+> > Probably a good idea, I can see somebody pulling hair out because
+> > of this in various product trees.
+> 
+> Ooops sorry I totally missed to add that :(
+> 
+> Please ask Greg to take it as a selected stable patch.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Well it has the fixes tag, let's see if the stable people will
+find it automatically now :) If not, Keerthy can send email
+requesting adding it manually to stable trees.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6a62ebbcae28..1aed38fd4337 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -773,6 +773,7 @@ CONFIG_EXTCON=y
- CONFIG_TI_AEMIF=y
- CONFIG_IIO=y
- CONFIG_AT91_ADC=m
-+CONFIG_AT91_SAMA5D2_ADC=m
- CONFIG_BERLIN2_ADC=m
- CONFIG_EXYNOS_ADC=m
- CONFIG_VF610_ADC=m
--- 
-2.1.3
+Tony
