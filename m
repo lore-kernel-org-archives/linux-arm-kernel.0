@@ -1,56 +1,64 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 26 Apr 2016 17:36:41 -0500
-Subject: [PATCH v7 1/9] clk: ti: am335x/am4372: Add tbclk to pwm node
-In-Reply-To: <1461710209-6563-1-git-send-email-fcooper@ti.com>
-References: <1461710209-6563-1-git-send-email-fcooper@ti.com>
-Message-ID: <1461710209-6563-2-git-send-email-fcooper@ti.com>
+Date: Tue, 26 Apr 2016 17:36:40 -0500
+Subject: [PATCH v7 0/9] ARM: dts: DRA7: Add dt nodes for PWMSS
+Message-ID: <1461710209-6563-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
-to the time-based clk.
+This patch series adds support for PWM for DRA7. The IP is the same as the
+one present in AM33XX and AM437XX.
 
-Do not remove similar entries for ehrpwm node. Later patches will switch
-from using ehrpwm node name to pwm. But to maintain ABI compatibility we
-shouldn't remove the old entries.
+However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
+and eQEP.
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/ti/clk-33xx.c | 3 +++
- drivers/clk/ti/clk-43xx.c | 6 ++++++
- 2 files changed, 9 insertions(+)
+The following are the biggest changes from v6 to v7:
+* Several patches to document previously undocumented bindings. 
+* Fix minor issues in binding documents.
 
-diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-index ef2ec64..0e47d95 100644
---- a/drivers/clk/ti/clk-33xx.c
-+++ b/drivers/clk/ti/clk-33xx.c
-@@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
- 	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
- 	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
- 	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
-+	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-+	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-+	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
- 	{ .node_name = NULL },
- };
- 
-diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-index 097fc90..7255aa8 100644
---- a/drivers/clk/ti/clk-43xx.c
-+++ b/drivers/clk/ti/clk-43xx.c
-@@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
- 	DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
- 	DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
- 	DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
-+	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-+	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-+	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
-+	DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
-+	DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
-+	DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
- 	{ .node_name = NULL },
- };
- 
+The following are the biggest changes from v5 to v6:
+* Created two new bindings to allow ECAP and PWM to grab their functional
+clock from DT rather than depending on PWMSS parent.
+* Pull in a couple of patches from the "Correct PWM bindings" series. This
+makes it a bit easier to understand.
+
+>From the two patchsets a handful of patches have already been pulled in by
+maintainers and have already made it to linux-next. Therefore, this
+patch series is built ontop of the latest linux-next.
+
+Tested on:
+AM335x, AM437x and X15 + lcd w/backlight
+
+Franklin S Cooper Jr (8):
+  clk: ti: am335x/am4372: Add tbclk to pwm node
+  ARM: dts: am437x: Add missing compatibles to PWM binding documents
+  pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
+  pwm: pwm-tiecap: Update dt binding document to use proper unit address
+  ARM: dts: am437x/am33xx/da850: Add new ECAP and EPWM bindings
+  pwms: pwm-ti*: Get the clock from the PWMSS parent when using old
+    bindings
+  ARM: dts: am437x/am33xx: Remove hwmod entries for ECAP and EPWM nodes
+  ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
+
+Vignesh R (1):
+  ARM: dts: DRA7: Add dt nodes for PWMSS
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         | 36 +++++++--
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 36 +++++++--
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 33 +++++++-
+ arch/arm/boot/dts/am33xx.dtsi                      | 36 ++++++---
+ arch/arm/boot/dts/am4372.dtsi                      | 63 ++++++++++-----
+ arch/arm/boot/dts/da850.dtsi                       | 15 ++--
+ arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 ---------------
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 --------------------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 -------------
+ drivers/clk/ti/clk-33xx.c                          |  3 +
+ drivers/clk/ti/clk-43xx.c                          |  6 ++
+ drivers/pwm/pwm-tiecap.c                           |  7 ++
+ drivers/pwm/pwm-tiehrpwm.c                         |  7 ++
+ 16 files changed, 279 insertions(+), 282 deletions(-)
+
 -- 
 2.7.0
