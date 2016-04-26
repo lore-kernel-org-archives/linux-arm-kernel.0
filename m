@@ -1,141 +1,254 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 26 Apr 2016 16:10:30 -0600
-Subject: [PATCH V4 14/18] coresight: tmc: keep track of memory width
+Date: Tue, 26 Apr 2016 16:10:32 -0600
+Subject: [PATCH V4 16/18] coresight: tmc: implementing TMC-ETF AUX space API
 In-Reply-To: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461708634-6327-15-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461708634-6327-17-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Accessing the HW configuration register each time the memory
-width is needed simply doesn't make sense.  It is much more
-efficient to read the value once and keep a reference for
-later use.
+This patch implement the AUX area interfaces required to
+use the TMC (configured as an ETF) from the Perf sub-system.
+
+The heuristic is heavily borrowed from the ETB10 implementation.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 14 +---------
- drivers/hwtracing/coresight/coresight-tmc.c     | 34 +++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-tmc.h     | 10 +++++---
- 3 files changed, 41 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 198 ++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc.h     |   1 +
+ 2 files changed, 199 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index b11c52be54a9..ba3384781f71 100644
+index ba3384781f71..f00867869d20 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -41,25 +41,13 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+@@ -15,7 +15,9 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- {
--	enum tmc_mem_intf_width memwidth;
--	u8 memwords;
- 	char *bufp;
- 	u32 read_data;
- 	int i;
++#include <linux/circ_buf.h>
+ #include <linux/coresight.h>
++#include <linux/perf_event.h>
+ #include <linux/slab.h>
+ #include "coresight-priv.h"
+ #include "coresight-tmc.h"
+@@ -282,9 +284,205 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
+ 	dev_info(drvdata->dev, "TMC disabled\n");
+ }
  
--	memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID), 8, 10);
--	if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
--		memwords = 1;
--	else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
--		memwords = 2;
--	else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
--		memwords = 4;
--	else
--		memwords = 8;
--
- 	bufp = drvdata->buf;
- 	while (1) {
--		for (i = 0; i < memwords; i++) {
-+		for (i = 0; i < drvdata->memwidth; i++) {
- 			read_data = readl_relaxed(drvdata->base + TMC_RRD);
- 			if (read_data == 0xFFFFFFFF)
- 				return;
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index ae7525a2b94a..9e02ac963cd0 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -186,6 +186,39 @@ static const struct file_operations tmc_fops = {
- 	.llseek		= no_llseek,
- };
- 
-+static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
++static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
++				  void **pages, int nr_pages, bool overwrite)
 +{
-+	enum tmc_mem_intf_width memwidth;
++	int node;
++	struct cs_buffers *buf;
 +
-+	/*
-+	 * Excerpt from the TRM:
-+	 *
-+	 * DEVID::MEMWIDTH[10:8]
-+	 * 0x2 Memory interface databus is 32 bits wide.
-+	 * 0x3 Memory interface databus is 64 bits wide.
-+	 * 0x4 Memory interface databus is 128 bits wide.
-+	 * 0x5 Memory interface databus is 256 bits wide.
-+	 */
-+	switch (BMVAL(devid, 8, 10)) {
-+	case 0x2:
-+		memwidth = TMC_MEM_INTF_WIDTH_32BITS;
-+		break;
-+	case 0x3:
-+		memwidth = TMC_MEM_INTF_WIDTH_64BITS;
-+		break;
-+	case 0x4:
-+		memwidth = TMC_MEM_INTF_WIDTH_128BITS;
-+		break;
-+	case 0x5:
-+		memwidth = TMC_MEM_INTF_WIDTH_256BITS;
-+		break;
-+	default:
-+		memwidth = 0;
-+	}
++	if (cpu == -1)
++		cpu = smp_processor_id();
++	node = cpu_to_node(cpu);
 +
-+	return memwidth;
++	/* Allocate memory structure for interaction with Perf */
++	buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
++	if (!buf)
++		return NULL;
++
++	buf->snapshot = overwrite;
++	buf->nr_pages = nr_pages;
++	buf->data_pages = pages;
++
++	return buf;
 +}
 +
- #define coresight_tmc_simple_func(name, offset)			\
- 	coresight_simple_func(struct tmc_drvdata, name, offset)
++static void tmc_free_etf_buffer(void *config)
++{
++	struct cs_buffers *buf = config;
++
++	kfree(buf);
++}
++
++static int tmc_set_etf_buffer(struct coresight_device *csdev,
++			      struct perf_output_handle *handle,
++			      void *sink_config)
++{
++	int ret = 0;
++	unsigned long head;
++	struct cs_buffers *buf = sink_config;
++
++	/* wrap head around to the amount of space we have */
++	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
++
++	/* find the page to write to */
++	buf->cur = head / PAGE_SIZE;
++
++	/* and offset within that page */
++	buf->offset = head % PAGE_SIZE;
++
++	local_set(&buf->data_size, 0);
++
++	return ret;
++}
++
++static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
++					  struct perf_output_handle *handle,
++					  void *sink_config, bool *lost)
++{
++	long size = 0;
++	struct cs_buffers *buf = sink_config;
++
++	if (buf) {
++		/*
++		 * In snapshot mode ->data_size holds the new address of the
++		 * ring buffer's head.  The size itself is the whole address
++		 * range since we want the latest information.
++		 */
++		if (buf->snapshot)
++			handle->head = local_xchg(&buf->data_size,
++						  buf->nr_pages << PAGE_SHIFT);
++		/*
++		 * Tell the tracer PMU how much we got in this run and if
++		 * something went wrong along the way.  Nobody else can use
++		 * this cs_buffers instance until we are done.  As such
++		 * resetting parameters here and squaring off with the ring
++		 * buffer API in the tracer PMU is fine.
++		 */
++		*lost = !!local_xchg(&buf->lost, 0);
++		size = local_xchg(&buf->data_size, 0);
++	}
++
++	return size;
++}
++
++static void tmc_update_etf_buffer(struct coresight_device *csdev,
++				  struct perf_output_handle *handle,
++				  void *sink_config)
++{
++	int i, cur;
++	u32 *buf_ptr;
++	u32 read_ptr, write_ptr;
++	u32 status, to_read;
++	unsigned long offset;
++	struct cs_buffers *buf = sink_config;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	if (!buf)
++		return;
++
++	/* This shouldn't happen */
++	if (WARN_ON_ONCE(local_read(&drvdata->mode) != CS_MODE_PERF))
++		return;
++
++	CS_UNLOCK(drvdata->base);
++
++	tmc_flush_and_stop(drvdata);
++
++	read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
++	write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
++
++	/*
++	 * Get a hold of the status register and see if a wrap around
++	 * has occurred.  If so adjust things accordingly.
++	 */
++	status = readl_relaxed(drvdata->base + TMC_STS);
++	if (status & TMC_STS_FULL) {
++		local_inc(&buf->lost);
++		to_read = drvdata->size;
++	} else {
++		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->size);
++	}
++
++	/*
++	 * The TMC RAM buffer may be bigger than the space available in the
++	 * perf ring buffer (handle->size).  If so advance the RRP so that we
++	 * get the latest trace data.
++	 */
++	if (to_read > handle->size) {
++		u32 mask = 0;
++
++		/*
++		 * The value written to RRP must be byte-address aligned to
++		 * the width of the trace memory databus _and_ to a frame
++		 * boundary (16 byte), whichever is the biggest. For example,
++		 * for 32-bit, 64-bit and 128-bit wide trace memory, the four
++		 * LSBs must be 0s. For 256-bit wide trace memory, the five
++		 * LSBs must be 0s.
++		 */
++		switch (drvdata->memwidth) {
++		case TMC_MEM_INTF_WIDTH_32BITS:
++		case TMC_MEM_INTF_WIDTH_64BITS:
++		case TMC_MEM_INTF_WIDTH_128BITS:
++			mask = GENMASK(31, 5);
++			break;
++		case TMC_MEM_INTF_WIDTH_256BITS:
++			mask = GENMASK(31, 6);
++			break;
++		}
++
++		/*
++		 * Make sure the new size is aligned in accordance with the
++		 * requirement explained above.
++		 */
++		to_read = handle->size & mask;
++		/* Move the RAM read pointer up */
++		read_ptr = (write_ptr + drvdata->size) - to_read;
++		/* Make sure we are still within our limits */
++		read_ptr &= ~(drvdata->size - 1);
++		/* Tell the HW */
++		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
++		local_inc(&buf->lost);
++	}
++
++	cur = buf->cur;
++	offset = buf->offset;
++
++	/* for every byte to read */
++	for (i = 0; i < to_read; i += 4) {
++		buf_ptr = buf->data_pages[cur] + offset;
++		*buf_ptr = readl_relaxed(drvdata->base + TMC_RRD);
++
++		offset += 4;
++		if (offset >= PAGE_SIZE) {
++			offset = 0;
++			cur++;
++			/* wrap around at the end of the buffer */
++			cur &= buf->nr_pages - 1;
++		}
++	}
++
++	/*
++	 * In snapshot mode all we have to do is communicate to
++	 * perf_aux_output_end() the address of the current head.  In full
++	 * trace mode the same function expects a size to move rb->aux_head
++	 * forward.
++	 */
++	if (buf->snapshot)
++		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
++	else
++		local_add(to_read, &buf->data_size);
++
++	CS_LOCK(drvdata->base);
++}
++
+ static const struct coresight_ops_sink tmc_etf_sink_ops = {
+ 	.enable		= tmc_enable_etf_sink,
+ 	.disable	= tmc_disable_etf_sink,
++	.alloc_buffer	= tmc_alloc_etf_buffer,
++	.free_buffer	= tmc_free_etf_buffer,
++	.set_buffer	= tmc_set_etf_buffer,
++	.reset_buffer	= tmc_reset_etf_buffer,
++	.update_buffer	= tmc_update_etf_buffer,
+ };
  
-@@ -299,6 +332,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
- 	drvdata->config_type = BMVAL(devid, 6, 7);
-+	drvdata->memwidth = tmc_get_memwidth(devid);
- 
- 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
- 		if (np)
+ static const struct coresight_ops_link tmc_etf_link_ops = {
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 94bc034d3b98..c5d06fd57fa8 100644
+index c5d06fd57fa8..5c5fe2ad2ca7 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -81,10 +81,10 @@ enum tmc_mode {
- };
- 
- enum tmc_mem_intf_width {
--	TMC_MEM_INTF_WIDTH_32BITS	= 0x2,
--	TMC_MEM_INTF_WIDTH_64BITS	= 0x3,
--	TMC_MEM_INTF_WIDTH_128BITS	= 0x4,
--	TMC_MEM_INTF_WIDTH_256BITS	= 0x5,
-+	TMC_MEM_INTF_WIDTH_32BITS	= 1,
-+	TMC_MEM_INTF_WIDTH_64BITS	= 2,
-+	TMC_MEM_INTF_WIDTH_128BITS	= 4,
-+	TMC_MEM_INTF_WIDTH_256BITS	= 8,
- };
- 
- /**
-@@ -100,6 +100,7 @@ enum tmc_mem_intf_width {
-  * @size:	@buf size.
-  * @mode:	how this TMC is being used.
-  * @config_type: TMC variant, must be of type @tmc_config_type.
-+ * @memwidth:	width of the memory interface databus, in bytes.
-  * @trigger_cntr: amount of words to store after a trigger.
-  */
- struct tmc_drvdata {
-@@ -115,6 +116,7 @@ struct tmc_drvdata {
- 	u32			size;
- 	local_t			mode;
- 	enum tmc_config_type	config_type;
-+	enum tmc_mem_intf_width	memwidth;
- 	u32			trigger_cntr;
- };
- 
+@@ -52,6 +52,7 @@
+ #define TMC_CTL_CAPT_EN		BIT(0)
+ /* TMC_STS - 0x00C */
+ #define TMC_STS_TMCREADY_BIT	2
++#define TMC_STS_FULL		BIT(0)
+ #define TMC_STS_TRIGGERED	BIT(1)
+ /* TMC_AXICTL - 0x110 */
+ #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
 -- 
 2.5.0
