@@ -1,222 +1,178 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 26 Apr 2016 18:28:52 +0300
-Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-Message-ID: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 26 Apr 2016 17:30:44 +0200
+Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
+ device
+In-Reply-To: <20160426151841.GA5433@camel2.lan>
+References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
+ <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
+ <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
+ <571F2B09.1000107@metafoo.de> <20160426130914.GA2015@delle.lan>
+ <571F6B95.1000709@metafoo.de> <20160426151841.GA5433@camel2.lan>
+Message-ID: <571F89A4.6070008@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch intended to fix following cases:
-- SoC-A has ARM GT, defines DT node for ARM GT and selects
-ARM_GLOBAL_TIMER statically in Kconfig file. SoC-B has ARM GT and
-defines DT node for ARM GT, but do not selects ARM_GLOBAL_TIMER
-statically in Kconfig file. In case of multiplatform build ARM GT will
-be implicitly enabled for SoC-B.
+On 04/26/2016 05:18 PM, Matthias Reichl wrote:
+> On Tue, Apr 26, 2016 at 03:22:29PM +0200, Lars-Peter Clausen wrote:
+>> On 04/26/2016 03:09 PM, Matthias Reichl wrote:
+>>> Hi Lars,
+>>>
+>>> first of all thanks a lot for your detailled feedback!
+>>>
+>>> On Tue, Apr 26, 2016 at 10:47:05AM +0200, Lars-Peter Clausen wrote:
+>>>>>>> +	.periods_min		= 2,
+>>>>>>> +	.periods_max		= 255,
+>>>>>>> +	.buffer_bytes_max	= 128 * PAGE_SIZE,
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
+>>>>>>> +	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
+>>>>>>> +	.pcm_hardware = &bcm2835_pcm_hardware,
+>>>>>>> +	.prealloc_buffer_size = 256 * PAGE_SIZE,
+>>>>>>> +};
+>>>>>>
+>>>>>> The generic dmaengine PCM driver auto-discovers these things, no need to
+>>>>>> provide them. The code is OK as it is.
+>>>>>
+>>>>> With the auto-discover code we loose the S16_LE format.
+>>>>>
+>>>>> If I understood the code in dmaengine_pcm_set_runtime_hwparams
+>>>>> correctly, this is because the DMA controller doesn't support
+>>>>> 16bit transfers (only multiples of 32bit are allowed).
+>>>>>
+>>>>> But since the I2S driver needs exactly 2 channels S16_LE actually
+>>>>> works fine (one 32bit transfer per frame).
+>>>>>
+>>>>> Do you know of a better way to get S16_LE support? It could well
+>>>>> be that I missed something important...
+>>>>
+>>>> With your patch we should just get an error when trying to configure a
+>>>> stream with 16-bit samples since when setting up the DMA controller the
+>>>> generic code will still choose a 16-bit device port size and this will be
+>>>> rejected by the DMA controller.
+>>>
+>>> We had that code in downstream RPi kernel for ages (IIRC since
+>>> 3.10) and so far it worked fine.
+>>>
+>>> I traced the code for the S16_LE case to find out why:
+>>>
+>>> snd_hwparams_to_dma_slave_config() sets src/dst_addr_width to 16bit.
+>>>
+>>> But immediately afterwards snd_dmaengine_pcm_set_config_from_dai_data()
+>>> overrides addr_width to 32bit.
+>>>
+>>
+>> Ok, makes sense.
+>>
+>>> bcm2835-i2s only supports 32bit access to the FIFO/data register
+>>> and dma_data.addr_width is set to 32bit in the I2S driver - that
+>>> code is also in mainline since the initial bcm2835-i2s commit.
+>>>
+>>> Of course all this only works because the number of channels
+>>> is always 2.
+>>>
+>>>> When you look at peripherals that have DMA support there are basically two
+>>>> types.
+>>>>
+>>>> Type A expect that each write (same applies for read) to the memory mapped
+>>>> FIFO corresponds to exactly one sample. So if the sample width is 16-bit a
+>>>> 16-bit write is done, if the sample width is 32-bit a 32-bit write is done.
+>>>> In this case it is up to the DMA controller to fragment the byte stream into
+>>>> individual samples.
+>>>>
+>>>> Type B on the other hand has a fixed port width (usually the bus size) and
+>>>> expects that each write to the memory mapped FIFO uses the port width. It
+>>>> then internally unpacks the data into the sample data. E.g. if the FIFO is
+>>>> 32-bit wide and the sample width is 16-bit it will unpack the 32-bit entry
+>>>> into two samples.
+>>>>
+>>>> Currently the generic code only supports type A. It would be great if you
+>>>> could add support for type B to support the BCM2835 I2S controller properly.
+>>>
+>>> Do you have a particular solution in mind?
+>>>
+>>> Introducing a flag to just auto-add some packed formats would be
+>>> easy, but a generic, robust solution might be tricky. We'd have
+>>> to make sure that unsupported configurations (like an odd number
+>>> of 16bit channels on 32bit-only setups) get rejected or we might
+>>> be in trouble.
+>>
+>> I think in this case the DMA shouldn't limit the supported sample types.
+>> Since the unpacking is done by the peripheral the peripheral is the one
+>> component that limits what is supported and what is not and the DMA itself
+>> has no influence on this. In the peripheral driver you have all the
+>> information available there to specify the proper constraints and can handle
+>> all the corner cases.
+> 
+> Do you mean let the DAI driver check for and reject invalid
+> configurations in hw_params? Yes, I think that should do it.
 
-- There is no way to disable ARM GT without modifying Kconfig file,
-once ARM_GLOBAL_TIMER is selected statically in Kconfig file.
+The DAI driver already specifies which formats it can handle, just keep that
+as it is. The ALSA core takes care of rejecting invalid configurations, so
+need to do anything special in hw_params.
 
-Hence, fix above case by defining both HAVE_ARM_GLOBAL_TIMER and
-ARM_GLOBAL_TIMER as recommended by 'Adding common features and make
-the usage configurable' section in kconfig-language.txt. All places in
-ARM folder where ARM_GLOBAL_TIMER was used now replaced on
-HAVE_ARM_GLOBAL_TIMER.
+> 
+>> The overall constraints are the intersection of the
+>> DMA and peripheral constraints, so by having no DMA constraints the
+>> peripheral is the one providing all the constraints.
+>>
+>> We could either say that we assume that when the addr_width is fixed the DMA
+>> shouldn't supply any constraints, or we could introduce a new flag in
+>> snd_dmaengine_dai_dma_data that the peripheral has unpack support and the
+>> DMA constraints don't matter.
+> 
+> The additional flag sounds like a good idea. How about something
+> like the patch below?
+> 
+> If the ...PACK_16_32 flag is set, 16-bit data will always be
+> packed into 32bit and 32bit DMA is done instead of 16bit.
+> No further checks are done.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Jun Nie <jun.nie@linaro.org>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-Cc: Lars Persson <lars.persson@axis.com>
-Cc: Mike Looijmans <mike.looijmans@topic.nl>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Changes is v1:
-- updated mach-artpec
-- rebased on top of tip: timers/core
-  commit: 86d3473 time: Introduce do_sys_settimeofday64()
+You don't need to be specific about what kind of unpack the the peripheral
+supports. If it supports unpacking it is in charge of what formats can be
+supported.
 
- arch/arm/mach-artpec/Kconfig   | 2 +-
- arch/arm/mach-bcm/Kconfig      | 4 ++--
- arch/arm/mach-hisi/Kconfig     | 2 +-
- arch/arm/mach-imx/Kconfig      | 2 +-
- arch/arm/mach-rockchip/Kconfig | 2 +-
- arch/arm/mach-sti/Kconfig      | 2 +-
- arch/arm/mach-uniphier/Kconfig | 2 +-
- arch/arm/mach-vexpress/Kconfig | 2 +-
- arch/arm/mach-zx/Kconfig       | 2 +-
- arch/arm/mach-zynq/Kconfig     | 2 +-
- drivers/clocksource/Kconfig    | 7 ++++++-
- 11 files changed, 17 insertions(+), 12 deletions(-)
+[...]
+>  void snd_dmaengine_pcm_set_config_from_dai_data(
+> diff --git a/sound/core/pcm_dmaengine.c b/sound/core/pcm_dmaengine.c
+> index fba365a..a429f94 100644
+> --- a/sound/core/pcm_dmaengine.c
+> +++ b/sound/core/pcm_dmaengine.c
+> @@ -117,11 +117,21 @@ void snd_dmaengine_pcm_set_config_from_dai_data(
+>  	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+>  		slave_config->dst_addr = dma_data->addr;
+>  		slave_config->dst_maxburst = dma_data->maxburst;
+> +		if ((slave_config->dst_addr_width ==
+> +		     DMA_SLAVE_BUSWIDTH_2_BYTES) &&
+> +		    (dma_data->flags & SND_DMAENGINE_PCM_DAI_FLAG_PACK_16_32))
+> +			slave_config->dst_addr_width =
+> +				DMA_SLAVE_BUSWIDTH_4_BYTES;
 
-diff --git a/arch/arm/mach-artpec/Kconfig b/arch/arm/mach-artpec/Kconfig
-index 6cbe5a2..6cbca77 100644
---- a/arch/arm/mach-artpec/Kconfig
-+++ b/arch/arm/mach-artpec/Kconfig
-@@ -9,7 +9,7 @@ config MACH_ARTPEC6
- 	depends on ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select ARM_PSCI
- 	select HAVE_ARM_ARCH_TIMER
- 	select HAVE_ARM_SCU
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 7ef1214..d4d079a7 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -14,7 +14,7 @@ config ARCH_BCM_IPROC
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select COMMON_CLK_IPROC
- 	select CLKSRC_MMIO
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -156,7 +156,7 @@ config ARCH_BCM_63XX
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_GIC
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select CACHE_L2X0
- 	select HAVE_ARM_ARCH_TIMER
- 	select HAVE_ARM_TWD if SMP
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index a3b091a..251bb03 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -28,7 +28,7 @@ config ARCH_HIP01
-        depends on ARCH_MULTI_V7
-        select HAVE_ARM_SCU if SMP
-        select HAVE_ARM_TWD if SMP
--       select ARM_GLOBAL_TIMER
-+       select HAVE_ARM_GLOBAL_TIMER
-        help
-          Support for Hisilicon HIP01 SoC family
- 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 8973fae..3fbf38c 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -602,7 +602,7 @@ choice
- 	config VF_USE_ARM_GLOBAL_TIMER
- 		bool "Use ARM Global Timer"
- 		depends on ARCH_MULTI_V7
--		select ARM_GLOBAL_TIMER
-+		select HAVE_ARM_GLOBAL_TIMER
- 		select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 		help
- 		  Use the ARM Global Timer as clocksource
-diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-index cef42fd..a53b787 100644
---- a/arch/arm/mach-rockchip/Kconfig
-+++ b/arch/arm/mach-rockchip/Kconfig
-@@ -14,7 +14,7 @@ config ARCH_ROCKCHIP
- 	select DW_APB_TIMER_OF
- 	select REGULATOR if PM
- 	select ROCKCHIP_TIMER
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	help
- 	  Support for Rockchip's Cortex-A9 Single-to-Quad-Core-SoCs
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index a196d14..c799f9d 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -3,7 +3,7 @@ menuconfig ARCH_STI
- 	depends on ARCH_MULTI_V7
- 	select ARM_GIC
- 	select ST_IRQCHIP
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select CLKSRC_ST_LPC
- 	select PINCTRL
- 	select PINCTRL_ST
-diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
-index 82dddee..81bdf77 100644
---- a/arch/arm/mach-uniphier/Kconfig
-+++ b/arch/arm/mach-uniphier/Kconfig
-@@ -2,7 +2,7 @@ config ARCH_UNIPHIER
- 	bool "Socionext UniPhier SoCs"
- 	depends on ARCH_MULTI_V7
- 	select ARM_AMBA
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select ARM_GIC
- 	select HAVE_ARM_SCU
- 	select HAVE_ARM_TWD if SMP
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 398a297..e89941d 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,7 +5,7 @@ menuconfig ARCH_VEXPRESS
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select ARM_TIMER_SP804
- 	select COMMON_CLK_VERSATILE
- 	select HAVE_ARM_SCU if SMP
-diff --git a/arch/arm/mach-zx/Kconfig b/arch/arm/mach-zx/Kconfig
-index 209c979..e84b0c2 100644
---- a/arch/arm/mach-zx/Kconfig
-+++ b/arch/arm/mach-zx/Kconfig
-@@ -11,7 +11,7 @@ if ARCH_ZX
- config SOC_ZX296702
- 	def_bool y
- 	select ARM_GIC
--	select ARM_GLOBAL_TIMER
-+	select HAVE_ARM_GLOBAL_TIMER
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select PM_GENERIC_DOMAINS if PM
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index fd0aeeb..3165720 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -5,7 +5,7 @@ config ARCH_ZYNQ
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
--	select ARM_GLOBAL_TIMER if !CPU_FREQ
-+	select HAVE_ARM_GLOBAL_TIMER if !CPU_FREQ
- 	select CADENCE_TTC_TIMER
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index c346be6..c686811 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -207,9 +207,14 @@ config ARM_ARCH_TIMER_EVTSTREAM
- 	  This must be disabled for hardware validation purposes to detect any
- 	  hardware anomalies of missing events.
- 
--config ARM_GLOBAL_TIMER
-+config HAVE_ARM_GLOBAL_TIMER
- 	bool
-+
-+config ARM_GLOBAL_TIMER
-+	bool "Support for ARM global timer unit"
- 	select CLKSRC_OF if OF
-+	default y
-+	depends on HAVE_ARM_GLOBAL_TIMER
- 	help
- 	  This options enables support for the ARM global timer unit
- 
--- 
-2.8.0
+If the PACK flag is set we should set the width to UNKOWN, that means the
+DMA controller is free to choose whatever width it things is most efficient.
+If the port has a fixed width it will be overwritten later as you described
+in the earlier mail.
+
+[...]
+> diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
+> index 6fd1906..25552c2 100644
+> --- a/sound/soc/soc-generic-dmaengine-pcm.c
+> +++ b/sound/soc/soc-generic-dmaengine-pcm.c
+> @@ -173,6 +173,11 @@ static int dmaengine_pcm_set_runtime_hwparams(struct snd_pcm_substream *substrea
+
+In this function when the flag is set just skip this step altogether and set
+hw->formats. That means the DMA does not restrict the sample formats that
+are supported.
+
+>  	for (i = 0; i <= SNDRV_PCM_FORMAT_LAST; i++) {
+>  		int bits = snd_pcm_format_physical_width(i);
+>  
+> +		if ((bits == 16) &&
+> +		    (dma_data->flags & SND_DMAENGINE_PCM_DAI_FLAG_PACK_16_32))
+> +			/* 16-bit data needs to be packed into 32bit */
+> +			bits = 32;
+> +
+>  		/* Enable only samples with DMA supported physical widths */
+>  		switch (bits) {
+>  		case 8:
+> 
