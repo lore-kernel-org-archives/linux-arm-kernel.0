@@ -1,29 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 13:13:04 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC PCI Defconfig Updates for v4.7
-In-Reply-To: <cover.1461631445.git.horms+renesas@verge.net.au>
-References: <cover.1461631445.git.horms+renesas@verge.net.au>
-Message-ID: <4949462.nM0EuO7OEc@wuerfel>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 26 Apr 2016 12:15:32 +0100
+Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
+ code
+In-Reply-To: <6161197.8XCk69TI60@wuerfel>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <4337545.DyleYAUzIV@wuerfel>
+ <20160426101136.GA2984@griffinp-ThinkPad-X1-Carbon-2nd>
+ <6161197.8XCk69TI60@wuerfel>
+Message-ID: <20160426111532.GA5457@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 April 2016 10:50:10 Simon Horman wrote:
-> Please consider these Renesas ARM based SoC PCI defconfig updates for v4.7.
-> 
-> 
-> This pull request includes a single patch with changes that I would
-> ordinarily be inclined to split into different branches. However,
-> are most easily done atomicly and as they are rather small I have
-> kept them in one patch in its own branch. My hope is that you can find
-> an appropriate home for it.
-> 
-> The patch updates renames PCI_RCAR_GEN2_PCIE Kconfig symbol
-> as PCIE_RCAR. It includes PCI Makefile and Kconfig changes and
-> accordingly the patch has an ack from Bjorn Helgaas. It also updates
-> arm and arm64 defconfigs.
-> 
+Hi Arnd,
 
-I've merged it into next/defconfig and made sure we don't (yet) have
-any conflicts against changes in the arm64 defconfig. Thanks,
+On Tue, 26 Apr 2016, Arnd Bergmann wrote:
 
-	Arnd
+> On Tuesday 26 April 2016 11:11:36 Peter Griffin wrote:
+> > Hi Arnd,
+> > 
+> > On Thu, 21 Apr 2016, Arnd Bergmann wrote:
+> > 
+> > > On Thursday 21 April 2016 12:04:26 Peter Griffin wrote:
+> > > > uniperiph-id, version and mode are ST specific bindings and
+> > > > need the 'st,' prefix. Update the examples, as otherwise copying
+> > > > them yields a runtime error parsing the DT node.
+> > > > 
+> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > > > Cc: arnaud.pouliquen at st.com
+> > > > ---
+> > > >  .../devicetree/bindings/sound/st,sti-asoc-card.txt         | 14 +++++++-------
+> > > >  1 file changed, 7 insertions(+), 7 deletions(-)
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
+> > > > index 028fa1c..ef2e0c6 100644
+> > > > --- a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
+> > > > +++ b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
+> > > > @@ -67,9 +67,9 @@ Example:
+> > > >                 dmas = <&fdma0 4 0 1>;
+> > > >                 dai-name = "Uni Player #1 (DAC)";
+> > > >                 dma-names = "tx";
+> > > > -               uniperiph-id = <2>;
+> > > > -               version = <5>;
+> > > > -               mode = "PCM";
+> > > > +               st,uniperiph-id = <2>;
+> > > > +               st,version = <5>;
+> > > > +               st,mode = "PCM";
+> > > >         };
+> > > 
+> > > You don't change the binding desciption here, only the example,
+> > > so they no longer match.
+> > 
+> > Whoops. Will fix that in v4.
+> > 
+> > > 
+> > > What is st,uniperiph-id needed for anyway? It's often an indication
+> > > that you are doing something wrong if you need this.
+> > 
+> > From looking at the code in sound/soc/sti/uniperif_player.c, there is
+> > one sysconf register called "Audio glue config" which is shared by all
+> > of the uniperif IP instances. This binding is being used to generate a
+> > bitoffset into this shared register based on the instance of the IP.
+> > 
+> > I guess the alternative is to have an explosion of compatibles?
+> > 
+> > st,sti-uni-player-1
+> > st,sti-uni-player-2
+> > st,sti-uni-player-3
+> > 
+> 
+> That would certainly be worse: if the devices are actually identical,
+> they should have the same compatible string.
+> 
+> > If not what would you recommend instead? :-)
+> 
+> It's still not clear to me what that bit in the syscfg register
+> is for. Given the error message about "sti-audio-clk-glue",
+> I suspect that this is actually a clock controller and that
+> it should be using the clock binding with a separate driver
+> instead of manipulating the regmap directly from the audio driver.
+
+Luckily I do have the datasheet for the audio-glue sysconf register.
+
+It says: -
+
+[11:8] PCM_CLK_SEL: Selects the frequency synthesizer clock or the external
+PCM clock for each channel.
+
+The driver only ever sets this to 1 which selects the frequency synthesizer
+clock. So the bitfield of the register which the driver is using (PCM_CLK_SEL)
+is a clock mux.
+
+Peter.
