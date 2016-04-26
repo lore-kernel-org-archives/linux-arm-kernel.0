@@ -1,144 +1,229 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 26 Apr 2016 16:10:26 -0600
-Subject: [PATCH V4 10/18] coresight: tmc: getting rid of multiple read access
+Date: Tue, 26 Apr 2016 16:10:29 -0600
+Subject: [PATCH V4 13/18] coresight: tmc: make sysFS and Perf mode mutually
+ exclusive
 In-Reply-To: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461708634-6327-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461708634-6327-14-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allowing multiple readers to access the trace data simultaniously
-via sysFS provides no shortage of opportunity for race condition,
-mandates two variable to be maintained (drvdata::read_count and
-drvdata::reading), makes the code complex and provide little
-advantages, if any.
-
-This patch streamlines the read process by restricting trace data
-access to a single user.  That way drvdata::read_count can
-be eliminated and race conditions (along with faulty error handling)
-in function tmc_open() and tmc_release() eliminated.
+The sysFS and Perf access methods can't be allowed to interfere
+with one another.  As such introducing guards to access
+functions that prevents moving forward if a TMC is already
+being used.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c |  5 +++++
- drivers/hwtracing/coresight/coresight-tmc-etr.c |  4 ++++
- drivers/hwtracing/coresight/coresight-tmc.c     | 24 +++++++++---------------
- drivers/hwtracing/coresight/coresight-tmc.h     |  2 --
- 4 files changed, 18 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 60 +++++++++++++++++++++++-
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 62 +++++++++++++++++++++++--
+ 2 files changed, 117 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 6eb1665cfc9c..60edf4d1968f 100644
+index b5e5e6ac67eb..b11c52be54a9 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -260,6 +260,11 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+@@ -111,7 +111,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+ 	CS_LOCK(drvdata->base);
+ }
  
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 
-+	if (drvdata->reading) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
- 	/* There is no point in reading a TMC in HW FIFO mode */
- 	mode = readl_relaxed(drvdata->base + TMC_MODE);
- 	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index ac37bf904fb7..d6999b457fb8 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -188,6 +188,10 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 		return -EINVAL;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
-+	if (drvdata->reading) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
- 
- 	/* If drvdata::buf is NULL the trace data has been read already */
- 	if (drvdata->buf == NULL) {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index e8e12a9b917a..ae7525a2b94a 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -95,7 +95,7 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
+-static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
++static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ {
+ 	int ret = 0;
+ 	bool used = false;
+@@ -185,6 +185,54 @@ out:
  	return ret;
  }
  
--static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
-+static int tmc_read_unprepare(struct tmc_drvdata *drvdata)
++static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
++{
++	int ret = 0;
++	long val;
++	unsigned long flags;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	 /* This shouldn't be happening */
++	if (WARN_ON(mode != CS_MODE_PERF))
++		return -EINVAL;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	if (drvdata->reading) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	val = local_xchg(&drvdata->mode, mode);
++	/*
++	 * In Perf mode there can be only one writer per sink.  There
++	 * is also no need to continue if the ETB/ETR is already operated
++	 * from sysFS.
++	 */
++	if (val != CS_MODE_DISABLED) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	tmc_etb_enable_hw(drvdata);
++out:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	return ret;
++}
++
++static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
++{
++	switch (mode) {
++	case CS_MODE_SYSFS:
++		return tmc_enable_etf_sink_sysfs(csdev, mode);
++	case CS_MODE_PERF:
++		return tmc_enable_etf_sink_perf(csdev, mode);
++	}
++
++	/* We shouldn't be here */
++	return -EINVAL;
++}
++
+ static void tmc_disable_etf_sink(struct coresight_device *csdev)
+ {
+ 	long val;
+@@ -267,6 +315,7 @@ const struct coresight_ops tmc_etf_cs_ops = {
+ 
+ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ {
++	long val;
+ 	enum tmc_mode mode;
+ 	int ret = 0;
+ 	unsigned long flags;
+@@ -290,6 +339,13 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ 		goto out;
+ 	}
+ 
++	val = local_read(&drvdata->mode);
++	/* Don't interfere if operated from Perf */
++	if (val == CS_MODE_PERF) {
++		ret = -EINVAL;
++		goto out;
++	}
++
+ 	/* If drvdata::buf is NULL the trace data has been read already */
+ 	if (drvdata->buf == NULL) {
+ 		ret = -EINVAL;
+@@ -297,7 +353,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ 	}
+ 
+ 	/* Disable the TMC if need be */
+-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
++	if (val == CS_MODE_SYSFS)
+ 		tmc_etb_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 7208584d0da7..847d1b5f2c13 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -87,7 +87,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
+-static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
++static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
  {
  	int ret = 0;
+ 	bool used = false;
+@@ -165,6 +165,54 @@ out:
+ 	return ret;
+ }
  
-@@ -113,21 +113,20 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
- 
- 	if (!ret)
- 		dev_info(drvdata->dev, "TMC read end\n");
++static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
++{
++	int ret = 0;
++	long val;
++	unsigned long flags;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
++	 /* This shouldn't be happening */
++	if (WARN_ON(mode != CS_MODE_PERF))
++		return -EINVAL;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	if (drvdata->reading) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	val = local_xchg(&drvdata->mode, mode);
++	/*
++	 * In Perf mode there can be only one writer per sink.  There
++	 * is also no need to continue if the ETR is already operated
++	 * from sysFS.
++	 */
++	if (val != CS_MODE_DISABLED) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	tmc_etr_enable_hw(drvdata);
++out:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	return ret;
++}
++
++static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
++{
++	switch (mode) {
++	case CS_MODE_SYSFS:
++		return tmc_enable_etr_sink_sysfs(csdev, mode);
++	case CS_MODE_PERF:
++		return tmc_enable_etr_sink_perf(csdev, mode);
++	}
++
++	/* We shouldn't be here */
++	return -EINVAL;
++}
++
+ static void tmc_disable_etr_sink(struct coresight_device *csdev)
+ {
+ 	long val;
+@@ -199,6 +247,7 @@ const struct coresight_ops tmc_etr_cs_ops = {
+ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ {
+ 	int ret = 0;
++	long val;
+ 	unsigned long flags;
+ 
+ 	/* config types are set a boot time and never change */
+@@ -211,6 +260,13 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 		goto out;
+ 	}
+ 
++	val = local_read(&drvdata->mode);
++	/* Don't interfere if operated from Perf */
++	if (val == CS_MODE_PERF) {
++		ret = -EINVAL;
++		goto out;
++	}
++
+ 	/* If drvdata::buf is NULL the trace data has been read already */
+ 	if (drvdata->buf == NULL) {
+ 		ret = -EINVAL;
+@@ -218,14 +274,14 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 	}
+ 
+ 	/* Disable the TMC if need be */
+-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
++	if (val == CS_MODE_SYSFS)
+ 		tmc_etr_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
+ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+-	return 0;
 +	return ret;
  }
  
- static int tmc_open(struct inode *inode, struct file *file)
- {
-+	int ret;
- 	struct tmc_drvdata *drvdata = container_of(file->private_data,
- 						   struct tmc_drvdata, miscdev);
--	int ret = 0;
--
--	if (drvdata->read_count++)
--		goto out;
- 
- 	ret = tmc_read_prepare(drvdata);
- 	if (ret)
- 		return ret;
--out:
-+
- 	nonseekable_open(inode, file);
- 
- 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
-@@ -167,19 +166,14 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
- 
- static int tmc_release(struct inode *inode, struct file *file)
- {
-+	int ret;
- 	struct tmc_drvdata *drvdata = container_of(file->private_data,
- 						   struct tmc_drvdata, miscdev);
- 
--	if (--drvdata->read_count) {
--		if (drvdata->read_count < 0) {
--			dev_err(drvdata->dev, "mismatched close\n");
--			drvdata->read_count = 0;
--		}
--		goto out;
--	}
-+	ret = tmc_read_unprepare(drvdata);
-+	if (ret)
-+		return ret;
- 
--	tmc_read_unprepare(drvdata);
--out:
- 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
- 	return 0;
- }
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index df661903f83c..592eb149fe3a 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -94,7 +94,6 @@ enum tmc_mem_intf_width {
-  * @csdev:	component vitals needed by the framework.
-  * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
-  * @spinlock:	only one at a time pls.
-- * @read_count:	manages preparation of buffer for reading.
-  * @buf:	area of memory where trace data get sent.
-  * @paddr:	DMA start location in RAM.
-  * @vaddr:	virtual representation of @paddr.
-@@ -109,7 +108,6 @@ struct tmc_drvdata {
- 	struct coresight_device	*csdev;
- 	struct miscdevice	miscdev;
- 	spinlock_t		spinlock;
--	int			read_count;
- 	bool			reading;
- 	char			*buf;
- 	dma_addr_t		paddr;
+ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
 -- 
 2.5.0
