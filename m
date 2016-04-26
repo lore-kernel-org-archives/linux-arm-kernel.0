@@ -1,73 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Apr 2016 14:53:54 +0100
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <20160426120809.GA9796@hardcore>
-References: <cover.1457539621.git.jglauber@cavium.com>
- <20160404121954.GA9300@hardcore> <20160425112207.GL16065@arm.com>
- <20160425120222.GA2552@hardcore> <20160425131907.GB30830@arm.com>
- <20160426120809.GA9796@hardcore>
-Message-ID: <20160426135354.GR27312@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Apr 2016 16:00:51 +0200
+Subject: [PATCH] regulator: axp20x: Fix LDO4 linear voltage range
+Message-ID: <1461679251-25538-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 02:08:09PM +0200, Jan Glauber wrote:
-> On Mon, Apr 25, 2016 at 02:19:07PM +0100, Will Deacon wrote:
-> > On Mon, Apr 25, 2016 at 02:02:22PM +0200, Jan Glauber wrote:
-> > > On Mon, Apr 25, 2016 at 12:22:07PM +0100, Will Deacon wrote:
-> > > > On Mon, Apr 04, 2016 at 02:19:54PM +0200, Jan Glauber wrote:
-> > > > > can you have a look at these patches?
-> > > > 
-> > > > Looks like Mark reviewed this last week -- are you planning to respin?
-> > > 
-> > > Yes, of course. I just had no time yet and I'm a bit lost on how to
-> > > proceed without using the NUMA node information which Mark did not like
-> > > to be used.
-> > > 
-> > > The only way to know which device is on which node would be to look
-> > > at the PCI topology (which is also the source of the NUMA node_id).
-> > > We could do this manually in order to not depend on CONFIG_NUMA,
-> > > but I would like to know if that is acceptable before respinning the
-> > > patches.
-> > 
-> > That doesn't feel like it really addresses Mark's concerns -- it's just
-> > another way to get the information that isn't a first-class PMU topology
-> > description from firmware.
-> > 
-> > Now, I don't actually mind using the NUMA topology so much in the cases
-> > where it genuinely correlates with the PMU topology. My objection is more
-> > that we end up sticking everything on node 0 if !CONFIG_NUMA, which could
-> > result in working with an incorrect PMU topology and passing all of that
-> > through to userspace.
-> > 
-> > So I'd prefer either making the driver depend on NUMA, or at the very least
-> > failing to probe  the PMU if we discover a socketed system and NUMA is not
-> > selected. Do either of those work as a compromise?
-> > 
-> > Will
-> 
-> That sounds like a good compromise.
-> 
-> So I could do the following:
-> 
-> 1) In the uncore setup check for CONFIG_NUMA, if set use the NUMA
->    information to determine the device node
-> 
-> 2) If CONFIG_NUMA is not set we check if we run on a socketed system
-> 
->    a) In that case we return an error and give a message that CONFIG_NUMA needs
->       to be enabled
->    b) Otherwise we have a single node system and use node_id = 0
+The current linear voltage range for the LDO4 regulator found in the APX20X
+PMICs assumes that the voltage is linear between 2.5 and 3.1V.
 
-That sounds sensible to me. How do you "check if we run on a socketed
-system"? My assumption would be that you could figure this out from the
-firmware tables?
+However, the PMIC can output up to 3.3V on that regulator by skipping the
+2.6V and 2.9V steps.
 
-> David noted that it would also be possible to extract the node id from
-> the physical address of the device, but I'm not sure that classifies as
-> 'first-class' topology description...
+Fix the ranges to read and set the proper voltages.
 
-I'd rather avoid this sort of probing, as it inevitably breaks when it
-sees new hardware that doesn't follow the unwritten assumptions of the
-old hardware.
+Fixes: 13d57e64352a ("regulator: axp20x: Use linear voltage ranges for AXP20X LDO4")
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Hi Mark,
 
-Will
+This patch fixes a commit merged into 4.6-rc1, so it should probably go in
+the next -rc release.
+
+Thanks!
+Maxime
+
+ drivers/regulator/axp20x-regulator.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 40cd894e4df5..29ab0985b46e 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -157,7 +157,9 @@ static struct regulator_ops axp20x_ops_sw = {
+ static const struct regulator_linear_range axp20x_ldo4_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1250000, 0x0, 0x0, 0),
+ 	REGULATOR_LINEAR_RANGE(1300000, 0x1, 0x8, 100000),
+-	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0xf, 100000),
++	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0x9, 0),
++	REGULATOR_LINEAR_RANGE(2700000, 0xa, 0xb, 100000),
++	REGULATOR_LINEAR_RANGE(3000000, 0xc, 0xf, 100000),
+ };
+ 
+ static const struct regulator_desc axp20x_regulators[] = {
+-- 
+2.8.1
