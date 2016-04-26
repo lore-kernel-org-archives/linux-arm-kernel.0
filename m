@@ -1,85 +1,32 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Wed, 27 Apr 2016 08:59:24 +1000
-Subject: bug in autoloading of imx-ipuv3-crtc
-In-Reply-To: <13533046.1iFyOjiAs0@anubis.ausil.us>
-References: <6926808.b0joqYQPQE@anubis.ausil.us>
- <1513165.9WxCa41tI1@anubis.ausil.us>
- <20160420230317.GT29108@pengutronix.de>
- <13533046.1iFyOjiAs0@anubis.ausil.us>
-Message-ID: <CAPM=9tyyYZqPYz2AHvSDBdG+=LwSELR4m+cc1RrKG0ramZS0ug@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 26 Apr 2016 16:11:15 -0700
+Subject: [PATCH] usb: core: buffer: avoid NULL pointer dereferrence
+In-Reply-To: <Pine.LNX.4.44L0.1604081120190.2069-100000@iolanthe.rowland.org>
+References: <20160408140701.GA3547@kroah.com>
+ <Pine.LNX.4.44L0.1604081120190.2069-100000@iolanthe.rowland.org>
+Message-ID: <20160426231115.GB23273@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2016 at 23:11, Dennis Gilmore <dennis@ausil.us> wrote:
-> On Thursday, April 21, 2016 1:03:17 AM CDT Uwe Kleine-K?nig wrote:
->> Hello,
->>
->> On Tue, Apr 19, 2016 at 03:16:01PM -0500, Dennis Gilmore wrote:
->> > On Tuesday, April 19, 2016 2:27:17 PM CDT Dennis Gilmore wrote:
->> > > On Tuesday, April 19, 2016 7:50:49 PM CDT Russell King - ARM Linux
-> wrote:
->> > > > On Tue, Apr 19, 2016 at 01:34:23PM -0500, Dennis Gilmore wrote:
->> > > > > on all of my i.MX6 systems imx-ipuv3-crtc ius not getting
->> > > > > automatically
->> > > > > loaded.  Everything is built as a module
->> > > > >
->> > > > > CONFIG_DRM_IMX=m
->> > > > > CONFIG_DRM_IMX_FB_HELPER=m
->> > > > > CONFIG_DRM_IMX_HDMI=m
->> > > > > CONFIG_DRM_IMX_IPUV3=m
->> > > > > CONFIG_DRM_IMX_LDB=m
->> > > > > CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
->> > > > > CONFIG_DRM_IMX_TVE=m
->> > > > > CONFIG_IMX_IPUV3_CORE=m
->> > > > >
->> > > > > The result is that until I log in via serial or ssh and modprobe the
->> > > > > module there is no display.  I suspect that there is some devicetree
->> > > > > glue missing 4.4 and 4.5 seem to both be effected.
->> > > >
->> > > > DT doesn't come into it for imx-ipuv3-crtc - these platform devices
->> > > > are
->> > > > created by drivers/gpu/ipu-v3/ipu-common.c itself.
->> > > >
->> > > > drivers/gpu/drm/imx/ipuv3-crtc.c contains the proper module alias
->> > > > which
->> > > > should result in the module loaded at boot time when the
->> > > > imx-ipuv3-crtc
->> > > > devices are created.
->> > > >
->> > > > Could the problem be that imx-ipu-v3 isn't being loaded?  However,
->> > > > again,
->> > > > it looks to me like everything is correct there.
->> > > >
->> > > > Are you saying that this used to work in older kernel versions like
->> > > > 4.3,
->> > > > but stopped in 4.4?
->> > >
->> > > yers it used to work and stopped working. I would need to go back and
->> > > test
->> > > old kernels to figure out where it broke.
->> >
->> > after installing some old kernels it broke with 4.4-rc4 which included a
->> > patch with teh subject of "drm/imx: Remove of_node assignment from
->> > ipuv3-crtc driver probe"
->>
->> Just to be sure: 4.4-rc4 with 407c9eba7897 ("drm/imx: Remove of_node
->> assignment from ipuv3-crtc driver probe") reverted works fine for you?
->>
->> Best regards
->> Uwe
->
-> I reverted the 4 patches in that series
->
-> 407c9eba drm/imx: Remove of_node assignment from ipuv3-crtc driver probe
-> 304e6be6 gpu: ipu-v3: Assign of_node of child platform devices to
-> corresponding ports
-> 99ae78c3 gpu: ipu-v3: Remove reg_offset field
-> c3ede03c gpu: ipu-v3: drop unused dmfc field from client platform data
->
-> and it then worked again.
+On Fri, Apr 08, 2016 at 11:21:05AM -0400, Alan Stern wrote:
+> On Fri, 8 Apr 2016, Greg Kroah-Hartman wrote:
+> 
+> > On Fri, Apr 08, 2016 at 05:08:03PM +0800, Chunfeng Yun wrote:
+> > > NULL pointer dereferrence will happen when class driver
+> > > wants to allocate zero length buffer and pool_max[0]
+> > > can't be used, so skip reserved pool in this case.
+> > 
+> > Why would a driver want to allocate a 0 length buffer?  What driver does
+> > this?
+> > 
+> > Shouldn't we fix that issue instead?
+> 
+> And even if a driver does want to allocate a 0-length buffer, shouldn't 
+> the function simply return early instead of running through all its 
+> calculations?
 
-Should I be reverting these upstream as it's some sort of regression?
+Yes it should, Chunfeng, can you fix this patch to do that please.
 
-Uwe?
+thanks,
 
-Dave.
+greg k-h
