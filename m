@@ -1,83 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 13:25:39 -0700
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426201134.GA29779@linux.vnet.ibm.com>
-References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <20160426150031.GP5995@atomide.com>
- <20160426175214.GJ3715@linux.vnet.ibm.com>
- <20160426182939.GO5995@atomide.com>
- <20160426190755.GK3715@linux.vnet.ibm.com>
- <20160426193949.GP5995@atomide.com>
- <20160426154414.7bb33de4@gandalf.local.home>
- <20160426195158.GR5995@atomide.com>
- <20160426200613.GO3715@linux.vnet.ibm.com>
- <20160426201134.GA29779@linux.vnet.ibm.com>
-Message-ID: <20160426202538.GS5995@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2016 22:34:29 +0200
+Subject: [PATCH] ARM: Drop CONFIG_RTC_LIB dependency
+In-Reply-To: <CAAEAJfC3zJiVv9bCmP1VqpHkMPNbaqx75mmsXEh7k7UMU6DGVQ@mail.gmail.com>
+References: <1459569633-6470-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <4624574.xXAYWxU134@wuerfel>
+ <CAAEAJfC3zJiVv9bCmP1VqpHkMPNbaqx75mmsXEh7k7UMU6DGVQ@mail.gmail.com>
+Message-ID: <7827332.ilWiE07kMM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 13:12]:
-> On Tue, Apr 26, 2016 at 01:06:13PM -0700, Paul E. McKenney wrote:
-> > On Tue, Apr 26, 2016 at 12:51:59PM -0700, Tony Lindgren wrote:
-> > > * Steven Rostedt <rostedt@goodmis.org> [160426 12:45]:
-> > > > *Whack* *Whack* *Whack*!!!
-> > > > 
-> > > > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-> > > > ---
-> > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > > index fb74dc1f7520..4fa43c02d682 100644
-> > > > --- a/drivers/clk/clk.c
-> > > > +++ b/drivers/clk/clk.c
-> > > > @@ -682,12 +682,12 @@ static void clk_core_disable(struct clk_core *core)
-> > > >  	if (--core->enable_count > 0)
-> > > >  		return;
-> > > >  
-> > > > -	trace_clk_disable(core);
-> > > > +	trace_clk_disable_rcuidle(core);
-> > > >  
-> > > >  	if (core->ops->disable)
-> > > >  		core->ops->disable(core->hw);
-> > > >  
-> > > > -	trace_clk_disable_complete(core);
-> > > > +	trace_clk_disable_complete_rcuidle(core);
-> > > >  
-> > > >  	clk_core_disable(core->parent);
-> > > >  }
-> > > 
-> > > Now the mole shows up here!
-> > 
-> > And the patch shows up here!
+On Friday 15 April 2016 16:22:18 Ezequiel Garcia wrote:
+> > Sorry for missing this the first time around. The patch looks fine to me,
+> > but I wonder if we should just do this for all architectures, the patch
+> > below looks like it should do the trick. If you want to have your ARM
+> > patch merged separately, that's fine too, please add my
+> >
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> >
 > 
-> And I bet you will need this one as well...
+> Sure, if your patch does not break any platform, then
+> I think it's much better than taking mine.
 
-OK and now the mode is coming back after a short nap during idle:
+I've gone through my patches again to see which ones to submit and
+it turned out that mine was wrong: we can't remove the symbol
+because some architectures (not ARM) symbols exported by
+drivers/rtc/rtc-lib.c.
 
-===============================
-[ INFO: suspicious RCU usage. ]
-4.6.0-rc5-next-20160426+ #1122 Not tainted
--------------------------------
-include/trace/events/rpm.h:69 suspicious rcu_dereference_check() usage!
+Your patch is fine, and we can do the same thing on arm64.
 
-other info that might help us debug this:
-
-
-RCU used illegally from idle CPU!
-rcu_scheduler_active = 1, debug_locks = 0
-RCU used illegally from extended quiescent state!
-1 lock held by swapper/0/0:
- #0:  (&(&dev->power.lock)->rlock){-.-...}, at: [<c052e3dc>] __pm_runtime_resume+0x3c/0x64
-
-stack backtrace:
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1122
-Hardware name: Generic OMAP36xx (Flattened Device Tree)
-[<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-[<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
-[<c047fd68>] (dump_stack) from [<c052e178>] (rpm_resume+0x5cc/0x7f4)
-[<c052e178>] (rpm_resume) from [<c052e3ec>] (__pm_runtime_resume+0x4c/0x64)
-[<c052e3ec>] (__pm_runtime_resume) from [<c04bf2c4>] (omap2_gpio_resume_after_idle+0x54/0x68)
-[<c04bf2c4>] (omap2_gpio_resume_after_idle) from [<c01269dc>] (omap3_enter_idle_bm+0xfc/0x1ec)
-[<c01269dc>] (omap3_enter_idle_bm) from [<c060198c>] (cpuidle_enter_state+0x80/0x3d4)
-[<c060198c>] (cpuidle_enter_state) from [<c0183b08>] (cpu_startup_entry+0x198/0x3a0)
-[<c0183b08>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
-[<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
+	Arnd
