@@ -1,77 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Apr 2016 14:35:01 +0100
-Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <571F671D.70401@linaro.org>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com>
- <571E4A2A.8070908@caviumnetworks.com> <571EFD1B.1070609@linaro.org>
- <20160426121547.GL27312@arm.com> <571F671D.70401@linaro.org>
-Message-ID: <20160426133500.GQ27312@arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Tue, 26 Apr 2016 09:41:22 -0400
+Subject: [PATCH v2 2/4] irqchip: add LPC32xx interrupt controller driver
+In-Reply-To: <1461546038-25668-1-git-send-email-vz@mleia.com>
+References: <1461545990-25560-1-git-send-email-vz@mleia.com>
+ <1461546038-25668-1-git-send-email-vz@mleia.com>
+Message-ID: <1461678082.9433.3.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 09:03:25PM +0800, Hanjun Guo wrote:
-> On 2016/4/26 20:15, Will Deacon wrote:
-> >On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
-> >>On 2016/4/26 0:47, David Daney wrote:
-> >>>On 04/25/2016 04:13 AM, Will Deacon wrote:
-> >>>>On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
-> >>>>>From: David Daney <david.daney@cavium.com>
-> >>>>>
-> >>>>>Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
-> >>>>>set introduce the ACPI based configuration to provide NUMA
-> >>>>>information.
-> >>>>>
-> >>>>>ACPI 5.1 already introduced NUMA support for ARM64, which can get the
-> >>>>>NUMA domain information from SRAT and SLIT table, so parse those two
-> >>>>>tables to get mappings from cpu/mem to numa node configuration and
-> >>>>>system locality.
-> >>>>
-> >>>>Whilst I've queued the main NUMA series for arm64, I'd really like to
-> >>>>see more movement on the generic header file cleanups that you posted
-> >>>>separately:
-> >>>>
-> >>>>http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
-> >>>>
-> >>>
-> >>>FWIW:  Those patches should still apply.  I am carrying them in my
-> >>>development trees, and have not changed them in any way.
-> >
-> >What's your plan for getting them merged?
+Hi Vladimir,
+
+On Mon, 2016-04-25 at 04:00 +0300, Vladimir Zapolskiy wrote:
+> The change adds improved support of NXP LPC32xx MIC, SIC1 and SIC2
+> interrupt controllers.
 > 
-> This patch set touches lots of ACPI related file in arch/x86,
-> arch/ia64, and drivers/acpi/ (also arch/arm64), I think it can be
-> merged via ACPI tree by Rafael with your ack to ARM64 code, does
-> it make sense?
-
-It doesn't touch anything in drivers/acpi/... are you following the link
-above?
-
-> >>>>Given that this ACPI series already requires some significant cross-arch
-> >>>>interaction (which is actually good!), perhaps extending the clean-up
-> >>>>patches to encompass some of the ACPI bits might make sense, and we can
-> >>>>get that queued as a pre-requisite.
-> >>>
-> >>>The cleanup patches you mention above are really independent of the ACPI
-> >>>things.  I have applied them both before and after the ACPI patches, and
-> >>>both seem to work.  With a quick perusal of the ACPI patches nothing
-> >>>jumps out at me as being a candidate for inclusion in the header file
-> >>>cleanup series.
-> >>
-> >>I agree. My patch set is ACPI related enablement, cleanups and
-> >>consolidations, it would be good to merge as a single patch set
-> >>as it's self-contained.
-> >
-> >Up to you. I just thought you might want to avoid having two sets of
-> >cross-arch changes and the associated merging headaches that go with
-> >that.
+> This is a list of new features in comparison to the legacy driver:
+> * irq types are taken from device tree settings, no more need to
+>   hardcode them,
+> * old driver is based on irq_domain_add_legacy, which causes problems
+>   with handling MIC hardware interrupt 0 produced by SIC1,
+> * there is one driver for MIC, SIC1 and SIC2, no more need to handle
+>   them separately, e.g. have two separate handlers for SIC1 and SIC2,
+> * the driver does not have any dependencies on hardcoded register
+>   offsets,
+> * the driver is much simpler for maintenance,
+> * SPARSE_IRQS option is supported.
 > 
-> Good point, as I suggested above, it can go with ACPI tree if it's ok
-> to you and Rafael. The problem we have now is that dt based core NUMA
-> support for ARM64 is queued in your tree, that would be the headache.
+> Legacy LPC32xx interrupt controller driver was broken since commit
+> 76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler"), which
+> requires a private interrupt handler, otherwise any SIC1 generated
+> interrupt (mapped to MIC hwirq 0) breaks the kernel with the message
+> "unexpected IRQ trap at vector 00".
+> 
+> The change disables compilation of a legacy driver found at
+> arch/arm/mach-lpc32xx/irq.c, the file will be removed in a separate
+> commit.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+> Changes from v1 to v2:
+> * added chained_irq_{enter,exit} for SIC chained handler,
+> * use {writel,readl}_relaxed flavour of io access functions,
+> * changed anchor data type to access iomem from struct irq_domain
+>   to private struct lpc32xx_irq_chip,
+> * do not read irq status register twice on every irq event,
+> * resource deallocation fixes on error path of irqchip driver init,
+> * removed handling of "interrupt-controller-name" property, name
+>   is constructed from mic/sic type and controller's physical address,
+> * minor improvements (renames, __ffs instead of ffs, etc.)
+> 
+> Many kudos to Marc for review of v1.
+> 
+>  arch/arm/Kconfig                |   2 +
+>  arch/arm/mach-lpc32xx/phy3250.c |   1 -
+>  drivers/irqchip/Makefile        |   1 +
+>  drivers/irqchip/irq-lpc32xx.c   | 238 ++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 241 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/irqchip/irq-lpc32xx.c
+> 
+I tested the driver on a custom LPC3250 board; I was having at
+least 1 interrupt generated from each source (MIC/SIC1/SIC2).
 
-Sorry, but if you wanted me *not* to queue the patches, then you should
-have said so (similarly, if you wanted a stable branch). I'm not rebasing
-our for-next/core branch now.
-
-Will
+Tested-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
