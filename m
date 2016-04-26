@@ -1,42 +1,67 @@
-From: s.christ@phytec.de (Stefan Christ)
-Date: Tue, 26 Apr 2016 09:51:28 +0200
-Subject: [PATCH v2] gpmi-nand: Handle ECC Errors in erased pages
-In-Reply-To: <1461587712-16403-1-git-send-email-mpa@pengutronix.de>
-References: <1461587712-16403-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20160426075128.GC2351@lws-christ>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2016 09:52:20 +0200
+Subject: [PATCH] ARM: cache-uniphier: activate ways for secondary CPUs
+In-Reply-To: <CAK7LNAS4gYS3VswmnUj6OS0mBpYeSKLPnV26mO0yRiEtwEDoww@mail.gmail.com>
+References: <1460703947-12539-1-git-send-email-yamada.masahiro@socionext.com>
+ <51817650.ZWFPAKxQiK@wuerfel>
+ <CAK7LNAS4gYS3VswmnUj6OS0mBpYeSKLPnV26mO0yRiEtwEDoww@mail.gmail.com>
+Message-ID: <10871675.TbbhfWgNkx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 25, 2016 at 02:35:12PM +0200, Markus Pargmann wrote:
-> ECC is only calculated for written pages. As erased pages are not
-> actively written the ECC is always invalid. For this purpose the
-> Hardware BCH unit is able to check for erased pages and does not raise
-> an ECC error in this case. This behaviour can be influenced using the
-> BCH_MODE register which sets the number of allowed bitflips in an erased
-> page. Unfortunately the unit is not capable of fixing the bitflips in
-> memory.
+On Tuesday 26 April 2016 09:55:35 Masahiro Yamada wrote:
+> Hi Arnd,
 > 
-> To avoid complete software checks for erased pages, we can simply check
-> buffers with uncorrectable ECC errors because we know that any erased
-> page with errors is uncorrectable by the BCH unit.
+> 2016-04-26 7:13 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Friday 15 April 2016 16:05:46 Masahiro Yamada wrote:
+> >> This outer cache allows to control active ways independently for
+> >> each CPU, but currently nothing is done for secondary CPUs.  In
+> >> other words, all the ways are locked for secondary CPUs by default.
+> >> This commit fixes it to fully bring out the performance of this
+> >> outer cache.
+> >>
+> >> There would be two possible ways to achieve this:
+> >>
+> >> [1] Each CPU initializes active ways for itself.  This can be done
+> >>     via the SSCLPDAWCR register.  This is a banked register, so each
+> >>     CPU sees a different instance of the register.
+> >>
+> >> [2] The master CPU initializes active ways for all the CPUs.  This
+> >>     is available via SSCDAWCARMR(N) registers.  They are mapped at
+> >>     the address SSCDAWCARMR + 4 * N, where N is the CPU number.
+> >>
+> >> Currently, the outer cache frame work does not support a per-CPU
+> >> init callback.  So this commit adopts [2]; the master CPU iterates
+> >> over possible CPUs setting up SSCDAWCARMR(N) registers.
+> >>
+> >> Unfortunately, the register offsets of SSCDAWCARMR(N) are different
+> >> by SoC.  We can live with it by checking the version register.
+> >>
+> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> >>
+> >
+> > Applied to next/soc, thanks!
+> >
+> > I'm a little lost with the patches you send, could you check that
+> > I have applied all the ones you sent for 4.7 so far?
+> >
+> >         Arnd
 > 
-> This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
-> to correct erased pages. To have the valid data in the buffer before
-> using them, this patch moves the read_page_swap_end() call before the
-> ECC status checking for-loop.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> [Squashed patches by Stefan and Boris to check ECC area]
-> Cc: Stefan Christ <s.christ@phytec.de>
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Was this one really applied, or not yet?
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> My intention was to send this one just for review,
+> because outer-cache things are generally in Russell's field.
+> 
+> If you have already applied it, I should drop it
+> from Russell's patch tracker.
+> (Sorry, I should have mentioned it.)
+> 
+> Please let me know the status.
 
-Tested-by: Stefan Christ <s.christ@phytec.de>
+Sorry, my mistake, I accidentally sent out my mail early and
+then did not put it into arm-soc in the end.
 
-I verified the fix again on our board.
+It's not in arm-soc and it should go through Russell's patch tracker.
 
-Mit freundlichen Gr??en / Kind regards,
-	Stefan Christ
+	Arnd
