@@ -1,41 +1,55 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 27 Apr 2016 02:55:19 +0300
-Subject: [PATCH 3/3] MAINTAINERS: add ARM/NXP LPC32XX SoC specific drivers to
- the section
+Date: Wed, 27 Apr 2016 02:55:17 +0300
+Subject: [PATCH 1/3] MAINTAINERS: move ARM/NXP LPC32xx record to ARM section
 In-Reply-To: <1461714919-25577-1-git-send-email-vz@mleia.com>
 References: <1461714919-25577-1-git-send-email-vz@mleia.com>
-Message-ID: <1461714919-25577-4-git-send-email-vz@mleia.com>
+Message-ID: <1461714919-25577-2-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change adds a list of files for maintenance under NXP LPC32xx
-section, the listed files are NXP LPC32xx SoC series mach files,
-DTS files of NXP LPC32xx SoC powered boards and NXP LPC32xx SoC
-peripheral drivers, most of the peripheral driver file names match
-'lpc32xx' pattern.
+A record of NXP LPC32xx SoC support is lost between LMxx hwmon drivers
+and lockdep, rename and move it to a place where all other ARM
+SoC and machines settle.
+
+Note, NXP LPC32xx maintenance is actually about SoC series itself, SoC
+peripherals and a number of machines powered by LPC32xx SoC, so while
+we are here correct the title name to emphasize that the maintenance
+concerns SoC support in general.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+ MAINTAINERS | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index e70c5a8..117a3c3 100644
+index 03e00c7..233c9bf 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1312,7 +1312,13 @@ M:	Sylvain Lemieux <slemieux.tyco@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://github.com/vzapolskiy/linux-lpc32xx.git
- S:	Maintained
-+F:	arch/arm/boot/dts/lpc32*
- F:	arch/arm/mach-lpc32xx/
-+F:	drivers/i2c/busses/i2c-pnx.c
-+F:	drivers/net/ethernet/nxp/lpc_eth.c
-+F:	drivers/usb/host/ohci-nxp.c
-+F:	drivers/watchdog/pnx4008_wdt.c
-+N:	lpc32xx
+@@ -1306,6 +1306,12 @@ F:	drivers/mtd/spi-nor/nxp-spifi.c
+ F:	drivers/rtc/rtc-lpc24xx.c
+ N:	lpc18xx
  
++ARM/LPC32XX SOC SUPPORT
++M:	Roland Stigge <stigge@antcom.de>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-lpc32xx/
++
  ARM/MAGICIAN MACHINE SUPPORT
  M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
+@@ -6775,12 +6781,6 @@ W:	logfs.org
+ S:	Maintained
+ F:	fs/logfs/
+ 
+-LPC32XX MACHINE SUPPORT
+-M:	Roland Stigge <stigge@antcom.de>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	arch/arm/mach-lpc32xx/
+-
+ LSILOGIC MPT FUSION DRIVERS (FC/SAS/SPI)
+ M:	Sathya Prakash <sathya.prakash@broadcom.com>
+ M:	Chaitra P B <chaitra.basappa@broadcom.com>
 -- 
 2.8.0.rc3
