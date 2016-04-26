@@ -1,50 +1,46 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Tue, 26 Apr 2016 20:53:37 +0530
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <571F2427.5030003@arm.com>
- <5485255.0LNbKf2a8b@wuerfel>
-Message-ID: <20160426152337.GA10644@afzalpc>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 26 Apr 2016 10:24:04 -0500
+Subject: [GIT PULL] SoCFPGA fixes for v4.6-rc5
+Message-ID: <1461684244-6112-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Kevin, Olof:
 
-On Tue, Apr 26, 2016 at 09:17:43AM +0100, Vladimir Murzin wrote:
+Please pull in these fixes for v4.6-rc5. The first patch "ARM: SoCFPGA: Fix
+secondary CPU startup in thumb2 kernel" is a true fix for enabling CPU1 in
+thumb2 mode, but the second patch "ARM: SoCFPGA: simplify secondary trampoline"
+may not be a true fix, but it is dependent on the first patch. I didn't want
+to cause any conflicts.
 
-> I built myself, but there are prebild tools available at [1] although
-> I've never tried them.
-> 
-> It seems to me there have been internal patches to support FDPIC [2],
-> but I don't know what happen afterwards :(
-> 
-> [1] https://launchpad.net/gcc-arm-embedded
-> [2]
-> http://connect.linaro.org/resource/sfo15/sfo15-406-arm-fdpic-toolset-kernel-libraries-for-cortex-m-cortex-r-mmuless-cores/
+Thanks,
 
-Thank You, [2] gave some indigestion :), will take some to ...
+Dinh
 
-On Tue, Apr 26, 2016 at 01:59:57PM +0200, Arnd Bergmann wrote:
-> On Tuesday 26 April 2016 11:57:38 Vladimir Murzin wrote:
+The following changes since commit 02da2d72174c61988eb4456b53f405e3ebdebce4:
 
-> and there are probably use cases for ARMv7-A without MMU.
+  Linux 4.6-rc5 (2016-04-24 16:17:05 -0700)
 
-My regular work is motor control related that uses RTOS, there was a
-potential customer asking about running it with MMU, caches disabled
-on A9. Probably the reason being they considering guranteed worst
-case performance w/ caches enabled similar to that w/ caches disabled,
-though that requirement was not in Linux.
+are available in the git repository at:
 
-> > Right they are quite close and shares a lot of code except MMU and MPU,
-> > and I'd think without MMU/MPU such configurations are limited with UP
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_fixes_for_v4.6
 
-> I think one problem is that with MMU disabled ARMv7-A, you implicitly
-> disable the caches and that is probably what you are thinking of for
-> SMP support as well (atomic instructions need caches).
+for you to fetch changes up to 162332eb719bc822c950732c343044bb3158f5fe:
 
-Have once tried to compile ARMv7-A w/o MMU, got entangled in a web of
-Kconfig dependencies, iirc one among them was that with !MMU, MULTI_V7
-platforms (AM335x, Vybrid A5 part) couldn't be selected, probably
-because of SMP dependency, but that was on a older Kernel version.
+  ARM: SoCFPGA: simplify secondary trampoline (2016-04-26 10:13:49 -0500)
 
-Regards
-afzal
+----------------------------------------------------------------
+SoCFPGA fixes against v4.6-rc5
+- Fix secondary CPU startup in Thumb2 mode
+- Simplify secondary CPU startup
+
+----------------------------------------------------------------
+Sascha Hauer (2):
+      ARM: SoCFPGA: Fix secondary CPU startup in thumb2 kernel
+      ARM: SoCFPGA: simplify secondary trampoline
+
+ arch/arm/mach-socfpga/core.h    |  4 ++--
+ arch/arm/mach-socfpga/headsmp.S | 28 ++++++++--------------
+ arch/arm/mach-socfpga/platsmp.c | 51 +++++++++++++++++++----------------------
+ arch/arm/mach-socfpga/socfpga.c |  9 --------
+ 4 files changed, 34 insertions(+), 58 deletions(-)
