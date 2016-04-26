@@ -1,84 +1,86 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 26 Apr 2016 10:23:20 +0100
-Subject: [PATCH V3 13/18] coresight: tmc: make sysFS and Perf mode
- mutually exclusive
-In-Reply-To: <CANLsYkwbme0FcYOAp5McyXxh-rQ77jCS0WhyAOr1pqdtdaSBFA@mail.gmail.com>
-References: <1461345255-11758-1-git-send-email-mathieu.poirier@linaro.org>
- <1461345255-11758-14-git-send-email-mathieu.poirier@linaro.org>
- <571E2A7F.2070802@arm.com>
- <CANLsYkywBS2_wXHsjELRy-s5y36W5_U29csBfTt0h=40TNbU-A@mail.gmail.com>
- <571E2F16.3010706@arm.com>
- <CANLsYkxJB2HzsDqwdKBJmUfVgnH7q7dF6+GQFhuSF+6-LzB_9Q@mail.gmail.com>
- <571E339E.9080306@arm.com>
- <CANLsYkwbme0FcYOAp5McyXxh-rQ77jCS0WhyAOr1pqdtdaSBFA@mail.gmail.com>
-Message-ID: <571F3388.8090700@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 26 Apr 2016 17:24:15 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+Message-ID: <20160426092414.GH8870@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 16:18, Mathieu Poirier wrote:
-> On 25 April 2016 at 09:11, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> On 25/04/16 16:05, Mathieu Poirier wrote:
->>>
->>> On 25 April 2016 at 08:52, Suzuki K Poulose <Suzuki.Poulose@arm.com>
->>> wrote:
->>>>
->>>> On 25/04/16 15:48, Mathieu Poirier wrote:
->>>>>
->>>>>
->>>>> On 25 April 2016 at 08:32, Suzuki K Poulose <Suzuki.Poulose@arm.com>
->>>>> wrote:
->>>>>>
->>>>>>
->>>>>> On 22/04/16 18:14, Mathieu Poirier wrote:
->>>>
->>>>
->>>>
->>>>>>> +       spin_lock_irqsave(&drvdata->spinlock, flags);
->>>>>>> +       if (drvdata->reading) {
->>>>>>> +               ret = -EINVAL;
->>>>>>> +               goto out;
->>>>>>> +       }
->>>>>>> +
->>>>>>> +       val = local_xchg(&drvdata->mode, mode);
->>>>>>> +       /*
->>>>>>> +        * In Perf mode there can be only one writer per sink.  There
->>>>>>> +        * is also no need to continue if the ETR is already operated
->>>>>>> +        * from sysFS.
->>>>>>> +        */
->>>>>>> +       if (val != CS_MODE_DISABLED) {
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> Could val be CS_MODE_PERF ? In other words, should we be checking :
->>>>>>            if (val == CS_MODE_SYSFS)  instead ?
->>>>>
->>>>>
->>>>>
->>>>> If we check for CS_MODE_SYSFS we also have to check for CS_MODE_PERF,
->>>>> which is two checks rather than a single one with the current
->>>>> solution.
->>>>
->>>>
->>>>
->>>> I am confused now. The comment says, we want to check for sysfs mode and
->>>> don't continue in that case. So, we shouldn't be worried about PERF mode.
->>>
->>>
->>> You are correct about the sysFS part, but the first sentence of the
->>> comment also mention that in perf mode there can only be one writer
->>> per sink.  Otherwise ring buffers for one session would end up with
->>> traces from other ongoing sessions, and that is not taking into
->>> account the buffer management nightmares it would cause.
->>
->>
->> OK, in either case, val == CS_MODE_SYSFS is much better check there, to
->> what we want to do
->
-> If we check for SYSFS we also need to check for PERF.  Otherwise
-> nothing prevents another session from using the sink buffer, which is
-> not supported.
+On Tue, Apr 26, 2016 at 01:51:13PM +0800, Dong Aisheng wrote:
+> Hi Shawn,
+> 
+> On Tue, Apr 26, 2016 at 9:23 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Thu, Apr 21, 2016 at 11:45:20AM +0800, Dong Aisheng wrote:
+> >> On Fri, Jan 29, 2016 at 02:49:23PM -0800, Stefan Agner wrote:
+> >> > If a clock gets enabled early during boot time, it can lead to a PLL
+> >> > startup. The wait_lock function makes sure that the PLL is really
+> >> > stareted up before it gets used. However, the function sleeps which
+> >> > leads to scheduling and an error:
+> >> > bad: scheduling from the idle thread!
+> >> > ...
+> >> >
+> >> > Use udelay in case IRQ's are still disabled.
+> >> >
+> >> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> >> > ---
+> >> >  drivers/clk/imx/clk-pllv3.c | 5 ++++-
+> >> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> >> > index c05c43d..b5ff561 100644
+> >> > --- a/drivers/clk/imx/clk-pllv3.c
+> >> > +++ b/drivers/clk/imx/clk-pllv3.c
+> >> > @@ -63,7 +63,10 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+> >> >                     break;
+> >> >             if (time_after(jiffies, timeout))
+> >> >                     break;
+> >> > -           usleep_range(50, 500);
+> >> > +           if (unlikely(irqs_disabled()))
+> >>
+> >> This causes a bit confusion that clk_pllv3_prepare is sleepable.
+> >> But this line indicates it's possible to be called in irq context.
+> >> Although it's only happened during kernel boot phase where irq is
+> >> still not enabled.
+> >> It seems schedule_debug() somehow did not catch it during early boot
+> >> phase. Maybe schedule guys can help explain.
+> >>
+> >> My question is if it's really worthy to introduce this confusion
+> >> to fix the issue since the delay is minor?
+> >
+> > I do not understand why it's confusing.  The code already obviously
+> > indicates this is a special handling for cases where irq is still not
+> > enabled, rather than for irq context.
+> >
+> 
+> The code itself has nothing telling it's a special handling for the
+> case where irq is
+> still not enabled.
 
-Ah, I got wrong. Sorry for the noise. The current check makes sense.
+I think the following if-clause is telling that.
 
-Suzuki
+	if (unlikely(irqs_disabled()))
+
+> Even it tells, it may still cause confusing by adding complexity in
+> clk_pllv3_prepare()
+> which actually should be called in non-atomic context as it could sleep.
+
+I agree with you on that.
+
+> > The patch is to fix the "bad: scheduling from the idle thread!" warning
+> > rather than minimize the delay.  Do you have an opinion on how to fix
+> > the warning?
+> >
+> 
+> I just wonder maybe we could simply just using udelay(50) instead of
+> usleep_range(50, 500) to eliminate the confusing since it's minor cast.
+> What do you think of it?
+
+I'm fine with it.  Since I haven't sent the patch to clk maintainers, I
+could replace Stefan's patch with yours, if you can send me a patch
+quickly.
+
+Shawn
