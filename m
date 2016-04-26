@@ -1,126 +1,79 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 26 Apr 2016 22:35:08 +0300
-Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
-References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
- <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
-Message-ID: <571FC2EC.9090605@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 26 Apr 2016 12:39:45 -0700
+Subject: [PATCH 2/2] clk: bcm2835: Skip PLLC clocks when deciding on a new
+ clock parent
+In-Reply-To: <1461699585-6649-1-git-send-email-eric@anholt.net>
+References: <1461699585-6649-1-git-send-email-eric@anholt.net>
+Message-ID: <1461699585-6649-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2016 07:02 PM, Liviu Dudau wrote:
-> On Tue, Apr 26, 2016 at 06:28:52PM +0300, Grygorii Strashko wrote:
-> 
-> Hi Grygorii,
-> 
-> First time I'm seeing this patch, so I have a few questions, mostly
-> related to the commit message:
+If the firmware had set up a clock to source from PLLC, go along with
+it.  But if we're looking for a new parent, we don't want to switch it
+to PLLC because the firmware will force PLLC (and thus the AXI bus
+clock) to different frequencies during over-temp/under-voltage,
+without notification to Linux.
 
-Hm. You are in cc for RFC.
-Sry, forgot to add link [1].
+On my system, this moves the Linux-enabled HDMI state machine and DSI1
+escape clock over to plld_per from pllc_per.  EMMC still ends up on
+pllc_per, because the firmware had set it up to use that.
 
-> 
->> This patch intended to fix following cases:
->> - SoC-A has ARM GT, defines DT node for ARM GT and selects
->> ARM_GLOBAL_TIMER statically in Kconfig file. SoC-B has ARM GT and
->> defines DT node for ARM GT, but do not selects ARM_GLOBAL_TIMER
->> statically in Kconfig file. In case of multiplatform build ARM GT will
->> be implicitly enabled for SoC-B.
-> 
-> Well, SoC-B has the GT *and* the DT node, so what is the problem with
-> enabling it for SoC-B? If there are reasons not to use the Global Timer
-> on SoC-B, surely a better option would be to mark it in DT with status = "disabled";
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+---
+ drivers/clk/bcm/clk-bcm2835.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-This was rejected [2]. DT describes HW and if it is functional the status = "disabled"
-is not good choice.
-ARM GT can't be used as clocksource/sched_clock/clockevent when CPUFreq or
-CPUIdle are enabled :(, and this is Linux specific functionality and
-not HW description. 
-
-> 
->>
->> - There is no way to disable ARM GT without modifying Kconfig file,
->> once ARM_GLOBAL_TIMER is selected statically in Kconfig file.
-> 
-> What about disabling the DT node?
-> 
-> Not sure I properly understand the problem you are trying to solve here.
-
-I'd like to have way to enable/disable ARM GT without modifying Kernel sources
-(Kconfig specifically) which is now impossible.
-
-> 
->>
->> Hence, fix above case by defining both HAVE_ARM_GLOBAL_TIMER and
->> ARM_GLOBAL_TIMER as recommended by 'Adding common features and make
->> the usage configurable' section in kconfig-language.txt. All places in
->> ARM folder where ARM_GLOBAL_TIMER was used now replaced on
->> HAVE_ARM_GLOBAL_TIMER.
-> 
-> I'm OK with the way you have changed ARM_GLOBAL_TIMER from a sticky config
-> option to a selectable one, but I would like more details on the problem
-> this was causing you.
-> 
-
-The same HW (board) could be used with PM features enabled (power saving)
-and disabled (-RT). Without this change it will require to have
-and maintain two branches, but with it - just separate defconfig.
-
-[1] http://lists.infradead.org/pipermail/linux-rockchip/2016-February/007159.html
-[2] http://www.spinics.net/lists/devicetree/msg102918.html
-
-> 
->>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Florian Fainelli <f.fainelli@gmail.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Wei Xu <xuwei5@hisilicon.com>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
->> Cc: Maxime Coquelin <maxime.coquelin@st.com>
->> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Cc: Liviu Dudau <liviu.dudau@arm.com>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Jun Nie <jun.nie@linaro.org>
->> Cc: Michal Simek <michal.simek@xilinx.com>
->> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
->> Cc: Lars Persson <lars.persson@axis.com>
->> Cc: Mike Looijmans <mike.looijmans@topic.nl>
->> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->> Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->> Changes is v1:
->> - updated mach-artpec
->> - rebased on top of tip: timers/core
->>    commit: 86d3473 time: Introduce do_sys_settimeofday64()
->>
->>   arch/arm/mach-artpec/Kconfig   | 2 +-
->>   arch/arm/mach-bcm/Kconfig      | 4 ++--
->>   arch/arm/mach-hisi/Kconfig     | 2 +-
->>   arch/arm/mach-imx/Kconfig      | 2 +-
->>   arch/arm/mach-rockchip/Kconfig | 2 +-
->>   arch/arm/mach-sti/Kconfig      | 2 +-
->>   arch/arm/mach-uniphier/Kconfig | 2 +-
->>   arch/arm/mach-vexpress/Kconfig | 2 +-
->>   arch/arm/mach-zx/Kconfig       | 2 +-
->>   arch/arm/mach-zynq/Kconfig     | 2 +-
->>   drivers/clocksource/Kconfig    | 7 ++++++-
->>   11 files changed, 17 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-artpec/Kconfig b/arch/arm/mach-artpec/Kconfig
->> index 6cbe5a2..6cbca77 100644
->> --- a/arch/arm/mach-artpec/Kconfig
->> +++ b/arch/arm/mach-artpec/Kconfig
->> @@ -9,7 +9,7 @@ config MACH_ARTPEC6
->>   	depends on ARCH_MULTI_V7
->>   	select ARM_AMBA
->>   	select ARM_GIC
->> -	select ARM_GLOBAL_TIMER
-
-[...]
-
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 14f3066194ac..870c5745d649 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1035,16 +1035,28 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
+ 	return 0;
+ }
+ 
++static bool
++bcm2835_clk_is_pllc(struct clk_hw *hw)
++{
++	if (!hw)
++		return false;
++
++	return strncmp(clk_hw_get_name(hw), "pllc", 4) == 0;
++}
++
+ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+ 					struct clk_rate_request *req)
+ {
+ 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
+ 	struct clk_hw *parent, *best_parent = NULL;
++	bool current_parent_is_pllc;
+ 	unsigned long rate, best_rate = 0;
+ 	unsigned long prate, best_prate = 0;
+ 	size_t i;
+ 	u32 div;
+ 
++	current_parent_is_pllc = bcm2835_clk_is_pllc(clk_hw_get_parent(hw));
++
+ 	/*
+ 	 * Select parent clock that results in the closest but lower rate
+ 	 */
+@@ -1052,6 +1064,17 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+ 		parent = clk_hw_get_parent_by_index(hw, i);
+ 		if (!parent)
+ 			continue;
++
++		/*
++		 * Don't choose a PLLC-derived clock as our parent
++		 * unless it had been manually set that way.  PLLC's
++		 * frequency gets adjusted by the firmware due to
++		 * over-temp or under-voltage conditions, without
++		 * prior notification to our clock consumer.
++		 */
++		if (bcm2835_clk_is_pllc(parent) && !current_parent_is_pllc)
++			continue;
++
+ 		prate = clk_hw_get_rate(parent);
+ 		div = bcm2835_clock_choose_div(hw, req->rate, prate, true);
+ 		rate = bcm2835_clock_rate_from_divisor(clock, prate, div);
 -- 
-regards,
--grygorii
+2.8.0.rc3
