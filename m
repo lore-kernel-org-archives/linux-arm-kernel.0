@@ -1,41 +1,51 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 26 Apr 2016 15:51:29 +0100
-Subject: [PATCH 10/18] ASoC: sti: Update example to include
- assigned-clocks and mclk-fs
-In-Reply-To: <20160426142357.GW3217@sirena.org.uk>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
- <20160421154933.GR3217@sirena.org.uk>
- <20160426115210.GB5457@griffinp-ThinkPad-X1-Carbon-2nd>
- <20160426142357.GW3217@sirena.org.uk>
-Message-ID: <20160426145129.GA11946@griffinp-ThinkPad-X1-Carbon-2nd>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 26 Apr 2016 16:53:45 +0200
+Subject: [GIT PULL v2] STi DT updates for v4.7 #1
+Message-ID: <571F80F9.80901@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Olof, Arnd and Kevin,
 
-On Tue, 26 Apr 2016, Mark Brown wrote:
+Please consider the second version of the first round of STi DT updates 
+for v4.7. Problems reported by Olof have been taken into account by Lee.
 
-> On Tue, Apr 26, 2016 at 12:52:10PM +0100, Peter Griffin wrote:
-> > On Thu, 21 Apr 2016, Mark Brown wrote:
-> 
-> > > This one is more relevant though I'm still a bit concerned that there's
-> > > an expectation that the examples can just be pasted in...
-> 
-> > So although I would only consider copying an example as the starting
-> > point for getting something working (and indeed it was the case here). On STi
-> > arch there *should* be a very high probability that copying the exanple 
-> > is all that will be required.
-> 
-> If there are never going to be any new users why bother at all, why
-> would anyone paste it in when all the SoCs that ever use this are
-> already upstream?
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Generally if I come across documentation which is incorrect, I like to fix it.
+   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Currently the DT ASoC documentation doesn't match the driver and the example
-doesn't work, which is not ideal. I could well be the last person who needs
-to read it & use the example, but deliberately leaving it with mistakes in
-seemed like a bad idea.
+are available in the git repository at:
 
-Peter. 
+   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
+tags/sti-dt-for-v4.7b-1
+
+for you to fetch changes up to 3d90bc051361c6f867df494d838d4fe1215d475a:
+
+   ARM: dts: STi: STih407: Switch LPC mode from RTC to Clocksource 
+(2016-04-26 16:10:33 +0200)
+
+----------------------------------------------------------------
+Highlights:
+-----------
+  - Add CPUFreq support to STiH407 family
+  - Add Mailbox nodes to STiH407 family
+  - Add RemoteProc nodes to STiH407 family
+  - Use 'reserved-memory' for DMA memory on STiH407
+  - Use the LPC timer as a clocksource
+
+----------------------------------------------------------------
+Lee Jones (8):
+       ARM: dts: STi: STiH407: Provide generic (safe) DVFS configuration
+       ARM: dts: STi: STiH407: Provide CPU with clocking information
+       ARM: dts: STi: STiH407: Link CPU with its voltage supply
+       ARM: dts: STi: STiH407: Provide CPU with a means to look-up Major 
+number
+       ARM: dts: STi: stih407-family: Add nodes for Mailbox
+       ARM: dts: STiH407: Add nodes for RemoteProc
+       ARM: dts: STiH407: Move over to using the 'reserved-memory' API 
+for obtaining DMA memory
+       ARM: dts: STi: STih407: Switch LPC mode from RTC to Clocksource
+
+  arch/arm/boot/dts/stih407-family.dtsi | 126 
++++++++++++++++++++++++++++++++++-
+  1 file changed, 125 insertions(+), 1 deletion(-)
