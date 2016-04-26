@@ -1,47 +1,151 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 26 Apr 2016 20:57:38 +0800
-Subject: [RESEND PATCH v2 5/7] usb: xhci: plat: Remove checks for optional
- clock in error/remove path
+Date: Tue, 26 Apr 2016 20:57:40 +0800
+Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
 In-Reply-To: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
 References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1461675460-2295-6-git-send-email-jszhang@marvell.com>
+Message-ID: <1461675460-2295-8-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
-clk_{unprepare, disable}()") allows NULL or error pointer to be passed
-unconditionally.
-
-This patch is to simplify probe error and remove code paths.
+The Marvell BG4CT STB board has board level vbus control through gpio.
+This patch adds the vbus regulator control to support this board.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/usb/host/xhci-plat.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/usb/host/xhci-plat.c | 40 +++++++++++++++++++++++++++++++++++++++-
+ drivers/usb/host/xhci.h      |  2 ++
+ 2 files changed, 41 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 0e69712..83669d0 100644
+index d7f4f3c..0310c13 100644
 --- a/drivers/usb/host/xhci-plat.c
 +++ b/drivers/usb/host/xhci-plat.c
-@@ -266,8 +266,7 @@ put_usb3_hcd:
+@@ -18,6 +18,7 @@
+ #include <linux/of.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/slab.h>
+ #include <linux/usb/phy.h>
+ #include <linux/usb/xhci_pdriver.h>
+@@ -178,6 +179,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	struct clk              *clk;
+ 	struct usb_phy		*usb_phy;
+ 	struct phy		*phy;
++	struct regulator	*vbus;
+ 	int			ret;
+ 	int			irq;
+ 
+@@ -249,13 +251,30 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 
+ 	device_wakeup_enable(hcd->self.controller);
+ 
++	vbus = devm_regulator_get(&pdev->dev, "vbus");
++	if (PTR_ERR(vbus) == -ENODEV) {
++		vbus = NULL;
++	} else if (IS_ERR(vbus)) {
++		ret = PTR_ERR(vbus);
++		goto disable_clk;
++	} else if (vbus) {
++		ret = regulator_enable(vbus);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"failed to enable usb vbus regulator: %d\n",
++				ret);
++			goto disable_clk;
++		}
++	}
++
+ 	xhci->clk = clk;
++	xhci->vbus = vbus;
+ 	xhci->main_hcd = hcd;
+ 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+ 			dev_name(&pdev->dev), hcd);
+ 	if (!xhci->shared_hcd) {
+ 		ret = -ENOMEM;
+-		goto disable_clk;
++		goto disable_vbus;
+ 	}
+ 
+ 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
+@@ -323,6 +342,10 @@ disable_usb2_phy:
+ put_usb3_hcd:
  	usb_put_hcd(xhci->shared_hcd);
  
++disable_vbus:
++	if (vbus)
++		regulator_disable(vbus);
++
  disable_clk:
--	if (!IS_ERR(clk))
--		clk_disable_unprepare(clk);
-+	clk_disable_unprepare(clk);
+ 	clk_disable_unprepare(clk);
  
- put_hcd:
+@@ -337,6 +360,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
+ 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+ 	struct clk *clk = xhci->clk;
++	struct regulator *vbus = xhci->vbus;
+ 
+ 	usb_remove_hcd(xhci->shared_hcd);
+ 	xhci_plat_phy_exit(xhci->shared_hcd);
+@@ -347,6 +371,9 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	clk_disable_unprepare(clk);
  	usb_put_hcd(hcd);
-@@ -287,8 +286,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	usb_remove_hcd(hcd);
- 	usb_put_hcd(xhci->shared_hcd);
  
--	if (!IS_ERR(clk))
--		clk_disable_unprepare(clk);
-+	clk_disable_unprepare(clk);
- 	usb_put_hcd(hcd);
- 
++	if (vbus)
++		regulator_disable(vbus);
++
  	return 0;
+ }
+ 
+@@ -356,6 +383,7 @@ static int xhci_plat_suspend(struct device *dev)
+ 	int ret;
+ 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+ 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
++	struct regulator *vbus = xhci->vbus;
+ 
+ 	/*
+ 	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
+@@ -373,6 +401,9 @@ static int xhci_plat_suspend(struct device *dev)
+ 	xhci_plat_phy_exit(hcd);
+ 	clk_disable_unprepare(xhci->clk);
+ 
++	if (vbus)
++		ret = regulator_disable(vbus);
++
+ 	return ret;
+ }
+ 
+@@ -381,11 +412,18 @@ static int xhci_plat_resume(struct device *dev)
+ 	int ret;
+ 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+ 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
++	struct regulator *vbus = xhci->vbus;
+ 
+ 	ret = clk_prepare_enable(xhci->clk);
+ 	if (ret)
+ 		return ret;
+ 
++	if (vbus) {
++		ret = regulator_enable(vbus);
++		if (ret)
++			return ret;
++	}
++
+ 	ret = xhci_plat_phy_init(hcd);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index 6c629c9..5fa8662 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1550,6 +1550,8 @@ struct xhci_hcd {
+ 	struct msix_entry	*msix_entries;
+ 	/* optional clock */
+ 	struct clk		*clk;
++	/* optional regulator */
++	struct regulator	*vbus;
+ 	/* data structures */
+ 	struct xhci_device_context_array *dcbaa;
+ 	struct xhci_ring	*cmd_ring;
 -- 
 2.8.1
