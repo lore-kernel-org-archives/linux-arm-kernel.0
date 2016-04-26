@@ -1,16 +1,16 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Apr 2016 17:24:15 +0800
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 26 Apr 2016 11:31:12 +0200
 Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
 In-Reply-To: <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
 References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
  <20160421034520.GA19965@shlinux2.ap.freescale.net>
  <20160426012341.GB8870@tiger>
  <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
-Message-ID: <20160426092414.GH8870@tiger>
+Message-ID: <1461663072.7839.17.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 01:51:13PM +0800, Dong Aisheng wrote:
+Am Dienstag, den 26.04.2016, 13:51 +0800 schrieb Dong Aisheng:
 > Hi Shawn,
 > 
 > On Tue, Apr 26, 2016 at 9:23 AM, Shawn Guo <shawnguo@kernel.org> wrote:
@@ -59,17 +59,10 @@ On Tue, Apr 26, 2016 at 01:51:13PM +0800, Dong Aisheng wrote:
 > The code itself has nothing telling it's a special handling for the
 > case where irq is
 > still not enabled.
-
-I think the following if-clause is telling that.
-
-	if (unlikely(irqs_disabled()))
-
 > Even it tells, it may still cause confusing by adding complexity in
 > clk_pllv3_prepare()
 > which actually should be called in non-atomic context as it could sleep.
-
-I agree with you on that.
-
+> 
 > > The patch is to fix the "bad: scheduling from the idle thread!" warning
 > > rather than minimize the delay.  Do you have an opinion on how to fix
 > > the warning?
@@ -79,8 +72,11 @@ I agree with you on that.
 > usleep_range(50, 500) to eliminate the confusing since it's minor cast.
 > What do you think of it?
 
-I'm fine with it.  Since I haven't sent the patch to clk maintainers, I
-could replace Stefan's patch with yours, if you can send me a patch
-quickly.
+Why should we needless burn CPU time in the likely case of
+clk_pllv3_prepare() being called in sleepable context?
 
-Shawn
+Using udelay() in a sleepable context is even more confusing than having
+the special case for clk_prepare() being called in atomic context IMHO.
+
+Regards,
+Lucas
