@@ -1,9 +1,9 @@
 From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Tue, 26 Apr 2016 15:00:26 +0200
-Subject: [PATCH 3/3] ARM: dts: add DTS for Baltos IR2110
+Date: Tue, 26 Apr 2016 15:00:25 +0200
+Subject: [PATCH 2/3] ARM: dts: add DTS for Baltos IR3220
 In-Reply-To: <1461675626-5818-1-git-send-email-yegorslists@googlemail.com>
 References: <1461675626-5818-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <1461675626-5818-4-git-send-email-yegorslists@googlemail.com>
+Message-ID: <1461675626-5818-3-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,29 +11,29 @@ From: Yegor Yefremov <yegorslists@googlemail.com>
 
 Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
 ---
- arch/arm/boot/dts/Makefile                 |  1 +
- arch/arm/boot/dts/am335x-baltos-ir2110.dts | 71 ++++++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+)
- create mode 100644 arch/arm/boot/dts/am335x-baltos-ir2110.dts
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/am335x-baltos-ir3220.dts | 119 +++++++++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am335x-baltos-ir3220.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2c19cd9..64a2bc6 100644
+index e323922..2c19cd9 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
 @@ -485,6 +485,7 @@ dtb-$(CONFIG_SOC_TI81XX) += \
  	dm8168-evm.dtb \
  	dra62x-j5eco-evm.dtb
  dtb-$(CONFIG_SOC_AM33XX) += \
-+	am335x-baltos-ir2110.dtb \
- 	am335x-baltos-ir3220.dtb \
++	am335x-baltos-ir3220.dtb \
  	am335x-baltos-ir5221.dtb \
  	am335x-base0033.dtb \
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir2110.dts b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
+ 	am335x-bone.dtb \
+diff --git a/arch/arm/boot/dts/am335x-baltos-ir3220.dts b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
 new file mode 100644
-index 0000000..a9a9730
+index 0000000..fe002a1
 --- /dev/null
-+++ b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-@@ -0,0 +1,71 @@
++++ b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
+@@ -0,0 +1,119 @@
 +/*
 + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
 + *
@@ -52,10 +52,16 @@ index 0000000..a9a9730
 +#include "am335x-baltos.dtsi"
 +
 +/ {
-+	model = "OnRISC Baltos iR 2110";
++	model = "OnRISC Baltos iR 3220";
 +};
 +
 +&am33xx_pinmux {
++	tca6416_pins: pinmux_tca6416_pins {
++		pinctrl-single,pins = <
++			AM33XX_IOPAD(0x9b4, PIN_INPUT_PULLUP | MUX_MODE7)      /* xdma_event_intr1.gpio0[20] tca6416 stuff */
++		>;
++	};
++
 +	uart1_pins: pinmux_uart1_pins {
 +		pinctrl-single,pins = <
 +			AM33XX_IOPAD(0x980, PIN_INPUT | MUX_MODE0)      /* uart1_rxd */
@@ -66,6 +72,21 @@ index 0000000..a9a9730
 +			AM33XX_IOPAD(0x8e4, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_hsync.gpio2[23] DSR */
 +			AM33XX_IOPAD(0x8e8, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_pclk.gpio2[24] DCD */
 +			AM33XX_IOPAD(0x8ec, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_ac_bias_en.gpio2[25] RI */
++		>;
++	};
++
++	uart2_pins: pinmux_uart2_pins {
++		pinctrl-single,pins = <
++			AM33XX_IOPAD(0x950, PIN_INPUT | MUX_MODE1)      /* spi0_sclk.uart2_rxd_mux3 */
++			AM33XX_IOPAD(0x954, PIN_OUTPUT | MUX_MODE1)      /* spi0_d0.uart2_txd_mux3 */
++			AM33XX_IOPAD(0x988, PIN_INPUT_PULLDOWN | MUX_MODE2)      /* i2c0_sda.uart2_ctsn_mux0 */
++			AM33XX_IOPAD(0x98c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)      /* i2c0_scl.uart2_rtsn_mux0 */
++			AM33XX_IOPAD(0x830, PIN_OUTPUT_PULLDOWN | MUX_MODE7)      /* gpmc_ad12.gpio1[12] DTR */
++			AM33XX_IOPAD(0x834, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* gpmc_ad13.gpio1[13] DSR */
++			AM33XX_IOPAD(0x838, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* gpmc_ad14.gpio1[14] DCD */
++			AM33XX_IOPAD(0x83c, PIN_INPUT_PULLDOWN | MUX_MODE7)     /* gpmc_ad15.gpio1[15] RI */
++
++			AM33XX_IOPAD(0x9a0, PIN_INPUT_PULLUP | MUX_MODE7)      /* mcasp0_aclkr.gpio3[18], INPUT_PULLDOWN | MODE7 */
 +		>;
 +	};
 +};
@@ -81,6 +102,30 @@ index 0000000..a9a9730
 +	status = "okay";
 +};
 +
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	dtr-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
++	dsr-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
++	dcd-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++	rng-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
++
++	status = "okay";
++};
++
++&i2c1 {
++	tca6416: gpio at 20 {
++		compatible = "ti,tca6416";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-parent = <&gpio0>;
++		interrupts = <20 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&tca6416_pins>;
++	};
++};
++
 +&usb0_phy {
 +	status = "okay";
 +};
@@ -91,9 +136,12 @@ index 0000000..a9a9730
 +};
 +
 +&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <1>;
 +	phy-mode = "rmii";
 +	dual_emac_res_vlan = <1>;
++	fixed-link {
++		speed = <100>;
++		full-duplex;
++	};
 +};
 +
 +&cpsw_emac1 {
