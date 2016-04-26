@@ -1,49 +1,46 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 26 Apr 2016 20:42:37 +0200
-Subject: [PATCH 05/45] KVM: arm/arm64: vgic-new: Add acccessor to new
- struct vgic_irq instance
-In-Reply-To: <20160426094433.z5y44u5eb3ovkfb6@hawk.localdomain>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
- <1460740316-8755-6-git-send-email-andre.przywara@arm.com>
- <20160425161525.b4hqjrrharfdsdgo@hawk.localdomain>
- <20160425194901.GM16590@cbox> <571F250A.2040507@arm.com>
- <20160426094433.z5y44u5eb3ovkfb6@hawk.localdomain>
-Message-ID: <20160426184237.GA25138@cbox>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 26 Apr 2016 21:05:57 +0200
+Subject: [PATCH] ARM: cpuidle: Pass on arm_cpuidle_suspend()'s return value
+In-Reply-To: <20160426113103.GB2204@red-moon>
+References: <1461669301-30834-1-git-send-email-james.morse@arm.com>
+ <20160426113103.GB2204@red-moon>
+Message-ID: <CAJZ5v0h+P5baWVkTcbjxOjsXyp7aDy25+ik_9XHtUs6+jeN7Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 11:44:33AM +0200, Andrew Jones wrote:
-> On Tue, Apr 26, 2016 at 09:21:30AM +0100, Marc Zyngier wrote:
-> > On 25/04/16 20:49, Christoffer Dall wrote:
-> > > On Mon, Apr 25, 2016 at 06:15:25PM +0200, Andrew Jones wrote:
-> > >> Hi Andre,
-> > >>
-> > >> I'm just randomly jumping in here because I spotted a typo in $SUBJECT.
-> > >> 'accessor' has too many c's. Also, just curious, but if the author is
-> > >> from Linaro (hi Christoffer), then why do the new files this patch adds
-> > >> have ARM copyrights?
-> > >>
-> > > 
-> > > We just decided to let ARM deal with asserting the license since we all
-> > > collaborated on it, but others also suggested that we should let ARM and
-> > > Linaro share the license.
-> > 
-> > I personally have no objections to having both ARM and Linaro sharing
-> > the copyright, but I just don't know how this works in practice (and
-> > asking any legal department is a sure recipe to delay these patches for
-> > an extra 6 months, give or take a few years).
-> > 
-> > In the end, all I care about is the licence under which the code is
-> > released.
-> >
-> 
-> Thanks, my curiosity is satisfied. I fully agree that if it's not easy
-> to share a collaborated file, then it's just a matter of flipping a coin,
-> or defaulting to whichever has the majority.
-> 
-I also only care about the license under which it is released.
+On Tue, Apr 26, 2016 at 1:31 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, Apr 26, 2016 at 12:15:01PM +0100, James Morse wrote:
+>> arm_cpuidle_suspend() may return -EOPNOTSUPP, or any value returned
+>> by the cpu_ops/cpuidle_ops suspend call. arm_enter_idle_state() doesn't
+>> update 'ret' with this value, meaning we always signal success to
+>> cpuidle_enter_state(), causing it to update the usage counters as if we
+>> succeeded.
+>>
+>> Fixes: 191de17aa3c1 ("ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function")
+>> Signed-off-by: James Morse <james.morse@arm.com>
+>> ---
+>>  drivers/cpuidle/cpuidle-arm.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+>> index 545069d5fdfb..e342565e8715 100644
+>> --- a/drivers/cpuidle/cpuidle-arm.c
+>> +++ b/drivers/cpuidle/cpuidle-arm.c
+>> @@ -50,7 +50,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+>>                * call the CPU ops suspend protocol with idle index as a
+>>                * parameter.
+>>                */
+>> -             arm_cpuidle_suspend(idx);
+>> +             ret = arm_cpuidle_suspend(idx);
+>>
+>>               cpu_pm_exit();
+>>       }
+>> --
 
-I opted for defaulting to the company that is most set up to pursue any
-potential infringement on the copyright.
+OK
 
--Christoffer
+Should that go into -stable?
