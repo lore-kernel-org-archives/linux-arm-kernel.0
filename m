@@ -1,42 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 14:36:30 -0700
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426212630.GV3715@linux.vnet.ibm.com>
-References: <20160426154414.7bb33de4@gandalf.local.home>
- <20160426195158.GR5995@atomide.com>
- <20160426200613.GO3715@linux.vnet.ibm.com>
- <20160426201134.GA29779@linux.vnet.ibm.com>
- <20160426202538.GS5995@atomide.com>
- <20160426204148.GR3715@linux.vnet.ibm.com>
- <20160426204613.GT5995@atomide.com>
- <20160426210407.GT3715@linux.vnet.ibm.com>
- <20160426211259.GU5995@atomide.com>
- <20160426212630.GV3715@linux.vnet.ibm.com>
-Message-ID: <20160426213630.GV5995@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 26 Apr 2016 16:45:10 -0500
+Subject: [PATCH v3 0/2] pci: host: new driver for Marvell Armada 7K/8K
+ PCIe controller
+In-Reply-To: <20160426210850.13cc8a0e@free-electrons.com>
+References: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160426173144.GB27803@localhost>
+ <20160426210850.13cc8a0e@free-electrons.com>
+Message-ID: <20160426214510.GA6789@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 14:27]:
-> Done!  These are at -rcu:
+On Tue, Apr 26, 2016 at 09:08:50PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> 6eeec2b4a50c (arm: Use _rcuidle tracepoint to allow use from idle)
-> 0efee3da3b29 (arm: Use more _rcuidle tracepoints to allow use from idle)
-> b6cdf6d22f52 (arm: Additional _rcuidle tracepoints to allow use from idle)
-> 70da6fb7275b (arm: Whack another event-trace-from-idle mole)
-> 019db9102c6c (arm: Whack yet another event-trace-from-idle mole)
-> ebcd2861ae27 (arm: Whack an expected event-trace-from-idle mole)
+> On Tue, 26 Apr 2016 12:31:44 -0500, Bjorn Helgaas wrote:
 > 
-> So how would you like these handled?  I would be happy to send a fresh
-> patch series or git pull request if you would like to send them up your
-> tree, or I can send them up my usual path.  Just let me know!
+> > >  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
+> > >  create mode 100644 drivers/pci/host/pcie-armada8k.c
+> > 
+> > Thanks, Thomas, I applied these to pci/host-armada for v4.7.
+> 
+> Thanks!
+> 
+> > I added the tweaks below to use dev_dbg() instead of pr_debug(), use
+> > dw_pcie_wait_for_link() instead of another hand-coded timeout loop,
+> > and fix a typo and remove unused constants.
+> 
+> Looks all good, thanks for applying! Just one tiny question below.
+> 
+> >  	/*
+> >  	 * Interrupts are directly handled by the device driver of the
+> > -	 * PCI device. However, there are also latched into the PCIe
+> > +	 * PCI device.  However, they are also latched into the PCIe
+> 
+> Any reason to have two spaces after the dot here?
 
-Probably best to keep them in your rcu tree, at least I'm not seeing
-any conflicts with my for-next with these.
+Only habit because my eighth-grade typing teacher in 1979 did it that
+way, and (I think) vim does it that way by default.  Poor reasons,
+both, and definitely trumped by consistency with the rest of the file,
+which does use a single space in both other instances.  I removed the
+extra space :)
 
-> And I would guess that other hardware and other configurations will
-> cause other moles to pop their heads up, but you never know.
-
-Heh yeah I'm sure we'll see some more :)
-
-Tony
+Bjorn
