@@ -1,25 +1,62 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 26 Apr 2016 10:51:50 +1000
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <8018210.3MZgHs9g7Q@wuerfel>
-References: <20160426094331.64032731@canb.auug.org.au>
- <8018210.3MZgHs9g7Q@wuerfel>
-Message-ID: <20160426105150.6b7793ef@canb.auug.org.au>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 26 Apr 2016 09:55:35 +0900
+Subject: [PATCH] ARM: cache-uniphier: activate ways for secondary CPUs
+In-Reply-To: <51817650.ZWFPAKxQiK@wuerfel>
+References: <1460703947-12539-1-git-send-email-yamada.masahiro@socionext.com>
+ <51817650.ZWFPAKxQiK@wuerfel>
+Message-ID: <CAK7LNAS4gYS3VswmnUj6OS0mBpYeSKLPnV26mO0yRiEtwEDoww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-On Tue, 26 Apr 2016 01:54:20 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+2016-04-26 7:13 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 15 April 2016 16:05:46 Masahiro Yamada wrote:
+>> This outer cache allows to control active ways independently for
+>> each CPU, but currently nothing is done for secondary CPUs.  In
+>> other words, all the ways are locked for secondary CPUs by default.
+>> This commit fixes it to fully bring out the performance of this
+>> outer cache.
+>>
+>> There would be two possible ways to achieve this:
+>>
+>> [1] Each CPU initializes active ways for itself.  This can be done
+>>     via the SSCLPDAWCR register.  This is a banked register, so each
+>>     CPU sees a different instance of the register.
+>>
+>> [2] The master CPU initializes active ways for all the CPUs.  This
+>>     is available via SSCDAWCARMR(N) registers.  They are mapped at
+>>     the address SSCDAWCARMR + 4 * N, where N is the CPU number.
+>>
+>> Currently, the outer cache frame work does not support a per-CPU
+>> init callback.  So this commit adopts [2]; the master CPU iterates
+>> over possible CPUs setting up SSCDAWCARMR(N) registers.
+>>
+>> Unfortunately, the register offsets of SSCDAWCARMR(N) are different
+>> by SoC.  We can live with it by checking the version register.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>
 >
-> Ah, sorry about that. I think I fixed it up just as you pulled it in.
-> If you don't mind, could you try pulling the tree once more on top
-> of what you have?
+> Applied to next/soc, thanks!
+>
+> I'm a little lost with the patches you send, could you check that
+> I have applied all the ones you sent for 4.7 so far?
+>
+>         Arnd
 
-Sorry, but I need to keep going if I am to finish each day.  I will
-fetch it for tomorrow, though.  If I finish early enough, I will see if
-I can fetch and merge it at the end ...
+
+Was this one really applied, or not yet?
+
+My intention was to send this one just for review,
+because outer-cache things are generally in Russell's field.
+
+If you have already applied it, I should drop it
+from Russell's patch tracker.
+(Sorry, I should have mentioned it.)
+
+Please let me know the status.
 
 -- 
-Cheers,
-Stephen Rothwell
+Best Regards
+Masahiro Yamada
