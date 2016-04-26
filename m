@@ -1,111 +1,76 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 26 Apr 2016 15:22:29 +0200
-Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
- device
-In-Reply-To: <20160426130914.GA2015@delle.lan>
-References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
- <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
- <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
- <571F2B09.1000107@metafoo.de> <20160426130914.GA2015@delle.lan>
-Message-ID: <571F6B95.1000709@metafoo.de>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Tue, 26 Apr 2016 08:22:45 -0500
+Subject: [PATCH v6 3/7] ARM: dts: am437x/am33xx/da850: Add new ECAP and
+ EPWM bindings
+In-Reply-To: <20160425130308.GA7802@rob-hp-laptop>
+References: <1461343238-29274-1-git-send-email-fcooper@ti.com>
+ <1461343238-29274-4-git-send-email-fcooper@ti.com>
+ <20160425130308.GA7802@rob-hp-laptop>
+Message-ID: <571F6BA5.4010004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2016 03:09 PM, Matthias Reichl wrote:
-> Hi Lars,
-> 
-> first of all thanks a lot for your detailled feedback!
-> 
-> On Tue, Apr 26, 2016 at 10:47:05AM +0200, Lars-Peter Clausen wrote:
->>>>> +	.periods_min		= 2,
->>>>> +	.periods_max		= 255,
->>>>> +	.buffer_bytes_max	= 128 * PAGE_SIZE,
->>>>> +};
->>>>> +
->>>>> +static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
->>>>> +	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
->>>>> +	.pcm_hardware = &bcm2835_pcm_hardware,
->>>>> +	.prealloc_buffer_size = 256 * PAGE_SIZE,
->>>>> +};
->>>>
->>>> The generic dmaengine PCM driver auto-discovers these things, no need to
->>>> provide them. The code is OK as it is.
->>>
->>> With the auto-discover code we loose the S16_LE format.
->>>
->>> If I understood the code in dmaengine_pcm_set_runtime_hwparams
->>> correctly, this is because the DMA controller doesn't support
->>> 16bit transfers (only multiples of 32bit are allowed).
->>>
->>> But since the I2S driver needs exactly 2 channels S16_LE actually
->>> works fine (one 32bit transfer per frame).
->>>
->>> Do you know of a better way to get S16_LE support? It could well
->>> be that I missed something important...
+
+
+On 04/25/2016 08:03 AM, Rob Herring wrote:
+> On Fri, Apr 22, 2016 at 11:40:34AM -0500, Franklin S Cooper Jr wrote:
+>> Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
+>> provide the various required clocks.
 >>
->> With your patch we should just get an error when trying to configure a
->> stream with 16-bit samples since when setting up the DMA controller the
->> generic code will still choose a 16-bit device port size and this will be
->> rejected by the DMA controller.
-> 
-> We had that code in downstream RPi kernel for ages (IIRC since
-> 3.10) and so far it worked fine.
-> 
-> I traced the code for the S16_LE case to find out why:
-> 
-> snd_hwparams_to_dma_slave_config() sets src/dst_addr_width to 16bit.
-> 
-> But immediately afterwards snd_dmaengine_pcm_set_config_from_dai_data()
-> overrides addr_width to 32bit.
-> 
-
-Ok, makes sense.
-
-> bcm2835-i2s only supports 32bit access to the FIFO/data register
-> and dma_data.addr_width is set to 32bit in the I2S driver - that
-> code is also in mainline since the initial bcm2835-i2s commit.
-> 
-> Of course all this only works because the number of channels
-> is always 2.
-> 
->> When you look at peripherals that have DMA support there are basically two
->> types.
+>> For AM437 and AM335x, add the required clocks explicitly to DT. The
+>> hwmod entries for ECAP and EPWM will be removed and this will prevent
+>> anything from breaking.
 >>
->> Type A expect that each write (same applies for read) to the memory mapped
->> FIFO corresponds to exactly one sample. So if the sample width is 16-bit a
->> 16-bit write is done, if the sample width is 32-bit a 32-bit write is done.
->> In this case it is up to the DMA controller to fragment the byte stream into
->> individual samples.
->>
->> Type B on the other hand has a fixed port width (usually the bus size) and
->> expects that each write to the memory mapped FIFO uses the port width. It
->> then internally unpacks the data into the sample data. E.g. if the FIFO is
->> 32-bit wide and the sample width is 16-bit it will unpack the 32-bit entry
->> into two samples.
->>
->> Currently the generic code only supports type A. It would be great if you
->> could add support for type B to support the BCM2835 I2S controller properly.
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+>>  .../devicetree/bindings/pwm/pwm-tiecap.txt         | 12 +++--
+>>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 12 +++--
+>>  arch/arm/boot/dts/am33xx.dtsi                      | 30 +++++++++---
+>>  arch/arm/boot/dts/am4372.dtsi                      | 54 ++++++++++++++++++----
+>>  arch/arm/boot/dts/da850.dtsi                       | 15 ++++--
+>>  5 files changed, 95 insertions(+), 28 deletions(-)
 > 
-> Do you have a particular solution in mind?
+> [...]
 > 
-> Introducing a flag to just auto-add some packed formats would be
-> easy, but a generic, robust solution might be tricky. We'd have
-> to make sure that unsupported configurations (like an odd number
-> of 16bit channels on 32bit-only setups) get rejected or we might
-> be in trouble.
+>> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+>> index 12fcde4..e858460 100644
+>> --- a/arch/arm/boot/dts/am4372.dtsi
+>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>> @@ -672,18 +672,26 @@
+>>  			status = "disabled";
+>>  
+>>  			ecap0: ecap at 48300100 {
+>> -				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
+>> +				compatible = "ti,am4372-ecap",
+> 
+> This doesn't appear to be documented.
+> 
+>> +					     "ti,am3352-ecap",
+>> +					     "ti,am33xx-ecap";
+>>  				#pwm-cells = <3>;
+>>  				reg = <0x48300100 0x80>;
+>>  				ti,hwmods = "ecap0";
+>> +				clocks = <&l4ls_gclk>;
+>> +				clock-names = "fck";
+>>  				status = "disabled";
+>>  			};
+>>  
+>>  			ehrpwm0: pwm at 48300200 {
+>> -				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+>> +				compatible = "ti,am4372-ehrpwm",
+> 
+> ditto.
 
-I think in this case the DMA shouldn't limit the supported sample types.
-Since the unpacking is done by the peripheral the peripheral is the one
-component that limits what is supported and what is not and the DMA itself
-has no influence on this. In the peripheral driver you have all the
-information available there to specify the proper constraints and can handle
-all the corner cases. The overall constraints are the intersection of the
-DMA and peripheral constraints, so by having no DMA constraints the
-peripheral is the one providing all the constraints.
 
-We could either say that we assume that when the addr_width is fixed the DMA
-shouldn't supply any constraints, or we could introduce a new flag in
-snd_dmaengine_dai_dma_data that the peripheral has unpack support and the
-DMA constraints don't matter.
-
-- Lars
+Will fix
+> 
+>> +					     "ti,am3352-ehrpwm",
+>> +					     "ti,am33xx-ehrpwm";
+>>  				#pwm-cells = <3>;
+>>  				reg = <0x48300200 0x80>;
+>>  				ti,hwmods = "ehrpwm0";
+>> +				clocks = <&ehrpwm0_tbclk>, <&l4ls_gclk>;
+>> +				clock-names = "tbclk", "fck";
+>>  				status = "disabled";
+>>  			};
+>>  		};
