@@ -1,50 +1,47 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 26 Apr 2016 18:10:42 +0100
-Subject: [PATCH] ARM: debug: remove extraneous DEBUG_HI3716_UART option
-In-Reply-To: <5182022.a4Nr98h1hf@wuerfel>
-References: <1461590006-1395429-1-git-send-email-arnd@arndb.de>
- <571F2733.6070609@hisilicon.com> <5182022.a4Nr98h1hf@wuerfel>
-Message-ID: <571FA112.2050701@hisilicon.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 10:12:47 -0700
+Subject: [PATCH] ARM: dts: omap3: Fix ISP syscon register offset
+In-Reply-To: <20160422131626.GA7534@earth>
+References: <1460787628-17316-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <5719A9E3.1000902@gmail.com> <20160422131626.GA7534@earth>
+Message-ID: <20160426171246.GE5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+* Sebastian Reichel <sre@kernel.org> [160422 06:17]:
+> Hi,
+> 
+> On Fri, Apr 22, 2016 at 07:34:43AM +0300, Ivaylo Dimitrov wrote:
+> > On 16.04.2016 09:20, Ivaylo Dimitrov wrote:
+> > >According to the TRM, SCM CONTROL_CSIRXFE register is on offset 0x6c
+> > >
+> > >Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> > >---
+> > >  arch/arm/boot/dts/omap34xx.dtsi | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > >
+> > >diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+> > >index 5cdba1f..e446562 100644
+> > >--- a/arch/arm/boot/dts/omap34xx.dtsi
+> > >+++ b/arch/arm/boot/dts/omap34xx.dtsi
+> > >@@ -46,7 +46,7 @@
+> > >  			       0x480bd800 0x017c>;
+> > >  			interrupts = <24>;
+> > >  			iommus = <&mmu_isp>;
+> > >-			syscon = <&scm_conf 0xdc>;
+> > >+			syscon = <&scm_conf 0x6c>;
+> > >  			ti,phy-type = <OMAP3ISP_PHY_TYPE_COMPLEX_IO>;
+> > >  			#clock-cells = <1>;
+> > >  			ports {
+> > >
+> 
+> You may want to add the hint, that 0xdc (the old, wrong "offset")
+> represents the last few bits of the register address. I guess
+> somebody didn't notice, that scm_conf does not start at a register
+> address ending with 00 (like most other modules).
+> 
+> Reviewed-By: Sebastian Reichel <sre@kernel.org>
 
-On 26/04/2016 12:01, Arnd Bergmann wrote:
-> On Tuesday 26 April 2016 09:30:43 Wei Xu wrote:
->> Hi Arnd,
->>
->> On 25/04/2016 14:13, Arnd Bergmann wrote:
->>> DEBUG_HI3716_UART was supposed to be renamed to DEBUG_HIX5HD2_UART, but
->>> accidentally both got left in place, which results in a build error when
->>> CONFIG_DEBUG_UART_PHYS is not set as it should be.
->>>
->>> This removes the old symbol.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Fixes: 12aae3097454 ("ARM: debug: Rename Hi3716 to HIX5HD2")
->>> ---
->>>  arch/arm/Kconfig.debug | 8 --------
->>>  1 file changed, 8 deletions(-)
->>
->> Thanks!
->> Fine to me.
->> Should I pick up it and send a pull request or
->> will you directly pick up it?
-> 
-> I have put it into the next/cleanup branch now, and added your
-> 
->     Acked-by: Wei Xu <xuwei5@hisilicon.com>
+Applying into omap-for-v4.6/fixes-rc5 thanks.
 
-Thanks!
-
-Best Regards,
-Wei
-
-> 
-> Thanks,
-> 
-> 	Arnd
-> 
-> .
-> 
+Tony
