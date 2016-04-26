@@ -1,40 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Apr 2016 21:41:02 +0200
-Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
-In-Reply-To: <9424602.Vqb0FY56gH@wuerfel>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <5167289.0a4LBoWhyX@wuerfel> <20160426182335.GE30107@lunn.ch>
- <9424602.Vqb0FY56gH@wuerfel>
-Message-ID: <20160426194102.GF30107@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 12:41:19 -0700
+Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
+ idle
+In-Reply-To: <20160426151725.657ae70c@gandalf.local.home>
+References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20160426150031.GP5995@atomide.com>
+ <20160426175214.GJ3715@linux.vnet.ibm.com>
+ <20160426182939.GO5995@atomide.com>
+ <20160426151725.657ae70c@gandalf.local.home>
+Message-ID: <20160426194119.GQ5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 09:24:34PM +0200, Arnd Bergmann wrote:
-> On Tuesday 26 April 2016 20:23:35 Andrew Lunn wrote:
-> > > A more complex problem would be having a PHY driver for a device
-> > > that can be either an ethernet phy or some other phy.
-> > 
-> > I doubt that ever happens. You can have up to 32 different devices on
-> > an MDIO bus. Since an Ethernet PHY and a "some other sort of PHY" are
-> > completely different things, why would a hardware engineer place them
-> > on the same address? It is like saying your ATA controller and VGA
-> > controller share the same slot on the PCI bus...
-> 
-> To clarify: what I meant is a device that is designed as a PHY for
-> similar hardware (e.g. SATA, USB3 and PCIe) and that has a common
-> register set and a single driver, but that driver can operate
-> in multiple modes. You typically have multiple instances of
-> such hardware, with each instance linked to exactly one host
-> device, but one driver for all of them.
-> 
-> See Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-> and drivers/phy/phy-xgene.c for one such example.
+* Steven Rostedt <rostedt@goodmis.org> [160426 12:18]:
+> Time to play "Whack-a-Mole"(TM)
 
-Interesting. Also, that this lists SGMII. I assume this is a phy in
-the MAC in order to talk to the Ethernet PHY.
+:)
 
-I still don't see it being a big problem if a phy driver implements an
-Ethernet PHY. It just needs to call phy_device_create() and
-phy_device_register().
+> Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> ---
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 78af6d8cf2e2..12b66b5bcc55 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -523,8 +523,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+>  
+>  	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+>  		/* Trace the pwrdm desired target state */
+> -		trace_power_domain_target(pwrdm->name, pwrst,
+> -					  smp_processor_id());
+> +		trace_power_domain_target_rcuidle(pwrdm->name, pwrst,
+> +						  smp_processor_id());
+>  		/* Program the pwrdm desired target state */
+>  		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+>  	}
 
-	Andrew
+That part is already there with "arm: Use _rcuidle tracepoint to allow
+use from idle" which I did not have applied.
+
+Regards,
+
+Tony
