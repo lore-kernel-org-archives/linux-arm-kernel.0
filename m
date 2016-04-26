@@ -1,66 +1,42 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 26 Apr 2016 12:07:55 -0700
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426182939.GO5995@atomide.com>
-References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <20160426150031.GP5995@atomide.com>
- <20160426175214.GJ3715@linux.vnet.ibm.com>
- <20160426182939.GO5995@atomide.com>
-Message-ID: <20160426190755.GK3715@linux.vnet.ibm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Apr 2016 21:08:50 +0200
+Subject: [PATCH v3 0/2] pci: host: new driver for Marvell Armada 7K/8K
+ PCIe controller
+In-Reply-To: <20160426173144.GB27803@localhost>
+References: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160426173144.GB27803@localhost>
+Message-ID: <20160426210850.13cc8a0e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 11:29:39AM -0700, Tony Lindgren wrote:
-> * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 10:53]:
-> > Does the following patch help?
-> 
-> It just changes the output.. See below.
+Hello,
 
-Ah -- you need both patches.
+On Tue, 26 Apr 2016 12:31:44 -0500, Bjorn Helgaas wrote:
 
-These are on -rcu at:
+> >  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
+> >  create mode 100644 drivers/pci/host/pcie-armada8k.c
+> 
+> Thanks, Thomas, I applied these to pci/host-armada for v4.7.
 
-501889db6fee (arm: Use _rcuidle tracepoint to allow use from idle)
-99cd56ad86d2 (rm: Use more _rcuidle tracepoints to allow use from idle)
+Thanks!
 
-And -rcu may be found at:
+> I added the tweaks below to use dev_dbg() instead of pr_debug(), use
+> dw_pcie_wait_for_link() instead of another hand-coded timeout loop,
+> and fix a typo and remove unused constants.
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+Looks all good, thanks for applying! Just one tiny question below.
 
-							Thanx, Paul
+>  	/*
+>  	 * Interrupts are directly handled by the device driver of the
+> -	 * PCI device. However, there are also latched into the PCIe
+> +	 * PCI device.  However, they are also latched into the PCIe
 
-> > It is quite possible that there are quite a few more of these.  If this
-> > is the case, then one way to make the kernel list more of them on a
-> > given boot is to build with CONFIG_PROVE_RCU_REPEATEDLY=y.
-> 
-> OK
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ------------------
-> CPU: Testing write buffer coherency: ok
-> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> 
-> 
-> RCU used illegally from idle CPU!
-> rcu_scheduler_active = 1, debug_locks = 0
-> RCU used illegally from extended quiescent state!
-> no locks held by swapper/1/0.
-> 
-> stack backtrace:
-> CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.6.0-rc5-next-20160426+ #1113
-> Hardware name: Generic OMAP4 (Flattened Device Tree)
-> [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-> [<c010c3a8>] (show_stack) from [<c047ff88>] (dump_stack+0xb0/0xe4)
-> [<c047ff88>] (dump_stack) from [<c012c014>] (pwrdm_set_next_pwrst+0x100/0x1d4)
-> [<c012c014>] (pwrdm_set_next_pwrst) from [<c0126120>] (omap4_enter_lowpower+0xc8/0x230)
-> [<c0126120>] (omap4_enter_lowpower) from [<c0126c24>] (omap_enter_idle_coupled+0x6c/0x254)
-> [<c0126c24>] (omap_enter_idle_coupled) from [<c0601dfc>] (cpuidle_enter_state+0x80/0x3d4)
-> [<c0601dfc>] (cpuidle_enter_state) from [<c0603d30>] (cpuidle_enter_state_coupled+0x348/0x390)
-> [<c0603d30>] (cpuidle_enter_state_coupled) from [<c0183d34>] (cpu_startup_entry+0x198/0x3a0)
-> [<c0183d34>] (cpu_startup_entry) from [<8010162c>] (0x8010162c)
-> hw-breakpoint: Failed to enable monitor mode on CPU 0.
-> 
+Any reason to have two spaces after the dot here?
+
+Thanks again!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
