@@ -1,56 +1,122 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 26 Apr 2016 09:48:28 -0700
-Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <20160426133500.GQ27312@arm.com>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com> <571E4A2A.8070908@caviumnetworks.com>
- <571EFD1B.1070609@linaro.org> <20160426121547.GL27312@arm.com>
- <571F671D.70401@linaro.org> <20160426133500.GQ27312@arm.com>
-Message-ID: <571F9BDC.5090804@caviumnetworks.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 26 Apr 2016 22:26:22 +0530
+Subject: [PATCH 03/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ engine driver support
+In-Reply-To: <1461236675-10176-4-git-send-email-peter.griffin@linaro.org>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160426165622.GR2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2016 06:35 AM, Will Deacon wrote:
-> On Tue, Apr 26, 2016 at 09:03:25PM +0800, Hanjun Guo wrote:
->> On 2016/4/26 20:15, Will Deacon wrote:
->>> On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
->>>> On 2016/4/26 0:47, David Daney wrote:
-[...]
->>>>>> Given that this ACPI series already requires some significant cross-arch
->>>>>> interaction (which is actually good!), perhaps extending the clean-up
->>>>>> patches to encompass some of the ACPI bits might make sense, and we can
->>>>>> get that queued as a pre-requisite.
->>>>>
->>>>> The cleanup patches you mention above are really independent of the ACPI
->>>>> things.  I have applied them both before and after the ACPI patches, and
->>>>> both seem to work.  With a quick perusal of the ACPI patches nothing
->>>>> jumps out at me as being a candidate for inclusion in the header file
->>>>> cleanup series.
->>>>
->>>> I agree. My patch set is ACPI related enablement, cleanups and
->>>> consolidations, it would be good to merge as a single patch set
->>>> as it's self-contained.
->>>
->>> Up to you. I just thought you might want to avoid having two sets of
->>> cross-arch changes and the associated merging headaches that go with
->>> that.
->>
->> Good point, as I suggested above, it can go with ACPI tree if it's ok
->> to you and Rafael. The problem we have now is that dt based core NUMA
->> support for ARM64 is queued in your tree, that would be the headache.
->
-> Sorry, but if you wanted me *not* to queue the patches, then you should
-> have said so (similarly, if you wanted a stable branch). I'm not rebasing
-> our for-next/core branch now.
+On Thu, Apr 21, 2016 at 12:04:20PM +0100, Peter Griffin wrote:
 
-I am quite happy with the fact that you put the base device-tree based 
-NUMA patches on for-next/core.
+> +	if (!atomic_read(&fchan->fdev->fw_loaded)) {
+> +		dev_err(fchan->fdev->dev, "%s: fdma fw not loaded\n", __func__);
+> +		return NULL;
+> +	}
 
-There is only a very small adjustment to those in the ACPI-NUMA patches 
-([PATCH v5 06/14] arm64, numa: rework numa_add_memblk()), so I think we 
-are fine as far as that goes.
+so who is loading the fw and setting fw_loaded, it is not set in this patch?
 
-My plan is to post a v6 later today that adjusts some of the messages 
-printed out and adds some Reviewed-by and Acked-by that were accumulated.
+> +	if (direction == DMA_DEV_TO_MEM) {
+> +		fchan->cfg.req_ctrl &= ~REQ_CTRL_WNR;
+> +		maxburst = fchan->scfg.src_maxburst;
+> +		width = fchan->scfg.src_addr_width;
+> +		addr = fchan->scfg.src_addr;
+> +	} else if (direction == DMA_MEM_TO_DEV) {
+> +		fchan->cfg.req_ctrl |= REQ_CTRL_WNR;
+> +		maxburst = fchan->scfg.dst_maxburst;
+> +		width = fchan->scfg.dst_addr_width;
+> +		addr = fchan->scfg.dst_addr;
+> +	} else {
+> +		return -EINVAL;
+> +	}
 
-David.
+switch please
+
+> +
+> +	fchan->cfg.req_ctrl &= ~REQ_CTRL_OPCODE_MASK;
+> +	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+> +		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST1;
+> +	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
+> +		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST2;
+> +	else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
+> +		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST4;
+> +	else if (width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+> +		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST8;
+> +	else
+> +		return -EINVAL;
+
+here as well
+
+> +static void fill_hw_node(struct st_fdma_hw_node *hw_node,
+> +			struct st_fdma_chan *fchan,
+> +			enum dma_transfer_direction direction)
+> +{
+> +
+> +	if (direction == DMA_MEM_TO_DEV) {
+> +		hw_node->control |= NODE_CTRL_SRC_INCR;
+> +		hw_node->control |= NODE_CTRL_DST_STATIC;
+> +		hw_node->daddr = fchan->cfg.dev_addr;
+> +	} else {
+> +		hw_node->control |= NODE_CTRL_SRC_STATIC;
+> +		hw_node->control |= NODE_CTRL_DST_INCR;
+> +		hw_node->saddr = fchan->cfg.dev_addr;
+> +	}
+
+empty line here at other places too. The code looks very compressed and bit
+harder to read overall
+
+> +	fdesc = st_fdma_alloc_desc(fchan, sg_len);
+> +	if (!fdesc) {
+> +		dev_err(fchan->fdev->dev, "no memory for desc\n");
+> +		return NULL;
+> +	}
+> +
+> +	fdesc->iscyclic = false;
+> +
+> +	for_each_sg(sgl, sg, sg_len, i) {
+> +		hw_node = fdesc->node[i].desc;
+> +
+> +		hw_node->next = fdesc->node[(i + 1) % sg_len].pdesc;
+> +		hw_node->control = NODE_CTRL_REQ_MAP_DREQ(fchan->dreq_line);
+> +
+> +		fill_hw_node(hw_node, fchan, direction);
+> +
+> +		if (direction == DMA_MEM_TO_DEV)
+> +			hw_node->saddr = sg_dma_address(sg);
+> +		else
+> +			hw_node->daddr = sg_dma_address(sg);
+> +
+> +		hw_node->nbytes = sg_dma_len(sg);
+> +		hw_node->generic.length = sg_dma_len(sg);
+> +	}
+> +
+> +	/* interrupt at end of last node */
+> +	hw_node->control |= NODE_CTRL_INT_EON;
+> +
+> +	return vchan_tx_prep(&fchan->vchan, &fdesc->vdesc, flags);
+
+bunch of this seems similar to cyclic case, can you create common setup
+routine for these, anyway cyclic is a special cases of slave_sg
+
+> +
+> +	ret = dma_cookie_status(chan, cookie, txstate);
+> +	if (ret == DMA_COMPLETE)
+> +		return ret;
+> +
+> +	if (!txstate)
+> +		return fchan->status;
+
+why channel status, query is for descriptor
+
+> +static int st_fdma_remove(struct platform_device *pdev)
+> +{
+> +	struct st_fdma_dev *fdev = platform_get_drvdata(pdev);
+> +
+> +	st_fdma_clk_disable(fdev);
+
+and you irq is still enabled and tasklets can be scheduled!!
+
+-- 
+~Vinod
