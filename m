@@ -1,37 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 13:02:55 +0200
-Subject: [PATCH v2] drivers: firmware: psci: unify enable-method binding
- on ARM {64, 32}-bit systems
-In-Reply-To: <20160426110147.GC20836@leverpostej>
-References: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
- <31757054.8aSO57qemx@wuerfel> <20160426110147.GC20836@leverpostej>
-Message-ID: <5255940.mPUzGZ0TLa@wuerfel>
+Date: Tue, 26 Apr 2016 13:04:13 +0200
+Subject: [GIT PULL v3] arm64: hisilicon: config changes for 4.7
+In-Reply-To: <571F3CB8.3000904@hisilicon.com>
+References: <571F3CB8.3000904@hisilicon.com>
+Message-ID: <4910387.g0H3XLnE4p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 April 2016 12:01:48 Mark Rutland wrote:
-> On Tue, Apr 26, 2016 at 12:49:00PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 26 April 2016 11:42:58 Sudeep Holla wrote:
-
-> > > 
-> > > Gentle ping to include this in next round of arm-soc fixes. It would be
-> > > good to get this fixed before v4.6 as we don't want to have user of the
-> > > binding which we want to remove in the release.
-> > > 
-> > 
-> > Applied to the fixes branch. I have to admit that I don't understand
-> > how the compatible string is really used here, so I have to trust that
-> > this cannot break any existing machine.
+On Tuesday 26 April 2016 11:02:32 Wei Xu wrote:
+> Please help to pull the following changes.
 > 
-> The buggy code was merged for v4.6-rc1, so this hasn't been in a
-> release, and should not break an existing user.
+> I rebased this pull request on v4.6-rc3 but I found
+> it is same with the v2 that based on v4.6-rc4.
+> Is it OK or should I base on earlier -rc version like rc1?
+
+Looks good now.  What is important to me is that I don't pull
+in a later -rc release from mainline than what I already have
+in arm-soc, if at all possible.
+
+> The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
 > 
-> No compatible string is used here, which is precisely the confusion this
-> addresses. The PSCI enable-method != the compatible string for a PSCI
-> node, but the two got confused in a documentation patch, and then that
-> confusion spread to code.
+>   Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7v3
+> 
+> for you to fetch changes up to 2b905d3a8d7e40c3486abbf585419fafa220a8f8:
+> 
+>   arm64: Kconfig: select sp804 timer for ARCH_HISI (2016-04-26 10:39:09 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM64: Hi6220: configure updates for 4.7 based on rc3
+> 
+> - Enable Hi655x PMIC and regulator
+> - Enable SPI_SPIDEV as module
+> - Enable several common USB-Ethernet dongles
+> - Enable configs for WLAN and TI WL1835 as modules
+> - Enable ARM SP804 for ARCH_HISI
 > 
 
-Ok, thanks for the explanation.
+Pulled into next/arm64, thanks for the rebase!
 
-	ARnd
+	Arnd
