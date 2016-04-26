@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Apr 2016 11:28:45 +1000
-Subject: [PATCH 10/11] soc: renesas: rcar-sysc: Add support for R-Car E2 power
+Date: Tue, 26 Apr 2016 11:28:46 +1000
+Subject: [PATCH 11/11] soc: renesas: rcar-sysc: Add support for R-Car H3 power
  areas
 In-Reply-To: <cover.1461632180.git.horms+renesas@verge.net.au>
 References: <cover.1461632180.git.horms+renesas@verge.net.au>
-Message-ID: <9af1dbcc3028e1de8cac2d7e32345965353edde0.1461632180.git.horms+renesas@verge.net.au>
+Message-ID: <23f1e2ecdecee9f2ec45de0a468b82bb1f7f3ca2.1461632180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,31 +14,30 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/Makefile       |  2 +-
- drivers/soc/renesas/r8a7794-sysc.c | 33 +++++++++++++++++++++++++++++++++
- drivers/soc/renesas/rcar-sysc.c    |  3 +++
+ drivers/soc/renesas/Makefile       |  1 +
+ drivers/soc/renesas/r8a7795-sysc.c | 56 ++++++++++++++++++++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.c    |  3 ++
  drivers/soc/renesas/rcar-sysc.h    |  1 +
- 4 files changed, 38 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
+ 4 files changed, 61 insertions(+)
+ create mode 100644 drivers/soc/renesas/r8a7795-sysc.c
 
 diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
-index c6c4ce7ef8a1..b328205fef36 100644
+index b328205fef36..151fcd3f025b 100644
 --- a/drivers/soc/renesas/Makefile
 +++ b/drivers/soc/renesas/Makefile
-@@ -3,4 +3,4 @@ obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
- obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
+@@ -4,3 +4,4 @@ obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
  # R-Car M2-N is identical to R-Car M2-W w.r.t. power domains.
  obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o r8a7791-sysc.o
--obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o
-+obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o r8a7794-sysc.o
-diff --git a/drivers/soc/renesas/r8a7794-sysc.c b/drivers/soc/renesas/r8a7794-sysc.c
+ obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o r8a7794-sysc.o
++obj-$(CONFIG_ARCH_R8A7795)	+= rcar-sysc.o r8a7795-sysc.o
+diff --git a/drivers/soc/renesas/r8a7795-sysc.c b/drivers/soc/renesas/r8a7795-sysc.c
 new file mode 100644
-index 000000000000..c4da2941e06c
+index 000000000000..5e7537c96f7b
 --- /dev/null
-+++ b/drivers/soc/renesas/r8a7794-sysc.c
-@@ -0,0 +1,33 @@
++++ b/drivers/soc/renesas/r8a7795-sysc.c
+@@ -0,0 +1,56 @@
 +/*
-+ * Renesas R-Car E2 System Controller
++ * Renesas R-Car H3 System Controller
 + *
 + * Copyright (C) 2016 Glider bvba
 + *
@@ -50,49 +49,72 @@ index 000000000000..c4da2941e06c
 +#include <linux/bug.h>
 +#include <linux/kernel.h>
 +
-+#include <dt-bindings/power/r8a7794-sysc.h>
++#include <dt-bindings/power/r8a7795-sysc.h>
 +
 +#include "rcar-sysc.h"
 +
-+static const struct rcar_sysc_area r8a7794_areas[] __initconst = {
-+	{ "always-on",	    0, 0, R8A7794_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
-+	{ "ca7-scu",	0x100, 0, R8A7794_PD_CA7_SCU,	R8A7794_PD_ALWAYS_ON,
++static const struct rcar_sysc_area r8a7795_areas[] __initconst = {
++	{ "always-on",	    0, 0, R8A7795_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
++	{ "ca57-scu",	0x1c0, 0, R8A7795_PD_CA57_SCU,	R8A7795_PD_ALWAYS_ON,
 +	  PD_SCU },
-+	{ "ca7-cpu0",	0x1c0, 0, R8A7794_PD_CA7_CPU0,	R8A7794_PD_CA7_SCU,
++	{ "ca57-cpu0",	 0x80, 0, R8A7795_PD_CA57_CPU0,	R8A7795_PD_CA57_SCU,
 +	  PD_CPU_NOCR },
-+	{ "ca7-cpu1",	0x1c0, 1, R8A7794_PD_CA7_CPU1,	R8A7794_PD_CA7_SCU,
++	{ "ca57-cpu1",	 0x80, 1, R8A7795_PD_CA57_CPU1,	R8A7795_PD_CA57_SCU,
 +	  PD_CPU_NOCR },
-+	{ "sh-4a",	 0x80, 0, R8A7794_PD_SH_4A,	R8A7794_PD_ALWAYS_ON },
-+	{ "sgx",	 0xc0, 0, R8A7794_PD_SGX,	R8A7794_PD_ALWAYS_ON },
++	{ "ca57-cpu2",	 0x80, 2, R8A7795_PD_CA57_CPU2,	R8A7795_PD_CA57_SCU,
++	  PD_CPU_NOCR },
++	{ "ca57-cpu3",	 0x80, 3, R8A7795_PD_CA57_CPU3,	R8A7795_PD_CA57_SCU,
++	  PD_CPU_NOCR },
++	{ "ca53-scu",	0x140, 0, R8A7795_PD_CA53_SCU,	R8A7795_PD_ALWAYS_ON,
++	  PD_SCU },
++	{ "ca53-cpu0",	0x200, 0, R8A7795_PD_CA53_CPU0,	R8A7795_PD_CA53_SCU,
++	  PD_CPU_NOCR },
++	{ "ca53-cpu1",	0x200, 1, R8A7795_PD_CA53_CPU1,	R8A7795_PD_CA53_SCU,
++	  PD_CPU_NOCR },
++	{ "ca53-cpu2",	0x200, 2, R8A7795_PD_CA53_CPU2,	R8A7795_PD_CA53_SCU,
++	  PD_CPU_NOCR },
++	{ "ca53-cpu3",	0x200, 3, R8A7795_PD_CA53_CPU3,	R8A7795_PD_CA53_SCU,
++	  PD_CPU_NOCR },
++	{ "a3vp",	0x340, 0, R8A7795_PD_A3VP,	R8A7795_PD_ALWAYS_ON },
++	{ "cr7",	0x240, 0, R8A7795_PD_CR7,	R8A7795_PD_ALWAYS_ON },
++	{ "a3vc",	0x380, 0, R8A7795_PD_A3VC,	R8A7795_PD_ALWAYS_ON },
++	{ "a2vc0",	0x3c0, 0, R8A7795_PD_A2VC0,	R8A7795_PD_A3VC },
++	{ "a2vc1",	0x3c0, 1, R8A7795_PD_A2VC1,	R8A7795_PD_A3VC },
++	{ "3dg-a",	0x100, 0, R8A7795_PD_3DG_A,	R8A7795_PD_ALWAYS_ON },
++	{ "3dg-b",	0x100, 1, R8A7795_PD_3DG_B,	R8A7795_PD_3DG_A },
++	{ "3dg-c",	0x100, 2, R8A7795_PD_3DG_C,	R8A7795_PD_3DG_B },
++	{ "3dg-d",	0x100, 3, R8A7795_PD_3DG_D,	R8A7795_PD_3DG_C },
++	{ "3dg-e",	0x100, 4, R8A7795_PD_3DG_E,	R8A7795_PD_3DG_D },
++	{ "a3ir",	0x180, 0, R8A7795_PD_A3IR,	R8A7795_PD_ALWAYS_ON },
 +};
 +
-+const struct rcar_sysc_info r8a7794_sysc_info __initconst = {
-+	.areas = r8a7794_areas,
-+	.num_areas = ARRAY_SIZE(r8a7794_areas),
++const struct rcar_sysc_info r8a7795_sysc_info __initconst = {
++	.areas = r8a7795_areas,
++	.num_areas = ARRAY_SIZE(r8a7795_areas),
 +};
 diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index d8eaf8b2ee20..e2cd99027303 100644
+index e2cd99027303..79dbc770895f 100644
 --- a/drivers/soc/renesas/rcar-sysc.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -297,6 +297,9 @@ static const struct of_device_id rcar_sysc_matches[] = {
- 	/* R-Car M2-N is identical to R-Car M2-W w.r.t. power domains. */
- 	{ .compatible = "renesas,r8a7793-sysc", .data = &r8a7791_sysc_info },
+@@ -300,6 +300,9 @@ static const struct of_device_id rcar_sysc_matches[] = {
+ #ifdef CONFIG_ARCH_R8A7794
+ 	{ .compatible = "renesas,r8a7794-sysc", .data = &r8a7794_sysc_info },
  #endif
-+#ifdef CONFIG_ARCH_R8A7794
-+	{ .compatible = "renesas,r8a7794-sysc", .data = &r8a7794_sysc_info },
++#ifdef CONFIG_ARCH_R8A7795
++	{ .compatible = "renesas,r8a7795-sysc", .data = &r8a7795_sysc_info },
 +#endif
  	{ /* sentinel */ }
  };
  
 diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
-index d58b39400e79..d64258cfaa20 100644
+index d64258cfaa20..5e766174c2f4 100644
 --- a/drivers/soc/renesas/rcar-sysc.h
 +++ b/drivers/soc/renesas/rcar-sysc.h
-@@ -53,4 +53,5 @@ struct rcar_sysc_info {
- extern const struct rcar_sysc_info r8a7779_sysc_info;
+@@ -54,4 +54,5 @@ extern const struct rcar_sysc_info r8a7779_sysc_info;
  extern const struct rcar_sysc_info r8a7790_sysc_info;
  extern const struct rcar_sysc_info r8a7791_sysc_info;
-+extern const struct rcar_sysc_info r8a7794_sysc_info;
+ extern const struct rcar_sysc_info r8a7794_sysc_info;
++extern const struct rcar_sysc_info r8a7795_sysc_info;
  #endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 2.7.0.rc3.207.g0ac5344
