@@ -1,131 +1,227 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Apr 2016 11:33:46 +0100
-Subject: [PATCH] perf/core / arm_pmu: special-case hetereogeneous CPUs
-In-Reply-To: <20160425190334.GK3448@twins.programming.kicks-ass.net>
-References: <20160425175837.GB3141@leverpostej>
- <20160425190334.GK3448@twins.programming.kicks-ass.net>
-Message-ID: <20160426103346.GA20836@leverpostej>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 26 Apr 2016 12:37:38 +0200
+Subject: [PATCH v8] drivers: amba: properly handle devices with power
+ domains
+In-Reply-To: <CAPDyKFqnnjdQgXNjA30AAi--+0NP74gWFjuYfrsvUGTV=yK=Hw@mail.gmail.com>
+References: <1460711612-5268-1-git-send-email-m.szyprowski@samsung.com>
+ <CAPDyKFqnnjdQgXNjA30AAi--+0NP74gWFjuYfrsvUGTV=yK=Hw@mail.gmail.com>
+Message-ID: <fd0f3f8e-fe0e-b75e-620d-ecf6ffff5f69@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 09:03:34PM +0200, Peter Zijlstra wrote:
-> On Mon, Apr 25, 2016 at 06:58:37PM +0100, Mark Rutland wrote:
-> > Hi,
-> > 
-> > When booting an arm64 defconfig linux-next (next-20160422) on an ARM
-> > Juno system, I hit a WARN_ON_ONCE in perf_pmu_register (see backtrace at
-> > the end of this email).
-> > 
-> > This was introduced by commit 26657848502b7847 ("perf/core: Verify we
-> > have a single perf_hw_context PMU") where we forcefully prevent multiple
-> > PMUs from sharing perf_hw_context (with a warning), and force additional
-> > PMUs to use perf_invalid_context.
+Hello,
 
-> > Are you happy to revert 26657848502b787 for the timebeing? Or to somehow
-> > predicate the check such that it doesn't adversely affect those HW PMUs?
-> 
-> I'm happy with a chicken bit for now, its already found two real issues,
-> so I'd like to keep it.
 
-Ok, how about the below? (based on next-20160422).
+On 2016-04-25 11:19, Ulf Hansson wrote:
+> On 15 April 2016 at 11:13, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> To read pid/cid registers, the probed device need to be properly turned on.
+>> When it is inside a power domain, the bus code should ensure that the
+>> given power domain is enabled before trying to access device's registers.
+>> However in some cases power domain (or clocks) might not be yet available.
+>> Returning -EPROBE_DEFER is not a solution in such case, because callers
+>> don't handle this special error code. Instead such devices are added to the
+>> special list and their registration is retried from periodic worker until
+>> all resources are available.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>> Changelog:
+>>
+>> v8:
+>> - replaced notifier with periodic workqueue on Greg request
+>>
+>> v7: https://lkml.org/lkml/2016/4/13/201
+>> - replaced late_initcall approach with a notifier registered to device core
+>>
+>> v6: https://lkml.org/lkml/2016/4/12/414
+>> - got back to v1-style approach on Russell King request to avoid ABI break
+>> - use list for storing deferred devices and retry their registration from
+>>    late_initcall
+>>
+>> v5: https://lkml.org/lkml/2016/2/10/179
+>> - added 2 more patches to avoid regression with existing drivers (nvdimm and
+>>    sa1111), for more information, see https://lkml.org/lkml/2015/12/17/390
+>> - changed thread name to "AMBA: add complete support for power domains"
+>>
+>> v4: https://lkml.org/lkml/2015/12/2/52
+>> - fixed more issues pointed by Ulf Hansson and Russell King
+>>
+>> v3: https://lkml.org/lkml/2015/12/1/334
+>> - fixed issues pointed by Ulf Hansson
+>> - dropped patch for exynos4210 dts, because it already got queued for merging
+>>
+>> v2: https://lkml.org/lkml/2015/11/26/229
+>> - added 2 patches from 'On-demand device probing' thread
+>>    (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
+>>    from amba_device_add() to amba_match()
+>> - moved dev_pm_domain_attach() to amba_match(), which is allowed to
+>>    return -EPROBE_DEFER
+>>
+>> v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
+>> - initial version
+>> ---
+>>   drivers/amba/bus.c | 100 +++++++++++++++++++++++++++++++++++++++++++++++------
+>>   1 file changed, 90 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+>> index f0099360039e..a5b5c87e2114 100644
+>> --- a/drivers/amba/bus.c
+>> +++ b/drivers/amba/bus.c
+>> @@ -336,16 +336,7 @@ static void amba_device_release(struct device *dev)
+>>          kfree(d);
+>>   }
+>>
+>> -/**
+>> - *     amba_device_add - add a previously allocated AMBA device structure
+>> - *     @dev: AMBA device allocated by amba_device_alloc
+>> - *     @parent: resource parent for this devices resources
+>> - *
+>> - *     Claim the resource, and read the device cell ID if not already
+>> - *     initialized.  Register the AMBA device with the Linux device
+>> - *     manager.
+>> - */
+>> -int amba_device_add(struct amba_device *dev, struct resource *parent)
+>> +static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
+>>   {
+>>          u32 size;
+>>          void __iomem *tmp;
+>> @@ -373,6 +364,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+>>                  goto err_release;
+>>          }
+>>
+>> +       ret = dev_pm_domain_attach(&dev->dev, true);
+>> +       if (ret == -EPROBE_DEFER) {
+>> +               iounmap(tmp);
+>> +               goto err_release;
+>> +       }
+>> +
+>>          ret = amba_get_enable_pclk(dev);
+>>          if (ret == 0) {
+>>                  u32 pid, cid;
+>> @@ -398,6 +395,7 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+>>          }
+>>
+>>          iounmap(tmp);
+>> +       dev_pm_domain_detach(&dev->dev, true);
+>>
+>>          if (ret)
+>>                  goto err_release;
+>> @@ -421,6 +419,88 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+>>    err_out:
+>>          return ret;
+>>   }
+>> +
+>> +/*
+>> + * Registration of AMBA device require reading its pid and cid registers.
+>> + * To do this, the device must be turned on (if it is a part of power domain)
+>> + * and have clocks enabled. However in some cases those resources might not be
+>> + * yet available. Returning EPROBE_DEFER is not a solution in such case,
+>> + * because callers don't handle this special error code. Instead such devices
+>> + * are added to the special list and their registration is retried from
+>> + * periodic worker, until all resources are available and registration succeeds.
+>> + */
+>> +struct deferred_device {
+>> +       struct amba_device *dev;
+>> +       struct resource *parent;
+>> +       struct list_head node;
+>> +};
+>> +
+>> +static LIST_HEAD(deferred_devices);
+>> +static DEFINE_MUTEX(deferred_devices_lock);
+>> +
+>> +static void amba_deferred_retry_func(struct work_struct *dummy);
+>> +static DECLARE_DELAYED_WORK(deferred_retry_work, amba_deferred_retry_func);
+>> +
+>> +#define DEFERRED_DEVICE_TIMEOUT (msecs_to_jiffies(5 * 1000))
+>> +
+>> +static void amba_deferred_retry_func(struct work_struct *dummy)
+>> +{
+>> +       struct deferred_device *ddev, *tmp;
+>> +
+>> +       mutex_lock(&deferred_devices_lock);
+>> +
+>> +       list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
+>> +               int ret = amba_device_try_add(ddev->dev, ddev->parent);
+>> +
+>> +               if (ret == -EPROBE_DEFER)
+>> +                       continue;
+>> +
+>> +               list_del_init(&ddev->node);
+>> +               kfree(ddev);
+>> +       }
+>> +
+>> +       if (!list_empty(&deferred_devices))
+>> +               schedule_delayed_work(&deferred_retry_work,
+>> +                                     DEFERRED_DEVICE_TIMEOUT);
+>> +
+>> +       mutex_unlock(&deferred_devices_lock);
+>> +}
+>> +
+>> +/**
+>> + *     amba_device_add - add a previously allocated AMBA device structure
+>> + *     @dev: AMBA device allocated by amba_device_alloc
+>> + *     @parent: resource parent for this devices resources
+>> + *
+>> + *     Claim the resource, and read the device cell ID if not already
+>> + *     initialized.  Register the AMBA device with the Linux device
+>> + *     manager.
+>> + */
+>> +int amba_device_add(struct amba_device *dev, struct resource *parent)
+>> +{
+>> +       int ret = amba_device_try_add(dev, parent);
+>> +
+>> +       if (ret == -EPROBE_DEFER) {
+>> +               struct deferred_device *ddev;
+>> +
+>> +               ddev = kmalloc(sizeof(*ddev), GFP_KERNEL);
+>> +               if (!ddev)
+>> +                       return -ENOMEM;
+>> +
+>> +               ddev->dev = dev;
+>> +               ddev->parent = parent;
+>> +               ret = 0;
+>> +
+>> +               mutex_lock(&deferred_devices_lock);
+>> +
+>> +               if (list_empty(&deferred_devices))
+>> +                       schedule_delayed_work(&deferred_retry_work,
+>> +                                             DEFERRED_DEVICE_TIMEOUT);
+>> +               list_add_tail(&ddev->node, &deferred_devices);
+>> +
+>> +               mutex_unlock(&deferred_devices_lock);
+>> +       }
+>> +       return ret;
+>> +}
+>>   EXPORT_SYMBOL_GPL(amba_device_add);
+>>
+>>   static struct amba_device *
+>> --
+>> 1.9.2
+>>
+> Overall this looks okay to me! Even if I don't really like the
+> approach, it seems like this is the only viable option there is right
+> now.
+>
+> One minor improvement that I could think of, is to use also a late
+> initcall in conjunction with the delayed work. So, instead of
+> scheduling a work unconditionally when -EPROBE_DEFER is returned from
+> amba_device_try_add(), you can postpone the *first* re-try to be done
+> from a late initcall.
+>
+> Of course, as devices may be added also after the late initcall, you
+> need to keep a flag which tells amba_device_add() whether it can rely
+> on the late initcall to re-try, or if it needs to schedule a work by
+> itself.
 
-It looks like 26657848502b7847 was on a stable branch, so I guess we
-can't fold this in. It probably makes sense for this to go the same path
-as 26657848502b7847, assuming people are happy with that and there are
-no conflicts.
+I don't think that such micro-optimization makes sense in this case.
+Please note that there is still no platform and driver which require
+this deferred probe logic - in my case exynos power domain driver is
+registered very early, so dev_pm_domain_attach() calls succeeds in the
+standard amba device registration path. This patch is mainly to get
+the device registered to power domain to properly read its cid/pid
+pair.
 
-Mark.
-
----->8----
->From 7b1007f86d30bfed1dde21218224f119b6ad547f Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Tue, 26 Apr 2016 11:17:51 +0100
-Subject: [PATCH] perf/core / arm_pmu: special-case hetereogeneous CPUs
-
-Commit 26657848502b7847 ("perf/core: Verify we have a single
-perf_hw_context PMU") forcefully prevents multiple PMUs from sharing
-perf_hw_context, as this generally doesn't make sense. It is a common
-bug for uncore PMUs to use perf_hw_context rather than
-perf_invalid_context, which this detects.
-
-However, systems exist with heterogeneous CPUs (and hence heterogeneous
-HW PMUs), for which sharing perf_hw_context is necessary, and possible
-in some limited cases. To make this work we have to perform some
-gymnastics, as we did in commit 66eb579e66ecfea5 ("perf: allow for
-PMU-specific event filtering") and c904e32a69b7c779 ("arm: perf: filter
-unschedulable events").
-
-To allow those systems to work, we must allow PMUs for heterogeneous
-CPUs to share perf_hw_context, though we must still disallow sharing
-otherwise to detect the common misuse of perf_hw_context.
-
-This patch adds a new PERF_PMU_CAP_HETEROGENEOUS_CPUS for this, updates
-the core logic to account for this, and makes use of it in the arm_pmu
-code that is used for systems with heterogeneous CPUs. Comments are
-added to make the rationale clear and hopefully avoid accidental abuse.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/perf/arm_pmu.c     | 8 ++++++++
- include/linux/perf_event.h | 1 +
- kernel/events/core.c       | 8 +++++++-
- 3 files changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 32346b5..bbf827a 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -836,6 +836,14 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (!platform_get_irq(cpu_pmu->plat_device, 0))
- 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
- 
-+	/*
-+	 * This is a CPU PMU potentially in a heterogeneous configuration (e.g.
-+	 * big.LITTLE). This is not an uncore PMU, and we have taken ctx
-+	 * sharing into account (e.g. with our pmu::filter_match callback and
-+	 * pmu::event_init group validation).
-+	 */
-+	cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_HETEROGENEOUS_CPUS;
-+
- 	return 0;
- 
- out_unregister:
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 342cb92..18d19d6 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -216,6 +216,7 @@ struct perf_event;
- #define PERF_PMU_CAP_AUX_SW_DOUBLEBUF		0x08
- #define PERF_PMU_CAP_EXCLUSIVE			0x10
- #define PERF_PMU_CAP_ITRACE			0x20
-+#define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
- 
- /**
-  * struct pmu - generic performance monitoring unit
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 1e0f117..796ee56 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -7855,7 +7855,13 @@ skip_type:
- 	if (pmu->task_ctx_nr == perf_hw_context) {
- 		static int hw_context_taken = 0;
- 
--		if (WARN_ON_ONCE(hw_context_taken))
-+		/*
-+		 * Other than systems with heterogeneous CPUs, it never makes
-+		 * sense for two PMUs to share perf_hw_context. PMUs which are
-+		 * uncore must use perf_invalid_context.
-+		 */
-+		if (WARN_ON_ONCE(hw_context_taken &&
-+		    !(pmu->capabilities & PERF_PMU_CAP_HETEROGENEOUS_CPUS)))
- 			pmu->task_ctx_nr = perf_invalid_context;
- 
- 		hw_context_taken = 1;
+Best regards
 -- 
-1.9.1
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
