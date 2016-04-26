@@ -1,25 +1,52 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Apr 2016 19:45:05 +0200
-Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
-In-Reply-To: <571FA3F6.7000903@gmail.com>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <1461230323-27891-2-git-send-email-pramod.kumar@broadcom.com>
- <20160425205650.GA31129@lunn.ch>
- <666dffb41a922b0c8638f2f002a2de08@mail.gmail.com>
- <20160426121335.GC11668@lunn.ch> <571FA3F6.7000903@gmail.com>
-Message-ID: <20160426174505.GD11668@lunn.ch>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 26 Apr 2016 18:49:13 +0100
+Subject: [PATCH 10/18] ASoC: sti: Update example to include
+ assigned-clocks and mclk-fs
+In-Reply-To: <20160426164104.GC3217@sirena.org.uk>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+ <20160421154933.GR3217@sirena.org.uk>
+ <20160426115210.GB5457@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426142357.GW3217@sirena.org.uk>
+ <20160426145129.GA11946@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426150319.GY3217@sirena.org.uk>
+ <20160426161432.GA12088@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426164104.GC3217@sirena.org.uk>
+Message-ID: <20160426174913.GA12621@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I am not clear on how common a shared MDIO bus is on other SoCs, but the
-> other Broadcom SoCs I am familiar with have dedicated MDIO buses
-> instances per type of PHY (PCIe, BUSB, Ethernet), thus making the split
-> a ton easier.
+Hi Mark,
 
-I don't actually see this shared bus being an issue, once the mux it
-implemented. With the mux, you see N MDIO busses, each acting like a
-normal MDIO bus. I've used the GPIO variety and had no issues:
+On Tue, 26 Apr 2016, Mark Brown wrote:
 
-http://marc.info/?l=linux-arm-kernel&m=145910090401796&w=2
+> On Tue, Apr 26, 2016 at 05:14:32PM +0100, Peter Griffin wrote:
+> > On Tue, 26 Apr 2016, Mark Brown wrote:
+> 
+> > > A lot of this is details of the system integration for this SoC, not
+> > > actual errors.
+> 
+> > This particular clock patch yes, but the other ASoC dt doc update is fixing
+> > bindings which haven't progressed in lockstep with the driver code. Presumably
+> > this happened during the review process when they were changed to being st,
+> > prefixed in the driver, but the doc wasn't also updated.
+> 
+> The bits where you are correcting the names of the properties are not
+> details of the system integration and are therefore fine.  The bits
+> where you're documenting the particular clocking arrangements for the
+> SoC you happen to be using less so.
 
-	Andrew
+Ok sounds good. With that in mind I will drop this clocking patch in v4
+and just leave the one which updates the ASoC bindings mismatch.
+
+> 
+> > > it's fairly routine
+> > > to have to explain to people that just because some old driver did
+> > > something that doesn't mean it's something we want in new drivers.
+> 
+> > I'm sure it is. Although I fail to see why leaving the documentation with
+> > mistakes in is helpful to anybody.
+> 
+> Fixing actual mistakes is fine.
+
+Peter.
