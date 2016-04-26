@@ -1,144 +1,59 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 26 Apr 2016 17:30:37 +0100
-Subject: [PATCH] dmaengine: pl330: Fix race in pl330_get_desc()
-Message-ID: <bc03a8073460ebac253b80466d11654ee81f540e.1461687536.git.robin.murphy@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 26 Apr 2016 18:30:55 +0200
+Subject: [PATCH 1/2] clocksource: sp804: Add support for OX810SE 24bit
+ timer width
+In-Reply-To: <571E2E38.3060401@baylibre.com>
+References: <1459520559-13110-1-git-send-email-narmstrong@baylibre.com>
+ <1459520559-13110-2-git-send-email-narmstrong@baylibre.com>
+ <20160422074645.GA3974@linaro.org>
+ <alpine.DEB.2.11.1604220953000.3941@nanos>
+ <571E2E38.3060401@baylibre.com>
+Message-ID: <20160426163055.GB13887@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current logic in pl330_get_desc() contains a clear race condition,
-whereby if the descriptor pool is empty, we will create a new
-descriptor, add it to the pool with the lock held, *release the lock*,
-then try to remove it from the pool again.
+On Mon, Apr 25, 2016 at 04:48:24PM +0200, Neil Armstrong wrote:
+> On 04/22/2016 09:53 AM, Thomas Gleixner wrote:
+> > On Fri, 22 Apr 2016, Daniel Lezcano wrote:
+> > 
+> >> On Fri, Apr 01, 2016 at 04:22:38PM +0200, Neil Armstrong wrote:
+> >>> In order to support the Dual-Timer on the Oxford Semiconductor OX810SE SoC,
+> >>> implement variable counter width, keeping 32bit as default width.
+> >>> Add new compatible string oxsemi,ox810se-rps-timer in order to select
+> >>> the 24bit counter width.
+> >>>
+> >>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> >>> ---
+> >>>  drivers/clocksource/timer-sp804.c | 107 ++++++++++++++++++++++++--------------
+> >>>  include/clocksource/timer-sp804.h |  42 ++++++++++++---
+> >>>  2 files changed, 102 insertions(+), 47 deletions(-)
+> >>
+> >> I will take those patches but this driver really deserves a cleanup.
+> > 
+> > If it deserves a cleanup, then this should happen _BEFORE_ we add new
+> > functionality to it.
+> > 
+> > Thanks,
+> > 
+> > 	tglx
+> > 
+> 
+> Hi Thomas, Daniel,
+> 
+> Sure this driver should have a cleanup, but it still depends on old legacy vexpress calls.
+> 
+> The reason I submitted a change and a small cleanup over this driver is because the high
+> similarities of the HW and avoiding adding a brand new driver cloning much of its
+> functionalities.
 
-Furthermore, if that second attempt then finds the pool empty because
-someone else got there first, we conclude that something must have gone
-terribly wrong and it's the absolute end of the world. In practice,
-however, this can be hit relatively easily by dmatest with a suitably
-aggressive number of threads and channels on a multi-core system, and
-the fallout is a veritable storm of this sort of thing:
+Hi Neil,
 
-...
-[  709.328891] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
-** 10 printk messages dropped ** [  709.352280] dma-pl330 7ff00000.dma: __pl330_prep_dma_memcpy:2493 Unable to fetch desc
-** 11 printk messages dropped ** [  709.372930] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
-** 2 printk messages dropped ** [  709.372953] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
-** 8 printk messages dropped ** [  709.374157] dma-pl330 7ff00000.dma: __pl330_prep_dma_memcpy:2493 Unable to fetch desc
-** 41 printk messages dropped ** [  709.393095] dmatest: dma0chan4-copy1: result #4545: 'prep error' with src_off=0x3a32 dst_off=0x46dd len=0xc5c3 (0)
-...
+it is a good idea to avoid having new drivers when it is possible to group 
+them into a single one.
+ 
+> I propose to study an eventual cleanup, but could this change be submitted for 4.7 since
+> it's part of a base platform support serie ?
 
-Down with this sort of thing! The most sensible thing to do is avoid the
-allocate-add-remove dance entirely and simply use the freshly-allocated
-descriptor straight away. We can then further simplify the code and save
-unnecessary work by also inlining the initial pool allocation and
-removing add_desc() entirely.
+I am not against if the next patches you send are cleanups.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-I'm also seeing what looks like another occasional race under the same
-conditions where pl330_tx_submit() blows up from dma_cookie_assign()
-dereferencing a bogus tx->chan, but I think that's beyond my ability to
-figure out right now. Similarly the storm of WARNs from pl330_issue_pending()
-when using a large number of small buffers and dmatest.noverify=1. This
-one was some obvious low-hanging fruit.
-
-Robin.
-
- drivers/dma/pl330.c | 45 +++++++++++++--------------------------------
- 1 file changed, 13 insertions(+), 32 deletions(-)
-
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 372b4359da97..a196adb358f1 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2393,29 +2393,6 @@ static inline void _init_desc(struct dma_pl330_desc *desc)
- 	INIT_LIST_HEAD(&desc->node);
- }
- 
--/* Returns the number of descriptors added to the DMAC pool */
--static int add_desc(struct pl330_dmac *pl330, gfp_t flg, int count)
--{
--	struct dma_pl330_desc *desc;
--	unsigned long flags;
--	int i;
--
--	desc = kcalloc(count, sizeof(*desc), flg);
--	if (!desc)
--		return 0;
--
--	spin_lock_irqsave(&pl330->pool_lock, flags);
--
--	for (i = 0; i < count; i++) {
--		_init_desc(&desc[i]);
--		list_add_tail(&desc[i].node, &pl330->desc_pool);
--	}
--
--	spin_unlock_irqrestore(&pl330->pool_lock, flags);
--
--	return count;
--}
--
- static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
- {
- 	struct dma_pl330_desc *desc = NULL;
-@@ -2428,9 +2405,6 @@ static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
- 				struct dma_pl330_desc, node);
- 
- 		list_del_init(&desc->node);
--
--		desc->status = PREP;
--		desc->txd.callback = NULL;
- 	}
- 
- 	spin_unlock_irqrestore(&pl330->pool_lock, flags);
-@@ -2449,19 +2423,18 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
- 
- 	/* If the DMAC pool is empty, alloc new */
- 	if (!desc) {
--		if (!add_desc(pl330, GFP_ATOMIC, 1))
--			return NULL;
--
--		/* Try again */
--		desc = pluck_desc(pl330);
-+		desc = kzalloc(sizeof(*desc), GFP_ATOMIC);
- 		if (!desc) {
- 			dev_err(pch->dmac->ddma.dev,
- 				"%s:%d ALERT!\n", __func__, __LINE__);
- 			return NULL;
- 		}
-+		_init_desc(desc);
- 	}
- 
- 	/* Initialize the descriptor */
-+	desc->status = PREP;
-+	desc->txd.callback = NULL;
- 	desc->pchan = pch;
- 	desc->txd.cookie = 0;
- 	async_tx_ack(&desc->txd);
-@@ -2814,6 +2787,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	struct pl330_config *pcfg;
- 	struct pl330_dmac *pl330;
- 	struct dma_pl330_chan *pch, *_p;
-+	struct dma_pl330_desc *desc;
- 	struct dma_device *pd;
- 	struct resource *res;
- 	int i, ret, irq;
-@@ -2874,8 +2848,15 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	spin_lock_init(&pl330->pool_lock);
- 
- 	/* Create a descriptor pool of default size */
--	if (!add_desc(pl330, GFP_KERNEL, NR_DEFAULT_DESC))
-+	desc = kcalloc(NR_DEFAULT_DESC, sizeof(*desc), GFP_KERNEL);
-+	if (desc) {
-+		for (i = 0; i < NR_DEFAULT_DESC; i++) {
-+			_init_desc(&desc[i]);
-+			list_add_tail(&desc[i].node, &pl330->desc_pool);
-+		}
-+	} else {
- 		dev_warn(&adev->dev, "unable to allocate desc\n");
-+	}
- 
- 	INIT_LIST_HEAD(&pd->channels);
- 
--- 
-2.8.1.dirty
+Thomas ?
