@@ -1,57 +1,30 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Tue, 26 Apr 2016 15:43:25 +0200
-Subject: [PATCH 31/47] ARM: dts: r8a7794: Reference both DMA controllers
- in SCIFA nodes
-In-Reply-To: <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
- <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
- <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
- <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
-Message-ID: <20160426134325.GO28777@bigcity.dyn.berto.se>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Apr 2016 15:47:11 +0200
+Subject: [PATCH] ARM: at91/defconfig: add the HDMA controller to
+ sama5_defconfig
+Message-ID: <1461678431-17798-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Selection of the HDMAC option is now needed to allow some sama5 devices
+to have the DMA driver compiled.
 
-It seems Arnd have been dropped from this thread and I would appreciate 
-your feedback on this. Do you think it is a good idea to reference both 
-DMA controllers in this fashion to be able to get channels from either 
-of the two DMA controllers?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/sama5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Also to both of you if this is a good solution would you like me to 
-squash the patches per SoC and resend it? Olof pointed out it might be a 
-bit silly to do this in so many patches.
-
-On 2016-04-13 21:55:14 +0200, Geert Uytterhoeven wrote:
-> Hi Olof,
-> 
-> On Wed, Apr 13, 2016 at 9:48 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Sun, Apr 3, 2016 at 6:23 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> >> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> >> index eacb2b291361..4256557ca041 100644
-> >> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> >> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> >> @@ -296,8 +296,9 @@
-> >>                 interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-> >>                 clocks = <&mstp2_clks R8A7794_CLK_SCIFA0>;
-> >>                 clock-names = "fck";
-> >> -               dmas = <&dmac0 0x21>, <&dmac0 0x22>;
-> >> -               dma-names = "tx", "rx";
-> >> +               dmas = <&dmac0 0x21>, <&dmac0 0x22>,
-> >> +                      <&dmac1 0x21>, <&dmac1 0x22>;
-> >> +               dma-names = "tx", "rx", "tx", "rx";
-> >>                 power-domains = <&cpg_clocks>;
-> >>                 status = "disabled";
-> >>         };
-> >
-> > The names are no longer unique. So a get_<foo>_by_name() function no
-> > longer can work as expected.
-> 
-> That's intentional, and a relic of how dma_request_slave_channel_compat()
-> works: if e.g. the first "tx" channel can't be gotten (e.g. because
-> the referenced
-> DMAC instance ran out of channels), it will try the next one.
-
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index afbda413d61a..e002b3bba5b4 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -183,6 +183,7 @@ CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_AT91RM9200=y
+ CONFIG_DMADEVICES=y
++CONFIG_AT_HDMAC=y
+ CONFIG_AT_XDMAC=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_IIO=y
 -- 
-Regards,
-Niklas S?derlund
+2.1.3
