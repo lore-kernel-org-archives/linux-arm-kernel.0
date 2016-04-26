@@ -1,26 +1,89 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 26 Apr 2016 12:12:46 +0200
-Subject: [PATCH 4/4] ARM: remove duplicate const qualifier
-In-Reply-To: <20160425143731.GR32731@imgtec.com> (Eric Engestrom's message of
- "Mon, 25 Apr 2016 15:37:31 +0100")
-References: <1461577678-29517-1-git-send-email-eric.engestrom@imgtec.com>
- <20160425095715.GA2366@piout.net> <20160425103911.GO32731@imgtec.com>
- <4641918.pNBP5iAK01@wuerfel> <20160425125809.GP32731@imgtec.com>
- <alpine.LFD.2.20.1604250953200.5091@knanqh.ubzr>
- <20160425143731.GR32731@imgtec.com>
-Message-ID: <m337q8fzkx.fsf@t19.piap.pl>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Apr 2016 11:14:27 +0100
+Subject: [PATCH 23/45] KVM: arm/arm64: vgic-new: Add GICv3 MMIO handling
+ framework
+In-Reply-To: <1460740316-8755-24-git-send-email-andre.przywara@arm.com>
+References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+ <1460740316-8755-24-git-send-email-andre.przywara@arm.com>
+Message-ID: <571F3F83.3040503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Engestrom <eric.engestrom@imgtec.com> writes:
+On 15/04/16 18:11, Andre Przywara wrote:
+> Describe the GICv3 distributor and redistributor registers in our
+> structure. This adds a special macro to deal with the split of
+> SGI/PPI in the redistributor and SPIs in the distributor, which
+> allows us to reuse the existing GICv2 handlers for those registers
+> which are compatible.
+> Also we register the separate MMIO page for the redistributor
+> registers dealing with private interrupts.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
+> Changelog RFC..v1:
+> - adapt to new MMIO registration approach:
+>   register one device for the distributor and two for each VCPU
+> - implement special handling for private interrupts
+> - remove empty stub functions
+> - make IGROUPR return RAO
+> ---
+>  virt/kvm/arm/vgic/vgic.h      |  16 +++
+>  virt/kvm/arm/vgic/vgic_mmio.c | 269 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 285 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 59fddbf..ccae13e 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -40,6 +40,10 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+>  void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+>  void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
+>  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
+> +int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +			int offset, int len, void *val);
+> +int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +			  int offset, int len, void *val);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -61,6 +65,18 @@ static inline void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
+>  static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+>  {
+>  }
+> +
+> +static inline int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +				      int offset, int len, void *val)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+> +static inline int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +					int offset, int len, void *val)
+> +{
+> +	return -ENXIO;
+> +}
+>  #endif
+>  
+>  #endif
+> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+> index daa2e00..4a31d60 100644
+> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+> @@ -17,6 +17,8 @@
+>  #include <kvm/vgic/vgic.h>
+>  #include <linux/bitops.h>
+>  #include <linux/irqchip/arm-gic.h>
+> +#include <linux/irqchip/arm-gic-v3.h>
 
-> I can't confirm it (haven't tried), and don't care enough to do it :]
-> I guess I'm just dropping the patch then. Like I said, it can't hurt to
-> leave them in.
+This is going to cause no end of trouble in the long run. There two
+include files were never designed to co-exist, and it is only a matter
+of chance if they do not clash.
 
-Actually it may hurt (a little bit) - it makes the code less readable.
+I'm afraid we'll eventually need to split that file in vgic-mmio.c,
+vgic-mmio-v2.c and vgic-mmio-v3.c.
+
+Thanks,
+
+	M.
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Jazz is not dead. It just smells funny...
