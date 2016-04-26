@@ -1,66 +1,90 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Tue, 26 Apr 2016 16:58:32 +0800
-Subject: [PATCH v9 3/8] arm64: dts: mediatek: Add node for Mediatek Video
- Processor Unit
-In-Reply-To: <1461661117-4657-3-git-send-email-tiffany.lin@mediatek.com>
+Date: Tue, 26 Apr 2016 16:58:33 +0800
+Subject: [PATCH v9 4/8] dt-bindings: Add a binding for Mediatek Video Encoder
+In-Reply-To: <1461661117-4657-4-git-send-email-tiffany.lin@mediatek.com>
 References: <1461661117-4657-1-git-send-email-tiffany.lin@mediatek.com>
  <1461661117-4657-2-git-send-email-tiffany.lin@mediatek.com>
  <1461661117-4657-3-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1461661117-4657-4-git-send-email-tiffany.lin@mediatek.com>
+ <1461661117-4657-4-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1461661117-4657-5-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+Add a DT binding documentation of Video Encoder for the
+MT8173 SoC from Mediatek.
 
-Add VPU drivers for MT8173
-
-Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ .../devicetree/bindings/media/mediatek-vcodec.txt  |   59 ++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index eab7efc..ae147bb 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -125,6 +125,18 @@
- 		clock-output-names = "cpum_ck";
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		vpu_dma_reserved: vpu_dma_mem_region {
-+			compatible = "shared-dma-pool";
-+			reg = <0 0xb7000000 0 0x500000>;
-+			alignment = <0x1000>;
-+			no-map;
-+		};
-+	};
+diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+new file mode 100644
+index 0000000..59a47a5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+@@ -0,0 +1,59 @@
++Mediatek Video Codec
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
-@@ -269,6 +281,17 @@
- 			clock-names = "spi", "wrap";
- 		};
- 
-+		vpu: vpu at 10020000 {
-+			compatible = "mediatek,mt8173-vpu";
-+			reg = <0 0x10020000 0 0x30000>,
-+			      <0 0x10050000 0 0x100>;
-+			reg-names = "tcm", "cfg_reg";
-+			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&topckgen CLK_TOP_SCP_SEL>;
-+			clock-names = "main";
-+			memory-region = <&vpu_dma_reserved>;
-+		};
++Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
++supports high resolution encoding functionalities.
 +
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 				     "mediatek,mt6577-sysirq";
++Required properties:
++- compatible : "mediatek,mt8173-vcodec-enc" for encoder
++- reg : Physical base address of the video codec registers and length of
++  memory mapped region.
++- interrupts : interrupt number to the cpu.
++- mediatek,larb : must contain the local arbiters in the current Socs.
++- clocks : list of clock specifiers, corresponding to entries in
++  the clock-names property.
++- clock-names: encoder must contain "venc_sel_src", "venc_sel",
++- "venc_lt_sel_src", "venc_lt_sel".
++- iommus : should point to the respective IOMMU block with master port as
++  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
++  for details.
++- mediatek,vpu : the node of video processor unit
++
++Example:
++vcodec_enc: vcodec at 0x18002000 {
++    compatible = "mediatek,mt8173-vcodec-enc";
++    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
++          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
++    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
++		 <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
++    mediatek,larb = <&larb3>,
++		    <&larb5>;
++    iommus = <&iommu M4U_PORT_VENC_RCPU>,
++             <&iommu M4U_PORT_VENC_REC>,
++             <&iommu M4U_PORT_VENC_BSDMA>,
++             <&iommu M4U_PORT_VENC_SV_COMV>,
++             <&iommu M4U_PORT_VENC_RD_COMV>,
++             <&iommu M4U_PORT_VENC_CUR_LUMA>,
++             <&iommu M4U_PORT_VENC_CUR_CHROMA>,
++             <&iommu M4U_PORT_VENC_REF_LUMA>,
++             <&iommu M4U_PORT_VENC_REF_CHROMA>,
++             <&iommu M4U_PORT_VENC_NBM_RDMA>,
++             <&iommu M4U_PORT_VENC_NBM_WDMA>,
++             <&iommu M4U_PORT_VENC_RCPU_SET2>,
++             <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
++             <&iommu M4U_PORT_VENC_BSDMA_SET2>,
++             <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
++             <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
++             <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
++             <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
++             <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
++             <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
++    mediatek,vpu = <&vpu>;
++    clocks = <&topckgen CLK_TOP_VENCPLL_D2>,
++             <&topckgen CLK_TOP_VENC_SEL>,
++             <&topckgen CLK_TOP_UNIVPLL1_D2>,
++             <&topckgen CLK_TOP_VENC_LT_SEL>;
++    clock-names = "venc_sel_src",
++                  "venc_sel",
++                  "venc_lt_sel_src",
++                  "venc_lt_sel";
++  };
 -- 
 1.7.9.5
