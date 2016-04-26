@@ -1,51 +1,31 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 26 Apr 2016 13:52:06 +0000
-Subject: [PATCH 0/3 v2] arm64: defconfig updates
-In-Reply-To: <20160426101546.GI8870@tiger>
-References: <1461167836-3163-1-git-send-email-stuart.yoder@nxp.com>
- <20160426101546.GI8870@tiger>
-Message-ID: <HE1PR04MB1641EB5615245CC5A5BE041F8D630@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Apr 2016 15:52:38 +0200
+Subject: [PATCH v2] pinctrl-exynos5440: Use off-stack memory for
+ pinctrl_gpio_range
+In-Reply-To: <1461117257-27048-1-git-send-email-andrew@aj.id.au>
+References: <1461117257-27048-1-git-send-email-andrew@aj.id.au>
+Message-ID: <CACRpkdYczBP58uS4nVpUGUevb7E+OCXmXA60SydigQo=AzX8Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 20, 2016 at 3:54 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
 
+> The range is registered into a linked list which can be referenced
+> throughout the lifetime of the driver. Ensure the range's memory is useful
+> for the same lifetime by adding it to the driver's private data structure.
+>
+> The bug was introduced in the driver's initial commit, which was present in
+> v3.10.
+>
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
+> Cc: stable at vger.kernel.org
+> ---
+> Since v1:
+>
+> * Add range member kerneldoc addressing Tomasz Figa's comment
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Tuesday, April 26, 2016 5:16 AM
-> To: Stuart Yoder <stuart.yoder@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com; will.deacon at arm.com;
-> kernel at pengutronix.de; Yang-Leo Li <leoyang.li@nxp.com>; Scott Wood <scott.wood@nxp.com>;
-> marc.zyngier at arm.com; mark.rutland at arm.com
-> Subject: Re: [PATCH 0/3 v2] arm64: defconfig updates
-> 
-> On Wed, Apr 20, 2016 at 10:57:16AM -0500, Stuart Yoder wrote:
-> > Stuart Yoder (3):
-> >   arm64: defconfig: cleanup the defconfig
-> >   arm64: defconfig: enable 48-bit virtual addresses
-> 
-> Applied these two.
-> 
-> >   arm64: defconfig: enable freescale/nxp config options
-> 
-> But this one doesn't apply to v4.6-rc1.
+Patch applied with the ACKs.
 
-Yes.  There is a patch from Will that went into rc2 that was a major
-defconfig update:
-   431597b arm64: defconfig: updates for 4.6
-
-...so basing my patch on rc1 would have caused it not to apply to 
-later kernels.
-
-The only sane thing I could think of to do was base my patches against
-the latest rc, which was 4.6-rc4, which I mentioned in the cover
-letter.
-
-I can rebase that patch if needed, but it will most likely produce a merge
-conflict later.  The defconfig file really should not be hand edited,
-because that will quite likely cause it to get out of sync with what
-'make savedefconfig' produces...so I'm trying to avoid someone having
-to manually fix a merge conflict.
-
-Thanks,
-Stuart
+Yours,
+Linus Walleij
