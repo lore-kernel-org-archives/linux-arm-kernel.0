@@ -1,105 +1,77 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Tue, 26 Apr 2016 14:03:27 +0530
-Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
-In-Reply-To: <20160425205650.GA31129@lunn.ch>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <1461230323-27891-2-git-send-email-pramod.kumar@broadcom.com>
- <20160425205650.GA31129@lunn.ch>
-Message-ID: <666dffb41a922b0c8638f2f002a2de08@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Tue, 26 Apr 2016 08:35:23 +0000
+Subject: [PATCH V2] ASoC: bcm2835: Register as custom PCM device to enable
+ 16bit pcm
+Message-ID: <1461659723-5382-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+From: Matthias Reichl <hias@horus.com>
 
-Thanks for reviewing. I really appreciate your effort it.
+Register as a custom pcm device with the correct settings supporting
+also 16 bit.
 
-I am already aware of MDIO mux framework but did not see it fit for our
-use case due to below limitations:
+The automatic pcm discovery does not enable 16 bit modes because
+of a percived mismatch between the dma controller only
+supporting 32 bit transfers and the requirement by the HW to only
+support exactly 2 channels, which effectively results in a minimum
+size of 32 bits, which matches the dma controller transfer width.
 
-1.  Current MDIO mux framework is Ethernet centric and it is only meant to
-mux multiple MII buses using same MDIO controller.  This means it is only
-meant for MII-compliant PHY devices (i.e. PHY devices having registers
-as-per MII specs). This is not the case with Broadcom SATA PHYs, PCIe
-PHYs, and USB PHYs even if we are sharing same MDIO controller for
-accessing these PHYs.
+Code ported from bcm2708-i2s driver in Raspberry Pi tree.
 
-2.  The MDIO mux framework registers each child bus as MII bus. The Linux
-Ethernet MDIO framework will scan for all attached PHY devices on given
-MII bus and try to read MII PHY_ID register which is not present in all
-Broadcom non-ethernet PHYs.
+Signed-off-by: Florian Meier <florian.meier@koalo.de>
+Signed-off-by: Matthias Reichl <hias@horus.com>
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-3. Let's say we ignore point1 and point2 above and go ahead and use MDIO
-mux framework then we will still have to emulated MII PHY_ID read for
-non-ethernet PHYs. Let's say we also emulate MII PHY_ID read in
-non-ethernet PHYs then next thing is non-ethernet PHYs don't follow MII
-state machine so all other MII PHY register read/write will not work.
+Changelog:
+  V1 -> V2: use of SZ_* defines instead of multiple of page size
+            better description of commit message
+---
+ sound/soc/bcm/bcm2835-i2s.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-4. Apart from these, by using MDIO mux framework we are making our
-non-ethernet PHYs dependent on Linux network drivers which is not
-acceptable. What if some product line does not need network subsystem at
-all?
-
-As you can see from above points, trying to re-use Linux Ethernet MDIO mux
-framework for non-Ethernet PHYs is not the right way. The sole reason
-being Linux MDIO mux framework is not generic enough to be shared across
-IO subsystems. Due to this reason we had to come-up with "Shared MDIO
-framework" which is very simple, generic  and independent of I/O
-subsystems.
-
-I'll add PCIe PHYs driver based on Shared MDIO framework in next patch
-revision to get a feel of its need.
-
-Regards,
-Pramod
-
-> -----Original Message-----
-> From: Andrew Lunn [mailto:andrew at lunn.ch]
-> Sent: 26 April 2016 02:27
-> To: Pramod Kumar
-> Cc: Rob Herring; Catalin Marinas; Will Deacon; Masahiro Yamada; Chen-Yu
-Tsai;
-> Mark Rutland; devicetree at vger.kernel.org; Pawel Moll; Arnd Bergmann;
-Suzuki
-> K Poulose; netdev at vger.kernel.org; Punit Agrawal; linux-
-> kernel at vger.kernel.org; BCM Kernel Feedback; linux-arm-
-> kernel at lists.infradead.org; Anup Patel
-> Subject: Re: [PATCH 1/6] bus: Add shared MDIO bus framework
->
-> Hi Pramod
->
-> I took a closer look. I don't see why the current MDIO code should not
-be used,
-> rather than adding a new framework.
->
-> What you need for your Non Ethernet PHYs is that they are somehow
-probed.
-> The current MDIO code will do that, based on the compatible string. An
-mdio
-> device gets passed a struct mdio_device * to its probe function, giving
-you the
-> bus and address on the bus for the device. Your PHY driver can then
-register
-> itself using devm_of_phy_provider_register(). The user of the PHY then
-needs to
-> use
-> devm_phy_get() to get a handle on the phy, and can then use
-> phy_power_on()/phy_power_off().
->
-> There is a very simple example here for an MDIO device driver:
->
-> http://thread.gmane.org/gmane.linux.network/393532
->
-> The muxing of the MDIO busses looks a little tricky. At the moment you
-have:
->
->     writel(cmd, base + MDIO_PARAM_OFFSET);
->
-> which mixes together the muxing parameters and the write value. Can this
-> register be accessed as two 16 bit registers? If it can be, you can
-cleanly
-> separate out the muxing.
->
-> Take a look at mdio-mux-gpio.c and mdio-mux-mmioreg.c for examples of
-> MDIO muxes.
->
->      Andrew
+diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+index a0026e2..66680f1 100644
+--- a/sound/soc/bcm/bcm2835-i2s.c
++++ b/sound/soc/bcm/bcm2835-i2s.c
+@@ -632,6 +632,27 @@ static const struct snd_soc_component_driver bcm2835_i2s_component = {
+ 	.name		= "bcm2835-i2s-comp",
+ };
+ 
++static const struct snd_pcm_hardware bcm2835_pcm_hardware = {
++	.info			= SNDRV_PCM_INFO_INTERLEAVED |
++				  SNDRV_PCM_INFO_JOINT_DUPLEX |
++				  SNDRV_PCM_INFO_MMAP |
++				  SNDRV_PCM_INFO_MMAP_VALID,
++	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
++				  SNDRV_PCM_FMTBIT_S24_LE |
++				  SNDRV_PCM_FMTBIT_S32_LE,
++	.period_bytes_min	= 32,
++	.period_bytes_max	= SZ_256K,
++	.periods_min		= 2,
++	.periods_max		= 255,
++	.buffer_bytes_max	= SZ_512K,
++};
++
++static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
++	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
++	.pcm_hardware = &bcm2835_pcm_hardware,
++	.prealloc_buffer_size = SZ_1M,
++};
++
+ static int bcm2835_i2s_probe(struct platform_device *pdev)
+ {
+ 	struct bcm2835_i2s_dev *dev;
+@@ -704,7 +725,9 @@ static int bcm2835_i2s_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
++	ret = devm_snd_dmaengine_pcm_register(
++		&pdev->dev, &bcm2835_dmaengine_pcm_config,
++		SND_DMAENGINE_PCM_FLAG_COMPAT);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
+ 		return ret;
+-- 
+2.1.4
