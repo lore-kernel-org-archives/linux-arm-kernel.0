@@ -1,82 +1,82 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 26 Apr 2016 16:21:40 +0200
-Subject: [GIT PULL] STi DT updates for v4.7 #1
-In-Reply-To: <20160413220539.GZ19945@localhost>
-References: <5707B032.60401@st.com> <20160413220539.GZ19945@localhost>
-Message-ID: <571F7974.5050807@st.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Tue, 26 Apr 2016 16:21:57 +0200
+Subject: [PATCH v5 4/4] printk/nmi: flush NMI messages on the system panic
+In-Reply-To: <20160423034924.GA535@swordfish>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-5-git-send-email-pmladek@suse.com>
+ <20160423034924.GA535@swordfish>
+Message-ID: <20160426142157.GK2749@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Sat 2016-04-23 12:49:24, Sergey Senozhatsky wrote:
+> Hello Petr,
+> 
+> On (04/21/16 13:48), Petr Mladek wrote:
+> >  extern void printk_nmi_flush(void);
+> > +extern void printk_nmi_flush_on_panic(void);
+> >  #else
+> >  static inline void printk_nmi_flush(void) { }
+> > +static inline void printk_nmi_flush_on_panic(void) { }
+> [..]
+> > +void printk_nmi_flush_on_panic(void)
+> > +{
+> > +	/*
+> > +	 * Make sure that we could access the main ring buffer.
+> > +	 * Do not risk a double release when more CPUs are up.
+> > +	 */
+> > +	if (in_nmi() && raw_spin_is_locked(&logbuf_lock)) {
+> > +		if (num_online_cpus() > 1)
+> > +			return;
+> > +
+> > +		debug_locks_off();
+> > +		raw_spin_lock_init(&logbuf_lock);
+> > +	}
+> > +
+> > +	printk_nmi_flush();
+> > +}
+> [..]
+> > -static DEFINE_RAW_SPINLOCK(logbuf_lock);
+> > +DEFINE_RAW_SPINLOCK(logbuf_lock);
+> 
+> just an idea,
+> 
+> how about doing it a bit differently?
+> 
+> 
+> move printk_nmi_flush_on_panic() to printk.c, and place it next to
+> printk_flush_on_panic() (so we will have two printk "flush-on-panic"
+> functions sitting together). /* printk_nmi_flush() is in printk.h,
+> so it's visible to printk anyway */
+> 
+> it also will let us keep logbuf_lock static, it's a bit too internal
+> to printk to expose it, I think.
+> 
+> IOW, something like this?
 
-On 04/14/2016 12:05 AM, Olof Johansson wrote:
-> Hi,
->
-> On Fri, Apr 08, 2016 at 03:20:50PM +0200, Maxime Coquelin wrote:
->> Hi Olof, Arnd and Kevin,
->>
->> Please consider this first round of STi DT updates for v4.7:
->>
->> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
->>
->>    Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git
->> tags/sti-dt-for-v4.7-1
->>
->> for you to fetch changes up to a8ff73843d015af1a65e94604677c2efd9ae70d4:
->>
->>    ARM: STi: DT: STih407: Switch LPC mode from RTC to Clocksource (2016-04-05
->> 15:42:29 +0200)
->>
->> ----------------------------------------------------------------
->> Highlights:
->> -----------
->>   - Add CPUFreq support to STiH407 family
->>   - Add Mailbox nodes to STiH407 family
->>   - Add RemoteProc nodes to STiH407 family
->>   - Use 'reserved-memory' for DMA memory on STiH407
->>   - Use the LPC timer as a clocksource
->>
->> ----------------------------------------------------------------
->> Lee Jones (9):
->>        ARM: STi: STiH407: Provide generic (safe) DVFS configuration
->>        ARM: STi: STiH407: Provide CPU with clocking information
->>        ARM: STi: STiH407: Link CPU with its voltage supply
->>        ARM: STi: STiH407: Provide CPU with a means to look-up Major number
->>        ARM: STi: stih407-family: Add nodes for Mailbox
->>        ARM: STi: DT: STiH407: Enable Mailbox testing facility
->>        ARM: STiH407: Add nodes for RemoteProc
->>        ARM: STiH407: Move over to using the 'reserved-memory' API for
->> obtaining DMA memory
->>        ARM: STi: DT: STih407: Switch LPC mode from RTC to Clocksource
-> We use the format;
->
-> ARM: dts: STi: <...>
->
-> for DT changes.
-Noted.
->
-> Also, I've sent several replies directly to patches that should be
-> revisited (or dropped):
->
-> ARM: STi: stih407-family: Add nodes for Mailbox: Fix unit-ids.
->
-> ARM: STi: DT: STiH407: Enable Mailbox testing facility: Should probably not be
-> in DT.
->
-> ARM: STiH407: Add nodes for RemoteProc: Doesn't conform to the bindings patch.
-Lee has reworked his series, and all should be fine now.
-For "ARM: STiH407: Add nodes for RemoteProc", the following patch does 
-the change to conform with the bindings.
-It is not squashed in order to keep first reporter's "Suggested-by"
+It is rather cosmetic change. I 
 
->
-> All in all, please do more due diligence on your patches before you send
-> them, so we can avoid doing it at our level.
-Ok, I will be more careful next time.
+> ---
+> 
+>  kernel/printk/internal.h |  2 --
+>  kernel/printk/nmi.c      | 27 ---------------------------
+>  kernel/printk/printk.c   | 29 ++++++++++++++++++++++++++++-
+>  3 files changed, 28 insertions(+), 30 deletions(-)
+> 
+> diff --git a/kernel/printk/internal.h b/kernel/printk/internal.h
+> index 7fd2838..341bedc 100644
+> --- a/kernel/printk/internal.h
+> +++ b/kernel/printk/internal.h
+> @@ -22,8 +22,6 @@ int __printf(1, 0) vprintk_default(const char *fmt, va_list args);
+>  
+>  #ifdef CONFIG_PRINTK_NMI
+>  
+> -extern raw_spinlock_t logbuf_lock;
 
-Thanks,
-Maxime
+Well, it was exposed only in the internal.h header file. I consider
+this rather a cosmetic change and do not have strong opinion about it. :-)
+
+Anyway, thanks a lot for review.
+
+Best Regards,
+Petr
