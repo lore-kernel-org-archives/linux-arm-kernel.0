@@ -1,42 +1,85 @@
-From: jay.xu@rock-chips.com (jay.xu)
-Date: Tue, 26 Apr 2016 09:27:16 +0800
-Subject: [PATCH RESEND v2 4/4] ARM64: dts: rockchip: add dts file for
- RK3399 evaluation board
-In-Reply-To: <CAD=FV=UQxoGYsrw8C2VT_-oYs3ZuJQ6eM1HAFemoGrcDJoOHfw@mail.gmail.com>
-References: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
- <1461304307-14113-5-git-send-email-jay.xu@rock-chips.com>
- <571D7723.1020707@gmail.com> <4687144.rPskt7YEHJ@diego>
- <CAD=FV=UQxoGYsrw8C2VT_-oYs3ZuJQ6eM1HAFemoGrcDJoOHfw@mail.gmail.com>
-Message-ID: <571EC3F4.2070703@rock-chips.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 26 Apr 2016 11:28:38 +1000
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates
+ for v4.7
+Message-ID: <cover.1461632180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug:
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 2016?04?26? 06:23, Doug Anderson wrote:
-> Hi,
->
-> On Mon, Apr 25, 2016 at 12:37 AM, Heiko St?bner <heiko@sntech.de> wrote:
->>> Can we add the following strings to match the loader (coreboot)?
->>>    No matter, we can match the loader(coreboot) to bring up the evb board
->>> on now or in the future.
->>>
->>> ...,"google,rk3399evb-rev3",
->>> google,rk3399evb-rev2",google,rk3399evb-rev1","google,rk3399evb-rev0"
->>
->> Yep, that should be no problem ... i.e. we also have this longer list of board
->> matches for the previous veyron boards (both in the dts files as well as the
->> board-binding document)
->
-> Just to make sure we're on the same page: I presume we're expecting
-> the Jay spin with this change?
->
-Got it, and do you think it's better to use rk3399-evb-rev1 but 
-rk3399evb-rev1, since the dts use rk3399-evb ?
+Please consider these second round of Renesas ARM based SoC R-Car SYSC
+updates for v4.7.
 
-Anyway I just want to point out that we needn't to fix in the future.
+This pull request is based on a merge of:
 
-> -Doug
->
->
->
+* Thee previous round of such requests, tagged as renesas-rcar-sysc-for-v4.7,
+  which you have previously pulled.
+* The clk-renesas-for-v4.7-tag2 tag of Geert Uytterhoeven's renesas-drivers
+  tree which has been accepted into clk-next by Stephen Boyd.
+
+There are follow-up DT changes that depend on this driver which I plan to
+send in a pull-request for in the near future.
+
+
+The following changes since commit a93fed0956bef9e4df420aa181198d86d347895d:
+
+  Merge tag 'clk-renesas-for-v4.7-tag2' of git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers into rcar-sysc-for-v4.7 (2016-04-22 17:22:21 +1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-rcar-sysc2-for-v4.7
+
+for you to fetch changes up to 23f1e2ecdecee9f2ec45de0a468b82bb1f7f3ca2:
+
+  soc: renesas: rcar-sysc: Add support for R-Car H3 power areas (2016-04-26 09:56:38 +1000)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC R-Car SYSC Updates for v4.7
+
+Introduce a DT-based driver for the R-Car System Controller, as found on
+Renesas R-Car H1, R-Car Gen2, and R-Car Gen3 SoCs.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (11):
+      soc: renesas: Move pm-rcar to drivers/soc/renesas/rcar-sysc
+      soc: renesas: rcar-sysc: Improve rcar_sysc_power() debug info
+      soc: renesas: rcar-sysc: Add DT support for SYSC PM domains
+      soc: renesas: rcar-sysc: Make rcar_sysc_power_is_off() static
+      soc: renesas: rcar-sysc: Enable Clock Domain for I/O devices
+      soc: renesas: rcar-sysc: Add support for R-Car H1 power areas
+      soc: renesas: rcar-sysc: Add support for R-Car H2 power areas
+      soc: renesas: rcar-sysc: Add support for R-Car M2-W power areas
+      soc: renesas: rcar-sysc: Add support for R-Car M2-N power areas
+      soc: renesas: rcar-sysc: Add support for R-Car E2 power areas
+      soc: renesas: rcar-sysc: Add support for R-Car H3 power areas
+
+ MAINTAINERS                                        |   4 +
+ arch/arm/mach-shmobile/Kconfig                     |  11 +-
+ arch/arm/mach-shmobile/Makefile                    |   1 -
+ arch/arm/mach-shmobile/pm-r8a7779.c                |   3 +-
+ arch/arm/mach-shmobile/pm-rcar-gen2.c              |   2 +-
+ arch/arm/mach-shmobile/pm-rcar.c                   | 164 ---------
+ arch/arm/mach-shmobile/smp-r8a7779.c               |   2 +-
+ arch/arm/mach-shmobile/smp-r8a7790.c               |   2 +-
+ drivers/soc/Makefile                               |   3 +-
+ drivers/soc/renesas/Makefile                       |   7 +
+ drivers/soc/renesas/r8a7779-sysc.c                 |  34 ++
+ drivers/soc/renesas/r8a7790-sysc.c                 |  48 +++
+ drivers/soc/renesas/r8a7791-sysc.c                 |  33 ++
+ drivers/soc/renesas/r8a7794-sysc.c                 |  33 ++
+ drivers/soc/renesas/r8a7795-sysc.c                 |  56 +++
+ drivers/soc/renesas/rcar-sysc.c                    | 401 +++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.h                    |  58 +++
+ .../linux/soc/renesas/rcar-sysc.h                  |   9 +-
+ 18 files changed, 690 insertions(+), 181 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/pm-rcar.c
+ create mode 100644 drivers/soc/renesas/Makefile
+ create mode 100644 drivers/soc/renesas/r8a7779-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7790-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7791-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7795-sysc.c
+ create mode 100644 drivers/soc/renesas/rcar-sysc.c
+ create mode 100644 drivers/soc/renesas/rcar-sysc.h
+ rename arch/arm/mach-shmobile/pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h (60%)
