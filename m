@@ -1,46 +1,126 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 26 Apr 2016 12:31:24 -0700
-Subject: [PATCH V2] clk: bcm2835: mark enabled pll_dividers as critical
-In-Reply-To: <1461660989-11846-1-git-send-email-kernel@martin.sperl.org>
-References: <1461660989-11846-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <8737q8dv5f.fsf@eliezer.anholt.net>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 26 Apr 2016 22:35:08 +0300
+Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
+References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
+ <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
+Message-ID: <571FC2EC.9090605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On 04/26/2016 07:02 PM, Liviu Dudau wrote:
+> On Tue, Apr 26, 2016 at 06:28:52PM +0300, Grygorii Strashko wrote:
+> 
+> Hi Grygorii,
+> 
+> First time I'm seeing this patch, so I have a few questions, mostly
+> related to the commit message:
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> The bcm2835 firmware enables several clocks and plls before
-> booting the linux kernel.
->
-> These plls should never get disabled as it may result in a
-> stopped system clock and more.
->
-> So during probing we check if the pll_divider is enabled
-> and if it is then mark that pll_divider as critical.
-> As a consequence this will also enable the corresponding parent pll.
->
-> Here the list of pll_div that are marked as critical:
-> [    2.022437] bcm2835-clk 20101000.cprman: found enabled pll_div plla_core - marking it as critical
-> [    2.031640] bcm2835-clk 20101000.cprman: found enabled pll_div pllb_arm - marking it as critical
-> [    2.040966] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_core0 - marking it as critical
-> [    2.050351] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_per - marking it as critical
-> [    2.059427] bcm2835-clk 20101000.cprman: found enabled pll_div plld_core - marking it as critical
-> [    2.068590] bcm2835-clk 20101000.cprman: found enabled pll_div plld_per - marking it as critical
-> [    2.077724] bcm2835-clk 20101000.cprman: found enabled pll_div pllh_pix - marking it as critical
+Hm. You are in cc for RFC.
+Sry, forgot to add link [1].
 
-Yeah, pllh_pix isn't critical, though.  We want it to get turned off
-when the driver asks to disable its clock, or we're going to just waste
-a pile of power.
+> 
+>> This patch intended to fix following cases:
+>> - SoC-A has ARM GT, defines DT node for ARM GT and selects
+>> ARM_GLOBAL_TIMER statically in Kconfig file. SoC-B has ARM GT and
+>> defines DT node for ARM GT, but do not selects ARM_GLOBAL_TIMER
+>> statically in Kconfig file. In case of multiplatform build ARM GT will
+>> be implicitly enabled for SoC-B.
+> 
+> Well, SoC-B has the GT *and* the DT node, so what is the problem with
+> enabling it for SoC-B? If there are reasons not to use the Global Timer
+> on SoC-B, surely a better option would be to mark it in DT with status = "disabled";
 
-I'm sending out a patch that marks the VPU clock as critical (it's the
-also AXI bus, so it certainly is critical), which should solve your
-aux_uart clock disabling problem, I think.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/cd74e134/attachment-0001.sig>
+This was rejected [2]. DT describes HW and if it is functional the status = "disabled"
+is not good choice.
+ARM GT can't be used as clocksource/sched_clock/clockevent when CPUFreq or
+CPUIdle are enabled :(, and this is Linux specific functionality and
+not HW description. 
+
+> 
+>>
+>> - There is no way to disable ARM GT without modifying Kconfig file,
+>> once ARM_GLOBAL_TIMER is selected statically in Kconfig file.
+> 
+> What about disabling the DT node?
+> 
+> Not sure I properly understand the problem you are trying to solve here.
+
+I'd like to have way to enable/disable ARM GT without modifying Kernel sources
+(Kconfig specifically) which is now impossible.
+
+> 
+>>
+>> Hence, fix above case by defining both HAVE_ARM_GLOBAL_TIMER and
+>> ARM_GLOBAL_TIMER as recommended by 'Adding common features and make
+>> the usage configurable' section in kconfig-language.txt. All places in
+>> ARM folder where ARM_GLOBAL_TIMER was used now replaced on
+>> HAVE_ARM_GLOBAL_TIMER.
+> 
+> I'm OK with the way you have changed ARM_GLOBAL_TIMER from a sticky config
+> option to a selectable one, but I would like more details on the problem
+> this was causing you.
+> 
+
+The same HW (board) could be used with PM features enabled (power saving)
+and disabled (-RT). Without this change it will require to have
+and maintain two branches, but with it - just separate defconfig.
+
+[1] http://lists.infradead.org/pipermail/linux-rockchip/2016-February/007159.html
+[2] http://www.spinics.net/lists/devicetree/msg102918.html
+
+> 
+>>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Florian Fainelli <f.fainelli@gmail.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Wei Xu <xuwei5@hisilicon.com>
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+>> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Jun Nie <jun.nie@linaro.org>
+>> Cc: Michal Simek <michal.simek@xilinx.com>
+>> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+>> Cc: Lars Persson <lars.persson@axis.com>
+>> Cc: Mike Looijmans <mike.looijmans@topic.nl>
+>> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>> Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>> Changes is v1:
+>> - updated mach-artpec
+>> - rebased on top of tip: timers/core
+>>    commit: 86d3473 time: Introduce do_sys_settimeofday64()
+>>
+>>   arch/arm/mach-artpec/Kconfig   | 2 +-
+>>   arch/arm/mach-bcm/Kconfig      | 4 ++--
+>>   arch/arm/mach-hisi/Kconfig     | 2 +-
+>>   arch/arm/mach-imx/Kconfig      | 2 +-
+>>   arch/arm/mach-rockchip/Kconfig | 2 +-
+>>   arch/arm/mach-sti/Kconfig      | 2 +-
+>>   arch/arm/mach-uniphier/Kconfig | 2 +-
+>>   arch/arm/mach-vexpress/Kconfig | 2 +-
+>>   arch/arm/mach-zx/Kconfig       | 2 +-
+>>   arch/arm/mach-zynq/Kconfig     | 2 +-
+>>   drivers/clocksource/Kconfig    | 7 ++++++-
+>>   11 files changed, 17 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-artpec/Kconfig b/arch/arm/mach-artpec/Kconfig
+>> index 6cbe5a2..6cbca77 100644
+>> --- a/arch/arm/mach-artpec/Kconfig
+>> +++ b/arch/arm/mach-artpec/Kconfig
+>> @@ -9,7 +9,7 @@ config MACH_ARTPEC6
+>>   	depends on ARCH_MULTI_V7
+>>   	select ARM_AMBA
+>>   	select ARM_GIC
+>> -	select ARM_GLOBAL_TIMER
+
+[...]
+
+-- 
+regards,
+-grygorii
