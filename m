@@ -1,127 +1,56 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 26 Apr 2016 18:43:38 +0200
-Subject: [lkp] [PATCH v7 7/8] genirq/msi: map/unmap the MSI doorbells on
- msi_domain_alloc/free_irqs
-In-Reply-To: <20160426012413.GC11960@yexl-desktop>
-References: <201604200215.XNyvZSsl%fengguang.wu@intel.com>
- <57173407.9040401@linaro.org> <20160426012413.GC11960@yexl-desktop>
-Message-ID: <571F9ABA.8020307@linaro.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 26 Apr 2016 09:48:28 -0700
+Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <20160426133500.GQ27312@arm.com>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160425111338.GJ16065@arm.com> <571E4A2A.8070908@caviumnetworks.com>
+ <571EFD1B.1070609@linaro.org> <20160426121547.GL27312@arm.com>
+ <571F671D.70401@linaro.org> <20160426133500.GQ27312@arm.com>
+Message-ID: <571F9BDC.5090804@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiaolong
-On 04/26/2016 03:24 AM, Ye Xiaolong wrote:
-> On Wed, Apr 20, 2016 at 09:47:19AM +0200, Eric Auger wrote:
->> Hi,
+On 04/26/2016 06:35 AM, Will Deacon wrote:
+> On Tue, Apr 26, 2016 at 09:03:25PM +0800, Hanjun Guo wrote:
+>> On 2016/4/26 20:15, Will Deacon wrote:
+>>> On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
+>>>> On 2016/4/26 0:47, David Daney wrote:
+[...]
+>>>>>> Given that this ACPI series already requires some significant cross-arch
+>>>>>> interaction (which is actually good!), perhaps extending the clean-up
+>>>>>> patches to encompass some of the ACPI bits might make sense, and we can
+>>>>>> get that queued as a pre-requisite.
+>>>>>
+>>>>> The cleanup patches you mention above are really independent of the ACPI
+>>>>> things.  I have applied them both before and after the ACPI patches, and
+>>>>> both seem to work.  With a quick perusal of the ACPI patches nothing
+>>>>> jumps out at me as being a candidate for inclusion in the header file
+>>>>> cleanup series.
+>>>>
+>>>> I agree. My patch set is ACPI related enablement, cleanups and
+>>>> consolidations, it would be good to merge as a single patch set
+>>>> as it's self-contained.
+>>>
+>>> Up to you. I just thought you might want to avoid having two sets of
+>>> cross-arch changes and the associated merging headaches that go with
+>>> that.
 >>
-> Hi, Eric
->> Both reported errors related to this series are due to the fact part n
->> has dependency on part n-1.
->>
-> 
-> If I understand correctly, what you meant is that you send patch series
-> (let's say B), and B has its dependency patch series A which is in-flight
-> and hasn't been merged, so the commit history is like:
-> 
->         ---P---A---B
-> 
-> where P is the well-known commit in public linux tree. In this case,
-> 0day just applied B based on P without A, thus caused the build error.
+>> Good point, as I suggested above, it can go with ACPI tree if it's ok
+>> to you and Rafael. The problem we have now is that dt based core NUMA
+>> support for ARM64 is queued in your tree, that would be the headache.
+>
+> Sorry, but if you wanted me *not* to queue the patches, then you should
+> have said so (similarly, if you wanted a stable branch). I'm not rebasing
+> our for-next/core branch now.
 
-yes that's it.
-> 
->> Does anyone know how to let the 0-day CI robot know about such
->> dependency between series?
->>
-> 
-> Currently, we have proposed to add a new '--base' option for git-format-patch
-> to git community[1], developers could use this option to record the base tree
-> information which could help 0day to identify the state the patch series
-> applies to, thus 0day could avoid false report like this case.
-> 
-> For example, imagine that on top of the public commit P, you applied well-known
-> patches X, Y and Z from somebody else or yourself, and then built your
-> three-patch series A, B, C, the history would be like:
-> 
-> ................................................
-> ---P---X---Y---Z---A---B---C
-> ................................................
-> 
-> With `git format-patch --base=P -3 C` (or variants thereof, e.g. with
-> `--cover-letter` of using `Z..C` instead of `-3 C` to specify the
-> range), the base tree information block is shown at the end of the
-> first message the command outputs (either the first patch, or the
-> cover letter), like this:
-> 
-> ------------
-> base-commit: P
-> prerequisite-patch-id: X
-> prerequisite-patch-id: Y
-> prerequisite-patch-id: Z
-> ------------
-> 
-> Now this feature is still under review in git community[2], hope it could be
-> merged in next git release.
+I am quite happy with the fact that you put the base device-tree based 
+NUMA patches on for-next/core.
 
-OK. That's good to know. Thank you very much for the info. I will follow
-the progress then.
+There is only a very small adjustment to those in the ACPI-NUMA patches 
+([PATCH v5 06/14] arm64, numa: rework numa_add_memblk()), so I think we 
+are fine as far as that goes.
 
-Best Regards
+My plan is to post a v6 later today that adjusts some of the messages 
+printed out and adds some Reviewed-by and Acked-by that were accumulated.
 
-Eric
-> 
-> 
-> [1] http://thread.gmane.org/gmane.comp.version-control.git/286873
-> [2] http://thread.gmane.org/gmane.comp.version-control.git/292168
-> 
-> Thanks,
-> Xiaolong
-> 
->> If it is an inconvenience I can put all the patches back into the same
->> big series, specifying tentative patch split according to sub-systems in
->> the cover-letter?
->>
->> Thank you in advance
->>
->> Best Regards
->>
->> Eric
->>
->> 04/19/2016 08:04 PM, kbuild test robot wrote:
->>> Hi,
->>>
->>> [auto build test ERROR on tip/irq/core]
->>> [also build test ERROR on v4.6-rc4 next-20160419]
->>> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->>>
->>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-2-3-msi-changes/20160420-011957
->>> config: x86_64-lkp (attached as .config)
->>> reproduce:
->>>         # save the attached .config to linux build tree
->>>         make ARCH=x86_64 
->>>
->>> All errors (new ones prefixed by >>):
->>>
->>>>> kernel/irq/msi.c:17:38: fatal error: linux/dma-reserved-iommu.h: No such file or directory
->>>     #include <linux/dma-reserved-iommu.h>
->>>                                          ^
->>>    compilation terminated.
->>>
->>> vim +17 kernel/irq/msi.c
->>>
->>>     11	 */
->>>     12	#include <linux/types.h>
->>>     13	#include <linux/device.h>
->>>     14	#include <linux/irq.h>
->>>     15	#include <linux/irqdomain.h>
->>>     16	#include <linux/msi.h>
->>>   > 17	#include <linux/dma-reserved-iommu.h>
->>>     18	#include <linux/iommu.h>
->>>     19	
->>>     20	/* Temparory solution for building, will be removed later */
->>>
->>> ---
->>> 0-DAY kernel test infrastructure                Open Source Technology Center
->>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->>>
->>
+David.
