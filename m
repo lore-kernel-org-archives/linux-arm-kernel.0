@@ -1,59 +1,69 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 26 Apr 2016 18:30:55 +0200
-Subject: [PATCH 1/2] clocksource: sp804: Add support for OX810SE 24bit
- timer width
-In-Reply-To: <571E2E38.3060401@baylibre.com>
-References: <1459520559-13110-1-git-send-email-narmstrong@baylibre.com>
- <1459520559-13110-2-git-send-email-narmstrong@baylibre.com>
- <20160422074645.GA3974@linaro.org>
- <alpine.DEB.2.11.1604220953000.3941@nanos>
- <571E2E38.3060401@baylibre.com>
-Message-ID: <20160426163055.GB13887@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 26 Apr 2016 11:36:42 -0500
+Subject: [PATCH] regulator: tps65917/palmas: Add bypass "On" value
+Message-ID: <1461688602-19996-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 04:48:24PM +0200, Neil Armstrong wrote:
-> On 04/22/2016 09:53 AM, Thomas Gleixner wrote:
-> > On Fri, 22 Apr 2016, Daniel Lezcano wrote:
-> > 
-> >> On Fri, Apr 01, 2016 at 04:22:38PM +0200, Neil Armstrong wrote:
-> >>> In order to support the Dual-Timer on the Oxford Semiconductor OX810SE SoC,
-> >>> implement variable counter width, keeping 32bit as default width.
-> >>> Add new compatible string oxsemi,ox810se-rps-timer in order to select
-> >>> the 24bit counter width.
-> >>>
-> >>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >>> ---
-> >>>  drivers/clocksource/timer-sp804.c | 107 ++++++++++++++++++++++++--------------
-> >>>  include/clocksource/timer-sp804.h |  42 ++++++++++++---
-> >>>  2 files changed, 102 insertions(+), 47 deletions(-)
-> >>
-> >> I will take those patches but this driver really deserves a cleanup.
-> > 
-> > If it deserves a cleanup, then this should happen _BEFORE_ we add new
-> > functionality to it.
-> > 
-> > Thanks,
-> > 
-> > 	tglx
-> > 
-> 
-> Hi Thomas, Daniel,
-> 
-> Sure this driver should have a cleanup, but it still depends on old legacy vexpress calls.
-> 
-> The reason I submitted a change and a small cleanup over this driver is because the high
-> similarities of the HW and avoiding adding a brand new driver cloning much of its
-> functionalities.
+When commit b554e1450658 ("regulator: tps65917/palmas: Add bypass
+ops for LDOs with bypass capability") introduced bypass capability
+to palmas regulator, it went with the assumption that regulator
+regmap helpers just check val against the bypass_mask.
 
-Hi Neil,
+Unfortunately, this ignored the explicit "on" and "off" values when
+the register value is masked with bypass_mask in commit ca5d1b3524b4
+("regulator: helpers: Modify helpers enabling multi-bit control").
 
-it is a good idea to avoid having new drivers when it is possible to group 
-them into a single one.
- 
-> I propose to study an eventual cleanup, but could this change be submitted for 4.7 since
-> it's part of a base platform support serie ?
+With the recent commit dd1a571daee7 ("regulator: helpers: Ensure
+bypass register field matches ON value"), this issue gets highlighted
+and fails tps65917/palmas based platforms which need regulators/ldos
+that have bypass capability.
 
-I am not against if the next patches you send are cleanups.
+Introduce the bypass_on value appropriately for tps65917/palmas
+regulator.
 
-Thomas ?
+Fixes: b554e1450658 ("regulator: tps65917/palmas: Add bypass ops for LDOs with bypass capability")
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+
+Fixes regression in next-20160426 for DRA7 platforms and BeagleBoard-X15
+
+Fail in boot: http://pastebin.ubuntu.com/16065715/
+
+ drivers/regulator/palmas-regulator.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
+index 6efc7ee8aea3..c83e06b2cedb 100644
+--- a/drivers/regulator/palmas-regulator.c
++++ b/drivers/regulator/palmas-regulator.c
+@@ -944,6 +944,8 @@ static int palmas_ldo_registration(struct palmas_pmic *pmic,
+ 			if (id == PALMAS_REG_LDO9) {
+ 				desc->ops = &palmas_ops_ldo9;
+ 				desc->bypass_reg = desc->enable_reg;
++				desc->bypass_val_on =
++						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
+ 				desc->bypass_mask =
+ 						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
+ 			}
+@@ -1055,6 +1057,8 @@ static int tps65917_ldo_registration(struct palmas_pmic *pmic,
+ 			    id == TPS65917_REG_LDO2) {
+ 				desc->ops = &tps65917_ops_ldo_1_2;
+ 				desc->bypass_reg = desc->enable_reg;
++				desc->bypass_val_on =
++						TPS65917_LDO1_CTRL_BYPASS_EN;
+ 				desc->bypass_mask =
+ 						TPS65917_LDO1_CTRL_BYPASS_EN;
+ 			}
+@@ -1206,6 +1210,7 @@ static int palmas_smps_registration(struct palmas_pmic *pmic,
+ 				desc->enable_mask = SMPS10_BOOST_EN;
+ 			desc->bypass_reg = PALMAS_BASE_TO_REG(PALMAS_SMPS_BASE,
+ 							    PALMAS_SMPS10_CTRL);
++			desc->bypass_val_on = SMPS10_BYPASS_EN;
+ 			desc->bypass_mask = SMPS10_BYPASS_EN;
+ 			desc->min_uV = 3750000;
+ 			desc->uV_step = 1250000;
+-- 
+2.8.0
