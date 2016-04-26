@@ -1,62 +1,28 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 26 Apr 2016 12:55:18 -0400
-Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
-In-Reply-To: <20160426162529.GK2274@localhost>
-References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
- <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
- <20160426033029.GB2274@localhost>
- <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
- <20160426162529.GK2274@localhost>
-Message-ID: <571F9D76.2060809@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 09:56:22 -0700
+Subject: [PATCH 1/2] ARM: dts: omap5-board-common: fix ldo1_reg and
+ ldo4_reg ranges
+In-Reply-To: <1460973967-25077-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1460973967-25077-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20160426165622.GB5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/26/2016 12:25 PM, Vinod Koul wrote:
-> On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org wrote:
->> On 2016-04-25 23:30, Vinod Koul wrote:
->>> On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
->>>
->>>> +static int hidma_chan_stats(struct seq_file *s, void *unused)
->>>> +{
->>>> +	struct hidma_chan *mchan = s->private;
->>>> +	struct hidma_desc *mdesc;
->>>> +	struct hidma_dev *dmadev = mchan->dmadev;
->>>> +
->>>> +	pm_runtime_get_sync(dmadev->ddev.dev);
->>>
->>> debug shouldn't power up device, why do you want to do that
->>
->>
->> Clocks are turned off while the hw is idle. I can?t reach hw
->> registers without restoring power.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [160418 03:07]:
+> ldo4_reg is connected to DSS, and should always be 1.8V. However the
+> The dts defines a range of 1.5V-1.8V, which requires somethings to set
+> the actual voltage at runtime. Currently we set the voltage in omapdss
+> driver.
 > 
-> Hmm, have you thought about using regmap?
-> 
+> As the voltage must always be 1.8V, let's just define the range to 1.8V
+> so that the driver doesn't need to deal with the voltage. In fact, the
+> driver should not touch the voltage, except in the cases where the
+> voltage needs to be changed at runtime.
 
-To be honest, I didn't know what regmap is but I just read some code
-and looked at how it is used. Feel free to correct me if I got it 
-wrong. 
+Thanks applying both into omap-for-v4.6/fixes-rc5. Feel free to merge
+commit 5607959a4d5b54dcc9a3572bdbf967dfda88ae66 into your DSS tree
+too for v4.7 in case it gets too late for these fixes for v4.6-rc.
 
-Regmap seems to be designed for *slow* speed peripherals to improve frequent
-accesses by the SW. It looks like it is used by MFD, SPI and I2C drivers.
+Regards,
 
-It seems to cache the register contents and flush/invalidate them only when
-needed.
-
-The MMIO version seems to be assuming the presence of device-tree like CLK
-API which doesn't exist on ACPI systems and is not portable.
-
-My reaction is that it is a lot of code with no added functionality to what
-HIDMA driver is trying to achieve. 
-
-Given that the use case here is only for debug purposes; I think it is OK 
-to keep this runtime call here. I don't want to add any overhead into the
-existing code just to support the debug use case.  
-
-None of my register read/writes are slow. This file will only be used to 
-troubleshoot customer issues.
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Tony
