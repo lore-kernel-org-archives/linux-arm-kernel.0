@@ -1,68 +1,29 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 26 Apr 2016 19:02:57 +0800
-Subject: [PATCH v2] drivers: firmware: psci: unify enable-method binding
- on ARM {64, 32}-bit systems
-In-Reply-To: <31757054.8aSO57qemx@wuerfel>
-References: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
- <571F4632.6090003@arm.com>	<31757054.8aSO57qemx@wuerfel>
-Message-ID: <20160426190257.7b2e6a9a@xhacker>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2016 13:13:04 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC PCI Defconfig Updates for v4.7
+In-Reply-To: <cover.1461631445.git.horms+renesas@verge.net.au>
+References: <cover.1461631445.git.horms+renesas@verge.net.au>
+Message-ID: <4949462.nM0EuO7OEc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd, Sudeep,
-
-On Tue, 26 Apr 2016 12:49:00 +0200 Arnd Bergmann wrote:
-
-> On Tuesday 26 April 2016 11:42:58 Sudeep Holla wrote:
-> > On 22/04/16 16:18, Sudeep Holla wrote:  
-> > > Currently ARM CPUs DT bindings allows different enable-method value for
-> > > PSCI based systems. On ARM 64-bit this property is required and must be
-> > > "psci" while on ARM 32-bit systems this property is optional and must
-> > > be "arm,psci" if present.
-> > >
-> > > However, "arm,psci" has always been the compatible string for the PSCI
-> > > node, and was never intended to be the enable-method. So this is a bug
-> > > in the binding and not a deliberate attempt at specifying 32-bit
-> > > differently.
-> > >
-> > > This is problematic if 32-bit OS is run on 64-bit system which has
-> > > "psci" as enable-method rather than the expected "arm,psci".
-> > >
-> > > So let's unify the value into "psci" and remove support for "arm,psci"
-> > > before it finds any users.
-> > >
-> > > Reported-by: Soby Mathew <Soby.Mathew@arm.com>
-> > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > > ---
-> > >   Documentation/devicetree/bindings/arm/cpus.txt | 1 -
-> > >   drivers/firmware/psci.c                        | 2 +-
-> > >   2 files changed, 1 insertion(+), 2 deletions(-)
-> > >
-> > > v2->v1:
-> > >       - Added Mark and Lorenzo's ACKs
-> > >       - Updated commit message to specify that it also conflicts with
-> > >         PSCI compatible(from Mark's reply on the thread)
-> > >
-> > > Hi ARM-SoC guys,
-> > >
-> > > Can you please pick up this single fix for PSCI binding/driver for v4.6 ?
-> > >  
-> > 
-> > Gentle ping to include this in next round of arm-soc fixes. It would be
-> > good to get this fixed before v4.6 as we don't want to have user of the
-> > binding which we want to remove in the release.
-> >   
+On Tuesday 26 April 2016 10:50:10 Simon Horman wrote:
+> Please consider these Renesas ARM based SoC PCI defconfig updates for v4.7.
 > 
-> Applied to the fixes branch. I have to admit that I don't understand
-> how the compatible string is really used here, so I have to trust that
-> this cannot break any existing machine.
+> 
+> This pull request includes a single patch with changes that I would
+> ordinarily be inclined to split into different branches. However,
+> are most easily done atomicly and as they are rather small I have
+> kept them in one patch in its own branch. My hope is that you can find
+> an appropriate home for it.
+> 
+> The patch updates renames PCI_RCAR_GEN2_PCIE Kconfig symbol
+> as PCIE_RCAR. It includes PCI Makefile and Kconfig changes and
+> accordingly the patch has an ack from Bjorn Helgaas. It also updates
+> arm and arm64 defconfigs.
+> 
 
-To be honest, this breaks some Marvell DEBU's 32 bit SoCs' kernel, but these
-SoCs' support are not mainlined yet, so it's fine to fix it as early as
-possible.
+I've merged it into next/defconfig and made sure we don't (yet) have
+any conflicts against changes in the arm64 defconfig. Thanks,
 
-Thanks,
-Jisheng
+	Arnd
