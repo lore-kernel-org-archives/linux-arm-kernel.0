@@ -1,61 +1,186 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Apr 2016 14:27:18 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d2: add shutdown controller node
-Message-ID: <1461673638-14644-1-git-send-email-nicolas.ferre@atmel.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 26 Apr 2016 14:37 +0200
+Subject: [PATCH 4/4] ARM64: dts: rockchip: add dts file for RK3399
+ evaluation board
+In-Reply-To: <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
+References: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
+ <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <9945516.Q6LYCrkl5z@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SAMA5D2-Compatible Shutdown Controller node to sama5d2.dtsi
-and the use of it in the sama5d2 Xplained board dts file.
+Am Dienstag, 26. April 2016, 10:36:46 schrieb Jianqun Xu:
+> This patch add rk3399-evb.dts for RK3399 evaluation board.
+> Tested on RK3399 evb.
+> 
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+> changes in v3:
+> - add more compatible (Doug)
+> - add modle
+> 
+>  arch/arm64/boot/dts/rockchip/Makefile       |   1 +
+>  arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 125
+> ++++++++++++++++++++++++++++ 2 files changed, 126 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/Makefile
+> b/arch/arm64/boot/dts/rockchip/Makefile index df37865..7037a16 100644
+> --- a/arch/arm64/boot/dts/rockchip/Makefile
+> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> @@ -1,6 +1,7 @@
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
+> 
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts new file mode 100644
+> index 0000000..c3370bd
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> @@ -0,0 +1,125 @@
+> +/*
+> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/pwm/pwm.h>
+> +#include "rk3399.dtsi"
+> +
+> +/ {
+> +	model = "Rockchip RK3399 Evaluation Board";
+> +	compatible = "rockchip,rk3399-evb", "rockchip,rk3399",
+> +		     "google,rk3399evb-rev2", google,rk3399evb-rev1",
+> +		     "google,rk3399evb-rev0" ;
 
-Enable the RTC wakeup event and the "wake up" button support through the
-input "0" that is present on the board.
+can you check against which compatibles that coreboot really matches?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 9 +++++++++
- arch/arm/boot/dts/sama5d2.dtsi              | 9 +++++++++
- 2 files changed, 18 insertions(+)
+As we said that the evb changed between rev1 and rev2, I would expect the 
+compatible to be something like
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 21c780fab761..eb4f1ac96271 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -234,6 +234,15 @@
- 				};
- 			};
- 
-+			shdwc at f8048010 {
-+				atmel,shdwc-debouncer = <976>;
-+
-+				input at 0 {
-+					reg = <0>;
-+					atmel,wakeup-type = "low";
-+				};
-+			};
-+
- 			watchdog at f8048040 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 12cc1d34097d..43015c2ad395 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1030,6 +1030,15 @@
- 				clocks = <&clk32k>;
- 			};
- 
-+			shdwc at f8048010 {
-+				compatible = "atmel,sama5d2-shdwc";
-+				reg = <0xf8048010 0x10>;
-+				clocks = <&clk32k>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				atmel,wakeup-rtc-timer;
-+			};
-+
- 			pit: timer at f8048030 {
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xf8048030 0x10>;
--- 
-2.1.3
+	compatible = "rockchip,rk3399-evb",  "google,rk3399evb-rev2", 
+			"rockchip,rk3399";
+
+leaving out the rev1 and rev0
+
+> +
+> +	vdd_center: vdd-center {
+> +		compatible = "pwm-regulator";
+> +		pwms = <&pwm3 0 25000 0>;
+> +		regulator-name = "vdd_center";
+> +		regulator-min-microvolt = <800000>;
+> +		regulator-max-microvolt = <1400000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		status = "okay";
+> +	};
+
+Can you check if this runs stable with the pwm-regulator in mainline please?
+I.e. Boris' rework series hasn't landed yet and at least on Veyron I remember 
+the pwm-regulator having reliability issues or something like that.
+
+
+> +
+> +	vcc3v3_sys: vcc3v3-sys {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc3v3_sys";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	vcc_phy: vcc-phy-regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_phy";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +};
+> +
+> +&pwm0 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm2 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+> +&usb_host0_ehci {
+> +	status = "okay";
+> +};
+> +
+> +&usb_host0_ohci {
+> +	status = "okay";
+> +};
+> +
+> +&usb_host1_ehci {
+> +	status = "okay";
+> +};
+> +
+> +&usb_host1_ohci {
+> +	status = "okay";
+> +};
+> +
+> +&pinctrl {
+> +	pmic {
+> +		pmic_int_l: pmic-int-l {
+> +			rockchip,pins =
+> +				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
+> +		};
+> +
+> +		pmic_dvs2: pmic-dvs2 {
+> +			rockchip,pins =
+> +				<1 18 RK_FUNC_GPIO &pcfg_pull_down>;
+> +		};
+> +	};
+> +};
