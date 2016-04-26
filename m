@@ -1,60 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 16:46:22 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: n900 needs MMC slot names for legacy user
- space
-In-Reply-To: <1461714383-9956-1-git-send-email-tony@atomide.com>
-References: <1461714383-9956-1-git-send-email-tony@atomide.com>
-Message-ID: <1461714383-9956-2-git-send-email-tony@atomide.com>
+Date: Tue, 26 Apr 2016 16:51:47 -0700
+Subject: [PATCH 0/2] Fix ir-rx51 by using PWM pdata
+Message-ID: <1461714709-10455-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's pass the slot names in pdata like the legacy code does.
-Once we have a generic DT binding for the slot names we can
-switch to that.
+Hi all,
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+Here are minimal fixes to get ir-rx51 going again. Then further
+fixes can be done as noted in the second patch.
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index a935d28..cfaf45f 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -21,6 +21,7 @@
- #include <linux/regulator/fixed.h>
- 
- #include <linux/platform_data/pinctrl-single.h>
-+#include <linux/platform_data/hsmmc-omap.h>
- #include <linux/platform_data/iommu-omap.h>
- #include <linux/platform_data/wkup_m3.h>
- #include <linux/platform_data/pwm_omap_dmtimer.h>
-@@ -35,6 +36,8 @@
- #include "soc.h"
- #include "hsmmc.h"
- 
-+static struct __maybe_unused omap_hsmmc_platform_data mmc_pdata[2];
-+
- struct pdata_init {
- 	const char *compatible;
- 	void (*fn)(void);
-@@ -271,6 +274,8 @@ static struct platform_device omap3_rom_rng_device = {
- static void __init nokia_n900_legacy_init(void)
- {
- 	hsmmc2_internal_input_clk();
-+	mmc_pdata[0].name = "external";
-+	mmc_pdata[1].name = "internal";
- 
- 	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
- 		if (IS_ENABLED(CONFIG_ARM_ERRATA_430973)) {
-@@ -497,6 +502,8 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
- 		       &omap3_iommu_pdata),
-+	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x4809c000, "4809c000.mmc", &mmc_pdata[0]),
-+	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x480b4000, "480b4000.mmc", &mmc_pdata[1]),
- 	/* Only on am3517 */
- 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
- 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+Regards,
+
+Tony
+
+
+Tony Lindgren (2):
+  ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51
+  [media] ir-rx51: Fix build after multiarch changes broke it
+
+ arch/arm/mach-omap2/board-rx51-peripherals.c   | 35 ++++++++-
+ arch/arm/mach-omap2/pdata-quirks.c             | 33 ++++++++-
+ drivers/media/rc/Kconfig                       |  2 +-
+ drivers/media/rc/ir-rx51.c                     | 99 ++++++++++++++------------
+ include/linux/platform_data/media/ir-rx51.h    |  1 +
+ include/linux/platform_data/pwm_omap_dmtimer.h | 21 ++++++
+ 6 files changed, 141 insertions(+), 50 deletions(-)
+
 -- 
 2.8.1
