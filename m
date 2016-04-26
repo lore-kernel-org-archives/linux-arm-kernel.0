@@ -1,46 +1,66 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 26 Apr 2016 21:05:57 +0200
-Subject: [PATCH] ARM: cpuidle: Pass on arm_cpuidle_suspend()'s return value
-In-Reply-To: <20160426113103.GB2204@red-moon>
-References: <1461669301-30834-1-git-send-email-james.morse@arm.com>
- <20160426113103.GB2204@red-moon>
-Message-ID: <CAJZ5v0h+P5baWVkTcbjxOjsXyp7aDy25+ik_9XHtUs6+jeN7Pw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 26 Apr 2016 12:07:55 -0700
+Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
+ idle
+In-Reply-To: <20160426182939.GO5995@atomide.com>
+References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20160426150031.GP5995@atomide.com>
+ <20160426175214.GJ3715@linux.vnet.ibm.com>
+ <20160426182939.GO5995@atomide.com>
+Message-ID: <20160426190755.GK3715@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 1:31 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Apr 26, 2016 at 12:15:01PM +0100, James Morse wrote:
->> arm_cpuidle_suspend() may return -EOPNOTSUPP, or any value returned
->> by the cpu_ops/cpuidle_ops suspend call. arm_enter_idle_state() doesn't
->> update 'ret' with this value, meaning we always signal success to
->> cpuidle_enter_state(), causing it to update the usage counters as if we
->> succeeded.
->>
->> Fixes: 191de17aa3c1 ("ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function")
->> Signed-off-by: James Morse <james.morse@arm.com>
->> ---
->>  drivers/cpuidle/cpuidle-arm.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
->>
->> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->> index 545069d5fdfb..e342565e8715 100644
->> --- a/drivers/cpuidle/cpuidle-arm.c
->> +++ b/drivers/cpuidle/cpuidle-arm.c
->> @@ -50,7 +50,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->>                * call the CPU ops suspend protocol with idle index as a
->>                * parameter.
->>                */
->> -             arm_cpuidle_suspend(idx);
->> +             ret = arm_cpuidle_suspend(idx);
->>
->>               cpu_pm_exit();
->>       }
->> --
+On Tue, Apr 26, 2016 at 11:29:39AM -0700, Tony Lindgren wrote:
+> * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 10:53]:
+> > Does the following patch help?
+> 
+> It just changes the output.. See below.
 
-OK
+Ah -- you need both patches.
 
-Should that go into -stable?
+These are on -rcu at:
+
+501889db6fee (arm: Use _rcuidle tracepoint to allow use from idle)
+99cd56ad86d2 (rm: Use more _rcuidle tracepoints to allow use from idle)
+
+And -rcu may be found at:
+
+	git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+
+							Thanx, Paul
+
+> > It is quite possible that there are quite a few more of these.  If this
+> > is the case, then one way to make the kernel list more of them on a
+> > given boot is to build with CONFIG_PROVE_RCU_REPEATEDLY=y.
+> 
+> OK
+> 
+> Regards,
+> 
+> Tony
+> 
+> 8< ------------------
+> CPU: Testing write buffer coherency: ok
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> 
+> 
+> RCU used illegally from idle CPU!
+> rcu_scheduler_active = 1, debug_locks = 0
+> RCU used illegally from extended quiescent state!
+> no locks held by swapper/1/0.
+> 
+> stack backtrace:
+> CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.6.0-rc5-next-20160426+ #1113
+> Hardware name: Generic OMAP4 (Flattened Device Tree)
+> [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
+> [<c010c3a8>] (show_stack) from [<c047ff88>] (dump_stack+0xb0/0xe4)
+> [<c047ff88>] (dump_stack) from [<c012c014>] (pwrdm_set_next_pwrst+0x100/0x1d4)
+> [<c012c014>] (pwrdm_set_next_pwrst) from [<c0126120>] (omap4_enter_lowpower+0xc8/0x230)
+> [<c0126120>] (omap4_enter_lowpower) from [<c0126c24>] (omap_enter_idle_coupled+0x6c/0x254)
+> [<c0126c24>] (omap_enter_idle_coupled) from [<c0601dfc>] (cpuidle_enter_state+0x80/0x3d4)
+> [<c0601dfc>] (cpuidle_enter_state) from [<c0603d30>] (cpuidle_enter_state_coupled+0x348/0x390)
+> [<c0603d30>] (cpuidle_enter_state_coupled) from [<c0183d34>] (cpu_startup_entry+0x198/0x3a0)
+> [<c0183d34>] (cpu_startup_entry) from [<8010162c>] (0x8010162c)
+> hw-breakpoint: Failed to enable monitor mode on CPU 0.
+> 
