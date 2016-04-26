@@ -1,49 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 26 Apr 2016 02:34:49 +0200
-Subject: [PULL] ARM: cpuidle: changes for 4.7
-In-Reply-To: <5719E10D.5020008@linaro.org>
-References: <5719E10D.5020008@linaro.org>
-Message-ID: <1585774.soUmxhQCPX@vostro.rjw.lan>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 26 Apr 2016 03:37:23 +0300
+Subject: [PATCH 0/7] ARM: dts: lpc32xx: nonfunctional updates to ea3250 and
+ phy3250 dts
+Message-ID: <1461631050-10479-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 22, 2016 10:30:05 AM Daniel Lezcano wrote:
-> Hi Rafael,
-> 
-> please pull the following changes for 4.7.
-> 
->   * Constify the cpuidle_ops structure and the types returned by the 
-> functions using it (Jisheng Zhang)
-> 
-> Thanks !
-> 
->    -- Daniel
-> 
-> The following changes since commit c3b46c73264b03000d1e18b22f5caf63332547c9:
-> 
->    Linux 4.6-rc4 (2016-04-17 19:13:32 -0700)
-> 
-> are available in the git repository at:
-> 
->    http://git.linaro.org/people/daniel.lezcano/linux.git cpuidle/4.7
-> 
-> for you to fetch changes up to 5e7c17df795e462c70a43f1b3b670e08efefe8fd:
-> 
->    drivers: firmware: psci: use const and __initconst for 
-> psci_cpuidle_ops (2016-04-20 10:44:32 +0200)
-> 
-> ----------------------------------------------------------------
-> Jisheng Zhang (4):
->        ARM: cpuidle: add const qualifier to cpuidle_ops member in structures
->        ARM: cpuidle: constify return value of arm_cpuidle_get_ops()
->        soc: qcom: spm: Use const and __initconst for qcom_cpuidle_ops
->        drivers: firmware: psci: use const and __initconst for 
-> psci_cpuidle_ops
-> 
->   arch/arm/include/asm/cpuidle.h | 2 +-
->   arch/arm/kernel/cpuidle.c      | 6 +++---
->   drivers/firmware/psci.c        | 2 +-
->   drivers/soc/qcom/spm.c         | 2 +-
->   4 files changed, 6 insertions(+), 6 deletions(-)
+The change updates DTS files of PHY3250 and EA3250 boards powered by
+NXP LPC3250 SoC:
+* flatten board DTS files by exploiting device node labels,
+* add 'partitions' device node for MTD OF,
+* correct Atmel vendor prefix,
+* rename board DTS files by adding SoC name prefix.
 
-Pulled, thanks!
+The change is wanted to have to prevent similar issues on copy-paste
+in case if more DTS files for LPC32xx boards are submitted.
+
+No functional changes are intended.
+
+Vladimir Zapolskiy (7):
+  ARM: dts: lpc32xx: ea3250: avoid extension of device nodes by absolute path
+  ARM: dts: lpc32xx: ea3250: add NAND partitions device node
+  ARM: dts: lpc32xx: ea3250: fix Atmel at24 eeprom vendor
+  ARM: dts: lpc32xx: ea3250: add SoC name prefix to board dts file
+  ARM: dts: lpc32xx: phy3250: avoid extension of device nodes by absolute path
+  ARM: dts: lpc32xx: phy3250: add NAND partitions device node
+  ARM: dts: lpc32xx: phy3250: add SoC name prefix to board dts file
+
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ .../boot/dts/{ea3250.dts => lpc3250-ea3250.dts}    | 229 ++++++++---------
+ .../boot/dts/{phy3250.dts => lpc3250-phy3250.dts}  | 285 ++++++++++-----------
+ 3 files changed, 256 insertions(+), 261 deletions(-)
+ rename arch/arm/boot/dts/{ea3250.dts => lpc3250-ea3250.dts} (61%)
+ rename arch/arm/boot/dts/{phy3250.dts => lpc3250-phy3250.dts} (43%)
+
+-- 
+2.1.4
