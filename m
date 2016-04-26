@@ -1,53 +1,41 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 26 Apr 2016 09:30:43 +0100
-Subject: [PATCH] ARM: debug: remove extraneous DEBUG_HI3716_UART option
-In-Reply-To: <1461590006-1395429-1-git-send-email-arnd@arndb.de>
-References: <1461590006-1395429-1-git-send-email-arnd@arndb.de>
-Message-ID: <571F2733.6070609@hisilicon.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Apr 2016 10:31:44 +0200
+Subject: [PATCH v3 0/2] pci: host: new driver for Marvell Armada 7K/8K PCIe
+ controller
+Message-ID: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-On 25/04/2016 14:13, Arnd Bergmann wrote:
-> DEBUG_HI3716_UART was supposed to be renamed to DEBUG_HIX5HD2_UART, but
-> accidentally both got left in place, which results in a build error when
-> CONFIG_DEBUG_UART_PHYS is not set as it should be.
-> 
-> This removes the old symbol.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 12aae3097454 ("ARM: debug: Rename Hi3716 to HIX5HD2")
-> ---
->  arch/arm/Kconfig.debug | 8 --------
->  1 file changed, 8 deletions(-)
+Here is the third iteration of the PCIe host controller driver needed
+for the ARM64 Marvell Armada 7K/8K platform.
+
+Changes since v2:
+
+ - Added Rob Herring's Acked-by on the Device Tree binding patch.
+
+ - Reworked the PCIe host driver following the suggestion of Bjorn
+   Helgaas: creation of armada8k_add_pcie_port() and
+   armada8k_pcie_establish_link() in order to follow the convention of
+   other Designware based drivers.
 
 Thanks!
-Fine to me.
-Should I pick up it and send a pull request or
-will you directly pick up it?
 
-Best Regards,
-Wei
+Thomas
 
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 6993978cfd6f..2afd38766707 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -268,14 +268,6 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on HI3620 UART.
->  
-> -	config DEBUG_HI3716_UART
-> -		bool "Hisilicon Hi3716 Debug UART"
-> -		depends on ARCH_HI3xxx
-> -		select DEBUG_UART_PL01X
-> -		help
-> -		  Say Y here if you want kernel low-level debugging support
-> -		  on HI3716 UART.
-> -
->  	config DEBUG_HIGHBANK_UART
->  		bool "Kernel low-level debugging messages via Highbank UART"
->  		depends on ARCH_HIGHBANK
-> 
+Thomas Petazzoni (2):
+  dt-bindings: pci: add DT binding for Marvell Armada 7K/8K PCIe
+    controller
+  pci: host: new driver for Marvell Armada 7K/8K PCIe controller
+
+ .../devicetree/bindings/pci/pci-armada8k.txt       |  38 +++
+ drivers/pci/host/Kconfig                           |  11 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-armada8k.c                   | 276 +++++++++++++++++++++
+ 4 files changed, 326 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
+ create mode 100644 drivers/pci/host/pcie-armada8k.c
+
+-- 
+2.6.4
