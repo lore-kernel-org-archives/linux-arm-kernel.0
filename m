@@ -1,95 +1,30 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Tue, 26 Apr 2016 15:09:14 +0200
-Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
- device
-In-Reply-To: <571F2B09.1000107@metafoo.de>
-References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
- <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
- <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
- <571F2B09.1000107@metafoo.de>
-Message-ID: <20160426130914.GA2015@delle.lan>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Apr 2016 15:11:47 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2: add slow clock to watchdog node
+Message-ID: <1461676307-16059-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
+As the watchdog timer needs the slow clock, add it to the currently defined
+wdt node.
 
-first of all thanks a lot for your detailled feedback!
+Reported-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-On Tue, Apr 26, 2016 at 10:47:05AM +0200, Lars-Peter Clausen wrote:
-> >>> +	.periods_min		= 2,
-> >>> +	.periods_max		= 255,
-> >>> +	.buffer_bytes_max	= 128 * PAGE_SIZE,
-> >>> +};
-> >>> +
-> >>> +static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
-> >>> +	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
-> >>> +	.pcm_hardware = &bcm2835_pcm_hardware,
-> >>> +	.prealloc_buffer_size = 256 * PAGE_SIZE,
-> >>> +};
-> >>
-> >> The generic dmaengine PCM driver auto-discovers these things, no need to
-> >> provide them. The code is OK as it is.
-> > 
-> > With the auto-discover code we loose the S16_LE format.
-> > 
-> > If I understood the code in dmaengine_pcm_set_runtime_hwparams
-> > correctly, this is because the DMA controller doesn't support
-> > 16bit transfers (only multiples of 32bit are allowed).
-> > 
-> > But since the I2S driver needs exactly 2 channels S16_LE actually
-> > works fine (one 32bit transfer per frame).
-> > 
-> > Do you know of a better way to get S16_LE support? It could well
-> > be that I missed something important...
-> 
-> With your patch we should just get an error when trying to configure a
-> stream with 16-bit samples since when setting up the DMA controller the
-> generic code will still choose a 16-bit device port size and this will be
-> rejected by the DMA controller.
-
-We had that code in downstream RPi kernel for ages (IIRC since
-3.10) and so far it worked fine.
-
-I traced the code for the S16_LE case to find out why:
-
-snd_hwparams_to_dma_slave_config() sets src/dst_addr_width to 16bit.
-
-But immediately afterwards snd_dmaengine_pcm_set_config_from_dai_data()
-overrides addr_width to 32bit.
-
-bcm2835-i2s only supports 32bit access to the FIFO/data register
-and dma_data.addr_width is set to 32bit in the I2S driver - that
-code is also in mainline since the initial bcm2835-i2s commit.
-
-Of course all this only works because the number of channels
-is always 2.
-
-> When you look at peripherals that have DMA support there are basically two
-> types.
-> 
-> Type A expect that each write (same applies for read) to the memory mapped
-> FIFO corresponds to exactly one sample. So if the sample width is 16-bit a
-> 16-bit write is done, if the sample width is 32-bit a 32-bit write is done.
-> In this case it is up to the DMA controller to fragment the byte stream into
-> individual samples.
-> 
-> Type B on the other hand has a fixed port width (usually the bus size) and
-> expects that each write to the memory mapped FIFO uses the port width. It
-> then internally unpacks the data into the sample data. E.g. if the FIFO is
-> 32-bit wide and the sample width is 16-bit it will unpack the 32-bit entry
-> into two samples.
-> 
-> Currently the generic code only supports type A. It would be great if you
-> could add support for type B to support the BCM2835 I2S controller properly.
-
-Do you have a particular solution in mind?
-
-Introducing a flag to just auto-add some packed formats would be
-easy, but a generic, robust solution might be tricky. We'd have
-to make sure that unsupported configurations (like an odd number
-of 16bit channels on 32bit-only setups) get rejected or we might
-be in trouble.
-
-so long,
-
-Hias
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 43015c2ad395..84eed47ffb0a 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1050,6 +1050,7 @@
+ 				compatible = "atmel,sama5d4-wdt";
+ 				reg = <0xf8048040 0x10>;
+ 				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.1.3
