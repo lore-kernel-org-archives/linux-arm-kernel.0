@@ -1,61 +1,36 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 26 Apr 2016 18:52:00 +0100
-Subject: [PATCH v6 05/10] irqchip/gic-v3: Prefix all pr_* messages by
- "GICv3: "
-In-Reply-To: <570E190C.8020203@linaro.org>
-References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
- <1460388780-914-6-git-send-email-julien.grall@arm.com>
- <570E190C.8020203@linaro.org>
-Message-ID: <571FAAC0.3070706@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 10:52:41 -0700
+Subject: [PATCH v2 2/2] ARM: dts: dra7x: Support QSPI MODE-0 operation at
+ 64MHz
+In-Reply-To: <20160422193353.GA15316@rob-hp-laptop>
+References: <1461151980-28139-1-git-send-email-vigneshr@ti.com>
+ <1461151980-28139-3-git-send-email-vigneshr@ti.com>
+ <20160422193353.GA15316@rob-hp-laptop>
+Message-ID: <20160426175241.GL5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+* Rob Herring <robh@kernel.org> [160422 12:35]:
+> On Wed, Apr 20, 2016 at 05:03:00PM +0530, Vignesh R wrote:
+> > According to Data Manual(SPRS915P) of AM57x, TI QSPI controller on
+> > DRA74(rev 1.1+)/DRA72 EVM can support up to 64MHz in MODE-0, whereas
+> > MODE-3 is limited to 48MHz. Hence, switch to MODE-0 for better
+> > throughput.
+> > 
+> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> > ---
+> > 
+> > v2: rebased on linux-next 20160419 to include moving to
+> > dra72-evm-common.dtsi
+> > 
+> > 
+> >  Documentation/devicetree/bindings/spi/ti_qspi.txt | 7 +++++++
+> >  arch/arm/boot/dts/dra7-evm.dts                    | 6 ++----
+> >  arch/arm/boot/dts/dra72-evm-common.dtsi           | 6 ++----
+> >  3 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Sorry for the late answer.
+Applying both into omap-for-v4.7/dt thanks.
 
-On 13/04/16 11:01, Hanjun Guo wrote:
-> On 2016/4/11 23:32, Julien Grall wrote:
->> Currently, most of the pr_* messages in the GICv3 driver don't have a
->> prefix.  Add one to make clear where the messages come from.
->>
->> Signed-off-by: Julien Grall <julien.grall@arm.com>
->>
->> ---
->>      Changes in v6:
->>          - Patch added
->> ---
->>   drivers/irqchip/irq-gic-v3.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 5b7d3c2..6dc6f03 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -15,6 +15,8 @@
->>    * along with this program.  If not, see
->> <http://www.gnu.org/licenses/>.
->>    */
->>
->> +#define pr_fmt(fmt)    "GICv3: " fmt
->
-> I don't think this patch is needed, as GICv3 and GICv2 will
-> not be probed at the same time, did I miss something?
-
-True, however this make slightly easier to know which driver is in-use 
-and avoid to prefix all the messages with "GIC:" or "GICv3:".
-
->
-> Further more, there are prefixes in pr_fmt in this
-> patch using GIC:, with your patch added, it will print:
->
-> GIV3: GIC: .....
->
-> which is not a good idea.
-
-I think it is better than having message without prefix at all.
-
-Regards,
-
--- 
-Julien Grall
+Tony
