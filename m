@@ -1,52 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Apr 2016 12:41:29 +0200
-Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
-In-Reply-To: <20160425115758.GA4874@lukather>
-References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
- <20160425115758.GA4874@lukather>
-Message-ID: <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 26 Apr 2016 11:42:53 +0100
+Subject: [PATCH 08/18] ARM: multi_v7_defconfig: Enable STi FDMA driver
+In-Reply-To: <5937696.Zdx8BrBD6K@wuerfel>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-9-git-send-email-peter.griffin@linaro.org>
+ <5937696.Zdx8BrBD6K@wuerfel>
+Message-ID: <20160426104253.GB2984@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 1:57 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, Apr 23, 2016 at 11:43:58AM +0200, Linus Walleij wrote:
->> Hi ARM SoC guys,
->>
->> these two patches move the ARM character LCD driver from
->> misc drivers to the auxdisplay subsystem where it belongs and
->> updates the defconfig for the RealView accordingly.
->>
->> Please pull it into some cleanup branch in the ARM SoC
->> tree.
->>
->> I tried to get some ACK from the auxdisplay maintainer but no
->> reaction.
->
-> Auxdisplay is not a new framework, but rather a very old one.
->
-> It got introduced in 2.6.21, and only received a couple of drivers
-> since.
+Hi Arnd,
 
-Small problem for me, but Robin is submitting a brand new
-auxdisplay driver:
-http://marc.info/?l=linux-kernel&m=146001950512999&w=2
-http://marc.info/?l=linux-kernel&m=146001988013230&w=2
+On Thu, 21 Apr 2016, Arnd Bergmann wrote:
 
-> It seems to be quite redundant with fbdev deferred_io, which itself is
-> almost deprecated these days.
+> On Thursday 21 April 2016 12:04:25 Peter Griffin wrote:
+> > This DMA controller is found on all STi chipsets.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/configs/multi_v7_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> > index 2823490..61008a0 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -727,6 +727,7 @@ CONFIG_DMA_OMAP=y
+> >  CONFIG_QCOM_BAM_DMA=y
+> >  CONFIG_XILINX_VDMA=y
+> >  CONFIG_DMA_SUN6I=y
+> > +CONFIG_ST_FDMA=y
+> >  CONFIG_STAGING=y
+> >  CONFIG_SENSORS_ISL29018=y
+> >  CONFIG_SENSORS_ISL29028=y
+> > -- 
+> 
+> Is this needed for booting? If not, make it a loadable module.
 
-That is a valid argument for moving cfag12864b* out to
-drivers/video/* I guess, but it has nothing to do with this
-driver whatsoever.
+No it isn't required for booting. Will fix in v4.
 
-This driver has nothing to do with fbdev. Nothing at all.
-It so not connected to any framebuffer.
-
-This driver gets moved to auxdisplay to match the existing
-LCD driver in drivers/auxdisplay/ks0108.c which is a similar
-hardware, driving an LCD that likewise has nothing to do
-with fbdev.
-
-Yours,
-Linus Walleij
+Peter
