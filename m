@@ -1,36 +1,19 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 26 Apr 2016 09:04:36 +0530
-Subject: [PATCH] dmaengine: pxa: handle bus errors
-In-Reply-To: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
-References: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20160426033436.GC2274@localhost>
+Date: Tue, 26 Apr 2016 09:09:52 +0530
+Subject: [PATCH RESEND v3 0/2] dmaengine: sun6i: Fixes
+In-Reply-To: <cover.1461306176.git.moinejf@free.fr>
+References: <cover.1461306176.git.moinejf@free.fr>
+Message-ID: <20160426033952.GE2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 11:32:24PM +0200, Robert Jarzmik wrote:
-> In the current state, upon bus error the driver will spin endlessly,
-> relaunching the last tx, which will fail again and again :
->  - a bus error happens
->  - pxad_chan_handler() is called
->  - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
->    lauched, which is the one triggering the bus error, as it didn't
->    terminate
->  - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
->    active
-> 
-> Break this logic by stopping the automatic relaunch of a dma channel
-> upon a bus error, even if there are still pending issued requests on it.
-> 
-> As dma_cookie_status() seems unable to return DMA_ERROR in its current
-> form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
-> basis, it is chosen in this patch to remember on the channel which
-> transaction failed, and report it in pxad_tx_status().
-> 
-> It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
-> was completed while T2 causes a bus error, the status of T3 and T4 will
-> be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
+On Fri, Apr 22, 2016 at 08:22:56AM +0200, Jean-Francois Moine wrote:
+> This patch series replaces part of the previous series
+> 'dmaengine: sun6i: Fixes and upgrade for audio transfers'.
+> It contains only fixes for a normal use of the DMA driver.
 
 Applied, thanks
+
 
 -- 
 ~Vinod
