@@ -1,29 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Apr 2016 17:38:08 +0200
-Subject: [PATCH] ARM: at91/defconfig: add PDMIC driver to sama5_defconfig
-Message-ID: <1461685088-28659-1-git-send-email-nicolas.ferre@atmel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 26 Apr 2016 23:37:26 +0800
+Subject: [PATCH] mmc: sunxi: Disable eMMC HS-DDR (MMC_CAP_1_8V_DDR) for
+ Allwinner A80
+Message-ID: <1461685046-24798-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Pulse Density Modulation Interface Controller (PDMIC) driver compilation
-for sama5 default configuration. Is used by sama5d2 SoC for instance.
+eMMC HS-DDR no longer works on the A80, despite it working when support
+for this developed.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Disable it for now.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/configs/sama5_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index f5a3966f6793..32a082888adf 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -158,6 +158,7 @@ CONFIG_SND_SOC=y
- CONFIG_SND_ATMEL_SOC=y
- CONFIG_SND_ATMEL_SOC_WM8904=y
- # CONFIG_HID_GENERIC is not set
-+CONFIG_SND_ATMEL_SOC_PDMIC=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
+Hi,
+
+When i worked on this it was working, but now it isn't. Unfortunately I
+don't have my old tree to do a proper bisect. I probably won't have time
+to dig into this issue before v4.6 release, so it's best to disable it
+on the A80 for now.
+
+Thanks.
+
+---
+ drivers/mmc/host/sunxi-mmc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 8372a413848c..7fc8b7aa83f0 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1129,6 +1129,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 				  MMC_CAP_1_8V_DDR |
+ 				  MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
+ 
++	/* TODO MMC DDR is not working on A80 */
++	if (of_device_is_compatible(pdev->dev.of_node,
++				    "allwinner,sun9i-a80-mmc"))
++		mmc->caps &= ~MMC_CAP_1_8V_DDR;
++
+ 	ret = mmc_of_parse(mmc);
+ 	if (ret)
+ 		goto error_free_dma;
 -- 
-2.1.3
+2.8.1
