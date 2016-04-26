@@ -1,45 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 13:04:13 +0200
-Subject: [GIT PULL v3] arm64: hisilicon: config changes for 4.7
-In-Reply-To: <571F3CB8.3000904@hisilicon.com>
-References: <571F3CB8.3000904@hisilicon.com>
-Message-ID: <4910387.g0H3XLnE4p@wuerfel>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 26 Apr 2016 19:02:57 +0800
+Subject: [PATCH v2] drivers: firmware: psci: unify enable-method binding
+ on ARM {64, 32}-bit systems
+In-Reply-To: <31757054.8aSO57qemx@wuerfel>
+References: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
+ <571F4632.6090003@arm.com>	<31757054.8aSO57qemx@wuerfel>
+Message-ID: <20160426190257.7b2e6a9a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 April 2016 11:02:32 Wei Xu wrote:
-> Please help to pull the following changes.
-> 
-> I rebased this pull request on v4.6-rc3 but I found
-> it is same with the v2 that based on v4.6-rc4.
-> Is it OK or should I base on earlier -rc version like rc1?
+Dear Arnd, Sudeep,
 
-Looks good now.  What is important to me is that I don't pull
-in a later -rc release from mainline than what I already have
-in arm-soc, if at all possible.
+On Tue, 26 Apr 2016 12:49:00 +0200 Arnd Bergmann wrote:
 
-> The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
+> On Tuesday 26 April 2016 11:42:58 Sudeep Holla wrote:
+> > On 22/04/16 16:18, Sudeep Holla wrote:  
+> > > Currently ARM CPUs DT bindings allows different enable-method value for
+> > > PSCI based systems. On ARM 64-bit this property is required and must be
+> > > "psci" while on ARM 32-bit systems this property is optional and must
+> > > be "arm,psci" if present.
+> > >
+> > > However, "arm,psci" has always been the compatible string for the PSCI
+> > > node, and was never intended to be the enable-method. So this is a bug
+> > > in the binding and not a deliberate attempt at specifying 32-bit
+> > > differently.
+> > >
+> > > This is problematic if 32-bit OS is run on 64-bit system which has
+> > > "psci" as enable-method rather than the expected "arm,psci".
+> > >
+> > > So let's unify the value into "psci" and remove support for "arm,psci"
+> > > before it finds any users.
+> > >
+> > > Reported-by: Soby Mathew <Soby.Mathew@arm.com>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > ---
+> > >   Documentation/devicetree/bindings/arm/cpus.txt | 1 -
+> > >   drivers/firmware/psci.c                        | 2 +-
+> > >   2 files changed, 1 insertion(+), 2 deletions(-)
+> > >
+> > > v2->v1:
+> > >       - Added Mark and Lorenzo's ACKs
+> > >       - Updated commit message to specify that it also conflicts with
+> > >         PSCI compatible(from Mark's reply on the thread)
+> > >
+> > > Hi ARM-SoC guys,
+> > >
+> > > Can you please pick up this single fix for PSCI binding/driver for v4.6 ?
+> > >  
+> > 
+> > Gentle ping to include this in next round of arm-soc fixes. It would be
+> > good to get this fixed before v4.6 as we don't want to have user of the
+> > binding which we want to remove in the release.
+> >   
 > 
->   Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7v3
-> 
-> for you to fetch changes up to 2b905d3a8d7e40c3486abbf585419fafa220a8f8:
-> 
->   arm64: Kconfig: select sp804 timer for ARCH_HISI (2016-04-26 10:39:09 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM64: Hi6220: configure updates for 4.7 based on rc3
-> 
-> - Enable Hi655x PMIC and regulator
-> - Enable SPI_SPIDEV as module
-> - Enable several common USB-Ethernet dongles
-> - Enable configs for WLAN and TI WL1835 as modules
-> - Enable ARM SP804 for ARCH_HISI
-> 
+> Applied to the fixes branch. I have to admit that I don't understand
+> how the compatible string is really used here, so I have to trust that
+> this cannot break any existing machine.
 
-Pulled into next/arm64, thanks for the rebase!
+To be honest, this breaks some Marvell DEBU's 32 bit SoCs' kernel, but these
+SoCs' support are not mainlined yet, so it's fine to fix it as early as
+possible.
 
-	Arnd
+Thanks,
+Jisheng
