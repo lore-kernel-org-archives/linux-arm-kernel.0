@@ -1,56 +1,84 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 26 Apr 2016 13:31:07 +0800
-Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <571E4A2A.8070908@caviumnetworks.com>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com> <571E4A2A.8070908@caviumnetworks.com>
-Message-ID: <571EFD1B.1070609@linaro.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 26 Apr 2016 13:51:13 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <20160426012341.GB8870@tiger>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+Message-ID: <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, David,
+Hi Shawn,
 
-On 2016/4/26 0:47, David Daney wrote:
-> On 04/25/2016 04:13 AM, Will Deacon wrote:
->> Hi David,
+On Tue, Apr 26, 2016 at 9:23 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Apr 21, 2016 at 11:45:20AM +0800, Dong Aisheng wrote:
+>> On Fri, Jan 29, 2016 at 02:49:23PM -0800, Stefan Agner wrote:
+>> > If a clock gets enabled early during boot time, it can lead to a PLL
+>> > startup. The wait_lock function makes sure that the PLL is really
+>> > stareted up before it gets used. However, the function sleeps which
+>> > leads to scheduling and an error:
+>> > bad: scheduling from the idle thread!
+>> > ...
+>> >
+>> > Use udelay in case IRQ's are still disabled.
+>> >
+>> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> > ---
+>> >  drivers/clk/imx/clk-pllv3.c | 5 ++++-
+>> >  1 file changed, 4 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+>> > index c05c43d..b5ff561 100644
+>> > --- a/drivers/clk/imx/clk-pllv3.c
+>> > +++ b/drivers/clk/imx/clk-pllv3.c
+>> > @@ -63,7 +63,10 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+>> >                     break;
+>> >             if (time_after(jiffies, timeout))
+>> >                     break;
+>> > -           usleep_range(50, 500);
+>> > +           if (unlikely(irqs_disabled()))
 >>
->> On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
->>> From: David Daney <david.daney@cavium.com>
->>>
->>> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
->>> set introduce the ACPI based configuration to provide NUMA
->>> information.
->>>
->>> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
->>> NUMA domain information from SRAT and SLIT table, so parse those two
->>> tables to get mappings from cpu/mem to numa node configuration and
->>> system locality.
+>> This causes a bit confusion that clk_pllv3_prepare is sleepable.
+>> But this line indicates it's possible to be called in irq context.
+>> Although it's only happened during kernel boot phase where irq is
+>> still not enabled.
+>> It seems schedule_debug() somehow did not catch it during early boot
+>> phase. Maybe schedule guys can help explain.
 >>
->> Whilst I've queued the main NUMA series for arm64, I'd really like to
->> see more movement on the generic header file cleanups that you posted
->> separately:
->>
->> http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
->>
+>> My question is if it's really worthy to introduce this confusion
+>> to fix the issue since the delay is minor?
 >
-> FWIW:  Those patches should still apply.  I am carrying them in my
-> development trees, and have not changed them in any way.
+> I do not understand why it's confusing.  The code already obviously
+> indicates this is a special handling for cases where irq is still not
+> enabled, rather than for irq context.
 >
->>
->> Given that this ACPI series already requires some significant cross-arch
->> interaction (which is actually good!), perhaps extending the clean-up
->> patches to encompass some of the ACPI bits might make sense, and we can
->> get that queued as a pre-requisite.
->
-> The cleanup patches you mention above are really independent of the ACPI
-> things.  I have applied them both before and after the ACPI patches, and
-> both seem to work.  With a quick perusal of the ACPI patches nothing
-> jumps out at me as being a candidate for inclusion in the header file
-> cleanup series.
 
-I agree. My patch set is ACPI related enablement, cleanups and
-consolidations, it would be good to merge as a single patch set
-as it's self-contained.
+The code itself has nothing telling it's a special handling for the
+case where irq is
+still not enabled.
+Even it tells, it may still cause confusing by adding complexity in
+clk_pllv3_prepare()
+which actually should be called in non-atomic context as it could sleep.
 
-Thanks
-Hanjun
+> The patch is to fix the "bad: scheduling from the idle thread!" warning
+> rather than minimize the delay.  Do you have an opinion on how to fix
+> the warning?
+>
+
+I just wonder maybe we could simply just using udelay(50) instead of
+usleep_range(50, 500) to eliminate the confusing since it's minor cast.
+What do you think of it?
+
+>> Furthermore, shouldn't it be udelay(500)?
+>
+> 500 is for the worst case of sleep, and 50 is good enough for delay.
+>
+
+Yes, you''re right.
+We have a loop, so 50ns one time should be good.
+
+> Shawn
+
+Regards
+Dong Aisheng
