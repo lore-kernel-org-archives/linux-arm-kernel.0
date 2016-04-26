@@ -1,65 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 26 Apr 2016 11:18:22 +0100
-Subject: [GIT PULL v2 1/2] ARM: vexpress: addition of MPS2 platform
- support for v4.7
-In-Reply-To: <7512668.6FnnShhbHF@wuerfel>
-References: <1461601876-25288-1-git-send-email-sudeep.holla@arm.com>
- <7512668.6FnnShhbHF@wuerfel>
-Message-ID: <571F406E.9010503@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Apr 2016 12:24:32 +0200
+Subject: [PATCH] ARM: dts: at91: VInCo: fix phy reset gpio flag
+In-Reply-To: <570BF481.9070903@cogentembedded.com>
+References: <570BF481.9070903@cogentembedded.com>
+Message-ID: <1461666272-10107-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Fix gpio active flag for the phy reset-gpios property. The line is
+active low instead of active high.
+Actually, this flags was never used by the macb driver.
 
-On 25/04/16 22:06, Arnd Bergmann wrote:
-> On Monday 25 April 2016 17:31:15 Sudeep Holla wrote:
->> ARMv7 Cortex-M Prototyping System (MPS2) support
->>
->> Basic support for ARM Versatile Express Cortex-M Prototyping System
->> (V2M-MPS2). ucLinux can be now run on both the hardware and FVP models
->> with Cortex-M3/M4/M7 configurations (Vladimir Murzin)
->>
->> ----------------------------------------------------------------
->> Vladimir Murzin (5):
->>        ARM: vexpress/mps2: introduce MPS2 platform
->>        ARM: configs: add MPS2 defconfig
->>        ARM: dts: introduce MPS2 AN385/AN386
->>        ARM: dts: introduce MPS2 AN399/AN400
->>        MAINTAINERS: Update ARM Versatile Express platform entry
->>
->>   MAINTAINERS                          |   1 +
->>   arch/arm/Kconfig                     |  12 ++
->>   arch/arm/Makefile                    |   1 +
->>   arch/arm/boot/dts/Makefile           |   3 +
->>   arch/arm/boot/dts/mps2-an385.dts     |  92 +++++++++++++
->>   arch/arm/boot/dts/mps2-an399.dts     |  92 +++++++++++++
->>   arch/arm/boot/dts/mps2.dtsi          | 241 +++++++++++++++++++++++++++++++++++
->>   arch/arm/configs/mps2_defconfig      | 109 ++++++++++++++++
->>   arch/arm/mach-vexpress/Makefile      |   4 +-
->>   arch/arm/mach-vexpress/Makefile.boot |   3 +
->>   arch/arm/mach-vexpress/v2m-mps2.c    |  21 +++
->>
->
-> Thanks for respinning them, all the contents look good for arm-soc now.
->
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: David Miller <davem@davemloft.net>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi,
 
-Thanks for having a look at this.
+Thanks for having reported this bug to me.
+I hope that we will be able to move forward for changing the phy
+reset code in the macb driver.
 
-> However, the way we pull them in, I need them separately for dts, defconfig and
-> the rest. This means only one or two patches for each branch, which is getting
-> slightly silly at that point, so you could just send them as patches,
-> or I can cherry-pick the changes into the individual branches to save you
-> yet another respin.
+I plan to queue this patch through arm-soc for 4.7.
 
-Sure, I have pushed 3 branches accordingly:
-1. for-next/mps2
-2. for-next/mps2-dt
-3. for-next/mps2-defconfig
+Thanks, best regards,
+  Nicolas
 
-@ git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+ arch/arm/boot/dts/at91-vinco.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Let me know if that's fine for you. I can tag and send PR if needed.
-
+diff --git a/arch/arm/boot/dts/at91-vinco.dts b/arch/arm/boot/dts/at91-vinco.dts
+index 79aec55e1ebc..6a366ee952a8 100644
+--- a/arch/arm/boot/dts/at91-vinco.dts
++++ b/arch/arm/boot/dts/at91-vinco.dts
+@@ -118,7 +118,7 @@
+ 
+ 				ethernet-phy at 1 {
+ 					reg = <0x1>;
+-					reset-gpios = <&pioE 8 GPIO_ACTIVE_HIGH>;
++					reset-gpios = <&pioE 8 GPIO_ACTIVE_LOW>;
+ 					interrupt-parent = <&pioB>;
+ 					interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
+ 				};
+@@ -162,7 +162,7 @@
+ 					reg = <0x1>;
+ 					interrupt-parent = <&pioB>;
+ 					interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+-					reset-gpios = <&pioE 6 GPIO_ACTIVE_HIGH>;
++					reset-gpios = <&pioE 6 GPIO_ACTIVE_LOW>;
+ 				};
+ 			};
+ 
 -- 
-Regards,
-Sudeep
+2.1.3
