@@ -1,24 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 25 Apr 2016 18:29:48 -0700
-Subject: [Patch v2 3/8] firmware: qcom: scm: Generalize shared error map
-In-Reply-To: <1461625725-32425-4-git-send-email-andy.gross@linaro.org>
-References: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
- <1461625725-32425-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160426012948.GF29990@codeaurora.org>
+From: jay.xu@rock-chips.com (jay.xu)
+Date: Tue, 26 Apr 2016 09:30:05 +0800
+Subject: [PATCH RESEND v2 3/4] ARM64: dts: rockchip: add RK3399 evaluation
+ board
+In-Reply-To: <20160425232223.GA59576@google.com>
+References: <1461304307-14113-1-git-send-email-jay.xu@rock-chips.com>
+ <1461304307-14113-4-git-send-email-jay.xu@rock-chips.com>
+ <20160425232223.GA59576@google.com>
+Message-ID: <571EC49D.9010004@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25, Andy Gross wrote:
-> This patch moves the qcom_scm_remap_error function to the include file
-> where can be used by both the 32 and 64 bit versions of the code.
-> 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
+Hi Brian:
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+On 2016?04?26? 07:22, Brian Norris wrote:
+> On Fri, Apr 22, 2016 at 01:51:46PM +0800, Jianqun Xu wrote:
+>> The RK3399 evaluation board is designed with pmic
+>> rk808 on top board.
+>>
+>> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+>> ---
+>> changes in v2:
+>> - new add patch
+>
+> FWIW, the $subject is a bit confusing. Probaly should be "Documentation:
+> ...". But otherwise, LGTM.
+>
+yes, I will fix it in next version, thanks
+>
+>
