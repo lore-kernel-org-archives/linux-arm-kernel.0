@@ -1,28 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Apr 2016 13:34:06 +0200
-Subject: [PATCH v2 0/6] arm64/ARM pt dumper changes
-In-Reply-To: <20160426112918.GK27312@arm.com>
-References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160426112918.GK27312@arm.com>
-Message-ID: <CAKv+Gu9h4r1ypiUo23ZGw=rF_NqLwWybwrhT-1gyAE9TYhN0zA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2016 13:37:15 +0200
+Subject: [PULL REQUEST v3] ARM: OXNAS pull request for 4.7
+In-Reply-To: <1461657981-22942-1-git-send-email-narmstrong@baylibre.com>
+References: <1461657981-22942-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <53499338.xCg5O7lsm4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2016 at 13:29, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Apr 22, 2016 at 06:48:02PM +0200, Ard Biesheuvel wrote:
->> This series updates the kernel page table dumper to:
->> - not initialize the vmemmap region markers dynamically
->> - show region boundaries for the kasan shadow region
->> - include the UEFI runtime services mappings
->
-> I've merged the first two patches of this series. I can take patch 4 too
-> if you can rebase onto for-next/core.
->
+On Tuesday 26 April 2016 10:06:21 Neil Armstrong wrote:
+> This is the ARM pull request for the OXNAS platform.
+> It also includes one-line change into irq-versatile-fpga.
+> 
+> The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
+> 
+>   Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/superna9999/linux.git tags/ox810se-arm-v4.6-rc3
+> 
+> for you to fetch changes up to e557959d5599037899dd974f4a79419c664dcf79:
+> 
+>   MAINTAINERS: add maintainer entry for ARM/OXNAS platform (2016-04-26 09:50:53 +0200)
+> 
 
-Thanks, but it is not very useful without the last patch. I am trying
-to respin the code so it can be shared between ARM and arm64 in a way
-that addresses Mark's concerns. But since this is debug code anyway, I
-am not sure when I will get around to doing that.
+Pulled into next/soc
 
-Thanks,
-Ard.
+Please include descriptions of the contents in each tag in the
+future, so they can become the merge changelog text. This is what
+I put in there myself:
+    
+    Merge "ARM: Add OXNAS Platform Support" from Neil Armstrong
+    
+    This is for the ARM926 based ox810 chip used in some older
+    NAS appliances. There is another related ox820 chip based on
+    ARM11 that might get added here later.
+
+
+Thanks!
+
+	Arnd
