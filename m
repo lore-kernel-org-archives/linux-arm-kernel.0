@@ -1,169 +1,79 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Tue, 26 Apr 2016 10:36:46 +0800
-Subject: [PATCH 4/4] ARM64: dts: rockchip: add dts file for RK3399 evaluation
- board
-In-Reply-To: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
-References: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Tue, 26 Apr 2016 02:43:10 +0000
+Subject: [v8, 1/7] Documentation: DT: update Freescale DCFG compatible
+In-Reply-To: <20160422131151.GJ10606@leverpostej>
+References: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
+ <1461306464-19521-2-git-send-email-yangbo.lu@nxp.com>
+ <20160422131151.GJ10606@leverpostej>
+Message-ID: <HE1PR04MB0889A68C6D275D3102382D8BF8630@HE1PR04MB0889.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add rk3399-evb.dts for RK3399 evaluation board.
-Tested on RK3399 evb.
+Hi Mark,
 
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
-changes in v3:
-- add more compatible (Doug)
-- add modle
 
- arch/arm64/boot/dts/rockchip/Makefile       |   1 +
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 125 ++++++++++++++++++++++++++++
- 2 files changed, 126 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Friday, April 22, 2016 9:12 PM
+> To: Yangbo Lu
+> Cc: linux-mmc at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; linux-clk at vger.kernel.org; linux-
+> i2c at vger.kernel.org; iommu at lists.linux-foundation.org;
+> netdev at vger.kernel.org; ulf.hansson at linaro.org; Scott Wood; Rob Herring;
+> Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh
+> Sharma; Zhao Qiang; Kumar Gala; Santosh Shilimkar; Yang-Leo Li; Xiaobo
+> Xie
+> Subject: Re: [v8, 1/7] Documentation: DT: update Freescale DCFG
+> compatible
+> 
+> On Fri, Apr 22, 2016 at 02:27:38PM +0800, Yangbo Lu wrote:
+> > Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead of
+> > 'fsl,ls1021a-dcfg' to include more chips.
+> >
+> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> > ---
+> > Changes for v8:
+> > 	- Added this patch
+> > ---
+> >  Documentation/devicetree/bindings/arm/fsl.txt | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+> > b/Documentation/devicetree/bindings/arm/fsl.txt
+> > index 752a685..1d5f512 100644
+> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> > @@ -119,7 +119,7 @@ Freescale DCFG
+> >  configuration and status for the device. Such as setting the
+> > secondary  core start address and release the secondary core from
+> holdoff and startup.
+> >    Required properties:
+> > -  - compatible: should be "fsl,ls1021a-dcfg"
+> > +  - compatible: should be "fsl,<chip>-dcfg"
+> 
+> Please list specific values expected for <chip>, while jusy saying <chip>
+> may be more generic, it makes it practically impossible to search for the
+> correct binding given a compatible string, and it's vague as to exaclty
+> what <chip> should be.
 
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index df37865..7037a16 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-new file mode 100644
-index 0000000..c3370bd
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -0,0 +1,125 @@
-+/*
-+ * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/pwm/pwm.h>
-+#include "rk3399.dtsi"
-+
-+/ {
-+	model = "Rockchip RK3399 Evaluation Board";
-+	compatible = "rockchip,rk3399-evb", "rockchip,rk3399",
-+		     "google,rk3399evb-rev2", google,rk3399evb-rev1",
-+		     "google,rk3399evb-rev0" ;
-+
-+	vdd_center: vdd-center {
-+		compatible = "pwm-regulator";
-+		pwms = <&pwm3 0 25000 0>;
-+		regulator-name = "vdd_center";
-+		regulator-min-microvolt = <800000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		status = "okay";
-+	};
-+
-+	vcc3v3_sys: vcc3v3-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3_sys";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&pwm0 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ohci {
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins =
-+				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		pmic_dvs2: pmic-dvs2 {
-+			rockchip,pins =
-+				<1 18 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+};
--- 
-1.9.1
+[Lu Yangbo-B47093] Thanks for your comment. I will list the possible chips.
+
+> 
+> Thanks,
+> Mark.
+> 
+> 
+> 
+> >    - reg : should contain base address and length of DCFG
+> > memory-mapped registers
+> >
+> >  Example:
+> > --
+> > 2.1.0.27.g96db324
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree"
+> > in the body of a message to majordomo at vger.kernel.org More majordomo
+> > info at  http://vger.kernel.org/majordomo-info.html
+> >
