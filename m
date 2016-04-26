@@ -1,31 +1,78 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 26 Apr 2016 12:39:44 -0700
-Subject: [PATCH 1/2] clk: bcm2835: Mark the VPU clock as critical
-Message-ID: <1461699585-6649-1-git-send-email-eric@anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 12:39:50 -0700
+Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
+ idle
+In-Reply-To: <20160426190755.GK3715@linux.vnet.ibm.com>
+References: <1461617335-22372-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20160426150031.GP5995@atomide.com>
+ <20160426175214.GJ3715@linux.vnet.ibm.com>
+ <20160426182939.GO5995@atomide.com>
+ <20160426190755.GK3715@linux.vnet.ibm.com>
+Message-ID: <20160426193949.GP5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VPU clock is also the clock for our AXI bus, so we really can't
-disable it.  This might have happened during boot if, for example,
-uart1 (aux_uart clock) probed and was then disabled before the other
-consumers of the VPU clock had probed.
+* Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 12:08]:
+> On Tue, Apr 26, 2016 at 11:29:39AM -0700, Tony Lindgren wrote:
+> > * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 10:53]:
+> > > Does the following patch help?
+> > 
+> > It just changes the output.. See below.
+> 
+> Ah -- you need both patches.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/clk/bcm/clk-bcm2835.c | 1 +
- 1 file changed, 1 insertion(+)
+Oops sorry, I though I had the first one already from next..
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 5a7e3eca5d12..14f3066194ac 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1267,6 +1267,7 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 
- 	if (data->is_vpu_clock) {
- 		init.ops = &bcm2835_vpu_clock_clk_ops;
-+		init.flags |= CLK_IS_CRITICAL;
- 	} else {
- 		init.ops = &bcm2835_clock_clk_ops;
- 		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
--- 
-2.8.0.rc3
+> These are on -rcu at:
+> 
+> 501889db6fee (arm: Use _rcuidle tracepoint to allow use from idle)
+> 99cd56ad86d2 (rm: Use more _rcuidle tracepoints to allow use from idle)
+
+With these omap4 is now OK. But omap3 produces yet another warning,
+See below :)
+
+Regards,
+
+Tony
+
+8< ------------------
+===============================
+[ INFO: suspicious RCU usage. ]
+4.6.0-rc5-next-20160426+ #1114 Not tainted
+-------------------------------
+include/trace/events/clk.h:59 suspicious rcu_dereference_check() usage!
+
+other info that might help us debug this:
+
+
+RCU used illegally from idle CPU!
+rcu_scheduler_active = 1, debug_locks = 0
+RCU used illegally from extended quiescent state!
+2 locks held by swapper/0/0:
+ #0:  (&oh->hwmod_key#30){......}, at: [<c0121b40>] omap_hwmod_idle+0x18/0x44
+ #1:  (enable_lock){......}, at: [<c0630998>] clk_enable_lock+0x18/0x124
+
+stack backtrace:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1114
+Hardware name: Generic OMAP36xx (Flattened Device Tree)
+[<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
+[<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
+[<c047fd68>] (dump_stack) from [<c0631618>] (clk_core_disable+0x17c/0x348)
+[<c0631618>] (clk_core_disable) from [<c0632774>] (clk_disable+0x24/0x30)
+[<c0632774>] (clk_disable) from [<c0120590>] (_disable_clocks+0x18/0x7c)
+[<c0120590>] (_disable_clocks) from [<c0121680>] (_idle+0x12c/0x230)
+[<c0121680>] (_idle) from [<c0121b4c>] (omap_hwmod_idle+0x24/0x44)
+[<c0121b4c>] (omap_hwmod_idle) from [<c0122c24>] (omap_device_idle+0x3c/0x90)
+[<c0122c24>] (omap_device_idle) from [<c052cc00>] (__rpm_callback+0x2c/0x60)
+[<c052cc00>] (__rpm_callback) from [<c052cc54>] (rpm_callback+0x20/0x80)
+[<c052cc54>] (rpm_callback) from [<c052d150>] (rpm_suspend+0x100/0x768)
+[<c052d150>] (rpm_suspend) from [<c052ec58>] (__pm_runtime_suspend+0x64/0x84)
+[<c052ec58>] (__pm_runtime_suspend) from [<c04bf25c>] (omap2_gpio_prepare_for_idle+0x5
+c/0x70)
+[<c04bf25c>] (omap2_gpio_prepare_for_idle) from [<c0125568>] (omap_sram_idle+0x140/0x2
+44)
+[<c0125568>] (omap_sram_idle) from [<c01269dc>] (omap3_enter_idle_bm+0xfc/0x1ec)
+[<c01269dc>] (omap3_enter_idle_bm) from [<c0601bdc>] (cpuidle_enter_state+0x80/0x3d4)
+[<c0601bdc>] (cpuidle_enter_state) from [<c0183b08>] (cpu_startup_entry+0x198/0x3a0)
+[<c0183b08>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
+[<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
