@@ -1,99 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Apr 2016 11:08:43 +0100
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <20160425184740.GA2559@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
- <20160425172656.GI9614@e104818-lin.cambridge.arm.com>
- <20160425181913.GA30125@yury-N73SV>
- <20160425184740.GA2559@yury-N73SV>
-Message-ID: <20160426100842.GB8525@e104818-lin.cambridge.arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 26 Apr 2016 11:08:35 +0100
+Subject: [PATCH v3 0/4] Enable configs for 96boards HiKey and general arm64
+In-Reply-To: <1459597674-6834-1-git-send-email-guodong.xu@linaro.org>
+References: <1459597674-6834-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <571F3E23.7040805@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 09:47:40PM +0300, Yury Norov wrote:
-> On Mon, Apr 25, 2016 at 09:19:13PM +0300, Yury Norov wrote:
-> > On Mon, Apr 25, 2016 at 06:26:56PM +0100, Catalin Marinas wrote:
-> > > On Wed, Apr 06, 2016 at 01:08:42AM +0300, Yury Norov wrote:
-> > > > --- a/arch/arm64/kernel/entry.S
-> > > > +++ b/arch/arm64/kernel/entry.S
-> > > > @@ -715,9 +715,13 @@ ENDPROC(ret_from_fork)
-> > > >   */
-> > > >  	.align	6
-> > > >  el0_svc:
-> > > > -	adrp	stbl, sys_call_table		// load syscall table pointer
-> > > >  	uxtw	scno, w8			// syscall number in w8
-> > > >  	mov	sc_nr, #__NR_syscalls
-> > > > +#ifdef CONFIG_ARM64_ILP32
-> > > > +	ldr	x16, [tsk, #TI_FLAGS]
-> > > > +	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> > > > +#endif
-> > > 
-> > > There is another ldr x16, [tsk, #TI_FLAGS] load further down in the
-> > > el0_svc_naked block. We should rework these a bit to avoid loading the
-> > > same location twice unnecessarily. E.g. move the ldr x16 just before
-> > > el0_svc_naked and branch one line after in case of the ILP32 syscall.
-> > > 
-> > 
-> > Yes, I thiks we can refactor it. Thanks for a catch.
+Hi Guodong,
+
+On 02/04/2016 12:47, Guodong Xu wrote:
+> This patch enables a number of devices currently supported by the Hi6220
+> and 96boards HiKey. These include
+> a) Hi655x PMIC and regulator
+> b) Hi6220 I2C, USB, MMC, mailbox, and hisi-reset
+> c) CONFIG_PINCTRL_SINGLE, and CONFIG_LEDS_GPIO
+> d) WLAN, TI WL1835
 > 
-> Now it's better, I think
+> Also added general features (built as modules) in arm64:
+>  - SPIDEV
+>  - USB network adapters
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index cf4d1ae..21312bb 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -715,16 +715,22 @@ ENDPROC(ret_from_fork)
->   */
->  	.align	6
->  el0_svc:
-> -	adrp	stbl, sys_call_table		// load syscall table pointer
->  	uxtw	scno, w8			// syscall number in w8
->  	mov	sc_nr, #__NR_syscalls
-> +	ldr	x16, [tsk, #TI_FLAGS]
+> v3:
+>  - rebase to next-20160401
+>  - Enabled configs for WLAN and TI WL1835.
 
-You can move this higher up for interlocking reasons (though these days
-CPUs do a lot of speculative loads).
+Thanks!
+Applied series to the hisilicon soc tree.
+And the b) and c) are already in the mainline, so I just kept a) and d) there.
 
-> +#ifdef CONFIG_ARM64_ILP32
-> +	tbz	x16, #TIF_32BIT_AARCH64, el0_lp64_svc // We are using ILP32
+Best Regards,
+Wei
 
-	// We are *not* using ILP32
-
-> +	adrp	stbl, sys_call_ilp32_table	// load ilp32 syscall table pointer
-> +	b el0_svc_naked
-> +el0_lp64_svc:
-> +#endif
-> +	adrp	stbl, sys_call_table		// load syscall table pointer
-
-You can avoid the branches by using csel, something like this:
-
-	ldr	x16, [tsk, #TI_FLAGS]
-	adrp	stbl, sys_call_table
-	...
-#ifdef CONFIG_ARM64_ILP32
-	adrp	x17, sys_call_ilp32_table
-	tst	x16, #_TIF_32BIT_AARCH64
-	csel	stbl, stbl, x17, eq
-#endif
-el0_svc_naked:
-	...
-
->  el0_svc_naked:					// compat entry point
->  	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
->  	enable_dbg_and_irq
->  	ct_user_exit 1
->  
-> -	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
-> -	tst	x16, #_TIF_SYSCALL_WORK
-> +	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
->  	b.ne	__sys_trace
->  	cmp     scno, sc_nr                     // check upper syscall limit
->  	b.hs	ni_sys
-
-There is el0_svc_compat branching to el0_svc_naked and it won't have x16
-set anymore. So you need to add an ldr x16 to el0_svc_compat as well.
-
--- 
-Catalin
+> 
+> v2:
+>  - rebase to next-20160310, CONFIG_MMC_BLOCK_MINORS=16 is already in.
+>  - set CONFIG_I2C_DESIGNWARE_PLATFORM to be build as module
+>  - Enable general features (as modules) in arm64
+> 
+> Akira Tsukamoto (1):
+>   arm64: defconfig: enable several common USB network adapters
+> 
+> Guodong Xu (3):
+>   arm64: defconfig: Enable devices for Hi6220 and 96boards HiKey
+>   arm64: defconfig: add CONFIG_SPI_SPIDEV as module
+>   arm64: defconfig: enable configs for WLAN and TI WL1835 as modules
+> 
+>  arch/arm64/configs/defconfig | 30 ++++++++++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
+> 
