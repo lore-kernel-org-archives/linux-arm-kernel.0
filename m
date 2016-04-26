@@ -1,47 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 10:12:47 -0700
-Subject: [PATCH] ARM: dts: omap3: Fix ISP syscon register offset
-In-Reply-To: <20160422131626.GA7534@earth>
-References: <1460787628-17316-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <5719A9E3.1000902@gmail.com> <20160422131626.GA7534@earth>
-Message-ID: <20160426171246.GE5995@atomide.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 26 Apr 2016 19:13:38 +0200
+Subject: [PATCH v2 1/5] PM / AVS: rockchip-io: make io-domains a child of
+ the GRF
+In-Reply-To: <15890066.zZg7hiMmi2@diego>
+References: <1459432126-6395-1-git-send-email-heiko@sntech.de>
+ <3991738.xMQYlxyb28@phil>
+ <CAJZ5v0gi_EBnL+M6iEAkgYHNkFQOG5OT=6fABQtvCyQY4=GcQQ@mail.gmail.com>
+ <15890066.zZg7hiMmi2@diego>
+Message-ID: <CAJZ5v0gMEX+5fKgrhHPTZh1GW4FB7QWSOB_ZARL0O8n47cep5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@kernel.org> [160422 06:17]:
-> Hi,
-> 
-> On Fri, Apr 22, 2016 at 07:34:43AM +0300, Ivaylo Dimitrov wrote:
-> > On 16.04.2016 09:20, Ivaylo Dimitrov wrote:
-> > >According to the TRM, SCM CONTROL_CSIRXFE register is on offset 0x6c
-> > >
-> > >Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-> > >---
-> > >  arch/arm/boot/dts/omap34xx.dtsi | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > >diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
-> > >index 5cdba1f..e446562 100644
-> > >--- a/arch/arm/boot/dts/omap34xx.dtsi
-> > >+++ b/arch/arm/boot/dts/omap34xx.dtsi
-> > >@@ -46,7 +46,7 @@
-> > >  			       0x480bd800 0x017c>;
-> > >  			interrupts = <24>;
-> > >  			iommus = <&mmu_isp>;
-> > >-			syscon = <&scm_conf 0xdc>;
-> > >+			syscon = <&scm_conf 0x6c>;
-> > >  			ti,phy-type = <OMAP3ISP_PHY_TYPE_COMPLEX_IO>;
-> > >  			#clock-cells = <1>;
-> > >  			ports {
-> > >
-> 
-> You may want to add the hint, that 0xdc (the old, wrong "offset")
-> represents the last few bits of the register address. I guess
-> somebody didn't notice, that scm_conf does not start at a register
-> address ending with 00 (like most other modules).
-> 
-> Reviewed-By: Sebastian Reichel <sre@kernel.org>
+On Tue, Apr 26, 2016 at 6:25 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Rafael,
+>
+> Am Mittwoch, 13. April 2016, 06:55:03 schrieb Rafael J. Wysocki:
+>> On Tue, Apr 12, 2016 at 4:23 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+>> > Am Donnerstag, 31. M?rz 2016, 15:48:42 schrieb Heiko Stuebner:
+>> >> IO-domain handling is part of the general register files, so should live
+>> >> under the grf directly. This change allows the grf to be a simple-mfd and
+>> >> the io-domains fetching the syscon regmap from that parent-node.
+>> >>
+>> >> The old binding is of course preserved, though deprecated.
+>> >>
+>> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> >> Acked-by: Kevin Hilman <khilman@baylibre.com>
+>> >> Tested-by: David Wu <david.wu@rock-chips.com>
+>> >
+>> > could you look into picking up this patch 1/5 please?
+>> >
+>> > The others are to much interwined into other devicetree changes, so I'll
+>> > apply them for 4.8, but it would be nice if you could pick up this one for
+>> > 4.7 so the code change becomes available at 4.8-rc1
+>>
+>> OK, I'll pick it up, but I'm traveling this week, so that'll take a
+>> few days more.
+>
+> I just checked kernel/git/rafael/linux-pm.git and didn't find this patch there,
+> so I guess it might be time for a ping ;-) .
 
-Applying into omap-for-v4.6/fixes-rc5 thanks.
+My bad, sorry.
 
-Tony
+Queued up for 4.7 now, will show up in linux-next in the next few days.
