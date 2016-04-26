@@ -1,38 +1,85 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 26 Apr 2016 03:37:23 +0300
-Subject: [PATCH 0/7] ARM: dts: lpc32xx: nonfunctional updates to ea3250 and
- phy3250 dts
-Message-ID: <1461631050-10479-1-git-send-email-vz@mleia.com>
+Date: Tue, 26 Apr 2016 03:37:25 +0300
+Subject: [PATCH 2/7] ARM: dts: lpc32xx: ea3250: add NAND partitions device node
+In-Reply-To: <1461631050-10479-1-git-send-email-vz@mleia.com>
+References: <1461631050-10479-1-git-send-email-vz@mleia.com>
+Message-ID: <1461631050-10479-3-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change updates DTS files of PHY3250 and EA3250 boards powered by
-NXP LPC3250 SoC:
-* flatten board DTS files by exploiting device node labels,
-* add 'partitions' device node for MTD OF,
-* correct Atmel vendor prefix,
-* rename board DTS files by adding SoC name prefix.
+To declare MTD OF partitions NAND controller device node should have
+a special 'partitions' subnode, the change removes a debug message
+from mtd/ofpart on boot:
 
-The change is wanted to have to prevent similar issues on copy-paste
-in case if more DTS files for LPC32xx boards are submitted.
+  nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
+  Trying to parse direct subnodes as partitions.
 
-No functional changes are intended.
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ arch/arm/boot/dts/ea3250.dts | 41 ++++++++++++++++++++++-------------------
+ 1 file changed, 22 insertions(+), 19 deletions(-)
 
-Vladimir Zapolskiy (7):
-  ARM: dts: lpc32xx: ea3250: avoid extension of device nodes by absolute path
-  ARM: dts: lpc32xx: ea3250: add NAND partitions device node
-  ARM: dts: lpc32xx: ea3250: fix Atmel at24 eeprom vendor
-  ARM: dts: lpc32xx: ea3250: add SoC name prefix to board dts file
-  ARM: dts: lpc32xx: phy3250: avoid extension of device nodes by absolute path
-  ARM: dts: lpc32xx: phy3250: add NAND partitions device node
-  ARM: dts: lpc32xx: phy3250: add SoC name prefix to board dts file
-
- arch/arm/boot/dts/Makefile                         |   3 +-
- .../boot/dts/{ea3250.dts => lpc3250-ea3250.dts}    | 229 ++++++++---------
- .../boot/dts/{phy3250.dts => lpc3250-phy3250.dts}  | 285 ++++++++++-----------
- 3 files changed, 256 insertions(+), 261 deletions(-)
- rename arch/arm/boot/dts/{ea3250.dts => lpc3250-ea3250.dts} (61%)
- rename arch/arm/boot/dts/{phy3250.dts => lpc3250-phy3250.dts} (43%)
-
+diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
+index 7cf815a..58bcda9 100644
+--- a/arch/arm/boot/dts/ea3250.dts
++++ b/arch/arm/boot/dts/ea3250.dts
+@@ -213,8 +213,6 @@
+ 
+ /* 128MB Flash via SLC NAND controller */
+ &slc {
+-	#address-cells = <1>;
+-	#size-cells = <1>;
+ 	status = "okay";
+ 
+ 	nxp,wdr-clks = <14>;
+@@ -228,26 +226,31 @@
+ 	nand-on-flash-bbt;
+ 	gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
+ 
+-	mtd0 at 00000000 {
+-		label = "ea3250-boot";
+-		reg = <0x00000000 0x00080000>;
+-		read-only;
+-	};
++	partitions {
++		#address-cells = <1>;
++		#size-cells = <1>;
+ 
+-	mtd1 at 00080000 {
+-		label = "ea3250-uboot";
+-		reg = <0x00080000 0x000c0000>;
+-		read-only;
+-	};
++		mtd0 at 00000000 {
++			label = "ea3250-boot";
++			reg = <0x00000000 0x00080000>;
++			read-only;
++		};
+ 
+-	mtd2 at 00140000 {
+-		label = "ea3250-kernel";
+-		reg = <0x00140000 0x00400000>;
+-	};
++		mtd1 at 00080000 {
++			label = "ea3250-uboot";
++			reg = <0x00080000 0x000c0000>;
++			read-only;
++		};
+ 
+-	mtd3 at 00540000 {
+-		label = "ea3250-rootfs";
+-		reg = <0x00540000 0x07ac0000>;
++		mtd2 at 00140000 {
++			label = "ea3250-kernel";
++			reg = <0x00140000 0x00400000>;
++		};
++
++		mtd3 at 00540000 {
++			label = "ea3250-rootfs";
++			reg = <0x00540000 0x07ac0000>;
++		};
+ 	};
+ };
+ 
 -- 
 2.1.4
