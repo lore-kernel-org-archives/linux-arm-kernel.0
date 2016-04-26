@@ -1,44 +1,99 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Apr 2016 12:04:13 +0200
-Subject: [PATCH] ARM: dts: at91: fix typo in sama5d2 PIN_PD24 description
-Message-ID: <1461665075-9636-1-git-send-email-nicolas.ferre@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Apr 2016 11:08:43 +0100
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160425184740.GA2559@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
+ <20160425172656.GI9614@e104818-lin.cambridge.arm.com>
+ <20160425181913.GA30125@yury-N73SV>
+ <20160425184740.GA2559@yury-N73SV>
+Message-ID: <20160426100842.GB8525@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vallee <fvallee@eukrea.fr>
+On Mon, Apr 25, 2016 at 09:47:40PM +0300, Yury Norov wrote:
+> On Mon, Apr 25, 2016 at 09:19:13PM +0300, Yury Norov wrote:
+> > On Mon, Apr 25, 2016 at 06:26:56PM +0100, Catalin Marinas wrote:
+> > > On Wed, Apr 06, 2016 at 01:08:42AM +0300, Yury Norov wrote:
+> > > > --- a/arch/arm64/kernel/entry.S
+> > > > +++ b/arch/arm64/kernel/entry.S
+> > > > @@ -715,9 +715,13 @@ ENDPROC(ret_from_fork)
+> > > >   */
+> > > >  	.align	6
+> > > >  el0_svc:
+> > > > -	adrp	stbl, sys_call_table		// load syscall table pointer
+> > > >  	uxtw	scno, w8			// syscall number in w8
+> > > >  	mov	sc_nr, #__NR_syscalls
+> > > > +#ifdef CONFIG_ARM64_ILP32
+> > > > +	ldr	x16, [tsk, #TI_FLAGS]
+> > > > +	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
+> > > > +#endif
+> > > 
+> > > There is another ldr x16, [tsk, #TI_FLAGS] load further down in the
+> > > el0_svc_naked block. We should rework these a bit to avoid loading the
+> > > same location twice unnecessarily. E.g. move the ldr x16 just before
+> > > el0_svc_naked and branch one line after in case of the ILP32 syscall.
+> > > 
+> > 
+> > Yes, I thiks we can refactor it. Thanks for a catch.
+> 
+> Now it's better, I think
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index cf4d1ae..21312bb 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -715,16 +715,22 @@ ENDPROC(ret_from_fork)
+>   */
+>  	.align	6
+>  el0_svc:
+> -	adrp	stbl, sys_call_table		// load syscall table pointer
+>  	uxtw	scno, w8			// syscall number in w8
+>  	mov	sc_nr, #__NR_syscalls
+> +	ldr	x16, [tsk, #TI_FLAGS]
 
-Fix a typo on PIN_PD24 for UTXD2 and FLEXCOM4_IO3 which were
-wrongly linked to PIN_PD23).
+You can move this higher up for interlocking reasons (though these days
+CPUs do a lot of speculative loads).
 
-Signed-off-by: Florian Vallee <fvallee@eukrea.fr>
-Fixes: 7f16cb676c00 ("ARM: at91/dt: add sama5d2 pinmux")
-Cc: stable at vger.kernel.org # v4.4+
-[nicolas.ferre at atmel.com: add commit message, changed subject]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
+> +#ifdef CONFIG_ARM64_ILP32
+> +	tbz	x16, #TIF_32BIT_AARCH64, el0_lp64_svc // We are using ILP32
 
-I'll queue this patch in at91-4.7-dt branch.
+	// We are *not* using ILP32
 
-thanks, bye.
+> +	adrp	stbl, sys_call_ilp32_table	// load ilp32 syscall table pointer
+> +	b el0_svc_naked
+> +el0_lp64_svc:
+> +#endif
+> +	adrp	stbl, sys_call_table		// load syscall table pointer
 
- arch/arm/boot/dts/sama5d2-pinfunc.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+You can avoid the branches by using csel, something like this:
 
-diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
-index b0c912feaa2f..8a394f336003 100644
---- a/arch/arm/boot/dts/sama5d2-pinfunc.h
-+++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
-@@ -837,8 +837,8 @@
- #define PIN_PD23__ISC_FIELD		PINMUX_PIN(PIN_PD23, 6, 4)
- #define PIN_PD24			120
- #define PIN_PD24__GPIO			PINMUX_PIN(PIN_PD24, 0, 0)
--#define PIN_PD24__UTXD2			PINMUX_PIN(PIN_PD23, 1, 2)
--#define PIN_PD24__FLEXCOM4_IO3		PINMUX_PIN(PIN_PD23, 3, 3)
-+#define PIN_PD24__UTXD2			PINMUX_PIN(PIN_PD24, 1, 2)
-+#define PIN_PD24__FLEXCOM4_IO3		PINMUX_PIN(PIN_PD24, 3, 3)
- #define PIN_PD25			121
- #define PIN_PD25__GPIO			PINMUX_PIN(PIN_PD25, 0, 0)
- #define PIN_PD25__SPI1_SPCK		PINMUX_PIN(PIN_PD25, 1, 3)
+	ldr	x16, [tsk, #TI_FLAGS]
+	adrp	stbl, sys_call_table
+	...
+#ifdef CONFIG_ARM64_ILP32
+	adrp	x17, sys_call_ilp32_table
+	tst	x16, #_TIF_32BIT_AARCH64
+	csel	stbl, stbl, x17, eq
+#endif
+el0_svc_naked:
+	...
+
+>  el0_svc_naked:					// compat entry point
+>  	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+>  	enable_dbg_and_irq
+>  	ct_user_exit 1
+>  
+> -	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
+> -	tst	x16, #_TIF_SYSCALL_WORK
+> +	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
+>  	b.ne	__sys_trace
+>  	cmp     scno, sc_nr                     // check upper syscall limit
+>  	b.hs	ni_sys
+
+There is el0_svc_compat branching to el0_svc_naked and it won't have x16
+set anymore. So you need to add an ldr x16 to el0_svc_compat as well.
+
 -- 
-2.1.3
+Catalin
