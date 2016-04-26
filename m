@@ -1,227 +1,149 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Apr 2016 12:37:38 +0200
-Subject: [PATCH v8] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <CAPDyKFqnnjdQgXNjA30AAi--+0NP74gWFjuYfrsvUGTV=yK=Hw@mail.gmail.com>
-References: <1460711612-5268-1-git-send-email-m.szyprowski@samsung.com>
- <CAPDyKFqnnjdQgXNjA30AAi--+0NP74gWFjuYfrsvUGTV=yK=Hw@mail.gmail.com>
-Message-ID: <fd0f3f8e-fe0e-b75e-620d-ecf6ffff5f69@samsung.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 26 Apr 2016 11:38:20 +0100
+Subject: [PATCH v2] io-64-nonatomic: Add relaxed accessor variants
+In-Reply-To: <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <44173fd4e8efd27d670cadc6b30e215243a14099.1460391217.git.robin.murphy@arm.com>
+Message-ID: <4eeca6f53113aca2ab7a645339c78235999ee7a9.1461666736.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
+accessor macros as conditional wrappers") makes the *_relaxed forms of
+I/O accessors universally available to drivers, in cases where writeq()
+is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
+end up falling back to writel() regardless of whether writel_relaxed()
+is available (identically for s/write/read/).
 
+Add corresponding relaxed forms of the nonatomic helpers to delegate
+to the equivalent 32-bit accessors as appropriate. We also need to fix
+io.h to avoid defining default relaxed variants if the basic accessors
+themselves don't exist.
 
-On 2016-04-25 11:19, Ulf Hansson wrote:
-> On 15 April 2016 at 11:13, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->> To read pid/cid registers, the probed device need to be properly turned on.
->> When it is inside a power domain, the bus code should ensure that the
->> given power domain is enabled before trying to access device's registers.
->> However in some cases power domain (or clocks) might not be yet available.
->> Returning -EPROBE_DEFER is not a solution in such case, because callers
->> don't handle this special error code. Instead such devices are added to the
->> special list and their registration is retried from periodic worker until
->> all resources are available.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->> Changelog:
->>
->> v8:
->> - replaced notifier with periodic workqueue on Greg request
->>
->> v7: https://lkml.org/lkml/2016/4/13/201
->> - replaced late_initcall approach with a notifier registered to device core
->>
->> v6: https://lkml.org/lkml/2016/4/12/414
->> - got back to v1-style approach on Russell King request to avoid ABI break
->> - use list for storing deferred devices and retry their registration from
->>    late_initcall
->>
->> v5: https://lkml.org/lkml/2016/2/10/179
->> - added 2 more patches to avoid regression with existing drivers (nvdimm and
->>    sa1111), for more information, see https://lkml.org/lkml/2015/12/17/390
->> - changed thread name to "AMBA: add complete support for power domains"
->>
->> v4: https://lkml.org/lkml/2015/12/2/52
->> - fixed more issues pointed by Ulf Hansson and Russell King
->>
->> v3: https://lkml.org/lkml/2015/12/1/334
->> - fixed issues pointed by Ulf Hansson
->> - dropped patch for exynos4210 dts, because it already got queued for merging
->>
->> v2: https://lkml.org/lkml/2015/11/26/229
->> - added 2 patches from 'On-demand device probing' thread
->>    (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
->>    from amba_device_add() to amba_match()
->> - moved dev_pm_domain_attach() to amba_match(), which is allowed to
->>    return -EPROBE_DEFER
->>
->> v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
->> - initial version
->> ---
->>   drivers/amba/bus.c | 100 +++++++++++++++++++++++++++++++++++++++++++++++------
->>   1 file changed, 90 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
->> index f0099360039e..a5b5c87e2114 100644
->> --- a/drivers/amba/bus.c
->> +++ b/drivers/amba/bus.c
->> @@ -336,16 +336,7 @@ static void amba_device_release(struct device *dev)
->>          kfree(d);
->>   }
->>
->> -/**
->> - *     amba_device_add - add a previously allocated AMBA device structure
->> - *     @dev: AMBA device allocated by amba_device_alloc
->> - *     @parent: resource parent for this devices resources
->> - *
->> - *     Claim the resource, and read the device cell ID if not already
->> - *     initialized.  Register the AMBA device with the Linux device
->> - *     manager.
->> - */
->> -int amba_device_add(struct amba_device *dev, struct resource *parent)
->> +static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
->>   {
->>          u32 size;
->>          void __iomem *tmp;
->> @@ -373,6 +364,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->>                  goto err_release;
->>          }
->>
->> +       ret = dev_pm_domain_attach(&dev->dev, true);
->> +       if (ret == -EPROBE_DEFER) {
->> +               iounmap(tmp);
->> +               goto err_release;
->> +       }
->> +
->>          ret = amba_get_enable_pclk(dev);
->>          if (ret == 0) {
->>                  u32 pid, cid;
->> @@ -398,6 +395,7 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->>          }
->>
->>          iounmap(tmp);
->> +       dev_pm_domain_detach(&dev->dev, true);
->>
->>          if (ret)
->>                  goto err_release;
->> @@ -421,6 +419,88 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->>    err_out:
->>          return ret;
->>   }
->> +
->> +/*
->> + * Registration of AMBA device require reading its pid and cid registers.
->> + * To do this, the device must be turned on (if it is a part of power domain)
->> + * and have clocks enabled. However in some cases those resources might not be
->> + * yet available. Returning EPROBE_DEFER is not a solution in such case,
->> + * because callers don't handle this special error code. Instead such devices
->> + * are added to the special list and their registration is retried from
->> + * periodic worker, until all resources are available and registration succeeds.
->> + */
->> +struct deferred_device {
->> +       struct amba_device *dev;
->> +       struct resource *parent;
->> +       struct list_head node;
->> +};
->> +
->> +static LIST_HEAD(deferred_devices);
->> +static DEFINE_MUTEX(deferred_devices_lock);
->> +
->> +static void amba_deferred_retry_func(struct work_struct *dummy);
->> +static DECLARE_DELAYED_WORK(deferred_retry_work, amba_deferred_retry_func);
->> +
->> +#define DEFERRED_DEVICE_TIMEOUT (msecs_to_jiffies(5 * 1000))
->> +
->> +static void amba_deferred_retry_func(struct work_struct *dummy)
->> +{
->> +       struct deferred_device *ddev, *tmp;
->> +
->> +       mutex_lock(&deferred_devices_lock);
->> +
->> +       list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
->> +               int ret = amba_device_try_add(ddev->dev, ddev->parent);
->> +
->> +               if (ret == -EPROBE_DEFER)
->> +                       continue;
->> +
->> +               list_del_init(&ddev->node);
->> +               kfree(ddev);
->> +       }
->> +
->> +       if (!list_empty(&deferred_devices))
->> +               schedule_delayed_work(&deferred_retry_work,
->> +                                     DEFERRED_DEVICE_TIMEOUT);
->> +
->> +       mutex_unlock(&deferred_devices_lock);
->> +}
->> +
->> +/**
->> + *     amba_device_add - add a previously allocated AMBA device structure
->> + *     @dev: AMBA device allocated by amba_device_alloc
->> + *     @parent: resource parent for this devices resources
->> + *
->> + *     Claim the resource, and read the device cell ID if not already
->> + *     initialized.  Register the AMBA device with the Linux device
->> + *     manager.
->> + */
->> +int amba_device_add(struct amba_device *dev, struct resource *parent)
->> +{
->> +       int ret = amba_device_try_add(dev, parent);
->> +
->> +       if (ret == -EPROBE_DEFER) {
->> +               struct deferred_device *ddev;
->> +
->> +               ddev = kmalloc(sizeof(*ddev), GFP_KERNEL);
->> +               if (!ddev)
->> +                       return -ENOMEM;
->> +
->> +               ddev->dev = dev;
->> +               ddev->parent = parent;
->> +               ret = 0;
->> +
->> +               mutex_lock(&deferred_devices_lock);
->> +
->> +               if (list_empty(&deferred_devices))
->> +                       schedule_delayed_work(&deferred_retry_work,
->> +                                             DEFERRED_DEVICE_TIMEOUT);
->> +               list_add_tail(&ddev->node, &deferred_devices);
->> +
->> +               mutex_unlock(&deferred_devices_lock);
->> +       }
->> +       return ret;
->> +}
->>   EXPORT_SYMBOL_GPL(amba_device_add);
->>
->>   static struct amba_device *
->> --
->> 1.9.2
->>
-> Overall this looks okay to me! Even if I don't really like the
-> approach, it seems like this is the only viable option there is right
-> now.
->
-> One minor improvement that I could think of, is to use also a late
-> initcall in conjunction with the delayed work. So, instead of
-> scheduling a work unconditionally when -EPROBE_DEFER is returned from
-> amba_device_try_add(), you can postpone the *first* re-try to be done
-> from a late initcall.
->
-> Of course, as devices may be added also after the late initcall, you
-> need to keep a flag which tells amba_device_add() whether it can rely
-> on the late initcall to re-try, or if it needs to schedule a work by
-> itself.
+CC: Christoph Hellwig <hch@lst.de>
+CC: Darren Hart <dvhart@linux.intel.com>
+CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-I don't think that such micro-optimization makes sense in this case.
-Please note that there is still no platform and driver which require
-this deferred probe logic - in my case exynos power domain driver is
-registered very early, so dev_pm_domain_attach() calls succeeds in the
-standard amba device registration path. This patch is mainly to get
-the device registered to power domain to properly read its cid/pid
-pair.
+Changes since v1:
+- Fix the embarassing copy-paste errors which we all managed to miss.
+- Fix io.h so that the nonatomic relaxed definitions are actually used.
 
-Best regards
+Arnd, I've taken the liberty of leaving your ack in place for the
+additional io.h tweak - please yell at me if that's not OK.
+
+Robin.
+
+ include/asm-generic/io.h              |  4 ++--
+ include/linux/io-64-nonatomic-hi-lo.h | 25 +++++++++++++++++++++++++
+ include/linux/io-64-nonatomic-lo-hi.h | 25 +++++++++++++++++++++++++
+ 3 files changed, 52 insertions(+), 2 deletions(-)
+
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index eed3bbe88c8a..002b81f6f2bc 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -191,7 +191,7 @@ static inline void writeq(u64 value, volatile void __iomem *addr)
+ #define readl_relaxed readl
+ #endif
+ 
+-#ifndef readq_relaxed
++#if defined(readq) && !defined(readq_relaxed)
+ #define readq_relaxed readq
+ #endif
+ 
+@@ -207,7 +207,7 @@ static inline void writeq(u64 value, volatile void __iomem *addr)
+ #define writel_relaxed writel
+ #endif
+ 
+-#ifndef writeq_relaxed
++#if defined(writeq) && !defined(writeq_relaxed)
+ #define writeq_relaxed writeq
+ #endif
+ 
+diff --git a/include/linux/io-64-nonatomic-hi-lo.h b/include/linux/io-64-nonatomic-hi-lo.h
+index 11d7e840d913..defcc4644ce3 100644
+--- a/include/linux/io-64-nonatomic-hi-lo.h
++++ b/include/linux/io-64-nonatomic-hi-lo.h
+@@ -21,6 +21,23 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
+ 	writel(val, addr);
+ }
+ 
++static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
++{
++	const volatile u32 __iomem *p = addr;
++	u32 low, high;
++
++	high = readl_relaxed(p + 1);
++	low = readl_relaxed(p);
++
++	return low + ((u64)high << 32);
++}
++
++static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
++{
++	writel_relaxed(val >> 32, addr + 4);
++	writel_relaxed(val, addr);
++}
++
+ #ifndef readq
+ #define readq hi_lo_readq
+ #endif
+@@ -29,4 +46,12 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
+ #define writeq hi_lo_writeq
+ #endif
+ 
++#ifndef readq_relaxed
++#define readq_relaxed hi_lo_readq_relaxed
++#endif
++
++#ifndef writeq_relaxed
++#define writeq_relaxed hi_lo_writeq_relaxed
++#endif
++
+ #endif	/* _LINUX_IO_64_NONATOMIC_HI_LO_H_ */
+diff --git a/include/linux/io-64-nonatomic-lo-hi.h b/include/linux/io-64-nonatomic-lo-hi.h
+index 1a4315f97360..084461a4e5ab 100644
+--- a/include/linux/io-64-nonatomic-lo-hi.h
++++ b/include/linux/io-64-nonatomic-lo-hi.h
+@@ -21,6 +21,23 @@ static inline void lo_hi_writeq(__u64 val, volatile void __iomem *addr)
+ 	writel(val >> 32, addr + 4);
+ }
+ 
++static inline __u64 lo_hi_readq_relaxed(const volatile void __iomem *addr)
++{
++	const volatile u32 __iomem *p = addr;
++	u32 low, high;
++
++	low = readl_relaxed(p);
++	high = readl_relaxed(p + 1);
++
++	return low + ((u64)high << 32);
++}
++
++static inline void lo_hi_writeq_relaxed(__u64 val, volatile void __iomem *addr)
++{
++	writel_relaxed(val, addr);
++	writel_relaxed(val >> 32, addr + 4);
++}
++
+ #ifndef readq
+ #define readq lo_hi_readq
+ #endif
+@@ -29,4 +46,12 @@ static inline void lo_hi_writeq(__u64 val, volatile void __iomem *addr)
+ #define writeq lo_hi_writeq
+ #endif
+ 
++#ifndef readq_relaxed
++#define readq_relaxed lo_hi_readq_relaxed
++#endif
++
++#ifndef writeq_relaxed
++#define writeq_relaxed lo_hi_writeq_relaxed
++#endif
++
+ #endif	/* _LINUX_IO_64_NONATOMIC_LO_HI_H_ */
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.8.1.dirty
