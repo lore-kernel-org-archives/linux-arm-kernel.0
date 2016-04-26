@@ -1,87 +1,58 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 26 Apr 2016 16:10:34 -0600
-Subject: [PATCH V4 18/18] coresight: configuring ETF in FIFO mode when acting
- as link
+Date: Tue, 26 Apr 2016 16:10:28 -0600
+Subject: [PATCH V4 12/18] coresight: tmc: dump system memory content only when
+ needed
 In-Reply-To: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461708634-6327-19-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461708634-6327-13-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When part of a path but not identified as a sink, the EFT has to
-be configured as a link and placed in HW FIFO mode.  As such when
-enabling a path, call the right configuration function based on
-the role the ETF if playing in this trace run.
+Calling tmc_etf/etr_dump_hw() is required only when operating from
+sysFS.  When working from Perf, the system memory is harvested
+from the AUX trace API.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight.c | 32 ++++++++++++++++++++++++++++----
- 1 file changed, 28 insertions(+), 4 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 7 ++++++-
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 ++++++-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 2ea5961092c1..bba9f3d653c9 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -257,15 +257,27 @@ static void coresight_disable_source(struct coresight_device *csdev)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index bc0efc1e5b49..b5e5e6ac67eb 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -74,7 +74,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ 	CS_UNLOCK(drvdata->base);
  
- void coresight_disable_path(struct list_head *path)
- {
-+	u32 type;
- 	struct coresight_node *nd;
- 	struct coresight_device *csdev, *parent, *child;
+ 	tmc_flush_and_stop(drvdata);
+-	tmc_etb_dump_hw(drvdata);
++	/*
++	 * When operating in sysFS mode the content of the buffer needs to be
++	 * read before the TMC is disabled.
++	 */
++	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
++		tmc_etb_dump_hw(drvdata);
+ 	tmc_disable_hw(drvdata);
  
- 	list_for_each_entry(nd, path, link) {
- 		csdev = nd->csdev;
-+		type = csdev->type;
+ 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 0c107811a232..7208584d0da7 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -76,7 +76,12 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	CS_UNLOCK(drvdata->base);
  
--		switch (csdev->type) {
-+		/*
-+		 * ETF devices are tricky... They can be a link or a sink,
-+		 * depending on how they are configured.  If an ETF has been
-+		 * "activated" it will be configured as a sink, otherwise
-+		 * go ahead with the link configuration.
-+		 */
-+		if (type == CORESIGHT_DEV_TYPE_LINKSINK)
-+			type = (csdev == coresight_get_sink(path)) ?
-+						CORESIGHT_DEV_TYPE_SINK :
-+						CORESIGHT_DEV_TYPE_LINK;
-+
-+		switch (type) {
- 		case CORESIGHT_DEV_TYPE_SINK:
--		case CORESIGHT_DEV_TYPE_LINKSINK:
- 			coresight_disable_sink(csdev);
- 			break;
- 		case CORESIGHT_DEV_TYPE_SOURCE:
-@@ -286,15 +298,27 @@ int coresight_enable_path(struct list_head *path, u32 mode)
- {
+ 	tmc_flush_and_stop(drvdata);
+-	tmc_etr_dump_hw(drvdata);
++	/*
++	 * When operating in sysFS mode the content of the buffer needs to be
++	 * read before the TMC is disabled.
++	 */
++	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
++		tmc_etr_dump_hw(drvdata);
+ 	tmc_disable_hw(drvdata);
  
- 	int ret = 0;
-+	u32 type;
- 	struct coresight_node *nd;
- 	struct coresight_device *csdev, *parent, *child;
- 
- 	list_for_each_entry_reverse(nd, path, link) {
- 		csdev = nd->csdev;
-+		type = csdev->type;
-+
-+		/*
-+		 * ETF devices are tricky... They can be a link or a sink,
-+		 * depending on how they are configured.  If an ETF has been
-+		 * "activated" it will be configured as a sink, otherwise
-+		 * go ahead with the link configuration.
-+		 */
-+		if (type == CORESIGHT_DEV_TYPE_LINKSINK)
-+			type = (csdev == coresight_get_sink(path)) ?
-+						CORESIGHT_DEV_TYPE_SINK :
-+						CORESIGHT_DEV_TYPE_LINK;
- 
--		switch (csdev->type) {
-+		switch (type) {
- 		case CORESIGHT_DEV_TYPE_SINK:
--		case CORESIGHT_DEV_TYPE_LINKSINK:
- 			ret = coresight_enable_sink(csdev, mode);
- 			if (ret)
- 				goto err;
+ 	CS_LOCK(drvdata->base);
 -- 
 2.5.0
