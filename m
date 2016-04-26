@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Apr 2016 19:25:05 +0100
-Subject: Applied "regulator: axp20x: Fix LDO4 linear voltage range" to the
+Date: Tue, 26 Apr 2016 19:25:02 +0100
+Subject: Applied "regulator: tps65917/palmas: Add bypass "On" value" to the
  regulator tree
-In-Reply-To: <1461679251-25538-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <E1av7fV-00083t-3k@debutante>
+In-Reply-To: <1461688602-19996-1-git-send-email-nm@ti.com>
+Message-ID: <E1av7fS-00082z-3t@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   regulator: axp20x: Fix LDO4 linear voltage range
+   regulator: tps65917/palmas: Add bypass "On" value
 
 has been applied to the regulator tree at
 
@@ -34,41 +34,66 @@ to this mail.
 Thanks,
 Mark
 
->From 8d4d5c3a7c25e69075e60e5e70c1e05c205aef89 Mon Sep 17 00:00:00 2001
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
-Date: Tue, 26 Apr 2016 16:00:51 +0200
-Subject: [PATCH] regulator: axp20x: Fix LDO4 linear voltage range
+>From e0341f1732237777d65bdda7184ea4b11fb31d53 Mon Sep 17 00:00:00 2001
+From: Nishanth Menon <nm@ti.com>
+Date: Tue, 26 Apr 2016 11:36:42 -0500
+Subject: [PATCH] regulator: tps65917/palmas: Add bypass "On" value
 
-The current linear voltage range for the LDO4 regulator found in the APX20X
-PMICs assumes that the voltage is linear between 2.5 and 3.1V.
+When commit b554e1450658 ("regulator: tps65917/palmas: Add bypass
+ops for LDOs with bypass capability") introduced bypass capability
+to palmas regulator, it went with the assumption that regulator
+regmap helpers just check val against the bypass_mask.
 
-However, the PMIC can output up to 3.3V on that regulator by skipping the
-2.6V and 2.9V steps.
+Unfortunately, this ignored the explicit "on" and "off" values when
+the register value is masked with bypass_mask in commit ca5d1b3524b4
+("regulator: helpers: Modify helpers enabling multi-bit control").
 
-Fix the ranges to read and set the proper voltages.
+With the recent commit dd1a571daee7 ("regulator: helpers: Ensure
+bypass register field matches ON value"), this issue gets highlighted
+and fails tps65917/palmas based platforms which need regulators/ldos
+that have bypass capability.
 
-Fixes: 13d57e64352a ("regulator: axp20x: Use linear voltage ranges for AXP20X LDO4")
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Introduce the bypass_on value appropriately for tps65917/palmas
+regulator.
+
+Fixes: b554e1450658 ("regulator: tps65917/palmas: Add bypass ops for LDOs with bypass capability")
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/regulator/axp20x-regulator.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/regulator/palmas-regulator.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 40cd894e4df5..29ab0985b46e 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -157,7 +157,9 @@ static struct regulator_ops axp20x_ops_sw = {
- static const struct regulator_linear_range axp20x_ldo4_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(1250000, 0x0, 0x0, 0),
- 	REGULATOR_LINEAR_RANGE(1300000, 0x1, 0x8, 100000),
--	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0xf, 100000),
-+	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0x9, 0),
-+	REGULATOR_LINEAR_RANGE(2700000, 0xa, 0xb, 100000),
-+	REGULATOR_LINEAR_RANGE(3000000, 0xc, 0xf, 100000),
- };
- 
- static const struct regulator_desc axp20x_regulators[] = {
+diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
+index 6efc7ee8aea3..c83e06b2cedb 100644
+--- a/drivers/regulator/palmas-regulator.c
++++ b/drivers/regulator/palmas-regulator.c
+@@ -944,6 +944,8 @@ static int palmas_ldo_registration(struct palmas_pmic *pmic,
+ 			if (id == PALMAS_REG_LDO9) {
+ 				desc->ops = &palmas_ops_ldo9;
+ 				desc->bypass_reg = desc->enable_reg;
++				desc->bypass_val_on =
++						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
+ 				desc->bypass_mask =
+ 						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
+ 			}
+@@ -1055,6 +1057,8 @@ static int tps65917_ldo_registration(struct palmas_pmic *pmic,
+ 			    id == TPS65917_REG_LDO2) {
+ 				desc->ops = &tps65917_ops_ldo_1_2;
+ 				desc->bypass_reg = desc->enable_reg;
++				desc->bypass_val_on =
++						TPS65917_LDO1_CTRL_BYPASS_EN;
+ 				desc->bypass_mask =
+ 						TPS65917_LDO1_CTRL_BYPASS_EN;
+ 			}
+@@ -1206,6 +1210,7 @@ static int palmas_smps_registration(struct palmas_pmic *pmic,
+ 				desc->enable_mask = SMPS10_BOOST_EN;
+ 			desc->bypass_reg = PALMAS_BASE_TO_REG(PALMAS_SMPS_BASE,
+ 							    PALMAS_SMPS10_CTRL);
++			desc->bypass_val_on = SMPS10_BYPASS_EN;
+ 			desc->bypass_mask = SMPS10_BYPASS_EN;
+ 			desc->min_uV = 3750000;
+ 			desc->uV_step = 1250000;
 -- 
 2.8.0.rc3
