@@ -1,336 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Apr 2016 11:28:38 +1000
-Subject: [PATCH 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC PM
- domains
+Date: Tue, 26 Apr 2016 11:28:39 +1000
+Subject: [PATCH 04/11] soc: renesas: rcar-sysc: Make rcar_sysc_power_is_off()
+ static
 In-Reply-To: <cover.1461632180.git.horms+renesas@verge.net.au>
 References: <cover.1461632180.git.horms+renesas@verge.net.au>
-Message-ID: <dcc09fd143bb97c2e83e443f7343c07aa0a9a6c0.1461632180.git.horms+renesas@verge.net.au>
+Message-ID: <2f024cef5b064d5498fe466dfe9492d46b5b12a4.1461632180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Populate the SYSC PM domains from DT, based on the presence of a device
-node for the System Controller. The actual power area hiearchy, and
-features of specific areas are obtained from tables in the C code.
-
-The SYSCIER and SYSCIMR register values are derived from the power areas
-present, which will help to get rid of the hardcoded values in R-Car H1
-and R-Car Gen2 platform code later.
-
-Initialization is done from an early_initcall(), to make sure the PM
-Domains are initialized before secondary CPU bringup.
+As of commit b12ff41658171f53 ("ARM: shmobile: r8a7779: Remove legacy PM
+Domain remainings"), rcar_sysc_power_is_off() is no longer used from
+SoC-specific code.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/rcar-sysc.c | 202 +++++++++++++++++++++++++++++++++++++++-
- drivers/soc/renesas/rcar-sysc.h |  53 +++++++++++
- 2 files changed, 254 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/renesas/rcar-sysc.h
+ drivers/soc/renesas/rcar-sysc.c       | 2 +-
+ include/linux/soc/renesas/rcar-sysc.h | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 9ba5fd15c53b..95f2b59cbd76 100644
+index 95f2b59cbd76..4e760d63f2ab 100644
 --- a/drivers/soc/renesas/rcar-sysc.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -2,6 +2,7 @@
-  * R-Car SYSC Power management support
-  *
-  * Copyright (C) 2014  Magnus Damm
-+ * Copyright (C) 2015-2016 Glider bvba
-  *
-  * This file is subject to the terms and conditions of the GNU General Public
-  * License.  See the file "COPYING" in the main directory of this archive
-@@ -11,10 +12,15 @@
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/mm.h>
-+#include <linux/of_address.h>
-+#include <linux/pm_domain.h>
-+#include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
- #include <linux/soc/renesas/rcar-sysc.h>
- 
-+#include "rcar-sysc.h"
-+
- /* SYSC Common */
- #define SYSCSR			0x00	/* SYSC Status Register */
- #define SYSCISR			0x04	/* Interrupt Status Register */
-@@ -29,7 +35,8 @@
- /*
-  * Power Control Register Offsets inside the register block for each domain
-  * Note: The "CR" registers for ARM cores exist on H1 only
-- *       Use WFI to power off, CPG/APMU to resume ARM cores on R-Car Gen2
-+ *	 Use WFI to power off, CPG/APMU to resume ARM cores on R-Car Gen2
-+ *	 Use PSCI on R-Car Gen3
-  */
- #define PWRSR_OFFS		0x00	/* Power Status Register */
- #define PWROFFCR_OFFS		0x04	/* Power Shutoff Control Register */
-@@ -48,6 +55,8 @@
- #define SYSCISR_RETRIES		1000
- #define SYSCISR_DELAY_US	1
- 
-+#define RCAR_PD_ALWAYS_ON	32	/* Always-on power area */
-+
- static void __iomem *rcar_sysc_base;
- static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
- 
-@@ -162,3 +171,194 @@ void __iomem *rcar_sysc_init(phys_addr_t base)
- 
- 	return rcar_sysc_base;
+@@ -152,7 +152,7 @@ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
+ 	return rcar_sysc_power(sysc_ch, true);
  }
-+
-+struct rcar_sysc_pd {
-+	struct generic_pm_domain genpd;
-+	struct rcar_sysc_ch ch;
-+	unsigned int flags;
-+	char name[0];
-+};
-+
-+static inline struct rcar_sysc_pd *to_rcar_pd(struct generic_pm_domain *d)
-+{
-+	return container_of(d, struct rcar_sysc_pd, genpd);
-+}
-+
-+static int rcar_sysc_pd_power_off(struct generic_pm_domain *genpd)
-+{
-+	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
-+
-+	pr_debug("%s: %s\n", __func__, genpd->name);
-+
-+	if (pd->flags & PD_NO_CR) {
-+		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
-+		return -EBUSY;
-+	}
-+
-+	if (pd->flags & PD_BUSY) {
-+		pr_debug("%s: %s busy\n", __func__, genpd->name);
-+		return -EBUSY;
-+	}
-+
-+	return rcar_sysc_power_down(&pd->ch);
-+}
-+
-+static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
-+{
-+	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
-+
-+	pr_debug("%s: %s\n", __func__, genpd->name);
-+
-+	if (pd->flags & PD_NO_CR) {
-+		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
-+		return 0;
-+	}
-+
-+	return rcar_sysc_power_up(&pd->ch);
-+}
-+
-+static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
-+{
-+	struct generic_pm_domain *genpd = &pd->genpd;
-+	const char *name = pd->genpd.name;
-+	struct dev_power_governor *gov = &simple_qos_governor;
-+
-+	if (pd->flags & PD_CPU) {
-+		/*
-+		 * This domain contains a CPU core and therefore it should
-+		 * only be turned off if the CPU is not in use.
-+		 */
-+		pr_debug("PM domain %s contains %s\n", name, "CPU");
-+		pd->flags |= PD_BUSY;
-+		gov = &pm_domain_always_on_gov;
-+	} else if (pd->flags & PD_SCU) {
-+		/*
-+		 * This domain contains an SCU and cache-controller, and
-+		 * therefore it should only be turned off if the CPU cores are
-+		 * not in use.
-+		 */
-+		pr_debug("PM domain %s contains %s\n", name, "SCU");
-+		pd->flags |= PD_BUSY;
-+		gov = &pm_domain_always_on_gov;
-+	} else if (pd->flags & PD_NO_CR) {
-+		/*
-+		 * This domain cannot be turned off.
-+		 */
-+		pd->flags |= PD_BUSY;
-+		gov = &pm_domain_always_on_gov;
-+	}
-+
-+	genpd->power_off = rcar_sysc_pd_power_off;
-+	genpd->power_on = rcar_sysc_pd_power_on;
-+
-+	if (pd->flags & (PD_CPU | PD_NO_CR)) {
-+		/* Skip CPUs (handled by SMP code) and areas without control */
-+		pr_debug("%s: Not touching %s\n", __func__, genpd->name);
-+		goto finalize;
-+	}
-+
-+	if (!rcar_sysc_power_is_off(&pd->ch)) {
-+		pr_debug("%s: %s is already powered\n", __func__, genpd->name);
-+		goto finalize;
-+	}
-+
-+	rcar_sysc_power_up(&pd->ch);
-+
-+finalize:
-+	pm_genpd_init(genpd, gov, false);
-+}
-+
-+static const struct of_device_id rcar_sysc_matches[] = {
-+	{ /* sentinel */ }
-+};
-+
-+struct rcar_pm_domains {
-+	struct genpd_onecell_data onecell_data;
-+	struct generic_pm_domain *domains[RCAR_PD_ALWAYS_ON + 1];
-+};
-+
-+static int __init rcar_sysc_pd_init(void)
-+{
-+	const struct rcar_sysc_info *info;
-+	const struct of_device_id *match;
-+	struct rcar_pm_domains *domains;
-+	struct device_node *np;
-+	u32 syscier, syscimr;
-+	void __iomem *base;
-+	unsigned int i;
-+	int error;
-+
-+	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
-+	if (!np)
-+		return -ENODEV;
-+
-+	info = match->data;
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("%s: Cannot map regs\n", np->full_name);
-+		error = -ENOMEM;
-+		goto out_put;
-+	}
-+
-+	rcar_sysc_base = base;
-+
-+	domains = kzalloc(sizeof(*domains), GFP_KERNEL);
-+	if (!domains) {
-+		error = -ENOMEM;
-+		goto out_put;
-+	}
-+
-+	domains->onecell_data.domains = domains->domains;
-+	domains->onecell_data.num_domains = ARRAY_SIZE(domains->domains);
-+
-+	for (i = 0, syscier = 0; i < info->num_areas; i++)
-+		syscier |= BIT(info->areas[i].isr_bit);
-+
-+	/*
-+	 * Mask all interrupt sources to prevent the CPU from receiving them.
-+	 * Make sure not to clear reserved bits that were set before.
-+	 */
-+	syscimr = ioread32(base + SYSCIMR);
-+	syscimr |= syscier;
-+	pr_debug("%s: syscimr = 0x%08x\n", np->full_name, syscimr);
-+	iowrite32(syscimr, base + SYSCIMR);
-+
-+	/*
-+	 * SYSC needs all interrupt sources enabled to control power.
-+	 */
-+	pr_debug("%s: syscier = 0x%08x\n", np->full_name, syscier);
-+	iowrite32(syscier, base + SYSCIER);
-+
-+	for (i = 0; i < info->num_areas; i++) {
-+		const struct rcar_sysc_area *area = &info->areas[i];
-+		struct rcar_sysc_pd *pd;
-+
-+		pd = kzalloc(sizeof(*pd) + strlen(area->name) + 1, GFP_KERNEL);
-+		if (!pd) {
-+			error = -ENOMEM;
-+			goto out_put;
-+		}
-+
-+		strcpy(pd->name, area->name);
-+		pd->genpd.name = pd->name;
-+		pd->ch.chan_offs = area->chan_offs;
-+		pd->ch.chan_bit = area->chan_bit;
-+		pd->ch.isr_bit = area->isr_bit;
-+		pd->flags = area->flags;
-+
-+		rcar_sysc_pd_setup(pd);
-+		if (area->parent >= 0)
-+			pm_genpd_add_subdomain(domains->domains[area->parent],
-+					       &pd->genpd);
-+
-+		domains->domains[area->isr_bit] = &pd->genpd;
-+	}
-+
-+	of_genpd_add_provider_onecell(np, &domains->onecell_data);
-+
-+out_put:
-+	of_node_put(np);
-+	return error;
-+}
-+early_initcall(rcar_sysc_pd_init);
-diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
-new file mode 100644
-index 000000000000..7bb48b4f7334
---- /dev/null
-+++ b/drivers/soc/renesas/rcar-sysc.h
-@@ -0,0 +1,53 @@
-+/*
-+ * Renesas R-Car System Controller
-+ *
-+ * Copyright (C) 2016 Glider bvba
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ */
-+#ifndef __SOC_RENESAS_RCAR_SYSC_H__
-+#define __SOC_RENESAS_RCAR_SYSC_H__
-+
-+#include <linux/types.h>
-+
-+
-+/*
-+ * Power Domain flags
-+ */
-+#define PD_CPU		BIT(0)	/* Area contains main CPU core */
-+#define PD_SCU		BIT(1)	/* Area contains SCU and L2 cache */
-+#define PD_NO_CR	BIT(2)	/* Area lacks PWR{ON,OFF}CR registers */
-+
-+#define PD_BUSY		BIT(3)	/* Busy, for internal use only */
-+
-+#define PD_CPU_CR	PD_CPU		  /* CPU area has CR (R-Car H1) */
-+#define PD_CPU_NOCR	PD_CPU | PD_NO_CR /* CPU area lacks CR (R-Car Gen2/3) */
-+#define PD_ALWAYS_ON	PD_NO_CR	  /* Always-on area */
-+
-+
-+/*
-+ * Description of a Power Area
-+ */
-+
-+struct rcar_sysc_area {
-+	const char *name;
-+	u16 chan_offs;		/* Offset of PWRSR register for this area */
-+	u8 chan_bit;		/* Bit in PWR* (except for PWRUP in PWRSR) */
-+	u8 isr_bit;		/* Bit in SYSCI*R */
-+	int parent;		/* -1 if none */
-+	unsigned int flags;	/* See PD_* */
-+};
-+
-+
-+/*
-+ * SoC-specific Power Area Description
-+ */
-+
-+struct rcar_sysc_info {
-+	const struct rcar_sysc_area *areas;
-+	unsigned int num_areas;
-+};
-+
-+#endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
+ 
+-bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
++static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	unsigned int st;
+ 
+diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
+index 96f30c288388..92fc613ab23d 100644
+--- a/include/linux/soc/renesas/rcar-sysc.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -11,7 +11,6 @@ struct rcar_sysc_ch {
+ 
+ int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
+ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+-bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch);
+ void __iomem *rcar_sysc_init(phys_addr_t base);
+ 
+ #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 2.7.0.rc3.207.g0ac5344
