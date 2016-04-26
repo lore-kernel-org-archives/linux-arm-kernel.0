@@ -1,59 +1,46 @@
-From: prime.zeng@hisilicon.com (Zengtao (B))
-Date: Tue, 26 Apr 2016 02:21:16 +0000
-Subject: [PATCH] arm64: fix /proc/cpuinfo for elf32
-In-Reply-To: <20160425091239.GB9614@e104818-lin.cambridge.arm.com>
-References: <1461555453-60440-1-git-send-email-prime.zeng@huawei.com>
- <20160425091239.GB9614@e104818-lin.cambridge.arm.com>
-Message-ID: <678F3D1BB717D949B966B68EAEB446ED0A6E6FB7@SZXEMA509-MBX.china.huawei.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Tue, 26 Apr 2016 10:36:42 +0800
+Subject: [PATCH v3 0/4] ARM64: dts: rockchip: add support for RK3399
+Message-ID: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Monday, April 25, 2016 5:13 PM
-> To: Zengtao (B)
-> Cc: will.deacon at arm.com; mark.rutland at arm.com; yang.shi at linaro.org;
-> suzuki.poulose at arm.com; linux-kernel at vger.kernel.org;
-> james.morse at arm.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] arm64: fix /proc/cpuinfo for elf32
-> 
-> On Mon, Apr 25, 2016 at 11:37:33AM +0800, Zeng Tao wrote:
-> > For elf32 thread, personality is used for arm32,
-> > and thread_flag for arm64.
-> >
-> > Here personality is used for arm64, so fix it.
-> >
-> > Signed-off-by: Zeng Tao <prime.zeng@huawei.com>
-> > ---
-> >  arch/arm64/kernel/cpuinfo.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> > index 84c8684..f739398 100644
-> > --- a/arch/arm64/kernel/cpuinfo.c
-> > +++ b/arch/arm64/kernel/cpuinfo.c
-> > @@ -126,7 +126,7 @@ static int c_show(struct seq_file *m, void *v)
-> >  		 * software which does already (at least for 32-bit).
-> >  		 */
-> >  		seq_puts(m, "Features\t:");
-> > -		if (personality(current->personality) == PER_LINUX32) {
-> > +		if (test_thread_flag(TIF_32BIT)) {
-> >  #ifdef CONFIG_COMPAT
-> >  			for (j = 0; compat_hwcap_str[j]; j++)
-> >  				if (compat_elf_hwcap & (1 << j))
-> 
-> We discussed this some time ago and we decided against it. One reason
-> was scripts where you may or may not end up with the desired cpuinfo
-> (e.g. grep being 64-bit invoked by a 32-bit bash). The personality at
-> least is inherited by child processes.
+Add dtsi file for RK3399 SoCs, and evb dts file for RK3399 evb.
 
-So you mean the 64-bit grep should see the same cpuinfo as its father process
-which is 32-bit?
+To make patch more easily to be reviewed, some nodes have been removed
+temporarily, after this base file been applied, more patches will be
+upstreamed independently.
 
-For 32-bit process running on 64-bit kernel, we have to explicitly call the personality 
-syscall to get the right cpuinfo, but how to deal with the old 32-bit binaries? 
- 
+Jianqun Xu (3):
+  ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
+  Documentation: devicetree: rockchip: Document rk3399-evb
+  ARM64: dts: rockchip: add dts file for RK3399 evaluation board
 
-> 
-> --
-> Catalin
+Shawn Lin (1):
+  Documentation: rockchip-dw-mshc: add description for rk3399
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |    6 +-
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    1 +
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |  125 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 1022 ++++++++++++++++++++
+ 5 files changed, 1154 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+
+--
+changes in v3:
+- modify title for patch 3/4 (Brian)
+- add more compatible for evb dts (Doug)
+
+changes in v2:
+- split into more patches. (Heiko)
+- remove arm-pmu at first. (Marc, Heiko, Mark)
+- remove rga, emmc, usb3, mipi, edp, pd, i2c, gpu, thermal, tsadc, saradc, which will upstream independently
+- remove rk808 since without i2c, which will upstream independently
+- remove es8316 since without i2c, which will upstream independently
+- add rockchip-dw-mshc binding patch
+- add rockchip,rk3399-evb binding patch
+- fix codingstyle issues
+
+1.9.1
