@@ -1,186 +1,159 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 26 Apr 2016 14:37 +0200
-Subject: [PATCH 4/4] ARM64: dts: rockchip: add dts file for RK3399
- evaluation board
-In-Reply-To: <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
-References: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
- <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <9945516.Q6LYCrkl5z@diego>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 26 Apr 2016 13:47:20 +0100
+Subject: [PATCH v2 1/3] drivers: pci: add generic code to claim bus
+ resources
+In-Reply-To: <1456843449-19393-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1456843449-19393-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160426124720.GD2204@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 26. April 2016, 10:36:46 schrieb Jianqun Xu:
-> This patch add rk3399-evb.dts for RK3399 evaluation board.
-> Tested on RK3399 evb.
+[Replying to self]
+
+On Tue, Mar 01, 2016 at 02:44:07PM +0000, Lorenzo Pieralisi wrote:
+> From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
 > 
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> PCI core code contains a set of functions, eg:
+> 
+> pci_assign_unassigned_bus_resources()
+> 
+> that allow to assign the PCI resources for a given bus after
+> enumeration.
+> 
+> On systems where the PCI BARs are immutable (ie they must not and can
+> not be assigned), PCI bus resources should still be inserted in the PCI
+> resources tree (even if they are not (re)-assigned), but there is
+> no generic PCI kernel function for that purpose. Currently the PCI bus
+> resources insertion in the resources tree is implemented in an arch
+> specific fashion through arch specific callbacks that rely on the PCI
+> resources claiming API (for bridges and devices) which resulted in arches
+> implementations that contain duplicated code to claim resources for a
+> given PCI bus hierarchy.
+> 
+> This patch, based on the x86/ia64 resources claiming arch implementations,
+> implements a set of functions in core PCI code that provides a PCI core
+> interface for resources claiming for a given PCI bus hierarchy, paving
+> the way for further resource claiming consolidation across architectures.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Yinghai Lu <yinghai@kernel.org>
 > ---
-> changes in v3:
-> - add more compatible (Doug)
-> - add modle
+>  drivers/pci/setup-bus.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h     |  1 +
+>  2 files changed, 69 insertions(+)
+
+I have v3 ready, which does not change this patch, however I have
+some questions below before asking to merge it.
+
+> diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+> index 7796d0a..95f0906 100644
+> --- a/drivers/pci/setup-bus.c
+> +++ b/drivers/pci/setup-bus.c
+> @@ -1424,6 +1424,74 @@ void pci_bus_assign_resources(const struct pci_bus *bus)
+>  }
+>  EXPORT_SYMBOL(pci_bus_assign_resources);
+>  
+> +static void pci_claim_device_resources(struct pci_dev *dev)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < PCI_BRIDGE_RESOURCES; i++) {
+> +		struct resource *r = &dev->resource[i];
+> +
+> +		if (!r->flags || r->parent)
+> +			continue;
+> +
+> +		pci_claim_resource(dev, i);
+
+pci_claim_resource() (and in particular pci_find_parent_resource()) fails
+if resource.start == 0x0. Is this intentional ? The resource.start == 0x0
+check is used in other bits of the kernel to detect an "invalid"
+resource, I am not sure I understand its implications correctly.
+
+> +	}
+> +}
+> +
+> +static void pci_claim_bridge_resources(struct pci_dev *dev)
+> +{
+> +	int i;
+> +
+> +	for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
+> +		struct resource *r = &dev->resource[i];
+> +
+> +		if (!r->flags || r->parent)
+> +			continue;
+> +
+> +		pci_claim_bridge_resource(dev, i);
+> +	}
+> +}
+> +
+> +static void pci_bus_allocate_dev_resources(struct pci_bus *b)
+> +{
+> +	struct pci_dev *dev;
+> +	struct pci_bus *child;
+> +
+> +	list_for_each_entry(dev, &b->devices, bus_list) {
+> +		pci_claim_device_resources(dev);
+> +
+> +		child = dev->subordinate;
+> +		if (child)
+> +			pci_bus_allocate_dev_resources(child);
+> +	}
+> +}
+> +
+> +static void pci_bus_allocate_resources(struct pci_bus *b)
+> +{
+> +	struct pci_bus *child;
+> +
+> +	/*
+> +	 * Carry out a depth-first search on the PCI bus
+> +	 * tree to allocate bridge apertures. Read the
+> +	 * programmed bridge bases and recursively claim
+> +	 * the respective bridge resources.
+> +	 */
+> +	if (b->self) {
+
+Is it *always* correct to check b->self to detect a device backing
+the PCI bridge ? All PCI bridges should have their ->self pointer
+set-up correctly, I wanted to countercheck anyway.
+
+Comments welcome, thanks.
+
+Lorenzo
+
+> +		pci_read_bridge_bases(b);
+> +		pci_claim_bridge_resources(b->self);
+> +	}
+> +
+> +	list_for_each_entry(child, &b->children, node)
+> +		pci_bus_allocate_resources(child);
+> +}
+> +
+> +void pci_bus_claim_resources(struct pci_bus *b)
+> +{
+> +	pci_bus_allocate_resources(b);
+> +	pci_bus_allocate_dev_resources(b);
+> +}
+> +EXPORT_SYMBOL(pci_bus_claim_resources);
+> +
+>  static void __pci_bridge_assign_resources(const struct pci_dev *bridge,
+>  					  struct list_head *add_head,
+>  					  struct list_head *fail_head)
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 2771625..e66eba7 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1102,6 +1102,7 @@ ssize_t pci_write_vpd(struct pci_dev *dev, loff_t pos, size_t count, const void
+>  /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
+>  resource_size_t pcibios_retrieve_fw_addr(struct pci_dev *dev, int idx);
+>  void pci_bus_assign_resources(const struct pci_bus *bus);
+> +void pci_bus_claim_resources(struct pci_bus *bus);
+>  void pci_bus_size_bridges(struct pci_bus *bus);
+>  int pci_claim_resource(struct pci_dev *, int);
+>  int pci_claim_bridge_resource(struct pci_dev *bridge, int i);
+> -- 
+> 2.5.1
 > 
->  arch/arm64/boot/dts/rockchip/Makefile       |   1 +
->  arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 125
-> ++++++++++++++++++++++++++++ 2 files changed, 126 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/Makefile
-> b/arch/arm64/boot/dts/rockchip/Makefile index df37865..7037a16 100644
-> --- a/arch/arm64/boot/dts/rockchip/Makefile
-> +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> @@ -1,6 +1,7 @@
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-> 
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts new file mode 100644
-> index 0000000..c3370bd
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> @@ -0,0 +1,125 @@
-> +/*
-> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/pwm/pwm.h>
-> +#include "rk3399.dtsi"
-> +
-> +/ {
-> +	model = "Rockchip RK3399 Evaluation Board";
-> +	compatible = "rockchip,rk3399-evb", "rockchip,rk3399",
-> +		     "google,rk3399evb-rev2", google,rk3399evb-rev1",
-> +		     "google,rk3399evb-rev0" ;
-
-can you check against which compatibles that coreboot really matches?
-
-As we said that the evb changed between rev1 and rev2, I would expect the 
-compatible to be something like
-
-	compatible = "rockchip,rk3399-evb",  "google,rk3399evb-rev2", 
-			"rockchip,rk3399";
-
-leaving out the rev1 and rev0
-
-> +
-> +	vdd_center: vdd-center {
-> +		compatible = "pwm-regulator";
-> +		pwms = <&pwm3 0 25000 0>;
-> +		regulator-name = "vdd_center";
-> +		regulator-min-microvolt = <800000>;
-> +		regulator-max-microvolt = <1400000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		status = "okay";
-> +	};
-
-Can you check if this runs stable with the pwm-regulator in mainline please?
-I.e. Boris' rework series hasn't landed yet and at least on Veyron I remember 
-the pwm-regulator having reliability issues or something like that.
-
-
-> +
-> +	vcc3v3_sys: vcc3v3-sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	vcc_phy: vcc-phy-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_phy";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +};
-> +
-> +&pwm0 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host0_ehci {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host0_ohci {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host1_ehci {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host1_ohci {
-> +	status = "okay";
-> +};
-> +
-> +&pinctrl {
-> +	pmic {
-> +		pmic_int_l: pmic-int-l {
-> +			rockchip,pins =
-> +				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
-> +		};
-> +
-> +		pmic_dvs2: pmic-dvs2 {
-> +			rockchip,pins =
-> +				<1 18 RK_FUNC_GPIO &pcfg_pull_down>;
-> +		};
-> +	};
-> +};
