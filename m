@@ -1,63 +1,75 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 26 Apr 2016 14:08:09 +0200
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <20160425131907.GB30830@arm.com>
-References: <cover.1457539621.git.jglauber@cavium.com>
- <20160404121954.GA9300@hardcore> <20160425112207.GL16065@arm.com>
- <20160425120222.GA2552@hardcore> <20160425131907.GB30830@arm.com>
-Message-ID: <20160426120809.GA9796@hardcore>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 26 Apr 2016 14:13:35 +0200
+Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
+In-Reply-To: <666dffb41a922b0c8638f2f002a2de08@mail.gmail.com>
+References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
+ <1461230323-27891-2-git-send-email-pramod.kumar@broadcom.com>
+ <20160425205650.GA31129@lunn.ch>
+ <666dffb41a922b0c8638f2f002a2de08@mail.gmail.com>
+Message-ID: <20160426121335.GC11668@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 02:19:07PM +0100, Will Deacon wrote:
-> On Mon, Apr 25, 2016 at 02:02:22PM +0200, Jan Glauber wrote:
-> > On Mon, Apr 25, 2016 at 12:22:07PM +0100, Will Deacon wrote:
-> > > On Mon, Apr 04, 2016 at 02:19:54PM +0200, Jan Glauber wrote:
-> > > > can you have a look at these patches?
-> > > 
-> > > Looks like Mark reviewed this last week -- are you planning to respin?
-> > 
-> > Yes, of course. I just had no time yet and I'm a bit lost on how to
-> > proceed without using the NUMA node information which Mark did not like
-> > to be used.
-> > 
-> > The only way to know which device is on which node would be to look
-> > at the PCI topology (which is also the source of the NUMA node_id).
-> > We could do this manually in order to not depend on CONFIG_NUMA,
-> > but I would like to know if that is acceptable before respinning the
-> > patches.
+On Tue, Apr 26, 2016 at 02:03:27PM +0530, Pramod Kumar wrote:
+> Hi Andrew,
 > 
-> That doesn't feel like it really addresses Mark's concerns -- it's just
-> another way to get the information that isn't a first-class PMU topology
-> description from firmware.
+> Thanks for reviewing. I really appreciate your effort it.
 > 
-> Now, I don't actually mind using the NUMA topology so much in the cases
-> where it genuinely correlates with the PMU topology. My objection is more
-> that we end up sticking everything on node 0 if !CONFIG_NUMA, which could
-> result in working with an incorrect PMU topology and passing all of that
-> through to userspace.
+> I am already aware of MDIO mux framework but did not see it fit for our
+> use case due to below limitations:
 > 
-> So I'd prefer either making the driver depend on NUMA, or at the very least
-> failing to probe  the PMU if we discover a socketed system and NUMA is not
-> selected. Do either of those work as a compromise?
+> 1.  Current MDIO mux framework is Ethernet centric and it is only meant to
+> mux multiple MII buses using same MDIO controller.  This means it is only
+> meant for MII-compliant PHY devices (i.e. PHY devices having registers
+> as-per MII specs).
+
+Nope, this is wrong. You can have a mixture of PHYs and other MDIO
+devices on the MII bus. The framework does not care. A PHY is a
+special case of an MDIO device.
+
+> 2.  The MDIO mux framework registers each child bus as MII bus. The Linux
+> Ethernet MDIO framework will scan for all attached PHY devices on given
+> MII bus and try to read MII PHY_ID register which is not present in all
+> Broadcom non-ethernet PHYs.
+
+It only performs a scan if you don't list the devices in the device
+tree. If you do list devices, and include the address on the bus, it
+never scans.
+
+A good example of this is Ethernet switches. They occupy multiple
+addresses on the MDIO bus, and also do not implement the PHY_ID
+register at each address. Yet the MDIO layer is happy with this.
+
+> 3. Let's say we ignore point1 and point2 above  and go ahead and use MDIO
+> mux framework then we will still have to emulated MII PHY_ID read for
+> non-ethernet PHYs.
+
+Nope. Not at all. You have an MDIO device on the bus, not an Ethernet
+PHY. Hence the device is not liked to the PHY state machine, etc.
+
+The key concept to get here is that there are MDIO devices, and a
+subset of MDIO devices are Ethernet PHYs.....
+
+> 4. Apart from these, by using MDIO mux framework we are making our
+> non-ethernet PHYs dependent on Linux network drivers which is not
+> acceptable. What if some product line does not need network subsystem at
+> all?
+
+This is your only valid point. However, does Broadcom have a product
+line which does not include networking? Is not Broadcom a network SoC
+vendor?
+
 > 
-> Will
+> As you can see from above points, trying to re-use Linux Ethernet MDIO mux
+> framework for non-Ethernet PHYs is not the right way.
 
-That sounds like a good compromise.
+And as i pointed out, all your arguments are wrong, bar one. And i
+doubt that one argument is sufficient to duplicate a lot of code which
+already exists and does 95% of what you need.
 
-So I could do the following:
+> I'll add PCIe PHYs driver based on Shared MDIO framework in next patch
+> revision to get a feel of its need.
 
-1) In the uncore setup check for CONFIG_NUMA, if set use the NUMA
-   information to determine the device node
+Great. Lets then see what is needed to turn it into an MDIO device.
 
-2) If CONFIG_NUMA is not set we check if we run on a socketed system
-
-   a) In that case we return an error and give a message that CONFIG_NUMA needs
-      to be enabled
-   b) Otherwise we have a single node system and use node_id = 0
-
-David noted that it would also be possible to extract the node id from
-the physical address of the device, but I'm not sure that classifies as
-'first-class' topology description...
-
---Jan
+       Andrew
