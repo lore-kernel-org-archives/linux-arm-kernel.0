@@ -1,45 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Apr 2016 10:42:08 +0200
-Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <20160425172846.GB1759@localhost>
-References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160425154611.3e7e9dc9@free-electrons.com>
- <20160425172846.GB1759@localhost>
-Message-ID: <20160426104208.150cbbd0@free-electrons.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 26 Apr 2016 10:47:05 +0200
+Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
+ device
+In-Reply-To: <20160425171515.GA10952@camel2.lan>
+References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
+ <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
+ <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
+Message-ID: <571F2B09.1000107@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
+>>> +	.periods_min		= 2,
+>>> +	.periods_max		= 255,
+>>> +	.buffer_bytes_max	= 128 * PAGE_SIZE,
+>>> +};
+>>> +
+>>> +static const struct snd_dmaengine_pcm_config bcm2835_dmaengine_pcm_config = {
+>>> +	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
+>>> +	.pcm_hardware = &bcm2835_pcm_hardware,
+>>> +	.prealloc_buffer_size = 256 * PAGE_SIZE,
+>>> +};
+>>
+>> The generic dmaengine PCM driver auto-discovers these things, no need to
+>> provide them. The code is OK as it is.
+> 
+> With the auto-discover code we loose the S16_LE format.
+> 
+> If I understood the code in dmaengine_pcm_set_runtime_hwparams
+> correctly, this is because the DMA controller doesn't support
+> 16bit transfers (only multiples of 32bit are allowed).
+> 
+> But since the I2S driver needs exactly 2 channels S16_LE actually
+> works fine (one 32bit transfer per frame).
+> 
+> Do you know of a better way to get S16_LE support? It could well
+> be that I missed something important...
 
-On Mon, 25 Apr 2016 12:28:46 -0500, Bjorn Helgaas wrote:
+With your patch we should just get an error when trying to configure a
+stream with 16-bit samples since when setting up the DMA controller the
+generic code will still choose a 16-bit device port size and this will be
+rejected by the DMA controller.
 
-> How about if you just shuffle those bits around into
-> an armada8k_add_pcie_port() and an armada8k_pcie_establish_link(), and
-> we'll call that good for now?
+When you look at peripherals that have DMA support there are basically two
+types.
 
-I just sent a v3 which implements this.
+Type A expect that each write (same applies for read) to the memory mapped
+FIFO corresponds to exactly one sample. So if the sample width is 16-bit a
+16-bit write is done, if the sample width is 32-bit a 32-bit write is done.
+In this case it is up to the DMA controller to fragment the byte stream into
+individual samples.
 
-However, to be honest, after looking at the other drivers, I found the
-XYZ_add_pcie_port() function to not be very useful: it simply
-continues the work done by the probe function, and there is really no
-reason to split the remaining work of the probe() in a separate
-function. The XYZ_add_pcie_port() is called only one time for each
-probe() call, so having a separate function is somewhat useless. In
-addition, the separation of work between probe() and
-XYZ_add_pcie_port() is not very consistent accross drivers. In
-pci-imx6, XYZ_add_pcie_port() only sets up the interrupt handler and
-calls dw_pcie_host_init(). In pci-dra7xx, XYZ_add_pcie_port() sets up
-the interrupt, maps some registers and calls dw_pcie_host_init().
+Type B on the other hand has a fixed port width (usually the bus size) and
+expects that each write to the memory mapped FIFO uses the port width. It
+then internally unpacks the data into the sample data. E.g. if the FIFO is
+32-bit wide and the sample width is 16-bit it will unpack the 32-bit entry
+into two samples.
 
-So my v3 implements what you suggested, and creates a
-armada8k_add_pcie_port() to make it consistent with the other drivers,
-but long term, I'm not sure this particular function is really useful.
+Currently the generic code only supports type A. It would be great if you
+could add support for type B to support the BCM2835 I2S controller properly.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+- Lars
