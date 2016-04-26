@@ -1,146 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 26 Apr 2016 07:48:47 -0500
-Subject: [PATCH v2 net-next 11/13] Documentation: Bindings: Update DT
- binding for separating dsaf dev support
-In-Reply-To: <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <20160426124847.GA26682@rob-hp-laptop>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 26 Apr 2016 14:59:41 +0200
+Subject: nvmem: mxs-ocotp read problem
+In-Reply-To: <571F54DF.9020902@meduna.org>
+References: <571F54DF.9020902@meduna.org>
+Message-ID: <571F663D.5080703@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 23, 2016 at 05:05:15PM +0800, Yisen Zhuang wrote:
-> Because debug dsaf port was separated from service dsaf port, this patch
-> updates the related information of DT binding.
+Hi Stano,
 
-Separated when? New version of the h/w? If so, where's the new 
-compatible string? This is quite a big binding change. 
+Am 26.04.2016 um 13:45 schrieb Stanislav Meduna:
+> Hi,
+>
+> the mxs_ocotp_read seems to incorrectly iterate through
+> the memory to be read, resulting in a buffer overflow/off-area
+> access and sometimes oops. 
 
-> Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
-> 
-> ---
->  .../devicetree/bindings/net/hisilicon-hns-dsaf.txt | 59 ++++++++++++++++++----
->  1 file changed, 49 insertions(+), 10 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> index ecacfa4..5ccd4f0 100644
-> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> @@ -7,19 +7,47 @@ Required properties:
->  - mode: dsa fabric mode string. only support one of dsaf modes like these:
->  		"2port-64vf",
->  		"6port-16rss",
-> -		"6port-16vf".
-> +		"6port-16vf",
-> +		"single-port".
->  - interrupt-parent: the interrupt parent of this device.
->  - interrupts: should contain the DSA Fabric and rcb interrupt.
->  - reg: specifies base physical address(es) and size of the device registers.
-> -  The first region is external interface control register base and size.
-> -  The second region is SerDes base register and size.
-> +  The first region is external interface control register base and size(optional,
-> +  only be used when subctrl-syscon is not exists). It is recommended using
+could you please provide me scenario, so i can test it.
 
-only used when subctrl-syscon does not exist
+Regards
+Stefan
 
-> +  subctrl-syscon rather than this address.
-> +  The second region is SerDes base register and size(optional, only be used when
-> +  serdes-syscon in port node is not exists. It is recommended using
-
-similar rewording needed here.
-
-> +  serdes-syscon rather than this address.
->    The third region is the PPE register base and size.
-> -  The fourth region is dsa fabric base register and size.
-> -  The fifth region is cpld base register and size, it is not required if do not use cpld.
-> -- phy-handle: phy handle of physicl port, 0 if not any phy device. see ethernet.txt [1].
-> +  The fourth region is dsa fabric base register and size. It is not required for
-> +  single-port mode.
-> +- reg-names: may be ppe-base and(or) dsaf-base. It is used to find the
-> +  corresponding reg's index.
-
-But you have up to 5 regions.
-
-The variable nature of what regions you have tells me you need more 
-specific compatible strings for each chip.
-
-> +
-> +- phy-handle: phy handle of physicl port, 0 if not any phy device. It is optional
-
-s/physicl/physical/
-
-> +  attribute. If port node is exists, phy-handle in each port node will be used.
-> +  see ethernet.txt [1].
-> +- subctrl-syscon: is syscon handle for external interface control register.
-> +- reset-field-offset: is offset of reset field. Its value depends on the hardware
-> +  user manual.
->  - buf-size: rx buffer size, should be 16-1024.
->  - desc-num: number of description in TX and RX queue, should be 512, 1024, 2048 or 4096.
->  
-> +- port: subnodes of dsaf. A dsaf node may contain several port nodes(Depending
-> +  on mode of dsaf). Port node contain some attributes listed below:
-> +- port-id: is physical port index in one dsaf.
-
-Indexes should generally be avoided. What does the number correspond 
-to in h/w (if anything)?
-
-> +- phy-handle: phy handle of physicl port. It is not required if there isn't
-> +  phy device. see ethernet.txt [1].
-> +- serdes-syscon: is syscon handle for SerDes register.
-> +- cpld-syscon: is syscon handle for cpld register. It is not required if there
-> +  isn't cpld device.
-> +- cpld-ctrl-reg: is cpld register offset. It is not required if there isn't
-> +  cpld-syscon.
-
-This would usually be a cell in the cpld-syscon property.
-
-> +- port-rst-offset: is offset of reset field for each port in dsaf. Its value
-> +  depends on the hardware user manual.
-> +- port-mode-offset: is offset of port mode field for each port in dsaf. Its
-> +  value depends on the hardware user manual.
-
-Again, sounds like you need more specific compatible strings that imply 
-this information.
-
-> +
->  [1] Documentation/devicetree/bindings/net/phy.txt
->  
->  Example:
-> @@ -28,11 +56,11 @@ dsaf0: dsa at c7000000 {
->  	compatible = "hisilicon,hns-dsaf-v1";
->  	mode = "6port-16rss";
->  	interrupt-parent = <&mbigen_dsa>;
-> -	reg = <0x0 0xC0000000 0x0 0x420000
-> -	       0x0 0xC2000000 0x0 0x300000
-> -	       0x0 0xc5000000 0x0 0x890000
-> +	reg = <0x0 0xc5000000 0x0 0x890000
->  	       0x0 0xc7000000 0x0 0x60000>;
-> -	phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
-> +	reg-names = "ppe-base", "dsaf-base";
-> +	subctrl-syscon = <&subctrl>;
-> +	reset-field-offset = 0;
->  	interrupts = <131 4>,<132 4>, <133 4>,<134 4>,
->  		     <135 4>,<136 4>, <137 4>,<138 4>,
->  		     <139 4>,<140 4>, <141 4>,<142 4>,
-> @@ -43,4 +71,15 @@ dsaf0: dsa at c7000000 {
->  	buf-size = <4096>;
->  	desc-num = <1024>;
->  	dma-coherent;
-> +
-> +	prot at 0 {
-
-port?
-
-> +		port-id = 0;
-> +		phy-handle = <&phy0>;
-> +		serdes-syscon = <&serdes>;
-> +	};
-> +
-> +	prot at 1 {
-> +                port-id = 1;
-> +                serdes-syscon = <&serdes>;
-> +        };
->  };
-> -- 
-> 1.9.1
-> 
+> The following patch seems to fix
+> the problem
+>
+> Regards
+>                                Stano
+>
+>
+> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
+> index 8ba19bb..914a4fa 100644
+> --- a/drivers/nvmem/mxs-ocotp.c
+> +++ b/drivers/nvmem/mxs-ocotp.c
+> @@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
+>         if (ret)
+>                 goto close_banks;
+>
+> -       while (val_size) {
+> +       while (val_size >= reg_size) {
+>                 if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
+>                         /* fill up non-data register */
+>                         *buf = 0;
+> @@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
+>                 }
+>
+>                 buf++;
+> -               val_size--;
+> +               val_size -= reg_size;
+>                 offset += reg_size;
+>         }
