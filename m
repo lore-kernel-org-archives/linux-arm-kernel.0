@@ -1,51 +1,49 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 26 Apr 2016 21:38:50 +0300
-Subject: [PATCH v3 3/4] arm: dts: lpc32xx: reparent SIC1 and SIC2
- interrupts from MIC
-In-Reply-To: <1461673563.18338.20.camel@localhost>
-References: <1461546041-25713-1-git-send-email-vz@mleia.com>
- <1461618143-12310-1-git-send-email-vz@mleia.com>
- <1461673563.18338.20.camel@localhost>
-Message-ID: <571FB5BA.1010903@mleia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Apr 2016 20:42:37 +0200
+Subject: [PATCH 05/45] KVM: arm/arm64: vgic-new: Add acccessor to new
+ struct vgic_irq instance
+In-Reply-To: <20160426094433.z5y44u5eb3ovkfb6@hawk.localdomain>
+References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+ <1460740316-8755-6-git-send-email-andre.przywara@arm.com>
+ <20160425161525.b4hqjrrharfdsdgo@hawk.localdomain>
+ <20160425194901.GM16590@cbox> <571F250A.2040507@arm.com>
+ <20160426094433.z5y44u5eb3ovkfb6@hawk.localdomain>
+Message-ID: <20160426184237.GA25138@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
-
-On 26.04.2016 15:26, Sylvain Lemieux wrote:
-> Hi Vladimir,
+On Tue, Apr 26, 2016 at 11:44:33AM +0200, Andrew Jones wrote:
+> On Tue, Apr 26, 2016 at 09:21:30AM +0100, Marc Zyngier wrote:
+> > On 25/04/16 20:49, Christoffer Dall wrote:
+> > > On Mon, Apr 25, 2016 at 06:15:25PM +0200, Andrew Jones wrote:
+> > >> Hi Andre,
+> > >>
+> > >> I'm just randomly jumping in here because I spotted a typo in $SUBJECT.
+> > >> 'accessor' has too many c's. Also, just curious, but if the author is
+> > >> from Linaro (hi Christoffer), then why do the new files this patch adds
+> > >> have ARM copyrights?
+> > >>
+> > > 
+> > > We just decided to let ARM deal with asserting the license since we all
+> > > collaborated on it, but others also suggested that we should let ARM and
+> > > Linaro share the license.
+> > 
+> > I personally have no objections to having both ARM and Linaro sharing
+> > the copyright, but I just don't know how this works in practice (and
+> > asking any legal department is a sure recipe to delay these patches for
+> > an extra 6 months, give or take a few years).
+> > 
+> > In the end, all I care about is the licence under which the code is
+> > released.
+> >
 > 
-> On Tue, 2016-04-26 at 00:02 +0300, Vladimir Zapolskiy wrote:
->> The change adds separate device nodes for SIC1 and SIC2 interrupt
->> controllers and reparents all defined SIC1 and SIC2 interrupt
->> producers to the correspondent interrupt controller, this is needed to
->> perform switching to a new LPC32xx MIC/SIC interrupt controller driver.
->>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> ---
->> Changes from v2 to v3:
->> * fix io region size for MIC controller after moving SIC1/SIC2
->>   controllers out,
->> * move MIC 'reg' property up to follow 'compatible' property.
->>
->> Changes from v1 to v2:
->> * squashed two step change in lpc32xx.dtsi - new irqchip driver can be
->>   used (i.e. board boots with access to userspace) with old DTS file,
->>   so there is no need to fix DTS firstly and then switch to a new driver,
->> * removed "interrupt-controller-name" and "wakeup-sources" properties
->>   from all interrupt controllers,
->> * removed outdated comment.
->>
->>  arch/arm/boot/dts/lpc32xx.dtsi | 60 +++++++++++++++++++++++++++++-------------
->>  1 file changed, 42 insertions(+), 18 deletions(-)
->>
-> Please use capital letter for the word ARM in the patch title.
-
-right, I'll change it on application, thank you for review.
-
-> Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Thanks, my curiosity is satisfied. I fully agree that if it's not easy
+> to share a collaborated file, then it's just a matter of flipping a coin,
+> or defaulting to whichever has the majority.
 > 
+I also only care about the license under which it is released.
 
---
-With best wishes,
-Vladimir
+I opted for defaulting to the company that is most set up to pursue any
+potential infringement on the copyright.
+
+-Christoffer
