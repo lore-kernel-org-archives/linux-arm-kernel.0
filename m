@@ -1,55 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 26 Apr 2016 11:42:58 +0100
-Subject: [PATCH v2] drivers: firmware: psci: unify enable-method binding
- on ARM {64,32}-bit systems
-In-Reply-To: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
-References: <1461338282-19509-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <571F4632.6090003@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Apr 2016 11:44:28 +0100
+Subject: [PATCH v8 06/13] arm64: kernel: Rework finisher callback out of
+ __cpu_suspend_enter()
+In-Reply-To: <1461604250-12789-7-git-send-email-james.morse@arm.com>
+References: <1461604250-12789-1-git-send-email-james.morse@arm.com>
+ <1461604250-12789-7-git-send-email-james.morse@arm.com>
+Message-ID: <20160426104427.GC8525@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 22/04/16 16:18, Sudeep Holla wrote:
-> Currently ARM CPUs DT bindings allows different enable-method value for
-> PSCI based systems. On ARM 64-bit this property is required and must be
-> "psci" while on ARM 32-bit systems this property is optional and must
-> be "arm,psci" if present.
->
-> However, "arm,psci" has always been the compatible string for the PSCI
-> node, and was never intended to be the enable-method. So this is a bug
-> in the binding and not a deliberate attempt at specifying 32-bit
-> differently.
->
-> This is problematic if 32-bit OS is run on 64-bit system which has
-> "psci" as enable-method rather than the expected "arm,psci".
->
-> So let's unify the value into "psci" and remove support for "arm,psci"
-> before it finds any users.
->
-> Reported-by: Soby Mathew <Soby.Mathew@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+On Mon, Apr 25, 2016 at 06:10:43PM +0100, James Morse wrote:
+> Hibernate could make use of the cpu_suspend() code to save/restore cpu
+> state, however it needs to be able to return '0' from the 'finisher'.
+> 
+> Rework cpu_suspend() so that the finisher is called from C code,
+> independently from the save/restore of cpu state. Space to save the context
+> in is allocated in the caller's stack frame, and passed into
+> __cpu_suspend_enter().
+> 
+> Hibernate's use of this API will look like a copy of the cpu_suspend()
+> function.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->   Documentation/devicetree/bindings/arm/cpus.txt | 1 -
->   drivers/firmware/psci.c                        | 2 +-
->   2 files changed, 1 insertion(+), 2 deletions(-)
->
-> v2->v1:
-> 	- Added Mark and Lorenzo's ACKs
-> 	- Updated commit message to specify that it also conflicts with
-> 	  PSCI compatible(from Mark's reply on the thread)
->
-> Hi ARM-SoC guys,
->
-> Can you please pick up this single fix for PSCI binding/driver for v4.6 ?
->
 
-Gentle ping to include this in next round of arm-soc fixes. It would be
-good to get this fixed before v4.6 as we don't want to have user of the
-binding which we want to remove in the release.
+With the push/pop macros gone:
 
--- 
-Regards,
-Sudeep
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
