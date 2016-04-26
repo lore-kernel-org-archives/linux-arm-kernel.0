@@ -1,99 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Apr 2016 19:25:02 +0100
-Subject: Applied "regulator: tps65917/palmas: Add bypass "On" value" to the
- regulator tree
-In-Reply-To: <1461688602-19996-1-git-send-email-nm@ti.com>
-Message-ID: <E1av7fS-00082z-3t@debutante>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 26 Apr 2016 21:25:13 +0300
+Subject: [PATCH] ARM: dts: at91: VInCo: fix phy reset gpio flag
+In-Reply-To: <1461666272-10107-1-git-send-email-nicolas.ferre@atmel.com>
+References: <570BF481.9070903@cogentembedded.com>
+ <1461666272-10107-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <571FB289.40807@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hello.
 
-   regulator: tps65917/palmas: Add bypass "On" value
+On 04/26/2016 01:24 PM, Nicolas Ferre wrote:
 
-has been applied to the regulator tree at
+> Fix gpio active flag for the phy reset-gpios property. The line is
+> active low instead of active high.
+> Actually, this flags was never used by the macb driver.
+>
+> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: David Miller <davem@davemloft.net>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Hi,
+>
+> Thanks for having reported this bug to me.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+    And thank you for beating me to it and doing the patch. I'm still busy 
+with other stuff. :-(
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> I hope that we will be able to move forward for changing the phy
+> reset code in the macb driver.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+    I meant to delete it entirely.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+> I plan to queue this patch through arm-soc for 4.7.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+    Hm, that way we get that board broken if my phylib/macb patches get merged 
+before your patch. Perhaps it would be better to merge this patch thru DaveM's 
+tree (before my patches) to keep the kernel bisectable?
 
-Thanks,
-Mark
+> Thanks, best regards,
+>    Nicolas
 
->From e0341f1732237777d65bdda7184ea4b11fb31d53 Mon Sep 17 00:00:00 2001
-From: Nishanth Menon <nm@ti.com>
-Date: Tue, 26 Apr 2016 11:36:42 -0500
-Subject: [PATCH] regulator: tps65917/palmas: Add bypass "On" value
-
-When commit b554e1450658 ("regulator: tps65917/palmas: Add bypass
-ops for LDOs with bypass capability") introduced bypass capability
-to palmas regulator, it went with the assumption that regulator
-regmap helpers just check val against the bypass_mask.
-
-Unfortunately, this ignored the explicit "on" and "off" values when
-the register value is masked with bypass_mask in commit ca5d1b3524b4
-("regulator: helpers: Modify helpers enabling multi-bit control").
-
-With the recent commit dd1a571daee7 ("regulator: helpers: Ensure
-bypass register field matches ON value"), this issue gets highlighted
-and fails tps65917/palmas based platforms which need regulators/ldos
-that have bypass capability.
-
-Introduce the bypass_on value appropriately for tps65917/palmas
-regulator.
-
-Fixes: b554e1450658 ("regulator: tps65917/palmas: Add bypass ops for LDOs with bypass capability")
-Cc: Keerthy <j-keerthy@ti.com>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/regulator/palmas-regulator.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
-index 6efc7ee8aea3..c83e06b2cedb 100644
---- a/drivers/regulator/palmas-regulator.c
-+++ b/drivers/regulator/palmas-regulator.c
-@@ -944,6 +944,8 @@ static int palmas_ldo_registration(struct palmas_pmic *pmic,
- 			if (id == PALMAS_REG_LDO9) {
- 				desc->ops = &palmas_ops_ldo9;
- 				desc->bypass_reg = desc->enable_reg;
-+				desc->bypass_val_on =
-+						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
- 				desc->bypass_mask =
- 						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
- 			}
-@@ -1055,6 +1057,8 @@ static int tps65917_ldo_registration(struct palmas_pmic *pmic,
- 			    id == TPS65917_REG_LDO2) {
- 				desc->ops = &tps65917_ops_ldo_1_2;
- 				desc->bypass_reg = desc->enable_reg;
-+				desc->bypass_val_on =
-+						TPS65917_LDO1_CTRL_BYPASS_EN;
- 				desc->bypass_mask =
- 						TPS65917_LDO1_CTRL_BYPASS_EN;
- 			}
-@@ -1206,6 +1210,7 @@ static int palmas_smps_registration(struct palmas_pmic *pmic,
- 				desc->enable_mask = SMPS10_BOOST_EN;
- 			desc->bypass_reg = PALMAS_BASE_TO_REG(PALMAS_SMPS_BASE,
- 							    PALMAS_SMPS10_CTRL);
-+			desc->bypass_val_on = SMPS10_BYPASS_EN;
- 			desc->bypass_mask = SMPS10_BYPASS_EN;
- 			desc->min_uV = 3750000;
- 			desc->uV_step = 1250000;
--- 
-2.8.0.rc3
+MBR, Sergei
