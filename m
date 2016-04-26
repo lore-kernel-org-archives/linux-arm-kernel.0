@@ -1,39 +1,30 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Tue, 26 Apr 2016 13:45:35 +0200
-Subject: nvmem: mxs-ocotp read problem
-Message-ID: <571F54DF.9020902@meduna.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 26 Apr 2016 08:52:14 -0300
+Subject: [PATCH] ARM: dts: imx53-qsb: Fix regulator constraints
+In-Reply-To: <20160426031959.GE8870@tiger>
+References: <1461089705-8270-1-git-send-email-fabio.estevam@nxp.com>
+ <20160426031959.GE8870@tiger>
+Message-ID: <CAOMZO5BAVqxGVoVQEPmax2RPNjEf8eO8WQ6S4TSqnOgC=_wG3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shawn,
 
-the mxs_ocotp_read seems to incorrectly iterate through
-the memory to be read, resulting in a buffer overflow/off-area
-access and sometimes oops. The following patch seems to fix
-the problem
+On Tue, Apr 26, 2016 at 12:19 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Tue, Apr 19, 2016 at 03:15:05PM -0300, Fabio Estevam wrote:
+>> Currently the imx53-qsb board with a Dialog DA9053 PMIC fails to boot:
+>>
+>> [    0.397546] LDO3: Bringing 3300000uV into 1800000-1800000uV
+>>
+>> The LDO3 voltage constraints passed in the device tree do not match
+>> the valid range according to the datasheet, so fix this accordingly to
+>> allow the board booting again.
+>
+> So you are saying this is a regression?  If so, please provide the
+> commit that introduces the regression.
 
-Regards
-                               Stano
+I can boot mainline kernel fine on a mx53qsb with Dialog PMIC. I only
+see this issue with linux-next, so it is OK if you only apply this
+into your 'for-next' branch.
 
-
-diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-index 8ba19bb..914a4fa 100644
---- a/drivers/nvmem/mxs-ocotp.c
-+++ b/drivers/nvmem/mxs-ocotp.c
-@@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
-        if (ret)
-                goto close_banks;
-
--       while (val_size) {
-+       while (val_size >= reg_size) {
-                if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
-                        /* fill up non-data register */
-                        *buf = 0;
-@@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
-                }
-
-                buf++;
--               val_size--;
-+               val_size -= reg_size;
-                offset += reg_size;
-        }
+Thanks
