@@ -1,275 +1,362 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 26 Apr 2016 16:10:24 -0600
-Subject: [PATCH V4 08/18] coresight: tmc: making prepare/unprepare functions
- generic
+Date: Tue, 26 Apr 2016 16:10:25 -0600
+Subject: [PATCH V4 09/18] coresight: tmc: allocating memory when needed
 In-Reply-To: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1461708634-6327-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1461708634-6327-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dealing with HW related matters in tmc_read_prepare/unprepare
-becomes convoluted when many cases need to be handled distinctively.
+In it's current form the TMC probe() function allocates
+trace buffer memory at boot time, event if coresight isn't
+used.  This is highly inefficient since trace buffers can
+occupy a lot of memory that could be used otherwised.
 
-As such moving processing related to HW setup to individual driver
-files and keep the core driver generic.
+This patch allocates trace buffers on the fly, when the
+coresight subsystem is solicited.  Allocated buffers are
+released when traces are read using the device descriptors
+under /dev.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 62 ++++++++++++++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 42 ++++++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.c     | 55 +++++-----------------
- drivers/hwtracing/coresight/coresight-tmc.h     |  8 ++--
- 4 files changed, 117 insertions(+), 50 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 90 +++++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 93 +++++++++++++++++++++++--
+ drivers/hwtracing/coresight/coresight-tmc.c     | 14 ----
+ 3 files changed, 170 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 467d19221f7b..91e43572ce9f 100644
+index 91e43572ce9f..6eb1665cfc9c 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -71,7 +71,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- 	}
- }
+@@ -16,14 +16,12 @@
+  */
  
--void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
-+static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ #include <linux/coresight.h>
++#include <linux/slab.h>
+ #include "coresight-priv.h"
+ #include "coresight-tmc.h"
+ 
+ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
  {
+-	/* Zero out the memory to help with debug */
+-	memset(drvdata->buf, 0, drvdata->size);
+-
  	CS_UNLOCK(drvdata->base);
  
-@@ -202,3 +202,63 @@ const struct coresight_ops tmc_etf_cs_ops = {
- 	.sink_ops	= &tmc_etf_sink_ops,
- 	.link_ops	= &tmc_etf_link_ops,
- };
-+
-+int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
-+{
-+	enum tmc_mode mode;
+ 	/* Wait for TMCSReady bit to be set */
+@@ -110,21 +108,67 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+ 
+ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+ {
 +	int ret = 0;
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
++	bool used = false;
++	char *buf = NULL;
+ 	unsigned long flags;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
++	 /* This shouldn't be happening */
++	if (WARN_ON(mode != CS_MODE_SYSFS))
 +		return -EINVAL;
 +
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
++	/*
++	 * If we don't have a buffer release the lock and allocate memory.
++	 * Otherwise keep the lock and move along.
++	 */
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (drvdata->reading) {
++	if (!drvdata->buf) {
+ 		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-		return -EBUSY;
 +
-+	/* There is no point in reading a TMC in HW FIFO mode */
-+	mode = readl_relaxed(drvdata->base + TMC_MODE);
-+	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
++		/* Allocating the memory here while outside of the spinlock */
++		buf = kzalloc(drvdata->size, GFP_KERNEL);
++		if (!buf)
++			return -ENOMEM;
++
++		/* Let's try again */
++		spin_lock_irqsave(&drvdata->spinlock, flags);
++	}
++
++	if (drvdata->reading) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	/*
++	 * If drvdata::buf isn't NULL, memory was allocated for a previous
++	 * trace run but wasn't read.  If so simply zero-out the memory.
++	 * Otherwise use the memory allocated above.
++	 *
++	 * The memory is freed when users read the buffer using the
++	 * /dev/xyz.{etf|etb} interface.  See tmc_read_unprepare_etf() for
++	 * details.
++	 */
++	if (drvdata->buf) {
++		memset(drvdata->buf, 0, drvdata->size);
++	} else {
++		used = true;
++		drvdata->buf = buf;
+ 	}
+ 
+ 	tmc_etb_enable_hw(drvdata);
+ 	drvdata->enable = true;
++out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+-	dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
+-	return 0;
++	/* Free memory outside the spinlock if need be */
++	if (!used && buf)
++		kfree(buf);
++
++	if (!ret)
++		dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
++
++	return ret;
+ }
+ 
+ static void tmc_disable_etf_sink(struct coresight_device *csdev)
+@@ -223,6 +267,12 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ 		goto out;
+ 	}
+ 
++	/* If drvdata::buf is NULL the trace data has been read already */
++	if (drvdata->buf == NULL) {
 +		ret = -EINVAL;
 +		goto out;
 +	}
 +
-+	/* Disable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etb_disable_hw(drvdata);
-+
-+	drvdata->reading = true;
-+out:
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return ret;
-+}
-+
-+int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
-+{
-+	enum tmc_mode mode;
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* There is no point in reading a TMC in HW FIFO mode */
-+	mode = readl_relaxed(drvdata->base + TMC_MODE);
-+	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-+		spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+		return -EINVAL;
+ 	/* Disable the TMC if need be */
+ 	if (drvdata->enable)
+ 		tmc_etb_disable_hw(drvdata);
+@@ -236,6 +286,7 @@ out:
+ 
+ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
+ {
++	char *buf = NULL;
+ 	enum tmc_mode mode;
+ 	unsigned long flags;
+ 
+@@ -254,11 +305,34 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
+ 	}
+ 
+ 	/* Re-enable the TMC if need be */
+-	if (drvdata->enable)
++	if (drvdata->enable) {
++		/*
++		 * The trace run will continue with the same allocated trace
++		 * buffer. As such zero-out the buffer so that we don't end
++		 * up with stale data.
++		 *
++		 * Since the tracer is still enabled drvdata::buf
++		 * can't be NULL.
++		 */
++		memset(drvdata->buf, 0, drvdata->size);
+ 		tmc_etb_enable_hw(drvdata);
++	} else {
++		/*
++		 * The ETB/ETF is not tracing and the buffer was just read.
++		 * As such prepare to free the trace buffer.
++		 */
++		buf = drvdata->buf;
++		drvdata->buf = NULL;
 +	}
+ 
+ 	drvdata->reading = false;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
++	/*
++	 * Free allocated memory outside of the spinlock.  There is no need
++	 * to assert the validity of 'buf' since calling kfree(NULL) is safe.
++	 */
++	kfree(buf);
 +
-+	/* Re-enable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etb_enable_hw(drvdata);
-+
-+	drvdata->reading = false;
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return 0;
-+}
+ 	return 0;
+ }
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 5d9333ec49ae..3483d139a4ac 100644
+index 3483d139a4ac..ac37bf904fb7 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -70,7 +70,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
- 		drvdata->buf = drvdata->vaddr;
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <linux/coresight.h>
++#include <linux/dma-mapping.h>
+ #include "coresight-priv.h"
+ #include "coresight-tmc.h"
+ 
+@@ -83,21 +84,71 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 
+ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+ {
++	int ret = 0;
++	bool used = false;
+ 	unsigned long flags;
++	void __iomem *vaddr = NULL;
++	dma_addr_t paddr;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
++	 /* This shouldn't be happening */
++	if (WARN_ON(mode != CS_MODE_SYSFS))
++		return -EINVAL;
++
++	/*
++	 * If we don't have a buffer release the lock and allocate memory.
++	 * Otherwise keep the lock and move along.
++	 */
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (drvdata->reading) {
++	if (!drvdata->vaddr) {
+ 		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-		return -EBUSY;
++
++		/*
++		 * Contiguous  memory can't be allocated while a spinlock is
++		 * held.  As such allocate memory here and free it if a buffer
++		 * has already been allocated (from a previous session).
++		 */
++		vaddr = dma_alloc_coherent(drvdata->dev, drvdata->size,
++					   &paddr, GFP_KERNEL);
++		if (!vaddr)
++			return -ENOMEM;
++
++		/* Let's try again */
++		spin_lock_irqsave(&drvdata->spinlock, flags);
++	}
++
++	if (drvdata->reading) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	/*
++	 * If drvdata::buf == NULL, use the memory allocated above.
++	 * Otherwise a buffer still exists from a previous session, so
++	 * simply use that.
++	 */
++	if (drvdata->buf == NULL) {
++		used = true;
++		drvdata->vaddr = vaddr;
++		drvdata->paddr = paddr;
++		drvdata->buf = drvdata->vaddr;
+ 	}
+ 
++	memset(drvdata->vaddr, 0, drvdata->size);
++
+ 	tmc_etr_enable_hw(drvdata);
+ 	drvdata->enable = true;
++out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+-	dev_info(drvdata->dev, "TMC-ETR enabled\n");
+-	return 0;
++	/* Free memory outside the spinlock if need be */
++	if (!used && vaddr)
++		dma_free_coherent(drvdata->dev, drvdata->size, vaddr, paddr);
++
++	if (!ret)
++		dev_info(drvdata->dev, "TMC-ETR enabled\n");
++
++	return ret;
  }
  
--void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
-+static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
+ static void tmc_disable_etr_sink(struct coresight_device *csdev)
+@@ -129,6 +180,7 @@ const struct coresight_ops tmc_etr_cs_ops = {
  
-@@ -126,3 +126,43 @@ static const struct coresight_ops_sink tmc_etr_sink_ops = {
- const struct coresight_ops tmc_etr_cs_ops = {
- 	.sink_ops	= &tmc_etr_sink_ops,
- };
+ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ {
++	int ret = 0;
+ 	unsigned long flags;
+ 
+ 	/* config types are set a boot time and never change */
+@@ -137,11 +189,18 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 
++	/* If drvdata::buf is NULL the trace data has been read already */
++	if (drvdata->buf == NULL) {
++		ret = -EINVAL;
++		goto out;
++	}
 +
-+int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
-+{
-+	unsigned long flags;
+ 	/* Disable the TMC if need be */
+ 	if (drvdata->enable)
+ 		tmc_etr_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
++out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+ 	return 0;
+@@ -150,6 +209,8 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+ {
+ 	unsigned long flags;
++	dma_addr_t paddr;
++	void __iomem *vaddr = NULL;
+ 
+ 	/* config types are set a boot time and never change */
+ 	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETR))
+@@ -158,11 +219,33 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 
+ 	/* RE-enable the TMC if need be */
+-	if (drvdata->enable)
++	if (drvdata->enable) {
++		/*
++		 * The trace run will continue with the same allocated trace
++		 * buffer. As such zero-out the buffer so that we don't end
++		 * up with stale data.
++		 *
++		 * Since the tracer is still enabled drvdata::buf
++		 * can't be NULL.
++		 */
++		memset(drvdata->buf, 0, drvdata->size);
+ 		tmc_etr_enable_hw(drvdata);
++	} else {
++		/*
++		 * The ETR is not tracing and the buffer was just read.
++		 * As such prepare to free the trace buffer.
++		 */
++		vaddr = drvdata->vaddr;
++		paddr = drvdata->paddr;
++		drvdata->buf = NULL;
++	}
+ 
+ 	drvdata->reading = false;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
++	/* Free allocated memory out side of the spinlock */
++	if (vaddr)
++		dma_free_coherent(drvdata->dev, drvdata->size, vaddr, paddr);
 +
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETR))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* Disable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etr_disable_hw(drvdata);
-+
-+	drvdata->reading = true;
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return 0;
-+}
-+
-+int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
-+{
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETR))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* RE-enable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etr_enable_hw(drvdata);
-+
-+	drvdata->reading = false;
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return 0;
-+}
+ 	return 0;
+ }
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 8d7f6d54c9b0..63f8e55116a6 100644
+index 63f8e55116a6..e8e12a9b917a 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -76,76 +76,43 @@ void tmc_disable_hw(struct tmc_drvdata *drvdata)
- static int tmc_read_prepare(struct tmc_drvdata *drvdata)
- {
- 	int ret = 0;
--	unsigned long flags;
--	enum tmc_mode mode;
+@@ -319,20 +319,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	pm_runtime_put(&adev->dev);
+ 
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+-		drvdata->vaddr = dma_alloc_coherent(dev, drvdata->size,
+-						&drvdata->paddr, GFP_KERNEL);
+-		if (!drvdata->vaddr)
+-			return -ENOMEM;
 -
--	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (!drvdata->enable)
--		goto out;
- 
- 	switch (drvdata->config_type) {
- 	case TMC_CONFIG_TYPE_ETB:
--		tmc_etb_disable_hw(drvdata);
--		break;
- 	case TMC_CONFIG_TYPE_ETF:
--		/* There is no point in reading a TMC in HW FIFO mode */
--		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
--			ret = -EINVAL;
--			goto err;
--		}
+-		memset(drvdata->vaddr, 0, drvdata->size);
+-		drvdata->buf = drvdata->vaddr;
+-	} else {
+-		drvdata->buf = devm_kzalloc(dev, drvdata->size, GFP_KERNEL);
+-		if (!drvdata->buf)
+-			return -ENOMEM;
+-	}
 -
--		tmc_etb_disable_hw(drvdata);
-+		ret = tmc_read_prepare_etb(drvdata);
- 		break;
- 	case TMC_CONFIG_TYPE_ETR:
--		tmc_etr_disable_hw(drvdata);
-+		ret = tmc_read_prepare_etr(drvdata);
- 		break;
- 	default:
- 		ret = -EINVAL;
--		goto err;
- 	}
- 
--out:
--	drvdata->reading = true;
--	dev_info(drvdata->dev, "TMC read start\n");
--err:
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+	if (!ret)
-+		dev_info(drvdata->dev, "TMC read start\n");
-+
- 	return ret;
- }
- 
- static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
- {
--	unsigned long flags;
--	enum tmc_mode mode;
--
--	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (!drvdata->enable)
--		goto out;
-+	int ret = 0;
- 
- 	switch (drvdata->config_type) {
- 	case TMC_CONFIG_TYPE_ETB:
--		tmc_etb_enable_hw(drvdata);
--		break;
- 	case TMC_CONFIG_TYPE_ETF:
--		/* Make sure we don't re-enable a TMC in HW FIFO mode */
--		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode != TMC_MODE_CIRCULAR_BUFFER)
--			goto err;
--
--		tmc_etb_enable_hw(drvdata);
-+		ret = tmc_read_unprepare_etb(drvdata);
- 		break;
- 	case TMC_CONFIG_TYPE_ETR:
--		tmc_etr_disable_hw(drvdata);
-+		ret = tmc_read_unprepare_etr(drvdata);
- 		break;
- 	default:
--		goto err;
-+		ret = -EINVAL;
- 	}
- 
--out:
--	drvdata->reading = false;
--	dev_info(drvdata->dev, "TMC read end\n");
--err:
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+	if (!ret)
-+		dev_info(drvdata->dev, "TMC read end\n");
- }
- 
- static int tmc_open(struct inode *inode, struct file *file)
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index b3017e115c4d..df661903f83c 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -127,13 +127,13 @@ void tmc_enable_hw(struct tmc_drvdata *drvdata);
- void tmc_disable_hw(struct tmc_drvdata *drvdata);
- 
- /* ETB/ETF functions */
--void tmc_etb_enable_hw(struct tmc_drvdata *drvdata);
--void tmc_etb_disable_hw(struct tmc_drvdata *drvdata);
-+int tmc_read_prepare_etb(struct tmc_drvdata *drvdata);
-+int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata);
- extern const struct coresight_ops tmc_etb_cs_ops;
- extern const struct coresight_ops tmc_etf_cs_ops;
- 
- /* ETR functions */
--void tmc_etr_enable_hw(struct tmc_drvdata *drvdata);
--void tmc_etr_disable_hw(struct tmc_drvdata *drvdata);
-+int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
-+int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
- extern const struct coresight_ops tmc_etr_cs_ops;
- #endif
+ 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+ 	if (!desc) {
+ 		ret = -ENOMEM;
 -- 
 2.5.0
