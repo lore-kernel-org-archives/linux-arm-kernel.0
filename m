@@ -1,60 +1,116 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Apr 2016 09:23:41 +0800
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <20160421034520.GA19965@shlinux2.ap.freescale.net>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160421034520.GA19965@shlinux2.ap.freescale.net>
-Message-ID: <20160426012341.GB8870@tiger>
+From: xiaolong.ye@intel.com (Ye Xiaolong)
+Date: Tue, 26 Apr 2016 09:24:13 +0800
+Subject: [lkp] [PATCH v7 7/8] genirq/msi: map/unmap the MSI doorbells on
+ msi_domain_alloc/free_irqs
+In-Reply-To: <57173407.9040401@linaro.org>
+References: <201604200215.XNyvZSsl%fengguang.wu@intel.com>
+ <57173407.9040401@linaro.org>
+Message-ID: <20160426012413.GC11960@yexl-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 11:45:20AM +0800, Dong Aisheng wrote:
-> On Fri, Jan 29, 2016 at 02:49:23PM -0800, Stefan Agner wrote:
-> > If a clock gets enabled early during boot time, it can lead to a PLL
-> > startup. The wait_lock function makes sure that the PLL is really
-> > stareted up before it gets used. However, the function sleeps which
-> > leads to scheduling and an error:
-> > bad: scheduling from the idle thread!
-> > ...
-> > 
-> > Use udelay in case IRQ's are still disabled.
-> > 
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > ---
-> >  drivers/clk/imx/clk-pllv3.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> > index c05c43d..b5ff561 100644
-> > --- a/drivers/clk/imx/clk-pllv3.c
-> > +++ b/drivers/clk/imx/clk-pllv3.c
-> > @@ -63,7 +63,10 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
-> >  			break;
-> >  		if (time_after(jiffies, timeout))
-> >  			break;
-> > -		usleep_range(50, 500);
-> > +		if (unlikely(irqs_disabled()))
-> 
-> This causes a bit confusion that clk_pllv3_prepare is sleepable.
-> But this line indicates it's possible to be called in irq context.
-> Although it's only happened during kernel boot phase where irq is
-> still not enabled.
-> It seems schedule_debug() somehow did not catch it during early boot
-> phase. Maybe schedule guys can help explain.
-> 
-> My question is if it's really worthy to introduce this confusion
-> to fix the issue since the delay is minor?
+On Wed, Apr 20, 2016 at 09:47:19AM +0200, Eric Auger wrote:
+>Hi,
+>
+Hi, Eric
+>Both reported errors related to this series are due to the fact part n
+>has dependency on part n-1.
+>
 
-I do not understand why it's confusing.  The code already obviously
-indicates this is a special handling for cases where irq is still not
-enabled, rather than for irq context.
+If I understand correctly, what you meant is that you send patch series
+(let's say B), and B has its dependency patch series A which is in-flight
+and hasn't been merged, so the commit history is like:
 
-The patch is to fix the "bad: scheduling from the idle thread!" warning
-rather than minimize the delay.  Do you have an opinion on how to fix
-the warning?
+        ---P---A---B
 
-> Furthermore, shouldn't it be udelay(500)?
+where P is the well-known commit in public linux tree. In this case,
+0day just applied B based on P without A, thus caused the build error.
 
-500 is for the worst case of sleep, and 50 is good enough for delay.
+>Does anyone know how to let the 0-day CI robot know about such
+>dependency between series?
+>
 
-Shawn
+Currently, we have proposed to add a new '--base' option for git-format-patch
+to git community[1], developers could use this option to record the base tree
+information which could help 0day to identify the state the patch series
+applies to, thus 0day could avoid false report like this case.
+
+For example, imagine that on top of the public commit P, you applied well-known
+patches X, Y and Z from somebody else or yourself, and then built your
+three-patch series A, B, C, the history would be like:
+
+................................................
+---P---X---Y---Z---A---B---C
+................................................
+
+With `git format-patch --base=P -3 C` (or variants thereof, e.g. with
+`--cover-letter` of using `Z..C` instead of `-3 C` to specify the
+range), the base tree information block is shown at the end of the
+first message the command outputs (either the first patch, or the
+cover letter), like this:
+
+------------
+base-commit: P
+prerequisite-patch-id: X
+prerequisite-patch-id: Y
+prerequisite-patch-id: Z
+------------
+
+Now this feature is still under review in git community[2], hope it could be
+merged in next git release.
+
+
+[1] http://thread.gmane.org/gmane.comp.version-control.git/286873
+[2] http://thread.gmane.org/gmane.comp.version-control.git/292168
+
+Thanks,
+Xiaolong
+
+>If it is an inconvenience I can put all the patches back into the same
+>big series, specifying tentative patch split according to sub-systems in
+>the cover-letter?
+>
+>Thank you in advance
+>
+>Best Regards
+>
+>Eric
+>
+>04/19/2016 08:04 PM, kbuild test robot wrote:
+>> Hi,
+>> 
+>> [auto build test ERROR on tip/irq/core]
+>> [also build test ERROR on v4.6-rc4 next-20160419]
+>> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>> 
+>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-2-3-msi-changes/20160420-011957
+>> config: x86_64-lkp (attached as .config)
+>> reproduce:
+>>         # save the attached .config to linux build tree
+>>         make ARCH=x86_64 
+>> 
+>> All errors (new ones prefixed by >>):
+>> 
+>>>> kernel/irq/msi.c:17:38: fatal error: linux/dma-reserved-iommu.h: No such file or directory
+>>     #include <linux/dma-reserved-iommu.h>
+>>                                          ^
+>>    compilation terminated.
+>> 
+>> vim +17 kernel/irq/msi.c
+>> 
+>>     11	 */
+>>     12	#include <linux/types.h>
+>>     13	#include <linux/device.h>
+>>     14	#include <linux/irq.h>
+>>     15	#include <linux/irqdomain.h>
+>>     16	#include <linux/msi.h>
+>>   > 17	#include <linux/dma-reserved-iommu.h>
+>>     18	#include <linux/iommu.h>
+>>     19	
+>>     20	/* Temparory solution for building, will be removed later */
+>> 
+>> ---
+>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>> 
+>
