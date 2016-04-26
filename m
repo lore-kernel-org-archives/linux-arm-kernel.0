@@ -1,15 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Apr 2016 11:26:46 +0800
-Subject: [PATCH 0/2 v3] fsl-mc binding and device tree updates
-In-Reply-To: <1461102207-13263-1-git-send-email-stuart.yoder@nxp.com>
-References: <1461102207-13263-1-git-send-email-stuart.yoder@nxp.com>
-Message-ID: <20160426032645.GG8870@tiger>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 26 Apr 2016 09:04:36 +0530
+Subject: [PATCH] dmaengine: pxa: handle bus errors
+In-Reply-To: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
+References: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160426033436.GC2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 04:43:27PM -0500, Stuart Yoder wrote:
-> Stuart Yoder (2):
->   Documentation: fsl-mc: binding updates for MSIs, ranges, PHYs
->   arm64: dts: ls2080a: fsl-mc dt node updates
+On Mon, Mar 28, 2016 at 11:32:24PM +0200, Robert Jarzmik wrote:
+> In the current state, upon bus error the driver will spin endlessly,
+> relaunching the last tx, which will fail again and again :
+>  - a bus error happens
+>  - pxad_chan_handler() is called
+>  - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
+>    lauched, which is the one triggering the bus error, as it didn't
+>    terminate
+>  - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
+>    active
+> 
+> Break this logic by stopping the automatic relaunch of a dma channel
+> upon a bus error, even if there are still pending issued requests on it.
+> 
+> As dma_cookie_status() seems unable to return DMA_ERROR in its current
+> form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
+> basis, it is chosen in this patch to remember on the channel which
+> transaction failed, and report it in pxad_tx_status().
+> 
+> It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
+> was completed while T2 causes a bus error, the status of T3 and T4 will
+> be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
 
-Applied both, thanks.
+Applied, thanks
+
+-- 
+~Vinod
