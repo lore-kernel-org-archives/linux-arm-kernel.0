@@ -1,44 +1,144 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 26 Apr 2016 19:30:02 +0200
-Subject: [PATCH v2] gpmi-nand: Handle ECC Errors in erased pages
-In-Reply-To: <1461587712-16403-1-git-send-email-mpa@pengutronix.de>
-References: <1461587712-16403-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20160426193002.187aefc2@bbrezillon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 26 Apr 2016 12:31:44 -0500
+Subject: [PATCH v3 0/2] pci: host: new driver for Marvell Armada 7K/8K
+ PCIe controller
+In-Reply-To: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160426173144.GB27803@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2016 14:35:12 +0200
-Markus Pargmann <mpa@pengutronix.de> wrote:
+On Tue, Apr 26, 2016 at 10:31:44AM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> Here is the third iteration of the PCIe host controller driver needed
+> for the ARM64 Marvell Armada 7K/8K platform.
+> 
+> Changes since v2:
+> 
+>  - Added Rob Herring's Acked-by on the Device Tree binding patch.
+> 
+>  - Reworked the PCIe host driver following the suggestion of Bjorn
+>    Helgaas: creation of armada8k_add_pcie_port() and
+>    armada8k_pcie_establish_link() in order to follow the convention of
+>    other Designware based drivers.
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (2):
+>   dt-bindings: pci: add DT binding for Marvell Armada 7K/8K PCIe
+>     controller
+>   pci: host: new driver for Marvell Armada 7K/8K PCIe controller
+> 
+>  .../devicetree/bindings/pci/pci-armada8k.txt       |  38 +++
+>  drivers/pci/host/Kconfig                           |  11 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pcie-armada8k.c                   | 276 +++++++++++++++++++++
+>  4 files changed, 326 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
+>  create mode 100644 drivers/pci/host/pcie-armada8k.c
 
-> ECC is only calculated for written pages. As erased pages are not
-> actively written the ECC is always invalid. For this purpose the
-> Hardware BCH unit is able to check for erased pages and does not raise
-> an ECC error in this case. This behaviour can be influenced using the
-> BCH_MODE register which sets the number of allowed bitflips in an erased
-> page. Unfortunately the unit is not capable of fixing the bitflips in
-> memory.
-> 
-> To avoid complete software checks for erased pages, we can simply check
-> buffers with uncorrectable ECC errors because we know that any erased
-> page with errors is uncorrectable by the BCH unit.
-> 
-> This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
-> to correct erased pages. To have the valid data in the buffer before
-> using them, this patch moves the read_page_swap_end() call before the
-> ECC status checking for-loop.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> [Squashed patches by Stefan and Boris to check ECC area]
-> Cc: Stefan Christ <s.christ@phytec.de>
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
+Thanks, Thomas, I applied these to pci/host-armada for v4.7.
 
-Applied, thanks.
+I added the tweaks below to use dev_dbg() instead of pr_debug(), use
+dw_pcie_wait_for_link() instead of another hand-coded timeout loop,
+and fix a typo and remove unused constants.
 
-Boris
--- 
-Boris Brezillon, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Bjorn
+
+
+diff --git a/drivers/pci/host/pcie-armada8k.c b/drivers/pci/host/pcie-armada8k.c
+index 7302de2..811ddf8 100644
+--- a/drivers/pci/host/pcie-armada8k.c
++++ b/drivers/pci/host/pcie-armada8k.c
+@@ -10,8 +10,6 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#define pr_fmt(fmt) "armada-8k-pcie: " fmt
+-
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
+@@ -39,8 +37,6 @@ struct armada8k_pcie {
+ #define PCIE_APP_LTSSM_EN		BIT(2)
+ #define PCIE_DEVICE_TYPE_SHIFT		4
+ #define PCIE_DEVICE_TYPE_MASK		0xF
+-#define PCIE_DEVICE_TYPE_EP		0x0 /* Endpoint */
+-#define PCIE_DEVICE_TYPE_LEP		0x1 /* Legacy endpoint */
+ #define PCIE_DEVICE_TYPE_RC		0x4 /* Root complex */
+ 
+ #define PCIE_GLOBAL_STATUS_REG		0x8
+@@ -69,14 +65,12 @@ struct armada8k_pcie {
+ #define AX_USER_DOMAIN_MASK		0x3
+ #define AX_USER_DOMAIN_SHIFT		4
+ 
+-
+-
+ #define to_armada8k_pcie(x)	container_of(x, struct armada8k_pcie, pp)
+ 
+ static int armada8k_pcie_link_up(struct pcie_port *pp)
+ {
+-	u32 reg;
+ 	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
++	u32 reg;
+ 	u32 mask = PCIE_GLB_STS_RDLH_LINK_UP | PCIE_GLB_STS_PHY_LINK_UP;
+ 
+ 	reg = readl(pcie->base + PCIE_GLOBAL_STATUS_REG);
+@@ -84,7 +78,7 @@ static int armada8k_pcie_link_up(struct pcie_port *pp)
+ 	if ((reg & mask) == mask)
+ 		return 1;
+ 
+-	pr_debug("No link detected (Global-Status: 0x%08x).\n", reg);
++	dev_dbg(pp->dev, "No link detected (Global-Status: 0x%08x).\n", reg);
+ 	return 0;
+ }
+ 
+@@ -92,10 +86,9 @@ static void armada8k_pcie_establish_link(struct pcie_port *pp)
+ {
+ 	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
+ 	void __iomem *base = pcie->base;
+-	int timeout = 1000;
+ 	u32 reg;
+ 
+-	if (!armada8k_pcie_link_up(pp)) {
++	if (!dw_pcie_link_up(pp)) {
+ 		/* Disable LTSSM state machine to enable configuration */
+ 		reg = readl(base + PCIE_GLOBAL_CONTROL_REG);
+ 		reg &= ~(PCIE_APP_LTSSM_EN);
+@@ -129,7 +122,7 @@ static void armada8k_pcie_establish_link(struct pcie_port *pp)
+ 	       PCIE_INT_C_ASSERT_MASK | PCIE_INT_D_ASSERT_MASK;
+ 	writel(reg, base + PCIE_GLOBAL_INT_MASK1_REG);
+ 
+-	if (!armada8k_pcie_link_up(pp)) {
++	if (!dw_pcie_link_up(pp)) {
+ 		/* Configuration done. Start LTSSM */
+ 		reg = readl(base + PCIE_GLOBAL_CONTROL_REG);
+ 		reg |= PCIE_APP_LTSSM_EN;
+@@ -137,14 +130,7 @@ static void armada8k_pcie_establish_link(struct pcie_port *pp)
+ 	}
+ 
+ 	/* Wait until the link becomes active again */
+-	while (timeout) {
+-		if (armada8k_pcie_link_up(pp))
+-			break;
+-		msleep(1);
+-		timeout--;
+-	}
+-
+-	if (timeout == 0)
++	if (dw_pcie_wait_for_link(pp))
+ 		dev_err(pp->dev, "Link not up after reconfiguration\n");
+ }
+ 
+@@ -163,7 +149,7 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
+ 
+ 	/*
+ 	 * Interrupts are directly handled by the device driver of the
+-	 * PCI device. However, there are also latched into the PCIe
++	 * PCI device.  However, they are also latched into the PCIe
+ 	 * controller, so we simply discard them.
+ 	 */
+ 	val = readl(base + PCIE_GLOBAL_INT_CAUSE1_REG);
