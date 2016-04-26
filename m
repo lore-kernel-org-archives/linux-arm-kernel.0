@@ -1,40 +1,95 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 26 Apr 2016 03:37:30 +0300
-Subject: [PATCH 7/7] ARM: dts: lpc32xx: phy3250: add SoC name prefix to board
- dts file
+Date: Tue, 26 Apr 2016 03:37:29 +0300
+Subject: [PATCH 6/7] ARM: dts: lpc32xx: phy3250: add NAND partitions device
+ node
 In-Reply-To: <1461631050-10479-1-git-send-email-vz@mleia.com>
 References: <1461631050-10479-1-git-send-email-vz@mleia.com>
-Message-ID: <1461631050-10479-8-git-send-email-vz@mleia.com>
+Message-ID: <1461631050-10479-7-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To simplify matching of DTS files of all NXP LPC32xx powered boards by
-a file name add 'lpc3250' prefix to PHYTEC PHYCORE-LPC3250 board dts
-file.
+To declare MTD OF partitions NAND controller device node should have
+a special 'partitions' subnode, the change removes a debug message
+from mtd/ofpart on boot:
+
+  nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
+  Trying to parse direct subnodes as partitions.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/Makefile                             | 2 +-
- arch/arm/boot/dts/{phy3250.dts => lpc3250-phy3250.dts} | 0
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename arch/arm/boot/dts/{phy3250.dts => lpc3250-phy3250.dts} (100%)
+ arch/arm/boot/dts/phy3250.dts | 49 +++++++++++++++++++++++--------------------
+ 1 file changed, 26 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9f8b14f..4733ec9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -242,7 +242,7 @@ dtb-$(CONFIG_ARCH_LPC18XX) += \
- 	lpc4357-ea4357-devkit.dtb
- dtb-$(CONFIG_ARCH_LPC32XX) += \
- 	lpc3250-ea3250.dtb \
--	phy3250.dtb
-+	lpc3250-phy3250.dtb
- dtb-$(CONFIG_MACH_MESON6) += \
- 	meson6-atv1200.dtb
- dtb-$(CONFIG_MACH_MESON8) += \
-diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/lpc3250-phy3250.dts
-similarity index 100%
-rename from arch/arm/boot/dts/phy3250.dts
-rename to arch/arm/boot/dts/lpc3250-phy3250.dts
+diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
+index c1a6e62..ca9870f 100644
+--- a/arch/arm/boot/dts/phy3250.dts
++++ b/arch/arm/boot/dts/phy3250.dts
+@@ -136,8 +136,6 @@
+ 
+ /* 64MB Flash via SLC NAND controller */
+ &slc {
+-	#address-cells = <1>;
+-	#size-cells = <1>;
+ 	status = "okay";
+ 
+ 	nxp,wdr-clks = <14>;
+@@ -151,31 +149,36 @@
+ 	nand-on-flash-bbt;
+ 	gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
+ 
+-	mtd0 at 00000000 {
+-		label = "phy3250-boot";
+-		reg = <0x00000000 0x00064000>;
+-		read-only;
+-	};
++	partitions {
++		#address-cells = <1>;
++		#size-cells = <1>;
+ 
+-	mtd1 at 00064000 {
+-		label = "phy3250-uboot";
+-		reg = <0x00064000 0x00190000>;
+-		read-only;
+-	};
++		mtd0 at 00000000 {
++			label = "phy3250-boot";
++			reg = <0x00000000 0x00064000>;
++			read-only;
++		};
+ 
+-	mtd2 at 001f4000 {
+-		label = "phy3250-ubt-prms";
+-		reg = <0x001f4000 0x00010000>;
+-	};
++		mtd1 at 00064000 {
++			label = "phy3250-uboot";
++			reg = <0x00064000 0x00190000>;
++			read-only;
++		};
+ 
+-	mtd3 at 00204000 {
+-		label = "phy3250-kernel";
+-		reg = <0x00204000 0x00400000>;
+-	};
++		mtd2 at 001f4000 {
++			label = "phy3250-ubt-prms";
++			reg = <0x001f4000 0x00010000>;
++		};
+ 
+-	mtd4 at 00604000 {
+-		label = "phy3250-rootfs";
+-		reg = <0x00604000 0x039fc000>;
++		mtd3 at 00204000 {
++			label = "phy3250-kernel";
++			reg = <0x00204000 0x00400000>;
++		};
++
++		mtd4 at 00604000 {
++			label = "phy3250-rootfs";
++			reg = <0x00604000 0x039fc000>;
++		};
+ 	};
+ };
+ 
 -- 
 2.1.4
