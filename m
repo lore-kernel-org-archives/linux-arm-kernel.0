@@ -1,49 +1,33 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 26 Apr 2016 12:00:04 -0500
-Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <20160426104208.150cbbd0@free-electrons.com>
-References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160425154611.3e7e9dc9@free-electrons.com>
- <20160425172846.GB1759@localhost>
- <20160426104208.150cbbd0@free-electrons.com>
-Message-ID: <20160426170004.GA27803@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 10:03:01 -0700
+Subject: [PATCH] ARM: dts: AM57xx/DRA7: Update SoC voltage rail limits to
+ match data sheet
+In-Reply-To: <1461140319-32026-1-git-send-email-nm@ti.com>
+References: <1461140319-32026-1-git-send-email-nm@ti.com>
+Message-ID: <20160426170300.GC5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 10:42:08AM +0200, Thomas Petazzoni wrote:
-> Hello Bjorn,
+* Nishanth Menon <nm@ti.com> [160420 01:20]:
+> As per the data sheet starting from SPRUHQ0H (Nov 2015 - Latest[1]),
+> VDD_CORE can vary from 0.85v to 1.15v for AVS class0. VDD GPU/DSP
+> et.al. can range from 0.85v to 1.25V with AVS class0
 > 
-> On Mon, 25 Apr 2016 12:28:46 -0500, Bjorn Helgaas wrote:
+> Since dynamic voltage scaling is disabled for DRA7/AM57xx SoCs for
+> all SoC rails other than MPU, the bootloader is responsible for
+> setting up the AVS class0 voltage, however, with wrong voltage machine
+> constraints in dtb, regulator framework will lower the voltage below
+> the required voltage levels for certain samples in production flow.
+> This can cause catastrophic failures which can be pretty hard to
+> identify.
 > 
-> > How about if you just shuffle those bits around into
-> > an armada8k_add_pcie_port() and an armada8k_pcie_establish_link(), and
-> > we'll call that good for now?
+> Update board files which don't match required specification.
 > 
-> I just sent a v3 which implements this.
-> 
-> However, to be honest, after looking at the other drivers, I found the
-> XYZ_add_pcie_port() function to not be very useful: it simply
-> continues the work done by the probe function, and there is really no
-> reason to split the remaining work of the probe() in a separate
-> function. The XYZ_add_pcie_port() is called only one time for each
-> probe() call, so having a separate function is somewhat useless. In
-> addition, the separation of work between probe() and
-> XYZ_add_pcie_port() is not very consistent accross drivers. In
-> pci-imx6, XYZ_add_pcie_port() only sets up the interrupt handler and
-> calls dw_pcie_host_init(). In pci-dra7xx, XYZ_add_pcie_port() sets up
-> the interrupt, maps some registers and calls dw_pcie_host_init().
-> 
-> So my v3 implements what you suggested, and creates a
-> armada8k_add_pcie_port() to make it consistent with the other drivers,
-> but long term, I'm not sure this particular function is really useful.
+> [1] http://www.ti.com/product/AM5728/datasheet/specifications#SPRT637-7340
 
-I agree completely with everything you said.  I would be thrilled if
-somebody were to make this more sensible, as long as we did it to
-*all* the drivers, not just one.
+Applying into omap-for-v4.7/dt thanks. This does not apply to
+v4.6-rc, so assuming this is not an urgent fix.
 
-I think things started out fairly simple, then diverged over time as
-we added clocks, PHYs, MSI, etc.  It looks like we're going to have
-more divergence for power management, suspend, hotplug, modules, etc.
+Regards,
 
-Bjorn
+Tony
