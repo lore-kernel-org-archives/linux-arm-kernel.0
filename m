@@ -1,84 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 Apr 2016 15:29:55 +0200
-Subject: [PATCH v3 00/11] arm64: marvell: improve support for Armada 7K/8K
-In-Reply-To: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 26 Apr 2016 09:58:28 +0200")
-References: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <878u00v6p8.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Apr 2016 14:35:01 +0100
+Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <571F671D.70401@linaro.org>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160425111338.GJ16065@arm.com>
+ <571E4A2A.8070908@caviumnetworks.com> <571EFD1B.1070609@linaro.org>
+ <20160426121547.GL27312@arm.com> <571F671D.70401@linaro.org>
+Message-ID: <20160426133500.GQ27312@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., avril 26 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Tue, Apr 26, 2016 at 09:03:25PM +0800, Hanjun Guo wrote:
+> On 2016/4/26 20:15, Will Deacon wrote:
+> >On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
+> >>On 2016/4/26 0:47, David Daney wrote:
+> >>>On 04/25/2016 04:13 AM, Will Deacon wrote:
+> >>>>On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
+> >>>>>From: David Daney <david.daney@cavium.com>
+> >>>>>
+> >>>>>Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
+> >>>>>set introduce the ACPI based configuration to provide NUMA
+> >>>>>information.
+> >>>>>
+> >>>>>ACPI 5.1 already introduced NUMA support for ARM64, which can get the
+> >>>>>NUMA domain information from SRAT and SLIT table, so parse those two
+> >>>>>tables to get mappings from cpu/mem to numa node configuration and
+> >>>>>system locality.
+> >>>>
+> >>>>Whilst I've queued the main NUMA series for arm64, I'd really like to
+> >>>>see more movement on the generic header file cleanups that you posted
+> >>>>separately:
+> >>>>
+> >>>>http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
+> >>>>
+> >>>
+> >>>FWIW:  Those patches should still apply.  I am carrying them in my
+> >>>development trees, and have not changed them in any way.
+> >
+> >What's your plan for getting them merged?
+> 
+> This patch set touches lots of ACPI related file in arch/x86,
+> arch/ia64, and drivers/acpi/ (also arch/arm64), I think it can be
+> merged via ACPI tree by Rafael with your ack to ARM64 code, does
+> it make sense?
 
-> Hello,
->
-> This is the third version of the set of patches improving support for
-> Marvell Armada 7K/8K. It brings:
->
->  - Cleanups to the existing Device Tree files, suggested by Andreas
->    F?rber.
->
->  - Switch to the new clock binding for the AP806 and misc other
->    improvements (stdout-path, SPI flash description improvements,
->    etc.)
->
->  - Addition of the description for the CP110 part of the Armada 7K/8K,
->    which brings features like PCIe, SATA, USB3, more I2C and SPI
->    controllers.
+It doesn't touch anything in drivers/acpi/... are you following the link
+above?
 
-Patches 1 and 11 applied on mvebu/arm64
-Patches 2 to 9 applied on mvebu/dt64
-Patches 10 applied on mvebu/defconfig
+> >>>>Given that this ACPI series already requires some significant cross-arch
+> >>>>interaction (which is actually good!), perhaps extending the clean-up
+> >>>>patches to encompass some of the ACPI bits might make sense, and we can
+> >>>>get that queued as a pre-requisite.
+> >>>
+> >>>The cleanup patches you mention above are really independent of the ACPI
+> >>>things.  I have applied them both before and after the ACPI patches, and
+> >>>both seem to work.  With a quick perusal of the ACPI patches nothing
+> >>>jumps out at me as being a candidate for inclusion in the header file
+> >>>cleanup series.
+> >>
+> >>I agree. My patch set is ACPI related enablement, cleanups and
+> >>consolidations, it would be good to merge as a single patch set
+> >>as it's self-contained.
+> >
+> >Up to you. I just thought you might want to avoid having two sets of
+> >cross-arch changes and the associated merging headaches that go with
+> >that.
+> 
+> Good point, as I suggested above, it can go with ACPI tree if it's ok
+> to you and Rafael. The problem we have now is that dt based core NUMA
+> support for ARM64 is queued in your tree, that would be the headache.
 
-Thanks,
+Sorry, but if you wanted me *not* to queue the patches, then you should
+have said so (similarly, if you wanted a stable branch). I'm not rebasing
+our for-next/core branch now.
 
-Gregory
-
-
-[...]
-
-> Thomas
->
-> Andreas F?rber (2):
->   arm64: dts: marvell: clean up armada-7040-db
->   arm64: dts: marvell: rename armada-ap806 XOR nodes
->
-> Thomas Petazzoni (9):
->   arm64: marvell: enable AP806 and CP110 syscon driver
->   arm64: dts: marvell: add UART aliases and define stdout-path
->   arm64: dts: marvell: use new clock binding on Armada AP806
->   arm64: dts: marvell: improve SPI flash description on Armada 7040-DB
->   arm64: dts: marvell: use the proper I2C controller compatible string
->     for 7K/8K
->   arm64: dts: marvell: initial DT description of Armada 7K/8K CP110
->     master
->   arm64: dts: marvell: enable several CP interfaces on Armada 7040-DB
->   arm64: configs: add options useful for Armada 7K/8K support
->   MAINTAINERS: update entry for Marvell ARM platform maintainers
->
->  MAINTAINERS                                        |   2 +-
->  arch/arm64/Kconfig.platforms                       |   4 +-
->  arch/arm64/boot/dts/marvell/armada-7020.dtsi       |   1 +
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 108 +++++++---
->  arch/arm64/boot/dts/marvell/armada-7040.dtsi       |   1 +
->  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   1 +
->  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   1 +
->  arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |   1 -
->  arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |   2 -
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  56 +++--
->  .../boot/dts/marvell/armada-cp110-master.dtsi      | 228 +++++++++++++++++++++
->  arch/arm64/configs/defconfig                       |   4 +
->  12 files changed, 345 insertions(+), 64 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
->
-> -- 
-> 2.6.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
