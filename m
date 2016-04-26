@@ -1,84 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Apr 2016 09:58:37 +0200
-Subject: [PATCH v3 09/11] arm64: dts: marvell: enable several CP interfaces on
- Armada 7040-DB
+Date: Tue, 26 Apr 2016 09:58:35 +0200
+Subject: [PATCH v3 07/11] arm64: dts: marvell: use the proper I2C controller
+ compatible string for 7K/8K
 In-Reply-To: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1461657519-11939-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1461657519-11939-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1461657519-11939-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables several interfaces of the CP side of the Armada
-7040 for the Armada 7040 DB board:
-
- - one PCIe interface
- - one SPI controller with an attached SPI flash
- - one I2C controller
- - one SATA controller
- - two USB3 controllers
+The I2C controller found in the Marvell Armada 7K/8K provides the
+bridge/offloading features, so the Device Tree should use the
+marvell,mv78230-i2c compatible string instead of marvell,mv64xxx-i2c.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 50 ++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 95dd7c7..070b589 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -96,3 +96,53 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+
-+&cpm_pcie2 {
-+	status = "okay";
-+};
-+
-+&cpm_i2c0 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+};
-+
-+&cpm_spi1 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		compatible = "jedec,spi-nor";
-+		reg = <0x0>;
-+		spi-max-frequency = <20000000>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "U-Boot";
-+				reg = <0x0 0x200000>;
-+			};
-+
-+			partition at 400000 {
-+				label = "Filesystem";
-+				reg = <0x200000 0xe00000>;
-+			};
-+		};
-+	};
-+};
-+
-+&cpm_sata0 {
-+	status = "okay";
-+};
-+
-+&cpm_usb3_0 {
-+	status = "okay";
-+};
-+
-+&cpm_usb3_1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 38be192..20d256b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -184,7 +184,7 @@
+ 			};
+ 
+ 			i2c0: i2c at 511000 {
+-				compatible = "marvell,mv64xxx-i2c";
++				compatible = "marvell,mv78230-i2c";
+ 				reg = <0x511000 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
 2.6.4
