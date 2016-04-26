@@ -1,64 +1,57 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 26 Apr 2016 09:41:22 -0400
-Subject: [PATCH v2 2/4] irqchip: add LPC32xx interrupt controller driver
-In-Reply-To: <1461546038-25668-1-git-send-email-vz@mleia.com>
-References: <1461545990-25560-1-git-send-email-vz@mleia.com>
- <1461546038-25668-1-git-send-email-vz@mleia.com>
-Message-ID: <1461678082.9433.3.camel@localhost>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Tue, 26 Apr 2016 15:43:25 +0200
+Subject: [PATCH 31/47] ARM: dts: r8a7794: Reference both DMA controllers
+ in SCIFA nodes
+In-Reply-To: <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
+References: <cover.1459732726.git.horms+renesas@verge.net.au>
+ <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
+ <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
+ <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
+Message-ID: <20160426134325.GO28777@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Hi Arnd and Olof,
 
-On Mon, 2016-04-25 at 04:00 +0300, Vladimir Zapolskiy wrote:
-> The change adds improved support of NXP LPC32xx MIC, SIC1 and SIC2
-> interrupt controllers.
-> 
-> This is a list of new features in comparison to the legacy driver:
-> * irq types are taken from device tree settings, no more need to
->   hardcode them,
-> * old driver is based on irq_domain_add_legacy, which causes problems
->   with handling MIC hardware interrupt 0 produced by SIC1,
-> * there is one driver for MIC, SIC1 and SIC2, no more need to handle
->   them separately, e.g. have two separate handlers for SIC1 and SIC2,
-> * the driver does not have any dependencies on hardcoded register
->   offsets,
-> * the driver is much simpler for maintenance,
-> * SPARSE_IRQS option is supported.
-> 
-> Legacy LPC32xx interrupt controller driver was broken since commit
-> 76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler"), which
-> requires a private interrupt handler, otherwise any SIC1 generated
-> interrupt (mapped to MIC hwirq 0) breaks the kernel with the message
-> "unexpected IRQ trap at vector 00".
-> 
-> The change disables compilation of a legacy driver found at
-> arch/arm/mach-lpc32xx/irq.c, the file will be removed in a separate
-> commit.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
-> Changes from v1 to v2:
-> * added chained_irq_{enter,exit} for SIC chained handler,
-> * use {writel,readl}_relaxed flavour of io access functions,
-> * changed anchor data type to access iomem from struct irq_domain
->   to private struct lpc32xx_irq_chip,
-> * do not read irq status register twice on every irq event,
-> * resource deallocation fixes on error path of irqchip driver init,
-> * removed handling of "interrupt-controller-name" property, name
->   is constructed from mic/sic type and controller's physical address,
-> * minor improvements (renames, __ffs instead of ffs, etc.)
-> 
-> Many kudos to Marc for review of v1.
-> 
->  arch/arm/Kconfig                |   2 +
->  arch/arm/mach-lpc32xx/phy3250.c |   1 -
->  drivers/irqchip/Makefile        |   1 +
->  drivers/irqchip/irq-lpc32xx.c   | 238 ++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 241 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/irqchip/irq-lpc32xx.c
-> 
-I tested the driver on a custom LPC3250 board; I was having at
-least 1 interrupt generated from each source (MIC/SIC1/SIC2).
+It seems Arnd have been dropped from this thread and I would appreciate 
+your feedback on this. Do you think it is a good idea to reference both 
+DMA controllers in this fashion to be able to get channels from either 
+of the two DMA controllers?
 
-Tested-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Also to both of you if this is a good solution would you like me to 
+squash the patches per SoC and resend it? Olof pointed out it might be a 
+bit silly to do this in so many patches.
+
+On 2016-04-13 21:55:14 +0200, Geert Uytterhoeven wrote:
+> Hi Olof,
+> 
+> On Wed, Apr 13, 2016 at 9:48 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Sun, Apr 3, 2016 at 6:23 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> >> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> >> index eacb2b291361..4256557ca041 100644
+> >> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> >> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> >> @@ -296,8 +296,9 @@
+> >>                 interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+> >>                 clocks = <&mstp2_clks R8A7794_CLK_SCIFA0>;
+> >>                 clock-names = "fck";
+> >> -               dmas = <&dmac0 0x21>, <&dmac0 0x22>;
+> >> -               dma-names = "tx", "rx";
+> >> +               dmas = <&dmac0 0x21>, <&dmac0 0x22>,
+> >> +                      <&dmac1 0x21>, <&dmac1 0x22>;
+> >> +               dma-names = "tx", "rx", "tx", "rx";
+> >>                 power-domains = <&cpg_clocks>;
+> >>                 status = "disabled";
+> >>         };
+> >
+> > The names are no longer unique. So a get_<foo>_by_name() function no
+> > longer can work as expected.
+> 
+> That's intentional, and a relic of how dma_request_slave_channel_compat()
+> works: if e.g. the first "tx" channel can't be gotten (e.g. because
+> the referenced
+> DMAC instance ran out of channels), it will try the next one.
+
+-- 
+Regards,
+Niklas S?derlund
