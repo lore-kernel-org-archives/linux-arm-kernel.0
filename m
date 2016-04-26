@@ -1,63 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Apr 2016 17:57:01 +0100
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160426165701.GE8525@e104818-lin.cambridge.arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Tue, 26 Apr 2016 12:58:45 -0400
+Subject: [PATCH 2/7] ARM: dts: lpc32xx: ea3250: add NAND partitions
+ device node
+In-Reply-To: <1461631050-10479-3-git-send-email-vz@mleia.com>
+References: <1461631050-10479-1-git-send-email-vz@mleia.com>
+ <1461631050-10479-3-git-send-email-vz@mleia.com>
+Message-ID: <1461689925.9433.14.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 01:08:42AM +0300, Yury Norov wrote:
-> +/* Using non-compat syscalls where necessary */
-> +#define compat_sys_fadvise64_64        sys_fadvise64_64
-> +#define compat_sys_fallocate           sys_fallocate
-> +#define compat_sys_ftruncate64         sys_ftruncate
-> +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
-> +#define compat_sys_pread64             sys_pread64
-> +#define compat_sys_pwrite64            sys_pwrite64
-> +#define compat_sys_readahead           sys_readahead
-> +#define compat_sys_shmat               sys_shmat
+Hi Vladimir,
 
-Why don't we use compat_sys_shmat? Is it because of COMPAT_SHMLBA?
+On Tue, 2016-04-26 at 03:37 +0300, Vladimir Zapolskiy wrote:
+> To declare MTD OF partitions NAND controller device node should have
+> a special 'partitions' subnode, the change removes a debug message
+> from mtd/ofpart on boot:
+> 
+>   nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
+>   Trying to parse direct subnodes as partitions.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+>  arch/arm/boot/dts/ea3250.dts | 41 ++++++++++++++++++++++-------------------
+>  1 file changed, 22 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
+> index 7cf815a..58bcda9 100644
+> --- a/arch/arm/boot/dts/ea3250.dts
+> +++ b/arch/arm/boot/dts/ea3250.dts
+> @@ -213,8 +213,6 @@
+>  
+>  /* 128MB Flash via SLC NAND controller */
+>  &slc {
+> -	#address-cells = <1>;
+> -	#size-cells = <1>;
+>  	status = "okay";
+>  
+>  	nxp,wdr-clks = <14>;
+> @@ -228,26 +226,31 @@
+>  	nand-on-flash-bbt;
+>  	gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
+>  
+> -	mtd0 at 00000000 {
+> -		label = "ea3250-boot";
+> -		reg = <0x00000000 0x00080000>;
+> -		read-only;
+> -	};
+> +	partitions {
 
-> +#define compat_sys_sync_file_range     sys_sync_file_range
-> +#define compat_sys_truncate64          sys_truncate
-> +#define sys_llseek                     sys_lseek
-> +#define sys_mmap2		       sys_mmap
+You may want to add the compatible property to the partitions here:
++		compatible = "fixed-partitions";
 
-Nitpick: there are some whitespace inconsistencies above (just convert
-all spaces to tabs).
+Refer to commit e488ca9f8d4f62c2dc36bfa5c32f68e7f05ab381 for details.
 
-I think you should also update Documentation/arm64/ilp32.txt to include
-the list above.
+This suggestion is also valid for patch #6.
 
-> +
-> +#include <asm/syscall.h>
-> +
-> +#undef __SYSCALL
-> +#undef __SC_COMP
-> +#undef __SC_WRAP
-> +#undef __SC_3264
-> +#undef __SC_COMP_3264
+Note:
+This change was required to use the "partitions" subnode
+on my custom LPC3250 board definition.
 
-Minor detail: do we actually need to undef all these? Maybe we can get
-away with just defining __SYSCALL_COMPAT at the top of the file.
-
-> +
-> +#define __SYSCALL_COMPAT
-> +#define __SYSCALL(nr, sym)	[nr] = sym,
-> +#define __SC_WRAP(nr, sym)	[nr] = compat_##sym,
-> +
-> +/*
-> + * The sys_call_ilp32_table array must be 4K aligned to be accessible from
-> + * kernel/entry.S.
-> + */
-> +void *sys_call_ilp32_table[__NR_syscalls] __aligned(4096) = {
-> +	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
-> +#include <asm/unistd.h>
-> +};
-
--- 
-Catalin
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+>  
+...
+Sylvain
+ 
