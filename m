@@ -1,25 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 11:13:18 -0700
-Subject: [PATCH 0/3] AM57/DRA7 Clock Tree DTSI Fix-ups
-In-Reply-To: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
-References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
-Message-ID: <20160426181318.GM5995@atomide.com>
+Date: Tue, 26 Apr 2016 11:13:54 -0700
+Subject: [PATCH 0/3] Add additional OnRISC Baltos devices
+In-Reply-To: <1461675626-5818-1-git-send-email-yegorslists@googlemail.com>
+References: <1461675626-5818-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <20160426181354.GN5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* yegorslists at googlemail.com <yegorslists@googlemail.com> [160426 06:03]:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+> 
+> This series splits am335x-baltos.dtsi out of am335x-baltos-ir5221.dts to
+> consolidate common configuration for Baltos device.
+> 
+> DTS files for Baltos IR3220 and IR2110 will be added using newly created
+> am335x-baltos.dtsi.
 
-* J.D. Schroeder <Linux.HWI@garmin.com> [160426 10:57]:
-> This series of patches fixes several discrepancies between the
-> AM57/DRA7 clock tree description and the actual hardware behavior and
-> frequencies. With these changes a more complete picture of the clock
-> tree is represented for a few of the clocks and their resulting
-> frequencies.
-
-Are any of these needed for the v4.6-rc cycle?
-
-Adding Tero to Cc so he can review the changes.
-
-Regards,
+Thanks applying into omap-for-v4.7/dt.
 
 Tony
