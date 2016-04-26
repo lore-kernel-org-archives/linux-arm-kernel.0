@@ -1,58 +1,44 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 26 Apr 2016 11:02:32 +0100
-Subject: [GIT PULL v3] arm64: hisilicon: config changes for 4.7
-Message-ID: <571F3CB8.3000904@hisilicon.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Apr 2016 12:04:13 +0200
+Subject: [PATCH] ARM: dts: at91: fix typo in sama5d2 PIN_PD24 description
+Message-ID: <1461665075-9636-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+From: Florian Vallee <fvallee@eukrea.fr>
 
-Please help to pull the following changes.
+Fix a typo on PIN_PD24 for UTXD2 and FLEXCOM4_IO3 which were
+wrongly linked to PIN_PD23).
 
-I rebased this pull request on v4.6-rc3 but I found
-it is same with the v2 that based on v4.6-rc4.
-Is it OK or should I base on earlier -rc version like rc1?
-
-Thanks!
-
-Best Regards,
-Wei
-
+Signed-off-by: Florian Vallee <fvallee@eukrea.fr>
+Fixes: 7f16cb676c00 ("ARM: at91/dt: add sama5d2 pinmux")
+Cc: stable at vger.kernel.org # v4.4+
+[nicolas.ferre at atmel.com: add commit message, changed subject]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
+Hi,
 
-The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
+I'll queue this patch in at91-4.7-dt branch.
 
-  Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
+thanks, bye.
 
-are available in the git repository at:
+ arch/arm/boot/dts/sama5d2-pinfunc.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-  git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7v3
-
-for you to fetch changes up to 2b905d3a8d7e40c3486abbf585419fafa220a8f8:
-
-  arm64: Kconfig: select sp804 timer for ARCH_HISI (2016-04-26 10:39:09 +0100)
-
-----------------------------------------------------------------
-ARM64: Hi6220: configure updates for 4.7 based on rc3
-
-- Enable Hi655x PMIC and regulator
-- Enable SPI_SPIDEV as module
-- Enable several common USB-Ethernet dongles
-- Enable configs for WLAN and TI WL1835 as modules
-- Enable ARM SP804 for ARCH_HISI
-
-----------------------------------------------------------------
-Akira Tsukamoto (1):
-      arm64: defconfig: enable several common USB network adapters
-
-Guodong Xu (3):
-      arm64: defconfig: Enable the PMIC and regulator for Hi6220 and 96boards HiKey
-      arm64: defconfig: add CONFIG_SPI_SPIDEV as module
-      arm64: defconfig: enable configs for WLAN and TI WL1835 as modules
-
-Leo Yan (1):
-      arm64: Kconfig: select sp804 timer for ARCH_HISI
-
- arch/arm64/Kconfig.platforms |  1 +
- arch/arm64/configs/defconfig | 21 +++++++++++++++++++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
+index b0c912feaa2f..8a394f336003 100644
+--- a/arch/arm/boot/dts/sama5d2-pinfunc.h
++++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
+@@ -837,8 +837,8 @@
+ #define PIN_PD23__ISC_FIELD		PINMUX_PIN(PIN_PD23, 6, 4)
+ #define PIN_PD24			120
+ #define PIN_PD24__GPIO			PINMUX_PIN(PIN_PD24, 0, 0)
+-#define PIN_PD24__UTXD2			PINMUX_PIN(PIN_PD23, 1, 2)
+-#define PIN_PD24__FLEXCOM4_IO3		PINMUX_PIN(PIN_PD23, 3, 3)
++#define PIN_PD24__UTXD2			PINMUX_PIN(PIN_PD24, 1, 2)
++#define PIN_PD24__FLEXCOM4_IO3		PINMUX_PIN(PIN_PD24, 3, 3)
+ #define PIN_PD25			121
+ #define PIN_PD25__GPIO			PINMUX_PIN(PIN_PD25, 0, 0)
+ #define PIN_PD25__SPI1_SPCK		PINMUX_PIN(PIN_PD25, 1, 3)
+-- 
+2.1.3
