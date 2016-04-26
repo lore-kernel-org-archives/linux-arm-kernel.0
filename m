@@ -1,93 +1,108 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 26 Apr 2016 12:15:32 +0100
-Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
- code
-In-Reply-To: <6161197.8XCk69TI60@wuerfel>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <4337545.DyleYAUzIV@wuerfel>
- <20160426101136.GA2984@griffinp-ThinkPad-X1-Carbon-2nd>
- <6161197.8XCk69TI60@wuerfel>
-Message-ID: <20160426111532.GA5457@griffinp-ThinkPad-X1-Carbon-2nd>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 26 Apr 2016 19:16:15 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <1461663072.7839.17.camel@pengutronix.de>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+Message-ID: <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Apr 26, 2016 at 5:31 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Dienstag, den 26.04.2016, 13:51 +0800 schrieb Dong Aisheng:
+>> Hi Shawn,
+>>
+>> On Tue, Apr 26, 2016 at 9:23 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+>> > On Thu, Apr 21, 2016 at 11:45:20AM +0800, Dong Aisheng wrote:
+>> >> On Fri, Jan 29, 2016 at 02:49:23PM -0800, Stefan Agner wrote:
+>> >> > If a clock gets enabled early during boot time, it can lead to a PLL
+>> >> > startup. The wait_lock function makes sure that the PLL is really
+>> >> > stareted up before it gets used. However, the function sleeps which
+>> >> > leads to scheduling and an error:
+>> >> > bad: scheduling from the idle thread!
+>> >> > ...
+>> >> >
+>> >> > Use udelay in case IRQ's are still disabled.
+>> >> >
+>> >> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> >> > ---
+>> >> >  drivers/clk/imx/clk-pllv3.c | 5 ++++-
+>> >> >  1 file changed, 4 insertions(+), 1 deletion(-)
+>> >> >
+>> >> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+>> >> > index c05c43d..b5ff561 100644
+>> >> > --- a/drivers/clk/imx/clk-pllv3.c
+>> >> > +++ b/drivers/clk/imx/clk-pllv3.c
+>> >> > @@ -63,7 +63,10 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+>> >> >                     break;
+>> >> >             if (time_after(jiffies, timeout))
+>> >> >                     break;
+>> >> > -           usleep_range(50, 500);
+>> >> > +           if (unlikely(irqs_disabled()))
+>> >>
+>> >> This causes a bit confusion that clk_pllv3_prepare is sleepable.
+>> >> But this line indicates it's possible to be called in irq context.
+>> >> Although it's only happened during kernel boot phase where irq is
+>> >> still not enabled.
+>> >> It seems schedule_debug() somehow did not catch it during early boot
+>> >> phase. Maybe schedule guys can help explain.
+>> >>
+>> >> My question is if it's really worthy to introduce this confusion
+>> >> to fix the issue since the delay is minor?
+>> >
+>> > I do not understand why it's confusing.  The code already obviously
+>> > indicates this is a special handling for cases where irq is still not
+>> > enabled, rather than for irq context.
+>> >
+>>
+>> The code itself has nothing telling it's a special handling for the
+>> case where irq is
+>> still not enabled.
+>> Even it tells, it may still cause confusing by adding complexity in
+>> clk_pllv3_prepare()
+>> which actually should be called in non-atomic context as it could sleep.
+>>
+>> > The patch is to fix the "bad: scheduling from the idle thread!" warning
+>> > rather than minimize the delay.  Do you have an opinion on how to fix
+>> > the warning?
+>> >
+>>
+>> I just wonder maybe we could simply just using udelay(50) instead of
+>> usleep_range(50, 500) to eliminate the confusing since it's minor cast.
+>> What do you think of it?
+>
+> Why should we needless burn CPU time in the likely case of
+> clk_pllv3_prepare() being called in sleepable context?
+>
 
-On Tue, 26 Apr 2016, Arnd Bergmann wrote:
+I think because the delay time is not big.
+And pll clks are system basic clocks and less likely to be frequently
+enabled/disabled.
 
-> On Tuesday 26 April 2016 11:11:36 Peter Griffin wrote:
-> > Hi Arnd,
-> > 
-> > On Thu, 21 Apr 2016, Arnd Bergmann wrote:
-> > 
-> > > On Thursday 21 April 2016 12:04:26 Peter Griffin wrote:
-> > > > uniperiph-id, version and mode are ST specific bindings and
-> > > > need the 'st,' prefix. Update the examples, as otherwise copying
-> > > > them yields a runtime error parsing the DT node.
-> > > > 
-> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > > > Cc: arnaud.pouliquen at st.com
-> > > > ---
-> > > >  .../devicetree/bindings/sound/st,sti-asoc-card.txt         | 14 +++++++-------
-> > > >  1 file changed, 7 insertions(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-> > > > index 028fa1c..ef2e0c6 100644
-> > > > --- a/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-> > > > +++ b/Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-> > > > @@ -67,9 +67,9 @@ Example:
-> > > >                 dmas = <&fdma0 4 0 1>;
-> > > >                 dai-name = "Uni Player #1 (DAC)";
-> > > >                 dma-names = "tx";
-> > > > -               uniperiph-id = <2>;
-> > > > -               version = <5>;
-> > > > -               mode = "PCM";
-> > > > +               st,uniperiph-id = <2>;
-> > > > +               st,version = <5>;
-> > > > +               st,mode = "PCM";
-> > > >         };
-> > > 
-> > > You don't change the binding desciption here, only the example,
-> > > so they no longer match.
-> > 
-> > Whoops. Will fix that in v4.
-> > 
-> > > 
-> > > What is st,uniperiph-id needed for anyway? It's often an indication
-> > > that you are doing something wrong if you need this.
-> > 
-> > From looking at the code in sound/soc/sti/uniperif_player.c, there is
-> > one sysconf register called "Audio glue config" which is shared by all
-> > of the uniperif IP instances. This binding is being used to generate a
-> > bitoffset into this shared register based on the instance of the IP.
-> > 
-> > I guess the alternative is to have an explosion of compatibles?
-> > 
-> > st,sti-uni-player-1
-> > st,sti-uni-player-2
-> > st,sti-uni-player-3
-> > 
-> 
-> That would certainly be worse: if the devices are actually identical,
-> they should have the same compatible string.
-> 
-> > If not what would you recommend instead? :-)
-> 
-> It's still not clear to me what that bit in the syscfg register
-> is for. Given the error message about "sti-audio-clk-glue",
-> I suspect that this is actually a clock controller and that
-> it should be using the clock binding with a separate driver
-> instead of manipulating the regmap directly from the audio driver.
+> Using udelay() in a sleepable context is even more confusing than having
+> the special case for clk_prepare() being called in atomic context IMHO.
+>
 
-Luckily I do have the datasheet for the audio-glue sysconf register.
+I can't agree having special case by checking
+unlikely(irqs_disabled()) is better
+which is obviously more confusing IMHO.
+I'd more like to hide it from users.
 
-It says: -
+I see other platforms like samsung&tegra also implements pll using udelay.
+But difference is that they implement it in .enable(I) clalback not prepare.
 
-[11:8] PCM_CLK_SEL: Selects the frequency synthesizer clock or the external
-PCM clock for each channel.
+How about simply remove usleep_range to poll instead of using udelay?
+Cause most PLL enable may be more faster than 50ns.
 
-The driver only ever sets this to 1 which selects the frequency synthesizer
-clock. So the bitfield of the register which the driver is using (PCM_CLK_SEL)
-is a clock mux.
+And according to kernel doc, for delay time less than 10ns,
+udelay or polling is recommended.
 
-Peter.
+> Regards,
+> Lucas
+>
+
+Regards
+Dong Aisheng
