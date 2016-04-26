@@ -1,142 +1,79 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 26 Apr 2016 14:04:07 -0700
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426204613.GT5995@atomide.com>
-References: <20160426182939.GO5995@atomide.com>
- <20160426190755.GK3715@linux.vnet.ibm.com>
- <20160426193949.GP5995@atomide.com>
- <20160426154414.7bb33de4@gandalf.local.home>
- <20160426195158.GR5995@atomide.com>
- <20160426200613.GO3715@linux.vnet.ibm.com>
- <20160426201134.GA29779@linux.vnet.ibm.com>
- <20160426202538.GS5995@atomide.com>
- <20160426204148.GR3715@linux.vnet.ibm.com>
- <20160426204613.GT5995@atomide.com>
-Message-ID: <20160426210407.GT3715@linux.vnet.ibm.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Tue, 26 Apr 2016 23:07:53 +0200
+Subject: [PATCH V2] clk: bcm2835: mark enabled pll_dividers as critical
+In-Reply-To: <8737q8dv5f.fsf@eliezer.anholt.net>
+References: <1461660989-11846-1-git-send-email-kernel@martin.sperl.org>
+ <8737q8dv5f.fsf@eliezer.anholt.net>
+Message-ID: <BC74AA10-C36C-4643-B979-0617D222D605@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 01:46:15PM -0700, Tony Lindgren wrote:
-> * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 13:42]:
-> > On Tue, Apr 26, 2016 at 01:25:39PM -0700, Tony Lindgren wrote:
-> > > * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [160426 13:12]:
-> > > > On Tue, Apr 26, 2016 at 01:06:13PM -0700, Paul E. McKenney wrote:
-> > > > > On Tue, Apr 26, 2016 at 12:51:59PM -0700, Tony Lindgren wrote:
-> > > > > > * Steven Rostedt <rostedt@goodmis.org> [160426 12:45]:
-> > > > > > > *Whack* *Whack* *Whack*!!!
-> > > > > > > 
-> > > > > > > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-> > > > > > > ---
-> > > > > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > > > > > index fb74dc1f7520..4fa43c02d682 100644
-> > > > > > > --- a/drivers/clk/clk.c
-> > > > > > > +++ b/drivers/clk/clk.c
-> > > > > > > @@ -682,12 +682,12 @@ static void clk_core_disable(struct clk_core *core)
-> > > > > > >  	if (--core->enable_count > 0)
-> > > > > > >  		return;
-> > > > > > >  
-> > > > > > > -	trace_clk_disable(core);
-> > > > > > > +	trace_clk_disable_rcuidle(core);
-> > > > > > >  
-> > > > > > >  	if (core->ops->disable)
-> > > > > > >  		core->ops->disable(core->hw);
-> > > > > > >  
-> > > > > > > -	trace_clk_disable_complete(core);
-> > > > > > > +	trace_clk_disable_complete_rcuidle(core);
-> > > > > > >  
-> > > > > > >  	clk_core_disable(core->parent);
-> > > > > > >  }
-> > > > > > 
-> > > > > > Now the mole shows up here!
-> > > > > 
-> > > > > And the patch shows up here!
-> > > > 
-> > > > And I bet you will need this one as well...
-> > > 
-> > > OK and now the mode is coming back after a short nap during idle:
-> > 
-> > Seems a bit unfair to whack it just after a short nap, but here goes!
+
+
+
+Sent from my iPad
+> On 26.04.2016, at 21:31, Eric Anholt <eric@anholt.net> wrote:
 > 
-> This mode seems pretty hard headed :) Now clk_core_enable:
+> kernel at martin.sperl.org writes:
+> 
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> The bcm2835 firmware enables several clocks and plls before
+>> booting the linux kernel.
+>> 
+>> These plls should never get disabled as it may result in a
+>> stopped system clock and more.
+>> 
+>> So during probing we check if the pll_divider is enabled
+>> and if it is then mark that pll_divider as critical.
+>> As a consequence this will also enable the corresponding parent pll.
+>> 
+>> Here the list of pll_div that are marked as critical:
+>> [    2.022437] bcm2835-clk 20101000.cprman: found enabled pll_div plla_core - marking it as critical
+>> [    2.031640] bcm2835-clk 20101000.cprman: found enabled pll_div pllb_arm - marking it as critical
+>> [    2.040966] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_core0 - marking it as critical
+>> [    2.050351] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_per - marking it as critical
+>> [    2.059427] bcm2835-clk 20101000.cprman: found enabled pll_div plld_core - marking it as critical
+>> [    2.068590] bcm2835-clk 20101000.cprman: found enabled pll_div plld_per - marking it as critical
+>> [    2.077724] bcm2835-clk 20101000.cprman: found enabled pll_div pllh_pix - marking it as critical
+> 
+> Yeah, pllh_pix isn't critical, though.  We want it to get turned off
+> when the driver asks to disable its clock, or we're going to just waste
+> a pile of power.
+> 
+> I'm sending out a patch that marks the VPU clock as critical (it's the
+> also AXI bus, so it certainly is critical), which should solve your
+> aux_uart clock disabling problem, I think.
 
-Nah, just a lot of heads...
+The problem is that it also fails on the pcm clock alone when pllc or 
+plld_per are used as parent, but it is fine when osc is used...
 
-							Thanx, Paul
+This started to show during the steps towards migration of 
+downstream to use the new driver -PCM was the only clock that was 
+referred in the dt to use the new clock driver while all others were 
+using fixed clocks.
 
-------------------------------------------------------------------------
+So as far as I can see this is a bigger problem and making all 
+running pll_div Critical makes it work fine.
 
-commit 21c3fc2373886a9fa014f0f69a72186377758f4b
-Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-Date:   Tue Apr 26 14:02:23 2016 -0700
+We potentially could mask pllh as non-critical, but even then
+the parent selector could choose pllh-per and then release it
+and then the hdmi would stop working... E.g if we would request a
+PCM clock rate of  290039- then Pllh_aux would be ideal with 
+a divider of 2 and on releasing it it would stop the pllh (assuming
+no KMS)
 
-    arm: Whack an expected event-trace-from-idle mole
-    
-    This commit fixes the RCU use-from-idle bug corresponding the following
-    splat:
-    
-    > [ INFO: suspicious RCU usage. ]
-    > 4.6.0-rc5-next-20160426+ #1127 Not tainted
-    > -------------------------------
-    > include/trace/events/clk.h:45 suspicious rcu_dereference_check() usage!
-    >
-    > other info that might help us debug this:
-    >
-    >
-    > RCU used illegally from idle CPU!
-    > rcu_scheduler_active = 1, debug_locks = 0
-    > RCU used illegally from extended quiescent state!
-    > 2 locks held by swapper/0/0:
-    >  #0:  (&oh->hwmod_key#30){......}, at: [<c0121afc>] omap_hwmod_enable+0x18/0x44
-    >  #1:  (enable_lock){......}, at: [<c0630684>] clk_enable_lock+0x18/0x124
-    >
-    > stack backtrace:
-    > CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1127
-    > Hardware name: Generic OMAP36xx (Flattened Device Tree)
-    > [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-    > [<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
-    > [<c047fd68>] (dump_stack) from [<c06315c0>] (clk_core_enable+0x1e0/0x36c)
-    > [<c06315c0>] (clk_core_enable) from [<c0632298>] (clk_enable+0x1c/0x38)
-    > [<c0632298>] (clk_enable) from [<c01204e0>] (_enable_clocks+0x18/0x7c)
-    > [<c01204e0>] (_enable_clocks) from [<c012137c>] (_enable+0x114/0x2ec)
-    > [<c012137c>] (_enable) from [<c0121b08>] (omap_hwmod_enable+0x24/0x44)
-    > [<c0121b08>] (omap_hwmod_enable) from [<c0122ad0>] (omap_device_enable+0x3c/0x90)
-    > [<c0122ad0>] (omap_device_enable) from [<c0122b34>] (_od_runtime_resume+0x10/0x38)
-    > [<c0122b34>] (_od_runtime_resume) from [<c052cc00>] (__rpm_callback+0x2c/0x60)
-    > [<c052cc00>] (__rpm_callback) from [<c052cc54>] (rpm_callback+0x20/0x80)
-    > [<c052cc54>] (rpm_callback) from [<c052df7c>] (rpm_resume+0x3d0/0x6f0)
-    > [<c052df7c>] (rpm_resume) from [<c052e2e8>] (__pm_runtime_resume+0x4c/0x64)
-    > [<c052e2e8>] (__pm_runtime_resume) from [<c04bf2c4>] (omap2_gpio_resume_after_idle+0x54/0x68)
-    > [<c04bf2c4>] (omap2_gpio_resume_after_idle) from [<c01269dc>] (omap3_enter_idle_bm+0xfc/0x1ec)
-    > [<c01269dc>] (omap3_enter_idle_bm) from [<c0601888>] (cpuidle_enter_state+0x80/0x3d4)
-    > [<c0601888>] (cpuidle_enter_state) from [<c0183b08>] (cpu_startup_entry+0x198/0x3a0)
-    > [<c0183b08>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
-    > [<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
-    
-    Reported-by: Tony Lindgren <tony@atomide.com>
-    Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-    Cc: Tony Lindgren <tony@atomide.com>
-    Cc: Russell King <linux@arm.linux.org.uk>
-    Cc: Steven Rostedt <rostedt@goodmis.org>
-    Cc: <linux-omap@vger.kernel.org>
-    Cc: <linux-arm-kernel@lists.infradead.org>
+There was this other approach proposed by Michael some time ago
+that might be the better solution, but then I guess it had its own
+drawbacks, which may not make it applicable in our situation.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 4fa43c02d682..ec83f404c1d2 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -735,12 +735,12 @@ static int clk_core_enable(struct clk_core *core)
- 		if (ret)
- 			return ret;
- 
--		trace_clk_enable(core);
-+		trace_clk_enable_rcuidle(core);
- 
- 		if (core->ops->enable)
- 			ret = core->ops->enable(core->hw);
- 
--		trace_clk_enable_complete(core);
-+		trace_clk_enable_complete_rcuidle(core);
- 
- 		if (ret) {
- 			clk_core_disable(core->parent);
+Critical seems the right choice, but we would need a means
+that would allow us to remove the critical flag when first requesting
+the clock for some clocks - maybe via dt - so that when KMS is
+enabled the critical flag for pllh_aux is removed.
+
+As an alternative: maybe set the flag to use in case the pll-div
+is enabled in the pll_div_data structure. That way we can
+make some decisions on a per pll-div basis...
+
+Martin
