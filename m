@@ -1,31 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 21:24:34 +0200
-Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
-In-Reply-To: <20160426182335.GE30107@lunn.ch>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <5167289.0a4LBoWhyX@wuerfel> <20160426182335.GE30107@lunn.ch>
-Message-ID: <9424602.Vqb0FY56gH@wuerfel>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 26 Apr 2016 12:31:24 -0700
+Subject: [PATCH V2] clk: bcm2835: mark enabled pll_dividers as critical
+In-Reply-To: <1461660989-11846-1-git-send-email-kernel@martin.sperl.org>
+References: <1461660989-11846-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <8737q8dv5f.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 April 2016 20:23:35 Andrew Lunn wrote:
-> > A more complex problem would be having a PHY driver for a device
-> > that can be either an ethernet phy or some other phy.
-> 
-> I doubt that ever happens. You can have up to 32 different devices on
-> an MDIO bus. Since an Ethernet PHY and a "some other sort of PHY" are
-> completely different things, why would a hardware engineer place them
-> on the same address? It is like saying your ATA controller and VGA
-> controller share the same slot on the PCI bus...
+kernel at martin.sperl.org writes:
 
-To clarify: what I meant is a device that is designed as a PHY for
-similar hardware (e.g. SATA, USB3 and PCIe) and that has a common
-register set and a single driver, but that driver can operate
-in multiple modes. You typically have multiple instances of
-such hardware, with each instance linked to exactly one host
-device, but one driver for all of them.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The bcm2835 firmware enables several clocks and plls before
+> booting the linux kernel.
+>
+> These plls should never get disabled as it may result in a
+> stopped system clock and more.
+>
+> So during probing we check if the pll_divider is enabled
+> and if it is then mark that pll_divider as critical.
+> As a consequence this will also enable the corresponding parent pll.
+>
+> Here the list of pll_div that are marked as critical:
+> [    2.022437] bcm2835-clk 20101000.cprman: found enabled pll_div plla_core - marking it as critical
+> [    2.031640] bcm2835-clk 20101000.cprman: found enabled pll_div pllb_arm - marking it as critical
+> [    2.040966] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_core0 - marking it as critical
+> [    2.050351] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_per - marking it as critical
+> [    2.059427] bcm2835-clk 20101000.cprman: found enabled pll_div plld_core - marking it as critical
+> [    2.068590] bcm2835-clk 20101000.cprman: found enabled pll_div plld_per - marking it as critical
+> [    2.077724] bcm2835-clk 20101000.cprman: found enabled pll_div pllh_pix - marking it as critical
 
-See Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-and drivers/phy/phy-xgene.c for one such example.
+Yeah, pllh_pix isn't critical, though.  We want it to get turned off
+when the driver asks to disable its clock, or we're going to just waste
+a pile of power.
 
-	Arnd
+I'm sending out a patch that marks the VPU clock as critical (it's the
+also AXI bus, so it certainly is critical), which should solve your
+aux_uart clock disabling problem, I think.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/cd74e134/attachment-0001.sig>
