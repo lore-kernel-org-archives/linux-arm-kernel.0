@@ -1,51 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 11:15:38 +0200
-Subject: [PATCH] [media] exynos-gsc: avoid build warning without CONFIG_OF
-Message-ID: <1461662157-1798157-1-git-send-email-arnd@arndb.de>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 26 Apr 2016 10:20:51 +0100
+Subject: [PATCH] arm64: fix /proc/cpuinfo for elf32
+In-Reply-To: <678F3D1BB717D949B966B68EAEB446ED0A6E6FB7@SZXEMA509-MBX.china.huawei.com>
+References: <1461555453-60440-1-git-send-email-prime.zeng@huawei.com>
+ <20160425091239.GB9614@e104818-lin.cambridge.arm.com>
+ <678F3D1BB717D949B966B68EAEB446ED0A6E6FB7@SZXEMA509-MBX.china.huawei.com>
+Message-ID: <571F32F3.7080005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building the exynos-gsc driver with CONFIG_OF disabled, we get
-a warning about an out-of-bounds access:
+On 26/04/16 03:21, Zengtao (B) wrote:
+>
+> So you mean the 64-bit grep should see the same cpuinfo as its father process
+> which is 32-bit?
+>
+> For 32-bit process running on 64-bit kernel, we have to explicitly call the personality
+> syscall to get the right cpuinfo, but how to deal with the old 32-bit binaries?
 
-drivers/media/platform/exynos-gsc/gsc-core.c: In function 'gsc_probe':
-drivers/media/platform/exynos-gsc/gsc-core.c:1078:34: error: array subscript is above array bounds [-Werror=array-bounds]
+Yes, you could use the syscall to switch the personality. Alternately, you could run
+"linux32" command to switch the personality to PER_LINUX32 and then execute
+64/32 bit applications.
 
-This is harmless because the driver will never be used without CONFIG_OF,
-but it's better to avoid the warning anyway. Checking the return value
-of of_alias_get_id() for an error condition is probably a good idea
-anyway, and it makes sure the compiler can verify that we don't get
-into that situation.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 26a7ed9c1819 ("[media] exynos-gsc: remove an always false condition")
----
- drivers/media/platform/exynos-gsc/gsc-core.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index c595723f5031..c04973669a47 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1063,13 +1063,17 @@ static int gsc_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct gsc_driverdata *drv_data = gsc_get_drv_data(pdev);
- 	struct device *dev = &pdev->dev;
--	int ret = 0;
-+	int ret;
- 
- 	gsc = devm_kzalloc(dev, sizeof(struct gsc_dev), GFP_KERNEL);
- 	if (!gsc)
- 		return -ENOMEM;
- 
--	gsc->id = of_alias_get_id(pdev->dev.of_node, "gsc");
-+	ret = of_alias_get_id(pdev->dev.of_node, "gsc");
-+	if (ret < 0)
-+		return ret;
-+
-+	gsc->id = ret;
- 	if (gsc->id >= drv_data->num_entities) {
- 		dev_err(dev, "Invalid platform device id: %d\n", gsc->id);
- 		return -EINVAL;
--- 
-2.7.0
+Suzuki
