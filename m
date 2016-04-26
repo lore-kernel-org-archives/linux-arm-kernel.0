@@ -1,159 +1,146 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 26 Apr 2016 13:47:20 +0100
-Subject: [PATCH v2 1/3] drivers: pci: add generic code to claim bus
- resources
-In-Reply-To: <1456843449-19393-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1456843449-19393-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160426124720.GD2204@red-moon>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 26 Apr 2016 07:48:47 -0500
+Subject: [PATCH v2 net-next 11/13] Documentation: Bindings: Update DT
+ binding for separating dsaf dev support
+In-Reply-To: <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <20160426124847.GA26682@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Replying to self]
+On Sat, Apr 23, 2016 at 05:05:15PM +0800, Yisen Zhuang wrote:
+> Because debug dsaf port was separated from service dsaf port, this patch
+> updates the related information of DT binding.
 
-On Tue, Mar 01, 2016 at 02:44:07PM +0000, Lorenzo Pieralisi wrote:
-> From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+Separated when? New version of the h/w? If so, where's the new 
+compatible string? This is quite a big binding change. 
+
+> Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
 > 
-> PCI core code contains a set of functions, eg:
-> 
-> pci_assign_unassigned_bus_resources()
-> 
-> that allow to assign the PCI resources for a given bus after
-> enumeration.
-> 
-> On systems where the PCI BARs are immutable (ie they must not and can
-> not be assigned), PCI bus resources should still be inserted in the PCI
-> resources tree (even if they are not (re)-assigned), but there is
-> no generic PCI kernel function for that purpose. Currently the PCI bus
-> resources insertion in the resources tree is implemented in an arch
-> specific fashion through arch specific callbacks that rely on the PCI
-> resources claiming API (for bridges and devices) which resulted in arches
-> implementations that contain duplicated code to claim resources for a
-> given PCI bus hierarchy.
-> 
-> This patch, based on the x86/ia64 resources claiming arch implementations,
-> implements a set of functions in core PCI code that provides a PCI core
-> interface for resources claiming for a given PCI bus hierarchy, paving
-> the way for further resource claiming consolidation across architectures.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
 > ---
->  drivers/pci/setup-bus.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pci.h     |  1 +
->  2 files changed, 69 insertions(+)
+>  .../devicetree/bindings/net/hisilicon-hns-dsaf.txt | 59 ++++++++++++++++++----
+>  1 file changed, 49 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> index ecacfa4..5ccd4f0 100644
+> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> @@ -7,19 +7,47 @@ Required properties:
+>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
+>  		"2port-64vf",
+>  		"6port-16rss",
+> -		"6port-16vf".
+> +		"6port-16vf",
+> +		"single-port".
+>  - interrupt-parent: the interrupt parent of this device.
+>  - interrupts: should contain the DSA Fabric and rcb interrupt.
+>  - reg: specifies base physical address(es) and size of the device registers.
+> -  The first region is external interface control register base and size.
+> -  The second region is SerDes base register and size.
+> +  The first region is external interface control register base and size(optional,
+> +  only be used when subctrl-syscon is not exists). It is recommended using
 
-I have v3 ready, which does not change this patch, however I have
-some questions below before asking to merge it.
+only used when subctrl-syscon does not exist
 
-> diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-> index 7796d0a..95f0906 100644
-> --- a/drivers/pci/setup-bus.c
-> +++ b/drivers/pci/setup-bus.c
-> @@ -1424,6 +1424,74 @@ void pci_bus_assign_resources(const struct pci_bus *bus)
->  }
->  EXPORT_SYMBOL(pci_bus_assign_resources);
+> +  subctrl-syscon rather than this address.
+> +  The second region is SerDes base register and size(optional, only be used when
+> +  serdes-syscon in port node is not exists. It is recommended using
+
+similar rewording needed here.
+
+> +  serdes-syscon rather than this address.
+>    The third region is the PPE register base and size.
+> -  The fourth region is dsa fabric base register and size.
+> -  The fifth region is cpld base register and size, it is not required if do not use cpld.
+> -- phy-handle: phy handle of physicl port, 0 if not any phy device. see ethernet.txt [1].
+> +  The fourth region is dsa fabric base register and size. It is not required for
+> +  single-port mode.
+> +- reg-names: may be ppe-base and(or) dsaf-base. It is used to find the
+> +  corresponding reg's index.
+
+But you have up to 5 regions.
+
+The variable nature of what regions you have tells me you need more 
+specific compatible strings for each chip.
+
+> +
+> +- phy-handle: phy handle of physicl port, 0 if not any phy device. It is optional
+
+s/physicl/physical/
+
+> +  attribute. If port node is exists, phy-handle in each port node will be used.
+> +  see ethernet.txt [1].
+> +- subctrl-syscon: is syscon handle for external interface control register.
+> +- reset-field-offset: is offset of reset field. Its value depends on the hardware
+> +  user manual.
+>  - buf-size: rx buffer size, should be 16-1024.
+>  - desc-num: number of description in TX and RX queue, should be 512, 1024, 2048 or 4096.
 >  
-> +static void pci_claim_device_resources(struct pci_dev *dev)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < PCI_BRIDGE_RESOURCES; i++) {
-> +		struct resource *r = &dev->resource[i];
-> +
-> +		if (!r->flags || r->parent)
-> +			continue;
-> +
-> +		pci_claim_resource(dev, i);
+> +- port: subnodes of dsaf. A dsaf node may contain several port nodes(Depending
+> +  on mode of dsaf). Port node contain some attributes listed below:
+> +- port-id: is physical port index in one dsaf.
 
-pci_claim_resource() (and in particular pci_find_parent_resource()) fails
-if resource.start == 0x0. Is this intentional ? The resource.start == 0x0
-check is used in other bits of the kernel to detect an "invalid"
-resource, I am not sure I understand its implications correctly.
+Indexes should generally be avoided. What does the number correspond 
+to in h/w (if anything)?
 
-> +	}
-> +}
-> +
-> +static void pci_claim_bridge_resources(struct pci_dev *dev)
-> +{
-> +	int i;
-> +
-> +	for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
-> +		struct resource *r = &dev->resource[i];
-> +
-> +		if (!r->flags || r->parent)
-> +			continue;
-> +
-> +		pci_claim_bridge_resource(dev, i);
-> +	}
-> +}
-> +
-> +static void pci_bus_allocate_dev_resources(struct pci_bus *b)
-> +{
-> +	struct pci_dev *dev;
-> +	struct pci_bus *child;
-> +
-> +	list_for_each_entry(dev, &b->devices, bus_list) {
-> +		pci_claim_device_resources(dev);
-> +
-> +		child = dev->subordinate;
-> +		if (child)
-> +			pci_bus_allocate_dev_resources(child);
-> +	}
-> +}
-> +
-> +static void pci_bus_allocate_resources(struct pci_bus *b)
-> +{
-> +	struct pci_bus *child;
-> +
-> +	/*
-> +	 * Carry out a depth-first search on the PCI bus
-> +	 * tree to allocate bridge apertures. Read the
-> +	 * programmed bridge bases and recursively claim
-> +	 * the respective bridge resources.
-> +	 */
-> +	if (b->self) {
+> +- phy-handle: phy handle of physicl port. It is not required if there isn't
+> +  phy device. see ethernet.txt [1].
+> +- serdes-syscon: is syscon handle for SerDes register.
+> +- cpld-syscon: is syscon handle for cpld register. It is not required if there
+> +  isn't cpld device.
+> +- cpld-ctrl-reg: is cpld register offset. It is not required if there isn't
+> +  cpld-syscon.
 
-Is it *always* correct to check b->self to detect a device backing
-the PCI bridge ? All PCI bridges should have their ->self pointer
-set-up correctly, I wanted to countercheck anyway.
+This would usually be a cell in the cpld-syscon property.
 
-Comments welcome, thanks.
+> +- port-rst-offset: is offset of reset field for each port in dsaf. Its value
+> +  depends on the hardware user manual.
+> +- port-mode-offset: is offset of port mode field for each port in dsaf. Its
+> +  value depends on the hardware user manual.
 
-Lorenzo
+Again, sounds like you need more specific compatible strings that imply 
+this information.
 
-> +		pci_read_bridge_bases(b);
-> +		pci_claim_bridge_resources(b->self);
-> +	}
 > +
-> +	list_for_each_entry(child, &b->children, node)
-> +		pci_bus_allocate_resources(child);
-> +}
+>  [1] Documentation/devicetree/bindings/net/phy.txt
+>  
+>  Example:
+> @@ -28,11 +56,11 @@ dsaf0: dsa at c7000000 {
+>  	compatible = "hisilicon,hns-dsaf-v1";
+>  	mode = "6port-16rss";
+>  	interrupt-parent = <&mbigen_dsa>;
+> -	reg = <0x0 0xC0000000 0x0 0x420000
+> -	       0x0 0xC2000000 0x0 0x300000
+> -	       0x0 0xc5000000 0x0 0x890000
+> +	reg = <0x0 0xc5000000 0x0 0x890000
+>  	       0x0 0xc7000000 0x0 0x60000>;
+> -	phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
+> +	reg-names = "ppe-base", "dsaf-base";
+> +	subctrl-syscon = <&subctrl>;
+> +	reset-field-offset = 0;
+>  	interrupts = <131 4>,<132 4>, <133 4>,<134 4>,
+>  		     <135 4>,<136 4>, <137 4>,<138 4>,
+>  		     <139 4>,<140 4>, <141 4>,<142 4>,
+> @@ -43,4 +71,15 @@ dsaf0: dsa at c7000000 {
+>  	buf-size = <4096>;
+>  	desc-num = <1024>;
+>  	dma-coherent;
 > +
-> +void pci_bus_claim_resources(struct pci_bus *b)
-> +{
-> +	pci_bus_allocate_resources(b);
-> +	pci_bus_allocate_dev_resources(b);
-> +}
-> +EXPORT_SYMBOL(pci_bus_claim_resources);
+> +	prot at 0 {
+
+port?
+
+> +		port-id = 0;
+> +		phy-handle = <&phy0>;
+> +		serdes-syscon = <&serdes>;
+> +	};
 > +
->  static void __pci_bridge_assign_resources(const struct pci_dev *bridge,
->  					  struct list_head *add_head,
->  					  struct list_head *fail_head)
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 2771625..e66eba7 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1102,6 +1102,7 @@ ssize_t pci_write_vpd(struct pci_dev *dev, loff_t pos, size_t count, const void
->  /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
->  resource_size_t pcibios_retrieve_fw_addr(struct pci_dev *dev, int idx);
->  void pci_bus_assign_resources(const struct pci_bus *bus);
-> +void pci_bus_claim_resources(struct pci_bus *bus);
->  void pci_bus_size_bridges(struct pci_bus *bus);
->  int pci_claim_resource(struct pci_dev *, int);
->  int pci_claim_bridge_resource(struct pci_dev *bridge, int i);
+> +	prot at 1 {
+> +                port-id = 1;
+> +                serdes-syscon = <&serdes>;
+> +        };
+>  };
 > -- 
-> 2.5.1
+> 1.9.1
 > 
