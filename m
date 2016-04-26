@@ -1,29 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2016 01:54:20 +0200
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <20160426094331.64032731@canb.auug.org.au>
-References: <20160426094331.64032731@canb.auug.org.au>
-Message-ID: <8018210.3MZgHs9g7Q@wuerfel>
+Date: Tue, 26 Apr 2016 02:16:17 +0200
+Subject: [PATCH] drivers: firmware: psci: make two helper functions inline
+Message-ID: <1461629793-3856390-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 April 2016 09:43:31 Stephen Rothwell wrote:
-> Hi all,
-> 
-> After merging the arm-soc tree, today's linux-next build (x86_64
-> allmodconfig) failed like this:
-> 
-> ERROR: "of_flash_probe_versatile" [drivers/mtd/maps/physmap_of.ko] undefined!
-> 
-> Caused by commit
-> 
->   b0afd44bc192 ("mtd: physmap_of: add a hook for Versatile write protection")
-> 
-> I used the arm-soc tree from next-20160422 for today.
-> 
+The previous patch marked these two as 'static' which showed that they
+are sometimes unused:
 
-Ah, sorry about that. I think I fixed it up just as you pulled it in.
-If you don't mind, could you try pulling the tree once more on top
-of what you have?
+drivers/firmware/psci.c:103:13: error: 'psci_power_state_is_valid' defined but not used [-Werror=unused-function]
+ static bool psci_power_state_is_valid(u32 state)
+drivers/firmware/psci.c:94:13: error: 'psci_power_state_loses_context' defined but not used [-Werror=unused-function]
+ static bool psci_power_state_loses_context(u32 state)
 
-	Arnd
+This also marks the functions 'inline', which has the main effect of
+silently ignoring them when they are unused. The compiler will typically
+inline small static functions anyway, so this seems more appropriate
+than using __maybe_unused, which would have the same result otherwise.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 21e8868 ("drivers: firmware: psci: make two helper functions static")
+---
+ drivers/firmware/psci.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 04f2ac5..89fcbdd 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -91,7 +91,7 @@ static inline bool psci_has_ext_power_state(void)
+ 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+ }
+ 
+-static bool psci_power_state_loses_context(u32 state)
++static inline bool psci_power_state_loses_context(u32 state)
+ {
+ 	const u32 mask = psci_has_ext_power_state() ?
+ 					PSCI_1_0_EXT_POWER_STATE_TYPE_MASK :
+@@ -100,7 +100,7 @@ static bool psci_power_state_loses_context(u32 state)
+ 	return state & mask;
+ }
+ 
+-static bool psci_power_state_is_valid(u32 state)
++static inline bool psci_power_state_is_valid(u32 state)
+ {
+ 	const u32 valid_mask = psci_has_ext_power_state() ?
+ 			       PSCI_1_0_EXT_POWER_STATE_MASK :
+-- 
+2.7.0
