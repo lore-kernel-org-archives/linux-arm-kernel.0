@@ -1,44 +1,60 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 26 Apr 2016 19:13:38 +0200
-Subject: [PATCH v2 1/5] PM / AVS: rockchip-io: make io-domains a child of
- the GRF
-In-Reply-To: <15890066.zZg7hiMmi2@diego>
-References: <1459432126-6395-1-git-send-email-heiko@sntech.de>
- <3991738.xMQYlxyb28@phil>
- <CAJZ5v0gi_EBnL+M6iEAkgYHNkFQOG5OT=6fABQtvCyQY4=GcQQ@mail.gmail.com>
- <15890066.zZg7hiMmi2@diego>
-Message-ID: <CAJZ5v0gMEX+5fKgrhHPTZh1GW4FB7QWSOB_ZARL0O8n47cep5w@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 26 Apr 2016 18:09:53 +0100
+Subject: [GIT PULL v3] arm64: hisilicon: config changes for 4.7
+In-Reply-To: <4910387.g0H3XLnE4p@wuerfel>
+References: <571F3CB8.3000904@hisilicon.com> <4910387.g0H3XLnE4p@wuerfel>
+Message-ID: <571FA0E1.2010901@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 6:25 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Rafael,
->
-> Am Mittwoch, 13. April 2016, 06:55:03 schrieb Rafael J. Wysocki:
->> On Tue, Apr 12, 2016 at 4:23 AM, Heiko Stuebner <heiko@sntech.de> wrote:
->> > Am Donnerstag, 31. M?rz 2016, 15:48:42 schrieb Heiko Stuebner:
->> >> IO-domain handling is part of the general register files, so should live
->> >> under the grf directly. This change allows the grf to be a simple-mfd and
->> >> the io-domains fetching the syscon regmap from that parent-node.
->> >>
->> >> The old binding is of course preserved, though deprecated.
->> >>
->> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> >> Acked-by: Kevin Hilman <khilman@baylibre.com>
->> >> Tested-by: David Wu <david.wu@rock-chips.com>
->> >
->> > could you look into picking up this patch 1/5 please?
->> >
->> > The others are to much interwined into other devicetree changes, so I'll
->> > apply them for 4.8, but it would be nice if you could pick up this one for
->> > 4.7 so the code change becomes available at 4.8-rc1
+Hi Arnd,
+
+On 26/04/2016 12:04, Arnd Bergmann wrote:
+> On Tuesday 26 April 2016 11:02:32 Wei Xu wrote:
+>> Please help to pull the following changes.
 >>
->> OK, I'll pick it up, but I'm traveling this week, so that'll take a
->> few days more.
->
-> I just checked kernel/git/rafael/linux-pm.git and didn't find this patch there,
-> so I guess it might be time for a ping ;-) .
+>> I rebased this pull request on v4.6-rc3 but I found
+>> it is same with the v2 that based on v4.6-rc4.
+>> Is it OK or should I base on earlier -rc version like rc1?
+> 
+> Looks good now.  What is important to me is that I don't pull
+> in a later -rc release from mainline than what I already have
+> in arm-soc, if at all possible.
 
-My bad, sorry.
+Got it.
 
-Queued up for 4.7 now, will show up in linux-next in the next few days.
+> 
+>> The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
+>>
+>>   Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7v3
+>>
+>> for you to fetch changes up to 2b905d3a8d7e40c3486abbf585419fafa220a8f8:
+>>
+>>   arm64: Kconfig: select sp804 timer for ARCH_HISI (2016-04-26 10:39:09 +0100)
+>>
+>> ----------------------------------------------------------------
+>> ARM64: Hi6220: configure updates for 4.7 based on rc3
+>>
+>> - Enable Hi655x PMIC and regulator
+>> - Enable SPI_SPIDEV as module
+>> - Enable several common USB-Ethernet dongles
+>> - Enable configs for WLAN and TI WL1835 as modules
+>> - Enable ARM SP804 for ARCH_HISI
+>>
+> 
+> Pulled into next/arm64, thanks for the rebase!
+
+Thanks!
+
+Best Regards,
+Wei
+
+> 
+> 	Arnd
+> 
+> .
+> 
