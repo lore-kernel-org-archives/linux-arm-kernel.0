@@ -1,45 +1,90 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 26 Apr 2016 14:08:54 -0700
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426165217.5b46eea7@gandalf.local.home>
-References: <20160426190755.GK3715@linux.vnet.ibm.com>
- <20160426193949.GP5995@atomide.com>
- <20160426154414.7bb33de4@gandalf.local.home>
- <20160426195158.GR5995@atomide.com>
- <20160426200613.GO3715@linux.vnet.ibm.com>
- <20160426201134.GA29779@linux.vnet.ibm.com>
- <20160426202538.GS5995@atomide.com>
- <20160426204148.GR3715@linux.vnet.ibm.com>
- <20160426204613.GT5995@atomide.com>
- <20160426165217.5b46eea7@gandalf.local.home>
-Message-ID: <20160426210854.GU3715@linux.vnet.ibm.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 27 Apr 2016 00:10:29 +0300
+Subject: [PATCH v2 2/7] ARM: dts: lpc32xx: ea3250: add NAND partitions device
+ node
+In-Reply-To: <1461705034-355-1-git-send-email-vz@mleia.com>
+References: <1461705034-355-1-git-send-email-vz@mleia.com>
+Message-ID: <1461705034-355-3-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 04:52:17PM -0400, Steven Rostedt wrote:
-> On Tue, 26 Apr 2016 13:46:15 -0700
-> Tony Lindgren <tony@atomide.com> wrote:
-> 
-> 
-> > [ INFO: suspicious RCU usage. ]
-> > 4.6.0-rc5-next-20160426+ #1127 Not tainted
-> > -------------------------------
-> > include/trace/events/clk.h:45 suspicious rcu_dereference_check() usage!
-> > 
-> > other info that might help us debug this:
-> > 
-> > 
-> > RCU used illegally from idle CPU!
-> > rcu_scheduler_active = 1, debug_locks = 0
-> > RCU used illegally from extended quiescent state!
-> > 2 locks held by swapper/0/0:
-> >  #0:  (&oh->hwmod_key#30){......}, at: [<c0121afc>] omap_hwmod_enable+0x18/0x44
-> >  #1:  (enable_lock){......}, at: [<c0630684>] clk_enable_lock+0x18/0x124
-> > 
-> 
-> Hah! I knew that mole would show up.
+To declare MTD OF partitions NAND controller device node should have
+a special 'partitions' subnode, the change removes a debug message
+from mtd/ofpart on boot:
 
-There do seem to be quite a few candidate moles, don't there?
+  nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
+  Trying to parse direct subnodes as partitions.
 
-							Thanx, Paul
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+* on conversion added missing 'compatible = "fixed-partitions";',
+  thanks to Sylvain for finding
+
+ arch/arm/boot/dts/ea3250.dts | 42 +++++++++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
+index 7cf815a..9637ac5 100644
+--- a/arch/arm/boot/dts/ea3250.dts
++++ b/arch/arm/boot/dts/ea3250.dts
+@@ -213,8 +213,6 @@
+ 
+ /* 128MB Flash via SLC NAND controller */
+ &slc {
+-	#address-cells = <1>;
+-	#size-cells = <1>;
+ 	status = "okay";
+ 
+ 	nxp,wdr-clks = <14>;
+@@ -228,26 +226,32 @@
+ 	nand-on-flash-bbt;
+ 	gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
+ 
+-	mtd0 at 00000000 {
+-		label = "ea3250-boot";
+-		reg = <0x00000000 0x00080000>;
+-		read-only;
+-	};
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
+ 
+-	mtd1 at 00080000 {
+-		label = "ea3250-uboot";
+-		reg = <0x00080000 0x000c0000>;
+-		read-only;
+-	};
++		mtd0 at 00000000 {
++			label = "ea3250-boot";
++			reg = <0x00000000 0x00080000>;
++			read-only;
++		};
+ 
+-	mtd2 at 00140000 {
+-		label = "ea3250-kernel";
+-		reg = <0x00140000 0x00400000>;
+-	};
++		mtd1 at 00080000 {
++			label = "ea3250-uboot";
++			reg = <0x00080000 0x000c0000>;
++			read-only;
++		};
+ 
+-	mtd3 at 00540000 {
+-		label = "ea3250-rootfs";
+-		reg = <0x00540000 0x07ac0000>;
++		mtd2 at 00140000 {
++			label = "ea3250-kernel";
++			reg = <0x00140000 0x00400000>;
++		};
++
++		mtd3 at 00540000 {
++			label = "ea3250-rootfs";
++			reg = <0x00540000 0x07ac0000>;
++		};
+ 	};
+ };
+ 
+-- 
+2.1.4
