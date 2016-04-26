@@ -1,34 +1,61 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Apr 2016 12:15:01 +0100
-Subject: [PATCH] ARM: cpuidle: Pass on arm_cpuidle_suspend()'s return value
-Message-ID: <1461669301-30834-1-git-send-email-james.morse@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 26 Apr 2016 13:22:17 +0200
+Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7
+In-Reply-To: <5045792.GEWy4n0LSP@wuerfel>
+References: <cover.1461558315.git.horms+renesas@verge.net.au>
+ <7781705.p6jrBl2RnJ@wuerfel>
+ <CAMuHMdWmGKa16BOoF=MJab5V_Ceb1yAbAf2yjFV7sSHxG6=GOQ@mail.gmail.com>
+ <5045792.GEWy4n0LSP@wuerfel>
+Message-ID: <CAMuHMdU+1zcdjVv0OpdXQq2S107BgqR86UnN==ohaUhmMRKR5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_cpuidle_suspend() may return -EOPNOTSUPP, or any value returned
-by the cpu_ops/cpuidle_ops suspend call. arm_enter_idle_state() doesn't
-update 'ret' with this value, meaning we always signal success to
-cpuidle_enter_state(), causing it to update the usage counters as if we
-succeeded.
+Hi Arnd,
 
-Fixes: 191de17aa3c1 ("ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function")
-Signed-off-by: James Morse <james.morse@arm.com>
----
- drivers/cpuidle/cpuidle-arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, Apr 26, 2016 at 12:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 26 April 2016 10:32:39 Geert Uytterhoeven wrote:
+>> On Tue, Apr 26, 2016 at 10:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 26 April 2016 09:30:45 Geert Uytterhoeven wrote:
+>> >> Commit 93fafa81cad3da9c ("Merge branches 'next/dt' and 'next/dt64' into
+>> >> for-next") accidentally re-added the line
+>> >>
+>> >>         clock-output-names = "can_clk";
+>> >>
+>> >> to arch/arm/boot/dts/r8a7791.dtsi, which was removed in commit
+>> >> f617604fe5d74b9c ("ARM: dts: r8a7791: Remove unnecessary
+>> >> clock-output-names properties") before.  It seems the same wrong
+>> >> conflict resolution was made before in commit ef3b08c6c0d85753 ("Merge
+>> >> branch 'fixes' into for-next").
+>> >>
+>> >> While this won't cause failures, can you please remove the offending
+>> >> line?
+>> >
+>> > I've merged renesas-fixes-for-v4.6 into next/dt now to resolve
+>> > the conflict there, otherwise Linus would have to do the same resolution
+>> > during the merge window.
+>> >
+>> > Thanks for letting us know. If you want to verify my new resolution,
+>> > please look at next/dt, which is the more important branch.
+>>
+>> Thanks, but unfortunately your new merge resolution is incorrect, as it revived
+>> the line
+>>
+>>         status = "disabled";
+>>
+>> for the pcie_bus node.
+>
+> I've done the merge once more, noticed my mistake (vimdiff syntax
+> coloring was slightly misleading) and fixed it.
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 545069d5fdfb..e342565e8715 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -50,7 +50,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 		 * call the CPU ops suspend protocol with idle index as a
- 		 * parameter.
- 		 */
--		arm_cpuidle_suspend(idx);
-+		ret = arm_cpuidle_suspend(idx);
- 
- 		cpu_pm_exit();
- 	}
--- 
-2.8.0.rc3
+Thanks, that looks correct now!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
