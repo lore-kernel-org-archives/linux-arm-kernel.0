@@ -1,40 +1,64 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 25 Apr 2016 18:44:57 -0700
-Subject: [Patch v2 6/8] firmware: qcom: scm: Use atomic SCM for cold boot
-In-Reply-To: <1461625725-32425-7-git-send-email-andy.gross@linaro.org>
+Date: Mon, 25 Apr 2016 18:49:06 -0700
+Subject: [Patch v2 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <1461625725-32425-2-git-send-email-andy.gross@linaro.org>
 References: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
- <1461625725-32425-7-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160426014457.GG29990@codeaurora.org>
+ <1461625725-32425-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160426014906.GH29990@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/25, Andy Gross wrote:
-> This patch changes the cold_set_boot_addr function to use atomic SCM
-> calls.  This removes the need for memory allocation and instead places
-> all arguments in registers.
+> This patch adds the device tree support for the Qualcomm SCM firmware.
 > 
 > Signed-off-by: Andy Gross <andy.gross@linaro.org>
 > ---
->  drivers/firmware/qcom_scm-32.c | 47 ++++++++++++++++++++----------------------
->  1 file changed, 22 insertions(+), 25 deletions(-)
+>  .../devicetree/bindings/firmware/qcom,scm.txt      | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
 > 
-> diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
-> index 0d2a3f8..419df4d 100644
-> --- a/drivers/firmware/qcom_scm-32.c
-> +++ b/drivers/firmware/qcom_scm-32.c
-> @@ -294,34 +294,39 @@ out:
->  				(n & 0xf))
->  
->  /**
-> - * qcom_scm_call_atomic1() - Send an atomic SCM command with one argument
-> + * qcom_scm_call_atomic() - Send an atomic SCM command with one argument
+> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> new file mode 100644
+> index 0000000..a679a87
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> @@ -0,0 +1,28 @@
+> +QCOM Secure Channel Manager (SCM)
+> +
+> +Qualcomm processors include an interface to communicate to the secure firmware.
+> +This interface allows for clients to request different types of actions.  These
+> +can include CPU power up/down, HDCP requests, loading of firmware, and other
+> +assorted actions.
+> +
+> +Required properties:
+> +- compatible: must contain one of the following:
+> + * "qcom,scm-apq8064" for APQ8064
+> + * "qcom,scm-apq8084" for APQ8084
+> + * "qcom,scm-msm8916" for MSM8916
+> + * "qcom,scm-msm8974" for MSM8974
 
-Update doc to say 1 or 2 arguments now? I guess we get slightly
-worse code because we force a load into the second argument
-register even if it isn't used.
+Do we need to keep adding these into the driver for every SoC
+that we support? My understanding is apq8064 can be the one that
+requires one clk, and msm8974 can be the one that requires three.
+The driver can just have those two compatibles for now, and we
+can keep adding compatibles here for the different SoCs, but
+really we don't care, that's just to save ourselves if something
+pops up and needs a workaround.
 
-Also, is there a patch to change scm-32 to use dma allocations
-for the buffer, or did I miss it?
+It will certainly look weird if it's firmware that's compatible
+with qcom,scm-msm8974 but on an apq8084, so perhaps something
+more generic like, qcom-scm-v1 and qcom,scm-v2 can be used as the
+generic compatible in the driver:
+
+	compatible = "qcom,scm-apq8064", "qcom,scm-v1";
+
+	vs.
+
+	compatible = "qcom,scm-apq8084", "qcom,scm-v2";
+
+?
+
+I just want to avoid the constant SoC churn update here if we can.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
