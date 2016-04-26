@@ -1,43 +1,44 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 26 Apr 2016 16:52:17 -0400
-Subject: [PATCH arm 1/1] arm: Use _rcuidle tracepoint to allow use from
- idle
-In-Reply-To: <20160426204613.GT5995@atomide.com>
-References: <20160426175214.GJ3715@linux.vnet.ibm.com>
- <20160426182939.GO5995@atomide.com>
- <20160426190755.GK3715@linux.vnet.ibm.com>
- <20160426193949.GP5995@atomide.com>
- <20160426154414.7bb33de4@gandalf.local.home>
- <20160426195158.GR5995@atomide.com>
- <20160426200613.GO3715@linux.vnet.ibm.com>
- <20160426201134.GA29779@linux.vnet.ibm.com>
- <20160426202538.GS5995@atomide.com>
- <20160426204148.GR3715@linux.vnet.ibm.com>
- <20160426204613.GT5995@atomide.com>
-Message-ID: <20160426165217.5b46eea7@gandalf.local.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 26 Apr 2016 13:53:58 -0700
+Subject: [PATCH 4/4] ARM64: dts: rockchip: add dts file for RK3399
+ evaluation board
+In-Reply-To: <9945516.Q6LYCrkl5z@diego>
+References: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
+ <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
+ <9945516.Q6LYCrkl5z@diego>
+Message-ID: <CAD=FV=Wgnz-vBo71f3mqFxcOpL7fJX58hXPJ+vk9uHpymqdN5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Apr 2016 13:46:15 -0700
-Tony Lindgren <tony@atomide.com> wrote:
+Hi,
+
+On Tue, Apr 26, 2016 at 5:37 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>> +     model = "Rockchip RK3399 Evaluation Board";
+>> +     compatible = "rockchip,rk3399-evb", "rockchip,rk3399",
+>> +                  "google,rk3399evb-rev2", google,rk3399evb-rev1",
+>> +                  "google,rk3399evb-rev0" ;
+>
+> can you check against which compatibles that coreboot really matches?
+>
+> As we said that the evb changed between rev1 and rev2, I would expect the
+> compatible to be something like
+>
+>         compatible = "rockchip,rk3399-evb",  "google,rk3399evb-rev2",
+>                         "rockchip,rk3399";
+>
+> leaving out the rev1 and rev0
+
+What Heiko suggests seems reasonable to me.
+
+It all depends on what your bootloader is doing and what you guys want
+to do.  Chrome OS designs that I've worked on have had board
+strappings that you can read a board ID from and that's how the BIOS
+(like coreboot) will figure out which board ID it is running on.  I'm
+not aware of such strappings on rk3399-evb.  Do they exist?
+
+Of course, even without strappings it's possible to get the bootloader
+to work sanely.  You can either define the revision number at build
+time or you can store the revision number somewhere non-volatile.
 
 
-> [ INFO: suspicious RCU usage. ]
-> 4.6.0-rc5-next-20160426+ #1127 Not tainted
-> -------------------------------
-> include/trace/events/clk.h:45 suspicious rcu_dereference_check() usage!
-> 
-> other info that might help us debug this:
-> 
-> 
-> RCU used illegally from idle CPU!
-> rcu_scheduler_active = 1, debug_locks = 0
-> RCU used illegally from extended quiescent state!
-> 2 locks held by swapper/0/0:
->  #0:  (&oh->hwmod_key#30){......}, at: [<c0121afc>] omap_hwmod_enable+0x18/0x44
->  #1:  (enable_lock){......}, at: [<c0630684>] clk_enable_lock+0x18/0x124
-> 
-
-Hah! I knew that mole would show up.
-
--- Steve
+-Doug
