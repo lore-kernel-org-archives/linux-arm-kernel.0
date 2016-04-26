@@ -1,30 +1,65 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Apr 2016 18:15:46 +0800
-Subject: [PATCH 0/3 v2] arm64: defconfig updates
-In-Reply-To: <1461167836-3163-1-git-send-email-stuart.yoder@nxp.com>
-References: <1461167836-3163-1-git-send-email-stuart.yoder@nxp.com>
-Message-ID: <20160426101546.GI8870@tiger>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 26 Apr 2016 11:18:22 +0100
+Subject: [GIT PULL v2 1/2] ARM: vexpress: addition of MPS2 platform
+ support for v4.7
+In-Reply-To: <7512668.6FnnShhbHF@wuerfel>
+References: <1461601876-25288-1-git-send-email-sudeep.holla@arm.com>
+ <7512668.6FnnShhbHF@wuerfel>
+Message-ID: <571F406E.9010503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 10:57:16AM -0500, Stuart Yoder wrote:
-> Stuart Yoder (3):
->   arm64: defconfig: cleanup the defconfig
->   arm64: defconfig: enable 48-bit virtual addresses
+Hi Arnd,
 
-Applied these two.
+On 25/04/16 22:06, Arnd Bergmann wrote:
+> On Monday 25 April 2016 17:31:15 Sudeep Holla wrote:
+>> ARMv7 Cortex-M Prototyping System (MPS2) support
+>>
+>> Basic support for ARM Versatile Express Cortex-M Prototyping System
+>> (V2M-MPS2). ucLinux can be now run on both the hardware and FVP models
+>> with Cortex-M3/M4/M7 configurations (Vladimir Murzin)
+>>
+>> ----------------------------------------------------------------
+>> Vladimir Murzin (5):
+>>        ARM: vexpress/mps2: introduce MPS2 platform
+>>        ARM: configs: add MPS2 defconfig
+>>        ARM: dts: introduce MPS2 AN385/AN386
+>>        ARM: dts: introduce MPS2 AN399/AN400
+>>        MAINTAINERS: Update ARM Versatile Express platform entry
+>>
+>>   MAINTAINERS                          |   1 +
+>>   arch/arm/Kconfig                     |  12 ++
+>>   arch/arm/Makefile                    |   1 +
+>>   arch/arm/boot/dts/Makefile           |   3 +
+>>   arch/arm/boot/dts/mps2-an385.dts     |  92 +++++++++++++
+>>   arch/arm/boot/dts/mps2-an399.dts     |  92 +++++++++++++
+>>   arch/arm/boot/dts/mps2.dtsi          | 241 +++++++++++++++++++++++++++++++++++
+>>   arch/arm/configs/mps2_defconfig      | 109 ++++++++++++++++
+>>   arch/arm/mach-vexpress/Makefile      |   4 +-
+>>   arch/arm/mach-vexpress/Makefile.boot |   3 +
+>>   arch/arm/mach-vexpress/v2m-mps2.c    |  21 +++
+>>
+>
+> Thanks for respinning them, all the contents look good for arm-soc now.
+>
 
->   arm64: defconfig: enable freescale/nxp config options
+Thanks for having a look at this.
 
-But this one doesn't apply to v4.6-rc1.
+> However, the way we pull them in, I need them separately for dts, defconfig and
+> the rest. This means only one or two patches for each branch, which is getting
+> slightly silly at that point, so you could just send them as patches,
+> or I can cherry-pick the changes into the individual branches to save you
+> yet another respin.
 
-Shawn
+Sure, I have pushed 3 branches accordingly:
+1. for-next/mps2
+2. for-next/mps2-dt
+3. for-next/mps2-defconfig
 
-> 
->  arch/arm64/configs/defconfig | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> -- 
-> 1.9.0
-> 
-> 
+@ git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+
+Let me know if that's fine for you. I can tag and send PR if needed.
+
+-- 
+Regards,
+Sudeep
