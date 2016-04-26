@@ -1,53 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Apr 2016 15:50:46 +0100
-Subject: [PATCH v5 0/5] arm64: Fix behavior of maxcpus=n
-In-Reply-To: <1461682140-7131-1-git-send-email-suzuki.poulose@arm.com>
-References: <1461682140-7131-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160426145046.GB1793@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 26 Apr 2016 15:51:29 +0100
+Subject: [PATCH 10/18] ASoC: sti: Update example to include
+ assigned-clocks and mclk-fs
+In-Reply-To: <20160426142357.GW3217@sirena.org.uk>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+ <20160421154933.GR3217@sirena.org.uk>
+ <20160426115210.GB5457@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426142357.GW3217@sirena.org.uk>
+Message-ID: <20160426145129.GA11946@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 03:48:55PM +0100, Suzuki K Poulose wrote:
-> This series is an attempt at fixing the maxcpus=n behavior
-> on arm64. So far we have disabled hotplugging a CPU > n,
-> when maxcpus=n is in effect, due to following reasons.
-> 
->  1) Possible cpu feature incompatibilities with the new CPU
->     in heterogeneous systems.
->  2) New CPU requiring an errata work around which was not detected
->     (and the code patched in) at boot time.
->  3) Failure to initialise the PMU in case the supported CPUs are
->     not online while probing the PMU.
-> 
-> (1) has been mostly solved with our early CPU feature verification
-> support. This series tries to address (2) & (3).
-> 
-> (2) is solved by iterating over the known erratas and checking if
-> the new CPU requires an errata not set in the cpu_hwcaps, failing
-> which, we kill the CPU. We plan to fix this properly by retaining
-> the CPU errata work arounds and apply the required at runtime.
-> 
-> (3) is ignored and will not be fixed as there is no reliable way of
-> knowing if there would be a CPU that will be online to support the
-> PMU.
-> 
-> In the process, also restores the capability to check GIC interface settings
-> by the firmware on individual CPUs.
-> 
-> Tested on Juno with maxcpus=2 (enables A57 cores and A57-PMU) and
-> maxcpus=1 (disables both A57 cores and A57-PMU).
-> 
-> This series applies on aarch64/for-next/core :
-> 
-> The tree is available here :
-> 	git://linux-arm.org/linux-skp.git maxcpus/v5
-> 
-> Changes since V4:
->  - Address Catalin's comments
->  - Rebased to aarch64 for-next/core
->  - Add Reviewed/Acked bys.
+Hi Mark,
 
-I merged this yesterday onto for-next/core. Please can you check that
-I fixed everything up that you expected?
+On Tue, 26 Apr 2016, Mark Brown wrote:
 
-Will
+> On Tue, Apr 26, 2016 at 12:52:10PM +0100, Peter Griffin wrote:
+> > On Thu, 21 Apr 2016, Mark Brown wrote:
+> 
+> > > This one is more relevant though I'm still a bit concerned that there's
+> > > an expectation that the examples can just be pasted in...
+> 
+> > So although I would only consider copying an example as the starting
+> > point for getting something working (and indeed it was the case here). On STi
+> > arch there *should* be a very high probability that copying the exanple 
+> > is all that will be required.
+> 
+> If there are never going to be any new users why bother at all, why
+> would anyone paste it in when all the SoCs that ever use this are
+> already upstream?
+
+Generally if I come across documentation which is incorrect, I like to fix it.
+
+Currently the DT ASoC documentation doesn't match the driver and the example
+doesn't work, which is not ideal. I could well be the last person who needs
+to read it & use the example, but deliberately leaving it with mistakes in
+seemed like a bad idea.
+
+Peter. 
