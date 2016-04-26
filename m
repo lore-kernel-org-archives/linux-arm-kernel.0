@@ -1,27 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Apr 2016 19:54:04 +0800
-Subject: [PATCH] ARM: dts: imx6dl: Fix the VDD_ARM_CAP voltage for 396MHz
- operation
-In-Reply-To: <1461616637-24717-1-git-send-email-festevam@gmail.com>
-References: <1461616637-24717-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160426115404.GB30692@tiger>
+Date: Tue, 26 Apr 2016 19:55:54 +0800
+Subject: [PATCH] ARM: dts: imx6: fix dtc warnings for ipu endpoints
+In-Reply-To: <1461632973-10487-1-git-send-email-stillcompiling@gmail.com>
+References: <1461632973-10487-1-git-send-email-stillcompiling@gmail.com>
+Message-ID: <20160426115554.GC30692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 05:37:17PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Apr 25, 2016 at 06:09:33PM -0700, Joshua Clayton wrote:
+> When compiled with "W=1", dtc complains: e.g.
+> "Warning (unit_address_vs_reg):
+> Node /soc/ipu at 02800000/port at 2/endpoint at 0
+> has a unit name, but no reg property"
 > 
-> Table 8 from MX6DL datasheet (IMX6SDLCEC Rev. 5, 06/2015):
-> http://cache.nxp.com/files/32bit/doc/data_sheet/IMX6SDLCEC.pdf
+> Endpoint nodes don't have a reg property, and the addresses
+> in their node names are ordinals without any special meaning
+> so remove them and swap them for semantic node names.
 > 
-> states the following:
-> 
-> "LDO Output Set Point (VDD_ARM_CAP) = 1.125 V minimum for operation
-> up to 396 MHz."
-> 
-> So fix the entry by adding the 25mV margin value as done in the other
-> entries of the table, which results in 1.15V for 396MHz operation.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 
 Applied, thanks.
