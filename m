@@ -1,42 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Apr 2016 21:08:50 +0200
-Subject: [PATCH v3 0/2] pci: host: new driver for Marvell Armada 7K/8K
- PCIe controller
-In-Reply-To: <20160426173144.GB27803@localhost>
-References: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160426173144.GB27803@localhost>
-Message-ID: <20160426210850.13cc8a0e@free-electrons.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 26 Apr 2016 21:09:08 +0200
+Subject: [alsa-devel] [PATCH 3/3] ASoC: bcm2835: Register also as PCM
+ device
+In-Reply-To: <20160426180542.GA767@camel2.lan>
+References: <1461591580-7565-1-git-send-email-kernel@martin.sperl.org>
+ <1461591580-7565-3-git-send-email-kernel@martin.sperl.org>
+ <571E218A.7050508@metafoo.de> <20160425171515.GA10952@camel2.lan>
+ <571F2B09.1000107@metafoo.de> <20160426130914.GA2015@delle.lan>
+ <571F6B95.1000709@metafoo.de> <20160426151841.GA5433@camel2.lan>
+ <571F89A4.6070008@metafoo.de> <20160426180542.GA767@camel2.lan>
+Message-ID: <571FBCD4.3010407@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 26 Apr 2016 12:31:44 -0500, Bjorn Helgaas wrote:
-
-> >  create mode 100644 Documentation/devicetree/bindings/pci/pci-armada8k.txt
-> >  create mode 100644 drivers/pci/host/pcie-armada8k.c
+On 04/26/2016 08:05 PM, Matthias Reichl wrote:
+[...]
 > 
-> Thanks, Thomas, I applied these to pci/host-armada for v4.7.
+> Ok, I think I got you now and I have to say that solution is really elegant.
+> I wouldn't have thought that it could be that simple. V2 of the patch
+> is below.
 
-Thanks!
+Looks good. One minor thing inline below. Please split this into two
+patches, one adding support for the flag and the other using it in the bcm
+diver and then send them to the ASoC maintainers.
 
-> I added the tweaks below to use dev_dbg() instead of pr_debug(), use
-> dw_pcie_wait_for_link() instead of another hand-coded timeout loop,
-> and fix a typo and remove unused constants.
+[...]
+> +		hw.formats = GENMASK_ULL((int)SNDRV_PCM_FORMAT_LAST-1, 0);
 
-Looks all good, thanks for applying! Just one tiny question below.
-
->  	/*
->  	 * Interrupts are directly handled by the device driver of the
-> -	 * PCI device. However, there are also latched into the PCIe
-> +	 * PCI device.  However, they are also latched into the PCIe
-
-Any reason to have two spaces after the dot here?
-
-Thanks again!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+setting it to 0 is OK. 0 is a special case that means all formats supported.
