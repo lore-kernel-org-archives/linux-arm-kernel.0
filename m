@@ -1,69 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 26 Apr 2016 11:36:42 -0500
-Subject: [PATCH] regulator: tps65917/palmas: Add bypass "On" value
-Message-ID: <1461688602-19996-1-git-send-email-nm@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Apr 2016 17:41:04 +0100
+Subject: [PATCH 10/18] ASoC: sti: Update example to include
+ assigned-clocks and mclk-fs
+In-Reply-To: <20160426161432.GA12088@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+ <20160421154933.GR3217@sirena.org.uk>
+ <20160426115210.GB5457@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426142357.GW3217@sirena.org.uk>
+ <20160426145129.GA11946@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426150319.GY3217@sirena.org.uk>
+ <20160426161432.GA12088@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20160426164104.GC3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When commit b554e1450658 ("regulator: tps65917/palmas: Add bypass
-ops for LDOs with bypass capability") introduced bypass capability
-to palmas regulator, it went with the assumption that regulator
-regmap helpers just check val against the bypass_mask.
+On Tue, Apr 26, 2016 at 05:14:32PM +0100, Peter Griffin wrote:
+> On Tue, 26 Apr 2016, Mark Brown wrote:
 
-Unfortunately, this ignored the explicit "on" and "off" values when
-the register value is masked with bypass_mask in commit ca5d1b3524b4
-("regulator: helpers: Modify helpers enabling multi-bit control").
+> > A lot of this is details of the system integration for this SoC, not
+> > actual errors.
 
-With the recent commit dd1a571daee7 ("regulator: helpers: Ensure
-bypass register field matches ON value"), this issue gets highlighted
-and fails tps65917/palmas based platforms which need regulators/ldos
-that have bypass capability.
+> This particular clock patch yes, but the other ASoC dt doc update is fixing
+> bindings which haven't progressed in lockstep with the driver code. Presumably
+> this happened during the review process when they were changed to being st,
+> prefixed in the driver, but the doc wasn't also updated.
 
-Introduce the bypass_on value appropriately for tps65917/palmas
-regulator.
+The bits where you are correcting the names of the properties are not
+details of the system integration and are therefore fine.  The bits
+where you're documenting the particular clocking arrangements for the
+SoC you happen to be using less so.
 
-Fixes: b554e1450658 ("regulator: tps65917/palmas: Add bypass ops for LDOs with bypass capability")
-Cc: Keerthy <j-keerthy@ti.com>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+> > it's fairly routine
+> > to have to explain to people that just because some old driver did
+> > something that doesn't mean it's something we want in new drivers.
 
-Fixes regression in next-20160426 for DRA7 platforms and BeagleBoard-X15
+> I'm sure it is. Although I fail to see why leaving the documentation with
+> mistakes in is helpful to anybody.
 
-Fail in boot: http://pastebin.ubuntu.com/16065715/
-
- drivers/regulator/palmas-regulator.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
-index 6efc7ee8aea3..c83e06b2cedb 100644
---- a/drivers/regulator/palmas-regulator.c
-+++ b/drivers/regulator/palmas-regulator.c
-@@ -944,6 +944,8 @@ static int palmas_ldo_registration(struct palmas_pmic *pmic,
- 			if (id == PALMAS_REG_LDO9) {
- 				desc->ops = &palmas_ops_ldo9;
- 				desc->bypass_reg = desc->enable_reg;
-+				desc->bypass_val_on =
-+						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
- 				desc->bypass_mask =
- 						PALMAS_LDO9_CTRL_LDO_BYPASS_EN;
- 			}
-@@ -1055,6 +1057,8 @@ static int tps65917_ldo_registration(struct palmas_pmic *pmic,
- 			    id == TPS65917_REG_LDO2) {
- 				desc->ops = &tps65917_ops_ldo_1_2;
- 				desc->bypass_reg = desc->enable_reg;
-+				desc->bypass_val_on =
-+						TPS65917_LDO1_CTRL_BYPASS_EN;
- 				desc->bypass_mask =
- 						TPS65917_LDO1_CTRL_BYPASS_EN;
- 			}
-@@ -1206,6 +1210,7 @@ static int palmas_smps_registration(struct palmas_pmic *pmic,
- 				desc->enable_mask = SMPS10_BOOST_EN;
- 			desc->bypass_reg = PALMAS_BASE_TO_REG(PALMAS_SMPS_BASE,
- 							    PALMAS_SMPS10_CTRL);
-+			desc->bypass_val_on = SMPS10_BYPASS_EN;
- 			desc->bypass_mask = SMPS10_BYPASS_EN;
- 			desc->min_uV = 3750000;
- 			desc->uV_step = 1250000;
--- 
-2.8.0
+Fixing actual mistakes is fine.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/dd60a9a6/attachment.sig>
