@@ -1,24 +1,15 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 26 Apr 2016 09:00:30 +0530
-Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
-In-Reply-To: <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
-References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
- <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160426033029.GB2274@localhost>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 26 Apr 2016 11:26:46 +0800
+Subject: [PATCH 0/2 v3] fsl-mc binding and device tree updates
+In-Reply-To: <1461102207-13263-1-git-send-email-stuart.yoder@nxp.com>
+References: <1461102207-13263-1-git-send-email-stuart.yoder@nxp.com>
+Message-ID: <20160426032645.GG8870@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
+On Tue, Apr 19, 2016 at 04:43:27PM -0500, Stuart Yoder wrote:
+> Stuart Yoder (2):
+>   Documentation: fsl-mc: binding updates for MSIs, ranges, PHYs
+>   arm64: dts: ls2080a: fsl-mc dt node updates
 
-> +static int hidma_chan_stats(struct seq_file *s, void *unused)
-> +{
-> +	struct hidma_chan *mchan = s->private;
-> +	struct hidma_desc *mdesc;
-> +	struct hidma_dev *dmadev = mchan->dmadev;
-> +
-> +	pm_runtime_get_sync(dmadev->ddev.dev);
-
-debug shouldn't power up device, why do you want to do that
-
--- 
-~Vinod
+Applied both, thanks.
