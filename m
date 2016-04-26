@@ -1,42 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Apr 2016 13:22:13 +0100
-Subject: [BUG] arm64/hw_breakpoint: trigger breakpoint exception infinitely
-In-Reply-To: <571F2577.2080203@huawei.com>
-References: <571F2577.2080203@huawei.com>
-Message-ID: <20160426122212.GN27312@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 26 Apr 2016 13:24:38 +0100
+Subject: [PATCH 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <5485255.0LNbKf2a8b@wuerfel>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <6943381.tLU1c7RclQ@wuerfel> <571F49A2.3000706@arm.com>
+ <5485255.0LNbKf2a8b@wuerfel>
+Message-ID: <571F5E06.7040406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 04:23:19PM +0800, Li Bin wrote:
-> This bug can be reproduced by compiling the hw_breakpoint sample
-> module that is in the kernel tree, when loading it with parameter
-> ksym=nfsdstats, and running nfsstat:
+On 26/04/16 12:59, Arnd Bergmann wrote:
+> On Tuesday 26 April 2016 11:57:38 Vladimir Murzin wrote:
+>> On 26/04/16 10:10, Arnd Bergmann wrote:
+>>> On Tuesday 26 April 2016 09:17:14 Vladimir Murzin wrote:
 > 
-> $ insmod data_breakpoint.ko ksym=nfsdstats
-> $ nfsstat
+>>> Turning it around would limit the platforms to the ones that
+>>> explictly turn on NOMMU support. In order to make ARMv7-R support
+>>> work, we need either another top-level platform option next to
+>>> ARCH_MULTIPLATFORM and ARM_SINGLE_ARMV7M, or add ARMv7-R in
+>>> the CPU selection phase as an alternative to ARMv4/5 and ARMv6/7-A.
+>>>
+>>
+>> It depends if we what NOMMU represented (apart from M-class) R-class
+>> only or R-class + A-class without MMU.
 > 
-> It will trigger breakpoint exception infinitely:
+> Exactly. The same is of course true for the older architectures:
+> There are tons of ARM7TDMI, ARM946, ARM1156 or Marvell Feroceon cores
+> without MMU, but we don't currently support any of them with an
+> upstream kernel. Respectively, we should in theory be able to
+> run on any of the other MMU based cores that we do support (ARM720T,
+> StrongARM, ARM92x, ARM1136/1176/MPCore, ...) with the MMU disabled,
+> but neither of the two scenarios seems interesting for mainline
+> kernels in this age any more.
 > 
-> nfsdstats value is changed
-> ...
-> Call trace:
-> ...
-> Dump stack from sample_hbp_handler
-> nfsdstats value is changed
-> ...
-> Call trace:
-> ...
-> Dump stack from sample_hbp_handler
-> ......
-> ......
+> What we know is that ARMv7-M is widely used, ARMv7-R makes a lot of
+> sense to use, and there are probably use cases for ARMv7-A without
+> MMU.
 > 
-> This is because that the overflow_handler is set to the callback
-> in the module, and in watchpoint_handler, it will not disable the
-> breakpoint (and set single step that reenable it), so when exception
-> return, it will trigger the breakpoint exception again immediately...
+>>>>> What hardware platform do you use? It would be nice to make it a little
+>>>>> more explicit which platforms can use the ARMv7-R, or an ARMv7-A with
+>>>>> the MMU disabled.
+>>>>
+>>>> Currently I'm dealing mostly with ARMv7-R FVP models which represents
+>>>> Vexpress with R-class tile (it is why this mini series have MPU
+>>>> patches). I've never tried ARMv7-A with the MMU disabled and I'm quite
+>>>> in doubt if it is feasible.
+>>>
+>>> What is the difference? I always assumed that ARMv7-R and ARMv7-A are
+>>> sufficiently close that you can run the same kernel on both as long
+>>> as you use neither the MMU nor the MPU.
+>>
+>> Right they are quite close and shares a lot of code except MMU and MPU,
+>> and I'd think without MMU/MPU such configurations are limited with UP
+>> only. I've not though of such option before, so I'd need to try and see.
+>>
+>> On the other hand assumption that NOMMU == ARMv7-A - MMU, makes me think
+>> that any ARMv7 platform should be available for selection if CONFIG_MMU
+>> is deselected. At least such approach gives better build coverage and if
+>> there are platforms which suffer from such assumption runtime they can
+>> be guarded with COMPILE_TEST.
+> 
+> I think one problem is that with MMU disabled ARMv7-A, you implicitly
+> disable the caches and that is probably what you are thinking of for
+> SMP support as well (atomic instructions need caches).
 
-As I explained before, GDB/ptrace *relies* on this behaviour. If you
-register an breakpoint overflow handler on arm64, then you need to handle
-the step.
+Another problem is that we need to provide DRAM_BASE and DRAM_SIZE for
+such builds, but it can be addressed with 1:1 mappings you've described
+below
 
-Will
+> 
+> However, this can be worked around using a static page table set up
+> at boot time that creates hugepage entries with appropriate flags for
+> RAM and I/O areas. If we ever had a usecase for running this setup
+> in production, we could even fake an MPU that way.
+
+I'd think that support for FDPIC would make it one step closer.
+
+I conclude that we don't want dedicated option for R-class cores and we
+start from assumption that NOMMU covers: M-, R- and A- (without MMU or
+1:1 mapping) cores. Please, correct me.
+
+Vladimir
+
+> 	Arnd
+> 
+> 
