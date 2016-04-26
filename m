@@ -1,44 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Apr 2016 18:58:55 +0200
-Subject: [PATCH v3 0/5] arm64: tegra: fix DT definitions for GM20B GPU
-In-Reply-To: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-References: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20160426165855.GA2388@ulmo.ba.sec>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 26 Apr 2016 12:00:04 -0500
+Subject: [PATCH v2 0/2] pci: host: new driver for Marvell Armada 7K/8K
+ PCIe controller
+In-Reply-To: <20160426104208.150cbbd0@free-electrons.com>
+References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160425154611.3e7e9dc9@free-electrons.com>
+ <20160425172846.GB1759@localhost>
+ <20160426104208.150cbbd0@free-electrons.com>
+Message-ID: <20160426170004.GA27803@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 06:22:59PM +0900, Alexandre Courbot wrote:
-> Small series that fixes/completes DT bindings for Tegra GPUs and add two
-> missing entries required for the Tegra210 GPU to operate properly.
+On Tue, Apr 26, 2016 at 10:42:08AM +0200, Thomas Petazzoni wrote:
+> Hello Bjorn,
 > 
-> Without these fixes, GM20B will crash during probe on 4.6 because a
-> required clock is not activated.
+> On Mon, 25 Apr 2016 12:28:46 -0500, Bjorn Helgaas wrote:
 > 
-> Changes since v2:
-> - Fixed device address in DT examples
-> - Carried Acked-bys
+> > How about if you just shuffle those bits around into
+> > an armada8k_add_pcie_port() and an armada8k_pcie_establish_link(), and
+> > we'll call that good for now?
 > 
-> Changes since v1:
-> - Renamed "pllg_ref" clock to "ref" in DT bindings
+> I just sent a v3 which implements this.
 > 
-> Alexandre Courbot (5):
->   dt-bindings: gk20a: Fix typo in compatible name
->   dt-bindings: gk20a: Document iommus property
->   dt-bindings: Add documentation for GM20B GPU
->   arm64: tegra210: Add reference clock to GM20B
->   arm64: tegra210: Add IOMMU node to GM20B
+> However, to be honest, after looking at the other drivers, I found the
+> XYZ_add_pcie_port() function to not be very useful: it simply
+> continues the work done by the probe function, and there is really no
+> reason to split the remaining work of the probe() in a separate
+> function. The XYZ_add_pcie_port() is called only one time for each
+> probe() call, so having a separate function is somewhat useless. In
+> addition, the separation of work between probe() and
+> XYZ_add_pcie_port() is not very consistent accross drivers. In
+> pci-imx6, XYZ_add_pcie_port() only sets up the interrupt handler and
+> calls dw_pcie_host_init(). In pci-dra7xx, XYZ_add_pcie_port() sets up
+> the interrupt, maps some registers and calls dw_pcie_host_init().
 > 
->  .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 37 +++++++++++++++++++---
->  arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  8 +++--
->  2 files changed, 38 insertions(+), 7 deletions(-)
+> So my v3 implements what you suggested, and creates a
+> armada8k_add_pcie_port() to make it consistent with the other drivers,
+> but long term, I'm not sure this particular function is really useful.
 
-Applied, thanks.
+I agree completely with everything you said.  I would be thrilled if
+somebody were to make this more sensible, as long as we did it to
+*all* the drivers, not just one.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/99377113/attachment.sig>
+I think things started out fairly simple, then diverged over time as
+we added clocks, PHYs, MSI, etc.  It looks like we're going to have
+more divergence for power management, suspend, hotplug, modules, etc.
+
+Bjorn
