@@ -1,51 +1,39 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 26 Apr 2016 14:59:41 +0200
-Subject: nvmem: mxs-ocotp read problem
-In-Reply-To: <571F54DF.9020902@meduna.org>
-References: <571F54DF.9020902@meduna.org>
-Message-ID: <571F663D.5080703@i2se.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 26 Apr 2016 20:57:33 +0800
+Subject: [RESEND PATCH v2 0/7] usb: xhci-plat: support generic PHY and vbus
+ regulator
+Message-ID: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stano,
+The Marvell BG4CT has xhci controller. This controller has two phys:
+one for usb2 and another for usb3. BG4CT boards have board level vbus
+control through gpio.
 
-Am 26.04.2016 um 13:45 schrieb Stanislav Meduna:
-> Hi,
->
-> the mxs_ocotp_read seems to incorrectly iterate through
-> the memory to be read, resulting in a buffer overflow/off-area
-> access and sometimes oops. 
+I plan to add the xhci support in two steps: first of all, add generic
+PHY and vbus regulator control support to the xhci-plat driver. Then
+add the usb2 and usb3 phy drivers, after that, we add the phy and xhci
+nodes in the dtsi.
 
-could you please provide me scenario, so i can test it.
+This series takes the first step. The first three patches are bug fix.
+Then two clean up patches. The last two patches add generic PHY and
+vbus regulator control support.
 
-Regards
-Stefan
+Since v1:
+ - fix NULL pointer dereference in [PATCH 7/7]
 
-> The following patch seems to fix
-> the problem
->
-> Regards
->                                Stano
->
->
-> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-> index 8ba19bb..914a4fa 100644
-> --- a/drivers/nvmem/mxs-ocotp.c
-> +++ b/drivers/nvmem/mxs-ocotp.c
-> @@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->         if (ret)
->                 goto close_banks;
->
-> -       while (val_size) {
-> +       while (val_size >= reg_size) {
->                 if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
->                         /* fill up non-data register */
->                         *buf = 0;
-> @@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->                 }
->
->                 buf++;
-> -               val_size--;
-> +               val_size -= reg_size;
->                 offset += reg_size;
->         }
+Jisheng Zhang (7):
+  usb: xhci: plat: Fix suspend/resume when the optional clk exists
+  usb: xhci: plat: attach the usb_phy to the correct hcd
+  usb: xhci: plat: Fix suspend/resume when the optional usb_phy exists
+  usb: xhci: plat: sort the headers in alphabetic order
+  usb: xhci: plat: Remove checks for optional clock in error/remove path
+  usb: xhci: plat: add generic PHY support
+  usb: xhci: plat: add vbus regulator control
+
+ drivers/usb/host/xhci-plat.c | 162 +++++++++++++++++++++++++++++++++++++------
+ drivers/usb/host/xhci.h      |   2 +
+ 2 files changed, 142 insertions(+), 22 deletions(-)
+
+-- 
+2.8.1
