@@ -1,151 +1,109 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 26 Apr 2016 20:57:40 +0800
-Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
-In-Reply-To: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1461675460-2295-8-git-send-email-jszhang@marvell.com>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Tue, 26 Apr 2016 15:00:26 +0200
+Subject: [PATCH 3/3] ARM: dts: add DTS for Baltos IR2110
+In-Reply-To: <1461675626-5818-1-git-send-email-yegorslists@googlemail.com>
+References: <1461675626-5818-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <1461675626-5818-4-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell BG4CT STB board has board level vbus control through gpio.
-This patch adds the vbus regulator control to support this board.
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
 ---
- drivers/usb/host/xhci-plat.c | 40 +++++++++++++++++++++++++++++++++++++++-
- drivers/usb/host/xhci.h      |  2 ++
- 2 files changed, 41 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                 |  1 +
+ arch/arm/boot/dts/am335x-baltos-ir2110.dts | 71 ++++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am335x-baltos-ir2110.dts
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index d7f4f3c..0310c13 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -18,6 +18,7 @@
- #include <linux/of.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/xhci_pdriver.h>
-@@ -178,6 +179,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	struct clk              *clk;
- 	struct usb_phy		*usb_phy;
- 	struct phy		*phy;
-+	struct regulator	*vbus;
- 	int			ret;
- 	int			irq;
- 
-@@ -249,13 +251,30 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 
- 	device_wakeup_enable(hcd->self.controller);
- 
-+	vbus = devm_regulator_get(&pdev->dev, "vbus");
-+	if (PTR_ERR(vbus) == -ENODEV) {
-+		vbus = NULL;
-+	} else if (IS_ERR(vbus)) {
-+		ret = PTR_ERR(vbus);
-+		goto disable_clk;
-+	} else if (vbus) {
-+		ret = regulator_enable(vbus);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"failed to enable usb vbus regulator: %d\n",
-+				ret);
-+			goto disable_clk;
-+		}
-+	}
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2c19cd9..64a2bc6 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -485,6 +485,7 @@ dtb-$(CONFIG_SOC_TI81XX) += \
+ 	dm8168-evm.dtb \
+ 	dra62x-j5eco-evm.dtb
+ dtb-$(CONFIG_SOC_AM33XX) += \
++	am335x-baltos-ir2110.dtb \
+ 	am335x-baltos-ir3220.dtb \
+ 	am335x-baltos-ir5221.dtb \
+ 	am335x-base0033.dtb \
+diff --git a/arch/arm/boot/dts/am335x-baltos-ir2110.dts b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
+new file mode 100644
+index 0000000..a9a9730
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- 	xhci->clk = clk;
-+	xhci->vbus = vbus;
- 	xhci->main_hcd = hcd;
- 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
- 			dev_name(&pdev->dev), hcd);
- 	if (!xhci->shared_hcd) {
- 		ret = -ENOMEM;
--		goto disable_clk;
-+		goto disable_vbus;
- 	}
- 
- 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
-@@ -323,6 +342,10 @@ disable_usb2_phy:
- put_usb3_hcd:
- 	usb_put_hcd(xhci->shared_hcd);
- 
-+disable_vbus:
-+	if (vbus)
-+		regulator_disable(vbus);
++/*
++ * VScom OnRISC
++ * http://www.vscom.de
++ */
 +
- disable_clk:
- 	clk_disable_unprepare(clk);
- 
-@@ -337,6 +360,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
- 	struct clk *clk = xhci->clk;
-+	struct regulator *vbus = xhci->vbus;
- 
- 	usb_remove_hcd(xhci->shared_hcd);
- 	xhci_plat_phy_exit(xhci->shared_hcd);
-@@ -347,6 +371,9 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	clk_disable_unprepare(clk);
- 	usb_put_hcd(hcd);
- 
-+	if (vbus)
-+		regulator_disable(vbus);
++/dts-v1/;
 +
- 	return 0;
- }
- 
-@@ -356,6 +383,7 @@ static int xhci_plat_suspend(struct device *dev)
- 	int ret;
- 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-+	struct regulator *vbus = xhci->vbus;
- 
- 	/*
- 	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
-@@ -373,6 +401,9 @@ static int xhci_plat_suspend(struct device *dev)
- 	xhci_plat_phy_exit(hcd);
- 	clk_disable_unprepare(xhci->clk);
- 
-+	if (vbus)
-+		ret = regulator_disable(vbus);
++#include "am335x-baltos.dtsi"
 +
- 	return ret;
- }
- 
-@@ -381,11 +412,18 @@ static int xhci_plat_resume(struct device *dev)
- 	int ret;
- 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-+	struct regulator *vbus = xhci->vbus;
- 
- 	ret = clk_prepare_enable(xhci->clk);
- 	if (ret)
- 		return ret;
- 
-+	if (vbus) {
-+		ret = regulator_enable(vbus);
-+		if (ret)
-+			return ret;
-+	}
++/ {
++	model = "OnRISC Baltos iR 2110";
++};
 +
- 	ret = xhci_plat_phy_init(hcd);
- 	if (ret)
- 		return ret;
-diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
-index 6c629c9..5fa8662 100644
---- a/drivers/usb/host/xhci.h
-+++ b/drivers/usb/host/xhci.h
-@@ -1550,6 +1550,8 @@ struct xhci_hcd {
- 	struct msix_entry	*msix_entries;
- 	/* optional clock */
- 	struct clk		*clk;
-+	/* optional regulator */
-+	struct regulator	*vbus;
- 	/* data structures */
- 	struct xhci_device_context_array *dcbaa;
- 	struct xhci_ring	*cmd_ring;
++&am33xx_pinmux {
++	uart1_pins: pinmux_uart1_pins {
++		pinctrl-single,pins = <
++			AM33XX_IOPAD(0x980, PIN_INPUT | MUX_MODE0)      /* uart1_rxd */
++			AM33XX_IOPAD(0x984, PIN_INPUT | MUX_MODE0)      /* uart1_txd */
++			AM33XX_IOPAD(0x978, PIN_INPUT_PULLDOWN | MUX_MODE0)      /* uart1_ctsn */
++			AM33XX_IOPAD(0x97c, PIN_OUTPUT_PULLDOWN | MUX_MODE0)      /* uart1_rtsn */
++			AM33XX_IOPAD(0x8e0, PIN_OUTPUT_PULLDOWN | MUX_MODE7)      /* lcd_vsync.gpio2[22] DTR */
++			AM33XX_IOPAD(0x8e4, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_hsync.gpio2[23] DSR */
++			AM33XX_IOPAD(0x8e8, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_pclk.gpio2[24] DCD */
++			AM33XX_IOPAD(0x8ec, PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_ac_bias_en.gpio2[25] RI */
++		>;
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	dtr-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>;
++	dsr-gpios = <&gpio2 23 GPIO_ACTIVE_LOW>;
++	dcd-gpios = <&gpio2 24 GPIO_ACTIVE_LOW>;
++	rng-gpios = <&gpio2 25 GPIO_ACTIVE_LOW>;
++
++	status = "okay";
++};
++
++&usb0_phy {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++};
++
++&cpsw_emac0 {
++	phy_id = <&davinci_mdio>, <1>;
++	phy-mode = "rmii";
++	dual_emac_res_vlan = <1>;
++};
++
++&cpsw_emac1 {
++	phy_id = <&davinci_mdio>, <7>;
++	phy-mode = "rgmii-txid";
++	dual_emac_res_vlan = <2>;
++};
++
++&phy_sel {
++	rmii-clock-ext = <1>;
++};
 -- 
-2.8.1
+2.1.4
