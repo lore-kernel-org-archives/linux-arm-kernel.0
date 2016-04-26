@@ -1,32 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2016 09:17:04 -0700
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
- pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
-In-Reply-To: <CACRpkdZa=v1iKZ=eiY11V3qZV9pPqtoi6vHm2Pu4ctWTFiy0TA@mail.gmail.com>
-References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
- <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
- <20160415152215.GR5995@atomide.com>
- <CACRpkdZa=v1iKZ=eiY11V3qZV9pPqtoi6vHm2Pu4ctWTFiy0TA@mail.gmail.com>
-Message-ID: <20160426161704.GU5995@atomide.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 26 Apr 2016 21:54:41 +0530
+Subject: [PATCH V17 1/3] dmaengine: qcom_hidma: implement lower level
+ hardware interface
+In-Reply-To: <571F8397.5000803@codeaurora.org>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-2-git-send-email-okaya@codeaurora.org>
+ <20160426032805.GA2274@localhost> <571F8397.5000803@codeaurora.org>
+Message-ID: <20160426162441.GJ2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [160423 02:46]:
-> On Fri, Apr 15, 2016 at 5:22 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Walleij <linus.walleij@linaro.org> [160415 02:29]:
-> >> Patch applied for fixes with Tony's ACK.
-> >>
-> >> Should it also be tagged for stable?
-> >
-> > Probably a good idea, I can see somebody pulling hair out because
-> > of this in various product trees.
+On Tue, Apr 26, 2016 at 11:04:55AM -0400, Sinan Kaya wrote:
+> On 4/25/2016 11:28 PM, Vinod Koul wrote:
+> >> +
+> >> +			/* reset the channel for recovery */
+> >> +			if (hidma_ll_setup(lldev)) {
+> > 
+> > should this be done in ISR?
 > 
-> Ooops sorry I totally missed to add that :(
+> I created a new tasklet called rst_task and posted the code there. 
+
+sounds better
+
 > 
-> Please ask Greg to take it as a selected stable patch.
+>  /*
+> + * Abort all transactions and perform a reset.
+> + */
+> +static void hidma_ll_abort(unsigned long arg)
+> +{
+> +       u8 err_code = HIDMA_EVRE_STATUS_ERROR;
+> +       u8 err_info = 0xFF;
+> +
+> +       dev_err(lldev->dev, "error 0x%x, resetting...\n",
+> +               cause);
 
-Well it has the fixes tag, let's see if the stable people will
-find it automatically now :) If not, Keerthy can send email
-requesting adding it manually to stable trees.
+right justify this and others as well please
 
-Tony
+> >> +int hidma_ll_resume(struct hidma_lldev *lldev)
+> >> +{
+> >> +	return hidma_ll_enable(lldev);
+> >> +}
+> > 
+> > why do we need this empty function, use hidma_ll_enable.
+> 
+> hidma_ll_enable is a common function that gets called from multiple places. 
+> hidma_ll_resume and hidma_ll_pause is used by the OS interface for pausing
+> and resuming the DMA channel. 
+
+is there a reason why we can't have the code in resume and that being called
+internally as well as externally?
+
+> >> +/*
+> >> + * Note that even though we stop this channel
+> >> + * if there is a pending transaction in flight
+> >> + * it will complete and follow the callback.
+> >> + * This request will prevent further requests
+> >> + * to be made.
+> > 
+> > Why the odd formating?
+> 
+> aligned to 75 characters.
+
+This seems to be 50 chars!
+
+-- 
+~Vinod
