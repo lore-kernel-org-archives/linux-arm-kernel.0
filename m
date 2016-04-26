@@ -1,338 +1,54 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Apr 2016 10:31:46 +0200
-Subject: [PATCH v3 2/2] pci: host: new driver for Marvell Armada 7K/8K PCIe
- controller
-In-Reply-To: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1461659506-10387-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1461659506-10387-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 26 Apr 2016 10:32:39 +0200
+Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7
+In-Reply-To: <7781705.p6jrBl2RnJ@wuerfel>
+References: <cover.1461558315.git.horms+renesas@verge.net.au>
+ <4737327.YB9LJZXs32@wuerfel>
+ <CAMuHMdV_DN4YEzP1urC9LmKga6rkstGNDv20i96qnb=kS1+skw@mail.gmail.com>
+ <7781705.p6jrBl2RnJ@wuerfel>
+Message-ID: <CAMuHMdWmGKa16BOoF=MJab5V_Ceb1yAbAf2yjFV7sSHxG6=GOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 7K/8K SoCs integrate a PCIe controller from
-Synopsys. This commit adds a new driver that provides the small glue
-needed to use the existing Designware driver to make it work on
-Marvell Armada 7K/8K SoCs.
+Hi Arnd,
 
-The MSI support will be enabled at a later point.
+On Tue, Apr 26, 2016 at 10:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 26 April 2016 09:30:45 Geert Uytterhoeven wrote:
+>> Commit 93fafa81cad3da9c ("Merge branches 'next/dt' and 'next/dt64' into
+>> for-next") accidentally re-added the line
+>>
+>>         clock-output-names = "can_clk";
+>>
+>> to arch/arm/boot/dts/r8a7791.dtsi, which was removed in commit
+>> f617604fe5d74b9c ("ARM: dts: r8a7791: Remove unnecessary
+>> clock-output-names properties") before.  It seems the same wrong
+>> conflict resolution was made before in commit ef3b08c6c0d85753 ("Merge
+>> branch 'fixes' into for-next").
+>>
+>> While this won't cause failures, can you please remove the offending
+>> line?
+>
+> I've merged renesas-fixes-for-v4.6 into next/dt now to resolve
+> the conflict there, otherwise Linus would have to do the same resolution
+> during the merge window.
+>
+> Thanks for letting us know. If you want to verify my new resolution,
+> please look at next/dt, which is the more important branch.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/Kconfig         |  11 ++
- drivers/pci/host/Makefile        |   1 +
- drivers/pci/host/pcie-armada8k.c | 276 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 288 insertions(+)
- create mode 100644 drivers/pci/host/pcie-armada8k.c
+Thanks, but unfortunately your new merge resolution is incorrect, as it revived
+the line
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 7a0780d..a3b6f24 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -231,4 +231,15 @@ config PCI_HOST_THUNDER_ECAM
- 	help
- 	  Say Y here if you want ECAM support for CN88XX-Pass-1.x Cavium Thunder SoCs.
- 
-+config PCIE_ARMADA_8K
-+	bool "Marvell Armada-8K PCIe controller"
-+	depends on ARCH_MVEBU
-+	select PCIE_DW
-+	select PCIEPORTBUS
-+	help
-+	  Say Y here if you want to enable PCIe controller support on
-+	  Armada-8K SoCs. The PCIe controller on Armada-8K is based on
-+	  Designware hardware and therefore the driver re-uses the
-+	  Designware core functions to implement the driver.
-+
- endmenu
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index d85b5fa..a6f85e3 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -28,3 +28,4 @@ obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
- obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
- obj-$(CONFIG_PCI_HOST_THUNDER_ECAM) += pci-thunder-ecam.o
- obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
-+obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
-diff --git a/drivers/pci/host/pcie-armada8k.c b/drivers/pci/host/pcie-armada8k.c
-new file mode 100644
-index 0000000..7302de2
---- /dev/null
-+++ b/drivers/pci/host/pcie-armada8k.c
-@@ -0,0 +1,276 @@
-+/*
-+ * PCIe host controller driver for Marvell Armada-8K SoCs
-+ *
-+ * Armada-8K PCIe Glue Layer Source Code
-+ *
-+ * Copyright (C) 2016 Marvell Technology Group Ltd.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#define pr_fmt(fmt) "armada-8k-pcie: " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pci.h>
-+#include <linux/phy/phy.h>
-+#include <linux/platform_device.h>
-+#include <linux/resource.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_irq.h>
-+
-+#include "pcie-designware.h"
-+
-+struct armada8k_pcie {
-+	void __iomem *base;
-+	struct clk *clk;
-+	struct pcie_port pp;
-+};
-+
-+#define PCIE_VENDOR_REGS_OFFSET		0x8000
-+
-+#define PCIE_GLOBAL_CONTROL_REG		0x0
-+#define PCIE_APP_LTSSM_EN		BIT(2)
-+#define PCIE_DEVICE_TYPE_SHIFT		4
-+#define PCIE_DEVICE_TYPE_MASK		0xF
-+#define PCIE_DEVICE_TYPE_EP		0x0 /* Endpoint */
-+#define PCIE_DEVICE_TYPE_LEP		0x1 /* Legacy endpoint */
-+#define PCIE_DEVICE_TYPE_RC		0x4 /* Root complex */
-+
-+#define PCIE_GLOBAL_STATUS_REG		0x8
-+#define PCIE_GLB_STS_RDLH_LINK_UP	BIT(1)
-+#define PCIE_GLB_STS_PHY_LINK_UP	BIT(9)
-+
-+#define PCIE_GLOBAL_INT_CAUSE1_REG	0x1C
-+#define PCIE_GLOBAL_INT_MASK1_REG	0x20
-+#define PCIE_INT_A_ASSERT_MASK		BIT(9)
-+#define PCIE_INT_B_ASSERT_MASK		BIT(10)
-+#define PCIE_INT_C_ASSERT_MASK		BIT(11)
-+#define PCIE_INT_D_ASSERT_MASK		BIT(12)
-+
-+#define PCIE_ARCACHE_TRC_REG		0x50
-+#define PCIE_AWCACHE_TRC_REG		0x54
-+#define PCIE_ARUSER_REG			0x5C
-+#define PCIE_AWUSER_REG			0x60
-+/*
-+ * AR/AW Cache defauls: Normal memory, Write-Back, Read / Write
-+ * allocate
-+ */
-+#define ARCACHE_DEFAULT_VALUE		0x3511
-+#define AWCACHE_DEFAULT_VALUE		0x5311
-+
-+#define DOMAIN_OUTER_SHAREABLE		0x2
-+#define AX_USER_DOMAIN_MASK		0x3
-+#define AX_USER_DOMAIN_SHIFT		4
-+
-+
-+
-+#define to_armada8k_pcie(x)	container_of(x, struct armada8k_pcie, pp)
-+
-+static int armada8k_pcie_link_up(struct pcie_port *pp)
-+{
-+	u32 reg;
-+	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
-+	u32 mask = PCIE_GLB_STS_RDLH_LINK_UP | PCIE_GLB_STS_PHY_LINK_UP;
-+
-+	reg = readl(pcie->base + PCIE_GLOBAL_STATUS_REG);
-+
-+	if ((reg & mask) == mask)
-+		return 1;
-+
-+	pr_debug("No link detected (Global-Status: 0x%08x).\n", reg);
-+	return 0;
-+}
-+
-+static void armada8k_pcie_establish_link(struct pcie_port *pp)
-+{
-+	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
-+	void __iomem *base = pcie->base;
-+	int timeout = 1000;
-+	u32 reg;
-+
-+	if (!armada8k_pcie_link_up(pp)) {
-+		/* Disable LTSSM state machine to enable configuration */
-+		reg = readl(base + PCIE_GLOBAL_CONTROL_REG);
-+		reg &= ~(PCIE_APP_LTSSM_EN);
-+		writel(reg, base + PCIE_GLOBAL_CONTROL_REG);
-+	}
-+
-+	/* Set the device to root complex mode */
-+	reg = readl(base + PCIE_GLOBAL_CONTROL_REG);
-+	reg &= ~(PCIE_DEVICE_TYPE_MASK << PCIE_DEVICE_TYPE_SHIFT);
-+	reg |= PCIE_DEVICE_TYPE_RC << PCIE_DEVICE_TYPE_SHIFT;
-+	writel(reg, base + PCIE_GLOBAL_CONTROL_REG);
-+
-+	/* Set the PCIe master AxCache attributes */
-+	writel(ARCACHE_DEFAULT_VALUE, base + PCIE_ARCACHE_TRC_REG);
-+	writel(AWCACHE_DEFAULT_VALUE, base + PCIE_AWCACHE_TRC_REG);
-+
-+	/* Set the PCIe master AxDomain attributes */
-+	reg = readl(base + PCIE_ARUSER_REG);
-+	reg &= ~(AX_USER_DOMAIN_MASK << AX_USER_DOMAIN_SHIFT);
-+	reg |= DOMAIN_OUTER_SHAREABLE << AX_USER_DOMAIN_SHIFT;
-+	writel(reg, base + PCIE_ARUSER_REG);
-+
-+	reg = readl(base + PCIE_AWUSER_REG);
-+	reg &= ~(AX_USER_DOMAIN_MASK << AX_USER_DOMAIN_SHIFT);
-+	reg |= DOMAIN_OUTER_SHAREABLE << AX_USER_DOMAIN_SHIFT;
-+	writel(reg, base + PCIE_AWUSER_REG);
-+
-+	/* Enable INT A-D interrupts */
-+	reg = readl(base + PCIE_GLOBAL_INT_MASK1_REG);
-+	reg |= PCIE_INT_A_ASSERT_MASK | PCIE_INT_B_ASSERT_MASK |
-+	       PCIE_INT_C_ASSERT_MASK | PCIE_INT_D_ASSERT_MASK;
-+	writel(reg, base + PCIE_GLOBAL_INT_MASK1_REG);
-+
-+	if (!armada8k_pcie_link_up(pp)) {
-+		/* Configuration done. Start LTSSM */
-+		reg = readl(base + PCIE_GLOBAL_CONTROL_REG);
-+		reg |= PCIE_APP_LTSSM_EN;
-+		writel(reg, base + PCIE_GLOBAL_CONTROL_REG);
-+	}
-+
-+	/* Wait until the link becomes active again */
-+	while (timeout) {
-+		if (armada8k_pcie_link_up(pp))
-+			break;
-+		msleep(1);
-+		timeout--;
-+	}
-+
-+	if (timeout == 0)
-+		dev_err(pp->dev, "Link not up after reconfiguration\n");
-+}
-+
-+static void armada8k_pcie_host_init(struct pcie_port *pp)
-+{
-+	dw_pcie_setup_rc(pp);
-+	armada8k_pcie_establish_link(pp);
-+}
-+
-+static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
-+{
-+	struct pcie_port *pp = arg;
-+	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
-+	void __iomem *base = pcie->base;
-+	u32 val;
-+
-+	/*
-+	 * Interrupts are directly handled by the device driver of the
-+	 * PCI device. However, there are also latched into the PCIe
-+	 * controller, so we simply discard them.
-+	 */
-+	val = readl(base + PCIE_GLOBAL_INT_CAUSE1_REG);
-+	writel(val, base + PCIE_GLOBAL_INT_CAUSE1_REG);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct pcie_host_ops armada8k_pcie_host_ops = {
-+	.link_up = armada8k_pcie_link_up,
-+	.host_init = armada8k_pcie_host_init,
-+};
-+
-+static int armada8k_add_pcie_port(struct pcie_port *pp,
-+				  struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int ret;
-+
-+	pp->root_bus_nr = -1;
-+	pp->ops = &armada8k_pcie_host_ops;
-+
-+	pp->irq = platform_get_irq(pdev, 0);
-+	if (!pp->irq) {
-+		dev_err(dev, "failed to get irq for port\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = devm_request_irq(dev, pp->irq, armada8k_pcie_irq_handler,
-+			       IRQF_SHARED, "armada8k-pcie", pp);
-+	if (ret) {
-+		dev_err(dev, "failed to request irq %d\n", pp->irq);
-+		return ret;
-+	}
-+
-+	ret = dw_pcie_host_init(pp);
-+	if (ret) {
-+		dev_err(dev, "failed to initialize host: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int armada8k_pcie_probe(struct platform_device *pdev)
-+{
-+	struct armada8k_pcie *pcie;
-+	struct pcie_port *pp;
-+	struct device *dev = &pdev->dev;
-+	struct resource *base;
-+	int ret;
-+
-+	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-+	if (!pcie)
-+		return -ENOMEM;
-+
-+	pcie->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(pcie->clk))
-+		return PTR_ERR(pcie->clk);
-+
-+	clk_prepare_enable(pcie->clk);
-+
-+	pp = &pcie->pp;
-+	pp->dev = dev;
-+	platform_set_drvdata(pdev, pcie);
-+
-+	/* Get the dw-pcie unit configuration/control registers base. */
-+	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
-+	pp->dbi_base = devm_ioremap_resource(dev, base);
-+	if (IS_ERR(pp->dbi_base)) {
-+		dev_err(dev, "couldn't remap regs base %p\n", base);
-+		ret = PTR_ERR(pp->dbi_base);
-+		goto fail;
-+	}
-+
-+	pcie->base = pp->dbi_base + PCIE_VENDOR_REGS_OFFSET;
-+
-+	ret = armada8k_add_pcie_port(pp, pdev);
-+	if (ret)
-+		goto fail;
-+
-+	return 0;
-+
-+fail:
-+	if (!IS_ERR(pcie->clk))
-+		clk_disable_unprepare(pcie->clk);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id armada8k_pcie_of_match[] = {
-+	{ .compatible = "marvell,armada8k-pcie", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, armada8k_pcie_of_match);
-+
-+static struct platform_driver armada8k_pcie_driver = {
-+	.probe		= armada8k_pcie_probe,
-+	.driver = {
-+		.name	= "armada8k-pcie",
-+		.of_match_table = of_match_ptr(armada8k_pcie_of_match),
-+	},
-+};
-+
-+module_platform_driver(armada8k_pcie_driver);
-+
-+MODULE_DESCRIPTION("Armada 8k PCIe host controller driver");
-+MODULE_AUTHOR("Yehuda Yitshak <yehuday@marvell.com>");
-+MODULE_AUTHOR("Shadi Ammouri <shadi@marvell.com>");
-+MODULE_LICENSE("GPL v2");
--- 
-2.6.4
+        status = "disabled";
+
+for the pcie_bus node.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
