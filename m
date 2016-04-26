@@ -1,58 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Apr 2016 13:15:48 +0100
-Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <571EFD1B.1070609@linaro.org>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com>
- <571E4A2A.8070908@caviumnetworks.com> <571EFD1B.1070609@linaro.org>
-Message-ID: <20160426121547.GL27312@arm.com>
+Date: Tue, 26 Apr 2016 13:22:13 +0100
+Subject: [BUG] arm64/hw_breakpoint: trigger breakpoint exception infinitely
+In-Reply-To: <571F2577.2080203@huawei.com>
+References: <571F2577.2080203@huawei.com>
+Message-ID: <20160426122212.GN27312@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
-> On 2016/4/26 0:47, David Daney wrote:
-> >On 04/25/2016 04:13 AM, Will Deacon wrote:
-> >>On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
-> >>>From: David Daney <david.daney@cavium.com>
-> >>>
-> >>>Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
-> >>>set introduce the ACPI based configuration to provide NUMA
-> >>>information.
-> >>>
-> >>>ACPI 5.1 already introduced NUMA support for ARM64, which can get the
-> >>>NUMA domain information from SRAT and SLIT table, so parse those two
-> >>>tables to get mappings from cpu/mem to numa node configuration and
-> >>>system locality.
-> >>
-> >>Whilst I've queued the main NUMA series for arm64, I'd really like to
-> >>see more movement on the generic header file cleanups that you posted
-> >>separately:
-> >>
-> >>http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
-> >>
-> >
-> >FWIW:  Those patches should still apply.  I am carrying them in my
-> >development trees, and have not changed them in any way.
-
-What's your plan for getting them merged?
-
-> >>Given that this ACPI series already requires some significant cross-arch
-> >>interaction (which is actually good!), perhaps extending the clean-up
-> >>patches to encompass some of the ACPI bits might make sense, and we can
-> >>get that queued as a pre-requisite.
-> >
-> >The cleanup patches you mention above are really independent of the ACPI
-> >things.  I have applied them both before and after the ACPI patches, and
-> >both seem to work.  With a quick perusal of the ACPI patches nothing
-> >jumps out at me as being a candidate for inclusion in the header file
-> >cleanup series.
+On Tue, Apr 26, 2016 at 04:23:19PM +0800, Li Bin wrote:
+> This bug can be reproduced by compiling the hw_breakpoint sample
+> module that is in the kernel tree, when loading it with parameter
+> ksym=nfsdstats, and running nfsstat:
 > 
-> I agree. My patch set is ACPI related enablement, cleanups and
-> consolidations, it would be good to merge as a single patch set
-> as it's self-contained.
+> $ insmod data_breakpoint.ko ksym=nfsdstats
+> $ nfsstat
+> 
+> It will trigger breakpoint exception infinitely:
+> 
+> nfsdstats value is changed
+> ...
+> Call trace:
+> ...
+> Dump stack from sample_hbp_handler
+> nfsdstats value is changed
+> ...
+> Call trace:
+> ...
+> Dump stack from sample_hbp_handler
+> ......
+> ......
+> 
+> This is because that the overflow_handler is set to the callback
+> in the module, and in watchpoint_handler, it will not disable the
+> breakpoint (and set single step that reenable it), so when exception
+> return, it will trigger the breakpoint exception again immediately...
 
-Up to you. I just thought you might want to avoid having two sets of
-cross-arch changes and the associated merging headaches that go with
-that.
+As I explained before, GDB/ptrace *relies* on this behaviour. If you
+register an breakpoint overflow handler on arm64, then you need to handle
+the step.
 
 Will
