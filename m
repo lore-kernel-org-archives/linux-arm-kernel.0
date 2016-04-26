@@ -1,58 +1,50 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 26 Apr 2016 11:23:09 -0400
-Subject: [PATCH V17 1/3] dmaengine: qcom_hidma: implement lower level
- hardware interface
-In-Reply-To: <CAHp75VeZQnhaiSDuGJtgcKtek7yUwgQWd3J5QSJbdisehmBGqA@mail.gmail.com>
-References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
- <1460384473-5775-2-git-send-email-okaya@codeaurora.org>
- <20160426032805.GA2274@localhost> <571F8397.5000803@codeaurora.org>
- <CAHp75VeZQnhaiSDuGJtgcKtek7yUwgQWd3J5QSJbdisehmBGqA@mail.gmail.com>
-Message-ID: <571F87DD.2010909@codeaurora.org>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Tue, 26 Apr 2016 20:53:37 +0530
+Subject: [PATCH 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <571F2427.5030003@arm.com>
+ <5485255.0LNbKf2a8b@wuerfel>
+Message-ID: <20160426152337.GA10644@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/26/2016 11:10 AM, Andy Shevchenko wrote:
-> On Tue, Apr 26, 2016 at 6:04 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> On 4/25/2016 11:28 PM, Vinod Koul wrote:
->>> On Mon, Apr 11, 2016 at 10:21:11AM -0400, Sinan Kaya wrote:
-> 
->>>> +    while (cause) {
->>>> +            if ((cause & BIT(HIDMA_IRQ_TR_CH_INVALID_TRE_BIT_POS)) ||
->>>> +                (cause & BIT(HIDMA_IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)) ||
->>>> +                (cause & BIT(HIDMA_IRQ_EV_CH_WR_RESP_BIT_POS)) ||
->>>> +                (cause & BIT(HIDMA_IRQ_TR_CH_DATA_RD_ER_BIT_POS)) ||
->>>> +                (cause & BIT(HIDMA_IRQ_TR_CH_DATA_WR_ER_BIT_POS))) {
->>>
->>> Switch please
->>
->> Cause is a combined status register. Let's say it contains 0x41. I need to check
->> if bit 0 or bit 6 is set in this value for each case condition. The value is not 0x40
->> or 0x1.
->>
->> I created macro like this instead.
->>
->> +#define HIDMA_IS_ERR_INTERRUPT(cause)                          \
->> +       (cause & BIT(HIDMA_IRQ_TR_CH_INVALID_TRE_BIT_POS))   || \
->> +       (cause & BIT(HIDMA_IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)) || \
->> +       (cause & BIT(HIDMA_IRQ_EV_CH_WR_RESP_BIT_POS))       || \
->> +       (cause & BIT(HIDMA_IRQ_TR_CH_DATA_RD_ER_BIT_POS))    || \
->> +       (cause & BIT(HIDMA_IRQ_TR_CH_DATA_WR_ER_BIT_POS))
-> 
-> This looks overheaded.
-> 
-> #define HIDMA_XXX (BIT(a) | BIT (b) ... BIT(n))
-> 
->>
->> and replaced the if statement as follows
->>
->> if (HIDMA_IS_ERR_INTERRUPT(cause)) {
-> 
-> if (cause & HIDMA_XXX) {
-> 
+Hi,
 
-This is even better.
+On Tue, Apr 26, 2016 at 09:17:43AM +0100, Vladimir Murzin wrote:
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> I built myself, but there are prebild tools available at [1] although
+> I've never tried them.
+> 
+> It seems to me there have been internal patches to support FDPIC [2],
+> but I don't know what happen afterwards :(
+> 
+> [1] https://launchpad.net/gcc-arm-embedded
+> [2]
+> http://connect.linaro.org/resource/sfo15/sfo15-406-arm-fdpic-toolset-kernel-libraries-for-cortex-m-cortex-r-mmuless-cores/
+
+Thank You, [2] gave some indigestion :), will take some to ...
+
+On Tue, Apr 26, 2016 at 01:59:57PM +0200, Arnd Bergmann wrote:
+> On Tuesday 26 April 2016 11:57:38 Vladimir Murzin wrote:
+
+> and there are probably use cases for ARMv7-A without MMU.
+
+My regular work is motor control related that uses RTOS, there was a
+potential customer asking about running it with MMU, caches disabled
+on A9. Probably the reason being they considering guranteed worst
+case performance w/ caches enabled similar to that w/ caches disabled,
+though that requirement was not in Linux.
+
+> > Right they are quite close and shares a lot of code except MMU and MPU,
+> > and I'd think without MMU/MPU such configurations are limited with UP
+
+> I think one problem is that with MMU disabled ARMv7-A, you implicitly
+> disable the caches and that is probably what you are thinking of for
+> SMP support as well (atomic instructions need caches).
+
+Have once tried to compile ARMv7-A w/o MMU, got entangled in a web of
+Kconfig dependencies, iirc one among them was that with !MMU, MULTI_V7
+platforms (AM335x, Vybrid A5 part) couldn't be selected, probably
+because of SMP dependency, but that was on a older Kernel version.
+
+Regards
+afzal
