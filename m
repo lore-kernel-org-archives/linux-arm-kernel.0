@@ -1,203 +1,85 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 26 Apr 2016 17:36:49 -0500
-Subject: [PATCH v7 9/9] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <1461710209-6563-1-git-send-email-fcooper@ti.com>
-References: <1461710209-6563-1-git-send-email-fcooper@ti.com>
-Message-ID: <1461710209-6563-10-git-send-email-fcooper@ti.com>
+From: airlied@gmail.com (Dave Airlie)
+Date: Wed, 27 Apr 2016 08:59:24 +1000
+Subject: bug in autoloading of imx-ipuv3-crtc
+In-Reply-To: <13533046.1iFyOjiAs0@anubis.ausil.us>
+References: <6926808.b0joqYQPQE@anubis.ausil.us>
+ <1513165.9WxCa41tI1@anubis.ausil.us>
+ <20160420230317.GT29108@pengutronix.de>
+ <13533046.1iFyOjiAs0@anubis.ausil.us>
+Message-ID: <CAPM=9tyyYZqPYz2AHvSDBdG+=LwSELR4m+cc1RrKG0ramZS0ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vignesh R <vigneshr@ti.com>
+On 22 April 2016 at 23:11, Dennis Gilmore <dennis@ausil.us> wrote:
+> On Thursday, April 21, 2016 1:03:17 AM CDT Uwe Kleine-K?nig wrote:
+>> Hello,
+>>
+>> On Tue, Apr 19, 2016 at 03:16:01PM -0500, Dennis Gilmore wrote:
+>> > On Tuesday, April 19, 2016 2:27:17 PM CDT Dennis Gilmore wrote:
+>> > > On Tuesday, April 19, 2016 7:50:49 PM CDT Russell King - ARM Linux
+> wrote:
+>> > > > On Tue, Apr 19, 2016 at 01:34:23PM -0500, Dennis Gilmore wrote:
+>> > > > > on all of my i.MX6 systems imx-ipuv3-crtc ius not getting
+>> > > > > automatically
+>> > > > > loaded.  Everything is built as a module
+>> > > > >
+>> > > > > CONFIG_DRM_IMX=m
+>> > > > > CONFIG_DRM_IMX_FB_HELPER=m
+>> > > > > CONFIG_DRM_IMX_HDMI=m
+>> > > > > CONFIG_DRM_IMX_IPUV3=m
+>> > > > > CONFIG_DRM_IMX_LDB=m
+>> > > > > CONFIG_DRM_IMX_PARALLEL_DISPLAY=m
+>> > > > > CONFIG_DRM_IMX_TVE=m
+>> > > > > CONFIG_IMX_IPUV3_CORE=m
+>> > > > >
+>> > > > > The result is that until I log in via serial or ssh and modprobe the
+>> > > > > module there is no display.  I suspect that there is some devicetree
+>> > > > > glue missing 4.4 and 4.5 seem to both be effected.
+>> > > >
+>> > > > DT doesn't come into it for imx-ipuv3-crtc - these platform devices
+>> > > > are
+>> > > > created by drivers/gpu/ipu-v3/ipu-common.c itself.
+>> > > >
+>> > > > drivers/gpu/drm/imx/ipuv3-crtc.c contains the proper module alias
+>> > > > which
+>> > > > should result in the module loaded at boot time when the
+>> > > > imx-ipuv3-crtc
+>> > > > devices are created.
+>> > > >
+>> > > > Could the problem be that imx-ipu-v3 isn't being loaded?  However,
+>> > > > again,
+>> > > > it looks to me like everything is correct there.
+>> > > >
+>> > > > Are you saying that this used to work in older kernel versions like
+>> > > > 4.3,
+>> > > > but stopped in 4.4?
+>> > >
+>> > > yers it used to work and stopped working. I would need to go back and
+>> > > test
+>> > > old kernels to figure out where it broke.
+>> >
+>> > after installing some old kernels it broke with 4.4-rc4 which included a
+>> > patch with teh subject of "drm/imx: Remove of_node assignment from
+>> > ipuv3-crtc driver probe"
+>>
+>> Just to be sure: 4.4-rc4 with 407c9eba7897 ("drm/imx: Remove of_node
+>> assignment from ipuv3-crtc driver probe") reverted works fine for you?
+>>
+>> Best regards
+>> Uwe
+>
+> I reverted the 4 patches in that series
+>
+> 407c9eba drm/imx: Remove of_node assignment from ipuv3-crtc driver probe
+> 304e6be6 gpu: ipu-v3: Assign of_node of child platform devices to
+> corresponding ports
+> 99ae78c3 gpu: ipu-v3: Remove reg_offset field
+> c3ede03c gpu: ipu-v3: drop unused dmfc field from client platform data
+>
+> and it then worked again.
 
-Add PWMSS device tree nodes for DRA7 SoC family and add documentation
-for dt bindings.
+Should I be reverting these upstream as it's some sort of regression?
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-[fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
- .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
- .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 12 +++
- arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
- 4 files changed, 120 insertions(+)
+Uwe?
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-index 4d4c977..759de05 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-@@ -5,6 +5,7 @@ Required properties:
-   for am33xx - compatible = "ti,am3352-ecap", "ti,am33xx-ecap";
-   for am4372 - compatible = "ti,am4372-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
-   for da850  - compatible = "ti,da850-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
-+  for dra746 - compatible = "ti,dra746-ecap", "ti,am3352-ecap";
- - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-   the cells format. The PWM channel index ranges from 0 to 4. The only third
-   cell flag supported by this binding is PWM_POLARITY_INVERTED.
-@@ -38,3 +39,11 @@ ecap0: ecap at 1f06000 { /* ECAP on da850 */
- 	#pwm-cells = <3>;
- 	reg = <0x306000 0x80>;
- };
-+
-+ecap0: ecap at 4843e100 {
-+	compatible = "ti,dra746-ecap", "ti,am3352-ecap";
-+	#pwm-cells = <3>;
-+	reg = <0x4843e100 0x80>;
-+	clocks = <&l4_root_clk_div>;
-+	clock-names = "fck";
-+};
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-index c1d6a2a..135132a 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-@@ -5,6 +5,7 @@ Required properties:
-   for am33xx  - compatible = "ti,am3352-ehrpwm", "ti,am33xx-ehrpwm";
-   for am4372  - compatible = "ti,am4372-ehrpwm", "ti-am3352-ehrpwm", "ti,am33xx-ehrpwm";
-   for da850   - compatible = "ti,da850-ehrpwm", "ti-am3352-ehrpwm", "ti,am33xx-ehrpwm";
-+  for dra746 - compatible = "ti,dra746-ehrpwm", "ti-am3352-ehrpwm";
- - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-   the cells format. The only third cell flag supported by this binding is
-   PWM_POLARITY_INVERTED.
-@@ -38,3 +39,11 @@ ehrpwm0: pwm at 1f00000 { /* EHRPWM on da850 */
- 	#pwm-cells = <3>;
- 	reg = <0x300000 0x2000>;
- };
-+
-+ehrpwm0: pwm at 4843e200 { /* EHRPWM on dra746 */
-+	compatible = "ti,dra746-ehrpwm", "ti,am3352-ehrpwm";
-+	#pwm-cells = <3>;
-+	reg = <0x48440200 0x80>;
-+	clocks = <&ehrpwm0_tbclk>, <&l4_root_clk_div>;
-+	clock-names = "tbclk", "fck";
-+};
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
-index fd8e87c..1a5d7b7 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: Must be "ti,<soc>-pwmss".
-   for am33xx  - compatible = "ti,am33xx-pwmss";
-   for am4372  - compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
-+  for dra746 - compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss"
- 
- - reg: physical base address and size of the registers map.
- - address-cells: Specify the number of u32 entries needed in child nodes.
-@@ -46,3 +47,14 @@ epwmss0: epwmss at 48300000 { /* PWMSS for am4372 */
- 
- 	/* child nodes go here */
- };
-+
-+epwmss0: epwmss at 4843e000 { /* PWMSS for DRA7xx */
-+	compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
-+	reg = <0x4843e000 0x30>;
-+	ti,hwmods = "epwmss0";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	/* child nodes go here */
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index e007401..5a21e46 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1743,6 +1743,96 @@
- 				clock-names = "fck", "sys_clk";
- 			};
- 		};
-+
-+		epwmss0: epwmss at 4843e000 {
-+			compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
-+			reg = <0x4843e000 0x30>;
-+			ti,hwmods = "epwmss0";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status = "disabled";
-+			ranges;
-+
-+			ehrpwm0: pwm at 4843e200 {
-+				compatible = "ti,dra746-ehrpwm",
-+					     "ti,am3352-ehrpwm";
-+				#pwm-cells = <3>;
-+				reg = <0x4843e200 0x80>;
-+				clocks = <&ehrpwm0_tbclk>, <&l4_root_clk_div>;
-+				clock-names = "tbclk", "fck";
-+				status = "disabled";
-+			};
-+
-+			ecap0: ecap at 4843e100 {
-+				compatible = "ti,dra746-ecap",
-+					     "ti,am3352-ecap";
-+				#pwm-cells = <3>;
-+				reg = <0x4843e100 0x80>;
-+				clocks = <&l4_root_clk_div>;
-+				clock-names = "fck";
-+				status = "disabled";
-+			};
-+		};
-+
-+		epwmss1: epwmss at 48440000 {
-+			compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
-+			reg = <0x48440000 0x30>;
-+			ti,hwmods = "epwmss1";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status = "disabled";
-+			ranges;
-+
-+			ehrpwm1: pwm at 48440200 {
-+				compatible = "ti,dra746-ehrpwm",
-+					     "ti,am3352-ehrpwm";
-+				#pwm-cells = <3>;
-+				reg = <0x48440200 0x80>;
-+				clocks = <&ehrpwm1_tbclk>, <&l4_root_clk_div>;
-+				clock-names = "tbclk", "fck";
-+				status = "disabled";
-+			};
-+
-+			ecap1: ecap at 48440100 {
-+				compatible = "ti,dra746-ecap",
-+					     "ti,am3352-ecap";
-+				#pwm-cells = <3>;
-+				reg = <0x48440100 0x80>;
-+				clocks = <&l4_root_clk_div>;
-+				clock-names = "fck";
-+				status = "disabled";
-+			};
-+		};
-+
-+		epwmss2: epwmss at 48442000 {
-+			compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
-+			reg = <0x48442000 0x30>;
-+			ti,hwmods = "epwmss2";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status = "disabled";
-+			ranges;
-+
-+			ehrpwm2: pwm at 48442200 {
-+				compatible = "ti,dra746-ehrpwm",
-+					     "ti,am3352-ehrpwm";
-+				#pwm-cells = <3>;
-+				reg = <0x48442200 0x80>;
-+				clocks = <&ehrpwm2_tbclk>, <&l4_root_clk_div>;
-+				clock-names = "tbclk", "fck";
-+				status = "disabled";
-+			};
-+
-+			ecap2: ecap at 48442100 {
-+				compatible = "ti,dra746-ecap",
-+					     "ti,am3352-ecap";
-+				#pwm-cells = <3>;
-+				reg = <0x48442100 0x80>;
-+				clocks = <&l4_root_clk_div>;
-+				clock-names = "fck";
-+				status = "disabled";
-+			};
-+		};
- 	};
- 
- 	thermal_zones: thermal-zones {
--- 
-2.7.0
+Dave.
