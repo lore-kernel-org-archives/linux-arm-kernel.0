@@ -1,58 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Apr 2016 17:01:27 +0200
-Subject: [PATCH] ARM: at91/defconfig: add HLCDC driver to sama5_defconfig
-Message-ID: <1461682887-28014-1-git-send-email-nicolas.ferre@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Apr 2016 16:03:19 +0100
+Subject: [PATCH 10/18] ASoC: sti: Update example to include
+ assigned-clocks and mclk-fs
+In-Reply-To: <20160426145129.GA11946@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-11-git-send-email-peter.griffin@linaro.org>
+ <20160421154933.GR3217@sirena.org.uk>
+ <20160426115210.GB5457@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160426142357.GW3217@sirena.org.uk>
+ <20160426145129.GA11946@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20160426150319.GY3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the LCD DRM driver with all its dependencies:
-- the MFD driver
-- the backlight PWM
-- the simple panel driver
+On Tue, Apr 26, 2016 at 03:51:29PM +0100, Peter Griffin wrote:
+> On Tue, 26 Apr 2016, Mark Brown wrote:
+> > On Tue, Apr 26, 2016 at 12:52:10PM +0100, Peter Griffin wrote:
 
-Remove the CONFIG_FB as it is not needed on any sama5 device.
+> > If there are never going to be any new users why bother at all, why
+> > would anyone paste it in when all the SoCs that ever use this are
+> > already upstream?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/configs/sama5_defconfig | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+> Generally if I come across documentation which is incorrect, I like to fix it.
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index e002b3bba5b4..f5a3966f6793 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -133,6 +133,7 @@ CONFIG_WATCHDOG=y
- CONFIG_AT91SAM9X_WATCHDOG=y
- CONFIG_SAMA5D4_WATCHDOG=y
- CONFIG_MFD_ATMEL_FLEXCOM=y
-+CONFIG_MFD_ATMEL_HLCDC=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ACT8865=y
-@@ -142,11 +143,14 @@ CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_VIDEO_ATMEL_ISI=y
- CONFIG_SOC_CAMERA_OV2640=y
--CONFIG_FB=y
-+CONFIG_DRM=y
-+CONFIG_DRM_ATMEL_HLCDC=y
-+CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
--# CONFIG_LCD_CLASS_DEVICE is not set
-+CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_BACKLIGHT_GENERIC is not set
-+CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -191,6 +195,7 @@ CONFIG_AT91_ADC=y
- CONFIG_AT91_SAMA5D2_ADC=y
- CONFIG_PWM=y
- CONFIG_PWM_ATMEL=y
-+CONFIG_PWM_ATMEL_HLCDC_PWM=y
- CONFIG_PWM_ATMEL_TCB=y
- CONFIG_EXT4_FS=y
- CONFIG_FANOTIFY=y
--- 
-2.1.3
+A lot of this is details of the system integration for this SoC, not
+actual errors.
+
+> Currently the DT ASoC documentation doesn't match the driver and the example
+> doesn't work, which is not ideal. I could well be the last person who needs
+> to read it & use the example, but deliberately leaving it with mistakes in
+> seemed like a bad idea.
+
+People might end up trying to use it as an example, it's fairly routine
+to have to explain to people that just because some old driver did
+something that doesn't mean it's something we want in new drivers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160426/7531f543/attachment.sig>
