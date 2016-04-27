@@ -1,39 +1,41 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Wed, 27 Apr 2016 10:57:51 +0300
-Subject: [RESEND PATCH v2 6/7] usb: xhci: plat: add generic PHY support
-In-Reply-To: <1461675460-2295-7-git-send-email-jszhang@marvell.com>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-7-git-send-email-jszhang@marvell.com>
-Message-ID: <20160427075751.GA3540@kuha.fi.intel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 27 Apr 2016 10:05:32 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2: add slow clock to watchdog node
+In-Reply-To: <1461676307-16059-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1461676307-16059-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20160427080532.GB3264@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 26/04/2016 at 15:11:47 +0200, Nicolas Ferre wrote :
+> As the watchdog timer needs the slow clock, add it to the currently defined
+> wdt node.
+> 
+> Reported-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-On Tue, Apr 26, 2016 at 08:57:39PM +0800, Jisheng Zhang wrote:
-> @@ -232,22 +265,44 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->  		xhci->shared_hcd->can_do_streams = 1;
+> ---
+>  arch/arm/boot/dts/sama5d2.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index 43015c2ad395..84eed47ffb0a 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -1050,6 +1050,7 @@
+>  				compatible = "atmel,sama5d4-wdt";
+>  				reg = <0xf8048040 0x10>;
+>  				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				clocks = <&clk32k>;
+>  				status = "disabled";
+>  			};
 >  
-> +	hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
-> +	if (IS_ERR(hcd->phy)) {
-> +		ret = PTR_ERR(hcd->phy);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto put_usb3_hcd;
-> +		hcd->phy = NULL;
-> +	}
-> +
-> +	phy = devm_phy_get(&pdev->dev, "usb-phy");
-
-"usb-phy" for what I understand is the USB3 PHY right?
-
-I was unable to find any definition for the phy names for example from
-Documentation/devicetree/bindings/usb/usb-xhci.txt, so I would say
-this needs to be "usb3-phy" and the phy names need to be defined
-somewhere.
-
-
-Thanks,
+> -- 
+> 2.1.3
+> 
 
 -- 
-heikki
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
