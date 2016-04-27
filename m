@@ -1,40 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Apr 2016 14:06:44 +1000
-Subject: [PATCH 2/4] arm64: dts: r8a7795: enable PCIe on Salvator-X
+Date: Wed, 27 Apr 2016 14:06:45 +1000
+Subject: [PATCH 3/4] arm64: dts: salvator-x: populate EXTALR
 In-Reply-To: <cover.1461723181.git.horms+renesas@verge.net.au>
 References: <cover.1461723181.git.horms+renesas@verge.net.au>
-Message-ID: <bbd273047b765b431411103c2f7a2688b7288c85.1461723181.git.horms+renesas@verge.net.au>
+Message-ID: <de5a79f125dd8c260d8c39b2bdced2a8fa957518.1461723181.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <Phil.Edworthy@renesas.com>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+It can be used for the watchdog.
+
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index b992b1a3d956..7c40ac8232f3 100644
+index 7c40ac8232f3..78c02937697e 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -388,3 +388,15 @@
- &ohci2 {
- 	status = "okay";
+@@ -141,6 +141,10 @@
+ 	clock-frequency = <16666666>;
  };
-+
-+&pcie_bus_clk {
-+	status = "okay";
+ 
++&extalr_clk {
++	clock-frequency = <32768>;
 +};
 +
-+&pciec0 {
-+	status = "okay";
-+};
-+
-+&pciec1 {
-+	status = "okay";
-+};
+ &pfc {
+ 	pinctrl-0 = <&scif_clk_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
