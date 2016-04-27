@@ -1,71 +1,88 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Apr 2016 10:52:00 +0200
-Subject: [PATCH 2/2] mmc: omap_hsmmc: Check if MMC slot name is passed in
- pdata
-In-Reply-To: <1461714383-9956-3-git-send-email-tony@atomide.com>
-References: <1461714383-9956-1-git-send-email-tony@atomide.com>
- <1461714383-9956-3-git-send-email-tony@atomide.com>
-Message-ID: <CAPDyKFqCMfBx=VFy05MNDhO5ZpLw9x=Xmdst9JR0zHy+GHYJyQ@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 27 Apr 2016 16:53:06 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <1f10ab4830032858bc4d6174528f18e8@agner.ch>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=SNp7bQZSUp5R5v9BfXMffS-4-msv12G5UAQJTxUMKW=A@mail.gmail.com>
+ <CAOMZO5BeAxPLerGMkaadkEZusW8wHkO5P6SiZeHOCKWstHUTSA@mail.gmail.com>
+ <1f10ab4830032858bc4d6174528f18e8@agner.ch>
+Message-ID: <CAA+hA=QJJ7zeHn+Luruyq2eGU+HWsv4UmFz7RNqkeaTP0eerUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2016 at 01:46, Tony Lindgren <tony@atomide.com> wrote:
-> The legacy user space for n900 relies on the MMC slot names.
-> Let's check if those are passed in pdata and use them.
+On Wed, Apr 27, 2016 at 3:28 PM, Stefan Agner <stefan@agner.ch> wrote:
+> On 2016-04-26 19:56, Fabio Estevam wrote:
+>> On Tue, Apr 26, 2016 at 11:45 PM, Dong Aisheng <dongas86@gmail.com> wrote:
+>>
+>>>> We need to firstly understand why this is happening.  The .prepare hook
+>>>> is defined to be non-atomic context, and so that we call sleep function
+>>>> in there.  We did everything right.  Why are we getting the warning?  If
+>>>> I'm correct, this warning only happens on i.MX7D.  Why is that?
+>>>>
+>>>
+>>> This is mainly caused by during kernel early booting, there's only one init idle
+>>> task running.
+>>> See:
+>>> void __init sched_init(void)
+>>> {
+>>> .....
+>>>         /*
+>>>          * Make us the idle thread. Technically, schedule() should not be
+>>>          * called from this thread, however somewhere below it might be,
+>>>          * but because we are the idle thread, we just pick up running again
+>>>          * when this runqueue becomes "idle".
+>>>          */
+>>>         init_idle(current, smp_processor_id());
+>>> ...
+>>> }
+>>>
+>>> And the idle sched class indicates it's not valid to schedule for idle task.
+>>> const struct sched_class idle_sched_class = {
+>>>         /* .next is NULL */
+>>>         /* no enqueue/yield_task for idle tasks */
+>>>
+>>>         /* dequeue is not valid, we print a debug message there: */
+>>>         .dequeue_task           = dequeue_task_idle,
+>>> ...........
+>>>
+>>> }
+>>>
+>>> /*
+>>>  * It is not legal to sleep in the idle task - print a warning
+>>>  * message if some code attempts to do it:
+>>>  */
+>>> static void
+>>> dequeue_task_idle(struct rq *rq, struct task_struct *p, int flags)
+>>> {
+>>>         raw_spin_unlock_irq(&rq->lock);
+>>>         printk(KERN_ERR "bad: scheduling from the idle thread!\n");
+>>>         dump_stack();
+>>>         raw_spin_lock_irq(&rq->lock);
+>>> }
+>>>
+>>>
+>>> Below is the full log of imx7d booting FYI.
+>>
+>> This does not answer Shawn's question: why do we see this only on mx7d?
 >
-> Then when we have a generic MMC slot name binding we can
-> switch to use that assuming it works for the n900 legacy
-> user space too.
+> I was wondering that too.... My theory is that either on i.MX 6 the
+> clocks enable almost instantly leading to no sleep, or they are just
+> bootloader/firmware on...?
+>
 
-I dropped this section, because I don't think it will happen.
+Yes, for core plls, they're already enabled in bootloader.
+We observed this issue on MX7D is because we rudely enable all clocks
+for it and MX7D AV PLLs which will lead to sleep reveals this issue.
 
->
-> As this makes the DT booting compatible with legacy booting,
-> we should be able to start dropping omap3 legacy booting
-> support in v4.8.
->
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Regards
+Dong Aisheng
 
-Thanks, applied for next!
-
-Kind regards
-Uffe
-
-> ---
->
-> Ulf, this is safe to pick separately to the MMC tree if it looks
-> acceptable to you.
->
->
->  drivers/mmc/host/omap_hsmmc.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index e9d75c6..3563321 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1946,13 +1946,17 @@ MODULE_DEVICE_TABLE(of, omap_mmc_of_match);
->
->  static struct omap_hsmmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
->  {
-> -       struct omap_hsmmc_platform_data *pdata;
-> +       struct omap_hsmmc_platform_data *pdata, *legacy;
->         struct device_node *np = dev->of_node;
->
->         pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
->         if (!pdata)
->                 return ERR_PTR(-ENOMEM); /* out of memory */
->
-> +       legacy = dev_get_platdata(dev);
-> +       if (legacy && legacy->name)
-> +               pdata->name = legacy->name;
-> +
->         if (of_find_property(np, "ti,dual-volt", NULL))
->                 pdata->controller_flags |= OMAP_HSMMC_SUPPORTS_DUAL_VOLT;
->
 > --
-> 2.8.1
->
+> Stefan
