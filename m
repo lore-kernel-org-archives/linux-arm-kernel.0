@@ -1,106 +1,106 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 27 Apr 2016 10:16:40 +0530
-Subject: [PATCH 1/6] bus: Add shared MDIO bus framework
-In-Reply-To: <20160426194102.GF30107@lunn.ch>
-References: <1461230323-27891-1-git-send-email-pramod.kumar@broadcom.com>
- <5167289.0a4LBoWhyX@wuerfel> <20160426182335.GE30107@lunn.ch>
- <9424602.Vqb0FY56gH@wuerfel> <20160426194102.GF30107@lunn.ch>
-Message-ID: <CAALAos_bPnT96xA883mkkjwUTut=_NJymUZKM=-0ZujdDxNEkA@mail.gmail.com>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 27 Apr 2016 08:25:38 +0300
+Subject: [RESEND PATCH v2 1/7] usb: xhci: plat: Fix suspend/resume when
+ the optional clk exists
+In-Reply-To: <1461675460-2295-2-git-send-email-jszhang@marvell.com>
+References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
+ <1461675460-2295-2-git-send-email-jszhang@marvell.com>
+Message-ID: <87shy7pqr1.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 1:11 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Apr 26, 2016 at 09:24:34PM +0200, Arnd Bergmann wrote:
->> On Tuesday 26 April 2016 20:23:35 Andrew Lunn wrote:
->> > > A more complex problem would be having a PHY driver for a device
->> > > that can be either an ethernet phy or some other phy.
->> >
->> > I doubt that ever happens. You can have up to 32 different devices on
->> > an MDIO bus. Since an Ethernet PHY and a "some other sort of PHY" are
->> > completely different things, why would a hardware engineer place them
->> > on the same address? It is like saying your ATA controller and VGA
->> > controller share the same slot on the PCI bus...
->>
->> To clarify: what I meant is a device that is designed as a PHY for
->> similar hardware (e.g. SATA, USB3 and PCIe) and that has a common
->> register set and a single driver, but that driver can operate
->> in multiple modes. You typically have multiple instances of
->> such hardware, with each instance linked to exactly one host
->> device, but one driver for all of them.
->>
->> See Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
->> and drivers/phy/phy-xgene.c for one such example.
+
+Hi,
+
+(since you're fixing somebody else's commit, it's nice to Cc authors)
+
+Jisheng Zhang <jszhang@marvell.com> writes:
+> Commit 4718c1774051 ("usb: host: xhci-plat: add clock support") adds
+> optional clk support, but it forgets to prepare/disable and
+                                          ^^^^^^^^^^^^^^^
+                                          prepare/enable ?
+
+> enable/unprepare the clk in the resume/suspend path. This path fixes
+  ^^^^^^^^^^^^^^^^                                          ^^^^
+  disable/unprepare ?                                       patch
+
+> this issue by adding missing clk related calls.
+
+frankly, I'm not sure this patch is entirely correct. At minimum, it's
+not necessarily a bug fix. Original commit had no intent in gating
+clocks during suspend/resume and, IMHO, that might not be what *all*
+XHCI implementations want, though I'm not entirely sure.
+
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Fixes: 4718c1774051 ("usb: host: xhci-plat: add clock support")
+
+Assuming this is, indeed, a fix; you need to Cc stable here. Just add:
+
+Cc: <stable@vger.kernel.org> # v3.16+
+
+> ---
+>  drivers/usb/host/xhci-plat.c | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
 >
-> Interesting. Also, that this lists SGMII. I assume this is a phy in
-> the MAC in order to talk to the Ethernet PHY.
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 474b5fa..8cb46cb 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -295,6 +295,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int xhci_plat_suspend(struct device *dev)
+>  {
+> +	int ret;
+
+this would look neater after hcd and xhci declarations below
+
+>  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+>  
+> @@ -306,14 +307,25 @@ static int xhci_plat_suspend(struct device *dev)
+>  	 * reconsider this when xhci_plat_suspend enlarges its scope, e.g.,
+>  	 * also applies to runtime suspend.
+>  	 */
+> -	return xhci_suspend(xhci, device_may_wakeup(dev));
+> +	ret = xhci_suspend(xhci, device_may_wakeup(dev));
+> +	if (ret)
+> +		return ret;
+> +
+> +	clk_disable_unprepare(xhci->clk);
+> +
+> +	return ret;
+>  }
+>  
+>  static int xhci_plat_resume(struct device *dev)
+>  {
+> +	int ret;
+
+ditto
+
+>  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+>  
+> +	ret = clk_prepare_enable(xhci->clk);
+> +	if (ret)
+> +		return ret;
+> +
+>  	return xhci_resume(xhci, 0);
+>  }
+>  
+> -- 
+> 2.8.1
 >
-> I still don't see it being a big problem if a phy driver implements an
-> Ethernet PHY. It just needs to call phy_device_create() and
-> phy_device_register().
->
->         Andrew
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-It is really interesting to see the evolution of MDIO bus:
-
-1. Traditionally, MDIO controller used to be part of each ethernet controller
-itself so each ethernet controller used to have it's own 2 wire MDIO bus
-
-2. Next, we saw SoC with multiple ethernet controllers sharing same MDIO
-bus. In other words, we saw multiple MDIO bus being muxed over single
-MDIO bus with additional bus select lines (I think this is when
-drivers/net/phy/mdio-mux.c APIs were implemented but at this point all
-PHYs on muxed MDIO bus were ethernet PHYs).
-
-3. Then, we saw SoC with ethernet switch devices also accessible over
-shared MDIO bus (or Muxed MDIO bus) along with ethernet PHYs (I guess
-this is why we have drivers/net/phy/mdio_device.c which adds
-"mdio_device" for non-ethernet-PHY devices on MDIO bus).
-
-4. Now, we have SoC with SATA PHYs, PCIe PHYs, USB PHYs, and Ethernet
-PHYs all accessible over same shared MDIO bus (or Muxed MDIO bus). The
-SATA PHYs and PCIe PHYs are registered to "Generic PHY framework". For
-USB PHYs, we can either register to "Generic PHY framework" or "USB PHY
-framework". For Ethernet PHYs, we register MDIO bus instance to "Ethernet
-MDIO framework".
-
-The devices on ARM64 SoC has to be within first 4GB and RAM has to start
-from first 4GB to be ARM compliant because ARM64 CPUs have 32bit mode and
-all devices and RAM should be available to 32bit mode with MMU disabled.
-This means that we only have 4GB to fit all devices registers and some
-portion of RAM. Some of these non-Ethernet PHYs have tons of registers so
-as number of PHYs increase in a SoC they will eat-up lot of first 4GB
-address space. Using same MDIO bus for all types of PHYs (SATA, PCIe, USB,
-and Ethernet) is actually a good approach because it actually saves lot of
-first 4GB address space. In future, more devices will be moved to a shared
-MDIO bus which are less frequently accessed.
-
-For Broadcom iProc SoCs, the design choice has already been made to use
-shared MDIO bus for all PHYs. In fact, Broadcom iProc NS2 SoC already has
-a shared MDIO bus for SATA PHYs, USB PHYs, PCIe PHYs, and Ethernet
-PHYs and more Broadcom iProc SoCs are on their way. Of course, there are
-few exceptions in iProc SoCs such as SATA PHYs where we also have memory
-mapped registers to access PHYs but other PHYs don't have such memory
-mapped registers.
-
-Clearly from above, the traditional 2 wire MDIO bus is now a shared MDIO
-bus with 2-wire plus additional select lines. Also, now we have SoCs (such
-as Broadcom iProc SoCs) which has such shared MDIO bus and I think
-in-future we will have SoCs with a shared MDIO bus for variety of devices.
-
-For long term, we really need a clean solution to fit shared MDIO based
-PHY drivers in Linux kernel. Also, shared MDIO based PHY drivers should
-not be dependent on any particular IO subsystem (such as Linux Ethernet)
-because there are lot of use-cases where people want strip down kernel
-image by not-compiling IO subsystems which are not required.
-
-IMHO, we have several options in front of us:
-1. Use some light-weight framework (such as shared_mdio.c implemented
-by this patchset) under drivers/bus
-2. Extend "Generic PHY framework" to allow something like shared MDIO
-bus (as-per Arnd's suggestion)
-3. Move-out "MDIO-mux APIs" from drivers/net/phy to something like
-drivers/mdio-mux and make it independent of "Linux Ethernet subsystem".
-(... may be more options ...)
-
-Regards,
-Anup
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/4c64ec1f/attachment-0001.sig>
