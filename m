@@ -1,45 +1,64 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:12 -0700
-Subject: [PATCH v6 10/14] acpi, numa: remove unneeded acpi_numa=1
+Date: Wed, 27 Apr 2016 11:07:14 -0700
+Subject: [PATCH v6 12/14] acpi, numa,
+ srat: Improve SRAT error detection and add messages.
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-11-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-13-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-acpi_numa is default to 0, it's set to -1 when disable acpi numa or
-when a bad SRAT is parsed, and it's only consumed in srat_disabled()
-(compare it with 0) to continue parse the SRAT or not, so we don't
-need to set acpi_numa to 1 when we get a valid SRAT entry.
+Loosely based on code from Robert Richter and Hanjun Guo.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Improve out of range node detection as well as allow for Larger SRAT
+entities.
+
+Add printing of nice messages.
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/acpi/numa.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index 4217071f..30460f5 100644
---- a/arch/x86/mm/srat.c
-+++ b/arch/x86/mm/srat.c
-@@ -59,7 +59,6 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
- 	}
- 	set_apicid_to_node(apic_id, node);
- 	node_set(node, numa_nodes_parsed);
--	acpi_numa = 1;
- 	printk(KERN_INFO "SRAT: PXM %u -> APIC 0x%04x -> Node %u\n",
- 	       pxm, apic_id, node);
- }
-@@ -101,7 +100,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index d7d0499..50c8f42 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -252,8 +252,11 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
  
- 	set_apicid_to_node(apic_id, node);
+ 	if (srat_disabled())
+ 		goto out_err;
+-	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
++	if (ma->header.length < sizeof(struct acpi_srat_mem_affinity)) {
++		pr_err("SRAT: Unexpected header length: %d\n",
++		       ma->header.length);
+ 		goto out_err_bad_srat;
++	}
+ 	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
+ 		goto out_err;
+ 	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
+@@ -267,13 +270,17 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ 		pxm &= 0xff;
+ 
+ 	node = acpi_map_pxm_to_node(pxm);
+-	if (node < 0) {
+-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
++	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
++		pr_err("SRAT: Too many proximity domains.\n");
+ 		goto out_err_bad_srat;
+ 	}
+ 
+-	if (numa_add_memblk(node, start, end) < 0)
++	if (numa_add_memblk(node, start, end) < 0) {
++		pr_err("SRAT: Failed to add memblk to node %u [mem %#010Lx-%#010Lx]\n",
++		       node, (unsigned long long) start,
++		       (unsigned long long) end - 1);
+ 		goto out_err_bad_srat;
++	}
+ 
  	node_set(node, numa_nodes_parsed);
--	acpi_numa = 1;
- 	printk(KERN_INFO "SRAT: PXM %u -> APIC 0x%02x -> Node %u\n",
- 	       pxm, apic_id, node);
- }
+ 
 -- 
 1.7.11.7
