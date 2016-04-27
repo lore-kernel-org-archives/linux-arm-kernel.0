@@ -1,33 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Apr 2016 10:30:24 +0200
-Subject: bug in autoloading of imx-ipuv3-crtc
-In-Reply-To: <13533046.1iFyOjiAs0@anubis.ausil.us>
-References: <6926808.b0joqYQPQE@anubis.ausil.us>
- <1513165.9WxCa41tI1@anubis.ausil.us>
- <20160420230317.GT29108@pengutronix.de>
- <13533046.1iFyOjiAs0@anubis.ausil.us>
-Message-ID: <1461745824.4044.8.camel@pengutronix.de>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 27 Apr 2016 18:01:00 +0930
+Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
+In-Reply-To: <4956403.scaVRGhPEf@diego>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-4-git-send-email-joel@jms.id.au> <4956403.scaVRGhPEf@diego>
+Message-ID: <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dennis,
+On Thu, Apr 21, 2016 at 8:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> [+clock-related patches should include clock-maintainers and lists]
 
-Am Freitag, den 22.04.2016, 08:11 -0500 schrieb Dennis Gilmore:
-[...]
-> I reverted the 4 patches in that series
-> 
-> 407c9eba drm/imx: Remove of_node assignment from ipuv3-crtc driver probe
-> 304e6be6 gpu: ipu-v3: Assign of_node of child platform devices to 
-> corresponding ports
-> 99ae78c3 gpu: ipu-v3: Remove reg_offset field
-> c3ede03c gpu: ipu-v3: drop unused dmfc field from client platform data
-> 
-> and it then worked again.
-> 
-> Dennis
+Thanks.
 
-Thank you for testing this, I've sent a patch to set the dev->of_node
-pointer later so that the platform modalias matching should work again.
+> Am Donnerstag, 21. April 2016, 17:34:01 schrieb Joel Stanley:
+>> +For example:
+>> +
+>> +     clk_clkin: clk_clkin {
+>> +             #clock-cells = <0>;
+>> +             compatible = "fixed-clock";
+>> +             clock-frequency = <48000000>;
+>> +     };
+>> +
+>> +     clk_hpll: clk_hpll {
+>> +             compatible = "aspeed,g4-hpll-clock";
+>> +             #clock-cells = <0>;
+>> +             reg = <0x1e6e2008 0x4>;
+>> +     };
+>> +
+>> +     clk_apb: clk_apb at 1e6e2008 {
+>> +             #clock-cells = <0>;
+>> +             compatible = "aspeed,g4-apb-clock";
+>> +             reg = <0x1e6e2008 0x4>;
+>> +             clocks = <&clk_hpll>;
+>> +     };
+>
+> You have both the hpll and apb_clk in the same register (probably even more
+> clocks?) and separate clock instances where each instance will of_iomap the
+> register itself (and thus multiple times in general).
 
-best regards
-Philipp
+Yep. I agree that's not ideal.
+
+>
+> From what I remember exposing the clock controller as one block (instead of
+> declaring each clock individually in the dts) is still the preferred way but I
+> don't think I can find Mike's mail from back then easily.
+
+I can't picture how that would look. I took my lead from the moxart
+clock driver; is there a better example that I should follow?
+
+Cheers,
+
+Joel
