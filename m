@@ -1,122 +1,42 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 27 Apr 2016 15:19:48 +0200
-Subject: [PATCH V6 03/13] x86, ia64: Include acpi_pci_{add|remove}_bus to
- the default pcibios_{add|remove}_bus implementation.
-In-Reply-To: <20160427023429.GE6789@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-4-git-send-email-tn@semihalf.com>
- <20160427023429.GE6789@localhost>
-Message-ID: <5720BC74.7050200@semihalf.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Apr 2016 14:24:03 +0100
+Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
+In-Reply-To: <20160427182516.36bd5fb5@xhacker>
+References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
+ <1461675460-2295-8-git-send-email-jszhang@marvell.com>
+ <87bn4vpq7j.fsf@intel.com> <20160427095738.GG3217@sirena.org.uk>
+ <20160427182516.36bd5fb5@xhacker>
+Message-ID: <20160427132403.GN3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.04.2016 04:34, Bjorn Helgaas wrote:
-> On Fri, Apr 15, 2016 at 07:06:38PM +0200, Tomasz Nowicki wrote:
->> x86 and ia64 are the only arches that implement pcibios_{add|remove}_bus hooks
->> and implement them in the same way. Moreover ARM64 is going to do the same.
->> So it seems that acpi_pci_{add|remove}_bus is generic enough to be default
->> option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
->> acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
->> return if ACPI has been switched off in run time.
->>
->> After all we can remove x86 and ia64 pcibios_{add|remove}_bus
->> implementation.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Tested-by: Duc Dang <dhdang@apm.com>
->> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
->> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Tested-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>   arch/ia64/pci/pci.c   | 10 ----------
->>   arch/x86/pci/common.c | 10 ----------
->>   drivers/pci/probe.c   |  3 +++
->>   3 files changed, 3 insertions(+), 20 deletions(-)
->>
->> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
->> index 978d6af..be4c9ef 100644
->> --- a/arch/ia64/pci/pci.c
->> +++ b/arch/ia64/pci/pci.c
->> @@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
->>   	platform_pci_fixup_bus(b);
->>   }
->>
->> -void pcibios_add_bus(struct pci_bus *bus)
->> -{
->> -	acpi_pci_add_bus(bus);
->> -}
->> -
->> -void pcibios_remove_bus(struct pci_bus *bus)
->> -{
->> -	acpi_pci_remove_bus(bus);
->> -}
->> -
->>   void pcibios_set_master (struct pci_dev *dev)
->>   {
->>   	/* No special bus mastering setup handling */
->> diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
->> index 381a43c..7763a84 100644
->> --- a/arch/x86/pci/common.c
->> +++ b/arch/x86/pci/common.c
->> @@ -170,16 +170,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
->>   		pcibios_fixup_device_resources(dev);
->>   }
->>
->> -void pcibios_add_bus(struct pci_bus *bus)
->> -{
->> -	acpi_pci_add_bus(bus);
->> -}
->> -
->> -void pcibios_remove_bus(struct pci_bus *bus)
->> -{
->> -	acpi_pci_remove_bus(bus);
->> -}
->> -
->>   /*
->>    * Only use DMI information to set this if nothing was passed
->>    * on the kernel command line (which was parsed earlier).
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 8087297..ef569e8 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -12,6 +12,7 @@
->>   #include <linux/slab.h>
->>   #include <linux/module.h>
->>   #include <linux/cpumask.h>
->> +#include <linux/pci-acpi.h>
->>   #include <linux/pci-aspm.h>
->>   #include <linux/aer.h>
->>   #include <linux/acpi.h>
->> @@ -2101,10 +2102,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
->>
->>   void __weak pcibios_add_bus(struct pci_bus *bus)
->>   {
->> +	acpi_pci_add_bus(bus);
->>   }
->>
->>   void __weak pcibios_remove_bus(struct pci_bus *bus)
->>   {
->> +	acpi_pci_remove_bus(bus);
->>   }
->
-> Is this buying us something more than just getting rid of these
-> pcibios functions in the arches?  The arch-specific pcibios methods
-> by themselves don't seem too onerous, and I don't really want to add
-> #includes and calls to every firmware interface under the sun.
->
-> I admit it's a net removal of 17 lines, but I'm not sure it's a net
-> reduction in complexity for the reader, who now has to remember that
-> this ACPI stuff is a no-op on most arches.
->
-> As a tangent, some of the stuff in acpi_pci_add_bus() really belongs
-> elsewhere anyway.  For example, the _DSM stuff should probably be in
-> acpi_pci_root_create() since it's a one-per-host bridge kind of thing.
->
+On Wed, Apr 27, 2016 at 06:25:16PM +0800, Jisheng Zhang wrote:
+> On Wed, 27 Apr 2016 10:57:39 +0100 Mark Brown wrote:
+> > On Wed, Apr 27, 2016 at 08:37:20AM +0300, Felipe Balbi wrote:
 
-OK, I will add pcibios_add_bus to ARM64 arch code and call 
-acpi_pci_remove_bus(bus) from there.
+> > > > +	vbus = devm_regulator_get(&pdev->dev, "vbus");  
 
-Thanks,
-Tomasz
+> > > devm_regulator_get_optional() ??  
+
+> > Does USB work without a VBUS?  Unless the answer is yes then I'd expect
+> > this to be just a normal regulator_get().
+
+> Per spec no. But the vbus may be transparent to SW on some platforms, so I
+> think devm_regulator_get_optional() is better.
+
+Really, no.  If it's physically there the software needs to be written
+as such.  Please see the documentation and list archives for extensive
+discussion on this topic.
+
+> > This is all completely broken unless the supply is optional.
+
+> The supply is optional.
+
+To repeat a supply is only optional if it might be physically absent.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/5c7d5c8b/attachment.sig>
