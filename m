@@ -1,29 +1,21 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 27 Apr 2016 17:30:50 -0400
-Subject: [PATCH v2 3/3] ARM: dts: exynos: Lower SD card interface voltage
- to 2.8v on Odroid X/X2/U3
-In-Reply-To: <1461765620-6833-3-git-send-email-k.kozlowski@samsung.com>
-References: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
- <1461765620-6833-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <4691605f-545d-b721-af7d-e4b7669bcd79@osg.samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 27 Apr 2016 23:31:03 +0200
+Subject: [PATCH v4 4/4] ARM64: dts: rockchip: add dts file for RK3399
+ evaluation board
+In-Reply-To: <1461743693-10671-5-git-send-email-jay.xu@rock-chips.com>
+References: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
+ <1461743693-10671-5-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <4419038.ZuKFqUcQX9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello 
-
-On 04/27/2016 10:00 AM, Krzysztof Kozlowski wrote:
-> Odroid X/X2/U3 schematics say that SD card vmmc regulator
-> (LDO21/TFLASH) operates on 2.8 V. Mainline U-Boot uses that value as
-> well. 2.8 V is common on Exynos-based boards. Additionally use some
-> descriptive name for this regulator.
+Am Mittwoch, 27. April 2016, 15:54:53 schrieb Jianqun Xu:
+> This patch add rk3399-evb.dts for RK3399 evaluation board.
+> Tested on RK3399 evb.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+applied to my dts64-branch for 4.7
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks
+Heiko
