@@ -1,41 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Apr 2016 09:07:02 +1000
-Subject: [PATCH] arm64: dts: r8a7795: Don't disable referenced optional scif
- clock
-In-Reply-To: <cover.1461798058.git.horms+renesas@verge.net.au>
-References: <cover.1461798058.git.horms+renesas@verge.net.au>
-Message-ID: <f5515f9cdff136dc32517d4b81fe2b9091237b4a.1461798058.git.horms+renesas@verge.net.au>
+Date: Thu, 28 Apr 2016 09:08:06 +1000
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.7
+Message-ID: <cover.1461798352.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-clk_get() on a disabled clock node will return -EPROBE_DEFER, which can
-cause drivers to be deferred forever if such clocks are referenced in
-their devices' clocks properties.
+Please consider these second round of Renesas ARM based SoC DT updates for v4.7.
 
-Update the disabled external scif clock node so that it
-is not disabled to prevent this.
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-for-v4.7,
+which you have already pulled.
 
-Reported-by: J?rg Billeter <j@bitron.ch>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[simon: fix for v4.6 extracted from a larger patch targeted at v4.7]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 1 -
- 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a7315ebe3883..706d2426024f 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -120,7 +120,6 @@
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <0>;
--		status = "disabled";
- 	};
- 
- 	soc {
--- 
-2.7.0.rc3.207.g0ac5344
+The following changes since commit 6f92cb2f454c26d9bdada902e22af4bc361a5202:
+
+  ARM: dts: gose: Enable SDHI controllers (2016-04-25 14:10:11 +1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.7
+
+for you to fetch changes up to c9006ac628ca30dd0d06dad47677d338e243bb95:
+
+  ARM: dts: r8a7794: Don't disable referenced optional clocks (2016-04-27 11:37:01 +1000)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v4.7
+
+* Don't disable referenced optional clocks in DT of R-Car Gen 1 & 2 SoCs
+
+----------------------------------------------------------------
+Geert Uytterhoeven (5):
+      ARM: dts: r8a7778: Don't disable referenced optional clocks
+      ARM: dts: r8a7779: Don't disable referenced optional clocks
+      ARM: dts: r8a7790: Don't disable referenced optional clocks
+      ARM: dts: r8a7793: Don't disable referenced optional clocks
+      ARM: dts: r8a7794: Don't disable referenced optional clocks
+
+ arch/arm/boot/dts/r8a7778.dtsi | 1 -
+ arch/arm/boot/dts/r8a7779.dtsi | 1 -
+ arch/arm/boot/dts/r8a7790.dtsi | 5 +----
+ arch/arm/boot/dts/r8a7793.dtsi | 2 --
+ arch/arm/boot/dts/r8a7794.dtsi | 2 --
+ 5 files changed, 1 insertion(+), 10 deletions(-)
