@@ -1,27 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2016 10:34:38 +0100
-Subject: [PATCH v5 2/4] printk/nmi: warn when some message has been lost
- in NMI context
-In-Reply-To: <1461239325-22779-3-git-send-email-pmladek@suse.com>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-3-git-send-email-pmladek@suse.com>
-Message-ID: <20160427093438.GK19428@n2100.arm.linux.org.uk>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 27 Apr 2016 12:34:07 +0300
+Subject: [RESEND PATCH v2 6/7] usb: xhci: plat: add generic PHY support
+In-Reply-To: <20160427075751.GA3540@kuha.fi.intel.com>
+References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
+ <1461675460-2295-7-git-send-email-jszhang@marvell.com>
+ <20160427075751.GA3540@kuha.fi.intel.com>
+Message-ID: <87twinmm40.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 01:48:43PM +0200, Petr Mladek wrote:
-> @@ -64,8 +65,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
->  again:
->  	len = atomic_read(&s->len);
->  
-> -	if (len >= sizeof(s->buffer))
-> +	if (len >= sizeof(s->buffer)) {
-> +		atomic_inc(&nmi_message_lost);
 
-This should be fine - I think its reasonable to expect that no one is
-using a spinlock implementation for their atomic ops for this...
+Hi,
+
+Heikki Krogerus <heikki.krogerus@linux.intel.com> writes:
+> On Tue, Apr 26, 2016 at 08:57:39PM +0800, Jisheng Zhang wrote:
+>> @@ -232,22 +265,44 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>>  		xhci->shared_hcd->can_do_streams = 1;
+>>  
+>> +	hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
+>> +	if (IS_ERR(hcd->phy)) {
+>> +		ret = PTR_ERR(hcd->phy);
+>> +		if (ret == -EPROBE_DEFER)
+>> +			goto put_usb3_hcd;
+>> +		hcd->phy = NULL;
+>> +	}
+>> +
+>> +	phy = devm_phy_get(&pdev->dev, "usb-phy");
+>
+> "usb-phy" for what I understand is the USB3 PHY right?
+
+that doesn't appear to be documented anywhere ;-)
+
+> I was unable to find any definition for the phy names for example from
+> Documentation/devicetree/bindings/usb/usb-xhci.txt, so I would say
+> this needs to be "usb3-phy" and the phy names need to be defined
+> somewhere.
+
+yeah, usb3-phy sounds like a better name.
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/4946e7f5/attachment.sig>
