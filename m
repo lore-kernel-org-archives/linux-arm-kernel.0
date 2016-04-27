@@ -1,133 +1,61 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 27 Apr 2016 11:15:48 +0100
-Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <571FC2EC.9090605@ti.com>
-References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
- <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
- <571FC2EC.9090605@ti.com>
-Message-ID: <57209154.6050508@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 27 Apr 2016 12:15:00 +0200 (CEST)
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1604271212290.3941@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/16 20:35, Grygorii Strashko wrote:
-> On 04/26/2016 07:02 PM, Liviu Dudau wrote:
->> On Tue, Apr 26, 2016 at 06:28:52PM +0300, Grygorii Strashko wrote:
->>
->> Hi Grygorii,
->>
->> First time I'm seeing this patch, so I have a few questions, mostly
->> related to the commit message:
->
-> Hm. You are in cc for RFC.
-> Sry, forgot to add link [1].
->
->>
->>> This patch intended to fix following cases:
->>> - SoC-A has ARM GT, defines DT node for ARM GT and selects
->>> ARM_GLOBAL_TIMER statically in Kconfig file. SoC-B has ARM GT and
->>> defines DT node for ARM GT, but do not selects ARM_GLOBAL_TIMER
->>> statically in Kconfig file. In case of multiplatform build ARM GT will
->>> be implicitly enabled for SoC-B.
->>
->> Well, SoC-B has the GT *and* the DT node, so what is the problem with
->> enabling it for SoC-B? If there are reasons not to use the Global Timer
->> on SoC-B, surely a better option would be to mark it in DT with status = "disabled";
->
-> This was rejected [2]. DT describes HW and if it is functional the status = "disabled"
-> is not good choice.
-> ARM GT can't be used as clocksource/sched_clock/clockevent when CPUFreq or
-> CPUIdle are enabled :(, and this is Linux specific functionality and
-> not HW description.
+On Wed, 27 Apr 2016, Dong Aisheng wrote:
+> On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
+> >> Shawn,
+> >> What's your suggestion?
+> >
+> > I think this needs more discussion, and I just dropped Stefan's patch
+> > from my tree.
+> >
+> > We need to firstly understand why this is happening.  The .prepare hook
+> > is defined to be non-atomic context, and so that we call sleep function
+> > in there.  We did everything right.  Why are we getting the warning?  If
+> > I'm correct, this warning only happens on i.MX7D.  Why is that?
+> >
+> 
+> Why Stefan's patch works (checking irqs_disabled()) is because during kernel
+> time init, the irq is still not enabled. It fixes the issue indirectly.
+> See:
+> asmlinkage __visible void __init start_kernel(void)
+> {
+>         /*
+>          * Set up the scheduler prior starting any interrupts (such as the
+>          * timer interrupt). Full topology setup happens at smp_init()
+>          * time - but meanwhile we still have a functioning scheduler.
+>          */
+>         sched_init();
+>         .............
+>         time_init();
+>         ..............
+>         WARN(!irqs_disabled(), "Interrupts were enabled early\n");
+>         early_boot_irqs_disabled = false;
+>         local_irq_enable();
+> }
+> 
+> The issue can only happen when PLL enable causes a schedule during
+> imx_clock_init().
 
-It sounds to me like the cleanest option might then be to address it 
-within the Linux-specific driver itself. How feasible would it be for 
-the GT driver to detect at runtime whether CPUfreq/idle will be used and 
-simply refuse to register as a clocksource if so? (I guess there are 
-probably horrible initialisation order issues, at least...)
+Calling a function which might sleep _BEFORE_ kernel_init() is wrong. Don't
+try to work around such an issue by doing magic irq_disabled() checks and busy
+loops. Fix the call site and be done with it.
 
-Robin.
+Thanks,
 
->>
->>>
->>> - There is no way to disable ARM GT without modifying Kconfig file,
->>> once ARM_GLOBAL_TIMER is selected statically in Kconfig file.
->>
->> What about disabling the DT node?
->>
->> Not sure I properly understand the problem you are trying to solve here.
->
-> I'd like to have way to enable/disable ARM GT without modifying Kernel sources
-> (Kconfig specifically) which is now impossible.
->
->>
->>>
->>> Hence, fix above case by defining both HAVE_ARM_GLOBAL_TIMER and
->>> ARM_GLOBAL_TIMER as recommended by 'Adding common features and make
->>> the usage configurable' section in kconfig-language.txt. All places in
->>> ARM folder where ARM_GLOBAL_TIMER was used now replaced on
->>> HAVE_ARM_GLOBAL_TIMER.
->>
->> I'm OK with the way you have changed ARM_GLOBAL_TIMER from a sticky config
->> option to a selectable one, but I would like more details on the problem
->> this was causing you.
->>
->
-> The same HW (board) could be used with PM features enabled (power saving)
-> and disabled (-RT). Without this change it will require to have
-> and maintain two branches, but with it - just separate defconfig.
->
-> [1] http://lists.infradead.org/pipermail/linux-rockchip/2016-February/007159.html
-> [2] http://www.spinics.net/lists/devicetree/msg102918.html
->
->>
->>>
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Cc: Florian Fainelli <f.fainelli@gmail.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Wei Xu <xuwei5@hisilicon.com>
->>> Cc: Shawn Guo <shawnguo@kernel.org>
->>> Cc: Sascha Hauer <kernel@pengutronix.de>
->>> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
->>> Cc: Maxime Coquelin <maxime.coquelin@st.com>
->>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->>> Cc: Liviu Dudau <liviu.dudau@arm.com>
->>> Cc: Sudeep Holla <sudeep.holla@arm.com>
->>> Cc: Jun Nie <jun.nie@linaro.org>
->>> Cc: Michal Simek <michal.simek@xilinx.com>
->>> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
->>> Cc: Lars Persson <lars.persson@axis.com>
->>> Cc: Mike Looijmans <mike.looijmans@topic.nl>
->>> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>> Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>> ---
->>> Changes is v1:
->>> - updated mach-artpec
->>> - rebased on top of tip: timers/core
->>>     commit: 86d3473 time: Introduce do_sys_settimeofday64()
->>>
->>>    arch/arm/mach-artpec/Kconfig   | 2 +-
->>>    arch/arm/mach-bcm/Kconfig      | 4 ++--
->>>    arch/arm/mach-hisi/Kconfig     | 2 +-
->>>    arch/arm/mach-imx/Kconfig      | 2 +-
->>>    arch/arm/mach-rockchip/Kconfig | 2 +-
->>>    arch/arm/mach-sti/Kconfig      | 2 +-
->>>    arch/arm/mach-uniphier/Kconfig | 2 +-
->>>    arch/arm/mach-vexpress/Kconfig | 2 +-
->>>    arch/arm/mach-zx/Kconfig       | 2 +-
->>>    arch/arm/mach-zynq/Kconfig     | 2 +-
->>>    drivers/clocksource/Kconfig    | 7 ++++++-
->>>    11 files changed, 17 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-artpec/Kconfig b/arch/arm/mach-artpec/Kconfig
->>> index 6cbe5a2..6cbca77 100644
->>> --- a/arch/arm/mach-artpec/Kconfig
->>> +++ b/arch/arm/mach-artpec/Kconfig
->>> @@ -9,7 +9,7 @@ config MACH_ARTPEC6
->>>    	depends on ARCH_MULTI_V7
->>>    	select ARM_AMBA
->>>    	select ARM_GIC
->>> -	select ARM_GLOBAL_TIMER
->
-> [...]
->
+	tglx
