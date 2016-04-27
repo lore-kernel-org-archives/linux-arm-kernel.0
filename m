@@ -1,50 +1,27 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 12:34:07 +0300
-Subject: [RESEND PATCH v2 6/7] usb: xhci: plat: add generic PHY support
-In-Reply-To: <20160427075751.GA3540@kuha.fi.intel.com>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-7-git-send-email-jszhang@marvell.com>
- <20160427075751.GA3540@kuha.fi.intel.com>
-Message-ID: <87twinmm40.fsf@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Apr 2016 11:39:58 +0200
+Subject: [PATCH 0/3] MAINTAINERS: add new maintainers of NXP LPC32xx SoC
+In-Reply-To: <1461714919-25577-1-git-send-email-vz@mleia.com>
+References: <1461714919-25577-1-git-send-email-vz@mleia.com>
+Message-ID: <4622738.ujCxg0gb7N@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 27 April 2016 02:55:16 Vladimir Zapolskiy wrote:
+> Roland Stigge added initial support of NXP LPC32xx SoC series and
+> first boards powered by it, but for a while since v3.18-rc1 the
+> SoC support is unmaintained and became stale.
+> 
+> Vladimir Zapolskiy and Sylvain Lemieux expressed interest in
+> continuation of NXP LPC32xx maintenance, reflect this in MAINTAINERS
+> record file for better communication with Linux kernel community.
+> 
+> The maintenance change is in agreement with Arnd Bergmann:
+> 
 
-Hi,
+Looks good. Let's give Roland some time to reply (hopefully with
+and Ack), and then merge it for 4.7.
 
-Heikki Krogerus <heikki.krogerus@linux.intel.com> writes:
-> On Tue, Apr 26, 2016 at 08:57:39PM +0800, Jisheng Zhang wrote:
->> @@ -232,22 +265,44 @@ static int xhci_plat_probe(struct platform_device *pdev)
->>  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->>  		xhci->shared_hcd->can_do_streams = 1;
->>  
->> +	hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
->> +	if (IS_ERR(hcd->phy)) {
->> +		ret = PTR_ERR(hcd->phy);
->> +		if (ret == -EPROBE_DEFER)
->> +			goto put_usb3_hcd;
->> +		hcd->phy = NULL;
->> +	}
->> +
->> +	phy = devm_phy_get(&pdev->dev, "usb-phy");
->
-> "usb-phy" for what I understand is the USB3 PHY right?
+Thanks,
 
-that doesn't appear to be documented anywhere ;-)
-
-> I was unable to find any definition for the phy names for example from
-> Documentation/devicetree/bindings/usb/usb-xhci.txt, so I would say
-> this needs to be "usb3-phy" and the phy names need to be defined
-> somewhere.
-
-yeah, usb3-phy sounds like a better name.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/4946e7f5/attachment.sig>
+	Arnd
