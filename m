@@ -1,50 +1,46 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Wed, 27 Apr 2016 09:48:23 -0600
-Subject: [Linaro-acpi] Additional ACPI requirements
-In-Reply-To: <20160427112513.GC12598@leverpostej>
-References: <5720341F.3040702@redhat.com> <20160427112513.GC12598@leverpostej>
-Message-ID: <5720DF47.9060504@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Apr 2016 16:50:19 +0100
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <9452408.uEOOA4q1YW@wuerfel>
+References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+ <878tzzpq19.fsf@intel.com>
+ <20160427135859.GC20646@e104818-lin.cambridge.arm.com>
+ <9452408.uEOOA4q1YW@wuerfel>
+Message-ID: <20160427155019.GE20646@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2016 05:25 AM, Mark Rutland wrote:
-> On Tue, Apr 26, 2016 at 11:38:07PM -0400, Jon Masters wrote:
->> Hi Folks,
->>
->> There are a few requirements that I would like to ensure are documented
->> in various revised documentation. I'm curious to know whether you'd like
->> the current in-kernel documentation to include things at the level of
->> "GICv3 use requires that every processor have a Processor Device in the
->> DSDT". Is that too much detail for the kernel documentation?
+On Wed, Apr 27, 2016 at 04:11:17PM +0200, Arnd Bergmann wrote:
+> On Wednesday 27 April 2016 14:59:00 Catalin Marinas wrote:
+> > 
+> > I would be in favour of a dma_inherit() function as well. We could hack
+> > something up in the arch code (like below) but I would rather prefer an
+> > explicit dma_inherit() call by drivers creating such devices.
+> > 
+> > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> > index ba437f090a74..ea6fb9b0e8fa 100644
+> > --- a/arch/arm64/include/asm/dma-mapping.h
+> > +++ b/arch/arm64/include/asm/dma-mapping.h
+> > @@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
+> >  
+> >  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+> >  {
+> > -       if (dev && dev->archdata.dma_ops)
+> > -               return dev->archdata.dma_ops;
+> > +       while (dev) {
+> > +               if (dev->archdata.dma_ops)
+> > +                       return dev->archdata.dma_ops;
+> > +               dev = dev->parent;
+> > +       }
 > 
-> If this is about catching oversights and mistakes (as seems to be the
-> case for the example), having {boot,run}time checks in the kernel is
-> much more likely to have an impact, especially if there is a helpful
-> diagnostic.
-> 
-> Otherewise, this kind of requirement, if anything, belongs in the ACPI
-> spec. If it's in the ACPI spec, having it in the kernel is redundant. If
-> it's not in the ACPI spec, it will be an uphill struggle to convince
-> people to implement Linux-flavoured ACPI rather than generic, standard
-> ACPI.
-> 
-> Thanks,
-> Mark.
+> I think this would be a very bad idea: we don't want to have random
+> devices be able to perform DMA just because their parent devices
+> have been set up that way.
 
-I would agree with Mark that this is more appropriate to the ACPI spec
-where it can be fairly unambiguously described -- for example, something
-along the lines of "for every processor ID used in an MADT subtable,
-there must be a corresponding ACPI Device object with _HID ACPI0007...".
-
-That being said, why should this be required?  MADT subtables may have
-the info needed.
+I agree, it's a big hack. It would be nice to have a simpler way to do
+this in driver code rather than explicitly calling
+of_dma_configure/arch_setup_dma_ops as per the original patch in this
+thread.
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+Catalin
