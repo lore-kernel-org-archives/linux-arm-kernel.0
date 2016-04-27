@@ -1,237 +1,182 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 27 Apr 2016 17:09:19 +0100
-Subject: [PATCH V6 05/13] acpi, pci: Support IO resources when parsing
- PCI host bridge resources.
-In-Reply-To: <20160427151035.GT28464@e106497-lin.cambridge.arm.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-6-git-send-email-tn@semihalf.com>
- <20160427023916.GF6789@localhost> <20160427141429.GA7324@red-moon>
- <20160427151035.GT28464@e106497-lin.cambridge.arm.com>
-Message-ID: <20160427160919.GA7737@red-moon>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 27 Apr 2016 21:44:17 +0530
+Subject: [PATCH] dmaengine: pl330: Fix race in pl330_get_desc()
+In-Reply-To: <5720C301.1020707@arm.com>
+References: <bc03a8073460ebac253b80466d11654ee81f540e.1461687536.git.robin.murphy@arm.com>
+ <CABb+yY3JG=XyJekz==VYF+w7ptDBwgMyVJMHzO-uM_ynXKOcaA@mail.gmail.com>
+ <5720C301.1020707@arm.com>
+Message-ID: <CAJe_Zhc-ueMEi9mnW2VKQP8CD6LYXywbpQHP-Gv=aOV-ww=Syg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 04:10:36PM +0100, Liviu.Dudau at arm.com wrote:
-> On Wed, Apr 27, 2016 at 03:26:59PM +0100, Lorenzo Pieralisi wrote:
-> > On Tue, Apr 26, 2016 at 09:39:16PM -0500, Bjorn Helgaas wrote:
-> > > On Fri, Apr 15, 2016 at 07:06:40PM +0200, Tomasz Nowicki wrote:
-> > > > Platforms that have memory mapped IO port (such as ARM64) need special
-> > > > handling for PCI I/O resources. For host bridge's resource probing case
-> > > > these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
-> > > 
-> > > ia64 also has memory-mapped I/O port space.  It would be ideal to find
-> > > some way to handle ia64 and ARM64 similarly.  At the very least, we
-> > > have to make sure that this doesn't break ia64.  The ia64 dense/sparse
-> > > I/O spaces complicate things; I don't know if ARM64 has something
-> > > similar or not.
-> > 
-> > No it does not, and that's exactly the same problem we faced with
-> > the DT generic version of of_pci_range_to_resource() which basically
-> > relies on PCI_IOBASE to be defined to add code that creates IO port
-> > resources out of the MMIO resource describing how IO port space is
-> > mapped to MMIO (physical) address space.
-> > 
-> > IIRC everything hinges on PCI_IOBASE definition to make sure that
-> > of_pci_range_to_resource() *works*, which means that if PCI_IOBASE is
-> > not defined (ie IA64) that code - acpi_pci_root_remap_iospace() in this
-> > case - does nothing.
-> > 
-> > So acpi_pci_root_remap_iospace() is of_pci_range_to_resource() ACPI
-> > equivalent + the pci_remap_iospace() call (I have to dig into the
-> > logs to check why Liviu did not add a call to pci_remap_iospace()
-> > in of_pci_get_host_bridge_resources() - I want to do that actually).
-> 
-> Because of_pci_get_host_bridge_resources() only gives you a list of
-> resources, it doesn't allocate them. An arch or platform could add
-> further filtering to that list before it gets requested (in our case
-> it is done in pci-host-common.c)
+On 27 April 2016 at 19:17, Robin Murphy <robin.murphy@arm.com> wrote:
 
-Well, it does register the IO cpu physical address in pci_register_io_range()
-though, if pci_remap_iospace() fails in arch/platform code we can delete the
-resource but we must also unregister the corresponding cpu address from
-the IO ranges otherwise we end up with stale entries in the io_range_list.
+>> Instead of churning the code, I would suggest either check in a loop
+>> that we have a desc OR allocate 2 or NR_DEFAULT_DESC descriptors
+>> there. Probably we get more descriptors at the same cost of memory.
+>
+>
+> Having had a quick look into how beneficial that might be, I discover that
+> what's provoking the add_desc() race is something else causing
+> desc_pool->head to get wedged pointing at itself, so list_empty() forever
+> returns true and we kick off a storm of allocations while desc_pool->tail
+> fills up with unused descriptors. Looks like I'm going to have to set aside
+> some time to properly debug and fix this driver if I want to use it for
+> stress-testing IOMMU code...
+>
+OK, thanks.
+And yes, we still need to fix that potential race in pl330_get_desc,
+probably by retrying in a loop.
 
-Anyway, it is not related to this thread, I will see what I can do
-to improve that API from this standpoint.
+>>>
+>>> I'm also seeing what looks like another occasional race under the same
+>>> conditions where pl330_tx_submit() blows up from dma_cookie_assign()
+>>> dereferencing a bogus tx->chan, but I think that's beyond my ability to
+>>> figure out right now. Similarly the storm of WARNs from
+>>> pl330_issue_pending()
+>>> when using a large number of small buffers and dmatest.noverify=1. This
+>>> one was some obvious low-hanging fruit.
+>>>
+>> Sorry, that part of code has changed a lot since I wrote the driver,
+>> so more details will help me.
+>
+>
+> Here's the actual splat:
+>
+> [  220.649267] Unable to handle kernel paging request at virtual address
+> 100341338
+> [  220.666576] pgd = ffffff8008dcb000
+> [  220.679805] [100341338] *pgd=0000000000000000, *pud=0000000000000000
+> [  220.696116] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+> [  220.711579] Modules linked in:
+> [  220.724459] CPU: 3 PID: 1249 Comm: dma0chan5-copy0 Not tainted 4.6.0-rc4+
+> #527
+> [  220.741652] Hardware name: ARM Juno development board (r1) (DT)
+> [  220.757512] task: ffffffc976255400 ti: ffffffc975aa4000 task.ti:
+> ffffffc975aa4000
+> [  220.774979] PC is at pl330_tx_submit+0x68/0x108
+> [  220.789412] LR is at pl330_tx_submit+0x2c/0x108
+> [  220.803704] pc : [<ffffff80083dae08>] lr : [<ffffff80083dadcc>] pstate:
+> 800001c5
+> [  220.821078] sp : ffffffc975aa7c90
+> [  220.834236] x29: ffffffc975aa7c90 x28: ffffffc975e81800
+> [  220.849303] x27: ffffffc97626c018 x26: ffffff8008cd9000
+> [  220.864314] x25: 0000000000000000 x24: 0000000000000000
+> [  220.879300] x23: ffffff8008d8d410 x22: ffffff8008ce52f0
+> [  220.894266] x21: ffffffc976220d18 x20: ffffffc079138610
+> [  220.909139] x19: ffffffc976220c60 x18: 0000000000000010
+> [  220.923857] x17: 0000000000000007 x16: 0000000000000001
+> [  220.938418] x15: 0000000000000001 x14: 0001020304050607
+> [  220.952886] x13: 08090a0b0c0d0e0f x12: 1011121314151617
+> [  220.967305] x11: 18191a1b1c1d1e1f x10: 0001020304050607
+> [  220.981603] x9 : 0000000000000000 x8 : 0000000000000010
+> [  220.995783] x7 : 0000000000000001 x6 : ffffffc976220ce0
+> [  221.009899] x5 : 0000000100341330 x4 : ffffffc079138600
+> [  221.023775] x3 : 0000000000000000 x2 : ffffffc97626c158
+> [  221.037417] x1 : ffffffc97636a790 x0 : 0000000000000140
+> [  221.050845]
+> [  221.060126] Process dma0chan5-copy0 (pid: 1249, stack limit =
+> 0xffffffc975aa4020)
+> [  221.075704] Stack: (0xffffffc975aa7c90 to 0xffffffc975aa8000)
+> [  221.089574] 7c80:                                   ffffffc975aa7cd0
+> ffffff80083d9e60
+> [  221.105653] 7ca0: ffffffc9758b88c0 0000000000002b12 00000000000020b8
+> ffffff8008ce52f0
+> [  221.121765] 7cc0: 00000000f9f82b12 ffffffc0790e5b00 ffffffc975aa7e30
+> ffffff80080d7138
+> [  221.137833] 7ce0: ffffffc975e81780 ffffff8008d90b00 ffffff8008af0d40
+> ffffffc975e81800
+> [  221.153811] 7d00: ffffff80083d91c0 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.169777] 7d20: 0000000000000000 0000000000000000 ffffff8008ca7000
+> 000000323ef9fd9c
+> [  221.185714] 7d40: 0000000000000008 ffffffc975aa7e20 ffffff8008b265d8
+> 0000000000000000
+> [  221.201753] 7d60: 0000000000000010 0000000000000000 0000000175aa7dc0
+> 0000000000000000
+> [  221.217898] 7d80: 0000000000000259 0000000000000001 ffffff8008b265f0
+> ffffffc9758b88e8
+> [  221.234155] 7da0: ffffff8000002b12 ffffffc975aa7cd0 ffffffc976220c88
+> 00000000005d99c3
+> [  221.250577] 7dc0: 0000000000000001 000002f400000259 ffffff8008d12be0
+> ffffffc975aa7cc0
+> [  221.267166] 7de0: 0000000000000000 ffffffc975aa7df0 ffffff800bcc0bcc
+> ffffffc975aa7df8
+> [  221.283840] 7e00: ffffffc975aa7df8 c5b6eabfb5a2c4b8 ffffffc900000000
+> ffffff80080f2048
+> [  221.300672] 7e20: ffffffc975aa7e20 ffffffc975aa7e20 0000000000000000
+> ffffff8008085e10
+> [  221.317405] 7e40: ffffff80080d7068 ffffffc975e81780 0000000000000000
+> 0000000000000000
+> [  221.334211] 7e60: 0000000000000000 ffffff80080df900 ffffff80080d7068
+> 0000000000000000
+> [  221.351119] 7e80: 0000000000000000 ffffffc975e81800 0000000000000000
+> 0000000000000000
+> [  221.368086] 7ea0: ffffffc975aa7ea0 ffffffc975aa7ea0 0000000000000000
+> ffffff8000000000
+> [  221.385128] 7ec0: ffffffc975aa7ec0 ffffffc975aa7ec0 0000000000000000
+> 0000000000000000
+> [  221.402194] 7ee0: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.419345] 7f00: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.436492] 7f20: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.453629] 7f40: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.470764] 7f60: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.487893] 7f80: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.505008] 7fa0: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000000
+> [  221.522116] 7fc0: 0000000000000000 0000000000000000 0000000000000000
+> 0000000000000005
+> [  221.539221] 7fe0: 0000000000000000 0000000000000000 88898a8b8c8d8e8f
+> 8081828384858687
+> [  221.556415] Call trace:
+> [  221.568286] Exception stack(0xffffffc975aa7ad0 to 0xffffffc975aa7bf0)
+> [  221.584423] 7ac0:                                   ffffffc976220c60
+> ffffffc079138610
+> [  221.602172] 7ae0: ffffffc975aa7c90 ffffff80083dae08 ffffffc976812d00
+> ffffffc976aa2600
+> [  221.620055] 7b00: ffffffc975aa7b30 ffffff80080ebfa0 ffffffc975aa7b30
+> ffffff80080ec050
+> [  221.638012] 7b20: 00000000ffffb237 ffffffc976255400 ffffffc975aa7bd0
+> ffffff8008881408
+> [  221.656053] 7b40: ffffff8008ca7000 ffffff8008cd9000 ffffffc97feef380
+> ffffffc976255400
+> [  221.674207] 7b60: ffffffc975aa7b90 ffffff80080e6fb8 0000000000000140
+> ffffffc97636a790
+> [  221.692454] 7b80: ffffffc97626c158 0000000000000000 ffffffc079138600
+> 0000000100341330
+> [  221.710838] 7ba0: ffffffc976220ce0 0000000000000001 0000000000000010
+> 0000000000000000
+> [  221.729306] 7bc0: 0001020304050607 18191a1b1c1d1e1f 1011121314151617
+> 08090a0b0c0d0e0f
+> [  221.747943] 7be0: 0001020304050607 0000000000000001
+> [  221.763694] [<ffffff80083dae08>] pl330_tx_submit+0x68/0x108
+> [  221.780284] [<ffffff80083d9e60>] dmatest_func+0xca0/0x1248
+> [  221.796853] [<ffffff80080d7138>] kthread+0xd0/0xe8
+> [  221.812785] [<ffffff8008085e10>] ret_from_fork+0x10/0x40
+> [  221.829336] Code: f9402083 f9002043 f9401045 3902205f (b94008a3)
+> [  221.846910] ---[ end trace a413951a16f706c7 ]---
+>
+> The faulting instruction is the initial access to chan->cookie in
+> dma_cookie_assign(), and tx->chan (x5 here) seems to always be 0x100341330,
+> implying that tx is pointing somewhere near a struct pl330_config because
+> that 'address' is clearly the first two words of one of those (.periph_id,
+> .mode). I'm going to have to put this to one side for now and maybe come
+> back to it later, but I thought it was worth mentioning just in case it
+> looked familiar to anyone. I can usually hit it within a couple of runs of
+> dmatest with 8 channels, threads_per_chan=6, test_buf_size=16384 and
+> iterations=5000 (the point of which, if anyone's wondering, is to batter the
+> TLBs of the downstream SMMU with recycled addresses as much as possible).
+>
+I have had it tested just as well on some old platform and I didn't
+hit the issue.
+Let me try if I can guess where the problem is, which might
+'disappear' when we fix the real problem that this patch intended to
+fix.
 
-Thanks !
-Lorenzo
-
-> 
-> Best regards,
-> Liviu
-> 
-> > 
-> > The point here is: IO space (in DT and ACPI) handling is arch specific.
-> > 
-> > For DT, by relying on PCI_IOBASE, we left that code in drivers/of and
-> > it works (well, with some niggles - see the thread with Murali on IO
-> > space on TI keystone) for ARM/ARM64.
-> > 
-> > http://www.spinics.net/lists/linux-pci/msg49725.html
-> > 
-> > What are we going to do with the ACPI version ?
-> > 
-> > Do we want to add an arch specific call that takes the raw resource
-> > describing IO space and creates an IO port resource (and the MMIO
-> > equivalent - that's what add_io_space() does in IA64) and use that
-> > in generic ACPI parsing code ?
-> > 
-> > Or we just do what Tomasz does, which is basically the approach we took
-> > for DT ?
-> > 
-> > > > Furthermore, the same I/O resources need to be released after hotplug
-> > > > removal so that it can be re-added back by the pci_remap_iospace
-> > > > function during insertion. Therefore we implement new pci_unmap_iospace call
-> > > > which unmaps I/O space as the symmetry to pci_remap_iospace.
-> > > 
-> > > "Furthermore" is a hint that we should check to see if this can be
-> > > split into two patches.
-> > > 
-> > > We already have a pci_remap_iospace(), and you're adding
-> > > pci_unmap_iospace(), which will be used for hotplug removal.  So let's 
-> > > add pci_unmap_iospace() first in a patch by itself because that's
-> > > potentially useful for other callers of pci_remap_iospace(), even if
-> > > they don't need the acpi_pci_root_remap_iospace() stuff.
-> > 
-> > I agree.
-> > 
-> > Thanks,
-> > Lorenzo
-> > 
-> > > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> > > > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > > > ---
-> > > >  drivers/acpi/pci_root.c | 33 +++++++++++++++++++++++++++++++++
-> > > >  drivers/pci/pci.c       | 24 ++++++++++++++++++++++++
-> > > >  include/linux/pci.h     |  1 +
-> > > >  3 files changed, 58 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> > > > index d9a70c4..815b6ca 100644
-> > > > --- a/drivers/acpi/pci_root.c
-> > > > +++ b/drivers/acpi/pci_root.c
-> > > > @@ -742,6 +742,34 @@ next:
-> > > >  			resource_list_add_tail(entry, resources);
-> > > >  	}
-> > > >  }
-> > > > +static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
-> > > > +{
-> > > > +#ifdef PCI_IOBASE
-> > > > +	struct resource *res = entry->res;
-> > > > +	resource_size_t cpu_addr = res->start;
-> > > > +	resource_size_t pci_addr = cpu_addr - entry->offset;
-> > > > +	resource_size_t length = resource_size(res);
-> > > > +	unsigned long port;
-> > > > +
-> > > > +	if (pci_register_io_range(cpu_addr, length))
-> > > > +		goto err;
-> > > > +
-> > > > +	port = pci_address_to_pio(cpu_addr);
-> > > > +	if (port == (unsigned long)-1)
-> > > > +		goto err;
-> > > > +
-> > > > +	res->start = port;
-> > > > +	res->end = port + length - 1;
-> > > > +	entry->offset = port - pci_addr;
-> > > > +
-> > > > +	if (pci_remap_iospace(res, cpu_addr) < 0)
-> > > > +		goto err;
-> > > > +	pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
-> > > > +	return;
-> > > > +err:
-> > > > +	res->flags |= IORESOURCE_DISABLED;
-> > > > +#endif
-> > > > +}
-> > > >  
-> > > >  int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
-> > > >  {
-> > > > @@ -763,6 +791,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
-> > > >  			"no IO and memory resources present in _CRS\n");
-> > > >  	else {
-> > > >  		resource_list_for_each_entry_safe(entry, tmp, list) {
-> > > > +			if (entry->res->flags & IORESOURCE_IO)
-> > > > +				acpi_pci_root_remap_iospace(entry);
-> > > > +
-> > > >  			if (entry->res->flags & IORESOURCE_DISABLED)
-> > > >  				resource_list_destroy_entry(entry);
-> > > >  			else
-> > > > @@ -834,6 +865,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
-> > > >  
-> > > >  	resource_list_for_each_entry(entry, &bridge->windows) {
-> > > >  		res = entry->res;
-> > > > +		if (res->flags & IORESOURCE_IO)
-> > > > +			pci_unmap_iospace(res);
-> > > >  		if (res->parent &&
-> > > >  		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
-> > > >  			release_resource(res);
-> > > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > > > index 89e9996..c0f8a4e 100644
-> > > > --- a/drivers/pci/pci.c
-> > > > +++ b/drivers/pci/pci.c
-> > > > @@ -26,6 +26,7 @@
-> > > >  #include <linux/device.h>
-> > > >  #include <linux/pm_runtime.h>
-> > > >  #include <linux/pci_hotplug.h>
-> > > > +#include <linux/vmalloc.h>
-> > > >  #include <asm/setup.h>
-> > > >  #include <linux/aer.h>
-> > > >  #include "pci.h"
-> > > > @@ -3168,6 +3169,29 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> > > >  #endif
-> > > >  }
-> > > >  
-> > > > +/**
-> > > > + *	pci_unmap_iospace - Unmap the memory mapped I/O space
-> > > > + *	@res: resource to be unmapped
-> > > > + *
-> > > > + *	Unmap the CPU virtual address @res from virtual address space.
-> > > > + *	Only architectures that have memory mapped IO functions defined
-> > > > + *	(and the PCI_IOBASE value defined) should call this function.
-> > > > + */
-> > > > +void  pci_unmap_iospace(struct resource *res)
-> > > > +{
-> > > > +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-> > > > +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
-> > > > +
-> > > > +	unmap_kernel_range(vaddr, resource_size(res));
-> > > > +#else
-> > > > +	/*
-> > > > +	 * This architecture does not have memory mapped I/O space,
-> > > > +	 * so this function should never be called.
-> > > > +	 */
-> > > > +	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-> > > > +#endif
-> > > > +}
-> > > > +
-> > > >  static void __pci_set_master(struct pci_dev *dev, bool enable)
-> > > >  {
-> > > >  	u16 old_cmd, cmd;
-> > > > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > > > index c28adb4..df1f33d 100644
-> > > > --- a/include/linux/pci.h
-> > > > +++ b/include/linux/pci.h
-> > > > @@ -1168,6 +1168,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
-> > > >  unsigned long pci_address_to_pio(phys_addr_t addr);
-> > > >  phys_addr_t pci_pio_to_address(unsigned long pio);
-> > > >  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-> > > > +void pci_unmap_iospace(struct resource *res);
-> > > >  
-> > > >  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
-> > > >  {
-> > > > -- 
-> > > > 1.9.1
-> > > > 
-> > > 
-> > 
-> 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ??\_(???)_/??
+Thanks.
