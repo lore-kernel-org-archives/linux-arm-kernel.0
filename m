@@ -1,132 +1,148 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 27 Apr 2016 20:06:16 +0800
-Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
-In-Reply-To: <CAPDyKFpO89QWHST8XoBvRO4Y+Fv4Umt43B35E2vhm-z2WmZXSw@mail.gmail.com>
-References: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
- <1461404630.7081.9.camel@mhfsdcap03>
- <CAPDyKFpO89QWHST8XoBvRO4Y+Fv4Umt43B35E2vhm-z2WmZXSw@mail.gmail.com>
-Message-ID: <1461758776.20837.7.camel@mhfsdcap03>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 27 Apr 2016 14:08:38 +0200
+Subject: [PATCH] of: iommu: make of_iommu_init() postcore_initcall_sync
+In-Reply-To: <1461403987-10697-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1461403987-10697-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <7f0beaa3-442b-ad6e-129c-4c7cb22d9e12@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Wed, 2016-04-27 at 12:02 +0200, Ulf Hansson wrote:
-> On 23 April 2016 at 11:43, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > Hi,
-> > On Fri, 2016-04-22 at 14:24 +0200, Ulf Hansson wrote:
-> >> On 18 April 2016 at 09:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> >> > there are 2 points will cause could not call mmc_request_done()
-> >> > and eventually cause the caller thread blocked.
-> >> >
-> >> > A. if card was busy, cancel_delayed_work() will return false because
-> >> > the delay work has not been scheduled, in this case, need put
-> >> > mod_delayed_work() in front of msdc_cmd_is_ready()
-> >> >
-> >> > B. if a request really need more than 5s(Some Sandisk TF card), it will
-> >> > use cancel_delayed_work() to cancel itself, and also return false, so use
-> >> > in_interrupt() to avoid this case
-> >> >
-> >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> >> > ---
-> >> >  drivers/mmc/host/mtk-sd.c | 11 ++++++++---
-> >> >  1 file changed, 8 insertions(+), 3 deletions(-)
-> >> >
-> >> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> >> > index b17f30d..1511b1b 100644
-> >> > --- a/drivers/mmc/host/mtk-sd.c
-> >> > +++ b/drivers/mmc/host/mtk-sd.c
-> >> > @@ -724,7 +724,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
-> >> >         bool ret;
-> >> >
-> >> >         ret = cancel_delayed_work(&host->req_timeout);
-> >> > -       if (!ret) {
-> >> > +       if (!ret && in_interrupt()) {
-> >> >                 /* delay work already running */
-> >> >                 return;
-> >> >         }
-> >> > @@ -824,7 +824,12 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
-> >> >         }
-> >> >
-> >> >         if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
-> >> > -               tmo = jiffies + msecs_to_jiffies(20);
-> >> > +               /*
-> >> > +                * 2550ms is from EXT_CSD[248], after switch to hs200,
-> >> > +                * using CMD13 to polling card status, it will get response
-> >> > +                * of 0x800, but EMMC still pull-low DAT0.
-> >> > +                */
-> >>
-> >> Seems like you are solving a eMMC specific issue on your driver?
-> >>
-> >> Perhaps we should try to use a card quirk instead?
-> >
-> > Actually, this is a Bug of __mmc_switch(), Per JEDEC Spec, while switch
-> > speed mode, should not use CMD13 to get card status, as it's response
-> > cannot reflect that if card was busy now, for this CMD6 switch HS200
-> 
-> There is a statement applicable to all HS modes, which says it's *not
-> recommended* but *if* used, CRC errors shall be ignored.
-> 
-Yes, but if we ignore the CRC error check, how do we know current
-response is correct or incorrect ? if card is still busy but we get the
-response of 0x900 caused by latching error, then it still consider that
-card has already changed to trans state.
-So, it's better to never use CMD13 when change the speed mode.
-> That's what we have been doing so far, but perhaps that isn't good
-> enough for HS200/400.
-> 
-> > case, I tried some Samsung/Sandisk/KSI eMMC, issue CMD13 will always get
-> > 0x800, even eMMC has already changed to transfer state and DAT0 is high,
-> > the response of CMD13 is also 0x800, and will never be 0x900.
-> 
-> What do you mean by never? I assume it would when you extend the timeout?
-> 
-> Does your host driver make sure to ignore CRC errors in this case?
-> Just to be sure, that isn't the problem.
-> 
-> > So, in __mmc_switch(), it's a bug to use CMD13 to know that if card has
-> > already changed to transfer state.
-> 
-> Whether it's a bug or not, it seems like we have eMMC cards that we
-> have issues to support because of the way we have interpreted the
-> spec. So let's try to fix them!
-> 
-> > But, Our host do not support MMC_CAP_WAIT_WHILE_BUSY, that's why we hit
-> > this issue.
-> 
-> Okay, I see.
-> 
-> Let's try to change the behaviour in __mmc_switch() to prevent it to
-> send CMD13 before the cards stops signal busy on DAT0, when switching
-> to HS200/HS400 mode.
-> What I have in mind is:
-> 
-> 1.
-> When the host controller doesn't support MMC_CAP_WAIT_WHILE_BUSY, we
-> would then to wait for a fixed timeout, before we send CMD13. In this
-> case, do you know if the "generic_cmd6_time" is working for your eMMC
-> devices that you had issues with?
-> 
-In general, generic_cmd6_time is enough, unless the card has firmware
-issue itself,
-> 2.
-> In additional to the above solution, we can for those hosts that
-> supports the ->card_busy() ops, but not MMC_CAP_WAIT_WHILE_BUSY,
-> invoke the ->card_busy() in a polling manner. Of course the above
-> timeout should also be considered as we need to stop polling at some
-> point.
-> 
-this is what I want to do it, use the ops->card_busy() to check DAT0
-status. if a host do not support MMC_CAP_WAIT_WHILE_BUSY and there is
-no ops->card_busy(), then the only way is wait a fixed
-timeout(generic_cmd6_time).
+Hello,
 
-> So I noticed the Mediatek mmc host driver supports the ->card_busy()
-> ops. So I think you can try 1) first, then extend it to 2).
-> 
-> Does it makes sense?
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
+
+On 2016-04-23 11:33, Kefeng Wang wrote:
+> The of_iommu_init() is called multiple times by arch code,
+> make it postcore_initcall_sync, then we can drop relevant
+> calls fully.
+>
+> Note, the IOMMUs should have a chance to perform some basic
+> initialisation before we start adding masters to them. So
+> postcore_initcall_sync is good choice, it ensures of_iommu_init()
+> called before of_platform_populate.
+>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Works fine on Samsung Exynos 4412 based Odroid U3 board.
+
+> ---
+>   arch/arm/kernel/setup.c     | 2 --
+>   arch/arm64/kernel/setup.c   | 2 --
+>   arch/sh/boards/of-generic.c | 2 --
+>   drivers/iommu/of_iommu.c    | 5 ++++-
+>   include/linux/of_iommu.h    | 2 --
+>   5 files changed, 4 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 2c4bea3..18a29a0 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -19,7 +19,6 @@
+>   #include <linux/bootmem.h>
+>   #include <linux/seq_file.h>
+>   #include <linux/screen_info.h>
+> -#include <linux/of_iommu.h>
+>   #include <linux/of_platform.h>
+>   #include <linux/init.h>
+>   #include <linux/kexec.h>
+> @@ -902,7 +901,6 @@ static int __init customize_machine(void)
+>   	 * machine from the device tree, if no callback is provided,
+>   	 * otherwise we would always need an init_machine callback.
+>   	 */
+> -	of_iommu_init();
+>   	if (machine_desc->init_machine)
+>   		machine_desc->init_machine();
+>   #ifdef CONFIG_OF
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 9dc6776..e20b64f 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -39,7 +39,6 @@
+>   #include <linux/fs.h>
+>   #include <linux/proc_fs.h>
+>   #include <linux/memblock.h>
+> -#include <linux/of_iommu.h>
+>   #include <linux/of_fdt.h>
+>   #include <linux/of_platform.h>
+>   #include <linux/efi.h>
+> @@ -365,7 +364,6 @@ void __init setup_arch(char **cmdline_p)
+>   static int __init arm64_device_init(void)
+>   {
+>   	if (of_have_populated_dt()) {
+> -		of_iommu_init();
+>   		of_platform_populate(NULL, of_default_bus_match_table,
+>   				     NULL, NULL);
+>   	} else if (acpi_disabled) {
+> diff --git a/arch/sh/boards/of-generic.c b/arch/sh/boards/of-generic.c
+> index bf3a166..b4d4313 100644
+> --- a/arch/sh/boards/of-generic.c
+> +++ b/arch/sh/boards/of-generic.c
+> @@ -11,7 +11,6 @@
+>   #include <linux/of.h>
+>   #include <linux/of_platform.h>
+>   #include <linux/of_fdt.h>
+> -#include <linux/of_iommu.h>
+>   #include <linux/clocksource.h>
+>   #include <linux/irqchip.h>
+>   #include <linux/clk-provider.h>
+> @@ -185,7 +184,6 @@ static int __init sh_of_device_init(void)
+>   {
+>   	pr_info("SH generic board support: populating platform devices\n");
+>   	if (of_have_populated_dt()) {
+> -		of_iommu_init();
+>   		of_platform_populate(NULL, of_default_bus_match_table,
+>   				     NULL, NULL);
+>   	} else {
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 5fea665..04cc80f 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -174,7 +174,7 @@ err_put_node:
+>   	return NULL;
+>   }
+>   
+> -void __init of_iommu_init(void)
+> +static int __init of_iommu_init(void)
+>   {
+>   	struct device_node *np;
+>   	const struct of_device_id *match, *matches = &__iommu_of_table;
+> @@ -186,4 +186,7 @@ void __init of_iommu_init(void)
+>   			pr_err("Failed to initialise IOMMU %s\n",
+>   				of_node_full_name(np));
+>   	}
+> +
+> +	return 0;
+>   }
+> +postcore_initcall_sync(of_iommu_init);
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index ffbe470..e2c2e71 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -11,7 +11,6 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+>   			     int index, unsigned long *busno, dma_addr_t *addr,
+>   			     size_t *size);
+>   
+> -extern void of_iommu_init(void);
+>   extern struct iommu_ops *of_iommu_configure(struct device *dev,
+>   					struct device_node *master_np);
+>   
+> @@ -24,7 +23,6 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>   	return -EINVAL;
+>   }
+>   
+> -static inline void of_iommu_init(void) { }
+>   static inline struct iommu_ops *of_iommu_configure(struct device *dev,
+>   					 struct device_node *master_np)
+>   {
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
