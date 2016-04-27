@@ -1,33 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2016 11:41:10 +0100
-Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <571FC2EC.9090605@ti.com>
-References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
- <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
- <571FC2EC.9090605@ti.com>
-Message-ID: <20160427104110.GU5783@n2100.arm.linux.org.uk>
+Date: Wed, 27 Apr 2016 11:49:18 +0100
+Subject: [PATCH 3/3] ARM: domain: move {set, get}_domain under config guard
+In-Reply-To: <1461325416-29570-4-git-send-email-vladimir.murzin@arm.com>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <1461325416-29570-4-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160427104918.GQ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 10:35:08PM +0300, Grygorii Strashko wrote:
-> On 04/26/2016 07:02 PM, Liviu Dudau wrote:
-> > Well, SoC-B has the GT *and* the DT node, so what is the problem with
-> > enabling it for SoC-B? If there are reasons not to use the Global Timer
-> > on SoC-B, surely a better option would be to mark it in DT with status = "disabled";
+On Fri, Apr 22, 2016 at 12:43:36PM +0100, Vladimir Murzin wrote:
+> Domains is not available on !MMU cores, like R/M class. However,
+> currently guarding manages M-class only, for the R-class, in case
+> of fault we get in recursive "undefined instruction" faulting because
+> __show_regs() tries to get domain information.
 > 
-> This was rejected [2]. DT describes HW and if it is functional the status = "disabled"
-> is not good choice.
-> ARM GT can't be used as clocksource/sched_clock/clockevent when CPUFreq or
-> CPUIdle are enabled :(, and this is Linux specific functionality and
-> not HW description. 
+> Fix it by extending CONFIG_CPU_USE_DOMAINS on {set,get}_domain
+> functions and providing stubs for the case where Domains is not
+> supported.
 
-Sorry, but we don't want to have to disable drivers in the kernel just
-because one platform has a problem (consider the single zImage case
-where it may be required that the global timer is enabled for some
-platform to boot - it becomes mandatory in single zImage at that point.)
+Huge big bloody NAK.
 
-Maybe a linux-specific property is needed here - "linux,low-power-unstable"
-or something like that?
+I think it would be useful if you read the history of the file,
+particularly looking at commit a5e090acbf545c0a3b04080f8a488b17ec41fe02.
+
+It really amazes me how people propose patches which undo bits of
+previous patches without making comments about it.
+
+No way is this patch going in, which has the effect of completely
+disabling SW PAN, sorry.
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
