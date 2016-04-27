@@ -1,45 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 27 Apr 2016 10:13:48 +0800
-Subject: [PATCH 0/3 v2] arm64: defconfig updates
-In-Reply-To: <HE1PR04MB1641EB5615245CC5A5BE041F8D630@HE1PR04MB1641.eurprd04.prod.outlook.com>
-References: <1461167836-3163-1-git-send-email-stuart.yoder@nxp.com>
- <20160426101546.GI8870@tiger>
- <HE1PR04MB1641EB5615245CC5A5BE041F8D630@HE1PR04MB1641.eurprd04.prod.outlook.com>
-Message-ID: <20160427021348.GF30692@tiger>
+From: prime.zeng@hisilicon.com (Zengtao (B))
+Date: Wed, 27 Apr 2016 02:13:01 +0000
+Subject: [PATCH] arm64: fix /proc/cpuinfo for elf32
+In-Reply-To: <571F32F3.7080005@arm.com>
+References: <1461555453-60440-1-git-send-email-prime.zeng@huawei.com>
+ <20160425091239.GB9614@e104818-lin.cambridge.arm.com>
+ <678F3D1BB717D949B966B68EAEB446ED0A6E6FB7@SZXEMA509-MBX.china.huawei.com>
+ <571F32F3.7080005@arm.com>
+Message-ID: <678F3D1BB717D949B966B68EAEB446ED0A6E7595@SZXEMA509-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 01:52:06PM +0000, Stuart Yoder wrote:
+> -----Original Message-----
+> From: Suzuki K Poulose [mailto:Suzuki.Poulose at arm.com]
+> Sent: Tuesday, April 26, 2016 5:21 PM
+> To: Zengtao (B); Catalin Marinas
+> Cc: will.deacon at arm.com; mark.rutland at arm.com; yang.shi at linaro.org;
+> linux-kernel at vger.kernel.org; james.morse at arm.com;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm64: fix /proc/cpuinfo for elf32
 > 
+> On 26/04/16 03:21, Zengtao (B) wrote:
+> >
+> > So you mean the 64-bit grep should see the same cpuinfo as its father process
+> > which is 32-bit?
+> >
+> > For 32-bit process running on 64-bit kernel, we have to explicitly call the
+> personality
+> > syscall to get the right cpuinfo, but how to deal with the old 32-bit binaries?
 > 
-> > -----Original Message-----
-> > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> > Sent: Tuesday, April 26, 2016 5:16 AM
-> > To: Stuart Yoder <stuart.yoder@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com; will.deacon at arm.com;
-> > kernel at pengutronix.de; Yang-Leo Li <leoyang.li@nxp.com>; Scott Wood <scott.wood@nxp.com>;
-> > marc.zyngier at arm.com; mark.rutland at arm.com
-> > Subject: Re: [PATCH 0/3 v2] arm64: defconfig updates
-> > 
-> > On Wed, Apr 20, 2016 at 10:57:16AM -0500, Stuart Yoder wrote:
-> > > Stuart Yoder (3):
-> > >   arm64: defconfig: cleanup the defconfig
-> > >   arm64: defconfig: enable 48-bit virtual addresses
-> > 
-> > Applied these two.
-> > 
-> > >   arm64: defconfig: enable freescale/nxp config options
-> > 
-> > But this one doesn't apply to v4.6-rc1.
-> 
-> Yes.  There is a patch from Will that went into rc2 that was a major
-> defconfig update:
->    431597b arm64: defconfig: updates for 4.6
-> 
-> ...so basing my patch on rc1 would have caused it not to apply to 
-> later kernels.
+> Yes, you could use the syscall to switch the personality. Alternately, you could
+> run
+> "linux32" command to switch the personality to PER_LINUX32 and then
+> execute
+> 64/32 bit applications.
+>
 
-Okay, I rebased my defconfig64 branch onto v4.6-rc2 and applied all 3
-patches.
-
-Shawn
+Any plan to place the personality syscall in libc? It is not nessary for each 32-bit process 
+to do the personality syscall or linux32 command. 
+ 
+> Suzuki
+> 
+> 
