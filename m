@@ -1,78 +1,56 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 Apr 2016 00:28:10 -0700
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <CAOMZO5BeAxPLerGMkaadkEZusW8wHkO5P6SiZeHOCKWstHUTSA@mail.gmail.com>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160421034520.GA19965@shlinux2.ap.freescale.net>
- <20160426012341.GB8870@tiger>
- <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
- <1461663072.7839.17.camel@pengutronix.de>
- <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
- <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
- <20160427015835.GE30692@tiger>
- <CAA+hA=SNp7bQZSUp5R5v9BfXMffS-4-msv12G5UAQJTxUMKW=A@mail.gmail.com>
- <CAOMZO5BeAxPLerGMkaadkEZusW8wHkO5P6SiZeHOCKWstHUTSA@mail.gmail.com>
-Message-ID: <1f10ab4830032858bc4d6174528f18e8@agner.ch>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 27 Apr 2016 07:33:22 +0000
+Subject: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
+ device tree binding documentation
+In-Reply-To: <57206632.7010508@metafoo.de>
+References: <1461740729-30715-1-git-send-email-appanad@xilinx.com>
+ <57206632.7010508@metafoo.de>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A57B840@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-04-26 19:56, Fabio Estevam wrote:
-> On Tue, Apr 26, 2016 at 11:45 PM, Dong Aisheng <dongas86@gmail.com> wrote:
-> 
->>> We need to firstly understand why this is happening.  The .prepare hook
->>> is defined to be non-atomic context, and so that we call sleep function
->>> in there.  We did everything right.  Why are we getting the warning?  If
->>> I'm correct, this warning only happens on i.MX7D.  Why is that?
->>>
->>
->> This is mainly caused by during kernel early booting, there's only one init idle
->> task running.
->> See:
->> void __init sched_init(void)
->> {
->> .....
->>         /*
->>          * Make us the idle thread. Technically, schedule() should not be
->>          * called from this thread, however somewhere below it might be,
->>          * but because we are the idle thread, we just pick up running again
->>          * when this runqueue becomes "idle".
->>          */
->>         init_idle(current, smp_processor_id());
->> ...
->> }
->>
->> And the idle sched class indicates it's not valid to schedule for idle task.
->> const struct sched_class idle_sched_class = {
->>         /* .next is NULL */
->>         /* no enqueue/yield_task for idle tasks */
->>
->>         /* dequeue is not valid, we print a debug message there: */
->>         .dequeue_task           = dequeue_task_idle,
->> ...........
->>
->> }
->>
->> /*
->>  * It is not legal to sleep in the idle task - print a warning
->>  * message if some code attempts to do it:
->>  */
->> static void
->> dequeue_task_idle(struct rq *rq, struct task_struct *p, int flags)
->> {
->>         raw_spin_unlock_irq(&rq->lock);
->>         printk(KERN_ERR "bad: scheduling from the idle thread!\n");
->>         dump_stack();
->>         raw_spin_lock_irq(&rq->lock);
->> }
->>
->>
->> Below is the full log of imx7d booting FYI.
-> 
-> This does not answer Shawn's question: why do we see this only on mx7d?
+Hi Lars,
 
-I was wondering that too.... My theory is that either on i.MX 6 the
-clocks enable almost instantly leading to no sleep, or they are just
-bootloader/firmware on...?
+> -----Original Message-----
+> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
+> Sent: Wednesday, April 27, 2016 12:42 PM
+> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>;
+> robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
+> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
+> vinod.koul at intel.com; dan.j.williams at intel.com; Appana Durga Kedareswara
+> Rao <appanad@xilinx.com>; moritz.fischer at ettus.com;
+> laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Anirudha
+> Sarangi <anirudh@xilinx.com>; Punnaiah Choudary Kalluri
+> <punnaia@xilinx.com>
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; dmaengine at vger.kernel.org
+> Subject: Re: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
+> device tree binding documentation
+> 
+> On 04/27/2016 09:05 AM, Kedareswara rao Appana wrote:
+> [...]
+> > +- xlnx,include-sg	: Indicates the controller to operate in simple or
+> > +			  scatter gather dma mode
+> > +- xlnx,ratectrl		: Scheduling interval in terms of clock cycles for
+> > +			  source AXI transaction
+> > +- xlnx,overfetch	: Tells whether the channel is allowed to over
+> > +			  fetch the data
+> > +- xlnx,src-issue	: Number of AXI outstanding transactions on source
+> side
+> > +- xlnx,src-burst-len	: AXI length for data read. Support only power of
+> > +			  2 byte values.
+> > +- xlnx,dst-burst-len	: AXI length for data write. Support only power of
+> 
+> These are all software runtime configuration parameters that you'd want to
+> change at runtime depending on which peripheral you are targeting with a
+> specific DMA transfer. These really do not belong into the devicetree.
 
---
-Stefan
+You mean to have a separate config structure in the driver and handle the above parameters
+Through that structure???
+
+I understand that above will work for slave dma transfer types what about memory to memory
+Transfers where we don't have provision to the use this parameters...
+
+Regards,
+Kedar.
