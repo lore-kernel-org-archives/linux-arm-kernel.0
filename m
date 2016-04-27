@@ -1,18 +1,23 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 27 Apr 2016 11:10:55 +0200
-Subject: [GIT PULL 2/3] ARM: dts: exynos: Fixup for SROM controller (v4.7)
+Date: Wed, 27 Apr 2016 11:10:56 +0200
+Subject: [GIT PULL 3/3] ARM: drivers: memory: SROM controller for v4.7
 In-Reply-To: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
 References: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1461748256-4394-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1461748256-4394-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-The DTS changes for SROM controller (pull 3/3 here) was pulled during
-previous cycle. The SROM controller itself was delayed due to
-late comments. These late comments introduced changes in the bindings
-which now have to be fixed before merging drivers/memory commits.
+Finally, I hope the SROM controller can be split from mach-exynos into
+drivers/memory. This is a very long standing patchset. The delay was
+caused (twice) by very late comments, including comments for already
+acked patch by the acker. Endless work... but I think entire feedback
+was addressed (not ignored!).
+
+This includes internal dependency: samsung-dt-exynos-srom-fixup-4.7.
+
+Please, be so kind and pick it up.
 
 Best regards,
 Krzysztof
@@ -24,24 +29,55 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  kernel.org:/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-exynos-srom-fixup-4.7
+  kernel.org:/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos-srom-4.7
 
-for you to fetch changes up to 4d7820b0465a78e6c85a74474b89fb4ab84768ba:
+for you to fetch changes up to 8ac2266d88318d348fa5f1dad5b525e0d2c665ef:
 
-  ARM: dts: change SROM node compatible from generic to model specific (2016-04-18 14:18:31 +0200)
-
-----------------------------------------------------------------
-DeviceTree changes for new SROM controller driver reached mainline
-some time ago, before the driver was accepted (due to very late
-comments). However, after these late comments, the driver expects
-different bindings so we need to fix the DTS.
+  memory: samsung: exynos-srom: Add support for bank configuration (2016-04-18 14:25:29 +0200)
 
 ----------------------------------------------------------------
-Pankaj Dubey (1):
+Topic branch for Samsung soc/drivers update for v4.7:
+
+This moves Samsung SROM controller code from arm/mach-exynos into to
+separate driver under drivers/memory/samsung. In the future this driver
+will be re-used on ARM64 Exynos platform.
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      Merge tag 'samsung-dt-exynos-srom-fixup-4.7' into for-v4.7/drivers-memory-exynos-srom
+
+Pankaj Dubey (5):
       ARM: dts: change SROM node compatible from generic to model specific
+      dt-bindings: EXYNOS: Add exynos-srom device tree binding
+      memory: Add support for Exynos SROM driver
+      MAINTAINERS: Add maintainers entry for drivers/memory/samsung
+      ARM: EXYNOS: Remove SROM related register settings from mach-exynos
 
- arch/arm/boot/dts/exynos4.dtsi            | 4 ++--
- arch/arm/boot/dts/exynos5.dtsi            | 4 ++--
- arch/arm/boot/dts/exynos5410-smdk5410.dts | 2 +-
- arch/arm/boot/dts/exynos5410.dtsi         | 4 ++--
- 4 files changed, 7 insertions(+), 7 deletions(-)
+Pavel Fedin (1):
+      memory: samsung: exynos-srom: Add support for bank configuration
+
+ .../bindings/memory-controllers/exynos-srom.txt    |  79 +++++++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   4 +-
+ arch/arm/boot/dts/exynos5.dtsi                     |   4 +-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   2 +-
+ arch/arm/boot/dts/exynos5410.dtsi                  |   4 +-
+ arch/arm/mach-exynos/Kconfig                       |   3 +
+ arch/arm/mach-exynos/exynos.c                      |  17 --
+ arch/arm/mach-exynos/include/mach/map.h            |   3 -
+ arch/arm/mach-exynos/regs-srom.h                   |  53 -----
+ arch/arm/mach-exynos/suspend.c                     |  20 +-
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+ drivers/memory/Kconfig                             |   1 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/samsung/Kconfig                     |  13 ++
+ drivers/memory/samsung/Makefile                    |   1 +
+ drivers/memory/samsung/exynos-srom.c               | 231 +++++++++++++++++++++
+ drivers/memory/samsung/exynos-srom.h               |  51 +++++
+ 18 files changed, 390 insertions(+), 99 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ create mode 100644 drivers/memory/samsung/Kconfig
+ create mode 100644 drivers/memory/samsung/Makefile
+ create mode 100644 drivers/memory/samsung/exynos-srom.c
+ create mode 100644 drivers/memory/samsung/exynos-srom.h
