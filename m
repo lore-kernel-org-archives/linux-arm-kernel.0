@@ -1,57 +1,20 @@
-From: jay.xu@rock-chips.com (jay.xu)
-Date: Wed, 27 Apr 2016 08:57:19 +0800
-Subject: [PATCH 4/4] ARM64: dts: rockchip: add dts file for RK3399
- evaluation board
-In-Reply-To: <CAD=FV=Wgnz-vBo71f3mqFxcOpL7fJX58hXPJ+vk9uHpymqdN5Q@mail.gmail.com>
-References: <1461638206-20473-1-git-send-email-jay.xu@rock-chips.com>
- <1461638206-20473-5-git-send-email-jay.xu@rock-chips.com>
- <9945516.Q6LYCrkl5z@diego>
- <CAD=FV=Wgnz-vBo71f3mqFxcOpL7fJX58hXPJ+vk9uHpymqdN5Q@mail.gmail.com>
-Message-ID: <57200E6F.1080507@rock-chips.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 26 Apr 2016 22:12:24 -0300
+Subject: [PATCH v4] ARM: dts: imx6: Add dts for Embest MarS Board
+In-Reply-To: <1461713902-10804-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1461713902-10804-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <CAOMZO5ACU4ggMfjfNO99vc_ENvPGcBTCSzsF_N2XoOYjf2xe4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug?
+On Tue, Apr 26, 2016 at 8:38 PM, Sergio Prado
+<sergio.prado@e-labworks.com> wrote:
+> Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
+> Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
+> and with a 4MB SPI flash.
+>
+> [1] http://www.embest-tech.com/shop/star/marsboard.html
+>
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
 
-On 2016?04?27? 04:53, Doug Anderson wrote:
-> Hi,
->
-> On Tue, Apr 26, 2016 at 5:37 AM, Heiko St?bner <heiko@sntech.de> wrote:
->>> +     model = "Rockchip RK3399 Evaluation Board";
->>> +     compatible = "rockchip,rk3399-evb", "rockchip,rk3399",
->>> +                  "google,rk3399evb-rev2", google,rk3399evb-rev1",
->>> +                  "google,rk3399evb-rev0" ;
->>
->> can you check against which compatibles that coreboot really matches?
->>
->> As we said that the evb changed between rev1 and rev2, I would expect the
->> compatible to be something like
->>
->>          compatible = "rockchip,rk3399-evb",  "google,rk3399evb-rev2",
->>                          "rockchip,rk3399";
->>
->> leaving out the rev1 and rev0
->
-> What Heiko suggests seems reasonable to me.
->
-> It all depends on what your bootloader is doing and what you guys want
-> to do.  Chrome OS designs that I've worked on have had board
-> strappings that you can read a board ID from and that's how the BIOS
-> (like coreboot) will figure out which board ID it is running on.  I'm
-> not aware of such strappings on rk3399-evb.  Do they exist?
->
-> Of course, even without strappings it's possible to get the bootloader
-> to work sanely.  You can either define the revision number at build
-> time or you can store the revision number somewhere non-volatile.
->
-yes, I will talk with coreboot developer about this, maybe to fix it in 
-coreboot and just keep simple in dtsi file.
-
-thanks
-
-Jianqun
->
-> -Doug
->
->
->
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
