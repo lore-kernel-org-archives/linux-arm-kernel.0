@@ -1,64 +1,34 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 27 Apr 2016 11:12:41 +0200
-Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
-In-Reply-To: <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <4956403.scaVRGhPEf@diego>
- <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
-Message-ID: <4459295.XmBqACy0jk@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2016 10:13:33 +0100
+Subject: [PATCH RFC 04/10] ARM: V7M: Add support for reading the CTR with
+ CPUID_CACHETYPE
+In-Reply-To: <1461226702-27160-5-git-send-email-vladimir.murzin@arm.com>
+References: <1461226702-27160-1-git-send-email-vladimir.murzin@arm.com>
+ <1461226702-27160-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160427091333.GH19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+On Thu, Apr 21, 2016 at 09:18:16AM +0100, Vladimir Murzin wrote:
+> @@ -79,5 +80,19 @@ static inline unsigned int read_ccsidr(void)
+>  	asm volatile("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
+>  	return val;
+>  }
+> +#else /* CONFIG_CPU_V7M */
+> +#include <asm/io.h>
 
-Am Mittwoch, 27. April 2016, 18:01:00 schrieb Joel Stanley:
-> On Thu, Apr 21, 2016 at 8:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > [+clock-related patches should include clock-maintainers and lists]
-> 
-> Thanks.
-> 
-> > Am Donnerstag, 21. April 2016, 17:34:01 schrieb Joel Stanley:
-> >> +For example:
-> >> +
-> >> +     clk_clkin: clk_clkin {
-> >> +             #clock-cells = <0>;
-> >> +             compatible = "fixed-clock";
-> >> +             clock-frequency = <48000000>;
-> >> +     };
-> >> +
-> >> +     clk_hpll: clk_hpll {
-> >> +             compatible = "aspeed,g4-hpll-clock";
-> >> +             #clock-cells = <0>;
-> >> +             reg = <0x1e6e2008 0x4>;
-> >> +     };
-> >> +
-> >> +     clk_apb: clk_apb at 1e6e2008 {
-> >> +             #clock-cells = <0>;
-> >> +             compatible = "aspeed,g4-apb-clock";
-> >> +             reg = <0x1e6e2008 0x4>;
-> >> +             clocks = <&clk_hpll>;
-> >> +     };
-> > 
-> > You have both the hpll and apb_clk in the same register (probably even
-> > more
-> > clocks?) and separate clock instances where each instance will of_iomap
-> > the
-> > register itself (and thus multiple times in general).
-> 
-> Yep. I agree that's not ideal.
-> 
-> > From what I remember exposing the clock controller as one block (instead
-> > of
-> > declaring each clock individually in the dts) is still the preferred way
-> > but I don't think I can find Mike's mail from back then easily.
-> 
-> I can't picture how that would look. I took my lead from the moxart
-> clock driver; is there a better example that I should follow?
+Please use linux/io.h
 
-qcom, samsung, rockchip, hisilicon, imx, ...
+> +#include "asm/v7m.h"
+> +
+> +static inline void set_csselr(unsigned int cache_selector)
+> +{
+> +	writel(cache_selector, (void *)(BASEADDR_V7M_SCB + V7M_SCB_CTR));
 
-I guess the design would depend on the actual layout of your clock- / system-
-controller - aka what else is contained there.
+writel() doesn't take a void pointer.  It takes a void __iomem pointer.
+BASEADDR_V7M_SCB may need to be defined more appropriately.
 
-
-Heiko
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
