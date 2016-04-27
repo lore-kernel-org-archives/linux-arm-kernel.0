@@ -1,563 +1,192 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Apr 2016 01:00:21 -0300
-Subject: [PATCH v4 2/2] ARM: dts: imx6ul-pico-hobbit: Add initial support
-In-Reply-To: <1461729621-13283-1-git-send-email-festevam@gmail.com>
-References: <1461729621-13283-1-git-send-email-festevam@gmail.com>
-Message-ID: <1461729621-13283-2-git-send-email-festevam@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 Apr 2016 12:04:23 +0800
+Subject: [PATCH v5 12/14] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <5720127E.1030307@caviumnetworks.com>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+ <1461116439-22991-13-git-send-email-ddaney.cavm@gmail.com>
+ <CADKHWadFBh2TbyoZSmYJHX24roMQQXf8Kx8rEoLABJ8xaTGL=Q@mail.gmail.com>
+ <5720127E.1030307@caviumnetworks.com>
+Message-ID: <57203A47.9000108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Dennis, David,
 
-Add initial support for imx6ul pico hobbit board.
+Sorry for the late reply, please see my comments below.
 
-For information about this board, please visit:
-http://www.wandboard.org/images/hobbit/hobbitboard-imx6ul-reva1.pdf
+On 2016/4/27 9:14, David Daney wrote:
+> On 04/21/2016 03:06 AM, Dennis Chen wrote:
+>> On 20 April 2016 at 09:40, David Daney <ddaney.cavm@gmail.com> wrote:
+> [...]
+>>> +/* Callback for Proximity Domain -> ACPI processor UID mapping */
+>>> +void __init acpi_numa_gicc_affinity_init(struct
+>>> acpi_srat_gicc_affinity *pa)
+>>> +{
+>>> +       int pxm, node;
+>>> +       u64 mpidr;
+>>> +
+>>> +       if (srat_disabled())
+>>> +               return;
+>>> +
+>>> +       if (pa->header.length < sizeof(struct
+>>> acpi_srat_gicc_affinity)) {
+>>> +               pr_err("SRAT: Invalid SRAT header length: %d\n",
+>>> +                       pa->header.length);
+>>> +               bad_srat();
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+>>> +               return;
+>>> +
+>>> +       if (cpus_in_srat >= NR_CPUS) {
+>>> +               pr_warn_once("SRAT: cpu_to_node_map[%d] is too small,
+>>> may not be able to use all cpus\n",
+>>> +                            NR_CPUS);
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       pxm = pa->proximity_domain;
+>>> +       node = acpi_map_pxm_to_node(pxm);
+>>> +
+>>> +       if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+>>> +               pr_err("SRAT: Too many proximity domains %d\n", pxm);
+>>> +               bad_srat();
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
+>>> +               pr_err("SRAT: PXM %d with ACPI ID %d has no valid
+>>> MPIDR in MADT\n",
+>>> +                       pxm, pa->acpi_processor_uid);
+>>> +               bad_srat();
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       early_node_cpu_hwid[cpus_in_srat].node_id = node;
+>>> +       early_node_cpu_hwid[cpus_in_srat].cpu_hwid =  mpidr;
+>>> +       node_set(node, numa_nodes_parsed);
+>>> +       cpus_in_srat++;
+>>> +       pr_info("SRAT: PXM %d -> MPIDR 0x%Lx -> Node %d cpu %d\n",
+>>> +               pxm, mpidr, node, cpus_in_srat);
+>>> +}
+>>
+>> What does the *cpu* means in above pr_info function? If it's the
+>> logical processor ID or ACPI processor UID, then I suggest to use
+>> pa->acpi_processor_uid instead of cpus_in_srat, I understand the
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v3:
-- Apply Shawn's comments that I missed earlier
-- Only use the regulators that have users (Javier)
+I think print cpus_in_srat is pointless here, as the logic cpu number
+is allocated by OS when initializing SMP by scanning MADT table. As
+Dennis said, it's just a count number, not a number mapping to MPIDR.
 
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 516 +++++++++++++++++++++++++++++++
- 2 files changed, 517 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+ACPI processor UID is the key value to connect MADT, SRAT, DSDT.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 87a4cb9..33b9433 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -387,6 +387,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sdb.dtb
- dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-14x14-evk.dtb \
-+	imx6ul-pico-hobbit.dtb \
- 	imx6ul-tx6ul-0010.dtb \
- 	imx6ul-tx6ul-0011.dtb \
- 	imx6ul-tx6ul-mainboard.dtb
-diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-new file mode 100644
-index 0000000..8ce1fec
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-@@ -0,0 +1,516 @@
-+/*
-+ * Copyright 2015 Technexion Ltd.
-+ *
-+ * Author: Wig Cheng  <wig.cheng@technexion.com>
-+ *	   Richard Hu <richard.hu@technexion.com>
-+ *	   Tapani Utriainen <tapani@technexion.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6ul.dtsi"
-+
-+/ {
-+	model = "Technexion Pico i.MX6UL Board";
-+	compatible = "technexion,imx6ul-pico-hobbit", "fsl,imx6ul";
-+
-+	memory {
-+		reg = <0x80000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart6;
-+	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm3 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+		status = "okay";
-+	};
-+
-+	reg_2p5v: regulator-2p5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "2P5V";
-+		regulator-min-microvolt = <2500000>;
-+		regulator-max-microvolt = <2500000>;
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_sd1_vmmc: regulator-sd1-vmmc {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VSD_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usb_otg1>;
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 6 0>;
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx-audio-sgtl5000";
-+		model = "imx6ul-sgtl5000";
-+		audio-cpu = <&sai1>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"LINE_IN", "Line In Jack",
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+	};
-+
-+	sys_mclk: clock-sys-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24576000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		hobbitled {
-+			label = "hobbitled";
-+			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	status = "okay";
-+};
-+
-+&clks {
-+	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <786432000>;
-+};
-+
-+&fec2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet2>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy1>;
-+	status = "okay";
-+	phy-reset-gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
-+	phy-reset-duration = <11>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy1: ethernet-phy at 1 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <1>;
-+			max-speed = <100>;
-+			interrupt-parent = <&gpio5>;
-+			interrupts = <6 IRQ_TYPE_LEVEL_LOW 0>;
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic: pfuze3000 at 08 {
-+		compatible = "fsl,pfuze3000";
-+		reg = <0x08>;
-+
-+		regulators {
-+			/* VDD_ARM_SOC_IN*/
-+			sw1b_reg: sw1b {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* DRAM */
-+			sw3a_reg: sw3 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1650000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* DRAM */
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	clock_frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	codec: sgtl5000 at 0a {
-+		reg = <0x0a>;
-+		compatible = "fsl,sgtl5000";
-+		clocks = <&sys_mclk>;
-+		VDDA-supply = <&reg_2p5v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+	};
-+};
-+
-+&i2c3 {
-+	clock_frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+};
-+
-+&lcdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lcdif_dat &pinctrl_lcdif_ctrl>;
-+	display = <&display0>;
-+	status = "okay";
-+
-+	display0: display0 {
-+		bits-per-pixel = <32>;
-+		bus-width = <24>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+
-+			timing0: timing0 {
-+				clock-frequency = <33200000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hfront-porch = <210>;
-+				hback-porch = <46>;
-+				hsync-len = <1>;
-+				vback-porch = <22>;
-+				vfront-porch = <23>;
-+				vsync-len = <1>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>;
-+	status = "okay";
-+};
-+
-+&pwm7 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm7>;
-+	status = "okay";
-+};
-+
-+&pwm8 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm8>;
-+	status = "okay";
-+};
-+
-+&sai1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai1>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart6 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart6>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-+	dr_mode = "otg";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	bus-width = <8>;
-+	no-1-8-v;
-+	non-removable;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
-+
-+&usdhc2 {  /* Wifi SDIO */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_enet2: enet2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET1_TX_DATA1__ENET2_MDIO	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_EN__ENET2_MDC	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_EN__ENET2_RX_EN	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_ER__ENET2_RX_ER	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_DATA0__ENET2_RDATA00	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_DATA1__ENET2_RDATA01	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_EN__ENET2_TX_EN	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_DATA0__ENET2_TDATA00	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_DATA1__ENET2_TDATA01	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2	0x4001b031
-+			MX6UL_PAD_SNVS_TAMPER6__GPIO5_IO06	0x800
-+			MX6UL_PAD_UART4_TX_DATA__GPIO1_IO28	0x79
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET1_RX_DATA0__FLEXCAN1_TX	0x1b020
-+			MX6UL_PAD_ENET1_RX_DATA1__FLEXCAN1_RX	0x1b020
-+		>;
-+	};
-+
-+	pinctrl_flexcan2: flexcan2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET1_TX_DATA0__FLEXCAN2_RX	0x1b020
-+			MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX	0x1b020
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO02__I2C1_SCL		0x4001b8b0
-+			MX6UL_PAD_GPIO1_IO03__I2C1_SDA		0x4001b8b0
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART5_TX_DATA__I2C2_SCL	0x4001b8b0
-+			MX6UL_PAD_UART5_RX_DATA__I2C2_SDA	0x4001b8b0
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART1_TX_DATA__I2C3_SCL	0x4001b8b0
-+			MX6UL_PAD_UART1_RX_DATA__I2C3_SDA	0x4001b8b0
-+			>;
-+	};
-+
-+	pinctrl_lcdif_dat: lcdifdatgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_LCD_DATA00__LCDIF_DATA00	0x79
-+			MX6UL_PAD_LCD_DATA01__LCDIF_DATA01	0x79
-+			MX6UL_PAD_LCD_DATA02__LCDIF_DATA02	0x79
-+			MX6UL_PAD_LCD_DATA03__LCDIF_DATA03	0x79
-+			MX6UL_PAD_LCD_DATA04__LCDIF_DATA04	0x79
-+			MX6UL_PAD_LCD_DATA05__LCDIF_DATA05	0x79
-+			MX6UL_PAD_LCD_DATA06__LCDIF_DATA06	0x79
-+			MX6UL_PAD_LCD_DATA07__LCDIF_DATA07	0x79
-+			MX6UL_PAD_LCD_DATA08__LCDIF_DATA08	0x79
-+			MX6UL_PAD_LCD_DATA09__LCDIF_DATA09	0x79
-+			MX6UL_PAD_LCD_DATA10__LCDIF_DATA10	0x79
-+			MX6UL_PAD_LCD_DATA11__LCDIF_DATA11	0x79
-+			MX6UL_PAD_LCD_DATA12__LCDIF_DATA12	0x79
-+			MX6UL_PAD_LCD_DATA13__LCDIF_DATA13	0x79
-+			MX6UL_PAD_LCD_DATA14__LCDIF_DATA14	0x79
-+			MX6UL_PAD_LCD_DATA15__LCDIF_DATA15	0x79
-+			MX6UL_PAD_LCD_DATA16__LCDIF_DATA16	0x79
-+			MX6UL_PAD_LCD_DATA17__LCDIF_DATA17	0x79
-+			MX6UL_PAD_LCD_DATA18__LCDIF_DATA18	0x79
-+			MX6UL_PAD_LCD_DATA19__LCDIF_DATA19	0x79
-+			MX6UL_PAD_LCD_DATA20__LCDIF_DATA20	0x79
-+			MX6UL_PAD_LCD_DATA21__LCDIF_DATA21	0x79
-+			MX6UL_PAD_LCD_DATA22__LCDIF_DATA22	0x79
-+			MX6UL_PAD_LCD_DATA23__LCDIF_DATA23	0x79
-+		>;
-+	};
-+
-+	pinctrl_lcdif_ctrl: lcdifctrlgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_LCD_CLK__LCDIF_CLK		0x79
-+			MX6UL_PAD_LCD_ENABLE__LCDIF_ENABLE	0x79
-+			MX6UL_PAD_LCD_HSYNC__LCDIF_HSYNC	0x79
-+			MX6UL_PAD_LCD_VSYNC__LCDIF_VSYNC	0x79
-+			/* LCD reset */
-+			MX6UL_PAD_SNVS_TAMPER9__GPIO5_IO09	0x79
-+		>;
-+	};
-+
-+	pinctrl_pwm3: pwm3grp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_ALE__PWM3_OUT		0x110b0
-+		>;
-+	};
-+
-+	pinctrl_pwm7: pwm7grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET1_TX_CLK__PWM7_OUT	0x110b0
-+		>;
-+	};
-+
-+	pinctrl_pwm8: pwm8grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET1_RX_ER__PWM8_OUT		0x110b0
-+		>;
-+	};
-+
-+	pinctrl_sai1: sai1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_CSI_DATA04__SAI1_TX_SYNC	0x1b0b0
-+			MX6UL_PAD_CSI_DATA05__SAI1_TX_BCLK	0x1b0b0
-+			MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA	0x110b0
-+			MX6UL_PAD_CSI_DATA07__SAI1_TX_DATA	0x1f0b8
-+		>;
-+	};
-+
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART3_TX_DATA__UART3_DCE_TX	0x1b0b0
-+			MX6UL_PAD_UART3_RX_DATA__UART3_DCE_RX	0x1b0b0
-+			MX6UL_PAD_UART3_RTS_B__UART3_DCE_RTS	0x1b0b0
-+			MX6UL_PAD_UART3_CTS_B__UART3_DCE_CTS	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO04__UART5_DCE_TX	0x1b0b1
-+			MX6UL_PAD_GPIO1_IO05__UART5_DCE_RX	0x1b0b1
-+			MX6UL_PAD_GPIO1_IO08__UART5_DCE_RTS	0x1b0b1
-+			MX6UL_PAD_GPIO1_IO09__UART5_DCE_CTS	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart6: uart6grp {
-+		fsl,pins = <
-+			MX6UL_PAD_CSI_MCLK__UART6_DCE_TX	0x1b0b1
-+			MX6UL_PAD_CSI_PIXCLK__UART6_DCE_RX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usb_otg1: usbotg1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO06__GPIO1_IO06	0x10b0
-+			>;
-+	};
-+
-+	pinctrl_usb_otg1_id: usbotg1idgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO00__ANATOP_OTG1_ID	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x17059
-+			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x10071
-+			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x17059
-+			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x17059
-+			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x17059
-+			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x17059
-+			MX6UL_PAD_UART1_RTS_B__USDHC1_CD_B	0x03029
-+			MX6UL_PAD_NAND_READY_B__USDHC1_DATA4	0x17059
-+			MX6UL_PAD_NAND_CE0_B__USDHC1_DATA5	0x17059
-+			MX6UL_PAD_NAND_CE1_B__USDHC1_DATA6	0x17059
-+			MX6UL_PAD_NAND_CLE__USDHC1_DATA7	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_WE_B__USDHC2_CMD		0x17059
-+			MX6UL_PAD_NAND_RE_B__USDHC2_CLK		0x10059
-+			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0	0x17059
-+			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1	0x17059
-+			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2	0x17059
-+			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3	0x17059
-+		>;
-+	};
-+};
--- 
-1.9.1
+For MADT, it will have MPIDR and ACPI processor UID, and OS will
+create mappings to MPIDR and cpu logical number,
+ACPI processor UID <------> MPIDR <------> CPU logical number
+
+In SRAT, there is ACPI processor UID represented, mappings will be
+ACPI processor UID <------> PXM <------> NUMA node logical number
+
+So we can use ACPI processor UID to get the MPIDR by scanning the
+MADT, then we can map NUMA node logical number to cpu logical
+number later.
+
+>> cpus_in_srat is just a count number of the entries of GICC Affinity
+>> Struct instance in SRAT, correct me if I am wrong. So at least it sees
+>> to me, the above pr_info will output message looks like:
+>> SRAT: PXM 0 -> MPIDR 0x100 -> Node 0 cpu 1
+>> SRAT: PXM 0 -> MPIDR 0x101 -> Node 0 cpu 2
+>> SRAT: PXM 0 -> MPIDR 0x102 -> Node 0 cpu 3
+>>
+>
+> Yes, that is correct, and for my system seems to be what we want as the
+> names in /sys/devices/system/cpu/ and /proc/cpu_info agree with the
+> sequential numbering (0..95) with 48 CPUs on each node.
+
+That's because you place CPUs in the same order both in MADT and SRAT :)
+if not, that will be not match.
+
+>
+> If I make the change you suggest, I get :
+> .
+> .
+> .
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x0 -> Node 0 cpu 0
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x1 -> Node 0 cpu 1
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x2 -> Node 0 cpu 2
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x3 -> Node 0 cpu 3
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x4 -> Node 0 cpu 4
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x5 -> Node 0 cpu 5
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x6 -> Node 0 cpu 6
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x7 -> Node 0 cpu 7
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x8 -> Node 0 cpu 8
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x9 -> Node 0 cpu 9
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0xa -> Node 0 cpu 10
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0xb -> Node 0 cpu 11
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0xc -> Node 0 cpu 12
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0xd -> Node 0 cpu 13
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0xe -> Node 0 cpu 14
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0xf -> Node 0 cpu 15
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x100 -> Node 0 cpu 256
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x101 -> Node 0 cpu 257
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x102 -> Node 0 cpu 258
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x103 -> Node 0 cpu 259
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x104 -> Node 0 cpu 260
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x105 -> Node 0 cpu 261
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x106 -> Node 0 cpu 262
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x107 -> Node 0 cpu 263
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x108 -> Node 0 cpu 264
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x109 -> Node 0 cpu 265
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x10a -> Node 0 cpu 266
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x10b -> Node 0 cpu 267
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x10c -> Node 0 cpu 268
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x10d -> Node 0 cpu 269
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x10e -> Node 0 cpu 270
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x10f -> Node 0 cpu 271
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x200 -> Node 0 cpu 512
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x201 -> Node 0 cpu 513
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x202 -> Node 0 cpu 514
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x203 -> Node 0 cpu 515
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x204 -> Node 0 cpu 516
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x205 -> Node 0 cpu 517
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x206 -> Node 0 cpu 518
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x207 -> Node 0 cpu 519
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x208 -> Node 0 cpu 520
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x209 -> Node 0 cpu 521
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x20a -> Node 0 cpu 522
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x20b -> Node 0 cpu 523
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x20c -> Node 0 cpu 524
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x20d -> Node 0 cpu 525
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x20e -> Node 0 cpu 526
+> [    0.000000] ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x20f -> Node 0 cpu 527
+> [    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10000 -> Node 1 cpu 65536
+> [    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10001 -> Node 1 cpu 65537
+> [    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10002 -> Node 1 cpu 65538
+> [    0.000000] ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x10003 -> Node 1 cpu 65539
+> .
+> .
+> .
+>
+> Not really what I would want.
+
+How about remove the print for "cpu"? it's not the right value we want,
+and we can get such mapping information under in sysfs.
+
+>
+>
+>> While the /sys/devices/system/cpu will use the ACPI processor UID to
+>> generate the index of the cpu, like:
+>> cpu0  cpu1  cpu2 ...
+>>
+>> As the GICC Affinity Struct indicated, the ps->proximity_domain is the
+>> domain to which the logical processor belongs...
+
+Yes, we can get such information in /sys/devices/system/node, I think
+we can only print:
+
+ACPI: NUMA: SRAT: PXM x -> MPIDR y -> Node z
+
+Thanks
+Hanjun
