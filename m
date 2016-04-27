@@ -1,35 +1,29 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Wed, 27 Apr 2016 09:11:44 -0500
-Subject: [PATCH 1/5] ARM: Keystone: Enable PINCTRL for Keystone ARCH
+Date: Wed, 27 Apr 2016 09:11:45 -0500
+Subject: [PATCH 2/5] ARM: keystone: defconfig: Enable PINCTRL SINGLE for
+ Keystone 2
 In-Reply-To: <1461766308-27669-1-git-send-email-fcooper@ti.com>
 References: <1461766308-27669-1-git-send-email-fcooper@ti.com>
-Message-ID: <1461766308-27669-2-git-send-email-fcooper@ti.com>
+Message-ID: <1461766308-27669-3-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+Newer Keystone 2 devices utilize pinmuxing. Enable PINCTRL SINGLE
+which is used to handle pinmuxing.
 
-Some Keystone 2 devices utilize pinmuxing which requires PINCTRL
-to be enabled. Therefore, enable PINCTRL for all Keystone 2 devices.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/mach-keystone/Kconfig | 1 +
+ arch/arm/configs/keystone_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index ea955f6db..7a432ee 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_KEYSTONE
- 	select ZONE_DMA if ARM_LPAE
- 	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
-+	select PINCTRL
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 5bcc9cf..d068421 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -208,3 +208,4 @@ CONFIG_CRYPTO_DES=y
+ CONFIG_CRYPTO_ANSI_CPRNG=y
+ CONFIG_CRYPTO_USER_API_HASH=y
+ CONFIG_CRYPTO_USER_API_SKCIPHER=y
++CONFIG_PINCTRL_SINGLE=y
 -- 
 2.7.0
