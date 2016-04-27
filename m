@@ -1,28 +1,70 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 27 Apr 2016 11:29:30 -0400
-Subject: [PATCH v2 6/7] ARM: dts: lpc32xx: phy3250: add NAND partitions
- device node
-In-Reply-To: <1461705034-355-7-git-send-email-vz@mleia.com>
-References: <1461705034-355-1-git-send-email-vz@mleia.com>
- <1461705034-355-7-git-send-email-vz@mleia.com>
-Message-ID: <1461770970.31696.1.camel@localhost>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 27 Apr 2016 17:32:40 +0200
+Subject: [PATCH v2] ARM: dts: imx28-m28: Remove unneeded partition nodes
+In-Reply-To: <1461770872-26510-1-git-send-email-fabio.estevam@nxp.com>
+References: <1461770872-26510-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <5720DB98.8@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-04-27 at 00:10 +0300, Vladimir Zapolskiy wrote:
-> To declare MTD OF partitions NAND controller device node should have
-> a special 'partitions' subnode, the change removes a debug message
-> from mtd/ofpart on boot:
+On 04/27/2016 05:27 PM, Fabio Estevam wrote:
+> mtdparts is passed from command line, so there is no need to have a
+> default partitioning in device-tree.
 > 
->   nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
->   Trying to parse direct subnodes as partitions.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Suggested-by: Marek Vasut <marex@denx.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Acked-by: Marek Vasut <marex@denx.de>
+
+Thanks for doing this :)
+
 > ---
-> * on conversion added missing 'compatible = "fixed-partitions";',
->   thanks to Sylvain for finding
+> Changes since v1:
+> - Remove all partition nodes
 > 
->  arch/arm/boot/dts/phy3250.dts | 50 +++++++++++++++++++++++--------------------
->  1 file changed, 27 insertions(+), 23 deletions(-)
+>  arch/arm/boot/dts/imx28-m28.dtsi | 26 --------------------------
+>  1 file changed, 26 deletions(-)
 > 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
+> index 759cc56..6cebaa6 100644
+> --- a/arch/arm/boot/dts/imx28-m28.dtsi
+> +++ b/arch/arm/boot/dts/imx28-m28.dtsi
+> @@ -27,32 +27,6 @@
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+>  				status = "okay";
+> -
+> -				partition at 0 {
+> -					label = "bootloader";
+> -					reg = <0x00000000 0x00300000>;
+> -					read-only;
+> -				};
+> -
+> -				partition at 1 {
+> -					label = "environment";
+> -					reg = <0x00300000 0x00080000>;
+> -				};
+> -
+> -				partition at 2 {
+> -					label = "redundant-environment";
+> -					reg = <0x00380000 0x00080000>;
+> -				};
+> -
+> -				partition at 3 {
+> -					label = "kernel";
+> -					reg = <0x00400000 0x00400000>;
+> -				};
+> -
+> -				partition at 4 {
+> -					label = "filesystem";
+> -					reg = <0x00800000 0x0f800000>;
+> -				};
+>  			};
+>  		};
+>  
+> 
+
+
+-- 
+Best regards,
+Marek Vasut
