@@ -1,49 +1,36 @@
 From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed, 27 Apr 2016 15:54:49 +0800
-Subject: [PATCH v4 0/4] ARM64: dts: rockchip: add support for RK3399
-Message-ID: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
+Date: Wed, 27 Apr 2016 15:54:50 +0800
+Subject: [PATCH v4 1/4] Documentation: rockchip-dw-mshc: add description for
+ rk3399
+In-Reply-To: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
+References: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1461743693-10671-2-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dtsi file for RK3399 SoCs, and evb dts file for RK3399 evb.
+From: Shawn Lin <shawn.lin@rock-chips.com>
 
-To make patch more easily to be reviewed, some nodes have been removed
-temporarily, after this base file been applied, more patches will be
-upstreamed independently.
+Add "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc" for
+dwmmc on rk3399 platform.
 
-Jianqun Xu (3):
-  ARM64: dts: rockchip: add core dtsi file for RK3399 SoCs
-  Documentation: devicetree: rockchip: Document rk3399-evb
-  ARM64: dts: rockchip: add dts file for RK3399 evaluation board
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+---
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn Lin (1):
-  Documentation: rockchip-dw-mshc: add description for rk3399
-
- Documentation/devicetree/bindings/arm/rockchip.txt |    6 +-
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |  124 +++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 1022 ++++++++++++++++++++
- 5 files changed, 1153 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
-
---
-changes in v4:
-- add google,rk3399evb-rev2 compatible (Doug, Heiko)
-
-changes in v3:
-- modify title for patch 3/4 (Brian)
-- add more compatible for evb dts (Doug)
-
-changes in v2:
-- split into more patches. (Heiko)
-- remove arm-pmu at first. (Marc, Heiko, Mark)
-- remove rga, emmc, usb3, mipi, edp, pd, i2c, gpu, thermal, tsadc, saradc, which will upstream independently
-- remove rk808 since without i2c, which will upstream independently
-- remove es8316 since without i2c, which will upstream independently
-- add rockchip-dw-mshc binding patch
-- add rockchip,rk3399-evb binding patch
-- fix codingstyle issues
-
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index ea5614b..07184e8 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -15,6 +15,7 @@ Required Properties:
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
+ 	- "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3036
+ 	- "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
++	- "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3399
+ 
+ Optional Properties:
+ * clocks: from common clock binding: if ciu_drive and ciu_sample are
+-- 
 1.9.1
