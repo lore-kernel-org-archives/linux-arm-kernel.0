@@ -1,135 +1,106 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:04 -0700
-Subject: [PATCH v6 02/14] acpi,
- numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+Date: Wed, 27 Apr 2016 11:07:06 -0700
+Subject: [PATCH v6 04/14] acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-5-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: Robert Richter <rrichter@cavium.com>
 
-ACPI_DEBUG_PRINT is a bit fragile in acpi/numa.c, the first thing
-is that component ACPI_NUMA(0x80000000) is not described in the
-Documentation/acpi/debug.txt, and even not defined in the struct
-acpi_dlayer acpi_debug_layers which we can not dynamically enable/disable
-it with /sys/modules/acpi/parameters/debug_layer. another thing
-is that ACPI_DEBUG_OUTPUT is controlled by ACPICA which not coordinate
-well with ACPI drivers.
+Since acpi_numa_arch_fixup() is only used in arch ia64, move it there
+to make a generic interface easier. This avoids empty function stubs
+or some complex kconfig options for x86 and arm64.
 
-Replace ACPI_DEBUG_PRINT() with pr_debug() in this patch as pr_debug
-will do the same thing for debug purpose and it can make the code much
-cleaner, also remove the related code which not needed anymore if
-ACPI_DEBUG_PRINT() is gone.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/acpi/numa.c | 59 +++++++++++++++++++----------------------------------
- 1 file changed, 21 insertions(+), 38 deletions(-)
+ arch/ia64/include/asm/acpi.h | 3 +++
+ arch/ia64/kernel/acpi.c      | 2 +-
+ arch/ia64/kernel/setup.c     | 1 +
+ arch/x86/mm/srat.c           | 2 --
+ drivers/acpi/numa.c          | 2 --
+ include/linux/acpi.h         | 1 -
+ 6 files changed, 5 insertions(+), 6 deletions(-)
 
+diff --git a/arch/ia64/include/asm/acpi.h b/arch/ia64/include/asm/acpi.h
+index aa0fdf1..a3d0211 100644
+--- a/arch/ia64/include/asm/acpi.h
++++ b/arch/ia64/include/asm/acpi.h
+@@ -140,6 +140,9 @@ static inline void per_cpu_scan_finalize(int min_cpus, int reserve_cpus)
+ 		}
+ 	}
+ }
++
++extern void acpi_numa_fixup(void);
++
+ #endif /* CONFIG_ACPI_NUMA */
+ 
+ #endif /*__KERNEL__*/
+diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
+index b1698bc..92b7bc9 100644
+--- a/arch/ia64/kernel/acpi.c
++++ b/arch/ia64/kernel/acpi.c
+@@ -524,7 +524,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ 	return 0;
+ }
+ 
+-void __init acpi_numa_arch_fixup(void)
++void __init acpi_numa_fixup(void)
+ {
+ 	int i, j, node_from, node_to;
+ 
+diff --git a/arch/ia64/kernel/setup.c b/arch/ia64/kernel/setup.c
+index 2029a38..afddb3e 100644
+--- a/arch/ia64/kernel/setup.c
++++ b/arch/ia64/kernel/setup.c
+@@ -552,6 +552,7 @@ setup_arch (char **cmdline_p)
+ 	early_acpi_boot_init();
+ # ifdef CONFIG_ACPI_NUMA
+ 	acpi_numa_init();
++	acpi_numa_fixup();
+ #  ifdef CONFIG_ACPI_HOTPLUG_CPU
+ 	prefill_possible_map();
+ #  endif
+diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
+index b5f8218..90b6ed9 100644
+--- a/arch/x86/mm/srat.c
++++ b/arch/x86/mm/srat.c
+@@ -212,8 +212,6 @@ out_err:
+ 	return -1;
+ }
+ 
+-void __init acpi_numa_arch_fixup(void) {}
+-
+ int __init x86_acpi_numa_init(void)
+ {
+ 	int ret;
 diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index 4e427fc..e34b5d0 100644
+index 2de6068..f41f06b 100644
 --- a/drivers/acpi/numa.c
 +++ b/drivers/acpi/numa.c
-@@ -31,10 +31,6 @@
- #include <linux/nodemask.h>
- #include <linux/topology.h>
+@@ -316,8 +316,6 @@ int __init acpi_numa_init(void)
+ 	/* SLIT: System Locality Information Table */
+ 	acpi_table_parse(ACPI_SIG_SLIT, acpi_parse_slit);
  
--#define ACPI_NUMA	0x80000000
--#define _COMPONENT	ACPI_NUMA
--ACPI_MODULE_NAME("numa");
+-	acpi_numa_arch_fixup();
 -
- static nodemask_t nodes_found_map = NODE_MASK_NONE;
+ 	if (cnt < 0)
+ 		return cnt;
+ 	else if (!parsed_numa_memblks)
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 06ed7e5..ab6fd96 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -244,7 +244,6 @@ void acpi_numa_slit_init (struct acpi_table_slit *slit);
+ void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
+ void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
+ int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
+-void acpi_numa_arch_fixup(void);
  
- /* maps to convert between proximity domain and logical node ID */
-@@ -129,64 +125,51 @@ EXPORT_SYMBOL(acpi_map_pxm_to_online_node);
- static void __init
- acpi_table_print_srat_entry(struct acpi_subtable_header *header)
- {
--
--	ACPI_FUNCTION_NAME("acpi_table_print_srat_entry");
--
- 	if (!header)
- 		return;
- 
- 	switch (header->type) {
--
- 	case ACPI_SRAT_TYPE_CPU_AFFINITY:
--#ifdef ACPI_DEBUG_OUTPUT
- 		{
- 			struct acpi_srat_cpu_affinity *p =
- 			    (struct acpi_srat_cpu_affinity *)header;
--			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
--					  "SRAT Processor (id[0x%02x] eid[0x%02x]) in proximity domain %d %s\n",
--					  p->apic_id, p->local_sapic_eid,
--					  p->proximity_domain_lo,
--					  (p->flags & ACPI_SRAT_CPU_ENABLED)?
--					  "enabled" : "disabled"));
-+			pr_debug("SRAT Processor (id[0x%02x] eid[0x%02x]) in proximity domain %d %s\n",
-+				 p->apic_id, p->local_sapic_eid,
-+				 p->proximity_domain_lo,
-+				 (p->flags & ACPI_SRAT_CPU_ENABLED) ?
-+				 "enabled" : "disabled");
- 		}
--#endif				/* ACPI_DEBUG_OUTPUT */
- 		break;
- 
- 	case ACPI_SRAT_TYPE_MEMORY_AFFINITY:
--#ifdef ACPI_DEBUG_OUTPUT
- 		{
- 			struct acpi_srat_mem_affinity *p =
- 			    (struct acpi_srat_mem_affinity *)header;
--			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
--					  "SRAT Memory (0x%lx length 0x%lx) in proximity domain %d %s%s%s\n",
--					  (unsigned long)p->base_address,
--					  (unsigned long)p->length,
--					  p->proximity_domain,
--					  (p->flags & ACPI_SRAT_MEM_ENABLED)?
--					  "enabled" : "disabled",
--					  (p->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)?
--					  " hot-pluggable" : "",
--					  (p->flags & ACPI_SRAT_MEM_NON_VOLATILE)?
--					  " non-volatile" : ""));
-+			pr_debug("SRAT Memory (0x%lx length 0x%lx) in proximity domain %d %s%s%s\n",
-+				 (unsigned long)p->base_address,
-+				 (unsigned long)p->length,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_MEM_ENABLED) ?
-+				 "enabled" : "disabled",
-+				 (p->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) ?
-+				 " hot-pluggable" : "",
-+				 (p->flags & ACPI_SRAT_MEM_NON_VOLATILE) ?
-+				 " non-volatile" : "");
- 		}
--#endif				/* ACPI_DEBUG_OUTPUT */
- 		break;
- 
- 	case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY:
--#ifdef ACPI_DEBUG_OUTPUT
- 		{
- 			struct acpi_srat_x2apic_cpu_affinity *p =
- 			    (struct acpi_srat_x2apic_cpu_affinity *)header;
--			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
--					  "SRAT Processor (x2apicid[0x%08x]) in"
--					  " proximity domain %d %s\n",
--					  p->apic_id,
--					  p->proximity_domain,
--					  (p->flags & ACPI_SRAT_CPU_ENABLED) ?
--					  "enabled" : "disabled"));
-+			pr_debug("SRAT Processor (x2apicid[0x%08x]) in proximity domain %d %s\n",
-+				 p->apic_id,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_CPU_ENABLED) ?
-+				 "enabled" : "disabled");
- 		}
--#endif				/* ACPI_DEBUG_OUTPUT */
- 		break;
-+
- 	default:
- 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
- 			header->type);
+ #ifndef PHYS_CPUID_INVALID
+ typedef u32 phys_cpuid_t;
 -- 
 1.7.11.7
