@@ -1,57 +1,66 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Wed, 27 Apr 2016 15:26:52 +0200
-Subject: [PATCH 2/2] ASoC: bcm2835: Add S16_LE support via packed DMA transfers
-In-Reply-To: <1461763613-28714-1-git-send-email-hias@horus.com>
-References: <1461763613-28714-1-git-send-email-hias@horus.com>
-Message-ID: <1461763613-28714-2-git-send-email-hias@horus.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 27 Apr 2016 16:31:05 +0300
+Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <20160427104110.GU5783@n2100.arm.linux.org.uk>
+References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
+ <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
+ <571FC2EC.9090605@ti.com> <20160427104110.GU5783@n2100.arm.linux.org.uk>
+Message-ID: <5720BF19.6040600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bcm2835-i2s driver already has support for the S16_LE format but
-that format hasn't been made available because dmaengine_pcm didn't
-support packed data transfers.
+Hi Russell,
 
-bcm2835-i2s needs 16-bit left+right channel data to be packed into
-a 32-bit word, the FIFO register is 32-bit only and doesn't support
-16-bit access.
+On 04/27/2016 01:41 PM, Russell King - ARM Linux wrote:
+> On Tue, Apr 26, 2016 at 10:35:08PM +0300, Grygorii Strashko wrote:
+>> On 04/26/2016 07:02 PM, Liviu Dudau wrote:
+>>> Well, SoC-B has the GT *and* the DT node, so what is the problem with
+>>> enabling it for SoC-B? If there are reasons not to use the Global Timer
+>>> on SoC-B, surely a better option would be to mark it in DT with status = "disabled";
+>>
+>> This was rejected [2]. DT describes HW and if it is functional the status = "disabled"
+>> is not good choice.
+>> ARM GT can't be used as clocksource/sched_clock/clockevent when CPUFreq or
+>> CPUIdle are enabled :(, and this is Linux specific functionality and
+>> not HW description.
+> 
+> Sorry, but we don't want to have to disable drivers in the kernel just
+> because one platform has a problem (consider the single zImage case
+> where it may be required that the global timer is enabled for some
+> platform to boot - it becomes mandatory in single zImage at that point.)
 
-Now that dmaengine_pcm supports packed transfers the format can
-be made available by setting the SND_DMAENGINE_PCM_DAI_FLAG_PACK flag.
+Sorry, but this patch doesn't disable anything. It provides possibility
+to do a custom build with disabled ARM GT driver without Kernel code modification -
+in my case RT-kernel and non-RT Kernel should run on same HW and 
+RT kernel should use ARM GT as clocksource/sched_clock, but 
+non-RT Kernel shouldn't.
 
-No further configuration is necessary:
-- snd_dmaengine_dai_dma_data.addr_width is already set to
-  DMA_SLAVE_BUSWIDTH_4_BYTES to force 32-bit DMA transfers
-- dmaengine_pcm will pick up the S16_LE format from the DAI
-  configuration and make it available since it's no longer
-  masked out due to the PACK flag.
-- there are no further corner cases to catch in hw_params,
-  since the channel count is fixed at 2 we always have two
-  16-bit stereo samples that can be transferred via 32-bit DMA
+I think RT can't be part of single zImage - it make no sense.
 
-Signed-off-by: Matthias Reichl <hias@horus.com>
----
- sound/soc/bcm/bcm2835-i2s.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> 
+> Maybe a linux-specific property is needed here - "linux,low-power-unstable"
+> or something like that?
+> 
 
-diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index 1c1f221..40ba01d 100644
---- a/sound/soc/bcm/bcm2835-i2s.c
-+++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -678,6 +678,15 @@ static int bcm2835_i2s_probe(struct platform_device *pdev)
- 	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].maxburst = 2;
- 	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].maxburst = 2;
- 
-+	/*
-+	 * Set the PACK flag to enable S16_LE support (2 S16_LE values
-+	 * packed into 32-bit transfers).
-+	 */
-+	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].flags =
-+		SND_DMAENGINE_PCM_DAI_FLAG_PACK;
-+	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].flags =
-+		SND_DMAENGINE_PCM_DAI_FLAG_PACK;
-+
- 	/* BCLK ratio - use default */
- 	dev->bclk_ratio = 0;
- 
+I've tried smth. like this [1]
+
+And it is not "unstable", it's will just stop in C3 (CPUIdle) and there no possibility 
+(at least I've not found how to do this) to adjust Freq in case of CPUFreq.
+[above is about clocksource/sched_clock]
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386858.html
+
+Oh :(. And it's really hard (I even would say - crazy task) to select
+proper clocksource/clockevent/sched_clock and timer_delay (opt, arm) 
+when SoC provides few choices.
+
+Last discussion:
+https://lkml.org/lkml/2016/3/17/38
+
+Prev discussions:
+http://www.spinics.net/lists/arm-kernel/msg459803.html
+http://www.spinics.net/lists/linux-omap/msg123658.html
+
 -- 
-2.1.4
+regards,
+-grygorii
