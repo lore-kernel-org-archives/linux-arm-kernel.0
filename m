@@ -1,94 +1,53 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 27 Apr 2016 14:55:57 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <878tzzpq19.fsf@intel.com>
-References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
- <87d1pcrj0t.fsf@intel.com> <571F2357.9080509@ti.com>
- <878tzzpq19.fsf@intel.com>
-Message-ID: <5720A8CD.6060103@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Apr 2016 13:56:12 +0200
+Subject: [PATCH] ARM: dove: Remove CLK_IS_ROOT
+In-Reply-To: <1461116748-5444-1-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Tue, 19 Apr 2016 18:45:48 -0700")
+References: <1461116748-5444-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <87k2jjtgdf.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2016 08:41 AM, Felipe Balbi wrote:
-> 
-> Hi,
-> 
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->> On 04/26/2016 09:17 AM, Felipe Balbi wrote:
->>>
->>> Hi,
->>>
->>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->>>> Now not all DMA paremters configured properly for "xhci-hcd" platform
->>>> device which is created manually. For example: dma_pfn_offset, dam_ops
->>>> and iommu configuration will not corresponds "dwc3" devices
->>>> configuration. As result, this will cause problems like wrong DMA
->>>> addresses translation on platforms with LPAE enabled like Keystone 2.
->>>>
->>>> When platform is using DT boot mode the DMA configuration will be
->>>> parsed and applied from DT, so, to fix this issue, reuse
->>>> of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
->>>> from DWC3 device node.
->>>
->>> patch is incomplete. You left out non-DT users which might suffer from
->>> the same problem.
->>>
->>
->> Honestly, I don't know how to fix it gracefully for non-DT case.
->> I can update commit message to mention that this is fix for DT case only.
-> 
-> no, that won't do :-) There are other users for this driver and they are
-> all "out-of-compliance" when it comes to DMA usage. Apparently, the
-> desired behavior is to pass correct device to DMA API which the gadget
-> side is already doing (see below). For the host side, the fix has to be
-> more involved.
-> 
-> Frankly, I'd prefer that DMA setup could be inherited from parent
-> device, then it wouldn't really matter and a bunch of this could be
-> simplified. Some sort of dma_inherit(struct device *dev, struct device
-> *parent) would go a long way, IMHO.
-> 
-> 8<-------------------------------- cut here ------------------------
-> commit 2725d6f974c4c268ae5fb746f8e3b33b76135aa8
-> Author: Felipe Balbi <felipe.balbi@linux.intel.com>
-> Date:   Tue Apr 19 16:18:12 2016 +0300
-> 
->      usb: dwc3: use parent device for DMA
->      
->      our parent device is the one which was initialized
->      by either PCI or DeviceTree and that's the one which
->      is configured properly for DMA access.
->      
->      Instead of copying DMA bits from parent to child,
->      let's just rely on parent device for the entire DMA
->      API.
+Hi Stephen,
+ 
+ On mer., avril 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-1) Patch I've sent fixes "xhci-hcd" platform device and not dwc3 core.
-On TI boards dwc3 core devices are created from DT and so, I do not see
-any problems with dwc3 core. Problem is with xhci.
+> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+> CLK_IS_ROOT", 2016-02-02) so remove it.
+>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-2) there is minimum one dtsi file where dwc3 ("snps,dwc3") does not have parent device
-ls1021a.dtsi (and 5 dtsi in arm64 folder)
+Applied on mvebu/soc
 
+Thanks,
 
-
->      
->      Signed-off-by: Felipe Balbi <felipe.balbi@linux.intel.com>
-> 
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index c050a88c16d4..09e4ff71a50f 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -180,7 +180,7 @@ static void dwc3_frame_length_adjustment(struct dwc3 *dwc, u32 fladj)
->   static void dwc3_free_one_event_buffer(struct dwc3 *dwc,
->   		struct dwc3_event_buffer *evt)
->   {
-> -	dma_free_coherent(dwc->dev, evt->length, evt->buf, evt->dma);
-> +	dma_free_coherent(dwc->dev->parent, evt->length, evt->buf, evt->dma);
->   }
-
-[...]
+Gregory
+> ---
+>  arch/arm/mach-dove/common.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+> index 0cdaa3851d2e..0d420a2bfe3e 100644
+> --- a/arch/arm/mach-dove/common.c
+> +++ b/arch/arm/mach-dove/common.c
+> @@ -88,8 +88,7 @@ static void __init dove_clk_init(void)
+>  	struct clk *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
+>  	struct clk *xor0, *xor1, *ge, *gephy;
+>  
+> -	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
+> -				       dove_tclk);
+> +	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, dove_tclk);
+>  
+>  	usb0 = dove_register_gate("usb0", "tclk", CLOCK_GATING_BIT_USB0);
+>  	usb1 = dove_register_gate("usb1", "tclk", CLOCK_GATING_BIT_USB1);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
 
 -- 
-regards,
--grygorii
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
