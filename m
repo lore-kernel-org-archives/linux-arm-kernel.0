@@ -1,36 +1,73 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 27 Apr 2016 12:21:19 +0100
-Subject: [PATCH V4 16/18] coresight: tmc: implementing TMC-ETF AUX space
- API
-In-Reply-To: <1461708634-6327-17-git-send-email-mathieu.poirier@linaro.org>
-References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
- <1461708634-6327-17-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <5720A0AF.9090107@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 27 Apr 2016 14:21:03 +0300
+Subject: [PATCH 1/3] DRA7: Fix clock data for gmac_gmii_ref_clk_div
+In-Reply-To: <1461693269-19436-2-git-send-email-Linux.HWI@garmin.com>
+References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
+ <1461693269-19436-2-git-send-email-Linux.HWI@garmin.com>
+Message-ID: <5720A09F.2060701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/16 23:10, Mathieu Poirier wrote:
-> This patch implement the AUX area interfaces required to
-> use the TMC (configured as an ETF) from the Perf sub-system.
+On 26/04/16 20:54, J.D. Schroeder wrote:
+> From: "J.D. Schroeder" <jay.schroeder@garmin.com>
 >
-> The heuristic is heavily borrowed from the ETB10 implementation.
+> This commit fixes the clock data inside the DRA7xx clocks device tree
+> structure for the gmac_gmii_ref_clk_div clock. This clock is actually
+> the GMAC_MAIN_CLK and has nothing to do with the register at address
+> 0x4a0093d0. If CLKSEL_REF bit 24 inside of CM_GMAC_GMAC_CLKCTRL, is
+> set to 1 in order to use the GMAC_RMII_CLK instead of the
+> GMAC_RMII_HS_CLK, the kernel generates a clock divider warning:
+>      WARNING: CPU: 0 PID: 0 at drivers/clk/clk-divider.c:129 clk_divider_recalc_rate+0xa8/0xe0()
+>      gmac_gmii_ref_clk_div: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set
 >
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> By properly configuring the gmac_gmii_ref_clk_div (GMAC_MAIN_CLK) to
+> have the parent of dpll_gmac_m2_ck always divided by 2 the warning is
+> resolved and the clock tree is fixed up.
+>
+> Additionally, a new clock called rmii_50mhz_clk_mux is defined that
+> does utilize CM_GMAC_GMAC_CLKCTRL[24] CLKSEL_REF to configure the
+> source clock for the RMII_50MHZ_CLK.
+>
+> Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
+> Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
 
+Looks like something weird happened with the clock data conversion tool 
+with this specific clock. Seems to be the only buggy instance in our 
+clock data across SoCs. Good catch.
+
+Acked-by: Tero Kristo <t-kristo@ti.com>
+
+> ---
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 15 +++++++++++----
+>   1 file changed, 11 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index d0bae06..9d1a583 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -1710,13 +1710,20 @@
+>   		reg = <0x0c00>;
+>   	};
+>
+> -	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div {
+> +	rmii_50mhz_clk_mux: rmii_50mhz_clk_mux {
+>   		#clock-cells = <0>;
+> -		compatible = "ti,divider-clock";
+> -		clocks = <&dpll_gmac_m2_ck>;
+> +		compatible = "ti,mux-clock";
+> +		clocks = <&dpll_gmac_h11x2_ck>, <&rmii_clk_ck>;
+>   		ti,bit-shift = <24>;
+>   		reg = <0x13d0>;
+> -		ti,dividers = <2>;
+> +	};
 > +
-> +		/*
-> +		 * Make sure the new size is aligned in accordance with the
-> +		 * requirement explained above.
-> +		 */
-> +		to_read = handle->size & mask;
-> +		/* Move the RAM read pointer up */
-> +		read_ptr = (write_ptr + drvdata->size) - to_read;
-> +		/* Make sure we are still within our limits */
-> +		read_ptr &= ~(drvdata->size - 1);
-
-Correct me if I am wrong, I think this will break for ETR configuration (used from the following
-patch 17/18). Since, for ETR, RRP/RWP will return the lower 32bit AXI address (not the queue offset).
-So the last step would really spoil the read_ptr. We might have to set the read_ptr by adding the
-appropriate offset from DBAL0.
-
-Suzuki
+> +	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-factor-clock";
+> +		clocks = <&dpll_gmac_m2_ck>;
+> +		clock-mult = <1>;
+> +		clock-div = <2>;
+>   	};
+>
+>   	gmac_rft_clk_mux: gmac_rft_clk_mux {
+>
