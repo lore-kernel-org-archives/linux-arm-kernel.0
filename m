@@ -1,31 +1,27 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 27 Apr 2016 17:09:38 -0400
-Subject: [PATCH v2 1/3] ARM: dts: exynos: Define vqmmc for SD card and
- allow disabling regulators on Odroid X/X2/U3
-In-Reply-To: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
-References: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <ba632ed9-6e6f-8a5d-5708-9c039e14056e@osg.samsung.com>
+From: dcb314@hotmail.com (David Binderman)
+Date: Wed, 27 Apr 2016 21:13:39 +0000
+Subject: linux-4.6-rc5/arch/arm/mach-pxa/pcm990-baseboard.c:354:
+ possible missing code ?
+In-Reply-To: <8737q6stk9.fsf@belgarion.home>
+References: <DUB128-W41502854DD81E8A089EBCA9C620@phx.gbl>,
+ <8737q6stk9.fsf@belgarion.home>
+Message-ID: <DUB128-W420C1D0460E92AD711327E9C640@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hello there,
 
-On 04/27/2016 10:00 AM, Krzysztof Kozlowski wrote:
-> The SD-card vmmc-supply contained incorrectly two regulators. The second
-> one is ignored. Fix this by defining proper vmmc and vqmmc supplies.
-> Additionally these regulators do not have to be always on, so allow
-> disabling them to reduce energy consumption.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
+----------------------------------------
+>> Suggest either use local variable val or delete it.
+> Can you please submit a proper patch as in Documentation/SubmittingPatches ?
 
-Patch looks good to me.
+Sorry no. Not only do I not know if deletion or use is the best solution,
+this email account conflicts with the whitespace requirements of a kernel patch.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+I am happy for someone else to invent a patch.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards
+
+David Binderman
+
+ 		 	   		  
