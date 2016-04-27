@@ -1,89 +1,106 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Wed, 27 Apr 2016 07:31:05 +0200
-Subject: [PATCH V2] clk: bcm2835: mark enabled pll_dividers as critical
-In-Reply-To: <87bn4v6dou.fsf@eliezer.anholt.net>
-References: <1461660989-11846-1-git-send-email-kernel@martin.sperl.org>
- <8737q8dv5f.fsf@eliezer.anholt.net>
- <BC74AA10-C36C-4643-B979-0617D222D605@martin.sperl.org>
- <87bn4v6dou.fsf@eliezer.anholt.net>
-Message-ID: <7BC21876-C9EF-489D-9F5A-06C7DD52F05C@martin.sperl.org>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 27 Apr 2016 08:29:34 +0300
+Subject: [RESEND PATCH v2 2/7] usb: xhci: plat: attach the usb_phy to the
+ correct hcd
+In-Reply-To: <1461675460-2295-3-git-send-email-jszhang@marvell.com>
+References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
+ <1461675460-2295-3-git-send-email-jszhang@marvell.com>
+Message-ID: <87potbpqkh.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Hi,
 
-> On 27.04.2016, at 03:30, Eric Anholt <eric@anholt.net> wrote:
-> 
-> Martin Sperl <kernel@martin.sperl.org> writes:
-> 
->> Sent from my iPad
->>> On 26.04.2016, at 21:31, Eric Anholt <eric@anholt.net> wrote:
->>> 
->>> kernel at martin.sperl.org writes:
->>> 
->>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>> 
->>>> The bcm2835 firmware enables several clocks and plls before
->>>> booting the linux kernel.
->>>> 
->>>> These plls should never get disabled as it may result in a
->>>> stopped system clock and more.
->>>> 
->>>> So during probing we check if the pll_divider is enabled
->>>> and if it is then mark that pll_divider as critical.
->>>> As a consequence this will also enable the corresponding parent pll.
->>>> 
->>>> Here the list of pll_div that are marked as critical:
->>>> [    2.022437] bcm2835-clk 20101000.cprman: found enabled pll_div plla_core - marking it as critical
->>>> [    2.031640] bcm2835-clk 20101000.cprman: found enabled pll_div pllb_arm - marking it as critical
->>>> [    2.040966] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_core0 - marking it as critical
->>>> [    2.050351] bcm2835-clk 20101000.cprman: found enabled pll_div pllc_per - marking it as critical
->>>> [    2.059427] bcm2835-clk 20101000.cprman: found enabled pll_div plld_core - marking it as critical
->>>> [    2.068590] bcm2835-clk 20101000.cprman: found enabled pll_div plld_per - marking it as critical
->>>> [    2.077724] bcm2835-clk 20101000.cprman: found enabled pll_div pllh_pix - marking it as critical
->>> 
->>> Yeah, pllh_pix isn't critical, though.  We want it to get turned off
->>> when the driver asks to disable its clock, or we're going to just waste
->>> a pile of power.
->>> 
->>> I'm sending out a patch that marks the VPU clock as critical (it's the
->>> also AXI bus, so it certainly is critical), which should solve your
->>> aux_uart clock disabling problem, I think.
->> 
->> The problem is that it also fails on the pcm clock alone when pllc or 
->> plld_per are used as parent, but it is fine when osc is used...
-> 
-> For that you're going to want the HAND_OFF patches that mturquette is
-> working on: Don't let the clock and its parents get turned off until a
-> driver has shown up that has referenced the clock and done at least a
-> prepare on it once.
-That one was the one I thought of as well, but it does not solve the
-issue at all, because:
+(Cc authors and maintainer, otherwise you're patch might be forgotten ;-)
 
-Speaker-test opens the audio device for 32bit 41200 samples
-Which in turn uses the i2s driver
-Which enable_prepares the clock (uses pllc_per or plld_per)
-Plays sound until the end
-Then speaker test closes the audio device
-Which disables/unprepared the PCM clock
-Which disables/unprepares plld_per
-Which disables/unprepares plld
-Machine crashes
+Jisheng Zhang <jszhang@marvell.com> writes:
+> Commit 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support") adds the
+> usb_phy for usb3, but it attached the usb_phy to incorrect hcd. The
 
-For those last few steps the handsoff still would release the
-Pll-div and pll as it has been claimed correctly first.
+where did you see that's the USB3 phy ? I can't see it.
 
-Maybe handsoff would work if applied to the individual
-Clocks (not the pll or pllc), but I am not sure if this is a correct
-assumption, as I do not know if handsoff would propagate 
-up the clock tree.
+> xhci->shared_hcd is the hcd for usb3, this patch fixes this issue
+> by attach the usb_phy to the xhci->shared_hcd.
 
-So the critical flag seems the "best" approach for now,
-But as you have said: it is not ideal as it never disables
-Any clocks when they are not really needed.
+Fixes: 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support")
+Cc: <stable@vger.kernel.org # v4.1+
 
-But so that we can continue we need something 
-that works now (even if it is not perfect)
+Maxime, any comments ? It _is_ odd that only one PHY got added.
 
-Another approach would be knowing the list of clocks 
-that the firmware claims/owns and mark only those as "critical".
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  drivers/usb/host/xhci-plat.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 8cb46cb..9ff89e9 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -144,6 +144,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	struct resource         *res;
+>  	struct usb_hcd		*hcd;
+>  	struct clk              *clk;
+> +	struct usb_phy		*usb_phy;
+>  	int			ret;
+>  	int			irq;
+>  
+> @@ -231,17 +232,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>  		xhci->shared_hcd->can_do_streams = 1;
+>  
+> -	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+> -	if (IS_ERR(hcd->usb_phy)) {
+> -		ret = PTR_ERR(hcd->usb_phy);
+> +	usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+> +	if (IS_ERR(usb_phy)) {
+> +		ret = PTR_ERR(usb_phy);
+>  		if (ret == -EPROBE_DEFER)
+>  			goto put_usb3_hcd;
+> -		hcd->usb_phy = NULL;
+> +		usb_phy = NULL;
+>  	} else {
+> -		ret = usb_phy_init(hcd->usb_phy);
+> +		ret = usb_phy_init(usb_phy);
+>  		if (ret)
+>  			goto put_usb3_hcd;
+>  	}
+> +	xhci->shared_hcd->usb_phy = usb_phy;
+>  
+>  	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>  	if (ret)
+> @@ -258,7 +260,7 @@ dealloc_usb2_hcd:
+>  	usb_remove_hcd(hcd);
+>  
+>  disable_usb_phy:
+> -	usb_phy_shutdown(hcd->usb_phy);
+> +	usb_phy_shutdown(usb_phy);
+>  
+>  put_usb3_hcd:
+>  	usb_put_hcd(xhci->shared_hcd);
+> @@ -280,7 +282,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+>  	struct clk *clk = xhci->clk;
+>  
+>  	usb_remove_hcd(xhci->shared_hcd);
+> -	usb_phy_shutdown(hcd->usb_phy);
+> +	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
+>  
+>  	usb_remove_hcd(hcd);
+>  	usb_put_hcd(xhci->shared_hcd);
+> -- 
+> 2.8.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/1bb1a626/attachment.sig>
