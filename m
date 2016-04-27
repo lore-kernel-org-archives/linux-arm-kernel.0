@@ -1,37 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Apr 2016 12:32:07 -0700
-Subject: [PATCH v7 0/9] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <1461710209-6563-1-git-send-email-fcooper@ti.com>
-References: <1461710209-6563-1-git-send-email-fcooper@ti.com>
-Message-ID: <20160427193207.GB5995@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2016 20:39:41 +0100
+Subject: [PATCH 1/2] ARM: PIE infrastructure
+In-Reply-To: <20160422231503.GE17051@piout.net>
+References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1459668234-16033-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160404100052.GS19428@n2100.arm.linux.org.uk>
+ <20160422231503.GE17051@piout.net>
+Message-ID: <20160427193941.GR19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Apr 23, 2016 at 01:15:03AM +0200, Alexandre Belloni wrote:
+> Well, do you want me to iterate and use fncpy on all the functions from
+> the generated binary?
 
-* Franklin S Cooper Jr <fcooper@ti.com> [160426 15:38]:
->
->  .../devicetree/bindings/pwm/pwm-tiecap.txt         | 36 +++++++--
->  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 36 +++++++--
->  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 33 +++++++-
->  arch/arm/boot/dts/am33xx.dtsi                      | 36 ++++++---
->  arch/arm/boot/dts/am4372.dtsi                      | 63 ++++++++++-----
->  arch/arm/boot/dts/da850.dtsi                       | 15 ++--
->  arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
->  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
->  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 ---------------
->  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 --------------------
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 -------------
->  drivers/clk/ti/clk-33xx.c                          |  3 +
->  drivers/clk/ti/clk-43xx.c                          |  6 ++
->  drivers/pwm/pwm-tiecap.c                           |  7 ++
->  drivers/pwm/pwm-tiehrpwm.c                         |  7 ++
->  16 files changed, 279 insertions(+), 282 deletions(-)
+No, because that will break the image too.
 
-Thierry, do you want to pick the driver changes or ack them
-and then I can queue the rest if no more comments?
+> I'm not sure this is necessary as the generated binary is self contained
+> and doing so will force me to also ensure the offsets are kept the same.
+> Doing only one copy is much more convenient. However, I still need to
+> ensure the destination address is properly 8-byte aligned and the
+> flush_icache_range().
 
-Regards,
+What you need to do is to immitate being an ELF loader - in other words,
+copy the blob according to the alignment rules of the blob (which may be
+greater than 8-byte alignment) and use the symbol table to find the
+functions and the type of the function (ARM vs ELF).
 
-Tony
+> I understand this is abusing fncpy() but it does want I need (still, I'm
+> planning to avoid the BUG() by always passing a properly aligned
+> destination address).
+
+Yea yea yea, such arguments don't wash with me, sorry.  The "but it does
+what I need" is total bollocks, sorry.  fncpy() is designed for a
+purpose, and what you're doing is an abuse of it, one which I will not
+stand for for the sake of long term maintainability.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
