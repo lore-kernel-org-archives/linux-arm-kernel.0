@@ -1,44 +1,98 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 27 Apr 2016 01:36:27 -0400
-Subject: [PATCH V6 05/13] acpi, pci: Support IO resources when parsing PCI
- host bridge resources.
-In-Reply-To: <20160427023916.GF6789@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-6-git-send-email-tn@semihalf.com>
- <20160427023916.GF6789@localhost>
-Message-ID: <57204FDB.6010202@redhat.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 27 Apr 2016 11:07:40 +0530
+Subject: [PATCH V2 4/5] iommu/msm: use generic ARMV7S short descriptor
+ pagetable ops
+In-Reply-To: <20160426141723.GA1793@arm.com>
+References: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
+ <1459952975-1250-5-git-send-email-sricharan@codeaurora.org>
+ <20160426141723.GA1793@arm.com>
+Message-ID: <004001d1a046$ee7dc5f0$cb7951d0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2016 10:39 PM, Bjorn Helgaas wrote:
-> On Fri, Apr 15, 2016 at 07:06:40PM +0200, Tomasz Nowicki wrote:
->> Platforms that have memory mapped IO port (such as ARM64) need special
->> handling for PCI I/O resources. For host bridge's resource probing case
->> these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
+Hi will,
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Tuesday, April 26, 2016 7:47 PM
+> To: Sricharan R <sricharan@codeaurora.org>
+> Cc: linux-arm-kernel at lists.infradead.org;
+iommu at lists.linux-foundation.org;
+> devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> robin.murphy at arm.com; robdclark at gmail.com; joro at 8bytes.org;
+> srinivas.kandagatla at linaro.org; laurent.pinchart at ideasonboard.com;
+> stepanm at codeaurora.org; treding at nvidia.com
+> Subject: Re: [PATCH V2 4/5] iommu/msm: use generic ARMV7S short
+> descriptor pagetable ops
 > 
-> ia64 also has memory-mapped I/O port space.
-
-The specific references of interest to anyone here are:
-
-*). Volume 2, Part 1: Itanium? Architecture-based Operating System
-Interaction Model with IA-32 Applications 2:267 section "10.7 I/O Port
-Space Model" which describes how they can map 4 "legacy" IO ports on a
-virtual page when operating in a "sparse" mode.
-
-*). Page 378 of the ACPI6.1 specification Table 6-213 I/O Resource Flag
-(Resource Type = 1) Definitions describes how a "sparse" translation can
-exist depending upon bit _TRS. This seems to be implemented in Linux
-using the ACPI_SPARSE_TRANSLATION types.
-
-> It would be ideal to find
-> some way to handle ia64 and ARM64 similarly.  At the very least, we
-> have to make sure that this doesn't break ia64.  The ia64 dense/sparse
-> I/O spaces complicate things; I don't know if ARM64 has something
-> similar or not.
-
-There's nothing directly similar - it's just regular MMIO.
-
-Jon.
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+> On Wed, Apr 06, 2016 at 07:59:34PM +0530, Sricharan R wrote:
+> > This iommu uses the armv7 short descriptor format. So use the generic
+> > ARMV7S pagetable ops instead of rewriting the same stuff in the
+> > driver.
+> >
+> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > ---
+> >  drivers/iommu/Kconfig     |   1 +
+> >  drivers/iommu/msm_iommu.c | 378
+> > ++++++++++------------------------------------
+> >  2 files changed, 80 insertions(+), 299 deletions(-)
+> 
+> Nice diffstat!
+> 
+> > +static void __flush_iotlb(void *cookie)
+> >  {
+> > -	struct msm_priv *priv = to_msm_priv(domain);
+> > +	struct msm_priv *priv = cookie;
+> >  	struct msm_iommu_dev *iommu = NULL;
+> >  	struct msm_iommu_ctx_dev *master;
+> >  	int ret = 0;
+> >
+> > -#ifndef CONFIG_IOMMU_PGTABLES_L2
+> > -	unsigned long *fl_table = priv->pgtable;
+> > -	int i;
+> > -
+> > -	if (!list_empty(&priv->list_attached)) {
+> > -		dmac_flush_range(fl_table, fl_table + SZ_16K);
+> > -
+> > -		for (i = 0; i < NUM_FL_PTE; i++)
+> > -			if ((fl_table[i] & 0x03) == FL_TYPE_TABLE) {
+> > -				void *sl_table = __va(fl_table[i] &
+> > -
+> 	FL_BASE_MASK);
+> > -				dmac_flush_range(sl_table, sl_table +
+> SZ_4K);
+> > -			}
+> > -	}
+> > -#endif
+> > -
+> >  	list_for_each_entry(iommu, &priv->list_attached, dom_node) {
+> >  		ret = __enable_clocks(iommu);
+> >  		if (ret)
+> > @@ -162,9 +144,26 @@ static int __flush_iotlb(struct iommu_domain
+> *domain)
+> >  		__disable_clocks(iommu);
+> >  	}
+> >  fail:
+> > -	return ret;
+> > +	return;
+> > +}
+> > +
+> > +static void __flush_iotlb_range(unsigned long iova, size_t size,
+> > +				size_t granule, bool leaf, void *cookie) {
+> > +	__flush_iotlb(cookie);
+> 
+> Can you really not do better than this? __flush_iotlb does a TLBIALL
+afaict,
+> whereas you have the address range here and
+> drivers/iommu/msm_iommu_hw-8xxx.h has entries for things like
+> TLBIVA[A]...
+> 
+> You might even be able to make SET_CTX_REG use writel_relaxed and stick a
+> DSB in the sync callback (assuming that's sufficient to complete the
+> maintenance on your device).
+> 
+  Yes, this is a overkill. I should change this as you have mentioned.
+Thanks.
+      
+ 
+Regards,
+  Sricharan
