@@ -1,36 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Apr 2016 08:57:05 +1000
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC
- Updates for v4.7
-In-Reply-To: <4754122.zMqi1lHELM@wuerfel>
-References: <cover.1461632180.git.horms+renesas@verge.net.au>
- <4754122.zMqi1lHELM@wuerfel>
-Message-ID: <20160427225705.GB29115@verge.net.au>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 27 Apr 2016 17:58:27 -0500
+Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
+Message-ID: <20160427225827.GC17629@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 12:44:48PM +0200, Arnd Bergmann wrote:
-> On Tuesday 26 April 2016 11:28:38 Simon Horman wrote:
-> > This pull request is based on a merge of:
-> > 
-> > * Thee previous round of such requests, tagged as renesas-rcar-sysc-for-v4.7,
-> >   which you have previously pulled.
-> > * The clk-renesas-for-v4.7-tag2 tag of Geert Uytterhoeven's renesas-drivers
-> >   tree which has been accepted into clk-next by Stephen Boyd.
-> 
-> I've pulled it into next/drivers now.
-> 
-> > There are follow-up DT changes that depend on this driver which I plan to
-> > send in a pull-request for in the near future.
-> 
-> Ok, I need to revisit your earlier explanation of the exact dependencies
-> here and see if we can find a way to merge this nicely. We usually
-> have the next/dt branch before the next/drivers branch, so this reverse
-> dependency would require a next/dt2 branch unless we can either change
-> the order for the 4.7 merge window for all platforms, or find a way
-> to merge (most of) the following DT changes without having the driver
-> done first.
+Hi Thomas & Liviu,
 
-I have sent the relevant pull-requests for you to review.
-I have tried to keep the patches contained in pull-requests
-with awkward dependencies to a minimum.
+You added pci_ioremap_set_mem_type(int mem_type) with 1c8c3cf0b523
+("ARM: 8060/1: mm: allow sub-architectures to override PCI I/O memory
+type").
+
+I see this patch on the list: "[PATCH 3/3] ARM: mvebu: implement
+L2/PCIe deadlock workaround"
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/242784.html)
+that does call pci_ioremap_set_mem_type(), but it doesn't look like
+that patch ever got merged.
+
+Is it still useful to have pci_ioremap_set_mem_type() even though
+nobody calls it?
+
+I'm looking at the issue of how we ioremap memory-mapped ioport
+spaces, and pci_ioremap_mem_type is currently used in the arm-specific
+pci_ioremap_io():
+
+  int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+  {
+    BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
+
+    return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+                              PCI_IO_VIRT_BASE + offset + SZ_64K,
+                              phys_addr,
+                              __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+  }
+
+Also, what about pci_remap_iospace(), added by 8b921acfeffd ("PCI: Add
+pci_remap_iospace() to map bus I/O resources")?
+
+  int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+  {
+  #if defined(PCI_IOBASE) && defined(CONFIG_MMU)
+    unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+
+    if (!(res->flags & IORESOURCE_IO))
+      return -EINVAL;
+
+    if (res->end > IO_SPACE_LIMIT)
+      return -EINVAL;
+
+    return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+                              pgprot_device(PAGE_KERNEL));
+    ...
+
+pci_remap_iospace() is generic code from drivers/pci/pci.c.  Here we
+also call ioremap_page_range(), but we use pgprot_device(PAGE_KERNEL)
+(not __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte)).
+
+It seems like these two calls of ioremap_page_range() should use the
+same prot argument.  Looking at __arm_ioremap_pfn_caller() makes me
+suspect that pci_remap_iospace() is not safe on arm.
+
+Bjorn
