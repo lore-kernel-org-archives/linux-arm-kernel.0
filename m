@@ -1,53 +1,30 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 27 Apr 2016 16:16:10 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon: hip05 and hip06 SoC updates for 4.7
-Message-ID: <5720D7BA.2050107@hisilicon.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Apr 2016 17:21:37 +0200
+Subject: bug in autoloading of imx-ipuv3-crtc
+In-Reply-To: <CAPM=9tyyYZqPYz2AHvSDBdG+=LwSELR4m+cc1RrKG0ramZS0ug@mail.gmail.com>
+References: <6926808.b0joqYQPQE@anubis.ausil.us>
+ <1513165.9WxCa41tI1@anubis.ausil.us>
+ <20160420230317.GT29108@pengutronix.de>
+ <13533046.1iFyOjiAs0@anubis.ausil.us>
+ <CAPM=9tyyYZqPYz2AHvSDBdG+=LwSELR4m+cc1RrKG0ramZS0ug@mail.gmail.com>
+Message-ID: <1461770497.4044.53.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Am Mittwoch, den 27.04.2016, 08:59 +1000 schrieb Dave Airlie:
+> > I reverted the 4 patches in that series
+> >
+> > 407c9eba drm/imx: Remove of_node assignment from ipuv3-crtc driver probe
+> > 304e6be6 gpu: ipu-v3: Assign of_node of child platform devices to
+> > corresponding ports
+> > 99ae78c3 gpu: ipu-v3: Remove reg_offset field
+> > c3ede03c gpu: ipu-v3: drop unused dmfc field from client platform data
+> >
+> > and it then worked again.
+> 
+> Should I be reverting these upstream as it's some sort of regression?
 
-Please help to pull the following changes.
-Thanks!
+I will send an imx-drm/fixes pull request with the issue fixed.
 
-Best Regards,
-Wei
-
----
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hip0x-dt-for-4.7
-
-for you to fetch changes up to 4cfcb35189f62ae351194827fca1787053a66235:
-
-  Documentation: arm64: Add Hisilicon Hip06 D03 dts binding (2016-04-27 15:40:13 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon hip05 and hip06 updates for 4.7
-
-- Fix its node without msi-cells for hip05
-- Add nor flash node for hip05 D02 board
-- Add initial dts for hip06 D03 board
-- Reorder and add the hip06 D03 binding in the binding document
-
-----------------------------------------------------------------
-Kefeng Wang (4):
-      arm64: dts: hip05: fix its node without msi-cells
-      arm64: dts: hip05: Add nor flash support
-      arm64: dts: Add initial dts for Hisilicon Hip06 D03 board
-      Documentation: arm64: Add Hisilicon Hip06 D03 dts binding
-
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  20 +++++----
- arch/arm64/boot/dts/hisilicon/Makefile                        |   4 +-
- arch/arm64/boot/dts/hisilicon/hip05-d02.dts                   |  34 +++++++++++++++
- arch/arm64/boot/dts/hisilicon/hip05.dtsi                      |  10 +++++
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts                   |  34 +++++++++++++++
- arch/arm64/boot/dts/hisilicon/hip06.dtsi                      | 307 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 400 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip06-d03.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip06.dtsi
+regards
+Philipp
