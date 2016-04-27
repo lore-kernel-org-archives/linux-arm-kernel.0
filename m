@@ -1,107 +1,68 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:07 -0700
-Subject: [PATCH v6 05/14] acpi,
- numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+Date: Wed, 27 Apr 2016 11:07:09 -0700
+Subject: [PATCH v6 07/14] arm64, numa: Cleanup NUMA disabled messages.
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-6-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-8-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-Identical implementations of acpi_numa_slit_init() are used by both
-x86 and follow-on arm64 support.  Move it to drivers/acpi/numa.c, and
-guard with CONFIG_X86 || CONFIG_ARM64 because ia64 has its own
-architecture specific implementation.
+As noted by Dennis Chen, we don't want to print "No NUMA configuration
+found" if NUMA was forced off from the command line.
 
-No code change.
+Change the type of numa_off to bool, and clean up printing code.
+Print "NUMA disabled" if forced off on command line and "No NUMA
+configuration found" if there was no firmware NUMA information.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c  | 27 ---------------------------
- drivers/acpi/numa.c | 29 +++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 27 deletions(-)
+ arch/arm64/mm/numa.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index 90b6ed9..f242a11 100644
---- a/arch/x86/mm/srat.c
-+++ b/arch/x86/mm/srat.c
-@@ -42,33 +42,6 @@ static __init inline int srat_disabled(void)
- 	return acpi_numa < 0;
- }
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 6cb03f9..1def1de 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -29,7 +29,7 @@ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
  
--/*
-- * Callback for SLIT parsing.  pxm_to_node() returns NUMA_NO_NODE for
-- * I/O localities since SRAT does not list them.  I/O localities are
-- * not supported@this point.
-- */
--void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
--{
--	int i, j;
--
--	for (i = 0; i < slit->locality_count; i++) {
--		const int from_node = pxm_to_node(i);
--
--		if (from_node == NUMA_NO_NODE)
--			continue;
--
--		for (j = 0; j < slit->locality_count; j++) {
--			const int to_node = pxm_to_node(j);
--
--			if (to_node == NUMA_NO_NODE)
--				continue;
--
--			numa_set_distance(from_node, to_node,
--				slit->entry[slit->locality_count * i + j]);
--		}
--	}
--}
--
- /* Callback for Proximity Domain -> x2APIC mapping */
- void __init
- acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index f41f06b..6fa528a 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -197,6 +197,35 @@ static int __init slit_valid(struct acpi_table_slit *slit)
- 	return 1;
- }
+ static int numa_distance_cnt;
+ static u8 *numa_distance;
+-static int numa_off;
++static bool numa_off;
  
-+#if defined(CONFIG_X86) || defined (CONFIG_ARM64)
-+/*
-+ * Callback for SLIT parsing.  pxm_to_node() returns NUMA_NO_NODE for
-+ * I/O localities since SRAT does not list them.  I/O localities are
-+ * not supported at this point.
-+ */
-+void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
-+{
-+	int i, j;
-+
-+	for (i = 0; i < slit->locality_count; i++) {
-+		const int from_node = pxm_to_node(i);
-+
-+		if (from_node == NUMA_NO_NODE)
-+			continue;
-+
-+		for (j = 0; j < slit->locality_count; j++) {
-+			const int to_node = pxm_to_node(j);
-+
-+			if (to_node == NUMA_NO_NODE)
-+				continue;
-+
-+			numa_set_distance(from_node, to_node,
-+				slit->entry[slit->locality_count * i + j]);
-+		}
-+	}
-+}
-+#endif /* defined(CONFIG_X86) || defined (CONFIG_ARM64) */
-+
- static int __init acpi_parse_slit(struct acpi_table_header *table)
+ static __init int numa_parse_early_param(char *opt)
  {
- 	struct acpi_table_slit *slit = (struct acpi_table_slit *)table;
+@@ -37,7 +37,7 @@ static __init int numa_parse_early_param(char *opt)
+ 		return -EINVAL;
+ 	if (!strncmp(opt, "off", 3)) {
+ 		pr_info("%s\n", "NUMA turned off");
+-		numa_off = 1;
++		numa_off = true;
+ 	}
+ 	return 0;
+ }
+@@ -362,7 +362,10 @@ static int __init dummy_numa_init(void)
+ 	int ret;
+ 	struct memblock_region *mblk;
+ 
+-	pr_info("%s\n", "No NUMA configuration found");
++	if (numa_off)
++		pr_info("NUMA disabled\n"); /* Forced off on command line. */
++	else
++		pr_info("No NUMA configuration found\n");
+ 	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
+ 	       0LLU, PFN_PHYS(max_pfn) - 1);
+ 
+@@ -375,7 +378,7 @@ static int __init dummy_numa_init(void)
+ 		return ret;
+ 	}
+ 
+-	numa_off = 1;
++	numa_off = true;
+ 	return 0;
+ }
+ 
 -- 
 1.7.11.7
