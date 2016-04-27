@@ -1,85 +1,88 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 27 Apr 2016 09:05:03 +0200
-Subject: [PATCH] ARM: BCM5301X: Enable SPI-NOR on dual flash devices
-Message-ID: <1461740704-21501-1-git-send-email-zajec5@gmail.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Wed, 27 Apr 2016 12:35:28 +0530
+Subject: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma device
+ tree binding documentation
+Message-ID: <1461740729-30715-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1b47b98acce2 ("ARM: BCM5301X: Add DT entry for SPI controller and
-NOR flash") enabled SPI-NOR device on routers using serial flash only.
-However there are also devices with two flash memories:
-1) Small SPI attached flash used mostly for booting
-2) Bigger NAND used mostly for storing firmware
-On such devices we still need SPI-NOR e.g. to access NVRAM data.
+Device-tree binding documentation for Xilinx zynqmp dma engine used in
+Zynq UltraScale+ MPSoC.
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts | 4 ++++
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts       | 4 ++++
- arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts    | 4 ++++
- arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts | 4 ++++
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts     | 4 ++++
- 5 files changed, 20 insertions(+)
+Changes in v7:
+- None.
+Changes in v6:
+- Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
+  from the binding doc as it allow broken combinations when dma-coherent
+  is set as suggested by Rob.
+- Fixed minor comments given by Rob related coding(lower case DT node name).
+Changes in v5:
+- Use dma-coherent flag for coherent transfers as suggested by rob.
+- Removed unnecessary properties from binding doc as suggested by Rob.
+Changes in v4:
+- None
+Changes in v3:
+- None
+Changes in v2:
+- None.
 
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index 5087aa8..9cb186e 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -147,3 +147,7 @@
- &usb3 {
- 	vcc-gpio = <&chipcommon 10 GPIO_ACTIVE_LOW>;
- };
+
+ .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+new file mode 100644
+index 0000000..f0f0b54
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+@@ -0,0 +1,44 @@
++Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
++memory to device and device to memory transfers. It also has flow
++control and rate control support for slave/peripheral dma access.
 +
-+&spi_nor {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index 1049ab1..8ce39d5 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -90,3 +90,7 @@
- &usb3 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
++Required properties:
++- compatible		: Should be "xlnx,zynqmp-dma-1.0"
++- reg			: Memory map for gdma/adma module access.
++- interrupt-parent	: Interrupt controller the interrupt is routed through
++- interrupts		: Should contain DMA channel interrupt.
++- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
++- clock-names		: List of input clocks "clk_main", "clk_apb"
++			  (see clock bindings for details)
 +
-+&spi_nor {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-index 3a94606..6229ef2 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-@@ -82,3 +82,7 @@
- 		};
- 	};
- };
++Optional properties:
++- xlnx,include-sg	: Indicates the controller to operate in simple or
++			  scatter gather dma mode
++- xlnx,ratectrl		: Scheduling interval in terms of clock cycles for
++			  source AXI transaction
++- xlnx,overfetch	: Tells whether the channel is allowed to over
++			  fetch the data
++- xlnx,src-issue	: Number of AXI outstanding transactions on source side
++- xlnx,src-burst-len	: AXI length for data read. Support only power of
++			  2 byte values.
++- xlnx,dst-burst-len	: AXI length for data write. Support only power of
++			  2 byte values.
++- dma-coherent		: Present if dma operations are coherent.
 +
-+&spi_nor {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-index 791d722..0653e7e 100644
---- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-+++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-@@ -131,3 +131,7 @@
- &usb2 {
- 	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
- };
-+
-+&spi_nor {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-index ace38ef..50cf804 100644
---- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -113,3 +113,7 @@
- &usb3 {
- 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
- };
-+
-+&spi_nor {
-+	status = "okay";
++Example:
++++++++++
++fpd_dma_chan1: dma at fd500000 {
++	compatible = "xlnx,zynqmp-dma-1.0";
++	reg = <0x0 0xFD500000 0x1000>;
++	interrupt-parent = <&gic>;
++	interrupts = <0 117 4>;
++	clock-names = "clk_main", "clk_apb";
++	xlnx,bus-width = <128>;
++	xlnx,include-sg;
++	xlnx,overfetch;
++	dma-coherent;
++	xlnx,ratectrl = <0>;
++	xlnx,src-issue = <16>;
++	xlnx,src-burst-len = <4>;
++	xlnx,dst-burst-len = <4>;
 +};
 -- 
-1.8.4.5
+2.1.2
