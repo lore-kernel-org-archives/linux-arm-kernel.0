@@ -1,26 +1,37 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 27 Apr 2016 09:11:46 +0200
-Subject: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
- device tree binding documentation
-In-Reply-To: <1461740729-30715-1-git-send-email-appanad@xilinx.com>
-References: <1461740729-30715-1-git-send-email-appanad@xilinx.com>
-Message-ID: <57206632.7010508@metafoo.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Apr 2016 09:15:40 +0200
+Subject: [PATCH] ARM: dts: at91: VInCo: fix phy reset gpio flag
+In-Reply-To: <571FB305.4060304@cogentembedded.com>
+References: <570BF481.9070903@cogentembedded.com>
+ <1461666272-10107-1-git-send-email-nicolas.ferre@atmel.com>
+ <20160426.131750.433048061726795876.davem@davemloft.net>
+ <571FB305.4060304@cogentembedded.com>
+Message-ID: <5720671C.9040406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2016 09:05 AM, Kedareswara rao Appana wrote:
-[...]
-> +- xlnx,include-sg	: Indicates the controller to operate in simple or
-> +			  scatter gather dma mode
-> +- xlnx,ratectrl		: Scheduling interval in terms of clock cycles for
-> +			  source AXI transaction
-> +- xlnx,overfetch	: Tells whether the channel is allowed to over
-> +			  fetch the data
-> +- xlnx,src-issue	: Number of AXI outstanding transactions on source side
-> +- xlnx,src-burst-len	: AXI length for data read. Support only power of
-> +			  2 byte values.
-> +- xlnx,dst-burst-len	: AXI length for data write. Support only power of
+Le 26/04/2016 20:27, Sergei Shtylyov a ?crit :
+> On 04/26/2016 08:17 PM, David Miller wrote:
+> 
+>>> I plan to queue this patch through arm-soc for 4.7.
+>>
+>> Ok.
+> 
+>     How about this patch going thru your net-next repo instead?
+> I'd like to keep the kernel bisectable... if my phylib/macb patches get merged 
+> earlier than this one, that board would be broken...
 
-These are all software runtime configuration parameters that you'd want to
-change at runtime depending on which peripheral you are targeting with a
-specific DMA transfer. These really do not belong into the devicetree.
+Sergei, David,
+
+I don't think that there is a big risk for this board to be tested in
+the meantime as it's not widely deployed yet.
+And as I'm aware of the issue and basically maintaining this DT file, I
+think that I'll be informed if people try an unlikely arrangement of
+patches on this board.
+
+So either way, I'm okay. But I do think it's not worth thinking too much
+about this case.
+
+Bye,
+-- 
+Nicolas Ferre
