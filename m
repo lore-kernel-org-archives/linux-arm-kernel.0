@@ -1,68 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Apr 2016 14:59:00 +0100
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <878tzzpq19.fsf@intel.com>
-References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
- <87d1pcrj0t.fsf@intel.com> <571F2357.9080509@ti.com>
- <878tzzpq19.fsf@intel.com>
-Message-ID: <20160427135859.GC20646@e104818-lin.cambridge.arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 27 Apr 2016 16:00:18 +0200
+Subject: [PATCH v2 1/3] ARM: dts: exynos: Define vqmmc for SD card and allow
+ disabling regulators on Odroid X/X2/U3
+Message-ID: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 08:41:06AM +0300, Felipe Balbi wrote:
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
-> > On 04/26/2016 09:17 AM, Felipe Balbi wrote:
-> >> Grygorii Strashko <grygorii.strashko@ti.com> writes:
-> >>> Now not all DMA paremters configured properly for "xhci-hcd" platform
-> >>> device which is created manually. For example: dma_pfn_offset, dam_ops
-> >>> and iommu configuration will not corresponds "dwc3" devices
-> >>> configuration. As result, this will cause problems like wrong DMA
-> >>> addresses translation on platforms with LPAE enabled like Keystone 2.
-> >>>
-> >>> When platform is using DT boot mode the DMA configuration will be
-> >>> parsed and applied from DT, so, to fix this issue, reuse
-> >>> of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
-> >>> from DWC3 device node.
-> >> 
-> >> patch is incomplete. You left out non-DT users which might suffer from
-> >> the same problem.
-> >
-> > Honestly, I don't know how to fix it gracefully for non-DT case.
-> > I can update commit message to mention that this is fix for DT case only.
-> 
-> no, that won't do :-) There are other users for this driver and they are
-> all "out-of-compliance" when it comes to DMA usage. Apparently, the
-> desired behavior is to pass correct device to DMA API which the gadget
-> side is already doing (see below). For the host side, the fix has to be
-> more involved.
-> 
-> Frankly, I'd prefer that DMA setup could be inherited from parent
-> device, then it wouldn't really matter and a bunch of this could be
-> simplified. Some sort of dma_inherit(struct device *dev, struct device
-> *parent) would go a long way, IMHO.
+The SD-card vmmc-supply contained incorrectly two regulators. The second
+one is ignored. Fix this by defining proper vmmc and vqmmc supplies.
+Additionally these regulators do not have to be always on, so allow
+disabling them to reduce energy consumption.
 
-I would be in favour of a dma_inherit() function as well. We could hack
-something up in the arch code (like below) but I would rather prefer an
-explicit dma_inherit() call by drivers creating such devices.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index ba437f090a74..ea6fb9b0e8fa 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
+---
+
+Changes since v1:
+1. None
+---
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index cab0f07d7d28..3d0d44581fbd 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -249,7 +249,6 @@
+ 				regulator-name = "VDDQ_MMC2_2.8V";
+ 				regulator-min-microvolt = <2800000>;
+ 				regulator-max-microvolt = <2800000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 			};
  
- static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
--	if (dev && dev->archdata.dma_ops)
--		return dev->archdata.dma_ops;
-+	while (dev) {
-+		if (dev->archdata.dma_ops)
-+			return dev->archdata.dma_ops;
-+		dev = dev->parent;
-+	}
+@@ -345,7 +344,6 @@
+ 				regulator-name = "LDO21_3.3V";
+ 				regulator-min-microvolt = <3300000>;
+ 				regulator-max-microvolt = <3300000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 			};
  
- 	/*
- 	 * We expect no ISA devices, and all other DMA masters are expected to
-
+@@ -482,7 +480,8 @@
+ 	bus-width = <4>;
+ 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+ 	pinctrl-names = "default";
+-	vmmc-supply = <&ldo4_reg &ldo21_reg>;
++	vmmc-supply = <&ldo21_reg>;
++	vqmmc-supply = <&ldo4_reg>;
+ 	cd-gpios = <&gpk2 2 GPIO_ACTIVE_HIGH>;
+ 	cd-inverted;
+ 	status = "okay";
 -- 
-Catalin
+1.9.1
