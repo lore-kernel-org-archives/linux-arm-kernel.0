@@ -1,48 +1,53 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 27 Apr 2016 14:49:15 +0300
-Subject: [PATCH 3/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
-In-Reply-To: <1461693269-19436-4-git-send-email-Linux.HWI@garmin.com>
-References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
- <1461693269-19436-4-git-send-email-Linux.HWI@garmin.com>
-Message-ID: <5720A73B.6050408@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Apr 2016 13:53:26 +0200
+Subject: [PATCH] ARM: orion5x: Remove CLK_IS_ROOT
+In-Reply-To: <1461116330-2922-1-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Tue, 19 Apr 2016 18:38:50 -0700")
+References: <1461116330-2922-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <87oa8vtgi1.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/16 20:54, J.D. Schroeder wrote:
-> From: "J.D. Schroeder" <jay.schroeder@garmin.com>
+Hi Stephen,
+ 
+ On mer., avril 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+> CLK_IS_ROOT", 2016-02-02) so remove it.
 >
-> This commit updates the OSC_32K_CLK (secure_32k_clk_src_ck) frequency
-> from the precise 32kHz frequency (i.e., 32.768 kHz) to the more
-> accurate frequency of ~34.6 kHz. Actual measured frequencies of the
-> clock vary from board to board anywhere from 34.4 kHz up to 34.8 kHz.
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Uhm, if you have a board specific, accurate value for this clock, you 
-should update it in the board file itself. This definition is going to 
-be used across all the DRA7 / AM57xx boards, which can very likely have 
-different crystal accuracies.
+Applied on mvebu/soc
 
-So, NAK.
+Thanks,
 
--Tero
-
->
-> Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
-> Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
+Gregory
 > ---
->   arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-orion5x/common.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index a514fc3..4501140 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -95,7 +95,7 @@
->   	secure_32k_clk_src_ck: secure_32k_clk_src_ck {
->   		#clock-cells = <0>;
->   		compatible = "fixed-clock";
-> -		clock-frequency = <32768>;
-> +		clock-frequency = <34600>; /* approximate frequency */
->   	};
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index 70c3366c8d03..058994e99570 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -66,8 +66,7 @@ static struct clk *tclk;
+>  
+>  void __init clk_init(void)
+>  {
+> -	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
+> -				       orion5x_tclk);
+> +	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, orion5x_tclk);
+>  
+>  	orion_clkdev_init(tclk);
+>  }
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 >
->   	virt_12000000_ck: virt_12000000_ck {
->
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
