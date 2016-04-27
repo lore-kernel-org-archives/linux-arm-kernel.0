@@ -1,139 +1,180 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:16 -0700
-Subject: [PATCH v6 14/14] acpi, numa: Enable ACPI based NUMA on ARM64
+Date: Wed, 27 Apr 2016 11:07:13 -0700
+Subject: [PATCH v6 11/14] acpi,
+ numa: Move acpi_numa_memory_affinity_init() to drivers/acpi/numa.c
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-15-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-12-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Add function needed for cpu to node mapping, and enable ACPI based
-NUMA for ARM64 in Kconfig
+acpi_numa_memory_affinity_init() will be reused by arm64.  Move it to
+drivers/acpi/numa.c to facilitate reuse.
+
+No code change.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
-[david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/acpi/Kconfig |  4 ++--
- drivers/acpi/numa.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/acpi.h | 17 ++++++++++++++++-
- 3 files changed, 53 insertions(+), 3 deletions(-)
+ arch/x86/mm/srat.c  | 57 --------------------------------------------------
+ drivers/acpi/numa.c | 60 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 57 deletions(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index fa91ea2..5a3b161 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -291,8 +291,8 @@ config ACPI_THERMAL
- config ACPI_NUMA
- 	bool "NUMA support"
- 	depends on NUMA
--	depends on (X86 || IA64)
--	default y if IA64_GENERIC || IA64_SGI_SN2
-+	depends on (X86 || IA64 || ARM64)
-+	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
- 
- config ACPI_CUSTOM_DSDT_FILE
- 	string "Custom DSDT Table file to include"
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index 50c8f42..f6696ac 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
- 		}
- 		break;
- 
-+	case ACPI_SRAT_TYPE_GICC_AFFINITY:
-+		{
-+			struct acpi_srat_gicc_affinity *p =
-+			    (struct acpi_srat_gicc_affinity *)header;
-+			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
-+				 p->acpi_processor_uid,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
-+				 "enabled" : "disabled");
-+		}
-+		break;
-+
- 	default:
- 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
- 			header->type);
-@@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
- 	return 0;
+diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
+index 30460f5..b1ecff4 100644
+--- a/arch/x86/mm/srat.c
++++ b/arch/x86/mm/srat.c
+@@ -15,8 +15,6 @@
+ #include <linux/bitmap.h>
+ #include <linux/module.h>
+ #include <linux/topology.h>
+-#include <linux/bootmem.h>
+-#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <asm/proto.h>
+ #include <asm/numa.h>
+@@ -104,61 +102,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+ 	       pxm, apic_id, node);
  }
  
-+static int __init
-+acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
-+			 const unsigned long end)
+-/* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
+-int __init
+-acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+-{
+-	u64 start, end;
+-	u32 hotpluggable;
+-	int node, pxm;
+-
+-	if (srat_disabled())
+-		goto out_err;
+-	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
+-		goto out_err_bad_srat;
+-	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
+-		goto out_err;
+-	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
+-	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
+-		goto out_err;
+-
+-	start = ma->base_address;
+-	end = start + ma->length;
+-	pxm = ma->proximity_domain;
+-	if (acpi_srat_revision <= 1)
+-		pxm &= 0xff;
+-
+-	node = acpi_map_pxm_to_node(pxm);
+-	if (node < 0) {
+-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
+-		goto out_err_bad_srat;
+-	}
+-
+-	if (numa_add_memblk(node, start, end) < 0)
+-		goto out_err_bad_srat;
+-
+-	node_set(node, numa_nodes_parsed);
+-
+-	pr_info("SRAT: Node %u PXM %u [mem %#010Lx-%#010Lx]%s%s\n",
+-		node, pxm,
+-		(unsigned long long) start, (unsigned long long) end - 1,
+-		hotpluggable ? " hotplug" : "",
+-		ma->flags & ACPI_SRAT_MEM_NON_VOLATILE ? " non-volatile" : "");
+-
+-	/* Mark hotplug range in memblock. */
+-	if (hotpluggable && memblock_mark_hotplug(start, ma->length))
+-		pr_warn("SRAT: Failed to mark hotplug range [mem %#010Lx-%#010Lx] in memblock\n",
+-			(unsigned long long)start, (unsigned long long)end - 1);
+-
+-	max_possible_pfn = max(max_possible_pfn, PFN_UP(end - 1));
+-
+-	return 0;
+-out_err_bad_srat:
+-	bad_srat();
+-out_err:
+-	return -EINVAL;
+-}
+-
+ int __init x86_acpi_numa_init(void)
+ {
+ 	int ret;
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index f6fd87c..d7d0499 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -27,6 +27,8 @@
+ #include <linux/types.h>
+ #include <linux/errno.h>
+ #include <linux/acpi.h>
++#include <linux/bootmem.h>
++#include <linux/memblock.h>
+ #include <linux/numa.h>
+ #include <linux/nodemask.h>
+ #include <linux/topology.h>
+@@ -236,6 +238,64 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+ 		}
+ 	}
+ }
++
++/*
++ * Default callback for parsing of the Proximity Domain <-> Memory
++ * Area mappings
++ */
++int __init
++acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 +{
-+	struct acpi_srat_gicc_affinity *processor_affinity;
++	u64 start, end;
++	u32 hotpluggable;
++	int node, pxm;
 +
-+	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
-+	if (!processor_affinity)
-+		return -EINVAL;
++	if (srat_disabled())
++		goto out_err;
++	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
++		goto out_err_bad_srat;
++	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
++		goto out_err;
++	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
++	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
++		goto out_err;
 +
-+	acpi_table_print_srat_entry(header);
++	start = ma->base_address;
++	end = start + ma->length;
++	pxm = ma->proximity_domain;
++	if (acpi_srat_revision <= 1)
++		pxm &= 0xff;
 +
-+	/* let architecture-dependent part to do it */
-+	acpi_numa_gicc_affinity_init(processor_affinity);
++	node = acpi_map_pxm_to_node(pxm);
++	if (node < 0) {
++		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
++		goto out_err_bad_srat;
++	}
++
++	if (numa_add_memblk(node, start, end) < 0)
++		goto out_err_bad_srat;
++
++	node_set(node, numa_nodes_parsed);
++
++	pr_info("SRAT: Node %u PXM %u [mem %#010Lx-%#010Lx]%s%s\n",
++		node, pxm,
++		(unsigned long long) start, (unsigned long long) end - 1,
++		hotpluggable ? " hotplug" : "",
++		ma->flags & ACPI_SRAT_MEM_NON_VOLATILE ? " non-volatile" : "");
++
++	/* Mark hotplug range in memblock. */
++	if (hotpluggable && memblock_mark_hotplug(start, ma->length))
++		pr_warn("SRAT: Failed to mark hotplug range [mem %#010Lx-%#010Lx] in memblock\n",
++			(unsigned long long)start, (unsigned long long)end - 1);
++
++	max_possible_pfn = max(max_possible_pfn, PFN_UP(end - 1));
 +
 +	return 0;
++out_err_bad_srat:
++	bad_srat();
++out_err:
++	return -EINVAL;
 +}
-+
- static int __initdata parsed_numa_memblks;
+ #endif /* defined(CONFIG_X86) || defined (CONFIG_ARM64) */
  
- static int __init
-@@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
- {
- 	int cnt = 0;
- 
-+	if (acpi_disabled)
-+		return -EINVAL;
-+
- 	/*
- 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
- 	 * SRAT cpu entries could have different order with that in MADT.
-@@ -416,6 +449,8 @@ int __init acpi_numa_init(void)
- 				     acpi_parse_x2apic_affinity, 0);
- 		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
- 				     acpi_parse_processor_affinity, 0);
-+		acpi_table_parse_srat(ACPI_SRAT_TYPE_GICC_AFFINITY,
-+				      acpi_parse_gicc_affinity, 0);
- 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
- 					    acpi_parse_memory_affinity,
- 					    NR_NODE_MEMBLKS);
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index ab6fd96..af34064 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -239,10 +239,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
- int acpi_parse_mcfg (struct acpi_table_header *header);
- void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
- 
--/* the following four functions are architecture-dependent */
-+/* the following numa functions are architecture-dependent */
- void acpi_numa_slit_init (struct acpi_table_slit *slit);
-+
-+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
-+#endif
-+
- void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-+
-+#ifdef CONFIG_ARM64
-+void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
-+#endif
-+
- int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
- 
- #ifndef PHYS_CPUID_INVALID
+ static int __init acpi_parse_slit(struct acpi_table_header *table)
 -- 
 1.7.11.7
