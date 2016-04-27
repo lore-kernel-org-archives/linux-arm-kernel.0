@@ -1,53 +1,62 @@
 From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 08:30:52 +0300
-Subject: [RESEND PATCH v2 3/7] usb: xhci: plat: Fix suspend/resume when
- the optional usb_phy exists
-In-Reply-To: <1461675460-2295-4-git-send-email-jszhang@marvell.com>
+Date: Wed, 27 Apr 2016 08:33:52 +0300
+Subject: [RESEND PATCH v2 5/7] usb: xhci: plat: Remove checks for optional
+ clock in error/remove path
+In-Reply-To: <1461675460-2295-6-git-send-email-jszhang@marvell.com>
 References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-4-git-send-email-jszhang@marvell.com>
-Message-ID: <87mvofpqib.fsf@intel.com>
+ <1461675460-2295-6-git-send-email-jszhang@marvell.com>
+Message-ID: <87h9enpqdb.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
 Jisheng Zhang <jszhang@marvell.com> writes:
-> Commit 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support") adds the
-> usb_phy for usb3, but it forgets to shutdown/init the usb_phy in the
-> suspend/resume path. This patch fixes this issue by adding missing
-> usb_phy related calls.
+> Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
+> clk_{unprepare, disable}()") allows NULL or error pointer to be passed
+> unconditionally.
+>
+> This patch is to simplify probe error and remove code paths.
 
-Fixes: 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support")
-Cc: <stable@vger.kernel.org> # v4.1+
+this seems wrong to me. xhci->clk isn't initialized to NULL, it's either
+initialized to a valid struct clk * or some ERR_PTR() value.
+
+Care to explain ?
 
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  drivers/usb/host/xhci-plat.c | 5 +++++
->  1 file changed, 5 insertions(+)
+>  drivers/usb/host/xhci-plat.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 >
 > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 9ff89e9..fbd23fd 100644
+> index 0e69712..83669d0 100644
 > --- a/drivers/usb/host/xhci-plat.c
 > +++ b/drivers/usb/host/xhci-plat.c
-> @@ -313,6 +313,7 @@ static int xhci_plat_suspend(struct device *dev)
->  	if (ret)
->  		return ret;
+> @@ -266,8 +266,7 @@ put_usb3_hcd:
+>  	usb_put_hcd(xhci->shared_hcd);
 >  
-> +	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
->  	clk_disable_unprepare(xhci->clk);
+>  disable_clk:
+> -	if (!IS_ERR(clk))
+> -		clk_disable_unprepare(clk);
+> +	clk_disable_unprepare(clk);
 >  
->  	return ret;
-> @@ -328,6 +329,10 @@ static int xhci_plat_resume(struct device *dev)
->  	if (ret)
->  		return ret;
+>  put_hcd:
+>  	usb_put_hcd(hcd);
+> @@ -287,8 +286,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+>  	usb_remove_hcd(hcd);
+>  	usb_put_hcd(xhci->shared_hcd);
 >  
-> +	ret = usb_phy_init(xhci->shared_hcd->usb_phy);
-> +	if (ret)
-> +		return ret;
-> +
->  	return xhci_resume(xhci, 0);
->  }
+> -	if (!IS_ERR(clk))
+> -		clk_disable_unprepare(clk);
+> +	clk_disable_unprepare(clk);
+>  	usb_put_hcd(hcd);
+>  
+>  	return 0;
+> -- 
+> 2.8.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 balbi
@@ -57,4 +66,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/e713f363/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/9eb13fb2/attachment.sig>
