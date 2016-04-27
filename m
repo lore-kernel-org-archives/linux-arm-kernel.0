@@ -1,63 +1,42 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 27 Apr 2016 17:58:27 -0500
-Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
-Message-ID: <20160427225827.GC17629@localhost>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 28 Apr 2016 09:06:57 +1000
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v4.6
+Message-ID: <cover.1461798058.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas & Liviu,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-You added pci_ioremap_set_mem_type(int mem_type) with 1c8c3cf0b523
-("ARM: 8060/1: mm: allow sub-architectures to override PCI I/O memory
-type").
+Please consider these second round of Renesas ARM based SoC fixes for v4.6.
 
-I see this patch on the list: "[PATCH 3/3] ARM: mvebu: implement
-L2/PCIe deadlock workaround"
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/242784.html)
-that does call pci_ioremap_set_mem_type(), but it doesn't look like
-that patch ever got merged.
+This fix allows serial to work on r8a7795-based boards where the optional
+scif clock is not populated.
 
-Is it still useful to have pci_ioremap_set_mem_type() even though
-nobody calls it?
+This pull request is based on the previous round of
+such requests, tagged as renesas-fixes-for-v4.6,
+which I have already sent a pull-request for.
 
-I'm looking at the issue of how we ioremap memory-mapped ioport
-spaces, and pci_ioremap_mem_type is currently used in the arm-specific
-pci_ioremap_io():
 
-  int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
-  {
-    BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
+The following changes since commit c531fb27e9699eaee478ee5686a3cca5dee73602:
 
-    return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
-                              PCI_IO_VIRT_BASE + offset + SZ_64K,
-                              phys_addr,
-                              __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
-  }
+  ARM: shmobile: timer: Fix preset_lpj leading to too short delays (2016-04-20 08:52:55 +1000)
 
-Also, what about pci_remap_iospace(), added by 8b921acfeffd ("PCI: Add
-pci_remap_iospace() to map bus I/O resources")?
+are available in the git repository at:
 
-  int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-  {
-  #if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-    unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v4.6
 
-    if (!(res->flags & IORESOURCE_IO))
-      return -EINVAL;
+for you to fetch changes up to f5515f9cdff136dc32517d4b81fe2b9091237b4a:
 
-    if (res->end > IO_SPACE_LIMIT)
-      return -EINVAL;
+  arm64: dts: r8a7795: Don't disable referenced optional scif clock (2016-04-26 09:44:48 +1000)
 
-    return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
-                              pgprot_device(PAGE_KERNEL));
-    ...
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Fixes for v4.6
 
-pci_remap_iospace() is generic code from drivers/pci/pci.c.  Here we
-also call ioremap_page_range(), but we use pgprot_device(PAGE_KERNEL)
-(not __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte)).
+* Don't disable referenced optional scif clock
 
-It seems like these two calls of ioremap_page_range() should use the
-same prot argument.  Looking at __arm_ioremap_pfn_caller() makes me
-suspect that pci_remap_iospace() is not safe on arm.
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      arm64: dts: r8a7795: Don't disable referenced optional scif clock
 
-Bjorn
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
