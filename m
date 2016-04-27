@@ -1,82 +1,128 @@
 From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 27 Apr 2016 23:26:52 +0300
-Subject: [PATCH 04/23] mmc: sdhci: re-factor sdhci_start_signal_voltage()
-In-Reply-To: <CAA+hA=SygBBr+-C_r4Geodni+hj2Mg71o+ecVq_AD8vv22=UPA@mail.gmail.com>
+Date: Wed, 27 Apr 2016 23:26:27 +0300
+Subject: [PATCH 02/23] mmc: sdhci: move sdhci_get_cd() forward to avoid
+ declaration
+In-Reply-To: <CAA+hA=R_8KfwZutxYp4tBx0bkSrJYsUcR7c1fWjAVFUxqwpByw@mail.gmail.com>
 References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-5-git-send-email-aisheng.dong@nxp.com>
- <571A0E5E.4090904@intel.com>
- <CAA+hA=SygBBr+-C_r4Geodni+hj2Mg71o+ecVq_AD8vv22=UPA@mail.gmail.com>
-Message-ID: <5721208C.2090509@intel.com>
+ <1460741387-23815-3-git-send-email-aisheng.dong@nxp.com>
+ <5719FCAB.1050806@intel.com>
+ <CAA+hA=R_8KfwZutxYp4tBx0bkSrJYsUcR7c1fWjAVFUxqwpByw@mail.gmail.com>
+Message-ID: <57212073.7090006@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/2016 12:14 p.m., Dong Aisheng wrote:
-> Hi Adrian,
->
-> Thanks for the review first.
->
-> On Fri, Apr 22, 2016 at 7:43 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+On 24/04/2016 12:17 p.m., Dong Aisheng wrote:
+> On Fri, Apr 22, 2016 at 6:27 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
 >> On 15/04/16 20:29, Dong Aisheng wrote:
->>> Handle host and regulator signal voltage switch separately.
->>> Move host signal voltage switch code into a separated function
->>> sdhci_do_signal_voltage_switch() first, the following patches will
->>> remove the regulator voltage switch code and use the common
->>> mmc_regulator_set_vqmmc() instead.
+>>> Move sdhci_get_cd() to avoid needing to declare this function
+>>> before use.
 >>
->> You have changed the order that things are done.
->
-> Yes, the oder changes a bit that we always do controller voltage switch first.
-> I suppose the order is irrelevant here since i don't recall any
-> requirement from card.
->
-> Actually the original order is also a bit mass.
-> e.g.
-> For MMC_SIGNAL_VOLTAGE_330, switch controller first, then vqmmc.
-> But for MMC_SIGNAL_VOLTAGE_180, switch vqmmc first, then controller.
-> It looks to us the original one also order irrelevant.
->
->> There is no way to know
->> what that will break, so let's not do that.  What about just changing
->> regulator_set_voltage() to mmc_regulator_set_vqmmc()?
+>> In fact, we shouldn't be calling host functions directly. i.e. the call
+>> should be host->mmc->ops->get_cd().
+>>
+>> However the caller sdhci_do_reset() is called under spinlock so it should
+>> not be calling ->get_cd at all.
+>>
+>> What that means is that we really need to get rid of
+>> SDHCI_QUIRK_NO_CARD_NO_RESET, after which this patch wouldn't be needed, so
+>> let's leave it for now.
 >>
 >
-> Currently what i can think out VIO switch using are three cases: (Pls
-> help add if any)
-> 1) Both host IO and card IO use external vqmmc to do switch
-> (e.g eMMC 1.8V DDR/HS200/HS400 mode)
->
-> eMMC has no IO voltage switch protocol and requirement, so usually
-> board designed
-> using fixed 1.8V for eMMC and host IO.
-> Event it's switchable, it should be done in the first mmc_power_up().
-> Dynamical switch later may cause eMMC unable to work properly.
-> (We have been confirmed about this issue by many eMMC vendors
-> like Micron and Sandisk. I'm not sure if any exceptions in the community
-> still doing VIO dynamical switch for eMMC, if yes, please help share
-> the experience!).
->
-> Event some people still do dynamical IO switch for eMMC, since eMMC
-> spec has no requirement, so the order should also not care.
->
-> 2) Host using controller IO switch while card using standard CMD (SD/SDIO3.0)
->
-> SD/SDIO 3.0 spec defines the standard IO switch process and using it's internal
-> regulator to do card IO voltage switch. It does not use external vqmmc
-> regulator.
-> So order irrelevant too.
->
-> 3) Host using controller IO switch while card using external vqmmc
-> (special SDIO3.0 or eMMC)
-> I have met some special SDIO3.0 card like Broadcom WiFi which does not follow
-> the spec and using external regulator for card IO voltage.
-> Usually it's required to fix to 1.8v and also not order irrelevant.
->
-> For eMMC, refer to case 1), it should be fixed to 1.8v at power up.
->
-> So it looks all cases seems are not order required.
+> Yes, i agree we need get rid of SDHCI_QUIRK_NO_CARD_NO_RESET.
+> However, after that, we still need to remove the sdhci_get_cd
+> pre-declaration, right?
 
-I don't agree that there is any way to know that other host controllers
-are not affected.  I don't want a repeat of sdhci_set_power().
+Sure
 
-Please instead send a patch for just using mmc_regulator_set_vqmmc()
-in place of regulator_set_voltage().
+>
+> Regards
+> Dong Aisheng
+>
+>>>
+>>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>>> ---
+>>>   drivers/mmc/host/sdhci.c | 55 ++++++++++++++++++++++++------------------------
+>>>   1 file changed, 27 insertions(+), 28 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>>> index be52a3a..839aa4c 100644
+>>> --- a/drivers/mmc/host/sdhci.c
+>>> +++ b/drivers/mmc/host/sdhci.c
+>>> @@ -53,7 +53,6 @@ static void sdhci_finish_data(struct sdhci_host *);
+>>>   static void sdhci_finish_command(struct sdhci_host *);
+>>>   static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+>>>   static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
+>>> -static int sdhci_get_cd(struct mmc_host *mmc);
+>>>
+>>>   #ifdef CONFIG_PM
+>>>   static void sdhci_runtime_pm_bus_on(struct sdhci_host *host);
+>>> @@ -161,6 +160,33 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
+>>>        sdhci_set_card_detection(host, false);
+>>>   }
+>>>
+>>> +static int sdhci_get_cd(struct mmc_host *mmc)
+>>> +{
+>>> +     struct sdhci_host *host = mmc_priv(mmc);
+>>> +     int gpio_cd = mmc_gpio_get_cd(mmc);
+>>> +
+>>> +     if (host->flags & SDHCI_DEVICE_DEAD)
+>>> +             return 0;
+>>> +
+>>> +     /* If nonremovable, assume that the card is always present. */
+>>> +     if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+>>> +             return 1;
+>>> +
+>>> +     /*
+>>> +      * Try slot gpio detect, if defined it take precedence
+>>> +      * over build in controller functionality
+>>> +      */
+>>> +     if (!IS_ERR_VALUE(gpio_cd))
+>>> +             return !!gpio_cd;
+>>> +
+>>> +     /* If polling, assume that the card is always present. */
+>>> +     if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+>>> +             return 1;
+>>> +
+>>> +     /* Host native card detect */
+>>> +     return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+>>> +}
+>>> +
+>>>   void sdhci_reset(struct sdhci_host *host, u8 mask)
+>>>   {
+>>>        unsigned long timeout;
+>>> @@ -1551,33 +1577,6 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>        spin_unlock_irqrestore(&host->lock, flags);
+>>>   }
+>>>
+>>> -static int sdhci_get_cd(struct mmc_host *mmc)
+>>> -{
+>>> -     struct sdhci_host *host = mmc_priv(mmc);
+>>> -     int gpio_cd = mmc_gpio_get_cd(mmc);
+>>> -
+>>> -     if (host->flags & SDHCI_DEVICE_DEAD)
+>>> -             return 0;
+>>> -
+>>> -     /* If nonremovable, assume that the card is always present. */
+>>> -     if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+>>> -             return 1;
+>>> -
+>>> -     /*
+>>> -      * Try slot gpio detect, if defined it take precedence
+>>> -      * over build in controller functionality
+>>> -      */
+>>> -     if (!IS_ERR_VALUE(gpio_cd))
+>>> -             return !!gpio_cd;
+>>> -
+>>> -     /* If polling, assume that the card is always present. */
+>>> -     if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+>>> -             return 1;
+>>> -
+>>> -     /* Host native card detect */
+>>> -     return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+>>> -}
+>>> -
+>>>   static int sdhci_check_ro(struct sdhci_host *host)
+>>>   {
+>>>        unsigned long flags;
+>>>
+>>
