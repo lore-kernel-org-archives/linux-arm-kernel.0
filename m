@@ -1,84 +1,139 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:08 -0700
-Subject: [PATCH v6 06/14] arm64, numa: rework numa_add_memblk()
+Date: Wed, 27 Apr 2016 11:07:16 -0700
+Subject: [PATCH v6 14/14] acpi, numa: Enable ACPI based NUMA on ARM64
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-7-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-15-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Rework numa_add_memblk() to update the parameter "u64 size" to "u64
-end", this will make it consistent with x86 and simplifies the arm64
-ACPI NUMA code to be added later.
+Add function needed for cpu to node mapping, and enable ACPI based
+NUMA for ARM64 in Kconfig
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
+[david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/arm64/mm/numa.c | 12 ++++++------
- drivers/of/of_numa.c |  4 ++--
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/acpi/Kconfig |  4 ++--
+ drivers/acpi/numa.c  | 35 +++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h | 17 ++++++++++++++++-
+ 3 files changed, 53 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 98dc104..6cb03f9 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -131,25 +131,25 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
-  * numa_add_memblk - Set node id to memblk
-  * @nid: NUMA node ID of the new memblk
-  * @start: Start address of the new memblk
-- * @size:  Size of the new memblk
-+ * @end:  End address of the new memblk
-  *
-  * RETURNS:
-  * 0 on success, -errno on failure.
-  */
--int __init numa_add_memblk(int nid, u64 start, u64 size)
-+int __init numa_add_memblk(int nid, u64 start, u64 end)
- {
- 	int ret;
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index fa91ea2..5a3b161 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -291,8 +291,8 @@ config ACPI_THERMAL
+ config ACPI_NUMA
+ 	bool "NUMA support"
+ 	depends on NUMA
+-	depends on (X86 || IA64)
+-	default y if IA64_GENERIC || IA64_SGI_SN2
++	depends on (X86 || IA64 || ARM64)
++	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
  
--	ret = memblock_set_node(start, size, &memblock.memory, nid);
-+	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
- 	if (ret < 0) {
- 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
--			start, (start + size - 1), nid);
-+			start, (end - 1), nid);
- 		return ret;
- 	}
+ config ACPI_CUSTOM_DSDT_FILE
+ 	string "Custom DSDT Table file to include"
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 50c8f42..f6696ac 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
+ 		}
+ 		break;
  
- 	node_set(nid, numa_nodes_parsed);
- 	pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
--			start, (start + size - 1), nid);
-+			start, (end - 1), nid);
- 	return ret;
++	case ACPI_SRAT_TYPE_GICC_AFFINITY:
++		{
++			struct acpi_srat_gicc_affinity *p =
++			    (struct acpi_srat_gicc_affinity *)header;
++			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
++				 p->acpi_processor_uid,
++				 p->proximity_domain,
++				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
++				 "enabled" : "disabled");
++		}
++		break;
++
+ 	default:
+ 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
+ 			header->type);
+@@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
+ 	return 0;
  }
  
-@@ -367,7 +367,7 @@ static int __init dummy_numa_init(void)
- 	       0LLU, PFN_PHYS(max_pfn) - 1);
- 
- 	for_each_memblock(memory, mblk) {
--		ret = numa_add_memblk(0, mblk->base, mblk->size);
-+		ret = numa_add_memblk(0, mblk->base, mblk->base + mblk->size);
- 		if (!ret)
- 			continue;
- 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 0f2784b..ed5a097 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -91,8 +91,8 @@ static int __init of_numa_parse_memory_nodes(void)
- 		pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
- 			 rsrc.start, rsrc.end - rsrc.start + 1, nid);
- 
--		r = numa_add_memblk(nid, rsrc.start,
--				    rsrc.end - rsrc.start + 1);
++static int __init
++acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
++			 const unsigned long end)
++{
++	struct acpi_srat_gicc_affinity *processor_affinity;
 +
-+		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
- 		if (r)
- 			break;
- 	}
++	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
++	if (!processor_affinity)
++		return -EINVAL;
++
++	acpi_table_print_srat_entry(header);
++
++	/* let architecture-dependent part to do it */
++	acpi_numa_gicc_affinity_init(processor_affinity);
++
++	return 0;
++}
++
+ static int __initdata parsed_numa_memblks;
+ 
+ static int __init
+@@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
+ {
+ 	int cnt = 0;
+ 
++	if (acpi_disabled)
++		return -EINVAL;
++
+ 	/*
+ 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
+ 	 * SRAT cpu entries could have different order with that in MADT.
+@@ -416,6 +449,8 @@ int __init acpi_numa_init(void)
+ 				     acpi_parse_x2apic_affinity, 0);
+ 		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
+ 				     acpi_parse_processor_affinity, 0);
++		acpi_table_parse_srat(ACPI_SRAT_TYPE_GICC_AFFINITY,
++				      acpi_parse_gicc_affinity, 0);
+ 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
+ 					    acpi_parse_memory_affinity,
+ 					    NR_NODE_MEMBLKS);
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index ab6fd96..af34064 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -239,10 +239,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
+ int acpi_parse_mcfg (struct acpi_table_header *header);
+ void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
+ 
+-/* the following four functions are architecture-dependent */
++/* the following numa functions are architecture-dependent */
+ void acpi_numa_slit_init (struct acpi_table_slit *slit);
++
++#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+ void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
++#else
++static inline void
++acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
++#endif
++
+ void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
++
++#ifdef CONFIG_ARM64
++void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
++#else
++static inline void
++acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
++#endif
++
+ int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
+ 
+ #ifndef PHYS_CPUID_INVALID
 -- 
 1.7.11.7
