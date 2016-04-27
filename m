@@ -1,54 +1,77 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 27 Apr 2016 18:01:00 +0930
-Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
-In-Reply-To: <4956403.scaVRGhPEf@diego>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-4-git-send-email-joel@jms.id.au> <4956403.scaVRGhPEf@diego>
-Message-ID: <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 27 Apr 2016 09:47:45 +0100
+Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
+In-Reply-To: <20160427081501.GV2274@localhost>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
+ <20160426033029.GB2274@localhost>
+ <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
+ <20160426162529.GK2274@localhost> <571F9D76.2060809@codeaurora.org>
+ <20160427081501.GV2274@localhost>
+Message-ID: <57207CB1.4040307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 8:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> [+clock-related patches should include clock-maintainers and lists]
+On 27/04/16 09:15, Vinod Koul wrote:
+> On Tue, Apr 26, 2016 at 12:55:18PM -0400, Sinan Kaya wrote:
+>> On 4/26/2016 12:25 PM, Vinod Koul wrote:
+>>> On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org wrote:
+>>>> On 2016-04-25 23:30, Vinod Koul wrote:
+>>>>> On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
+>>>>>
+>>>>>> +static int hidma_chan_stats(struct seq_file *s, void *unused)
+>>>>>> +{
+>>>>>> +	struct hidma_chan *mchan = s->private;
+>>>>>> +	struct hidma_desc *mdesc;
+>>>>>> +	struct hidma_dev *dmadev = mchan->dmadev;
+>>>>>> +
+>>>>>> +	pm_runtime_get_sync(dmadev->ddev.dev);
+>>>>>
+>>>>> debug shouldn't power up device, why do you want to do that
+>>>>
+>>>>
+>>>> Clocks are turned off while the hw is idle. I can?t reach hw
+>>>> registers without restoring power.
+>>>
+>>> Hmm, have you thought about using regmap?
+>>>
+>>
+>> To be honest, I didn't know what regmap is but I just read some code
+>> and looked at how it is used. Feel free to correct me if I got it 
+>> wrong. 
+>>
+>> Regmap seems to be designed for *slow* speed peripherals to improve frequent
+>> accesses by the SW. It looks like it is used by MFD, SPI and I2C drivers.
+>>
+>> It seems to cache the register contents and flush/invalidate them only when
+>> needed.
+>>
+>> The MMIO version seems to be assuming the presence of device-tree like CLK
+>> API which doesn't exist on ACPI systems and is not portable.
+>>
+>> My reaction is that it is a lot of code with no added functionality to what
+>> HIDMA driver is trying to achieve. 
+>>
+>> Given that the use case here is only for debug purposes; I think it is OK 
+>> to keep this runtime call here. I don't want to add any overhead into the
+>> existing code just to support the debug use case.  
+>>
+>> None of my register read/writes are slow. This file will only be used to 
+>> troubleshoot customer issues.
 
-Thanks.
+I'd recommend you actually run perf on a a few of your MMIO accesses. I
+believe the result will be eye opening. On the KVM side, we've trimmed
+our MMIO access as much as possible, using a memory-based cache (similar
+to regmap in concept). This has made some code paths about 40% faster.
 
-> Am Donnerstag, 21. April 2016, 17:34:01 schrieb Joel Stanley:
->> +For example:
->> +
->> +     clk_clkin: clk_clkin {
->> +             #clock-cells = <0>;
->> +             compatible = "fixed-clock";
->> +             clock-frequency = <48000000>;
->> +     };
->> +
->> +     clk_hpll: clk_hpll {
->> +             compatible = "aspeed,g4-hpll-clock";
->> +             #clock-cells = <0>;
->> +             reg = <0x1e6e2008 0x4>;
->> +     };
->> +
->> +     clk_apb: clk_apb at 1e6e2008 {
->> +             #clock-cells = <0>;
->> +             compatible = "aspeed,g4-apb-clock";
->> +             reg = <0x1e6e2008 0x4>;
->> +             clocks = <&clk_hpll>;
->> +     };
->
-> You have both the hpll and apb_clk in the same register (probably even more
-> clocks?) and separate clock instances where each instance will of_iomap the
-> register itself (and thus multiple times in general).
+> $ is always faster than MMIO. This way you can give reg contents to users
+> without waking up hw.
 
-Yep. I agree that's not ideal.
+Indeed. MMIO access sucks rocks, even on a very fast box. Actually, the
+faster the box is, the slower MMIO feels (compared to memory).
 
->
-> From what I remember exposing the clock controller as one block (instead of
-> declaring each clock individually in the dts) is still the preferred way but I
-> don't think I can find Mike's mail from back then easily.
+Thanks,
 
-I can't picture how that would look. I took my lead from the moxart
-clock driver; is there a better example that I should follow?
-
-Cheers,
-
-Joel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
