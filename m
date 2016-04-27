@@ -1,38 +1,91 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Wed, 27 Apr 2016 09:32:10 +0800
-Subject: [PATCH] usb: core: buffer: avoid NULL pointer dereferrence
-In-Reply-To: <20160426231115.GB23273@kroah.com>
-References: <20160408140701.GA3547@kroah.com>
- <Pine.LNX.4.44L0.1604081120190.2069-100000@iolanthe.rowland.org>
- <20160426231115.GB23273@kroah.com>
-Message-ID: <1461720730.11651.4.camel@mhfsdcap03>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 Apr 2016 09:49:36 +0800
+Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <20160426133500.GQ27312@arm.com>
+References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160425111338.GJ16065@arm.com> <571E4A2A.8070908@caviumnetworks.com>
+ <571EFD1B.1070609@linaro.org> <20160426121547.GL27312@arm.com>
+ <571F671D.70401@linaro.org> <20160426133500.GQ27312@arm.com>
+Message-ID: <57201AB0.9050202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will,
 
-On Tue, 2016-04-26 at 16:11 -0700, Greg Kroah-Hartman wrote:
-> On Fri, Apr 08, 2016 at 11:21:05AM -0400, Alan Stern wrote:
-> > On Fri, 8 Apr 2016, Greg Kroah-Hartman wrote:
-> > 
-> > > On Fri, Apr 08, 2016 at 05:08:03PM +0800, Chunfeng Yun wrote:
-> > > > NULL pointer dereferrence will happen when class driver
-> > > > wants to allocate zero length buffer and pool_max[0]
-> > > > can't be used, so skip reserved pool in this case.
-> > > 
-> > > Why would a driver want to allocate a 0 length buffer?  What driver does
-> > > this?
-> > > 
-> > > Shouldn't we fix that issue instead?
-> > 
-> > And even if a driver does want to allocate a 0-length buffer, shouldn't 
-> > the function simply return early instead of running through all its 
-> > calculations?
-> 
-> Yes it should, Chunfeng, can you fix this patch to do that please.
-> 
-Ok, I will fix it later
+On 2016/4/26 21:35, Will Deacon wrote:
+> On Tue, Apr 26, 2016 at 09:03:25PM +0800, Hanjun Guo wrote:
+>> On 2016/4/26 20:15, Will Deacon wrote:
+>>> On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
+>>>> On 2016/4/26 0:47, David Daney wrote:
+>>>>> On 04/25/2016 04:13 AM, Will Deacon wrote:
+>>>>>> On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
+>>>>>>> From: David Daney <david.daney@cavium.com>
+>>>>>>>
+>>>>>>> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
+>>>>>>> set introduce the ACPI based configuration to provide NUMA
+>>>>>>> information.
+>>>>>>>
+>>>>>>> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
+>>>>>>> NUMA domain information from SRAT and SLIT table, so parse those two
+>>>>>>> tables to get mappings from cpu/mem to numa node configuration and
+>>>>>>> system locality.
+>>>>>>
+>>>>>> Whilst I've queued the main NUMA series for arm64, I'd really like to
+>>>>>> see more movement on the generic header file cleanups that you posted
+>>>>>> separately:
+>>>>>>
+>>>>>> http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
+>>>>>>
+>>>>>
+>>>>> FWIW:  Those patches should still apply.  I am carrying them in my
+>>>>> development trees, and have not changed them in any way.
+>>>
+>>> What's your plan for getting them merged?
+>>
+>> This patch set touches lots of ACPI related file in arch/x86,
+>> arch/ia64, and drivers/acpi/ (also arch/arm64), I think it can be
+>> merged via ACPI tree by Rafael with your ack to ARM64 code, does
+>> it make sense?
+>
+> It doesn't touch anything in drivers/acpi/... are you following the link
+> above?
 
-> thanks,
-> 
-> greg k-h
+Sorry, my bad, I though you were talking about this ACPI NUMA support
+for ARM64 patch set.
+
+>
+>>>>>> Given that this ACPI series already requires some significant cross-arch
+>>>>>> interaction (which is actually good!), perhaps extending the clean-up
+>>>>>> patches to encompass some of the ACPI bits might make sense, and we can
+>>>>>> get that queued as a pre-requisite.
+>>>>>
+>>>>> The cleanup patches you mention above are really independent of the ACPI
+>>>>> things.  I have applied them both before and after the ACPI patches, and
+>>>>> both seem to work.  With a quick perusal of the ACPI patches nothing
+>>>>> jumps out at me as being a candidate for inclusion in the header file
+>>>>> cleanup series.
+>>>>
+>>>> I agree. My patch set is ACPI related enablement, cleanups and
+>>>> consolidations, it would be good to merge as a single patch set
+>>>> as it's self-contained.
+>>>
+>>> Up to you. I just thought you might want to avoid having two sets of
+>>> cross-arch changes and the associated merging headaches that go with
+>>> that.
+>>
+>> Good point, as I suggested above, it can go with ACPI tree if it's ok
+>> to you and Rafael. The problem we have now is that dt based core NUMA
+>> support for ARM64 is queued in your tree, that would be the headache.
+>
+> Sorry, but if you wanted me *not* to queue the patches, then you should
+> have said so (similarly, if you wanted a stable branch). I'm not rebasing
+> our for-next/core branch now.
+
+I misread the message above, I'm really sorry if I did something
+offending you, I didn't mean that.
+
+How about this patch set? We only get few comments on it, your
+comments on it are appreciated.
+
+Thanks
+Hanjun
