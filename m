@@ -1,39 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 27 Apr 2016 14:19:13 +0200
-Subject: [PATCH 3/3] ARM: dts: exynos: Lower SD card interface voltage to 2.8v
- on Odroid X/X2/U3
-In-Reply-To: <1461759553-10119-1-git-send-email-k.kozlowski@samsung.com>
-References: <1461759553-10119-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1461759553-10119-3-git-send-email-k.kozlowski@samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Apr 2016 14:22:38 +0200
+Subject: [PATCH] memory: mtk-smi: export mtk_smi_larb_get/put
+In-Reply-To: <57209DD0.5050002@gmail.com>
+References: <1461747086-26286-1-git-send-email-p.zabel@pengutronix.de>
+ <57209DD0.5050002@gmail.com>
+Message-ID: <1461759758.4044.43.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Odroid X/X2/U3 schematics say that SD card vmmc regulator
-(LDO21/TFLASH) operates on 2.8 V. Mainline U-Boot uses that value as
-well. 2.8 V is common on Exynos-based boards. Additionally use some
-descriptive name for this regulator.
+Hi Matthias,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Am Mittwoch, den 27.04.2016, 13:09 +0200 schrieb Matthias Brugger:
+> Hi Philipp,
+> 
+> On 27/04/16 10:51, Philipp Zabel wrote:
+> > To allow building mediatek-drm.ko as a module, the
+> > mtk_smi_larb_get and mtk_smi_larb_put symbols have
+> > to be exported.
+> >
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> >   drivers/memory/mtk-smi.c | 2 ++
+> >   1 file changed, 2 insertions(+)
+> >
+> > diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> > index 089091f..f6b5757 100644
+> > --- a/drivers/memory/mtk-smi.c
+> > +++ b/drivers/memory/mtk-smi.c
+> > @@ -91,6 +91,7 @@ int mtk_smi_larb_get(struct device *larbdev)
+> >
+> >   	return 0;
+> >   }
+> > +EXPORT_SYMBOL_GPL(mtk_smi_larb_get);
+> >
+> >   void mtk_smi_larb_put(struct device *larbdev)
+> >   {
+> > @@ -106,6 +107,7 @@ void mtk_smi_larb_put(struct device *larbdev)
+> >   	mtk_smi_disable(&larb->smi);
+> >   	mtk_smi_disable(common);
+> >   }
+> > +EXPORT_SYMBOL_GPL(mtk_smi_larb_put);
+> >
+> >   static int
+> >   mtk_smi_larb_bind(struct device *dev, struct device *master, void *data)
+> >
+> 
+> Strangely this didn't work with my config (attached).
+> Would you mind to double check?
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index 55d766f28202..563681c39ec2 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -341,9 +341,9 @@
- 			};
- 
- 			ldo21_reg: LDO21 {
--				regulator-name = "LDO21_3.3V";
--				regulator-min-microvolt = <3300000>;
--				regulator-max-microvolt = <3300000>;
-+				regulator-name = "TFLASH_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
- 				regulator-boot-on;
- 			};
- 
--- 
-1.9.1
+warning: (DRM_MEDIATEK && MTK_IOMMU) selects MTK_SMI which has unmet
+direct dependencies (MEMORY && (ARCH_MEDIATEK || COMPILE_TEST))
+
+I suppose DRM_MEDIATEK also has to select MEMORY, just like MTK_IOMMU
+does?
+
+regards
+Philipp
