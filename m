@@ -1,103 +1,118 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 27 Apr 2016 13:46:23 +0800
-Subject: [RESEND PATCH v2 1/7] usb: xhci: plat: Fix suspend/resume when
- the optional clk exists
-In-Reply-To: <87shy7pqr1.fsf@intel.com>
+Date: Wed, 27 Apr 2016 13:59:46 +0800
+Subject: [RESEND PATCH v2 2/7] usb: xhci: plat: attach the usb_phy to
+ the correct hcd
+In-Reply-To: <87potbpqkh.fsf@intel.com>
 References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-2-git-send-email-jszhang@marvell.com>
- <87shy7pqr1.fsf@intel.com>
-Message-ID: <20160427134623.0c90a837@xhacker>
+ <1461675460-2295-3-git-send-email-jszhang@marvell.com>
+ <87potbpqkh.fsf@intel.com>
+Message-ID: <20160427135946.3b983890@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Felipe,
 
-On Wed, 27 Apr 2016 08:25:38 +0300 Felipe Balbi wrote:
+On Wed, 27 Apr 2016 08:29:34 +0300 Felipe Balbi wrote:
 
 > Hi,
 > 
-> (since you're fixing somebody else's commit, it's nice to Cc authors)
+> (Cc authors and maintainer, otherwise you're patch might be forgotten ;-)
+
+Thanks a lot for the kind remind. I just run get_maintainer.pl to get the
+To and Cc lists. It seems Mathias's email changed, MAINTAINERS need to updated.
+
 > 
 > Jisheng Zhang <jszhang@marvell.com> writes:
-> > Commit 4718c1774051 ("usb: host: xhci-plat: add clock support") adds
-> > optional clk support, but it forgets to prepare/disable and  
->                                           ^^^^^^^^^^^^^^^
->                                           prepare/enable ?
+> > Commit 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support") adds the
+> > usb_phy for usb3, but it attached the usb_phy to incorrect hcd. The  
 > 
-> > enable/unprepare the clk in the resume/suspend path. This path fixes  
->   ^^^^^^^^^^^^^^^^                                          ^^^^
->   disable/unprepare ?                                       patch
-> 
-> > this issue by adding missing clk related calls.  
-> 
-> frankly, I'm not sure this patch is entirely correct. At minimum, it's
-> not necessarily a bug fix. Original commit had no intent in gating
-> clocks during suspend/resume and, IMHO, that might not be what *all*
-> XHCI implementations want, though I'm not entirely sure.
+> where did you see that's the USB3 phy ? I can't see it.
 
-Thanks for the hint. Indeed, that's not all xhci-plat users want. I'll drop
-this patch in v3.
+Commit 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support") says:
 
-Thanks a lot for the review,
+"The Marvell Armada 385 AP needs a dumb phy in order to enable the USB3 VBUS."
+
+So I think it means USB3 phy.
+
+Here I have two questions: Per my understanding, usb_phy is deprecated, all
+users and new code are encouraged to use generic phy. I think there must
+be some special reason commit 7b8ef22ea547 still made use of usb_phy, could
+I know what's the reason?
+
+And could the "USB3 VBUS" support be achieved through regulator framework?
+
+Thanks in advance,
 Jisheng
 
+
+> 
+> > xhci->shared_hcd is the hcd for usb3, this patch fixes this issue
+> > by attach the usb_phy to the xhci->shared_hcd.  
+> 
+> Fixes: 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support")
+> Cc: <stable@vger.kernel.org # v4.1+
+> 
+> Maxime, any comments ? It _is_ odd that only one PHY got added.
 > 
 > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > Fixes: 4718c1774051 ("usb: host: xhci-plat: add clock support")  
-> 
-> Assuming this is, indeed, a fix; you need to Cc stable here. Just add:
-> 
-> Cc: <stable@vger.kernel.org> # v3.16+
-> 
 > > ---
-> >  drivers/usb/host/xhci-plat.c | 14 +++++++++++++-
-> >  1 file changed, 13 insertions(+), 1 deletion(-)
+> >  drivers/usb/host/xhci-plat.c | 16 +++++++++-------
+> >  1 file changed, 9 insertions(+), 7 deletions(-)
 > >
 > > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> > index 474b5fa..8cb46cb 100644
+> > index 8cb46cb..9ff89e9 100644
 > > --- a/drivers/usb/host/xhci-plat.c
 > > +++ b/drivers/usb/host/xhci-plat.c
-> > @@ -295,6 +295,7 @@ static int xhci_plat_remove(struct platform_device *dev)
-> >  #ifdef CONFIG_PM_SLEEP
-> >  static int xhci_plat_suspend(struct device *dev)
-> >  {
-> > +	int ret;  
-> 
-> this would look neater after hcd and xhci declarations below
-> 
-> >  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
-> >  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> > @@ -144,6 +144,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+> >  	struct resource         *res;
+> >  	struct usb_hcd		*hcd;
+> >  	struct clk              *clk;
+> > +	struct usb_phy		*usb_phy;
+> >  	int			ret;
+> >  	int			irq;
 > >  
-> > @@ -306,14 +307,25 @@ static int xhci_plat_suspend(struct device *dev)
-> >  	 * reconsider this when xhci_plat_suspend enlarges its scope, e.g.,
-> >  	 * also applies to runtime suspend.
-> >  	 */
-> > -	return xhci_suspend(xhci, device_may_wakeup(dev));
-> > +	ret = xhci_suspend(xhci, device_may_wakeup(dev));
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	clk_disable_unprepare(xhci->clk);
-> > +
-> > +	return ret;
-> >  }
+> > @@ -231,17 +232,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+> >  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+> >  		xhci->shared_hcd->can_do_streams = 1;
 > >  
-> >  static int xhci_plat_resume(struct device *dev)
-> >  {
-> > +	int ret;  
-> 
-> ditto
-> 
-> >  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
-> >  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> > -	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+> > -	if (IS_ERR(hcd->usb_phy)) {
+> > -		ret = PTR_ERR(hcd->usb_phy);
+> > +	usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+> > +	if (IS_ERR(usb_phy)) {
+> > +		ret = PTR_ERR(usb_phy);
+> >  		if (ret == -EPROBE_DEFER)
+> >  			goto put_usb3_hcd;
+> > -		hcd->usb_phy = NULL;
+> > +		usb_phy = NULL;
+> >  	} else {
+> > -		ret = usb_phy_init(hcd->usb_phy);
+> > +		ret = usb_phy_init(usb_phy);
+> >  		if (ret)
+> >  			goto put_usb3_hcd;
+> >  	}
+> > +	xhci->shared_hcd->usb_phy = usb_phy;
 > >  
-> > +	ret = clk_prepare_enable(xhci->clk);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> >  	return xhci_resume(xhci, 0);
-> >  }
+> >  	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> >  	if (ret)
+> > @@ -258,7 +260,7 @@ dealloc_usb2_hcd:
+> >  	usb_remove_hcd(hcd);
 > >  
+> >  disable_usb_phy:
+> > -	usb_phy_shutdown(hcd->usb_phy);
+> > +	usb_phy_shutdown(usb_phy);
+> >  
+> >  put_usb3_hcd:
+> >  	usb_put_hcd(xhci->shared_hcd);
+> > @@ -280,7 +282,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+> >  	struct clk *clk = xhci->clk;
+> >  
+> >  	usb_remove_hcd(xhci->shared_hcd);
+> > -	usb_phy_shutdown(hcd->usb_phy);
+> > +	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
+> >  
+> >  	usb_remove_hcd(hcd);
+> >  	usb_put_hcd(xhci->shared_hcd);
 > > -- 
 > > 2.8.1
 > >
