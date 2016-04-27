@@ -1,117 +1,68 @@
-From: andrew-ct.chen@mediatek.com (andrew-ct chen)
-Date: Wed, 27 Apr 2016 14:30:13 +0800
-Subject: [PATCH 08/12] nvmem: mtk-efuse: remove nvmem regmap dependency
-In-Reply-To: <1461526096-29584-9-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1461526096-29584-9-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1461738613.12466.8.camel@mtksdaap41>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 27 Apr 2016 14:33:43 +0800
+Subject: [RESEND PATCH v2 5/7] usb: xhci: plat: Remove checks for
+ optional clock in error/remove path
+In-Reply-To: <87h9enpqdb.fsf@intel.com>
+References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
+ <1461675460-2295-6-git-send-email-jszhang@marvell.com>
+ <87h9enpqdb.fsf@intel.com>
+Message-ID: <20160427143343.6510ff57@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+Dear Felipe,
 
-On Sun, 2016-04-24 at 20:28 +0100, Srinivas Kandagatla wrote:
-> This patch moves to nvmem support in the driver to use callback
-> instead of regmap.
+On Wed, 27 Apr 2016 08:33:52 +0300 Felipe Balbi wrote:
+
+> Jisheng Zhang <jszhang@marvell.com> writes:
+> > Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
+> > clk_{unprepare, disable}()") allows NULL or error pointer to be passed
+> > unconditionally.
+> >
+> > This patch is to simplify probe error and remove code paths.  
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
+> this seems wrong to me. xhci->clk isn't initialized to NULL, it's either
+> initialized to a valid struct clk * or some ERR_PTR() value.
 
-Thanks for the patch. It works on our platform. This driver doesn't
-support "efuse write". I will send another patch for fixing this.
+Commit 63589e92c2d9 could also ignore error value ;)
 
-Acked-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-
-Andrew
-
->  drivers/nvmem/Kconfig     |  1 -
->  drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++++++++++++++++---------------
->  2 files changed, 32 insertions(+), 16 deletions(-)
 > 
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index 377bc21..c158712 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -48,7 +48,6 @@ config NVMEM_MXS_OCOTP
->  config MTK_EFUSE
->  	tristate "Mediatek SoCs EFUSE support"
->  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> -	select REGMAP_MMIO
->  	help
->  	  This is a driver to access hardware related data like sensor
->  	  calibration, HDMI impedance etc.
-> diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-> index 9c49369..32fd572 100644
-> --- a/drivers/nvmem/mtk-efuse.c
-> +++ b/drivers/nvmem/mtk-efuse.c
-> @@ -14,15 +14,35 @@
->  
->  #include <linux/device.h>
->  #include <linux/module.h>
-> +#include <linux/io.h>
->  #include <linux/nvmem-provider.h>
->  #include <linux/platform_device.h>
-> -#include <linux/regmap.h>
->  
-> -static struct regmap_config mtk_regmap_config = {
-> -	.reg_bits = 32,
-> -	.val_bits = 32,
-> -	.reg_stride = 4,
-> -};
-> +static int mtk_reg_read(void *context,
-> +			unsigned int reg, void *_val, size_t bytes)
-> +{
-> +	void __iomem *base = context;
-> +	u32 *val = _val;
-> +	int i = 0, words = bytes / 4;
-> +
-> +	while (words--)
-> +		*val++ = readl(base + reg + (i++ * 4));
-> +
-> +	return 0;
-> +}
-> +
-> +static int mtk_reg_write(void *context,
-> +			 unsigned int reg, void *_val, size_t bytes)
-> +{
-> +	void __iomem *base = context;
-> +	u32 *val = _val;
-> +	int i = 0, words = bytes / 4;
-> +
-> +	while (words--)
-> +		writel(*val++, base + reg + (i++ * 4));
-> +
-> +	return 0;
-> +}
->  
->  static int mtk_efuse_probe(struct platform_device *pdev)
->  {
-> @@ -30,7 +50,6 @@ static int mtk_efuse_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	struct nvmem_device *nvmem;
->  	struct nvmem_config *econfig;
-> -	struct regmap *regmap;
->  	void __iomem *base;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -42,14 +61,12 @@ static int mtk_efuse_probe(struct platform_device *pdev)
->  	if (!econfig)
->  		return -ENOMEM;
->  
-> -	mtk_regmap_config.max_register = resource_size(res) - 1;
-> -
-> -	regmap = devm_regmap_init_mmio(dev, base, &mtk_regmap_config);
-> -	if (IS_ERR(regmap)) {
-> -		dev_err(dev, "regmap init failed\n");
-> -		return PTR_ERR(regmap);
-> -	}
-> -
-> +	econfig->stride = 4;
-> +	econfig->word_size = 4;
-> +	econfig->reg_read = mtk_reg_read;
-> +	econfig->reg_write = mtk_reg_write;
-> +	econfig->size = resource_size(res);
-> +	econfig->priv = base;
->  	econfig->dev = dev;
->  	econfig->owner = THIS_MODULE;
->  	nvmem = nvmem_register(econfig);
+> Care to explain ?
+> 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/usb/host/xhci-plat.c | 6 ++----
+> >  1 file changed, 2 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> > index 0e69712..83669d0 100644
+> > --- a/drivers/usb/host/xhci-plat.c
+> > +++ b/drivers/usb/host/xhci-plat.c
+> > @@ -266,8 +266,7 @@ put_usb3_hcd:
+> >  	usb_put_hcd(xhci->shared_hcd);
+> >  
+> >  disable_clk:
+> > -	if (!IS_ERR(clk))
+> > -		clk_disable_unprepare(clk);
+> > +	clk_disable_unprepare(clk);
+> >  
+> >  put_hcd:
+> >  	usb_put_hcd(hcd);
+> > @@ -287,8 +286,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+> >  	usb_remove_hcd(hcd);
+> >  	usb_put_hcd(xhci->shared_hcd);
+> >  
+> > -	if (!IS_ERR(clk))
+> > -		clk_disable_unprepare(clk);
+> > +	clk_disable_unprepare(clk);
+> >  	usb_put_hcd(hcd);
+> >  
+> >  	return 0;
+> > -- 
+> > 2.8.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html  
+> 
