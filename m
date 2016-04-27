@@ -1,91 +1,28 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 Apr 2016 09:49:36 +0800
-Subject: [PATCH v5 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <20160426133500.GQ27312@arm.com>
-References: <1461116439-22991-1-git-send-email-ddaney.cavm@gmail.com>
- <20160425111338.GJ16065@arm.com> <571E4A2A.8070908@caviumnetworks.com>
- <571EFD1B.1070609@linaro.org> <20160426121547.GL27312@arm.com>
- <571F671D.70401@linaro.org> <20160426133500.GQ27312@arm.com>
-Message-ID: <57201AB0.9050202@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 27 Apr 2016 09:58:36 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+Message-ID: <20160427015835.GE30692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
+> Shawn,
+> What's your suggestion?
 
-On 2016/4/26 21:35, Will Deacon wrote:
-> On Tue, Apr 26, 2016 at 09:03:25PM +0800, Hanjun Guo wrote:
->> On 2016/4/26 20:15, Will Deacon wrote:
->>> On Tue, Apr 26, 2016 at 01:31:07PM +0800, Hanjun Guo wrote:
->>>> On 2016/4/26 0:47, David Daney wrote:
->>>>> On 04/25/2016 04:13 AM, Will Deacon wrote:
->>>>>> On Tue, Apr 19, 2016 at 06:40:25PM -0700, David Daney wrote:
->>>>>>> From: David Daney <david.daney@cavium.com>
->>>>>>>
->>>>>>> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
->>>>>>> set introduce the ACPI based configuration to provide NUMA
->>>>>>> information.
->>>>>>>
->>>>>>> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
->>>>>>> NUMA domain information from SRAT and SLIT table, so parse those two
->>>>>>> tables to get mappings from cpu/mem to numa node configuration and
->>>>>>> system locality.
->>>>>>
->>>>>> Whilst I've queued the main NUMA series for arm64, I'd really like to
->>>>>> see more movement on the generic header file cleanups that you posted
->>>>>> separately:
->>>>>>
->>>>>> http://lkml.kernel.org/r/1456358528-24213-1-git-send-email-ddaney.cavm at gmail.com
->>>>>>
->>>>>
->>>>> FWIW:  Those patches should still apply.  I am carrying them in my
->>>>> development trees, and have not changed them in any way.
->>>
->>> What's your plan for getting them merged?
->>
->> This patch set touches lots of ACPI related file in arch/x86,
->> arch/ia64, and drivers/acpi/ (also arch/arm64), I think it can be
->> merged via ACPI tree by Rafael with your ack to ARM64 code, does
->> it make sense?
->
-> It doesn't touch anything in drivers/acpi/... are you following the link
-> above?
+I think this needs more discussion, and I just dropped Stefan's patch
+from my tree.
 
-Sorry, my bad, I though you were talking about this ACPI NUMA support
-for ARM64 patch set.
+We need to firstly understand why this is happening.  The .prepare hook
+is defined to be non-atomic context, and so that we call sleep function
+in there.  We did everything right.  Why are we getting the warning?  If
+I'm correct, this warning only happens on i.MX7D.  Why is that?
 
->
->>>>>> Given that this ACPI series already requires some significant cross-arch
->>>>>> interaction (which is actually good!), perhaps extending the clean-up
->>>>>> patches to encompass some of the ACPI bits might make sense, and we can
->>>>>> get that queued as a pre-requisite.
->>>>>
->>>>> The cleanup patches you mention above are really independent of the ACPI
->>>>> things.  I have applied them both before and after the ACPI patches, and
->>>>> both seem to work.  With a quick perusal of the ACPI patches nothing
->>>>> jumps out at me as being a candidate for inclusion in the header file
->>>>> cleanup series.
->>>>
->>>> I agree. My patch set is ACPI related enablement, cleanups and
->>>> consolidations, it would be good to merge as a single patch set
->>>> as it's self-contained.
->>>
->>> Up to you. I just thought you might want to avoid having two sets of
->>> cross-arch changes and the associated merging headaches that go with
->>> that.
->>
->> Good point, as I suggested above, it can go with ACPI tree if it's ok
->> to you and Rafael. The problem we have now is that dt based core NUMA
->> support for ARM64 is queued in your tree, that would be the headache.
->
-> Sorry, but if you wanted me *not* to queue the patches, then you should
-> have said so (similarly, if you wanted a stable branch). I'm not rebasing
-> our for-next/core branch now.
-
-I misread the message above, I'm really sorry if I did something
-offending you, I didn't mean that.
-
-How about this patch set? We only get few comments on it, your
-comments on it are appreciated.
-
-Thanks
-Hanjun
+Shawn
