@@ -1,29 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2016 21:12:39 +0100
-Subject: [PATCH v2 6/6] efi/arm*: add support to dump the EFI page tables
-In-Reply-To: <CAKv+Gu9fOnKK66Ee7N_5UXbZh_cZbQ0AnnPLHQhm8qCb-r5gVg@mail.gmail.com>
-References: <1461343688-8552-1-git-send-email-ard.biesheuvel@linaro.org>
- <1461343688-8552-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160422170112.GS10606@leverpostej>
- <CAKv+Gu-abf2g5htQSHA=ETnSfzVExFLwsjs2Kbs8fn86MfFv3Q@mail.gmail.com>
- <20160422172513.GV10606@leverpostej>
- <CAKv+Gu9fOnKK66Ee7N_5UXbZh_cZbQ0AnnPLHQhm8qCb-r5gVg@mail.gmail.com>
-Message-ID: <20160427201239.GT19428@n2100.arm.linux.org.uk>
+From: Linux.HWI@garmin.com (J.D. Schroeder)
+Date: Wed, 27 Apr 2016 15:13:30 -0500
+Subject: [PATCH 2/3] ARM: DRA7x: dts: Fix the 32kHz clock calculation
+In-Reply-To: <5721175B.8030904@ti.com>
+References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
+ <1461693269-19436-3-git-send-email-Linux.HWI@garmin.com>
+ <5720A51E.2000900@ti.com> <5720C77A.3020708@garmin.com>
+ <5721175B.8030904@ti.com>
+Message-ID: <57211D6A.407@garmin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 01:26:07PM +0200, Ard Biesheuvel wrote:
-> Well, the problem here is that we only sync the EFI page tables with
-> the kernel page tables in switch_mm() (if they turn out to be out of
-> sync). This means we should either sync them in this code path as
-> well, or remove the kernel VA range from the output, since we'll be
-> dumping known stale data otherwise.
+On 04/27/2016 02:47 PM, Tero Kristo wrote:
+> The patch is merged already in 4.6-rc3.
+> 
+> Which repo / version are you using as baseline?
 
-The kernel VA range can always be different - even at task switch time
-we don't always update it.  We only update when there's something that
-needs to be removed from the page table, and we're running on UP systems.
+I'm using git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git. I
+can see eea08802f586acd6aef377d1b4a541821013cc0b as of now. However, I don't
+think it was included in -rc3 or even -rc5 which is what I was basing my
+changes on. It looks like it got merged in late last night in Linus tree. No
+big deal. The change is nearly identical to my solution so no need to pursue mine.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Please disregard this patch.
+
+Thanks,
+JD
