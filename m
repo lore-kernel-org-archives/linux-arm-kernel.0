@@ -1,171 +1,106 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 27 Apr 2016 23:57:17 +0300
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Apr 2016 23:05:44 +0200
 Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <6148633.0YXW4XnX4b@wuerfel>
-References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
- <4985498.GT33RtioOA@wuerfel> <877ffjro0w.fsf@ti.com>
- <6148633.0YXW4XnX4b@wuerfel>
-Message-ID: <87zisercr6.fsf@ti.com>
+In-Reply-To: <8737q6stpl.fsf@ti.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <13248156.8VXoeOzRlg@wuerfel> <8737q6stpl.fsf@ti.com>
+Message-ID: <5129992.Q57qoSDEqC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 27 April 2016 23:05:42 Felipe Balbi wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Wednesday 27 April 2016 13:59:13 Alan Stern wrote:
+> >> On Wed, 27 Apr 2016, Arnd Bergmann wrote:
+> >> 
+> >> > I've looked at the usb HCD code now and see this:
+> >> > 
+> >> > struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
+> >> >                 struct device *dev, const char *bus_name,
+> >> >                 struct usb_hcd *primary_hcd)
+> >> > {
+> >> >       ...
+> >> >         hcd->self.controller = dev;
+> >> >         hcd->self.uses_dma = (dev->dma_mask != NULL);
+> >> >       ...
+> >> > }
+> >> > 
+> >> > What I think we need to do here is ensure that the device that gets
+> >> > passed here and assigned to hcd->self.controller is the actual DMA
+> >> > master device, i.e. the pci_device or platform_device that was created
+> >> > from outside of the xhci stack. This is after all the pointer that
+> >> > gets passed into all the dma_map_*/dma_sync_*/dma_alloc_*/...
+> >> > functions.
+> >> 
+> >> It would be better to add a new field, since self.controller is also
+> >> used for lots of other purposes.  Something like hcd->self.dma_dev.
+> >
+> > Ok, fair enough. I only took a brief look and all uses I found were
+> > either for the DMA mapping API or some printk logging.
+> 
+> I have a feeling you guys are not considering how the patch to implement
+> this will look like.
+> 
+> How are you expecting dwc3 to pass a pointer to the DMA device from
+> dwc3.ko to xhci-plat ? platform_data ? That's gonna be horrible 
 
-Hi,
+Not any worse than it already is really. It already uses platform_data
+for the exact case that is causing the problem here.
 
-Arnd Bergmann <arnd@arndb.de> writes:
-> On Wednesday 27 April 2016 19:53:51 Felipe Balbi wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
->> > On Wednesday 27 April 2016 16:50:19 Catalin Marinas wrote:
->> >> On Wed, Apr 27, 2016 at 04:11:17PM +0200, Arnd Bergmann wrote:
->> >> > On Wednesday 27 April 2016 14:59:00 Catalin Marinas wrote:
->> >> > > 
->> >> > > I would be in favour of a dma_inherit() function as well. We could hack
->> >> > > something up in the arch code (like below) but I would rather prefer an
->> >> > > explicit dma_inherit() call by drivers creating such devices.
->> >> > > 
->> >> > > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
->> >> > > index ba437f090a74..ea6fb9b0e8fa 100644
->> >> > > --- a/arch/arm64/include/asm/dma-mapping.h
->> >> > > +++ b/arch/arm64/include/asm/dma-mapping.h
->> >> > > @@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
->> >> > >  
->> >> > >  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
->> >> > >  {
->> >> > > -       if (dev && dev->archdata.dma_ops)
->> >> > > -               return dev->archdata.dma_ops;
->> >> > > +       while (dev) {
->> >> > > +               if (dev->archdata.dma_ops)
->> >> > > +                       return dev->archdata.dma_ops;
->> >> > > +               dev = dev->parent;
->> >> > > +       }
->> >> > 
->> >> > I think this would be a very bad idea: we don't want to have random
->> >> > devices be able to perform DMA just because their parent devices
->> >> > have been set up that way.
->> >> 
->> >> I agree, it's a big hack. It would be nice to have a simpler way to do
->> >> this in driver code rather than explicitly calling
->> >> of_dma_configure/arch_setup_dma_ops as per the original patch in this
->> >> thread.
->> >
->> > I haven't followed the entire discussion, but what's wrong with passing
->> > around a pointer to a 'struct device *hwdev' that represents the physical
->> > device that does the DMA?
->> 
->> that will likely create duplicated solutions in several drivers and
->> it'll be a pain to maintain. There's another complication, dwc3 can be
->> integrated in many different ways. See the device child-parent tree
->> representations below:
->> 
->> a) with a parent PCI device:
->> 
->> pci_bus_type
->>  - dwc3-pci
->>    - dwc3
->>      - xhci-plat
->> 
->> b) with a parent platform_device (OF):
->> 
->> platform_bus_type
->>  - dwc3-${omap,st,of-simple,exynos,keystone}
->>    - dwc3
->>      - xhci-plat
->> 
->> c) without a parent at all (thanks Grygorii):
->> 
->> platform_bus_type
->>  - dwc3
->>    - xhci-plat
->> 
->> (a) and (b) above are the common cases. The DMA-capable device is
->> clearly dwc3-${pci,omap,st,of-simple,exynos,keystone} with dwc3 only
->> having proper DMA configuration in OF platforms (because of the
->> unconditional of_dma_configure() during OF device creation) and
->> xhci-plat not knowing about DMA at all and hardcoding some crappy
->> defaults.
->> 
->> (c) is the uncommon case which creates some problems. In this case, dwc3
->> itself is the DMA-capable device and dwc3->dev->parent is the
->> platform_bus_type itself. Now consider the problem this creates:
->> 
->> i. the patch that I wrote [1] becomes invalid for (c), thanks to
->> Grygorii for pointing this out before it was too late.
->> 
->> ii. xhci-plat can also be described directly in DT (and is in some
->> cases). This means that assuming xhci-plat's parent's parent to be the
->> DMA-capable device is also an invalid assumption.
->> 
->> iii. one might argue that for DT-based platforms *with* a glue layer
->> ((b) above), OF already "copies" some sensible DMA defaults during
->> device creation.
->
-> But that is exactly the point I was trying to make: instead of copying
-> all the data into the xhci-plat device, just assign one pointer
-> inside the xhci-plat device from whoever creates it.
+> Also, remember that the DMA device for dwc3 is not always
+> dwc3->dev->parent. It might be dwc3->dev itself. How are you expecting
+> us to figure that one out ?
 
-and how do you pass that pointer to xhci-plat from another driver ?
-No, platform_data is not an option ;-)
+Do you have an example for this? The ones I found here either
+create the dwc3 device from PCI or from a platform glue driver.
 
->> The only clean way to fix this up is with a dma_inherit()-like API which
->> would allow dwc3's glue layers ((a) and (b) above) to initialize child's
->> (dwc3) DMA configuration during child's creation. Something like below:
->> 
->> diff --git a/drivers/usb/dwc3/dwc3-pci.c b/drivers/usb/dwc3/dwc3-pci.c
->> index adc1e8a624cb..74b599269e2c 100644
->> --- a/drivers/usb/dwc3/dwc3-pci.c
->> +++ b/drivers/usb/dwc3/dwc3-pci.c
->> @@ -152,6 +152,8 @@ static int dwc3_pci_probe(struct pci_dev *pci,
->>  		return -ENOMEM;
->>  	}
->>  
->> +	dma_inherit(&dwc->dev, dev);
->> +
->>  	memset(res, 0x00, sizeof(struct resource) * ARRAY_SIZE(res));
->>  
->>  	res[0].start	= pci_resource_start(pci, 0);
->> 
->> that's all I'm asking for :-) dma_inherit() should, probably, be
->> arch-specific to handle details like IOMMU (which today sits under
->> archdata).
->
-> It's still wrong: the archdata in the device can contain all sorts of
-> additional information about how to do DMA, and some of that information
+> I still think dma_inherit() (or something along those lines) is
+> necessary. Specially when you consider that, as I said previously,
+> that's pretty much what of_dma_configure() does.
 
-yes, inherit all of that ;-)
+As I said, this is not an API that can work in general, because
+it makes the assumption that everything related to DMA in a
+device can be set in that device itself.
 
-> is bus specific, e.g. when your dma_map_ops look like the on sparc:
+The simplest case where this does not work is a PCI device behind
+an IOMMU: when you call dma_map_single() or dma_alloc_coherent(),
+the dma_map_ops implementation for the IOMMU has to look at the
+PCI device to find out the association with an IOMMU context,
+and on most architectures you cannot bind an IOMMU context to
+a platform device at all.
 
-okay, let me be clear. The underlying bus is still pci_bus_type or
-platform_bus_type; that won't change.
+> Anyway, I'd really like to see a patch implementing this
+> hcd->self.dma_dev logic. Consider all the duplication with this
+> approach, btw. struct dwc3 will *also* need a dwc->dma_dev of its
+> own. Will that be passed to dwc3 as platform_data from glue layer ? What
+> about platforms which don't even use a glue layer ?
 
-> static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> {
-> #ifdef CONFIG_SPARC_LEON
->         if (sparc_cpu_model == sparc_leon)
->                 return leon_dma_ops;
-> #endif
-> #if defined(CONFIG_SPARC32) && defined(CONFIG_PCI)
->         if (dev->bus == &pci_bus_type)
->                 return &pci32_dma_ops;
-> #endif
->         return dma_ops;
-> }
+Let's separate the three problems here.
 
-this seems to be a rather fragile assumption, no ? Only works because
-*_bus_type declarations are exported. I wonder if this is the only
-reason *why* they are exported, probably not...
+a) dwc3 creating a "xhci-hcd" platform_device that is not connected
+   to any proper bus. We can work around that by adding the "self.dma_dev"
+   pointer and pass that in platform_data. This is really easy, it's
+   actually less code (and less iffy) than the current implementation of
+   copying the parent dma mask.
+   In the long run, this could be solved by doing away with the extra
+   platform_device, by calling a variant of xhci_probe() from
+   xhci_plat_probe() like we do for the normal *HCI drivers.
 
-> There is no way for a device to "inherit" the bus_type of its parent,
+b) dwc3-pci creating a "dwc3" platform_device under the covers. This
+   is pretty much the exact same problem as a) on another layer. In
+   the short run, we can pass the device pointer as part of
+   struct dwc3_platform_data (dwc3-pci is the only such user anway),
+   and in the long run, it should be easy enough to get rid of the
+   extra platform device by just calling a variant of dwc3_probe,
+   which will again simplify the driver
 
-I don't want to inherit bus_type, I just want DMA configuration to not
-depend on bus_type directly ;-)
+c) some SoCs that have two separate device nodes to describe their
+   dwc3 xhci. I don't think this is causing any additional problems,
+   but if we want to make this behave more like other drivers in the
+   long run or deal with machines that are missing a "dma-ranges"
+   property in the parent node, we can kill off the
+   of_platform_populate() hack and instead call dwc3_probe()
+   directly from the glue drivers as in b), and have that
+   do for_each_child_of_node() or similar to find the child node.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/4310c981/attachment.sig>
+	Arnd
