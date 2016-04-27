@@ -1,88 +1,109 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 27 Apr 2016 14:40:14 +0300
-Subject: [PATCH 2/3] ARM: DRA7x: dts: Fix the 32kHz clock calculation
-In-Reply-To: <1461693269-19436-3-git-send-email-Linux.HWI@garmin.com>
-References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
- <1461693269-19436-3-git-send-email-Linux.HWI@garmin.com>
-Message-ID: <5720A51E.2000900@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 27 Apr 2016 12:46:37 +0100
+Subject: [PATCH V6 06/13] arm64, pci, acpi: ACPI support for legacy IRQs
+ parsing and consolidation with DT code.
+In-Reply-To: <20160427024430.GG6789@localhost>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-7-git-send-email-tn@semihalf.com>
+ <20160427024430.GG6789@localhost>
+Message-ID: <20160427114637.GA6795@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/16 20:54, J.D. Schroeder wrote:
-> From: "J.D. Schroeder" <jay.schroeder@garmin.com>
->
-> This commit fixes the 32kHz clock (sys_32k_ck) calculation to be
-> correctly based on the SYS_CLK1 (sys_clkin1) frequency. Based on the
-> TRM CTRL_CORE_BOOTSTRAP[9:8] SPEEDSELECT, set by the SYSBOOT[9:8]
-> board jumpers according to the SYS_CLK1 frequency, the frequency of
-> the 32kHz FUNC_32K_CLK is set to SYS_CLK1/610. The following
-> sys_32k_ck frequencies get used for different SYS_CLK1 frequencies:
->          0b00: Unknown  -> 32768 Hz crystal from CLKIN_32K pin
->          0b01: 20   MHz -> 32787 Hz clock (SYS_CLK1/610)
->          0b10: 27   MHz -> 44262 Hz clock (SYS_CLK1/610)
->          0b11: 19.2 MHz -> 31475 Hz clock (SYS_CLK1/610)
->
-> Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
-> Reviewed-by: Ben McCauley <ben.mccauley@garmin.com>
+On Tue, Apr 26, 2016 at 09:44:30PM -0500, Bjorn Helgaas wrote:
+> On Fri, Apr 15, 2016 at 07:06:41PM +0200, Tomasz Nowicki wrote:
+> > To enable PCI legacy IRQs on platforms booting with ACPI, arch code
+> > should include ACPI specific callbacks that parse and set-up the
+> > device IRQ number, equivalent to the DT boot path. Owing to the current
+> > ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
+> > cannot be parsed at device add time, since that would trigger ACPI scan
+> > handlers ordering issues depending on how the ACPI tables are defined.
+> 
+> Can you be a little more specific about the issue here?  I think you
+> mean pci_device_add()-time, because that's where we call
+> pcibios_add_device.  Which ACPI tables are involved?  _PRT?  Why is
+> that a problem?  We don't cache those tables any more after
+> 181380b702ee ("PCI/ACPI: Don't cache _PRT, and don't associate them
+> with bus numbers").
 
-A patch doing the same thing is already in mainline, see:
+https://lists.linaro.org/pipermail/linaro-acpi/2015-October/005944.html
 
-commit eea08802f586acd6aef377d1b4a541821013cc0b
-Author: Keerthy <j-keerthy@ti.com>
-Date:   Mon Apr 4 11:07:15 2016 +0530
+I think it is a scan handler ordering issue and probably by caching
+_PRT this problem would not exist but I have to read the commit above
+in details to understand if that's the case.
 
-     ARM: dts: dra7: Correct clock tree for sys_32k_ck
+> x86 and ia64 both call acpi_pci_irq_enable() from
+> pcibios_enable_device().  Could you do the same on ARM64?
+> pcibios_enable_device() happens later than either pci_device_add() or
+> pci_device_probe().
 
-So, this one can be ignored.
+We could in theory. In practice we have to see if that triggers DT
+regressions on PCI host controllers that do not call pci_fixup_irqs(),
+but rely on the legacy IRQ routing to be done in arm64
+pcibios_add_device().
 
--Tero
+> > To solve this problem and consolidate FW PCI legacy IRQs parsing in
+> > one single pcibios callback (pending final removal), this patch moves
+> > DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
+> > PCI core code at device probe time) and adds ACPI PCI legacy IRQs
+> > parsing to the same callback too, so that FW PCI legacy IRQs parsing
+> > is confined in one single arch callback that can be easily removed
+> > when code parsing PCI legacy IRQs is consolidated and moved to core
+> > PCI code.
+> > 
+> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> > Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  arch/arm64/kernel/pci.c | 11 ++++++++---
+> >  1 file changed, 8 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > index c72de66..15109c11 100644
+> > --- a/arch/arm64/kernel/pci.c
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -50,11 +50,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+> >  }
+> >  
+> >  /*
+> > - * Try to assign the IRQ number from DT when adding a new device
+> > + * Try to assign the IRQ number when probing a new device
+> >   */
+> > -int pcibios_add_device(struct pci_dev *dev)
+> > +int pcibios_alloc_irq(struct pci_dev *dev)
+> >  {
+> > -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> > +	if (acpi_disabled)
+> > +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> > +#ifdef CONFIG_ACPI
+> > +	else
+> > +		return acpi_pci_irq_enable(dev);
+> > +#endif
+> 
+> Not your problem, but your patch makes it obvious: it's ugly that we
+> set dev->irq to the IRQ returned from of_irq_parse_and_map_pci(), but
+> acpi_pci_irq_enable() sets dev->irq internally.
+> 
+> x86 also has the situation of calling either acpi_pci_irq_enable() or
+> of_irq_parse_and_map_pci(), and it looks like they can even decide at
+> run-time as you can here.  If we're solving the same problem, can we
+> use a similar mechanism?  x86 sets a pcibios_enable_irq function
+> pointer.
 
-> ---
->   arch/arm/boot/dts/dra7xx-clocks.dtsi | 28 ++++++++++++++++++++++------
->   1 file changed, 22 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index 9d1a583..a514fc3 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -98,12 +98,6 @@
->   		clock-frequency = <32768>;
->   	};
->
-> -	sys_32k_ck: sys_32k_ck {
-> -		#clock-cells = <0>;
-> -		compatible = "fixed-clock";
-> -		clock-frequency = <32768>;
-> -	};
-> -
->   	virt_12000000_ck: virt_12000000_ck {
->   		#clock-cells = <0>;
->   		compatible = "fixed-clock";
-> @@ -2177,4 +2171,26 @@
->   		ti,bit-shift = <22>;
->   		reg = <0x0558>;
->   	};
-> +
-> +	sys_32kin: sys_32kin {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <32768>;
-> +	};
-> +
-> +	sys_clkin1_32k_div: sys_clkin1_32k_div {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-factor-clock";
-> +		clocks = <&sys_clkin1>;
-> +		clock-mult = <1>;
-> +		clock-div = <610>;
-> +	};
-> +
-> +	sys_32k_ck: sys_32k_ck {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,mux-clock";
-> +		clocks = <&sys_32kin>, <&sys_clkin1_32k_div>, <&sys_clkin1_32k_div>, <&sys_clkin1_32k_div>;
-> +		ti,bit-shift = <8>;
-> +		reg = <0x06c4>;
-> +	};
->   };
->
+Yes we could, but that's orthogonal to this patch, it's basically
+rewriting this code in a different way and adding flexibility to the
+function mapping irqs.
+
+Thanks,
+Lorenzo
+
+> 
+> >  	return 0;
+> >  }
+> > -- 
+> > 1.9.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
