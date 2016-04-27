@@ -1,68 +1,99 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:09 -0700
-Subject: [PATCH v6 07/14] arm64, numa: Cleanup NUMA disabled messages.
+Date: Wed, 27 Apr 2016 11:07:10 -0700
+Subject: [PATCH v6 08/14] x86, acpi,
+ numa: cleanup acpi_numa_processor_affinity_init()
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-8-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-9-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-As noted by Dennis Chen, we don't want to print "No NUMA configuration
-found" if NUMA was forced off from the command line.
+Cleanup acpi_numa_processor_affinity_init() in preparation for its
+move to drivers/acpi/numa.c.  It will be reused by arm64, this has no
+functional change.
 
-Change the type of numa_off to bool, and clean up printing code.
-Print "NUMA disabled" if forced off on command line and "No NUMA
-configuration found" if there was no firmware NUMA information.
-
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/arm64/mm/numa.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ arch/x86/mm/srat.c | 21 +++++----------------
+ 1 file changed, 5 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 6cb03f9..1def1de 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -29,7 +29,7 @@ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
+diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
+index f242a11..9e2a833 100644
+--- a/arch/x86/mm/srat.c
++++ b/arch/x86/mm/srat.c
+@@ -26,11 +26,6 @@
  
- static int numa_distance_cnt;
- static u8 *numa_distance;
--static int numa_off;
-+static bool numa_off;
+ int acpi_numa __initdata;
  
- static __init int numa_parse_early_param(char *opt)
+-static __init int setup_node(int pxm)
+-{
+-	return acpi_map_pxm_to_node(pxm);
+-}
+-
+ static __init void bad_srat(void)
  {
-@@ -37,7 +37,7 @@ static __init int numa_parse_early_param(char *opt)
- 		return -EINVAL;
- 	if (!strncmp(opt, "off", 3)) {
- 		pr_info("%s\n", "NUMA turned off");
--		numa_off = 1;
-+		numa_off = true;
+ 	printk(KERN_ERR "SRAT: SRAT not used.\n");
+@@ -64,7 +59,7 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+ 			 pxm, apic_id);
+ 		return;
  	}
- 	return 0;
- }
-@@ -362,7 +362,10 @@ static int __init dummy_numa_init(void)
- 	int ret;
- 	struct memblock_region *mblk;
- 
--	pr_info("%s\n", "No NUMA configuration found");
-+	if (numa_off)
-+		pr_info("NUMA disabled\n"); /* Forced off on command line. */
-+	else
-+		pr_info("No NUMA configuration found\n");
- 	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
- 	       0LLU, PFN_PHYS(max_pfn) - 1);
- 
-@@ -375,7 +378,7 @@ static int __init dummy_numa_init(void)
- 		return ret;
- 	}
- 
--	numa_off = 1;
-+	numa_off = true;
- 	return 0;
+-	node = setup_node(pxm);
++	node = acpi_map_pxm_to_node(pxm);
+ 	if (node < 0) {
+ 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
+ 		bad_srat();
+@@ -100,7 +95,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+ 	pxm = pa->proximity_domain_lo;
+ 	if (acpi_srat_revision >= 2)
+ 		pxm |= *((unsigned int*)pa->proximity_domain_hi) << 8;
+-	node = setup_node(pxm);
++	node = acpi_map_pxm_to_node(pxm);
+ 	if (node < 0) {
+ 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
+ 		bad_srat();
+@@ -124,12 +119,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+ 	       pxm, apic_id, node);
  }
  
+-#ifdef CONFIG_MEMORY_HOTPLUG
+-static inline int save_add_info(void) {return 1;}
+-#else
+-static inline int save_add_info(void) {return 0;}
+-#endif
+-
+ /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
+ int __init
+ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+@@ -145,7 +134,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ 	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
+ 		goto out_err;
+ 	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
+-	if (hotpluggable && !save_add_info())
++	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
+ 		goto out_err;
+ 
+ 	start = ma->base_address;
+@@ -154,7 +143,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ 	if (acpi_srat_revision <= 1)
+ 		pxm &= 0xff;
+ 
+-	node = setup_node(pxm);
++	node = acpi_map_pxm_to_node(pxm);
+ 	if (node < 0) {
+ 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
+ 		goto out_err_bad_srat;
+@@ -182,7 +171,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ out_err_bad_srat:
+ 	bad_srat();
+ out_err:
+-	return -1;
++	return -EINVAL;
+ }
+ 
+ int __init x86_acpi_numa_init(void)
 -- 
 1.7.11.7
