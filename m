@@ -1,26 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2016 11:50:29 +0200
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <572081FB.5090303@arm.com>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
- <5591261.0X3WRSsdGl@wuerfel> <572081FB.5090303@arm.com>
-Message-ID: <5212316.Wg9FOfdsuU@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Apr 2016 10:57:39 +0100
+Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
+In-Reply-To: <87bn4vpq7j.fsf@intel.com>
+References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
+ <1461675460-2295-8-git-send-email-jszhang@marvell.com>
+ <87bn4vpq7j.fsf@intel.com>
+Message-ID: <20160427095738.GG3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 10:10:19 Vladimir Murzin wrote:
-> > On the other hand, separating the two has the advantage of keeping it
-> > simple, as we don't have to worry about all the ARMv7-A platforms
-> > and whether we actually want to allow their kernels to be built with
-> > MMU disabled.
-> > 
+On Wed, Apr 27, 2016 at 08:37:20AM +0300, Felipe Balbi wrote:
+> Jisheng Zhang <jszhang@marvell.com> writes:
+
+> > +	vbus = devm_regulator_get(&pdev->dev, "vbus");
+
+> devm_regulator_get_optional() ??
+
+Does USB work without a VBUS?  Unless the answer is yes then I'd expect
+this to be just a normal regulator_get().
+
 > 
-> Ok, what if we start with your approach explicitly saying which platform
-> wants to be listed when CONFIG_MMU is deselected (I think R-class is the
-> first user here) gradually extending such list with ARMv7-A? There is
-> (little?) chance that at some point we can support kernel which can run
-> on both configurations.
+> > +	if (PTR_ERR(vbus) == -ENODEV) {
+> > +		vbus = NULL;
+> > +	} else if (IS_ERR(vbus)) {
+> > +		ret = PTR_ERR(vbus);
+> > +		goto disable_clk;
+> > +	} else if (vbus) {
+> > +		ret = regulator_enable(vbus);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev,
+> > +				"failed to enable usb vbus regulator: %d\n",
+> > +				ret);
+> > +			goto disable_clk;
+> > +		}
+> > +	}
 
-Do you mean adding a ARM_SINGLE_ARMV7R option, or ARCH_MULTI_V7R?
-
-	Arnd
+This is all completely broken unless the supply is optional.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/48c0861d/attachment.sig>
