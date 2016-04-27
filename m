@@ -1,77 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Apr 2016 09:47:45 +0100
-Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
-In-Reply-To: <20160427081501.GV2274@localhost>
-References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
- <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
- <20160426033029.GB2274@localhost>
- <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
- <20160426162529.GK2274@localhost> <571F9D76.2060809@codeaurora.org>
- <20160427081501.GV2274@localhost>
-Message-ID: <57207CB1.4040307@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Apr 2016 10:48:36 +0200
+Subject: [PATCH 1/2] ARM: OMAP2+: n900 needs MMC slot names for legacy
+ user space
+In-Reply-To: <1461714383-9956-2-git-send-email-tony@atomide.com>
+References: <1461714383-9956-1-git-send-email-tony@atomide.com>
+ <1461714383-9956-2-git-send-email-tony@atomide.com>
+Message-ID: <CAPDyKFokkpF_-yxE+G2_nvC2q3uHkMCxZJHYU7y4KRRDWfvPTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/16 09:15, Vinod Koul wrote:
-> On Tue, Apr 26, 2016 at 12:55:18PM -0400, Sinan Kaya wrote:
->> On 4/26/2016 12:25 PM, Vinod Koul wrote:
->>> On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org wrote:
->>>> On 2016-04-25 23:30, Vinod Koul wrote:
->>>>> On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
->>>>>
->>>>>> +static int hidma_chan_stats(struct seq_file *s, void *unused)
->>>>>> +{
->>>>>> +	struct hidma_chan *mchan = s->private;
->>>>>> +	struct hidma_desc *mdesc;
->>>>>> +	struct hidma_dev *dmadev = mchan->dmadev;
->>>>>> +
->>>>>> +	pm_runtime_get_sync(dmadev->ddev.dev);
->>>>>
->>>>> debug shouldn't power up device, why do you want to do that
->>>>
->>>>
->>>> Clocks are turned off while the hw is idle. I can?t reach hw
->>>> registers without restoring power.
->>>
->>> Hmm, have you thought about using regmap?
->>>
->>
->> To be honest, I didn't know what regmap is but I just read some code
->> and looked at how it is used. Feel free to correct me if I got it 
->> wrong. 
->>
->> Regmap seems to be designed for *slow* speed peripherals to improve frequent
->> accesses by the SW. It looks like it is used by MFD, SPI and I2C drivers.
->>
->> It seems to cache the register contents and flush/invalidate them only when
->> needed.
->>
->> The MMIO version seems to be assuming the presence of device-tree like CLK
->> API which doesn't exist on ACPI systems and is not portable.
->>
->> My reaction is that it is a lot of code with no added functionality to what
->> HIDMA driver is trying to achieve. 
->>
->> Given that the use case here is only for debug purposes; I think it is OK 
->> to keep this runtime call here. I don't want to add any overhead into the
->> existing code just to support the debug use case.  
->>
->> None of my register read/writes are slow. This file will only be used to 
->> troubleshoot customer issues.
+On 27 April 2016 at 01:46, Tony Lindgren <tony@atomide.com> wrote:
+> Let's pass the slot names in pdata like the legacy code does.
+> Once we have a generic DT binding for the slot names we can
+> switch to that.
 
-I'd recommend you actually run perf on a a few of your MMIO accesses. I
-believe the result will be eye opening. On the KVM side, we've trimmed
-our MMIO access as much as possible, using a memory-based cache (similar
-to regmap in concept). This has made some code paths about 40% faster.
+I am not sure we ever will get a DT binding accepted for the slot
+name. It seem far from being a HW description. :-)
 
-> $ is always faster than MMIO. This way you can give reg contents to users
-> without waking up hw.
+Instead, the long term and proper solution, is to enable userspace to
+be able to use UUID/PARTID instead.
 
-Indeed. MMIO access sucks rocks, even on a very fast box. Actually, the
-faster the box is, the slower MMIO feels (compared to memory).
+Until that happens, I guess this will have to do.
 
-Thanks,
+Kind regards
+Uffe
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index a935d28..cfaf45f 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/regulator/fixed.h>
+>
+>  #include <linux/platform_data/pinctrl-single.h>
+> +#include <linux/platform_data/hsmmc-omap.h>
+>  #include <linux/platform_data/iommu-omap.h>
+>  #include <linux/platform_data/wkup_m3.h>
+>  #include <linux/platform_data/pwm_omap_dmtimer.h>
+> @@ -35,6 +36,8 @@
+>  #include "soc.h"
+>  #include "hsmmc.h"
+>
+> +static struct __maybe_unused omap_hsmmc_platform_data mmc_pdata[2];
+> +
+>  struct pdata_init {
+>         const char *compatible;
+>         void (*fn)(void);
+> @@ -271,6 +274,8 @@ static struct platform_device omap3_rom_rng_device = {
+>  static void __init nokia_n900_legacy_init(void)
+>  {
+>         hsmmc2_internal_input_clk();
+> +       mmc_pdata[0].name = "external";
+> +       mmc_pdata[1].name = "internal";
+>
+>         if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
+>                 if (IS_ENABLED(CONFIG_ARM_ERRATA_430973)) {
+> @@ -497,6 +502,8 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+>         OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
+>         OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
+>                        &omap3_iommu_pdata),
+> +       OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x4809c000, "4809c000.mmc", &mmc_pdata[0]),
+> +       OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x480b4000, "480b4000.mmc", &mmc_pdata[1]),
+>         /* Only on am3517 */
+>         OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
+>         OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+> --
+> 2.8.1
+>
