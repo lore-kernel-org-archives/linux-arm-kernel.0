@@ -1,210 +1,185 @@
-From: pinskia@gmail.com (Andrew Pinski)
-Date: Wed, 27 Apr 2016 14:15:30 -0700
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64 - LTP results
-In-Reply-To: <CA+=Sn1kT7-3k4smZ60zcjcXeVMzjH6AxV6-um68SNhD9meC=ZA@mail.gmail.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160405224412.GA18300@yury-N73SV> <571AEDF9.6030701@huawei.com>
- <CA+=Sn1kT7-3k4smZ60zcjcXeVMzjH6AxV6-um68SNhD9meC=ZA@mail.gmail.com>
-Message-ID: <CA+=Sn1=xnbDDHL921rTLEZmXt4QDLPO=Y8GkQWv7VkidWzt4-A@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 27 Apr 2016 17:29:03 -0400
+Subject: [PATCH v2 2/3] ARM: dts: exynos: Define vqmmc for eMMC card on
+ Odroid X/X2/U3
+In-Reply-To: <1461765620-6833-2-git-send-email-k.kozlowski@samsung.com>
+References: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
+ <1461765620-6833-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <bca8c1c9-41ac-c7e8-9313-ff96058376be@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 12:30 AM, Andrew Pinski <pinskia@gmail.com> wrote:
-> On Fri, Apr 22, 2016 at 8:37 PM, Zhangjian (Bamvor)
-> <bamvor.zhangjian@huawei.com> wrote:
->> Hi, Yury
->>
->>
->> On 2016/4/6 6:44, Yury Norov wrote:
->>>
->>> There are about 20 failing tests of 782 in lite scenario.
->>> float_bessel
->>> float_exp_log
->>> float_iperb
->>> float_power
->>> float_trigo
->>> pipeio_1
->>> pipeio_3
->>> pipeio_5
->>> pipeio_8
->>> abort01
->>> clone02
->>> kill11
->>> mmap16
->>> open12
->>> pause01
->>> rename11
->>> rmdir02
->>> umount2_01
->>> umount2_02
->>> umount2_03
->>> utime06
->>> mtest06
->>>
->>> The list is rough because some tests fail not every time.
->>>
->>> Tests abort01 and kill11 fail for lp64 too, so maybe there's
->>> a reason unrelated to ilp32 itself.
->>>
->>> float_xxx tests fail because they call unwind() from signal context,
->>> and GCC for ilp32 has problem with it, as Andrew told.
->>
->> Is there some progress about this issue. When we talk about unwind
->> functions, do you mean the function in libgcc?
->>
->> We encountered another issue(abort not segfault) which also called
->> pthread_cancel(). The test code is in the attachment. Here is the
->> backtrace:
->
-> Yes this was a known issue I knew about.  I have a patch GCC to fix
-> this.  Basically REG_VALUE_IN_UNWIND_CONTEXT needs to be defined while
-> building libgcc to support the correct unwind information.
-> I will be posting a GCC patch to fix this tomorrow.  This was a bug
-> even in the original set of ilp32 patches.  I only finally was able to
-> sit down and fix it today.
+Hello Krzysztof,
 
-Here is the link to the GCC patch which I said was going to submit today:
-https://gcc.gnu.org/ml/gcc-patches/2016-04/msg01726.html
+On 04/27/2016 10:00 AM, Krzysztof Kozlowski wrote:
+> The eMMC card vmmc-supply contained incorrectly two regulators: LDO20
+> and buck8. The second one is ignored. Additionally the buck8 is a vqmmc
+> supply only on X and X2. On U3 the buck8 is providing power to the LAN
+> (SMSC95xx) so instead the LDO22 should be used.
+> 
+> Fix this by defining proper vmmc and vqmmc supplies for respective
+> boards.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> ---
+> 
+> Changes since v1:
+> 1. buck8 is used on X/X2 so differentiate the configuration (hint by
+>    Tobias Jakobi).
+> ---
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 13 ++++++++++---
+>  arch/arm/boot/dts/exynos4412-odroidu3.dts       | 18 ++++++++++++++++++
+>  arch/arm/boot/dts/exynos4412-odroidx.dts        | 11 +++++++++++
+>  arch/arm/boot/dts/exynos4412-odroidx2.dts       | 11 +++++++++++
+>  4 files changed, 50 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> index 3d0d44581fbd..34a5b3daced0 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> @@ -347,6 +347,13 @@
+>  				regulator-boot-on;
+>  			};
+>  
+> +			ldo22_reg: LDO22 {
+> +				regulator-name = "LDO22";
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3950000>;
+> +				regulator-boot-on;
+> +			};
+> +
 
-Thanks,
-Andrew
+I don't have a datasheet for the max77686 but I guess these min and max
+values are the actual voltage range that the ldo22 regulator can support?
 
->
->
-> Thanks,
-> Andrew
->
->>
->> ```
->> Program received signal SIGABRT, Aborted.
->> [Switching to Thread 0xf77ee330 (LWP 2958)]
->> 0x000000000040f5bc in raise (sig=sig at entry=6)
->>     at ../sysdeps/unix/sysv/linux/raise.c:55
->> 55      ../sysdeps/unix/sysv/linux/raise.c: No such file or directory.
->> (gdb) bt
->> #0  0x000000000040f5bc in raise (sig=sig at entry=6)
->>     at ../sysdeps/unix/sysv/linux/raise.c:55
->> #1  0x000000000040f884 in abort () at abort.c:89
->>
->> #2  0x00000000004073b4 in uw_update_context_1 (
->>     context=context at entry=0xf77ec820, fs=fs at entry=0xf77ebec8)
->> at /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind-dw2.c:1430
->>
->> #3  0x00000000004078c0 in uw_update_context
->> (context=context at entry=0xf77ec820,
->>     fs=fs at entry=0xf77ebec8)
->>    at
->> /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind-dw2.c:1506
->> #4  0x0000000000407a9c in uw_advance_context (fs=0xf77ebec8,
->>     context=0xf77ec820)
->>     at
->> /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind-dw2.c:1529
->> #5  _Unwind_ForcedUnwind_Phase2 (exc=exc at entry=0xf77ee580,
->>     context=context at entry=0xf77ec820)
->>     at /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind.inc:185
->> #6  0x0000000000408228 in _Unwind_ForcedUnwind (exc=0xf77ee580,
->>     stop=stop at entry=0x405440 <unwind_stop>, stop_argument=0xf77eddd8)
->>     at /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind.inc:207
->> #7  0x00000000004055c4 in __pthread_unwind (buf=<optimized out>)
->>     at unwind.c:126
->> #8  0x00000000004050b4 in __do_cancel () at ./pthreadP.h:283
->> #9  sigcancel_handler (sig=<optimized out>, si=<optimized out>,
->>     ctx=<optimized out>) at nptl-init.c:225
->> ---Type <return> to continue, or q <return> to quit---
->> #10 <signal handler called>
->>
->> #11 0x0000000000000000 in ?? ()
->>
->> #12 0x0000000000423084 in __select (nfds=-66661, readfds=<optimized out>,
->>     writefds=<optimized out>, exceptfds=<optimized out>, timeout=0x0)
->>     at ../sysdeps/unix/sysv/linux/generic/select.c:45
->> #13 0x0000000000400604 in TEST_TaskDelay (
->>     uiMillSecs=<error reading variable: can't compute CFA for this frame>)
->>     at test-cancel.c:18
->> #14 0x0000000000400680 in printids (
->>     s=<error reading variable: can't compute CFA for this frame>)
->>     at test-cancel.c:38
->> #15 0x00000000004006d0 in thr_fn (
->>     arg=<error reading variable: can't compute CFA for this frame>)
->>     at test-cancel.c:49
->> #16 0x0000000000401b28 in start_thread (arg=0x4a3000) at
->> pthread_create.c:335
->> #17 0x0000000000401b28 in start_thread (arg=0x4a3000) at
->> pthread_create.c:335
->> Backtrace stopped: previous frame identical to this frame (corrupt stack?)
->> ```
->>
->> Such abort is raise by the following code:
->> ```
->> static void
->> uw_update_context_1 (struct _Unwind_Context *context, _Unwind_FrameState
->> *fs)
->> {
->> //...
->>   /* Compute this frame's CFA.  */
->>   switch (fs->regs.cfa_how)
->>     {
->>     case CFA_REG_OFFSET:
->>       cfa = _Unwind_GetPtr (&orig_context, fs->regs.cfa_reg);
->>       cfa += fs->regs.cfa_offset;
->>       break;
->>
->>     case CFA_EXP:
->>       {
->>         const unsigned char *exp = fs->regs.cfa_exp;
->>         _uleb128_t len;
->>
->>         exp = read_uleb128 (exp, &len);
->>         cfa = (void *) (_Unwind_Ptr)
->>           execute_stack_op (exp, exp + len, &orig_context, 0);
->>         break;
->>       }
->>
->>     default:
->>       gcc_unreachable ();
->>     }
->>   context->cfa = cfa;
->> //...
->> }
->> ``
->>
->> Any suggestion is appreciated.
->>
->> CC gcc mailing list. Sorry if it is off topic.
->>
->> Regards
->>
->> Bamvor
->>
->>
->>
->>
->>> pipeio_x tests are very unstable and may fail randomly. I strongly
->>> suspect race conditions, as they all work like a charm if pinned to
->>> single CPU with taskset. Probably, race is the reason of clone02 too.
->>> Though I'm not sure, is the race in kernel, glibc or test itself.
->>>
->>> But I know for sure that pause01 fails due to test design:
->>>         if (setitimer(ITIMER_REAL, &it, NULL)) // For 1000us
->>>                 tst_brkm(TBROK | TERRNO, NULL, "setitimer() failed");
->>>
->>>         TEST(pause());
->>>
->>> As setitimer() and pause() calls are not atomic, alarm may come before
->>> pause()
->>> is called, and be silently dropped by the handler. Next pause() call hangs
->>> test forever. I already reported to LTP list.
->>>
->>> open12, rename11, rmdir02, mmap16, mtest06 - all call mkfs tool, and it
->>> returns
->>> error code. I didn't investigate it much yet.
->>>
->>> umount02_x, utime06 - cannot reproduce out of scenario, even run it in
->>> infinite
->>> loop - they work fine.
->>>
->>> Full test log is attached.
->>>
->>> Yury
->>>
->>
+If that's the case, then I don't think setting these are correct since the
+DT binding says that the regulator-{min,max}-microvolt properties describe
+the voltage range that consumers may set. I've seen Mark mention this many
+times, the last one I remember is at [0].
+
+Probably would be better to leave the ldo22_reg definition to odroidu3.dts
+to avoid setting these constraint in a .dtsi file.
+
+>  			ldo25_reg: LDO25 {
+>  				regulator-name = "VDDQ_LCD_1.8V";
+>  				regulator-min-microvolt = <1800000>;
+> @@ -411,8 +418,8 @@
+>  
+>  			buck8_reg: BUCK8 {
+>  				regulator-name = "BUCK8_2.8V";
+> -				regulator-min-microvolt = <2800000>;
+> -				regulator-max-microvolt = <2800000>;
+> +				regulator-min-microvolt = <750000>;
+> +				regulator-max-microvolt = <3900000>;
+
+Same here, since not all boards have the same constraint for this regulator,
+it would be better to remove it from the .dtsi and let each dts to define it.
+
+>  			};
+>  		};
+>  	};
+> @@ -456,7 +463,7 @@
+>  &mshc_0 {
+>  	pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
+>  	pinctrl-names = "default";
+> -	vmmc-supply = <&ldo20_reg &buck8_reg>;
+> +	vmmc-supply = <&ldo20_reg>;
+>  	mmc-pwrseq = <&emmc_pwrseq>;
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> index dd89f7b37c9f..d73aa6c58fe3 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> @@ -69,6 +69,24 @@
+>  	};
+>  };
+>  
+> +/* Supply for LAN9730/SMSC95xx */
+> +&buck8_reg {
+> +	regulator-name = "BUCK8_P3V3";
+
+I think it would be better to name it "BUCK8_3.3V" for consistency. 
+
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +};
+> +
+> +/* VDDQ for MSHC (eMMC card) */
+> +&ldo22_reg {
+> +	regulator-name = "LDO22_VDDQ_MMC4_2.8V";
+> +	regulator-min-microvolt = <2800000>;
+> +	regulator-max-microvolt = <2800000>;
+> +};
+> +
+> +&mshc_0 {
+> +	vqmmc-supply = <&ldo22_reg>;
+> +};
+> +
+>  &pwm {
+>  	pinctrl-0 = <&pwm0_out>;
+>  	pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> index bf7b21b817e4..2af235151301 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -63,12 +63,23 @@
+>  	};
+>  };
+>  
+> +/* VDDQ for MSHC (eMMC card) */
+> +&buck8_reg {
+> +	regulator-name = "BUCK8_VDDQ_MMC4_2.8V";
+> +	regulator-min-microvolt = <2800000>;
+> +	regulator-max-microvolt = <2800000>;
+> +};
+> +
+>  &ehci {
+>  	port at 1 {
+>  		status = "okay";
+>  	};
+>  };
+>  
+> +&mshc_0 {
+> +	vqmmc-supply = <&buck8_reg>;
+> +};
+> +
+>  &pinctrl_1 {
+>  	gpio_home_key: home_key {
+>  		samsung,pins = "gpx2-2";
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx2.dts b/arch/arm/boot/dts/exynos4412-odroidx2.dts
+> index 6e33678562ae..3e3584270e00 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidx2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx2.dts
+> @@ -22,6 +22,17 @@
+>  	};
+>  };
+>  
+> +/* VDDQ for MSHC (eMMC card) */
+> +&buck8_reg {
+> +	regulator-name = "BUCK8_VDDQ_MMC4_2.8V";
+> +	regulator-min-microvolt = <2800000>;
+> +	regulator-max-microvolt = <2800000>;
+> +};
+> +
+> +&mshc_0 {
+> +	vqmmc-supply = <&buck8_reg>;
+> +};
+> +
+>  &sound {
+>  	simple-audio-card,name = "Odroid-X2";
+>  	simple-audio-card,widgets =
+> 
+
+Rest looks good, so if you do those changes feel free to add:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+[0]: http://www.spinics.net/lists/linux-omap/msg127035.html
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
