@@ -1,46 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2016 10:31:45 +0100
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <1461239325-22779-2-git-send-email-pmladek@suse.com>
+Date: Wed, 27 Apr 2016 10:34:38 +0100
+Subject: [PATCH v5 2/4] printk/nmi: warn when some message has been lost
+ in NMI context
+In-Reply-To: <1461239325-22779-3-git-send-email-pmladek@suse.com>
 References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
-Message-ID: <20160427093145.GJ19428@n2100.arm.linux.org.uk>
+ <1461239325-22779-3-git-send-email-pmladek@suse.com>
+Message-ID: <20160427093438.GK19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 01:48:42PM +0200, Petr Mladek wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index cdfa6c2b7626..259543ec6dc9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -66,6 +66,7 @@ config ARM
->  	select HAVE_KRETPROBES if (HAVE_KPROBES)
->  	select HAVE_MEMBLOCK
->  	select HAVE_MOD_ARCH_SPECIFIC
-> +	select HAVE_NMI
->  	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
->  	select HAVE_OPTPROBES if !THUMB2_KERNEL
->  	select HAVE_PERF_EVENTS
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index baee70267f29..df90bc59bfce 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -644,9 +644,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  		break;
+On Thu, Apr 21, 2016 at 01:48:43PM +0200, Petr Mladek wrote:
+> @@ -64,8 +65,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
+>  again:
+>  	len = atomic_read(&s->len);
 >  
->  	case IPI_CPU_BACKTRACE:
-> +		printk_nmi_enter();
->  		irq_enter();
->  		nmi_cpu_backtrace(regs);
->  		irq_exit();
-> +		printk_nmi_exit();
->  		break;
->  
->  	default:
+> -	if (len >= sizeof(s->buffer))
+> +	if (len >= sizeof(s->buffer)) {
+> +		atomic_inc(&nmi_message_lost);
 
-For the above,
-
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This should be fine - I think its reasonable to expect that no one is
+using a spinlock implementation for their atomic ops for this...
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
