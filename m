@@ -1,10 +1,10 @@
 From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 08:35:58 +0300
-Subject: [RESEND PATCH v2 6/7] usb: xhci: plat: add generic PHY support
-In-Reply-To: <1461675460-2295-7-git-send-email-jszhang@marvell.com>
+Date: Wed, 27 Apr 2016 08:37:20 +0300
+Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
+In-Reply-To: <1461675460-2295-8-git-send-email-jszhang@marvell.com>
 References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-7-git-send-email-jszhang@marvell.com>
-Message-ID: <87eg9rpq9t.fsf@intel.com>
+ <1461675460-2295-8-git-send-email-jszhang@marvell.com>
+Message-ID: <87bn4vpq7j.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,177 +12,149 @@ List-Id: linux-arm-kernel.lists.infradead.org
 Hi,
 
 Jisheng Zhang <jszhang@marvell.com> writes:
-> Marvell BG4CT SoC needs two phy: one for usb2 and another for usb3. Add
-> the calls to retrieve generic PHY to xhci plat in order to support this.
+> The Marvell BG4CT STB board has board level vbus control through gpio.
+> This patch adds the vbus regulator control to support this board.
 >
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  drivers/usb/host/xhci-plat.c | 87 ++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 75 insertions(+), 12 deletions(-)
+>  drivers/usb/host/xhci-plat.c | 40 +++++++++++++++++++++++++++++++++++++++-
+>  drivers/usb/host/xhci.h      |  2 ++
+>  2 files changed, 41 insertions(+), 1 deletion(-)
 >
 > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 83669d0..d7f4f3c 100644
+> index d7f4f3c..0310c13 100644
 > --- a/drivers/usb/host/xhci-plat.c
 > +++ b/drivers/usb/host/xhci-plat.c
-> @@ -16,6 +16,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/module.h>
+> @@ -18,6 +18,7 @@
 >  #include <linux/of.h>
-> +#include <linux/phy/phy.h>
+>  #include <linux/phy/phy.h>
 >  #include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
 >  #include <linux/slab.h>
 >  #include <linux/usb/phy.h>
-> @@ -134,6 +135,37 @@ static const struct of_device_id usb_xhci_of_match[] = {
->  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->  #endif
->  
-> +static int xhci_plat_phy_init(struct usb_hcd *hcd)
-> +{
-> +	int ret;
-> +
-> +	if (hcd->phy) {
-> +		ret = phy_init(hcd->phy);
-> +		if (ret)
-> +			return ret;
-> +
-> +		ret = phy_power_on(hcd->phy);
-> +		if (ret) {
-> +			phy_exit(hcd->phy);
-> +			return ret;
-> +		}
-> +	} else {
-> +		ret = usb_phy_init(hcd->usb_phy);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void xhci_plat_phy_exit(struct usb_hcd *hcd)
-> +{
-> +	if (hcd->phy) {
-> +		phy_power_off(hcd->phy);
-> +		phy_exit(hcd->phy);
-> +	} else {
-> +		usb_phy_shutdown(hcd->usb_phy);
-> +	}
-> +}
-> +
->  static int xhci_plat_probe(struct platform_device *pdev)
->  {
->  	struct device_node	*node = pdev->dev.of_node;
-> @@ -145,6 +177,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	struct usb_hcd		*hcd;
+>  #include <linux/usb/xhci_pdriver.h>
+> @@ -178,6 +179,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 >  	struct clk              *clk;
 >  	struct usb_phy		*usb_phy;
-> +	struct phy		*phy;
-
-so, one phy driver using USB PHY layer and another using generic PHY
-layer ? Why ? I think the first thing your series should do would be to
-add proper suport for both APIs with two PHYs and make them all optional
-for xhci-plat.
-
-> @@ -232,22 +265,44 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->  		xhci->shared_hcd->can_do_streams = 1;
+>  	struct phy		*phy;
+> +	struct regulator	*vbus;
+>  	int			ret;
+>  	int			irq;
 >  
-> +	hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
-> +	if (IS_ERR(hcd->phy)) {
-> +		ret = PTR_ERR(hcd->phy);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto put_usb3_hcd;
-> +		hcd->phy = NULL;
+> @@ -249,13 +251,30 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  
+>  	device_wakeup_enable(hcd->self.controller);
+>  
+> +	vbus = devm_regulator_get(&pdev->dev, "vbus");
+
+devm_regulator_get_optional() ??
+
+> +	if (PTR_ERR(vbus) == -ENODEV) {
+> +		vbus = NULL;
+> +	} else if (IS_ERR(vbus)) {
+> +		ret = PTR_ERR(vbus);
+> +		goto disable_clk;
+> +	} else if (vbus) {
+> +		ret = regulator_enable(vbus);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"failed to enable usb vbus regulator: %d\n",
+> +				ret);
+> +			goto disable_clk;
+> +		}
 > +	}
 > +
-> +	phy = devm_phy_get(&pdev->dev, "usb-phy");
-> +	if (IS_ERR(phy)) {
-> +		ret = PTR_ERR(phy);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto put_usb3_hcd;
-> +		phy = NULL;
-> +	}
-> +
->  	usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
->  	if (IS_ERR(usb_phy)) {
->  		ret = PTR_ERR(usb_phy);
->  		if (ret == -EPROBE_DEFER)
->  			goto put_usb3_hcd;
->  		usb_phy = NULL;
-> -	} else {
-> -		ret = usb_phy_init(usb_phy);
-> -		if (ret)
-> -			goto put_usb3_hcd;
+>  	xhci->clk = clk;
+> +	xhci->vbus = vbus;
+>  	xhci->main_hcd = hcd;
+>  	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+>  			dev_name(&pdev->dev), hcd);
+>  	if (!xhci->shared_hcd) {
+>  		ret = -ENOMEM;
+> -		goto disable_clk;
+> +		goto disable_vbus;
 >  	}
-> +
->  	xhci->shared_hcd->usb_phy = usb_phy;
-> +	xhci->shared_hcd->phy = phy;
-> +
-> +	ret = xhci_plat_phy_init(hcd);
-> +	if (ret)
-> +		goto put_usb3_hcd;
-> +
-> +	ret = xhci_plat_phy_init(xhci->shared_hcd);
-> +	if (ret)
-> +		goto disable_usb2_phy;
 >  
->  	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
->  	if (ret)
-> -		goto disable_usb_phy;
-> +		goto disable_usb3_phy;
->  
->  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
->  	if (ret)
-> @@ -259,8 +314,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  dealloc_usb2_hcd:
->  	usb_remove_hcd(hcd);
->  
-> -disable_usb_phy:
-> -	usb_phy_shutdown(usb_phy);
-> +disable_usb3_phy:
-> +	xhci_plat_phy_exit(xhci->shared_hcd);
-> +
-> +disable_usb2_phy:
-> +	xhci_plat_phy_exit(hcd);
->  
+>  	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
+> @@ -323,6 +342,10 @@ disable_usb2_phy:
 >  put_usb3_hcd:
 >  	usb_put_hcd(xhci->shared_hcd);
-> @@ -281,11 +339,11 @@ static int xhci_plat_remove(struct platform_device *dev)
+>  
+> +disable_vbus:
+> +	if (vbus)
+> +		regulator_disable(vbus);
+> +
+>  disable_clk:
+>  	clk_disable_unprepare(clk);
+>  
+> @@ -337,6 +360,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+>  	struct usb_hcd	*hcd = platform_get_drvdata(dev);
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 >  	struct clk *clk = xhci->clk;
+> +	struct regulator *vbus = xhci->vbus;
 >  
 >  	usb_remove_hcd(xhci->shared_hcd);
-> -	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
-> -
-> -	usb_remove_hcd(hcd);
-> +	xhci_plat_phy_exit(xhci->shared_hcd);
->  	usb_put_hcd(xhci->shared_hcd);
->  
-> +	usb_remove_hcd(hcd);
-> +	xhci_plat_phy_exit(hcd);
+>  	xhci_plat_phy_exit(xhci->shared_hcd);
+> @@ -347,6 +371,9 @@ static int xhci_plat_remove(struct platform_device *dev)
 >  	clk_disable_unprepare(clk);
 >  	usb_put_hcd(hcd);
 >  
-> @@ -311,7 +369,8 @@ static int xhci_plat_suspend(struct device *dev)
->  	if (ret)
->  		return ret;
+> +	if (vbus)
+> +		regulator_disable(vbus);
+> +
+>  	return 0;
+>  }
 >  
-> -	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
-> +	xhci_plat_phy_exit(xhci->shared_hcd);
-> +	xhci_plat_phy_exit(hcd);
+> @@ -356,6 +383,7 @@ static int xhci_plat_suspend(struct device *dev)
+>  	int ret;
+>  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> +	struct regulator *vbus = xhci->vbus;
+>  
+>  	/*
+>  	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
+> @@ -373,6 +401,9 @@ static int xhci_plat_suspend(struct device *dev)
+>  	xhci_plat_phy_exit(hcd);
 >  	clk_disable_unprepare(xhci->clk);
 >  
->  	return ret;
-> @@ -327,7 +386,11 @@ static int xhci_plat_resume(struct device *dev)
->  	if (ret)
->  		return ret;
->  
-> -	ret = usb_phy_init(xhci->shared_hcd->usb_phy);
-> +	ret = xhci_plat_phy_init(hcd);
-> +	if (ret)
-> +		return ret;
+> +	if (vbus)
+> +		ret = regulator_disable(vbus);
 > +
-> +	ret = xhci_plat_phy_init(xhci->shared_hcd);
+>  	return ret;
+>  }
+>  
+> @@ -381,11 +412,18 @@ static int xhci_plat_resume(struct device *dev)
+>  	int ret;
+>  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> +	struct regulator *vbus = xhci->vbus;
+>  
+>  	ret = clk_prepare_enable(xhci->clk);
 >  	if (ret)
 >  		return ret;
 >  
+> +	if (vbus) {
+> +		ret = regulator_enable(vbus);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	ret = xhci_plat_phy_init(hcd);
+>  	if (ret)
+>  		return ret;
+> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+> index 6c629c9..5fa8662 100644
+> --- a/drivers/usb/host/xhci.h
+> +++ b/drivers/usb/host/xhci.h
+> @@ -1550,6 +1550,8 @@ struct xhci_hcd {
+>  	struct msix_entry	*msix_entries;
+>  	/* optional clock */
+>  	struct clk		*clk;
+> +	/* optional regulator */
+> +	struct regulator	*vbus;
+>  	/* data structures */
+>  	struct xhci_device_context_array *dcbaa;
+>  	struct xhci_ring	*cmd_ring;
 > -- 
 > 2.8.1
 >
@@ -199,4 +171,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/dadf98da/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/dc562ee1/attachment.sig>
