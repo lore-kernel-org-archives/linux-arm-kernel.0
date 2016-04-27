@@ -1,91 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Apr 2016 17:36:13 +0100
-Subject: Applied "ASoC: bcm2835: Add S16_LE support via packed DMA transfers"
- to the asoc tree
-In-Reply-To: <1461763613-28714-2-git-send-email-hias@horus.com>
-Message-ID: <E1avSRh-0004md-40@debutante>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Apr 2016 09:36:41 -0700
+Subject: [PATCH 1/3] DRA7: Fix clock data for gmac_gmii_ref_clk_div
+In-Reply-To: <5720A09F.2060701@ti.com>
+References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
+ <1461693269-19436-2-git-send-email-Linux.HWI@garmin.com>
+ <5720A09F.2060701@ti.com>
+Message-ID: <20160427163640.GZ5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+* Tero Kristo <t-kristo@ti.com> [160427 04:22]:
+> On 26/04/16 20:54, J.D. Schroeder wrote:
+> >From: "J.D. Schroeder" <jay.schroeder@garmin.com>
+> >
+> >This commit fixes the clock data inside the DRA7xx clocks device tree
+> >structure for the gmac_gmii_ref_clk_div clock. This clock is actually
+> >the GMAC_MAIN_CLK and has nothing to do with the register at address
+> >0x4a0093d0. If CLKSEL_REF bit 24 inside of CM_GMAC_GMAC_CLKCTRL, is
+> >set to 1 in order to use the GMAC_RMII_CLK instead of the
+> >GMAC_RMII_HS_CLK, the kernel generates a clock divider warning:
+> >     WARNING: CPU: 0 PID: 0 at drivers/clk/clk-divider.c:129 clk_divider_recalc_rate+0xa8/0xe0()
+> >     gmac_gmii_ref_clk_div: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set
+> >
+> >By properly configuring the gmac_gmii_ref_clk_div (GMAC_MAIN_CLK) to
+> >have the parent of dpll_gmac_m2_ck always divided by 2 the warning is
+> >resolved and the clock tree is fixed up.
+> >
+> >Additionally, a new clock called rmii_50mhz_clk_mux is defined that
+> >does utilize CM_GMAC_GMAC_CLKCTRL[24] CLKSEL_REF to configure the
+> >source clock for the RMII_50MHZ_CLK.
+> >
+> >Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
+> >Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
+> 
+> Looks like something weird happened with the clock data conversion tool with
+> this specific clock. Seems to be the only buggy instance in our clock data
+> across SoCs. Good catch.
+> 
+> Acked-by: Tero Kristo <t-kristo@ti.com>
 
-   ASoC: bcm2835: Add S16_LE support via packed DMA transfers
+Applying into omap-for-v4.6/fixes thanks.
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From beff053c0ef6983897e3481169292e6435ef0a2d Mon Sep 17 00:00:00 2001
-From: Matthias Reichl <hias@horus.com>
-Date: Wed, 27 Apr 2016 15:26:52 +0200
-Subject: [PATCH] ASoC: bcm2835: Add S16_LE support via packed DMA transfers
-
-The bcm2835-i2s driver already has support for the S16_LE format but
-that format hasn't been made available because dmaengine_pcm didn't
-support packed data transfers.
-
-bcm2835-i2s needs 16-bit left+right channel data to be packed into
-a 32-bit word, the FIFO register is 32-bit only and doesn't support
-16-bit access.
-
-Now that dmaengine_pcm supports packed transfers the format can
-be made available by setting the SND_DMAENGINE_PCM_DAI_FLAG_PACK flag.
-
-No further configuration is necessary:
-- snd_dmaengine_dai_dma_data.addr_width is already set to
-  DMA_SLAVE_BUSWIDTH_4_BYTES to force 32-bit DMA transfers
-- dmaengine_pcm will pick up the S16_LE format from the DAI
-  configuration and make it available since it's no longer
-  masked out due to the PACK flag.
-- there are no further corner cases to catch in hw_params,
-  since the channel count is fixed at 2 we always have two
-  16-bit stereo samples that can be transferred via 32-bit DMA
-
-Signed-off-by: Matthias Reichl <hias@horus.com>
-Tested-by: Martin Sperl <kernel@martin.sperl.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/bcm/bcm2835-i2s.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index a0026e2d2f0a..6ba20498202e 100644
---- a/sound/soc/bcm/bcm2835-i2s.c
-+++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -690,6 +690,15 @@ static int bcm2835_i2s_probe(struct platform_device *pdev)
- 	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].maxburst = 2;
- 	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].maxburst = 2;
- 
-+	/*
-+	 * Set the PACK flag to enable S16_LE support (2 S16_LE values
-+	 * packed into 32-bit transfers).
-+	 */
-+	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].flags =
-+		SND_DMAENGINE_PCM_DAI_FLAG_PACK;
-+	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].flags =
-+		SND_DMAENGINE_PCM_DAI_FLAG_PACK;
-+
- 	/* BCLK ratio - use default */
- 	dev->bclk_ratio = 0;
- 
--- 
-2.8.0.rc3
+Tony
