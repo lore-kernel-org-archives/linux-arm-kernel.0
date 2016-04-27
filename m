@@ -1,42 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2016 20:39:41 +0100
-Subject: [PATCH 1/2] ARM: PIE infrastructure
-In-Reply-To: <20160422231503.GE17051@piout.net>
-References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1459668234-16033-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20160404100052.GS19428@n2100.arm.linux.org.uk>
- <20160422231503.GE17051@piout.net>
-Message-ID: <20160427193941.GR19428@n2100.arm.linux.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 27 Apr 2016 22:47:39 +0300
+Subject: [PATCH 2/3] ARM: DRA7x: dts: Fix the 32kHz clock calculation
+In-Reply-To: <5720C77A.3020708@garmin.com>
+References: <1461693269-19436-1-git-send-email-Linux.HWI@garmin.com>
+ <1461693269-19436-3-git-send-email-Linux.HWI@garmin.com>
+ <5720A51E.2000900@ti.com> <5720C77A.3020708@garmin.com>
+Message-ID: <5721175B.8030904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 23, 2016 at 01:15:03AM +0200, Alexandre Belloni wrote:
-> Well, do you want me to iterate and use fncpy on all the functions from
-> the generated binary?
+On 27/04/16 17:06, J.D. Schroeder wrote:
+> On 04/27/2016 06:40 AM, Tero Kristo wrote:
+>> On 26/04/16 20:54, J.D. Schroeder wrote:
+>>> This commit fixes the 32kHz clock (sys_32k_ck) calculation to be
+>>> correctly based on the SYS_CLK1 (sys_clkin1) frequency. Based on the
+>>> TRM CTRL_CORE_BOOTSTRAP[9:8] SPEEDSELECT, set by the SYSBOOT[9:8]
+>>> board jumpers according to the SYS_CLK1 frequency, the frequency of
+>>> the 32kHz FUNC_32K_CLK is set to SYS_CLK1/610. The following
+>>> sys_32k_ck frequencies get used for different SYS_CLK1 frequencies:
+>>>           0b00: Unknown  -> 32768 Hz crystal from CLKIN_32K pin
+>>>           0b01: 20   MHz -> 32787 Hz clock (SYS_CLK1/610)
+>>>           0b10: 27   MHz -> 44262 Hz clock (SYS_CLK1/610)
+>>>           0b11: 19.2 MHz -> 31475 Hz clock (SYS_CLK1/610)
+>>
+>> A patch doing the same thing is already in mainline, see:
+>>
+>> commit eea08802f586acd6aef377d1b4a541821013cc0b
+>> Author: Keerthy <j-keerthy@ti.com>
+>> Date:   Mon Apr 4 11:07:15 2016 +0530
+>>
+>>      ARM: dts: dra7: Correct clock tree for sys_32k_ck
+>>
+>> So, this one can be ignored.
+>
+> My change had no issue when applying to the tip of master and I'm not seeing
+> that SHA1 in mainline. Are you saying it is in another repo ready to be sent
+> to mainline for the next release cycle?
+>
 
-No, because that will break the image too.
+The patch is merged already in 4.6-rc3.
 
-> I'm not sure this is necessary as the generated binary is self contained
-> and doing so will force me to also ensure the offsets are kept the same.
-> Doing only one copy is much more convenient. However, I still need to
-> ensure the destination address is properly 8-byte aligned and the
-> flush_icache_range().
+Which repo / version are you using as baseline?
 
-What you need to do is to immitate being an ELF loader - in other words,
-copy the blob according to the alignment rules of the blob (which may be
-greater than 8-byte alignment) and use the symbol table to find the
-functions and the type of the function (ARM vs ELF).
-
-> I understand this is abusing fncpy() but it does want I need (still, I'm
-> planning to avoid the BUG() by always passing a properly aligned
-> destination address).
-
-Yea yea yea, such arguments don't wash with me, sorry.  The "but it does
-what I need" is total bollocks, sorry.  fncpy() is designed for a
-purpose, and what you're doing is an abuse of it, one which I will not
-stand for for the sake of long term maintainability.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-Tero
