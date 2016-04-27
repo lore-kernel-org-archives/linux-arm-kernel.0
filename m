@@ -1,77 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2016 09:59:47 +0100
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
- <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
- <20160419224122.GE19428@n2100.arm.linux.org.uk>
- <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
-Message-ID: <20160427085947.GG19428@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Apr 2016 11:03:17 +0200
+Subject: [GIT PULL] ARM: EXYNOS: fixes for v4.6
+In-Reply-To: <1461738154-8335-1-git-send-email-k.kozlowski@samsung.com>
+References: <1461738154-8335-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5647946.YabRqFapJm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 09:04:39AM -0500, Rob Herring wrote:
-> On Tue, Apr 19, 2016 at 5:41 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
-> >> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
-> >> > Document the DT bindings for controlling ARM PL310 Power Control
-> >> > settings.
-> >> >
-> >> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
-> >>
-> >> What happened to Josh's ack?
-> >>
-> >> > ---
-> >> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
-> >> >  1 file changed, 4 insertions(+)
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> >> > index fe0398c..c1c756e 100644
-> >> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> >> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-> >> > @@ -84,6 +84,10 @@ Optional properties:
-> >> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-> >> >    <1> (forcibly enable), property absent (retain settings set by
-> >> >    firmware)
-> >> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
-> >> > +  disable), <1> or property absent (forcibly enable)
-> >> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
-> >> > +  <1>  or property absent (forcibly enable)
-> >>
-> >> What happened to "retain settings set by firmware"?
-> >
-> > I said we shouldn't.  Current behaviour is that we enable these features,
-> > and moving to missing-means-retain means that everything today ends up
-> > with these features disabled.  IOW, it's yet another change of actual
-> > behaviour that every platform would see.
+On Wednesday 27 April 2016 08:22:34 Krzysztof Kozlowski wrote:
+>   ARM: EXYNOS: Properly skip unitialized parent clock in power domain on (2016-04-25 11:35:37 +0200)
 > 
-> Right, but then the properties are different from prefetch-instr and
-> others IIRC. We're letting the OS define the binding. If BSD doesn't
-> enable these settings currently, then there is a mismatch between the
-> binding and actual behavior. Saying "retain firmware settings" also
-> defines specific OS behavior. I think absent should mean OS is free to
-> do whatever it wants which could be retain firmware settings, enable
-> or disable. In other words, it is undefined as this ship has already
-> sailed.
+> ----------------------------------------------------------------
+> Fix for more theoretical than practical OOPS on first turn on of a exynos
+> power domain, if there was no turn off before. Usually all power domains
+> are on, so the first action is to turn off but some older bootloaders
+> might behave differently.
+> 
 
-I agree with "the ship has already sailed" but I disagree with the
-rest of your comment.  The ship has already sailed in that we have
-an established behaviour which has been there for 18 months.  Given
-the time period, it's not something I'm going to change at this
-stage, sorry.
+Pulled into fixes. Linus has just merged a larger set of fixes from
+arm-soc, and this one doesn't seem very urgent, so I'd wait for more
+important fixes to come up before sending out another pull request.
 
-Why?  Such a change will go unnoticed, and it's particularly hard
-to debug why battery life has reduced.
+In the unlikely case that we don't get any critical bugfixes, I'd just
+send this one for 4.7.
 
-I guess we need to find a way to ensure that the default behaviour
-stays.  Whether that's by _everyone_ updating their DT files with
-the new properties or some other way, I don't care.  I only care
-that we retain the behaviour we've had for the last 18 months.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
