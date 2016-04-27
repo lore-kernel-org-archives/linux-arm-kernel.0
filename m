@@ -1,47 +1,35 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 13:38:53 +0300
-Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
-In-Reply-To: <20160427103521.GJ3217@sirena.org.uk>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-8-git-send-email-jszhang@marvell.com>
- <87bn4vpq7j.fsf@intel.com> <20160427095738.GG3217@sirena.org.uk>
- <87oa8vmjqg.fsf@intel.com> <20160427103521.GJ3217@sirena.org.uk>
-Message-ID: <87k2jjmj42.fsf@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2016 11:41:10 +0100
+Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <571FC2EC.9090605@ti.com>
+References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
+ <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
+ <571FC2EC.9090605@ti.com>
+Message-ID: <20160427104110.GU5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 26, 2016 at 10:35:08PM +0300, Grygorii Strashko wrote:
+> On 04/26/2016 07:02 PM, Liviu Dudau wrote:
+> > Well, SoC-B has the GT *and* the DT node, so what is the problem with
+> > enabling it for SoC-B? If there are reasons not to use the Global Timer
+> > on SoC-B, surely a better option would be to mark it in DT with status = "disabled";
+> 
+> This was rejected [2]. DT describes HW and if it is functional the status = "disabled"
+> is not good choice.
+> ARM GT can't be used as clocksource/sched_clock/clockevent when CPUFreq or
+> CPUIdle are enabled :(, and this is Linux specific functionality and
+> not HW description. 
 
-Hi,
+Sorry, but we don't want to have to disable drivers in the kernel just
+because one platform has a problem (consider the single zImage case
+where it may be required that the global timer is enabled for some
+platform to boot - it becomes mandatory in single zImage at that point.)
 
-Mark Brown <broonie@kernel.org> writes:
-> On Wed, Apr 27, 2016 at 01:25:27PM +0300, Felipe Balbi wrote:
->> Mark Brown <broonie@kernel.org> writes:
->
->> > this to be just a normal regulator_get().
->
->> jokes aside, this regulator is optional because not all platforms
->> require a SW controlled regulator, no ? Will normal regulator_get() give
->> us a dummy regulator in case it's not listed in DT/ACPI ?
->
-> Yes we do that, but even regulators that are not software controlled
-
-okay, good.
-
-> should really be described anyway since it's a much simpler rule for
-
-okay, we'll wait until all vendors update their ACPI tables ;-)
-
-> people to understand, it ensures that we can just scale up on systems
-> where there does happen to be software control and it makes all the
-> resulting code much simpler and hence less error prone if we're not
-> randomly ignoring some errors.
+Maybe a linux-specific property is needed here - "linux,low-power-unstable"
+or something like that?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/f96ae4f0/attachment.sig>
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
