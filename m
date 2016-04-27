@@ -1,53 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Apr 2016 13:53:26 +0200
-Subject: [PATCH] ARM: orion5x: Remove CLK_IS_ROOT
-In-Reply-To: <1461116330-2922-1-git-send-email-sboyd@codeaurora.org> (Stephen
- Boyd's message of "Tue, 19 Apr 2016 18:38:50 -0700")
-References: <1461116330-2922-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <87oa8vtgi1.fsf@free-electrons.com>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Wed, 27 Apr 2016 13:53:21 +0200
+Subject: [PATCH] nvmem/mxs-ocotp: fix buffer overflow in read
+Message-ID: <201ccd58-8735-02d8-b4e4-9d2eda828fd8@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
- 
- On mer., avril 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
+This patch fixes the issue where the mxs_ocotp_read is reading
+the ocotp in reg_size steps but decrements the remaining size
+by 1. The number of iterations is thus four times higher,
+overwriting the area behind the output buffer.
 
-> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
-> CLK_IS_ROOT", 2016-02-02) so remove it.
->
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Fixes: c01e9a11ab6f ("nvmem: add driver for ocotp in i.MX23 and i.MX28")
+---
+ drivers/nvmem/mxs-ocotp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Applied on mvebu/soc
+diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
+index 8ba19bb..2bb3c57 100644
+--- a/drivers/nvmem/mxs-ocotp.c
++++ b/drivers/nvmem/mxs-ocotp.c
+@@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
+ 	if (ret)
+ 		goto close_banks;
 
-Thanks,
+-	while (val_size) {
++	while (val_size >= reg_size) {
+ 		if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
+ 			/* fill up non-data register */
+ 			*buf = 0;
+@@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
+ 		}
 
-Gregory
-> ---
->  arch/arm/mach-orion5x/common.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-> index 70c3366c8d03..058994e99570 100644
-> --- a/arch/arm/mach-orion5x/common.c
-> +++ b/arch/arm/mach-orion5x/common.c
-> @@ -66,8 +66,7 @@ static struct clk *tclk;
->  
->  void __init clk_init(void)
->  {
-> -	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
-> -				       orion5x_tclk);
-> +	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, orion5x_tclk);
->  
->  	orion_clkdev_init(tclk);
->  }
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+ 		buf++;
+-		val_size--;
++		val_size -= reg_size;
+ 		offset += reg_size;
+ 	}
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
