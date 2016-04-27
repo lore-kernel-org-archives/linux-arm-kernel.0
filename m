@@ -1,18 +1,64 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 27 Apr 2016 10:11:36 +0100
-Subject: [PATCH V4 15/18] coresight: moving struct cs_buffers to header
- file
-In-Reply-To: <1461708634-6327-16-git-send-email-mathieu.poirier@linaro.org>
-References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
- <1461708634-6327-16-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <57208248.7000801@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 27 Apr 2016 11:12:41 +0200
+Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
+In-Reply-To: <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <4956403.scaVRGhPEf@diego>
+ <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
+Message-ID: <4459295.XmBqACy0jk@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/16 23:10, Mathieu Poirier wrote:
-> That way we can re-use the structure in other drivers.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Hi Joel,
+
+Am Mittwoch, 27. April 2016, 18:01:00 schrieb Joel Stanley:
+> On Thu, Apr 21, 2016 at 8:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > [+clock-related patches should include clock-maintainers and lists]
+> 
+> Thanks.
+> 
+> > Am Donnerstag, 21. April 2016, 17:34:01 schrieb Joel Stanley:
+> >> +For example:
+> >> +
+> >> +     clk_clkin: clk_clkin {
+> >> +             #clock-cells = <0>;
+> >> +             compatible = "fixed-clock";
+> >> +             clock-frequency = <48000000>;
+> >> +     };
+> >> +
+> >> +     clk_hpll: clk_hpll {
+> >> +             compatible = "aspeed,g4-hpll-clock";
+> >> +             #clock-cells = <0>;
+> >> +             reg = <0x1e6e2008 0x4>;
+> >> +     };
+> >> +
+> >> +     clk_apb: clk_apb at 1e6e2008 {
+> >> +             #clock-cells = <0>;
+> >> +             compatible = "aspeed,g4-apb-clock";
+> >> +             reg = <0x1e6e2008 0x4>;
+> >> +             clocks = <&clk_hpll>;
+> >> +     };
+> > 
+> > You have both the hpll and apb_clk in the same register (probably even
+> > more
+> > clocks?) and separate clock instances where each instance will of_iomap
+> > the
+> > register itself (and thus multiple times in general).
+> 
+> Yep. I agree that's not ideal.
+> 
+> > From what I remember exposing the clock controller as one block (instead
+> > of
+> > declaring each clock individually in the dts) is still the preferred way
+> > but I don't think I can find Mike's mail from back then easily.
+> 
+> I can't picture how that would look. I took my lead from the moxart
+> clock driver; is there a better example that I should follow?
+
+qcom, samsung, rockchip, hisilicon, imx, ...
+
+I guess the design would depend on the actual layout of your clock- / system-
+controller - aka what else is contained there.
 
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Heiko
