@@ -1,38 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2016 16:11:17 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <20160427135859.GC20646@e104818-lin.cambridge.arm.com>
-References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
- <878tzzpq19.fsf@intel.com>
- <20160427135859.GC20646@e104818-lin.cambridge.arm.com>
-Message-ID: <9452408.uEOOA4q1YW@wuerfel>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed, 27 Apr 2016 09:11:43 -0500
+Subject: [PATCH 0/5] ARM:Keystone: Add pinmuxing support
+Message-ID: <1461766308-27669-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 14:59:00 Catalin Marinas wrote:
-> 
-> I would be in favour of a dma_inherit() function as well. We could hack
-> something up in the arch code (like below) but I would rather prefer an
-> explicit dma_inherit() call by drivers creating such devices.
-> 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index ba437f090a74..ea6fb9b0e8fa 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
->  
->  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
->  {
-> -       if (dev && dev->archdata.dma_ops)
-> -               return dev->archdata.dma_ops;
-> +       while (dev) {
-> +               if (dev->archdata.dma_ops)
-> +                       return dev->archdata.dma_ops;
-> +               dev = dev->parent;
-> +       }
+Unlike most Keystone 2 devices, K2G supports pinmuxing of its pins. This
+patch series enables pinmuxing for Keystone 2 devices.
 
-I think this would be a very bad idea: we don't want to have random
-devices be able to perform DMA just because their parent devices
-have been set up that way.
+Franklin S Cooper Jr (1):
+  ARM: keystone: defconfig: Enable PINCTRL SINGLE for Keystone 2
 
-	Arnd
+Lokesh Vutla (3):
+  ARM: Keystone: Enable PINCTRL for Keystone ARCH
+  ARM: dts: keystone: Header file for pinctrl constants
+  ARM: dts: k2g-evm: Add pinmuxing for UART0
+
+Vitaly Andrianov (1):
+  ARM: dts: k2g: Add pinctrl support
+
+ arch/arm/boot/dts/keystone-k2g-evm.dts | 11 ++++++++++
+ arch/arm/boot/dts/keystone-k2g.dtsi    |  8 +++++++
+ arch/arm/configs/keystone_defconfig    |  1 +
+ arch/arm/mach-keystone/Kconfig         |  1 +
+ include/dt-bindings/pinctrl/keystone.h | 39 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 60 insertions(+)
+ create mode 100644 include/dt-bindings/pinctrl/keystone.h
+
+-- 
+2.7.0
