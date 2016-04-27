@@ -1,118 +1,56 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 26 Apr 2016 21:34:29 -0500
-Subject: [PATCH V6 03/13] x86, ia64: Include acpi_pci_{add|remove}_bus to
- the default pcibios_{add|remove}_bus implementation.
-In-Reply-To: <1460740008-19489-4-git-send-email-tn@semihalf.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-4-git-send-email-tn@semihalf.com>
-Message-ID: <20160427023429.GE6789@localhost>
+From: huawei.libin@huawei.com (Li Bin)
+Date: Wed, 27 Apr 2016 10:35:33 +0800
+Subject: [BUG] arm64/hw_breakpoint: trigger breakpoint exception infinitely
+In-Reply-To: <20160426122212.GN27312@arm.com>
+References: <571F2577.2080203@huawei.com> <20160426122212.GN27312@arm.com>
+Message-ID: <57202575.20102@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 07:06:38PM +0200, Tomasz Nowicki wrote:
-> x86 and ia64 are the only arches that implement pcibios_{add|remove}_bus hooks
-> and implement them in the same way. Moreover ARM64 is going to do the same.
-> So it seems that acpi_pci_{add|remove}_bus is generic enough to be default
-> option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
-> acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
-> return if ACPI has been switched off in run time.
+
+
+on 2016/4/26 20:22, Will Deacon wrote:
+> On Tue, Apr 26, 2016 at 04:23:19PM +0800, Li Bin wrote:
+>> This bug can be reproduced by compiling the hw_breakpoint sample
+>> module that is in the kernel tree, when loading it with parameter
+>> ksym=nfsdstats, and running nfsstat:
+>>
+>> $ insmod data_breakpoint.ko ksym=nfsdstats
+>> $ nfsstat
+>>
+>> It will trigger breakpoint exception infinitely:
+>>
+>> nfsdstats value is changed
+>> ...
+>> Call trace:
+>> ...
+>> Dump stack from sample_hbp_handler
+>> nfsdstats value is changed
+>> ...
+>> Call trace:
+>> ...
+>> Dump stack from sample_hbp_handler
+>> ......
+>> ......
+>>
+>> This is because that the overflow_handler is set to the callback
+>> in the module, and in watchpoint_handler, it will not disable the
+>> breakpoint (and set single step that reenable it), so when exception
+>> return, it will trigger the breakpoint exception again immediately...
 > 
-> After all we can remove x86 and ia64 pcibios_{add|remove}_bus
-> implementation.
+> As I explained before, GDB/ptrace *relies* on this behaviour. If you
+> register an breakpoint overflow handler on arm64, then you need to handle
+> the step.
+
+So it is a bug of samples/hw_breakpoint/data_breakpoint.c for arm64.
+Should we fix it (may need to change the kernel code), or disable it
+for arm64?
+
+Thanks,
+Li Bin
+
 > 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  arch/ia64/pci/pci.c   | 10 ----------
->  arch/x86/pci/common.c | 10 ----------
->  drivers/pci/probe.c   |  3 +++
->  3 files changed, 3 insertions(+), 20 deletions(-)
+> Will
 > 
-> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-> index 978d6af..be4c9ef 100644
-> --- a/arch/ia64/pci/pci.c
-> +++ b/arch/ia64/pci/pci.c
-> @@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
->  	platform_pci_fixup_bus(b);
->  }
->  
-> -void pcibios_add_bus(struct pci_bus *bus)
-> -{
-> -	acpi_pci_add_bus(bus);
-> -}
-> -
-> -void pcibios_remove_bus(struct pci_bus *bus)
-> -{
-> -	acpi_pci_remove_bus(bus);
-> -}
-> -
->  void pcibios_set_master (struct pci_dev *dev)
->  {
->  	/* No special bus mastering setup handling */
-> diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
-> index 381a43c..7763a84 100644
-> --- a/arch/x86/pci/common.c
-> +++ b/arch/x86/pci/common.c
-> @@ -170,16 +170,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
->  		pcibios_fixup_device_resources(dev);
->  }
->  
-> -void pcibios_add_bus(struct pci_bus *bus)
-> -{
-> -	acpi_pci_add_bus(bus);
-> -}
-> -
-> -void pcibios_remove_bus(struct pci_bus *bus)
-> -{
-> -	acpi_pci_remove_bus(bus);
-> -}
-> -
->  /*
->   * Only use DMI information to set this if nothing was passed
->   * on the kernel command line (which was parsed earlier).
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8087297..ef569e8 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -12,6 +12,7 @@
->  #include <linux/slab.h>
->  #include <linux/module.h>
->  #include <linux/cpumask.h>
-> +#include <linux/pci-acpi.h>
->  #include <linux/pci-aspm.h>
->  #include <linux/aer.h>
->  #include <linux/acpi.h>
-> @@ -2101,10 +2102,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
->  
->  void __weak pcibios_add_bus(struct pci_bus *bus)
->  {
-> +	acpi_pci_add_bus(bus);
->  }
->  
->  void __weak pcibios_remove_bus(struct pci_bus *bus)
->  {
-> +	acpi_pci_remove_bus(bus);
->  }
-
-Is this buying us something more than just getting rid of these
-pcibios functions in the arches?  The arch-specific pcibios methods
-by themselves don't seem too onerous, and I don't really want to add
-#includes and calls to every firmware interface under the sun.
-
-I admit it's a net removal of 17 lines, but I'm not sure it's a net
-reduction in complexity for the reader, who now has to remember that
-this ACPI stuff is a no-op on most arches.
-
-As a tangent, some of the stuff in acpi_pci_add_bus() really belongs
-elsewhere anyway.  For example, the _DSM stuff should probably be in
-acpi_pci_root_create() since it's a one-per-host bridge kind of thing.
-
->  struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> -- 
-> 1.9.1
+> .
 > 
