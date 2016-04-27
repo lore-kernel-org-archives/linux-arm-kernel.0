@@ -1,199 +1,147 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 27 Apr 2016 11:44:53 -0500
-Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <20160427111758.GA6234@red-moon>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-3-git-send-email-tn@semihalf.com>
- <20160427022649.GD6789@localhost> <20160427111758.GA6234@red-moon>
-Message-ID: <20160427164453.GB17629@localhost>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 27 Apr 2016 17:46:59 +0100
+Subject: [PATCH v9 00/14] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+Message-ID: <1461775633-29715-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 12:17:58PM +0100, Lorenzo Pieralisi wrote:
-> On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
-> > On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
-> > > As we now have valid PCI host bridge device reference we can
-> > > introduce code that is going to find its bus domain number using
-> > > ACPI _SEG method.
-> > > 
-> > > Note that _SEG method is optional, therefore _SEG absence means
-> > > that all PCI buses belong to domain 0.
-> > > 
-> > > While at it, for the sake of code clarity we put ACPI and DT domain
-> > > assign methods into the corresponding helpers.
-> > > 
-> > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > > Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > > Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-> > > Tested-by: Duc Dang <dhdang@apm.com>
-> > > Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> > > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> > > ---
-> > >  drivers/acpi/pci_root.c  | 18 ++++++++++++++++++
-> > >  drivers/pci/pci.c        | 11 +++++++++--
-> > >  include/linux/pci-acpi.h |  2 ++
-> > >  3 files changed, 29 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> > > index 4581e0e..d9a70c4 100644
-> > > --- a/drivers/acpi/pci_root.c
-> > > +++ b/drivers/acpi/pci_root.c
-> > > @@ -419,6 +419,24 @@ out:
-> > >  }
-> > >  EXPORT_SYMBOL(acpi_pci_osc_control_set);
-> > >  
-> > > +int acpi_pci_bus_domain_nr(struct device *parent)
+Hi all,
 
-It looks like acpi_pci_bus_domain_nr() could be under #ifdef
-CONFIG_PCI_DOMAINS_GENERIC, right?
+This is the today's version of hibernate for arm64, based on arm64's
+for-next/core with latest commit 6a1f54711447 ("arm64: acpi: add acpi=on
+cmdline option to prefer ACPI boot over DT").
 
-> > > +{
-> > > +	struct acpi_device *acpi_dev = to_acpi_device(parent);
-> > > +	unsigned long long segment = 0;
-> > > +	acpi_status status;
-> > > +
-> > > +	/*
-> > > +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-> > > +	 * all PCI buses belong to domain 0.
-> > > +	 */
-> > > +	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
-> > > +				       &segment);
-> > 
-> > We already have code in acpi_pci_root_add() to evaluate _SEG.  We
-> > don't want to evaluate it *twice*, do we?
-> > 
-> > I was sort of expecting that if you added it here, we'd remove the
-> > existing call, but it looks like you're keeping both?
-> 
-> We can't remove the existing call, since it is used on X86 and IA64
-> to store the segment number that, in the process, is used in their
-> pci_domain_nr() arch specific callback to retrieve the domain nr.
-> 
-> On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
-> to retrieve the domain number that is not arch dependent, since
-> this is generic code, we can't rely on any bus->sysdata format (unless
-> we do something like JC did below), therefore the only way is to call
-> the _SEG method *again* here, which also forced Tomasz to go through
-> the ACPI_COMPANION setting song and dance and pass the parent pointer
-> to pci_create_root_bus() (see patch 1), which BTW is a source of
-> trouble on its own as you noticed.
-> 
-> JC solved it differently, via sysdata and pseudo-generic code:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg478167.html
+Patch 6 will conflict with Sudeep's cpu notifier fix that landed in rc4:
+> 06a71a24bae5 ("arm64: KVM: unregister notifiers in hyp mode teardown path").
+"arm64: kvm: allows kvm cpu hotplug" in this series removes the cpu hotplug
+notifiers, instead depending on the notifier in core kvm code to use the
+provided hardware enable/disable functions.
+The resolution is to remove the cpu-hotplug notifier register and unregister
+code, but leave the low power 'cpu_pm' notifier as it is after Sudeep's patch.
 
-The thing I don't like about this is the special case of checking
-parent and parent->of_node to figure out whether we should use the
-segment from ACPI and the fragility of depending on the fact that the
-companion hasn't been set yet.
+This series can be retrieved from:
+git://linux-arm.org/linux-jm.git -b hibernate/v9
 
-> http://www.spinics.net/lists/arm-kernel/msg478169.html
-> 
-> I like neither, we need the lesser of two evils though.
+Changes since v8:
+ * Moved hyp-gone code out from 'arm64: kvm: allows kvm cpu hotplug'
 
-Today we call pci_bus_assign_domain_nr() from the PCI core (from
-pci_create_root_bus()).  This is only implemented for
-PCI_DOMAINS_GENERIC, but even so, it fiddles around to figure out
-whether to get the domain from DT or to assign a new one.
+ * Added break before make to the two ttbr1 switches in hibernate-asm.S
+ * Added comments to hibernate-asm.S about where this executes from, and where
+ * its data is
+ * Removed comments referring to el2_setup() (missed from previous version)
 
-That seems backwards to me.  The host bridge drivers already know
-where the domain should come from (ACPI _SEG, DT, etc.) and in the
-long term, I think they should be responsible for looking up or
-assigning a domain number *before* they call pci_create_root_bus().
+ * Replaced set_p?d() for p?d_populate() equivalents
+ * Added isb to create_safe_exec_page() switch
+ * Replaced more p?d_val()s with p?d_none()
+ * Added comment about masking out RDONLY bit
+ * Wrapped get_safe_page() calls with p?d_none() to avoid leaking memory if
+   these levels are merged.
 
-> > > +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-> > > +		dev_err(&acpi_dev->dev, "can't evaluate _SEG\n");
-> > > +
-> > > +	return segment;
-> > > +}
-> > > +
-> > >  static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
-> > >  {
-> > >  	u32 support, control, requested;
-> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > > index 25e0327..1a74e87 100644
-> > > --- a/drivers/pci/pci.c
-> > > +++ b/drivers/pci/pci.c
-> > > @@ -19,6 +19,7 @@
-> > >  #include <linux/spinlock.h>
-> > >  #include <linux/string.h>
-> > >  #include <linux/log2.h>
-> > > +#include <linux/pci-acpi.h>
-> > >  #include <linux/pci-aspm.h>
-> > >  #include <linux/pm_wakeup.h>
-> > >  #include <linux/interrupt.h>
-> > > @@ -4779,7 +4780,7 @@ int pci_get_new_domain_nr(void)
-> > >  }
-> > >  
-> > >  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> > > -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > +static int of_pci_bus_domain_nr(struct device *parent)
-> > >  {
-> > >  	static int use_dt_domains = -1;
-> > >  	int domain = -1;
-> > > @@ -4823,7 +4824,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > >  		domain = -1;
-> > >  	}
-> > >  
-> > > -	bus->domain_nr = domain;
-> > > +	return domain;
-> > > +}
-> > > +
-> > > +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > +{
-> > > +	bus->domain_nr = acpi_disabled ? of_pci_bus_domain_nr(parent) :
-> > > +					 acpi_pci_bus_domain_nr(parent);
 
-We have the pci_bus * here, so to_pci_host_bridge(bus->bridge) gives
-us the struct pci_host_bridge.  I can't remember why we put domain_nr
-in the struct pci_bus instead of in the struct pci_host_bridge.  It
-seems like pci_host_bridge is the more logical place for it, because
-every bus below the host bridge must have the same domain by
-definition.
+Changes since v7:
+ * Squashed 'Prevent resume from a different kernel version' into the main patch
+ * Removed el2_setup() address details from the arch-header, added the physical
+   address of __hyp_stub_vectors.
+ * Removed patch "el2_setup() to accept sctlr_el1 as an argument"
+ * Removed el2_setup cleaning from hibernate-asm.S
+ * Removed code checking hyp support is the same
 
-Would it be feasible to either (a) move domain_nr to the
-pci_host_bridge, or (b) change acpi_pci_bus_domain_nr() so it uses the
-struct pci_bus * or the struct device * to find the struct
-acpi_pci_root where segment has already been stored by
-acpi_pci_root_add()?
+ * Moved the kvm-torn-down guest entry handling into handle_exit(),
+ * Added an exception type for hyp-stub to return to any kvm_call_hyp() caller
+ * Removed the patch moving do_el2_call, as now kexec_reset can't use
+   kvm_call_hyp() against the hyp-stub.
+ * Removed comments describing 'special' x0 values for hvc in terms of PAGE_SIZE
 
-Another wrinkle is the quirk added by 1f09b09b4de0 ("x86/PCI: Ignore
-_SEG on HP xw9300").  x86 doesn't use PCI_DOMAINS_GENERIC yet, so this
-patch wouldn't break it, but I hope x86 can use PCI_DOMAINS_GENERIC in
-the future, and then it will be a problem if we evaluate _SEG again.
+ * Added copyright header to hibernate-asm.S
+ * Split shared dsb around hibernate-asm.S PoU cleaning and icache-invalidate
+ * Reworked page table copying code to use p?d_offset()
+ * Removed PTRS_PER_P?D checks, using p?d_none() instead
+ * Added !is_kernel_in_hyp_mode() checks to prevent el2 re-configure with VHE
+ * Changed create_safe_exec_page() prototype to receive the dst_addr, instead
+   of passing it back,
+ * Changed the allocator prototype passed to create_safe_exec_page() to reduce
+   the amount of casting.
 
-> > >  }
-> > >  #endif
-> > >  #endif
-> > > diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> > > index 89ab057..a72e22d 100644
-> > > --- a/include/linux/pci-acpi.h
-> > > +++ b/include/linux/pci-acpi.h
-> > > @@ -22,6 +22,7 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
-> > >  {
-> > >  	return acpi_remove_pm_notifier(dev);
-> > >  }
-> > > +extern int acpi_pci_bus_domain_nr(struct device *parent);
-> > >  extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
-> > >  
-> > >  static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
-> > > @@ -109,6 +110,7 @@ extern const u8 pci_acpi_dsm_uuid[];
-> > >  #else	/* CONFIG_ACPI */
-> > >  static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
-> > >  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
-> > > +static inline int acpi_pci_bus_domain_nr(struct device *parent) { return -1; }
-> > >  #endif	/* CONFIG_ACPI */
-> > >  
-> > >  #ifdef CONFIG_ACPI_APEI
-> > > -- 
-> > > 1.9.1
-> > > 
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+ * Removed use of push/pop in sleep.S
+ * Fixed mis-use of ENDPROC() in sleep.S
+ * Removed misleading comment from suspend.c about struct mm_context being
+   saved on the stack and restored after suspend. cpu_uninstall_idmap() does
+   this based on current->active_mm.
+
+ * Added kconfig depends on CPU_PM.
+ * Used Lorenzo's commit message for 'Refuse to hibernate if the boot cpu...'
+
+
+[v8] http://www.spinics.net/lists/arm-kernel/msg499992.html
+[v7] https://lwn.net/Articles/682293/
+[v6] http://www.spinics.net/lists/arm-kernel/msg487467.html
+[v5] http://www.spinics.net/lists/arm-kernel/msg483595.html
+[v4] http://www.spinics.net/lists/arm-kernel/msg477769.html
+[v3] http://www.spinics.net/lists/arm-kernel/msg463590.html
+[v2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
+[v1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
+
+
+AKASHI Takahiro (1):
+  arm64: kvm: allows kvm cpu hotplug
+
+Geoff Levand (4):
+  arm64: Fold proc-macros.S into assembler.h
+  arm64: Cleanup SCTLR flags
+  arm64: hyp/kvm: Make hyp-stub extensible
+  arm64: Add new asm macro copy_page
+
+James Morse (9):
+  arm64: kvm: Move lr save/restore from do_el2_call into EL1
+  arm64: hyp/kvm: Make hyp-stub reject kvm_call_hyp()
+  arm64: kernel: Rework finisher callback out of __cpu_suspend_enter()
+  arm64: Change cpu_resume() to enable mmu early then access sleep_sp by
+    va
+  arm64: kernel: Include _AC definition in page.h
+  arm64: Promote KERNEL_START/KERNEL_END definitions to a header file
+  PM / Hibernate: Call flush_icache_range() on pages restored in-place
+  arm64: kernel: Add support for hibernate/suspend-to-disk
+  arm64: hibernate: Refuse to hibernate if the boot cpu is offline
+
+ arch/arm/include/asm/kvm_host.h    |  10 +-
+ arch/arm/include/asm/kvm_mmu.h     |   1 +
+ arch/arm/kvm/arm.c                 | 119 +++++----
+ arch/arm/kvm/mmu.c                 |   5 +
+ arch/arm64/Kconfig                 |   8 +
+ arch/arm64/include/asm/assembler.h | 101 +++++++-
+ arch/arm64/include/asm/kvm_arm.h   |  11 -
+ arch/arm64/include/asm/kvm_asm.h   |   3 +
+ arch/arm64/include/asm/kvm_host.h  |  13 +-
+ arch/arm64/include/asm/kvm_mmu.h   |   1 +
+ arch/arm64/include/asm/memory.h    |   3 +
+ arch/arm64/include/asm/page.h      |   2 +
+ arch/arm64/include/asm/suspend.h   |  32 ++-
+ arch/arm64/include/asm/sysreg.h    |  19 +-
+ arch/arm64/include/asm/virt.h      |  16 ++
+ arch/arm64/kernel/Makefile         |   1 +
+ arch/arm64/kernel/asm-offsets.c    |  10 +-
+ arch/arm64/kernel/head.S           |   5 +-
+ arch/arm64/kernel/hibernate-asm.S  | 176 ++++++++++++++
+ arch/arm64/kernel/hibernate.c      | 487 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S       |  45 +++-
+ arch/arm64/kernel/setup.c          |   1 -
+ arch/arm64/kernel/sleep.S          | 157 +++++-------
+ arch/arm64/kernel/suspend.c        | 102 ++++----
+ arch/arm64/kernel/vmlinux.lds.S    |  15 ++
+ arch/arm64/kvm/handle_exit.c       |   7 +
+ arch/arm64/kvm/hyp-init.S          |  43 +++-
+ arch/arm64/kvm/hyp.S               |  11 +-
+ arch/arm64/kvm/hyp/hyp-entry.S     |  10 +-
+ arch/arm64/kvm/reset.c             |  14 ++
+ arch/arm64/mm/cache.S              |   2 -
+ arch/arm64/mm/proc-macros.S        |  98 --------
+ arch/arm64/mm/proc.S               |  56 ++---
+ kernel/power/swap.c                |  18 ++
+ 34 files changed, 1209 insertions(+), 393 deletions(-)
+ create mode 100644 arch/arm64/kernel/hibernate-asm.S
+ create mode 100644 arch/arm64/kernel/hibernate.c
+ delete mode 100644 arch/arm64/mm/proc-macros.S
+
+-- 
+2.8.0.rc3
