@@ -1,267 +1,67 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 27 Apr 2016 08:52:27 +0530
-Subject: [PATCH V2 7/7] cpufreq: mvebu: Move cpufreq code into drivers/cpufreq/
-In-Reply-To: <cover.1461727086.git.viresh.kumar@linaro.org>
-References: <cover.1461727086.git.viresh.kumar@linaro.org>
-Message-ID: <8bac5a9dfb9280051d9f5dc3773106c253ad16d2.1461727086.git.viresh.kumar@linaro.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 27 Apr 2016 08:56:50 +0530
+Subject: [PATCH] dmaengine: pl330: Fix race in pl330_get_desc()
+In-Reply-To: <bc03a8073460ebac253b80466d11654ee81f540e.1461687536.git.robin.murphy@arm.com>
+References: <bc03a8073460ebac253b80466d11654ee81f540e.1461687536.git.robin.murphy@arm.com>
+Message-ID: <CABb+yY3JG=XyJekz==VYF+w7ptDBwgMyVJMHzO-uM_ynXKOcaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move cpufreq bits for mvebu into drivers/cpufreq/ directory, that's
-where they really belong to.
+On Tue, Apr 26, 2016 at 10:00 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> The current logic in pl330_get_desc() contains a clear race condition,
+> whereby if the descriptor pool is empty, we will create a new
+> descriptor, add it to the pool with the lock held, *release the lock*,
+> then try to remove it from the pool again.
+>
+> Furthermore, if that second attempt then finds the pool empty because
+> someone else got there first, we conclude that something must have gone
+> terribly wrong and it's the absolute end of the world.
+>
+We may retry or simply increase the number of descriptors allocated in
+a batch from 1 to, say, NR_DEFAULT_DESC.
 
-Compiled tested only.
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 372b435..7179a4d 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2449,7 +2449,7 @@ static struct dma_pl330_desc
+*pl330_get_desc(struct dma_pl330_chan *pch)
 
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- MAINTAINERS                     |   1 +
- arch/arm/mach-mvebu/pmsu.c      |  85 -------------------------------
- drivers/cpufreq/Makefile        |   1 +
- drivers/cpufreq/mvebu-cpufreq.c | 107 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 109 insertions(+), 85 deletions(-)
- create mode 100644 drivers/cpufreq/mvebu-cpufreq.c
+        /* If the DMAC pool is empty, alloc new */
+        if (!desc) {
+-               if (!add_desc(pl330, GFP_ATOMIC, 1))
++               if (!add_desc(pl330, GFP_ATOMIC, NR_DEFAULT_DESC))
+                        return NULL;
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1d5b4becab6f..0bb566e7df9b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1322,6 +1322,7 @@ F:	drivers/rtc/rtc-armada38x.c
- F:	arch/arm/boot/dts/armada*
- F:	arch/arm/boot/dts/kirkwood*
- F:	arch/arm64/boot/dts/marvell/armada*
-+F:	drivers/cpufreq/mvebu-cpufreq.c
- 
- 
- ARM/Marvell Berlin SoC support
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 8928f7caaf70..b44442338e4e 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -28,7 +28,6 @@
- #include <linux/of_address.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
--#include <linux/pm_opp.h>
- #include <linux/resource.h>
- #include <linux/slab.h>
- #include <linux/smp.h>
-@@ -607,87 +606,3 @@ int mvebu_pmsu_dfs_request(int cpu)
- 
- 	return 0;
- }
--
--static int __init armada_xp_pmsu_cpufreq_init(void)
--{
--	struct device_node *np;
--	struct resource res;
--	int ret, cpu;
--
--	if (!of_machine_is_compatible("marvell,armadaxp"))
--		return 0;
--
--	/*
--	 * In order to have proper cpufreq handling, we need to ensure
--	 * that the Device Tree description of the CPU clock includes
--	 * the definition of the PMU DFS registers. If not, we do not
--	 * register the clock notifier and the cpufreq driver. This
--	 * piece of code is only for compatibility with old Device
--	 * Trees.
--	 */
--	np = of_find_compatible_node(NULL, NULL, "marvell,armada-xp-cpu-clock");
--	if (!np)
--		return 0;
--
--	ret = of_address_to_resource(np, 1, &res);
--	if (ret) {
--		pr_warn(FW_WARN "not enabling cpufreq, deprecated armada-xp-cpu-clock binding\n");
--		of_node_put(np);
--		return 0;
--	}
--
--	of_node_put(np);
--
--	/*
--	 * For each CPU, this loop registers the operating points
--	 * supported (which are the nominal CPU frequency and half of
--	 * it), and registers the clock notifier that will take care
--	 * of doing the PMSU part of a frequency transition.
--	 */
--	for_each_possible_cpu(cpu) {
--		struct device *cpu_dev;
--		struct clk *clk;
--		int ret;
--
--		cpu_dev = get_cpu_device(cpu);
--		if (!cpu_dev) {
--			pr_err("Cannot get CPU %d\n", cpu);
--			continue;
--		}
--
--		clk = clk_get(cpu_dev, 0);
--		if (IS_ERR(clk)) {
--			pr_err("Cannot get clock for CPU %d\n", cpu);
--			return PTR_ERR(clk);
--		}
--
--		/*
--		 * In case of a failure of dev_pm_opp_add(), we don't
--		 * bother with cleaning up the registered OPP (there's
--		 * no function to do so), and simply cancel the
--		 * registration of the cpufreq device.
--		 */
--		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
--		if (ret) {
--			clk_put(clk);
--			return ret;
--		}
--
--		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
--		if (ret) {
--			clk_put(clk);
--			return ret;
--		}
--
--		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
--						  cpumask_of(cpu_dev->id));
--		if (ret)
--			dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
--				__func__, ret);
--	}
--
--	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
--	return 0;
--}
--
--device_initcall(armada_xp_pmsu_cpufreq_init);
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 2cce2cd400f9..e1eb11ee3570 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -79,6 +79,7 @@ obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
- obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
- obj-$(CONFIG_ACPI_CPPC_CPUFREQ) += cppc_cpufreq.o
-+obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
- 
- 
- ##################################################################################
-diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
-new file mode 100644
-index 000000000000..e920889b9ac2
---- /dev/null
-+++ b/drivers/cpufreq/mvebu-cpufreq.c
-@@ -0,0 +1,107 @@
-+/*
-+ * CPUFreq support for Armada 370/XP platforms.
-+ *
-+ * Copyright (C) 2012-2016 Marvell
-+ *
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#define pr_fmt(fmt) "mvebu-pmsu: " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/resource.h>
-+
-+static int __init armada_xp_pmsu_cpufreq_init(void)
-+{
-+	struct device_node *np;
-+	struct resource res;
-+	int ret, cpu;
-+
-+	if (!of_machine_is_compatible("marvell,armadaxp"))
-+		return 0;
-+
-+	/*
-+	 * In order to have proper cpufreq handling, we need to ensure
-+	 * that the Device Tree description of the CPU clock includes
-+	 * the definition of the PMU DFS registers. If not, we do not
-+	 * register the clock notifier and the cpufreq driver. This
-+	 * piece of code is only for compatibility with old Device
-+	 * Trees.
-+	 */
-+	np = of_find_compatible_node(NULL, NULL, "marvell,armada-xp-cpu-clock");
-+	if (!np)
-+		return 0;
-+
-+	ret = of_address_to_resource(np, 1, &res);
-+	if (ret) {
-+		pr_warn(FW_WARN "not enabling cpufreq, deprecated armada-xp-cpu-clock binding\n");
-+		of_node_put(np);
-+		return 0;
-+	}
-+
-+	of_node_put(np);
-+
-+	/*
-+	 * For each CPU, this loop registers the operating points
-+	 * supported (which are the nominal CPU frequency and half of
-+	 * it), and registers the clock notifier that will take care
-+	 * of doing the PMSU part of a frequency transition.
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		struct device *cpu_dev;
-+		struct clk *clk;
-+		int ret;
-+
-+		cpu_dev = get_cpu_device(cpu);
-+		if (!cpu_dev) {
-+			pr_err("Cannot get CPU %d\n", cpu);
-+			continue;
-+		}
-+
-+		clk = clk_get(cpu_dev, 0);
-+		if (IS_ERR(clk)) {
-+			pr_err("Cannot get clock for CPU %d\n", cpu);
-+			return PTR_ERR(clk);
-+		}
-+
-+		/*
-+		 * In case of a failure of dev_pm_opp_add(), we don't
-+		 * bother with cleaning up the registered OPP (there's
-+		 * no function to do so), and simply cancel the
-+		 * registration of the cpufreq device.
-+		 */
-+		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
-+		if (ret) {
-+			clk_put(clk);
-+			return ret;
-+		}
-+
-+		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
-+		if (ret) {
-+			clk_put(clk);
-+			return ret;
-+		}
-+
-+		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
-+						  cpumask_of(cpu_dev->id));
-+		if (ret)
-+			dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
-+				__func__, ret);
-+	}
-+
-+	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+	return 0;
-+}
-+device_initcall(armada_xp_pmsu_cpufreq_init);
--- 
-2.7.1.410.g6faf27b
+                /* Try again */
+
+> ...
+> [  709.328891] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
+> ** 10 printk messages dropped ** [  709.352280] dma-pl330 7ff00000.dma: __pl330_prep_dma_memcpy:2493 Unable to fetch desc
+> ** 11 printk messages dropped ** [  709.372930] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
+> ** 2 printk messages dropped ** [  709.372953] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
+> ** 8 printk messages dropped ** [  709.374157] dma-pl330 7ff00000.dma: __pl330_prep_dma_memcpy:2493 Unable to fetch desc
+> ** 41 printk messages dropped ** [  709.393095] dmatest: dma0chan4-copy1: result #4545: 'prep error' with src_off=0x3a32 dst_off=0x46dd len=0xc5c3 (0)
+> ...
+>
+> Down with this sort of thing! The most sensible thing to do is avoid the
+> allocate-add-remove dance entirely and simply use the freshly-allocated
+> descriptor straight away.
+>
+... but you still try to first pluck from the list.
+Instead of churning the code, I would suggest either check in a loop
+that we have a desc OR allocate 2 or NR_DEFAULT_DESC descriptors
+there. Probably we get more descriptors at the same cost of memory.
+
+>
+> I'm also seeing what looks like another occasional race under the same
+> conditions where pl330_tx_submit() blows up from dma_cookie_assign()
+> dereferencing a bogus tx->chan, but I think that's beyond my ability to
+> figure out right now. Similarly the storm of WARNs from pl330_issue_pending()
+> when using a large number of small buffers and dmatest.noverify=1. This
+> one was some obvious low-hanging fruit.
+>
+Sorry, that part of code has changed a lot since I wrote the driver,
+so more details will help me.
+
+Thanks.
