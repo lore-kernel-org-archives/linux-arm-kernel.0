@@ -1,102 +1,104 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Wed, 27 Apr 2016 15:24:24 +0000
-Subject: [PATCH V3] clk: bcm2835: mark enabled clocks with CLK_ENABLE_HAND_OFF
-Message-ID: <1461770664-29384-1-git-send-email-kernel@martin.sperl.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 27 Apr 2016 10:25:56 -0500
+Subject: [PATCH v2 net-next 11/13] Documentation: Bindings: Update DT
+ binding for separating dsaf dev support
+In-Reply-To: <57203309.1090501@huawei.com>
+References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
+ <20160426124847.GA26682@rob-hp-laptop> <57203309.1090501@huawei.com>
+Message-ID: <CAL_JsqLHrHWtiikSt7F39LoExoL2aep5Pqax5cGWWBw-yhz79g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+On Tue, Apr 26, 2016 at 10:33 PM, Yisen Zhuang <Yisen.zhuang@huawei.com> wrote:
+> Hi Rob and David,
+>
+> Please see my comments inline.
+>
+> David have merged this series to net-next, but we need to modify some codes according
+> to Rob's comments. I am not sure if i need to send V3 for this series, or separate
+> patches of documentation to independent series and generate a new patch for hns base
+> on current net-next?
 
-The bcm2835 firmware enables several clocks and plls before
-booting the linux kernel.
+That's David's call. I'm guessing he wants follow-up patches on top of these.
 
-These plls should never get disabled as it may result in a
-stopped system clock and more.
+> ? 2016/4/26 20:48, Rob Herring ??:
+>> On Sat, Apr 23, 2016 at 05:05:15PM +0800, Yisen Zhuang wrote:
+>>> Because debug dsaf port was separated from service dsaf port, this patch
+>>> updates the related information of DT binding.
+>>
+>> Separated when? New version of the h/w? If so, where's the new
+>> compatible string? This is quite a big binding change.
+>
+> There isn't any change of h/w. I separated debug dsaf port from sevice dsaf
+> port to make the code more simple and readability.
 
-So during probing we check if the clock is enabled
-and if it is then mark that clock with CLK_ENABLE_HAND_OFF.
-As a consequence this will also enable the corresponding
-parent plls and pll-divs.
+Okay.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+[...]
 
---
-Note that this requires the following patches applied:
-* clk: introduce CLK_ENABLE_HAND_OFF flag
-* clk: per-user clk prepare & enable ref counts
+>>> +  serdes-syscon rather than this address.
+>>>    The third region is the PPE register base and size.
+>>> -  The fourth region is dsa fabric base register and size.
+>>> -  The fifth region is cpld base register and size, it is not required if do not use cpld.
+>>> -- phy-handle: phy handle of physicl port, 0 if not any phy device. see ethernet.txt [1].
+>>> +  The fourth region is dsa fabric base register and size. It is not required for
+>>> +  single-port mode.
+>>> +- reg-names: may be ppe-base and(or) dsaf-base. It is used to find the
+>>> +  corresponding reg's index.
+>>
+>> But you have up to 5 regions.
+>>
+>> The variable nature of what regions you have tells me you need more
+>> specific compatible strings for each chip.
+>
+> we didn't add support of new h/w. We added these regions to make code simple and readability.
+> If we need to add support of next h/w version next time, we don't need to add many branches
+> for these attributes. So we didn't add a new compatible here.
 
-Here some detailed info:
+Not sure what you mean by branches. It's fine to put properties for
+things that vary among h/w versions, but new compatible strings will
+be needed for any new versions.
 
-Registered clocks with hand-off:
-bcm2835-clk 20101000.cprman: found enabled clock timer - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock otp - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock uart - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock v3d - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock isp - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock h264 - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock vec - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock tsens - enabling hand off
-bcm2835-clk 20101000.cprman: found enabled clock emmc - enabling hand off
 
-Enabled clock count:
-root at raspcm:~# grep -vE ^0 /sys/kernel/debug/clk/*/clk_enable_count
-/sys/kernel/debug/clk/apb_pclk/clk_enable_count:1
-/sys/kernel/debug/clk/clock/clk_enable_count:1
-/sys/kernel/debug/clk/core/clk_enable_count:3
-/sys/kernel/debug/clk/emmc/clk_enable_count:1
-/sys/kernel/debug/clk/h264/clk_enable_count:1
-/sys/kernel/debug/clk/isp/clk_enable_count:1
-/sys/kernel/debug/clk/osc/clk_enable_count:7
-/sys/kernel/debug/clk/otp/clk_enable_count:1
-/sys/kernel/debug/clk/plla/clk_enable_count:1
-/sys/kernel/debug/clk/plla_core/clk_enable_count:3
-/sys/kernel/debug/clk/pllc/clk_enable_count:1
-/sys/kernel/debug/clk/pllc_per/clk_enable_count:1
-/sys/kernel/debug/clk/plld/clk_enable_count:1
-/sys/kernel/debug/clk/plld_per/clk_enable_count:1
-/sys/kernel/debug/clk/pllh_aux/clk_enable_count:1
-/sys/kernel/debug/clk/pllh_aux_prediv/clk_enable_count:1
-/sys/kernel/debug/clk/pllh/clk_enable_count:1
-/sys/kernel/debug/clk/timer/clk_enable_count:1
-/sys/kernel/debug/clk/tsens/clk_enable_count:1
-/sys/kernel/debug/clk/uart0_pclk/clk_enable_count:1
-/sys/kernel/debug/clk/uart/clk_enable_count:1
-/sys/kernel/debug/clk/v3d/clk_enable_count:1
-/sys/kernel/debug/clk/vec/clk_enable_count:1
+>>> +- port: subnodes of dsaf. A dsaf node may contain several port nodes(Depending
+>>> +  on mode of dsaf). Port node contain some attributes listed below:
+>>> +- port-id: is physical port index in one dsaf.
+>>
+>> Indexes should generally be avoided. What does the number correspond
+>> to in h/w (if anything)?
+>
+> port-id is index for a port in dsaf, it is correspond to index of PHY showed below.
 
-That is a setup where the clock bcm2835 is only referenced
-in the device tree for pcm (which was not loaded or running
-at the time I took the above).
+Okay, you should use reg property here instead.
 
-Using pcm-audio would trigger a machine halt before this patch.
-Now this does not happen.
+>
+>                                                          CPU
+>                                                           |
+>                                     -----------------------------------
+>                                     |                     |           |
+>     ----------------------------------------------    ---------   ---------
+>     |                         |                  |    |       |   |   |   |
+>     |                        PPE                 |    |  PPE  |   |  PPE  |
+>     |                         |                  |    |   |   |   |   |   |
+>     |                         |                  |    |   |   |   |   |   |
+>     |                      crossbar              |    |   |   |   |   |   |
+>     |                         |                  |    |   |   |   |   |   |
+>     |   ----------------------------------       |    |   |   |   |   |   |
+>     |   |     |     |      |      |      |       |    |   |   |   |   |   |
+>     |   |     |     |      |      |      |       |    |   |   |   |   |   |
+>     |  MAC   MAC   MAC    MAC    MAC    MAC      |    |  MAC  |   |  MAC  |
+>     |   |     |     |      |      |      |       |    |   |   |   |   |   |
+>     ----------------------------------------------    ---------   ---------
+>         |     |     |      |      |      |    \        /  |        /  |
+>        PHY   PHY   PHY    PHY    PHY    PHY    \      /  PHY      /  PHY
+>                                                 \    /           /
+>                                                  \  /           /
+>                                              DSAF(three platform device)
+>
+>>
+>>> +- phy-handle: phy handle of physicl port. It is not required if there isn't
 
-Changelog:
- V1 -> V2: swith to use CLK_IS_CRITICAL for enabled pll_div
- V2 -> V3: swith to use CLK_ENABLE_HAND_OFF for enabled clocks
+Another typo here.
 
----
- drivers/clk/bcm/clk-bcm2835.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 35f8de7..65d62c2 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1251,7 +1251,14 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
- 	}
-
-+	/* if the clock is running then enable HAND_OFF */
-+	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
-+		dev_info(cprman->dev,
-+			 "found enabled clock %s - enabling hand off\n",
-+			 data->name);
-+		init.flags |= CLK_ENABLE_HAND_OFF;
-+	}
-+
- 	clock = devm_kzalloc(cprman->dev, sizeof(*clock), GFP_KERNEL);
- 	if (!clock)
- 		return NULL;
---
-2.1.4
+Rob
