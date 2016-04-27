@@ -1,174 +1,140 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 08:37:20 +0300
-Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
-In-Reply-To: <1461675460-2295-8-git-send-email-jszhang@marvell.com>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-8-git-send-email-jszhang@marvell.com>
-Message-ID: <87bn4vpq7j.fsf@intel.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Wed, 27 Apr 2016 11:06:00 +0530
+Subject: [PATCH 05/12] nvmem: vif610-ocotp: remove nvmem regmap dependency
+In-Reply-To: <1461526096-29584-6-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1461526096-29584-6-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160427053600.GB2048@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Srinivas,
 
-Hi,
+On 16-04-24 20:28:09, Srinivas Kandagatla wrote:
+> This patch moves to nvmem support in the driver to use callback
+> instead of regmap.
 
-Jisheng Zhang <jszhang@marvell.com> writes:
-> The Marvell BG4CT STB board has board level vbus control through gpio.
-> This patch adds the vbus regulator control to support this board.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Minor nit, it says "vif610-octop" it should have been vf610-ocotp.
+
+For what it's worth, I tested this on Colibri Vybrid VF61 for a while and
+all seems to work fine.
+
+So with the testing for vf610-ocotp driver other than the minor nit
+
+Acked-by: Sanchayan Maity <maitysanchayan@gmail.com>
+
+Regards,
+Sanchayan.
+
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->  drivers/usb/host/xhci-plat.c | 40 +++++++++++++++++++++++++++++++++++++++-
->  drivers/usb/host/xhci.h      |  2 ++
->  2 files changed, 41 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index d7f4f3c..0310c13 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -18,6 +18,7 @@
+>  drivers/nvmem/vf610-ocotp.c | 44 ++++++++++----------------------------------
+>  1 file changed, 10 insertions(+), 34 deletions(-)
+> 
+> diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+> index 8641319..72e4faa 100644
+> --- a/drivers/nvmem/vf610-ocotp.c
+> +++ b/drivers/nvmem/vf610-ocotp.c
+> @@ -25,7 +25,6 @@
+>  #include <linux/nvmem-provider.h>
 >  #include <linux/of.h>
->  #include <linux/phy/phy.h>
 >  #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
+> -#include <linux/regmap.h>
 >  #include <linux/slab.h>
->  #include <linux/usb/phy.h>
->  #include <linux/usb/xhci_pdriver.h>
-> @@ -178,6 +179,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	struct clk              *clk;
->  	struct usb_phy		*usb_phy;
->  	struct phy		*phy;
-> +	struct regulator	*vbus;
->  	int			ret;
->  	int			irq;
 >  
-> @@ -249,13 +251,30 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  /* OCOTP Register Offsets */
+> @@ -152,23 +151,16 @@ static int vf610_get_fuse_address(int base_addr_offset)
+>  	return -EINVAL;
+>  }
 >  
->  	device_wakeup_enable(hcd->self.controller);
+> -static int vf610_ocotp_write(void *context, const void *data, size_t count)
+> -{
+> -	return 0;
+> -}
+> -
+> -static int vf610_ocotp_read(void *context,
+> -			const void *off, size_t reg_size,
+> -			void *val, size_t val_size)
+> +static int vf610_ocotp_read(void *context, unsigned int offset,
+> +			void *val, size_t bytes)
+>  {
+>  	struct vf610_ocotp *ocotp = context;
+>  	void __iomem *base = ocotp->base;
+> -	unsigned int offset = *(u32 *)off;
+>  	u32 reg, *buf = val;
+>  	int fuse_addr;
+>  	int ret;
 >  
-> +	vbus = devm_regulator_get(&pdev->dev, "vbus");
-
-devm_regulator_get_optional() ??
-
-> +	if (PTR_ERR(vbus) == -ENODEV) {
-> +		vbus = NULL;
-> +	} else if (IS_ERR(vbus)) {
-> +		ret = PTR_ERR(vbus);
-> +		goto disable_clk;
-> +	} else if (vbus) {
-> +		ret = regulator_enable(vbus);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"failed to enable usb vbus regulator: %d\n",
-> +				ret);
-> +			goto disable_clk;
-> +		}
-> +	}
-> +
->  	xhci->clk = clk;
-> +	xhci->vbus = vbus;
->  	xhci->main_hcd = hcd;
->  	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
->  			dev_name(&pdev->dev), hcd);
->  	if (!xhci->shared_hcd) {
->  		ret = -ENOMEM;
-> -		goto disable_clk;
-> +		goto disable_vbus;
+> -	while (val_size > 0) {
+> +	while (bytes > 0) {
+>  		fuse_addr = vf610_get_fuse_address(offset);
+>  		if (fuse_addr > 0) {
+>  			writel(ocotp->timing, base + OCOTP_TIMING);
+> @@ -205,29 +197,19 @@ static int vf610_ocotp_read(void *context,
+>  		}
+>  
+>  		buf++;
+> -		val_size--;
+> -		offset += reg_size;
+> +		bytes -= 4;
+> +		offset += 4;
 >  	}
 >  
->  	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
-> @@ -323,6 +342,10 @@ disable_usb2_phy:
->  put_usb3_hcd:
->  	usb_put_hcd(xhci->shared_hcd);
->  
-> +disable_vbus:
-> +	if (vbus)
-> +		regulator_disable(vbus);
-> +
->  disable_clk:
->  	clk_disable_unprepare(clk);
->  
-> @@ -337,6 +360,7 @@ static int xhci_plat_remove(struct platform_device *dev)
->  	struct usb_hcd	*hcd = platform_get_drvdata(dev);
->  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
->  	struct clk *clk = xhci->clk;
-> +	struct regulator *vbus = xhci->vbus;
->  
->  	usb_remove_hcd(xhci->shared_hcd);
->  	xhci_plat_phy_exit(xhci->shared_hcd);
-> @@ -347,6 +371,9 @@ static int xhci_plat_remove(struct platform_device *dev)
->  	clk_disable_unprepare(clk);
->  	usb_put_hcd(hcd);
->  
-> +	if (vbus)
-> +		regulator_disable(vbus);
-> +
 >  	return 0;
 >  }
 >  
-> @@ -356,6 +383,7 @@ static int xhci_plat_suspend(struct device *dev)
->  	int ret;
->  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
->  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-> +	struct regulator *vbus = xhci->vbus;
+> -static struct regmap_bus vf610_ocotp_bus = {
+> -	.read = vf610_ocotp_read,
+> -	.write = vf610_ocotp_write,
+> -	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> -	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> -};
+> -
+> -static struct regmap_config ocotp_regmap_config = {
+> -	.reg_bits = 32,
+> -	.val_bits = 32,
+> -	.reg_stride = 4,
+> -};
+> -
+>  static struct nvmem_config ocotp_config = {
+>  	.name = "ocotp",
+>  	.owner = THIS_MODULE,
+> +	.stride = 4,
+> +	.word_size = 4,
+> +	.reg_read = vf610_ocotp_read,
+>  };
 >  
->  	/*
->  	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
-> @@ -373,6 +401,9 @@ static int xhci_plat_suspend(struct device *dev)
->  	xhci_plat_phy_exit(hcd);
->  	clk_disable_unprepare(xhci->clk);
+>  static const struct of_device_id ocotp_of_match[] = {
+> @@ -247,7 +229,6 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct resource *res;
+> -	struct regmap *regmap;
+>  	struct vf610_ocotp *ocotp_dev;
 >  
-> +	if (vbus)
-> +		ret = regulator_disable(vbus);
-> +
->  	return ret;
->  }
+>  	ocotp_dev = devm_kzalloc(&pdev->dev,
+> @@ -267,13 +248,8 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+>  		return PTR_ERR(ocotp_dev->clk);
+>  	}
 >  
-> @@ -381,11 +412,18 @@ static int xhci_plat_resume(struct device *dev)
->  	int ret;
->  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
->  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-> +	struct regulator *vbus = xhci->vbus;
+> -	ocotp_regmap_config.max_register = resource_size(res);
+> -	regmap = devm_regmap_init(dev,
+> -		&vf610_ocotp_bus, ocotp_dev, &ocotp_regmap_config);
+> -	if (IS_ERR(regmap)) {
+> -		dev_err(dev, "regmap init failed\n");
+> -		return PTR_ERR(regmap);
+> -	}
+> +	ocotp_config.size = resource_size(res);
+> +	ocotp_config.priv = ocotp_dev;
+>  	ocotp_config.dev = dev;
 >  
->  	ret = clk_prepare_enable(xhci->clk);
->  	if (ret)
->  		return ret;
->  
-> +	if (vbus) {
-> +		ret = regulator_enable(vbus);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	ret = xhci_plat_phy_init(hcd);
->  	if (ret)
->  		return ret;
-> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
-> index 6c629c9..5fa8662 100644
-> --- a/drivers/usb/host/xhci.h
-> +++ b/drivers/usb/host/xhci.h
-> @@ -1550,6 +1550,8 @@ struct xhci_hcd {
->  	struct msix_entry	*msix_entries;
->  	/* optional clock */
->  	struct clk		*clk;
-> +	/* optional regulator */
-> +	struct regulator	*vbus;
->  	/* data structures */
->  	struct xhci_device_context_array *dcbaa;
->  	struct xhci_ring	*cmd_ring;
+>  	ocotp_dev->nvmem = nvmem_register(&ocotp_config);
 > -- 
-> 2.8.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/dc562ee1/attachment.sig>
+> 2.5.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
