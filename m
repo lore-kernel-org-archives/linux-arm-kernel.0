@@ -1,67 +1,74 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 27 Apr 2016 09:04:32 -0600
-Subject: [PATCH] ARM: cpuidle: Pass on arm_cpuidle_suspend()'s return value
-In-Reply-To: <20160427091434.GA4303@red-moon>
-References: <1461669301-30834-1-git-send-email-james.morse@arm.com>
- <20160426113103.GB2204@red-moon>
- <CAJZ5v0h+P5baWVkTcbjxOjsXyp7aDy25+ik_9XHtUs6+jeN7Pw@mail.gmail.com>
- <20160427091434.GA4303@red-moon>
-Message-ID: <20160427150432.GC1387@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Apr 2016 17:05:07 +0200
+Subject: [PATCH] memory: mtk-smi: export mtk_smi_larb_get/put
+In-Reply-To: <5720BAF6.1070808@gmail.com>
+References: <1461747086-26286-1-git-send-email-p.zabel@pengutronix.de>
+ <57209DD0.5050002@gmail.com> <1461759758.4044.43.camel@pengutronix.de>
+ <5720BAF6.1070808@gmail.com>
+Message-ID: <1461769507.4044.50.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27 2016 at 03:14 -0600, Lorenzo Pieralisi wrote:
->[+ Lina]
->
->On Tue, Apr 26, 2016 at 09:05:57PM +0200, Rafael J. Wysocki wrote:
->> On Tue, Apr 26, 2016 at 1:31 PM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->> > On Tue, Apr 26, 2016 at 12:15:01PM +0100, James Morse wrote:
->> >> arm_cpuidle_suspend() may return -EOPNOTSUPP, or any value returned
->> >> by the cpu_ops/cpuidle_ops suspend call. arm_enter_idle_state() doesn't
->> >> update 'ret' with this value, meaning we always signal success to
->> >> cpuidle_enter_state(), causing it to update the usage counters as if we
->> >> succeeded.
->> >>
->> >> Fixes: 191de17aa3c1 ("ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function")
->> >> Signed-off-by: James Morse <james.morse@arm.com>
->> >> ---
->> >>  drivers/cpuidle/cpuidle-arm.c | 2 +-
->> >>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> >
->> >>
->> >> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->> >> index 545069d5fdfb..e342565e8715 100644
->> >> --- a/drivers/cpuidle/cpuidle-arm.c
->> >> +++ b/drivers/cpuidle/cpuidle-arm.c
->> >> @@ -50,7 +50,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->> >>                * call the CPU ops suspend protocol with idle index as a
->> >>                * parameter.
->> >>                */
->> >> -             arm_cpuidle_suspend(idx);
->> >> +             ret = arm_cpuidle_suspend(idx);
->> >>
->> >>               cpu_pm_exit();
->> >>       }
->> >> --
->>
->> OK
->>
->> Should that go into -stable?
->
->Yes for arm64, but I would ask Daniel and Lina please to chime in if
->they see any issue with this change (in particular in relation to the
->Qualcomm back-end), it looks like it just slipped through the cracks
->but let's check with them before merging it and send it to stable
->kernels to prevent any issue.
->
-This patch looks okay to me. In the QCOM backend driver, wee return -1
-if the state was not achieved because of a pending interrupt. This was
-previously ignored, but a quick check doesnt yield an issue returning
-that backend specific value. Its not a real error per-se and therefore a
--1.
+Am Mittwoch, den 27.04.2016, 15:13 +0200 schrieb Matthias Brugger:
+> 
+> On 27/04/16 14:22, Philipp Zabel wrote:
+> > Hi Matthias,
+> >
+> > Am Mittwoch, den 27.04.2016, 13:09 +0200 schrieb Matthias Brugger:
+> >> Hi Philipp,
+> >>
+> >> On 27/04/16 10:51, Philipp Zabel wrote:
+> >>> To allow building mediatek-drm.ko as a module, the
+> >>> mtk_smi_larb_get and mtk_smi_larb_put symbols have
+> >>> to be exported.
+> >>>
+> >>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >>> ---
+> >>>    drivers/memory/mtk-smi.c | 2 ++
+> >>>    1 file changed, 2 insertions(+)
+> >>>
+> >>> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> >>> index 089091f..f6b5757 100644
+> >>> --- a/drivers/memory/mtk-smi.c
+> >>> +++ b/drivers/memory/mtk-smi.c
+> >>> @@ -91,6 +91,7 @@ int mtk_smi_larb_get(struct device *larbdev)
+> >>>
+> >>>    	return 0;
+> >>>    }
+> >>> +EXPORT_SYMBOL_GPL(mtk_smi_larb_get);
+> >>>
+> >>>    void mtk_smi_larb_put(struct device *larbdev)
+> >>>    {
+> >>> @@ -106,6 +107,7 @@ void mtk_smi_larb_put(struct device *larbdev)
+> >>>    	mtk_smi_disable(&larb->smi);
+> >>>    	mtk_smi_disable(common);
+> >>>    }
+> >>> +EXPORT_SYMBOL_GPL(mtk_smi_larb_put);
+> >>>
+> >>>    static int
+> >>>    mtk_smi_larb_bind(struct device *dev, struct device *master, void *data)
+> >>>
+> >>
+> >> Strangely this didn't work with my config (attached).
+> >> Would you mind to double check?
+> >
+> > warning: (DRM_MEDIATEK && MTK_IOMMU) selects MTK_SMI which has unmet
+> > direct dependencies (MEMORY && (ARCH_MEDIATEK || COMPILE_TEST))
+> >
+> > I suppose DRM_MEDIATEK also has to select MEMORY, just like MTK_IOMMU
+> > does?
+> >
+> 
+> Yes that's it.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> 
+> Dave, can you take this patch through your tree to avoid build breakage?
+> 
+> Thanks,
+> Matthias
 
-Thanks,
-Lina
+Should I include this patch in the next MT8173 DRM pull request?
+
+regards
+Philipp
