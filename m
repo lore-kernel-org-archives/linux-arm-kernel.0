@@ -1,87 +1,239 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 26 Apr 2016 21:44:30 -0500
-Subject: [PATCH V6 06/13] arm64, pci, acpi: ACPI support for legacy IRQs
- parsing and consolidation with DT code.
-In-Reply-To: <1460740008-19489-7-git-send-email-tn@semihalf.com>
+Date: Tue, 26 Apr 2016 21:45:37 -0500
+Subject: [PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge
+ device companion assignment to core code.
+In-Reply-To: <1460740008-19489-2-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-7-git-send-email-tn@semihalf.com>
-Message-ID: <20160427024430.GG6789@localhost>
+ <1460740008-19489-2-git-send-email-tn@semihalf.com>
+Message-ID: <20160427024537.GH6789@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 07:06:41PM +0200, Tomasz Nowicki wrote:
-> To enable PCI legacy IRQs on platforms booting with ACPI, arch code
-> should include ACPI specific callbacks that parse and set-up the
-> device IRQ number, equivalent to the DT boot path. Owing to the current
-> ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
-> cannot be parsed at device add time, since that would trigger ACPI scan
-> handlers ordering issues depending on how the ACPI tables are defined.
+[question for Rafael below]
 
-Can you be a little more specific about the issue here?  I think you
-mean pci_device_add()-time, because that's where we call
-pcibios_add_device.  Which ACPI tables are involved?  _PRT?  Why is
-that a problem?  We don't cache those tables any more after
-181380b702ee ("PCI/ACPI: Don't cache _PRT, and don't associate them
-with bus numbers").
-
-x86 and ia64 both call acpi_pci_irq_enable() from
-pcibios_enable_device().  Could you do the same on ARM64?
-pcibios_enable_device() happens later than either pci_device_add() or
-pci_device_probe().
-
-> To solve this problem and consolidate FW PCI legacy IRQs parsing in
-> one single pcibios callback (pending final removal), this patch moves
-> DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
-> PCI core code at device probe time) and adds ACPI PCI legacy IRQs
-> parsing to the same callback too, so that FW PCI legacy IRQs parsing
-> is confined in one single arch callback that can be easily removed
-> when code parsing PCI legacy IRQs is consolidated and moved to core
-> PCI code.
+On Fri, Apr 15, 2016 at 07:06:36PM +0200, Tomasz Nowicki wrote:
+> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+> bridge initialization. They both use arch-specific sysdata to pass down
+> parent device reference and both rely on NULL parent in pci_create_root_bus()
+> to validate sysdata content.
 > 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> It looks hacky and prevents us from getting some firmware specific
+> info for PCI host controller based on its acpi_device structure
+> in generic pci_create_root_bus() function. However, we overcome that
+> blocker by passing down parent device via pci_create_root_bus parameter
+> (as the ACPI device type). Then we use ACPI_COMPANION_SET in core code
+> for ACPI boot method only. ACPI_COMPANION_SET is safe to run for all
+> cases DT, ACPI and DT&ACPI.
+> 
+> Since now PCI core code is setting ACPI companion device for us,
+> x86 & ia64 specific ACPI companion device setting turns out to be dead now.
+> We can get rid of it, including related companion reference from
+> PCI sysdata structure. Aslo, PCI_CONTROLLER macro cannot return valid
+> companion device anymore. Therefore we need to convert its usage to
+> ACPI_COMPANION.
+> 
 > Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Tested-by: Duc Dang <dhdang@apm.com>
+> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Tested-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/arm64/kernel/pci.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+>  arch/ia64/hp/common/sba_iommu.c    |  2 +-
+>  arch/ia64/include/asm/pci.h        |  1 -
+>  arch/ia64/pci/pci.c                | 16 ----------------
+>  arch/ia64/sn/kernel/io_acpi_init.c |  4 ++--
+>  arch/x86/include/asm/pci.h         |  3 ---
+>  arch/x86/pci/acpi.c                | 17 -----------------
+>  drivers/acpi/pci_root.c            |  7 ++++++-
+>  drivers/pci/probe.c                |  2 ++
+>  8 files changed, 11 insertions(+), 41 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index c72de66..15109c11 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -50,11 +50,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+> diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
+> index a6d6190..78e4444 100644
+> --- a/arch/ia64/hp/common/sba_iommu.c
+> +++ b/arch/ia64/hp/common/sba_iommu.c
+> @@ -1981,7 +1981,7 @@ sba_connect_bus(struct pci_bus *bus)
+>  	if (PCI_CONTROLLER(bus)->iommu)
+>  		return;
+>  
+> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
+> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+>  	if (!handle)
+>  		return;
+>  
+> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+> index c0835b0..12423f4 100644
+> --- a/arch/ia64/include/asm/pci.h
+> +++ b/arch/ia64/include/asm/pci.h
+> @@ -63,7 +63,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+>  #define pci_legacy_write platform_pci_legacy_write
+>  
+>  struct pci_controller {
+> -	struct acpi_device *companion;
+>  	void *iommu;
+>  	int segment;
+>  	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+> index 8f6ac2f..978d6af 100644
+> --- a/arch/ia64/pci/pci.c
+> +++ b/arch/ia64/pci/pci.c
+> @@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	}
+>  
+>  	info->controller.segment = root->segment;
+> -	info->controller.companion = device;
+>  	info->controller.node = acpi_get_node(device->handle);
+>  	INIT_LIST_HEAD(&info->io_resources);
+>  	return acpi_pci_root_create(root, &pci_acpi_root_ops,
+>  				    &info->common, &info->controller);
 >  }
 >  
->  /*
-> - * Try to assign the IRQ number from DT when adding a new device
-> + * Try to assign the IRQ number when probing a new device
->   */
-> -int pcibios_add_device(struct pci_dev *dev)
-> +int pcibios_alloc_irq(struct pci_dev *dev)
+> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> -{
+> -	/*
+> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+> -	 * here, pci_create_root_bus() has been called by someone else and
+> -	 * sysdata is likely to be different from what we expect.  Let it go in
+> -	 * that case.
+> -	 */
+> -	if (!bridge->dev.parent) {
+> -		struct pci_controller *controller = bridge->bus->sysdata;
+> -		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+> -	}
+> -	return 0;
+> -}
+> -
+>  void pcibios_fixup_device_resources(struct pci_dev *dev)
 >  {
-> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +	if (acpi_disabled)
-> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +#ifdef CONFIG_ACPI
-> +	else
-> +		return acpi_pci_irq_enable(dev);
-> +#endif
-
-Not your problem, but your patch makes it obvious: it's ugly that we
-set dev->irq to the IRQ returned from of_irq_parse_and_map_pci(), but
-acpi_pci_irq_enable() sets dev->irq internally.
-
-x86 also has the situation of calling either acpi_pci_irq_enable() or
-of_irq_parse_and_map_pci(), and it looks like they can even decide at
-run-time as you can here.  If we're solving the same problem, can we
-use a similar mechanism?  x86 sets a pcibios_enable_irq function
-pointer.
-
->  	return 0;
+>  	int idx;
+> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+> index 231234c..e454492 100644
+> --- a/arch/ia64/sn/kernel/io_acpi_init.c
+> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
+> @@ -132,7 +132,7 @@ sn_get_bussoft_ptr(struct pci_bus *bus)
+>  	struct acpi_resource_vendor_typed *vendor;
+>  
+>  
+> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
+> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+>  	status = acpi_get_vendor_resource(handle, METHOD_NAME__CRS,
+>  					  &sn_uuid, &buffer);
+>  	if (ACPI_FAILURE(status)) {
+> @@ -360,7 +360,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+>  	acpi_status status;
+>  	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>  
+> -	rootbus_handle = acpi_device_handle(PCI_CONTROLLER(dev)->companion);
+> +	rootbus_handle = acpi_device_handle(ACPI_COMPANION(dev->bus->bridge));
+>          status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+>                                         &segment);
+>          if (ACPI_SUCCESS(status)) {
+> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+> index 9ab7507..24de07d 100644
+> --- a/arch/x86/include/asm/pci.h
+> +++ b/arch/x86/include/asm/pci.h
+> @@ -14,9 +14,6 @@
+>  struct pci_sysdata {
+>  	int		domain;		/* PCI domain */
+>  	int		node;		/* NUMA node */
+> -#ifdef CONFIG_ACPI
+> -	struct acpi_device *companion;	/* ACPI companion device */
+> -#endif
+>  #ifdef CONFIG_X86_64
+>  	void		*iommu;		/* IOMMU private data */
+>  #endif
+> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+> index 3cd6983..f4ca17a 100644
+> --- a/arch/x86/pci/acpi.c
+> +++ b/arch/x86/pci/acpi.c
+> @@ -340,7 +340,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  		struct pci_sysdata sd = {
+>  			.domain = domain,
+>  			.node = node,
+> -			.companion = root->device
+>  		};
+>  
+>  		memcpy(bus->sysdata, &sd, sizeof(sd));
+> @@ -355,7 +354,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  		else {
+>  			info->sd.domain = domain;
+>  			info->sd.node = node;
+> -			info->sd.companion = root->device;
+>  			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
+>  						   &info->common, &info->sd);
+>  		}
+> @@ -373,21 +371,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	return bus;
 >  }
+>  
+> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> -{
+> -	/*
+> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+> -	 * here, pci_create_root_bus() has been called by someone else and
+> -	 * sysdata is likely to be different from what we expect.  Let it go in
+> -	 * that case.
+> -	 */
+> -	if (!bridge->dev.parent) {
+> -		struct pci_sysdata *sd = bridge->bus->sysdata;
+> -		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+> -	}
+> -	return 0;
+> -}
+> -
+>  int __init pci_acpi_init(void)
+>  {
+>  	struct pci_dev *dev = NULL;
+> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> index ae3fe4e..4581e0e 100644
+> --- a/drivers/acpi/pci_root.c
+> +++ b/drivers/acpi/pci_root.c
+> @@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device *device,
+>  		}
+>  	}
+>  
+> +	/*
+> +	 * pci_create_root_bus() needs to detect the parent device type,
+> +	 * so initialize its companion data accordingly.
+> +	 */
+> +	ACPI_COMPANION_SET(&device->dev, device);
+>  	root->device = device;
+>  	root->segment = segment & 0xFFFF;
+>  	strcpy(acpi_device_name(device), ACPI_PCI_ROOT_DEVICE_NAME);
+> @@ -846,7 +851,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>  
+>  	pci_acpi_root_add_resources(info);
+>  	pci_add_resource(&info->resources, &root->secondary);
+> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+>  				  sysdata, &info->resources);
+
+"device" here is a struct acpi_device *.  Rafael, is that the right
+thing to do?  I dimly recall proposing something similar long ago and
+that it turned out to be a bad idea.
+
+>  	if (!bus)
+>  		goto out_release_info;
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8004f67..8087297 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -2141,6 +2141,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  	bridge->dev.parent = parent;
+>  	bridge->dev.release = pci_release_host_bridge_dev;
+>  	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+> +	if (parent)
+> +		ACPI_COMPANION_SET(&bridge->dev, ACPI_COMPANION(parent));
+>  	error = pcibios_root_bridge_prepare(bridge);
+>  	if (error) {
+>  		kfree(bridge);
 > -- 
 > 1.9.1
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
