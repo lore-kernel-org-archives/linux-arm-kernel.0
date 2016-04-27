@@ -1,115 +1,35 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 26 Apr 2016 23:46:49 -0400
-Subject: [PATCH 2/2] ARM: dts: imx6ul-pico-hobbit: Add initial support
-In-Reply-To: <1460985138-6271-2-git-send-email-fabio.estevam@nxp.com>
-References: <1460985138-6271-1-git-send-email-fabio.estevam@nxp.com>
- <1460985138-6271-2-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <CABxcv=mOTFWz89_6EhB40OPcYSRbfbimzYYMwaed6V62PL3RFQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 27 Apr 2016 01:00:20 -0300
+Subject: [PATCH v4 1/2] dt-bindings: Add vendor prefix for TechNexion
+Message-ID: <1461729621-13283-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Mon, Apr 18, 2016 at 9:12 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
+TechNexion designs and manufactures embedded computing systems:
+http://www.technexion.com/
 
-[snip]
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v3:
+- None
 
-> +
-> +&i2c1 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c1>;
-> +       status = "okay";
-> +
-> +       pmic: pfuze3000 at 08 {
-> +               compatible = "fsl,pfuze3000";
-> +               reg = <0x08>;
-> +
-> +               regulators {
-> +                       sw1a_reg: sw1a {
-> +                               regulator-min-microvolt = <700000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                               regulator-ramp-delay = <6250>;
-> +                       };
-> +
-> +                       /* VDD_ARM_SOC_IN*/
-> +                       sw1b_reg: sw1b {
-> +                               regulator-min-microvolt = <700000>;
-> +                               regulator-max-microvolt = <1475000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                               regulator-ramp-delay = <6250>;
-> +                       };
-> +
-> +                       sw2_reg: sw2 {
-> +                               regulator-min-microvolt = <2500000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       /* DRAM */
-> +                       sw3a_reg: sw3 {
-> +                               regulator-min-microvolt = <900000>;
-> +                               regulator-max-microvolt = <1650000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       /* DRAM */
-> +                       vref_reg: vrefddr {
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vgen1_reg: vldo1 {
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vgen2_reg: vldo2 {
-> +                               regulator-min-microvolt = <800000>;
-> +                               regulator-max-microvolt = <1550000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vgen3_reg: vccsd {
-> +                               regulator-min-microvolt = <2850000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vgen4_reg: v33 {
-> +                               regulator-min-microvolt = <2850000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vgen5_reg: vldo3 {
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vgen6_reg: vldo4 {
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +               };
-> +       };
-> +};
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Do all these regulators really need to be marked as always-on?
-
-I see that these are not used by any device, so I guess that are
-either unused or a dependency is missing in the DT. I think it's
-better to only add the regulators that are really needed for now (i.e:
-DRAM, VDD_ARM_SOC_IN, etc) and leave the ones that are not going to be
-needed until the consumer devices are added.
-
-Best regards,
-Javier
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 6bc179e..ea63459 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -251,6 +251,7 @@ synology	Synology, Inc.
+ SUNW	Sun Microsystems, Inc
+ tbs	TBS Technologies
+ tcl	Toby Churchill Ltd.
++technexion	TechNexion
+ technologic	Technologic Systems
+ thine	THine Electronics, Inc.
+ ti	Texas Instruments
+-- 
+1.9.1
