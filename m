@@ -1,52 +1,96 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Apr 2016 14:20:10 +1000
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT PM Domain Updates for v4.7
-Message-ID: <cover.1461730364.git.horms+renesas@verge.net.au>
+Date: Wed, 27 Apr 2016 14:20:14 +1000
+Subject: [PATCH 1/2] arm64: dts: r8a7795: Add SYSC PM Domains
+In-Reply-To: <cover.1461730364.git.horms+renesas@verge.net.au>
+References: <cover.1461730364.git.horms+renesas@verge.net.au>
+Message-ID: <abbecab1a0b8c2cc07edc30c8bced855ca4e239d.1461730364.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM64 based SoC DT PM Domain updates for v4.7.
+Add a device node for the System Controller.
+Hook up the Cortex-A57 CPU cores and the Cortex-A57 and Cortex A53 L2
+caches/SCUs to their respective PM Domains.
 
-This pull requests is based on a merge of:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-* "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
-  v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
-  pulled
-* "[GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for v4.7",
-  tagged as renesas-arm64-dt2-for-v4.7, which I have sent a pull request
-  for.
-
-The reason for the somewhat tedious base on
-renesas-rcar-sysc2-for-v4.7, which provides driver changes,
-is a hard run-time dependency.
-
-I also have a similar set of changes for ARM (32-bit) which I will send
-separately.
-
-
-The following changes since commit 3238ec7c0a821915f38095752de97a424fd1d6ce:
-
-  Merge tag 'renesas-rcar-sysc2-for-v4.7' into arm64-dt-pm-domain-for-v4.7 (2016-04-27 11:49:19 +1000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-pm-domain-for-v4.7
-
-for you to fetch changes up to 38dbb45ee4bc7dda4aabba2178eebff2f93380d1:
-
-  arm64: dts: r8a7795: Use SYSC "always-on" PM Domain (2016-04-27 14:10:41 +1000)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC DT PM Domain Updates for v4.7
-
-* Add SYSC PM Domains to DT of r8a7795 SoC
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      arm64: dts: r8a7795: Add SYSC PM Domains
-      arm64: dts: r8a7795: Use SYSC "always-on" PM Domain
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 123 +++++++++++++++++--------------
- 1 file changed, 68 insertions(+), 55 deletions(-)
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 7cb2d72e7378..f96d0732b2a8 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -10,6 +10,7 @@
+ 
+ #include <dt-bindings/clock/r8a7795-cpg-mssr.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/power/r8a7795-sysc.h>
+ 
+ / {
+ 	compatible = "renesas,r8a7795";
+@@ -39,6 +40,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -47,6 +49,7 @@
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x1>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU1>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -54,6 +57,7 @@
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x2>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU2>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -61,6 +65,7 @@
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x3>;
+ 			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA57_CPU3>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
+ 		};
+@@ -68,12 +73,14 @@
+ 
+ 	L2_CA57: cache-controller at 0 {
+ 		compatible = "cache";
++		power-domains = <&sysc R8A7795_PD_CA57_SCU>;
+ 		cache-unified;
+ 		cache-level = <2>;
+ 	};
+ 
+ 	L2_CA53: cache-controller at 1 {
+ 		compatible = "cache";
++		power-domains = <&sysc R8A7795_PD_CA53_SCU>;
+ 		cache-unified;
+ 		cache-level = <2>;
+ 	};
+@@ -302,6 +309,12 @@
+ 			#power-domain-cells = <0>;
+ 		};
+ 
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a7795-sysc";
++			reg = <0 0xe6180000 0 0x0400>;
++			#power-domain-cells = <1>;
++		};
++
+ 		audma0: dma-controller at ec700000 {
+ 			compatible = "renesas,rcar-dmac";
+ 			reg = <0 0xec700000 0 0x10000>;
+-- 
+2.7.0.rc3.207.g0ac5344
