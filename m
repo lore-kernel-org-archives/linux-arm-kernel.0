@@ -1,67 +1,70 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 10:21:44 +0300
-Subject: [RESEND PATCH v2 6/7] usb: xhci: plat: add generic PHY support
-In-Reply-To: <20160427144649.67304003@xhacker>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-7-git-send-email-jszhang@marvell.com>
- <87eg9rpq9t.fsf@intel.com> <20160427144649.67304003@xhacker>
-Message-ID: <874mano6t3.fsf@intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 27 Apr 2016 15:24:54 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+Message-ID: <20160427072454.GJ30692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 27, 2016 at 10:57:21AM +0800, Dong Aisheng wrote:
+> On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
+> >> Shawn,
+> >> What's your suggestion?
+> >
+> > I think this needs more discussion, and I just dropped Stefan's patch
+> > from my tree.
+> >
+> > We need to firstly understand why this is happening.  The .prepare hook
+> > is defined to be non-atomic context, and so that we call sleep function
+> > in there.  We did everything right.  Why are we getting the warning?  If
+> > I'm correct, this warning only happens on i.MX7D.  Why is that?
+> >
+> 
+> Why Stefan's patch works (checking irqs_disabled()) is because during kernel
+> time init, the irq is still not enabled. It fixes the issue indirectly.
+> See:
+> asmlinkage __visible void __init start_kernel(void)
+> {
+>         /*
+>          * Set up the scheduler prior starting any interrupts (such as the
+>          * timer interrupt). Full topology setup happens at smp_init()
+>          * time - but meanwhile we still have a functioning scheduler.
+>          */
+>         sched_init();
+>         .............
+>         time_init();
+>         ..............
+>         WARN(!irqs_disabled(), "Interrupts were enabled early\n");
+>         early_boot_irqs_disabled = false;
+>         local_irq_enable();
+> }
+> 
+> The issue can only happen when PLL enable causes a schedule during
+> imx_clock_init().
+> Not all PLL has this issue.
+> The issue happens on MX7D pll_audio_main_clk/pll_video_main_clk
+> which requires more delay time and cause usleep.
+> Because clk framework does not support MX7D clock types (operation requires
+> parents on), we simply enable all clocks in imx7d_clocks_init().
+> 
+> If apply my this patch series:
+> https://lkml.org/lkml/2016/4/20/199
+> The issue can also be gone.
 
-Hi,
+Thanks for the info.  It sounds like that we are fixing the problem in
+the wrong place, i.e. clk_pllv3_prepare().  The function does nothing
+wrong, since the .prepare hook is defined to be one that can sleep.  If
+we see sleep warning in a context calling clk_prepare(), that probably
+means we shouldn't make the function call from that context.
 
-Jisheng Zhang <jszhang@marvell.com> writes:
->> > +static void xhci_plat_phy_exit(struct usb_hcd *hcd)
->> > +{
->> > +	if (hcd->phy) {
->> > +		phy_power_off(hcd->phy);
->> > +		phy_exit(hcd->phy);
->> > +	} else {
->> > +		usb_phy_shutdown(hcd->usb_phy);
->> > +	}
->> > +}
->> > +
->> >  static int xhci_plat_probe(struct platform_device *pdev)
->> >  {
->> >  	struct device_node	*node = pdev->dev.of_node;
->> > @@ -145,6 +177,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->> >  	struct usb_hcd		*hcd;
->> >  	struct clk              *clk;
->> >  	struct usb_phy		*usb_phy;
->> > +	struct phy		*phy;  
->> 
->> so, one phy driver using USB PHY layer and another using generic PHY
->> layer ? Why ? I think the first thing your series should do would be to
->
-> It's different platforms. E.g
-> platform A may write the phy driver under usb phy layer, while platform B
-> may have generic phy driver.
-
-right, but both APIs should be supported with *two* PHYs for the time being.
-
-> The questions are: when adding phy support to xhci-plat, the generic phy
-> has existed for a long time, what's the reason to use the deprecated usb
-> phy APIs.
-
-I don't know, ask the author :-) Maybe the PHY driver was already
-available on the USB PHY layer ? What we should do is push that PHY
-driver to be moved over to generic PHY layer, then we can get rid of USB
-PHY layer from xhci-plat.
-
-> And per my check, it's only MVEBU platforms use this support? I'm not sure
-> if we could remove usbphy code from xhci-plat first then add generic phy then
-> adding MVEBU xhci phy support bak with the new code. So Cc mvebu maintainers
-
-First the PHY driver(s) depending on that should be converted over.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/554d3060/attachment.sig>
+Shawn
