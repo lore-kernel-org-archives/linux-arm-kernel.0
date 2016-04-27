@@ -1,104 +1,58 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 27 Apr 2016 10:25:56 -0500
-Subject: [PATCH v2 net-next 11/13] Documentation: Bindings: Update DT
- binding for separating dsaf dev support
-In-Reply-To: <57203309.1090501@huawei.com>
-References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
- <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
- <20160426124847.GA26682@rob-hp-laptop> <57203309.1090501@huawei.com>
-Message-ID: <CAL_JsqLHrHWtiikSt7F39LoExoL2aep5Pqax5cGWWBw-yhz79g@mail.gmail.com>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Wed, 27 Apr 2016 12:27:52 -0300
+Subject: [PATCH v2] ARM: dts: imx28-m28: Remove unneeded partition nodes
+Message-ID: <1461770872-26510-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 10:33 PM, Yisen Zhuang <Yisen.zhuang@huawei.com> wrote:
-> Hi Rob and David,
->
-> Please see my comments inline.
->
-> David have merged this series to net-next, but we need to modify some codes according
-> to Rob's comments. I am not sure if i need to send V3 for this series, or separate
-> patches of documentation to independent series and generate a new patch for hns base
-> on current net-next?
+mtdparts is passed from command line, so there is no need to have a
+default partitioning in device-tree.
 
-That's David's call. I'm guessing he wants follow-up patches on top of these.
+Suggested-by: Marek Vasut <marex@denx.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Remove all partition nodes
 
-> ? 2016/4/26 20:48, Rob Herring ??:
->> On Sat, Apr 23, 2016 at 05:05:15PM +0800, Yisen Zhuang wrote:
->>> Because debug dsaf port was separated from service dsaf port, this patch
->>> updates the related information of DT binding.
->>
->> Separated when? New version of the h/w? If so, where's the new
->> compatible string? This is quite a big binding change.
->
-> There isn't any change of h/w. I separated debug dsaf port from sevice dsaf
-> port to make the code more simple and readability.
+ arch/arm/boot/dts/imx28-m28.dtsi | 26 --------------------------
+ 1 file changed, 26 deletions(-)
 
-Okay.
-
-[...]
-
->>> +  serdes-syscon rather than this address.
->>>    The third region is the PPE register base and size.
->>> -  The fourth region is dsa fabric base register and size.
->>> -  The fifth region is cpld base register and size, it is not required if do not use cpld.
->>> -- phy-handle: phy handle of physicl port, 0 if not any phy device. see ethernet.txt [1].
->>> +  The fourth region is dsa fabric base register and size. It is not required for
->>> +  single-port mode.
->>> +- reg-names: may be ppe-base and(or) dsaf-base. It is used to find the
->>> +  corresponding reg's index.
->>
->> But you have up to 5 regions.
->>
->> The variable nature of what regions you have tells me you need more
->> specific compatible strings for each chip.
->
-> we didn't add support of new h/w. We added these regions to make code simple and readability.
-> If we need to add support of next h/w version next time, we don't need to add many branches
-> for these attributes. So we didn't add a new compatible here.
-
-Not sure what you mean by branches. It's fine to put properties for
-things that vary among h/w versions, but new compatible strings will
-be needed for any new versions.
-
-
->>> +- port: subnodes of dsaf. A dsaf node may contain several port nodes(Depending
->>> +  on mode of dsaf). Port node contain some attributes listed below:
->>> +- port-id: is physical port index in one dsaf.
->>
->> Indexes should generally be avoided. What does the number correspond
->> to in h/w (if anything)?
->
-> port-id is index for a port in dsaf, it is correspond to index of PHY showed below.
-
-Okay, you should use reg property here instead.
-
->
->                                                          CPU
->                                                           |
->                                     -----------------------------------
->                                     |                     |           |
->     ----------------------------------------------    ---------   ---------
->     |                         |                  |    |       |   |   |   |
->     |                        PPE                 |    |  PPE  |   |  PPE  |
->     |                         |                  |    |   |   |   |   |   |
->     |                         |                  |    |   |   |   |   |   |
->     |                      crossbar              |    |   |   |   |   |   |
->     |                         |                  |    |   |   |   |   |   |
->     |   ----------------------------------       |    |   |   |   |   |   |
->     |   |     |     |      |      |      |       |    |   |   |   |   |   |
->     |   |     |     |      |      |      |       |    |   |   |   |   |   |
->     |  MAC   MAC   MAC    MAC    MAC    MAC      |    |  MAC  |   |  MAC  |
->     |   |     |     |      |      |      |       |    |   |   |   |   |   |
->     ----------------------------------------------    ---------   ---------
->         |     |     |      |      |      |    \        /  |        /  |
->        PHY   PHY   PHY    PHY    PHY    PHY    \      /  PHY      /  PHY
->                                                 \    /           /
->                                                  \  /           /
->                                              DSAF(three platform device)
->
->>
->>> +- phy-handle: phy handle of physicl port. It is not required if there isn't
-
-Another typo here.
-
-Rob
+diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
+index 759cc56..6cebaa6 100644
+--- a/arch/arm/boot/dts/imx28-m28.dtsi
++++ b/arch/arm/boot/dts/imx28-m28.dtsi
+@@ -27,32 +27,6 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+ 				status = "okay";
+-
+-				partition at 0 {
+-					label = "bootloader";
+-					reg = <0x00000000 0x00300000>;
+-					read-only;
+-				};
+-
+-				partition at 1 {
+-					label = "environment";
+-					reg = <0x00300000 0x00080000>;
+-				};
+-
+-				partition at 2 {
+-					label = "redundant-environment";
+-					reg = <0x00380000 0x00080000>;
+-				};
+-
+-				partition at 3 {
+-					label = "kernel";
+-					reg = <0x00400000 0x00400000>;
+-				};
+-
+-				partition at 4 {
+-					label = "filesystem";
+-					reg = <0x00800000 0x0f800000>;
+-				};
+ 			};
+ 		};
+ 
+-- 
+1.9.1
