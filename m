@@ -1,69 +1,44 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 27 Apr 2016 08:33:52 +0300
-Subject: [RESEND PATCH v2 5/7] usb: xhci: plat: Remove checks for optional
- clock in error/remove path
-In-Reply-To: <1461675460-2295-6-git-send-email-jszhang@marvell.com>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-6-git-send-email-jszhang@marvell.com>
-Message-ID: <87h9enpqdb.fsf@intel.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 27 Apr 2016 01:36:27 -0400
+Subject: [PATCH V6 05/13] acpi, pci: Support IO resources when parsing PCI
+ host bridge resources.
+In-Reply-To: <20160427023916.GF6789@localhost>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-6-git-send-email-tn@semihalf.com>
+ <20160427023916.GF6789@localhost>
+Message-ID: <57204FDB.6010202@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jisheng Zhang <jszhang@marvell.com> writes:
-> Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
-> clk_{unprepare, disable}()") allows NULL or error pointer to be passed
-> unconditionally.
->
-> This patch is to simplify probe error and remove code paths.
+On 04/26/2016 10:39 PM, Bjorn Helgaas wrote:
+> On Fri, Apr 15, 2016 at 07:06:40PM +0200, Tomasz Nowicki wrote:
+>> Platforms that have memory mapped IO port (such as ARM64) need special
+>> handling for PCI I/O resources. For host bridge's resource probing case
+>> these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
+> 
+> ia64 also has memory-mapped I/O port space.
 
-this seems wrong to me. xhci->clk isn't initialized to NULL, it's either
-initialized to a valid struct clk * or some ERR_PTR() value.
+The specific references of interest to anyone here are:
 
-Care to explain ?
+*). Volume 2, Part 1: Itanium? Architecture-based Operating System
+Interaction Model with IA-32 Applications 2:267 section "10.7 I/O Port
+Space Model" which describes how they can map 4 "legacy" IO ports on a
+virtual page when operating in a "sparse" mode.
 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/usb/host/xhci-plat.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 0e69712..83669d0 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -266,8 +266,7 @@ put_usb3_hcd:
->  	usb_put_hcd(xhci->shared_hcd);
->  
->  disable_clk:
-> -	if (!IS_ERR(clk))
-> -		clk_disable_unprepare(clk);
-> +	clk_disable_unprepare(clk);
->  
->  put_hcd:
->  	usb_put_hcd(hcd);
-> @@ -287,8 +286,7 @@ static int xhci_plat_remove(struct platform_device *dev)
->  	usb_remove_hcd(hcd);
->  	usb_put_hcd(xhci->shared_hcd);
->  
-> -	if (!IS_ERR(clk))
-> -		clk_disable_unprepare(clk);
-> +	clk_disable_unprepare(clk);
->  	usb_put_hcd(hcd);
->  
->  	return 0;
-> -- 
-> 2.8.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+*). Page 378 of the ACPI6.1 specification Table 6-213 I/O Resource Flag
+(Resource Type = 1) Definitions describes how a "sparse" translation can
+exist depending upon bit _TRS. This seems to be implemented in Linux
+using the ACPI_SPARSE_TRANSLATION types.
+
+> It would be ideal to find
+> some way to handle ia64 and ARM64 similarly.  At the very least, we
+> have to make sure that this doesn't break ia64.  The ia64 dense/sparse
+> I/O spaces complicate things; I don't know if ARM64 has something
+> similar or not.
+
+There's nothing directly similar - it's just regular MMIO.
+
+Jon.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/9eb13fb2/attachment.sig>
+Computer Architect | Sent from my Fedora powered laptop
