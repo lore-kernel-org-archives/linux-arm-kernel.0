@@ -1,83 +1,77 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 27 Apr 2016 16:57:28 +0800
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <bc975a1c9b40ee72b05d6e540ae4f4d8@agner.ch>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160421034520.GA19965@shlinux2.ap.freescale.net>
- <20160426012341.GB8870@tiger>
- <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
- <1461663072.7839.17.camel@pengutronix.de>
- <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
- <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
- <20160427015835.GE30692@tiger>
- <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
- <bc975a1c9b40ee72b05d6e540ae4f4d8@agner.ch>
-Message-ID: <CAA+hA=R5cXEy0QWUY034qYu2rQbZNnHrOF_M6=cM=6OA_zg6Gw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2016 09:59:47 +0100
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
+In-Reply-To: <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
+References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
+ <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
+ <20160419224122.GE19428@n2100.arm.linux.org.uk>
+ <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
+Message-ID: <20160427085947.GG19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 3:34 PM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2016-04-26 19:57, Dong Aisheng wrote:
->> On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
->>> On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
->>>> Shawn,
->>>> What's your suggestion?
->>>
->>> I think this needs more discussion, and I just dropped Stefan's patch
->>> from my tree.
->>>
->>> We need to firstly understand why this is happening.  The .prepare hook
->>> is defined to be non-atomic context, and so that we call sleep function
->>> in there.  We did everything right.  Why are we getting the warning?  If
->>> I'm correct, this warning only happens on i.MX7D.  Why is that?
->>>
->>
->> Why Stefan's patch works (checking irqs_disabled()) is because during kernel
->> time init, the irq is still not enabled. It fixes the issue indirectly.
->> See:
->> asmlinkage __visible void __init start_kernel(void)
->> {
->>         /*
->>          * Set up the scheduler prior starting any interrupts (such as the
->>          * timer interrupt). Full topology setup happens at smp_init()
->>          * time - but meanwhile we still have a functioning scheduler.
->>          */
->>         sched_init();
->>         .............
->>         time_init();
->>         ..............
->>         WARN(!irqs_disabled(), "Interrupts were enabled early\n");
->>         early_boot_irqs_disabled = false;
->>         local_irq_enable();
->> }
->>
->> The issue can only happen when PLL enable causes a schedule during
->> imx_clock_init().
->> Not all PLL has this issue.
->> The issue happens on MX7D pll_audio_main_clk/pll_video_main_clk
->> which requires more delay time and cause usleep.
->> Because clk framework does not support MX7D clock types (operation requires
->> parents on), we simply enable all clocks in imx7d_clocks_init().
->>
->> If apply my this patch series:
->> https://lkml.org/lkml/2016/4/20/199
->> The issue can also be gone.
->
-> Oh ok, it does make sense to enable as few clocks as possible.
->
-> However, even if we do not enable lots of clocks at that time, and this
-> helps to avoid the problem for now, it could still be that
-> someone/something requests a clock early during boot, leading to a PLL
-> enable... Shouldn't we make sure that those base clocks can be enabled
-> even during early boot..?
->
+On Wed, Apr 20, 2016 at 09:04:39AM -0500, Rob Herring wrote:
+> On Tue, Apr 19, 2016 at 5:41 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
+> >> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
+> >> > Document the DT bindings for controlling ARM PL310 Power Control
+> >> > settings.
+> >> >
+> >> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+> >>
+> >> What happened to Josh's ack?
+> >>
+> >> > ---
+> >> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
+> >> >  1 file changed, 4 insertions(+)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> >> > index fe0398c..c1c756e 100644
+> >> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> >> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> >> > @@ -84,6 +84,10 @@ Optional properties:
+> >> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+> >> >    <1> (forcibly enable), property absent (retain settings set by
+> >> >    firmware)
+> >> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
+> >> > +  disable), <1> or property absent (forcibly enable)
+> >> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
+> >> > +  <1>  or property absent (forcibly enable)
+> >>
+> >> What happened to "retain settings set by firmware"?
+> >
+> > I said we shouldn't.  Current behaviour is that we enable these features,
+> > and moving to missing-means-retain means that everything today ends up
+> > with these features disabled.  IOW, it's yet another change of actual
+> > behaviour that every platform would see.
+> 
+> Right, but then the properties are different from prefetch-instr and
+> others IIRC. We're letting the OS define the binding. If BSD doesn't
+> enable these settings currently, then there is a mismatch between the
+> binding and actual behavior. Saying "retain firmware settings" also
+> defines specific OS behavior. I think absent should mean OS is free to
+> do whatever it wants which could be retain firmware settings, enable
+> or disable. In other words, it is undefined as this ship has already
+> sailed.
 
-The point as Shawn pointed is that we even shouldn't call clk_prepare_enable
-at that time.
-So we may first try to eliminate those callings in imx7d_clocks_init.
+I agree with "the ship has already sailed" but I disagree with the
+rest of your comment.  The ship has already sailed in that we have
+an established behaviour which has been there for 18 months.  Given
+the time period, it's not something I'm going to change at this
+stage, sorry.
 
-> --
-> Stefan
+Why?  Such a change will go unnoticed, and it's particularly hard
+to debug why battery life has reduced.
 
-Regards
-Dong Aisheng
+I guess we need to find a way to ensure that the default behaviour
+stays.  Whether that's by _everyone_ updating their DT files with
+the new properties or some other way, I don't care.  I only care
+that we retain the behaviour we've had for the last 18 months.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
