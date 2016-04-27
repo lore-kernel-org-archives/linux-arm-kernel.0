@@ -1,28 +1,215 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Apr 2016 00:31:19 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul-pico-hobbit: Add initial support
-In-Reply-To: <20160426014938.GC8870@tiger>
-References: <1460985138-6271-1-git-send-email-fabio.estevam@nxp.com>
- <1460985138-6271-2-git-send-email-fabio.estevam@nxp.com>
- <20160426014938.GC8870@tiger>
-Message-ID: <CAOMZO5Cek=zwU4xN9jO06XoJ5_3NNXYOPzhe4YVdYuheVZFbJg@mail.gmail.com>
+From: Yisen.zhuang@huawei.com (Yisen Zhuang)
+Date: Wed, 27 Apr 2016 11:33:29 +0800
+Subject: [PATCH v2 net-next 11/13] Documentation: Bindings: Update DT
+ binding for separating dsaf dev support
+In-Reply-To: <20160426124847.GA26682@rob-hp-laptop>
+References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
+ <20160426124847.GA26682@rob-hp-laptop>
+Message-ID: <57203309.1090501@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 10:49 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+Hi Rob and David,
 
->> +     backlight {
->> +             compatible = "pwm-backlight";
->> +             pwms = <&pwm3 0 5000000>;
->> +             brightness-levels = <0 4 8 16 32 64 128 255>;
->> +             default-brightness-level = <6>;
->> +             status = "okay";
->> +     };
+Please see my comments inline.
+
+David have merged this series to net-next, but we need to modify some codes according
+to Rob's comments. I am not sure if i need to send V3 for this series, or separate
+patches of documentation to independent series and generate a new patch for hns base
+on current net-next?
+
+Thanks,
+
+Yisen
+
+? 2016/4/26 20:48, Rob Herring ??:
+> On Sat, Apr 23, 2016 at 05:05:15PM +0800, Yisen Zhuang wrote:
+>> Because debug dsaf port was separated from service dsaf port, this patch
+>> updates the related information of DT binding.
+> 
+> Separated when? New version of the h/w? If so, where's the new 
+> compatible string? This is quite a big binding change. 
+
+There isn't any change of h/w. I separated debug dsaf port from sevice dsaf
+port to make the code more simple and readability.
+
+> 
+>> Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
+>>
+>> ---
+>>  .../devicetree/bindings/net/hisilicon-hns-dsaf.txt | 59 ++++++++++++++++++----
+>>  1 file changed, 49 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>> index ecacfa4..5ccd4f0 100644
+>> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>> @@ -7,19 +7,47 @@ Required properties:
+>>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
+>>  		"2port-64vf",
+>>  		"6port-16rss",
+>> -		"6port-16vf".
+>> +		"6port-16vf",
+>> +		"single-port".
+>>  - interrupt-parent: the interrupt parent of this device.
+>>  - interrupts: should contain the DSA Fabric and rcb interrupt.
+>>  - reg: specifies base physical address(es) and size of the device registers.
+>> -  The first region is external interface control register base and size.
+>> -  The second region is SerDes base register and size.
+>> +  The first region is external interface control register base and size(optional,
+>> +  only be used when subctrl-syscon is not exists). It is recommended using
+> 
+> only used when subctrl-syscon does not exist
+
+Agree, thanks.
+
+> 
+>> +  subctrl-syscon rather than this address.
+>> +  The second region is SerDes base register and size(optional, only be used when
+>> +  serdes-syscon in port node is not exists. It is recommended using
+> 
+> similar rewording needed here.
+
+Agree, thanks.
+
+> 
+>> +  serdes-syscon rather than this address.
+>>    The third region is the PPE register base and size.
+>> -  The fourth region is dsa fabric base register and size.
+>> -  The fifth region is cpld base register and size, it is not required if do not use cpld.
+>> -- phy-handle: phy handle of physicl port, 0 if not any phy device. see ethernet.txt [1].
+>> +  The fourth region is dsa fabric base register and size. It is not required for
+>> +  single-port mode.
+>> +- reg-names: may be ppe-base and(or) dsaf-base. It is used to find the
+>> +  corresponding reg's index.
+> 
+> But you have up to 5 regions.
+> 
+> The variable nature of what regions you have tells me you need more 
+> specific compatible strings for each chip.
+
+we didn't add support of new h/w. We added these regions to make code simple and readability.
+If we need to add support of next h/w version next time, we don't need to add many branches
+for these attributes. So we didn't add a new compatible here.
+
+> 
 >> +
->> +     reg_sd1_vmmc: reg-sd1-vmmc {
->
-> regulator-xxx for node name please.
+>> +- phy-handle: phy handle of physicl port, 0 if not any phy device. It is optional
+> 
+> s/physicl/physical/
 
-Sorry, Shawn. I missed this email.
+Agree, thanks.
 
-Will prepare v4.
+> 
+>> +  attribute. If port node is exists, phy-handle in each port node will be used.
+>> +  see ethernet.txt [1].
+>> +- subctrl-syscon: is syscon handle for external interface control register.
+>> +- reset-field-offset: is offset of reset field. Its value depends on the hardware
+>> +  user manual.
+>>  - buf-size: rx buffer size, should be 16-1024.
+>>  - desc-num: number of description in TX and RX queue, should be 512, 1024, 2048 or 4096.
+>>  
+>> +- port: subnodes of dsaf. A dsaf node may contain several port nodes(Depending
+>> +  on mode of dsaf). Port node contain some attributes listed below:
+>> +- port-id: is physical port index in one dsaf.
+> 
+> Indexes should generally be avoided. What does the number correspond 
+> to in h/w (if anything)?
+
+port-id is index for a port in dsaf, it is correspond to index of PHY showed below.
+
+                                                         CPU
+                                                          |
+                                    -----------------------------------
+                                    |                     |           |
+    ----------------------------------------------    ---------   ---------
+    |                         |                  |    |       |   |   |   |
+    |                        PPE                 |    |  PPE  |   |  PPE  |
+    |                         |                  |    |   |   |   |   |   |
+    |                         |                  |    |   |   |   |   |   |
+    |                      crossbar              |    |   |   |   |   |   |
+    |                         |                  |    |   |   |   |   |   |
+    |   ----------------------------------       |    |   |   |   |   |   |
+    |   |     |     |      |      |      |       |    |   |   |   |   |   |
+    |   |     |     |      |      |      |       |    |   |   |   |   |   |
+    |  MAC   MAC   MAC    MAC    MAC    MAC      |    |  MAC  |   |  MAC  |
+    |   |     |     |      |      |      |       |    |   |   |   |   |   |
+    ----------------------------------------------    ---------   ---------
+        |     |     |      |      |      |    \        /  |        /  |
+       PHY   PHY   PHY    PHY    PHY    PHY    \      /  PHY      /  PHY
+                                                \    /           /
+                                                 \  /           /
+                                             DSAF(three platform device)
+
+> 
+>> +- phy-handle: phy handle of physicl port. It is not required if there isn't
+>> +  phy device. see ethernet.txt [1].
+>> +- serdes-syscon: is syscon handle for SerDes register.
+>> +- cpld-syscon: is syscon handle for cpld register. It is not required if there
+>> +  isn't cpld device.
+>> +- cpld-ctrl-reg: is cpld register offset. It is not required if there isn't
+>> +  cpld-syscon.
+> 
+> This would usually be a cell in the cpld-syscon property.
+
+Agree, thanks.
+
+> 
+>> +- port-rst-offset: is offset of reset field for each port in dsaf. Its value
+>> +  depends on the hardware user manual.
+>> +- port-mode-offset: is offset of port mode field for each port in dsaf. Its
+>> +  value depends on the hardware user manual.
+> 
+> Again, sounds like you need more specific compatible strings that imply 
+> this information.
+> 
+>> +
+>>  [1] Documentation/devicetree/bindings/net/phy.txt
+>>  
+>>  Example:
+>> @@ -28,11 +56,11 @@ dsaf0: dsa at c7000000 {
+>>  	compatible = "hisilicon,hns-dsaf-v1";
+>>  	mode = "6port-16rss";
+>>  	interrupt-parent = <&mbigen_dsa>;
+>> -	reg = <0x0 0xC0000000 0x0 0x420000
+>> -	       0x0 0xC2000000 0x0 0x300000
+>> -	       0x0 0xc5000000 0x0 0x890000
+>> +	reg = <0x0 0xc5000000 0x0 0x890000
+>>  	       0x0 0xc7000000 0x0 0x60000>;
+>> -	phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
+>> +	reg-names = "ppe-base", "dsaf-base";
+>> +	subctrl-syscon = <&subctrl>;
+>> +	reset-field-offset = 0;
+>>  	interrupts = <131 4>,<132 4>, <133 4>,<134 4>,
+>>  		     <135 4>,<136 4>, <137 4>,<138 4>,
+>>  		     <139 4>,<140 4>, <141 4>,<142 4>,
+>> @@ -43,4 +71,15 @@ dsaf0: dsa at c7000000 {
+>>  	buf-size = <4096>;
+>>  	desc-num = <1024>;
+>>  	dma-coherent;
+>> +
+>> +	prot at 0 {
+> 
+> port?
+
+Agree, i am sorry for my carelessness and will pay more attention to it next time.
+thank you very much.
+
+> 
+>> +		port-id = 0;
+>> +		phy-handle = <&phy0>;
+>> +		serdes-syscon = <&serdes>;
+>> +	};
+>> +
+>> +	prot at 1 {
+>> +                port-id = 1;
+>> +                serdes-syscon = <&serdes>;
+>> +        };
+>>  };
+>> -- 
+>> 1.9.1
+>>
+> 
+> .
+> 
