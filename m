@@ -1,44 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 27 Apr 2016 16:00:20 +0200
-Subject: [PATCH v2 3/3] ARM: dts: exynos: Lower SD card interface voltage to
- 2.8v on Odroid X/X2/U3
-In-Reply-To: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
-References: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1461765620-6833-3-git-send-email-k.kozlowski@samsung.com>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Wed, 27 Apr 2016 11:02:34 -0300
+Subject: [PATCH] ARM: dts: imx28-m28: Fix unit-address for partitions
+Message-ID: <1461765754-19020-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Odroid X/X2/U3 schematics say that SD card vmmc regulator
-(LDO21/TFLASH) operates on 2.8 V. Mainline U-Boot uses that value as
-well. 2.8 V is common on Exynos-based boards. Additionally use some
-descriptive name for this regulator.
+According to ePAPR v1.1: "The unit-address must match the first address
+specified in the reg property of the node"
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+So do as recommended.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
+ arch/arm/boot/dts/imx28-m28.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Changes since v1:
-1. None
----
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index 34a5b3daced0..260601d2f72f 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -341,9 +341,9 @@
- 			};
+diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
+index 759cc56..6270701 100644
+--- a/arch/arm/boot/dts/imx28-m28.dtsi
++++ b/arch/arm/boot/dts/imx28-m28.dtsi
+@@ -34,22 +34,22 @@
+ 					read-only;
+ 				};
  
- 			ldo21_reg: LDO21 {
--				regulator-name = "LDO21_3.3V";
--				regulator-min-microvolt = <3300000>;
--				regulator-max-microvolt = <3300000>;
-+				regulator-name = "TFLASH_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
- 				regulator-boot-on;
- 			};
+-				partition at 1 {
++				partition at 300000 {
+ 					label = "environment";
+ 					reg = <0x00300000 0x00080000>;
+ 				};
  
+-				partition at 2 {
++				partition at 380000 {
+ 					label = "redundant-environment";
+ 					reg = <0x00380000 0x00080000>;
+ 				};
+ 
+-				partition at 3 {
++				partition at 400000 {
+ 					label = "kernel";
+ 					reg = <0x00400000 0x00400000>;
+ 				};
+ 
+-				partition at 4 {
++				partition at 800000 {
+ 					label = "filesystem";
+ 					reg = <0x00800000 0x0f800000>;
+ 				};
 -- 
 1.9.1
