@@ -1,55 +1,42 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 27 Apr 2016 02:55:17 +0300
-Subject: [PATCH 1/3] MAINTAINERS: move ARM/NXP LPC32xx record to ARM section
-In-Reply-To: <1461714919-25577-1-git-send-email-vz@mleia.com>
-References: <1461714919-25577-1-git-send-email-vz@mleia.com>
-Message-ID: <1461714919-25577-2-git-send-email-vz@mleia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Apr 2016 17:01:06 -0700
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable PWM and ir-rx51 as loadable
+ modules
+Message-ID: <1461715266-11250-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A record of NXP LPC32xx SoC support is lost between LMxx hwmon drivers
-and lockdep, rename and move it to a place where all other ARM
-SoC and machines settle.
+These are available on n900.
 
-Note, NXP LPC32xx maintenance is actually about SoC series itself, SoC
-peripherals and a number of machines powered by LPC32xx SoC, so while
-we are here correct the title name to emphasize that the maintenance
-concerns SoC support in general.
-
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- MAINTAINERS | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/configs/omap2plus_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 03e00c7..233c9bf 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1306,6 +1306,12 @@ F:	drivers/mtd/spi-nor/nxp-spifi.c
- F:	drivers/rtc/rtc-lpc24xx.c
- N:	lpc18xx
- 
-+ARM/LPC32XX SOC SUPPORT
-+M:	Roland Stigge <stigge@antcom.de>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-lpc32xx/
-+
- ARM/MAGICIAN MACHINE SUPPORT
- M:	Philipp Zabel <philipp.zabel@gmail.com>
- S:	Maintained
-@@ -6775,12 +6781,6 @@ W:	logfs.org
- S:	Maintained
- F:	fs/logfs/
- 
--LPC32XX MACHINE SUPPORT
--M:	Roland Stigge <stigge@antcom.de>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
--F:	arch/arm/mach-lpc32xx/
--
- LSILOGIC MPT FUSION DRIVERS (FC/SAS/SPI)
- M:	Sathya Prakash <sathya.prakash@broadcom.com>
- M:	Chaitra P B <chaitra.basappa@broadcom.com>
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index d2c105e..b54d17d 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -284,8 +284,12 @@ CONFIG_REGULATOR_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_MEDIA_SUPPORT=m
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_RC_SUPPORT=y
+ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
++CONFIG_LIRC=m
++CONFIG_RC_DEVICES=y
++CONFIG_IR_RX51=m
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_VIDEO_OMAP3=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+@@ -421,6 +425,7 @@ CONFIG_TI_EMIF=m
+ CONFIG_IIO=m
+ CONFIG_TI_AM335X_ADC=m
+ CONFIG_PWM=y
++CONFIG_PWM_OMAP_DMTIMER=m
+ CONFIG_PWM_TIECAP=m
+ CONFIG_PWM_TIEHRPWM=m
+ CONFIG_PWM_TWL=m
 -- 
-2.8.0.rc3
+2.8.1
