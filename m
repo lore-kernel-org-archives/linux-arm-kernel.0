@@ -1,225 +1,68 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 27 Apr 2016 14:47:45 +0100
-Subject: [PATCH] dmaengine: pl330: Fix race in pl330_get_desc()
-In-Reply-To: <CABb+yY3JG=XyJekz==VYF+w7ptDBwgMyVJMHzO-uM_ynXKOcaA@mail.gmail.com>
-References: <bc03a8073460ebac253b80466d11654ee81f540e.1461687536.git.robin.murphy@arm.com>
- <CABb+yY3JG=XyJekz==VYF+w7ptDBwgMyVJMHzO-uM_ynXKOcaA@mail.gmail.com>
-Message-ID: <5720C301.1020707@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Apr 2016 14:59:00 +0100
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <878tzzpq19.fsf@intel.com>
+References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+ <87d1pcrj0t.fsf@intel.com> <571F2357.9080509@ti.com>
+ <878tzzpq19.fsf@intel.com>
+Message-ID: <20160427135859.GC20646@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+On Wed, Apr 27, 2016 at 08:41:06AM +0300, Felipe Balbi wrote:
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+> > On 04/26/2016 09:17 AM, Felipe Balbi wrote:
+> >> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+> >>> Now not all DMA paremters configured properly for "xhci-hcd" platform
+> >>> device which is created manually. For example: dma_pfn_offset, dam_ops
+> >>> and iommu configuration will not corresponds "dwc3" devices
+> >>> configuration. As result, this will cause problems like wrong DMA
+> >>> addresses translation on platforms with LPAE enabled like Keystone 2.
+> >>>
+> >>> When platform is using DT boot mode the DMA configuration will be
+> >>> parsed and applied from DT, so, to fix this issue, reuse
+> >>> of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
+> >>> from DWC3 device node.
+> >> 
+> >> patch is incomplete. You left out non-DT users which might suffer from
+> >> the same problem.
+> >
+> > Honestly, I don't know how to fix it gracefully for non-DT case.
+> > I can update commit message to mention that this is fix for DT case only.
+> 
+> no, that won't do :-) There are other users for this driver and they are
+> all "out-of-compliance" when it comes to DMA usage. Apparently, the
+> desired behavior is to pass correct device to DMA API which the gadget
+> side is already doing (see below). For the host side, the fix has to be
+> more involved.
+> 
+> Frankly, I'd prefer that DMA setup could be inherited from parent
+> device, then it wouldn't really matter and a bunch of this could be
+> simplified. Some sort of dma_inherit(struct device *dev, struct device
+> *parent) would go a long way, IMHO.
 
-On 27/04/16 04:26, Jassi Brar wrote:
-> On Tue, Apr 26, 2016 at 10:00 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> The current logic in pl330_get_desc() contains a clear race condition,
->> whereby if the descriptor pool is empty, we will create a new
->> descriptor, add it to the pool with the lock held, *release the lock*,
->> then try to remove it from the pool again.
->>
->> Furthermore, if that second attempt then finds the pool empty because
->> someone else got there first, we conclude that something must have gone
->> terribly wrong and it's the absolute end of the world.
->>
-> We may retry or simply increase the number of descriptors allocated in
-> a batch from 1 to, say, NR_DEFAULT_DESC.
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 372b435..7179a4d 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2449,7 +2449,7 @@ static struct dma_pl330_desc
-> *pl330_get_desc(struct dma_pl330_chan *pch)
->
->          /* If the DMAC pool is empty, alloc new */
->          if (!desc) {
-> -               if (!add_desc(pl330, GFP_ATOMIC, 1))
-> +               if (!add_desc(pl330, GFP_ATOMIC, NR_DEFAULT_DESC))
->                          return NULL;
->
->                  /* Try again */
+I would be in favour of a dma_inherit() function as well. We could hack
+something up in the arch code (like below) but I would rather prefer an
+explicit dma_inherit() call by drivers creating such devices.
 
-I'm not sure I see how leaving the obvious race in place and just making 
-it n times harder to hit is in any way not a terrible idea compared to 
-actually fixing it.
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index ba437f090a74..ea6fb9b0e8fa 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
+ 
+ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+ {
+-	if (dev && dev->archdata.dma_ops)
+-		return dev->archdata.dma_ops;
++	while (dev) {
++		if (dev->archdata.dma_ops)
++			return dev->archdata.dma_ops;
++		dev = dev->parent;
++	}
+ 
+ 	/*
+ 	 * We expect no ISA devices, and all other DMA masters are expected to
 
->> ...
->> [  709.328891] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
->> ** 10 printk messages dropped ** [  709.352280] dma-pl330 7ff00000.dma: __pl330_prep_dma_memcpy:2493 Unable to fetch desc
->> ** 11 printk messages dropped ** [  709.372930] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
->> ** 2 printk messages dropped ** [  709.372953] dma-pl330 7ff00000.dma: pl330_get_desc:2459 ALERT!
->> ** 8 printk messages dropped ** [  709.374157] dma-pl330 7ff00000.dma: __pl330_prep_dma_memcpy:2493 Unable to fetch desc
->> ** 41 printk messages dropped ** [  709.393095] dmatest: dma0chan4-copy1: result #4545: 'prep error' with src_off=0x3a32 dst_off=0x46dd len=0xc5c3 (0)
->> ...
->>
->> Down with this sort of thing! The most sensible thing to do is avoid the
->> allocate-add-remove dance entirely and simply use the freshly-allocated
->> descriptor straight away.
->>
-> ... but you still try to first pluck from the list.
-
-Well, that's the point of having a pool, right? Try to reuse a free 
-descriptor if there is one, otherwise expand the pool. It's just that in 
-the latter case, race or not, it's absolutely pointless to add the new 
-descriptor to the pool only to immediately remove it again, when you can 
-simply start using it instead - either way there's still an extra 
-descriptor released back to the pool once we're done with it.
-
-> Instead of churning the code, I would suggest either check in a loop
-> that we have a desc OR allocate 2 or NR_DEFAULT_DESC descriptors
-> there. Probably we get more descriptors at the same cost of memory.
-
-Having had a quick look into how beneficial that might be, I discover 
-that what's provoking the add_desc() race is something else causing 
-desc_pool->head to get wedged pointing at itself, so list_empty() 
-forever returns true and we kick off a storm of allocations while 
-desc_pool->tail fills up with unused descriptors. Looks like I'm going 
-to have to set aside some time to properly debug and fix this driver if 
-I want to use it for stress-testing IOMMU code...
-
->>
->> I'm also seeing what looks like another occasional race under the same
->> conditions where pl330_tx_submit() blows up from dma_cookie_assign()
->> dereferencing a bogus tx->chan, but I think that's beyond my ability to
->> figure out right now. Similarly the storm of WARNs from pl330_issue_pending()
->> when using a large number of small buffers and dmatest.noverify=1. This
->> one was some obvious low-hanging fruit.
->>
-> Sorry, that part of code has changed a lot since I wrote the driver,
-> so more details will help me.
-
-Here's the actual splat:
-
-[  220.649267] Unable to handle kernel paging request at virtual address 
-100341338
-[  220.666576] pgd = ffffff8008dcb000
-[  220.679805] [100341338] *pgd=0000000000000000, *pud=0000000000000000
-[  220.696116] Internal error: Oops: 96000005 [#1] PREEMPT SMP
-[  220.711579] Modules linked in:
-[  220.724459] CPU: 3 PID: 1249 Comm: dma0chan5-copy0 Not tainted 
-4.6.0-rc4+ #527
-[  220.741652] Hardware name: ARM Juno development board (r1) (DT)
-[  220.757512] task: ffffffc976255400 ti: ffffffc975aa4000 task.ti: 
-ffffffc975aa4000
-[  220.774979] PC is at pl330_tx_submit+0x68/0x108
-[  220.789412] LR is at pl330_tx_submit+0x2c/0x108
-[  220.803704] pc : [<ffffff80083dae08>] lr : [<ffffff80083dadcc>] 
-pstate: 800001c5
-[  220.821078] sp : ffffffc975aa7c90
-[  220.834236] x29: ffffffc975aa7c90 x28: ffffffc975e81800
-[  220.849303] x27: ffffffc97626c018 x26: ffffff8008cd9000
-[  220.864314] x25: 0000000000000000 x24: 0000000000000000
-[  220.879300] x23: ffffff8008d8d410 x22: ffffff8008ce52f0
-[  220.894266] x21: ffffffc976220d18 x20: ffffffc079138610
-[  220.909139] x19: ffffffc976220c60 x18: 0000000000000010
-[  220.923857] x17: 0000000000000007 x16: 0000000000000001
-[  220.938418] x15: 0000000000000001 x14: 0001020304050607
-[  220.952886] x13: 08090a0b0c0d0e0f x12: 1011121314151617
-[  220.967305] x11: 18191a1b1c1d1e1f x10: 0001020304050607
-[  220.981603] x9 : 0000000000000000 x8 : 0000000000000010
-[  220.995783] x7 : 0000000000000001 x6 : ffffffc976220ce0
-[  221.009899] x5 : 0000000100341330 x4 : ffffffc079138600
-[  221.023775] x3 : 0000000000000000 x2 : ffffffc97626c158
-[  221.037417] x1 : ffffffc97636a790 x0 : 0000000000000140
-[  221.050845]
-[  221.060126] Process dma0chan5-copy0 (pid: 1249, stack limit = 
-0xffffffc975aa4020)
-[  221.075704] Stack: (0xffffffc975aa7c90 to 0xffffffc975aa8000)
-[  221.089574] 7c80:                                   ffffffc975aa7cd0 
-ffffff80083d9e60
-[  221.105653] 7ca0: ffffffc9758b88c0 0000000000002b12 00000000000020b8 
-ffffff8008ce52f0
-[  221.121765] 7cc0: 00000000f9f82b12 ffffffc0790e5b00 ffffffc975aa7e30 
-ffffff80080d7138
-[  221.137833] 7ce0: ffffffc975e81780 ffffff8008d90b00 ffffff8008af0d40 
-ffffffc975e81800
-[  221.153811] 7d00: ffffff80083d91c0 0000000000000000 0000000000000000 
-0000000000000000
-[  221.169777] 7d20: 0000000000000000 0000000000000000 ffffff8008ca7000 
-000000323ef9fd9c
-[  221.185714] 7d40: 0000000000000008 ffffffc975aa7e20 ffffff8008b265d8 
-0000000000000000
-[  221.201753] 7d60: 0000000000000010 0000000000000000 0000000175aa7dc0 
-0000000000000000
-[  221.217898] 7d80: 0000000000000259 0000000000000001 ffffff8008b265f0 
-ffffffc9758b88e8
-[  221.234155] 7da0: ffffff8000002b12 ffffffc975aa7cd0 ffffffc976220c88 
-00000000005d99c3
-[  221.250577] 7dc0: 0000000000000001 000002f400000259 ffffff8008d12be0 
-ffffffc975aa7cc0
-[  221.267166] 7de0: 0000000000000000 ffffffc975aa7df0 ffffff800bcc0bcc 
-ffffffc975aa7df8
-[  221.283840] 7e00: ffffffc975aa7df8 c5b6eabfb5a2c4b8 ffffffc900000000 
-ffffff80080f2048
-[  221.300672] 7e20: ffffffc975aa7e20 ffffffc975aa7e20 0000000000000000 
-ffffff8008085e10
-[  221.317405] 7e40: ffffff80080d7068 ffffffc975e81780 0000000000000000 
-0000000000000000
-[  221.334211] 7e60: 0000000000000000 ffffff80080df900 ffffff80080d7068 
-0000000000000000
-[  221.351119] 7e80: 0000000000000000 ffffffc975e81800 0000000000000000 
-0000000000000000
-[  221.368086] 7ea0: ffffffc975aa7ea0 ffffffc975aa7ea0 0000000000000000 
-ffffff8000000000
-[  221.385128] 7ec0: ffffffc975aa7ec0 ffffffc975aa7ec0 0000000000000000 
-0000000000000000
-[  221.402194] 7ee0: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.419345] 7f00: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.436492] 7f20: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.453629] 7f40: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.470764] 7f60: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.487893] 7f80: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.505008] 7fa0: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000000
-[  221.522116] 7fc0: 0000000000000000 0000000000000000 0000000000000000 
-0000000000000005
-[  221.539221] 7fe0: 0000000000000000 0000000000000000 88898a8b8c8d8e8f 
-8081828384858687
-[  221.556415] Call trace:
-[  221.568286] Exception stack(0xffffffc975aa7ad0 to 0xffffffc975aa7bf0)
-[  221.584423] 7ac0:                                   ffffffc976220c60 
-ffffffc079138610
-[  221.602172] 7ae0: ffffffc975aa7c90 ffffff80083dae08 ffffffc976812d00 
-ffffffc976aa2600
-[  221.620055] 7b00: ffffffc975aa7b30 ffffff80080ebfa0 ffffffc975aa7b30 
-ffffff80080ec050
-[  221.638012] 7b20: 00000000ffffb237 ffffffc976255400 ffffffc975aa7bd0 
-ffffff8008881408
-[  221.656053] 7b40: ffffff8008ca7000 ffffff8008cd9000 ffffffc97feef380 
-ffffffc976255400
-[  221.674207] 7b60: ffffffc975aa7b90 ffffff80080e6fb8 0000000000000140 
-ffffffc97636a790
-[  221.692454] 7b80: ffffffc97626c158 0000000000000000 ffffffc079138600 
-0000000100341330
-[  221.710838] 7ba0: ffffffc976220ce0 0000000000000001 0000000000000010 
-0000000000000000
-[  221.729306] 7bc0: 0001020304050607 18191a1b1c1d1e1f 1011121314151617 
-08090a0b0c0d0e0f
-[  221.747943] 7be0: 0001020304050607 0000000000000001
-[  221.763694] [<ffffff80083dae08>] pl330_tx_submit+0x68/0x108
-[  221.780284] [<ffffff80083d9e60>] dmatest_func+0xca0/0x1248
-[  221.796853] [<ffffff80080d7138>] kthread+0xd0/0xe8
-[  221.812785] [<ffffff8008085e10>] ret_from_fork+0x10/0x40
-[  221.829336] Code: f9402083 f9002043 f9401045 3902205f (b94008a3)
-[  221.846910] ---[ end trace a413951a16f706c7 ]---
-
-The faulting instruction is the initial access to chan->cookie in 
-dma_cookie_assign(), and tx->chan (x5 here) seems to always be 
-0x100341330, implying that tx is pointing somewhere near a struct 
-pl330_config because that 'address' is clearly the first two words of 
-one of those (.periph_id, .mode). I'm going to have to put this to one 
-side for now and maybe come back to it later, but I thought it was worth 
-mentioning just in case it looked familiar to anyone. I can usually hit 
-it within a couple of runs of dmatest with 8 channels, 
-threads_per_chan=6, test_buf_size=16384 and iterations=5000 (the point 
-of which, if anyone's wondering, is to batter the TLBs of the downstream 
-SMMU with recycled addresses as much as possible).
-
-Thanks,
-Robin.
+-- 
+Catalin
