@@ -1,65 +1,65 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 27 Apr 2016 10:57:21 +0800
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <20160427015835.GE30692@tiger>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160421034520.GA19965@shlinux2.ap.freescale.net>
- <20160426012341.GB8870@tiger>
- <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
- <1461663072.7839.17.camel@pengutronix.de>
- <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
- <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
- <20160427015835.GE30692@tiger>
-Message-ID: <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 27 Apr 2016 08:52:25 +0530
+Subject: [PATCH V2 5/7] mvebu: Use dev_pm_opp_set_sharing_cpus() to mark OPP
+ tables as shared
+In-Reply-To: <cover.1461727086.git.viresh.kumar@linaro.org>
+References: <cover.1461727086.git.viresh.kumar@linaro.org>
+Message-ID: <e13515db21cb178a8834d50f8b6b68e9b650aaec.1461727086.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
->> Shawn,
->> What's your suggestion?
->
-> I think this needs more discussion, and I just dropped Stefan's patch
-> from my tree.
->
-> We need to firstly understand why this is happening.  The .prepare hook
-> is defined to be non-atomic context, and so that we call sleep function
-> in there.  We did everything right.  Why are we getting the warning?  If
-> I'm correct, this warning only happens on i.MX7D.  Why is that?
->
+That will allow us to avoid using cpufreq-dt platform data.
 
-Why Stefan's patch works (checking irqs_disabled()) is because during kernel
-time init, the irq is still not enabled. It fixes the issue indirectly.
-See:
-asmlinkage __visible void __init start_kernel(void)
-{
-        /*
-         * Set up the scheduler prior starting any interrupts (such as the
-         * timer interrupt). Full topology setup happens at smp_init()
-         * time - but meanwhile we still have a functioning scheduler.
-         */
-        sched_init();
-        .............
-        time_init();
-        ..............
-        WARN(!irqs_disabled(), "Interrupts were enabled early\n");
-        early_boot_irqs_disabled = false;
-        local_irq_enable();
-}
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-mvebu/pmsu.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-The issue can only happen when PLL enable causes a schedule during
-imx_clock_init().
-Not all PLL has this issue.
-The issue happens on MX7D pll_audio_main_clk/pll_video_main_clk
-which requires more delay time and cause usleep.
-Because clk framework does not support MX7D clock types (operation requires
-parents on), we simply enable all clocks in imx7d_clocks_init().
-
-If apply my this patch series:
-https://lkml.org/lkml/2016/4/20/199
-The issue can also be gone.
-
-Regards
-Dong Aisheng
-
-> Shawn
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index ed8fda4cd055..8928f7caaf70 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -20,7 +20,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/cpu_pm.h>
+-#include <linux/cpufreq-dt.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+@@ -609,10 +608,6 @@ int mvebu_pmsu_dfs_request(int cpu)
+ 	return 0;
+ }
+ 
+-struct cpufreq_dt_platform_data cpufreq_dt_pd = {
+-	.independent_clocks = true,
+-};
+-
+ static int __init armada_xp_pmsu_cpufreq_init(void)
+ {
+ 	struct device_node *np;
+@@ -683,10 +678,15 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+ 			clk_put(clk);
+ 			return ret;
+ 		}
++
++		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
++						  cpumask_of(cpu_dev->id));
++		if (ret)
++			dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
++				__func__, ret);
+ 	}
+ 
+-	platform_device_register_data(NULL, "cpufreq-dt", -1,
+-				      &cpufreq_dt_pd, sizeof(cpufreq_dt_pd));
++	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+ 	return 0;
+ }
+ 
+-- 
+2.7.1.410.g6faf27b
