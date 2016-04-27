@@ -1,58 +1,103 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 27 Apr 2016 14:24:33 +0200
-Subject: [PATCH] nvmem/mxs-ocotp: fix buffer overflow in read
-In-Reply-To: <201ccd58-8735-02d8-b4e4-9d2eda828fd8@meduna.org>
-References: <201ccd58-8735-02d8-b4e4-9d2eda828fd8@meduna.org>
-Message-ID: <5720AF81.2080402@i2se.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Apr 2016 14:33:58 +0200
+Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
+In-Reply-To: <1461758776.20837.7.camel@mhfsdcap03>
+References: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
+ <1461404630.7081.9.camel@mhfsdcap03>
+ <CAPDyKFpO89QWHST8XoBvRO4Y+Fv4Umt43B35E2vhm-z2WmZXSw@mail.gmail.com>
+ <1461758776.20837.7.camel@mhfsdcap03>
+Message-ID: <CAPDyKFrhR4P=X9VPoiSgkeQTrjinkp5YFH9MSsXkDwzd441A8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stano,
+[...]
 
-[add Srinivas and Maxime to CC]
+>> > Actually, this is a Bug of __mmc_switch(), Per JEDEC Spec, while switch
+>> > speed mode, should not use CMD13 to get card status, as it's response
+>> > cannot reflect that if card was busy now, for this CMD6 switch HS200
+>>
+>> There is a statement applicable to all HS modes, which says it's *not
+>> recommended* but *if* used, CRC errors shall be ignored.
+>>
+> Yes, but if we ignore the CRC error check, how do we know current
+> response is correct or incorrect ? if card is still busy but we get the
+> response of 0x900 caused by latching error, then it still consider that
+> card has already changed to trans state.
 
-Am 27.04.2016 um 13:53 schrieb Stanislav Meduna:
-> This patch fixes the issue where the mxs_ocotp_read is reading
-> the ocotp in reg_size steps but decrements the remaining size
-> by 1. The number of iterations is thus four times higher,
-> overwriting the area behind the output buffer.
+That's true. So perhaps we shouldn't ignore CRC errors, but instead
+treat them as card is still busy and send a new CMD13?
 
-please add your Signed-off-by here.
+Could you please try that and see how it works?
 
->
-> Fixes: c01e9a11ab6f ("nvmem: add driver for ocotp in i.MX23 and i.MX28")
+> So, it's better to never use CMD13 when change the speed mode.
 
-I tested the patch successful with i.MX23 and i.MX28.
+Yes, that might be the case. My concern is only that we should avoid
+adding unnecessary time-out for cards that is already working, as it
+might effects the total initialization time of the card.
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+On the other hand, perhaps these card are working more because of
+"luck" and thus the method to switch to HS mode are fragile and needs
+to be fixed. :-)
 
-@Srinivas: I think this patch should go to stable.
+>> That's what we have been doing so far, but perhaps that isn't good
+>> enough for HS200/400.
+>>
+>> > case, I tried some Samsung/Sandisk/KSI eMMC, issue CMD13 will always get
+>> > 0x800, even eMMC has already changed to transfer state and DAT0 is high,
+>> > the response of CMD13 is also 0x800, and will never be 0x900.
+>>
+>> What do you mean by never? I assume it would when you extend the timeout?
+>>
+>> Does your host driver make sure to ignore CRC errors in this case?
+>> Just to be sure, that isn't the problem.
+>>
+>> > So, in __mmc_switch(), it's a bug to use CMD13 to know that if card has
+>> > already changed to transfer state.
+>>
+>> Whether it's a bug or not, it seems like we have eMMC cards that we
+>> have issues to support because of the way we have interpreted the
+>> spec. So let's try to fix them!
+>>
+>> > But, Our host do not support MMC_CAP_WAIT_WHILE_BUSY, that's why we hit
+>> > this issue.
+>>
+>> Okay, I see.
+>>
+>> Let's try to change the behaviour in __mmc_switch() to prevent it to
+>> send CMD13 before the cards stops signal busy on DAT0, when switching
+>> to HS200/HS400 mode.
+>> What I have in mind is:
+>>
+>> 1.
+>> When the host controller doesn't support MMC_CAP_WAIT_WHILE_BUSY, we
+>> would then to wait for a fixed timeout, before we send CMD13. In this
+>> case, do you know if the "generic_cmd6_time" is working for your eMMC
+>> devices that you had issues with?
+>>
+> In general, generic_cmd6_time is enough, unless the card has firmware
+> issue itself,
 
-Regards
+Okay, so let's use that timeout value!
 
-> ---
->  drivers/nvmem/mxs-ocotp.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-> index 8ba19bb..2bb3c57 100644
-> --- a/drivers/nvmem/mxs-ocotp.c
-> +++ b/drivers/nvmem/mxs-ocotp.c
-> @@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->  	if (ret)
->  		goto close_banks;
->
-> -	while (val_size) {
-> +	while (val_size >= reg_size) {
->  		if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
->  			/* fill up non-data register */
->  			*buf = 0;
-> @@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->  		}
->
->  		buf++;
-> -		val_size--;
-> +		val_size -= reg_size;
->  		offset += reg_size;
->  	}
->
+If another value is needed for a specific card, that would have to be
+handled through a card quirk.
+
+>> 2.
+>> In additional to the above solution, we can for those hosts that
+>> supports the ->card_busy() ops, but not MMC_CAP_WAIT_WHILE_BUSY,
+>> invoke the ->card_busy() in a polling manner. Of course the above
+>> timeout should also be considered as we need to stop polling at some
+>> point.
+>>
+> this is what I want to do it, use the ops->card_busy() to check DAT0
+> status. if a host do not support MMC_CAP_WAIT_WHILE_BUSY and there is
+> no ops->card_busy(), then the only way is wait a fixed
+> timeout(generic_cmd6_time).
+
+Okay, great!
+
+[...]
+
+Kind regards
+Uffe
