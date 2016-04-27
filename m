@@ -1,31 +1,35 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 27 Apr 2016 00:08:19 -0400
-Subject: [PATCH v4 2/2] ARM: dts: imx6ul-pico-hobbit: Add initial support
-In-Reply-To: <1461729621-13283-2-git-send-email-festevam@gmail.com>
-References: <1461729621-13283-1-git-send-email-festevam@gmail.com>
- <1461729621-13283-2-git-send-email-festevam@gmail.com>
-Message-ID: <CABxcv=nhm+jrjBZ+jqS6pmZmEHpqB9K_1++7MsH6S4nznJyDtA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 27 Apr 2016 14:08:23 +1000
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.7
+Message-ID: <cover.1461722984.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On Wed, Apr 27, 2016 at 12:00 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
->
-> Add initial support for imx6ul pico hobbit board.
->
-> For information about this board, please visit:
-> http://www.wandboard.org/images/hobbit/hobbitboard-imx6ul-reva1.pdf
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
-> Changes since v3:
-> - Apply Shawn's comments that I missed earlier
-> - Only use the regulators that have users (Javier)
->
+Please consider these Renesas ARM64 based SoC defconfig updates for v4.7.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Best regards,
-Javier
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.7
+
+for you to fetch changes up to a03bd5735dfa87a5db585e162eda00794690c534:
+
+  arm64: defconfig: Add Renesas R-Car USB 3.0 driver support (2016-04-22 10:17:34 +1000)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC Defconfig Updates for v4.7
+
+* Add Renesas R-Car USB 3.0 driver support
+
+----------------------------------------------------------------
+Yoshihiro Shimoda (1):
+      arm64: defconfig: Add Renesas R-Car USB 3.0 driver support
+
+ arch/arm64/configs/defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
