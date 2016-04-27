@@ -1,222 +1,164 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 27 Apr 2016 18:31:29 +0100
-Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <20160427164453.GB17629@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-3-git-send-email-tn@semihalf.com>
- <20160427022649.GD6789@localhost> <20160427111758.GA6234@red-moon>
- <20160427164453.GB17629@localhost>
-Message-ID: <20160427173118.GA26653@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Apr 2016 19:42:13 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <877ffjro0w.fsf@ti.com>
+References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+ <4985498.GT33RtioOA@wuerfel> <877ffjro0w.fsf@ti.com>
+Message-ID: <6148633.0YXW4XnX4b@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 11:44:53AM -0500, Bjorn Helgaas wrote:
-> On Wed, Apr 27, 2016 at 12:17:58PM +0100, Lorenzo Pieralisi wrote:
-> > On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
-> > > On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
-> > > > As we now have valid PCI host bridge device reference we can
-> > > > introduce code that is going to find its bus domain number using
-> > > > ACPI _SEG method.
-> > > > 
-> > > > Note that _SEG method is optional, therefore _SEG absence means
-> > > > that all PCI buses belong to domain 0.
-> > > > 
-> > > > While at it, for the sake of code clarity we put ACPI and DT domain
-> > > > assign methods into the corresponding helpers.
-> > > > 
-> > > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > > > Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > > > Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-> > > > Tested-by: Duc Dang <dhdang@apm.com>
-> > > > Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> > > > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > > Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> > > > ---
-> > > >  drivers/acpi/pci_root.c  | 18 ++++++++++++++++++
-> > > >  drivers/pci/pci.c        | 11 +++++++++--
-> > > >  include/linux/pci-acpi.h |  2 ++
-> > > >  3 files changed, 29 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> > > > index 4581e0e..d9a70c4 100644
-> > > > --- a/drivers/acpi/pci_root.c
-> > > > +++ b/drivers/acpi/pci_root.c
-> > > > @@ -419,6 +419,24 @@ out:
-> > > >  }
-> > > >  EXPORT_SYMBOL(acpi_pci_osc_control_set);
-> > > >  
-> > > > +int acpi_pci_bus_domain_nr(struct device *parent)
+On Wednesday 27 April 2016 19:53:51 Felipe Balbi wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Wednesday 27 April 2016 16:50:19 Catalin Marinas wrote:
+> >> On Wed, Apr 27, 2016 at 04:11:17PM +0200, Arnd Bergmann wrote:
+> >> > On Wednesday 27 April 2016 14:59:00 Catalin Marinas wrote:
+> >> > > 
+> >> > > I would be in favour of a dma_inherit() function as well. We could hack
+> >> > > something up in the arch code (like below) but I would rather prefer an
+> >> > > explicit dma_inherit() call by drivers creating such devices.
+> >> > > 
+> >> > > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> >> > > index ba437f090a74..ea6fb9b0e8fa 100644
+> >> > > --- a/arch/arm64/include/asm/dma-mapping.h
+> >> > > +++ b/arch/arm64/include/asm/dma-mapping.h
+> >> > > @@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
+> >> > >  
+> >> > >  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+> >> > >  {
+> >> > > -       if (dev && dev->archdata.dma_ops)
+> >> > > -               return dev->archdata.dma_ops;
+> >> > > +       while (dev) {
+> >> > > +               if (dev->archdata.dma_ops)
+> >> > > +                       return dev->archdata.dma_ops;
+> >> > > +               dev = dev->parent;
+> >> > > +       }
+> >> > 
+> >> > I think this would be a very bad idea: we don't want to have random
+> >> > devices be able to perform DMA just because their parent devices
+> >> > have been set up that way.
+> >> 
+> >> I agree, it's a big hack. It would be nice to have a simpler way to do
+> >> this in driver code rather than explicitly calling
+> >> of_dma_configure/arch_setup_dma_ops as per the original patch in this
+> >> thread.
+> >
+> > I haven't followed the entire discussion, but what's wrong with passing
+> > around a pointer to a 'struct device *hwdev' that represents the physical
+> > device that does the DMA?
 > 
-> It looks like acpi_pci_bus_domain_nr() could be under #ifdef
-> CONFIG_PCI_DOMAINS_GENERIC, right?
-
-Yes it should.
-
-> > > > +{
-> > > > +	struct acpi_device *acpi_dev = to_acpi_device(parent);
-> > > > +	unsigned long long segment = 0;
-> > > > +	acpi_status status;
-> > > > +
-> > > > +	/*
-> > > > +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-> > > > +	 * all PCI buses belong to domain 0.
-> > > > +	 */
-> > > > +	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
-> > > > +				       &segment);
-> > > 
-> > > We already have code in acpi_pci_root_add() to evaluate _SEG.  We
-> > > don't want to evaluate it *twice*, do we?
-> > > 
-> > > I was sort of expecting that if you added it here, we'd remove the
-> > > existing call, but it looks like you're keeping both?
-> > 
-> > We can't remove the existing call, since it is used on X86 and IA64
-> > to store the segment number that, in the process, is used in their
-> > pci_domain_nr() arch specific callback to retrieve the domain nr.
-> > 
-> > On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
-> > to retrieve the domain number that is not arch dependent, since
-> > this is generic code, we can't rely on any bus->sysdata format (unless
-> > we do something like JC did below), therefore the only way is to call
-> > the _SEG method *again* here, which also forced Tomasz to go through
-> > the ACPI_COMPANION setting song and dance and pass the parent pointer
-> > to pci_create_root_bus() (see patch 1), which BTW is a source of
-> > trouble on its own as you noticed.
-> > 
-> > JC solved it differently, via sysdata and pseudo-generic code:
-> > 
-> > http://www.spinics.net/lists/arm-kernel/msg478167.html
+> that will likely create duplicated solutions in several drivers and
+> it'll be a pain to maintain. There's another complication, dwc3 can be
+> integrated in many different ways. See the device child-parent tree
+> representations below:
 > 
-> The thing I don't like about this is the special case of checking
-> parent and parent->of_node to figure out whether we should use the
-> segment from ACPI and the fragility of depending on the fact that the
-> companion hasn't been set yet.
+> a) with a parent PCI device:
 > 
-> > http://www.spinics.net/lists/arm-kernel/msg478169.html
-> > 
-> > I like neither, we need the lesser of two evils though.
+> pci_bus_type
+>  - dwc3-pci
+>    - dwc3
+>      - xhci-plat
 > 
-> Today we call pci_bus_assign_domain_nr() from the PCI core (from
-> pci_create_root_bus()).  This is only implemented for
-> PCI_DOMAINS_GENERIC, but even so, it fiddles around to figure out
-> whether to get the domain from DT or to assign a new one.
+> b) with a parent platform_device (OF):
 > 
-> That seems backwards to me.  The host bridge drivers already know
-> where the domain should come from (ACPI _SEG, DT, etc.) and in the
-> long term, I think they should be responsible for looking up or
-> assigning a domain number *before* they call pci_create_root_bus().
-
-Yes, the question still is how pci_create_root_bus() can get that
-value (I am pretty certain this was heavily debated in the past, which
-does not mean we can't give it another try).
-
-> > > > +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-> > > > +		dev_err(&acpi_dev->dev, "can't evaluate _SEG\n");
-> > > > +
-> > > > +	return segment;
-> > > > +}
-> > > > +
-> > > >  static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
-> > > >  {
-> > > >  	u32 support, control, requested;
-> > > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > > > index 25e0327..1a74e87 100644
-> > > > --- a/drivers/pci/pci.c
-> > > > +++ b/drivers/pci/pci.c
-> > > > @@ -19,6 +19,7 @@
-> > > >  #include <linux/spinlock.h>
-> > > >  #include <linux/string.h>
-> > > >  #include <linux/log2.h>
-> > > > +#include <linux/pci-acpi.h>
-> > > >  #include <linux/pci-aspm.h>
-> > > >  #include <linux/pm_wakeup.h>
-> > > >  #include <linux/interrupt.h>
-> > > > @@ -4779,7 +4780,7 @@ int pci_get_new_domain_nr(void)
-> > > >  }
-> > > >  
-> > > >  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> > > > -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > > +static int of_pci_bus_domain_nr(struct device *parent)
-> > > >  {
-> > > >  	static int use_dt_domains = -1;
-> > > >  	int domain = -1;
-> > > > @@ -4823,7 +4824,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > >  		domain = -1;
-> > > >  	}
-> > > >  
-> > > > -	bus->domain_nr = domain;
-> > > > +	return domain;
-> > > > +}
-> > > > +
-> > > > +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> > > > +{
-> > > > +	bus->domain_nr = acpi_disabled ? of_pci_bus_domain_nr(parent) :
-> > > > +					 acpi_pci_bus_domain_nr(parent);
+> platform_bus_type
+>  - dwc3-${omap,st,of-simple,exynos,keystone}
+>    - dwc3
+>      - xhci-plat
 > 
-> We have the pci_bus * here, so to_pci_host_bridge(bus->bridge) gives
-> us the struct pci_host_bridge.  I can't remember why we put domain_nr
-> in the struct pci_bus instead of in the struct pci_host_bridge.  It
-> seems like pci_host_bridge is the more logical place for it, because
-> every bus below the host bridge must have the same domain by
-> definition.
+> c) without a parent at all (thanks Grygorii):
 > 
-> Would it be feasible to either (a) move domain_nr to the
-> pci_host_bridge, or (b) change acpi_pci_bus_domain_nr() so it uses the
-> struct pci_bus * or the struct device * to find the struct
-> acpi_pci_root where segment has already been stored by
-> acpi_pci_root_add()?
-
-(b) is what JC implemented even though it works differently for
-different hosts since it all depends on what's in bus->sysdata.
-
-It can certainly be done in a generic way (that works on X86 and IA64
-too), let's give it more thought.
-
-> Another wrinkle is the quirk added by 1f09b09b4de0 ("x86/PCI: Ignore
-> _SEG on HP xw9300").  x86 doesn't use PCI_DOMAINS_GENERIC yet, so this
-> patch wouldn't break it, but I hope x86 can use PCI_DOMAINS_GENERIC in
-> the future, and then it will be a problem if we evaluate _SEG again.
-
-Yes, I share your concern here and I thought about that, if that's the
-end goal let's find a solution that works across arches (or we temporarily
-use JC's code and we then generalize it).
-
-Thanks,
-Lorenzo
-
+> platform_bus_type
+>  - dwc3
+>    - xhci-plat
 > 
-> > > >  }
-> > > >  #endif
-> > > >  #endif
-> > > > diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> > > > index 89ab057..a72e22d 100644
-> > > > --- a/include/linux/pci-acpi.h
-> > > > +++ b/include/linux/pci-acpi.h
-> > > > @@ -22,6 +22,7 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
-> > > >  {
-> > > >  	return acpi_remove_pm_notifier(dev);
-> > > >  }
-> > > > +extern int acpi_pci_bus_domain_nr(struct device *parent);
-> > > >  extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
-> > > >  
-> > > >  static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
-> > > > @@ -109,6 +110,7 @@ extern const u8 pci_acpi_dsm_uuid[];
-> > > >  #else	/* CONFIG_ACPI */
-> > > >  static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
-> > > >  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
-> > > > +static inline int acpi_pci_bus_domain_nr(struct device *parent) { return -1; }
-> > > >  #endif	/* CONFIG_ACPI */
-> > > >  
-> > > >  #ifdef CONFIG_ACPI_APEI
-> > > > -- 
-> > > > 1.9.1
-> > > > 
-> > > > --
-> > > > To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> > > > the body of a message to majordomo at vger.kernel.org
-> > > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > > 
+> (a) and (b) above are the common cases. The DMA-capable device is
+> clearly dwc3-${pci,omap,st,of-simple,exynos,keystone} with dwc3 only
+> having proper DMA configuration in OF platforms (because of the
+> unconditional of_dma_configure() during OF device creation) and
+> xhci-plat not knowing about DMA at all and hardcoding some crappy
+> defaults.
 > 
+> (c) is the uncommon case which creates some problems. In this case, dwc3
+> itself is the DMA-capable device and dwc3->dev->parent is the
+> platform_bus_type itself. Now consider the problem this creates:
+> 
+> i. the patch that I wrote [1] becomes invalid for (c), thanks to
+> Grygorii for pointing this out before it was too late.
+> 
+> ii. xhci-plat can also be described directly in DT (and is in some
+> cases). This means that assuming xhci-plat's parent's parent to be the
+> DMA-capable device is also an invalid assumption.
+> 
+> iii. one might argue that for DT-based platforms *with* a glue layer
+> ((b) above), OF already "copies" some sensible DMA defaults during
+> device creation.
+
+But that is exactly the point I was trying to make: instead of copying
+all the data into the xhci-plat device, just assign one pointer
+inside the xhci-plat device from whoever creates it.
+
+> The only clean way to fix this up is with a dma_inherit()-like API which
+> would allow dwc3's glue layers ((a) and (b) above) to initialize child's
+> (dwc3) DMA configuration during child's creation. Something like below:
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-pci.c b/drivers/usb/dwc3/dwc3-pci.c
+> index adc1e8a624cb..74b599269e2c 100644
+> --- a/drivers/usb/dwc3/dwc3-pci.c
+> +++ b/drivers/usb/dwc3/dwc3-pci.c
+> @@ -152,6 +152,8 @@ static int dwc3_pci_probe(struct pci_dev *pci,
+>  		return -ENOMEM;
+>  	}
+>  
+> +	dma_inherit(&dwc->dev, dev);
+> +
+>  	memset(res, 0x00, sizeof(struct resource) * ARRAY_SIZE(res));
+>  
+>  	res[0].start	= pci_resource_start(pci, 0);
+> 
+> that's all I'm asking for :-) dma_inherit() should, probably, be
+> arch-specific to handle details like IOMMU (which today sits under
+> archdata).
+
+It's still wrong: the archdata in the device can contain all sorts of
+additional information about how to do DMA, and some of that information
+is bus specific, e.g. when your dma_map_ops look like the on sparc:
+
+static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+{
+#ifdef CONFIG_SPARC_LEON
+        if (sparc_cpu_model == sparc_leon)
+                return leon_dma_ops;
+#endif
+#if defined(CONFIG_SPARC32) && defined(CONFIG_PCI)
+        if (dev->bus == &pci_bus_type)
+                return &pci32_dma_ops;
+#endif
+        return dma_ops;
+}
+
+There is no way for a device to "inherit" the bus_type of its parent,
+so it becomes an architecture specific hack. However, if you change
+all the dma operations to work on the actual device that the dma
+mapping API knows about, it just works.
+
+I've looked at the usb HCD code now and see this:
+
+struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
+                struct device *dev, const char *bus_name,
+                struct usb_hcd *primary_hcd)
+{
+	...
+        hcd->self.controller = dev;
+        hcd->self.uses_dma = (dev->dma_mask != NULL);
+	...
+}
+
+What I think we need to do here is ensure that the device that gets
+passed here and assigned to hcd->self.controller is the actual DMA
+master device, i.e. the pci_device or platform_device that was created
+from outside of the xhci stack. This is after all the pointer that
+gets passed into all the dma_map_*/dma_sync_*/dma_alloc_*/...
+functions.
+
+	Arnd
