@@ -1,42 +1,91 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Apr 2016 14:24:03 +0100
-Subject: [RESEND PATCH v2 7/7] usb: xhci: plat: add vbus regulator control
-In-Reply-To: <20160427182516.36bd5fb5@xhacker>
-References: <1461675460-2295-1-git-send-email-jszhang@marvell.com>
- <1461675460-2295-8-git-send-email-jszhang@marvell.com>
- <87bn4vpq7j.fsf@intel.com> <20160427095738.GG3217@sirena.org.uk>
- <20160427182516.36bd5fb5@xhacker>
-Message-ID: <20160427132403.GN3217@sirena.org.uk>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Wed, 27 Apr 2016 09:25:06 -0400
+Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
+In-Reply-To: <57207CB1.4040307@arm.com>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
+ <20160426033029.GB2274@localhost>
+ <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
+ <20160426162529.GK2274@localhost> <571F9D76.2060809@codeaurora.org>
+ <20160427081501.GV2274@localhost> <57207CB1.4040307@arm.com>
+Message-ID: <64be6f181a4c5b712fc3893e9ecd19df@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 06:25:16PM +0800, Jisheng Zhang wrote:
-> On Wed, 27 Apr 2016 10:57:39 +0100 Mark Brown wrote:
-> > On Wed, Apr 27, 2016 at 08:37:20AM +0300, Felipe Balbi wrote:
+On 2016-04-27 04:47, Marc Zyngier wrote:
+> On 27/04/16 09:15, Vinod Koul wrote:
+>> On Tue, Apr 26, 2016 at 12:55:18PM -0400, Sinan Kaya wrote:
+>>> On 4/26/2016 12:25 PM, Vinod Koul wrote:
+>>>> On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org 
+>>>> wrote:
+>>>>> On 2016-04-25 23:30, Vinod Koul wrote:
+>>>>>> On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
+>>>>>> 
+>>>>>>> +static int hidma_chan_stats(struct seq_file *s, void *unused)
+>>>>>>> +{
+>>>>>>> +	struct hidma_chan *mchan = s->private;
+>>>>>>> +	struct hidma_desc *mdesc;
+>>>>>>> +	struct hidma_dev *dmadev = mchan->dmadev;
+>>>>>>> +
+>>>>>>> +	pm_runtime_get_sync(dmadev->ddev.dev);
+>>>>>> 
+>>>>>> debug shouldn't power up device, why do you want to do that
+>>>>> 
+>>>>> 
+>>>>> Clocks are turned off while the hw is idle. I can?t reach hw
+>>>>> registers without restoring power.
+>>>> 
+>>>> Hmm, have you thought about using regmap?
+>>>> 
+>>> 
+>>> To be honest, I didn't know what regmap is but I just read some code
+>>> and looked at how it is used. Feel free to correct me if I got it
+>>> wrong.
+>>> 
+>>> Regmap seems to be designed for *slow* speed peripherals to improve 
+>>> frequent
+>>> accesses by the SW. It looks like it is used by MFD, SPI and I2C 
+>>> drivers.
+>>> 
+>>> It seems to cache the register contents and flush/invalidate them 
+>>> only when
+>>> needed.
+>>> 
+>>> The MMIO version seems to be assuming the presence of device-tree 
+>>> like CLK
+>>> API which doesn't exist on ACPI systems and is not portable.
+>>> 
+>>> My reaction is that it is a lot of code with no added functionality 
+>>> to what
+>>> HIDMA driver is trying to achieve.
+>>> 
+>>> Given that the use case here is only for debug purposes; I think it 
+>>> is OK
+>>> to keep this runtime call here. I don't want to add any overhead into 
+>>> the
+>>> existing code just to support the debug use case.
+>>> 
+>>> None of my register read/writes are slow. This file will only be used 
+>>> to
+>>> troubleshoot customer issues.
+> 
+> I'd recommend you actually run perf on a a few of your MMIO accesses. I
+> believe the result will be eye opening. On the KVM side, we've trimmed
+> our MMIO access as much as possible, using a memory-based cache 
+> (similar
+> to regmap in concept). This has made some code paths about 40% faster.
+> 
+>> $ is always faster than MMIO. This way you can give reg contents to 
+>> users
+>> without waking up hw.
+> 
+> Indeed. MMIO access sucks rocks, even on a very fast box. Actually, the
+> faster the box is, the slower MMIO feels (compared to memory).
+> 
+> Thanks,
+> 
+> 	M.
 
-> > > > +	vbus = devm_regulator_get(&pdev->dev, "vbus");  
 
-> > > devm_regulator_get_optional() ??  
-
-> > Does USB work without a VBUS?  Unless the answer is yes then I'd expect
-> > this to be just a normal regulator_get().
-
-> Per spec no. But the vbus may be transparent to SW on some platforms, so I
-> think devm_regulator_get_optional() is better.
-
-Really, no.  If it's physically there the software needs to be written
-as such.  Please see the documentation and list archives for extensive
-discussion on this topic.
-
-> > This is all completely broken unless the supply is optional.
-
-> The supply is optional.
-
-To repeat a supply is only optional if it might be physically absent.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160427/5c7d5c8b/attachment.sig>
+Agreed. However, I need to understand how regmap really works under the 
+covers and whether it is compatible with the hardware.
