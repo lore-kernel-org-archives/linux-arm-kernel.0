@@ -1,27 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2016 11:03:17 +0200
-Subject: [GIT PULL] ARM: EXYNOS: fixes for v4.6
-In-Reply-To: <1461738154-8335-1-git-send-email-k.kozlowski@samsung.com>
-References: <1461738154-8335-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5647946.YabRqFapJm@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 27 Apr 2016 10:07:46 +0100
+Subject: [PATCH V4 11/18] coresight: tmc: adding mode of operation for
+ link/sinks
+In-Reply-To: <1461708634-6327-12-git-send-email-mathieu.poirier@linaro.org>
+References: <1461708634-6327-1-git-send-email-mathieu.poirier@linaro.org>
+ <1461708634-6327-12-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <57208162.8080908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 08:22:34 Krzysztof Kozlowski wrote:
->   ARM: EXYNOS: Properly skip unitialized parent clock in power domain on (2016-04-25 11:35:37 +0200)
-> 
-> ----------------------------------------------------------------
-> Fix for more theoretical than practical OOPS on first turn on of a exynos
-> power domain, if there was no turn off before. Usually all power domains
-> are on, so the first action is to turn off but some older bootloaders
-> might behave differently.
-> 
+On 26/04/16 23:10, Mathieu Poirier wrote:
+> Moving tmc_drvdata::enable to a local_t mode.  That way the
+> sink interface is aware of it's orgin and the foundation for
+> mutual exclusion between the sysFS and Perf interface can be
+> laid out.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Pulled into fixes. Linus has just merged a larger set of fixes from
-arm-soc, and this one doesn't seem very urgent, so I'd wait for more
-important fixes to come up before sending out another pull request.
-
-In the unlikely case that we don't get any critical bugfixes, I'd just
-send this one for 4.7.
-
-	Arnd
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
