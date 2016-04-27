@@ -1,70 +1,21 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 27 Apr 2016 17:32:40 +0200
-Subject: [PATCH v2] ARM: dts: imx28-m28: Remove unneeded partition nodes
-In-Reply-To: <1461770872-26510-1-git-send-email-fabio.estevam@nxp.com>
-References: <1461770872-26510-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <5720DB98.8@denx.de>
+From: brad.mouring@ni.com (Brad Mouring)
+Date: Wed, 27 Apr 2016 10:35:49 -0500
+Subject: [PATCH v3 0/2] Control PL310 pwr_ctrl register through DT
+In-Reply-To: <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+References: <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+Message-ID: <1461771351-11645-1-git-send-email-brad.mouring@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2016 05:27 PM, Fabio Estevam wrote:
-> mtdparts is passed from command line, so there is no need to have a
-> default partitioning in device-tree.
-> 
-> Suggested-by: Marek Vasut <marex@denx.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Acked-by: Marek Vasut <marex@denx.de>
+This revision of the patches addresses the concerns on documenting
+the DT bindings brought up here:
+http://www.spinics.net/lists/arm-kernel/msg500784.html
 
-Thanks for doing this :)
+The technical change remains functionally the same, however v2 was
+needlessly setting the bits twice in the case that the binding
+existed and was non-zero.
 
-> ---
-> Changes since v1:
-> - Remove all partition nodes
-> 
->  arch/arm/boot/dts/imx28-m28.dtsi | 26 --------------------------
->  1 file changed, 26 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
-> index 759cc56..6cebaa6 100644
-> --- a/arch/arm/boot/dts/imx28-m28.dtsi
-> +++ b/arch/arm/boot/dts/imx28-m28.dtsi
-> @@ -27,32 +27,6 @@
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
->  				status = "okay";
-> -
-> -				partition at 0 {
-> -					label = "bootloader";
-> -					reg = <0x00000000 0x00300000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at 1 {
-> -					label = "environment";
-> -					reg = <0x00300000 0x00080000>;
-> -				};
-> -
-> -				partition at 2 {
-> -					label = "redundant-environment";
-> -					reg = <0x00380000 0x00080000>;
-> -				};
-> -
-> -				partition at 3 {
-> -					label = "kernel";
-> -					reg = <0x00400000 0x00400000>;
-> -				};
-> -
-> -				partition at 4 {
-> -					label = "filesystem";
-> -					reg = <0x00800000 0x0f800000>;
-> -				};
->  			};
->  		};
->  
-> 
+Thanks!
 
-
--- 
-Best regards,
-Marek Vasut
+Brad
