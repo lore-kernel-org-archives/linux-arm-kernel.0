@@ -1,99 +1,84 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 27 Apr 2016 11:07:10 -0700
-Subject: [PATCH v6 08/14] x86, acpi,
- numa: cleanup acpi_numa_processor_affinity_init()
+Date: Wed, 27 Apr 2016 11:07:08 -0700
+Subject: [PATCH v6 06/14] arm64, numa: rework numa_add_memblk()
 In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461780436-27182-9-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461780436-27182-7-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Cleanup acpi_numa_processor_affinity_init() in preparation for its
-move to drivers/acpi/numa.c.  It will be reused by arm64, this has no
-functional change.
+Rework numa_add_memblk() to update the parameter "u64 size" to "u64
+end", this will make it consistent with x86 and simplifies the arm64
+ACPI NUMA code to be added later.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c | 21 +++++----------------
- 1 file changed, 5 insertions(+), 16 deletions(-)
+ arch/arm64/mm/numa.c | 12 ++++++------
+ drivers/of/of_numa.c |  4 ++--
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index f242a11..9e2a833 100644
---- a/arch/x86/mm/srat.c
-+++ b/arch/x86/mm/srat.c
-@@ -26,11 +26,6 @@
- 
- int acpi_numa __initdata;
- 
--static __init int setup_node(int pxm)
--{
--	return acpi_map_pxm_to_node(pxm);
--}
--
- static __init void bad_srat(void)
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 98dc104..6cb03f9 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -131,25 +131,25 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+  * numa_add_memblk - Set node id to memblk
+  * @nid: NUMA node ID of the new memblk
+  * @start: Start address of the new memblk
+- * @size:  Size of the new memblk
++ * @end:  End address of the new memblk
+  *
+  * RETURNS:
+  * 0 on success, -errno on failure.
+  */
+-int __init numa_add_memblk(int nid, u64 start, u64 size)
++int __init numa_add_memblk(int nid, u64 start, u64 end)
  {
- 	printk(KERN_ERR "SRAT: SRAT not used.\n");
-@@ -64,7 +59,7 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
- 			 pxm, apic_id);
- 		return;
+ 	int ret;
+ 
+-	ret = memblock_set_node(start, size, &memblock.memory, nid);
++	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
+ 	if (ret < 0) {
+ 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
+-			start, (start + size - 1), nid);
++			start, (end - 1), nid);
+ 		return ret;
  	}
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
- 		bad_srat();
-@@ -100,7 +95,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
- 	pxm = pa->proximity_domain_lo;
- 	if (acpi_srat_revision >= 2)
- 		pxm |= *((unsigned int*)pa->proximity_domain_hi) << 8;
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
- 		bad_srat();
-@@ -124,12 +119,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
- 	       pxm, apic_id, node);
+ 
+ 	node_set(nid, numa_nodes_parsed);
+ 	pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
+-			start, (start + size - 1), nid);
++			start, (end - 1), nid);
+ 	return ret;
  }
  
--#ifdef CONFIG_MEMORY_HOTPLUG
--static inline int save_add_info(void) {return 1;}
--#else
--static inline int save_add_info(void) {return 0;}
--#endif
--
- /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
- int __init
- acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
-@@ -145,7 +134,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- 	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
- 		goto out_err;
- 	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
--	if (hotpluggable && !save_add_info())
-+	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
- 		goto out_err;
+@@ -367,7 +367,7 @@ static int __init dummy_numa_init(void)
+ 	       0LLU, PFN_PHYS(max_pfn) - 1);
  
- 	start = ma->base_address;
-@@ -154,7 +143,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- 	if (acpi_srat_revision <= 1)
- 		pxm &= 0xff;
+ 	for_each_memblock(memory, mblk) {
+-		ret = numa_add_memblk(0, mblk->base, mblk->size);
++		ret = numa_add_memblk(0, mblk->base, mblk->base + mblk->size);
+ 		if (!ret)
+ 			continue;
  
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
- 		goto out_err_bad_srat;
-@@ -182,7 +171,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- out_err_bad_srat:
- 	bad_srat();
- out_err:
--	return -1;
-+	return -EINVAL;
- }
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+index 0f2784b..ed5a097 100644
+--- a/drivers/of/of_numa.c
++++ b/drivers/of/of_numa.c
+@@ -91,8 +91,8 @@ static int __init of_numa_parse_memory_nodes(void)
+ 		pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
+ 			 rsrc.start, rsrc.end - rsrc.start + 1, nid);
  
- int __init x86_acpi_numa_init(void)
+-		r = numa_add_memblk(nid, rsrc.start,
+-				    rsrc.end - rsrc.start + 1);
++
++		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+ 		if (r)
+ 			break;
+ 	}
 -- 
 1.7.11.7
