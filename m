@@ -1,41 +1,94 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Wed, 27 Apr 2016 13:53:21 +0200
-Subject: [PATCH] nvmem/mxs-ocotp: fix buffer overflow in read
-Message-ID: <201ccd58-8735-02d8-b4e4-9d2eda828fd8@meduna.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 27 Apr 2016 14:55:57 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <878tzzpq19.fsf@intel.com>
+References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+ <87d1pcrj0t.fsf@intel.com> <571F2357.9080509@ti.com>
+ <878tzzpq19.fsf@intel.com>
+Message-ID: <5720A8CD.6060103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the issue where the mxs_ocotp_read is reading
-the ocotp in reg_size steps but decrements the remaining size
-by 1. The number of iterations is thus four times higher,
-overwriting the area behind the output buffer.
+On 04/27/2016 08:41 AM, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>> On 04/26/2016 09:17 AM, Felipe Balbi wrote:
+>>>
+>>> Hi,
+>>>
+>>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>>>> Now not all DMA paremters configured properly for "xhci-hcd" platform
+>>>> device which is created manually. For example: dma_pfn_offset, dam_ops
+>>>> and iommu configuration will not corresponds "dwc3" devices
+>>>> configuration. As result, this will cause problems like wrong DMA
+>>>> addresses translation on platforms with LPAE enabled like Keystone 2.
+>>>>
+>>>> When platform is using DT boot mode the DMA configuration will be
+>>>> parsed and applied from DT, so, to fix this issue, reuse
+>>>> of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
+>>>> from DWC3 device node.
+>>>
+>>> patch is incomplete. You left out non-DT users which might suffer from
+>>> the same problem.
+>>>
+>>
+>> Honestly, I don't know how to fix it gracefully for non-DT case.
+>> I can update commit message to mention that this is fix for DT case only.
+> 
+> no, that won't do :-) There are other users for this driver and they are
+> all "out-of-compliance" when it comes to DMA usage. Apparently, the
+> desired behavior is to pass correct device to DMA API which the gadget
+> side is already doing (see below). For the host side, the fix has to be
+> more involved.
+> 
+> Frankly, I'd prefer that DMA setup could be inherited from parent
+> device, then it wouldn't really matter and a bunch of this could be
+> simplified. Some sort of dma_inherit(struct device *dev, struct device
+> *parent) would go a long way, IMHO.
+> 
+> 8<-------------------------------- cut here ------------------------
+> commit 2725d6f974c4c268ae5fb746f8e3b33b76135aa8
+> Author: Felipe Balbi <felipe.balbi@linux.intel.com>
+> Date:   Tue Apr 19 16:18:12 2016 +0300
+> 
+>      usb: dwc3: use parent device for DMA
+>      
+>      our parent device is the one which was initialized
+>      by either PCI or DeviceTree and that's the one which
+>      is configured properly for DMA access.
+>      
+>      Instead of copying DMA bits from parent to child,
+>      let's just rely on parent device for the entire DMA
+>      API.
 
-Fixes: c01e9a11ab6f ("nvmem: add driver for ocotp in i.MX23 and i.MX28")
----
- drivers/nvmem/mxs-ocotp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+1) Patch I've sent fixes "xhci-hcd" platform device and not dwc3 core.
+On TI boards dwc3 core devices are created from DT and so, I do not see
+any problems with dwc3 core. Problem is with xhci.
 
-diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-index 8ba19bb..2bb3c57 100644
---- a/drivers/nvmem/mxs-ocotp.c
-+++ b/drivers/nvmem/mxs-ocotp.c
-@@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
- 	if (ret)
- 		goto close_banks;
+2) there is minimum one dtsi file where dwc3 ("snps,dwc3") does not have parent device
+ls1021a.dtsi (and 5 dtsi in arm64 folder)
 
--	while (val_size) {
-+	while (val_size >= reg_size) {
- 		if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
- 			/* fill up non-data register */
- 			*buf = 0;
-@@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
- 		}
 
- 		buf++;
--		val_size--;
-+		val_size -= reg_size;
- 		offset += reg_size;
- 	}
+
+>      
+>      Signed-off-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+> 
+> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> index c050a88c16d4..09e4ff71a50f 100644
+> --- a/drivers/usb/dwc3/core.c
+> +++ b/drivers/usb/dwc3/core.c
+> @@ -180,7 +180,7 @@ static void dwc3_frame_length_adjustment(struct dwc3 *dwc, u32 fladj)
+>   static void dwc3_free_one_event_buffer(struct dwc3 *dwc,
+>   		struct dwc3_event_buffer *evt)
+>   {
+> -	dma_free_coherent(dwc->dev, evt->length, evt->buf, evt->dma);
+> +	dma_free_coherent(dwc->dev->parent, evt->length, evt->buf, evt->dma);
+>   }
+
+[...]
 
 -- 
-2.1.4
+regards,
+-grygorii
