@@ -1,86 +1,132 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 27 Apr 2016 13:59:30 +0200
-Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <20160427022649.GD6789@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-3-git-send-email-tn@semihalf.com>
- <20160427022649.GD6789@localhost>
-Message-ID: <5720A9A2.6000609@semihalf.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Wed, 27 Apr 2016 20:06:16 +0800
+Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
+In-Reply-To: <CAPDyKFpO89QWHST8XoBvRO4Y+Fv4Umt43B35E2vhm-z2WmZXSw@mail.gmail.com>
+References: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrXVaq85sSQ+ib-U=rgdxB_k2tif0aHQi_0d8kZ2FZDcA@mail.gmail.com>
+ <1461404630.7081.9.camel@mhfsdcap03>
+ <CAPDyKFpO89QWHST8XoBvRO4Y+Fv4Umt43B35E2vhm-z2WmZXSw@mail.gmail.com>
+Message-ID: <1461758776.20837.7.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.04.2016 04:26, Bjorn Helgaas wrote:
-> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
->> As we now have valid PCI host bridge device reference we can
->> introduce code that is going to find its bus domain number using
->> ACPI _SEG method.
->>
->> Note that _SEG method is optional, therefore _SEG absence means
->> that all PCI buses belong to domain 0.
->>
->> While at it, for the sake of code clarity we put ACPI and DT domain
->> assign methods into the corresponding helpers.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
->> Tested-by: Duc Dang <dhdang@apm.com>
->> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
->> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Tested-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>   drivers/acpi/pci_root.c  | 18 ++++++++++++++++++
->>   drivers/pci/pci.c        | 11 +++++++++--
->>   include/linux/pci-acpi.h |  2 ++
->>   3 files changed, 29 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
->> index 4581e0e..d9a70c4 100644
->> --- a/drivers/acpi/pci_root.c
->> +++ b/drivers/acpi/pci_root.c
->> @@ -419,6 +419,24 @@ out:
->>   }
->>   EXPORT_SYMBOL(acpi_pci_osc_control_set);
->>
->> +int acpi_pci_bus_domain_nr(struct device *parent)
->> +{
->> +	struct acpi_device *acpi_dev = to_acpi_device(parent);
->> +	unsigned long long segment = 0;
->> +	acpi_status status;
->> +
->> +	/*
->> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
->> +	 * all PCI buses belong to domain 0.
->> +	 */
->> +	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
->> +				       &segment);
->
-> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
-> don't want to evaluate it *twice*, do we?
+Hi,
+On Wed, 2016-04-27 at 12:02 +0200, Ulf Hansson wrote:
+> On 23 April 2016 at 11:43, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > Hi,
+> > On Fri, 2016-04-22 at 14:24 +0200, Ulf Hansson wrote:
+> >> On 18 April 2016 at 09:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> >> > there are 2 points will cause could not call mmc_request_done()
+> >> > and eventually cause the caller thread blocked.
+> >> >
+> >> > A. if card was busy, cancel_delayed_work() will return false because
+> >> > the delay work has not been scheduled, in this case, need put
+> >> > mod_delayed_work() in front of msdc_cmd_is_ready()
+> >> >
+> >> > B. if a request really need more than 5s(Some Sandisk TF card), it will
+> >> > use cancel_delayed_work() to cancel itself, and also return false, so use
+> >> > in_interrupt() to avoid this case
+> >> >
+> >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> >> > ---
+> >> >  drivers/mmc/host/mtk-sd.c | 11 ++++++++---
+> >> >  1 file changed, 8 insertions(+), 3 deletions(-)
+> >> >
+> >> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> >> > index b17f30d..1511b1b 100644
+> >> > --- a/drivers/mmc/host/mtk-sd.c
+> >> > +++ b/drivers/mmc/host/mtk-sd.c
+> >> > @@ -724,7 +724,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
+> >> >         bool ret;
+> >> >
+> >> >         ret = cancel_delayed_work(&host->req_timeout);
+> >> > -       if (!ret) {
+> >> > +       if (!ret && in_interrupt()) {
+> >> >                 /* delay work already running */
+> >> >                 return;
+> >> >         }
+> >> > @@ -824,7 +824,12 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+> >> >         }
+> >> >
+> >> >         if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+> >> > -               tmo = jiffies + msecs_to_jiffies(20);
+> >> > +               /*
+> >> > +                * 2550ms is from EXT_CSD[248], after switch to hs200,
+> >> > +                * using CMD13 to polling card status, it will get response
+> >> > +                * of 0x800, but EMMC still pull-low DAT0.
+> >> > +                */
+> >>
+> >> Seems like you are solving a eMMC specific issue on your driver?
+> >>
+> >> Perhaps we should try to use a card quirk instead?
+> >
+> > Actually, this is a Bug of __mmc_switch(), Per JEDEC Spec, while switch
+> > speed mode, should not use CMD13 to get card status, as it's response
+> > cannot reflect that if card was busy now, for this CMD6 switch HS200
+> 
+> There is a statement applicable to all HS modes, which says it's *not
+> recommended* but *if* used, CRC errors shall be ignored.
+> 
+Yes, but if we ignore the CRC error check, how do we know current
+response is correct or incorrect ? if card is still busy but we get the
+response of 0x900 caused by latching error, then it still consider that
+card has already changed to trans state.
+So, it's better to never use CMD13 when change the speed mode.
+> That's what we have been doing so far, but perhaps that isn't good
+> enough for HS200/400.
+> 
+> > case, I tried some Samsung/Sandisk/KSI eMMC, issue CMD13 will always get
+> > 0x800, even eMMC has already changed to transfer state and DAT0 is high,
+> > the response of CMD13 is also 0x800, and will never be 0x900.
+> 
+> What do you mean by never? I assume it would when you extend the timeout?
+> 
+> Does your host driver make sure to ignore CRC errors in this case?
+> Just to be sure, that isn't the problem.
+> 
+> > So, in __mmc_switch(), it's a bug to use CMD13 to know that if card has
+> > already changed to transfer state.
+> 
+> Whether it's a bug or not, it seems like we have eMMC cards that we
+> have issues to support because of the way we have interpreted the
+> spec. So let's try to fix them!
+> 
+> > But, Our host do not support MMC_CAP_WAIT_WHILE_BUSY, that's why we hit
+> > this issue.
+> 
+> Okay, I see.
+> 
+> Let's try to change the behaviour in __mmc_switch() to prevent it to
+> send CMD13 before the cards stops signal busy on DAT0, when switching
+> to HS200/HS400 mode.
+> What I have in mind is:
+> 
+> 1.
+> When the host controller doesn't support MMC_CAP_WAIT_WHILE_BUSY, we
+> would then to wait for a fixed timeout, before we send CMD13. In this
+> case, do you know if the "generic_cmd6_time" is working for your eMMC
+> devices that you had issues with?
+> 
+In general, generic_cmd6_time is enough, unless the card has firmware
+issue itself,
+> 2.
+> In additional to the above solution, we can for those hosts that
+> supports the ->card_busy() ops, but not MMC_CAP_WAIT_WHILE_BUSY,
+> invoke the ->card_busy() in a polling manner. Of course the above
+> timeout should also be considered as we need to stop polling at some
+> point.
+> 
+this is what I want to do it, use the ops->card_busy() to check DAT0
+status. if a host do not support MMC_CAP_WAIT_WHILE_BUSY and there is
+no ops->card_busy(), then the only way is wait a fixed
+timeout(generic_cmd6_time).
 
-Ideally we do not want.
-
-The main intention here was to avoid using "void *sysdata" to retrieve 
-domain number. sysdata means something different for each architectures. 
-This would be common way for all arch using PCI_DOMAINS_GENERIC option 
-such as ARM64.
-
->
-> I was sort of expecting that if you added it here, we'd remove the
-> existing call, but it looks like you're keeping both?
-
-I leave _SEG evaluation in acpi_pci_root_add to keep support for IA64 
-and x86 which are still using arch-specific sysdata (struct 
-pci_sysdata->domain for x86 and struct pci_controller->segment for IA64) 
-to retrieve domain number.
-
-ARM64 uses PCI_DOMAINS_GENERIC for DT boot method, it would be 
-consistent to keep it for ACPI too.
-
-I am open to suggestions, do you think we should use sysdata for ARM64?
-
-Thanks,
-Tomasz
+> So I noticed the Mediatek mmc host driver supports the ->card_busy()
+> ops. So I think you can try 1) first, then extend it to 2).
+> 
+> Does it makes sense?
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
