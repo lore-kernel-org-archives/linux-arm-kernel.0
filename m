@@ -1,58 +1,28 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 27 Apr 2016 12:27:52 -0300
-Subject: [PATCH v2] ARM: dts: imx28-m28: Remove unneeded partition nodes
-Message-ID: <1461770872-26510-1-git-send-email-fabio.estevam@nxp.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 27 Apr 2016 11:29:09 -0400
+Subject: [PATCH v2 2/7] ARM: dts: lpc32xx: ea3250: add NAND partitions
+ device node
+In-Reply-To: <1461705034-355-3-git-send-email-vz@mleia.com>
+References: <1461705034-355-1-git-send-email-vz@mleia.com>
+ <1461705034-355-3-git-send-email-vz@mleia.com>
+Message-ID: <1461770949.31696.0.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtdparts is passed from command line, so there is no need to have a
-default partitioning in device-tree.
-
-Suggested-by: Marek Vasut <marex@denx.de>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Remove all partition nodes
-
- arch/arm/boot/dts/imx28-m28.dtsi | 26 --------------------------
- 1 file changed, 26 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
-index 759cc56..6cebaa6 100644
---- a/arch/arm/boot/dts/imx28-m28.dtsi
-+++ b/arch/arm/boot/dts/imx28-m28.dtsi
-@@ -27,32 +27,6 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
- 				status = "okay";
--
--				partition at 0 {
--					label = "bootloader";
--					reg = <0x00000000 0x00300000>;
--					read-only;
--				};
--
--				partition at 1 {
--					label = "environment";
--					reg = <0x00300000 0x00080000>;
--				};
--
--				partition at 2 {
--					label = "redundant-environment";
--					reg = <0x00380000 0x00080000>;
--				};
--
--				partition at 3 {
--					label = "kernel";
--					reg = <0x00400000 0x00400000>;
--				};
--
--				partition at 4 {
--					label = "filesystem";
--					reg = <0x00800000 0x0f800000>;
--				};
- 			};
- 		};
- 
--- 
-1.9.1
+On Wed, 2016-04-27 at 00:10 +0300, Vladimir Zapolskiy wrote:
+> To declare MTD OF partitions NAND controller device node should have
+> a special 'partitions' subnode, the change removes a debug message
+> from mtd/ofpart on boot:
+> 
+>   nxp_lpc3220_slc: 'partitions' subnode not found on /ahb/flash at 20020000.
+>   Trying to parse direct subnodes as partitions.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+> * on conversion added missing 'compatible = "fixed-partitions";',
+>   thanks to Sylvain for finding
+> 
+>  arch/arm/boot/dts/ea3250.dts | 42 +++++++++++++++++++++++-------------------
+>  1 file changed, 23 insertions(+), 19 deletions(-)
+> 
+Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
