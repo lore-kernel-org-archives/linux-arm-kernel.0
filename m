@@ -1,463 +1,816 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 27 Apr 2016 17:47:05 +0100
-Subject: [PATCH v9 06/14] arm64: kvm: allows kvm cpu hotplug
+Date: Wed, 27 Apr 2016 17:47:12 +0100
+Subject: [PATCH v9 13/14] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
 In-Reply-To: <1461775633-29715-1-git-send-email-james.morse@arm.com>
 References: <1461775633-29715-1-git-send-email-james.morse@arm.com>
-Message-ID: <1461775633-29715-7-git-send-email-james.morse@arm.com>
+Message-ID: <1461775633-29715-14-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Add support for hibernate/suspend-to-disk.
 
-The current kvm implementation on arm64 does cpu-specific initialization
-at system boot, and has no way to gracefully shutdown a core in terms of
-kvm. This prevents kexec from rebooting the system at EL2.
+Suspend borrows code from cpu_suspend() to write cpu state onto the stack,
+before calling swsusp_save() to save the memory image.
 
-This patch adds a cpu tear-down function and also puts an existing cpu-init
-code into a separate function, kvm_arch_hardware_disable() and
-kvm_arch_hardware_enable() respectively.
-We don't need the arm64 specific cpu hotplug hook any more.
+Restore creates a set of temporary page tables, covering only the
+linear map, copies the restore code to a 'safe' page, then uses the copy to
+restore the memory image. The copied code executes in the lower half of the
+address space, and once complete, restores the original kernel's page
+tables. It then calls into cpu_resume(), and follows the normal
+cpu_suspend() path back into the suspend code.
 
-Since this patch modifies common code between arm and arm64, one stub
-definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
-compilation errors.
+To restore a kernel using KASLR, the address of the page tables, and
+cpu_resume() are stored in the hibernate arch-header and the el2
+vectors are pivotted via the 'safe' page in low memory.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-[Rebase, added separate VHE init/exit path, changed resets use of
- kvm_call_hyp() to the __version, en/disabled hardware in init_subsystems(),
- added icache maintenance to __kvm_hyp_reset() and removed lr restore, removed
- guest-enter after teardown handling]
 Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Kevin Hilman <khilman@baylibre.com> # Tested on Juno R2
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+
 ---
 Changes since v8:
- * hyp-gone code broken out to form previous patch
+ * Added break before make to the two ttbr1 switches in hibernate-asm.S
+ * Added comments to hibernate-asm.S about where this executes from, and where
+ * its data is
+ * Removed comments referring to el2_setup() (missed from previous version)
+
+ * Replaced set_p?d() for p?d_populate() equivalents
+ * Added isb to create_safe_exec_page() switch
+ * Replaced more p?d_val()s with p?d_none()
+ * Added comment about masking out RDONLY bit
+ * Wrapped get_safe_page() calls with p?d_none() to avoid leaking memory if
+   these levels are merged.
 
 
- arch/arm/include/asm/kvm_host.h   |  10 +++-
- arch/arm/include/asm/kvm_mmu.h    |   1 +
- arch/arm/kvm/arm.c                | 119 +++++++++++++++++++++++---------------
- arch/arm/kvm/mmu.c                |   5 ++
- arch/arm64/include/asm/kvm_asm.h  |   1 +
- arch/arm64/include/asm/kvm_host.h |  13 ++++-
- arch/arm64/include/asm/kvm_mmu.h  |   1 +
- arch/arm64/kvm/hyp-init.S         |  38 ++++++++++++
- arch/arm64/kvm/reset.c            |  14 +++++
- 9 files changed, 152 insertions(+), 50 deletions(-)
+ arch/arm64/Kconfig                |   8 +
+ arch/arm64/include/asm/suspend.h  |   7 +
+ arch/arm64/kernel/Makefile        |   1 +
+ arch/arm64/kernel/asm-offsets.c   |   5 +
+ arch/arm64/kernel/hibernate-asm.S | 176 +++++++++++++++
+ arch/arm64/kernel/hibernate.c     | 461 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S   |  15 ++
+ 7 files changed, 673 insertions(+)
+ create mode 100644 arch/arm64/kernel/hibernate-asm.S
+ create mode 100644 arch/arm64/kernel/hibernate.c
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 385070180c25..738d5eee91de 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -265,6 +265,15 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c8762f4613f0..b87f303765d4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -978,6 +978,14 @@ menu "Power management options"
  
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start)
-+{
+ source "kernel/power/Kconfig"
+ 
++config ARCH_HIBERNATION_POSSIBLE
++	def_bool y
++	depends on CPU_PM
++
++config ARCH_HIBERNATION_HEADER
++	def_bool y
++	depends on HIBERNATION
++
+ config ARCH_SUSPEND_POSSIBLE
+ 	def_bool y
+ 
+diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
+index 29d3c71433e1..024d623f662e 100644
+--- a/arch/arm64/include/asm/suspend.h
++++ b/arch/arm64/include/asm/suspend.h
+@@ -40,4 +40,11 @@ extern int cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
+ extern void cpu_resume(void);
+ int __cpu_suspend_enter(struct sleep_stack_data *state);
+ void __cpu_suspend_exit(void);
++void _cpu_resume(void);
++
++int swsusp_arch_suspend(void);
++int swsusp_arch_resume(void);
++int arch_hibernation_header_save(void *addr, unsigned int max_size);
++int arch_hibernation_header_restore(void *addr);
++
+ #endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 3793003e16a2..2173149d8954 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -45,6 +45,7 @@ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+ arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
++arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index ac742ef0fde0..f8e5d47f0880 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -22,6 +22,7 @@
+ #include <linux/mm.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/kvm_host.h>
++#include <linux/suspend.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/smp_plat.h>
+@@ -124,5 +125,9 @@ int main(void)
+ #endif
+   DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
+   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
++  BLANK();
++  DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
++  DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
++  DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
+   return 0;
+ }
+diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+new file mode 100644
+index 000000000000..46f29b6560ec
+--- /dev/null
++++ b/arch/arm64/kernel/hibernate-asm.S
+@@ -0,0 +1,176 @@
++/*
++ * Hibernate low-level support
++ *
++ * Copyright (C) 2016 ARM Ltd.
++ * Author:	James Morse <james.morse@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/linkage.h>
++#include <linux/errno.h>
++
++#include <asm/asm-offsets.h>
++#include <asm/assembler.h>
++#include <asm/cputype.h>
++#include <asm/memory.h>
++#include <asm/page.h>
++#include <asm/virt.h>
++
++/*
++ * To prevent the possibility of old and new partial table walks being visible
++ * in the tlb, switch the ttbr to a zero page when we invalidate the old
++ * records. D4.7.1 'General TLB maintenance requirements' in ARM DDI 0487A.i
++ * Even switching to our copied tables will cause a changed output address at
++ * each stage of the walk.
++ */
++.macro break_before_make_ttbr_switch zero_page, page_table
++	msr	ttbr1_el1, \zero_page
++	isb
++	tlbi	vmalle1is
++	dsb	ish
++	msr	ttbr1_el1, \page_table
++	isb
++.endm
++
++
++/*
++ * Resume from hibernate
++ *
++ * Loads temporary page tables then restores the memory image.
++ * Finally branches to cpu_resume() to restore the state saved by
++ * swsusp_arch_suspend().
++ *
++ * Because this code has to be copied to a 'safe' page, it can't call out to
++ * other functions by PC-relative address. Also remember that it may be
++ * mid-way through over-writing other functions. For this reason it contains
++ * code from flush_icache_range() and uses the copy_page() macro.
++ *
++ * This 'safe' page is mapped via ttbr0, and executed from there. This function
++ * switches to a copy of the linear map in ttbr1, performs the restore, then
++ * switches ttbr1 to the original kernel's swapper_pg_dir.
++ *
++ * All of memory gets written to, including code. We need to clean the kernel
++ * text to the Point of Coherence (PoC) before secondary cores can be booted.
++ * Because the kernel modules and executable pages mapped to user space are
++ * also written as data, we clean all pages we touch to the Point of
++ * Unification (PoU).
++ *
++ * x0: physical address of temporary page tables
++ * x1: physical address of swapper page tables
++ * x2: address of cpu_resume
++ * x3: linear map address of restore_pblist in the current kernel
++ * x4: physical address of __hyp_stub_vectors, or 0
++ * x5: physical address of a  zero page that remains zero after resume
++ */
++.pushsection    ".hibernate_exit.text", "ax"
++ENTRY(swsusp_arch_suspend_exit)
 +	/*
-+	 * TODO
-+	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
++	 * We execute from ttbr0, change ttbr1 to our copied linear map tables
++	 * with a break-before-make via the zero page
 +	 */
-+}
++	break_before_make_ttbr_switch	x5, x0
 +
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
-@@ -277,7 +286,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
--static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index da44be9db4fa..f17a8d41822c 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index b5384311dec4..1687e1450c3a 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -16,7 +16,6 @@
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
- 
--#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/err.h>
-@@ -66,6 +65,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
- static bool vgic_present;
- 
-+static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
++	mov	x21, x1
++	mov	x30, x2
++	mov	x24, x4
++	mov	x25, x5
 +
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
- {
- 	BUG_ON(preemptible());
-@@ -90,11 +91,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
- 	return &kvm_arm_running_vcpu;
- }
- 
--int kvm_arch_hardware_enable(void)
--{
--	return 0;
--}
--
- int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
- {
- 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
-@@ -1033,11 +1029,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	}
- }
- 
--static void cpu_init_stage2(void *dummy)
--{
--	__cpu_init_stage2();
--}
--
- static void cpu_init_hyp_mode(void *dummy)
- {
- 	phys_addr_t boot_pgd_ptr;
-@@ -1065,43 +1056,87 @@ static void cpu_hyp_reinit(void)
- {
- 	if (is_kernel_in_hyp_mode()) {
- 		/*
--		 * cpu_init_stage2() is safe to call even if the PM
-+		 * __cpu_init_stage2() is safe to call even if the PM
- 		 * event was cancelled before the CPU was reset.
- 		 */
--		cpu_init_stage2(NULL);
-+		__cpu_init_stage2();
- 	} else {
- 		if (__hyp_get_vectors() == hyp_default_vectors)
- 			cpu_init_hyp_mode(NULL);
- 	}
- }
- 
--static int hyp_init_cpu_notify(struct notifier_block *self,
--			       unsigned long action, void *cpu)
-+static void cpu_hyp_reset(void)
++	/* walk the restore_pblist and use copy_page() to over-write memory */
++	mov	x19, x3
++
++1:	ldr	x10, [x19, #HIBERN_PBE_ORIG]
++	mov	x0, x10
++	ldr	x1, [x19, #HIBERN_PBE_ADDR]
++
++	copy_page	x0, x1, x2, x3, x4, x5, x6, x7, x8, x9
++
++	add	x1, x10, #PAGE_SIZE
++	/* Clean the copied page to PoU - based on flush_icache_range() */
++	dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x4, x10, x3
++2:	dc	cvau, x4	/* clean D line / unified line */
++	add	x4, x4, x2
++	cmp	x4, x1
++	b.lo	2b
++
++	ldr	x19, [x19, #HIBERN_PBE_NEXT]
++	cbnz	x19, 1b
++	dsb	ish		/* wait for PoU cleaning to finish */
++
++	/* switch to the restored kernels page tables */
++	break_before_make_ttbr_switch	x25, x21
++
++	ic	ialluis
++	dsb	ish
++	isb
++
++	cbz	x24, 3f		/* Do we need to re-initialise EL2? */
++	hvc	#0
++3:	ret
++
++	.ltorg
++ENDPROC(swsusp_arch_suspend_exit)
++
++/*
++ * Restore the hyp stub.
++ * This must be done before the hibernate page is unmapped by _cpu_resume(),
++ * but happens before any of the hyp-stub's code is cleaned to PoC.
++ *
++ * x24: The physical address of __hyp_stub_vectors
++ */
++el1_sync:
++	msr	vbar_el2, x24
++	eret
++ENDPROC(el1_sync)
++
++.macro invalid_vector	label
++\label:
++	b \label
++ENDPROC(\label)
++.endm
++
++	invalid_vector	el2_sync_invalid
++	invalid_vector	el2_irq_invalid
++	invalid_vector	el2_fiq_invalid
++	invalid_vector	el2_error_invalid
++	invalid_vector	el1_sync_invalid
++	invalid_vector	el1_irq_invalid
++	invalid_vector	el1_fiq_invalid
++	invalid_vector	el1_error_invalid
++
++/* el2 vectors - switch el2 here while we restore the memory image. */
++	.align 11
++ENTRY(hibernate_el2_vectors)
++	ventry	el2_sync_invalid		// Synchronous EL2t
++	ventry	el2_irq_invalid			// IRQ EL2t
++	ventry	el2_fiq_invalid			// FIQ EL2t
++	ventry	el2_error_invalid		// Error EL2t
++
++	ventry	el2_sync_invalid		// Synchronous EL2h
++	ventry	el2_irq_invalid			// IRQ EL2h
++	ventry	el2_fiq_invalid			// FIQ EL2h
++	ventry	el2_error_invalid		// Error EL2h
++
++	ventry	el1_sync			// Synchronous 64-bit EL1
++	ventry	el1_irq_invalid			// IRQ 64-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
++	ventry	el1_error_invalid		// Error 64-bit EL1
++
++	ventry	el1_sync_invalid		// Synchronous 32-bit EL1
++	ventry	el1_irq_invalid			// IRQ 32-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
++	ventry	el1_error_invalid		// Error 32-bit EL1
++END(hibernate_el2_vectors)
++
++.popsection
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+new file mode 100644
+index 000000000000..7e16fb327644
+--- /dev/null
++++ b/arch/arm64/kernel/hibernate.c
+@@ -0,0 +1,461 @@
++/*:
++ * Hibernate support specific for ARM64
++ *
++ * Derived from work on ARM hibernation support by:
++ *
++ * Ubuntu project, hibernation support for mach-dove
++ * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
++ * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
++ *  https://lkml.org/lkml/2010/6/18/4
++ *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
++ *  https://patchwork.kernel.org/patch/96442/
++ *
++ * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ */
++#define pr_fmt(x) "hibernate: " x
++#include <linux/kvm_host.h>
++#include <linux/mm.h>
++#include <linux/pm.h>
++#include <linux/sched.h>
++#include <linux/suspend.h>
++#include <linux/utsname.h>
++#include <linux/version.h>
++
++#include <asm/barrier.h>
++#include <asm/cacheflush.h>
++#include <asm/irqflags.h>
++#include <asm/memory.h>
++#include <asm/mmu_context.h>
++#include <asm/pgalloc.h>
++#include <asm/pgtable.h>
++#include <asm/pgtable-hwdef.h>
++#include <asm/sections.h>
++#include <asm/suspend.h>
++#include <asm/virt.h>
++
++/*
++ * Hibernate core relies on this value being 0 on resume, and marks it
++ * __nosavedata assuming it will keep the resume kernel's '0' value. This
++ * doesn't happen with either KASLR.
++ *
++ * defined as "__visible int in_suspend __nosavedata" in
++ * kernel/power/hibernate.c
++ */
++extern int in_suspend;
++
++/* Find a symbols alias in the linear map */
++#define LMADDR(x)	phys_to_virt(virt_to_phys(x))
++
++/* Do we need to reset el2? */
++#define el2_reset_needed() (is_hyp_mode_available() && !is_kernel_in_hyp_mode())
++
++/*
++ * Start/end of the hibernate exit code, this must be copied to a 'safe'
++ * location in memory, and executed from there.
++ */
++extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
++
++/* temporary el2 vectors in the __hibernate_exit_text section. */
++extern char hibernate_el2_vectors[];
++
++/* hyp-stub vectors, used to restore el2 during resume from hibernate. */
++extern char __hyp_stub_vectors[];
++
++/*
++ * Values that may not change over hibernate/resume. We put the build number
++ * and date in here so that we guarantee not to resume with a different
++ * kernel.
++ */
++struct arch_hibernate_hdr_invariants {
++	char		uts_version[__NEW_UTS_LEN + 1];
++};
++
++/* These values need to be know across a hibernate/restore. */
++static struct arch_hibernate_hdr {
++	struct arch_hibernate_hdr_invariants invariants;
++
++	/* These are needed to find the relocated kernel if built with kaslr */
++	phys_addr_t	ttbr1_el1;
++	void		(*reenter_kernel)(void);
++
++	/*
++	 * We need to know where the __hyp_stub_vectors are after restore to
++	 * re-configure el2.
++	 */
++	phys_addr_t	__hyp_stub_vectors;
++} resume_hdr;
++
++static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
 +{
-+	phys_addr_t boot_pgd_ptr;
-+	phys_addr_t phys_idmap_start;
-+
-+	if (!is_kernel_in_hyp_mode()) {
-+		boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-+		phys_idmap_start = kvm_get_idmap_start();
-+
-+		__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
-+	}
++	memset(i, 0, sizeof(*i));
++	memcpy(i->uts_version, init_utsname()->version, sizeof(i->uts_version));
 +}
 +
-+static void _kvm_arch_hardware_enable(void *discard)
- {
--	switch (action) {
--	case CPU_STARTING:
--	case CPU_STARTING_FROZEN:
-+	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
- 		cpu_hyp_reinit();
-+		__this_cpu_write(kvm_arm_hardware_enabled, 1);
- 	}
-+}
-+
-+int kvm_arch_hardware_enable(void)
++int pfn_is_nosave(unsigned long pfn)
 +{
-+	_kvm_arch_hardware_enable(NULL);
++	unsigned long nosave_begin_pfn = virt_to_pfn(&__nosave_begin);
++	unsigned long nosave_end_pfn = virt_to_pfn(&__nosave_end - 1);
++
++	return (pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn);
++}
++
++void notrace save_processor_state(void)
++{
++	WARN_ON(num_online_cpus() != 1);
++}
++
++void notrace restore_processor_state(void)
++{
++}
++
++int arch_hibernation_header_save(void *addr, unsigned int max_size)
++{
++	struct arch_hibernate_hdr *hdr = addr;
++
++	if (max_size < sizeof(*hdr))
++		return -EOVERFLOW;
++
++	arch_hdr_invariants(&hdr->invariants);
++	hdr->ttbr1_el1		= virt_to_phys(swapper_pg_dir);
++	hdr->reenter_kernel	= _cpu_resume;
++
++	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
++	if (el2_reset_needed())
++		hdr->__hyp_stub_vectors = virt_to_phys(__hyp_stub_vectors);
++	else
++		hdr->__hyp_stub_vectors = 0;
++
 +	return 0;
 +}
- 
--	return NOTIFY_OK;
-+static void _kvm_arch_hardware_disable(void *discard)
++EXPORT_SYMBOL(arch_hibernation_header_save);
++
++int arch_hibernation_header_restore(void *addr)
 +{
-+	if (__this_cpu_read(kvm_arm_hardware_enabled)) {
-+		cpu_hyp_reset();
-+		__this_cpu_write(kvm_arm_hardware_enabled, 0);
++	struct arch_hibernate_hdr_invariants invariants;
++	struct arch_hibernate_hdr *hdr = addr;
++
++	arch_hdr_invariants(&invariants);
++	if (memcmp(&hdr->invariants, &invariants, sizeof(invariants))) {
++		pr_crit("Hibernate image not generated by this kernel!\n");
++		return -EINVAL;
 +	}
- }
- 
--static struct notifier_block hyp_init_cpu_nb = {
--	.notifier_call = hyp_init_cpu_notify,
--};
-+void kvm_arch_hardware_disable(void)
-+{
-+	_kvm_arch_hardware_disable(NULL);
++
++	resume_hdr = *hdr;
++
++	return 0;
 +}
- 
- #ifdef CONFIG_CPU_PM
- static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT) {
--		cpu_hyp_reinit();
-+	/*
-+	 * kvm_arm_hardware_enabled is left with its old value over
-+	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
-+	 * re-enable hyp.
-+	 */
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			/*
-+			 * don't update kvm_arm_hardware_enabled here
-+			 * so that the hardware will be re-enabled
-+			 * when we resume. See below.
-+			 */
-+			cpu_hyp_reset();
++EXPORT_SYMBOL(arch_hibernation_header_restore);
 +
-+		return NOTIFY_OK;
-+	case CPU_PM_EXIT:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			/* The hardware was enabled before suspend. */
-+			cpu_hyp_reinit();
++/*
++ * Copies length bytes, starting at src_start into an new page,
++ * perform cache maintentance, then maps it at the specified address low
++ * address as executable.
++ *
++ * This is used by hibernate to copy the code it needs to execute when
++ * overwriting the kernel text. This function generates a new set of page
++ * tables, which it loads into ttbr0.
++ *
++ * Length is provided as we probably only want 4K of data, even on a 64K
++ * page system.
++ */
++static int create_safe_exec_page(void *src_start, size_t length,
++				 unsigned long dst_addr,
++				 phys_addr_t *phys_dst_addr,
++				 void *(*allocator)(gfp_t mask),
++				 gfp_t mask)
++{
++	int rc = 0;
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++	pte_t *pte;
++	unsigned long dst = (unsigned long)allocator(mask);
 +
- 		return NOTIFY_OK;
--	}
- 
--	return NOTIFY_DONE;
-+	default:
-+		return NOTIFY_DONE;
++	if (!dst) {
++		rc = -ENOMEM;
++		goto out;
 +	}
- }
- 
- static struct notifier_block hyp_init_cpu_pm_nb = {
-@@ -1136,18 +1171,12 @@ static int init_common_resources(void)
- 
- static int init_subsystems(void)
- {
--	int err;
-+	int err = 0;
- 
- 	/*
--	 * Register CPU Hotplug notifier
-+	 * Enable hardware so that subsystem initialisation can access EL2.
- 	 */
--	cpu_notifier_register_begin();
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--	cpu_notifier_register_done();
--	if (err) {
--		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
--		return err;
--	}
-+	on_each_cpu(_kvm_arch_hardware_enable, NULL, 1);
- 
- 	/*
- 	 * Register CPU lower-power notifier
-@@ -1165,9 +1194,10 @@ static int init_subsystems(void)
- 	case -ENODEV:
- 	case -ENXIO:
- 		vgic_present = false;
-+		err = 0;
- 		break;
- 	default:
--		return err;
-+		goto out;
- 	}
- 
- 	/*
-@@ -1175,12 +1205,15 @@ static int init_subsystems(void)
- 	 */
- 	err = kvm_timer_hyp_init();
- 	if (err)
--		return err;
-+		goto out;
- 
- 	kvm_perf_init();
- 	kvm_coproc_table_init();
- 
--	return 0;
++
++	memcpy((void *)dst, src_start, length);
++	flush_icache_range(dst, dst + length);
++
++	pgd = pgd_offset_raw(allocator(mask), dst_addr);
++	if (pgd_none(*pgd)) {
++		pud = allocator(mask);
++		if (!pud) {
++			rc = -ENOMEM;
++			goto out;
++		}
++		pgd_populate(&init_mm, pgd, pud);
++	}
++
++	pud = pud_offset(pgd, dst_addr);
++	if (pud_none(*pud)) {
++		pmd = allocator(mask);
++		if (!pmd) {
++			rc = -ENOMEM;
++			goto out;
++		}
++		pud_populate(&init_mm, pud, pmd);
++	}
++
++	pmd = pmd_offset(pud, dst_addr);
++	if (pmd_none(*pmd)) {
++		pte = allocator(mask);
++		if (!pte) {
++			rc = -ENOMEM;
++			goto out;
++		}
++		pmd_populate_kernel(&init_mm, pmd, pte);
++	}
++
++	pte = pte_offset_kernel(pmd, dst_addr);
++	set_pte(pte, __pte(virt_to_phys((void *)dst) |
++			 pgprot_val(PAGE_KERNEL_EXEC)));
++
++	/* Load our new page tables */
++	asm volatile("msr	ttbr0_el1, %0;"
++		     "isb;"
++		     "tlbi	vmalle1is;"
++		     "dsb	ish;"
++		     "isb" : : "r"(virt_to_phys(pgd)));
++
++	*phys_dst_addr = virt_to_phys((void *)dst);
++
 +out:
-+	on_each_cpu(_kvm_arch_hardware_disable, NULL, 1);
-+
-+	return err;
- }
- 
- static void teardown_hyp_mode(void)
-@@ -1197,11 +1230,6 @@ static void teardown_hyp_mode(void)
- 
- static int init_vhe_mode(void)
- {
--	/*
--	 * Execute the init code on each CPU.
--	 */
--	on_each_cpu(cpu_init_stage2, NULL, 1);
--
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
- 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-@@ -1288,11 +1316,6 @@ static int init_hyp_mode(void)
- 		}
- 	}
- 
--	/*
--	 * Execute the init code on each CPU.
--	 */
--	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
--
- #ifndef CONFIG_HOTPLUG_CPU
- 	free_boot_hyp_pgd();
- #endif
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 58dbd5c439df..7d86e15b5d85 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1666,6 +1666,11 @@ phys_addr_t kvm_get_idmap_vector(void)
- 	return hyp_idmap_vector;
- }
- 
-+phys_addr_t kvm_get_idmap_start(void)
-+{
-+	return hyp_idmap_start;
++	return rc;
 +}
 +
- int kvm_mmu_init(void)
- {
- 	int err;
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index dbfbc5fb5d35..a88da136f332 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -42,6 +42,7 @@ struct kvm_vcpu;
- 
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
-+extern char __kvm_hyp_reset[];
- 
- extern char __kvm_hyp_vector[];
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index b7e82a795ac9..b6f194d9f6b2 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -46,6 +46,7 @@
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
- int kvm_arch_dev_ioctl_check_extension(long ext);
-+phys_addr_t kvm_hyp_reset_entry(void);
- 
- struct kvm_arch {
- 	/* The VMID generation used for the virt. memory system */
-@@ -352,7 +353,17 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 		       hyp_stack_ptr, vector_ptr);
- }
- 
--static inline void kvm_arch_hardware_disable(void) {}
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start)
++
++int swsusp_arch_suspend(void)
 +{
-+	/*
-+	 * Call reset code, and switch back to stub hyp vectors.
-+	 * Uses __kvm_call_hyp() to avoid kaslr's kvm_ksym_ref() translation.
-+	 */
-+	__kvm_call_hyp((void *)kvm_hyp_reset_entry(),
-+		       boot_pgd_ptr, phys_idmap_start);
++	int ret = 0;
++	unsigned long flags;
++	struct sleep_stack_data state;
++
++	local_dbg_save(flags);
++
++	if (__cpu_suspend_enter(&state)) {
++		ret = swsusp_save();
++	} else {
++		/* Clean kernel to PoC for secondary core startup */
++		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
++
++		/*
++		 * Tell the hibernation core that we've just restored
++		 * the memory
++		 */
++		in_suspend = 0;
++
++		__cpu_suspend_exit();
++	}
++
++	local_dbg_restore(flags);
++
++	return ret;
 +}
 +
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 22732a5e3119..e8d39d4f86b6 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -109,6 +109,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 5ce1b47ef770..44ec4cb23ae7 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -139,6 +139,44 @@ merged:
- 	eret
- ENDPROC(__kvm_hyp_init)
- 
++static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
++		    unsigned long end)
++{
++	pte_t *src_pte;
++	pte_t *dst_pte;
++	unsigned long addr = start;
++
++	dst_pte = (pte_t *)get_safe_page(GFP_ATOMIC);
++	if (!dst_pte)
++		return -ENOMEM;
++	pmd_populate_kernel(&init_mm, dst_pmd, dst_pte);
++	dst_pte = pte_offset_kernel(dst_pmd, start);
++
++	src_pte = pte_offset_kernel(src_pmd, start);
++	do {
++		if (!pte_none(*src_pte))
++			/*
++			 * Resume will overwrite areas that may be marked
++			 * read only (code, rodata). Clear the RDONLY bit from
++			 * the temporary mappings we use during restore.
++			 */
++			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
++	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
++
++	return 0;
++}
++
++static int copy_pmd(pud_t *dst_pud, pud_t *src_pud, unsigned long start,
++		    unsigned long end)
++{
++	pmd_t *src_pmd;
++	pmd_t *dst_pmd;
++	unsigned long next;
++	unsigned long addr = start;
++
++	if (pud_none(*dst_pud)) {
++		dst_pmd = (pmd_t *)get_safe_page(GFP_ATOMIC);
++		if (!dst_pmd)
++			return -ENOMEM;
++		pud_populate(&init_mm, dst_pud, dst_pmd);
++	}
++	dst_pmd = pmd_offset(dst_pud, start);
++
++	src_pmd = pmd_offset(src_pud, start);
++	do {
++		next = pmd_addr_end(addr, end);
++		if (pmd_none(*src_pmd))
++			continue;
++		if (pmd_table(*src_pmd)) {
++			if (copy_pte(dst_pmd, src_pmd, addr, next))
++				return -ENOMEM;
++		} else {
++			set_pmd(dst_pmd,
++				__pmd(pmd_val(*src_pmd) & ~PMD_SECT_RDONLY));
++		}
++	} while (dst_pmd++, src_pmd++, addr = next, addr != end);
++
++	return 0;
++}
++
++static int copy_pud(pgd_t *dst_pgd, pgd_t *src_pgd, unsigned long start,
++		    unsigned long end)
++{
++	pud_t *dst_pud;
++	pud_t *src_pud;
++	unsigned long next;
++	unsigned long addr = start;
++
++	if (pgd_none(*dst_pgd)) {
++		dst_pud = (pud_t *)get_safe_page(GFP_ATOMIC);
++		if (!dst_pud)
++			return -ENOMEM;
++		pgd_populate(&init_mm, dst_pgd, dst_pud);
++	}
++	dst_pud = pud_offset(dst_pgd, start);
++
++	src_pud = pud_offset(src_pgd, start);
++	do {
++		next = pud_addr_end(addr, end);
++		if (pud_none(*src_pud))
++			continue;
++		if (pud_table(*(src_pud))) {
++			if (copy_pmd(dst_pud, src_pud, addr, next))
++				return -ENOMEM;
++		} else {
++			set_pud(dst_pud,
++				__pud(pud_val(*src_pud) & ~PMD_SECT_RDONLY));
++		}
++	} while (dst_pud++, src_pud++, addr = next, addr != end);
++
++	return 0;
++}
++
++static int copy_page_tables(pgd_t *dst_pgd, unsigned long start,
++			    unsigned long end)
++{
++	unsigned long next;
++	unsigned long addr = start;
++	pgd_t *src_pgd = pgd_offset_k(start);
++
++	dst_pgd = pgd_offset_raw(dst_pgd, start);
++	do {
++		next = pgd_addr_end(addr, end);
++		if (pgd_none(*src_pgd))
++			continue;
++		if (copy_pud(dst_pgd, src_pgd, addr, next))
++			return -ENOMEM;
++	} while (dst_pgd++, src_pgd++, addr = next, addr != end);
++
++	return 0;
++}
++
++/*
++ * Setup then Resume from the hibernate image using swsusp_arch_suspend_exit().
++ *
++ * Memory allocated by get_safe_page() will be dealt with by the hibernate code,
++ * we don't need to free it here.
++ */
++int swsusp_arch_resume(void)
++{
++	int rc = 0;
++	void *zero_page;
++	size_t exit_size;
++	pgd_t *tmp_pg_dir;
++	void *lm_restore_pblist;
++	phys_addr_t phys_hibernate_exit;
++	void __noreturn (*hibernate_exit)(phys_addr_t, phys_addr_t, void *,
++					  void *, phys_addr_t, phys_addr_t);
++
 +	/*
-+	 * x0: HYP boot pgd
-+	 * x1: HYP phys_idmap_start
++	 * Locate the exit code in the bottom-but-one page, so that *NULL
++	 * still has disastrous affects.
 +	 */
-+ENTRY(__kvm_hyp_reset)
-+	/* We're in trampoline code in VA, switch back to boot page tables */
-+	msr	ttbr0_el2, x0
-+	isb
++	hibernate_exit = (void *)PAGE_SIZE;
++	exit_size = __hibernate_exit_text_end - __hibernate_exit_text_start;
++	/*
++	 * Copy swsusp_arch_suspend_exit() to a safe page. This will generate
++	 * a new set of ttbr0 page tables and load them.
++	 */
++	rc = create_safe_exec_page(__hibernate_exit_text_start, exit_size,
++				   (unsigned long)hibernate_exit,
++				   &phys_hibernate_exit,
++				   (void *)get_safe_page, GFP_ATOMIC);
++	if (rc) {
++		pr_err("Failed to create safe executable page for hibernate_exit code.");
++		goto out;
++	}
 +
-+	/* Ensure the PA branch doesn't find a stale tlb entry or stale code. */
-+	ic	iallu
-+	tlbi	alle2
-+	dsb	sy
-+	isb
++	/*
++	 * The hibernate exit text contains a set of el2 vectors, that will
++	 * be executed at el2 with the mmu off in order to reload hyp-stub.
++	 */
++	__flush_dcache_area(hibernate_exit, exit_size);
 +
-+	/* Branch into PA space */
-+	adr	x0, 1f
-+	bfi	x1, x0, #0, #PAGE_SHIFT
-+	br	x1
++	/*
++	 * Restoring the memory image will overwrite the ttbr1 page tables.
++	 * Create a second copy of just the linear map, and use this when
++	 * restoring.
++	 */
++	tmp_pg_dir = (pgd_t *)get_safe_page(GFP_ATOMIC);
++	if (!tmp_pg_dir) {
++		pr_err("Failed to allocate memory for temporary page tables.");
++		rc = -ENOMEM;
++		goto out;
++	}
++	rc = copy_page_tables(tmp_pg_dir, PAGE_OFFSET, 0);
++	if (rc)
++		goto out;
 +
-+	/* We're now in idmap, disable MMU */
-+1:	mrs	x0, sctlr_el2
-+	ldr	x1, =SCTLR_ELx_FLAGS
-+	bic	x0, x0, x1		// Clear SCTL_M and etc
-+	msr	sctlr_el2, x0
-+	isb
++	/*
++	 * Since we only copied the linear map, we need to find restore_pblist's
++	 * linear map address.
++	 */
++	lm_restore_pblist = LMADDR(restore_pblist);
 +
-+	/* Invalidate the old TLBs */
-+	tlbi	alle2
-+	dsb	sy
++	/*
++	 * KASLR will cause the el2 vectors to be in a different location in
++	 * the resumed kernel. Load hibernate's temporary copy into el2.
++	 *
++	 * We can skip this step if we booted at EL1, or are running with VHE.
++	 */
++	if (el2_reset_needed()) {
++		phys_addr_t el2_vectors = phys_hibernate_exit;  /* base */
++		el2_vectors += hibernate_el2_vectors -
++			       __hibernate_exit_text_start;     /* offset */
 +
-+	/* Install stub vectors */
-+	adr_l	x0, __hyp_stub_vectors
-+	msr	vbar_el2, x0
++		__hyp_set_vectors(el2_vectors);
++	}
 +
-+	eret
-+ENDPROC(__kvm_hyp_reset)
++	/*
++	 * We need a zero page that is zero before & after resume in order to
++	 * to break before make on the ttbr1 page tables.
++	 */
++	zero_page = (void *)get_safe_page(GFP_ATOMIC);
 +
- 	.ltorg
++	hibernate_exit(virt_to_phys(tmp_pg_dir), resume_hdr.ttbr1_el1,
++		       resume_hdr.reenter_kernel, lm_restore_pblist,
++		       resume_hdr.__hyp_stub_vectors, virt_to_phys(zero_page));
++
++out:
++	return rc;
++}
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 8918b303cc61..435e820e898d 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -46,6 +46,16 @@ jiffies = jiffies_64;
+ 	*(.idmap.text)					\
+ 	VMLINUX_SYMBOL(__idmap_text_end) = .;
  
- 	.popsection
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 9677bf069bcc..4062e6dd4cc1 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -29,7 +29,9 @@
- #include <asm/cputype.h>
- #include <asm/ptrace.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_mmu.h>
++#ifdef CONFIG_HIBERNATION
++#define HIBERNATE_TEXT					\
++	. = ALIGN(SZ_4K);				\
++	VMLINUX_SYMBOL(__hibernate_exit_text_start) = .;\
++	*(.hibernate_exit.text)				\
++	VMLINUX_SYMBOL(__hibernate_exit_text_end) = .;
++#else
++#define HIBERNATE_TEXT
++#endif
++
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -113,6 +123,7 @@ SECTIONS
+ 			LOCK_TEXT
+ 			HYPERVISOR_TEXT
+ 			IDMAP_TEXT
++			HIBERNATE_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+@@ -206,6 +217,10 @@ ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ 	"HYP init code too big or misaligned")
+ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ 	"ID map text too big or misaligned")
++#ifdef CONFIG_HIBERNATION
++ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
++	<= SZ_4K, "Hibernate exit text too big or misaligned")
++#endif
  
  /*
-  * ARMv8 Reset Values
-@@ -130,3 +132,15 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset timer */
- 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
- }
-+
-+extern char __hyp_idmap_text_start[];
-+
-+phys_addr_t kvm_hyp_reset_entry(void)
-+{
-+	unsigned long offset;
-+
-+	offset = (unsigned long)__kvm_hyp_reset
-+		 - ((unsigned long)__hyp_idmap_text_start & PAGE_MASK);
-+
-+	return TRAMPOLINE_VA + offset;
-+}
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
 -- 
 2.8.0.rc3
