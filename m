@@ -1,18 +1,65 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 27 Apr 2016 10:56:25 +0800
-Subject: [PATCH] ARM: dts: imx6: Do not hardcode the CLKO clock
-In-Reply-To: <1461720509-8890-1-git-send-email-festevam@gmail.com>
-References: <1461720509-8890-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160427025624.GH30692@tiger>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 27 Apr 2016 10:57:21 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <20160427015835.GE30692@tiger>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+Message-ID: <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2016 at 10:28:29PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Using "IMX6QDL_CLK_CKO" for the clock is easier to read instead of
-> the hardcoded clock number.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
+>> Shawn,
+>> What's your suggestion?
+>
+> I think this needs more discussion, and I just dropped Stefan's patch
+> from my tree.
+>
+> We need to firstly understand why this is happening.  The .prepare hook
+> is defined to be non-atomic context, and so that we call sleep function
+> in there.  We did everything right.  Why are we getting the warning?  If
+> I'm correct, this warning only happens on i.MX7D.  Why is that?
+>
 
-Applied, thanks.
+Why Stefan's patch works (checking irqs_disabled()) is because during kernel
+time init, the irq is still not enabled. It fixes the issue indirectly.
+See:
+asmlinkage __visible void __init start_kernel(void)
+{
+        /*
+         * Set up the scheduler prior starting any interrupts (such as the
+         * timer interrupt). Full topology setup happens at smp_init()
+         * time - but meanwhile we still have a functioning scheduler.
+         */
+        sched_init();
+        .............
+        time_init();
+        ..............
+        WARN(!irqs_disabled(), "Interrupts were enabled early\n");
+        early_boot_irqs_disabled = false;
+        local_irq_enable();
+}
+
+The issue can only happen when PLL enable causes a schedule during
+imx_clock_init().
+Not all PLL has this issue.
+The issue happens on MX7D pll_audio_main_clk/pll_video_main_clk
+which requires more delay time and cause usleep.
+Because clk framework does not support MX7D clock types (operation requires
+parents on), we simply enable all clocks in imx7d_clocks_init().
+
+If apply my this patch series:
+https://lkml.org/lkml/2016/4/20/199
+The issue can also be gone.
+
+Regards
+Dong Aisheng
+
+> Shawn
