@@ -1,51 +1,237 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2016 18:04:27 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <20160427155019.GE20646@e104818-lin.cambridge.arm.com>
-References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
- <9452408.uEOOA4q1YW@wuerfel>
- <20160427155019.GE20646@e104818-lin.cambridge.arm.com>
-Message-ID: <4985498.GT33RtioOA@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 27 Apr 2016 17:09:19 +0100
+Subject: [PATCH V6 05/13] acpi, pci: Support IO resources when parsing
+ PCI host bridge resources.
+In-Reply-To: <20160427151035.GT28464@e106497-lin.cambridge.arm.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-6-git-send-email-tn@semihalf.com>
+ <20160427023916.GF6789@localhost> <20160427141429.GA7324@red-moon>
+ <20160427151035.GT28464@e106497-lin.cambridge.arm.com>
+Message-ID: <20160427160919.GA7737@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 16:50:19 Catalin Marinas wrote:
-> On Wed, Apr 27, 2016 at 04:11:17PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 27 April 2016 14:59:00 Catalin Marinas wrote:
+On Wed, Apr 27, 2016 at 04:10:36PM +0100, Liviu.Dudau at arm.com wrote:
+> On Wed, Apr 27, 2016 at 03:26:59PM +0100, Lorenzo Pieralisi wrote:
+> > On Tue, Apr 26, 2016 at 09:39:16PM -0500, Bjorn Helgaas wrote:
+> > > On Fri, Apr 15, 2016 at 07:06:40PM +0200, Tomasz Nowicki wrote:
+> > > > Platforms that have memory mapped IO port (such as ARM64) need special
+> > > > handling for PCI I/O resources. For host bridge's resource probing case
+> > > > these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
 > > > 
-> > > I would be in favour of a dma_inherit() function as well. We could hack
-> > > something up in the arch code (like below) but I would rather prefer an
-> > > explicit dma_inherit() call by drivers creating such devices.
-> > > 
-> > > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> > > index ba437f090a74..ea6fb9b0e8fa 100644
-> > > --- a/arch/arm64/include/asm/dma-mapping.h
-> > > +++ b/arch/arm64/include/asm/dma-mapping.h
-> > > @@ -29,8 +29,11 @@ extern struct dma_map_ops dummy_dma_ops;
-> > >  
-> > >  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
-> > >  {
-> > > -       if (dev && dev->archdata.dma_ops)
-> > > -               return dev->archdata.dma_ops;
-> > > +       while (dev) {
-> > > +               if (dev->archdata.dma_ops)
-> > > +                       return dev->archdata.dma_ops;
-> > > +               dev = dev->parent;
-> > > +       }
+> > > ia64 also has memory-mapped I/O port space.  It would be ideal to find
+> > > some way to handle ia64 and ARM64 similarly.  At the very least, we
+> > > have to make sure that this doesn't break ia64.  The ia64 dense/sparse
+> > > I/O spaces complicate things; I don't know if ARM64 has something
+> > > similar or not.
 > > 
-> > I think this would be a very bad idea: we don't want to have random
-> > devices be able to perform DMA just because their parent devices
-> > have been set up that way.
+> > No it does not, and that's exactly the same problem we faced with
+> > the DT generic version of of_pci_range_to_resource() which basically
+> > relies on PCI_IOBASE to be defined to add code that creates IO port
+> > resources out of the MMIO resource describing how IO port space is
+> > mapped to MMIO (physical) address space.
+> > 
+> > IIRC everything hinges on PCI_IOBASE definition to make sure that
+> > of_pci_range_to_resource() *works*, which means that if PCI_IOBASE is
+> > not defined (ie IA64) that code - acpi_pci_root_remap_iospace() in this
+> > case - does nothing.
+> > 
+> > So acpi_pci_root_remap_iospace() is of_pci_range_to_resource() ACPI
+> > equivalent + the pci_remap_iospace() call (I have to dig into the
+> > logs to check why Liviu did not add a call to pci_remap_iospace()
+> > in of_pci_get_host_bridge_resources() - I want to do that actually).
 > 
-> I agree, it's a big hack. It would be nice to have a simpler way to do
-> this in driver code rather than explicitly calling
-> of_dma_configure/arch_setup_dma_ops as per the original patch in this
-> thread.
+> Because of_pci_get_host_bridge_resources() only gives you a list of
+> resources, it doesn't allocate them. An arch or platform could add
+> further filtering to that list before it gets requested (in our case
+> it is done in pci-host-common.c)
+
+Well, it does register the IO cpu physical address in pci_register_io_range()
+though, if pci_remap_iospace() fails in arch/platform code we can delete the
+resource but we must also unregister the corresponding cpu address from
+the IO ranges otherwise we end up with stale entries in the io_range_list.
+
+Anyway, it is not related to this thread, I will see what I can do
+to improve that API from this standpoint.
+
+Thanks !
+Lorenzo
+
 > 
-
-
-I haven't followed the entire discussion, but what's wrong with passing
-around a pointer to a 'struct device *hwdev' that represents the physical
-device that does the DMA?
-
-	Arnd
+> Best regards,
+> Liviu
+> 
+> > 
+> > The point here is: IO space (in DT and ACPI) handling is arch specific.
+> > 
+> > For DT, by relying on PCI_IOBASE, we left that code in drivers/of and
+> > it works (well, with some niggles - see the thread with Murali on IO
+> > space on TI keystone) for ARM/ARM64.
+> > 
+> > http://www.spinics.net/lists/linux-pci/msg49725.html
+> > 
+> > What are we going to do with the ACPI version ?
+> > 
+> > Do we want to add an arch specific call that takes the raw resource
+> > describing IO space and creates an IO port resource (and the MMIO
+> > equivalent - that's what add_io_space() does in IA64) and use that
+> > in generic ACPI parsing code ?
+> > 
+> > Or we just do what Tomasz does, which is basically the approach we took
+> > for DT ?
+> > 
+> > > > Furthermore, the same I/O resources need to be released after hotplug
+> > > > removal so that it can be re-added back by the pci_remap_iospace
+> > > > function during insertion. Therefore we implement new pci_unmap_iospace call
+> > > > which unmaps I/O space as the symmetry to pci_remap_iospace.
+> > > 
+> > > "Furthermore" is a hint that we should check to see if this can be
+> > > split into two patches.
+> > > 
+> > > We already have a pci_remap_iospace(), and you're adding
+> > > pci_unmap_iospace(), which will be used for hotplug removal.  So let's 
+> > > add pci_unmap_iospace() first in a patch by itself because that's
+> > > potentially useful for other callers of pci_remap_iospace(), even if
+> > > they don't need the acpi_pci_root_remap_iospace() stuff.
+> > 
+> > I agree.
+> > 
+> > Thanks,
+> > Lorenzo
+> > 
+> > > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> > > > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> > > > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> > > > ---
+> > > >  drivers/acpi/pci_root.c | 33 +++++++++++++++++++++++++++++++++
+> > > >  drivers/pci/pci.c       | 24 ++++++++++++++++++++++++
+> > > >  include/linux/pci.h     |  1 +
+> > > >  3 files changed, 58 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> > > > index d9a70c4..815b6ca 100644
+> > > > --- a/drivers/acpi/pci_root.c
+> > > > +++ b/drivers/acpi/pci_root.c
+> > > > @@ -742,6 +742,34 @@ next:
+> > > >  			resource_list_add_tail(entry, resources);
+> > > >  	}
+> > > >  }
+> > > > +static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
+> > > > +{
+> > > > +#ifdef PCI_IOBASE
+> > > > +	struct resource *res = entry->res;
+> > > > +	resource_size_t cpu_addr = res->start;
+> > > > +	resource_size_t pci_addr = cpu_addr - entry->offset;
+> > > > +	resource_size_t length = resource_size(res);
+> > > > +	unsigned long port;
+> > > > +
+> > > > +	if (pci_register_io_range(cpu_addr, length))
+> > > > +		goto err;
+> > > > +
+> > > > +	port = pci_address_to_pio(cpu_addr);
+> > > > +	if (port == (unsigned long)-1)
+> > > > +		goto err;
+> > > > +
+> > > > +	res->start = port;
+> > > > +	res->end = port + length - 1;
+> > > > +	entry->offset = port - pci_addr;
+> > > > +
+> > > > +	if (pci_remap_iospace(res, cpu_addr) < 0)
+> > > > +		goto err;
+> > > > +	pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
+> > > > +	return;
+> > > > +err:
+> > > > +	res->flags |= IORESOURCE_DISABLED;
+> > > > +#endif
+> > > > +}
+> > > >  
+> > > >  int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+> > > >  {
+> > > > @@ -763,6 +791,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+> > > >  			"no IO and memory resources present in _CRS\n");
+> > > >  	else {
+> > > >  		resource_list_for_each_entry_safe(entry, tmp, list) {
+> > > > +			if (entry->res->flags & IORESOURCE_IO)
+> > > > +				acpi_pci_root_remap_iospace(entry);
+> > > > +
+> > > >  			if (entry->res->flags & IORESOURCE_DISABLED)
+> > > >  				resource_list_destroy_entry(entry);
+> > > >  			else
+> > > > @@ -834,6 +865,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+> > > >  
+> > > >  	resource_list_for_each_entry(entry, &bridge->windows) {
+> > > >  		res = entry->res;
+> > > > +		if (res->flags & IORESOURCE_IO)
+> > > > +			pci_unmap_iospace(res);
+> > > >  		if (res->parent &&
+> > > >  		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+> > > >  			release_resource(res);
+> > > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > > > index 89e9996..c0f8a4e 100644
+> > > > --- a/drivers/pci/pci.c
+> > > > +++ b/drivers/pci/pci.c
+> > > > @@ -26,6 +26,7 @@
+> > > >  #include <linux/device.h>
+> > > >  #include <linux/pm_runtime.h>
+> > > >  #include <linux/pci_hotplug.h>
+> > > > +#include <linux/vmalloc.h>
+> > > >  #include <asm/setup.h>
+> > > >  #include <linux/aer.h>
+> > > >  #include "pci.h"
+> > > > @@ -3168,6 +3169,29 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+> > > >  #endif
+> > > >  }
+> > > >  
+> > > > +/**
+> > > > + *	pci_unmap_iospace - Unmap the memory mapped I/O space
+> > > > + *	@res: resource to be unmapped
+> > > > + *
+> > > > + *	Unmap the CPU virtual address @res from virtual address space.
+> > > > + *	Only architectures that have memory mapped IO functions defined
+> > > > + *	(and the PCI_IOBASE value defined) should call this function.
+> > > > + */
+> > > > +void  pci_unmap_iospace(struct resource *res)
+> > > > +{
+> > > > +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
+> > > > +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+> > > > +
+> > > > +	unmap_kernel_range(vaddr, resource_size(res));
+> > > > +#else
+> > > > +	/*
+> > > > +	 * This architecture does not have memory mapped I/O space,
+> > > > +	 * so this function should never be called.
+> > > > +	 */
+> > > > +	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
+> > > > +#endif
+> > > > +}
+> > > > +
+> > > >  static void __pci_set_master(struct pci_dev *dev, bool enable)
+> > > >  {
+> > > >  	u16 old_cmd, cmd;
+> > > > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > > > index c28adb4..df1f33d 100644
+> > > > --- a/include/linux/pci.h
+> > > > +++ b/include/linux/pci.h
+> > > > @@ -1168,6 +1168,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+> > > >  unsigned long pci_address_to_pio(phys_addr_t addr);
+> > > >  phys_addr_t pci_pio_to_address(unsigned long pio);
+> > > >  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+> > > > +void pci_unmap_iospace(struct resource *res);
+> > > >  
+> > > >  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+> > > >  {
+> > > > -- 
+> > > > 1.9.1
+> > > > 
+> > > 
+> > 
+> 
+> -- 
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ??\_(???)_/??
