@@ -1,40 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 27 Apr 2016 08:22:34 +0200
-Subject: [GIT PULL] ARM: EXYNOS: fixes for v4.6
-Message-ID: <1461738154-8335-1-git-send-email-k.kozlowski@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 27 Apr 2016 14:26:28 +0800
+Subject: [PATCH v4 1/2] dt-bindings: Add vendor prefix for TechNexion
+In-Reply-To: <1461729621-13283-1-git-send-email-festevam@gmail.com>
+References: <1461729621-13283-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160427062628.GI30692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 27, 2016 at 01:00:20AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> TechNexion designs and manufactures embedded computing systems:
+> http://www.technexion.com/
+> 
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Please pull one fix for current release.
+Hi Rob,
 
-Best regards,
-Krzysztof
+Are you okay with this patch?
 
+Shawn
 
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.6
-
-for you to fetch changes up to a0a966b83873f33778710a4fc59240244b0734a5:
-
-  ARM: EXYNOS: Properly skip unitialized parent clock in power domain on (2016-04-25 11:35:37 +0200)
-
-----------------------------------------------------------------
-Fix for more theoretical than practical OOPS on first turn on of a exynos
-power domain, if there was no turn off before. Usually all power domains
-are on, so the first action is to turn off but some older bootloaders
-might behave differently.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      ARM: EXYNOS: Properly skip unitialized parent clock in power domain on
-
- arch/arm/mach-exynos/pm_domains.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> ---
+> Changes since v3:
+> - None
+> 
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 6bc179e..ea63459 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -251,6 +251,7 @@ synology	Synology, Inc.
+>  SUNW	Sun Microsystems, Inc
+>  tbs	TBS Technologies
+>  tcl	Toby Churchill Ltd.
+> +technexion	TechNexion
+>  technologic	Technologic Systems
+>  thine	THine Electronics, Inc.
+>  ti	Texas Instruments
+> -- 
+> 1.9.1
+> 
+> 
