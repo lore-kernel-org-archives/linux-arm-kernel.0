@@ -1,63 +1,81 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 27 Apr 2016 15:48:30 +0300
-Subject: [PATCH v7 1/9] clk: ti: am335x/am4372: Add tbclk to pwm node
-In-Reply-To: <1461710209-6563-2-git-send-email-fcooper@ti.com>
-References: <1461710209-6563-1-git-send-email-fcooper@ti.com>
- <1461710209-6563-2-git-send-email-fcooper@ti.com>
-Message-ID: <5720B51E.6050106@ti.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 27 Apr 2016 07:48:18 -0500
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
+In-Reply-To: <20160427085947.GG19428@n2100.arm.linux.org.uk>
+References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
+ <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
+ <20160419224122.GE19428@n2100.arm.linux.org.uk>
+ <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
+ <20160427085947.GG19428@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqJucGXLi0LS1ZoSCQJOceNBShauLLC4ZakZHnRmTYF4fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/16 01:36, Franklin S Cooper Jr wrote:
-> Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
-> to the time-based clk.
+On Wed, Apr 27, 2016 at 3:59 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Apr 20, 2016 at 09:04:39AM -0500, Rob Herring wrote:
+>> On Tue, Apr 19, 2016 at 5:41 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
+>> >> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
+>> >> > Document the DT bindings for controlling ARM PL310 Power Control
+>> >> > settings.
+>> >> >
+>> >> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+>> >>
+>> >> What happened to Josh's ack?
+>> >>
+>> >> > ---
+>> >> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
+>> >> >  1 file changed, 4 insertions(+)
+>> >> >
+>> >> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> >> > index fe0398c..c1c756e 100644
+>> >> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> >> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> >> > @@ -84,6 +84,10 @@ Optional properties:
+>> >> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+>> >> >    <1> (forcibly enable), property absent (retain settings set by
+>> >> >    firmware)
+>> >> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
+>> >> > +  disable), <1> or property absent (forcibly enable)
+>> >> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
+>> >> > +  <1>  or property absent (forcibly enable)
+>> >>
+>> >> What happened to "retain settings set by firmware"?
+>> >
+>> > I said we shouldn't.  Current behaviour is that we enable these features,
+>> > and moving to missing-means-retain means that everything today ends up
+>> > with these features disabled.  IOW, it's yet another change of actual
+>> > behaviour that every platform would see.
+>>
+>> Right, but then the properties are different from prefetch-instr and
+>> others IIRC. We're letting the OS define the binding. If BSD doesn't
+>> enable these settings currently, then there is a mismatch between the
+>> binding and actual behavior. Saying "retain firmware settings" also
+>> defines specific OS behavior. I think absent should mean OS is free to
+>> do whatever it wants which could be retain firmware settings, enable
+>> or disable. In other words, it is undefined as this ship has already
+>> sailed.
 >
-> Do not remove similar entries for ehrpwm node. Later patches will switch
-> from using ehrpwm node name to pwm. But to maintain ABI compatibility we
-> shouldn't remove the old entries.
+> I agree with "the ship has already sailed" but I disagree with the
+> rest of your comment.  The ship has already sailed in that we have
+> an established behaviour which has been there for 18 months.  Given
+> the time period, it's not something I'm going to change at this
+> stage, sorry.
 >
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> Why?  Such a change will go unnoticed, and it's particularly hard
+> to debug why battery life has reduced.
+>
+> I guess we need to find a way to ensure that the default behaviour
+> stays.  Whether that's by _everyone_ updating their DT files with
+> the new properties or some other way, I don't care.  I only care
+> that we retain the behaviour we've had for the last 18 months.
 
-I don't like adding new clock aliases to the list as I am trying to get 
-rid of them, but in this case we can't avoid it I believe. Thus,
+I'm not suggesting that we change behavior at all. I'm only suggesting
+that we leave it undefined in the binding documentation because the
+behavior is possibly OS specific and can't really be defined there.
 
-Acked-by: Tero Kristo <t-kristo@ti.com>
-
-> ---
->   drivers/clk/ti/clk-33xx.c | 3 +++
->   drivers/clk/ti/clk-43xx.c | 6 ++++++
->   2 files changed, 9 insertions(+)
->
-> diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-> index ef2ec64..0e47d95 100644
-> --- a/drivers/clk/ti/clk-33xx.c
-> +++ b/drivers/clk/ti/clk-33xx.c
-> @@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
->   	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
->   	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
->   	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
-> +	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-> +	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-> +	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
->   	{ .node_name = NULL },
->   };
->
-> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-> index 097fc90..7255aa8 100644
-> --- a/drivers/clk/ti/clk-43xx.c
-> +++ b/drivers/clk/ti/clk-43xx.c
-> @@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
->   	DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
->   	DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
->   	DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
-> +	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-> +	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-> +	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
-> +	DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
-> +	DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
-> +	DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
->   	{ .node_name = NULL },
->   };
->
->
+Rob
