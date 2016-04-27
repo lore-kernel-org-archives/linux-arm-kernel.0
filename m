@@ -1,39 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2016 20:08:16 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
-Message-ID: <13248156.8VXoeOzRlg@wuerfel>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 27 Apr 2016 12:24:38 -0600
+Subject: [PATCH] coresight: etb10: adjust read pointer only when needed
+Message-ID: <1461781478-6226-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 13:59:13 Alan Stern wrote:
-> On Wed, 27 Apr 2016, Arnd Bergmann wrote:
-> 
-> > I've looked at the usb HCD code now and see this:
-> > 
-> > struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
-> >                 struct device *dev, const char *bus_name,
-> >                 struct usb_hcd *primary_hcd)
-> > {
-> >       ...
-> >         hcd->self.controller = dev;
-> >         hcd->self.uses_dma = (dev->dma_mask != NULL);
-> >       ...
-> > }
-> > 
-> > What I think we need to do here is ensure that the device that gets
-> > passed here and assigned to hcd->self.controller is the actual DMA
-> > master device, i.e. the pci_device or platform_device that was created
-> > from outside of the xhci stack. This is after all the pointer that
-> > gets passed into all the dma_map_*/dma_sync_*/dma_alloc_*/...
-> > functions.
-> 
-> It would be better to add a new field, since self.controller is also
-> used for lots of other purposes.  Something like hcd->self.dma_dev.
-> 
+The read pointer (read_ptr) needs to be adjusted only if its value
+has gone beyond the length of the memory buffer.
 
-Ok, fair enough. I only took a brief look and all uses I found were
-either for the DMA mapping API or some printk logging.
+Reported-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etb10.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-	Arnd
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 586c98fbdb03..1e4031ee8969 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -428,7 +428,8 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 		read_ptr = (write_ptr + drvdata->buffer_depth) -
+ 					to_read / ETB_FRAME_SIZE_WORDS;
+ 		/* Wrap around if need be*/
+-		read_ptr &= ~(drvdata->buffer_depth - 1);
++		if (read_ptr > (drvdata->buffer_depth - 1))
++			read_ptr -= drvdata->buffer_depth;
+ 		/* let the decoder know we've skipped ahead */
+ 		local_inc(&buf->lost);
+ 	}
+-- 
+2.5.0
