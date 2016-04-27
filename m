@@ -1,53 +1,86 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Apr 2016 13:56:12 +0200
-Subject: [PATCH] ARM: dove: Remove CLK_IS_ROOT
-In-Reply-To: <1461116748-5444-1-git-send-email-sboyd@codeaurora.org> (Stephen
- Boyd's message of "Tue, 19 Apr 2016 18:45:48 -0700")
-References: <1461116748-5444-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <87k2jjtgdf.fsf@free-electrons.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 27 Apr 2016 13:59:30 +0200
+Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <20160427022649.GD6789@localhost>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-3-git-send-email-tn@semihalf.com>
+ <20160427022649.GD6789@localhost>
+Message-ID: <5720A9A2.6000609@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
- 
- On mer., avril 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
-> CLK_IS_ROOT", 2016-02-02) so remove it.
+On 27.04.2016 04:26, Bjorn Helgaas wrote:
+> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
+>> As we now have valid PCI host bridge device reference we can
+>> introduce code that is going to find its bus domain number using
+>> ACPI _SEG method.
+>>
+>> Note that _SEG method is optional, therefore _SEG absence means
+>> that all PCI buses belong to domain 0.
+>>
+>> While at it, for the sake of code clarity we put ACPI and DT domain
+>> assign methods into the corresponding helpers.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+>> Tested-by: Duc Dang <dhdang@apm.com>
+>> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>   drivers/acpi/pci_root.c  | 18 ++++++++++++++++++
+>>   drivers/pci/pci.c        | 11 +++++++++--
+>>   include/linux/pci-acpi.h |  2 ++
+>>   3 files changed, 29 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+>> index 4581e0e..d9a70c4 100644
+>> --- a/drivers/acpi/pci_root.c
+>> +++ b/drivers/acpi/pci_root.c
+>> @@ -419,6 +419,24 @@ out:
+>>   }
+>>   EXPORT_SYMBOL(acpi_pci_osc_control_set);
+>>
+>> +int acpi_pci_bus_domain_nr(struct device *parent)
+>> +{
+>> +	struct acpi_device *acpi_dev = to_acpi_device(parent);
+>> +	unsigned long long segment = 0;
+>> +	acpi_status status;
+>> +
+>> +	/*
+>> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
+>> +	 * all PCI buses belong to domain 0.
+>> +	 */
+>> +	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
+>> +				       &segment);
 >
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
+> don't want to evaluate it *twice*, do we?
 
-Applied on mvebu/soc
+Ideally we do not want.
+
+The main intention here was to avoid using "void *sysdata" to retrieve 
+domain number. sysdata means something different for each architectures. 
+This would be common way for all arch using PCI_DOMAINS_GENERIC option 
+such as ARM64.
+
+>
+> I was sort of expecting that if you added it here, we'd remove the
+> existing call, but it looks like you're keeping both?
+
+I leave _SEG evaluation in acpi_pci_root_add to keep support for IA64 
+and x86 which are still using arch-specific sysdata (struct 
+pci_sysdata->domain for x86 and struct pci_controller->segment for IA64) 
+to retrieve domain number.
+
+ARM64 uses PCI_DOMAINS_GENERIC for DT boot method, it would be 
+consistent to keep it for ACPI too.
+
+I am open to suggestions, do you think we should use sysdata for ARM64?
 
 Thanks,
-
-Gregory
-> ---
->  arch/arm/mach-dove/common.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index 0cdaa3851d2e..0d420a2bfe3e 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -88,8 +88,7 @@ static void __init dove_clk_init(void)
->  	struct clk *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
->  	struct clk *xor0, *xor1, *ge, *gephy;
->  
-> -	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
-> -				       dove_tclk);
-> +	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, dove_tclk);
->  
->  	usb0 = dove_register_gate("usb0", "tclk", CLOCK_GATING_BIT_USB0);
->  	usb1 = dove_register_gate("usb1", "tclk", CLOCK_GATING_BIT_USB1);
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tomasz
