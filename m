@@ -1,81 +1,49 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 27 Apr 2016 07:48:18 -0500
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <20160427085947.GG19428@n2100.arm.linux.org.uk>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
- <CAL_JsqL-LCt06ZYQL4FEu7vEdHaFCvBe5xnHbkZTf55yAf5Svw@mail.gmail.com>
- <20160419224122.GE19428@n2100.arm.linux.org.uk>
- <CAL_Jsq+SzUaNGy8LtqHv9T8i3x9WLHd-5eCb4=z4DMRwZo8XfA@mail.gmail.com>
- <20160427085947.GG19428@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqJucGXLi0LS1ZoSCQJOceNBShauLLC4ZakZHnRmTYF4fg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Apr 2016 14:51:46 +0200
+Subject: [GIT PULL] at91: defconfig for 4.7 #1
+Message-ID: <1461761506-31506-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 3:59 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 20, 2016 at 09:04:39AM -0500, Rob Herring wrote:
->> On Tue, Apr 19, 2016 at 5:41 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Apr 19, 2016 at 04:38:14PM -0500, Rob Herring wrote:
->> >> On Mon, Apr 18, 2016 at 4:36 PM, Brad Mouring <brad.mouring@ni.com> wrote:
->> >> > Document the DT bindings for controlling ARM PL310 Power Control
->> >> > settings.
->> >> >
->> >> > Signed-off-by: Brad Mouring <brad.mouring@ni.com>
->> >>
->> >> What happened to Josh's ack?
->> >>
->> >> > ---
->> >> >  Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
->> >> >  1 file changed, 4 insertions(+)
->> >> >
->> >> > diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
->> >> > index fe0398c..c1c756e 100644
->> >> > --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
->> >> > +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
->> >> > @@ -84,6 +84,10 @@ Optional properties:
->> >> >  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
->> >> >    <1> (forcibly enable), property absent (retain settings set by
->> >> >    firmware)
->> >> > +- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
->> >> > +  disable), <1> or property absent (forcibly enable)
->> >> > +- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
->> >> > +  <1>  or property absent (forcibly enable)
->> >>
->> >> What happened to "retain settings set by firmware"?
->> >
->> > I said we shouldn't.  Current behaviour is that we enable these features,
->> > and moving to missing-means-retain means that everything today ends up
->> > with these features disabled.  IOW, it's yet another change of actual
->> > behaviour that every platform would see.
->>
->> Right, but then the properties are different from prefetch-instr and
->> others IIRC. We're letting the OS define the binding. If BSD doesn't
->> enable these settings currently, then there is a mismatch between the
->> binding and actual behavior. Saying "retain firmware settings" also
->> defines specific OS behavior. I think absent should mean OS is free to
->> do whatever it wants which could be retain firmware settings, enable
->> or disable. In other words, it is undefined as this ship has already
->> sailed.
->
-> I agree with "the ship has already sailed" but I disagree with the
-> rest of your comment.  The ship has already sailed in that we have
-> an established behaviour which has been there for 18 months.  Given
-> the time period, it's not something I'm going to change at this
-> stage, sorry.
->
-> Why?  Such a change will go unnoticed, and it's particularly hard
-> to debug why battery life has reduced.
->
-> I guess we need to find a way to ensure that the default behaviour
-> stays.  Whether that's by _everyone_ updating their DT files with
-> the new properties or some other way, I don't care.  I only care
-> that we retain the behaviour we've had for the last 18 months.
+Arnd, Olof, Kevin,
 
-I'm not suggesting that we change behavior at all. I'm only suggesting
-that we leave it undefined in the binding documentation because the
-behavior is possibly OS specific and can't really be defined there.
+Here is a batch of defconfig update for both AT91 and the multi_v7_defconfig.
 
-Rob
+Thanks, best regards,
+
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
+
+for you to fetch changes up to ed87957b18f238516e578e5dbd44a5db11300831:
+
+  ARM: multi_v7_defconfig: add the Atmel sama5d2-compatible ADC driver (2016-04-27 14:07:59 +0200)
+
+----------------------------------------------------------------
+First batch of defconfig updates for 4.7:
+- HDMA, HLCD and PDMIC drivers for sama5_defconfig
+- several missing drivers in multi_v7_defconfig. In module when possible
+
+----------------------------------------------------------------
+Boris Brezillon (1):
+      ARM: multi_v7_defconfig: add HLCDC drivers as modules
+
+Nicolas Ferre (7):
+      ARM: at91/defconfig: add the HDMA controller to sama5_defconfig
+      ARM: at91/defconfig: add HLCDC driver to sama5_defconfig
+      ARM: at91/defconfig: add PDMIC driver to sama5_defconfig
+      ARM: multi_v7_defconfig: add Atmel watchdog timers
+      ARM: multi_v7_defconfig: add Atmel ISI (Image Sensor Interface) driver
+      ARM: multi_v7_defconfig: add the Atmel Audio microphone interface PDMIC
+      ARM: multi_v7_defconfig: add the Atmel sama5d2-compatible ADC driver
+
+ arch/arm/configs/multi_v7_defconfig |  8 ++++++++
+ arch/arm/configs/sama5_defconfig    | 11 +++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+-- 
+Nicolas Ferre
