@@ -1,27 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2016 11:39:58 +0200
-Subject: [PATCH 0/3] MAINTAINERS: add new maintainers of NXP LPC32xx SoC
-In-Reply-To: <1461714919-25577-1-git-send-email-vz@mleia.com>
-References: <1461714919-25577-1-git-send-email-vz@mleia.com>
-Message-ID: <4622738.ujCxg0gb7N@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 27 Apr 2016 11:46:29 +0200
+Subject: [PATCH] regulator: axp20x: Fix LDO4 linear voltage range
+In-Reply-To: <20160426145735.GX3217@sirena.org.uk>
+References: <1461679251-25538-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v648p8T5PqxZTyvoZsugcTM03-mqjNnwSZLXJq_KnErFdA@mail.gmail.com>
+ <20160426145735.GX3217@sirena.org.uk>
+Message-ID: <f63acd04-33ed-02d6-0ce4-b9c436a3bf84@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 02:55:16 Vladimir Zapolskiy wrote:
-> Roland Stigge added initial support of NXP LPC32xx SoC series and
-> first boards powered by it, but for a while since v3.18-rc1 the
-> SoC support is unmaintained and became stale.
-> 
-> Vladimir Zapolskiy and Sylvain Lemieux expressed interest in
-> continuation of NXP LPC32xx maintenance, reflect this in MAINTAINERS
-> record file for better communication with Linux kernel community.
-> 
-> The maintenance change is in agreement with Arnd Bergmann:
-> 
+Hi,
 
-Looks good. Let's give Roland some time to reply (hopefully with
-and Ack), and then merge it for 4.7.
+On 26-04-16 16:57, Mark Brown wrote:
+> On Tue, Apr 26, 2016 at 10:18:04PM +0800, Chen-Yu Tsai wrote:
+>
+>> Hans sent an identical patch (plus another fix) a month ago though.
+>
+> I have no record of any such patch, I don't know where it might've been
+> sent.
 
-Thanks,
+It is here:
 
-	Arnd
+https://groups.google.com/forum/#!topic/linux-sunxi/3sjt47-CtbU
+
+And according to that archive it was send to broonie at linaro.org
+(amongst others).
+
+Regards,
+
+Hans
