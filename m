@@ -1,40 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Apr 2016 10:10:09 +0200
-Subject: [PATCH] ARM: at91/defconfig: add PDMIC driver to sama5_defconfig
-In-Reply-To: <1461685088-28659-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1461685088-28659-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20160427081009.GE3264@piout.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Apr 2016 10:30:24 +0200
+Subject: bug in autoloading of imx-ipuv3-crtc
+In-Reply-To: <13533046.1iFyOjiAs0@anubis.ausil.us>
+References: <6926808.b0joqYQPQE@anubis.ausil.us>
+ <1513165.9WxCa41tI1@anubis.ausil.us>
+ <20160420230317.GT29108@pengutronix.de>
+ <13533046.1iFyOjiAs0@anubis.ausil.us>
+Message-ID: <1461745824.4044.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/2016 at 17:38:08 +0200, Nicolas Ferre wrote :
-> Add Pulse Density Modulation Interface Controller (PDMIC) driver compilation
-> for sama5 default configuration. Is used by sama5d2 SoC for instance.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Dennis,
 
-> ---
->  arch/arm/configs/sama5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+Am Freitag, den 22.04.2016, 08:11 -0500 schrieb Dennis Gilmore:
+[...]
+> I reverted the 4 patches in that series
 > 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index f5a3966f6793..32a082888adf 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -158,6 +158,7 @@ CONFIG_SND_SOC=y
->  CONFIG_SND_ATMEL_SOC=y
->  CONFIG_SND_ATMEL_SOC_WM8904=y
->  # CONFIG_HID_GENERIC is not set
-> +CONFIG_SND_ATMEL_SOC_PDMIC=y
->  CONFIG_USB=y
->  CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
->  CONFIG_USB_EHCI_HCD=y
-> -- 
-> 2.1.3
+> 407c9eba drm/imx: Remove of_node assignment from ipuv3-crtc driver probe
+> 304e6be6 gpu: ipu-v3: Assign of_node of child platform devices to 
+> corresponding ports
+> 99ae78c3 gpu: ipu-v3: Remove reg_offset field
+> c3ede03c gpu: ipu-v3: drop unused dmfc field from client platform data
 > 
+> and it then worked again.
+> 
+> Dennis
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thank you for testing this, I've sent a patch to set the dev->of_node
+pointer later so that the platform modalias matching should work again.
+
+best regards
+Philipp
