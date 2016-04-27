@@ -1,35 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Apr 2016 14:08:23 +1000
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.7
-Message-ID: <cover.1461722984.git.horms+renesas@verge.net.au>
+Date: Wed, 27 Apr 2016 14:08:25 +1000
+Subject: [PATCH] arm64: defconfig: Add Renesas R-Car USB 3.0 driver support
+In-Reply-To: <cover.1461722984.git.horms+renesas@verge.net.au>
+References: <cover.1461722984.git.horms+renesas@verge.net.au>
+Message-ID: <a03bd5735dfa87a5db585e162eda00794690c534.1461722984.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Please consider these Renesas ARM64 based SoC defconfig updates for v4.7.
-
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.7
-
-for you to fetch changes up to a03bd5735dfa87a5db585e162eda00794690c534:
-
-  arm64: defconfig: Add Renesas R-Car USB 3.0 driver support (2016-04-22 10:17:34 +1000)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC Defconfig Updates for v4.7
-
-* Add Renesas R-Car USB 3.0 driver support
-
-----------------------------------------------------------------
-Yoshihiro Shimoda (1):
-      arm64: defconfig: Add Renesas R-Car USB 3.0 driver support
-
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm64/configs/defconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f70505186820..c3cdd640bea3 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -189,7 +189,7 @@ CONFIG_SND_SOC_AK4613=y
+ CONFIG_USB=y
+ CONFIG_USB_OTG=y
+ CONFIG_USB_XHCI_HCD=y
+-CONFIG_USB_XHCI_PLATFORM=y
++CONFIG_USB_XHCI_RCAR=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MSM=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+-- 
+2.7.0.rc3.207.g0ac5344
