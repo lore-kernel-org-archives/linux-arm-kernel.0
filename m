@@ -1,64 +1,57 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 27 Apr 2016 16:25:01 +0300
-Subject: [PATCH v1] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <57209154.6050508@arm.com>
-References: <1461684532-16848-1-git-send-email-grygorii.strashko@ti.com>
- <20160426160245.GI28464@e106497-lin.cambridge.arm.com>
- <571FC2EC.9090605@ti.com> <57209154.6050508@arm.com>
-Message-ID: <5720BDAD.1040806@ti.com>
+From: hias@horus.com (Matthias Reichl)
+Date: Wed, 27 Apr 2016 15:26:52 +0200
+Subject: [PATCH 2/2] ASoC: bcm2835: Add S16_LE support via packed DMA transfers
+In-Reply-To: <1461763613-28714-1-git-send-email-hias@horus.com>
+References: <1461763613-28714-1-git-send-email-hias@horus.com>
+Message-ID: <1461763613-28714-2-git-send-email-hias@horus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2016 01:15 PM, Robin Murphy wrote:
-> On 26/04/16 20:35, Grygorii Strashko wrote:
->> On 04/26/2016 07:02 PM, Liviu Dudau wrote:
->>> On Tue, Apr 26, 2016 at 06:28:52PM +0300, Grygorii Strashko wrote:
->>>
->>> Hi Grygorii,
->>>
->>> First time I'm seeing this patch, so I have a few questions, mostly
->>> related to the commit message:
->>
->> Hm. You are in cc for RFC.
->> Sry, forgot to add link [1].
->>
->>>
->>>> This patch intended to fix following cases:
->>>> - SoC-A has ARM GT, defines DT node for ARM GT and selects
->>>> ARM_GLOBAL_TIMER statically in Kconfig file. SoC-B has ARM GT and
->>>> defines DT node for ARM GT, but do not selects ARM_GLOBAL_TIMER
->>>> statically in Kconfig file. In case of multiplatform build ARM GT will
->>>> be implicitly enabled for SoC-B.
->>>
->>> Well, SoC-B has the GT *and* the DT node, so what is the problem with
->>> enabling it for SoC-B? If there are reasons not to use the Global Timer
->>> on SoC-B, surely a better option would be to mark it in DT with 
->>> status = "disabled";
->>
->> This was rejected [2]. DT describes HW and if it is functional the 
->> status = "disabled"
->> is not good choice.
->> ARM GT can't be used as clocksource/sched_clock/clockevent when 
->> CPUFreq or
->> CPUIdle are enabled :(, and this is Linux specific functionality and
->> not HW description.
-> 
-> It sounds to me like the cleanest option might then be to address it 
-> within the Linux-specific driver itself. How feasible would it be for 
-> the GT driver to detect at runtime whether CPUfreq/idle will be used and 
-> simply refuse to register as a clocksource if so? (I guess there are 
-> probably horrible initialisation order issues, at least...)
-> 
+The bcm2835-i2s driver already has support for the S16_LE format but
+that format hasn't been made available because dmaengine_pcm didn't
+support packed data transfers.
 
-I do not thinK this is really possible, taking into account that
-clockevent device might need to be registered very early and 
-PM features can be enabled/disabled dynamically.
-For example, PM is enabled by loading module for TI am437x and am335x SoCs,
-but ARM GT is initialized much earlier. Before loading PM module,
-it is (theoretically) possible to change clocksource and
-clockevent (unbind) devices, but there is no way to change sched_clock
-(or timer_delay).
+bcm2835-i2s needs 16-bit left+right channel data to be packed into
+a 32-bit word, the FIFO register is 32-bit only and doesn't support
+16-bit access.
 
+Now that dmaengine_pcm supports packed transfers the format can
+be made available by setting the SND_DMAENGINE_PCM_DAI_FLAG_PACK flag.
+
+No further configuration is necessary:
+- snd_dmaengine_dai_dma_data.addr_width is already set to
+  DMA_SLAVE_BUSWIDTH_4_BYTES to force 32-bit DMA transfers
+- dmaengine_pcm will pick up the S16_LE format from the DAI
+  configuration and make it available since it's no longer
+  masked out due to the PACK flag.
+- there are no further corner cases to catch in hw_params,
+  since the channel count is fixed at 2 we always have two
+  16-bit stereo samples that can be transferred via 32-bit DMA
+
+Signed-off-by: Matthias Reichl <hias@horus.com>
+---
+ sound/soc/bcm/bcm2835-i2s.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+index 1c1f221..40ba01d 100644
+--- a/sound/soc/bcm/bcm2835-i2s.c
++++ b/sound/soc/bcm/bcm2835-i2s.c
+@@ -678,6 +678,15 @@ static int bcm2835_i2s_probe(struct platform_device *pdev)
+ 	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].maxburst = 2;
+ 	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].maxburst = 2;
+ 
++	/*
++	 * Set the PACK flag to enable S16_LE support (2 S16_LE values
++	 * packed into 32-bit transfers).
++	 */
++	dev->dma_data[SNDRV_PCM_STREAM_PLAYBACK].flags =
++		SND_DMAENGINE_PCM_DAI_FLAG_PACK;
++	dev->dma_data[SNDRV_PCM_STREAM_CAPTURE].flags =
++		SND_DMAENGINE_PCM_DAI_FLAG_PACK;
++
+ 	/* BCLK ratio - use default */
+ 	dev->bclk_ratio = 0;
+ 
 -- 
-regards,
--grygorii
+2.1.4
