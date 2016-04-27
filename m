@@ -1,75 +1,82 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Apr 2016 10:48:36 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: n900 needs MMC slot names for legacy
- user space
-In-Reply-To: <1461714383-9956-2-git-send-email-tony@atomide.com>
-References: <1461714383-9956-1-git-send-email-tony@atomide.com>
- <1461714383-9956-2-git-send-email-tony@atomide.com>
-Message-ID: <CAPDyKFokkpF_-yxE+G2_nvC2q3uHkMCxZJHYU7y4KRRDWfvPTQ@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 27 Apr 2016 16:48:41 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <20160427072454.GJ30692@tiger>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+ <20160427072454.GJ30692@tiger>
+Message-ID: <CAA+hA=T=TuOoAL7ojV9VoxyNS++6Wh9OOBQu2XQ59ojttsWE5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2016 at 01:46, Tony Lindgren <tony@atomide.com> wrote:
-> Let's pass the slot names in pdata like the legacy code does.
-> Once we have a generic DT binding for the slot names we can
-> switch to that.
+On Wed, Apr 27, 2016 at 3:24 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Wed, Apr 27, 2016 at 10:57:21AM +0800, Dong Aisheng wrote:
+>> On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+>> > On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
+>> >> Shawn,
+>> >> What's your suggestion?
+>> >
+>> > I think this needs more discussion, and I just dropped Stefan's patch
+>> > from my tree.
+>> >
+>> > We need to firstly understand why this is happening.  The .prepare hook
+>> > is defined to be non-atomic context, and so that we call sleep function
+>> > in there.  We did everything right.  Why are we getting the warning?  If
+>> > I'm correct, this warning only happens on i.MX7D.  Why is that?
+>> >
+>>
+>> Why Stefan's patch works (checking irqs_disabled()) is because during kernel
+>> time init, the irq is still not enabled. It fixes the issue indirectly.
+>> See:
+>> asmlinkage __visible void __init start_kernel(void)
+>> {
+>>         /*
+>>          * Set up the scheduler prior starting any interrupts (such as the
+>>          * timer interrupt). Full topology setup happens at smp_init()
+>>          * time - but meanwhile we still have a functioning scheduler.
+>>          */
+>>         sched_init();
+>>         .............
+>>         time_init();
+>>         ..............
+>>         WARN(!irqs_disabled(), "Interrupts were enabled early\n");
+>>         early_boot_irqs_disabled = false;
+>>         local_irq_enable();
+>> }
+>>
+>> The issue can only happen when PLL enable causes a schedule during
+>> imx_clock_init().
+>> Not all PLL has this issue.
+>> The issue happens on MX7D pll_audio_main_clk/pll_video_main_clk
+>> which requires more delay time and cause usleep.
+>> Because clk framework does not support MX7D clock types (operation requires
+>> parents on), we simply enable all clocks in imx7d_clocks_init().
+>>
+>> If apply my this patch series:
+>> https://lkml.org/lkml/2016/4/20/199
+>> The issue can also be gone.
+>
+> Thanks for the info.  It sounds like that we are fixing the problem in
+> the wrong place, i.e. clk_pllv3_prepare().  The function does nothing
+> wrong, since the .prepare hook is defined to be one that can sleep.  If
+> we see sleep warning in a context calling clk_prepare(), that probably
+> means we shouldn't make the function call from that context.
+>
 
-I am not sure we ever will get a DT binding accepted for the slot
-name. It seem far from being a HW description. :-)
+Yes, i agree.
+I'm trying to get rid of these calls.
 
-Instead, the long term and proper solution, is to enable userspace to
-be able to use UUID/PARTID instead.
+Simply remove them or delay to arch_init will cause kernel fail to boot.
+Still checking the root cause.
 
-Until that happens, I guess this will have to do.
+> Shawn
 
-Kind regards
-Uffe
-
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/pdata-quirks.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-> index a935d28..cfaf45f 100644
-> --- a/arch/arm/mach-omap2/pdata-quirks.c
-> +++ b/arch/arm/mach-omap2/pdata-quirks.c
-> @@ -21,6 +21,7 @@
->  #include <linux/regulator/fixed.h>
->
->  #include <linux/platform_data/pinctrl-single.h>
-> +#include <linux/platform_data/hsmmc-omap.h>
->  #include <linux/platform_data/iommu-omap.h>
->  #include <linux/platform_data/wkup_m3.h>
->  #include <linux/platform_data/pwm_omap_dmtimer.h>
-> @@ -35,6 +36,8 @@
->  #include "soc.h"
->  #include "hsmmc.h"
->
-> +static struct __maybe_unused omap_hsmmc_platform_data mmc_pdata[2];
-> +
->  struct pdata_init {
->         const char *compatible;
->         void (*fn)(void);
-> @@ -271,6 +274,8 @@ static struct platform_device omap3_rom_rng_device = {
->  static void __init nokia_n900_legacy_init(void)
->  {
->         hsmmc2_internal_input_clk();
-> +       mmc_pdata[0].name = "external";
-> +       mmc_pdata[1].name = "internal";
->
->         if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
->                 if (IS_ENABLED(CONFIG_ARM_ERRATA_430973)) {
-> @@ -497,6 +502,8 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
->         OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
->         OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
->                        &omap3_iommu_pdata),
-> +       OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x4809c000, "4809c000.mmc", &mmc_pdata[0]),
-> +       OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x480b4000, "480b4000.mmc", &mmc_pdata[1]),
->         /* Only on am3517 */
->         OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
->         OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
-> --
-> 2.8.1
->
+Regards
+Dong Aisheng
