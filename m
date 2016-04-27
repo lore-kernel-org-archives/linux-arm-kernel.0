@@ -1,36 +1,41 @@
 From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed, 27 Apr 2016 15:54:50 +0800
-Subject: [PATCH v4 1/4] Documentation: rockchip-dw-mshc: add description for
- rk3399
+Date: Wed, 27 Apr 2016 15:54:52 +0800
+Subject: [PATCH v4 3/4] Documentation: devicetree: rockchip: Document
+ rk3399-evb
 In-Reply-To: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
 References: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1461743693-10671-2-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1461743693-10671-4-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Lin <shawn.lin@rock-chips.com>
-
-Add "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc" for
-dwmmc on rk3399 platform.
+Use "rockchip,rk3399-evb" compatible string for Rockchip RK3399
+evaluation board.
 
 Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 ---
- Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
- 1 file changed, 1 insertion(+)
+changes in v4:
+- none
 
-diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-index ea5614b..07184e8 100644
---- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-@@ -15,6 +15,7 @@ Required Properties:
- 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
- 	- "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3036
- 	- "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
-+	- "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3399
+changes in v3:
+- modify title (Rob)
+
+ Documentation/devicetree/bindings/arm/rockchip.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 2549519..6491b56 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -101,4 +101,8 @@ Rockchip platforms device tree bindings
  
- Optional Properties:
- * clocks: from common clock binding: if ciu_drive and ciu_sample are
+ - Rockchip RK3228 Evaluation board:
+     Required root node properties:
+-      - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
++     - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
++
++- Rockchip RK3399 evb:
++    Required root node properties:
++      - compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
 -- 
 1.9.1
