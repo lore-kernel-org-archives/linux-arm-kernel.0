@@ -1,55 +1,57 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 27 Apr 2016 11:55:12 +0100
-Subject: [PATCH 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <5212316.Wg9FOfdsuU@wuerfel>
-References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
- <5591261.0X3WRSsdGl@wuerfel> <572081FB.5090303@arm.com>
- <5212316.Wg9FOfdsuU@wuerfel>
-Message-ID: <57209A90.5070707@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Apr 2016 13:04:23 +0200
+Subject: [PATCH] ARM: mv78xx0: Remove CLK_IS_ROOT
+In-Reply-To: <1461116404-3285-1-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Tue, 19 Apr 2016 18:40:04 -0700")
+References: <1461116404-3285-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <871t5ruxc8.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/16 10:50, Arnd Bergmann wrote:
-> On Wednesday 27 April 2016 10:10:19 Vladimir Murzin wrote:
->>> On the other hand, separating the two has the advantage of keeping it
->>> simple, as we don't have to worry about all the ARMv7-A platforms
->>> and whether we actually want to allow their kernels to be built with
->>> MMU disabled.
->>>
->>
->> Ok, what if we start with your approach explicitly saying which platform
->> wants to be listed when CONFIG_MMU is deselected (I think R-class is the
->> first user here) gradually extending such list with ARMv7-A? There is
->> (little?) chance that at some point we can support kernel which can run
->> on both configurations.
-> 
-> Do you mean adding a ARM_SINGLE_ARMV7R option, or ARCH_MULTI_V7R?
+Hi Stephen,
+ 
+ On mer., avril 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-I'd think that ARCH_MULTI_V7R would make more sense since it is close
-rather to the CPU variant than platform, so for the imaginary case where
-ARMv7-A platform want to run without MMU can adjust it's dependency to
+> This flag is a no-op now (see commit 47b0eeb3dc8a "clk: Deprecate
+> CLK_IS_ROOT", 2016-02-02) so remove it.
+>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-depends on ARCH_MULTI_V7 || ARCH_MULTI_V7R
+Applied on mvebu/soc
 
-where
+(I fixed the email format for Jason: the closing angle bracket was
+missing)
 
-config ARCH_MULTI_V7
-	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
-	depends on MMU
-...
+Thanks,
 
-config ARCH_MULTI_V7R
-	bool "MMU-less ARMv7 based platforms (Cortex-R)"
-	depends on !MMU
-...
+Gregory
+> ---
+>  arch/arm/mach-mv78xx0/common.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+> index 99cc93900a24..45a05207b418 100644
+> --- a/arch/arm/mach-mv78xx0/common.c
+> +++ b/arch/arm/mach-mv78xx0/common.c
+> @@ -168,8 +168,7 @@ static struct clk *tclk;
+>  
+>  static void __init clk_init(void)
+>  {
+> -	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
+> -				       get_tclk());
+> +	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, 0, get_tclk());
+>  
+>  	orion_clkdev_init(tclk);
+>  }
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
 
-It is also should work for purely R-class platform, although I'm not
-keen on Kconfig and may be totally wrong here :(
-
-Cheers
-Vladimir
-
-> 
-> 	Arnd
-> 
-> 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
