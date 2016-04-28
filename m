@@ -1,70 +1,64 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 28 Apr 2016 14:54:39 +0200
-Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20160428144607.191a29f2@bbrezillon>
-References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
- <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
- <20160428104925.7eb12ca2@bbrezillon>
- <CACh+v5Mi2Qd58SZkwW0mZ3ZJx3Rv3mwSkRqzgHwBTxpUbwjVFQ@mail.gmail.com>
- <20160428144607.191a29f2@bbrezillon>
-Message-ID: <CACh+v5ObRAf=7D3tbQdAzef+QRVObF_9eHJEreXwxVyrV8THcA@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 28 Apr 2016 14:02:28 +0100
+Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
+In-Reply-To: <20160428141336.60aa4be1@free-electrons.com>
+References: <20160427225827.GC17629@localhost>
+ <20160428120624.GV28464@e106497-lin.cambridge.arm.com>
+ <20160428141336.60aa4be1@free-electrons.com>
+Message-ID: <20160428130228.GW28464@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-04-28 14:46 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> On Thu, 28 Apr 2016 14:18:25 +0200
-> Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
->> >> > +
->> >> > +- atmel,ncs-rd-setup-ns
->> >> > +- atmel,nrd-setup-ns
->> >> > +- atmel,ncs-wr-setup-ns
->> >> > +- atmel,nwe-setup-ns
->> >> > +- atmel,ncs-rd-pulse-ns
->> >> > +- atmel,nrd-pulse-ns
->> >> > +- atmel,ncs-wr-pulse-ns
->> >> > +- atmel,nwe-pulse-ns
->> >> > +- atmel,nwe-cycle-ns
->> >> > +- atmel,nrd-cycle-ns
->> >> > +- atmel,tdf-ns
->> >>
->> >> One thought about the configuration in 'ns' unit: Some devices may
->> >> have requirements expressed in clock cycles (I'm thinking of FPGA
->> >> here). At  a fixed frequency one can always convert manually from 'ns'
->> >> to 'clocks' but it's a bit tedious and prone to rounding errors. And
->> >> It 'll  break when the EBI frequency is changed
->> >
->> > If you don't mind, I'd like to first get this version accepted, and
->> > we'll extend it with timings expressed in clock cycles afterward.
->> >
->> > BTW, could you describe a real use case where timings should be
->> > expressed in clock cycles? I mean, usually the devices have some timing
->> > constraints (tXX_min = Y ns), and I don't see why it would differ for
->> > FPGA interfaces, but I'm clearly not an FPGA expert.
->>
->> I'm not either, I only toyed with FPGA. That's just what experienced
->> FPGA designer told me.
->> I guess that it boils down to: FPGA are more suited for a synchronous
->> design than an asynchronous one.
->
-> The thing is, all the timings are based on the master clock, and,
-> AFAICS, this clk signal is not exposed, so you're basing your clk-cycle
-while EBI itself is asynchronous, the clk can be exposed through one
-of the PCK. I've seen this in real projects.
-> based timings on something that can change depending on how the
-> bootstrap/bootloader decided to configure the master clk.
->
-> One option would be to define one of the timing as the reference,
-> define this one in nanosecond, and define the other ones as multiple of
-> the reference timing. But I'm not sure it's easier to do that than
-> defining all the timings directly in nanoseconds.
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
+On Thu, Apr 28, 2016 at 02:13:36PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Thu, 28 Apr 2016 13:06:24 +0100, Liviu Dudau wrote:
+> 
+> > I am OK with the suggestion that Thomas has to add a parameter to
+> > pci_remap_iospace() to pass on the pgprot_t value one wants and get rid of
+> > pci_remap_io(), but I would suggest first to him to convert the ARMADA XP
+> > platform to generic PCI code and see if it doesn't work OK by default. We
+> > (well, Lorenzo driven nowadays) are pushing in that direction for a while now.
+> 
+> Armada XP itself is not affected by the HW issue that requires use to
+> use strongly-ordered mappings, it's only the Cortex-A9 based SoC, i.e
+> Armada 375, 38x and 39x.
+
+Sorry, I blame my unfamiliarity with the Armada family of devices when I
+said Armada XP (I know the name better than any other).
+
+> 
+> That being said, could you point to me to which bits of the generic PCI
+> code I should convert our PCI support to? I'd be happy to take a look.
+
+Hmm, looking at the DT bindings there seem to be a lot of custom stuff in there.
+I would start with trying to see if you can replace the custom parsing of
+ranges with the generic of_pci_range_to_resource() and then look at the
+pcie-designware.c how they got rid of the pci_common_init_dev() and the
+need to use hw_pci structure. You want to end up with calling
+of_pci_get_host_bridge_resources() to get back your list of MEM and IO
+resources (it parses the bus ranges as well) and then use those to map IO
+space and start the root bus scanning.
+
+Best regards,
+Liviu
+
+> 
+> Thanks!
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
 > http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
