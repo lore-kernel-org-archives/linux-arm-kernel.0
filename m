@@ -1,74 +1,37 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 28 Apr 2016 18:55:34 +0300
-Subject: [PATCH net v3 0/5] drivers: net: cpsw: phy-handle fixes
-In-Reply-To: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <57223276.8070603@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2016 17:56:16 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT PM Domain Updates for v4.7
+In-Reply-To: <cover.1461730638.git.horms+renesas@verge.net.au>
+References: <cover.1461730638.git.horms+renesas@verge.net.au>
+Message-ID: <5702417.rnCUR69ruo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2016 04:10 AM, David Rivshin (Allworx) wrote:
-> From: David Rivshin <drivshin@allworx.com>
->
-> This series fixes a number of related issues around using phy-handle
-> properties in cpsw emac nodes.
->
-> Patch 1 fixes a bug if more than one slave is used, and either
-> slave uses the phy-handle property in the devicetree.
->
-> Patch 2 fixes a NULL pointer dereference which can occur if a
-> phy-handle property is used and of_phy_connect() return NULL,
-> such as with a bad devicetree.
->
-> Patch 3 fixes an issue where the phy-mode property would be ignored
-> if a phy-handle property was used. This also fixes a bogus error
-> message that would be emitted.
->
-> Patch 4 fixes makes the binding documentation more explicit that
-> exactly one PHY property should be used, and also marks phy_id as
-> deprecated.
->
-> Patch 5 cleans up the fixed-link case to work like the now-fixed
-> phy-handle case.
->
-> I have tested on the following hardware configurations:
->   - (EVMSK) dual emac, phy_id property in both slaves
->   - (EVMSK) dual emac, phy-handle property in both slaves
->   - (EVMSK) a bad phy-handle property pointing to &mmc1
->   - (EVMSK) phy_id property with incorrect PHY address
->   - (BeagleBoneBlack) single emac, phy_id property
->   - (custom) single emac, fixed-link subnode
->
-> Andrew Goodbody reported testing v2 on a board that doesn't use
-> dual_emac mode, but with 2 PHYs using phy-handle properties [1].
->
-> Nicolas Chauvet reported testing v2 on an HP t410 (dm8148).
->
-> Markus Brunner reported testing v1 on the following [2]:
->   - emac0 with phy_id and emac1 with fixed phy
->   - emac0 with phy-handle and emac1 with fixed phy
->   - emac0 with fixed phy and emac1 with fixed phy
->
-> [1] https://lkml.org/lkml/2016/4/22/537
-> [2] http://www.spinics.net/lists/netdev/msg357890.html
->
-> David Rivshin (5):
->    drivers: net: cpsw: fix parsing of phy-handle DT property in dual_emac
->      config
->    drivers: net: cpsw: fix segfault in case of bad phy-handle
->    drivers: net: cpsw: don't ignore phy-mode if phy-handle is used
->    dt: cpsw: phy-handle, phy_id, and fixed-link are mutually exclusive
->    drivers: net: cpsw: use of_phy_connect() in fixed-link case
->
->   Documentation/devicetree/bindings/net/cpsw.txt |  6 +--
->   drivers/net/ethernet/ti/cpsw.c                 | 69 ++++++++++++++------------
->   drivers/net/ethernet/ti/cpsw.h                 |  1 +
->   3 files changed, 41 insertions(+), 35 deletions(-)
->
+On Wednesday 27 April 2016 14:20:34 Simon Horman wrote:
+> Please consider these Renesas ARM based SoC DT pm-domain updates for v4.7.
+> 
+> This pull requests is based on a merge of:
+> 
+> * "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
+>   v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
+>   pulled.
+> * "[GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7",
+>   tagged as renesas-dt-for-v4.7, which you have also already pulled.
+> 
+> The reason for the somewhat tedious base on
+> renesas-rcar-sysc2-for-v4.7, which provides driver changes,
+> is a hard run-time dependency.
+> 
+> I also have a similar set of changes for arm64 which I will send separately.
 
-Thanks a lot.
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
--- 
-regards,
--grygorii
+Ok, I've started a next/late branch for this now, but unless something
+else comes up that needs to be sent much later, I expect to submit
+this as the last pull request at the same time as all the other ones
+for 4.7.
+
+For further clarification, am I right reading the above as meaning that
+a 4.7 kernel is expected to still work with the dts files from 4.6,
+but not the other way round?
+
+	Arnd
