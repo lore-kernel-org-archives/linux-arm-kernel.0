@@ -1,60 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 18:23:57 +0200
-Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
-In-Reply-To: <20160428164734.0b3837be@free-electrons.com>
-References: <20160427225827.GC17629@localhost>
- <20160428144117.GX28464@e106497-lin.cambridge.arm.com>
- <20160428164734.0b3837be@free-electrons.com>
-Message-ID: <4332620.Jdkz6hNRbl@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 28 Apr 2016 18:27:25 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT PM Domain Updates for v4.7
+In-Reply-To: <5702417.rnCUR69ruo@wuerfel>
+References: <cover.1461730638.git.horms+renesas@verge.net.au>
+ <5702417.rnCUR69ruo@wuerfel>
+Message-ID: <CAMuHMdWnt4ceLuu-eddbMQDSFvHHVgoyUNM2V=SYO9R0XrJDMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2016 16:47:34 Thomas Petazzoni wrote:
+Hi Arnd,
 
-> > > We don't know at the moment of
-> > > scanning the DT, what will be the address and size of the different MEM
-> > > and IO mappings.
-> > 
-> > True, but you have bounds on the sizes of each region given the way you
-> > encode the address translation. Trying to decode what the example above is
-> > telling me:
-> >   - each port has 0x80000_00000000 possible IO space allocated based on
-> >     the MBUS_ID split of address space
-> >   - same for MEM space.
-> > 
-> > And IMO you *should* have address and sizes for the MEM and IO mappings, as
-> > they act as *upper* boundaries. No one says you need to reserve the whole
-> > space, you are just describing how the hardware translates addresses between
-> > the busses.
-> 
-> Hm, not sure what would be the benefit of changing the Device Tree with
-> this, but I'm probably missing something.
+On Thu, Apr 28, 2016 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 27 April 2016 14:20:34 Simon Horman wrote:
+>> Please consider these Renesas ARM based SoC DT pm-domain updates for v4.7.
+>>
+>> This pull requests is based on a merge of:
+>>
+>> * "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
+>>   v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
+>>   pulled.
+>> * "[GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7",
+>>   tagged as renesas-dt-for-v4.7, which you have also already pulled.
+>>
+>> The reason for the somewhat tedious base on
+>> renesas-rcar-sysc2-for-v4.7, which provides driver changes,
+>> is a hard run-time dependency.
+>>
+>> I also have a similar set of changes for arm64 which I will send separately.
+>
+> Ok, I've started a next/late branch for this now, but unless something
+> else comes up that needs to be sent much later, I expect to submit
+> this as the last pull request at the same time as all the other ones
+> for 4.7.
 
-Everything's fine here: we correctly describe how for each MEM and IO
-window, the hardware has a 4GB address space within the MBUS.
+Thanks!
 
-Part of the debate back then was whether we should also fix a mapping
-between the PCIs MBUS windows and the host CPU address space as we
-do for all other MBUS slaves, but we decided in the end to use dynamic
-allocation of MBUS windows to give us more flexibility: there are cases
-where we don't know in advance how much address space to give to
-each port, or whether there are enough MBUS windows to map all I/O
-spaces.
+> For further clarification, am I right reading the above as meaning that
+> a 4.7 kernel is expected to still work with the dts files from 4.6,
+> but not the other way round?
 
-> > Just for my own clarification, is the reason why the ranges are declared like
-> > this due to the fact that each port is a separate entity and multiple ports
-> > cannot be served by the same MBus window? What stops you from having one
-> > MBus window assigned to all IO space and the other window(s) assigned to MEM
-> > for individual ports?
-> 
-> Each port needs its own MBus window for the PCI memory space and PCI
-> I/O space that is accessed by this port. The MBUS_ID(x, y) thing is
-> here to encode the information that are needed to create such windows,
-> which as you can see are different for each port.
-> 
-> So we cannot have a single MBus window for all the IO space, we need
-> one per PCI port.
+That's correct.
 
-Right.
+Gr{oetje,eeting}s,
 
-	Arnd
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
