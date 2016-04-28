@@ -1,157 +1,158 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 28 Apr 2016 02:21:40 -0400
-Subject: [PATCH v2 2/3] ARM: dts: exynos: Define vqmmc for eMMC card on
- Odroid X/X2/U3
-In-Reply-To: <5721A49A.1020401@samsung.com>
-References: <1461765620-6833-1-git-send-email-k.kozlowski@samsung.com>
- <1461765620-6833-2-git-send-email-k.kozlowski@samsung.com>
- <bca8c1c9-41ac-c7e8-9313-ff96058376be@osg.samsung.com>
- <5721A49A.1020401@samsung.com>
-Message-ID: <CABxcv=mGMyjr=Gj8srdL+h5JruvRxYuybBRohBSNnRfykDdaDg@mail.gmail.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 28 Apr 2016 09:37:08 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <5129992.Q57qoSDEqC@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <13248156.8VXoeOzRlg@wuerfel> <8737q6stpl.fsf@ti.com>
+ <5129992.Q57qoSDEqC@wuerfel>
+Message-ID: <87y47ykzmz.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
 
-On Thu, Apr 28, 2016 at 1:50 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 04/27/2016 11:29 PM, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
->>
->> On 04/27/2016 10:00 AM, Krzysztof Kozlowski wrote:
->>> The eMMC card vmmc-supply contained incorrectly two regulators: LDO20
->>> and buck8. The second one is ignored. Additionally the buck8 is a vqmmc
->>> supply only on X and X2. On U3 the buck8 is providing power to the LAN
->>> (SMSC95xx) so instead the LDO22 should be used.
->>>
->>> Fix this by defining proper vmmc and vqmmc supplies for respective
->>> boards.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> ---
->>>
->>> Changes since v1:
->>> 1. buck8 is used on X/X2 so differentiate the configuration (hint by
->>>    Tobias Jakobi).
->>> ---
->>>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 13 ++++++++++---
->>>  arch/arm/boot/dts/exynos4412-odroidu3.dts       | 18 ++++++++++++++++++
->>>  arch/arm/boot/dts/exynos4412-odroidx.dts        | 11 +++++++++++
->>>  arch/arm/boot/dts/exynos4412-odroidx2.dts       | 11 +++++++++++
->>>  4 files changed, 50 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
->>> index 3d0d44581fbd..34a5b3daced0 100644
->>> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
->>> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
->>> @@ -347,6 +347,13 @@
->>>                              regulator-boot-on;
->>>                      };
->>>
->>> +                    ldo22_reg: LDO22 {
->>> +                            regulator-name = "LDO22";
->>> +                            regulator-min-microvolt = <800000>;
->>> +                            regulator-max-microvolt = <3950000>;
->>> +                            regulator-boot-on;
->>> +                    };
->>> +
->>
->> I don't have a datasheet for the max77686 but I guess these min and max
->> values are the actual voltage range that the ldo22 regulator can support?
->
-> Yes.
->
->> If that's the case, then I don't think setting these are correct since the
->> DT binding says that the regulator-{min,max}-microvolt properties describe
->> the voltage range that consumers may set. I've seen Mark mention this many
->> times, the last one I remember is at [0].
->
-> For LDO22 there is no consumer so these are the constraints. Leaving
+Hi,
 
-That was my point, there's no consumers for X/X2 and there is only a
-consumer in U3 (vqmmc-supply for mshc_0) added by $SUBJECT. That's why
-I thought that it should be defined in odroidu3.dts and removed from
-the .dtsi.
-
-> them undefined (here and in DTS for X/X2) would result in the same
-> effect. The point is that these values are valid constraints. Please
-> have in mind that the binding describe this as "smallest/largest voltage
-> consumer may set" which is true for the code above.
+Arnd Bergmann <arnd@arndb.de> writes:
+> On Wednesday 27 April 2016 23:05:42 Felipe Balbi wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> > On Wednesday 27 April 2016 13:59:13 Alan Stern wrote:
+>> >> On Wed, 27 Apr 2016, Arnd Bergmann wrote:
+>> >> 
+>> >> > I've looked at the usb HCD code now and see this:
+>> >> > 
+>> >> > struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
+>> >> >                 struct device *dev, const char *bus_name,
+>> >> >                 struct usb_hcd *primary_hcd)
+>> >> > {
+>> >> >       ...
+>> >> >         hcd->self.controller = dev;
+>> >> >         hcd->self.uses_dma = (dev->dma_mask != NULL);
+>> >> >       ...
+>> >> > }
+>> >> > 
+>> >> > What I think we need to do here is ensure that the device that gets
+>> >> > passed here and assigned to hcd->self.controller is the actual DMA
+>> >> > master device, i.e. the pci_device or platform_device that was created
+>> >> > from outside of the xhci stack. This is after all the pointer that
+>> >> > gets passed into all the dma_map_*/dma_sync_*/dma_alloc_*/...
+>> >> > functions.
+>> >> 
+>> >> It would be better to add a new field, since self.controller is also
+>> >> used for lots of other purposes.  Something like hcd->self.dma_dev.
+>> >
+>> > Ok, fair enough. I only took a brief look and all uses I found were
+>> > either for the DMA mapping API or some printk logging.
+>> 
+>> I have a feeling you guys are not considering how the patch to implement
+>> this will look like.
+>> 
+>> How are you expecting dwc3 to pass a pointer to the DMA device from
+>> dwc3.ko to xhci-plat ? platform_data ? That's gonna be horrible 
 >
->>
->> Probably would be better to leave the ldo22_reg definition to odroidu3.dts
->> to avoid setting these constraint in a .dtsi file.
+> Not any worse than it already is really. It already uses platform_data
+> for the exact case that is causing the problem here.
+
+there's no use of platform_data for passing around DMA configuration. By
+platform_data I really mean platform_device_add_data().
+
+>> Also, remember that the DMA device for dwc3 is not always
+>> dwc3->dev->parent. It might be dwc3->dev itself. How are you expecting
+>> us to figure that one out ?
 >
-> What about X/X2?
+> Do you have an example for this? The ones I found here either
+> create the dwc3 device from PCI or from a platform glue driver.
+
+arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+
+>> I still think dma_inherit() (or something along those lines) is
+>> necessary. Specially when you consider that, as I said previously,
+>> that's pretty much what of_dma_configure() does.
 >
-
-Mmm, I see what you mean. If the regulators are not defined then these
-for example won't be turned off by the regulator subsystem if were
-enabled by the bootloader. Then I guess your change makes sense.
-
->>>                      ldo25_reg: LDO25 {
->>>                              regulator-name = "VDDQ_LCD_1.8V";
->>>                              regulator-min-microvolt = <1800000>;
->>> @@ -411,8 +418,8 @@
->>>
->>>                      buck8_reg: BUCK8 {
->>>                              regulator-name = "BUCK8_2.8V";
->>> -                            regulator-min-microvolt = <2800000>;
->>> -                            regulator-max-microvolt = <2800000>;
->>> +                            regulator-min-microvolt = <750000>;
->>> +                            regulator-max-microvolt = <3900000>;
->>
->> Same here, since not all boards have the same constraint for this regulator,
->> it would be better to remove it from the .dtsi and let each dts to define it.
+> As I said, this is not an API that can work in general, because
+> it makes the assumption that everything related to DMA in a
+> device can be set in that device itself.
 >
-> Since all of the boards define them, it does not bring any difference
-> having it here... so I can remove them.
+> The simplest case where this does not work is a PCI device behind
+> an IOMMU: when you call dma_map_single() or dma_alloc_coherent(),
+> the dma_map_ops implementation for the IOMMU has to look at the
+> PCI device to find out the association with an IOMMU context,
+> and on most architectures you cannot bind an IOMMU context to
+> a platform device at all.
+
+no, it relies on dev->archdata for IOMMU. In fact, the first "patch"
+(more of a hack) I wrote to fix IOMMU with dwc3 on Intel platforms was
+to literally memcpy() pci's archdata to dwc3->dev and it worked just
+fine with and without IOMMU enabled.
+
+>> Anyway, I'd really like to see a patch implementing this
+>> hcd->self.dma_dev logic. Consider all the duplication with this
+>> approach, btw. struct dwc3 will *also* need a dwc->dma_dev of its
+>> own. Will that be passed to dwc3 as platform_data from glue layer ? What
+>> about platforms which don't even use a glue layer ?
 >
+> Let's separate the three problems here.
 >
+> a) dwc3 creating a "xhci-hcd" platform_device that is not connected
+>    to any proper bus. We can work around that by adding the "self.dma_dev"
 
-Ok. I don't have a strong opinion on this though now that I realized
-that not defining some regulators could lead to unused ones not being
-disabled on boot.
+platform_bus_type *is* a proper bus.
 
->>>                      };
->>>              };
->>>      };
->>> @@ -456,7 +463,7 @@
->>>  &mshc_0 {
->>>      pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
->>>      pinctrl-names = "default";
->>> -    vmmc-supply = <&ldo20_reg &buck8_reg>;
->>> +    vmmc-supply = <&ldo20_reg>;
->>>      mmc-pwrseq = <&emmc_pwrseq>;
->>>      status = "okay";
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
->>> index dd89f7b37c9f..d73aa6c58fe3 100644
->>> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
->>> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
->>> @@ -69,6 +69,24 @@
->>>      };
->>>  };
->>>
->>> +/* Supply for LAN9730/SMSC95xx */
->>> +&buck8_reg {
->>> +    regulator-name = "BUCK8_P3V3";
->>
->> I think it would be better to name it "BUCK8_3.3V" for consistency.
->
-> Consistency of naming is nice but in the same time we want the regulator
-> names to match the hardware because it is easier to read the code and
-> check the schematics. On the schematics this is unfortunately called
-> P3V3. :)
->
+>    pointer and pass that in platform_data. This is really easy, it's
 
-oh, I missed that. It's pity but I agree with you that matching the
-schematics is more important that naming consistency.
+Sorry but passing a struct device pointer in platform_data is
+ridiculous. Not to mention that, as I said before, we can't assume which
+device to pass to xhci_plat in the first place. It might be dwc->dev and
+it might be dwc->dev->parent.
 
-Thanks a lot for your explanations, the patch looks good to me as it is now:
+>    actually less code (and less iffy) than the current implementation of
+>    copying the parent dma mask.
+>    In the long run, this could be solved by doing away with the extra
+>    platform_device, by calling a variant of xhci_probe() from
+>    xhci_plat_probe() like we do for the normal *HCI drivers.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+no, that's not something I'll do for dwc3. We have had this talk before
+and I'm not giving up the benefits of splitting things to separate
+devices.
 
-Best regards,
-Javier
+> b) dwc3-pci creating a "dwc3" platform_device under the covers. This
+
+it's not under the covers at all. It's pretty similar to what MFD
+drivers do. It's just not wrapped in a nice API because there's no need
+for that.
+
+>    is pretty much the exact same problem as a) on another layer. In
+>    the short run, we can pass the device pointer as part of
+>    struct dwc3_platform_data (dwc3-pci is the only such user anway),
+
+It's incredible that you'd even suggest this at all. Did we not have a
+big trouble to solve on ARM land because of different mach-* passing
+function pointers and other pointers from arch/arch/mach-* instead of
+abstracting things away. Then came DT to the rescue, a setup where you
+can't even pass code or kernel objects ;-)
+
+>    and in the long run, it should be easy enough to get rid of the
+>    extra platform device by just calling a variant of dwc3_probe,
+>    which will again simplify the driver
+
+also again definitely not something I'll do
+
+> c) some SoCs that have two separate device nodes to describe their
+>    dwc3 xhci. I don't think this is causing any additional problems,
+>    but if we want to make this behave more like other drivers in the
+>    long run or deal with machines that are missing a "dma-ranges"
+>    property in the parent node, we can kill off the
+>    of_platform_populate() hack and instead call dwc3_probe()
+>    directly from the glue drivers as in b), and have that
+>    do for_each_child_of_node() or similar to find the child node.
+
+no, we cannot.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/e528cf76/attachment-0001.sig>
