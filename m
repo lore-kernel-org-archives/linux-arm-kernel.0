@@ -1,180 +1,221 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 28 Apr 2016 14:18:25 +0200
-Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20160428104925.7eb12ca2@bbrezillon>
-References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
- <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
- <20160428104925.7eb12ca2@bbrezillon>
-Message-ID: <CACh+v5Mi2Qd58SZkwW0mZ3ZJx3Rv3mwSkRqzgHwBTxpUbwjVFQ@mail.gmail.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Thu, 28 Apr 2016 20:16:53 +0800
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64 - LTP results
+In-Reply-To: <CA+=Sn1=xnbDDHL921rTLEZmXt4QDLPO=Y8GkQWv7VkidWzt4-A@mail.gmail.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160405224412.GA18300@yury-N73SV> <571AEDF9.6030701@huawei.com>
+ <CA+=Sn1kT7-3k4smZ60zcjcXeVMzjH6AxV6-um68SNhD9meC=ZA@mail.gmail.com>
+ <CA+=Sn1=xnbDDHL921rTLEZmXt4QDLPO=Y8GkQWv7VkidWzt4-A@mail.gmail.com>
+Message-ID: <5721FF35.6090602@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-04-28 10:49 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> Hi Jean-Jacques,
->
-> On Thu, 28 Apr 2016 10:32:49 +0200
-> Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
->
->> Hi Boris,
->>
->> i haven't seen this code in a while :) I'm glad you're working on it
->>
->> 2016-04-27 16:35 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
->> > The EBI (External Bus Interface) is used to access external peripherals
->> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
->> > Each device is assigned a CS line and an address range and can have its
->> > own configuration (timings, access mode, bus width, ...).
->> > This driver provides a generic DT binding to configure a device according
->> > to its requirements.
->> > For specific device controllers (like the NAND one) the SMC timings
->> > should be configured by the controller driver through the matrix and smc
->> > syscon regmaps.
->> >
->> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> > ---
->> >  .../bindings/memory-controllers/atmel,ebi.txt      | 146 +++++++++++++++++++++
->> >  1 file changed, 146 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->> > new file mode 100644
->> > index 0000000..0f332d2
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->> > @@ -0,0 +1,146 @@
->> > +* Device tree bindings for Atmel EBI
->> > +
->> > +The External Bus Interface (EBI) controller is a bus where you can connect
->> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
->> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
->> > +(Static Memory Controller).
->> > +Synchronous memories (and some asynchronous memories like NANDs) can be
->> > +attached to specialized controllers which are responsible for configuring the
->> > +bus appropriately according to the connected device.
->> > +In the other hand, the bus interface can be automated for simple asynchronous
->> > +devices.
->> > +
->> > +Required properties:
->> > +
->> > +- compatible:          "atmel,at91sam9260-ebi"
->> > +                       "atmel,at91sam9261-ebi"
->> > +                       "atmel,at91sam9263-ebi0"
->> > +                       "atmel,at91sam9263-ebi1"
->> > +                       "atmel,at91sam9rl-ebi"
->> > +                       "atmel,at91sam9g45-ebi"
->> > +                       "atmel,at91sam9x5-ebi"
->> > +                       "atmel,sama5d3-ebi"
->> > +
->> > +- reg:                 Contains offset/length value for EBI memory mapping.
->> > +                       This property might contain several entries if the EBI
->> > +                       memory range is not contiguous
->> > +
->> > +- #address-cells:      Must be 2.
->> > +                       The first cell encodes the CS.
->> > +                       The second cell encode the offset into the CS memory
->> > +                       range.
->> > +
->> > +- #size-cells:         Must be set to 1.
->> > +
->> > +- ranges:              Encodes CS to memory region association.
->> > +
->> > +- clocks:              Clock feeding the EBI controller.
->> > +                       See clock-bindings.txt
->> > +
->> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
->> > +such as NOR (e.g. cfi-flash) and NAND.
->> > +There might be board specific devices like FPGAs.
->> > +You'll define you device requirements in these child nodes.
->> > +
->> > +Required child cs node properties:
->> > +
->> > +- #address-cells:      Must be 2.
->> > +
->> > +- #size-cells:         Must be 1.
->> > +
->> > +- ranges:              Empty property indicating that child nodes can inherit
->> > +                       memory layout.
->> > +
->> > +Optional child cs node properties:
->> > +- atmel,bus-width:             width of the asynchronous device's data bus
->> > +                               8, 16 or 32.
->> > +                               8 if not present.
->> > +
->> > +- atmel,byte-access-type       "write" or "select" (see Atmel datasheet).
->> > +                               "select" if not present.
->> > +
->> > +- atmel,read-mode              "nrd" or "ncs".
->> > +                               "ncs" is not present.
->> > +
->> > +- atmel,write-mode             "nwe" or "ncs".
->> > +                               "ncs" is not present.
->> > +
->> > +- atmel,exnw-mode              "disabled", "frozen" or "ready".
->> > +                               "disabled" if not present.
->> > +
->> > +- atmel,page-mode              enable page mode if present. The provided value
->> > +                               defines the page size (supported values: 4, 8,
->> > +                               16 and 32).
->> > +
->> > +Optional device timings expressed in nanoseconds (if the property is not
->> > +present 0 is assumed):
->>
->> IMO If no timing information is provided, it's probably better not to
->> change it. It may have been configured by the bootloader or romboot.
->> It may not be the perfect timings but at least it could work, whereas
->> filling up with 0 is most probably going to break the access: it's a
->> kind of very agressive timing optimization
->
-> Yes, probably. I'll make all those timings mandatory in the next
-> version.
->
->>
->> > +
->> > +- atmel,ncs-rd-setup-ns
->> > +- atmel,nrd-setup-ns
->> > +- atmel,ncs-wr-setup-ns
->> > +- atmel,nwe-setup-ns
->> > +- atmel,ncs-rd-pulse-ns
->> > +- atmel,nrd-pulse-ns
->> > +- atmel,ncs-wr-pulse-ns
->> > +- atmel,nwe-pulse-ns
->> > +- atmel,nwe-cycle-ns
->> > +- atmel,nrd-cycle-ns
->> > +- atmel,tdf-ns
->>
->> One thought about the configuration in 'ns' unit: Some devices may
->> have requirements expressed in clock cycles (I'm thinking of FPGA
->> here). At  a fixed frequency one can always convert manually from 'ns'
->> to 'clocks' but it's a bit tedious and prone to rounding errors. And
->> It 'll  break when the EBI frequency is changed
->
-> If you don't mind, I'd like to first get this version accepted, and
-> we'll extend it with timings expressed in clock cycles afterward.
->
-> BTW, could you describe a real use case where timings should be
-> expressed in clock cycles? I mean, usually the devices have some timing
-> constraints (tXX_min = Y ns), and I don't see why it would differ for
-> FPGA interfaces, but I'm clearly not an FPGA expert.
+Hi, Andrew
 
-I'm not either, I only toyed with FPGA. That's just what experienced
-FPGA designer told me.
-I guess that it boils down to: FPGA are more suited for a synchronous
-design than an asynchronous one.
+On 2016/4/28 5:15, Andrew Pinski wrote:
+> On Wed, Apr 27, 2016 at 12:30 AM, Andrew Pinski <pinskia@gmail.com> wrote:
+>> On Fri, Apr 22, 2016 at 8:37 PM, Zhangjian (Bamvor)
+>> <bamvor.zhangjian@huawei.com> wrote:
+>>> Hi, Yury
+>>>
+>>>
+>>> On 2016/4/6 6:44, Yury Norov wrote:
+>>>>
+>>>> There are about 20 failing tests of 782 in lite scenario.
+>>>> float_bessel
+>>>> float_exp_log
+>>>> float_iperb
+>>>> float_power
+>>>> float_trigo
+>>>> pipeio_1
+>>>> pipeio_3
+>>>> pipeio_5
+>>>> pipeio_8
+>>>> abort01
+>>>> clone02
+>>>> kill11
+>>>> mmap16
+>>>> open12
+>>>> pause01
+>>>> rename11
+>>>> rmdir02
+>>>> umount2_01
+>>>> umount2_02
+>>>> umount2_03
+>>>> utime06
+>>>> mtest06
+>>>>
+>>>> The list is rough because some tests fail not every time.
+>>>>
+>>>> Tests abort01 and kill11 fail for lp64 too, so maybe there's
+>>>> a reason unrelated to ilp32 itself.
+>>>>
+>>>> float_xxx tests fail because they call unwind() from signal context,
+>>>> and GCC for ilp32 has problem with it, as Andrew told.
+>>>
+>>> Is there some progress about this issue. When we talk about unwind
+>>> functions, do you mean the function in libgcc?
+>>>
+>>> We encountered another issue(abort not segfault) which also called
+>>> pthread_cancel(). The test code is in the attachment. Here is the
+>>> backtrace:
+>>
+>> Yes this was a known issue I knew about.  I have a patch GCC to fix
+>> this.  Basically REG_VALUE_IN_UNWIND_CONTEXT needs to be defined while
+>> building libgcc to support the correct unwind information.
+>> I will be posting a GCC patch to fix this tomorrow.  This was a bug
+>> even in the original set of ilp32 patches.  I only finally was able to
+>> sit down and fix it today.
+>
+> Here is the link to the GCC patch which I said was going to submit today:
+> https://gcc.gnu.org/ml/gcc-patches/2016-04/msg01726.html
+It works for me. Both float_xx in ltp and my pthread_cancel testcase is
+pass.
 
-JJ
+Regards
+
+Bamvor
 
 >
 > Thanks,
+> Andrew
 >
-> Boris
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>> Thanks,
+>> Andrew
+>>
+>>>
+>>> ```
+>>> Program received signal SIGABRT, Aborted.
+>>> [Switching to Thread 0xf77ee330 (LWP 2958)]
+>>> 0x000000000040f5bc in raise (sig=sig at entry=6)
+>>>      at ../sysdeps/unix/sysv/linux/raise.c:55
+>>> 55      ../sysdeps/unix/sysv/linux/raise.c: No such file or directory.
+>>> (gdb) bt
+>>> #0  0x000000000040f5bc in raise (sig=sig at entry=6)
+>>>      at ../sysdeps/unix/sysv/linux/raise.c:55
+>>> #1  0x000000000040f884 in abort () at abort.c:89
+>>>
+>>> #2  0x00000000004073b4 in uw_update_context_1 (
+>>>      context=context at entry=0xf77ec820, fs=fs at entry=0xf77ebec8)
+>>> at /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind-dw2.c:1430
+>>>
+>>> #3  0x00000000004078c0 in uw_update_context
+>>> (context=context at entry=0xf77ec820,
+>>>      fs=fs at entry=0xf77ebec8)
+>>>     at
+>>> /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind-dw2.c:1506
+>>> #4  0x0000000000407a9c in uw_advance_context (fs=0xf77ebec8,
+>>>      context=0xf77ec820)
+>>>      at
+>>> /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind-dw2.c:1529
+>>> #5  _Unwind_ForcedUnwind_Phase2 (exc=exc at entry=0xf77ee580,
+>>>      context=context at entry=0xf77ec820)
+>>>      at /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind.inc:185
+>>> #6  0x0000000000408228 in _Unwind_ForcedUnwind (exc=0xf77ee580,
+>>>      stop=stop at entry=0x405440 <unwind_stop>, stop_argument=0xf77eddd8)
+>>>      at /home/GCC-Build/p660/p660_build_dir/src/gcc-4.9/libgcc/unwind.inc:207
+>>> #7  0x00000000004055c4 in __pthread_unwind (buf=<optimized out>)
+>>>      at unwind.c:126
+>>> #8  0x00000000004050b4 in __do_cancel () at ./pthreadP.h:283
+>>> #9  sigcancel_handler (sig=<optimized out>, si=<optimized out>,
+>>>      ctx=<optimized out>) at nptl-init.c:225
+>>> ---Type <return> to continue, or q <return> to quit---
+>>> #10 <signal handler called>
+>>>
+>>> #11 0x0000000000000000 in ?? ()
+>>>
+>>> #12 0x0000000000423084 in __select (nfds=-66661, readfds=<optimized out>,
+>>>      writefds=<optimized out>, exceptfds=<optimized out>, timeout=0x0)
+>>>      at ../sysdeps/unix/sysv/linux/generic/select.c:45
+>>> #13 0x0000000000400604 in TEST_TaskDelay (
+>>>      uiMillSecs=<error reading variable: can't compute CFA for this frame>)
+>>>      at test-cancel.c:18
+>>> #14 0x0000000000400680 in printids (
+>>>      s=<error reading variable: can't compute CFA for this frame>)
+>>>      at test-cancel.c:38
+>>> #15 0x00000000004006d0 in thr_fn (
+>>>      arg=<error reading variable: can't compute CFA for this frame>)
+>>>      at test-cancel.c:49
+>>> #16 0x0000000000401b28 in start_thread (arg=0x4a3000) at
+>>> pthread_create.c:335
+>>> #17 0x0000000000401b28 in start_thread (arg=0x4a3000) at
+>>> pthread_create.c:335
+>>> Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+>>> ```
+>>>
+>>> Such abort is raise by the following code:
+>>> ```
+>>> static void
+>>> uw_update_context_1 (struct _Unwind_Context *context, _Unwind_FrameState
+>>> *fs)
+>>> {
+>>> //...
+>>>    /* Compute this frame's CFA.  */
+>>>    switch (fs->regs.cfa_how)
+>>>      {
+>>>      case CFA_REG_OFFSET:
+>>>        cfa = _Unwind_GetPtr (&orig_context, fs->regs.cfa_reg);
+>>>        cfa += fs->regs.cfa_offset;
+>>>        break;
+>>>
+>>>      case CFA_EXP:
+>>>        {
+>>>          const unsigned char *exp = fs->regs.cfa_exp;
+>>>          _uleb128_t len;
+>>>
+>>>          exp = read_uleb128 (exp, &len);
+>>>          cfa = (void *) (_Unwind_Ptr)
+>>>            execute_stack_op (exp, exp + len, &orig_context, 0);
+>>>          break;
+>>>        }
+>>>
+>>>      default:
+>>>        gcc_unreachable ();
+>>>      }
+>>>    context->cfa = cfa;
+>>> //...
+>>> }
+>>> ``
+>>>
+>>> Any suggestion is appreciated.
+>>>
+>>> CC gcc mailing list. Sorry if it is off topic.
+>>>
+>>> Regards
+>>>
+>>> Bamvor
+>>>
+>>>
+>>>
+>>>
+>>>> pipeio_x tests are very unstable and may fail randomly. I strongly
+>>>> suspect race conditions, as they all work like a charm if pinned to
+>>>> single CPU with taskset. Probably, race is the reason of clone02 too.
+>>>> Though I'm not sure, is the race in kernel, glibc or test itself.
+>>>>
+>>>> But I know for sure that pause01 fails due to test design:
+>>>>          if (setitimer(ITIMER_REAL, &it, NULL)) // For 1000us
+>>>>                  tst_brkm(TBROK | TERRNO, NULL, "setitimer() failed");
+>>>>
+>>>>          TEST(pause());
+>>>>
+>>>> As setitimer() and pause() calls are not atomic, alarm may come before
+>>>> pause()
+>>>> is called, and be silently dropped by the handler. Next pause() call hangs
+>>>> test forever. I already reported to LTP list.
+>>>>
+>>>> open12, rename11, rmdir02, mmap16, mtest06 - all call mkfs tool, and it
+>>>> returns
+>>>> error code. I didn't investigate it much yet.
+>>>>
+>>>> umount02_x, utime06 - cannot reproduce out of scenario, even run it in
+>>>> infinite
+>>>> loop - they work fine.
+>>>>
+>>>> Full test log is attached.
+>>>>
+>>>> Yury
+>>>>
+>>>
