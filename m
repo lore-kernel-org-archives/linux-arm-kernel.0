@@ -1,21 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 15:44:42 +0200
-Subject: [GIT PULL] at91: dt for 4.7 #2
-In-Reply-To: <1461771717-32284-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1461771717-32284-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1922779.YJ9WdcBh3t@wuerfel>
+Date: Thu, 28 Apr 2016 15:49:05 +0200
+Subject: NXP LPC32xx DT Updates for v4.7
+In-Reply-To: <57215540.7060706@mleia.com>
+References: <57215540.7060706@mleia.com>
+Message-ID: <5081718.tFEgkGbhtW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 17:41:57 Nicolas Ferre wrote:
-> Second batch of DT changes for 4.7:
-> - three low priority fixes:
->   - sama5d2: one pin definition and dependency with the slow clock for watchdog
->   - sama5d4: definition of watchdog IRQ property
-> - addition of the new shutdown controller to sama5d2 & sama5d2 Xplained
+On Thursday 28 April 2016 03:11:44 Vladimir Zapolskiy wrote:
+> NXP LPC32xx device tree updates for v4.7
 > 
+> This includes a few functional changes:
+> * new representation of MIC, SIC1 and SIC2 interrupt controllers,
+> * disabled by default SPI1, SPI2, SSP0 and SSP1 SPI controllers in
+>   shared lpc32xx.dtsi file,
+> * added clock sources for SPI1 and SPI2,
+> * set default clock rate of HCLK PLL to main osc rate multiplied by 16.
+> 
+> Also there are some non-functional changes:
+> * flatten board DTS files by exploiting device node labels,
+> * add 'partitions' device node for NAND SLC / MTD OF,
+> * correct Atmel vendor prefix to describe on board AT24 EEPROMs,
+> * rename board DTS files by adding SoC name prefix.
+> 
+> Since now DTS files of LPC32xx boards match "^lpc32[2345]0-" pattern.
 > 
 
-Merged into next/dt, thanks!
+Looks all good, pulled into next/dt, thanks!
 
 	Arnd
