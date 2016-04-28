@@ -1,53 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Apr 2016 00:43:41 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <20160428222137.GB18227@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <2760348.qmm1L3yQch@wuerfel> <20160428222137.GB18227@yury-N73SV>
-Message-ID: <4271094.ei7kj5zJxn@wuerfel>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 29 Apr 2016 01:47:00 +0300
+Subject: NXP LPC32xx Mach Updates for v4.7
+Message-ID: <572292E4.9010209@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 April 2016 01:21:37 Yury Norov wrote:
-> index 1458ad7..410d817 100644
-> --- a/arch/arm64/kernel/sys_ilp32.c
-> +++ b/arch/arm64/kernel/sys_ilp32.c
-> @@ -17,6 +17,8 @@
->  * along with this program.  If not, see
->  * <http://www.gnu.org/licenses/>.
->  */
->     
-> +#define __SYSCALL_COMPAT
-> +
->  #include <linux/compiler.h>
->  #include <linux/errno.h>
->  #include <linux/fs.h>
-> @@ -48,13 +50,12 @@ asmlinkage long
->  ilp32_sys_rt_sigreturn_wrapper(void);
->    
->  #include <asm/syscall.h>
->      
-> -#undef __SYSCALL
-> -#undef __SC_COMP
-> -#undef __SC_WRAP
-> -#undef __SC_3264
-> -#undef __SC_COMP_3264
->  
-> -#define __SYSCALL_COMPAT
->  #define __SYSCALL(nr, sym)     [nr] = sym,
->  #define __SC_WRAP(nr, sym)     [nr] = compat_##sym,
->          
-> This patch makes gcc warn about redefinition.
-> 
-> arch/arm64/kernel/sys_ilp32.c:59:0: warning: "__SYSCALL" redefined
->  #define __SYSCALL(nr, sym) [nr] = sym,
->  ^
-> In file included from include/asm-generic/unistd.h:1:0,
-> 
+Hi Arnd, Olof, Kevin,
 
-Ok, I think I see it now. Can you #undef the two symbols at the
-end of arch/arm64/include/uapi/asm/unistd.h or possibly
-include/uapi/asm-generic/unistd.h?
+please consider to include NXP LPC32xx mach clean-up updates for v4.7.
 
-	Arnd
+I'm adding an official LPC32xx maintainer Roland to Cc, however
+he seems to be unresponsive for a quite long time.
+
+Thank you in advance.
+
+
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://github.com/vzapolskiy/linux-lpc32xx.git tags/lpc32xx-soc-4.7
+
+for you to fetch changes up to 71d42e9c71d7fca2eca98eac315cb485b5d2314d:
+
+  ARM: lpc32xx: remove duplicate const on lpc32xx_auxdata_lookup (2016-04-28 00:45:12 +0300)
+
+----------------------------------------------------------------
+NXP LPC32xx mach updates for v4.7
+
+This includes a few nonfunctional clean-ups for NXP LPC32xx:
+* removed leftover from restart code migration to a watchdog driver
+* removed dead code leftovers from migration to CCF driver
+* fix double const qualifier
+
+----------------------------------------------------------------
+Sylvain Lemieux (1):
+      ARM: lpc32xx: remove reboot header file
+
+Vladimir Zapolskiy (2):
+      ARM: lpc32xx: remove leftovers of legacy clock source and provider drivers
+      ARM: lpc32xx: remove duplicate const on lpc32xx_auxdata_lookup
+
+ arch/arm/mach-lpc32xx/common.c  | 95 -----------------------------------------
+ arch/arm/mach-lpc32xx/common.h  | 24 +----------
+ arch/arm/mach-lpc32xx/phy3250.c |  2 +-
+ 3 files changed, 2 insertions(+), 119 deletions(-)
