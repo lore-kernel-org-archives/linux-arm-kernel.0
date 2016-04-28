@@ -1,107 +1,114 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 28 Apr 2016 10:27:48 +0100
-Subject: [PATCH 01/12] ARM: kexec: fix crashkernel= handling
+Date: Thu, 28 Apr 2016 10:27:54 +0100
+Subject: [PATCH 02/12] ARM: provide improved virt_to_idmap() functionality
 In-Reply-To: <20160428092644.GX19428@n2100.arm.linux.org.uk>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
-Message-ID: <E1aviEe-0000if-VZ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1aviEk-0000il-44@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel crashkernel parameter is specified with just a size, we
-are supposed to allocate a region from RAM to store the crashkernel.
-However, ARM merely reserves physical address zero with no checking that
-there is even RAM there.
+For kexec, we need more functionality from the IDMAP system.  We need to
+be able to convert physical addresses to their identity mappped versions
+as well as virtual addresses.
 
-Fix this by lifting similar code from x86, importing it to ARM with the
-ARM specific parameters added.  In the absence of any platform specific
-information, we allocate the crashkernel region from the first 512MB of
-physical memory.
+Convert the existing arch_virt_to_idmap() to deal with physical
+addresses instead.
 
-Update the kdump documentation to reflect this change.
-
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- Documentation/kdump/kdump.txt | 13 +++----------
- arch/arm/kernel/setup.c       | 29 +++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+), 10 deletions(-)
+ arch/arm/include/asm/memory.h     | 33 ++++++++++++++++++++++++++-------
+ arch/arm/mach-keystone/keystone.c |  7 +------
+ arch/arm/mm/idmap.c               |  2 +-
+ 3 files changed, 28 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index bc4bd5a44b88..88ff63d5fde3 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -263,12 +263,6 @@ been removed from the machine.
-     crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
-     range=start-[end]
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 9427fd632552..ca208335fde6 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -288,19 +288,38 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
  
--Please note, on arm, the offset is required.
--    crashkernel=<range1>:<size1>[,<range2>:<size2>,...]@offset
--    range=start-[end]
--
--    'start' is inclusive and 'end' is exclusive.
--
- For example:
+-extern unsigned long (*arch_virt_to_idmap)(unsigned long x);
++extern long long arch_phys_to_idmap_offset;
  
-     crashkernel=512M-2G:64M,2G-:128M
-@@ -307,10 +301,9 @@ Boot into System Kernel
-    on the memory consumption of the kdump system. In general this is not
-    dependent on the memory size of the production system.
- 
--   On arm, use "crashkernel=Y at X". Note that the start address of the kernel
--   will be aligned to 128MiB (0x08000000), so if the start address is not then
--   any space below the alignment point may be overwritten by the dump-capture kernel,
--   which means it is possible that the vmcore is not that precise as expected.
-+   On arm, the use of "crashkernel=Y at X" is no longer necessary; the
-+   kernel will automatically locate the crash kernel image within the
-+   first 512MB of RAM if X is not given.
- 
- 
- Load the Dump-capture Kernel
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 139791ed473d..77b54c461c52 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -938,6 +938,13 @@ static int __init init_machine_late(void)
- late_initcall(init_machine_late);
- 
- #ifdef CONFIG_KEXEC
-+/*
-+ * The crash region must be aligned to 128MB to avoid
-+ * zImage relocating below the reserved region.
-+ */
-+#define CRASH_ALIGN	(128 << 20)
-+#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
+ /*
+- * These are for systems that have a hardware interconnect supported alias of
+- * physical memory for idmap purposes.  Most cases should leave these
++ * These are for systems that have a hardware interconnect supported alias
++ * of physical memory for idmap purposes.  Most cases should leave these
+  * untouched.  Note: this can only return addresses less than 4GiB.
+  */
++#define IDMAP_INVALID_ADDR ((u32)~0)
 +
- static inline unsigned long long get_total_mem(void)
- {
- 	unsigned long total;
-@@ -965,6 +972,28 @@ static void __init reserve_crashkernel(void)
- 	if (ret)
- 		return;
- 
-+	if (crash_base <= 0) {
-+		unsigned long long crash_max = CRASH_ADDR_MAX;
-+		if (crash_max > (u32)~0)
-+			crash_max = (u32)~0;
-+		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
-+						    crash_size, CRASH_ALIGN);
-+		if (!crash_base) {
-+			pr_err("crashkernel reservation failed - No suitable area found.\n");
-+			return;
-+		}
-+	} else {
-+		unsigned long long start;
-+
-+		start = memblock_find_in_range(crash_base,
-+					       crash_base + crash_size,
-+					       crash_size, SECTION_SIZE);
-+		if (start != crash_base) {
-+			pr_err("crashkernel reservation failed - memory is in use.\n");
-+			return;
-+		}
++static inline unsigned long phys_to_idmap(phys_addr_t addr)
++{
++	if (IS_ENABLED(CONFIG_MMU) && arch_phys_to_idmap_offset) {
++		addr += arch_phys_to_idmap_offset;
++		if (addr > (u32)~0)
++			addr = IDMAP_INVALID_ADDR;
 +	}
++	return addr;
++}
 +
- 	ret = memblock_reserve(crash_base, crash_size);
- 	if (ret < 0) {
- 		pr_warn("crashkernel reservation failed - memory is in use (0x%lx)\n",
++static inline phys_addr_t idmap_to_phys(unsigned long idmap)
++{
++	phys_addr_t addr = idmap;
++
++	if (IS_ENABLED(CONFIG_MMU) && arch_phys_to_idmap_offset)
++		addr -= arch_phys_to_idmap_offset;
++
++	return addr;
++}
++
+ static inline unsigned long __virt_to_idmap(unsigned long x)
+ {
+-	if (IS_ENABLED(CONFIG_MMU) && arch_virt_to_idmap)
+-		return arch_virt_to_idmap(x);
+-	else
+-		return __virt_to_phys(x);
++	return phys_to_idmap(__virt_to_phys(x));
+ }
+ 
+ #define virt_to_idmap(x)	__virt_to_idmap((unsigned long)(x))
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index e6b9cb1e6709..a33a296b00dc 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -63,11 +63,6 @@ static void __init keystone_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static unsigned long keystone_virt_to_idmap(unsigned long x)
+-{
+-	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
+-}
+-
+ static long long __init keystone_pv_fixup(void)
+ {
+ 	long long offset;
+@@ -91,7 +86,7 @@ static long long __init keystone_pv_fixup(void)
+ 	offset = KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START;
+ 
+ 	/* Populate the arch idmap hook */
+-	arch_virt_to_idmap = keystone_virt_to_idmap;
++	arch_phys_to_idmap_offset = -offset;
+ 
+ 	return offset;
+ }
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index bd274a05b8ff..c1a48f88764e 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -15,7 +15,7 @@
+  * page tables.
+  */
+ pgd_t *idmap_pgd;
+-unsigned long (*arch_virt_to_idmap)(unsigned long x);
++long long arch_phys_to_idmap_offset;
+ 
+ #ifdef CONFIG_ARM_LPAE
+ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
 -- 
 2.1.0
