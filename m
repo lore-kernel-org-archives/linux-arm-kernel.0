@@ -1,179 +1,93 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 28 Apr 2016 16:15:38 +0900
-Subject: [PATCH 04/23] mmc: sdhci: re-factor sdhci_start_signal_voltage()
-In-Reply-To: <5721B03A.5030006@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-5-git-send-email-aisheng.dong@nxp.com>
- <571A0E5E.4090904@intel.com>
- <CAA+hA=SygBBr+-C_r4Geodni+hj2Mg71o+ecVq_AD8vv22=UPA@mail.gmail.com>
- <5721208C.2090509@intel.com>
- <20160428030941.GA23362@shlinux2.ap.freescale.net>
- <5721B03A.5030006@intel.com>
-Message-ID: <5721B89A.8000408@samsung.com>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Thu, 28 Apr 2016 09:19:58 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+Message-ID: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+There are 3 kinds of OLinuXino Lime2 boards.
+One without any on board storage, one with NAND storage and one with
+eMMC storage. This patch adds the eMMC variant of boards.
 
-On 04/28/2016 03:39 PM, Adrian Hunter wrote:
-> On 28/04/16 06:09, Dong Aisheng wrote:
->> On Wed, Apr 27, 2016 at 11:26:52PM +0300, Adrian Hunter wrote:
->>> On 24/04/2016 12:14 p.m., Dong Aisheng wrote:
->>>> Hi Adrian,
->>>>
->>>> Thanks for the review first.
->>>>
->>>> On Fri, Apr 22, 2016 at 7:43 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
->>>>> On 15/04/16 20:29, Dong Aisheng wrote:
->>>>>> Handle host and regulator signal voltage switch separately.
->>>>>> Move host signal voltage switch code into a separated function
->>>>>> sdhci_do_signal_voltage_switch() first, the following patches will
->>>>>> remove the regulator voltage switch code and use the common
->>>>>> mmc_regulator_set_vqmmc() instead.
->>>>>
->>>>> You have changed the order that things are done.
->>>>
->>>> Yes, the oder changes a bit that we always do controller voltage switch first.
->>>> I suppose the order is irrelevant here since i don't recall any
->>>> requirement from card.
->>>>
->>>> Actually the original order is also a bit mass.
->>>> e.g.
->>>> For MMC_SIGNAL_VOLTAGE_330, switch controller first, then vqmmc.
->>>> But for MMC_SIGNAL_VOLTAGE_180, switch vqmmc first, then controller.
->>>> It looks to us the original one also order irrelevant.
->>>>
->>>>> There is no way to know
->>>>> what that will break, so let's not do that.  What about just changing
->>>>> regulator_set_voltage() to mmc_regulator_set_vqmmc()?
->>>>>
->>>>
->>>> Currently what i can think out VIO switch using are three cases: (Pls
->>>> help add if any)
->>>> 1) Both host IO and card IO use external vqmmc to do switch
->>>> (e.g eMMC 1.8V DDR/HS200/HS400 mode)
->>>>
->>>> eMMC has no IO voltage switch protocol and requirement, so usually
->>>> board designed
->>>> using fixed 1.8V for eMMC and host IO.
->>>> Event it's switchable, it should be done in the first mmc_power_up().
->>>> Dynamical switch later may cause eMMC unable to work properly.
->>>> (We have been confirmed about this issue by many eMMC vendors
->>>> like Micron and Sandisk. I'm not sure if any exceptions in the community
->>>> still doing VIO dynamical switch for eMMC, if yes, please help share
->>>> the experience!).
->>>>
->>>> Event some people still do dynamical IO switch for eMMC, since eMMC
->>>> spec has no requirement, so the order should also not care.
->>>>
->>>> 2) Host using controller IO switch while card using standard CMD (SD/SDIO3.0)
->>>>
->>>> SD/SDIO 3.0 spec defines the standard IO switch process and using it's internal
->>>> regulator to do card IO voltage switch. It does not use external vqmmc
->>>> regulator.
->>>> So order irrelevant too.
->>>>
->>>> 3) Host using controller IO switch while card using external vqmmc
->>>> (special SDIO3.0 or eMMC)
->>>> I have met some special SDIO3.0 card like Broadcom WiFi which does not follow
->>>> the spec and using external regulator for card IO voltage.
->>>> Usually it's required to fix to 1.8v and also not order irrelevant.
->>>>
->>>> For eMMC, refer to case 1), it should be fixed to 1.8v at power up.
->>>>
->>>> So it looks all cases seems are not order required.
->>>
->>> I don't agree that there is any way to know that other host controllers
->>> are not affected.  I don't want a repeat of sdhci_set_power().
->>>
->>
->> Can you share some more info about sdhci_set_power() issue?
->> I'd like to see if we are same the issue.
-> 
-> Not the same issue, but the same concept.  People changing the code under
-> the impression that their way was correct, and then breaking other people's
-> drivers.  Check the git history and mailing list.
-> 
-> 	http://marc.info/?l=linux-mmc&m=145880454106474&w=2
-> 
->>
->> BTW, IMHO i don't think we should stop keep moving only afraid of potential
->> break if it's correct way. Because .start_signal_voltage_switch() interface
->> seems shouldn't be order dependant.
->> If it is, then it should be fixed and handled in high layer like MMC core
->> rather than in host driver. Right?
-> 
-> The SDHCI spec. does not define how to use external regulators, so there is
-> no "correct way".
-> 
-> We have to move forward *and* avoid potential breakage.
-> 
-> In this case it seems me that the risk of breakage outweighs the value of
-> prettier code.
-> 
-> By the way, there are ways to get rid of the ugliness - such as pushing it down
-> into individual drivers.
-> 
->>
->>> Please instead send a patch for just using mmc_regulator_set_vqmmc()
->>> in place of regulator_set_voltage().
->>
->> Just using mmc_regulator_set_vqmmc() also changes the order which
->> is the same situation.
-> 
-> How so?  It looks like a drop-in replacement to me:
+eMMC storage is different from a regular SD card in that it is soldered
+on the board and cannot be changed. Additionally, it shares pins with
+the NAND module and with the second SPI port.
 
-maybe.. this question should not be related with this discussion..
-But i have one question..sdhci_do_start_signal_voltage_switch() returned 0 or EAGAIN, when IS_ERR(mmc->supply.vqmmc) is ture.
-It there any problem?
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+---
+ .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    | 64 ++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
 
-I'm also checking on core side. but just wondering this.
-(Because i'm fixing dwmmc controller for this.)
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 94cffa77490a..69b4d48aff87 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1757,8 +1757,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
->  		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
->  
->  		if (!IS_ERR(mmc->supply.vqmmc)) {
-> -			ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
-> -						    3600000);
-> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
->  			if (ret) {
->  				pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
->  					mmc_hostname(mmc));
-> @@ -1779,8 +1778,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
->  		return -EAGAIN;
->  	case MMC_SIGNAL_VOLTAGE_180:
->  		if (!IS_ERR(mmc->supply.vqmmc)) {
-> -			ret = regulator_set_voltage(mmc->supply.vqmmc,
-> -					1700000, 1950000);
-> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
->  			if (ret) {
->  				pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
->  					mmc_hostname(mmc));
-> @@ -1810,8 +1808,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
->  		return -EAGAIN;
->  	case MMC_SIGNAL_VOLTAGE_120:
->  		if (!IS_ERR(mmc->supply.vqmmc)) {
-> -			ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
-> -						    1300000);
-> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
->  			if (ret) {
->  				pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
->  					mmc_hostname(mmc));
-> 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+new file mode 100644
+index 0000000..689da36
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+@@ -0,0 +1,64 @@
++ /*
++ * Copyright 2015 - Ultimaker B.V.
++ * Author Olliver Schinagl <oliver@schinagl.nl>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sun7i-a20-olinuxino-lime2.dts"
++
++/ {
++	model = "Olimex A20-OLinuXino-LIME2-eMMC";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	no-1-8-v;
++	status = "okay";
++
++	emmc: emmc at 0 {
++		reg = <0>;
++		compatible = "mmc-card";
++		broken-hpi;
++	};
++};
+-- 
+2.8.0.rc3
