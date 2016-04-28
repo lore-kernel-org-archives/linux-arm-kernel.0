@@ -1,78 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Apr 2016 17:07:05 +0100
-Subject: [PATCH] arm/arm64: KVM: Enforce Break-Before-Make on Stage-2
- page tables
-In-Reply-To: <1461856591-5751-1-git-send-email-marc.zyngier@arm.com>
-References: <1461856591-5751-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160428160705.GA17867@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2016 18:07:28 +0200
+Subject: [GIT PULL 3/3] ARM: drivers: memory: SROM controller for v4.7
+In-Reply-To: <1461748256-4394-4-git-send-email-k.kozlowski@samsung.com>
+References: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
+ <1461748256-4394-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <4542406.lBvA1xgIVV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 04:16:31PM +0100, Marc Zyngier wrote:
-> The ARM architecture mandates that when changing a page table entry
-> from a valid entry to another valid entry, an invalid entry is first
-> written, TLB invalidated, and only then the new entry being written.
+On Wednesday 27 April 2016 11:10:56 Krzysztof Kozlowski wrote:
+> Finally, I hope the SROM controller can be split from mach-exynos into
+> drivers/memory. This is a very long standing patchset. The delay was
+> caused (twice) by very late comments, including comments for already
+> acked patch by the acker. Endless work... but I think entire feedback
+> was addressed (not ignored!).
 > 
-> The current code doesn't respect this, directly writing the new
-> entry and only then invalidating TLBs. Let's fix it up.
+> This includes internal dependency: samsung-dt-exynos-srom-fixup-4.7.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Please, be so kind and pick it up.
+> 
 
-FWIW, this looks correct to me.
+Pulled into next/drivers, thanks!
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm/kvm/mmu.c | 17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 58dbd5c..edf1cd1 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -893,11 +893,14 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->  	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
->  
->  	old_pmd = *pmd;
-> -	kvm_set_pmd(pmd, *new_pmd);
-> -	if (pmd_present(old_pmd))
-> +	if (pmd_present(old_pmd)) {
-> +		pmd_clear(pmd);
->  		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> -	else
-> +	} else {
->  		get_page(virt_to_page(pmd));
-> +	}
-> +
-> +	kvm_set_pmd(pmd, *new_pmd);
->  	return 0;
->  }
->  
-> @@ -946,12 +949,14 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->  
->  	/* Create 2nd stage page table mapping - Level 3 */
->  	old_pte = *pte;
-> -	kvm_set_pte(pte, *new_pte);
-> -	if (pte_present(old_pte))
-> +	if (pte_present(old_pte)) {
-> +		kvm_set_pte(pte, __pte(0));
->  		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> -	else
-> +	} else {
->  		get_page(virt_to_page(pte));
-> +	}
->  
-> +	kvm_set_pte(pte, *new_pte);
->  	return 0;
->  }
->  
-> -- 
-> 2.1.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+	Arnd
