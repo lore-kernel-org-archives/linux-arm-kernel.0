@@ -1,58 +1,104 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 28 Apr 2016 15:30:36 +0200
-Subject: [PATCH] i2c: st: Implement i2c_bus_recovery_info callbacks
-In-Reply-To: <20160424211044.GD4317@katana>
-References: <1460467759-11737-1-git-send-email-peter.griffin@linaro.org>
- <20160424211044.GD4317@katana>
-Message-ID: <5722107C.3000600@st.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 28 Apr 2016 21:24:37 +0800
+Subject: [PATCH 07/23] mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do
+ voltage switch
+In-Reply-To: <5721209B.7000707@intel.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-8-git-send-email-aisheng.dong@nxp.com>
+ <571A1970.7010800@intel.com>
+ <CAA+hA=S4yy8=z3EXS9ZO5V6+WQDV7K0d29vUpcFkB5q6f+Eo8g@mail.gmail.com>
+ <5721209B.7000707@intel.com>
+Message-ID: <20160428132437.GC27560@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Wed, Apr 27, 2016 at 11:27:07PM +0300, Adrian Hunter wrote:
+> On 24/04/2016 12:56 p.m., Dong Aisheng wrote:
+> >On Fri, Apr 22, 2016 at 8:30 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> >>On 15/04/16 20:29, Dong Aisheng wrote:
+> >>>Currently when card type supports EXT_CSD_CARD_TYPE_DDR_1_8V
+> >>>which means it can work on DDR mode with either 3.3v IO or 1.8v
+> >>>IO voltage. MMC core will first try 1.8v then 3.3v if host claims
+> >>>MMC_CAP_1_8V_DDR support.
+> >>>However the host driver voltage switch code does not check NO_1_8_V
+> >>>quirk which may set a wrong 1.8v and causes the card fixed to 3.3v
+> >>>VIO un-work.
+> >>>
+> >>>Checking 1.8V quirk before setting it to avoid such issue.
+> >>
+> >>We need to look forward to when SDHCI_QUIRK2_NO_1_8_V doesn't exist.
+> >>
+> >
+> >Yes, i did try to clean up SDHCI_QUIRK2_NO_1_8_V.
+> >However, it seems not that simply.
+> >Currently we may still need it before we got a better way.
+> >
+> >My point is whether we should stop fixing the exist issue in SDHCI driver
+> >just caused by we want to clean up it later?
+> 
+> If you want a fix for stable kernels, then I guess it is OK.  In that case
+> it is better to have a fix that applies cleanly to older kernels
+> i.e. not on top of re-factoring
+> 
 
-On 04/24/2016 11:10 PM, Wolfram Sang wrote:
->> +/*
->> + * i2c bus recovery routines
->> + * get_scl and set_scl must be defined to avoid the recover_bus field of
->> + * i2c_bus_recovery_info to be overriden with NULL during the
->> + * i2c_add_adapter call
->> + */
-> Oh, that shouldn't be like this. Can you try this patch and remove the
-> empty functions please?
->
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 4979728f7fb2de..604936955807e5 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -1595,10 +1595,12 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
->   
->   			bri->get_scl = get_scl_gpio_value;
->   			bri->set_scl = set_scl_gpio_value;
-> -		} else if (!bri->set_scl || !bri->get_scl) {
-> +		} else if (bri->recover_bus == i2c_generic_scl_recovery) {
->   			/* Generic SCL recovery */
-> -			dev_err(&adap->dev, "No {get|set}_gpio() found, not using recovery\n");
-> -			adap->bus_recovery_info = NULL;
-> +			if (!bri->set_scl || !bri->get_scl) {
-> +				dev_err(&adap->dev, "No {get|set}_scl() found, not using recovery\n");
-> +				adap->bus_recovery_info = NULL;
-> +			}
->   		}
->   	}
->   
->
->> +static int st_i2c_recover_bus(struct i2c_adapter *i2c_adap)
->> +{
-> Can you describe what the function does? It is not clear to me that it
-> generates 9 scl pulses.
-I agree, it would need some comments.
-This IP is dual-role, it can do either SPI or I2C.
-The trick is to switch to SPI mode, 9 bits words and write a 0,
-so that 9 clock pulses are generated.
+Okay, i would think more about how to remove SDHCI_QUIRK2_NO_1_8_V first.
 
-This is easier to manage than switching to GPIO mode,
-as we don't need to provide the gpio handles in DT, and no need to 
-put/get the pinctrl handle.
+Regards
+Dong Aisheng
 
-Regards,
-Maxime
+> >
+> >>There are two possibilities:
+> >>
+> >>1. Add MMC_CAP_3_3V_DDR and support to core and use that instead of
+> >>MMC_CAP_1_8V_DDR.  You'll need Ulf's feedback on that.
+> >>
+> >
+> >Yes, we can do it.
+> >But the point is for DDR50/SD3.0/SDIO3.0/HS200/HS400 cards we have
+> >the same situation and still need QUIRK2_NO_1_8_V.
+> >
+> >And i somehow a bit wonder whether we should retrieve the speed mode
+> >support from device tree since it's actually controller capability.
+> >IO range capability is another thing.
+> >
+> >Probably we may start another topic to discuss it specificly.
+> >
+> >>2. Replace ->start_signal_voltage_switch() i.e.
+> >>
+> >>host->mmc_host_ops.start_signal_voltage_switch =
+> >>esdhci_start_signal_voltage_switch;
+> >>
+> >>You will also need to change all calls to
+> >>sdhci_start_signal_voltage_switch() with
+> >>host->mmc->ops->start_signal_voltage_switch(), but that needs to be done anyway.
+> >>
+> >
+> >esdhc can fully use the common sdhci_start_signal_voltag_switch.
+> >Since it's already support QUIRK_NO_1_8_V, we don't want to
+> >invent imx voltage swith currently, but fix and use it first.
+> >
+> >Regards
+> >Dong Aisheng
+> >
+> >>>
+> >>>CC: stable <stable@vger.kernel.org>
+> >>>Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >>>---
+> >>>  drivers/mmc/host/sdhci.c | 2 ++
+> >>>  1 file changed, 2 insertions(+)
+> >>>
+> >>>diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> >>>index 2338aab..96ccb15 100644
+> >>>--- a/drivers/mmc/host/sdhci.c
+> >>>+++ b/drivers/mmc/host/sdhci.c
+> >>>@@ -1683,6 +1683,8 @@ static int sdhci_do_signal_voltage_switch(struct sdhci_host *host,
+> >>>
+> >>>               return -EAGAIN;
+> >>>       case MMC_SIGNAL_VOLTAGE_180:
+> >>>+             if (host->quirks2 & SDHCI_QUIRK2_NO_1_8_V)
+> >>>+                     return -EINVAL;
+> >>>               /*
+> >>>                * Enable 1.8V Signal Enable in the Host Control2
+> >>>                * register
+> >>>
+> >>
