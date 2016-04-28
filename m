@@ -1,27 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 28 Apr 2016 21:04:28 +0200
-Subject: [GIT PULL 1/3] ARM: dts: exynos: Secound round of DTS for v4.7
-In-Reply-To: <1956683.Gv388axJqA@wuerfel>
-References: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
- <1461748256-4394-2-git-send-email-k.kozlowski@samsung.com>
- <1956683.Gv388axJqA@wuerfel>
-Message-ID: <20160428190428.GA10520@kozik-lap>
+From: linux@horizon.com (George Spelvin)
+Date: 28 Apr 2016 15:15:51 -0400
+Subject: [patch V3] lib: GCD: add binary GCD algorithm
+In-Reply-To: <20160428175843.GZ21636@brightrain.aerifal.cx>
+Message-ID: <20160428191551.17438.qmail@ns.horizon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 04:06:54PM +0200, Arnd Bergmann wrote:
-> On Wednesday 27 April 2016 11:10:54 Krzysztof Kozlowski wrote:
-> >   kernel.org:/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.7-2
-> > 
-> 
-> Pulled into next/dt after I figured out that the URL was wrong.
-> 
-> Please check your git configuration to make sure you send an address
-> I can pull from.
+> How does a CPU lack an efficient ffs/ctz anyway? There are all sorts
+> of ways to implement it without a native insn, some of which are
+> almost or just as fast as the native insn on cpus that have the
+> latter. On anything with a fast multiply, the de Bruijn sequence
+> approach is near-optimal, and otherwise one of the binary-search type
+> approaches (possibly branchless) can be used. If the compiler doesn't
+> generate an appropriate one for __builtin_ctz, that's arguably a
+> compiler bug.
 
-Ah, indeed, sorry for that. I still did not automate entirely this process
-so apparently I am doing simple mistakes. I'll be more carefull next
-time.
+What's wanted here is something faster than any of those.
+Yes, there's a simple constant-time branch-free implementation:
 
-Best regards,
-Krzysztof
+unsigned inline __attribute__((const))
+hweight32(uint32_t x)
+{
+	x -= (x >> 1) & 0x55555555;
+	x  = ((x >> 2) & 0x33333333) + (x & 0x33333333);
+	x += x >> 4;
+	x &= 0x0f0f0f0f;
+	x += x >> 8;
+	x += x >> 16;
+	return x & 63;
+}
+
+unsigned inline __attribute__((const))
+__ffs32(uint32_t x)
+{
+	return hweight(~x & (x-1));
+}
+
+but if you work it through, that's about 19 instructions; a few more on
+platforms without 32-bit immediates.  The shift itself makes an even 20,
+and there are a lot of sequential dependencies (I count a 17-op chain
+including the shift) limiting execution time.
+
+The de Bruijn hack reduces the length but adds a memory access for
+the table lookup.  (http://supertech.csail.mit.edu/papers/debruijn.pdf)
+
+In the GCD code, the number to normalize is basically random, so the
+normalization loop shifts an average of 1 bit.  One bit half the time,
+a second bit 1/4 of the time, etc.
+
+(The posted code in the FAST_FFS case omits one guaranteed shift at the
+end of the loop because the normalization code is constant-time.)
+
+So "fast __ffs" basically means faster than *one* iteration of
+"while (!(x & 1)) x >>= 1;".
+
+In this case "fast" means cheaper than *one* unpredictable branch, which
+is a very small handful of instructions.
