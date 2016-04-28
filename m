@@ -1,124 +1,86 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:26 +0100
-Subject: [PATCH v2 07/54] KVM: arm/arm64: vgic: Remove irq_phys_map from
- interface
+Date: Thu, 28 Apr 2016 17:45:25 +0100
+Subject: [PATCH v2 06/54] KVM: arm/arm64: arch_timer: Remove irq_phys_map
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the virtual arch timer does not care about the irq_phys_map
-anymore, let's rework kvm_vgic_map_phys_irq() to return an error
-value instead. Any reference to that mapping can later be done by
-passing the correct combination of VCPU and virtual IRQ number.
-This makes the irq_phys_map handling completely private to the
-VGIC code.
+Now that the interface between the arch timer and the VGIC does not
+require passing the irq_phys_map entry pointer anymore, let's remove
+it from the virtual arch timer and use the virtual IRQ number instead
+directly.
+The remaining pointer returned by kvm_vgic_map_phys_irq() will be
+removed in the following patch.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
 Changelog v1 .. v2:
-- adaptations to changes in previous patches (removal of virt_irq)
+- remove extra virt_irq member from struct, instead use irq.irq directly
 
- include/kvm/arm_vgic.h    |  3 +--
- virt/kvm/arm/arch_timer.c |  8 ++++----
- virt/kvm/arm/vgic.c       | 15 +++++++--------
- 3 files changed, 12 insertions(+), 14 deletions(-)
+ include/kvm/arm_arch_timer.h |  3 ---
+ virt/kvm/arm/arch_timer.c    | 11 +++++------
+ 2 files changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 49c559e..f842d7d 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -343,8 +343,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
- 			       unsigned int virt_irq, bool level);
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
--struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
--					   int virt_irq, int phys_irq);
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq);
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index b651aed..a47b7de 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -53,9 +53,6 @@ struct arch_timer_cpu {
+ 	/* Timer IRQ */
+ 	struct kvm_irq_level		irq;
  
+-	/* VGIC mapping */
+-	struct irq_phys_map		*map;
+-
+ 	/* Active IRQ state caching */
+ 	bool				active_cleared_last;
+ };
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 3a74b17..9475000 100644
+index b470632..3a74b17 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -333,10 +333,10 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 			 const struct kvm_irq_level *irq)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	struct irq_phys_map *map;
- 	struct irq_desc *desc;
- 	struct irq_data *data;
- 	int phys_irq;
-+	int ret;
+@@ -175,10 +175,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+ 
+ 	timer->active_cleared_last = false;
+ 	timer->irq.level = new_level;
+-	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
++	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+ 				   timer->irq.level);
+ 	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+-					 timer->map->virt_irq,
++					 timer->irq.irq,
+ 					 timer->irq.level);
+ 	WARN_ON(ret);
+ }
+@@ -276,7 +276,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	* exit.
+ 	*/
+ 	phys_active = timer->irq.level ||
+-			kvm_vgic_map_is_active(vcpu, timer->map->virt_irq);
++			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
  
  	/*
- 	 * The vcpu timer irq number cannot be determined in
-@@ -374,9 +374,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * Tell the VGIC that the virtual interrupt is tied to a
- 	 * physical interrupt. We do that once per VCPU.
- 	 */
--	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
--	if (WARN_ON(IS_ERR(map)))
--		return PTR_ERR(map);
-+	ret = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
-+	if (ret)
-+		return ret;
+ 	 * We want to avoid hitting the (re)distributor as much as
+@@ -378,7 +378,6 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	if (WARN_ON(IS_ERR(map)))
+ 		return PTR_ERR(map);
  
+-	timer->map = map;
  	return 0;
  }
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 41792c0..00386df 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1720,21 +1720,20 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
-  * the physical interrupt represented by @phys_irq. This mapping can be
-  * established multiple times as long as the parameters are the same.
-  *
-- * Returns a valid pointer on success, and an error pointer otherwise
-+ * Returns 0 on success or an error value otherwise.
-  */
--struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
--					   int virt_irq, int phys_irq)
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
- 	struct irq_phys_map *map;
- 	struct irq_phys_map_entry *entry;
--
-+	int ret = 0;
  
- 	/* Create a new mapping */
- 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
- 	if (!entry)
--		return ERR_PTR(-ENOMEM);
-+		return -ENOMEM;
+@@ -521,8 +520,8 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
  
- 	spin_lock(&dist->irq_phys_map_lock);
- 
-@@ -1743,7 +1742,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 	if (map) {
- 		/* Make sure this mapping matches */
- 		if (map->phys_irq != phys_irq)
--			map = ERR_PTR(-EINVAL);
-+			ret = -EINVAL;
- 
- 		/* Found an existing, valid mapping */
- 		goto out;
-@@ -1759,9 +1758,9 @@ out:
- 	spin_unlock(&dist->irq_phys_map_lock);
- 	/* If we've found a hit in the existing list, free the useless
- 	 * entry */
--	if (IS_ERR(map) || map != &entry->map)
-+	if (ret || map != &entry->map)
- 		kfree(entry);
--	return map;
-+	return ret;
+ 	timer_disarm(timer);
+-	if (timer->map)
+-		kvm_vgic_unmap_phys_irq(vcpu, timer->map->virt_irq);
++	if (timer->irq.irq)
++		kvm_vgic_unmap_phys_irq(vcpu, timer->irq.irq);
  }
  
- static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
+ void kvm_timer_enable(struct kvm *kvm)
 -- 
 2.7.3
