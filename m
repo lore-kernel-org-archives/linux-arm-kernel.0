@@ -1,46 +1,85 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 28 Apr 2016 14:07:03 -0700
-Subject: [PATCH] clk: imx: fix ahb clock mux 1
-Message-ID: <1461877623-26838-1-git-send-email-stefan@agner.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 28 Apr 2016 16:07:16 -0500
+Subject: [PATCH v7 2/9] ARM: dts: am437x: Add missing compatibles to PWM
+ binding documents
+In-Reply-To: <1461710209-6563-3-git-send-email-fcooper@ti.com>
+References: <1461710209-6563-1-git-send-email-fcooper@ti.com>
+ <1461710209-6563-3-git-send-email-fcooper@ti.com>
+Message-ID: <20160428210716.GA12508@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock parent of the AHB root clock when using mux option 1
-is the SYS PLL 270MHz clock. This is specified in  Table 5-11
-Clock Root Table of the i.MX 7Dual Applications Processor
-Reference Manual.
+On Tue, Apr 26, 2016 at 05:36:42PM -0500, Franklin S Cooper Jr wrote:
+> There are several SOC specific compatibles for ECAP, EHRPWM and PWMMS
+> that are in use but aren't properly documented. Therefore, fix this
+> by adding the compatibles to the appropriate binding documents.
+> 
+> While at it make minor corrections to the binding document.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt          | 12 ++++++++++--
+>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt        | 12 ++++++++++--
+>  .../devicetree/bindings/pwm/pwm-tipwmss.txt         | 21 +++++++++++++++++++--
+>  3 files changed, 39 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> index fb81179..788da6c 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> @@ -2,8 +2,9 @@ TI SOC ECAP based APWM controller
+>  
+>  Required properties:
+>  - compatible: Must be "ti,<soc>-ecap".
+> -  for am33xx - compatible = "ti,am33xx-ecap";
+> -  for da850  - compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+> +  for am33xx  - compatible = "ti,am33xx-ecap";
+> +  for am4372  - compatible = "ti,am4372-ecap", "ti,am33xx-ecap";
+> +  for da850   - compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+>  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+>    the cells format. The PWM channel index ranges from 0 to 4. The only third
+>    cell flag supported by this binding is PWM_POLARITY_INVERTED.
+> @@ -22,6 +23,13 @@ ecap0: ecap at 0 { /* ECAP on am33xx */
+>  	ti,hwmods = "ecap0";
+>  };
+>  
+> +ecap0: ecap at 0 { /* ECAP on am4372 */
 
-While it could be a documentation error, the 270MHz parent is
-also mentioned in the boot ROM configuration in Table 6-28: The
-clock is by default at 135MHz due to a POST_PODF value of 1
-(=> divider of 2).
+The unit address is wrong.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Hi Shawn,
+> +	compatible = "ti,am4372-ecap", "ti,am33xx-ecap";
+> +	#pwm-cells = <3>;
+> +	reg = <0x48300100 0x80>;
+> +	ti,hwmods = "ecap0";
+> +};
+> +
+>  ecap0: ecap at 0 { /* ECAP on da850 */
+>  	compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+> index 9c100b2..99b544f 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+> @@ -2,8 +2,9 @@ TI SOC EHRPWM based PWM controller
+>  
+>  Required properties:
+>  - compatible: Must be "ti,<soc>-ehrpwm".
+> -  for am33xx - compatible = "ti,am33xx-ehrpwm";
+> -  for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+> +  for am33xx  - compatible = "ti,am33xx-ehrpwm";
+> +  for am4372  - compatible = "ti,am4372-ehrpwm", "ti,am33xx-ehrpwm";
+> +  for da850   - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+>  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+>    the cells format. The only third cell flag supported by this binding is
+>    PWM_POLARITY_INVERTED.
+> @@ -22,6 +23,13 @@ ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
+>  	ti,hwmods = "ehrpwm0";
+>  };
+>  
+> +ehrpwm0: ehrpwm at 0 { /* EHRPWM on am4372 */
 
-I did not found a clock which was based on this clock which I
-could measure externally... But the change is backed by the
-documentation.
+ditto
 
---
-Stefan
+Otherwise,
 
- drivers/clk/imx/clk-imx7d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 7912be8..5229968 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -56,7 +56,7 @@ static const char *nand_usdhc_bus_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
- 	"pll_sys_pfd2_135m_clk", "pll_sys_pfd6_clk", "pll_enet_250m_clk",
- 	"pll_audio_main_clk", };
- 
--static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
-+static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
- 	"pll_dram_533m_clk", "pll_sys_pfd0_392m_clk",
- 	"pll_enet_125m_clk", "pll_usb_main_clk", "pll_audio_main_clk",
- 	"pll_video_main_clk", };
--- 
-2.8.0
+Acked-by: Rob Herring <robh@kernel.org>
