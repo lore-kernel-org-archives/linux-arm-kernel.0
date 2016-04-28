@@ -1,25 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 16:14:15 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.7
-In-Reply-To: <cover.1461723181.git.horms+renesas@verge.net.au>
-References: <cover.1461723181.git.horms+renesas@verge.net.au>
-Message-ID: <1813099.gFLC2Strmj@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2016 15:16:12 +0100
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <87y47ykzmz.fsf@intel.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <13248156.8VXoeOzRlg@wuerfel> <8737q6stpl.fsf@ti.com>
+ <5129992.Q57qoSDEqC@wuerfel> <87y47ykzmz.fsf@intel.com>
+Message-ID: <20160428141611.GK19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 14:06:43 Simon Horman wrote:
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.7
+On Thu, Apr 28, 2016 at 09:37:08AM +0300, Felipe Balbi wrote:
 > 
-> * Don't disable referenced optional clocks in DT of r8a7795 SoC
-> * Populate EXTALR in DT of salvator-x board
-> * Enable PCIe in DT of salvator-x board
+> Hi,
 > 
+> Arnd Bergmann <arnd@arndb.de> writes:
+> >    pointer and pass that in platform_data. This is really easy, it's
+> 
+> Sorry but passing a struct device pointer in platform_data is
+> ridiculous. Not to mention that, as I said before, we can't assume which
+> device to pass to xhci_plat in the first place. It might be dwc->dev and
+> it might be dwc->dev->parent.
 
-Pulled into next/dt64.
++1.  Passing an unref-counted struct device through platform data is
+totally mad, Arnd you're off your rocker if you think that's a good
+idea.  What's more is that there's no way to properly refcount the
+thing.
 
-I briefly looked at the contents and noticed that the PCIe host
-node you add has a dma-ranges property, but its parent node does
-not, so you are still limited to 32-bit DMA and you should fix that.
-
-	Arnd
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
