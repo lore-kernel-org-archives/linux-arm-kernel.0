@@ -1,80 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Apr 2016 16:47:34 +0200
-Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
-In-Reply-To: <20160428144117.GX28464@e106497-lin.cambridge.arm.com>
-References: <20160427225827.GC17629@localhost>
- <20160428120624.GV28464@e106497-lin.cambridge.arm.com>
- <20160428141336.60aa4be1@free-electrons.com>
- <20160428130228.GW28464@e106497-lin.cambridge.arm.com>
- <20160428151222.2ef7ce06@free-electrons.com>
- <20160428144117.GX28464@e106497-lin.cambridge.arm.com>
-Message-ID: <20160428164734.0b3837be@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Apr 2016 07:50:48 -0700
+Subject: [GIT PULL] omap fixes for v4.6-rc cycle
+Message-ID: <20160428145047.GE5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Adding in Cc Arnd Bergmann, since he participated to the discussion
-several years ago around the PCI DT binding for the Armada platform.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-On Thu, 28 Apr 2016 15:41:17 +0100, Liviu Dudau wrote:
+are available in the git repository at:
 
-> > See how the address and size are 0 ? 
-> 
-> PCI or host address? Either are not zero, I'm afraid: PCI is 0x1 0, 0x2 0 ...
-> while host address is given by MBUS_ID(...) 0. Anyway ...
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc5-signed
 
-The host address is kind of a "fake address". "MBUS_ID(..., ....) 0" is
-not something that you can ioremap. See
-Documentation/devicetree/bindings/pci/mvebu-pci.txt:
+for you to fetch changes up to 7472931f7f1e9d91f761dce30107ae345b61a5c3:
 
-"""
-Since the location and size of the different MBus windows is not fixed
-in
-hardware, and only determined in runtime, those ranges cover the full
-first
-4 GB of the physical address space, and do not translate into a valid
-CPU
-address.
-"""
+  ARM: dts: omap5: fix range of permitted wakeup pinmux registers (2016-04-26 10:16:12 -0700)
 
-> > We don't know at the moment of
-> > scanning the DT, what will be the address and size of the different MEM
-> > and IO mappings.
-> 
-> True, but you have bounds on the sizes of each region given the way you
-> encode the address translation. Trying to decode what the example above is
-> telling me:
->   - each port has 0x80000_00000000 possible IO space allocated based on
->     the MBUS_ID split of address space
->   - same for MEM space.
-> 
-> And IMO you *should* have address and sizes for the MEM and IO mappings, as
-> they act as *upper* boundaries. No one says you need to reserve the whole
-> space, you are just describing how the hardware translates addresses between
-> the busses.
+----------------------------------------------------------------
+Fixes for omaps for v4.6-rc cycle. All dts fixes, mostly
+affecting voltages and pinctrl for various device drivers:
 
-Hm, not sure what would be the benefit of changing the Device Tree with
-this, but I'm probably missing something.
+- Regulator minimum voltage fixes for omap5
 
-> Just for my own clarification, is the reason why the ranges are declared like
-> this due to the fact that each port is a separate entity and multiple ports
-> cannot be served by the same MBus window? What stops you from having one
-> MBus window assigned to all IO space and the other window(s) assigned to MEM
-> for individual ports?
+- ISP syscon register offset fix for omap3
 
-Each port needs its own MBus window for the PCI memory space and PCI
-I/O space that is accessed by this port. The MBUS_ID(x, y) thing is
-here to encode the information that are needed to create such windows,
-which as you can see are different for each port.
+- Fix regulator initial modes for n900
 
-So we cannot have a single MBus window for all the IO space, we need
-one per PCI port.
+- Fix omap5 pinctrl wkup instance size
 
-Best regards,
+----------------------------------------------------------------
+H. Nikolaus Schaller (1):
+      ARM: dts: omap5: fix range of permitted wakeup pinmux registers
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ivaylo Dimitrov (2):
+      ARM: dts: omap3: Fix ISP syscon register offset
+      ARM: dts: omap3-n900: Specify peripherals LDO regulators initial mode
+
+Tomi Valkeinen (2):
+      ARM: dts: omap5-board-common: fix ldo1_reg and ldo4_reg ranges
+      ARM: dts: omap5-cm-t54: fix ldo1_reg and ldo4_reg ranges
+
+ arch/arm/boot/dts/omap3-n900.dts          | 9 +++++++++
+ arch/arm/boot/dts/omap34xx.dtsi           | 2 +-
+ arch/arm/boot/dts/omap5-board-common.dtsi | 4 ++--
+ arch/arm/boot/dts/omap5-cm-t54.dts        | 4 ++--
+ arch/arm/boot/dts/omap5.dtsi              | 2 +-
+ 5 files changed, 15 insertions(+), 6 deletions(-)
