@@ -1,82 +1,107 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 28 Apr 2016 16:47:49 -0500
-Subject: [PATCH V6 07/13] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <1460740008-19489-8-git-send-email-tn@semihalf.com>
+Date: Thu, 28 Apr 2016 16:48:00 -0500
+Subject: [PATCH V6 09/13] pci, acpi: Support for ACPI based generic PCI
+ host controller
+In-Reply-To: <1460740008-19489-10-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-8-git-send-email-tn@semihalf.com>
-Message-ID: <20160428214749.GF25125@localhost>
+ <1460740008-19489-10-git-send-email-tn@semihalf.com>
+Message-ID: <20160428214800.GG25125@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 07:06:42PM +0200, Tomasz Nowicki wrote:
-> From: Jayachandran C <jchandra@broadcom.com>
-> 
-> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
-> provide generic functions for accessing memory mapped PCI config space.
-> 
-> The API is defined in drivers/pci/ecam.h and is written to replace the
-> API in drivers/pci/host/pci-host-common.h. The file defines a new
-> 'struct pci_config_window' to hold the information related to a PCI
-> config area and its mapping. This structure is expected to be used as
-> sysdata for controllers that have ECAM based mapping.
-> 
-> Helper functions are provided to setup the mapping, free the mapping
-> and to implement the map_bus method in 'struct pci_ops'
+Hey, I really kind of like this.  I think this might work out well.
 
-Spec reference: PCI Express Base Specification, rev 3.0, sec 7.2.2.
-
+On Fri, Apr 15, 2016 at 07:06:44PM +0200, Tomasz Nowicki wrote:
+> This patch is going to implement generic PCI host controller for
+> ACPI world, similar to what pci-host-generic.c driver does for DT world.
+> 
+> All such drivers, which we have seen so far, were implemented within
+> arch/ directory since they had some arch assumptions (x86 and ia64).
+> However, they all are doing similar thing, so it makes sense to find
+> some common code and abstract it into the generic driver.
+> 
+> In order to handle PCI config space regions properly, we define new
+> MCFG interface which parses MCFG table and keep its entries
+> in a list. New pci_mcfg_init call is defined so that we do not depend
+> on PCI_MMCONFIG. Regions are not mapped until host bridge ask for it.
+> 
+> The implementation of pci_acpi_scan_root() looks up the saved MCFG entries
+> and sets up a new mapping. Generic PCI functions are used for
+> accessing config space. Driver selects PCI_GENERIC_ECAM and uses functions
+> from drivers/pci/ecam.h to create and access ECAM mappings.
+> 
+> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
+> should be made on a per-architecture basis.
+> 
+> This patch is heavily based on the updated version from Jayachandran C:
+> https://lkml.org/lkml/2016/4/11/908
+> git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 > ---
->  drivers/pci/Kconfig  |   3 ++
->  drivers/pci/Makefile |   2 +
->  drivers/pci/ecam.c   | 137 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/ecam.h   |  61 +++++++++++++++++++++++
->  4 files changed, 203 insertions(+)
->  create mode 100644 drivers/pci/ecam.c
->  create mode 100644 drivers/pci/ecam.h
+>  drivers/acpi/Kconfig        |   8 ++
+>  drivers/acpi/Makefile       |   1 +
+>  drivers/acpi/bus.c          |   1 +
+>  drivers/acpi/pci_gen_host.c | 231 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h         |   6 ++
+>  5 files changed, 247 insertions(+)
+>  create mode 100644 drivers/acpi/pci_gen_host.c
 > 
-> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-> index 209292e..e930d62 100644
-> --- a/drivers/pci/Kconfig
-> +++ b/drivers/pci/Kconfig
-> @@ -83,6 +83,9 @@ config HT_IRQ
->  config PCI_ATS
->  	bool
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 183ffa3..70272c5 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -346,6 +346,14 @@ config ACPI_PCI_SLOT
+>  	  i.e., segment/bus/device/function tuples, with physical slots in
+>  	  the system.  If you are unsure, say N.
 >  
-> +config PCI_GENERIC_ECAM
+> +config ACPI_PCI_HOST_GENERIC
 > +	bool
-
-"PCI_ECAM" is enough, I think.  It's defined by and required by the
-spec unless there's some arch-specific interface.  Plus, if I
-understand correctly, this infrastructure supports non-generic ECAM
-implementations as well, since the caller supplies "struct
-pci_generic_ecam_ops *ops".
-
->  config PCI_IOV
->  	bool "PCI IOV support"
->  	depends on PCI
-> diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-> index 2154092..810aec8 100644
-> --- a/drivers/pci/Makefile
-> +++ b/drivers/pci/Makefile
-> @@ -55,6 +55,8 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
->  
->  obj-$(CONFIG_PCI_STUB) += pci-stub.o
->  
-> +obj-$(CONFIG_PCI_GENERIC_ECAM) += ecam.o
+> +	select PCI_GENERIC_ECAM
+> +	help
+> +	  Select this config option from the architecture Kconfig,
+> +	  if it is preferred to enable ACPI PCI host controller driver which
+> +	  has no arch-specific assumptions.
 > +
->  obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
+>  config X86_PM_TIMER
+>  	bool "Power Management Timer Support" if EXPERT
+>  	depends on X86
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 81e5cbc..b12fa64 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+>  acpi-y				+= ec.o
+>  acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+>  acpi-y				+= pci_root.o pci_link.o pci_irq.o
+> +obj-$(CONFIG_ACPI_PCI_HOST_GENERIC)	+= pci_gen_host.o
+
+Maybe "pci_root_generic.c" so it shows up next to and is obviously
+related to pci_root.c?
+
+>  acpi-y				+= acpi_lpss.o acpi_apd.o
+>  acpi-y				+= acpi_platform.o
+>  acpi-y				+= acpi_pnp.o
+> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> index c068c82..803a1d7 100644
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -1107,6 +1107,7 @@ static int __init acpi_init(void)
+>  	}
 >  
->  obj-$(CONFIG_OF) += of.o
-> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+>  	pci_mmcfg_late_init();
+> +	pci_mcfg_init();
+>  	acpi_scan_init();
+>  	acpi_ec_init();
+>  	acpi_debugfs_init();
+> diff --git a/drivers/acpi/pci_gen_host.c b/drivers/acpi/pci_gen_host.c
 > new file mode 100644
-> index 0000000..ff04c01
+> index 0000000..fd360b5
 > --- /dev/null
-> +++ b/drivers/pci/ecam.c
-> @@ -0,0 +1,137 @@
+> +++ b/drivers/acpi/pci_gen_host.c
+> @@ -0,0 +1,231 @@
 > +/*
-> + * Copyright 2016 Broadcom
-> + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License, version 2, as
 > + * published by the Free Software Foundation (the "GPL").
@@ -89,241 +114,302 @@ pci_generic_ecam_ops *ops".
 > + * You should have received a copy of the GNU General Public License
 > + * version 2 (GPLv2) along with this source code.
 > + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/io.h>
 > +#include <linux/kernel.h>
-> +#include <linux/module.h>
 > +#include <linux/pci.h>
+> +#include <linux/pci-acpi.h>
+> +#include <linux/sfi_acpi.h>
 > +#include <linux/slab.h>
 > +
-> +#include "ecam.h"
+> +#include "../pci/ecam.h"
 > +
-> +/*
-> + * On 64 bit systems, we do a single ioremap for the whole config space
-> + * since we have enough virtual address range available. On 32 bit, do an
-> + * ioremap per bus.
-> + */
-> +static const bool per_bus_mapping = !config_enabled(CONFIG_64BIT);
+> +#define PREFIX	"ACPI: "
 > +
-> +/*
-> + * Create a PCI config space window
-> + *  - reserve mem region
-> + *  - alloc struct pci_config_window with space for all mappings
-> + *  - ioremap the config space
-> + */
-> +struct pci_config_window *pci_generic_ecam_create(struct device *dev,
-> +				phys_addr_t addr, u8 bus_start, u8 bus_end,
-
-Can you take pointers to struct resources here instead of addr,
-bus_start, and bus_end?  The caller probably has them already, and
-then you could add a useful printk like:
-
-  dev_info(dev, "ECAM for %pR at %pR\n", busn_res, mmio_res);
-
-Would have to be careful about the struct resource lifetimes though.
-
-If you had the MMIO resource here, you could also do the range
-checking you currently have in gen_pci_init() here instead, so all
-callers could benefit.
-
-> +				struct pci_generic_ecam_ops *ops)
+> +/* Structure to hold entries from the MCFG table */
+> +struct mcfg_entry {
+> +	struct list_head	list;
+> +	phys_addr_t		addr;
+> +	u16			segment;
+> +	u8			bus_start;
+> +	u8			bus_end;
+> +};
+> +
+> +/* List to save mcfg entries */
+> +static LIST_HEAD(pci_mcfg_list);
+> +static DEFINE_MUTEX(pci_mcfg_lock);
+> +
+> +/* ACPI info for generic ACPI PCI controller */
+> +struct acpi_pci_generic_root_info {
+> +	struct acpi_pci_root_info	common;
+> +	struct pci_config_window	*cfg;	/* config space mapping */
+> +};
+> +
+> +/* Find the entry in mcfg list which contains range bus_start */
+> +static struct mcfg_entry *pci_mcfg_lookup(u16 seg, u8 bus_start)
 > +{
+> +	struct mcfg_entry *e;
+> +
+> +	list_for_each_entry(e, &pci_mcfg_list, list) {
+> +		if (e->segment == seg &&
+> +		    e->bus_start <= bus_start && bus_start <= e->bus_end)
+> +			return e;
+> +	}
+> +
+> +	return NULL;
+> +}
+
+Can you put the MCFG parsing, caching, and searching in a different
+file, e.g., drivers/acpi/pci_mcfg.c?
+
+> +/*
+> + * Lookup the bus range for the domain in MCFG, and set up config space
+> + * mapping.
+> + */
+> +static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
+> +				       struct acpi_pci_generic_root_info *ri)
+> +{
+> +	u16 seg = root->segment;
+> +	u8 bus_start = root->secondary.start;
+> +	u8 bus_end = root->secondary.end;
 > +	struct pci_config_window *cfg;
-> +	unsigned int bus_shift, bus_range, bsz, mapsz;
-> +	int i, nidx;
-> +	int err = -ENOMEM;
+> +	struct mcfg_entry *e;
+> +	phys_addr_t addr;
+> +	int err = 0;
 > +
-> +	if (bus_end < bus_start)
-> +		return ERR_PTR(-EINVAL);
+> +	mutex_lock(&pci_mcfg_lock);
+
+What does this lock protect?  The pci_mcfg_list should already be
+initialized by the time we get there, and it should be immutable for
+the life of the system.  In fact, I would prefer if we could just
+search the static table itself whenever we need it rather than caching
+it in our own list.  But I don't think we can easily do that because
+acpi_table_parse() is __init.
+
+> +	e = pci_mcfg_lookup(seg, bus_start);
+
+I would argue that we should check for _CBA first, and fall back to
+MCFG if _CBA doesn't exist.
+
+> +	if (!e) {
+> +		addr = acpi_pci_root_get_mcfg_addr(root->device->handle);
+
+IMO, acpi_pci_root_get_mcfg_addr() is misnamed.  It should be
+acpi_pci_config_base_addr() or similar.  It definitely is not related
+to MCFG.  Not your fault, obviously.
+
+> +		if (addr == 0) {
+> +			pr_err(PREFIX"%04x:%02x-%02x bus range error\n",
+> +			       seg, bus_start, bus_end);
+> +			err = -ENOENT;
+> +			goto err_out;
+> +		}
+> +	} else {
+> +		if (bus_start != e->bus_start) {
+> +			pr_err("%04x:%02x-%02x bus range mismatch %02x\n",
+> +			       seg, bus_start, bus_end, e->bus_start);
+> +			err = -EINVAL;
+> +			goto err_out;
+> +		} else if (bus_end != e->bus_end) {
+> +			pr_warn("%04x:%02x-%02x bus end mismatch %02x\n",
+> +				seg, bus_start, bus_end, e->bus_end);
+> +			bus_end = min(bus_end, e->bus_end);
+> +		}
+> +		addr = e->addr;
+> +	}
+
+I really don't think you need a lock around this, so you can factor
+out the address lookup into something like:
+
+  addr = acpi_pci_config_base_addr(...);
+  if (addr)
+    return addr;
+
+  return acpi_pci_mcfg_lookup(seg, busn_res);
+
+You can check inside acpi_pci_mcfg_lookup() to make sure the entry you
+find covers the entire [busn_res.start-busn_res.end] range and return
+failure if it doesn't.  At this point, I'm not sure it's worth it to
+truncate the host bridge bus range to match something we find in MCFG.
+
+If the MCFG entry covers *more* than the host bridge range from _CRS,
+that's fine.  In any case, we have to be careful with the start address,
+because the MCFG start address is always based on bus 0, but I think
+pci_generic_ecam_create() expects the start address based on the
+bus_start you pass to it.
+
 > +
-> +	bus_shift = ops->bus_shift;
-> +	bus_range = bus_end - bus_start + 1;
-> +	bsz = 1 << bus_shift;
-> +	nidx = per_bus_mapping ? bus_range : 1;
-> +	mapsz = per_bus_mapping ? bsz : bus_range * bsz;
-> +	cfg = kzalloc(sizeof(*cfg) + nidx * sizeof(cfg->win[0]), GFP_KERNEL);
-> +	if (!cfg)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	cfg->bus_start = bus_start;
-> +	cfg->bus_end = bus_end;
-> +	cfg->ops = ops;
-> +
-> +	if (!request_mem_region(addr, bus_range * bsz, "Configuration Space"))
-> +		goto err_exit;
-> +
-> +	/* cfgaddr has to be set after request_mem_region */
-> +	cfg->cfgaddr = addr;
-> +
-> +	for (i = 0; i < nidx; i++) {
-> +		cfg->win[i] = ioremap(addr + i * mapsz, mapsz);
-> +		if (!cfg->win[i])
-> +			goto err_exit;
+> +	cfg = pci_generic_ecam_create(&root->device->dev, addr, bus_start,
+> +				      bus_end, &pci_generic_ecam_default_ops);
+> +	if (IS_ERR(cfg)) {
+> +		err = PTR_ERR(cfg);
+> +		pr_err("%04x:%02x-%02x error %d mapping CAM\n", seg,
+> +			bus_start, bus_end, err);
+> +		goto err_out;
 > +	}
 > +
-> +	if (cfg->ops->init) {
-> +		err = cfg->ops->init(dev, cfg);
-> +		if (err)
-> +			goto err_exit;
-> +	}
-> +	return cfg;
-> +
-> +err_exit:
-> +	pci_generic_ecam_free(cfg);
-> +	return ERR_PTR(err);
+> +	cfg->domain = seg;
+> +	ri->cfg = cfg;
+> +err_out:
+> +	mutex_unlock(&pci_mcfg_lock);
+> +	return err;
 > +}
 > +
-> +/*
-> + * Free a config space mapping
-> + */
-
-Superfluous comment.
-
-> +void pci_generic_ecam_free(struct pci_config_window *cfg)
+> +/* release_info: free resrouces allocated by init_info */
+> +static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
 > +{
-> +	unsigned int bus_range;
-> +	int i, nidx;
+> +	struct acpi_pci_generic_root_info *ri;
 > +
-> +	bus_range = cfg->bus_end - cfg->bus_start + 1;
-> +	nidx = per_bus_mapping ? bus_range : 1;
-> +	for (i = 0; i < nidx; i++)
-> +		if (cfg->win[i])
-> +			iounmap(cfg->win[i]);
-> +	if (cfg->cfgaddr)
-> +		release_mem_region(cfg->cfgaddr,
-> +				   bus_range << cfg->ops->bus_shift);
-> +	kfree(cfg);
+> +	ri = container_of(ci, struct acpi_pci_generic_root_info, common);
+> +	pci_generic_ecam_free(ri->cfg);
+> +	kfree(ri);
 > +}
 > +
-> +/*
-> + * Function to implement the pci_ops ->map_bus method
-> + */
-> +void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
-> +				       int where)
-> +{
-> +	struct pci_config_window *cfg = bus->sysdata;
-
-I don't really like the use of bus->sysdata here, because sysdata is
-explicitly arch-specific.
-
-But I guess we're in a bind right now: it'd be nice to save the cfg
-pointer in struct pci_host_bridge, but you have to call
-pci_generic_ecam_create() before the struct pci_host_bridge has been
-allocated, and you have to pass the pointer into pci_scan_root_bus(),
-and there's no generic way to do that yet.
-
-So I guess this will have to do for now.
-
-> +	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
-> +	unsigned int busn = bus->number;
-> +	void __iomem *base;
+> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
+> +	.release_info = pci_acpi_generic_release_info,
+> +};
 > +
-> +	if (busn < cfg->bus_start || busn > cfg->bus_end)
+> +/* Interface called from ACPI code to setup PCI host controller */
+> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> +{
+> +	int node = acpi_get_node(root->device->handle);
+> +	struct acpi_pci_generic_root_info *ri;
+> +	struct pci_bus *bus, *child;
+> +	int err;
+> +
+> +	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+> +	if (!ri)
 > +		return NULL;
 > +
-> +	busn -= cfg->bus_start;
-> +	if (per_bus_mapping)
-> +		base = cfg->win[busn];
-> +	else
-> +		base = cfg->win[0] + (busn << cfg->ops->bus_shift);
-> +	return base + (devfn << devfn_shift) + where;
+> +	err = pci_acpi_setup_ecam_mapping(root, ri);
+> +	if (err)
+> +		return NULL;
+> +
+> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
+> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+> +				   ri->cfg);
+> +	if (!bus)
+> +		return NULL;
+> +
+> +	pci_bus_size_bridges(bus);
+> +	pci_bus_assign_resources(bus);
+> +
+> +	list_for_each_entry(child, &bus->children, node)
+> +		pcie_bus_configure_settings(child);
+> +
+> +	return bus;
 > +}
 > +
-> +/* default ECAM ops */
-> +struct pci_generic_ecam_ops pci_generic_ecam_default_ops = {
-
-Using both "generic" and "default" seems overkill.  Maybe just:
-
-  struct pci_ecam_ops pci_generic_ecam_ops = { ... ?
-
-> +	.bus_shift	= 20,
-> +	.pci_ops		= {
-> +		.map_bus	= pci_generic_ecam_map_bus,
-> +		.read		= pci_generic_config_read,
-> +		.write		= pci_generic_config_write,
+> +/* handle MCFG table entries */
+> +static __init int pci_mcfg_parse(struct acpi_table_header *header)
+> +{
+> +	struct acpi_table_mcfg *mcfg;
+> +	struct acpi_mcfg_allocation *mptr;
+> +	struct mcfg_entry *e, *arr;
+> +	int i, n;
+> +
+> +	if (!header)
+> +		return -EINVAL;
+> +
+> +	mcfg = (struct acpi_table_mcfg *)header;
+> +	mptr = (struct acpi_mcfg_allocation *) &mcfg[1];
+> +	n = (header->length - sizeof(*mcfg)) / sizeof(*mptr);
+> +	if (n <= 0 || n > 255) {
+> +		pr_err(PREFIX " MCFG has incorrect entries (%d).\n", n);
+> +		return -EINVAL;
 > +	}
-> +};
-> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
-> new file mode 100644
-> index 0000000..34c0aba
-> --- /dev/null
-> +++ b/drivers/pci/ecam.h
-> @@ -0,0 +1,61 @@
-> +/*
-> + * Copyright 2016 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation (the "GPL").
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License version 2 (GPLv2) for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * version 2 (GPLv2) along with this source code.
-> + */
-> +#ifndef DRIVERS_PCI_ECAM_H
-> +#define DRIVERS_PCI_ECAM_H
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
+> +	arr = kcalloc(n, sizeof(*arr), GFP_KERNEL);
+> +	if (!arr)
+> +		return -ENOMEM;
 > +
-> +/*
-> + * struct to hold pci ops and bus shift of the config window
-> + * for a PCI controller.
-> + */
-> +struct pci_config_window;
-> +struct pci_generic_ecam_ops {
+> +	for (i = 0, e = arr; i < n; i++, mptr++, e++) {
+> +		e->segment = mptr->pci_segment;
+> +		e->addr =  mptr->address;
+> +		e->bus_start = mptr->start_bus_number;
+> +		e->bus_end = mptr->end_bus_number;
+> +		list_add(&e->list, &pci_mcfg_list);
+> +		pr_info(PREFIX
+> +			"MCFG entry for domain %04x [bus %02x-%02x] (base %pa)\n",
+> +			e->segment, e->bus_start, e->bus_end, &e->addr);
 
-"struct pci_ecam_ops"
+Ah, this is information similar to what I suggested we might print in
+pci_generic_ecam_create().  Could go either way, but personally I
+think I'd put it in pci_generic_ecam_create() instead, because then we
+only print the info we're actually using.  And I think it'd be nice to
+have the actual MMIO resource ("[mem 0x...-0x...]") instead of just
+the base.
 
-> +	unsigned int			bus_shift;
-> +	struct pci_ops			pci_ops;
-> +	int				(*init)(struct device *,
-> +						struct pci_config_window *);
-> +};
+> +	}
 > +
-> +/*
-> + * struct to hold the mappings of a config space window. This
-> + * will be allocated with enough entries in win[] to hold all
-> + * the mappings for the bus range.
-> + */
-> +struct pci_config_window {
-> +	phys_addr_t			cfgaddr;
-> +	u16				domain;
-> +	u8				bus_start;
-> +	u8				bus_end;
-> +	void				*priv;
-> +	struct pci_generic_ecam_ops	*ops;
-> +	void __iomem			*win[0];
-> +};
+> +	return 0;
+> +}
 > +
-> +/* create and free for pci_config_window */
-
-Superfluous comment.
-
-> +struct pci_config_window *pci_generic_ecam_create(struct device *dev,
-> +				phys_addr_t addr, u8 bus_start, u8 bus_end,
-> +				struct pci_generic_ecam_ops *ops);
-> +void pci_generic_ecam_free(struct pci_config_window *cfg);
-
-"pci_ecam_create" and "pci_ecam_free"?  I suspect you're going to call
-these for flavors of ECAM that are definitely not "generic".
-
-> +/* map_bus when ->sysdata is an instance of pci_config_window */
-> +void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
-> +				       int where);
-> +/* default ECAM ops, bus shift 20, generic read and write */
-> +extern struct pci_generic_ecam_ops pci_generic_ecam_default_ops;
+> +/* Interface called by ACPI - parse and save MCFG table */
+> +void __init pci_mcfg_init(void)
+> +{
+> +	int err = acpi_table_parse(ACPI_SIG_MCFG, pci_mcfg_parse);
+> +	if (err)
+> +		pr_err(PREFIX "Failed to parse MCFG (%d)\n", err);
+> +	else if (list_empty(&pci_mcfg_list))
+> +		pr_info(PREFIX "No valid entries in MCFG table.\n");
+> +	else {
+> +		struct mcfg_entry *e;
+> +		int i = 0;
+> +		list_for_each_entry(e, &pci_mcfg_list, list)
+> +			i++;
+> +		pr_info(PREFIX "MCFG table loaded, %d entries\n", i);
+> +	}
+> +}
 > +
+> +/* Raw operations, works only for MCFG entries with an associated bus */
+
+Can you elaborate a little on the connection with MCFG?  I don't quite
+see how they're related.  Obviously the device has to be on a bus
+we've already enumerated and assigned bus->ops for, but it seems like
+we don't really know or care what bus->ops actually is.  Given that
+these are in this file, acpi_pci_root_ops is the only possibility,
+since that's what we pass to acpi_pci_root_create(), but it doesn't
+seem worth mentioning specifically in a comment.
+
+> +int raw_pci_read(unsigned int domain, unsigned int busn, unsigned int devfn,
+> +		 int reg, int len, u32 *val)
+> +{
+> +	struct pci_bus *bus = pci_find_bus(domain, busn);
+> +
+> +	if (!bus)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return bus->ops->read(bus, devfn, reg, len, val);
+> +}
+> +
+> +int raw_pci_write(unsigned int domain, unsigned int busn, unsigned int devfn,
+> +		  int reg, int len, u32 val)
+> +{
+> +	struct pci_bus *bus = pci_find_bus(domain, busn);
+> +
+> +	if (!bus)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return bus->ops->write(bus, devfn, reg, len, val);
+> +}
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index df1f33d..c0422ea 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1729,6 +1729,12 @@ static inline void pci_mmcfg_early_init(void) { }
+>  static inline void pci_mmcfg_late_init(void) { }
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
+> +void __init pci_mcfg_init(void);
+> +#else
+> +static inline void pci_mcfg_init(void) { return; }
 > +#endif
+> +
+>  int pci_ext_cfg_avail(void);
+>  
+>  void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar);
 > -- 
 > 1.9.1
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
