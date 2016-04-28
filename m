@@ -1,47 +1,29 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri, 29 Apr 2016 00:19:31 +0300
-Subject: [PATCH 0/2] Fix ir-rx51 by using PWM pdata
-In-Reply-To: <1461714709-10455-1-git-send-email-tony@atomide.com>
-References: <1461714709-10455-1-git-send-email-tony@atomide.com>
-Message-ID: <57227E63.4040907@gmail.com>
+From: pkarthik@intrinsyc.com (Prasanna Karthik)
+Date: Thu, 28 Apr 2016 21:22:55 +0000
+Subject: [PATCH] ARM: davinci: dm646x: Make use of PTR_ERR_OR_ZERO
+Message-ID: <20160428212256.GA25520@prasanna-ubuntu.itc.intrinsyc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Using PTR_ERR_OR_ZERO instead of explicit Conditional operation
 
-On 27.04.2016 02:51, Tony Lindgren wrote:
-> Hi all,
->
-> Here are minimal fixes to get ir-rx51 going again. Then further
-> fixes can be done as noted in the second patch.
->
-> Regards,
->
-> Tony
->
->
-> Tony Lindgren (2):
->    ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51
->    [media] ir-rx51: Fix build after multiarch changes broke it
->
->   arch/arm/mach-omap2/board-rx51-peripherals.c   | 35 ++++++++-
->   arch/arm/mach-omap2/pdata-quirks.c             | 33 ++++++++-
->   drivers/media/rc/Kconfig                       |  2 +-
->   drivers/media/rc/ir-rx51.c                     | 99 ++++++++++++++------------
->   include/linux/platform_data/media/ir-rx51.h    |  1 +
->   include/linux/platform_data/pwm_omap_dmtimer.h | 21 ++++++
->   6 files changed, 141 insertions(+), 50 deletions(-)
->
+Signed-off-by: Prasanna Karthik <pkarthik@intrinsyc.com>
+---
+ arch/arm/mach-davinci/dm646x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I didn't test legacy boot, as I don't really see any value of doing it 
-now the end of the legacy boot is near, the driver does not function 
-correctly, however the patchset at least allows for the driver to be 
-build and we have something to improve on. And I am going to send a 
-patch that fixes the problem with omap_dm_timer_request_specific(). So, 
-for both patches, you may add:
-
-Tested-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-
-
-Thanks,
-Ivo
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index a43db0f..9a5faaf1 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -949,7 +949,7 @@ int __init dm646x_init_edma(struct edma_rsv_info *rsv)
+ 	dm646x_edma_pdata.rsv = rsv;
+ 
+ 	edma_pdev = platform_device_register_full(&dm646x_edma_device);
+-	return IS_ERR(edma_pdev) ? PTR_ERR(edma_pdev) : 0;
++	return PTR_ERR_OR_ZERO(edma_pdev);
+ }
+ 
+ void __init dm646x_init(void)
+-- 
+1.9.1
