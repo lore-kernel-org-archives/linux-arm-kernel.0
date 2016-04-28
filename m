@@ -1,74 +1,21 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 28 Apr 2016 11:32:50 +0300
-Subject: [PATCH] mmc: sdhci-of-at91: add presets setup
-In-Reply-To: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5721CAB2.5000207@intel.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 28 Apr 2016 18:38:26 +1000
+Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
+In-Reply-To: <4459295.XmBqACy0jk@diego>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <4956403.scaVRGhPEf@diego>
+ <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
+ <4459295.XmBqACy0jk@diego>
+Message-ID: <1461832706.2791.0.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/16 16:54, Ludovic Desroches wrote:
-> The controller claims to support SDR104. In fact, it only supports a
-> degraded SDR104 since the maximum frequency of the SD clock is 120 MHz
-> instead of 208 MHz.
-> The sdhci core is unaware of it and will compute a wrong clock divider.
-> We can deal with this specific case by using presets.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/mmc/host/sdhci-of-at91.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-> index c1923c0..76308b1 100644
-> --- a/drivers/mmc/host/sdhci-of-at91.c
-> +++ b/drivers/mmc/host/sdhci-of-at91.c
-> @@ -18,6 +18,7 @@
->  #include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> +#include <linux/kernel.h>
->  #include <linux/mmc/host.h>
->  #include <linux/mmc/slot-gpio.h>
->  #include <linux/module.h>
-> @@ -163,6 +164,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
->  	unsigned int			clk_base, clk_mul;
->  	unsigned int			gck_rate, real_gck_rate;
->  	int				ret;
-> +	unsigned int			preset_div, preset_common = 0x400; /* drv type B, programmable clock mode */
+On Wed, 2016-04-27 at 11:12 +0200, Heiko St?bner wrote:
+> I guess the design would depend on the actual layout of your clock- /
+> system-
+> controller - aka what else is contained there.
 
-preset_common is a constant, so why not #define it?
+One register controls most clocks so it makes sense to have one driver.
 
->  
->  	match = of_match_device(sdhci_at91_dt_match, &pdev->dev);
->  	if (!match)
-> @@ -230,6 +232,28 @@ static int sdhci_at91_probe(struct platform_device *pdev)
->  			 clk_mul, real_gck_rate);
->  	}
->  
-> +	/*
-> +	 * We have to set preset values because it depends on the clk_mul
-> +	 * value. Moreover, SDR104 is supported in a degraded mode since the
-> +	 * maximum sd clock value is 120 MHz instead of 208 MHz. For that
-> +	 * reason, we need to use presets to support SDR104.
-> +	 */
-> +	preset_div = DIV_ROUND_UP(real_gck_rate, 24000000) - 1;
-> +	writew(preset_common | preset_div,
-> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR12);
-> +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
-> +	writew(preset_common | preset_div,
-> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR25);
-> +	preset_div = DIV_ROUND_UP(real_gck_rate, 100000000) - 1;
-> +	writew(preset_common | preset_div,
-> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR50);
-> +	preset_div = DIV_ROUND_UP(real_gck_rate, 120000000) - 1;
-> +	writew(preset_common | preset_div,
-> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR104);
-> +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
-> +	writew(preset_common | preset_div,
-> +	       host->ioaddr + SDHCI_PRESET_FOR_DDR50);
-> +
->  	clk_prepare_enable(priv->mainck);
->  	clk_prepare_enable(priv->gck);
->  
-> 
+Cheers,
+Ben.
