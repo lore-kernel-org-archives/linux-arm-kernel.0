@@ -1,38 +1,34 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 28 Apr 2016 09:03:53 -0700
-Subject: [PATCH v4 2/4] ARM64: dts: rockchip: add core dtsi file for
- RK3399 SoCs
-In-Reply-To: <1461743693-10671-3-git-send-email-jay.xu@rock-chips.com>
-References: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
- <1461743693-10671-3-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20160428160353.GA95284@google.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 28 Apr 2016 12:04:26 -0400
+Subject: [PATCH] ARM: exynos_defconfig: Disable big.LITTLE switcher
+In-Reply-To: <1493315.8NlXQFsEtt@amdc1976>
+References: <1493315.8NlXQFsEtt@amdc1976>
+Message-ID: <e9259b1f-1cd7-b70f-86c3-cbe02c94be22@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko, Jianqun,
+Hello Bartlomiej,
 
-On Wed, Apr 27, 2016 at 03:54:51PM +0800, Jianqun Xu wrote:
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> new file mode 100644
-> index 0000000..5a8a915
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -0,0 +1,1022 @@
-[...]
-> +	sdhci: sdhci at fe330000 {
-> +		compatible = "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1";
+On 04/28/2016 10:44 AM, Bartlomiej Zolnierkiewicz wrote:
+> Disable big.LITTLE switcher in order to allow automatic usage of
+> cpufreq-dt driver on Exynos542x/Exynos5800 SoCs based boards.
+> 
+> This change should not cause any problems as arm_big_little[_dt]
+> driver (which is using big.LITTLE switcher support to do the "real"
+> big.LITTLE switching work) is not used on any Exynos SoC based
+> board currently.
+> 
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
 
-Not to rain on the parade too much, as this is already applied, but is
-the "rockchip,rk3399-sdhci-5.1" string documented anywhere? I don't see
-it.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> +		reg = <0x0 0xfe330000 0x0 0x10000>;
-> +		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
-> +		clock-names = "clk_xin", "clk_ahb";
-> +		status = "disabled";
-> +	};
+On an Exynos5422 Odroid XU4 and Exynos5800 Peach Pi Chromebook:
 
-[...]
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Brian
+Best regards,
+--
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
