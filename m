@@ -1,39 +1,87 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 28 Apr 2016 08:15:18 +0000
-Subject: [PATCH v8 3/8] iommu: introduce an msi cookie
+Date: Thu, 28 Apr 2016 08:15:21 +0000
+Subject: [PATCH v8 6/8] iommu/msi-iommu: iommu_msi_domain
 In-Reply-To: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
 References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461831323-5480-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This opaque pointer will enable to store information about msi
-iommu mappings.
+This function checks whether
+- the device belongs to a non default iommu domain
+- this iommu domain requires the MSI address to be mapped.
+
+If those conditions are met, the function returns the iommu domain
+to be used for mapping the MSI doorbell; else it returns NULL.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
+
 v7 -> v8:
-remove spinlock and RB tree
-
-v5 -> v6:
-- initialize reserved_binding_list
-- use a spinlock instead of a mutex
+- renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
+- the function now takes a struct device *
+- use DOMAIN_ATTR_MSI_GEOMETRY attribute
 ---
- include/linux/iommu.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
+ include/linux/msi-iommu.h | 14 ++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index ea5d288..cb8d30a 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -91,6 +91,7 @@ struct iommu_domain {
- 	struct iommu_domain_geometry geometry;
- 	struct iommu_domain_msi_geometry msi_geometry;
- 	void *iova_cookie;
-+	void *msi_cookie;
- };
+diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
+index 203e86e..023ff17 100644
+--- a/drivers/iommu/msi-iommu.c
++++ b/drivers/iommu/msi-iommu.c
+@@ -243,3 +243,20 @@ unlock:
+ 	}
+ }
+ EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
++
++struct iommu_domain *iommu_msi_domain(struct device *dev)
++{
++	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
++	struct iommu_domain_msi_geometry msi_geometry;
++
++	if (!d || (d->type == IOMMU_DOMAIN_DMA))
++		return NULL;
++
++	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
++	if (!msi_geometry.programmable)
++		return NULL;
++
++	return d;
++}
++EXPORT_SYMBOL_GPL(iommu_msi_domain);
++
+diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
+index 1cd115f..114bd69 100644
+--- a/include/linux/msi-iommu.h
++++ b/include/linux/msi-iommu.h
+@@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+  */
+ void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
  
- enum iommu_cap {
++/**
++ * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
++ * translates the MSI transaction, returns the iommu domain the MSI doorbell
++ * address must be mapped in; else returns NULL.
++ *
++ * @dev: device handle
++ */
++struct iommu_domain *iommu_msi_domain(struct device *dev);
++
+ #else
+ 
+ static inline int
+@@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+ static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
+ 					       phys_addr_t addr) {}
+ 
++static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
++{
++	return NULL;
++}
++
+ #endif	/* CONFIG_IOMMU_MSI */
+ #endif	/* __MSI_IOMMU_H */
 -- 
 1.9.1
