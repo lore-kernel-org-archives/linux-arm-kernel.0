@@ -1,119 +1,135 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:46:05 +0100
-Subject: [PATCH v2 46/54] KVM: arm/arm64: vgic-new: Add userland GIC CPU
- interface access
+Date: Thu, 28 Apr 2016 17:45:43 +0100
+Subject: [PATCH v2 24/54] KVM: arm/arm64: vgic-new: Add ENABLE registers
+ handlers
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-47-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-25-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the VMCR accessors we provide access to GIC CPU interface state
-to userland by wiring it up to the existing userland interface.
+As the enable register handlers are shared between the v2 and v3
+emulation, their implementation goes into vgic-mmio.c, to be easily
+referenced from the v3 emulation as well later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 72 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 71 insertions(+), 1 deletion(-)
+Changelog RFC..v1:
+- use lower bits of address to determine IRQ number
+- remove TODO, confirmed to be fine
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 38260ae..eaf5c1d 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -17,8 +17,11 @@
- #include <kvm/vgic/vgic.h>
- #include <linux/uaccess.h>
- #include <asm/kvm_mmu.h>
-+#include <linux/irqchip/arm-gic.h>
- #include "vgic.h"
- 
-+#define GICC_ARCH_VERSION_V2		0x2
-+
- /* common helpers */
- 
- static int vgic_ioaddr_overlap(struct kvm *kvm)
-@@ -252,6 +255,69 @@ void kvm_register_vgic_device(unsigned long type)
- 	}
+Changelog v1 .. v2:
+- adapt to new MMIO framework
+
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
+ virt/kvm/arm/vgic/vgic-mmio.c    | 56 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    | 11 ++++++++
+ 3 files changed, 69 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index bf64bbf..d5eafe9 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -72,9 +72,9 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
++		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
++		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 4301da0..120eb25 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -46,6 +46,62 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 	/* Ignore */
  }
  
-+static u32 vgic_read_vcpuif(struct kvm_vcpu *vcpu, int offset)
++/*
++ * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
++ * of the enabled bit, so there is only one function for both here.
++ */
++unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len)
 +{
-+	struct vgic_vmcr vmcr;
-+	u32 *field;
++	u32 intid = (addr & 0x7f) * 8;
++	u32 value = 0;
++	int i;
 +
-+	switch (offset) {
-+	case GIC_CPU_CTRL:
-+		field = &vmcr.ctlr;
-+		break;
-+	case GIC_CPU_PRIMASK:
-+		field = &vmcr.pmr;
-+		break;
-+	case GIC_CPU_BINPOINT:
-+		field = &vmcr.bpr;
-+		break;
-+	case GIC_CPU_ALIAS_BINPOINT:
-+		field = &vmcr.abpr;
-+		break;
-+	case GIC_CPU_IDENT:
-+		return (PRODUCT_ID_KVM << 20) |
-+		       (GICC_ARCH_VERSION_V2 << 16) |
-+		       (IMPLEMENTER_ARM << 0);
-+	default:
-+		return 0;
++	/* Loop over all IRQs affected by this read */
++	for (i = 0; i < len * 8; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		if (irq->enabled)
++			value |= (1U << i);
 +	}
 +
-+	vgic_get_vmcr(vcpu, &vmcr);
-+
-+	return *field;
++	return extract_bytes(value, addr & 3, len);
 +}
 +
-+static bool vgic_write_vcpuif(struct kvm_vcpu *vcpu, int offset, u32 value)
++void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
 +{
-+	struct vgic_vmcr vmcr;
-+	u32 *field;
++	u32 intid = (addr & 0x7f) * 8;
++	int i;
 +
-+	switch (offset) {
-+	case GIC_CPU_CTRL:
-+		field = &vmcr.ctlr;
-+		break;
-+	case GIC_CPU_PRIMASK:
-+		field = &vmcr.pmr;
-+		break;
-+	case GIC_CPU_BINPOINT:
-+		field = &vmcr.bpr;
-+		break;
-+	case GIC_CPU_ALIAS_BINPOINT:
-+		field = &vmcr.abpr;
-+		break;
-+	default:
-+		return false;
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++		irq->enabled = true;
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
 +	}
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
-+	if (*field == value)
-+		return false;
-+
-+	*field = value;
-+	vgic_set_vmcr(vcpu, &vmcr);
-+
-+	return true;
 +}
 +
- /** vgic_attr_regs_access: allows user space to read/write VGIC registers
-  *
-  * @dev: kvm device handle
-@@ -300,7 +366,11 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
++void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = (addr & 0x7f) * 8;
++	int i;
++
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++
++		irq->enabled = false;
++
++		spin_unlock(&irq->irq_lock);
++	}
++}
++
+ static int match_region(const void *key, const void *elt)
+ {
+ 	const unsigned int offset = (unsigned long)key;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 4f4dd2b..188909a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -74,6 +74,17 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 			unsigned int len, unsigned long val);
  
- 	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
--		ret = -EINVAL;
-+		ret = 0;
-+		if (is_write)
-+			vgic_write_vcpuif(vcpu, addr, *reg);
-+		else
-+			*reg = vgic_read_vcpuif(vcpu, addr);
- 		break;
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
- 		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
++unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len);
++
++void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
++
++void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
++
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+ 
+ #endif
 -- 
 2.7.3
