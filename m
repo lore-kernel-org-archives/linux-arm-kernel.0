@@ -1,49 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Apr 2016 01:14:55 +0200
-Subject: [PATCH 0/3] MAINTAINERS: add new maintainers of NXP LPC32xx SoC
-In-Reply-To: <57229868.30403@mleia.com>
-References: <1461714919-25577-1-git-send-email-vz@mleia.com>
- <4622738.ujCxg0gb7N@wuerfel> <57229868.30403@mleia.com>
-Message-ID: <3148840.0dvKHvK2Ga@wuerfel>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 29 Apr 2016 09:22:00 +1000
+Subject: [GIT PULL] Renesas ARM Based SoC DT PM Domain Updates for v4.7
+In-Reply-To: <CAMuHMdWnt4ceLuu-eddbMQDSFvHHVgoyUNM2V=SYO9R0XrJDMQ@mail.gmail.com>
+References: <cover.1461730638.git.horms+renesas@verge.net.au>
+ <5702417.rnCUR69ruo@wuerfel>
+ <CAMuHMdWnt4ceLuu-eddbMQDSFvHHVgoyUNM2V=SYO9R0XrJDMQ@mail.gmail.com>
+Message-ID: <20160428232159.GB18128@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 April 2016 02:10:32 Vladimir Zapolskiy wrote:
+Hi Arnd,
+
+On Thu, Apr 28, 2016 at 06:27:25PM +0200, Geert Uytterhoeven wrote:
 > Hi Arnd,
 > 
-> On 27.04.2016 12:39, Arnd Bergmann wrote:
-> > On Wednesday 27 April 2016 02:55:16 Vladimir Zapolskiy wrote:
-> >> Roland Stigge added initial support of NXP LPC32xx SoC series and
-> >> first boards powered by it, but for a while since v3.18-rc1 the
-> >> SoC support is unmaintained and became stale.
+> On Thu, Apr 28, 2016 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 27 April 2016 14:20:34 Simon Horman wrote:
+> >> Please consider these Renesas ARM based SoC DT pm-domain updates for v4.7.
 > >>
-> >> Vladimir Zapolskiy and Sylvain Lemieux expressed interest in
-> >> continuation of NXP LPC32xx maintenance, reflect this in MAINTAINERS
-> >> record file for better communication with Linux kernel community.
+> >> This pull requests is based on a merge of:
 > >>
-> >> The maintenance change is in agreement with Arnd Bergmann:
+> >> * "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
+> >>   v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
+> >>   pulled.
+> >> * "[GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7",
+> >>   tagged as renesas-dt-for-v4.7, which you have also already pulled.
 > >>
-> > 
-> > Looks good. Let's give Roland some time to reply (hopefully with
-> > and Ack), and then merge it for 4.7.
-> > 
+> >> The reason for the somewhat tedious base on
+> >> renesas-rcar-sysc2-for-v4.7, which provides driver changes,
+> >> is a hard run-time dependency.
+> >>
+> >> I also have a similar set of changes for arm64 which I will send separately.
+> >
+> > Ok, I've started a next/late branch for this now, but unless something
+> > else comes up that needs to be sent much later, I expect to submit
+> > this as the last pull request at the same time as all the other ones
+> > for 4.7.
 > 
-> to simplify the matter and to legitimate the process somehow I decided
-> not to include this change of maintainers into my last LPC32xx SoC pull
-> request, hence the pull request contains only code changes.
-> 
-> In other words please let me explicitly delegate a decision to you or
-> other ARM maintainers when and which way to apply this change. As for
-> me here I would prefer to get Signed-off-by tags from one of you.
-> 
-> If I'm worried for nothing, or if you don't consider to pick these
-> changes up directly from linux-arm-kernel at lists.infradead.org, for
-> your convenience I'll send a pull request to arm at kernel.org.
+> Thanks!
 
-It's all fine with me. My plan so far is to pick up the patches
-separately in a couple of days, but if you send a pull request,
-I'll take that instead. If Roland still wants to be listed in
-the MAINTAINERS file, we can change it again, but I'm considering
-the two of you the primary contacts now.
+Yes, thanks for your understanding.
 
-	Arnd
+FWIW, I think "Renesas ARM64 Based SoC DT PM Domain Updates for v4.7" needs
+to be handled the in a similar way. Its a similar pair of changes for the
+r8a7795 SoC.
+
+Everything else I have queued up for v4.7 has been pulled and I do
+not intend to queue up any more non-fix changes for v4.7.
+
+> > For further clarification, am I right reading the above as meaning that
+> > a 4.7 kernel is expected to still work with the dts files from 4.6,
+> > but not the other way round?
+> 
+> That's correct.
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
