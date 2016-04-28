@@ -1,56 +1,35 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Thu, 28 Apr 2016 23:13:40 +0530
-Subject: [PATCH] ARM: exynos_defconfig: Disable big.LITTLE switcher
-In-Reply-To: <1493315.8NlXQFsEtt@amdc1976>
-References: <1493315.8NlXQFsEtt@amdc1976>
-Message-ID: <CANAwSgQboz5g2Zh0vCfNBZ_K+UjHbSUcdeAMNeJn+T3a14OUSg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 28 Apr 2016 19:51:06 +0200
+Subject: [patch V3] lib: GCD: add binary GCD algorithm
+In-Reply-To: <20160428164856.10120.qmail@ns.horizon.com>
+References: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
+ <20160428164856.10120.qmail@ns.horizon.com>
+Message-ID: <CAMuHMdU2e2PdwKYVaEsJ73X8Di1XHNPqnxuunr8R8bN8udazxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
-
-On 28 April 2016 at 20:14, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Disable big.LITTLE switcher in order to allow automatic usage of
-> cpufreq-dt driver on Exynos542x/Exynos5800 SoCs based boards.
+On Thu, Apr 28, 2016 at 6:48 PM, George Spelvin <linux@horizon.com> wrote:
+> Another few comments:
 >
-> This change should not cause any problems as arm_big_little[_dt]
-> driver (which is using big.LITTLE switcher support to do the "real"
-> big.LITTLE switching work) is not used on any Exynos SoC based
-> board currently.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 2 --
->  1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index a8cf295..07d4168 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -13,8 +13,6 @@ CONFIG_ARCH_EXYNOS3=y
->  CONFIG_EXYNOS5420_MCPM=y
->  CONFIG_SMP=y
->  CONFIG_BIG_LITTLE=y
-> -CONFIG_BL_SWITCHER=y
-> -CONFIG_BL_SWITCHER_DUMMY_IF=y
->  CONFIG_NR_CPUS=8
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
-> --
-> 1.9.1
->
+> 1. Would ARCH_HAS_FAST_FFS involve fewer changes than CPU_NO_EFFICIENT_FFS?
 
-Tested On Odroid XU4.
+No, as you want to _disable_ ARCH_HAS_FAST_FFS / _enable_
+CPU_NO_EFFICIENT_FFS as soon as you're enabling support for a
+CPU that doesn't support it.
 
-Reviewed-by: Anand Moon <linux.amoon@gmail.com>
-Tested-by: Anand Moon <linux.amoon@gmail.com>
+Logical OR is easier in both the Kconfig and C preprocessor languages
+than logical NAND.
 
-Best Regards
--Anand Moon
+E.g. in Kconfig, a CPU core not supporting it can just select
+CPU_NO_EFFICIENT_FFS.
 
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
