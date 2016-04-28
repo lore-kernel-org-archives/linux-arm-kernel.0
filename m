@@ -1,202 +1,74 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 28 Apr 2016 10:32:49 +0200
-Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 28 Apr 2016 11:32:50 +0300
+Subject: [PATCH] mmc: sdhci-of-at91: add presets setup
+In-Reply-To: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <5721CAB2.5000207@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-i haven't seen this code in a while :) I'm glad you're working on it
-
-2016-04-27 16:35 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and smc
-> syscon regmaps.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 21/04/16 16:54, Ludovic Desroches wrote:
+> The controller claims to support SDR104. In fact, it only supports a
+> degraded SDR104 since the maximum frequency of the SD clock is 120 MHz
+> instead of 208 MHz.
+> The sdhci core is unaware of it and will compute a wrong clock divider.
+> We can deal with this specific case by using presets.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 > ---
->  .../bindings/memory-controllers/atmel,ebi.txt      | 146 +++++++++++++++++++++
->  1 file changed, 146 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> new file mode 100644
-> index 0000000..0f332d2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> @@ -0,0 +1,146 @@
-> +* Device tree bindings for Atmel EBI
-> +
-> +The External Bus Interface (EBI) controller is a bus where you can connect
-> +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> +The EBI provides a glue-less interface to asynchronous memories though the SMC
-> +(Static Memory Controller).
-> +Synchronous memories (and some asynchronous memories like NANDs) can be
-> +attached to specialized controllers which are responsible for configuring the
-> +bus appropriately according to the connected device.
-> +In the other hand, the bus interface can be automated for simple asynchronous
-> +devices.
-> +
-> +Required properties:
-> +
-> +- compatible:          "atmel,at91sam9260-ebi"
-> +                       "atmel,at91sam9261-ebi"
-> +                       "atmel,at91sam9263-ebi0"
-> +                       "atmel,at91sam9263-ebi1"
-> +                       "atmel,at91sam9rl-ebi"
-> +                       "atmel,at91sam9g45-ebi"
-> +                       "atmel,at91sam9x5-ebi"
-> +                       "atmel,sama5d3-ebi"
-> +
-> +- reg:                 Contains offset/length value for EBI memory mapping.
-> +                       This property might contain several entries if the EBI
-> +                       memory range is not contiguous
-> +
-> +- #address-cells:      Must be 2.
-> +                       The first cell encodes the CS.
-> +                       The second cell encode the offset into the CS memory
-> +                       range.
-> +
-> +- #size-cells:         Must be set to 1.
-> +
-> +- ranges:              Encodes CS to memory region association.
-> +
-> +- clocks:              Clock feeding the EBI controller.
-> +                       See clock-bindings.txt
-> +
-> +Child chip-select (cs) nodes contain the memory devices nodes connected to
-> +such as NOR (e.g. cfi-flash) and NAND.
-> +There might be board specific devices like FPGAs.
-> +You'll define you device requirements in these child nodes.
-> +
-> +Required child cs node properties:
-> +
-> +- #address-cells:      Must be 2.
-> +
-> +- #size-cells:         Must be 1.
-> +
-> +- ranges:              Empty property indicating that child nodes can inherit
-> +                       memory layout.
-> +
-> +Optional child cs node properties:
-> +- atmel,bus-width:             width of the asynchronous device's data bus
-> +                               8, 16 or 32.
-> +                               8 if not present.
-> +
-> +- atmel,byte-access-type       "write" or "select" (see Atmel datasheet).
-> +                               "select" if not present.
-> +
-> +- atmel,read-mode              "nrd" or "ncs".
-> +                               "ncs" is not present.
-> +
-> +- atmel,write-mode             "nwe" or "ncs".
-> +                               "ncs" is not present.
-> +
-> +- atmel,exnw-mode              "disabled", "frozen" or "ready".
-> +                               "disabled" if not present.
-> +
-> +- atmel,page-mode              enable page mode if present. The provided value
-> +                               defines the page size (supported values: 4, 8,
-> +                               16 and 32).
-> +
-> +Optional device timings expressed in nanoseconds (if the property is not
-> +present 0 is assumed):
+>  drivers/mmc/host/sdhci-of-at91.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> index c1923c0..76308b1 100644
+> --- a/drivers/mmc/host/sdhci-of-at91.c
+> +++ b/drivers/mmc/host/sdhci-of-at91.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/kernel.h>
+>  #include <linux/mmc/host.h>
+>  #include <linux/mmc/slot-gpio.h>
+>  #include <linux/module.h>
+> @@ -163,6 +164,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>  	unsigned int			clk_base, clk_mul;
+>  	unsigned int			gck_rate, real_gck_rate;
+>  	int				ret;
+> +	unsigned int			preset_div, preset_common = 0x400; /* drv type B, programmable clock mode */
 
-IMO If no timing information is provided, it's probably better not to
-change it. It may have been configured by the bootloader or romboot.
-It may not be the perfect timings but at least it could work, whereas
-filling up with 0 is most probably going to break the access: it's a
-kind of very agressive timing optimization
+preset_common is a constant, so why not #define it?
 
+>  
+>  	match = of_match_device(sdhci_at91_dt_match, &pdev->dev);
+>  	if (!match)
+> @@ -230,6 +232,28 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>  			 clk_mul, real_gck_rate);
+>  	}
+>  
+> +	/*
+> +	 * We have to set preset values because it depends on the clk_mul
+> +	 * value. Moreover, SDR104 is supported in a degraded mode since the
+> +	 * maximum sd clock value is 120 MHz instead of 208 MHz. For that
+> +	 * reason, we need to use presets to support SDR104.
+> +	 */
+> +	preset_div = DIV_ROUND_UP(real_gck_rate, 24000000) - 1;
+> +	writew(preset_common | preset_div,
+> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR12);
+> +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
+> +	writew(preset_common | preset_div,
+> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR25);
+> +	preset_div = DIV_ROUND_UP(real_gck_rate, 100000000) - 1;
+> +	writew(preset_common | preset_div,
+> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR50);
+> +	preset_div = DIV_ROUND_UP(real_gck_rate, 120000000) - 1;
+> +	writew(preset_common | preset_div,
+> +	       host->ioaddr + SDHCI_PRESET_FOR_SDR104);
+> +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
+> +	writew(preset_common | preset_div,
+> +	       host->ioaddr + SDHCI_PRESET_FOR_DDR50);
 > +
-> +- atmel,ncs-rd-setup-ns
-> +- atmel,nrd-setup-ns
-> +- atmel,ncs-wr-setup-ns
-> +- atmel,nwe-setup-ns
-> +- atmel,ncs-rd-pulse-ns
-> +- atmel,nrd-pulse-ns
-> +- atmel,ncs-wr-pulse-ns
-> +- atmel,nwe-pulse-ns
-> +- atmel,nwe-cycle-ns
-> +- atmel,nrd-cycle-ns
-> +- atmel,tdf-ns
-
-One thought about the configuration in 'ns' unit: Some devices may
-have requirements expressed in clock cycles (I'm thinking of FPGA
-here). At  a fixed frequency one can always convert manually from 'ns'
-to 'clocks' but it's a bit tedious and prone to rounding errors. And
-It 'll  break when the EBI frequency is changed
-
-JJ
-
-> +
-> +- atmel,tdf-mode:              "normal" or "optimized". If set to "optimized"
-> +                               the data float time is optimized depending on
-> +                               the next device being accessed (next device
-> +                               setup time is subtracted to the current device
-> +                               data float time).
-> +
-> +
-> +
-> +Example:
-> +
-> +       ebi: ebi at 10000000 {
-> +               compatible = "atmel,sama5d3-ebi", "simple-bus";
-> +               #address-cells = <2>;
-> +               #size-cells = <1>;
-> +               atmel,smc = <&hsmc>;
-> +               atmel,matrix = <&matrix>;
-> +               reg = <0x10000000 0x10000000
-> +                      0x40000000 0x30000000>;
-> +               ranges = <0x0 0x0 0x10000000 0x10000000
-> +                         0x1 0x0 0x40000000 0x10000000
-> +                         0x2 0x0 0x50000000 0x10000000
-> +                         0x3 0x0 0x60000000 0x10000000>;
-> +               clocks = <&mck>;
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ebi_addr>;
-> +
-> +               cs at 0 {
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +                       ranges;
-> +                       atmel,generic-dev;
-> +                       atmel,read-mode = "nrd";
-> +                       atmel,write-mode = "nwe";
-> +                       atmel,bus-width = <16>;
-> +                       atmel,ncs-rd-setup-ns = <0>;
-> +                       atmel,ncs-wr-setup-ns = <0>;
-> +                       atmel,nwe-setup-ns = <8>;
-> +                       atmel,nrd-setup-ns = <16>;
-> +                       atmel,ncs-rd-pulse-ns = <84>;
-> +                       atmel,ncs-wr-pulse-ns = <84>;
-> +                       atmel,nrd-pulse-ns = <76>;
-> +                       atmel,nwe-pulse-ns = <76>;
-> +                       atmel,nrd-cycle-ns = <107>;
-> +                       atmel,nwe-cycle-ns = <84>;
-> +                       atmel,tdf-ns = <16>;
-> +
-> +                       nor: flash at 0,0 {
-> +                               compatible = "cfi-flash";
-> +                               #address-cells = <1>;
-> +                               #size-cells = <1>;
-> +                               reg = <0x0 0x0 0x1000000>;
-> +                               bank-width = <2>;
-> +                       };
-> +               };
-> +       };
-> +
-> --
-> 2.7.4
->
+>  	clk_prepare_enable(priv->mainck);
+>  	clk_prepare_enable(priv->gck);
+>  
+> 
