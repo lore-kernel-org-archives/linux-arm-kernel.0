@@ -1,77 +1,93 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 29 Apr 2016 01:15:04 +0300
-Subject: [PATCH v2 2/4] irqchip: add LPC32xx interrupt controller driver
-In-Reply-To: <1461678082.9433.3.camel@localhost>
-References: <1461545990-25560-1-git-send-email-vz@mleia.com>
- <1461546038-25668-1-git-send-email-vz@mleia.com>
- <1461678082.9433.3.camel@localhost>
-Message-ID: <57228B68.8030706@mleia.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 29 Apr 2016 01:21:37 +0300
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <2760348.qmm1L3yQch@wuerfel>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160426165701.GE8525@e104818-lin.cambridge.arm.com>
+ <20160428191914.GA28527@yury-N73SV> <2760348.qmm1L3yQch@wuerfel>
+Message-ID: <20160428222137.GB18227@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.04.2016 16:41, Sylvain Lemieux wrote:
-> Hi Vladimir,
+On Thu, Apr 28, 2016 at 10:43:59PM +0200, Arnd Bergmann wrote:
+> On Thursday 28 April 2016 22:19:14 Yury Norov wrote:
+> > 
+> > Yes, we need. Otherwise we have circular dependency like this:
+> > arch/arm64/kernel/sys_ilp32.c:60:0: warning: "__SC_WRAP" redefined
+> >  #define __SC_WRAP(nr, sym) [nr] = compat_##sym,
+> >   ^
+> >   In file included from include/asm-generic/unistd.h:1:0,
+> >                    from ./arch/arm64/include/uapi/asm/unistd.h:16,
+> >                    from ./arch/arm64/include/asm/unistd.h:62,
+> >                    from ./include/uapi/linux/unistd.h:7,
+> >                    from include/linux/syscalls.h:23,
+> >                    from arch/arm64/kernel/sys_ilp32.c:30:
+> > include/uapi/asm-generic/unistd.h:33:0: note: this is the location of the previous definition
+> >  #define __SC_WRAP __SYSCALL
+> > 
+> > Defining __SYSCALL_COMPAT at the top of the file does not help much.
 > 
-> On Mon, 2016-04-25 at 04:00 +0300, Vladimir Zapolskiy wrote:
->> The change adds improved support of NXP LPC32xx MIC, SIC1 and SIC2
->> interrupt controllers.
->>
->> This is a list of new features in comparison to the legacy driver:
->> * irq types are taken from device tree settings, no more need to
->>   hardcode them,
->> * old driver is based on irq_domain_add_legacy, which causes problems
->>   with handling MIC hardware interrupt 0 produced by SIC1,
->> * there is one driver for MIC, SIC1 and SIC2, no more need to handle
->>   them separately, e.g. have two separate handlers for SIC1 and SIC2,
->> * the driver does not have any dependencies on hardcoded register
->>   offsets,
->> * the driver is much simpler for maintenance,
->> * SPARSE_IRQS option is supported.
->>
->> Legacy LPC32xx interrupt controller driver was broken since commit
->> 76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler"), which
->> requires a private interrupt handler, otherwise any SIC1 generated
->> interrupt (mapped to MIC hwirq 0) breaks the kernel with the message
->> "unexpected IRQ trap at vector 00".
->>
->> The change disables compilation of a legacy driver found at
->> arch/arm/mach-lpc32xx/irq.c, the file will be removed in a separate
->> commit.
->>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> ---
->> Changes from v1 to v2:
->> * added chained_irq_{enter,exit} for SIC chained handler,
->> * use {writel,readl}_relaxed flavour of io access functions,
->> * changed anchor data type to access iomem from struct irq_domain
->>   to private struct lpc32xx_irq_chip,
->> * do not read irq status register twice on every irq event,
->> * resource deallocation fixes on error path of irqchip driver init,
->> * removed handling of "interrupt-controller-name" property, name
->>   is constructed from mic/sic type and controller's physical address,
->> * minor improvements (renames, __ffs instead of ffs, etc.)
->>
->> Many kudos to Marc for review of v1.
->>
->>  arch/arm/Kconfig                |   2 +
->>  arch/arm/mach-lpc32xx/phy3250.c |   1 -
->>  drivers/irqchip/Makefile        |   1 +
->>  drivers/irqchip/irq-lpc32xx.c   | 238 ++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 241 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/irqchip/irq-lpc32xx.c
->>
-> I tested the driver on a custom LPC3250 board; I was having at
-> least 1 interrupt generated from each source (MIC/SIC1/SIC2).
+> Hmm, this sounds like something that we should fix in the asm-generic/unistd.h
+> file. Is it just for __SC_WRAP, or also the other macros?
 > 
-> Tested-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
-> 
+> 	Arnd
 
-Thomas, Marc, Jason, Russell,
+For __SYSCALL and __SC_WRAP:
 
-in your opinion would it be still possible to accept this change v2 2/4 for v4.7?
+diff --git a/arch/arm64/kernel/sys_ilp32.c
+b/arch/arm64/kernel/sys_ilp32.c
+index 1458ad7..410d817 100644
+--- a/arch/arm64/kernel/sys_ilp32.c
++++ b/arch/arm64/kernel/sys_ilp32.c
+@@ -17,6 +17,8 @@
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ */
+    
++#define __SYSCALL_COMPAT
++
+ #include <linux/compiler.h>
+ #include <linux/errno.h>
+ #include <linux/fs.h>
+@@ -48,13 +50,12 @@ asmlinkage long
+ ilp32_sys_rt_sigreturn_wrapper(void);
+   
+ #include <asm/syscall.h>
+     
+-#undef __SYSCALL
+-#undef __SC_COMP
+-#undef __SC_WRAP
+-#undef __SC_3264
+-#undef __SC_COMP_3264
+ 
+-#define __SYSCALL_COMPAT
+ #define __SYSCALL(nr, sym)     [nr] = sym,
+ #define __SC_WRAP(nr, sym)     [nr] = compat_##sym,
+         
+This patch makes gcc warn about redefinition.
 
-Thank you.
-
---
-With best wishes,
-Vladimir
+arch/arm64/kernel/sys_ilp32.c:59:0: warning: "__SYSCALL" redefined
+ #define __SYSCALL(nr, sym) [nr] = sym,
+ ^
+In file included from include/asm-generic/unistd.h:1:0,
+                 from ./arch/arm64/include/uapi/asm/unistd.h:16,
+                 from ./arch/arm64/include/asm/unistd.h:62,
+                 from ./include/uapi/linux/unistd.h:7,
+                 from include/linux/syscalls.h:23,
+                 from arch/arm64/kernel/sys_ilp32.c:30:
+include/uapi/asm-generic/unistd.h:15:0: note: this is the location of the previous definition
+ #define __SYSCALL(x, y)
+ ^
+arch/arm64/kernel/sys_ilp32.c:60:0: warning: "__SC_WRAP" redefined
+ #define __SC_WRAP(nr, sym) [nr] = compat_##sym,
+ ^
+In file included from include/asm-generic/unistd.h:1:0,
+                 from ./arch/arm64/include/uapi/asm/unistd.h:16,
+                 from ./arch/arm64/include/asm/unistd.h:62,
+                 from ./include/uapi/linux/unistd.h:7,
+                 from include/linux/syscalls.h:23,
+                 from arch/arm64/kernel/sys_ilp32.c:30:
+include/uapi/asm-generic/unistd.h:33:0: note: this is the location of the previous definition
+ #define __SC_WRAP __SYSCALL
+ ^
