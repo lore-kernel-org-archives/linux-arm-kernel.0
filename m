@@ -1,60 +1,111 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 29 Apr 2016 00:25:22 +0200
-Subject: [GIT PULL 3/3] Rockchip dts64 updates for v4.7 - part2
-In-Reply-To: <5544434.9tA8JHBIkp@diego>
-References: <5544434.9tA8JHBIkp@diego>
-Message-ID: <14339181.jSmLu3hG44@diego>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 28 Apr 2016 16:27:40 -0600
+Subject: [PATCH v8 6/8] iommu/msi-iommu: iommu_msi_domain
+In-Reply-To: <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
+References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
+ <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <20160428162740.28db4b8d@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 40ac568d0ef07b60ba8cc0f2e88ccdd4dd0e176a:
+On Thu, 28 Apr 2016 08:15:21 +0000
+Eric Auger <eric.auger@linaro.org> wrote:
 
-  Documentation: devicetree: rockchip: Document rk3368-GeekBox (2016-03-31 19:00:09 +0200)
+> This function checks whether
+> - the device belongs to a non default iommu domain
+> - this iommu domain requires the MSI address to be mapped.
+> 
+> If those conditions are met, the function returns the iommu domain
+> to be used for mapping the MSI doorbell; else it returns NULL.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> 
+> v7 -> v8:
+> - renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
+> - the function now takes a struct device *
+> - use DOMAIN_ATTR_MSI_GEOMETRY attribute
+> ---
+>  drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
+>  include/linux/msi-iommu.h | 14 ++++++++++++++
+>  2 files changed, 31 insertions(+)
+> 
+> diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
+> index 203e86e..023ff17 100644
+> --- a/drivers/iommu/msi-iommu.c
+> +++ b/drivers/iommu/msi-iommu.c
+> @@ -243,3 +243,20 @@ unlock:
+>  	}
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
+> +
+> +struct iommu_domain *iommu_msi_domain(struct device *dev)
+> +{
+> +	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
+> +	struct iommu_domain_msi_geometry msi_geometry;
+> +
+> +	if (!d || (d->type == IOMMU_DOMAIN_DMA))
+> +		return NULL;
+> +
+> +	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
+> +	if (!msi_geometry.programmable)
 
-are available in the git repository at:
+It feels like we're conflating ideas with using the "programmable" flag
+in this way.  AIUI the IOMMU API consumer is supposed to see the
+invalid MSI geometry with the programmable feature set and know to call
+iommu_msi_set_aperture().  Looking for the msi_cookie would tell us if
+that had been done, but that doesn't tell us if it should have been
+done.  iommu_msi_msg_pa_to_va() handles this later, if we return
+NULL here that function returns success otherwise it goes on to fail if
+the iova or msi cookie is not set.  So really what we're trying to flag
+is that the MSI geometry participates in the IOMMU-MSI API you've
+created and we should pick a feature name that says that rather than
+something as vague a "programmable".  Perhaps simply iommu_msi_api
+rather than programmable.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.7-rockchip-dts64-2
+BTW, I don't see that you ever set aperture_start/end once
+iommu_msi_set_aperture() has been called.  It seems like doing so would
+add some consistency to that MSI geometry attribute.
 
-for you to fetch changes up to 51c454d2610571404917fa027c73048599dc6c3d:
+Nice series overall.  Thanks,
 
-  dt-bindings: document rockchip rk3399-evb board (2016-04-28 22:25:49 +0200)
+Alex
 
-----------------------------------------------------------------
-Adding the new rk3399 core devicetree support as well as a board
-dts for the evaluation board of this chip and similar to the arm32
-side also move the rk3368 thermal data into the core soc dtsi, as
-there really is no need to keep it separate.
-
-----------------------------------------------------------------
-Caesar Wang (1):
-      arm64: dts: rockchip: move the rk3368 thermal data into rk3368.dtsi
-
-Heiko Stuebner (2):
-      clk: rockchip: fix checkpatch errors in rk3399 dt-binding header
-      Merge branch 'v4.7-shared/clkids' into v4.7-armsoc/dts64
-
-Jianqun Xu (3):
-      arm64: dts: rockchip: add core dtsi file for RK3399 SoCs
-      arm64: dts: rockchip: add dts file for RK3399 evaluation board
-      dt-bindings: document rockchip rk3399-evb board
-
-Shawn Lin (1):
-      dt-bindings: rockchip-dw-mshc: add description for rk3399
-
-Xing Zheng (4):
-      clk: rockchip: add dt-binding header for rk3399
-      clk: rockchip: add general gpu soft-reset on rk3399
-      clk: rockchip: rename rga clock-id on rk3399
-      clk: rockchip: export some necessary rk3399 clock ids
-
- Documentation/devicetree/bindings/arm/rockchip.txt |    6 +-
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           |   66 +-
- .../{rk3368-thermal.dtsi => rk3399-evb.dts}        |  124 +--
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 1013 ++++++++++++++++++++
- include/dt-bindings/clock/rk3399-cru.h             |  755 +++++++++++++++
- 7 files changed, 1908 insertions(+), 58 deletions(-)
- rename arch/arm64/boot/dts/rockchip/{rk3368-thermal.dtsi => rk3399-evb.dts} (55%)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
- create mode 100644 include/dt-bindings/clock/rk3399-cru.h
+> +		return NULL;
+> +
+> +	return d;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_msi_domain);
+> +
+> diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
+> index 1cd115f..114bd69 100644
+> --- a/include/linux/msi-iommu.h
+> +++ b/include/linux/msi-iommu.h
+> @@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+>   */
+>  void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
+>  
+> +/**
+> + * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
+> + * translates the MSI transaction, returns the iommu domain the MSI doorbell
+> + * address must be mapped in; else returns NULL.
+> + *
+> + * @dev: device handle
+> + */
+> +struct iommu_domain *iommu_msi_domain(struct device *dev);
+> +
+>  #else
+>  
+>  static inline int
+> @@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+>  static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
+>  					       phys_addr_t addr) {}
+>  
+> +static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
+> +{
+> +	return NULL;
+> +}
+> +
+>  #endif	/* CONFIG_IOMMU_MSI */
+>  #endif	/* __MSI_IOMMU_H */
