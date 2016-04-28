@@ -1,36 +1,50 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 28 Apr 2016 15:35:45 +0530
-Subject: [PATCH RESEND 0/4] arm: dts: am57xx: Correct the thermal thresholds
-Message-ID: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
+Date: Thu, 28 Apr 2016 15:35:47 +0530
+Subject: [PATCH RESEND 2/4] ARM: dts: am57xx: Introduce industrial grade
+ thermal thresholds
+In-Reply-To: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
+References: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1461837949-11116-3-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Noticed that earlier post had a wrong list name hence resending the
-series.
+The silicon version ES2.0 onwards are industrial grade samples
+and have higher thermal thresholds than commecial grade samples.
 
-Currently all the am57xx versions are wrongly re-using the dra7  thermal
-threholds. Introduing the correct thermal thresholds based on industrial
-or commercial grade silicon present on the individual boards.
-
-Tested on AM57XX-BEAGLE-X15 (Commercial) and AM572X-IDK(Industrial)
-for the trip_point node sysfs temperatures.
-
-These patches are on top of:
-https://kernel.googlesource.com/pub/scm/linux/kernel/git/tmlind/linux-omap/+/omap-for-v4.7/dt 
-
-Keerthy (4):
-  ARM: dts: am57xx: Introduce commercial grade thermal thresholds
-  ARM: dts: am57xx: Introduce industrial grade thermal thresholds
-  ARM: dts: am57xx: Include the commercial grade thresholds
-  ARM: dts: am57xx-idk: Include Industrial grade      thermal thresholds
-
- arch/arm/boot/dts/am57xx-beagle-x15.dts        |  1 +
- arch/arm/boot/dts/am57xx-commercial-grade.dtsi | 23 +++++++++++++++++++++++
- arch/arm/boot/dts/am57xx-idk-common.dtsi       |  2 ++
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
  arch/arm/boot/dts/am57xx-industrial-grade.dtsi | 23 +++++++++++++++++++++++
- 4 files changed, 49 insertions(+)
- create mode 100644 arch/arm/boot/dts/am57xx-commercial-grade.dtsi
+ 1 file changed, 23 insertions(+)
  create mode 100644 arch/arm/boot/dts/am57xx-industrial-grade.dtsi
 
+diff --git a/arch/arm/boot/dts/am57xx-industrial-grade.dtsi b/arch/arm/boot/dts/am57xx-industrial-grade.dtsi
+new file mode 100644
+index 0000000..70c8c4b
+--- /dev/null
++++ b/arch/arm/boot/dts/am57xx-industrial-grade.dtsi
+@@ -0,0 +1,23 @@
++&cpu_alert0 {
++	temperature = <90000>; /* milliCelsius */
++};
++
++&cpu_crit {
++	temperature = <105000>; /* milliCelsius */
++};
++
++&gpu_crit {
++	temperature = <105000>; /* milliCelsius */
++};
++
++&core_crit {
++	temperature = <105000>; /* milliCelsius */
++};
++
++&dspeve_crit {
++	temperature = <105000>; /* milliCelsius */
++};
++
++&iva_crit {
++	temperature = <105000>; /* milliCelsius */
++};
 -- 
 1.9.1
