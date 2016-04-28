@@ -1,42 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Apr 2016 13:27:32 +0100
-Subject: [PATCH v9 12/14] PM / Hibernate: Call flush_icache_range() on
- pages restored in-place
-In-Reply-To: <572200C4.90701@arm.com>
-References: <1461775633-29715-1-git-send-email-james.morse@arm.com>
- <1461775633-29715-13-git-send-email-james.morse@arm.com>
- <20160428121517.GF24693@arm.com> <572200C4.90701@arm.com>
-Message-ID: <20160428122731.GA30834@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2016 14:29:34 +0200
+Subject: [PATCH] arm64: Drop CONFIG_RTC_LIB dependency
+In-Reply-To: <20160428122424.GG24693@arm.com>
+References: <1461776128-7808-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <20160428122424.GG24693@arm.com>
+Message-ID: <5680660.CkYB5IbEDj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 01:23:32PM +0100, James Morse wrote:
-> On 28/04/16 13:15, Will Deacon wrote:
-> > On Wed, Apr 27, 2016 at 05:47:11PM +0100, James Morse wrote:
-> >>  kernel/power/swap.c | 18 ++++++++++++++++++
-> >>  1 file changed, 18 insertions(+)
-> >>
-> >> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-> >> index 12cd989dadf6..a30645d2e93f 100644
-> >> --- a/kernel/power/swap.c
-> >> +++ b/kernel/power/swap.c
-> >> @@ -37,6 +37,14 @@
-> >>  #define HIBERNATE_SIG	"S1SUSPEND"
-> >>  
-> >>  /*
-> >> + * When reading an {un,}compressed image, we may restore pages in place,
-> >> + * in which case some architectures need these pages cleaning before they
-> >> + * can be executed. We don't know which pages these may be, so clean the lot.
-> >> + */
-> >> +bool clean_pages_on_read = false;
-> >> +bool clean_pages_on_decompress = false;
-> > 
-> > Should these be static?
+On Thursday 28 April 2016 13:24:25 Will Deacon wrote:
+> On Wed, Apr 27, 2016 at 01:55:28PM -0300, Ezequiel Garcia wrote:
+> > The rtc-lib dependency is not required, and seems it was just
+> > copy-pasted from ARM's Kconfig. If platform requires rtc-lib,
+> > they should select it individually.
 > 
-> Bother, yes.
+> Are you sure this doesn't break any platforms that are relying on this
+> implicit select?
 > 
-> (They probably shouldn't be explicitly initialised either...)
 
-Good, just checking. I can fix this locally.
+I have checked this carefully. I actually had a patch that removed this
+from all of the kernel, but then found some users on other architectures.
+ARM and ARM64 both don't use it.
 
-Will
+	Arnd
