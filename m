@@ -1,111 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Apr 2016 10:55:27 +0200
-Subject: [GIT PULL] drm: Allwinner sun4i support
-Message-ID: <20160428085527.GA4129@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 28 Apr 2016 10:57:50 +0200
+Subject: [PATCH v6 1/2] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <CACh+v5MM68U64PQYKBzaKZehfEs7qNNH3XYXm0HyO=Lwy=KAkg@mail.gmail.com>
+References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1461767754-12189-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CACh+v5MM68U64PQYKBzaKZehfEs7qNNH3XYXm0HyO=Lwy=KAkg@mail.gmail.com>
+Message-ID: <20160428105750.01a32818@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Thu, 28 Apr 2016 10:47:24 +0200
+Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
 
-Please consider the following pull request to introduce the support
-for the Allwinner SoCs display engine.
+> > +static int at91_ebi_probe(struct platform_device *pdev)
+> > +{
+> > +       const struct of_device_id *match;
+> > +       struct device_node *child;
+> > +       struct at91_ebi *ebi;
+> > +       struct clk *clk;
+> > +       int ret;
+> > +
+> > +       match = of_match_device(at91_ebi_id_table, &pdev->dev);
+> > +       if (!match || !match->data)
+> > +               return -EINVAL;
+> > +
+> > +       ebi = devm_kzalloc(&pdev->dev, sizeof(*ebi), GFP_KERNEL);
+> > +       if (!ebi)
+> > +               return -ENOMEM;
+> > +
+> > +       ebi->caps = match->data;
+> > +       ebi->dev = &pdev->dev;
+> > +
+> > +       clk = devm_clk_get(&pdev->dev, NULL);
+> > +       if (IS_ERR(clk))
+> > +               return PTR_ERR(clk);
+> > +
+> > +       ebi->clk = clk;
+> > +
+> > +       ebi->smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> > +                                                  "atmel,smc");
+> > +       if (IS_ERR(ebi->smc))
+> > +               return PTR_ERR(ebi->smc);
+> > +
+> > +       /*
+> > +        * The sama5d3 does not provide an EBICSA register and thus does need
+> > +        * to access the matrix registers.
+> > +        */
+> > +       if (ebi->caps->ebi_csa) {
+> > +               ebi->matrix =
+> > +                       syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> > +                                                       "atmel,matrix");
+> > +               if (IS_ERR(ebi->matrix))
+> > +                       return PTR_ERR(ebi->matrix);
+> > +
+> > +               ebi->ebi_csa = regmap_field_alloc(ebi->matrix,
+> > +                                                 *ebi->caps->ebi_csa);
+> > +               if (IS_ERR(ebi->ebi_csa))
+> > +                       return PTR_ERR(ebi->ebi_csa);
+> > +       }
+> > +
+> > +       ret = ebi->caps->init(ebi);
+> > +       if (ret)
+> > +               return ret;
+> > +
+> > +       for_each_child_of_node(pdev->dev.of_node, child) {
+> > +               ret = at91_ebi_dev_setup(ebi, child);
+> > +               if (ret)
+> > +                       return ret;  
+> 
+> I'm not sure about breaking out of the loop here, if
+> at91_ebi_dev_setup() for a device fail then the remaining devices
+> won't be probed. If you add a bad config for a fpga on CS1, you can
+> prevent your NAND  on CS2 to be probed.
 
-This is based on my latest patch set, adressing the minor reviews made
-during that latest round.
+Fair enough, I'll continue iterating even if an error occurs.
 
-Thanks,
-Maxime
-
-The following changes since commit 152ef5fa9e14e93e7efc43adad7dbcf35d7780f5:
-
-  drm: Switch blobs to the new generic modeset obj refcounting (2016-04-27 09:58:05 +1000)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sun4i-drm-for-4.7
-
-for you to fetch changes up to bf1139dfe797c0d6037dd689219a431516490544:
-
-  MAINTAINERS: Add a maintainer for the Allwinner DRM driver (2016-04-28 10:30:05 +0200)
-
-----------------------------------------------------------------
-Allwinner DRM driver for 4.7
-
-This pull request introduces the sun4i driver, meant to be used on the
-older Allwinner SoCs (A10, A13, A20, A23, A31 and A33).
-
-It currently supports only the A13, which has one of the simplest video
-pipeline. Support for other video components and SoCs will be added
-eventually.
-
-It supports only a RGB or composite output. It doesn't do HDMI, VGA, LVDS
-or power management yet, but that will come in time as well.
-
-----------------------------------------------------------------
-Maxime Ripard (8):
-      drm: fb: Add seq_file definition
-      drm: sun4i: Add DT bindings documentation
-      drm: Add Allwinner A10 Display Engine support
-      drm: sun4i: Add RGB output
-      drm: sun4i: Add composite output
-      drm: sun4i: tv: Add PAL output standard
-      drm: sun4i: tv: Add NTSC output standard
-      MAINTAINERS: Add a maintainer for the Allwinner DRM driver
-
- .../bindings/display/sunxi/sun4i-drm.txt           | 258 ++++++++
- MAINTAINERS                                        |   7 +
- drivers/gpu/drm/Kconfig                            |   2 +
- drivers/gpu/drm/Makefile                           |   3 +-
- drivers/gpu/drm/sun4i/Kconfig                      |  14 +
- drivers/gpu/drm/sun4i/Makefile                     |  13 +
- drivers/gpu/drm/sun4i/sun4i_backend.c              | 364 +++++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.h              | 165 +++++
- drivers/gpu/drm/sun4i/sun4i_crtc.c                 | 120 ++++
- drivers/gpu/drm/sun4i/sun4i_crtc.h                 |  30 +
- drivers/gpu/drm/sun4i/sun4i_dotclock.c             | 160 +++++
- drivers/gpu/drm/sun4i/sun4i_dotclock.h             |  21 +
- drivers/gpu/drm/sun4i/sun4i_drv.c                  | 358 +++++++++++
- drivers/gpu/drm/sun4i/sun4i_drv.h                  |  30 +
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c          |  54 ++
- drivers/gpu/drm/sun4i/sun4i_framebuffer.h          |  19 +
- drivers/gpu/drm/sun4i/sun4i_layer.c                | 161 +++++
- drivers/gpu/drm/sun4i/sun4i_layer.h                |  30 +
- drivers/gpu/drm/sun4i/sun4i_rgb.c                  | 250 ++++++++
- drivers/gpu/drm/sun4i/sun4i_rgb.h                  |  18 +
- drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 561 ++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_tcon.h                 | 186 ++++++
- drivers/gpu/drm/sun4i/sun4i_tv.c                   | 708 +++++++++++++++++++++
- include/drm/drm_fb_cma_helper.h                    |   2 +
- 24 files changed, 3533 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
- create mode 100644 drivers/gpu/drm/sun4i/Kconfig
- create mode 100644 drivers/gpu/drm/sun4i/Makefile
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_backend.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_backend.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_crtc.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_crtc.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_dotclock.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_dotclock.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_drv.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_drv.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_framebuffer.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_framebuffer.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_layer.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_layer.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_rgb.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_rgb.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_tcon.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_tcon.h
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_tv.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/2d553697/attachment.sig>
