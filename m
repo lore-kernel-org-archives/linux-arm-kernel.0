@@ -1,33 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 22:43:59 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <20160428191914.GA28527@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160426165701.GE8525@e104818-lin.cambridge.arm.com>
- <20160428191914.GA28527@yury-N73SV>
-Message-ID: <2760348.qmm1L3yQch@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 28 Apr 2016 15:47:49 -0500
+Subject: [Patch v2 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <CAPBZ5QceWcTCTJSnp-OpoeK_YdV8DOWe+569+6yXpSWhR243Og@mail.gmail.com>
+References: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
+ <1461625725-32425-2-git-send-email-andy.gross@linaro.org>
+ <20160426014906.GH29990@codeaurora.org>
+ <CAPBZ5QceWcTCTJSnp-OpoeK_YdV8DOWe+569+6yXpSWhR243Og@mail.gmail.com>
+Message-ID: <20160428204749.GA12941@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2016 22:19:14 Yury Norov wrote:
-> 
-> Yes, we need. Otherwise we have circular dependency like this:
-> arch/arm64/kernel/sys_ilp32.c:60:0: warning: "__SC_WRAP" redefined
->  #define __SC_WRAP(nr, sym) [nr] = compat_##sym,
->   ^
->   In file included from include/asm-generic/unistd.h:1:0,
->                    from ./arch/arm64/include/uapi/asm/unistd.h:16,
->                    from ./arch/arm64/include/asm/unistd.h:62,
->                    from ./include/uapi/linux/unistd.h:7,
->                    from include/linux/syscalls.h:23,
->                    from arch/arm64/kernel/sys_ilp32.c:30:
-> include/uapi/asm-generic/unistd.h:33:0: note: this is the location of the previous definition
->  #define __SC_WRAP __SYSCALL
-> 
-> Defining __SYSCALL_COMPAT at the top of the file does not help much.
+On Mon, Apr 25, 2016 at 09:14:59PM -0500, Andy Gross wrote:
+> On 25 April 2016 at 20:49, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 04/25, Andy Gross wrote:
+> >> This patch adds the device tree support for the Qualcomm SCM firmware.
+> >>
+> >> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> >> ---
+> >>  .../devicetree/bindings/firmware/qcom,scm.txt      | 28 ++++++++++++++++++++++
+> >>  1 file changed, 28 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> >> new file mode 100644
+> >> index 0000000..a679a87
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> >> @@ -0,0 +1,28 @@
+> >> +QCOM Secure Channel Manager (SCM)
+> >> +
+> >> +Qualcomm processors include an interface to communicate to the secure firmware.
+> >> +This interface allows for clients to request different types of actions.  These
+> >> +can include CPU power up/down, HDCP requests, loading of firmware, and other
+> >> +assorted actions.
+> >> +
+> >> +Required properties:
+> >> +- compatible: must contain one of the following:
+> >> + * "qcom,scm-apq8064" for APQ8064
+> >> + * "qcom,scm-apq8084" for APQ8084
+> >> + * "qcom,scm-msm8916" for MSM8916
+> >> + * "qcom,scm-msm8974" for MSM8974
+> >
+> > Do we need to keep adding these into the driver for every SoC
+> > that we support? My understanding is apq8064 can be the one that
+> > requires one clk, and msm8974 can be the one that requires three.
+> > The driver can just have those two compatibles for now, and we
+> > can keep adding compatibles here for the different SoCs, but
+> > really we don't care, that's just to save ourselves if something
+> > pops up and needs a workaround.
+> >
+> > It will certainly look weird if it's firmware that's compatible
+> > with qcom,scm-msm8974 but on an apq8084, so perhaps something
 
-Hmm, this sounds like something that we should fix in the asm-generic/unistd.h
-file. Is it just for __SC_WRAP, or also the other macros?
+Not if the first string has apq8084.
 
-	Arnd
+> > more generic like, qcom-scm-v1 and qcom,scm-v2 can be used as the
+> > generic compatible in the driver:
+> >
+> >         compatible = "qcom,scm-apq8064", "qcom,scm-v1";
+> >
+> >         vs.
+> >
+> >         compatible = "qcom,scm-apq8084", "qcom,scm-v2";
+> >
+> > ?
+> >
+> > I just want to avoid the constant SoC churn update here if we can.
+> 
+> Right.  We can certainly do it that way.  Its just that the v1/v2
+> aren't the real versions.  What if we did qcom,scm vs
+> qcom,scm-apq8064?
+
+I'd prefer this over fake version numbers.
+
+Is there any sane versioning of the firmware itself that could be used?
+
+Rob
