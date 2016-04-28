@@ -1,52 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Apr 2016 20:11:32 +0200
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <20160428175843.GZ21636@brightrain.aerifal.cx>
-References: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
- <20160428164856.10120.qmail@ns.horizon.com>
- <CAMuHMdU2e2PdwKYVaEsJ73X8Di1XHNPqnxuunr8R8bN8udazxw@mail.gmail.com>
- <20160428175843.GZ21636@brightrain.aerifal.cx>
-Message-ID: <CAMuHMdUBWqdyS4w7EKsnvQLXJVgQh624AQsjgQvxT9FRW4s_6g@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 28 Apr 2016 11:29:38 -0700
+Subject: [PATCH v4 2/4] ARM64: dts: rockchip: add core dtsi file for
+ RK3399 SoCs
+In-Reply-To: <20160428160353.GA95284@google.com>
+References: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
+ <1461743693-10671-3-git-send-email-jay.xu@rock-chips.com>
+ <20160428160353.GA95284@google.com>
+Message-ID: <20160428182938.GA3079@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 7:58 PM, Rich Felker <dalias@libc.org> wrote:
-> On Thu, Apr 28, 2016 at 07:51:06PM +0200, Geert Uytterhoeven wrote:
->> On Thu, Apr 28, 2016 at 6:48 PM, George Spelvin <linux@horizon.com> wrote:
->> > Another few comments:
->> >
->> > 1. Would ARCH_HAS_FAST_FFS involve fewer changes than CPU_NO_EFFICIENT_FFS?
->>
->> No, as you want to _disable_ ARCH_HAS_FAST_FFS / _enable_
->> CPU_NO_EFFICIENT_FFS as soon as you're enabling support for a
->> CPU that doesn't support it.
->>
->> Logical OR is easier in both the Kconfig and C preprocessor languages
->> than logical NAND.
->>
->> E.g. in Kconfig, a CPU core not supporting it can just select
->> CPU_NO_EFFICIENT_FFS.
->
-> How does a CPU lack an efficient ffs/ctz anyway? There are all sorts
-> of ways to implement it without a native insn, some of which are
-> almost or just as fast as the native insn on cpus that have the
-> latter. On anything with a fast multiply, the de Bruijn sequence
-> approach is near-optimal, and otherwise one of the binary-search type
-> approaches (possibly branchless) can be used. If the compiler doesn't
-> generate an appropriate one for __builtin_ctz, that's arguably a
-> compiler bug.
+One more thing:
 
-m68k-linux-gcc 4.6.3 generates:
+On Thu, Apr 28, 2016 at 09:03:53AM -0700, Brian Norris wrote:
+> Hi Heiko, Jianqun,
+> 
+> On Wed, Apr 27, 2016 at 03:54:51PM +0800, Jianqun Xu wrote:
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > new file mode 100644
+> > index 0000000..5a8a915
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > @@ -0,0 +1,1022 @@
+> [...]
+> > +	sdhci: sdhci at fe330000 {
+> > +		compatible = "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1";
+> 
+> Not to rain on the parade too much, as this is already applied, but is
+> the "rockchip,rk3399-sdhci-5.1" string documented anywhere? I don't see
+> it.
 
-        jsr __ctzsi2
+According to the latest binding for "arasan,sdhci-5.1", the "phy" and
+"phy-names" properties are required. Fortunately, this device stays
+"disabled" for now in your EVB DTS. But just FYI.
 
-Gr{oetje,eeting}s,
+> > +		reg = <0x0 0xfe330000 0x0 0x10000>;
+> > +		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
+> > +		clock-names = "clk_xin", "clk_ahb";
+> > +		status = "disabled";
+> > +	};
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Brian
