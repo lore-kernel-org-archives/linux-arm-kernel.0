@@ -1,61 +1,35 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 28 Apr 2016 17:07:02 +0200
-Subject: [PATCH v6 1/3] dmaengine: sun6i: Set default maxburst size and bus
- width
+Date: Thu, 28 Apr 2016 17:09:14 +0200
+Subject: [PATCH v6 2/3] dmaengine: sun6i: Remove useless check
 In-Reply-To: <cover.1461856751.git.moinejf@free.fr>
 References: <cover.1461856751.git.moinejf@free.fr>
-Message-ID: <4c37c2c717077f2ebf201e141acdc8ad76d341a7.1461856751.git.moinejf@free.fr>
+Message-ID: <863fcb55cd4c528f589b80307a9b76b0a7e1b64f.1461856751.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some DMA clients, as audio, don't set the maxburst size and bus width
-on the memory side when starting DMA transfers.
-This patch prevents such transfers to be aborted by providing system
-default values to the lacking ones.
+The transfer direction is now checked in set_config.
+There is no need to check it twice.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/dma/sun6i-dma.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ drivers/dma/sun6i-dma.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index b08245e..cd436c6 100644
+index cd436c6..80e426d 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -470,10 +470,30 @@ static int set_config(struct sun6i_dma_dev *sdev,
- {
- 	s8 src_width, dst_width, src_burst, dst_burst;
+@@ -585,11 +585,6 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_slave_sg(
+ 	if (!sgl)
+ 		return NULL;
  
--	src_burst = convert_burst(sconfig->src_maxburst);
--	src_width = convert_buswidth(sconfig->src_addr_width);
--	dst_burst = convert_burst(sconfig->dst_maxburst);
--	dst_width = convert_buswidth(sconfig->dst_addr_width);
-+	switch (direction) {
-+	case DMA_MEM_TO_DEV:
-+		src_burst = convert_burst(sconfig->src_maxburst ?
-+					sconfig->src_maxburst : 8);
-+		src_width = convert_buswidth(sconfig->src_addr_width !=
-+						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
-+				sconfig->src_addr_width :
-+				DMA_SLAVE_BUSWIDTH_4_BYTES);
-+		dst_burst = convert_burst(sconfig->dst_maxburst);
-+		dst_width = convert_buswidth(sconfig->dst_addr_width);
-+		break;
-+	case DMA_DEV_TO_MEM:
-+		src_burst = convert_burst(sconfig->src_maxburst);
-+		src_width = convert_buswidth(sconfig->src_addr_width);
-+		dst_burst = convert_burst(sconfig->dst_maxburst ?
-+					sconfig->dst_maxburst : 8);
-+		dst_width = convert_buswidth(sconfig->dst_addr_width !=
-+						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
-+				sconfig->dst_addr_width :
-+				DMA_SLAVE_BUSWIDTH_4_BYTES);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
- 
- 	if (src_burst < 0)
- 		return src_burst;
+-	if (!is_slave_direction(dir)) {
+-		dev_err(chan2dev(chan), "Invalid DMA direction\n");
+-		return NULL;
+-	}
+-
+ 	ret = set_config(sdev, sconfig, dir, &lli_cfg);
+ 	if (ret) {
+ 		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
 -- 
 2.8.1
