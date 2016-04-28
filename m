@@ -1,58 +1,87 @@
-From: linux@horizon.com (George Spelvin)
-Date: 28 Apr 2016 15:15:51 -0400
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <20160428175843.GZ21636@brightrain.aerifal.cx>
-Message-ID: <20160428191551.17438.qmail@ns.horizon.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 28 Apr 2016 22:19:14 +0300
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160426165701.GE8525@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
+ <20160426165701.GE8525@e104818-lin.cambridge.arm.com>
+Message-ID: <20160428191914.GA28527@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> How does a CPU lack an efficient ffs/ctz anyway? There are all sorts
-> of ways to implement it without a native insn, some of which are
-> almost or just as fast as the native insn on cpus that have the
-> latter. On anything with a fast multiply, the de Bruijn sequence
-> approach is near-optimal, and otherwise one of the binary-search type
-> approaches (possibly branchless) can be used. If the compiler doesn't
-> generate an appropriate one for __builtin_ctz, that's arguably a
-> compiler bug.
+On Tue, Apr 26, 2016 at 05:57:01PM +0100, Catalin Marinas wrote:
+> On Wed, Apr 06, 2016 at 01:08:42AM +0300, Yury Norov wrote:
+> > +/* Using non-compat syscalls where necessary */
+> > +#define compat_sys_fadvise64_64        sys_fadvise64_64
+> > +#define compat_sys_fallocate           sys_fallocate
+> > +#define compat_sys_ftruncate64         sys_ftruncate
+> > +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
+> > +#define compat_sys_pread64             sys_pread64
+> > +#define compat_sys_pwrite64            sys_pwrite64
+> > +#define compat_sys_readahead           sys_readahead
+> > +#define compat_sys_shmat               sys_shmat
+> 
+> Why don't we use compat_sys_shmat? Is it because of COMPAT_SHMLBA?
 
-What's wanted here is something faster than any of those.
-Yes, there's a simple constant-time branch-free implementation:
+Yes. COMPAT_SHMLBA is 4 pages, and it's aarch32-only limitation.
 
-unsigned inline __attribute__((const))
-hweight32(uint32_t x)
-{
-	x -= (x >> 1) & 0x55555555;
-	x  = ((x >> 2) & 0x33333333) + (x & 0x33333333);
-	x += x >> 4;
-	x &= 0x0f0f0f0f;
-	x += x >> 8;
-	x += x >> 16;
-	return x & 63;
-}
+> 
+> > +#define compat_sys_sync_file_range     sys_sync_file_range
+> > +#define compat_sys_truncate64          sys_truncate
+> > +#define sys_llseek                     sys_lseek
+> > +#define sys_mmap2		       sys_mmap
+> 
+> Nitpick: there are some whitespace inconsistencies above (just convert
+> all spaces to tabs).
+> 
+> I think you should also update Documentation/arm64/ilp32.txt to include
+> the list above.
 
-unsigned inline __attribute__((const))
-__ffs32(uint32_t x)
-{
-	return hweight(~x & (x-1));
-}
+OK
 
-but if you work it through, that's about 19 instructions; a few more on
-platforms without 32-bit immediates.  The shift itself makes an even 20,
-and there are a lot of sequential dependencies (I count a 17-op chain
-including the shift) limiting execution time.
+> 
+> > +
+> > +#include <asm/syscall.h>
+> > +
+> > +#undef __SYSCALL
+> > +#undef __SC_COMP
+> > +#undef __SC_WRAP
+> > +#undef __SC_3264
+> > +#undef __SC_COMP_3264
+> 
+> Minor detail: do we actually need to undef all these? Maybe we can get
+> away with just defining __SYSCALL_COMPAT at the top of the file.
+> 
 
-The de Bruijn hack reduces the length but adds a memory access for
-the table lookup.  (http://supertech.csail.mit.edu/papers/debruijn.pdf)
+Yes, we need. Otherwise we have circular dependency like this:
+arch/arm64/kernel/sys_ilp32.c:60:0: warning: "__SC_WRAP" redefined
+ #define __SC_WRAP(nr, sym) [nr] = compat_##sym,
+  ^
+  In file included from include/asm-generic/unistd.h:1:0,
+                   from ./arch/arm64/include/uapi/asm/unistd.h:16,
+                   from ./arch/arm64/include/asm/unistd.h:62,
+                   from ./include/uapi/linux/unistd.h:7,
+                   from include/linux/syscalls.h:23,
+                   from arch/arm64/kernel/sys_ilp32.c:30:
+include/uapi/asm-generic/unistd.h:33:0: note: this is the location of the previous definition
+ #define __SC_WRAP __SYSCALL
 
-In the GCD code, the number to normalize is basically random, so the
-normalization loop shifts an average of 1 bit.  One bit half the time,
-a second bit 1/4 of the time, etc.
+Defining __SYSCALL_COMPAT at the top of the file does not help much.
 
-(The posted code in the FAST_FFS case omits one guaranteed shift at the
-end of the loop because the normalization code is constant-time.)
-
-So "fast __ffs" basically means faster than *one* iteration of
-"while (!(x & 1)) x >>= 1;".
-
-In this case "fast" means cheaper than *one* unpredictable branch, which
-is a very small handful of instructions.
+> > +
+> > +#define __SYSCALL_COMPAT
+> > +#define __SYSCALL(nr, sym)	[nr] = sym,
+> > +#define __SC_WRAP(nr, sym)	[nr] = compat_##sym,
+> > +
+> > +/*
+> > + * The sys_call_ilp32_table array must be 4K aligned to be accessible from
+> > + * kernel/entry.S.
+> > + */
+> > +void *sys_call_ilp32_table[__NR_syscalls] __aligned(4096) = {
+> > +	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
+> > +#include <asm/unistd.h>
+> > +};
+> 
+> -- 
+> Catalin
