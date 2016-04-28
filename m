@@ -1,74 +1,142 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 28 Apr 2016 16:05:01 +0100
-Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
-Message-ID: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 28 Apr 2016 22:58:06 +0800
+Subject: [PATCH 2/3] mmc: core: remove the invalid message in
+ mmc_select_timing
+In-Reply-To: <CAPDyKFqvXTtbZsaWJ1gr7gm-jTpWwL0hAYxDje+LsC4ScyF2bQ@mail.gmail.com>
+References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
+ <1461171092-30631-2-git-send-email-aisheng.dong@nxp.com>
+ <CAPDyKFqvXTtbZsaWJ1gr7gm-jTpWwL0hAYxDje+LsC4ScyF2bQ@mail.gmail.com>
+Message-ID: <20160428145806.GF27560@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-ccn driver uses irq_set_affinity, which is not exported and
-hence cannot be built as a module, eventhough we have all the
-bits ready. This patch makes use of the exported helper
-irq_set_affinity_hint() instead. Also, the __free_irq expects
-the affinity_hint to be NULL when we free the irq. So set the
-affinity_hint to NULL at clean up.
+On Thu, Apr 28, 2016 at 11:24:07AM +0200, Ulf Hansson wrote:
+> On 20 April 2016 at 18:51, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+> > mmc_select_hs200() and mmc_select_hs() will keep the timing
+> > as before if switch fails. So it's meaningless to print the
+> > failed switched mode outside based on the current host timing.
+> >
+> > Furthermore, the original print is wrong, it should be:
+> > pr_warn("%s: switch to %s failed\n",
+> >         mmc_hostname(card->host),
+> >         mmc_card_hs(card) ? "high-speed" :
+> >         (mmc_card_hs200(card) ? "hs200" : ""));
+> >
+> > Since we already have error message in mmc_select_hs200(),
+> > simply remove it outside.
+> >
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/mmc/core/mmc.c | 10 +---------
+> >  1 file changed, 1 insertion(+), 9 deletions(-)
+> >
+> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> > index f6683a9..55c8201 100644
+> > --- a/drivers/mmc/core/mmc.c
+> > +++ b/drivers/mmc/core/mmc.c
+> > @@ -1321,21 +1321,13 @@ static int mmc_select_timing(struct mmc_card *card)
+> >         if (err && err != -EBADMSG)
+> >                 return err;
+> >
+> > -       if (err) {
+> > -               pr_warn("%s: switch to %s failed\n",
+> > -                       mmc_card_hs(card) ? "high-speed" :
+> > -                       (mmc_card_hs200(card) ? "hs200" : ""),
+> > -                       mmc_hostname(card->host));
+> > -               err = 0;
+> > -       }
+> > -
+> 
+> No, this is not correct.
+> 
+> First, in patch1/3, you change to return an error code immediately
+> when __mmc_set_signal_voltage() fails, instead of using the "goto
+> err". Thus there will be no error printed for this case any more.
+> 
 
-Now that we can build it as a module, update the Kconfig to
-reflect the change.
+I noticed this issue when i made up this patch.
+Why i simply return is because i want to avoid write the following code:
+static int mmc_select_hs200(struct mmc_card *card)
+{
+...
+	err = voltage_switch();
+        /* If fails try again during next card power cycle */
+        if (err)
+                goto err;
+....
+		/* swith HS TIMING */
+                err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+                                   EXT_CSD_HS_TIMING, val,
+                                   card->ext_csd.generic_cmd6_time,
+                                   true, send_status, true);
+                if (err)
+                        goto err2;
+..........
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/Kconfig   |    2 +-
- drivers/bus/arm-ccn.c |    7 ++++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
+err2:
+        if (err) {
+                /* fall back to the old signal voltage, if fails report error */
+                if (__mmc_set_signal_voltage(host, old_signal_voltage))
+                        err = -EIO;
+        }
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index d4a3a31..3efc996 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -48,7 +48,7 @@ config ARM_CCI5xx_PMU
- 	  If unsure, say Y
- 
- config ARM_CCN
--	bool "ARM CCN driver support"
-+	tristate "ARM CCN driver support"
- 	depends on ARM || ARM64
- 	depends on PERF_EVENTS
- 	help
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 7082c72..acc3eb5 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1189,7 +1189,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
- 		perf_pmu_migrate_context(&dt->pmu, cpu, target);
- 		cpumask_set_cpu(target, &dt->cpu);
- 		if (ccn->irq)
--			WARN_ON(irq_set_affinity(ccn->irq, &dt->cpu) != 0);
-+			WARN_ON(irq_set_affinity_hint(ccn->irq, &dt->cpu) != 0);
- 	default:
- 		break;
- 	}
-@@ -1278,7 +1278,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
- 
- 	/* Also make sure that the overflow interrupt is handled by this CPU */
- 	if (ccn->irq) {
--		err = irq_set_affinity(ccn->irq, &ccn->dt.cpu);
-+		err = irq_set_affinity_hint(ccn->irq, &ccn->dt.cpu);
- 		if (err) {
- 			dev_err(ccn->dev, "Failed to set interrupt affinity!\n");
- 			goto error_set_affinity;
-@@ -1306,7 +1306,8 @@ static void arm_ccn_pmu_cleanup(struct arm_ccn *ccn)
- {
- 	int i;
- 
--	irq_set_affinity(ccn->irq, cpu_possible_mask);
-+	if (ccn->irq)
-+		irq_set_affinity_hint(ccn->irq, NULL);
- 	unregister_cpu_notifier(&ccn->dt.cpu_nb);
- 	for (i = 0; i < ccn->num_xps; i++)
- 		writel(0, ccn->xp[i].base + CCN_XP_DT_CONTROL);
--- 
-1.7.9.5
+err:
+        if (err)
+                pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
+                       __func__, err);
+
+        return err;
+}
+
+Because if first signal switch fails, we don't need fall back to original
+voltage. But HS timing switch needs.
+
+goto err makes the code a bit ugly.
+So i choose to avoid it and simply return since it's not so important
+and most host driver may already implement their debug IO switch debug info.
+
+Do you think if we can accept it?
+
+> Second, mmc_select_hs() may fail and there is no print done within
+> that function which is why above print is also needed.
+> 
+
+The same as above, i think this print is not so important.
+And __mmc_switch already has a err warn.
+
+And the most important reason is the original print outside is
+meaningless because it intends to print out the speed mode it
+wants to switch, however,it actually prints out the restored
+original speed mode.
+
+> On the other hand I agree with you, it doesn't seems necessary to
+> print two messages when mmc_select_hs200() fails. One should be
+> enough. Can we change this so *only* mmc_select_timing() will deal
+> with the print at all errors?
+> 
+
+Yes, i agree with your idea.
+I also thought about it before, but it seems after patch 3,
+it may not be so necessary.
+Can you help check it?
+
+> >  bus_speed:
+> >         /*
+> >          * Set the bus speed to the selected bus timing.
+> >          * If timing is not selected, backward compatible is the default.
+> >          */
+> >         mmc_set_bus_speed(card);
+> > -       return err;
+> > +       return 0;
+> >  }
+> >
+> >  /*
+> > --
+> > 1.9.1
+> >
+> 
+> Kind regards
+> Uffe
+
+Regards
+Dong Aisheng
