@@ -1,155 +1,260 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 28 Apr 2016 09:39:54 +0300
-Subject: [PATCH 04/23] mmc: sdhci: re-factor sdhci_start_signal_voltage()
-In-Reply-To: <20160428030941.GA23362@shlinux2.ap.freescale.net>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-5-git-send-email-aisheng.dong@nxp.com>
- <571A0E5E.4090904@intel.com>
- <CAA+hA=SygBBr+-C_r4Geodni+hj2Mg71o+ecVq_AD8vv22=UPA@mail.gmail.com>
- <5721208C.2090509@intel.com>
- <20160428030941.GA23362@shlinux2.ap.freescale.net>
-Message-ID: <5721B03A.5030006@intel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 28 Apr 2016 08:44:05 +0200
+Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <20160427150738.GA7359@leverpostej>
+References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20160427150738.GA7359@leverpostej>
+Message-ID: <20160428084405.4d71efbc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/16 06:09, Dong Aisheng wrote:
-> On Wed, Apr 27, 2016 at 11:26:52PM +0300, Adrian Hunter wrote:
->> On 24/04/2016 12:14 p.m., Dong Aisheng wrote:
->>> Hi Adrian,
->>>
->>> Thanks for the review first.
->>>
->>> On Fri, Apr 22, 2016 at 7:43 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
->>>> On 15/04/16 20:29, Dong Aisheng wrote:
->>>>> Handle host and regulator signal voltage switch separately.
->>>>> Move host signal voltage switch code into a separated function
->>>>> sdhci_do_signal_voltage_switch() first, the following patches will
->>>>> remove the regulator voltage switch code and use the common
->>>>> mmc_regulator_set_vqmmc() instead.
->>>>
->>>> You have changed the order that things are done.
->>>
->>> Yes, the oder changes a bit that we always do controller voltage switch first.
->>> I suppose the order is irrelevant here since i don't recall any
->>> requirement from card.
->>>
->>> Actually the original order is also a bit mass.
->>> e.g.
->>> For MMC_SIGNAL_VOLTAGE_330, switch controller first, then vqmmc.
->>> But for MMC_SIGNAL_VOLTAGE_180, switch vqmmc first, then controller.
->>> It looks to us the original one also order irrelevant.
->>>
->>>> There is no way to know
->>>> what that will break, so let's not do that.  What about just changing
->>>> regulator_set_voltage() to mmc_regulator_set_vqmmc()?
->>>>
->>>
->>> Currently what i can think out VIO switch using are three cases: (Pls
->>> help add if any)
->>> 1) Both host IO and card IO use external vqmmc to do switch
->>> (e.g eMMC 1.8V DDR/HS200/HS400 mode)
->>>
->>> eMMC has no IO voltage switch protocol and requirement, so usually
->>> board designed
->>> using fixed 1.8V for eMMC and host IO.
->>> Event it's switchable, it should be done in the first mmc_power_up().
->>> Dynamical switch later may cause eMMC unable to work properly.
->>> (We have been confirmed about this issue by many eMMC vendors
->>> like Micron and Sandisk. I'm not sure if any exceptions in the community
->>> still doing VIO dynamical switch for eMMC, if yes, please help share
->>> the experience!).
->>>
->>> Event some people still do dynamical IO switch for eMMC, since eMMC
->>> spec has no requirement, so the order should also not care.
->>>
->>> 2) Host using controller IO switch while card using standard CMD (SD/SDIO3.0)
->>>
->>> SD/SDIO 3.0 spec defines the standard IO switch process and using it's internal
->>> regulator to do card IO voltage switch. It does not use external vqmmc
->>> regulator.
->>> So order irrelevant too.
->>>
->>> 3) Host using controller IO switch while card using external vqmmc
->>> (special SDIO3.0 or eMMC)
->>> I have met some special SDIO3.0 card like Broadcom WiFi which does not follow
->>> the spec and using external regulator for card IO voltage.
->>> Usually it's required to fix to 1.8v and also not order irrelevant.
->>>
->>> For eMMC, refer to case 1), it should be fixed to 1.8v at power up.
->>>
->>> So it looks all cases seems are not order required.
->>
->> I don't agree that there is any way to know that other host controllers
->> are not affected.  I don't want a repeat of sdhci_set_power().
->>
+Hi Mark,
+
+On Wed, 27 Apr 2016 16:07:38 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
+
+> On Wed, Apr 27, 2016 at 04:35:54PM +0200, Boris Brezillon wrote:
+> > The EBI (External Bus Interface) is used to access external peripherals
+> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > Each device is assigned a CS line and an address range and can have its
+> > own configuration (timings, access mode, bus width, ...).
+> > This driver provides a generic DT binding to configure a device according
+> > to its requirements.
+> > For specific device controllers (like the NAND one) the SMC timings
+> > should be configured by the controller driver through the matrix and smc
+> > syscon regmaps.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  .../bindings/memory-controllers/atmel,ebi.txt      | 146 +++++++++++++++++++++
+> >  1 file changed, 146 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> > new file mode 100644
+> > index 0000000..0f332d2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> > @@ -0,0 +1,146 @@
+> > +* Device tree bindings for Atmel EBI
+> > +
+> > +The External Bus Interface (EBI) controller is a bus where you can connect
+> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
+> > +(Static Memory Controller).
+> > +Synchronous memories (and some asynchronous memories like NANDs) can be
+> > +attached to specialized controllers which are responsible for configuring the
+> > +bus appropriately according to the connected device.
+> > +In the other hand, the bus interface can be automated for simple asynchronous
+> > +devices.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible:		"atmel,at91sam9260-ebi"
+> > +			"atmel,at91sam9261-ebi"
+> > +			"atmel,at91sam9263-ebi0"
+> > +			"atmel,at91sam9263-ebi1"
+> > +			"atmel,at91sam9rl-ebi"
+> > +			"atmel,at91sam9g45-ebi"
+> > +			"atmel,at91sam9x5-ebi"
+> > +			"atmel,sama5d3-ebi"
+> > +
+> > +- reg:			Contains offset/length value for EBI memory mapping.
+> > +			This property might contain several entries if the EBI
+> > +			memory range is not contiguous
+> > +
+> > +- #address-cells:	Must be 2.
+> > +			The first cell encodes the CS.
+> > +			The second cell encode the offset into the CS memory
+> > +			range.
+> > +
+> > +- #size-cells:		Must be set to 1.
+> > +
+> > +- ranges:		Encodes CS to memory region association.
+> > +
+> > +- clocks:		Clock feeding the EBI controller.
+> > +			See clock-bindings.txt
+> > +
+> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
+> > +such as NOR (e.g. cfi-flash) and NAND.
+> > +There might be board specific devices like FPGAs.
+> > +You'll define you device requirements in these child nodes.
+> > +
+> > +Required child cs node properties:
+> > +
+> > +- #address-cells:	Must be 2.
+> > +
+> > +- #size-cells:		Must be 1.
+> > +
+> > +- ranges:		Empty property indicating that child nodes can inherit
+> > +			memory layout.
+> > +
+> > +Optional child cs node properties:
+> > +- atmel,bus-width:		width of the asynchronous device's data bus
+> > +				8, 16 or 32.
+> > +				8 if not present.
+> > +
+> > +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
+> > +				"select" if not present.
+> > +
+> > +- atmel,read-mode		"nrd" or "ncs".
+> > +				"ncs" is not present.
+> > +
+> > +- atmel,write-mode		"nwe" or "ncs".
+> > +				"ncs" is not present.
+> > +
+> > +- atmel,exnw-mode		"disabled", "frozen" or "ready".
+> > +				"disabled" if not present.
+> > +
+> > +- atmel,page-mode		enable page mode if present. The provided value
+> > +				defines the page size (supported values: 4, 8,
+> > +				16 and 32).
+> > +
+> > +Optional device timings expressed in nanoseconds (if the property is not
+> > +present 0 is assumed):
+> > +
+> > +- atmel,ncs-rd-setup-ns
+> > +- atmel,nrd-setup-ns
+> > +- atmel,ncs-wr-setup-ns
+> > +- atmel,nwe-setup-ns
+> > +- atmel,ncs-rd-pulse-ns
+> > +- atmel,nrd-pulse-ns
+> > +- atmel,ncs-wr-pulse-ns
+> > +- atmel,nwe-pulse-ns
+> > +- atmel,nwe-cycle-ns
+> > +- atmel,nrd-cycle-ns
+> > +- atmel,tdf-ns  
 > 
-> Can you share some more info about sdhci_set_power() issue?
-> I'd like to see if we are same the issue.
-
-Not the same issue, but the same concept.  People changing the code under
-the impression that their way was correct, and then breaking other people's
-drivers.  Check the git history and mailing list.
-
-	http://marc.info/?l=linux-mmc&m=145880454106474&w=2
-
+> I assume that these are defined in a datasheet. It may be worth noting
+> "see datasheet" above this collection of properties.
 > 
-> BTW, IMHO i don't think we should stop keep moving only afraid of potential
-> break if it's correct way. Because .start_signal_voltage_switch() interface
-> seems shouldn't be order dependant.
-> If it is, then it should be fixed and handled in high layer like MMC core
-> rather than in host driver. Right?
-
-The SDHCI spec. does not define how to use external regulators, so there is
-no "correct way".
-
-We have to move forward *and* avoid potential breakage.
-
-In this case it seems me that the risk of breakage outweighs the value of
-prettier code.
-
-By the way, there are ways to get rid of the ugliness - such as pushing it down
-into individual drivers.
-
+> > +
+> > +- atmel,tdf-mode:		"normal" or "optimized". If set to "optimized"
+> > +				the data float time is optimized depending on
+> > +				the next device being accessed (next device
+> > +				setup time is subtracted to the current device
+> > +				data float time).
+> > +
+> > +
+> > +
+> > +Example:
+> > +
+> > +	ebi: ebi at 10000000 {
+> > +		compatible = "atmel,sama5d3-ebi", "simple-bus";  
 > 
->> Please instead send a patch for just using mmc_regulator_set_vqmmc()
->> in place of regulator_set_voltage().
+> I don't believe that "simple-bus" should be here.
 > 
-> Just using mmc_regulator_set_vqmmc() also changes the order which
-> is the same situation.
+> > +		#address-cells = <2>;
+> > +		#size-cells = <1>;
+> > +		atmel,smc = <&hsmc>;
+> > +		atmel,matrix = <&matrix>;
+> > +		reg = <0x10000000 0x10000000
+> > +		       0x40000000 0x30000000>;
+> > +		ranges = <0x0 0x0 0x10000000 0x10000000
+> > +			  0x1 0x0 0x40000000 0x10000000
+> > +			  0x2 0x0 0x50000000 0x10000000
+> > +			  0x3 0x0 0x60000000 0x10000000>;
+> > +		clocks = <&mck>;
+> > +
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pinctrl_ebi_addr>;
+> > +
+> > +		cs at 0 {  
+> 
+> I suspect recent DTC will warn here, as the unit-address should match
+> the reg for the node (and no reg is defined). Here the reg would have to
+> be two cells, which means we have to make up an address, no?
+> 
+> We can either give the node a name without a unit-address (e.g. cs_0),
+> or define some reg format.
+> 
+> > +			#address-cells = <2>;
+> > +			#size-cells = <1>;
+> > +			ranges;
+> > +			atmel,generic-dev;  
+> 
+> The cover letter mentioned this should go.
+> 
+> > +			atmel,read-mode = "nrd";
+> > +			atmel,write-mode = "nwe";
+> > +			atmel,bus-width = <16>;
+> > +			atmel,ncs-rd-setup-ns = <0>;
+> > +			atmel,ncs-wr-setup-ns = <0>;
+> > +			atmel,nwe-setup-ns = <8>;
+> > +			atmel,nrd-setup-ns = <16>;
+> > +			atmel,ncs-rd-pulse-ns = <84>;
+> > +			atmel,ncs-wr-pulse-ns = <84>;
+> > +			atmel,nrd-pulse-ns = <76>;
+> > +			atmel,nwe-pulse-ns = <76>;
+> > +			atmel,nrd-cycle-ns = <107>;
+> > +			atmel,nwe-cycle-ns = <84>;
+> > +			atmel,tdf-ns = <16>;
+> > +
+> > +			nor: flash at 0,0 {
+> > +				compatible = "cfi-flash";
+> > +				#address-cells = <1>;
+> > +				#size-cells = <1>;
+> > +				reg = <0x0 0x0 0x1000000>;  
+> 
+> It feels odd that in the node for chipselect N, sub-devices have to
+> encode the chipselect number in their reg, when it's obvious from their
+> container. It may make more sense for the cs node to have a non-empty
+> reg (or somehow to make that translation/truncation implicit).
 
-How so?  It looks like a drop-in replacement to me:
+Would you agree with the following representation?
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 94cffa77490a..69b4d48aff87 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1757,8 +1757,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
- 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
- 
- 		if (!IS_ERR(mmc->supply.vqmmc)) {
--			ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
--						    3600000);
-+			ret = mmc_regulator_set_vqmmc(mmc, ios);
- 			if (ret) {
- 				pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
- 					mmc_hostname(mmc));
-@@ -1779,8 +1778,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
- 		return -EAGAIN;
- 	case MMC_SIGNAL_VOLTAGE_180:
- 		if (!IS_ERR(mmc->supply.vqmmc)) {
--			ret = regulator_set_voltage(mmc->supply.vqmmc,
--					1700000, 1950000);
-+			ret = mmc_regulator_set_vqmmc(mmc, ios);
- 			if (ret) {
- 				pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
- 					mmc_hostname(mmc));
-@@ -1810,8 +1808,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
- 		return -EAGAIN;
- 	case MMC_SIGNAL_VOLTAGE_120:
- 		if (!IS_ERR(mmc->supply.vqmmc)) {
--			ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
--						    1300000);
-+			ret = mmc_regulator_set_vqmmc(mmc, ios);
- 			if (ret) {
- 				pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
- 					mmc_hostname(mmc));
+	ebi: ebi at 10000000 {
+		compatible = "atmel,sama5d3-ebi";
+		#address-cells = <2>;
+		#size-cells = <1>;
+		atmel,smc = <&hsmc>;
+		atmel,matrix = <&matrix>;
+		reg = <0x10000000 0x10000000
+		       0x40000000 0x30000000>;
+		ranges = <0x0 0x0 0x10000000 0x10000000
+			  0x1 0x0 0x40000000 0x10000000
+			  0x2 0x0 0x50000000 0x10000000
+			  0x3 0x0 0x60000000 0x10000000>;
+		clocks = <&mck>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_ebi_addr>;
+
+		configs {
+			config-0 {
+				atmel,read-mode = "nrd";
+				atmel,write-mode = "nwe";
+				atmel,bus-width = <16>;
+				atmel,ncs-rd-setup-ns = <0>;
+				atmel,ncs-wr-setup-ns = <0>;
+				atmel,nwe-setup-ns = <8>;
+				atmel,nrd-setup-ns = <16>;
+				atmel,ncs-rd-pulse-ns = <84>;
+				atmel,ncs-wr-pulse-ns = <84>;
+				atmel,nrd-pulse-ns = <76>;
+				atmel,nwe-pulse-ns = <76>;
+				atmel,nrd-cycle-ns = <107>;
+				atmel,nwe-cycle-ns = <84>;
+				atmel,tdf-ns = <16>;
+			};
+		};
+
+		nor: flash at 0,0 {
+			compatible = "cfi-flash";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x0 0x0 0x1000000>;
+			bank-width = <2>;
+		};
+	};
+
+
+Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
