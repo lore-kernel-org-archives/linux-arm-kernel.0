@@ -1,50 +1,59 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 28 Apr 2016 10:28:19 +0100
-Subject: [PATCH 07/12] ARM: keystone: dts: add psci command definition
+Date: Thu, 28 Apr 2016 10:28:14 +0100
+Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
 In-Reply-To: <20160428092644.GX19428@n2100.arm.linux.org.uk>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
-Message-ID: <E1aviF9-0000jM-Qs@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+Advertise the location of bootable RAM to kexec-tools.  kexec needs to
+know where it can place the kernel in RAM, and so be executable when
+the system needs to jump into it.
 
-This commit adds definition for cpu_on, cpu_off and cpu_suspend commands.
-These definitions must match the corresponding PSCI definitions in
-boot monitor.
+Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
+tag.
 
-Having those command and corresponding PSCI support in boot monitor allows
-run time CPU hot plugin.
-
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
+ arch/arm/kernel/setup.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-This patch is already queued by Santosh, and only exists as part of this
-series for completeness.
-
- arch/arm/boot/dts/keystone.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 3f272826f537..007648971744 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -59,6 +59,14 @@
- 			     <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>;
- 	};
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 19b25ad61385..7cf1c0d4f773 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -847,10 +847,29 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	kernel_data.end     = virt_to_phys(_end - 1);
  
-+	psci {
-+		compatible	= "arm,psci";
-+		method		= "smc";
-+		cpu_suspend	= <0x84000001>;
-+		cpu_off		= <0x84000002>;
-+		cpu_on		= <0x84000003>;
-+	};
+ 	for_each_memblock(memory, region) {
++		phys_addr_t start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
++		phys_addr_t end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
++		unsigned long boot_alias_start;
 +
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
++		/*
++		 * Some systems have a special memory alias which is only
++		 * used for booting.  We need to advertise this region to
++		 * kexec-tools so they know where bootable RAM is located.
++		 */
++		boot_alias_start = phys_to_idmap(start);
++		if (arm_has_idmap_alias() && boot_alias_start != INVALID_IDMAP_ADDR) {
++			res = memblock_virt_alloc(sizeof(*res), 0);
++			res->name = "System RAM (boot alias)";
++			res->start = boot_alias_start;
++			res->end = phys_to_idmap(end);
++			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++			request_resource(&iomem_resource, res);
++		}
++
+ 		res = memblock_virt_alloc(sizeof(*res), 0);
+ 		res->name  = "System RAM";
+-		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+-		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
++		res->start = start;
++		res->end = end;
+ 		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+ 
+ 		request_resource(&iomem_resource, res);
 -- 
 2.1.0
