@@ -1,26 +1,57 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 28 Apr 2016 15:43:28 +0530
-Subject: [PATCH net v3 4/5] dt: cpsw: phy-handle, phy_id, and fixed-link
- are mutually exclusive
-In-Reply-To: <1461807767-4563-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
- <1461807767-4563-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <5721E248.6040106@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 Apr 2016 12:38:28 +0200
+Subject: [PATCH] mmc: sunxi: Disable eMMC HS-DDR (MMC_CAP_1_8V_DDR) for
+ Allwinner A80
+In-Reply-To: <1461685046-24798-1-git-send-email-wens@csie.org>
+References: <1461685046-24798-1-git-send-email-wens@csie.org>
+Message-ID: <CAPDyKFo4xBpS=4nQzeaRs8HsBRSBsrQEuSvRPjgoQVvPUFK7jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2016 07:12 AM, David Rivshin (Allworx) wrote:
-> From: David Rivshin <drivshin@allworx.com>
-> 
-> The phy-handle, phy_id, and fixed-link properties are mutually exclusive,
-> and only one need be specified. Make this clear in the binding doc.
-> 
-> Also mark the phy_id property as deprecated, as phy-handle should be
-> used instead.
-> 
-> Signed-off-by: David Rivshin <drivshin@allworx.com>
+On 26 April 2016 at 17:37, Chen-Yu Tsai <wens@csie.org> wrote:
+> eMMC HS-DDR no longer works on the A80, despite it working when support
+> for this developed.
+>
+> Disable it for now.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reviewed-by: Mugunthan V N <mugunthanvnm@ti.com>
+Thanks, applied for fixes!
 
-Regards
-Mugunthan V N
+Kind regards
+Uffe
+
+> ---
+>
+> Hi,
+>
+> When i worked on this it was working, but now it isn't. Unfortunately I
+> don't have my old tree to do a proper bisect. I probably won't have time
+> to dig into this issue before v4.6 release, so it's best to disable it
+> on the A80 for now.
+>
+> Thanks.
+>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 8372a413848c..7fc8b7aa83f0 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -1129,6 +1129,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>                                   MMC_CAP_1_8V_DDR |
+>                                   MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
+>
+> +       /* TODO MMC DDR is not working on A80 */
+> +       if (of_device_is_compatible(pdev->dev.of_node,
+> +                                   "allwinner,sun9i-a80-mmc"))
+> +               mmc->caps &= ~MMC_CAP_1_8V_DDR;
+> +
+>         ret = mmc_of_parse(mmc);
+>         if (ret)
+>                 goto error_free_dma;
+> --
+> 2.8.1
+>
