@@ -1,243 +1,206 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 28 Apr 2016 17:12:09 +0100
-Subject: [PATCH v2] iommu/arm-smmu: Decouple context format from kernel config
-In-Reply-To: <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <173006777218859d1671ae517c70592c6c02f630.1460391217.git.robin.murphy@arm.com>
-Message-ID: <395a76625458d198d3264b9ef91d4b619a3a14e0.1461858185.git.robin.murphy@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 28 Apr 2016 11:20:35 -0500
+Subject: [PATCH] arm64: Relocate screen_info.lfb_base on PCI BAR allocation
+In-Reply-To: <1461795744-28837-1-git-send-email-agraf@suse.de>
+References: <1461795744-28837-1-git-send-email-agraf@suse.de>
+Message-ID: <20160428162035.GB19785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way the driver currently forces an AArch32 or AArch64 context format
-based on the kernel config and SMMU architecture version is suboptimal,
-in that it makes it very hard to support oddball mix-and-match cases
-like the SMMUv1 64KB supplement, or situations where the reduced table
-depth of an AArch32 short descriptor context may be desirable under an
-AArch64 kernel. It also only happens to work on current implementations
-which do support all the relevant formats.
+On Thu, Apr 28, 2016 at 12:22:24AM +0200, Alexander Graf wrote:
+> When booting with efifb, we get a frame buffer address passed into the system.
+> This address can be backed by any device, including PCI devices.
 
-Introduce an explicit notion of context format, so we can manage that
-independently and get rid of the inflexible #ifdeffery.
+I guess we get the frame buffer address via EFI, but it doesn't tell
+us what PCI device it's connected to?
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+This same thing could happen on any EFI arch, I guess.  Maybe even on
+non-EFI arches, if there's a way to discover the frame buffer address
+as a bare address rather than a "offset X into BAR Y of PCI device Z"
+sort of thing.
 
-Changes since v1:
-- Simplify the format decision to let the io-pgtable code pick AArch64
-  granules itself, since (pl330 shenanigans aside) MMU-401 actually
-  works better than it claims to. I'll look into abstracting this away
-  completely into io-pgtable so it can be shared with SMMUv3 and others.
-- Remove a couple more now-dead lines from arm_smmu_device_cfg_probe()
-  which I missed first time around.
-
-Robin.
-
- drivers/iommu/arm-smmu.c | 94 ++++++++++++++++++++++++++++++++++++------------
- 1 file changed, 72 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index acff3326f818..625348431c5e 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -117,6 +117,8 @@
- #define ID0_NTS				(1 << 28)
- #define ID0_SMS				(1 << 27)
- #define ID0_ATOSNS			(1 << 26)
-+#define ID0_PTFS_NO_AARCH32		(1 << 25)
-+#define ID0_PTFS_NO_AARCH32S		(1 << 24)
- #define ID0_CTTW			(1 << 14)
- #define ID0_NUMIRPT_SHIFT		16
- #define ID0_NUMIRPT_MASK		0xff
-@@ -317,6 +319,11 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
- #define ARM_SMMU_FEAT_TRANS_OPS		(1 << 5)
- #define ARM_SMMU_FEAT_VMID16		(1 << 6)
-+#define ARM_SMMU_FEAT_FMT_AARCH64_4K	(1 << 7)
-+#define ARM_SMMU_FEAT_FMT_AARCH64_16K	(1 << 8)
-+#define ARM_SMMU_FEAT_FMT_AARCH64_64K	(1 << 9)
-+#define ARM_SMMU_FEAT_FMT_AARCH32_L	(1 << 10)
-+#define ARM_SMMU_FEAT_FMT_AARCH32_S	(1 << 11)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
-@@ -346,10 +353,18 @@ struct arm_smmu_device {
- 	u32				cavium_id_base; /* Specific to Cavium */
- };
- 
-+enum arm_smmu_context_fmt {
-+	ARM_SMMU_CTX_FMT_NONE,
-+	ARM_SMMU_CTX_FMT_AARCH64,
-+	ARM_SMMU_CTX_FMT_AARCH32_L,
-+	ARM_SMMU_CTX_FMT_AARCH32_S,
-+};
-+
- struct arm_smmu_cfg {
- 	u8				cbndx;
- 	u8				irptndx;
- 	u32				cbar;
-+	enum arm_smmu_context_fmt	fmt;
- };
- #define INVALID_IRPTNDX			0xff
- 
-@@ -619,14 +634,13 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
- 		reg += leaf ? ARM_SMMU_CB_S1_TLBIVAL : ARM_SMMU_CB_S1_TLBIVA;
- 
--		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
-+		if (cfg->fmt != ARM_SMMU_CTX_FMT_AARCH64) {
- 			iova &= ~12UL;
- 			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
- 			do {
- 				writel_relaxed(iova, reg);
- 				iova += granule;
- 			} while (size -= granule);
--#ifdef CONFIG_64BIT
- 		} else {
- 			iova >>= 12;
- 			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
-@@ -634,9 +648,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 				writeq_relaxed(iova, reg);
- 				iova += granule >> 12;
- 			} while (size -= granule);
--#endif
- 		}
--#ifdef CONFIG_64BIT
- 	} else if (smmu->version == ARM_SMMU_V2) {
- 		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
- 		reg += leaf ? ARM_SMMU_CB_S2_TLBIIPAS2L :
-@@ -646,7 +658,6 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 			smmu_write_atomic_lq(iova, reg);
- 			iova += granule >> 12;
- 		} while (size -= granule);
--#endif
- 	} else {
- 		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
- 		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
-@@ -745,11 +756,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
- 
- 	if (smmu->version > ARM_SMMU_V1) {
--#ifdef CONFIG_64BIT
--		reg = CBA2R_RW64_64BIT;
--#else
--		reg = CBA2R_RW64_32BIT;
--#endif
-+		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-+			reg = CBA2R_RW64_64BIT;
-+		else
-+			reg = CBA2R_RW64_32BIT;
- 		/* 16-bit VMIDs live in CBA2R */
- 		if (smmu->features & ARM_SMMU_FEAT_VMID16)
- 			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
-@@ -860,16 +870,40 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	if (!(smmu->features & ARM_SMMU_FEAT_TRANS_S2))
- 		smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
- 
-+	/*
-+	 * Choosing a suitable context format is even more fiddly. Until we
-+	 * grow some way for the caller to express a preference, and/or move
-+	 * the decision into the io-pgtable code where it arguably belongs,
-+	 * just aim for the closest thing to the rest of the system, and hope
-+	 * that the hardware isn't mental enough that we can't assume AArch64
-+	 * support to be a superset of AArch32 support...
-+	 */
-+	if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH32_L)
-+		cfg->fmt = ARM_SMMU_CTX_FMT_AARCH32_L;
-+	if ((IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) &&
-+	    (smmu->features & (ARM_SMMU_FEAT_FMT_AARCH64_64K |
-+			       ARM_SMMU_FEAT_FMT_AARCH64_16K |
-+			       ARM_SMMU_FEAT_FMT_AARCH64_4K)))
-+		cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
-+
-+	if (cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
-+		ret = -EINVAL;
-+		goto out_unlock;
-+	}
-+
- 	switch (smmu_domain->stage) {
- 	case ARM_SMMU_DOMAIN_S1:
- 		cfg->cbar = CBAR_TYPE_S1_TRANS_S2_BYPASS;
- 		start = smmu->num_s2_context_banks;
- 		ias = smmu->va_size;
- 		oas = smmu->ipa_size;
--		if (IS_ENABLED(CONFIG_64BIT))
-+		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64) {
- 			fmt = ARM_64_LPAE_S1;
--		else
-+		} else {
- 			fmt = ARM_32_LPAE_S1;
-+			ias = min(ias, 32UL);
-+			oas = min(oas, 40UL);
-+		}
- 		break;
- 	case ARM_SMMU_DOMAIN_NESTED:
- 		/*
-@@ -881,10 +915,13 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		start = 0;
- 		ias = smmu->ipa_size;
- 		oas = smmu->pa_size;
--		if (IS_ENABLED(CONFIG_64BIT))
-+		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64) {
- 			fmt = ARM_64_LPAE_S2;
--		else
-+		} else {
- 			fmt = ARM_32_LPAE_S2;
-+			ias = min(ias, 40UL);
-+			oas = min(oas, 40UL);
-+		}
- 		break;
- 	default:
- 		ret = -EINVAL;
-@@ -1670,6 +1707,12 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 					   ID0_NUMSIDB_MASK;
- 	}
- 
-+	if (smmu->version < ARM_SMMU_V2 || !(id & ID0_PTFS_NO_AARCH32)) {
-+		smmu->features |= ARM_SMMU_FEAT_FMT_AARCH32_L;
-+		if (!(id & ID0_PTFS_NO_AARCH32S))
-+			smmu->features |= ARM_SMMU_FEAT_FMT_AARCH32_S;
-+	}
-+
- 	/* ID1 */
- 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID1);
- 	smmu->pgshift = (id & ID1_PAGESIZE) ? 16 : 12;
-@@ -1725,22 +1768,29 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 
- 	if (smmu->version == ARM_SMMU_V1) {
- 		smmu->va_size = smmu->ipa_size;
--		size = SZ_4K | SZ_2M | SZ_1G;
- 	} else {
- 		size = (id >> ID2_UBS_SHIFT) & ID2_UBS_MASK;
- 		smmu->va_size = arm_smmu_id_size_to_bits(size);
--#ifndef CONFIG_64BIT
--		smmu->va_size = min(32UL, smmu->va_size);
--#endif
--		size = 0;
- 		if (id & ID2_PTFS_4K)
--			size |= SZ_4K | SZ_2M | SZ_1G;
-+			smmu->features |= ARM_SMMU_FEAT_FMT_AARCH64_4K;
- 		if (id & ID2_PTFS_16K)
--			size |= SZ_16K | SZ_32M;
-+			smmu->features |= ARM_SMMU_FEAT_FMT_AARCH64_16K;
- 		if (id & ID2_PTFS_64K)
--			size |= SZ_64K | SZ_512M;
-+			smmu->features |= ARM_SMMU_FEAT_FMT_AARCH64_64K;
- 	}
- 
-+	/* Now we've corralled the various formats, what'll it do? */
-+	size = 0;
-+	if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH32_S)
-+		size |= SZ_4K | SZ_64K | SZ_1M | SZ_16M;
-+	if (smmu->features &
-+	    (ARM_SMMU_FEAT_FMT_AARCH32_L | ARM_SMMU_FEAT_FMT_AARCH64_4K))
-+		size |= SZ_4K | SZ_2M | SZ_1G;
-+	if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_16K)
-+		size |= SZ_16K | SZ_32M;
-+	if (smmu->features & ARM_SMMU_FEAT_FMT_AARCH64_64K)
-+		size |= SZ_64K | SZ_512M;
-+
- 	arm_smmu_ops.pgsize_bitmap &= size;
- 	dev_notice(smmu->dev, "\tSupported page sizes: 0x%08lx\n", size);
- 
--- 
-2.8.1.dirty
+> PCI devices can have their BARs mapped to various places inside the PCI window
+> though. Linux makes use of that on early boot and usually maps PCI BARs wherever
+> it thinks makes sense.
+> 
+> If we now load the efifb driver after that BAR map has happened, the frame
+> buffer address we received may be invalid, because it was in a BAR map before
+> Linux modified it.
+> 
+> To work around that issue, this patch introduces a BAR mapping callback that
+> gets called every time Linux (re)allocates a BAR. That way our arm64 efi code
+> can check whether the frame buffer is inside the old map and adjust it to
+> the new one.
+> 
+> With this and the efifb patches applied, I can successfully see efifb output
+> even after Linux remapped BARs.
+> 
+> Signed-off-by: Alexander Graf <agraf@suse.de>
+> ---
+>  arch/arm64/kernel/efi.c | 40 +++++++++++++++++++++++++++++++++++++++-
+>  drivers/pci/setup-res.c | 29 +++++++++++++++++++++++++++++
+>  include/linux/pci.h     |  8 ++++++++
+>  3 files changed, 76 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 56a76b6..3612110 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pci.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/efi.h>
+> @@ -213,6 +214,41 @@ static __init void reserve_regions(void)
+>  	set_bit(EFI_MEMMAP, &efi.flags);
+>  }
+>  
+> +#ifdef CONFIG_PCI
+> +static bool efi_pci_overlaps_efifb(struct pci_bar_update_info *update_info)
+> +{
+> +	/* is the screen_info frame buffer inside the pci BAR? */
+> +	if (screen_info.lfb_base >= update_info->old_start &&
+> +	    (screen_info.lfb_base + screen_info.lfb_size) <=
+> +	     (update_info->old_start + update_info->size))
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+> +static int efi_pci_notifier(struct notifier_block *self,
+> +			    unsigned long cmd, void *v)
+> +{
+> +	struct pci_bar_update_info *update_info = v;
+> +
+> +	/*
+> +	 * When we reallocate a BAR that contains our frame buffer, set the
+> +	 * screen_info base to where it belongs
+> +	 */
+> +	if (efi_pci_overlaps_efifb(update_info)) {
+> +		u64 diff = (update_info->new_start - update_info->old_start);
+> +		screen_info.lfb_base += diff;
+> +	}
+> +
+> +	return NOTIFY_OK;
+> +}
+> +static struct notifier_block efi_pci_notifier_block = {
+> +	.notifier_call = efi_pci_notifier,
+> +};
+> +#else
+> +#define pci_notify_on_update_resource(a)
+> +#endif
+> +
+>  void __init efi_init_fdt(void *fdt)
+>  {
+>  	struct efi_fdt_params params;
+> @@ -246,8 +282,10 @@ void __init efi_init_fdt(void *fdt)
+>  	reserve_regions();
+>  	early_memunmap(memmap.map, params.mmap_size);
+>  
+> -	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI)
+> +	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI) {
+> +		pci_notify_on_update_resource(&efi_pci_notifier_block);
+>  		memblock_reserve(screen_info.lfb_base, screen_info.lfb_size);
+> +	}
+>  }
+>  
+>  static int __init register_gop_device(void)
+> diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
+> index 604011e..d5c24fc 100644
+> --- a/drivers/pci/setup-res.c
+> +++ b/drivers/pci/setup-res.c
+> @@ -23,8 +23,10 @@
+>  #include <linux/ioport.h>
+>  #include <linux/cache.h>
+>  #include <linux/slab.h>
+> +#include <linux/notifier.h>
+>  #include "pci.h"
+>  
+> +static RAW_NOTIFIER_HEAD(bar_update_chain);
+>  
+>  void pci_update_resource(struct pci_dev *dev, int resno)
+>  {
+> @@ -35,6 +37,9 @@ void pci_update_resource(struct pci_dev *dev, int resno)
+>  	int reg;
+>  	enum pci_bar_type type;
+>  	struct resource *res = dev->resource + resno;
+> +	struct pci_bar_update_info update_info;
+> +	struct pci_bus_region update_reg;
+> +	struct resource update_res;
+>  
+>  	if (dev->is_virtfn) {
+>  		dev_warn(&dev->dev, "can't update VF BAR%d\n", resno);
+> @@ -77,6 +82,22 @@ void pci_update_resource(struct pci_dev *dev, int resno)
+>  	}
+>  
+>  	/*
+> +	 * Fetch the old BAR location from the device, so we can notify
+> +	 * users of that BAR that its location is changing.
+> +	 */
+> +	pci_read_config_dword(dev, reg, &check);
+> +	update_reg.start = check & PCI_BASE_ADDRESS_MEM_MASK;
+> +	if (check & PCI_BASE_ADDRESS_MEM_TYPE_64) {
+> +		pci_read_config_dword(dev, reg, &check);
+> +		update_reg.start |= ((u64)check) << 32;
+> +	}
+> +	update_info.size = region.end - region.start;
+> +	update_reg.end = update_reg.start + update_info.size;
+> +	pcibios_bus_to_resource(dev->bus, &update_res, &update_reg);
+> +	update_info.old_start = update_res.start;
+> +	update_info.new_start = res->start;
+> +
+> +	/*
+>  	 * We can't update a 64-bit BAR atomically, so when possible,
+>  	 * disable decoding so that a half-updated BAR won't conflict
+>  	 * with another device.
+> @@ -108,6 +129,14 @@ void pci_update_resource(struct pci_dev *dev, int resno)
+>  
+>  	if (disable)
+>  		pci_write_config_word(dev, PCI_COMMAND, cmd);
+> +
+> +	/* Tell interested parties that the BAR mapping changed */
+> +	raw_notifier_call_chain(&bar_update_chain, 0, &update_info);
+> +}
+> +
+> +int pci_notify_on_update_resource(struct notifier_block *nb)
+> +{
+> +        return raw_notifier_chain_register(&bar_update_chain, nb);
+>  }
+>  
+>  int pci_claim_resource(struct pci_dev *dev, int resource)
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index c061250..04a430e 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -30,6 +30,7 @@
+>  #include <linux/device.h>
+>  #include <linux/io.h>
+>  #include <linux/resource_ext.h>
+> +#include <linux/notifier.h>
+>  #include <uapi/linux/pci.h>
+>  
+>  #include <linux/pci_ids.h>
+> @@ -1037,6 +1038,13 @@ int pci_select_bars(struct pci_dev *dev, unsigned long flags);
+>  bool pci_device_is_present(struct pci_dev *pdev);
+>  void pci_ignore_hotplug(struct pci_dev *dev);
+>  
+> +struct pci_bar_update_info {
+> +	u64 old_start;
+> +	u64 new_start;
+> +	u64 size;
+> +};
+> +int pci_notify_on_update_resource(struct notifier_block *nb);
+> +
+>  /* ROM control related routines */
+>  int pci_enable_rom(struct pci_dev *pdev);
+>  void pci_disable_rom(struct pci_dev *pdev);
+> -- 
+> 1.8.5.6
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
