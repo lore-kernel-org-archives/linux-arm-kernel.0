@@ -1,47 +1,27 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Thu, 28 Apr 2016 11:53:22 -0700
-Subject: VDSO unmap and remap support for additional architectures
-In-Reply-To: <1461856737-17071-1-git-send-email-cov@codeaurora.org>
-References: <20151202121918.GA4523@arm.com>
- <1461856737-17071-1-git-send-email-cov@codeaurora.org>
-Message-ID: <2ce7203f-305c-6edf-0ef9-448c141cb103@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 28 Apr 2016 21:04:28 +0200
+Subject: [GIT PULL 1/3] ARM: dts: exynos: Secound round of DTS for v4.7
+In-Reply-To: <1956683.Gv388axJqA@wuerfel>
+References: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
+ <1461748256-4394-2-git-send-email-k.kozlowski@samsung.com>
+ <1956683.Gv388axJqA@wuerfel>
+Message-ID: <20160428190428.GA10520@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2016 08:18 AM, Christopher Covington wrote:
-> Please take a look at the following prototype of sharing the PowerPC
-> VDSO unmap and remap code with other architectures. I've only hooked
-> up arm64 to begin with. If folks think this is a reasonable approach I
-> can work on 32 bit ARM as well. Not hearing back from an earlier
-> request for guidance [1], I simply dove in and started hacking.
-> Laurent's test case [2][3] is a compelling illustration of whether VDSO
-> remap works or not on a given architecture.
+On Thu, Apr 28, 2016 at 04:06:54PM +0200, Arnd Bergmann wrote:
+> On Wednesday 27 April 2016 11:10:54 Krzysztof Kozlowski wrote:
+> >   kernel.org:/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.7-2
+> > 
+> 
+> Pulled into next/dt after I figured out that the URL was wrong.
+> 
+> Please check your git configuration to make sure you send an address
+> I can pull from.
 
-I think there's a much nicer way:
+Ah, indeed, sorry for that. I still did not automate entirely this process
+so apparently I am doing simple mistakes. I'll be more carefull next
+time.
 
-https://lkml.kernel.org/r/1461584223-9418-1-git-send-email-dsafonov at virtuozzo.com
-
-Could arm64 and ppc use this approach?  These arch_xyz hooks are gross.
-
-Also, at some point, possibly quite soon, x86 will want a way for user code to ask the kernel to map a specific vdso variant at a specific address.  Could we perhaps add a new pair of syscalls:
-
-struct vdso_info {
-    unsigned long space_needed_before;
-    unsigned long space_needed_after;
-    unsigned long alignment;
-};
-
-long vdso_get_info(unsigned int vdso_type, struct vdso_info *info);
-
-long vdso_remap(unsigned int vdso_type, unsigned long addr, unsigned int flags);
-
-#define VDSO_X86_I386 0
-#define VDSO_X86_64 1
-#define VDSO_X86_X32 2
-// etc.
-
-vdso_remap will map the vdso of the chosen type such at AT_SYSINFO_EHDR lines up with addr.  It will use up to space_needed_before bytes before that address and space_needed_after after than address.  It will also unmap the old vdso (or maybe only do that if some flag is set).
-
-On x86, mremap is *not* sufficient for everything that's needed, because some programs will need to change the vdso type.
-
---Andy
+Best regards,
+Krzysztof
