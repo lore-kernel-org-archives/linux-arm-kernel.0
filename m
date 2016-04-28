@@ -1,37 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 17:56:16 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT PM Domain Updates for v4.7
-In-Reply-To: <cover.1461730638.git.horms+renesas@verge.net.au>
-References: <cover.1461730638.git.horms+renesas@verge.net.au>
-Message-ID: <5702417.rnCUR69ruo@wuerfel>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 28 Apr 2016 11:03:39 -0500
+Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
+In-Reply-To: <20160428163646.432e2c68@free-electrons.com>
+References: <20160427225827.GC17629@localhost>
+ <20160428141920.GB12470@localhost>
+ <20160428163646.432e2c68@free-electrons.com>
+Message-ID: <20160428160339.GA19785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2016 14:20:34 Simon Horman wrote:
-> Please consider these Renesas ARM based SoC DT pm-domain updates for v4.7.
+On Thu, Apr 28, 2016 at 04:36:46PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> This pull requests is based on a merge of:
+> On Thu, 28 Apr 2016 09:19:20 -0500, Bjorn Helgaas wrote:
 > 
-> * "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
->   v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
->   pulled.
-> * "[GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.7",
->   tagged as renesas-dt-for-v4.7, which you have also already pulled.
+> > >         coherency_cpu_base = of_iomap(np, 0);
+> > > -       arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+> > > +       arch_ioremap_caller = armada_wa_ioremap_caller;
+> > > +       pci_ioremap_set_mem_type(MT_UNCACHED);
+> > 
+> > This makes sense to me because I think this changes ioremap() to do
+> > the right thing.
 > 
-> The reason for the somewhat tedious base on
-> renesas-rcar-sysc2-for-v4.7, which provides driver changes,
-> is a hard run-time dependency.
+> What changes ioremap() to do the right thing for all mappings *except*
+> PCI I/O mappings:
 > 
-> I also have a similar set of changes for arm64 which I will send separately.
+>    arch_ioremap_caller = armada_wa_ioremap_caller;
+> 
+> >  But my concern is that ioremap_page_range() doesn't
+> > actually use ioremap(), so pci_ioremap_set_mem_type() has no effect on
+> > that path.  pci_remap_iospace() uses ioremap_page_range(), so I
+> > suspect it will use the wrong attributes.
+> 
+> Indeed, ioremap_page_range() doesn't use ioremap(), and that's why
+> there is this separate pci_ioremap_set_mem_type() to ensure that
+> mappings done for PCI I/O space are done with MT_UNCACHED.
+> 
+> And indeed, pci_remap_iospace() would not work for me, as it wouldn't
+> use the memory attributes set by pci_ioremap_set_mem_type().
 
+Right.  pci_remap_iospace() is a generic interface and should work
+on all arches.  It *is* declared __weak, but there's no arch-specific
+implementation of it, and I think if we made ioremap_page_range()
+truly generic, we could make pci_remap_iospace() non-weak.
 
-Ok, I've started a next/late branch for this now, but unless something
-else comes up that needs to be sent much later, I expect to submit
-this as the last pull request at the same time as all the other ones
-for 4.7.
+> To be honest, I am wondering why we're not using the same memory
+> attribute for PCI I/O space as the memory attributes used for anything
+> else that's ioremapped. In practice, that's what happens on ARM:
+> ioremap() uses MT_DEVICE by default, and pci_ioremap_io() uses
+> MT_DEVICE as well.
+> 
+> > >  1/ Providing an alternate version of pci_remap_iospace() that allows
+> > >     to pass the memory attribute to be used.
+> > 
+> > I'd rather fix ioremap_page_range() somehow, because that's an
+> > exported interface, and if we only fix pci_remap_iospace(), we still
+> > have to worry about ioremap_page_range() doing the wrong thing.
+> 
+> What do you want to fix in ioremap_page_range() ? It already allows
+> passing the memory type that you want, so I'm not sure to understand.
 
-For further clarification, am I right reading the above as meaning that
-a 4.7 kernel is expected to still work with the dts files from 4.6,
-but not the other way round?
+Yes, but in order for ioremap_page_range() to work on arm, we have to
+pass in an arm-specific memory type
+(__pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte)).
 
-	Arnd
+We can't do that because ioremap_page_range() is a generic function,
+implemented in lib/ioremap.c and exported to modules, and generic
+callers only know about pgprot_noncached, pgprot_writecombine,
+pgprot_writethrough, pgprot_device, etc.
