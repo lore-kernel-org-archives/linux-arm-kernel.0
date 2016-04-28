@@ -1,50 +1,50 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 28 Apr 2016 10:28:09 +0100
-Subject: [PATCH 05/12] ARM: kdump: advertise boot aliased crash kernel resource
+Date: Thu, 28 Apr 2016 10:28:19 +0100
+Subject: [PATCH 07/12] ARM: keystone: dts: add psci command definition
 In-Reply-To: <20160428092644.GX19428@n2100.arm.linux.org.uk>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
-Message-ID: <E1aviEz-0000j7-Gk@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1aviF9-0000jM-Qs@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Advertise a resource which describes where the crash kernel is located
-in the boot view of RAM.  This allows kexec-tools to have this vital
-information.
+From: Vitaly Andrianov <vitalya@ti.com>
 
+This commit adds definition for cpu_on, cpu_off and cpu_suspend commands.
+These definitions must match the corresponding PSCI definitions in
+boot monitor.
+
+Having those command and corresponding PSCI support in boot monitor allows
+run time CPU hot plugin.
+
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/setup.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d9317eec1eba..19b25ad61385 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1003,9 +1003,25 @@ static void __init reserve_crashkernel(void)
- 		(unsigned long)(crash_base >> 20),
- 		(unsigned long)(total_mem >> 20));
+This patch is already queued by Santosh, and only exists as part of this
+series for completeness.
+
+ arch/arm/boot/dts/keystone.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 3f272826f537..007648971744 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -59,6 +59,14 @@
+ 			     <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>;
+ 	};
  
-+	/* The crashk resource must always be located in normal mem */
- 	crashk_res.start = crash_base;
- 	crashk_res.end = crash_base + crash_size - 1;
- 	insert_resource(&iomem_resource, &crashk_res);
++	psci {
++		compatible	= "arm,psci";
++		method		= "smc";
++		cpu_suspend	= <0x84000001>;
++		cpu_off		= <0x84000002>;
++		cpu_on		= <0x84000003>;
++	};
 +
-+	if (arm_has_idmap_alias()) {
-+		/*
-+		 * If we have a special RAM alias for use at boot, we
-+		 * need to advertise to kexec tools where the alias is.
-+		 */
-+		static struct resource crashk_boot_res = {
-+			.name = "Crash kernel (boot alias)",
-+			.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+		};
-+
-+		crashk_boot_res.start = phys_to_idmap(crash_base);
-+		crashk_boot_res.end = crashk_boot_res.start + crash_size - 1;
-+		insert_resource(&iomem_resource, &crashk_boot_res);
-+	}
- }
- #else
- static inline void reserve_crashkernel(void) {}
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 2.1.0
