@@ -1,38 +1,59 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 28 Apr 2016 15:14:39 -0500
-Subject: [PATCH V6 08/13] PCI: generic, thunder: update to use generic
- ECAM API
-In-Reply-To: <8950494.UV8UrWiFbx@wuerfel>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <3830999.dF71UWYsBP@wuerfel> <57189D2F.9070802@semihalf.com>
- <8950494.UV8UrWiFbx@wuerfel>
-Message-ID: <20160428201439.GD25125@localhost>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 28 Apr 2016 13:22:22 -0700
+Subject: [PATCH V3] clk: bcm2835: mark enabled clocks with
+ CLK_ENABLE_HAND_OFF
+In-Reply-To: <1461770664-29384-1-git-send-email-kernel@martin.sperl.org>
+References: <1461770664-29384-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87d1p9v5z5.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 11:36:53AM +0200, Arnd Bergmann wrote:
-> On Thursday 21 April 2016 11:28:15 Tomasz Nowicki wrote:
-> > On 19.04.2016 15:06, Arnd Bergmann wrote:
-> > > On Monday 18 April 2016 21:31:54 Tomasz Nowicki wrote:
-> > >>
-> > >> Basically the whole content of pci-thunder-ecam.c and pci-thunder-pem.c.
-> > >>
-> > >> pci-thunder-ecam.c contains config space accessors. Similar for
-> > >> pci-thunder-pem.c but it also has extra init call (it is now called
-> > >> thunder_pem_init) which finds and maps related registers.
-> > >
-> > > They seem to do much more than just override the accessors, they actually
-> > > change the contents of the config space as well. Is that really necessary
-> > > on ACPI based systems as well?
-> > 
-> > Yes, the pci-thunder-ecam.c accessors are meant to emulate config space 
-> > capabilities. They are necessary to synthesize EA capabilities (fixed 
-> > PCI BARs), it wont work without this, for ACPI boot as well.
-> 
-> Why is that? I thought the BARs never get reassigned when using ACPI,
+kernel at martin.sperl.org writes:
 
-In general, there's no reason we can't reassign BARs, whether we're
-using DT, ACPI, or whatever.  In many cases, systems with ACPI also
-assign all the BARs in firmware, and Linux doesn't reassign them
-unless it needs to.  But that's just a coincidence.  There's no
-requirement that Linux leave BARs as firmware programmed them.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The bcm2835 firmware enables several clocks and plls before
+> booting the linux kernel.
+>
+> These plls should never get disabled as it may result in a
+> stopped system clock and more.
+>
+> So during probing we check if the clock is enabled
+> and if it is then mark that clock with CLK_ENABLE_HAND_OFF.
+> As a consequence this will also enable the corresponding
+> parent plls and pll-divs.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>
+> --
+
+> ---
+>  drivers/clk/bcm/clk-bcm2835.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index 35f8de7..65d62c2 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> @@ -1251,7 +1251,14 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+>  		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+>  	}
+>
+> +	/* if the clock is running then enable HAND_OFF */
+> +	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
+> +		dev_info(cprman->dev,
+> +			 "found enabled clock %s - enabling hand off\n",
+> +			 data->name);
+> +		init.flags |= CLK_ENABLE_HAND_OFF;
+> +	}
+> +
+
+The debug shouldn't be at dev_info() level, but other than that this
+seems like a good plan once CLK_ENABLE_HAND_OFF lands.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/1def9988/attachment-0001.sig>
