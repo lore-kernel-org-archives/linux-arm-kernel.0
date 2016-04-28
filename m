@@ -1,33 +1,50 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 29 Apr 2016 00:24:10 +0200
-Subject: [GIT PULL 1/3] Rockchip driver updates for v4.7 - part2
+Date: Fri, 29 Apr 2016 00:24:48 +0200
+Subject: [GIT PULL 2/3] Rockchip dts32 updates for v4.7 - part2
 In-Reply-To: <5544434.9tA8JHBIkp@diego>
 References: <5544434.9tA8JHBIkp@diego>
-Message-ID: <2744609.Je9E5Knv0x@diego>
+Message-ID: <76948175.MyD0mx7K4Q@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4506697d9f8537a8d33e9e002f8efceb32d10757:
+The following changes since commit fbf15046f12d6c8d5821c0dc5bf3ffc55a132243:
 
-  soc: rockchip: power-domain: check the existing of regmap (2016-04-12 03:28:08 +0200)
+  ARM: dts: rockchip: move rk3036 memory definition to board files (2016-04-06 16:30:33 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.7-rockchip-drivers-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.7-rockchip-dts32-2
 
-for you to fetch changes up to 074c6a422d86fff76e05cf31be25e0eb752e1bd4:
+for you to fetch changes up to f87305fa00b1d0633d2dc5fd7fb4995bed6a59e8:
 
-  soc: rockchip: power-domain: support qos save and restore (2016-04-21 23:02:16 +0200)
-
-----------------------------------------------------------------
-Ability to save and restore the power-domain quality of service
-settings that get lost and reset on power-domain power cycles.
+  ARM: dts: rockchip: move the rk3288 thermal data into rk3288.dtsi (2016-04-25 09:52:56 +0200)
 
 ----------------------------------------------------------------
-Elaine Zhang (2):
-      dt-bindings: modify document of Rockchip power domains
-      soc: rockchip: power-domain: support qos save and restore
+This adds the rk3288-miqi as new board, adapts the edp-phy settings
+to the binding-change that made it into 4.6, adds rk3288 i2c controller
+nodes and moves the rk3288 thermal data into the soc dtsi, as there
+really is no need to have that separate file.
 
- .../bindings/soc/rockchip/power_domain.txt         |  10 ++
- drivers/soc/rockchip/pm_domains.c                  | 105 ++++++++++++++++++++-
- 2 files changed, 112 insertions(+), 3 deletions(-)
+----------------------------------------------------------------
+Caesar Wang (1):
+      ARM: dts: rockchip: move the rk3288 thermal data into rk3288.dtsi
+
+Heiko Stuebner (4):
+      ARM: dts: rockchip: make rk3288-grf a simple-mfd
+      ARM: dts: rockchip: move rk3288 edp phy under the GRF
+      dt-bindings: add vendor-prefix for mqmaker
+      ARM: dts: rockchip: add MiQi board from mqmaker
+
+Yakir Yang (1):
+      ARM: dts: rockchip: add i2c nodes for RK3228 SoCs
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3228.dtsi                      |  80 ++++
+ arch/arm/boot/dts/rk3288-miqi.dts                  | 472 +++++++++++++++++++++
+ arch/arm/boot/dts/rk3288-thermal.dtsi              | 118 ------
+ arch/arm/boot/dts/rk3288.dtsi                      |  92 +++-
+ 7 files changed, 639 insertions(+), 129 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-miqi.dts
+ delete mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
