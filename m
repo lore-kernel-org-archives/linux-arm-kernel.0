@@ -1,82 +1,126 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Wed, 27 Apr 2016 21:45:45 -0400
-Subject: [PATCH net v3 5/5] drivers: net: cpsw: use of_phy_connect() in
- fixed-link case
-In-Reply-To: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <1461807945-4665-1-git-send-email-drivshin.allworx@gmail.com>
+From: Yisen.zhuang@huawei.com (Yisen Zhuang)
+Date: Thu, 28 Apr 2016 09:45:31 +0800
+Subject: [PATCH v2 net-next 11/13] Documentation: Bindings: Update DT
+ binding for separating dsaf dev support
+In-Reply-To: <CAL_JsqLHrHWtiikSt7F39LoExoL2aep5Pqax5cGWWBw-yhz79g@mail.gmail.com>
+References: <1461402317-136499-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1461402317-136499-12-git-send-email-Yisen.Zhuang@huawei.com>
+ <20160426124847.GA26682@rob-hp-laptop> <57203309.1090501@huawei.com>
+ <CAL_JsqLHrHWtiikSt7F39LoExoL2aep5Pqax5cGWWBw-yhz79g@mail.gmail.com>
+Message-ID: <57216B3B.8000306@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <drivshin@allworx.com>
+Hi Rob,
 
-If a fixed-link DT subnode is used, the phy_device was looked up so
-that a PHY ID string could be constructed and passed to phy_connect().
-This is not necessary, as the device_node can be passed directly to
-of_phy_connect() instead. This reuses the same codepath as if the
-phy-handle DT property was used.
+Thanks for you comments.
 
-Signed-off-by: David Rivshin <drivshin@allworx.com>
-Tested-by: Nicolas Chauvet <kwizart@gmail.com>
-Tested-by: Andrew Goodbody <andrew.goodbody@cambrionix.com>
-Reviewed-by: Mugunthan V N <mugunthanvnm@ti.com>
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
+? 2016/4/27 23:25, Rob Herring ??:
+> On Tue, Apr 26, 2016 at 10:33 PM, Yisen Zhuang <Yisen.zhuang@huawei.com> wrote:
+>> Hi Rob and David,
+>>
+>> Please see my comments inline.
+>>
+>> David have merged this series to net-next, but we need to modify some codes according
+>> to Rob's comments. I am not sure if i need to send V3 for this series, or separate
+>> patches of documentation to independent series and generate a new patch for hns base
+>> on current net-next?
+> 
+> That's David's call. I'm guessing he wants follow-up patches on top of these.
 
-Changes since v2 [1]:
-- Added Tested-by from Andrew Goodbody [3]
-- Added Reviewed-by from Mugunthan V N [4]
-- Added Reviewed-by from Grygorii Strashko [5]
+Okay, I will send a new series base on current net-next.
 
-Changes since v1 [2]:
-- Rebased (trivial conflict, e5a03bfd modified the deleted snprintf)
-- Added Tested-by from Nicolas Chauvet
+> 
+>> ? 2016/4/26 20:48, Rob Herring ??:
+>>> On Sat, Apr 23, 2016 at 05:05:15PM +0800, Yisen Zhuang wrote:
+>>>> Because debug dsaf port was separated from service dsaf port, this patch
+>>>> updates the related information of DT binding.
+>>>
+>>> Separated when? New version of the h/w? If so, where's the new
+>>> compatible string? This is quite a big binding change.
+>>
+>> There isn't any change of h/w. I separated debug dsaf port from sevice dsaf
+>> port to make the code more simple and readability.
+> 
+> Okay.
+> 
+> [...]
+> 
+>>>> +  serdes-syscon rather than this address.
+>>>>    The third region is the PPE register base and size.
+>>>> -  The fourth region is dsa fabric base register and size.
+>>>> -  The fifth region is cpld base register and size, it is not required if do not use cpld.
+>>>> -- phy-handle: phy handle of physicl port, 0 if not any phy device. see ethernet.txt [1].
+>>>> +  The fourth region is dsa fabric base register and size. It is not required for
+>>>> +  single-port mode.
+>>>> +- reg-names: may be ppe-base and(or) dsaf-base. It is used to find the
+>>>> +  corresponding reg's index.
+>>>
+>>> But you have up to 5 regions.
+>>>
+>>> The variable nature of what regions you have tells me you need more
+>>> specific compatible strings for each chip.
+>>
+>> we didn't add support of new h/w. We added these regions to make code simple and readability.
+>> If we need to add support of next h/w version next time, we don't need to add many branches
+>> for these attributes. So we didn't add a new compatible here.
+> 
+> Not sure what you mean by branches. It's fine to put properties for
+> things that vary among h/w versions, but new compatible strings will
+> be needed for any new versions.
 
-[1] http://patchwork.ozlabs.org/patch/613276/
-[2] http://patchwork.ozlabs.org/patch/560327/
-[3] https://lkml.org/lkml/2016/4/22/537
-[4] https://lkml.org/lkml/2016/4/22/63
-[5] https://lkml.org/lkml/2016/4/22/529
+I mean than we put properties for things that vary among h/w versions. If we add support for
+new h/w versions next time, we will add new compatible strings.
 
+> 
+> 
+>>>> +- port: subnodes of dsaf. A dsaf node may contain several port nodes(Depending
+>>>> +  on mode of dsaf). Port node contain some attributes listed below:
+>>>> +- port-id: is physical port index in one dsaf.
+>>>
+>>> Indexes should generally be avoided. What does the number correspond
+>>> to in h/w (if anything)?
+>>
+>> port-id is index for a port in dsaf, it is correspond to index of PHY showed below.
+> 
+> Okay, you should use reg property here instead.
 
- drivers/net/ethernet/ti/cpsw.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+Agree, thanks.
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 712bc6d..e2fcdf1 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -2044,30 +2044,21 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 							"phy-handle", 0);
- 		parp = of_get_property(slave_node, "phy_id", &lenp);
- 		if (slave_data->phy_node) {
- 			dev_dbg(&pdev->dev,
- 				"slave[%d] using phy-handle=\"%s\"\n",
- 				i, slave_data->phy_node->full_name);
- 		} else if (of_phy_is_fixed_link(slave_node)) {
--			struct device_node *phy_node;
--			struct phy_device *phy_dev;
--
- 			/* In the case of a fixed PHY, the DT node associated
- 			 * to the PHY is the Ethernet MAC DT node.
- 			 */
- 			ret = of_phy_register_fixed_link(slave_node);
- 			if (ret)
- 				return ret;
--			phy_node = of_node_get(slave_node);
--			phy_dev = of_phy_find_device(phy_node);
--			if (!phy_dev)
--				return -ENODEV;
--			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
--				 PHY_ID_FMT, phy_dev->mdio.bus->id,
--				 phy_dev->mdio.addr);
-+			slave_data->phy_node = of_node_get(slave_node);
- 		} else if (parp) {
- 			u32 phyid;
- 			struct device_node *mdio_node;
- 			struct platform_device *mdio;
- 
- 			if (lenp != (sizeof(__be32) * 2)) {
- 				dev_err(&pdev->dev, "Invalid slave[%d] phy_id property\n", i);
--- 
-2.5.5
+> 
+>>
+>>                                                          CPU
+>>                                                           |
+>>                                     -----------------------------------
+>>                                     |                     |           |
+>>     ----------------------------------------------    ---------   ---------
+>>     |                         |                  |    |       |   |   |   |
+>>     |                        PPE                 |    |  PPE  |   |  PPE  |
+>>     |                         |                  |    |   |   |   |   |   |
+>>     |                         |                  |    |   |   |   |   |   |
+>>     |                      crossbar              |    |   |   |   |   |   |
+>>     |                         |                  |    |   |   |   |   |   |
+>>     |   ----------------------------------       |    |   |   |   |   |   |
+>>     |   |     |     |      |      |      |       |    |   |   |   |   |   |
+>>     |   |     |     |      |      |      |       |    |   |   |   |   |   |
+>>     |  MAC   MAC   MAC    MAC    MAC    MAC      |    |  MAC  |   |  MAC  |
+>>     |   |     |     |      |      |      |       |    |   |   |   |   |   |
+>>     ----------------------------------------------    ---------   ---------
+>>         |     |     |      |      |      |    \        /  |        /  |
+>>        PHY   PHY   PHY    PHY    PHY    PHY    \      /  PHY      /  PHY
+>>                                                 \    /           /
+>>                                                  \  /           /
+>>                                              DSAF(three platform device)
+>>
+>>>
+>>>> +- phy-handle: phy handle of physicl port. It is not required if there isn't
+> 
+> Another typo here.
+
+Agree, thanks.
+
+> 
+> Rob
+> 
+> .
+> 
