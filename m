@@ -1,32 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 16:19:40 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.7
-In-Reply-To: <1813099.gFLC2Strmj@wuerfel>
-References: <cover.1461723181.git.horms+renesas@verge.net.au>
- <1813099.gFLC2Strmj@wuerfel>
-Message-ID: <4612233.87LvTVpE8A@wuerfel>
+Date: Thu, 28 Apr 2016 16:23:56 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20160428141611.GK19428@n2100.arm.linux.org.uk>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <87y47ykzmz.fsf@intel.com> <20160428141611.GK19428@n2100.arm.linux.org.uk>
+Message-ID: <2806018.GHhm6tEuKR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2016 16:14:15 Arnd Bergmann wrote:
-> On Wednesday 27 April 2016 14:06:43 Simon Horman wrote:
-> > Second Round of Renesas ARM64 Based SoC DT Updates for v4.7
+On Thursday 28 April 2016 15:16:12 Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2016 at 09:37:08AM +0300, Felipe Balbi wrote:
 > > 
-> > * Don't disable referenced optional clocks in DT of r8a7795 SoC
-> > * Populate EXTALR in DT of salvator-x board
-> > * Enable PCIe in DT of salvator-x board
+> > Hi,
 > > 
+> > Arnd Bergmann <arnd@arndb.de> writes:
+> > >    pointer and pass that in platform_data. This is really easy, it's
+> > 
+> > Sorry but passing a struct device pointer in platform_data is
+> > ridiculous. Not to mention that, as I said before, we can't assume which
+> > device to pass to xhci_plat in the first place. It might be dwc->dev and
+> > it might be dwc->dev->parent.
 > 
-> Pulled into next/dt64.
-> 
-> I briefly looked at the contents and noticed that the PCIe host
-> node you add has a dma-ranges property, but its parent node does
-> not, so you are still limited to 32-bit DMA and you should fix that.
-> 
+> +1.  Passing an unref-counted struct device through platform data is
+> totally mad, Arnd you're off your rocker if you think that's a good
+> idea.  What's more is that there's no way to properly refcount the
+> thing.
 
-On a closer look, it seems that the memory you map into the PCI
-is only 1 GB in size, so it's not really a problem, but I think
-it's cleaner to have an explicit dma-ranges property anyway.
+It's the parent device (or NULL), there is no way it can ever go away as
+it's already refcounted through the device subsystem by the creation
+of the child device.
+
+I do realize that it's a hack, but the idea is to get rid of that
+as soon as possibly by fixing the way the xhci device is probe so
+we no longer need to fake a platform_device as the child here and
+can just use the device itself.
 
 	Arnd
