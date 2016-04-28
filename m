@@ -1,83 +1,117 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:41 +0100
-Subject: [PATCH v2 22/54] KVM: arm/arm64: vgic-new: Export register access
- interface
+Date: Thu, 28 Apr 2016 17:45:42 +0100
+Subject: [PATCH v2 23/54] KVM: arm/arm64: vgic-new: Add CTLR,
+ TYPER and IIDR handlers
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-23-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-24-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Userland can access the emulated GIC to save and restore its state
-for initialization or migration purposes.
-The kvm_io_bus API requires an absolute gpa, which does not fit the
-KVM_DEV_ARM_VGIC_GRP_DIST_REGS user API, that only provides relative
-offsets. So we provide a wrapper to plug into our MMIO framework and
-find the respective register handler.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+Changelog RFC..v1:
+- kick VCPUs is the distributor gets enabled
+- improve comment
+
 Changelog v1 .. v2:
 - adapt to new MMIO framework
-- handle endianess explicitly
+- use switch() statements to improve readability
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 30 ++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 2 files changed, 32 insertions(+)
+ include/linux/irqchip/arm-gic.h  |  1 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 48 +++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h         |  3 +++
+ 3 files changed, 51 insertions(+), 1 deletion(-)
 
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index be0d26f..fd05185 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -33,6 +33,7 @@
+ 
+ #define GIC_DIST_CTRL			0x000
+ #define GIC_DIST_CTR			0x004
++#define GIC_DIST_IIDR			0x008
+ #define GIC_DIST_IGROUP			0x080
+ #define GIC_DIST_ENABLE_SET		0x100
+ #define GIC_DIST_ENABLE_CLEAR		0x180
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index afee778..02814a0 100644
+index 02814a0..bf64bbf 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -60,3 +60,33 @@ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
+@@ -20,9 +20,55 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
  
- 	return SZ_4K;
- }
-+
-+/*
-+ * When userland tries to access the VGIC register handlers, we need to
-+ * create a usable struct vgic_io_device to be passed to the handlers and we
-+ * have to set up a buffer similar to what would have happened if a guest MMIO
-+ * access occurred, including doing endian conversions on BE systems.
-+ */
-+int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+			int offset, u32 *val)
++static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
 +{
-+	unsigned int len = 4;
-+	u8 buf[4];
-+	int ret;
++	u32 value;
 +
-+	struct vgic_io_device dev = {
-+		.regions = vgic_v2_dist_registers,
-+		.nr_regions = ARRAY_SIZE(vgic_v2_dist_registers),
-+	};
-+
-+	if (is_write) {
-+		vgic_data_host_to_mmio_bus(buf, len, *val);
-+		ret = kvm_io_gic_ops.write(vcpu, &dev.dev, offset, len, buf);
-+	} else {
-+		ret = kvm_io_gic_ops.read(vcpu, &dev.dev, offset, len, buf);
-+		if (!ret)
-+			*val = vgic_data_mmio_bus_to_host(buf, len);
++	switch (addr & 0x0c) {
++	case GIC_DIST_CTRL:
++		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
++		break;
++	case GIC_DIST_CTR:
++		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = (value >> 5) - 1;
++		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
++		break;
++	case GIC_DIST_IIDR:
++		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++		break;
++	default:
++		return 0;
 +	}
 +
-+	return ret;
++	return extract_bytes(value, addr & 3, len);
 +}
++
++static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val)
++{
++	switch (addr & 0x0c) {
++	case GIC_DIST_CTRL:
++		if (!(addr & 1)) {
++			struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++			bool was_enabled = dist->enabled;
++
++			dist->enabled = val & GICD_ENABLE;
++			if (!was_enabled && dist->enabled)
++				vgic_kick_vcpus(vcpu->kvm);
++		}
++		break;
++	case GIC_DIST_CTR:
++	case GIC_DIST_IIDR:
++		/* Nothing to do */
++		return;
++	}
++}
++
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 12),
++		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 0c92cda..008588b 100644
+index 008588b..1ab7d97 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -28,6 +28,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+			 int offset, u32 *val);
+@@ -16,6 +16,9 @@
+ #ifndef __KVM_ARM_VGIC_NEW_H__
+ #define __KVM_ARM_VGIC_NEW_H__
  
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ 
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
 -- 
 2.7.3
