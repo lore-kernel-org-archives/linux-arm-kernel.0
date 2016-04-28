@@ -1,152 +1,70 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 28 Apr 2016 14:13:02 +0200
-Subject: [PATCH v2 03/10] gpio: stmpe: fix edge and rising/falling edge
- detection
+Date: Thu, 28 Apr 2016 14:13:04 +0200
+Subject: [PATCH v2 05/10] mfd: stmpe: use generic bit mask name
 In-Reply-To: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
 References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1461845589-4826-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <1461845589-4826-6-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-By cross-checking STMPE 610/801/811/1601/2401/2403 datasheets,
-it appears that edge detection and rising/falling edge detection
-is not supported by all STMPE variant:
-
-           GPIO              GPIO
-      Edge detection     rising/falling
-                         edge detection
- 610 |      X        |         X       |
- 801 |               |                 |
- 811 |      X        |         X       |
-1600 |               |                 |
-1601 |      X        |         X       |
-1801 |               |         X       |
-2401 |      X        |         X       |
-2403 |      X        |         X       |
-
-Rework stmpe_dbg_show_one() and stmpe_gpio_irq to correctly
-take these cases into account.
+In order to prepare the ground to STMPE1600,
+as STMPE1600's SYS_CTRL register has the same layout as
+STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
+bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-stmpe.c | 85 +++++++++++++++++++++++++++++++++--------------
- 1 file changed, 60 insertions(+), 25 deletions(-)
+ drivers/mfd/stmpe.c | 4 ++--
+ drivers/mfd/stmpe.h | 6 ++----
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
-index 5197edf..bfc918c 100644
---- a/drivers/gpio/gpio-stmpe.c
-+++ b/drivers/gpio/gpio-stmpe.c
-@@ -231,39 +231,74 @@ static void stmpe_dbg_show_one(struct seq_file *s,
- 			   gpio, label ?: "(none)",
- 			   val ? "hi" : "lo");
- 	} else {
--		u8 edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] + num_banks - 1 - (offset / 8);
--		u8 rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] - (offset / 8);
--		u8 fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] - (offset / 8);
--		u8 irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] - (offset / 8);
--		bool edge_det;
--		bool rise;
--		bool fall;
-+		u8 edge_det_reg;
-+		u8 rise_reg;
-+		u8 fall_reg;
-+		u8 irqen_reg;
-+
-+		char *edge_det_values[] = {"edge-inactive",
-+					   "edge-asserted",
-+					   "not-supported"};
-+		char *rise_values[] = {"no-rising-edge-detection",
-+				       "rising-edge-detection",
-+				       "not-supported"};
-+		char *fall_values[] = {"no-falling-edge-detection",
-+				       "falling-edge-detection",
-+				       "not-supported"};
-+		#define NOT_SUPPORTED_IDX 2
-+		u8 edge_det = NOT_SUPPORTED_IDX;
-+		u8 rise = NOT_SUPPORTED_IDX;
-+		u8 fall = NOT_SUPPORTED_IDX;
- 		bool irqen;
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index af682d0..2556463 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -1089,7 +1089,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
  
--		ret = stmpe_reg_read(stmpe, edge_det_reg);
--		if (ret < 0)
--			return;
--		edge_det = !!(ret & mask);
--		ret = stmpe_reg_read(stmpe, rise_reg);
--		if (ret < 0)
-+		switch (stmpe->partnum) {
-+		case STMPE610:
-+		case STMPE811:
-+		case STMPE1601:
-+		case STMPE2401:
-+		case STMPE2403:
-+			edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] +
-+				       num_banks - 1 - (offset / 8);
-+			ret = stmpe_reg_read(stmpe, edge_det_reg);
-+			if (ret < 0)
-+				return;
-+			edge_det = !!(ret & mask);
-+
-+		case STMPE1801:
-+			rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] -
-+				   (offset / 8);
-+			fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] -
-+				   (offset / 8);
-+			ret = stmpe_reg_read(stmpe, rise_reg);
-+			if (ret < 0)
-+				return;
-+			rise = !!(ret & mask);
-+			ret = stmpe_reg_read(stmpe, fall_reg);
-+			if (ret < 0)
-+				return;
-+			fall = !!(ret & mask);
-+
-+		case STMPE801:
-+			irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] -
-+				    (offset / 8);
-+			break;
-+
-+		default:
- 			return;
--		rise = !!(ret & mask);
--		ret = stmpe_reg_read(stmpe, fall_reg);
--		if (ret < 0)
--			return;
--		fall = !!(ret & mask);
-+		}
-+
- 		ret = stmpe_reg_read(stmpe, irqen_reg);
- 		if (ret < 0)
- 			return;
- 		irqen = !!(ret & mask);
+ 	if (stmpe->irq >= 0) {
+ 		if (id == STMPE801_ID)
+-			icr = STMPE801_REG_SYS_CTRL_INT_EN;
++			icr = STMPE_SYS_CTRL_INT_EN;
+ 		else
+ 			icr = STMPE_ICR_LSB_GIM;
  
--		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
-+		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %13s %13s %25s %25s",
- 			   gpio, label ?: "(none)",
- 			   val ? "hi" : "lo",
--			   edge_det ? "edge-asserted" : "edge-inactive",
--			   irqen ? "IRQ-enabled" : "",
--			   rise ? " rising-edge-detection" : "",
--			   fall ? " falling-edge-detection" : "");
-+			   edge_det_values[edge_det],
-+			   irqen ? "IRQ-enabled" : "IRQ-disabled",
-+			   rise_values[rise],
-+			   fall_values[fall]);
- 	}
- }
+@@ -1103,7 +1103,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+ 		if (irq_trigger == IRQF_TRIGGER_RISING ||
+ 				irq_trigger == IRQF_TRIGGER_HIGH) {
+ 			if (id == STMPE801_ID)
+-				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
++				icr |= STMPE_SYS_CTRL_INT_HI;
+ 			else
+ 				icr |= STMPE_ICR_LSB_HIGH;
+ 		}
+diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
+index 4ae343d..4ba1123 100644
+--- a/drivers/mfd/stmpe.h
++++ b/drivers/mfd/stmpe.h
+@@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
+ #define STMPE_ICR_LSB_GIM	(1 << 0)
  
-@@ -322,8 +357,8 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ #define STMPE_SYS_CTRL_RESET	(1 << 7)
++#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
++#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
  
- 		stmpe_reg_write(stmpe, statmsbreg + i, status[i]);
+ /*
+  * STMPE801
+@@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
+ #define STMPE801_REG_GPIO_SET_PIN	0x11
+ #define STMPE801_REG_GPIO_DIR		0x12
  
--		/* Edge detect register is not present on 801 */
--		if (stmpe->partnum != STMPE801)
-+		/* Edge detect register is not present on 801 and 1801 */
-+		if (stmpe->partnum != STMPE801 || stmpe->partnum != STMPE1801)
- 			stmpe_reg_write(stmpe, stmpe->regs[STMPE_IDX_GPEDR_MSB]
- 					+ i, status[i]);
- 	}
+-#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
+-#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
+-#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
+-
+ /*
+  * STMPE811
+  */
 -- 
 1.9.1
