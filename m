@@ -1,31 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 15:49:05 +0200
-Subject: NXP LPC32xx DT Updates for v4.7
-In-Reply-To: <57215540.7060706@mleia.com>
-References: <57215540.7060706@mleia.com>
-Message-ID: <5081718.tFEgkGbhtW@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2016 14:50:28 +0100
+Subject: [PATCH 3/3] ARM: domain: move {set, get}_domain under config guard
+In-Reply-To: <5720AD9D.7020909@arm.com>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <1461325416-29570-4-git-send-email-vladimir.murzin@arm.com>
+ <20160427104918.GQ19428@n2100.arm.linux.org.uk>
+ <5720AD9D.7020909@arm.com>
+Message-ID: <20160428135028.GE19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2016 03:11:44 Vladimir Zapolskiy wrote:
-> NXP LPC32xx device tree updates for v4.7
+On Wed, Apr 27, 2016 at 01:16:29PM +0100, Vladimir Murzin wrote:
+> I've confused myself that support for CPU_SW_DOMAIN_PAN implies
+> CONFIG_CPU_USE_DOMAINS, but now I see they are in fact different
+> features/users of those accessors.
 > 
-> This includes a few functional changes:
-> * new representation of MIC, SIC1 and SIC2 interrupt controllers,
-> * disabled by default SPI1, SPI2, SSP0 and SSP1 SPI controllers in
->   shared lpc32xx.dtsi file,
-> * added clock sources for SPI1 and SPI2,
-> * set default clock rate of HCLK PLL to main osc rate multiplied by 16.
-> 
-> Also there are some non-functional changes:
-> * flatten board DTS files by exploiting device node labels,
-> * add 'partitions' device node for NAND SLC / MTD OF,
-> * correct Atmel vendor prefix to describe on board AT24 EEPROMs,
-> * rename board DTS files by adding SoC name prefix.
-> 
-> Since now DTS files of LPC32xx boards match "^lpc32[2345]0-" pattern.
-> 
+> So something like below should be sufficient to fix my case, right?
 
-Looks all good, pulled into next/dt, thanks!
+How about:
 
-	Arnd
+ arch/arm/include/asm/domain.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+index fc8ba1663601..4e218993c12d 100644
+--- a/arch/arm/include/asm/domain.h
++++ b/arch/arm/include/asm/domain.h
+@@ -84,6 +84,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#ifdef CONFIG_CPU_CP15
+ static inline unsigned int get_domain(void)
+ {
+ 	unsigned int domain;
+@@ -103,6 +104,16 @@ static inline void set_domain(unsigned val)
+ 	  : : "r" (val) : "memory");
+ 	isb();
+ }
++#else
++static inline unsigned int get_domain(void)
++{
++	return 0;
++}
++
++static inline void set_domain(unsigned val)
++{
++}
++#endif
+ 
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ #define modify_domain(dom,type)					\
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
