@@ -1,38 +1,25 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Apr 2016 00:22:19 +0200
-Subject: [PATCH v3 0/3] Extend the LED panic trigger
-In-Reply-To: <1461881020-13964-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1461881020-13964-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <20160428222219.GA2155@amd>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 29 Apr 2016 00:23:22 +0200
+Subject: [GIT PULL 0/3] Rockchip updates for v4.7 - part2
+Message-ID: <5544434.9tA8JHBIkp@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-04-28 19:03:37, Ezequiel Garcia wrote:
-> As per commit 916fe619951f ("leds: trigger: Introduce a kernel
-> panic LED trigger"), the kernel now supports a new LED trigger
-> to hook on the panic blink.
-> 
-> However, the only way of using this is to dedicate a LED device,
-> making it rather useless.
-> 
-> To overcome this limitation, the present series introduces the
-> capability to switch the LED trigger of certain LED devices upon
-> a kernel panic (using the panic notifier).
-> 
-> The decision of which LEDs should be switched to the panic trigger
-> is left to each LED device driver. As an example, a devicetree
-> boolean property is introduced and used in the leds-gpio driver.
-> 
-> The big change in this v3 is that I've moved the panic trigger
-> switching away from the core code and it's now part of
-> ledtrig-panic.c. Pavel, Jacek: How does it look?
+Hi Arnd, Kevin, Olof,
 
-Seems better now. Thanks for doing that.
+please find in reply to this mail a second set of pull requests with stuff for 
+4.7 going on top of the previous round 1.
 
-For the series:
+Some more work on the power-domain driver, a new rk3288 board + some smaller 
+changes and on the arm64 side basic devicetree support for the new and shiny 
+rk3399 and its evaluation board.
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+The individual signed tags also explain the changes a bit more. And the arm64 
+branch contains a branch shared with the clock-tree that contains the new 
+clock-binding header for the rk3399.
+
+So if it looks ok, please pull.
+
+
+Thanks
+Heiko
