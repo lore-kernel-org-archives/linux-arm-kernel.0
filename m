@@ -1,46 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2016 22:40:35 +0200
-Subject: [PATCH V6 08/13] PCI: generic,
- thunder: update to use generic ECAM API
-In-Reply-To: <20160428201439.GD25125@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <8950494.UV8UrWiFbx@wuerfel> <20160428201439.GD25125@localhost>
-Message-ID: <5813591.CkzahFEfSl@wuerfel>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 28 Apr 2016 23:43:07 +0300
+Subject: [PATCH 2/2] [media] ir-rx51: Fix build after multiarch changes
+ broke it
+In-Reply-To: <20160428202248.GG5995@atomide.com>
+References: <1461714709-10455-1-git-send-email-tony@atomide.com>
+ <1461714709-10455-3-git-send-email-tony@atomide.com>
+ <572266AF.9020601@gmail.com> <20160428202248.GG5995@atomide.com>
+Message-ID: <572275DB.8090300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2016 15:14:39 Bjorn Helgaas wrote:
-> On Thu, Apr 21, 2016 at 11:36:53AM +0200, Arnd Bergmann wrote:
-> > On Thursday 21 April 2016 11:28:15 Tomasz Nowicki wrote:
-> > > On 19.04.2016 15:06, Arnd Bergmann wrote:
-> > > > On Monday 18 April 2016 21:31:54 Tomasz Nowicki wrote:
-> > > >>
-> > > >> Basically the whole content of pci-thunder-ecam.c and pci-thunder-pem.c.
-> > > >>
-> > > >> pci-thunder-ecam.c contains config space accessors. Similar for
-> > > >> pci-thunder-pem.c but it also has extra init call (it is now called
-> > > >> thunder_pem_init) which finds and maps related registers.
-> > > >
-> > > > They seem to do much more than just override the accessors, they actually
-> > > > change the contents of the config space as well. Is that really necessary
-> > > > on ACPI based systems as well?
-> > > 
-> > > Yes, the pci-thunder-ecam.c accessors are meant to emulate config space 
-> > > capabilities. They are necessary to synthesize EA capabilities (fixed 
-> > > PCI BARs), it wont work without this, for ACPI boot as well.
-> > 
-> > Why is that? I thought the BARs never get reassigned when using ACPI,
-> 
-> In general, there's no reason we can't reassign BARs, whether we're
-> using DT, ACPI, or whatever.  In many cases, systems with ACPI also
-> assign all the BARs in firmware, and Linux doesn't reassign them
-> unless it needs to.  But that's just a coincidence.  There's no
-> requirement that Linux leave BARs as firmware programmed them.
+??,
 
-I'm thought I've seen systems in which the ACPI BIOS assumes that
-certain PCI devices never move around, because it pokes the registers
-from AML, and changing them would require never using the same device
-through ACPI. It's likely that this is against some standard, but that
-won't help you if you have to deal with the system anyway.
+On 28.04.2016 23:22, Tony Lindgren wrote:
+> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 12:39]:
+>> On 27.04.2016 02:51, Tony Lindgren wrote:
+>>
+>> omap_dm_timer_request_specific always fails with message "Please use
+>> omap_dm_timer_request_by_cap/node()" with DT boot.
+>>
+>> I hacked the code to use omap_dm_timer_request_by_cap(OMAP_TIMER_HAS_PWM)
+>> and it seems to use the correct timer (IR LED blinks, checked with the
+>> camera of Samsung S4 mini), but it doesn't actually control either of the TV
+>> sets here. The same SW(pierogi) controls them when device is booted to stock
+>> kernel. However, this seems another problem not related to the patch.
+>
+> OK thanks for testing, I'll apply the pdata patch then.
+>
+> I assume you'll post a separate fix for the request_by_cap
+> driver change?
+>
 
-	Arnd
+Well, it was a hack, it just happens that the first matched timer is 
+GPT9, I think we should aim for a proper solution (request_by_node()).
+
+Shall I prepare a patch that gets the timer from the DT?
+
+Ivo
