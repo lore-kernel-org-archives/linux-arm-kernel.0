@@ -1,82 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Apr 2016 14:13:23 +0100
-Subject: [PATCH v6 00/10] arm64: Add support for KVM with ACPI
-In-Reply-To: <1460388780-914-1-git-send-email-julien.grall@arm.com>
-References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
-Message-ID: <57220C73.7010900@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 28 Apr 2016 15:17:58 +0200
+Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <CACh+v5ObRAf=7D3tbQdAzef+QRVObF_9eHJEreXwxVyrV8THcA@mail.gmail.com>
+References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
+ <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
+ <20160428104925.7eb12ca2@bbrezillon>
+ <CACh+v5Mi2Qd58SZkwW0mZ3ZJx3Rv3mwSkRqzgHwBTxpUbwjVFQ@mail.gmail.com>
+ <20160428144607.191a29f2@bbrezillon>
+ <CACh+v5ObRAf=7D3tbQdAzef+QRVObF_9eHJEreXwxVyrV8THcA@mail.gmail.com>
+Message-ID: <20160428151758.7fe54037@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Thomas, Jason]
+On Thu, 28 Apr 2016 14:54:39 +0200
+Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
 
-Do you have any objection against this going through the KVM tree? The
-dependencies are rather intricate, and Daniel gave us his green light
-already for the clocksource part.
+> 2016-04-28 14:46 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+> > On Thu, 28 Apr 2016 14:18:25 +0200
+> > Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:  
+> >> >> > +
+> >> >> > +- atmel,ncs-rd-setup-ns
+> >> >> > +- atmel,nrd-setup-ns
+> >> >> > +- atmel,ncs-wr-setup-ns
+> >> >> > +- atmel,nwe-setup-ns
+> >> >> > +- atmel,ncs-rd-pulse-ns
+> >> >> > +- atmel,nrd-pulse-ns
+> >> >> > +- atmel,ncs-wr-pulse-ns
+> >> >> > +- atmel,nwe-pulse-ns
+> >> >> > +- atmel,nwe-cycle-ns
+> >> >> > +- atmel,nrd-cycle-ns
+> >> >> > +- atmel,tdf-ns  
+> >> >>
+> >> >> One thought about the configuration in 'ns' unit: Some devices may
+> >> >> have requirements expressed in clock cycles (I'm thinking of FPGA
+> >> >> here). At  a fixed frequency one can always convert manually from 'ns'
+> >> >> to 'clocks' but it's a bit tedious and prone to rounding errors. And
+> >> >> It 'll  break when the EBI frequency is changed  
+> >> >
+> >> > If you don't mind, I'd like to first get this version accepted, and
+> >> > we'll extend it with timings expressed in clock cycles afterward.
+> >> >
+> >> > BTW, could you describe a real use case where timings should be
+> >> > expressed in clock cycles? I mean, usually the devices have some timing
+> >> > constraints (tXX_min = Y ns), and I don't see why it would differ for
+> >> > FPGA interfaces, but I'm clearly not an FPGA expert.  
+> >>
+> >> I'm not either, I only toyed with FPGA. That's just what experienced
+> >> FPGA designer told me.
+> >> I guess that it boils down to: FPGA are more suited for a synchronous
+> >> design than an asynchronous one.  
+> >
+> > The thing is, all the timings are based on the master clock, and,
+> > AFAICS, this clk signal is not exposed, so you're basing your clk-cycle  
+> while EBI itself is asynchronous, the clk can be exposed through one
+> of the PCK. I've seen this in real projects.
 
-If you'd rather maintain the usual flow, please let us know and we'll
-deal with it.
-
-Thanks,
-
-	M.
-
-On 11/04/16 16:32, Julien Grall wrote:
-> Hello,
-> 
-> This patch series allows KVM to work with ACPI on ARM64.
-> 
-> Currently, the firmware tables are parsed by the the virtual timer and virtual
-> GIC code in order to configure them correctly.
-> 
-> However the parsing of these tables is already done in the GIC and arch timer
-> drivers. This patch series introduces new helpers to retrieve the information
-> from the different drivers in order to avoid duplication of the parsing code.
-> 
-> To make the merge easier via the different trees, each patch modifies a single
-> subsystem. The suggested plan to merge the series is divided in 3 steps:
-> 
-> 1) Patches #1-#2 are merged via the clocksource tree
->    Patches #2-#7 are merged via the irqchip tree
-> 2) Patches #8-#9 are merge via the KVM tree
-> 3) Patch #10 is merged via the clocksource tree.
-> 
-> For all the changes see in each patch.
-> 
-> Regards,
-> 
-> 
-> Julien Grall (10):
->   clocksource: arm_arch_timer: Gather KVM specific information in a
->     structure
->   clocksource: arm_arch_timer: Extend arch_timer_kvm_info to get the
->     virtual IRQ
->   irqchip/gic-v2: Gather ACPI specific data in a single structure
->   irqchip/gic-v2: Parse and export virtual GIC information
->   irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
->   irqchip/gic-v3: Gather all ACPI specific data in a single structure
->   irqchip/gic-v3: Parse and export virtual GIC information
->   KVM: arm/arm64: arch_timer: Rely on the arch timer to parse the
->     firmware tables
->   KVM: arm/arm64: vgic: Rely on the GIC driver to parse the firmware
->     tables
->   clocksource: arm_arch_timer: Remove arch_timer_get_timecounter
-> 
->  drivers/clocksource/arm_arch_timer.c   |  11 ++-
->  drivers/irqchip/irq-gic-common.c       |  13 +++
->  drivers/irqchip/irq-gic-common.h       |   3 +
->  drivers/irqchip/irq-gic-v3.c           | 176 +++++++++++++++++++++++++++------
->  drivers/irqchip/irq-gic.c              |  87 +++++++++++++++-
->  include/clocksource/arm_arch_timer.h   |  12 +--
->  include/kvm/arm_vgic.h                 |   7 +-
->  include/linux/irqchip/arm-gic-common.h |  34 +++++++
->  virt/kvm/arm/arch_timer.c              |  40 +++-----
->  virt/kvm/arm/vgic-v2.c                 |  61 +++++-------
->  virt/kvm/arm/vgic-v3.c                 |  47 +++------
->  virt/kvm/arm/vgic.c                    |  50 +++++-----
->  12 files changed, 377 insertions(+), 164 deletions(-)
->  create mode 100644 include/linux/irqchip/arm-gic-common.h
-> 
-
+Okay, then it makes sense. But if you need such a complex thing it
+would probably be better to create a new driver and let this driver
+adapt the timings dynamically (I plan to expose an few fonctions for
+the NAND controller, so it would be possible to create an FPGA driver
+referencing the PCK clk and adapting the EBI timings).
 
 -- 
-Jazz is not dead. It just smells funny...
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
