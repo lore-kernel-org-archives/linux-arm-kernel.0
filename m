@@ -1,63 +1,58 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 28 Apr 2016 15:21:50 -0400
-Subject: [PATCH] ARM: dts: exynos: Add MFC memory banks for Peach boards
-Message-ID: <1461871311-18344-1-git-send-email-javier@osg.samsung.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 28 Apr 2016 15:30:07 -0400
+Subject: [PATCH V17 1/3] dmaengine: qcom_hidma: implement lower level
+ hardware interface
+In-Reply-To: <20160426162441.GJ2274@localhost>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-2-git-send-email-okaya@codeaurora.org>
+ <20160426032805.GA2274@localhost> <571F8397.5000803@codeaurora.org>
+ <20160426162441.GJ2274@localhost>
+Message-ID: <572264BF.5010703@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MFC nodes with the memory regions reserved for memory allocations
-are missing in the Exynos5420 Peach Pit and Exynos5800 Peach Pi DTS.
+On 4/26/2016 12:24 PM, Vinod Koul wrote:
+>> +
+>> > +       dev_err(lldev->dev, "error 0x%x, resetting...\n",
+>> > +               cause);
+> right justify this and others as well please
+> 
 
-This causes the s5p-mfc driver probe to fail with the following error:
+Can you please point me to other lines that need to be fixed please? It looks good
+to me though it doesn't to you. I want to make sure that I'm touching the right ones.
+You seem to prefer a tab following an open parenthesis in your code. Do you want me to
+add a tab for every single multi-line such that it comes this for instance?
 
-[    4.140647] s5p_mfc_alloc_memdevs:1072: Failed to declare coherent memory for MFC device
-[    4.216163] s5p-mfc: probe of 11000000.codec failed with error -12
 
-Add the missing nodes so the driver probes and the {en,de}coder video
-nodes are registered correctly:
+	ret = readl_poll_timeout(lldev->trca + HIDMA_TRCA_CTRLSTS_REG, val,
+				 	HIDMA_CH_STATE(val) == HIDMA_CH_DISABLED, 
+					1000, 10000); 
 
-[    4.096277] s5p-mfc 11000000.codec: decoder registered as /dev/video4
-[    4.102282] s5p-mfc 11000000.codec: encoder registered as /dev/video5
+instead of
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+	ret = readl_poll_timeout(lldev->trca + HIDMA_TRCA_CTRLSTS_REG, val,
+				 HIDMA_CH_STATE(val) == HIDMA_CH_DISABLED, 1000,
+				 10000); 
 
----
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 +++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 +++++
- 2 files changed, 10 insertions(+)
+>>>> > >> +int hidma_ll_resume(struct hidma_lldev *lldev)
+>>>> > >> +{
+>>>> > >> +	return hidma_ll_enable(lldev);
+>>>> > >> +}
+>>> > > 
+>>> > > why do we need this empty function, use hidma_ll_enable.
+>> > 
+>> > hidma_ll_enable is a common function that gets called from multiple places. 
+>> > hidma_ll_resume and hidma_ll_pause is used by the OS interface for pausing
+>> > and resuming the DMA channel. 
+> is there a reason why we can't have the code in resume and that being called
+> internally as well as externally?
+> 
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index b644858231b6..f9d2e4f1a0e0 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -694,6 +694,11 @@
- 	status = "okay";
- };
- 
-+&mfc {
-+	samsung,mfc-r = <0x43000000 0x800000>;
-+	samsung,mfc-l = <0x51000000 0x800000>;
-+};
-+
- &mmc_0 {
- 	status = "okay";
- 	num-slots = <1>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 6ba9aec15485..62ceb89e073f 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -669,6 +669,11 @@
- 	status = "okay";
- };
- 
-+&mfc {
-+	samsung,mfc-r = <0x43000000 0x800000>;
-+	samsung,mfc-l = <0x51000000 0x800000>;
-+};
-+
- &mmc_0 {
- 	status = "okay";
- 	num-slots = <1>;
+I'll have the pause code in OS layer call hidma_ll_enable and get rid of pause
+function here.
+
 -- 
-2.5.5
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
