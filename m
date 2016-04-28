@@ -1,40 +1,24 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Thu, 28 Apr 2016 21:54:06 +0200
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <20160428164856.10120.qmail@ns.horizon.com>
-References: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
- <20160428164856.10120.qmail@ns.horizon.com>
-Message-ID: <20160428195326.GB29802@ravnborg.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 28 Apr 2016 14:56:19 -0500
+Subject: [PATCH 2/2] Documentation: devicetree: Add PL310 PM bindings
+In-Reply-To: <1461771351-11645-3-git-send-email-brad.mouring@ni.com>
+References: <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+ <1461771351-11645-1-git-send-email-brad.mouring@ni.com>
+ <1461771351-11645-3-git-send-email-brad.mouring@ni.com>
+Message-ID: <CAL_JsqLbf+LyZzpQKKeGzeK_JMcDvOOBjTpQik1rpFuqGbJeYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> __ffs on the available architectures:
-> 	Alpha: sometimes (CONFIG_ALPHA_EV6, CONFIG_ALPHA_EV67)
-> 	ARC: sometimes (!CONFIG_ISA_ARCOMPACT)
-> 	ARM: sometimes (V5+)
-> 	ARM64: NO, could be written using RBIT and CLZ
-> 	AVR: yes
-> 	Blackfin: NO, could be written using hweight()
-> 	C6x: yes
-> 	CRIS: NO
-> 	FR-V: yes
-> 	H8300: NO
-> 	Hexagon: yes
-> 	IA64: yes
-> 	M32R: NO
-> 	M68k: sometimes
-> 	MetaG: NO
-> 	Microblaze: NO
-> 	MIPS: sometimes
-> 	MN10300: yes
-> 	OpenRISC: NO
-> 	PA-RISC: NO?  Interesting code, but I think it's a net loss.
-> 	PowerPC: yes
-> 	S390: sometimes (CONFIG_HAVE_MARCH_Z9_109_FEATURES)
-> 	Score: NO
-> 	SH: NO
-> 	SPARC: NO
-SPARC: sparc64: YES, sparc32: NO
-Patch needs to be updated to refelct this.
+On Wed, Apr 27, 2016 at 10:35 AM, Brad Mouring <brad.mouring@ni.com> wrote:
+> Document the DT bindings for controlling ARM PL310 Power Control
+> settings.
+>
+> Discussion on the binding wording:
+> http://archive.arm.linux.org.uk/lurker/message/20160427.143444.5141d302.en.html
+>
+> Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+> ---
+>  Documentation/devicetree/bindings/arm/l2c2x0.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-	Sam
+Acked-by: Rob Herring <robh@kernel.org>
