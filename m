@@ -1,165 +1,111 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 28 Apr 2016 10:49:25 +0200
-Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
-References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
- <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
-Message-ID: <20160428104925.7eb12ca2@bbrezillon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Apr 2016 10:55:27 +0200
+Subject: [GIT PULL] drm: Allwinner sun4i support
+Message-ID: <20160428085527.GA4129@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Jacques,
+Hi Dave,
 
-On Thu, 28 Apr 2016 10:32:49 +0200
-Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
+Please consider the following pull request to introduce the support
+for the Allwinner SoCs display engine.
 
-> Hi Boris,
-> 
-> i haven't seen this code in a while :) I'm glad you're working on it
-> 
-> 2016-04-27 16:35 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> > The EBI (External Bus Interface) is used to access external peripherals
-> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> > Each device is assigned a CS line and an address range and can have its
-> > own configuration (timings, access mode, bus width, ...).
-> > This driver provides a generic DT binding to configure a device according
-> > to its requirements.
-> > For specific device controllers (like the NAND one) the SMC timings
-> > should be configured by the controller driver through the matrix and smc
-> > syscon regmaps.
-> >
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  .../bindings/memory-controllers/atmel,ebi.txt      | 146 +++++++++++++++++++++
-> >  1 file changed, 146 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> > new file mode 100644
-> > index 0000000..0f332d2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> > @@ -0,0 +1,146 @@
-> > +* Device tree bindings for Atmel EBI
-> > +
-> > +The External Bus Interface (EBI) controller is a bus where you can connect
-> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
-> > +(Static Memory Controller).
-> > +Synchronous memories (and some asynchronous memories like NANDs) can be
-> > +attached to specialized controllers which are responsible for configuring the
-> > +bus appropriately according to the connected device.
-> > +In the other hand, the bus interface can be automated for simple asynchronous
-> > +devices.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible:          "atmel,at91sam9260-ebi"
-> > +                       "atmel,at91sam9261-ebi"
-> > +                       "atmel,at91sam9263-ebi0"
-> > +                       "atmel,at91sam9263-ebi1"
-> > +                       "atmel,at91sam9rl-ebi"
-> > +                       "atmel,at91sam9g45-ebi"
-> > +                       "atmel,at91sam9x5-ebi"
-> > +                       "atmel,sama5d3-ebi"
-> > +
-> > +- reg:                 Contains offset/length value for EBI memory mapping.
-> > +                       This property might contain several entries if the EBI
-> > +                       memory range is not contiguous
-> > +
-> > +- #address-cells:      Must be 2.
-> > +                       The first cell encodes the CS.
-> > +                       The second cell encode the offset into the CS memory
-> > +                       range.
-> > +
-> > +- #size-cells:         Must be set to 1.
-> > +
-> > +- ranges:              Encodes CS to memory region association.
-> > +
-> > +- clocks:              Clock feeding the EBI controller.
-> > +                       See clock-bindings.txt
-> > +
-> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
-> > +such as NOR (e.g. cfi-flash) and NAND.
-> > +There might be board specific devices like FPGAs.
-> > +You'll define you device requirements in these child nodes.
-> > +
-> > +Required child cs node properties:
-> > +
-> > +- #address-cells:      Must be 2.
-> > +
-> > +- #size-cells:         Must be 1.
-> > +
-> > +- ranges:              Empty property indicating that child nodes can inherit
-> > +                       memory layout.
-> > +
-> > +Optional child cs node properties:
-> > +- atmel,bus-width:             width of the asynchronous device's data bus
-> > +                               8, 16 or 32.
-> > +                               8 if not present.
-> > +
-> > +- atmel,byte-access-type       "write" or "select" (see Atmel datasheet).
-> > +                               "select" if not present.
-> > +
-> > +- atmel,read-mode              "nrd" or "ncs".
-> > +                               "ncs" is not present.
-> > +
-> > +- atmel,write-mode             "nwe" or "ncs".
-> > +                               "ncs" is not present.
-> > +
-> > +- atmel,exnw-mode              "disabled", "frozen" or "ready".
-> > +                               "disabled" if not present.
-> > +
-> > +- atmel,page-mode              enable page mode if present. The provided value
-> > +                               defines the page size (supported values: 4, 8,
-> > +                               16 and 32).
-> > +
-> > +Optional device timings expressed in nanoseconds (if the property is not
-> > +present 0 is assumed):  
-> 
-> IMO If no timing information is provided, it's probably better not to
-> change it. It may have been configured by the bootloader or romboot.
-> It may not be the perfect timings but at least it could work, whereas
-> filling up with 0 is most probably going to break the access: it's a
-> kind of very agressive timing optimization
-
-Yes, probably. I'll make all those timings mandatory in the next
-version.
-
-> 
-> > +
-> > +- atmel,ncs-rd-setup-ns
-> > +- atmel,nrd-setup-ns
-> > +- atmel,ncs-wr-setup-ns
-> > +- atmel,nwe-setup-ns
-> > +- atmel,ncs-rd-pulse-ns
-> > +- atmel,nrd-pulse-ns
-> > +- atmel,ncs-wr-pulse-ns
-> > +- atmel,nwe-pulse-ns
-> > +- atmel,nwe-cycle-ns
-> > +- atmel,nrd-cycle-ns
-> > +- atmel,tdf-ns  
-> 
-> One thought about the configuration in 'ns' unit: Some devices may
-> have requirements expressed in clock cycles (I'm thinking of FPGA
-> here). At  a fixed frequency one can always convert manually from 'ns'
-> to 'clocks' but it's a bit tedious and prone to rounding errors. And
-> It 'll  break when the EBI frequency is changed
-
-If you don't mind, I'd like to first get this version accepted, and
-we'll extend it with timings expressed in clock cycles afterward.
-
-BTW, could you describe a real use case where timings should be
-expressed in clock cycles? I mean, usually the devices have some timing
-constraints (tXX_min = Y ns), and I don't see why it would differ for
-FPGA interfaces, but I'm clearly not an FPGA expert.
+This is based on my latest patch set, adressing the minor reviews made
+during that latest round.
 
 Thanks,
+Maxime
 
-Boris
+The following changes since commit 152ef5fa9e14e93e7efc43adad7dbcf35d7780f5:
+
+  drm: Switch blobs to the new generic modeset obj refcounting (2016-04-27 09:58:05 +1000)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sun4i-drm-for-4.7
+
+for you to fetch changes up to bf1139dfe797c0d6037dd689219a431516490544:
+
+  MAINTAINERS: Add a maintainer for the Allwinner DRM driver (2016-04-28 10:30:05 +0200)
+
+----------------------------------------------------------------
+Allwinner DRM driver for 4.7
+
+This pull request introduces the sun4i driver, meant to be used on the
+older Allwinner SoCs (A10, A13, A20, A23, A31 and A33).
+
+It currently supports only the A13, which has one of the simplest video
+pipeline. Support for other video components and SoCs will be added
+eventually.
+
+It supports only a RGB or composite output. It doesn't do HDMI, VGA, LVDS
+or power management yet, but that will come in time as well.
+
+----------------------------------------------------------------
+Maxime Ripard (8):
+      drm: fb: Add seq_file definition
+      drm: sun4i: Add DT bindings documentation
+      drm: Add Allwinner A10 Display Engine support
+      drm: sun4i: Add RGB output
+      drm: sun4i: Add composite output
+      drm: sun4i: tv: Add PAL output standard
+      drm: sun4i: tv: Add NTSC output standard
+      MAINTAINERS: Add a maintainer for the Allwinner DRM driver
+
+ .../bindings/display/sunxi/sun4i-drm.txt           | 258 ++++++++
+ MAINTAINERS                                        |   7 +
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   3 +-
+ drivers/gpu/drm/sun4i/Kconfig                      |  14 +
+ drivers/gpu/drm/sun4i/Makefile                     |  13 +
+ drivers/gpu/drm/sun4i/sun4i_backend.c              | 364 +++++++++++
+ drivers/gpu/drm/sun4i/sun4i_backend.h              | 165 +++++
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 | 120 ++++
+ drivers/gpu/drm/sun4i/sun4i_crtc.h                 |  30 +
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c             | 160 +++++
+ drivers/gpu/drm/sun4i/sun4i_dotclock.h             |  21 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  | 358 +++++++++++
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |  30 +
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c          |  54 ++
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.h          |  19 +
+ drivers/gpu/drm/sun4i/sun4i_layer.c                | 161 +++++
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |  30 +
+ drivers/gpu/drm/sun4i/sun4i_rgb.c                  | 250 ++++++++
+ drivers/gpu/drm/sun4i/sun4i_rgb.h                  |  18 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 561 ++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 | 186 ++++++
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   | 708 +++++++++++++++++++++
+ include/drm/drm_fb_cma_helper.h                    |   2 +
+ 24 files changed, 3533 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+ create mode 100644 drivers/gpu/drm/sun4i/Kconfig
+ create mode 100644 drivers/gpu/drm/sun4i/Makefile
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_backend.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_backend.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_crtc.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_crtc.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_dotclock.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_dotclock.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_drv.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_drv.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_framebuffer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_layer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_layer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_rgb.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_rgb.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_tcon.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_tcon.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_tv.c
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/2d553697/attachment.sig>
