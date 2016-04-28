@@ -1,39 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Apr 2016 13:24:25 +0100
-Subject: [PATCH] arm64: Drop CONFIG_RTC_LIB dependency
-In-Reply-To: <1461776128-7808-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1461776128-7808-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <20160428122424.GG24693@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 28 Apr 2016 14:23:19 +0200
+Subject: [PATCH] mmc: sdhci-of-at91: add presets setup
+In-Reply-To: <5721CAB2.5000207@intel.com>
+References: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
+ <5721CAB2.5000207@intel.com>
+Message-ID: <20160428122319.GB3891@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 01:55:28PM -0300, Ezequiel Garcia wrote:
-> The rtc-lib dependency is not required, and seems it was just
-> copy-pasted from ARM's Kconfig. If platform requires rtc-lib,
-> they should select it individually.
-
-Are you sure this doesn't break any platforms that are relying on this
-implicit select?
-
-Will
-
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> ---
->  arch/arm64/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
+On Thu, Apr 28, 2016 at 11:32:50AM +0300, Adrian Hunter wrote:
+> On 21/04/16 16:54, Ludovic Desroches wrote:
+> > The controller claims to support SDR104. In fact, it only supports a
+> > degraded SDR104 since the maximum frequency of the SD clock is 120 MHz
+> > instead of 208 MHz.
+> > The sdhci core is unaware of it and will compute a wrong clock divider.
+> > We can deal with this specific case by using presets.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  drivers/mmc/host/sdhci-of-at91.c | 24 ++++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> > index c1923c0..76308b1 100644
+> > --- a/drivers/mmc/host/sdhci-of-at91.c
+> > +++ b/drivers/mmc/host/sdhci-of-at91.c
+> > @@ -18,6 +18,7 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/err.h>
+> >  #include <linux/io.h>
+> > +#include <linux/kernel.h>
+> >  #include <linux/mmc/host.h>
+> >  #include <linux/mmc/slot-gpio.h>
+> >  #include <linux/module.h>
+> > @@ -163,6 +164,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+> >  	unsigned int			clk_base, clk_mul;
+> >  	unsigned int			gck_rate, real_gck_rate;
+> >  	int				ret;
+> > +	unsigned int			preset_div, preset_common = 0x400; /* drv type B, programmable clock mode */
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index c8762f4613f0..b9d0a81d391c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -99,7 +99,6 @@ config ARM64
->  	select PERF_USE_VMALLOC
->  	select POWER_RESET
->  	select POWER_SUPPLY
-> -	select RTC_LIB
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	help
-> -- 
-> 2.7.0
+> preset_common is a constant, so why not #define it?
+
+No reason, a mistake, I'll fix it.
+
+> 
+> >  
+> >  	match = of_match_device(sdhci_at91_dt_match, &pdev->dev);
+> >  	if (!match)
+> > @@ -230,6 +232,28 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+> >  			 clk_mul, real_gck_rate);
+> >  	}
+> >  
+> > +	/*
+> > +	 * We have to set preset values because it depends on the clk_mul
+> > +	 * value. Moreover, SDR104 is supported in a degraded mode since the
+> > +	 * maximum sd clock value is 120 MHz instead of 208 MHz. For that
+> > +	 * reason, we need to use presets to support SDR104.
+> > +	 */
+> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 24000000) - 1;
+> > +	writew(preset_common | preset_div,
+> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR12);
+> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
+> > +	writew(preset_common | preset_div,
+> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR25);
+> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 100000000) - 1;
+> > +	writew(preset_common | preset_div,
+> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR50);
+> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 120000000) - 1;
+> > +	writew(preset_common | preset_div,
+> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR104);
+> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
+> > +	writew(preset_common | preset_div,
+> > +	       host->ioaddr + SDHCI_PRESET_FOR_DDR50);
+> > +
+> >  	clk_prepare_enable(priv->mainck);
+> >  	clk_prepare_enable(priv->gck);
+> >  
+> > 
 > 
