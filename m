@@ -1,111 +1,62 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 28 Apr 2016 16:27:40 -0600
-Subject: [PATCH v8 6/8] iommu/msi-iommu: iommu_msi_domain
-In-Reply-To: <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
-References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
- <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <20160428162740.28db4b8d@t450s.home>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 28 Apr 2016 15:28:19 -0700
+Subject: [PATCH v4 2/4] ARM64: dts: rockchip: add core dtsi file for
+ RK3399 SoCs
+In-Reply-To: <2138015.GmMsjTUH7U@diego>
+References: <1461743693-10671-1-git-send-email-jay.xu@rock-chips.com>
+ <20160428160353.GA95284@google.com>
+ <20160428182938.GA3079@google.com> <2138015.GmMsjTUH7U@diego>
+Message-ID: <20160428222819.GA98045@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2016 08:15:21 +0000
-Eric Auger <eric.auger@linaro.org> wrote:
-
-> This function checks whether
-> - the device belongs to a non default iommu domain
-> - this iommu domain requires the MSI address to be mapped.
+On Thu, Apr 28, 2016 at 10:33:07PM +0200, Heiko Stuebner wrote:
+> Am Donnerstag, 28. April 2016, 11:29:38 schrieb Brian Norris:
+> > On Thu, Apr 28, 2016 at 09:03:53AM -0700, Brian Norris wrote:
+> > > On Wed, Apr 27, 2016 at 03:54:51PM +0800, Jianqun Xu wrote:
+> > > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi new file mode 100644
+> > > > index 0000000..5a8a915
+> > > > --- /dev/null
+> > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > @@ -0,0 +1,1022 @@
+> > > 
+> > > [...]
+> > > 
+> > > > +	sdhci: sdhci at fe330000 {
+> > > > +		compatible = "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1";
+> > > 
+> > > Not to rain on the parade too much, as this is already applied, but is
+> > > the "rockchip,rk3399-sdhci-5.1" string documented anywhere? I don't see
+> > > it.
 > 
-> If those conditions are met, the function returns the iommu domain
-> to be used for mapping the MSI doorbell; else it returns NULL.
+> I don't think it is. I'm still not sure how those dangling (aka spare bindings 
+> for later use) should be handled.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Their use is suggested by dt maintainers, to be able to handle ip-block quirks 
+> later on without needing to touch the devicetree, but in this case spamming 
+> the arasan dt-binding document with numerous of those compatible values also 
+> feels wrong.
+
+Hmm, good point. I was mostly tipped off by checkpatch when applying
+locally, and I also didn't have any context for whether there were any
+known quirks for rk3399 vs. the "standard" core. Given your comments, I
+suppose it's fair to use without documenting it (do I get burned at the
+stake for saying that?).
+
+> > According to the latest binding for "arasan,sdhci-5.1", the "phy" and
+> > "phy-names" properties are required. Fortunately, this device stays
+> > "disabled" for now in your EVB DTS. But just FYI.
 > 
-> ---
-> 
-> v7 -> v8:
-> - renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
-> - the function now takes a struct device *
-> - use DOMAIN_ATTR_MSI_GEOMETRY attribute
-> ---
->  drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
->  include/linux/msi-iommu.h | 14 ++++++++++++++
->  2 files changed, 31 insertions(+)
-> 
-> diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
-> index 203e86e..023ff17 100644
-> --- a/drivers/iommu/msi-iommu.c
-> +++ b/drivers/iommu/msi-iommu.c
-> @@ -243,3 +243,20 @@ unlock:
->  	}
->  }
->  EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
-> +
-> +struct iommu_domain *iommu_msi_domain(struct device *dev)
-> +{
-> +	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
-> +	struct iommu_domain_msi_geometry msi_geometry;
-> +
-> +	if (!d || (d->type == IOMMU_DOMAIN_DMA))
-> +		return NULL;
-> +
-> +	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
-> +	if (!msi_geometry.programmable)
+> Thanks for catching this. As the patch was still local to my repository, I've 
+> amended the commit and dropped the whole emmc block for now.
 
-It feels like we're conflating ideas with using the "programmable" flag
-in this way.  AIUI the IOMMU API consumer is supposed to see the
-invalid MSI geometry with the programmable feature set and know to call
-iommu_msi_set_aperture().  Looking for the msi_cookie would tell us if
-that had been done, but that doesn't tell us if it should have been
-done.  iommu_msi_msg_pa_to_va() handles this later, if we return
-NULL here that function returns success otherwise it goes on to fail if
-the iova or msi cookie is not set.  So really what we're trying to flag
-is that the MSI geometry participates in the IOMMU-MSI API you've
-created and we should pick a feature name that says that rather than
-something as vague a "programmable".  Perhaps simply iommu_msi_api
-rather than programmable.
+No problem.
 
-BTW, I don't see that you ever set aperture_start/end once
-iommu_msi_set_aperture() has been called.  It seems like doing so would
-add some consistency to that MSI geometry attribute.
+> The emmc phy-binding just moved under the GRF (in 4.6-rc5 I think), so I guess 
+> we should handle that whole thing in the next version, as we're nearing (or 
+> are [nearly] over the armsoc cutoff already).
 
-Nice series overall.  Thanks,
+Sounds good. I'm already tracking/testing that modification.
 
-Alex
-
-> +		return NULL;
-> +
-> +	return d;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_msi_domain);
-> +
-> diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
-> index 1cd115f..114bd69 100644
-> --- a/include/linux/msi-iommu.h
-> +++ b/include/linux/msi-iommu.h
-> @@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
->   */
->  void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
->  
-> +/**
-> + * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
-> + * translates the MSI transaction, returns the iommu domain the MSI doorbell
-> + * address must be mapped in; else returns NULL.
-> + *
-> + * @dev: device handle
-> + */
-> +struct iommu_domain *iommu_msi_domain(struct device *dev);
-> +
->  #else
->  
->  static inline int
-> @@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
->  static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
->  					       phys_addr_t addr) {}
->  
-> +static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
-> +{
-> +	return NULL;
-> +}
-> +
->  #endif	/* CONFIG_IOMMU_MSI */
->  #endif	/* __MSI_IOMMU_H */
+Brian
