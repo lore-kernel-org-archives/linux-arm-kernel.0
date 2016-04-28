@@ -1,182 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:46:02 +0100
-Subject: [PATCH v2 43/54] KVM: arm/arm64: vgic-new: vgic_kvm_device: implement
- kvm_vgic_addr
-In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-44-git-send-email-andre.przywara@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 28 Apr 2016 17:51:56 +0100
+Subject: [PATCH v2 3/3] ARM: domain: move {set,get}_domain under config guard
+In-Reply-To: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
+References: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1461862316-9877-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+Recursive undefined instrcution falut is seen with R-class taking an
+exception. The reson for that is __show_regs() tries to get domain
+information, but domains is not available on !MMU cores, like R/M
+class.
 
-kvm_vgic_addr is used by the userspace to set the base address of
-the following register regions, as seen by the guest:
-- distributor(v2 and v3),
-- re-distributors (v3),
-- CPU interface (v2).
+Fix it by puting {set,get}_domain functions under CONFIG_CPU_CP15_MMU
+guard and providing stubs for the case where domains is not supported.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- include/kvm/vgic/vgic.h             |   2 +
- virt/kvm/arm/vgic/vgic-kvm-device.c | 112 ++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |   3 +
- 3 files changed, 117 insertions(+)
+Changelog:
+    v1 -> v2
+       - use CPU_CP15_MMU and don't disable SW PAN (per Russell)
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 2c43eb8..73cab36 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -194,6 +194,8 @@ struct vgic_cpu {
- 	u64 live_lrs;
- };
+arch/arm/include/asm/domain.h |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+index fc8ba16..99d9f63 100644
+--- a/arch/arm/include/asm/domain.h
++++ b/arch/arm/include/asm/domain.h
+@@ -84,6 +84,7 @@
  
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
+ #ifndef __ASSEMBLY__
  
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index dfe40a0..d9f2383 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -16,10 +16,122 @@
- #include <linux/kvm_host.h>
- #include <kvm/vgic/vgic.h>
- #include <linux/uaccess.h>
-+#include <asm/kvm_mmu.h>
- #include "vgic.h"
- 
- /* common helpers */
- 
-+static int vgic_ioaddr_overlap(struct kvm *kvm)
++#ifdef CONFIG_CPU_CP15_MMU
+ static inline unsigned int get_domain(void)
+ {
+ 	unsigned int domain;
+@@ -103,6 +104,16 @@ static inline void set_domain(unsigned val)
+ 	  : : "r" (val) : "memory");
+ 	isb();
+ }
++#else
++static inline unsigned int get_domain(void)
 +{
-+	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
-+	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
-+
-+	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
-+		return 0;
-+	if ((dist <= cpu && dist + KVM_VGIC_V2_DIST_SIZE > cpu) ||
-+	    (cpu <= dist && cpu + KVM_VGIC_V2_CPU_SIZE > dist))
-+		return -EBUSY;
 +	return 0;
 +}
 +
-+static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
-+			      phys_addr_t addr, phys_addr_t size)
++static inline void set_domain(unsigned val)
 +{
-+	int ret;
-+
-+	if (addr & ~KVM_PHYS_MASK)
-+		return -E2BIG;
-+
-+	if (addr & (SZ_4K - 1))
-+		return -EINVAL;
-+
-+	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
-+		return -EEXIST;
-+	if (addr + size < addr)
-+		return -EINVAL;
-+
-+	*ioaddr = addr;
-+	ret = vgic_ioaddr_overlap(kvm);
-+	if (ret)
-+		*ioaddr = VGIC_ADDR_UNDEF;
-+
-+	return ret;
 +}
-+
-+/**
-+ * kvm_vgic_addr - set or get vgic VM base addresses
-+ * @kvm:   pointer to the vm struct
-+ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
-+ * @addr:  pointer to address value
-+ * @write: if true set the address in the VM address space, if false read the
-+ *          address
-+ *
-+ * Set or get the vgic base addresses for the distributor and the virtual CPU
-+ * interface in the VM physical address space.  These addresses are properties
-+ * of the emulated core/SoC and therefore user space initially knows this
-+ * information.
-+ */
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
-+{
-+	int r = 0;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	int type_needed;
-+	phys_addr_t *addr_ptr, block_size;
-+	phys_addr_t alignment;
-+
-+	mutex_lock(&kvm->lock);
-+	switch (type) {
-+	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		block_size = KVM_VGIC_V2_DIST_SIZE;
-+		alignment = SZ_4K;
-+		break;
-+	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_cpu_base;
-+		block_size = KVM_VGIC_V2_CPU_SIZE;
-+		alignment = SZ_4K;
-+		break;
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		block_size = KVM_VGIC_V3_DIST_SIZE;
-+		alignment = SZ_64K;
-+		break;
-+	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_redist_base;
-+		block_size = KVM_VGIC_V3_REDIST_SIZE;
-+		alignment = SZ_64K;
-+		break;
 +#endif
-+	default:
-+		r = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (vgic->vgic_model != type_needed) {
-+		r = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (write) {
-+		if (!IS_ALIGNED(*addr, alignment))
-+			r = -EINVAL;
-+		else
-+			r = vgic_ioaddr_assign(kvm, addr_ptr,
-+					       *addr, block_size);
-+	} else {
-+		*addr = *addr_ptr;
-+	}
-+
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return r;
-+}
-+
- static int vgic_set_common_attr(struct kvm_device *dev,
- 				struct kvm_device_attr *attr)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index e8f8dbf..a048a2b 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,9 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
  
-+#define VGIC_ADDR_UNDEF		(-1)
-+#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
-+
- #define INTERRUPT_ID_BITS_SPIS	10
- 
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ #define modify_domain(dom,type)					\
 -- 
-2.7.3
+1.7.9.5
