@@ -1,143 +1,103 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:44 +0100
-Subject: [PATCH v2 25/54] KVM: arm/arm64: vgic-new: Add PENDING registers
- handlers
+Date: Thu, 28 Apr 2016 17:45:32 +0100
+Subject: [PATCH v2 13/54] KVM: arm/arm64: vgic-new: Add acccessor to new
+ struct vgic_irq instance
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-26-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-14-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pending register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be easily
-referenced from the v3 emulation as well later.
-For level triggered interrupts the real line level is unaffected by
-this write, so we keep this state separate and combine it with the
-device's level to get the actual pending state.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
+The new VGIC implementation centers around a struct vgic_irq instance
+per virtual IRQ.
+Provide a function to retrieve the right instance for a given IRQ
+number and (in case of private interrupts) the right VCPU.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog RFC..v1:
-- remove IRQ lock from read handler
-- remove TODO from clear pending handler
+ virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic.c
+ create mode 100644 virt/kvm/arm/vgic/vgic.h
 
-Changelog v1 .. v2:
-- adapt to new MMIO framework
-
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
- virt/kvm/arm/vgic/vgic-mmio.c    | 60 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    | 12 ++++++++
- 3 files changed, 74 insertions(+), 2 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index d5eafe9..4797203 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -76,9 +76,9 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
- 		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
-+		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
-+		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 120eb25..223cc84 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -102,6 +102,66 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len)
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+new file mode 100644
+index 0000000..fb45537
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++
++#include "vgic.h"
++
++struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
++
++struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
++			      u32 intid)
 +{
-+	u32 intid = (addr & 0x7f) * 8;
-+	u32 value = 0;
-+	int i;
++	/* SGIs and PPIs */
++	if (intid <= VGIC_MAX_PRIVATE)
++		return &vcpu->arch.vgic_cpu.private_irqs[intid];
 +
-+	/* Loop over all IRQs affected by this read */
-+	for (i = 0; i < len * 8; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	/* SPIs */
++	if (intid <= VGIC_MAX_SPI)
++		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
 +
-+		if (irq->pending)
-+			value |= (1U << i);
-+	}
++	/* LPIs are not yet covered */
++	if (intid >= VGIC_MIN_LPI)
++		return NULL;
 +
-+	return extract_bytes(value, addr & 3, len);
++	WARN(1, "Looking up struct vgic_irq for reserved INTID");
++	return NULL;
 +}
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+new file mode 100644
+index 0000000..61b8d22
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __KVM_ARM_VGIC_NEW_H__
++#define __KVM_ARM_VGIC_NEW_H__
 +
-+void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
-+{
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
++struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
++			      u32 intid);
 +
-+	for_each_set_bit(i, &val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->pending = true;
-+		if (irq->config == VGIC_CONFIG_LEVEL)
-+			irq->soft_pending = true;
-+
-+		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+	}
-+}
-+
-+void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
-+{
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
-+
-+	for_each_set_bit(i, &val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			irq->soft_pending = false;
-+			irq->pending = irq->line_level;
-+		} else {
-+			irq->pending = false;
-+		}
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 188909a..d4fc029 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -85,6 +85,18 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
- 
-+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len);
-+
-+void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
-+void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- #endif
++#endif
 -- 
 2.7.3
