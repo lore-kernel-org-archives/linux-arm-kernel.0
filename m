@@ -1,117 +1,101 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:42 +0100
-Subject: [PATCH v2 23/54] KVM: arm/arm64: vgic-new: Add CTLR,
- TYPER and IIDR handlers
+Date: Thu, 28 Apr 2016 17:45:38 +0100
+Subject: [PATCH v2 19/54] KVM: arm/arm64: vgic-new: Implement
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-24-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-20-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Eric Auger <eric.auger@linaro.org>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Tell KVM whether a particular VCPU has an IRQ that needs handling
+in the guest. This is used to decide whether a VCPU is runnable.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
 Changelog RFC..v1:
-- kick VCPUs is the distributor gets enabled
-- improve comment
+- return false if distributor is disabled
+- add vgic_kick_vcpus() implementations
 
-Changelog v1 .. v2:
-- adapt to new MMIO framework
-- use switch() statements to improve readability
+ include/kvm/vgic/vgic.h  |  2 ++
+ virt/kvm/arm/vgic/vgic.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h |  1 +
+ 3 files changed, 43 insertions(+)
 
- include/linux/irqchip/arm-gic.h  |  1 +
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 48 +++++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic.h         |  3 +++
- 3 files changed, 51 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index be0d26f..fd05185 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -33,6 +33,7 @@
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 5fae4a9..2615205 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -184,6 +184,8 @@ struct vgic_cpu {
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level);
  
- #define GIC_DIST_CTRL			0x000
- #define GIC_DIST_CTR			0x004
-+#define GIC_DIST_IIDR			0x008
- #define GIC_DIST_IGROUP			0x080
- #define GIC_DIST_ENABLE_SET		0x100
- #define GIC_DIST_ENABLE_CLEAR		0x180
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 02814a0..bf64bbf 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -20,9 +20,55 @@
- #include "vgic.h"
- #include "vgic-mmio.h"
- 
-+static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
-+					    gpa_t addr, unsigned int len)
-+{
-+	u32 value;
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
 +
-+	switch (addr & 0x0c) {
-+	case GIC_DIST_CTRL:
-+		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
-+		break;
-+	case GIC_DIST_CTR:
-+		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+		value = (value >> 5) - 1;
-+		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
-+		break;
-+	case GIC_DIST_IIDR:
-+		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+		break;
-+	default:
-+		return 0;
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(false)
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index ae52928..eeb766e 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -519,3 +519,43 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ }
++
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
++{
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	struct vgic_irq *irq;
++	bool pending = false;
++
++	if (!vcpu->kvm->arch.vgic.enabled)
++		return false;
++
++	spin_lock(&vgic_cpu->ap_list_lock);
++
++	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
++		spin_lock(&irq->irq_lock);
++		pending = irq->pending && irq->enabled;
++		spin_unlock(&irq->irq_lock);
++
++		if (pending)
++			break;
 +	}
 +
-+	return extract_bytes(value, addr & 3, len);
++	spin_unlock(&vgic_cpu->ap_list_lock);
++
++	return pending;
 +}
 +
-+static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
-+				    gpa_t addr, unsigned int len,
-+				    unsigned long val)
++void vgic_kick_vcpus(struct kvm *kvm)
 +{
-+	switch (addr & 0x0c) {
-+	case GIC_DIST_CTRL:
-+		if (!(addr & 1)) {
-+			struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+			bool was_enabled = dist->enabled;
++	struct kvm_vcpu *vcpu;
++	int c;
 +
-+			dist->enabled = val & GICD_ENABLE;
-+			if (!was_enabled && dist->enabled)
-+				vgic_kick_vcpus(vcpu->kvm);
-+		}
-+		break;
-+	case GIC_DIST_CTR:
-+	case GIC_DIST_IIDR:
-+		/* Nothing to do */
-+		return;
++	/*
++	 * We've injected an interrupt, time to find out who deserves
++	 * a good kick...
++	 */
++	kvm_for_each_vcpu(c, vcpu, kvm) {
++		if (kvm_vgic_vcpu_pending_irq(vcpu))
++			kvm_vcpu_kick(vcpu);
 +	}
 +}
-+
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 12),
-+		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
- 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 008588b..1ab7d97 100644
+index 81b1a20..0c92cda 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -16,6 +16,9 @@
- #ifndef __KVM_ARM_VGIC_NEW_H__
- #define __KVM_ARM_VGIC_NEW_H__
- 
-+#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
-+#define IMPLEMENTER_ARM		0x43b
-+
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
- 
+@@ -21,6 +21,7 @@
  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
++void vgic_kick_vcpus(struct kvm *kvm);
+ 
+ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
+ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
 -- 
 2.7.3
