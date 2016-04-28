@@ -1,43 +1,53 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 27 Apr 2016 21:37:30 -0500
-Subject: [PATCH v4 04/11] drm: sun4i: Add DT bindings documentation
-In-Reply-To: <1461590572-4027-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
- <1461590572-4027-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160428023730.GA1514@rob-hp-laptop>
+Date: Wed, 27 Apr 2016 21:51:44 -0500
+Subject: [PATCHv2 4/7] Documentation: dt: socfpga: Add Arria10 Ethernet
+ binding
+In-Reply-To: <1461606768-14404-5-git-send-email-tthayer@opensource.altera.com>
+References: <1461606768-14404-1-git-send-email-tthayer@opensource.altera.com>
+ <1461606768-14404-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160428025144.GA5837@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 03:22:45PM +0200, Maxime Ripard wrote:
-> The display pipeline of the Allwinner A10 is involving several loosely
-> coupled components.
+On Mon, Apr 25, 2016 at 12:52:45PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Add a documentation for the bindings.
+> Add the device tree bindings needed to support the Altera Ethernet
+> FIFO buffers on the Arria10 chip.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 > ---
->  .../bindings/display/sunxi/sun4i-drm.txt           | 258 +++++++++++++++++++++
->  1 file changed, 258 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> v2  No Change
+> ---
+>  .../bindings/arm/altera/socfpga-eccmgr.txt         |   24 ++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+> index 5a6b160..aa1c593 100644
+> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+> @@ -76,6 +76,18 @@ Required Properties:
+>  - compatible : Should be "altr,socfpga-a10-ocram-ecc"
+>  - reg        : Address and size for ECC block registers.
+>  
+> +Ethernet FIFO ECC
+> +Required Properties:
+> +- compatible : Should be "altr,socfpga-a10-emac0-rx-ecc" for the 1st EMAC
+> +	Receive	buffer
+> +	or "altr,socfpga-a10-emac0-tx-ecc" for the 1st EMAC Transmit buffer
+> +	or "altr,socfpga-a10-emac1-rx-ecc" for the 2nd EMAC Receive buffer
+> +	or "altr,socfpga-a10-emac1-tx-ecc" for the 2nd EMAC Transmit buffer
+> +	or "altr,socfpga-a10-emac2-rx-ecc" for the 3rd EMAC Receive buffer
+> +	or "altr,socfpga-a10-emac2-tx-ecc" for the 3rd EMAC Transmit buffer
 
-> +The display engine pipeline (and its entry point, since it can be
-> +either directly the backend or the frontend) is represented as an
-> +extra node.
-> +
-> +Required properties:
-> +  - compatible: value must be one of:
-> +    * allwinner,sun5i-a13-display-engine
-> +
-> +  - allwinner,pipelines: list of phandle to the display engine
-> +    frontends available.
+These blocks don't really appear to be different other than the 
+interrupt mask (which is in another block?). I think they should be the 
+same compatible with a property for the interrupt (perhaps a full 
+interrupt-controller binding). 
 
+> +- reg        : Address and size for ECC block registers.
+> +- parent     : phandle to parent Ethernet node.
 
-> +display-engine {
-> +	compatible = "allwinner,sun5i-a13-display-engine";
-> +	pipelines = <&fe0>;
+Needs a better name and altr prefix. Maybe altr,eth-mac?
 
-Missing allwinner prefix.
-
-Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
+Rob
