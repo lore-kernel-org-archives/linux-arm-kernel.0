@@ -1,275 +1,184 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:35 +0100
-Subject: [PATCH v2 16/54] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
- framework
+Date: Thu, 28 Apr 2016 17:46:04 +0100
+Subject: [PATCH v2 45/54] KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-17-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-46-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Since the GIC CPU interface is always virtualized by the hardware,
+we don't have CPU interface state information readily available in our
+emulation if userland wants to save or restore it.
+Fortunately the GIC hypervisor interface provides the VMCR register to
+access the required virtual CPU interface bits.
+Provide wrappers for GICv2 and GICv3 hosts to have access to this
+register.
 
-Implement the framework for syncing IRQs between our emulation and
-the list registers, which represent the guest's view of IRQs.
-This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
-which gets called on guest entry and exit.
-The code talking to the actual GICv2/v3 hardware is added in the
-following patches.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog RFC..v1:
-- split out vgic_clear_lr() from vgic_populate_lr()
-- rename vgic_populate_lrs() to vgic_flush_lr_state()
-- clean all LRs when the distributor is disabled
-- use list_del() instead of list_del_init()
-- add comments to explain the direction of sync/flush_hwstate
-- remove unneeded BUG_ON(in_interrupt()
-
- include/kvm/vgic/vgic.h  |   4 +
- virt/kvm/arm/vgic/vgic.c | 200 +++++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h |   2 +
- 3 files changed, 206 insertions(+)
+ include/kvm/vgic/vgic.h     |  7 +++++++
+ virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c | 22 ++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c    | 16 ++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h    | 17 +++++++++++++++++
+ 5 files changed, 91 insertions(+)
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 2bfb42c..5fae4a9 100644
+index 73cab36..cfc3640 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -190,6 +190,10 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- #define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
- 			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+@@ -171,6 +171,13 @@ struct vgic_v3_cpu_if {
+ #endif
+ };
  
-+bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
-+void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
-+void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
++struct vgic_vmcr {
++	u32	ctlr;
++	u32	abpr;
++	u32	bpr;
++	u32	pmr;
++};
 +
- /**
-  * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
-  *
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 4fb20fd..a656a12e5 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -305,3 +305,203 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ struct vgic_cpu {
+ 	/* CPU vif control registers for world switch */
+ 	union {
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 4cee616..70cac63 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -176,3 +176,32 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
  {
- 	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
  }
 +
-+/**
-+ * vgic_prune_ap_list - Remove non-relevant interrupts from the list
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * Go over the list of "interesting" interrupts, and prune those that we
-+ * won't have to consider in the near future.
-+ */
-+static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
++void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
 +{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_irq *irq, *tmp;
++	u32 vmcr;
 +
-+retry:
-+	spin_lock(&vgic_cpu->ap_list_lock);
++	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
++	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
++		GICH_VMCR_ALIAS_BINPOINT_MASK;
++	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
++		GICH_VMCR_BINPOINT_MASK;
++	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
++		GICH_VMCR_PRIMASK_MASK;
 +
-+	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
-+		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		BUG_ON(vcpu != irq->vcpu);
-+
-+		target_vcpu = vgic_target_oracle(irq);
-+
-+		if (!target_vcpu) {
-+			/*
-+			 * We don't need to process this interrupt any
-+			 * further, move it off the list.
-+			 */
-+			list_del(&irq->ap_list);
-+			irq->vcpu = NULL;
-+			spin_unlock(&irq->irq_lock);
-+			continue;
-+		}
-+
-+		if (target_vcpu == vcpu) {
-+			/* We're on the right CPU */
-+			spin_unlock(&irq->irq_lock);
-+			continue;
-+		}
-+
-+		/* This interrupt looks like it has to be migrated. */
-+
-+		spin_unlock(&irq->irq_lock);
-+		spin_unlock(&vgic_cpu->ap_list_lock);
-+
-+		/*
-+		 * Ensure locking order by always locking the smallest
-+		 * ID first.
-+		 */
-+		if (vcpu->vcpu_id < target_vcpu->vcpu_id) {
-+			vcpuA = vcpu;
-+			vcpuB = target_vcpu;
-+		} else {
-+			vcpuA = target_vcpu;
-+			vcpuB = vcpu;
-+		}
-+
-+		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-+		spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
-+		spin_lock(&irq->irq_lock);
-+
-+		/*
-+		 * If the affinity has been preserved, move the
-+		 * interrupt around. Otherwise, it means things have
-+		 * changed while the interrupt was unlocked, and we
-+		 * need to replay this.
-+		 *
-+		 * In all cases, we cannot trust the list not to have
-+		 * changed, so we restart from the beginning.
-+		 */
-+		if (target_vcpu == vgic_target_oracle(irq)) {
-+			struct vgic_cpu *new_cpu = &target_vcpu->arch.vgic_cpu;
-+
-+			list_del(&irq->ap_list);
-+			irq->vcpu = target_vcpu;
-+			list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
-+		}
-+
-+		spin_unlock(&irq->irq_lock);
-+		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
-+		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-+		goto retry;
-+	}
-+
-+	spin_unlock(&vgic_cpu->ap_list_lock);
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
 +}
 +
-+static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
++void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
 +{
++	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
++
++	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
++			GICH_VMCR_CTRL_SHIFT;
++	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
++			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
++	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
++			GICH_VMCR_BINPOINT_SHIFT;
++	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
++			GICH_VMCR_PRIMASK_SHIFT;
++}
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 461229b..2c55bd5 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -167,3 +167,25 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
+ {
+ 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = 0;
+ }
++
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr;
++
++	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
++	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
++	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
++	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
++
++	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
 +}
 +
-+static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
 +{
++	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
++
++	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
++	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
++	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
++	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
++}
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index eeb766e..763475d 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -440,6 +440,22 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
+ 		vgic_v3_set_underflow(vcpu);
+ }
+ 
++void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++	if (kvm_vgic_global_state.type == VGIC_V2)
++		vgic_v2_set_vmcr(vcpu, vmcr);
++	else
++		vgic_v3_set_vmcr(vcpu, vmcr);
 +}
 +
-+/* Requires the ap_list_lock and the irq_lock to be held. */
-+static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
-+				    struct vgic_irq *irq, int lr)
++void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
 +{
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	if (kvm_vgic_global_state.type == VGIC_V2)
++		vgic_v2_get_vmcr(vcpu, vmcr);
++	else
++		vgic_v3_get_vmcr(vcpu, vmcr);
 +}
 +
-+static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
-+{
-+}
-+
-+static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
-+{
-+}
-+
-+static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_irq *irq;
-+	int count = 0;
-+
-+	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-+		spin_lock(&irq->irq_lock);
-+		/* GICv2 SGIs can count for more than one... */
-+		if (vgic_irq_is_sgi(irq->intid) && irq->source)
-+			count += hweight8(irq->source);
-+		else
-+			count++;
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return count;
-+}
-+
-+/* Requires the VCPU's ap_list_lock to be held. */
-+static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	u32 model = dist->vgic_model;
-+	struct vgic_irq *irq;
-+	int count = 0;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(vgic_cpu->ap_list_lock));
-+
-+	if (unlikely(!dist->enabled))
-+		goto out_clean;
-+
-+	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr) {
-+		vgic_set_underflow(vcpu);
-+		vgic_sort_ap_list(vcpu);
-+	}
-+
-+	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-+		spin_lock(&irq->irq_lock);
-+
-+		if (unlikely(vgic_target_oracle(irq) != vcpu))
-+			goto next;
-+
-+		/*
-+		 * If we get an SGI with multiple sources, try to get
-+		 * them in all at once.
-+		 */
-+		if (model == KVM_DEV_TYPE_ARM_VGIC_V2 &&
-+		    vgic_irq_is_sgi(irq->intid)) {
-+			while (irq->source &&
-+			       count < kvm_vgic_global_state.nr_lr)
-+				vgic_populate_lr(vcpu, irq, count++);
-+		} else {
-+			vgic_populate_lr(vcpu, irq, count++);
-+		}
-+
-+next:
-+		spin_unlock(&irq->irq_lock);
-+
-+		if (count == kvm_vgic_global_state.nr_lr)
-+			break;
-+	}
-+
-+out_clean:
-+	vcpu->arch.vgic_cpu.used_lrs = count;
-+
-+	/* Nuke remaining LRs */
-+	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
-+		vgic_clear_lr(vcpu, count);
-+}
-+
-+/* Sync back the hardware VGIC state into our emulation after a guest's run. */
-+void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	vgic_process_maintenance_interrupt(vcpu);
-+	vgic_fold_lr_state(vcpu);
-+	vgic_prune_ap_list(vcpu);
-+}
-+
-+/* Flush our emulation state into the GIC hardware before entering the guest. */
-+void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+	vgic_flush_lr_state(vcpu);
-+	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+}
+ static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index c625767..29b96b9 100644
+index a048a2b..ea72f32 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -16,6 +16,8 @@
- #ifndef __KVM_ARM_VGIC_NEW_H__
- #define __KVM_ARM_VGIC_NEW_H__
+@@ -39,6 +39,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
+ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
+ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
++void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
  
-+#define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ #ifdef CONFIG_KVM_ARM_VGIC_V3
+ void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
+@@ -46,6 +48,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+@@ -68,8 +72,21 @@ static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
+ }
+ 
++static inline
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++}
 +
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
++static inline
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++}
++
+ #endif
+ 
++void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++
+ void kvm_register_vgic_device(unsigned long type);
+ 
+ #endif
 -- 
 2.7.3
