@@ -1,27 +1,48 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 28 Apr 2016 10:22:50 -0700
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
-References: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
-Message-ID: <1461864170.2307.19.camel@HansenPartnership.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Apr 2016 10:25:08 -0700
+Subject: [GIT PULL 2/3] omap defconfig changes for v4.7 merge window
+In-Reply-To: <pull-1461856674-976179>
+References: <pull-1461856674-976179>
+Message-ID: <pull-1461856674-976179-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-04-28 at 19:43 +0800, zengzhaoxiu at 163.com wrote:
-> From: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
-> 
-> Because some architectures (alpha, armv6, etc.) don't provide 
-> hardware division, the mod operation is slow! Binary GCD algorithm 
-> uses simple arithmetic operations, it replaces division with 
-> arithmetic shifts, comparisons, and subtractions.
-> 
-> I have compiled successfully with x86_64_defconfig and 
-> i386_defconfig.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-What's the reason for wanting to optimize this and thus have to
-maintain (and test) two separate code paths, which is a significant
-expense? As far as I can see, gcd() is mosly used in finding optimal
-clocks for operations, which is usually done at start of day and not
-time critical.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-James
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/defconfig-signed
+
+for you to fetch changes up to 714749313da9800ecc10bfc2bfab87540a349e97:
+
+  ARM: omap2plus_defconfig: Enable PWM and ir-rx51 as loadable modules (2016-04-27 09:40:09 -0700)
+
+----------------------------------------------------------------
+Defconfig changes for omap2plus_defconfig for v4.7 merge window.
+Mostly enable drivers used on various boards as loadable modules
+where possible. Also one warning fix related to RXKAD changes
+heading to v4.7. And run make save_defconfig to shrink down the
+size a bit.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (1):
+      ARM: omap2plus_defconfig: Fix warning due invalid RXKAD symbol value
+
+Lokesh Vutla (1):
+      ARM: omap2plus_defconfig: Enable GPIO_TPIC2810
+
+Nishanth Menon (1):
+      ARM: omap2plus_defconfig: Enable DP83867 support
+
+Tony Lindgren (3):
+      ARM: omap2plus_defconfig: Update with make savedefconfig
+      ARM: omap2plus_defconfig: Enable twl6030 USB phy as loadable module
+      ARM: omap2plus_defconfig: Enable PWM and ir-rx51 as loadable modules
+
+Yegor Yefremov (1):
+      ARM: omap2plus_defconfig: Enable MDIO Bus/PHY emulation support
+
+ arch/arm/configs/omap2plus_defconfig | 66 ++++++++++++++++--------------------
+ 1 file changed, 30 insertions(+), 36 deletions(-)
