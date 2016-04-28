@@ -1,112 +1,329 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 28 Apr 2016 17:47:15 -0400
-Subject: [PATCH V6 08/13] PCI: generic, thunder: update to use generic
- ECAM API
-In-Reply-To: <20160428211834.GE25125@localhost>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 28 Apr 2016 16:47:49 -0500
+Subject: [PATCH V6 07/13] PCI: Provide common functions for ECAM mapping
+In-Reply-To: <1460740008-19489-8-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <8950494.UV8UrWiFbx@wuerfel> <20160428201439.GD25125@localhost>
- <5813591.CkzahFEfSl@wuerfel> <20160428211834.GE25125@localhost>
-Message-ID: <572284E3.6050209@redhat.com>
+ <1460740008-19489-8-git-send-email-tn@semihalf.com>
+Message-ID: <20160428214749.GF25125@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, Arnd, all,
+On Fri, Apr 15, 2016 at 07:06:42PM +0200, Tomasz Nowicki wrote:
+> From: Jayachandran C <jchandra@broadcom.com>
+> 
+> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
+> provide generic functions for accessing memory mapped PCI config space.
+> 
+> The API is defined in drivers/pci/ecam.h and is written to replace the
+> API in drivers/pci/host/pci-host-common.h. The file defines a new
+> 'struct pci_config_window' to hold the information related to a PCI
+> config area and its mapping. This structure is expected to be used as
+> sysdata for controllers that have ECAM based mapping.
+> 
+> Helper functions are provided to setup the mapping, free the mapping
+> and to implement the map_bus method in 'struct pci_ops'
 
-On 04/28/2016 05:18 PM, Bjorn Helgaas wrote:
-> On Thu, Apr 28, 2016 at 10:40:35PM +0200, Arnd Bergmann wrote:
->> On Thursday 28 April 2016 15:14:39 Bjorn Helgaas wrote:
->>> On Thu, Apr 21, 2016 at 11:36:53AM +0200, Arnd Bergmann wrote:
->>>> On Thursday 21 April 2016 11:28:15 Tomasz Nowicki wrote:
->>>>> On 19.04.2016 15:06, Arnd Bergmann wrote:
->>>>>> On Monday 18 April 2016 21:31:54 Tomasz Nowicki wrote:
->>>>>>>
->>>>>>> Basically the whole content of pci-thunder-ecam.c and pci-thunder-pem.c.
->>>>>>>
->>>>>>> pci-thunder-ecam.c contains config space accessors. Similar for
->>>>>>> pci-thunder-pem.c but it also has extra init call (it is now called
->>>>>>> thunder_pem_init) which finds and maps related registers.
->>>>>>
->>>>>> They seem to do much more than just override the accessors, they actually
->>>>>> change the contents of the config space as well. Is that really necessary
->>>>>> on ACPI based systems as well?
->>>>>
->>>>> Yes, the pci-thunder-ecam.c accessors are meant to emulate config space 
->>>>> capabilities. They are necessary to synthesize EA capabilities (fixed 
->>>>> PCI BARs), it wont work without this, for ACPI boot as well.
->>>>
->>>> Why is that? I thought the BARs never get reassigned when using ACPI,
+Spec reference: PCI Express Base Specification, rev 3.0, sec 7.2.2.
 
-Just to specifically jump in here and clarify this piece, which only
-pertains to the specific platform's special extra host driver (which
-generally speaking I am encouraging all future platforms not to do). In
-other words, the following has nothing to do with the rest of the patch
-series and is entirely down to one specific SoC and its implementation.
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  drivers/pci/Kconfig  |   3 ++
+>  drivers/pci/Makefile |   2 +
+>  drivers/pci/ecam.c   | 137 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/pci/ecam.h   |  61 +++++++++++++++++++++++
+>  4 files changed, 203 insertions(+)
+>  create mode 100644 drivers/pci/ecam.c
+>  create mode 100644 drivers/pci/ecam.h
+> 
+> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+> index 209292e..e930d62 100644
+> --- a/drivers/pci/Kconfig
+> +++ b/drivers/pci/Kconfig
+> @@ -83,6 +83,9 @@ config HT_IRQ
+>  config PCI_ATS
+>  	bool
+>  
+> +config PCI_GENERIC_ECAM
+> +	bool
 
-ThunderX supports two different methods of PCIe configuration space for
-on-chip devices: with EA and without EA (which is being phased out). EA
-(Enhanced Allocation) is a fancy way of saying "read only BARs". Intel
-did the spec change for that in PCI SIG, so it wasn't us folks in the
-ARM community doing something weird. The good folks at Cavium desired a
-means to express their on-SoC hardware using PCI so that it was nice and
-enumerable, but without full boat PCI. EA fit the bill better than just
-wiring BARs as write ignore or whatever. Again, it's happening in many
-cases and there must be a reason Intel wanted to get it also.
+"PCI_ECAM" is enough, I think.  It's defined by and required by the
+spec unless there's some arch-specific interface.  Plus, if I
+understand correctly, this infrastructure supports non-generic ECAM
+implementations as well, since the caller supplies "struct
+pci_generic_ecam_ops *ops".
 
-I believe pci-thunder-ecam.c contains code to support the older devices
-that don't do full EA by faking the EA capabilities, but they can
-clarify. The point is, this is a specific and separate issue with the
-way one vendor has chosen to implement on-SoC devices as PCIe
-discoverable but using the newer PCI EA extension. And then the quirk is
-to handle that not every device that's out there yet has real EA.
+>  config PCI_IOV
+>  	bool "PCI IOV support"
+>  	depends on PCI
+> diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+> index 2154092..810aec8 100644
+> --- a/drivers/pci/Makefile
+> +++ b/drivers/pci/Makefile
+> @@ -55,6 +55,8 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
+>  
+>  obj-$(CONFIG_PCI_STUB) += pci-stub.o
+>  
+> +obj-$(CONFIG_PCI_GENERIC_ECAM) += ecam.o
+> +
+>  obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
+>  
+>  obj-$(CONFIG_OF) += of.o
+> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+> new file mode 100644
+> index 0000000..ff04c01
+> --- /dev/null
+> +++ b/drivers/pci/ecam.c
+> @@ -0,0 +1,137 @@
+> +/*
+> + * Copyright 2016 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/pci.h>
+> +#include <linux/slab.h>
+> +
+> +#include "ecam.h"
+> +
+> +/*
+> + * On 64 bit systems, we do a single ioremap for the whole config space
+> + * since we have enough virtual address range available. On 32 bit, do an
+> + * ioremap per bus.
+> + */
+> +static const bool per_bus_mapping = !config_enabled(CONFIG_64BIT);
+> +
+> +/*
+> + * Create a PCI config space window
+> + *  - reserve mem region
+> + *  - alloc struct pci_config_window with space for all mappings
+> + *  - ioremap the config space
+> + */
+> +struct pci_config_window *pci_generic_ecam_create(struct device *dev,
+> +				phys_addr_t addr, u8 bus_start, u8 bus_end,
 
->>> In general, there's no reason we can't reassign BARs, whether we're
->>> using DT, ACPI, or whatever.  In many cases, systems with ACPI also
->>> assign all the BARs in firmware, and Linux doesn't reassign them
->>> unless it needs to.  But that's just a coincidence.  There's no
->>> requirement that Linux leave BARs as firmware programmed them.
+Can you take pointers to struct resources here instead of addr,
+bus_start, and bus_end?  The caller probably has them already, and
+then you could add a useful printk like:
 
-There's no requirement, generally, that PCI compliant devices with ECAM
-can't be programmed with different base addresses. There's this PCI
-change called EA that is disjoint and some vendors have chosen to use
-it. We didn't catch that early in the definition of the SBSA for ARM,
-but just as an aside, I have already suggested we require future
-generations of chips to not use EA and only support writeable BARs (even
-for the decoders in the on-SoC platformish devices doing "PCI"). This
-isn't Cavium's fault - they did the right thing with the data at hand
-and nobody really considered the impact of PCI getting EA added. Again,
-that's something that will likely happen on x86 at some point (maybe it
-already is, I don't get any data about future Intel stuff).
+  dev_info(dev, "ECAM for %pR at %pR\n", busn_res, mmio_res);
 
-On the rest of the quirks and hacks. Without going into too much detail,
-some "concerned citizens" are chatting with various folks to ensure that
-many of these common quirks aren't needed in future parts.
+Would have to be careful about the struct resource lifetimes though.
 
->> I'm thought I've seen systems in which the ACPI BIOS assumes that
->> certain PCI devices never move around, because it pokes the registers
->> from AML, and changing them would require never using the same device
->> through ACPI. It's likely that this is against some standard, but that
->> won't help you if you have to deal with the system anyway.
+If you had the MMIO resource here, you could also do the range
+checking you currently have in gen_pci_init() here instead, so all
+callers could benefit.
 
-Right. This has happened, I think, and there you're no worse off on ARM
-than you would be on x86 if you had AML poking at something underneath.
+> +				struct pci_generic_ecam_ops *ops)
+> +{
+> +	struct pci_config_window *cfg;
+> +	unsigned int bus_shift, bus_range, bsz, mapsz;
+> +	int i, nidx;
+> +	int err = -ENOMEM;
+> +
+> +	if (bus_end < bus_start)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	bus_shift = ops->bus_shift;
+> +	bus_range = bus_end - bus_start + 1;
+> +	bsz = 1 << bus_shift;
+> +	nidx = per_bus_mapping ? bus_range : 1;
+> +	mapsz = per_bus_mapping ? bsz : bus_range * bsz;
+> +	cfg = kzalloc(sizeof(*cfg) + nidx * sizeof(cfg->win[0]), GFP_KERNEL);
+> +	if (!cfg)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	cfg->bus_start = bus_start;
+> +	cfg->bus_end = bus_end;
+> +	cfg->ops = ops;
+> +
+> +	if (!request_mem_region(addr, bus_range * bsz, "Configuration Space"))
+> +		goto err_exit;
+> +
+> +	/* cfgaddr has to be set after request_mem_region */
+> +	cfg->cfgaddr = addr;
+> +
+> +	for (i = 0; i < nidx; i++) {
+> +		cfg->win[i] = ioremap(addr + i * mapsz, mapsz);
+> +		if (!cfg->win[i])
+> +			goto err_exit;
+> +	}
+> +
+> +	if (cfg->ops->init) {
+> +		err = cfg->ops->init(dev, cfg);
+> +		if (err)
+> +			goto err_exit;
+> +	}
+> +	return cfg;
+> +
+> +err_exit:
+> +	pci_generic_ecam_free(cfg);
+> +	return ERR_PTR(err);
+> +}
+> +
+> +/*
+> + * Free a config space mapping
+> + */
 
-> Yes, I'm pretty sure there are systems like that, e.g., I think SMM
-> code on some HP servers assumes the iLO address never changes.  I
-> think that is a firmware defect because I don't think there's any spec
-> that says firmware retains control over PCI BARs after handoff.  And
-> this particular case isn't really ACPI-specific.
+Superfluous comment.
 
-If you substitute SMM for EL3 on ARM we're bound to eventually have the
-same kinds of things happening on some systems. It's just life.
+> +void pci_generic_ecam_free(struct pci_config_window *cfg)
+> +{
+> +	unsigned int bus_range;
+> +	int i, nidx;
+> +
+> +	bus_range = cfg->bus_end - cfg->bus_start + 1;
+> +	nidx = per_bus_mapping ? bus_range : 1;
+> +	for (i = 0; i < nidx; i++)
+> +		if (cfg->win[i])
+> +			iounmap(cfg->win[i]);
+> +	if (cfg->cfgaddr)
+> +		release_mem_region(cfg->cfgaddr,
+> +				   bus_range << cfg->ops->bus_shift);
+> +	kfree(cfg);
+> +}
+> +
+> +/*
+> + * Function to implement the pci_ops ->map_bus method
+> + */
+> +void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+> +				       int where)
+> +{
+> +	struct pci_config_window *cfg = bus->sysdata;
 
-> But as you say, we have to deal with these systems anyway, even if we
-> consider that behavior broken.  My proposal has been to add quirks to
-> mark those devices as IORESOURCE_PCI_FIXED, but I don't think anybody
-> has gotten around to doing that.
+I don't really like the use of bus->sysdata here, because sysdata is
+explicitly arch-specific.
 
-Good to know.
+But I guess we're in a bind right now: it'd be nice to save the cfg
+pointer in struct pci_host_bridge, but you have to call
+pci_generic_ecam_create() before the struct pci_host_bridge has been
+allocated, and you have to pass the pointer into pci_scan_root_bus(),
+and there's no generic way to do that yet.
 
-Jon.
+So I guess this will have to do for now.
 
--- 
-Computer Architect | Sent from my Fedora powered laptop
+> +	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
+> +	unsigned int busn = bus->number;
+> +	void __iomem *base;
+> +
+> +	if (busn < cfg->bus_start || busn > cfg->bus_end)
+> +		return NULL;
+> +
+> +	busn -= cfg->bus_start;
+> +	if (per_bus_mapping)
+> +		base = cfg->win[busn];
+> +	else
+> +		base = cfg->win[0] + (busn << cfg->ops->bus_shift);
+> +	return base + (devfn << devfn_shift) + where;
+> +}
+> +
+> +/* default ECAM ops */
+> +struct pci_generic_ecam_ops pci_generic_ecam_default_ops = {
+
+Using both "generic" and "default" seems overkill.  Maybe just:
+
+  struct pci_ecam_ops pci_generic_ecam_ops = { ... ?
+
+> +	.bus_shift	= 20,
+> +	.pci_ops		= {
+> +		.map_bus	= pci_generic_ecam_map_bus,
+> +		.read		= pci_generic_config_read,
+> +		.write		= pci_generic_config_write,
+> +	}
+> +};
+> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+> new file mode 100644
+> index 0000000..34c0aba
+> --- /dev/null
+> +++ b/drivers/pci/ecam.h
+> @@ -0,0 +1,61 @@
+> +/*
+> + * Copyright 2016 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
+> + */
+> +#ifndef DRIVERS_PCI_ECAM_H
+> +#define DRIVERS_PCI_ECAM_H
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +
+> +/*
+> + * struct to hold pci ops and bus shift of the config window
+> + * for a PCI controller.
+> + */
+> +struct pci_config_window;
+> +struct pci_generic_ecam_ops {
+
+"struct pci_ecam_ops"
+
+> +	unsigned int			bus_shift;
+> +	struct pci_ops			pci_ops;
+> +	int				(*init)(struct device *,
+> +						struct pci_config_window *);
+> +};
+> +
+> +/*
+> + * struct to hold the mappings of a config space window. This
+> + * will be allocated with enough entries in win[] to hold all
+> + * the mappings for the bus range.
+> + */
+> +struct pci_config_window {
+> +	phys_addr_t			cfgaddr;
+> +	u16				domain;
+> +	u8				bus_start;
+> +	u8				bus_end;
+> +	void				*priv;
+> +	struct pci_generic_ecam_ops	*ops;
+> +	void __iomem			*win[0];
+> +};
+> +
+> +/* create and free for pci_config_window */
+
+Superfluous comment.
+
+> +struct pci_config_window *pci_generic_ecam_create(struct device *dev,
+> +				phys_addr_t addr, u8 bus_start, u8 bus_end,
+> +				struct pci_generic_ecam_ops *ops);
+> +void pci_generic_ecam_free(struct pci_config_window *cfg);
+
+"pci_ecam_create" and "pci_ecam_free"?  I suspect you're going to call
+these for flavors of ECAM that are definitely not "generic".
+
+> +/* map_bus when ->sysdata is an instance of pci_config_window */
+> +void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+> +				       int where);
+> +/* default ECAM ops, bus shift 20, generic read and write */
+> +extern struct pci_generic_ecam_ops pci_generic_ecam_default_ops;
+> +
+> +#endif
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
