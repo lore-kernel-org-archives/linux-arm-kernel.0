@@ -1,27 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2016 14:45:00 +0100
-Subject: [PATCH v2] ARM: reboot: remove duplicated local_irq_disable()
-In-Reply-To: <20160427172211.395b846a@xhacker>
-References: <1459320308-4584-1-git-send-email-jszhang@marvell.com>
- <20160427172211.395b846a@xhacker>
-Message-ID: <20160428134500.GD19428@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2016 15:44:42 +0200
+Subject: [GIT PULL] at91: dt for 4.7 #2
+In-Reply-To: <1461771717-32284-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1461771717-32284-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1922779.YJ9WdcBh3t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 05:22:11PM +0800, Jisheng Zhang wrote:
-> Dear Russell,
+On Wednesday 27 April 2016 17:41:57 Nicolas Ferre wrote:
+> Second batch of DT changes for 4.7:
+> - three low priority fixes:
+>   - sama5d2: one pin definition and dependency with the slow clock for watchdog
+>   - sama5d4: definition of watchdog IRQ property
+> - addition of the new shutdown controller to sama5d2 & sama5d2 Xplained
 > 
-> On Wed, 30 Mar 2016 14:45:08 +0800 Jisheng Zhang wrote:
 > 
-> > Once entering machine_halt() and machine_restart(), local_irq_disable()
-> > is called, and local irq is kept disabled, so the local_irq_disable()
-> > at the end of these two functions are not necessary, remove it.
-> 
-> Could I put the patch in your patch tracking system?
 
-Yes please.  Thanks.
+Merged into next/dt, thanks!
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
