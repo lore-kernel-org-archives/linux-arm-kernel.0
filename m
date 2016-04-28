@@ -1,7 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 28 Apr 2016 15:21:31 +0200
-Subject: [PATCH 1/4] ARM: tegra: hotplug: Include missing common.h
-Message-ID: <1461849694-13068-1-git-send-email-thierry.reding@gmail.com>
+Date: Thu, 28 Apr 2016 15:21:32 +0200
+Subject: [PATCH 2/4] ARM: tegra: cpuidle: Add missing cpuidle.h include
+In-Reply-To: <1461849694-13068-1-git-send-email-thierry.reding@gmail.com>
+References: <1461849694-13068-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1461849694-13068-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,56 +11,67 @@ From: Thierry Reding <treding@nvidia.com>
 
 Some of the functions implemented are flagged as not having a prototype
 defined when building with W=1. Include the header to avoid these build
-warnings.
+warnings and add a prototype as well as a dummy implementation for the
+tegra_cpuidle_pcie_irqs_in_use() function.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-tegra/common.h  | 22 ++++++++++++++++++++++
- arch/arm/mach-tegra/hotplug.c |  1 +
- 2 files changed, 23 insertions(+)
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 1 +
+ arch/arm/mach-tegra/cpuidle-tegra20.c  | 1 +
+ arch/arm/mach-tegra/cpuidle-tegra30.c  | 1 +
+ arch/arm/mach-tegra/cpuidle.h          | 2 ++
+ 4 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
-index 1f6fb808e236..4cc00e993b00 100644
---- a/arch/arm/mach-tegra/common.h
-+++ b/arch/arm/mach-tegra/common.h
-@@ -1,4 +1,26 @@
-+/*
-+ * Copyright (c) 2011, ARM Ltd.
-+ * Copyright (c) 2013, NVIDIA Corporation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __MACH_TEGRA_COMMON_H
-+#define __MACH_TEGRA_COMMON_H
-+
- extern const struct smp_operations tegra_smp_ops;
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index 9157546fe68c..d3aa9be16621 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -26,6 +26,7 @@
+ #include <asm/suspend.h>
+ #include <asm/psci.h>
  
- extern int tegra_cpu_kill(unsigned int cpu);
- extern void tegra_cpu_die(unsigned int cpu);
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index 1b129899a277..8ec707826072 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -17,6 +17,7 @@
- 
- #include <asm/smp_plat.h>
- 
-+#include "common.h"
++#include "cpuidle.h"
+ #include "pm.h"
  #include "sleep.h"
  
- static void (*tegra_hotplug_shutdown)(void);
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+index 7469347b1749..afcee04f2616 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra20.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+@@ -30,6 +30,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ 
++#include "cpuidle.h"
+ #include "flowctrl.h"
+ #include "iomap.h"
+ #include "irq.h"
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 4dbe1dae937c..c1417361e10e 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -30,6 +30,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ 
++#include "cpuidle.h"
+ #include "pm.h"
+ #include "sleep.h"
+ 
+diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
+index c017dab60ffa..dd1624d4b294 100644
+--- a/arch/arm/mach-tegra/cpuidle.h
++++ b/arch/arm/mach-tegra/cpuidle.h
+@@ -23,8 +23,10 @@ void tegra20_cpuidle_pcie_irqs_in_use(void);
+ int tegra30_cpuidle_init(void);
+ int tegra114_cpuidle_init(void);
+ void tegra_cpuidle_init(void);
++void tegra_cpuidle_pcie_irqs_in_use(void);
+ #else
+ static inline void tegra_cpuidle_init(void) {}
++static inline void tegra_cpuidle_pcie_irqs_in_use(void) {}
+ #endif
+ 
+ #endif
 -- 
 2.8.0
