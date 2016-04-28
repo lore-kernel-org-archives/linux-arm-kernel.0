@@ -1,23 +1,73 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 28 Apr 2016 16:57:20 +0200
-Subject: [PATCH] i2c: st: Implement i2c_bus_recovery_info callbacks
-In-Reply-To: <5722107C.3000600@st.com>
-References: <1460467759-11737-1-git-send-email-peter.griffin@linaro.org>
- <20160424211044.GD4317@katana> <5722107C.3000600@st.com>
-Message-ID: <20160428145720.GA1541@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2016 15:59:00 +0100
+Subject: [PATCH 3/3] ARM: domain: move {set, get}_domain under config guard
+In-Reply-To: <572221D2.1080902@arm.com>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <1461325416-29570-4-git-send-email-vladimir.murzin@arm.com>
+ <20160427104918.GQ19428@n2100.arm.linux.org.uk>
+ <5720AD9D.7020909@arm.com>
+ <20160428135028.GE19428@n2100.arm.linux.org.uk>
+ <572221D2.1080902@arm.com>
+Message-ID: <20160428145900.GO19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 28, 2016 at 03:44:34PM +0100, Vladimir Murzin wrote:
+> On 28/04/16 14:50, Russell King - ARM Linux wrote:
+> > On Wed, Apr 27, 2016 at 01:16:29PM +0100, Vladimir Murzin wrote:
+> >> I've confused myself that support for CPU_SW_DOMAIN_PAN implies
+> >> CONFIG_CPU_USE_DOMAINS, but now I see they are in fact different
+> >> features/users of those accessors.
+> >>
+> >> So something like below should be sufficient to fix my case, right?
+> > 
+> > How about:
+> > 
+> >  arch/arm/include/asm/domain.h | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+> > index fc8ba1663601..4e218993c12d 100644
+> > --- a/arch/arm/include/asm/domain.h
+> > +++ b/arch/arm/include/asm/domain.h
+> > @@ -84,6 +84,7 @@
+> >  
+> >  #ifndef __ASSEMBLY__
+> >  
+> > +#ifdef CONFIG_CPU_CP15
+> 
+> I'm afraid it won't solve my case since R-class uses cp15 :(
 
-> The trick is to switch to SPI mode, 9 bits words and write a 0,
-> so that 9 clock pulses are generated.
+So maybe CPU_CP15_MMU then there?
 
-Heh. As long as it works :) But as you said, it really needs a comment.
+> 
+> Cheers
+> Vladimir
+> 
+> >  static inline unsigned int get_domain(void)
+> >  {
+> >  	unsigned int domain;
+> > @@ -103,6 +104,16 @@ static inline void set_domain(unsigned val)
+> >  	  : : "r" (val) : "memory");
+> >  	isb();
+> >  }
+> > +#else
+> > +static inline unsigned int get_domain(void)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +static inline void set_domain(unsigned val)
+> > +{
+> > +}
+> > +#endif
+> >  
+> >  #ifdef CONFIG_CPU_USE_DOMAINS
+> >  #define modify_domain(dom,type)					\
+> > 
+> 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/f5187d0c/attachment.sig>
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
