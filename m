@@ -1,91 +1,36 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 28 Apr 2016 12:58:03 +0300
-Subject: [RFC v4 3/8] gpio: generic: add DT support for generic
- memory-mapped GPIOs
-In-Reply-To: <a5d6bb7bb73ff9396c9e8053a8e8e0975b857934.1461806071.git.chunkeey@googlemail.com>
-References: <cover.1461806071.git.chunkeey@googlemail.com>
- <a5d6bb7bb73ff9396c9e8053a8e8e0975b857934.1461806071.git.chunkeey@googlemail.com>
-Message-ID: <CAHp75VeSf_=rQBRQ+1ox=fn7aJ53mGg_huH7HRbZck0HEhxBAQ@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 28 Apr 2016 15:35:45 +0530
+Subject: [PATCH RESEND 0/4] arm: dts: am57xx: Correct the thermal thresholds
+Message-ID: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 12:05 PM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
-> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
->
-> This patch adds support for defining memory-mapped GPIOs
-> which provide a compatible interface for the existing
-> generic-gpio driver.
+Noticed that earlier post had a wrong list name hence resending the
+series.
 
-> +static inline void set_resource_address(struct resource *res,
-> +                                       resource_size_t start,
-> +                                       resource_size_t len)
-> +{
-> +       res->start = start;
-> +       res->end = start + len - 1;
-> +}
+Currently all the am57xx versions are wrongly re-using the dra7  thermal
+threholds. Introduing the correct thermal thresholds based on industrial
+or commercial grade silicon present on the individual boards.
 
-It might make sense to put this in the generic (resource related, e.g.
-ioport.h) header. There are plenty users of such already and who knows
-how many will come.
+Tested on AM57XX-BEAGLE-X15 (Commercial) and AM572X-IDK(Industrial)
+for the trip_point node sysfs temperatures.
 
->  #include <linux/bitops.h>
->  #include <linux/platform_device.h>
->  #include <linux/mod_devicetable.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
+These patches are on top of:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/tmlind/linux-omap/+/omap-for-v4.7/dt 
 
-Perhaps + empty line?
+Keerthy (4):
+  ARM: dts: am57xx: Introduce commercial grade thermal thresholds
+  ARM: dts: am57xx: Introduce industrial grade thermal thresholds
+  ARM: dts: am57xx: Include the commercial grade thresholds
+  ARM: dts: am57xx-idk: Include Industrial grade      thermal thresholds
 
-> +#include "gpio-mmio-compat.h"
-
-[]
-
-> +#ifdef CONFIG_OF
-> +static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
-> +                                    struct bgpio_pdata *pdata,
-> +                                    unsigned long *flags)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       int err;
-> +
-> +       err = of_property_read_u32(dev->of_node, "ngpio", &pdata->ngpio);
-> +       if (err && err != -EINVAL)
-> +               return err;
-
-I think check for -EINVAL needs explanation.
-
-> +}
-
-[]
-
-> +       pdata = bgpio_parse_dt(pdev, &flags);
-> +       if (IS_ERR(pdata)) {
-> +               return PTR_ERR(pdata);
-
-> +       } else if (!pdata) {
-
-Redundant else
-
-> +               pdata = dev_get_platdata(dev);
-> +               flags = pdev->id_entry->driver_data;
-> +       }
->
->         r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");
->         if (!r)
-> @@ -646,6 +734,9 @@ MODULE_DEVICE_TABLE(platform, bgpio_id_table);
->  static struct platform_driver bgpio_driver = {
->         .driver = {
->                 .name = "basic-mmio-gpio",
-
-> +#ifdef CONFIG_OF
-
-Doesn't of_match_ptr do this for you?
-
-
-> +               .of_match_table = of_match_ptr(bgpio_of_match),
-> +#endif
+ arch/arm/boot/dts/am57xx-beagle-x15.dts        |  1 +
+ arch/arm/boot/dts/am57xx-commercial-grade.dtsi | 23 +++++++++++++++++++++++
+ arch/arm/boot/dts/am57xx-idk-common.dtsi       |  2 ++
+ arch/arm/boot/dts/am57xx-industrial-grade.dtsi | 23 +++++++++++++++++++++++
+ 4 files changed, 49 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am57xx-commercial-grade.dtsi
+ create mode 100644 arch/arm/boot/dts/am57xx-industrial-grade.dtsi
 
 -- 
-With Best Regards,
-Andy Shevchenko
+1.9.1
