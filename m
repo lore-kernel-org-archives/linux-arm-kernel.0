@@ -1,68 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 28 Apr 2016 15:17:58 +0200
-Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <CACh+v5ObRAf=7D3tbQdAzef+QRVObF_9eHJEreXwxVyrV8THcA@mail.gmail.com>
-References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
- <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
- <20160428104925.7eb12ca2@bbrezillon>
- <CACh+v5Mi2Qd58SZkwW0mZ3ZJx3Rv3mwSkRqzgHwBTxpUbwjVFQ@mail.gmail.com>
- <20160428144607.191a29f2@bbrezillon>
- <CACh+v5ObRAf=7D3tbQdAzef+QRVObF_9eHJEreXwxVyrV8THcA@mail.gmail.com>
-Message-ID: <20160428151758.7fe54037@bbrezillon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 28 Apr 2016 15:20:45 +0200
+Subject: [PATCH 2/5] clocksource/drivers/mtk_timer: Add __init attribute
+In-Reply-To: <1461849648-12751-1-git-send-email-daniel.lezcano@linaro.org>
+References: <20160428131908.GC5197@linaro.org>
+ <1461849648-12751-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1461849648-12751-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2016 14:54:39 +0200
-Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-> 2016-04-28 14:46 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> > On Thu, 28 Apr 2016 14:18:25 +0200
-> > Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:  
-> >> >> > +
-> >> >> > +- atmel,ncs-rd-setup-ns
-> >> >> > +- atmel,nrd-setup-ns
-> >> >> > +- atmel,ncs-wr-setup-ns
-> >> >> > +- atmel,nwe-setup-ns
-> >> >> > +- atmel,ncs-rd-pulse-ns
-> >> >> > +- atmel,nrd-pulse-ns
-> >> >> > +- atmel,ncs-wr-pulse-ns
-> >> >> > +- atmel,nwe-pulse-ns
-> >> >> > +- atmel,nwe-cycle-ns
-> >> >> > +- atmel,nrd-cycle-ns
-> >> >> > +- atmel,tdf-ns  
-> >> >>
-> >> >> One thought about the configuration in 'ns' unit: Some devices may
-> >> >> have requirements expressed in clock cycles (I'm thinking of FPGA
-> >> >> here). At  a fixed frequency one can always convert manually from 'ns'
-> >> >> to 'clocks' but it's a bit tedious and prone to rounding errors. And
-> >> >> It 'll  break when the EBI frequency is changed  
-> >> >
-> >> > If you don't mind, I'd like to first get this version accepted, and
-> >> > we'll extend it with timings expressed in clock cycles afterward.
-> >> >
-> >> > BTW, could you describe a real use case where timings should be
-> >> > expressed in clock cycles? I mean, usually the devices have some timing
-> >> > constraints (tXX_min = Y ns), and I don't see why it would differ for
-> >> > FPGA interfaces, but I'm clearly not an FPGA expert.  
-> >>
-> >> I'm not either, I only toyed with FPGA. That's just what experienced
-> >> FPGA designer told me.
-> >> I guess that it boils down to: FPGA are more suited for a synchronous
-> >> design than an asynchronous one.  
-> >
-> > The thing is, all the timings are based on the master clock, and,
-> > AFAICS, this clk signal is not exposed, so you're basing your clk-cycle  
-> while EBI itself is asynchronous, the clk can be exposed through one
-> of the PCK. I've seen this in real projects.
+Add __init attribute on a function that is only called from other __init
+functions and that is not inlined, at least with gcc version 4.8.4 on an
+x86 machine with allyesconfig.  Currently, the function is put in the
+.text.unlikely segment.  Declaring it as __init will cause it to be put in
+the .init.text and to disappear after initialization.
 
-Okay, then it makes sense. But if you need such a complex thing it
-would probably be better to create a new driver and let this driver
-adapt the timings dynamically (I plan to expose an few fonctions for
-the NAND controller, so it would be possible to create an FPGA driver
-referencing the PCK clk and adapting the EBI timings).
+The result of objdump -x on the function before the change is as follows:
 
+0000000000000000 l     F .text.unlikely 000000000000006f mtk_timer_setup.isra.4
+
+And after the change it is as follows:
+
+0000000000000000 l     F .init.text	000000000000006a mtk_timer_setup.isra.4
+
+Done with the help of Coccinelle.  The semantic patch checks for local
+static non-init functions that are called from an __init function and are
+not called from any other function.
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/clocksource/mtk_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index d67bc35..7e583f8 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -152,7 +152,7 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+ }
+ 
+ static void
+-mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
++__init mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+ {
+ 	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+ 		evt->gpt_base + TIMER_CTRL_REG(timer));
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
