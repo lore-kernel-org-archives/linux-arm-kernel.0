@@ -1,142 +1,75 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 28 Apr 2016 22:58:06 +0800
-Subject: [PATCH 2/3] mmc: core: remove the invalid message in
- mmc_select_timing
-In-Reply-To: <CAPDyKFqvXTtbZsaWJ1gr7gm-jTpWwL0hAYxDje+LsC4ScyF2bQ@mail.gmail.com>
-References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
- <1461171092-30631-2-git-send-email-aisheng.dong@nxp.com>
- <CAPDyKFqvXTtbZsaWJ1gr7gm-jTpWwL0hAYxDje+LsC4ScyF2bQ@mail.gmail.com>
-Message-ID: <20160428145806.GF27560@shlinux2.ap.freescale.net>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 28 Apr 2016 16:06:01 +0100
+Subject: [PATCH 3/3] ARM: domain: move {set, get}_domain under config guard
+In-Reply-To: <20160428145900.GO19428@n2100.arm.linux.org.uk>
+References: <1461325416-29570-1-git-send-email-vladimir.murzin@arm.com>
+ <1461325416-29570-4-git-send-email-vladimir.murzin@arm.com>
+ <20160427104918.GQ19428@n2100.arm.linux.org.uk> <5720AD9D.7020909@arm.com>
+ <20160428135028.GE19428@n2100.arm.linux.org.uk> <572221D2.1080902@arm.com>
+ <20160428145900.GO19428@n2100.arm.linux.org.uk>
+Message-ID: <572226D9.8040706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 11:24:07AM +0200, Ulf Hansson wrote:
-> On 20 April 2016 at 18:51, Dong Aisheng <aisheng.dong@nxp.com> wrote:
-> > mmc_select_hs200() and mmc_select_hs() will keep the timing
-> > as before if switch fails. So it's meaningless to print the
-> > failed switched mode outside based on the current host timing.
-> >
-> > Furthermore, the original print is wrong, it should be:
-> > pr_warn("%s: switch to %s failed\n",
-> >         mmc_hostname(card->host),
-> >         mmc_card_hs(card) ? "high-speed" :
-> >         (mmc_card_hs200(card) ? "hs200" : ""));
-> >
-> > Since we already have error message in mmc_select_hs200(),
-> > simply remove it outside.
-> >
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/mmc/core/mmc.c | 10 +---------
-> >  1 file changed, 1 insertion(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> > index f6683a9..55c8201 100644
-> > --- a/drivers/mmc/core/mmc.c
-> > +++ b/drivers/mmc/core/mmc.c
-> > @@ -1321,21 +1321,13 @@ static int mmc_select_timing(struct mmc_card *card)
-> >         if (err && err != -EBADMSG)
-> >                 return err;
-> >
-> > -       if (err) {
-> > -               pr_warn("%s: switch to %s failed\n",
-> > -                       mmc_card_hs(card) ? "high-speed" :
-> > -                       (mmc_card_hs200(card) ? "hs200" : ""),
-> > -                       mmc_hostname(card->host));
-> > -               err = 0;
-> > -       }
-> > -
+On 28/04/16 15:59, Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2016 at 03:44:34PM +0100, Vladimir Murzin wrote:
+>> On 28/04/16 14:50, Russell King - ARM Linux wrote:
+>>> On Wed, Apr 27, 2016 at 01:16:29PM +0100, Vladimir Murzin wrote:
+>>>> I've confused myself that support for CPU_SW_DOMAIN_PAN implies
+>>>> CONFIG_CPU_USE_DOMAINS, but now I see they are in fact different
+>>>> features/users of those accessors.
+>>>>
+>>>> So something like below should be sufficient to fix my case, right?
+>>>
+>>> How about:
+>>>
+>>>  arch/arm/include/asm/domain.h | 11 +++++++++++
+>>>  1 file changed, 11 insertions(+)
+>>>
+>>> diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+>>> index fc8ba1663601..4e218993c12d 100644
+>>> --- a/arch/arm/include/asm/domain.h
+>>> +++ b/arch/arm/include/asm/domain.h
+>>> @@ -84,6 +84,7 @@
+>>>  
+>>>  #ifndef __ASSEMBLY__
+>>>  
+>>> +#ifdef CONFIG_CPU_CP15
+>>
+>> I'm afraid it won't solve my case since R-class uses cp15 :(
 > 
-> No, this is not correct.
+> So maybe CPU_CP15_MMU then there?
+
+That should work :)
+
+Thanks
+Vladimir
+
 > 
-> First, in patch1/3, you change to return an error code immediately
-> when __mmc_set_signal_voltage() fails, instead of using the "goto
-> err". Thus there will be no error printed for this case any more.
+>>
+>> Cheers
+>> Vladimir
+>>
+>>>  static inline unsigned int get_domain(void)
+>>>  {
+>>>  	unsigned int domain;
+>>> @@ -103,6 +104,16 @@ static inline void set_domain(unsigned val)
+>>>  	  : : "r" (val) : "memory");
+>>>  	isb();
+>>>  }
+>>> +#else
+>>> +static inline unsigned int get_domain(void)
+>>> +{
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static inline void set_domain(unsigned val)
+>>> +{
+>>> +}
+>>> +#endif
+>>>  
+>>>  #ifdef CONFIG_CPU_USE_DOMAINS
+>>>  #define modify_domain(dom,type)					\
+>>>
+>>
 > 
-
-I noticed this issue when i made up this patch.
-Why i simply return is because i want to avoid write the following code:
-static int mmc_select_hs200(struct mmc_card *card)
-{
-...
-	err = voltage_switch();
-        /* If fails try again during next card power cycle */
-        if (err)
-                goto err;
-....
-		/* swith HS TIMING */
-                err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-                                   EXT_CSD_HS_TIMING, val,
-                                   card->ext_csd.generic_cmd6_time,
-                                   true, send_status, true);
-                if (err)
-                        goto err2;
-..........
-
-err2:
-        if (err) {
-                /* fall back to the old signal voltage, if fails report error */
-                if (__mmc_set_signal_voltage(host, old_signal_voltage))
-                        err = -EIO;
-        }
-
-err:
-        if (err)
-                pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
-                       __func__, err);
-
-        return err;
-}
-
-Because if first signal switch fails, we don't need fall back to original
-voltage. But HS timing switch needs.
-
-goto err makes the code a bit ugly.
-So i choose to avoid it and simply return since it's not so important
-and most host driver may already implement their debug IO switch debug info.
-
-Do you think if we can accept it?
-
-> Second, mmc_select_hs() may fail and there is no print done within
-> that function which is why above print is also needed.
-> 
-
-The same as above, i think this print is not so important.
-And __mmc_switch already has a err warn.
-
-And the most important reason is the original print outside is
-meaningless because it intends to print out the speed mode it
-wants to switch, however,it actually prints out the restored
-original speed mode.
-
-> On the other hand I agree with you, it doesn't seems necessary to
-> print two messages when mmc_select_hs200() fails. One should be
-> enough. Can we change this so *only* mmc_select_timing() will deal
-> with the print at all errors?
-> 
-
-Yes, i agree with your idea.
-I also thought about it before, but it seems after patch 3,
-it may not be so necessary.
-Can you help check it?
-
-> >  bus_speed:
-> >         /*
-> >          * Set the bus speed to the selected bus timing.
-> >          * If timing is not selected, backward compatible is the default.
-> >          */
-> >         mmc_set_bus_speed(card);
-> > -       return err;
-> > +       return 0;
-> >  }
-> >
-> >  /*
-> > --
-> > 1.9.1
-> >
-> 
-> Kind regards
-> Uffe
-
-Regards
-Dong Aisheng
