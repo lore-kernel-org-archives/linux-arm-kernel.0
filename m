@@ -1,47 +1,60 @@
 From: chris.brand@broadcom.com (Chris Brand)
-Date: Thu, 28 Apr 2016 10:59:56 -0700
-Subject: [PATCH 0/3] Fixup Broadcom CPU enable method
-Message-ID: <1461866399-1725-1-git-send-email-chris.brand@broadcom.com>
+Date: Thu, 28 Apr 2016 10:59:58 -0700
+Subject: [PATCH 2/3] arm: dts: fix use of bcm11351 enable method
+In-Reply-To: <1461866399-1725-1-git-send-email-chris.brand@broadcom.com>
+References: <1461866399-1725-1-git-send-email-chris.brand@broadcom.com>
+Message-ID: <1461866399-1725-3-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is preparation for supporting the quad-core BCM23550 chip.
+bindings/arm/cpus.txt states that "enable-method" should be a
+property of the "cpu" node rather than the "cpus" node.
 
-Documentation/devicetree/bindings/arm/cpus.txt states that "enable-method"
-should be a property of the "cpu" node rather than the "cpus" node.
+Signed-off-by: Chris Brand <chris.brand@broadcom.com>
+---
+ arch/arm/boot/dts/bcm11351.dtsi | 2 +-
+ arch/arm/boot/dts/bcm21664.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Commit 84320e1a635fcf90cff4185f029ce9e31bf1d4a7
-("ARM: BCM: Clean up SMP support for Broadcom Kona") moved the 
-"secondary-boot-reg" property from the "cpus" node to the individual "cpu"
-nodes but negelected to actually support multiple "secondary-boot-reg"
-properties.
-
-This patchset moves the enable-method property to the correct place,
-adds the missing enable-method to the binding documentation, and actually
-supports setting the "enable-method" property on multiple CPU nodes.
-
-Without this change, "secondary-boot-reg" on even-numbered CPUs is ignored,
-and the value specified on the last odd-numbered CPU to be processed
-overrides any earlier values.
-
-Behaviour is slightly changed by this patchset, in that the
-"secondary-boot-reg" property is only examined when the CPU is being enabled.
-This means that the omission of that property will be reported slightly later,
-or never if the CPU in question is never brought online. It also means that
-the omission in one CPU has no effect on other CPUs, whereas previously
-omitting it from one CPU would force the system into single-core mode.
-
-Chris Brand (3):
-  Documentation: Binding docs for bcm11351 enable method
-  arm: dts: fix use of bcm11351 enable method
-  arm: modify Broadcom CPU enable method
-
- .../bindings/arm/bcm/brcm,bcm11351-cpu-method.txt  |   6 +-
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- arch/arm/boot/dts/bcm11351.dtsi                    |   2 +-
- arch/arm/boot/dts/bcm21664.dtsi                    |   2 +-
- arch/arm/mach-bcm/platsmp.c                        | 116 +++++++--------------
- 5 files changed, 43 insertions(+), 84 deletions(-)
-
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 3dc7a8cc5812..18045c38bcf1 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -30,7 +30,6 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		enable-method = "brcm,bcm11351-cpu-method";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -41,6 +40,7 @@
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
++			enable-method = "brcm,bcm11351-cpu-method";
+ 			secondary-boot-reg = <0x3500417c>;
+ 			reg = <1>;
+ 		};
+diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
+index 3f525be28fd0..6dde95f21cef 100644
+--- a/arch/arm/boot/dts/bcm21664.dtsi
++++ b/arch/arm/boot/dts/bcm21664.dtsi
+@@ -30,7 +30,6 @@
+        cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		enable-method = "brcm,bcm11351-cpu-method";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -41,6 +40,7 @@
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
++			enable-method = "brcm,bcm11351-cpu-method";
+ 			secondary-boot-reg = <0x35004178>;
+ 			reg = <1>;
+ 		};
 -- 
 1.9.1
