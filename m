@@ -1,35 +1,72 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Apr 2016 19:51:06 +0200
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <20160428164856.10120.qmail@ns.horizon.com>
-References: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
- <20160428164856.10120.qmail@ns.horizon.com>
-Message-ID: <CAMuHMdU2e2PdwKYVaEsJ73X8Di1XHNPqnxuunr8R8bN8udazxw@mail.gmail.com>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Thu, 28 Apr 2016 10:59:57 -0700
+Subject: [PATCH 1/3] Documentation: Binding docs for bcm11351 enable method
+In-Reply-To: <1461866399-1725-1-git-send-email-chris.brand@broadcom.com>
+References: <1461866399-1725-1-git-send-email-chris.brand@broadcom.com>
+Message-ID: <1461866399-1725-2-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 6:48 PM, George Spelvin <linux@horizon.com> wrote:
-> Another few comments:
->
-> 1. Would ARCH_HAS_FAST_FFS involve fewer changes than CPU_NO_EFFICIENT_FFS?
+Commit 84320e1a635fcf90cff4185f029ce9e31bf1d4a7
+("ARM: BCM: Clean up SMP support for Broadcom Kona") moved the
+"secondary-boot-reg" property from the "cpus" node to the individual "cpu"
+nodes but negelected to update brcm,bcm11351-cpu-method.txt to match.
 
-No, as you want to _disable_ ARCH_HAS_FAST_FFS / _enable_
-CPU_NO_EFFICIENT_FFS as soon as you're enabling support for a
-CPU that doesn't support it.
+bcm11351-cpu-method was apparently never added to the list of methods in
+bindings/arm/cpus.txt.
 
-Logical OR is easier in both the Kconfig and C preprocessor languages
-than logical NAND.
+bindings/arm/cpus.txt states that "enable-method" should be a property of
+the "cpu" node rather than the "cpus" node.
 
-E.g. in Kconfig, a CPU core not supporting it can just select
-CPU_NO_EFFICIENT_FFS.
+This patch rectifies these two omissions and one inconsistency.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Chris Brand <chris.brand@broadcom.com>
+---
+ .../devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt        | 6 +++---
+ Documentation/devicetree/bindings/arm/cpus.txt                      | 1 +
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
+index 8240c023e202..e3f996920403 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
+@@ -5,7 +5,7 @@ CPUs in the following Broadcom SoCs:
+   BCM11130, BCM11140, BCM11351, BCM28145, BCM28155, BCM21664
+ 
+ The enable method is specified by defining the following required
+-properties in the "cpus" device tree node:
++properties in the "cpu" device tree node:
+   - enable-method = "brcm,bcm11351-cpu-method";
+   - secondary-boot-reg = <...>;
+ 
+@@ -19,8 +19,6 @@ Example:
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		enable-method = "brcm,bcm11351-cpu-method";
+-		secondary-boot-reg = <0x3500417c>;
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -32,5 +30,7 @@ Example:
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++			enable-method = "brcm,bcm11351-cpu-method";
++			secondary-boot-reg = <0x3500417c>;
+ 		};
+ 	};
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ccc62f145306..953350f085c9 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -194,6 +194,7 @@ nodes to be present and contain the properties described below.
+ 			    "allwinner,sun8i-a23"
+ 			    "arm,psci"
+ 			    "arm,realview-smp"
++			    "brcm,bcm11351-cpu-method"
+ 			    "brcm,bcm-nsp-smp"
+ 			    "brcm,brahma-b15"
+ 			    "marvell,armada-375-smp"
+-- 
+1.9.1
