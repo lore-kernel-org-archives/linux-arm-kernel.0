@@ -1,63 +1,62 @@
 From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
-Date: Thu, 28 Apr 2016 15:01:41 +0800
-Subject: [PATCH net-next 09/10] net: hns: add attribute port-rst-offset for
+Date: Thu, 28 Apr 2016 15:01:42 +0800
+Subject: [PATCH net-next 10/10] net: hns: add attribute port-mode-offset for
  dsaf port node
 In-Reply-To: <1461826902-51368-1-git-send-email-Yisen.Zhuang@huawei.com>
 References: <1461826902-51368-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1461826902-51368-10-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1461826902-51368-11-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset offset for each port in a dsaf is different. The current code is
-not so readability. This patch adds configuration named port-rst-offset to
-make the code simple and more readability. If this attribute isn't exists,
-default value of this attribute is equal to its port index.
+Port mode offset for each dsaf port is different. The current code is not
+so readability. This patch adds configuration named port-mode-offset to
+make the code simple and more readability. If port-mode-offset isn't
+exists, default value 0 will be used.
 
-Signed-off-by: Yisen Zhuang <yisen.zhuang@huawei.com>
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 ---
- .../devicetree/bindings/net/hisilicon-hns-dsaf.txt |  4 +++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 10 +++++++++
+ .../devicetree/bindings/net/hisilicon-hns-dsaf.txt |  2 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 10 +++++
  drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |  1 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 26 +++++++---------------
- 4 files changed, 22 insertions(+), 19 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 44 ++++++++++------------
+ 4 files changed, 32 insertions(+), 25 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-index c1358ea..72efe71 100644
+index 72efe71..31d9d19 100644
 --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
 +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-@@ -42,7 +42,9 @@ Required properties:
- - cpld-syscon: is syscon handle for cpld register. It is not required if there
-   isn't cpld device.
- - cpld-ctrl-reg: is cpld register offset. It is not required if there isn't
--  cpld-syscon.  
-+  cpld-syscon. 
-+- port-rst-offset: is offset of reset field for each port in dsaf. Its value 
-+  depends on the hardware user manual. 
+@@ -45,6 +45,8 @@ Required properties:
+   cpld-syscon. 
+ - port-rst-offset: is offset of reset field for each port in dsaf. Its value 
+   depends on the hardware user manual. 
++- port-mode-offset: is offset of port mode field for each port in dsaf. Its 
++  value depends on the hardware user manual.
  
  
  [1] Documentation/devicetree/bindings/net/phy.txt
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-index f1a477d..190477e 100644
+index 190477e..d825277 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-@@ -664,6 +664,7 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
- 
+@@ -665,6 +665,7 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
  	mac_cb->max_frm = MAC_DEFAULT_MTU;
  	mac_cb->tx_pause_frm_time = MAC_DEFAULT_PAUSE_TIME;
-+	mac_cb->port_rst_off = mac_cb->mac_id;
+ 	mac_cb->port_rst_off = mac_cb->mac_id;
++	mac_cb->port_mode_off = 0;
  
  	/* if the dsaf node doesn't contain a port subnode,
  	 * parse the old dts to get phy-handle from dsaf node
-@@ -694,6 +695,15 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
+@@ -704,6 +705,15 @@ static int  hns_mac_get_info(struct hns_mac_cb *mac_cb)
+ 			mac_cb->mac_id);
  	}
- 	mac_cb->serdes_ctrl = syscon;
  
 +	ret = fwnode_property_read_u32(mac_cb->fw_port,
-+				       "port-rst-offset",
-+				       &mac_cb->port_rst_off);
++				       "port-mode-offset",
++				       &mac_cb->port_mode_off);
 +	if (ret) {
-+		dev_dbg(mac_cb->dev, 
-+			"mac%d port-rst-offset not found, use default value.\n",
++		dev_dbg(mac_cb->dev,
++			"mac%d port-mode-offset not found, use default value.\n",
 +			mac_cb->mac_id);
 +	}
 +
@@ -65,83 +64,77 @@ index f1a477d..190477e 100644
  			of_parse_phandle(to_of_node(mac_cb->fw_port),
  					 "cpld-syscon", 0));
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-index 719816b..7be7104 100644
+index 7be7104..97ce9a7 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-@@ -318,6 +318,7 @@ struct hns_mac_cb {
- 	struct regmap *serdes_ctrl;
+@@ -319,6 +319,7 @@ struct hns_mac_cb {
  	struct regmap *cpld_ctrl;
  	u32 cpld_ctrl_reg;
-+	u32 port_rst_off;
+ 	u32 port_rst_off;
++	u32 port_mode_off;
  	struct mac_entry_idx addr_entry_idx[DSAF_MAX_VM_NUM];
  	u8 sfp_prsnt;
  	u8 cpld_led_value;
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index 7e52ab5..fc3056e 100644
+index fc3056e..eecdb14 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -136,11 +136,7 @@ void hns_dsaf_xge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port, u32 val)
- 		return;
- 
- 	reg_val |= RESET_REQ_OR_DREQ;
--
--	if (!HNS_DSAF_IS_DEBUG(dsaf_dev))
--		reg_val |= 0x2082082 << port;
--	else
--		reg_val |= 0x2082082 << (dsaf_dev->reset_offset + 6);
-+	reg_val |= 0x2082082 << dsaf_dev->mac_cb[port]->port_rst_off;
- 
- 	if (val == 0)
- 		reg_addr = DSAF_SUB_SC_XGE_RESET_REQ_REG;
-@@ -159,11 +155,7 @@ void hns_dsaf_xge_core_srst_by_port(struct dsaf_device *dsaf_dev,
- 	if (port >= DSAF_XGE_NUM)
- 		return;
- 
--	if (!HNS_DSAF_IS_DEBUG(dsaf_dev))
--		reg_val |= XGMAC_TRX_CORE_SRST_M << port;
--	else
--		reg_val |= XGMAC_TRX_CORE_SRST_M <<
--			(dsaf_dev->reset_offset + 6);
-+	reg_val |= XGMAC_TRX_CORE_SRST_M << dsaf_dev->mac_cb[port]->port_rst_off;
- 
- 	if (val == 0)
- 		reg_addr = DSAF_SUB_SC_XGE_RESET_REQ_REG;
-@@ -177,17 +169,19 @@ void hns_dsaf_ge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port, u32 val)
+@@ -265,37 +265,31 @@ phy_interface_t hns_mac_get_phy_if(struct hns_mac_cb *mac_cb)
  {
- 	u32 reg_val_1;
- 	u32 reg_val_2;
-+	u32 port_rst_off;
+ 	u32 mode;
+ 	u32 reg;
+-	u32 shift;
+-	u32 phy_offset;
+ 	bool is_ver1 = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver);
+ 	int mac_id = mac_cb->mac_id;
+-	phy_interface_t phy_if = PHY_INTERFACE_MODE_NA;
++	phy_interface_t phy_if;
  
- 	if (port >= DSAF_GE_NUM)
- 		return;
- 
- 	if (!HNS_DSAF_IS_DEBUG(dsaf_dev)) {
- 		reg_val_1  = 0x1 << port;
-+		port_rst_off = dsaf_dev->mac_cb[port]->port_rst_off;
- 		/* there is difference between V1 and V2 in register.*/
- 		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
--			reg_val_2  = 0x1041041 << port;
-+			reg_val_2  = 0x1041041 << port_rst_off;
+-	if (is_ver1 && HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev)) {
+-		phy_if = PHY_INTERFACE_MODE_SGMII;
+-	} else if (mac_id >= 0 && mac_id <= 3 &&
+-		   !HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev)) {
+-		reg = is_ver1 ? HNS_MAC_HILINK4_REG : HNS_MAC_HILINK4V2_REG;
+-		mode = dsaf_read_sub(mac_cb->dsaf_dev, reg);
+-		/* mac_id 0, 1, 2, 3 ---> hilink4 lane 0, 1, 2, 3 */
+-		shift = is_ver1 ? 0 : mac_id;
+-		if (dsaf_get_bit(mode, shift))
+-			phy_if = PHY_INTERFACE_MODE_XGMII;
++	if (is_ver1) {
++		if (HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev))
++			return PHY_INTERFACE_MODE_SGMII;
++
++		if (mac_id >= 0 && mac_id <= 3)
++			reg = HNS_MAC_HILINK4_REG;
  		else
--			reg_val_2  = 0x2082082 << port;
-+			reg_val_2  = 0x2082082 << port_rst_off;
+-			phy_if = PHY_INTERFACE_MODE_SGMII;
+-	} else {
+-		reg = is_ver1 ? HNS_MAC_HILINK3_REG : HNS_MAC_HILINK3V2_REG;
+-		mode = dsaf_read_sub(mac_cb->dsaf_dev, reg);
+-		/* mac_id 4, 5,---> hilink3 lane 2, 3
+-		 * debug port 0(6), 1(7) ---> hilink3 lane 0, 1
+-		 */
+-		phy_offset = mac_cb->dsaf_dev->reset_offset - 1;
+-		shift = is_ver1 ? 0 : mac_id >= 4 ? mac_id - 2 : phy_offset;
+-		if (dsaf_get_bit(mode, shift))
+-			phy_if = PHY_INTERFACE_MODE_XGMII;
++			reg = HNS_MAC_HILINK3_REG;
++	} else{
++		if (!HNS_DSAF_IS_DEBUG(mac_cb->dsaf_dev) && mac_id <= 3)
++			reg = HNS_MAC_HILINK4V2_REG;
+ 		else
+-			phy_if = PHY_INTERFACE_MODE_SGMII;
++			reg = HNS_MAC_HILINK3V2_REG;
+ 	}
++
++	mode = dsaf_read_sub(mac_cb->dsaf_dev, reg);
++	if (dsaf_get_bit(mode, mac_cb->port_mode_off))
++		phy_if = PHY_INTERFACE_MODE_XGMII;
++	else
++		phy_if = PHY_INTERFACE_MODE_SGMII;
++
+ 	return phy_if;
+ }
  
- 		if (val == 0) {
- 			dsaf_write_sub(dsaf_dev, DSAF_SUB_SC_GE_RESET_REQ1_REG,
-@@ -226,12 +220,8 @@ void hns_ppe_srst_by_port(struct dsaf_device *dsaf_dev, u32 port, u32 val)
- {
- 	u32 reg_val = 0;
- 	u32 reg_addr;
--
--	if (!HNS_DSAF_IS_DEBUG(dsaf_dev))
--		reg_val |= RESET_REQ_OR_DREQ << port;
--	else
--		reg_val |= RESET_REQ_OR_DREQ <<
--			(dsaf_dev->reset_offset + 6);
-+	
-+	reg_val |= RESET_REQ_OR_DREQ <<	dsaf_dev->mac_cb[port]->port_rst_off;
- 
- 	if (val == 0)
- 		reg_addr = DSAF_SUB_SC_PPE_RESET_REQ_REG;
 -- 
 1.9.1
