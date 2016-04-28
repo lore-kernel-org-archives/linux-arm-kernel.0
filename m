@@ -1,52 +1,271 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:46:06 +0100
-Subject: [PATCH v2 47/54] KVM: arm/arm64: vgic-new: vgic_init: implement
- kvm_vgic_hyp_init
+Date: Thu, 28 Apr 2016 17:45:39 +0100
+Subject: [PATCH v2 20/54] KVM: arm/arm64: vgic-new: Add MMIO handling framework
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-48-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-21-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Implements kvm_vgic_hyp_init and vgic_probe function.
+Add an MMIO handling framework to the VGIC emulation:
+Each register is described by its offset, size (or number of bits per
+IRQ, if applicable) and the read/write handler functions. We provide
+initialization macros to describe each GIC register later easily.
 
-The vgic_global struct is enriched with new fields populated
-by those functions.
+Separate dispatch functions for read and write accesses are connected
+to the kvm_io_bus framework and binary-search for the responsible
+register handler based on the offset address within the region.
+We convert the incoming data (referenced by a pointer) to the host's
+endianess and use pass-by-value to hand the data over to the actual
+handler functions.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+The register handler prototype and the endianess conversion are
+courtesy of Christoffer Dall.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog v1 .. v2:
-- rename vgic_init.c to vgic-init.c
+Changelog RFC..v1:
+- rework MMIO dispatching to use only one kvm_io_bus device
+- document purpose of register region macros
+- rename "this" parameter to "dev"
+- change IGROUPR to be RAO (returning 1 => Group1 IRQs)
 
- include/kvm/vgic/vgic.h       |   1 +
- virt/kvm/arm/vgic/vgic-init.c | 122 ++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v2.c   |  90 +++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c   |  74 +++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h      |   6 +++
- 5 files changed, 293 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-init.c
+Changelog v1 .. v2:
+* MASSIVE rework:
+- store register_region pointer in kvm_io_bus linked struct
+- replace write_mask_xxx functions with extract_bytes() implementation
+- change handler functions' prototypes to take and return unsigned long
+- use binary search to find matching register handler
+- convert endianess of input data in dispatch_mmio_xxx functions
+- improve readability of register initializer macros
+- remove any GICv2/GICv3 specific functions from vgic-mmio.c
+- rename file from vgic_mmio.c to vgic-mmio.c
+
+ include/kvm/vgic/vgic.h       |  13 ++++
+ virt/kvm/arm/vgic/vgic-mmio.c | 171 ++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h |  77 +++++++++++++++++++
+ 3 files changed, 261 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic-mmio.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-mmio.h
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index cfc3640..d144e3d 100644
+index 2615205..4ec1270 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -202,6 +202,7 @@ struct vgic_cpu {
+@@ -106,6 +106,16 @@ struct vgic_irq {
+ 	enum vgic_irq_config config;	/* Level or edge */
  };
  
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+int kvm_vgic_hyp_init(void);
++struct vgic_register_region;
++
++struct vgic_io_device {
++	gpa_t base_addr;
++	struct kvm_vcpu *redist_vcpu;
++	const struct vgic_register_region *regions;
++	int nr_regions;
++	struct kvm_io_device dev;
++};
++
+ struct vgic_dist {
+ 	bool			in_kernel;
+ 	bool			ready;
+@@ -132,6 +142,9 @@ struct vgic_dist {
+ 	bool			enabled;
  
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+ 	struct vgic_irq		*spis;
++
++	struct vgic_io_device	dist_iodev;
++	struct vgic_io_device	*redist_iodevs;
+ };
+ 
+ struct vgic_v2_cpu_if {
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
 new file mode 100644
-index 0000000..d7c50bb
+index 0000000..28b9cfe
 --- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -0,0 +1,122 @@
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -0,0 +1,171 @@
++/*
++ * VGIC MMIO handling functions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/bitops.h>
++#include <linux/bsearch.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <kvm/iodev.h>
++#include <kvm/vgic/vgic.h>
++
++#include "vgic.h"
++#include "vgic-mmio.h"
++
++/* extract @num bytes at @offset bytes offset in data */
++unsigned long extract_bytes(unsigned long data,
++			    unsigned int offset, unsigned int num)
++{
++	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
++}
++
++unsigned long vgic_mmio_read_raz(struct kvm_vcpu *vcpu,
++				 gpa_t addr, unsigned int len)
++{
++	return 0;
++}
++
++unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
++				 gpa_t addr, unsigned int len)
++{
++	return -1UL;
++}
++
++void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
++			unsigned int len, unsigned long val)
++{
++	/* Ignore */
++}
++
++static int match_region(const void *key, const void *elt)
++{
++	const unsigned int offset = (unsigned long)key;
++	const struct vgic_register_region *region = elt;
++
++	if (offset < region->reg_offset)
++		return -1;
++
++	if (offset >= region->reg_offset + region->len)
++		return 1;
++
++	return 0;
++}
++
++/* Find the proper register handler entry given a certain address offset. */
++static const struct vgic_register_region *
++vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
++		      unsigned int offset)
++{
++	return bsearch((void *)(uintptr_t)offset, region, nr_regions,
++		       sizeof(region[0]), match_region);
++}
++
++/*
++ * kvm_mmio_read_buf() returns a value in a format where it can be converted
++ * to a byte array and be directly observed as the guest wanted it to appear
++ * in memory if it had done the store itself, which is LE for the GIC, as the
++ * guest knows the GIC is always LE.
++ *
++ * We convert this value to the CPUs native format to deal with it as a data
++ * value.
++ */
++unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len)
++{
++	unsigned long data = kvm_mmio_read_buf(val, len);
++
++	switch (len) {
++	case 1:
++		return data;
++	case 2:
++		return le16_to_cpu(data);
++	case 4:
++		return le32_to_cpu(data);
++	default:
++		return le64_to_cpu(data);
++	}
++}
++
++/*
++ * kvm_mmio_write_buf() expects a value in a format such that if converted to
++ * a byte array it is observed as the guest would see it if it could perform
++ * the load directly.  Since the GIC is LE, and the guest knows this, the
++ * guest expects a value in little endian format.
++ *
++ * We convert the data value from the CPUs native format to LE so that the
++ * value is returned in the proper format.
++ */
++void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
++				unsigned long data)
++{
++	switch (len) {
++	case 1:
++		break;
++	case 2:
++		data = cpu_to_le16(data);
++		break;
++	case 4:
++		data = cpu_to_le32(data);
++		break;
++	default:
++		data = cpu_to_le64(data);
++	}
++
++	kvm_mmio_write_buf(buf, len, data);
++}
++
++static
++struct vgic_io_device *kvm_to_vgic_iodev(const struct kvm_io_device *dev)
++{
++	return container_of(dev, struct vgic_io_device, dev);
++}
++
++static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
++			      gpa_t addr, int len, void *val)
++{
++	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
++	const struct vgic_register_region *region;
++	struct kvm_vcpu *r_vcpu;
++	unsigned long data;
++
++	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
++				       addr - iodev->base_addr);
++	if (!region)
++		return -EOPNOTSUPP;
++
++	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
++	data = region->read(r_vcpu, addr, len);
++	vgic_data_host_to_mmio_bus(val, len, data);
++	return 0;
++}
++
++static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
++			       gpa_t addr, int len, const void *val)
++{
++	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
++	const struct vgic_register_region *region;
++	struct kvm_vcpu *r_vcpu;
++	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
++
++	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
++				       addr - iodev->base_addr);
++	if (!region)
++		return -EOPNOTSUPP;
++
++	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
++	region->write(r_vcpu, addr, len, data);
++	return 0;
++}
++
++struct kvm_io_device_ops kvm_io_gic_ops = {
++	.read = dispatch_mmio_read,
++	.write = dispatch_mmio_write,
++};
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+new file mode 100644
+index 0000000..18d3869
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -0,0 +1,77 @@
 +/*
 + * Copyright (C) 2015, 2016 ARM Ltd.
 + *
@@ -62,340 +281,67 @@ index 0000000..d7c50bb
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++#ifndef __KVM_ARM_VGIC_MMIO_H__
++#define __KVM_ARM_VGIC_MMIO_H__
 +
-+#include <linux/uaccess.h>
-+#include <linux/interrupt.h>
-+#include <linux/cpu.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/kvm_host.h>
-+#include <kvm/vgic/vgic.h>
-+#include <asm/kvm_mmu.h>
-+#include "vgic.h"
-+
-+/* GENERIC PROBE */
-+
-+static void vgic_init_maintenance_interrupt(void *info)
-+{
-+	enable_percpu_irq(kvm_vgic_global_state.maint_irq, 0);
-+}
-+
-+static int vgic_cpu_notify(struct notifier_block *self,
-+			   unsigned long action, void *cpu)
-+{
-+	switch (action) {
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		vgic_init_maintenance_interrupt(NULL);
-+		break;
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		disable_percpu_irq(kvm_vgic_global_state.maint_irq);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block vgic_cpu_nb = {
-+	.notifier_call = vgic_cpu_notify,
++struct vgic_register_region {
++	unsigned int reg_offset;
++	unsigned int len;
++	unsigned int bits_per_irq;
++	unsigned long (*read)(struct kvm_vcpu *vcpu, gpa_t addr,
++			      unsigned int len);
++	void (*write)(struct kvm_vcpu *vcpu, gpa_t addr, unsigned int len,
++		      unsigned long val);
 +};
 +
-+static irqreturn_t vgic_maintenance_handler(int irq, void *data)
-+{
-+	/*
-+	 * We cannot rely on the vgic maintenance interrupt to be
-+	 * delivered synchronously. This means we can only use it to
-+	 * exit the VM, and we perform the handling of EOIed
-+	 * interrupts on the exit path (see vgic_process_maintenance).
-+	 */
-+	return IRQ_HANDLED;
-+}
++extern struct kvm_io_device_ops kvm_io_gic_ops;
 +
-+static const struct of_device_id vgic_ids[] = {
-+	{ .compatible = "arm,cortex-a15-gic",	.data = vgic_v2_probe, },
-+	{ .compatible = "arm,cortex-a7-gic",	.data = vgic_v2_probe, },
-+	{ .compatible = "arm,gic-400",		.data = vgic_v2_probe, },
-+	{ .compatible = "arm,gic-v3",		.data = vgic_v3_probe, },
-+	{},
-+};
-+
-+/**
-+ * kvm_vgic_hyp_init: populates the kvm_vgic_global_state variable
-+ * according to the host GIC model. Accordingly calls either
-+ * vgic_v2/v3_probe which registers the KVM_DEVICE that can be
-+ * instantiated by a guest later on .
++/*
++ * Some VGIC registers store per-IRQ information, with a different number
++ * of bits per IRQ. For those registers this macro is used.
++ * The _WITH_LENGTH version instantiates registers with a fixed length
++ * and is mutually exclusive with the _PER_IRQ version.
 + */
-+int kvm_vgic_hyp_init(void)
-+{
-+	const struct of_device_id *matched_id;
-+	const int (*vgic_probe)(struct device_node *);
-+	struct device_node *vgic_node;
-+	int ret;
-+
-+	vgic_node = of_find_matching_node_and_match(NULL,
-+						    vgic_ids, &matched_id);
-+	if (!vgic_node) {
-+		kvm_err("error: no compatible GIC node found\n");
-+		return -ENODEV;
++#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, read_ops, write_ops, bpi)	\
++	{								\
++		.reg_offset = off,					\
++		.bits_per_irq = bpi,					\
++		.len = bpi * 1024 / 8,					\
++		.read = read_ops,					\
++		.write = write_ops,					\
 +	}
 +
-+	vgic_probe = matched_id->data;
-+	ret = vgic_probe(vgic_node);
-+	if (ret)
-+		return ret;
-+
-+	ret = request_percpu_irq(kvm_vgic_global_state.maint_irq,
-+				 vgic_maintenance_handler,
-+				 "vgic", kvm_get_running_vcpus());
-+	if (ret) {
-+		kvm_err("Cannot register interrupt %d\n",
-+			kvm_vgic_global_state.maint_irq);
-+		return ret;
++#define REGISTER_DESC_WITH_LENGTH(off, read_ops, write_ops, length)	\
++	{								\
++		.reg_offset = off,					\
++		.bits_per_irq = 0,					\
++		.len = length,						\
++		.read = read_ops,					\
++		.write = write_ops,					\
 +	}
 +
-+	ret = __register_cpu_notifier(&vgic_cpu_nb);
-+	if (ret) {
-+		kvm_err("Cannot register vgic CPU notifier\n");
-+		goto out_free_irq;
-+	}
++int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
++				  struct vgic_register_region *reg_desc,
++				  struct vgic_io_device *region,
++				  int nr_irqs, bool offset_private);
 +
-+	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
++unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
 +
-+	return 0;
++void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
++				unsigned long data);
 +
-+out_free_irq:
-+	free_percpu_irq(kvm_vgic_global_state.maint_irq,
-+			kvm_get_running_vcpus());
-+	return ret;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 70cac63..00dc166 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -17,6 +17,11 @@
- #include <linux/irqchip/arm-gic.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <kvm/vgic/vgic.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <asm/kvm_mmu.h>
- 
- #include "vgic.h"
- 
-@@ -205,3 +210,88 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
- 			GICH_VMCR_PRIMASK_SHIFT;
- }
++unsigned long extract_bytes(unsigned long data,
++			    unsigned int offset, unsigned int num);
 +
-+/**
-+ * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
-+ * @node:	pointer to the DT node
-+ *
-+ * Returns 0 if a GICv2 has been found, returns an error code otherwise
-+ */
-+int vgic_v2_probe(struct device_node *vgic_node)
-+{
-+	int ret;
-+	struct resource vctrl_res;
-+	struct resource vcpu_res;
++unsigned long vgic_mmio_read_raz(struct kvm_vcpu *vcpu,
++				 gpa_t addr, unsigned int len);
 +
-+	kvm_vgic_global_state.maint_irq = irq_of_parse_and_map(vgic_node, 0);
-+	if (!kvm_vgic_global_state.maint_irq) {
-+		kvm_err("error getting vgic maintenance irq from DT\n");
-+		ret = -ENXIO;
-+		goto out;
-+	}
++unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
++				 gpa_t addr, unsigned int len);
 +
-+	ret = of_address_to_resource(vgic_node, 2, &vctrl_res);
-+	if (ret) {
-+		kvm_err("Cannot obtain GICH resource\n");
-+		goto out;
-+	}
++void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
++			unsigned int len, unsigned long val);
 +
-+	kvm_vgic_global_state.vctrl_base = of_iomap(vgic_node, 2);
-+	if (!kvm_vgic_global_state.vctrl_base) {
-+		kvm_err("Cannot ioremap GICH\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	kvm_vgic_global_state.nr_lr =
-+		readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
-+	kvm_vgic_global_state.nr_lr = (kvm_vgic_global_state.nr_lr & 0x3f) + 1;
-+
-+	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
-+				     kvm_vgic_global_state.vctrl_base +
-+					 resource_size(&vctrl_res),
-+				     vctrl_res.start);
-+	if (ret) {
-+		kvm_err("Cannot map VCTRL into hyp\n");
-+		goto out_unmap;
-+	}
-+
-+	if (of_address_to_resource(vgic_node, 3, &vcpu_res)) {
-+		kvm_err("Cannot obtain GICV resource\n");
-+		ret = -ENXIO;
-+		goto out_unmap;
-+	}
-+
-+	if (!PAGE_ALIGNED(vcpu_res.start)) {
-+		kvm_err("GICV physical address 0x%llx not page aligned\n",
-+			(unsigned long long)vcpu_res.start);
-+		ret = -ENXIO;
-+		goto out_unmap;
-+	}
-+
-+	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
-+		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-+			(unsigned long long)resource_size(&vcpu_res),
-+			PAGE_SIZE);
-+		ret = -ENXIO;
-+		goto out_unmap;
-+	}
-+
-+	kvm_vgic_global_state.can_emulate_gicv2 = true;
-+	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
-+
-+	kvm_vgic_global_state.vcpu_base = vcpu_res.start;
-+
-+	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
-+		 vctrl_res.start, kvm_vgic_global_state.maint_irq);
-+
-+	kvm_vgic_global_state.type = VGIC_V2;
-+	kvm_vgic_global_state.max_gic_vcpus = VGIC_V2_MAX_CPUS;
-+	goto out;
-+
-+out_unmap:
-+	iounmap(kvm_vgic_global_state.vctrl_base);
-+out:
-+	of_node_put(vgic_node);
-+	return ret;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 2c55bd5..a2026c2 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -16,9 +16,17 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <kvm/vgic/vgic.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <asm/kvm_mmu.h>
-+#include <asm/kvm_asm.h>
- 
- #include "vgic.h"
- 
-+static u32 ich_vtr_el2;
-+
- void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -189,3 +197,69 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
- }
-+
-+/**
-+ * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-+ * @node:	pointer to the DT node
-+ *
-+ * Returns 0 if a GICv3 has been found, returns an error code otherwise
-+ */
-+int vgic_v3_probe(struct device_node *vgic_node)
-+{
-+	int ret = 0;
-+	u32 gicv_idx;
-+	struct resource vcpu_res;
-+
-+	kvm_vgic_global_state.maint_irq = irq_of_parse_and_map(vgic_node, 0);
-+	if (!kvm_vgic_global_state.maint_irq) {
-+		kvm_err("error getting vgic maintenance irq from DT\n");
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
-+
-+	/*
-+	 * The ListRegs field is 5 bits, but there is a architectural
-+	 * maximum of 16 list registers. Just ignore bit 4...
-+	 */
-+	kvm_vgic_global_state.nr_lr = (ich_vtr_el2 & 0xf) + 1;
-+	kvm_vgic_global_state.can_emulate_gicv2 = false;
-+
-+	if (of_property_read_u32(vgic_node, "#redistributor-regions",
-+				 &gicv_idx))
-+		gicv_idx = 1;
-+
-+	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
-+	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
-+		kvm_info("GICv3: no GICV resource entry\n");
-+		kvm_vgic_global_state.vcpu_base = 0;
-+	} else if (!PAGE_ALIGNED(vcpu_res.start)) {
-+		pr_warn("GICV physical address 0x%llx not page aligned\n",
-+			(unsigned long long)vcpu_res.start);
-+		kvm_vgic_global_state.vcpu_base = 0;
-+	} else if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
-+		pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-+			(unsigned long long)resource_size(&vcpu_res),
-+			PAGE_SIZE);
-+		kvm_vgic_global_state.vcpu_base = 0;
-+	} else {
-+		kvm_vgic_global_state.vcpu_base = vcpu_res.start;
-+		kvm_vgic_global_state.can_emulate_gicv2 = true;
-+		kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
-+	}
-+	if (kvm_vgic_global_state.vcpu_base == 0)
-+		kvm_info("disabling GICv2 emulation\n");
-+	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
-+
-+	kvm_vgic_global_state.vctrl_base = NULL;
-+	kvm_vgic_global_state.type = VGIC_V3;
-+	kvm_vgic_global_state.max_gic_vcpus = VGIC_V3_MAX_CPUS;
-+
-+	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
-+		 vcpu_res.start, kvm_vgic_global_state.maint_irq);
-+
-+out:
-+	of_node_put(vgic_node);
-+	return ret;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index ea72f32..d6fe7b4 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -41,6 +41,7 @@ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
- void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+int vgic_v2_probe(struct device_node *vgic_node);
- 
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
-@@ -50,6 +51,7 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+int vgic_v3_probe(struct device_node *vgic_node);
- #else
- static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
- {
-@@ -82,6 +84,10 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
- {
- }
- 
-+static inline int vgic_v3_probe(struct device_node *vgic_node)
-+{
-+	return -ENODEV;
-+}
- #endif
- 
- void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++#endif
 -- 
 2.7.3
