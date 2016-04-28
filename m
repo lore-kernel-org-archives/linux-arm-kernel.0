@@ -1,67 +1,92 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 28 Apr 2016 09:25:38 +0200
-Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
-In-Reply-To: <CACPK8Xdm_ZAyfUNbwEYrZuUZS4cP3YMkrkVbGNeiVmeFF6j3Cw@mail.gmail.com>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <4459295.XmBqACy0jk@diego>
- <CACPK8Xdm_ZAyfUNbwEYrZuUZS4cP3YMkrkVbGNeiVmeFF6j3Cw@mail.gmail.com>
-Message-ID: <2297276.nzTbucM52b@diego>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Apr 2016 09:40:59 +0200
+Subject: [PATCH v4 05/11] drm: Add Allwinner A10 Display Engine support
+In-Reply-To: <20160426111419.63db18d4@bbrezillon>
+References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1461590572-4027-6-git-send-email-maxime.ripard@free-electrons.com>
+ <20160426111419.63db18d4@bbrezillon>
+Message-ID: <20160428074059.GC17159@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 28. April 2016, 16:20:04 schrieb Joel Stanley:
-> On Wed, Apr 27, 2016 at 6:42 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Mittwoch, 27. April 2016, 18:01:00 schrieb Joel Stanley:
-> >> > From what I remember exposing the clock controller as one block
-> >> > (instead
-> >> > of
-> >> > declaring each clock individually in the dts) is still the preferred
-> >> > way
-> >> > but I don't think I can find Mike's mail from back then easily.
-> >> 
-> >> I can't picture how that would look. I took my lead from the moxart
-> >> clock driver; is there a better example that I should follow?
+Hi Boris,
+
+On Tue, Apr 26, 2016 at 11:14:19AM +0200, Boris Brezillon wrote:
+> Hi Maxime,
+> 
+> On Mon, 25 Apr 2016 15:22:46 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > The Allwinner A10 and subsequent SoCs share the same display pipeline, with
+> > variations in the number of controllers (1 or 2), or the presence or not of
+> > some output (HDMI, TV, VGA) or not.
 > > 
-> > qcom, samsung, rockchip, hisilicon, imx, ...
+> > Add a driver with a limited set of features for now, and we will hopefully
+> > support all of them eventually
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> I had a look here, and they appear to be much more complex than I
-> need. The qcom directory is 41000 lines of code! The moxart driver is
-> similar to what we do, but as you mentioned it is not arranged how you
-> want it.
-
-I'm by no means authoritative ;-), but from what you describe below, clk-
-asm9260.c or clk-efm32gg.c might be going in that direction of very simple 
-clock-controllers.
-
-Sorry about pointing to more complex drivers for bigger socs at first :-)
-
-
-> > I guess the design would depend on the actual layout of your clock- /
-> > system- controller - aka what else is contained there.
+> Just 2 comments below. Once addressed you can add my
 > 
-> In the fourth generation parts, such as the ast2400, we have this layout:
+> Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
->     clock                rate
->  -----------------------------
->   clk_clkin          48000000
->      clk_hpll       384000000
->         clk_apb      48000000
+> > ---
 > 
-> clkin is the oscillator that may be running at 24, 25 or 48MHz. We can
-> determine this from the strapping register.
+> [...]
 > 
-> The hpll divisor is controlled by strapping resistors, and indicated
-> in the strapping register.
+> > +
+> > +static int sun4i_drv_connector_plug_all(struct drm_device *drm)
+> > +{
+> > +	struct drm_connector *connector, *failed;
+> > +	int ret;
+> > +
+> > +	mutex_lock(&drm->mode_config.mutex);
+> > +	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
+> > +		ret = drm_connector_register(connector);
+> > +		if (ret) {
+> > +			failed = connector;
+> > +			goto err;
+> > +		}
+> > +	}
+> > +	mutex_unlock(&drm->mode_config.mutex);
+> > +	return 0;
+> > +
+> > +err:
+> > +	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
+> > +		if (failed == connector)
+> > +			break;
+> > +
+> > +		drm_connector_unregister(connector);
+> > +	}
+> > +	mutex_unlock(&drm->mode_config.mutex);
+> > +
+> > +	return ret;
+> > +}
 > 
-> The apb is controlled by a register in the SCU, the Aspeed's
-> bucket-of-bits for controlling various parts of the soc.
+> You can use the generic drm_connector_register_all() to do that.
+> 
+> [...]
+> 
+> > +
+> > +static void sun4i_drv_unbind(struct device *dev)
+> > +{
+> > +	struct drm_device *drm = dev_get_drvdata(dev);
+> > +
+> 
+> And you probably miss a call to drm_connector_unregister_all() here.
 
-I remember that from working on Samsung s3c24xx socs, the system-controller 
-area also worked as sort of catch-all :-) .
+Thanks, I'll fix that.
 
-> 
-> In our case we want don't need to adjust any clocks. We do want struct
-> clk's so attached device drivers to know how fast they are being
-> clocked. How do you see this laid out?
+Maxime
 
-see drivers referenced above.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/0d08c8d6/attachment.sig>
