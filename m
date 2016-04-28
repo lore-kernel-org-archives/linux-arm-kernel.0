@@ -1,37 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 28 Apr 2016 14:28:34 -0700
-Subject: [PATCH v6] i2c: rk3x: add i2c support for rk3399 soc
-In-Reply-To: <572212AE.5060904@rock-chips.com>
-References: <1458147438-62387-3-git-send-email-david.wu@rock-chips.com>
- <1461074137-23899-1-git-send-email-david.wu@rock-chips.com>
- <CAD=FV=U7Vsnh8RZjZ=an0Sfb+soS=+v1icoH=kL1huCR_9TTgA@mail.gmail.com>
- <572212AE.5060904@rock-chips.com>
-Message-ID: <CAD=FV=WxoZArMyhAPEmhG4FVHqhd-snMt59_Hk=BVsP2hZBxpw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 28 Apr 2016 16:31:22 -0500
+Subject: [PATCH v7 4/9] pwm: pwm-tiecap: Update dt binding document to
+ use proper unit address
+In-Reply-To: <1461710209-6563-5-git-send-email-fcooper@ti.com>
+References: <1461710209-6563-1-git-send-email-fcooper@ti.com>
+ <1461710209-6563-5-git-send-email-fcooper@ti.com>
+Message-ID: <20160428213122.GA27352@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 26, 2016 at 05:36:44PM -0500, Franklin S Cooper Jr wrote:
+> Replace unit address from 0 to the proper physical address.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> index 788da6c..1b7eec5 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> @@ -16,21 +16,21 @@ Optional properties:
+>  
+>  Example:
+>  
+> -ecap0: ecap at 0 { /* ECAP on am33xx */
+> +ecap0: ecap at 48300100 { /* ECAP on am33xx */
+>  	compatible = "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+>  	reg = <0x48300100 0x80>;
+>  	ti,hwmods = "ecap0";
+>  };
+>  
+> -ecap0: ecap at 0 { /* ECAP on am4372 */
+> +ecap0: ecap at 48300100 { /* ECAP on am4372 */
+>  	compatible = "ti,am4372-ecap", "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+>  	reg = <0x48300100 0x80>;
+>  	ti,hwmods = "ecap0";
+>  };
+>  
+> -ecap0: ecap at 0 { /* ECAP on da850 */
+> +ecap0: ecap at 1f06000 { /* ECAP on da850 */
+>  	compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+>  	reg = <0x306000 0x80>;
 
-On Thu, Apr 28, 2016 at 6:39 AM, David.Wu <david.wu@rock-chips.com> wrote:
-> +enum rk3x_i2c_bus_speed {
-> +       I2C_FS_SPD,
-> +       I2C_HS_SPD
-> +};
-> +
-> +struct rk3x_i2c;
->
-> Why do you need this forward definition?  Seems like it's not
-> necessary.  Remove?
->
->
-> I think we need a Master_Code state to seperate from other state.
+These still don't match.
 
-I meant remove the line above the contains just:
+Rob
 
-  struct rk3x_i2c;
-
-...I don't believe it's needed.  You only need a forward declaration
-like that if you refer to the structure before it's defined.
-
-
--Doug
+> -- 
+> 2.7.0
+> 
