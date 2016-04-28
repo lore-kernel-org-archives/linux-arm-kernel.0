@@ -1,56 +1,184 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 28 Apr 2016 16:20:04 +0930
-Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
-In-Reply-To: <4459295.XmBqACy0jk@diego>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <4956403.scaVRGhPEf@diego>
- <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
- <4459295.XmBqACy0jk@diego>
-Message-ID: <CACPK8Xdm_ZAyfUNbwEYrZuUZS4cP3YMkrkVbGNeiVmeFF6j3Cw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 28 Apr 2016 08:50:34 +0200
+Subject: [PATCH 11/12] nvmem: mxs-ocotp: remove nvmem regmap dependency
+In-Reply-To: <1461526096-29584-12-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1461526096-29584-12-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <5721B2BA.4080100@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 6:42 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Mittwoch, 27. April 2016, 18:01:00 schrieb Joel Stanley:
->> > From what I remember exposing the clock controller as one block (instead
->> > of
->> > declaring each clock individually in the dts) is still the preferred way
->> > but I don't think I can find Mike's mail from back then easily.
->>
->> I can't picture how that would look. I took my lead from the moxart
->> clock driver; is there a better example that I should follow?
+Hi Srinivas,
+
+Am 24.04.2016 um 21:28 schrieb Srinivas Kandagatla:
+> This patch moves to nvmem support in the driver to use callback
+> instead of regmap.
 >
-> qcom, samsung, rockchip, hisilicon, imx, ...
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  drivers/nvmem/mxs-ocotp.c | 79 +++++++++++++----------------------------------
+>  1 file changed, 21 insertions(+), 58 deletions(-)
+>
+> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
+> index 8ba19bb..3bf962c 100644
+> --- a/drivers/nvmem/mxs-ocotp.c
+> +++ b/drivers/nvmem/mxs-ocotp.c
 
-I had a look here, and they appear to be much more complex than I
-need. The qcom directory is 41000 lines of code! The moxart driver is
-similar to what we do, but as you mentioned it is not arranged how you
-want it.
+the include of regmap.h should also be removed.
 
-> I guess the design would depend on the actual layout of your clock- / system-
-> controller - aka what else is contained there.
+> @@ -66,11 +66,10 @@ static int mxs_ocotp_wait(struct mxs_ocotp *otp)
+>  	return 0;
+>  }
+>  
+> -static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
+> -			  void *val, size_t val_size)
+> +static int mxs_ocotp_read(void *context, unsigned int offset,
+> +			  void *val, size_t bytes)
+>  {
+>  	struct mxs_ocotp *otp = context;
+> -	unsigned int offset = *(u32 *)reg;
+>  	u32 *buf = val;
+>  	int ret;
+>  
+> @@ -94,17 +93,16 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
+>  	if (ret)
+>  		goto close_banks;
+>  
+> -	while (val_size) {
+> +	while (bytes) {
+>  		if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
+>  			/* fill up non-data register */
+> -			*buf = 0;
+> +			*buf++ = 0;
+>  		} else {
+> -			*buf = readl(otp->base + offset);
+> +			*buf++ = readl(otp->base + offset);
+>  		}
+>  
+> -		buf++;
+> -		val_size--;
+> -		offset += reg_size;
+> +		bytes -= 4;
+> +		offset += 4;
 
-In the fourth generation parts, such as the ast2400, we have this layout:
+This change would also fix the buffer overflow but Stanislav's patch
+should be applied before to get the fix in stable.
 
-    clock                rate
- -----------------------------
-  clk_clkin          48000000
-     clk_hpll       384000000
-        clk_apb      48000000
+>  	}
+>  
+>  close_banks:
+> @@ -117,57 +115,28 @@ disable_clk:
+>  	return ret;
+>  }
+>  
+> -static int mxs_ocotp_write(void *context, const void *data, size_t count)
+> -{
+> -	/* We don't want to support writing */
+> -	return 0;
+> -}
+> -
+> -static bool mxs_ocotp_writeable_reg(struct device *dev, unsigned int reg)
+> -{
+> -	return false;
+> -}
+> -
+>  static struct nvmem_config ocotp_config = {
+>  	.name = "mxs-ocotp",
+> +	.stride = 16,
+> +	.word_size = 4,
+>  	.owner = THIS_MODULE,
 
-clkin is the oscillator that may be running at 24, 25 or 48MHz. We can
-determine this from the strapping register.
+.reg_read = mxs_ocotp_read,
 
-The hpll divisor is controlled by strapping resistors, and indicated
-in the strapping register.
+>  };
+>  
+> -static const struct regmap_range imx23_ranges[] = {
+> -	regmap_reg_range(OCOTP_DATA_OFFSET, 0x210),
+> -};
+> -
+> -static const struct regmap_access_table imx23_access = {
+> -	.yes_ranges = imx23_ranges,
+> -	.n_yes_ranges = ARRAY_SIZE(imx23_ranges),
+> -};
+> -
+> -static const struct regmap_range imx28_ranges[] = {
+> -	regmap_reg_range(OCOTP_DATA_OFFSET, 0x290),
+> -};
+> -
+> -static const struct regmap_access_table imx28_access = {
+> -	.yes_ranges = imx28_ranges,
+> -	.n_yes_ranges = ARRAY_SIZE(imx28_ranges),
+> +struct imx_data {
+struct mxs_data
 
-The apb is controlled by a register in the SCU, the Aspeed's
-bucket-of-bits for controlling various parts of the soc.
+These chips are named imx2x but the platform is mxs. Please don't ask why.
+> +	int max_reg;
+Since nvmem_config uses "size" instead of "max_reg" we better use "size"
+here, too. This avoids confusion and potential issues see below.
+>  };
+>  
+> -static struct regmap_bus mxs_ocotp_bus = {
+> -	.read = mxs_ocotp_read,
+> -	.write = mxs_ocotp_write, /* make regmap_init() happy */
+> -	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> -	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> +static const struct imx_data imx23_data = {
+static const struct mxs_data imx23_data
+> +	.max_reg = 0x210,
+.size = 0x220,
+>  };
+>  
+> -static struct regmap_config mxs_ocotp_config = {
+> -	.reg_bits = 32,
+> -	.val_bits = 32,
+> -	.reg_stride = 16,
+> -	.writeable_reg = mxs_ocotp_writeable_reg,
+> +static const struct imx_data imx28_data = {
+static const struct mxs_data imx28_data
+> +	.max_reg = 0x290,
+.size = 0x2a0,
+>  };
+>  
+>  static const struct of_device_id mxs_ocotp_match[] = {
+> -	{ .compatible = "fsl,imx23-ocotp", .data = &imx23_access },
+> -	{ .compatible = "fsl,imx28-ocotp", .data = &imx28_access },
+> +	{ .compatible = "fsl,imx23-ocotp", .data = &imx23_data },
+> +	{ .compatible = "fsl,imx28-ocotp", .data = &imx23_data },
+.compatible = "fsl,imx28-ocotp", .data = &imx28_data
+>  	{ /* sentinel */},
+>  };
+>  MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
+> @@ -175,6 +144,7 @@ MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
+>  static int mxs_ocotp_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> +	struct imx_data *data;
+const struct mxs_data *data
+>  	struct mxs_ocotp *otp;
+>  	struct resource *res;
+>  	const struct of_device_id *match;
+> @@ -205,17 +175,10 @@ static int mxs_ocotp_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	access = match->data;
+> -	mxs_ocotp_config.rd_table = access;
+> -	mxs_ocotp_config.max_register = access->yes_ranges[0].range_max;
+> -
+> -	regmap = devm_regmap_init(dev, &mxs_ocotp_bus, otp, &mxs_ocotp_config);
+> -	if (IS_ERR(regmap)) {
+> -		dev_err(dev, "regmap init failed\n");
+> -		ret = PTR_ERR(regmap);
+> -		goto err_clk;
+> -	}
+> +	data = match->data;
+>  
+> +	ocotp_config.size = data->max_reg;
+data->size
 
-In our case we want don't need to adjust any clocks. We do want struct
-clk's so attached device drivers to know how fast they are being
-clocked. How do you see this laid out?
-
-Cheers,
-
-Joel
+Regards
+Stefan
+> +	ocotp_config.priv = otp;
+>  	ocotp_config.dev = dev;
+>  	otp->nvmem = nvmem_register(&ocotp_config);
+>  	if (IS_ERR(otp->nvmem)) {
