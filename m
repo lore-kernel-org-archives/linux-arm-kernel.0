@@ -1,68 +1,95 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Fri, 29 Apr 2016 01:39:55 +0200
-Subject: [RFC v4 3/8] gpio: generic: add DT support for generic
- memory-mapped GPIOs
-In-Reply-To: <CAHp75VeSf_=rQBRQ+1ox=fn7aJ53mGg_huH7HRbZck0HEhxBAQ@mail.gmail.com>
-References: <cover.1461806071.git.chunkeey@googlemail.com>
- <a5d6bb7bb73ff9396c9e8053a8e8e0975b857934.1461806071.git.chunkeey@googlemail.com>
- <CAHp75VeSf_=rQBRQ+1ox=fn7aJ53mGg_huH7HRbZck0HEhxBAQ@mail.gmail.com>
-Message-ID: <3841493.Kd66QyCgCc@debian64>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 29 Apr 2016 09:43:45 +1000
+Subject: [PATCH] arm64: dts: r8a7795: Increase the size of GIC-400 mapped
+ registers
+In-Reply-To: <5721A2A5.9010908@de.bosch.com>
+References: <1461047395-6532-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160427233028.GA5155@verge.net.au>
+ <5721A2A5.9010908@de.bosch.com>
+Message-ID: <20160428234345.GD18128@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 28, 2016 12:58:03 PM Andy Shevchenko wrote:
-> On Thu, Apr 28, 2016 at 12:05 PM, Christian Lamparter
-> <chunkeey@googlemail.com> wrote:
-> > From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
-> >
-> > This patch adds support for defining memory-mapped GPIOs
-> > which provide a compatible interface for the existing
-> > generic-gpio driver.
+[Cc Mark Zyngier, linux-arm-kernel]
 
-Thanks for your comments! I've prepared a new series which
-I'm going to post tomorrow. I've incorporated most of the
-remarks, but there's something I have to say about: 
+Hi Dirk,
 
-> > +static inline void set_resource_address(struct resource *res,
-> > +                                       resource_size_t start,
-> > +                                       resource_size_t len)
-> > +{
-> > +       res->start = start;
-> > +       res->end = start + len - 1;
-> > +}
+On Thu, Apr 28, 2016 at 07:41:57AM +0200, Dirk Behme wrote:
+> Hi Simon,
 > 
-> It might make sense to put this in the generic (resource related, e.g.
-> ioport.h) header. There are plenty users of such already and who knows
-> how many will come.
+> On 28.04.2016 01:30, Simon Horman wrote:
+> >Hi Dirk,
+> >
+> >I understand that there is an issue here but I'm not yet able
+> >to convince myself that this is the correct solution.
+> >
+> >In revision r0p1 of the CoreLink GIC-400 Generic Interrupt Controller
+> >Technical Reference Manual[1] I see in Section 3.2. "GIC-400 register map"
+> >that the size of both the CPU interfaces and Virtual CPU interfaces are
+> >0x2000 bytes. And assuming that the hardware follows the specification it
+> >appears that DT is correctly describing the hardware.
+> 
+> 
+> I think you are missing the details described by ARM in
+> 
+> http://xenbits.xen.org/gitweb/?p=xen.git;a=commit;h=21550029f709072aacf3b9
+> 
+> 
+> Maybe Julien could help if you have some more doubts?
 
-I looked around and found plenty of code in drivers/
-alone doing the same song and dance around it:
+I guess I am confused.
 
-acpi/pci_root.c acpi/resource.c
-bus/mvebu-mbus.c
-i2c/busses/i2c-i801.c
-irqchip/irq-mips-gic.c
-memory/omap-gpmc.c
-mfd/janz-cmodio.c mfd/lpc_ich.c mfd/sm501.c mtd/devices/ms02-nv.c
-nvdimm/namespace_devs.c
-of/address.c
-parisc/ccio-dma.c parisc/dino.c parisc/lba_pci.c
-pci/hotplug/ibmphp_res.c pci/bus.c pci/iov.c pci/setup-res.c
-pci/setup-bus.c pci/hotplug/ibmphp_res.c
-pcmcia/rsrc_mgr.c pcmcia/pcmcia_resource.c
-pnp/manager.c
-platform/x86/intel_pmc_ipc.c
-pinctrl/sh-pfc/core.c
-etc...
+I see that there is now handling of the case where the region size is
+128Kbytes. But I'm still not seeing the bit which describes that the
+GIC-400  has a region size of 128Kbytes. Perhaps the later is somehow
+implied by the former. Or perhaps I need to check with the hw team.
 
-I think arch/ will have a few more. If anything this will require
-help from coccinelle and more stuff. For now I'll convert the code
-to do the same thing as everybody else. And after the "linux,gpio-mmio"
-has been successfully mainlined I can worry about how to write the
-perfect set_resource_address or set_resource_range (needs to handle
-over- and underflows, etc...) and setup the automatic tools to convert
-the whole tree. So, unless someone else beats me to this, this would
-be my plan.
-
-Regards,
-Christian
+> Best regards
+> 
+> Dirk
+> 
+> 
+> >[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
+> >
+> >On Tue, Apr 19, 2016 at 08:29:55AM +0200, Dirk Behme wrote:
+> >>From: Pooya Keshavarzi <Pooya.Keshavarzi@de.bosch.com>
+> >>
+> >>There are some requirements about the GIC-400 memory layout and its
+> >>mapping if using 64k aligned base addresses like on r8a7795.
+> >>
+> >>See e.g.
+> >>
+> >>http://xenbits.xen.org/gitweb/?p=xen.git;a=commit;h=21550029f709072aacf3b9
+> >>
+> >>Map the whole memory range instead of only 0x2000. This will fix
+> >>the issue that some hypervisors, e.g. Xen, fail to handle the
+> >>interrupts correctly.
+> >>
+> >>Signed-off-by: Pooya Keshavarzi <Pooya.Keshavarzi@de.bosch.com>
+> >>Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+> >>---
+> >>Note: This patch is against renesas-drivers-2016-04-12-v4.6-rc3
+> >>
+> >>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >>diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>index 8be9424..d880fd4 100644
+> >>--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>@@ -160,9 +160,9 @@
+> >>  			#address-cells = <0>;
+> >>  			interrupt-controller;
+> >>  			reg = <0x0 0xf1010000 0 0x1000>,
+> >>-			      <0x0 0xf1020000 0 0x2000>,
+> >>+			      <0x0 0xf1020000 0 0x20000>,
+> >>  			      <0x0 0xf1040000 0 0x20000>,
+> >>-			      <0x0 0xf1060000 0 0x2000>;
+> >>+			      <0x0 0xf1060000 0 0x20000>;
+> >>  			interrupts = <GIC_PPI 9
+> >>  					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> >>  		};
+> >>--
+> >>2.8.0
+> >>
+> >
