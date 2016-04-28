@@ -1,34 +1,78 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 28 Apr 2016 12:04:26 -0400
-Subject: [PATCH] ARM: exynos_defconfig: Disable big.LITTLE switcher
-In-Reply-To: <1493315.8NlXQFsEtt@amdc1976>
-References: <1493315.8NlXQFsEtt@amdc1976>
-Message-ID: <e9259b1f-1cd7-b70f-86c3-cbe02c94be22@osg.samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Apr 2016 17:07:05 +0100
+Subject: [PATCH] arm/arm64: KVM: Enforce Break-Before-Make on Stage-2
+ page tables
+In-Reply-To: <1461856591-5751-1-git-send-email-marc.zyngier@arm.com>
+References: <1461856591-5751-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160428160705.GA17867@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bartlomiej,
+On Thu, Apr 28, 2016 at 04:16:31PM +0100, Marc Zyngier wrote:
+> The ARM architecture mandates that when changing a page table entry
+> from a valid entry to another valid entry, an invalid entry is first
+> written, TLB invalidated, and only then the new entry being written.
+> 
+> The current code doesn't respect this, directly writing the new
+> entry and only then invalidating TLBs. Let's fix it up.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On 04/28/2016 10:44 AM, Bartlomiej Zolnierkiewicz wrote:
-> Disable big.LITTLE switcher in order to allow automatic usage of
-> cpufreq-dt driver on Exynos542x/Exynos5800 SoCs based boards.
-> 
-> This change should not cause any problems as arm_big_little[_dt]
-> driver (which is using big.LITTLE switcher support to do the "real"
-> big.LITTLE switching work) is not used on any Exynos SoC based
-> board currently.
-> 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+FWIW, this looks correct to me.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-On an Exynos5422 Odroid XU4 and Exynos5800 Peach Pi Chromebook:
-
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
---
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+>  arch/arm/kvm/mmu.c | 17 +++++++++++------
+>  1 file changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 58dbd5c..edf1cd1 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -893,11 +893,14 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>  	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
+>  
+>  	old_pmd = *pmd;
+> -	kvm_set_pmd(pmd, *new_pmd);
+> -	if (pmd_present(old_pmd))
+> +	if (pmd_present(old_pmd)) {
+> +		pmd_clear(pmd);
+>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -	else
+> +	} else {
+>  		get_page(virt_to_page(pmd));
+> +	}
+> +
+> +	kvm_set_pmd(pmd, *new_pmd);
+>  	return 0;
+>  }
+>  
+> @@ -946,12 +949,14 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>  
+>  	/* Create 2nd stage page table mapping - Level 3 */
+>  	old_pte = *pte;
+> -	kvm_set_pte(pte, *new_pte);
+> -	if (pte_present(old_pte))
+> +	if (pte_present(old_pte)) {
+> +		kvm_set_pte(pte, __pte(0));
+>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -	else
+> +	} else {
+>  		get_page(virt_to_page(pte));
+> +	}
+>  
+> +	kvm_set_pte(pte, *new_pte);
+>  	return 0;
+>  }
+>  
+> -- 
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
