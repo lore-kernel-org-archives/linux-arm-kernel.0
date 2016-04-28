@@ -1,114 +1,59 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 28 Apr 2016 08:15:23 +0000
-Subject: [PATCH v8 8/8] iommu/arm-smmu: get/put the msi cookie
-In-Reply-To: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
-References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461831323-5480-9-git-send-email-eric.auger@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 28 Apr 2016 10:17:57 +0200
+Subject: [PATCH v2] gpmi-nand: Handle ECC Errors in erased pages
+In-Reply-To: <20160426193002.187aefc2@bbrezillon>
+References: <1461587712-16403-1-git-send-email-mpa@pengutronix.de>
+ <20160426193002.187aefc2@bbrezillon>
+Message-ID: <4159618.sXRX6hYBy1@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For IOMMU_DOMAIN_UNMANAGED type we now also get the msi
-cookie in both arm-smmu and arm-smmu-v3. This initializes
-resources for MSI doorbell mapping.
+On Tuesday 26 April 2016 19:30:02 Boris Brezillon wrote:
+> On Mon, 25 Apr 2016 14:35:12 +0200
+> Markus Pargmann <mpa@pengutronix.de> wrote:
+> 
+> > ECC is only calculated for written pages. As erased pages are not
+> > actively written the ECC is always invalid. For this purpose the
+> > Hardware BCH unit is able to check for erased pages and does not raise
+> > an ECC error in this case. This behaviour can be influenced using the
+> > BCH_MODE register which sets the number of allowed bitflips in an erased
+> > page. Unfortunately the unit is not capable of fixing the bitflips in
+> > memory.
+> > 
+> > To avoid complete software checks for erased pages, we can simply check
+> > buffers with uncorrectable ECC errors because we know that any erased
+> > page with errors is uncorrectable by the BCH unit.
+> > 
+> > This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
+> > to correct erased pages. To have the valid data in the buffer before
+> > using them, this patch moves the read_page_swap_end() call before the
+> > ECC status checking for-loop.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > [Squashed patches by Stefan and Boris to check ECC area]
+> > Cc: Stefan Christ <s.christ@phytec.de>
+> > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> 
+> Applied, thanks.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/iommu/arm-smmu-v3.c | 16 ++++++++++++----
- drivers/iommu/arm-smmu.c    | 15 +++++++++++----
- 2 files changed, 23 insertions(+), 8 deletions(-)
+Great, thanks all of you.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index bf222b5..b5d9826 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-+#include <linux/msi-iommu.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
- #include <linux/iommu.h>
-@@ -1411,15 +1412,21 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
--		kfree(smmu_domain);
--		return NULL;
--	}
-+	    iommu_get_dma_cookie(&smmu_domain->domain))
-+		goto err;
-+
-+	if (type == IOMMU_DOMAIN_UNMANAGED &&
-+		iommu_get_msi_cookie(&smmu_domain->domain))
-+		goto err;
-+
- 	smmu_domain->domain.msi_geometry = msi_geometry;
- 
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 	return &smmu_domain->domain;
-+err:
-+	kfree(smmu_domain);
-+	return NULL;
- }
- 
- static int arm_smmu_bitmap_alloc(unsigned long *map, int span)
-@@ -1445,6 +1452,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 
-+	iommu_put_msi_cookie(domain);
- 	iommu_put_dma_cookie(domain);
- 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
- 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 55f429d..0908985 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -30,6 +30,7 @@
- 
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-+#include <linux/msi-iommu.h>
- #include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
-@@ -990,10 +991,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
--		kfree(smmu_domain);
--		return NULL;
--	}
-+	    iommu_get_dma_cookie(&smmu_domain->domain))
-+		goto err;
-+
-+	if (type == IOMMU_DOMAIN_UNMANAGED &&
-+		iommu_get_msi_cookie(&smmu_domain->domain))
-+		goto err;
- 
- 	smmu_domain->domain.msi_geometry = msi_geometry;
- 
-@@ -1001,6 +1004,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 
- 	return &smmu_domain->domain;
-+err:
-+	kfree(smmu_domain);
-+	return NULL;
- }
- 
- static void arm_smmu_domain_free(struct iommu_domain *domain)
-@@ -1011,6 +1017,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	 * Free the domain resources. We assume that all devices have
- 	 * already been detached.
- 	 */
-+	iommu_put_msi_cookie(domain);
- 	iommu_put_dma_cookie(domain);
- 	arm_smmu_destroy_domain_context(domain);
- 	kfree(smmu_domain);
+Best Regards,
+
+Markus
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/e0ae6083/attachment.sig>
