@@ -1,88 +1,82 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Apr 2016 15:12:22 +0200
-Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
-In-Reply-To: <20160428130228.GW28464@e106497-lin.cambridge.arm.com>
-References: <20160427225827.GC17629@localhost>
- <20160428120624.GV28464@e106497-lin.cambridge.arm.com>
- <20160428141336.60aa4be1@free-electrons.com>
- <20160428130228.GW28464@e106497-lin.cambridge.arm.com>
-Message-ID: <20160428151222.2ef7ce06@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Apr 2016 14:13:23 +0100
+Subject: [PATCH v6 00/10] arm64: Add support for KVM with ACPI
+In-Reply-To: <1460388780-914-1-git-send-email-julien.grall@arm.com>
+References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
+Message-ID: <57220C73.7010900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+[+ Thomas, Jason]
 
-On Thu, 28 Apr 2016 14:02:28 +0100, Liviu Dudau wrote:
+Do you have any objection against this going through the KVM tree? The
+dependencies are rather intricate, and Daniel gave us his green light
+already for the clocksource part.
 
-> > Armada XP itself is not affected by the HW issue that requires use to
-> > use strongly-ordered mappings, it's only the Cortex-A9 based SoC, i.e
-> > Armada 375, 38x and 39x.
+If you'd rather maintain the usual flow, please let us know and we'll
+deal with it.
+
+Thanks,
+
+	M.
+
+On 11/04/16 16:32, Julien Grall wrote:
+> Hello,
 > 
-> Sorry, I blame my unfamiliarity with the Armada family of devices when I
-> said Armada XP (I know the name better than any other).
-
-No problem. It is impossible to understand the fine details of all SoC
-families supported in the kernel. I was making this statement only for
-the sake of precision.
-
-> > That being said, could you point to me to which bits of the generic PCI
-> > code I should convert our PCI support to? I'd be happy to take a look.
+> This patch series allows KVM to work with ACPI on ARM64.
 > 
-> Hmm, looking at the DT bindings there seem to be a lot of custom stuff in there.
-> I would start with trying to see if you can replace the custom parsing of
-> ranges with the generic of_pci_range_to_resource() and then look at the
-> pcie-designware.c how they got rid of the pci_common_init_dev() and the
-> need to use hw_pci structure. You want to end up with calling
-> of_pci_get_host_bridge_resources() to get back your list of MEM and IO
-> resources (it parses the bus ranges as well) and then use those to map IO
-> space and start the root bus scanning.
+> Currently, the firmware tables are parsed by the the virtual timer and virtual
+> GIC code in order to configure them correctly.
+> 
+> However the parsing of these tables is already done in the GIC and arch timer
+> drivers. This patch series introduces new helpers to retrieve the information
+> from the different drivers in order to avoid duplication of the parsing code.
+> 
+> To make the merge easier via the different trees, each patch modifies a single
+> subsystem. The suggested plan to merge the series is divided in 3 steps:
+> 
+> 1) Patches #1-#2 are merged via the clocksource tree
+>    Patches #2-#7 are merged via the irqchip tree
+> 2) Patches #8-#9 are merge via the KVM tree
+> 3) Patch #10 is merged via the clocksource tree.
+> 
+> For all the changes see in each patch.
+> 
+> Regards,
+> 
+> 
+> Julien Grall (10):
+>   clocksource: arm_arch_timer: Gather KVM specific information in a
+>     structure
+>   clocksource: arm_arch_timer: Extend arch_timer_kvm_info to get the
+>     virtual IRQ
+>   irqchip/gic-v2: Gather ACPI specific data in a single structure
+>   irqchip/gic-v2: Parse and export virtual GIC information
+>   irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
+>   irqchip/gic-v3: Gather all ACPI specific data in a single structure
+>   irqchip/gic-v3: Parse and export virtual GIC information
+>   KVM: arm/arm64: arch_timer: Rely on the arch timer to parse the
+>     firmware tables
+>   KVM: arm/arm64: vgic: Rely on the GIC driver to parse the firmware
+>     tables
+>   clocksource: arm_arch_timer: Remove arch_timer_get_timecounter
+> 
+>  drivers/clocksource/arm_arch_timer.c   |  11 ++-
+>  drivers/irqchip/irq-gic-common.c       |  13 +++
+>  drivers/irqchip/irq-gic-common.h       |   3 +
+>  drivers/irqchip/irq-gic-v3.c           | 176 +++++++++++++++++++++++++++------
+>  drivers/irqchip/irq-gic.c              |  87 +++++++++++++++-
+>  include/clocksource/arm_arch_timer.h   |  12 +--
+>  include/kvm/arm_vgic.h                 |   7 +-
+>  include/linux/irqchip/arm-gic-common.h |  34 +++++++
+>  virt/kvm/arm/arch_timer.c              |  40 +++-----
+>  virt/kvm/arm/vgic-v2.c                 |  61 +++++-------
+>  virt/kvm/arm/vgic-v3.c                 |  47 +++------
+>  virt/kvm/arm/vgic.c                    |  50 +++++-----
+>  12 files changed, 377 insertions(+), 164 deletions(-)
+>  create mode 100644 include/linux/irqchip/arm-gic-common.h
+> 
 
-I will have a look, but there is clearly one thing that is not
-possible: parsing the list of MEM and IO resources is not sufficient to
-map the IO space.
 
-With the pci-mvebu driver, all the MEM and IO mappings are dynamic. The
-device tree does *not* contain the addresses at which the MEM and IO
-mappings will be done. Indeed, we have too many PCIe interfaces and too
-few MBus windows and physical address space to map everything
-statically. So we have a logic that emulates a PCI bridge, for which we
-trap the read/write accesses made by the kernel when scanning the PCI
-busses, and we use what's written in the configuration space of the
-emulated PCI bridge to on-demand create the MBus windows with the
-appropriate size. Look at our usage of the DT:
-
-     0x82000000 0x1 0     MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
-     0x81000000 0x1 0     MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
-     0x82000000 0x2 0     MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */
-     0x81000000 0x2 0     MBUS_ID(0x04, 0xd0) 0 1 0 /* Port 0.1 IO  */
-     0x82000000 0x3 0     MBUS_ID(0x04, 0xb8) 0 1 0 /* Port 0.2 MEM */
-     0x81000000 0x3 0     MBUS_ID(0x04, 0xb0) 0 1 0 /* Port 0.2 IO  */
-     0x82000000 0x4 0     MBUS_ID(0x04, 0x78) 0 1 0 /* Port 0.3 MEM */
-     0x81000000 0x4 0     MBUS_ID(0x04, 0x70) 0 1 0 /* Port 0.3 IO  */
-
-     0x82000000 0x5 0     MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
-     0x81000000 0x5 0     MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO  */
-     0x82000000 0x6 0     MBUS_ID(0x08, 0xd8) 0 1 0 /* Port 1.1 MEM */
-     0x81000000 0x6 0     MBUS_ID(0x08, 0xd0) 0 1 0 /* Port 1.1 IO  */
-     0x82000000 0x7 0     MBUS_ID(0x08, 0xb8) 0 1 0 /* Port 1.2 MEM */
-     0x81000000 0x7 0     MBUS_ID(0x08, 0xb0) 0 1 0 /* Port 1.2 IO  */
-     0x82000000 0x8 0     MBUS_ID(0x08, 0x78) 0 1 0 /* Port 1.3 MEM */
-     0x81000000 0x8 0     MBUS_ID(0x08, 0x70) 0 1 0 /* Port 1.3 IO  */
-
-     0x82000000 0x9 0     MBUS_ID(0x04, 0xf8) 0 1 0 /* Port 2.0 MEM */
-     0x81000000 0x9 0     MBUS_ID(0x04, 0xf0) 0 1 0 /* Port 2.0 IO  */
-
-     0x82000000 0xa 0     MBUS_ID(0x08, 0xf8) 0 1 0 /* Port 3.0 MEM */
-     0x81000000 0xa 0     MBUS_ID(0x08, 0xf0) 0 1 0 /* Port 3.0 IO  */>;
-
-See how the address and size are 0 ? We don't know at the moment of
-scanning the DT, what will be the address and size of the different MEM
-and IO mappings.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
