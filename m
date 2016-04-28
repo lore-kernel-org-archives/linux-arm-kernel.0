@@ -1,87 +1,272 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 28 Apr 2016 08:15:21 +0000
-Subject: [PATCH v8 6/8] iommu/msi-iommu: iommu_msi_domain
+Date: Thu, 28 Apr 2016 08:15:19 +0000
+Subject: [PATCH v8 4/8] iommu/msi-iommu: initialization
 In-Reply-To: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
 References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461831323-5480-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function checks whether
-- the device belongs to a non default iommu domain
-- this iommu domain requires the MSI address to be mapped.
+iommu_get/put_msi_cookie allocates/frees the resource used to store
+and ref count the MSI doorbell mappings. iommu_msi_set_aperture
+initializes the iova domain used for MSI IOVA allocation.
 
-If those conditions are met, the function returns the iommu domain
-to be used for mapping the MSI doorbell; else it returns NULL.
+The implementation relies on dma-iommu API and iova API.
+
+New msi functions are fully implemented if CONFIG_IOMMU_MSI is set.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
+v8:
+- new design where msi-iommu relies on dma-iommu
+- remove the iommu_domain * from the doorbell_mapping struct
+- added is_aperture_set
 
-v7 -> v8:
-- renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
-- the function now takes a struct device *
-- use DOMAIN_ATTR_MSI_GEOMETRY attribute
+v7:
+- fix locking
+- add iova_cache_get/put
+- static inline functions when CONFIG_IOMMU_DMA_RESERVED is not set
+- introduce struct reserved_iova_domain to encapsulate prot info &
+  add prot parameter in alloc_reserved_iova_domain
+
+v5 -> v6:
+- use spin lock instead of mutex
+
+v3 -> v4:
+- formerly in "iommu/arm-smmu: implement alloc/free_reserved_iova_domain" &
+  "iommu: add alloc/free_reserved_iova_domain"
+
+v2 -> v3:
+- remove iommu_alloc_reserved_iova_domain & iommu_free_reserved_iova_domain
+  static implementation in case CONFIG_IOMMU_API is not set
+
+v1 -> v2:
+- moved from vfio API to IOMMU API
 ---
- drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
- include/linux/msi-iommu.h | 14 ++++++++++++++
- 2 files changed, 31 insertions(+)
+ drivers/iommu/Kconfig     |  7 ++++
+ drivers/iommu/Makefile    |  1 +
+ drivers/iommu/msi-iommu.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/msi-iommu.h | 65 ++++++++++++++++++++++++++++++++
+ 4 files changed, 168 insertions(+)
+ create mode 100644 drivers/iommu/msi-iommu.c
+ create mode 100644 include/linux/msi-iommu.h
 
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index dd1dc39..0078b72 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -74,6 +74,11 @@ config IOMMU_DMA
+ 	select IOMMU_IOVA
+ 	select NEED_SG_DMA_LENGTH
+ 
++# IOMMU MSI mapping
++config IOMMU_MSI
++	bool
++	select IOMMU_DMA
++
+ config FSL_PAMU
+ 	bool "Freescale IOMMU support"
+ 	depends on PPC32
+@@ -307,6 +312,7 @@ config SPAPR_TCE_IOMMU
+ config ARM_SMMU
+ 	bool "ARM Ltd. System MMU (SMMU) Support"
+ 	depends on (ARM64 || ARM) && MMU
++	select IOMMU_MSI
+ 	select IOMMU_API
+ 	select IOMMU_IO_PGTABLE_LPAE
+ 	select ARM_DMA_USE_IOMMU if ARM
+@@ -320,6 +326,7 @@ config ARM_SMMU
+ config ARM_SMMU_V3
+ 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
+ 	depends on ARM64 && PCI
++	select IOMMU_MSI
+ 	select IOMMU_API
+ 	select IOMMU_IO_PGTABLE_LPAE
+ 	select GENERIC_MSI_IRQ_DOMAIN
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index c6edb31..a381e66 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -2,6 +2,7 @@ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+ obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
+ obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
++obj-$(CONFIG_IOMMU_MSI) += msi-iommu.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
 diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
-index 203e86e..023ff17 100644
---- a/drivers/iommu/msi-iommu.c
+new file mode 100644
+index 0000000..d38725e
+--- /dev/null
 +++ b/drivers/iommu/msi-iommu.c
-@@ -243,3 +243,20 @@ unlock:
- 	}
- }
- EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
+@@ -0,0 +1,95 @@
++/*
++ * Reserved IOVA Management
++ *
++ * Copyright (c) 2015 Linaro Ltd.
++ *              www.linaro.org
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+struct iommu_domain *iommu_msi_domain(struct device *dev)
++#include <linux/iommu.h>
++#include <linux/dma-iommu.h>
++#include <linux/msi-iommu.h>
++#include <linux/spinlock.h>
++#include <linux/iova.h>
++
++struct doorbell_mapping {
++	struct kref		kref;
++	struct list_head	next;
++	phys_addr_t		addr;
++	dma_addr_t		iova;
++	size_t			size;
++};
++
++struct doorbell_mapping_info {
++	struct list_head list; /* list of doorbell mapping entries */
++	bool is_aperture_set; /* Is the MSI IOVA aperture set? */
++	spinlock_t lock;
++};
++
++int iommu_get_msi_cookie(struct iommu_domain *domain)
 +{
-+	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
-+	struct iommu_domain_msi_geometry msi_geometry;
++	struct doorbell_mapping_info *dmi;
++	int ret;
 +
-+	if (!d || (d->type == IOMMU_DOMAIN_DMA))
-+		return NULL;
++	if (domain->msi_cookie || domain->iova_cookie)
++		return -EINVAL;
 +
-+	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
-+	if (!msi_geometry.programmable)
-+		return NULL;
++	ret = iommu_get_dma_cookie(domain);
++	if (ret)
++		return ret;
 +
-+	return d;
++	dmi = kzalloc(sizeof(*dmi), GFP_KERNEL);
++
++	INIT_LIST_HEAD(&dmi->list);
++	spin_lock_init(&dmi->lock);
++	iova_cache_get();
++
++	domain->msi_cookie = dmi;
++
++	return dmi ? 0 : -ENOMEM;
 +}
-+EXPORT_SYMBOL_GPL(iommu_msi_domain);
++EXPORT_SYMBOL(iommu_get_msi_cookie);
++
++void iommu_put_msi_cookie(struct iommu_domain *domain)
++{
++	struct doorbell_mapping_info *dmi = domain->msi_cookie;
++
++	if (!dmi)
++		return;
++
++	domain->msi_cookie = NULL;
++
++	WARN_ON(!list_empty(&dmi->list));
++
++	kfree(dmi);
++	iommu_put_dma_cookie(domain);
++	iova_cache_put();
++}
++EXPORT_SYMBOL(iommu_put_msi_cookie);
++
++int iommu_msi_set_aperture(struct iommu_domain *domain,
++			   dma_addr_t start, dma_addr_t end)
++{
++	struct doorbell_mapping_info *dmi = domain->msi_cookie;
++	int ret;
++
++	if (!dmi)
++		return -ENODEV;
++
++	ret = iommu_dma_init_domain(domain, start, end - start + 1);
++	if (!ret)
++		dmi->is_aperture_set = true;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(iommu_msi_set_aperture);
 +
 diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
-index 1cd115f..114bd69 100644
---- a/include/linux/msi-iommu.h
+new file mode 100644
+index 0000000..392aa6f
+--- /dev/null
 +++ b/include/linux/msi-iommu.h
-@@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
-  */
- void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
- 
-+/**
-+ * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
-+ * translates the MSI transaction, returns the iommu domain the MSI doorbell
-+ * address must be mapped in; else returns NULL.
+@@ -0,0 +1,65 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ *              www.linaro.org
 + *
-+ * @dev: device handle
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
 + */
-+struct iommu_domain *iommu_msi_domain(struct device *dev);
++#ifndef __MSI_IOMMU_H
++#define __MSI_IOMMU_H
 +
- #else
- 
- static inline int
-@@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
- static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
- 					       phys_addr_t addr) {}
- 
-+static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
++#include <linux/types.h>
++#include <linux/kernel.h>
++
++struct iommu_domain;
++
++#ifdef CONFIG_IOMMU_MSI
++
++/**
++ * iommu_get_msi_cookie - Acquire MSI mapping resources for a domain
++ * @domain: IOMMU domain to prepare for MSI mapping
++ *
++ * IOMMU drivers which require MSI mapping should normally call this
++ * from their domain_alloc callback when domain->type ==
++ * IOMMU_DOMAIN_UNMANAGED.
++ */
++int iommu_get_msi_cookie(struct iommu_domain *domain);
++
++/**
++ * iommu_put_msi_cookie - Release a domain's MSI mapping resources
++ * @domain: IOMMU domain previously prepared by iommu_get_msi_cookie()
++ *
++ * IOMMU drivers requesting MSI mapping should normally call this from
++ * their domain_free callback.
++ */
++void iommu_put_msi_cookie(struct iommu_domain *domain);
++
++/**
++ * iommu_msi_set_aperture: allocate the msi iova domain
++ * according to the specified start/end IOVAs
++ *
++ * @domain: iommu domain handle
++ * @start: MSI iova start address
++ * @end: MSI iova end address
++ */
++int iommu_msi_set_aperture(struct iommu_domain *domain,
++			   dma_addr_t start, dma_addr_t end);
++
++#else
++
++static inline int
++iommu_msi_set_aperture(struct iommu_domain *domain,
++		       dma_addr_t start, dma_addr_t end)
 +{
-+	return NULL;
++	return -ENOENT;
 +}
 +
- #endif	/* CONFIG_IOMMU_MSI */
- #endif	/* __MSI_IOMMU_H */
++#endif	/* CONFIG_IOMMU_MSI */
++#endif	/* __MSI_IOMMU_H */
 -- 
 1.9.1
