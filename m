@@ -1,81 +1,193 @@
 From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Thu, 28 Apr 2016 11:05:10 +0200
-Subject: [RFC v4 0/8] gpio: add DT support for generic memory-mapped GPIOs
-Message-ID: <cover.1461806071.git.chunkeey@googlemail.com>
+Date: Thu, 28 Apr 2016 11:05:13 +0200
+Subject: [RFC v4 3/8] gpio: generic: add DT support for generic memory-mapped
+ GPIOs
+In-Reply-To: <cover.1461806071.git.chunkeey@googlemail.com>
+References: <cover.1461806071.git.chunkeey@googlemail.com>
+Message-ID: <a5d6bb7bb73ff9396c9e8053a8e8e0975b857934.1461806071.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds device tree support for generic memory-mapped GPIOs.
-The GPIO library already allows drivers and architecture support code to
-reuse generic code for managing a GPIO chip. Currently, a developer has
-to create a platform device "basic-mmio-gpio" and attach a bgpio_pdata
-platform data structure to make use of it. However, for architectures
-which rely on the device tree to enumerate devices, creating custom
-platform devices is another extra step that can be avoided by having
-direct support via a device tree binding.
+From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
 
-I initially came across this patch [0] from ?lvaro Fern?ndez Rojas,
-while looking for an easy way to add support for the GPIO of my
-WD MyBook Live [1] (APM82181 - ppc464). This generic approach patch
-allowed me to easily get the GPIO (and the connected LEDs,
-buttons, gpiohogs, etc.) up and running. Even tought, Mr. Fernandez
-initially developed it for his work on the brcm63xx [2].
+This patch adds support for defining memory-mapped GPIOs
+which provide a compatible interface for the existing
+generic-gpio driver.
 
-[0] <https://patchwork.ozlabs.org/patch/422121/>
-[1] <https://github.com/chunkeey/MBL-openwrt>
-[2] <https://wiki.openwrt.org/doc/hardware/soc/soc.broadcom.bcm63xx>
-
-Currently, the device tree parses for the integrated drivers
-(gpio-clps711x, gpio-ge, gpio-moxart and gpio-ts4800) are still
-residing in their original driver .c file. This way, these
-drivers don't clutter the gpio-generic.c with their own hardware
-definitions and MODULE_* statements. I hoped this would make the
-transition from the _probe to the parser less painless but the diff
-is retty much unreadable. So the next series will consolidate them
-into gpio-generic.c and then I can drop the gpio-generic -> gpio-mmio
-change. I think this is now mostly a matter of how to organize things
-and why not try it just once just so it was tested.
-
-changelog:
-
-v3 -> v4:
-	- renamed gpio-generic.c to gpio-mmio.c
-	  (The gpio-generic only contains a generic mmio driver,
-	  this confuses and angers people!)
-	- changed compat. string to "linux,gpio-mmio"
-	- integrated Cirrus clps711x driver
-	- integrated GE FGPA gpio-ge driver
-	- integrated MOXA ART GPIO driver
-	- integrated TS4800 gpio driver
-	- reshuffled patches, reworded commits, fixed spelling errors, etc.
-
-Thanks! (Please keep me in the CC)
+Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
 ---
-Christian Lamparter (6):
-  gpio: generic: fix GPIO_GENERIC_PLATFORM is set to module case
-  gpio: rename gpio-generic.c into gpio-mmio.c
-  gpio: clps711x: integrate cirrus clps711x into gpio-mmio
-  gpio: ge: integrate GE's FPGA GPIO into gpio-mmio
-  gpio: moxart: integrate MOXA ART GPIO driver into gpio-mmio
-  gpio: ts4800: integrate TS4800 into gpio-mmio
-
-?lvaro Fern?ndez Rojas (2):
-  gpio: generic: add DT support for generic memory-mapped GPIOs
-  gpio: dt-bindings: add gpio-mmio bindings
-
- .../devicetree/bindings/gpio/gpio-mmio.txt         |  73 +++++++++++++++
- drivers/gpio/Kconfig                               |  57 ++++++------
- drivers/gpio/Makefile                              |  11 ++-
- drivers/gpio/gpio-clps711x.c                       |  84 ++++++-----------
- drivers/gpio/gpio-ge.c                             | 101 ++++++---------------
- drivers/gpio/gpio-mmio-compat.h                    |  65 +++++++++++++
- drivers/gpio/{gpio-generic.c => gpio-mmio.c}       | 101 ++++++++++++++++++++-
- drivers/gpio/gpio-moxart.c                         |  81 +++++------------
- drivers/gpio/gpio-ts4800.c                         |  76 +++++-----------
- 9 files changed, 376 insertions(+), 273 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mmio.txt
+ drivers/gpio/Kconfig            |  3 ++
+ drivers/gpio/gpio-mmio-compat.h | 17 ++++++++
+ drivers/gpio/gpio-mmio.c        | 95 ++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 113 insertions(+), 2 deletions(-)
  create mode 100644 drivers/gpio/gpio-mmio-compat.h
- rename drivers/gpio/{gpio-generic.c => gpio-mmio.c} (86%)
 
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index f73f26b..d1f124e 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -212,6 +212,9 @@ config GPIO_GENERIC_PLATFORM
+ 	help
+ 	  Say yes here to support basic platform_device memory-mapped GPIO controllers.
+ 
++if GPIO_GENERIC_PLATFORM
++endif
++
+ config GPIO_GRGPIO
+ 	tristate "Aeroflex Gaisler GRGPIO support"
+ 	depends on OF
+diff --git a/drivers/gpio/gpio-mmio-compat.h b/drivers/gpio/gpio-mmio-compat.h
+new file mode 100644
+index 0000000..73c48bc
+--- /dev/null
++++ b/drivers/gpio/gpio-mmio-compat.h
+@@ -0,0 +1,17 @@
++#ifndef GPIO_MMIO_COMPAT_H
++#define GPIO_MMIO_COMPAT_H
++
++#include <linux/ioport.h>
++
++#define ADD(_name, _func) { .compatible = _name, .data = _func }
++
++#undef ADD
++
++static inline void set_resource_address(struct resource *res,
++					resource_size_t start,
++					resource_size_t len)
++{
++	res->start = start;
++	res->end = start + len - 1;
++}
++#endif /* GPIO_MMIO_COMPAT_H */
+diff --git a/drivers/gpio/gpio-mmio.c b/drivers/gpio/gpio-mmio.c
+index 6c1cb3b..4de9846 100644
+--- a/drivers/gpio/gpio-mmio.c
++++ b/drivers/gpio/gpio-mmio.c
+@@ -61,6 +61,9 @@ o        `                     ~~~~\___/~~~~    ` controller in FPGA is ,.`
+ #include <linux/bitops.h>
+ #include <linux/platform_device.h>
+ #include <linux/mod_devicetable.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include "gpio-mmio-compat.h"
+ 
+ static void bgpio_write8(void __iomem *reg, unsigned long data)
+ {
+@@ -569,6 +572,83 @@ static void __iomem *bgpio_map(struct platform_device *pdev,
+ 	return devm_ioremap_resource(&pdev->dev, r);
+ }
+ 
++#ifdef CONFIG_OF
++static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
++				     struct bgpio_pdata *pdata,
++				     unsigned long *flags)
++{
++	struct device *dev = &pdev->dev;
++	int err;
++
++	err = of_property_read_u32(dev->of_node, "ngpio", &pdata->ngpio);
++	if (err && err != -EINVAL)
++		return err;
++
++	if (of_device_is_big_endian(dev->of_node))
++		*flags |= BGPIOF_BIG_ENDIAN_BYTE_ORDER;
++
++	if (of_property_read_bool(dev->of_node, "unreadable-reg-set"))
++		*flags |= BGPIOF_UNREADABLE_REG_SET;
++
++	if (of_property_read_bool(dev->of_node, "unreadable-reg-dir"))
++		*flags |= BGPIOF_UNREADABLE_REG_DIR;
++
++	if (of_property_read_bool(dev->of_node, "big-endian-byte-order"))
++		*flags |= BGPIOF_BIG_ENDIAN;
++
++	if (of_property_read_bool(dev->of_node, "read-output-reg-set"))
++		*flags |= BGPIOF_READ_OUTPUT_REG_SET;
++
++	if (of_property_read_bool(dev->of_node, "no-output"))
++		*flags |= BGPIOF_NO_OUTPUT;
++	return 0;
++}
++
++#define ADD(_name, _func) { .compatible = _name, .data = _func }
++
++static const struct of_device_id bgpio_of_match[] = {
++	ADD("linux,gpio-mmio", bgpio_basic_mmio_parse_dt),
++
++	{ }
++};
++#undef ADD
++MODULE_DEVICE_TABLE(of, bgpio_of_match);
++
++static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
++					  unsigned long *flags)
++{
++	int (*parse_dt)(struct platform_device *,
++			struct bgpio_pdata *, unsigned long *);
++	const struct device_node *node = pdev->dev.of_node;
++	const struct of_device_id *of_id;
++	struct bgpio_pdata *pdata;
++	int err = -ENODEV;
++
++	of_id = of_match_node(bgpio_of_match, node);
++	if (!of_id)
++		return NULL;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(struct bgpio_pdata),
++			     GFP_KERNEL);
++	if (!pdata)
++		return ERR_PTR(-ENOMEM);
++
++	parse_dt = of_id->data;
++	if (parse_dt)
++		err = parse_dt(pdev, pdata, flags);
++	if (err)
++		return ERR_PTR(err);
++
++	return pdata;
++}
++#else
++static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
++					  unsigned long *flags)
++{
++	return NULL;
++}
++#endif /* CONFIG_OF */
++
+ static int bgpio_pdev_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -579,10 +659,18 @@ static int bgpio_pdev_probe(struct platform_device *pdev)
+ 	void __iomem *dirout;
+ 	void __iomem *dirin;
+ 	unsigned long sz;
+-	unsigned long flags = pdev->id_entry->driver_data;
++	unsigned long flags = 0;
+ 	int err;
+ 	struct gpio_chip *gc;
+-	struct bgpio_pdata *pdata = dev_get_platdata(dev);
++	struct bgpio_pdata *pdata;
++
++	pdata = bgpio_parse_dt(pdev, &flags);
++	if (IS_ERR(pdata)) {
++		return PTR_ERR(pdata);
++	} else if (!pdata) {
++		pdata = dev_get_platdata(dev);
++		flags = pdev->id_entry->driver_data;
++	}
+ 
+ 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");
+ 	if (!r)
+@@ -646,6 +734,9 @@ MODULE_DEVICE_TABLE(platform, bgpio_id_table);
+ static struct platform_driver bgpio_driver = {
+ 	.driver = {
+ 		.name = "basic-mmio-gpio",
++#ifdef CONFIG_OF
++		.of_match_table = of_match_ptr(bgpio_of_match),
++#endif
+ 	},
+ 	.id_table = bgpio_id_table,
+ 	.probe = bgpio_pdev_probe,
 -- 
 2.8.1
