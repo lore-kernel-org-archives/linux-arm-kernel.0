@@ -1,59 +1,47 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 28 Apr 2016 16:18:34 -0500
-Subject: [PATCH V6 08/13] PCI: generic, thunder: update to use generic
- ECAM API
-In-Reply-To: <5813591.CkzahFEfSl@wuerfel>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <8950494.UV8UrWiFbx@wuerfel> <20160428201439.GD25125@localhost>
- <5813591.CkzahFEfSl@wuerfel>
-Message-ID: <20160428211834.GE25125@localhost>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri, 29 Apr 2016 00:19:31 +0300
+Subject: [PATCH 0/2] Fix ir-rx51 by using PWM pdata
+In-Reply-To: <1461714709-10455-1-git-send-email-tony@atomide.com>
+References: <1461714709-10455-1-git-send-email-tony@atomide.com>
+Message-ID: <57227E63.4040907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 10:40:35PM +0200, Arnd Bergmann wrote:
-> On Thursday 28 April 2016 15:14:39 Bjorn Helgaas wrote:
-> > On Thu, Apr 21, 2016 at 11:36:53AM +0200, Arnd Bergmann wrote:
-> > > On Thursday 21 April 2016 11:28:15 Tomasz Nowicki wrote:
-> > > > On 19.04.2016 15:06, Arnd Bergmann wrote:
-> > > > > On Monday 18 April 2016 21:31:54 Tomasz Nowicki wrote:
-> > > > >>
-> > > > >> Basically the whole content of pci-thunder-ecam.c and pci-thunder-pem.c.
-> > > > >>
-> > > > >> pci-thunder-ecam.c contains config space accessors. Similar for
-> > > > >> pci-thunder-pem.c but it also has extra init call (it is now called
-> > > > >> thunder_pem_init) which finds and maps related registers.
-> > > > >
-> > > > > They seem to do much more than just override the accessors, they actually
-> > > > > change the contents of the config space as well. Is that really necessary
-> > > > > on ACPI based systems as well?
-> > > > 
-> > > > Yes, the pci-thunder-ecam.c accessors are meant to emulate config space 
-> > > > capabilities. They are necessary to synthesize EA capabilities (fixed 
-> > > > PCI BARs), it wont work without this, for ACPI boot as well.
-> > > 
-> > > Why is that? I thought the BARs never get reassigned when using ACPI,
-> > 
-> > In general, there's no reason we can't reassign BARs, whether we're
-> > using DT, ACPI, or whatever.  In many cases, systems with ACPI also
-> > assign all the BARs in firmware, and Linux doesn't reassign them
-> > unless it needs to.  But that's just a coincidence.  There's no
-> > requirement that Linux leave BARs as firmware programmed them.
-> 
-> I'm thought I've seen systems in which the ACPI BIOS assumes that
-> certain PCI devices never move around, because it pokes the registers
-> from AML, and changing them would require never using the same device
-> through ACPI. It's likely that this is against some standard, but that
-> won't help you if you have to deal with the system anyway.
+Hi,
 
-Yes, I'm pretty sure there are systems like that, e.g., I think SMM
-code on some HP servers assumes the iLO address never changes.  I
-think that is a firmware defect because I don't think there's any spec
-that says firmware retains control over PCI BARs after handoff.  And
-this particular case isn't really ACPI-specific.
+On 27.04.2016 02:51, Tony Lindgren wrote:
+> Hi all,
+>
+> Here are minimal fixes to get ir-rx51 going again. Then further
+> fixes can be done as noted in the second patch.
+>
+> Regards,
+>
+> Tony
+>
+>
+> Tony Lindgren (2):
+>    ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51
+>    [media] ir-rx51: Fix build after multiarch changes broke it
+>
+>   arch/arm/mach-omap2/board-rx51-peripherals.c   | 35 ++++++++-
+>   arch/arm/mach-omap2/pdata-quirks.c             | 33 ++++++++-
+>   drivers/media/rc/Kconfig                       |  2 +-
+>   drivers/media/rc/ir-rx51.c                     | 99 ++++++++++++++------------
+>   include/linux/platform_data/media/ir-rx51.h    |  1 +
+>   include/linux/platform_data/pwm_omap_dmtimer.h | 21 ++++++
+>   6 files changed, 141 insertions(+), 50 deletions(-)
+>
 
-But as you say, we have to deal with these systems anyway, even if we
-consider that behavior broken.  My proposal has been to add quirks to
-mark those devices as IORESOURCE_PCI_FIXED, but I don't think anybody
-has gotten around to doing that.
+I didn't test legacy boot, as I don't really see any value of doing it 
+now the end of the legacy boot is near, the driver does not function 
+correctly, however the patchset at least allows for the driver to be 
+build and we have something to improve on. And I am going to send a 
+patch that fixes the problem with omap_dm_timer_request_specific(). So, 
+for both patches, you may add:
 
-Bjorn
+Tested-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+
+
+Thanks,
+Ivo
