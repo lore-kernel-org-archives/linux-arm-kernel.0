@@ -1,64 +1,101 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 28 Apr 2016 14:02:28 +0100
-Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
-In-Reply-To: <20160428141336.60aa4be1@free-electrons.com>
-References: <20160427225827.GC17629@localhost>
- <20160428120624.GV28464@e106497-lin.cambridge.arm.com>
- <20160428141336.60aa4be1@free-electrons.com>
-Message-ID: <20160428130228.GW28464@e106497-lin.cambridge.arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 28 Apr 2016 14:03:58 +0100
+Subject: [RFC PATCH] arm64: Make arch_randomize_brk avoid stack area
+Message-ID: <1461848638.2848.19.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 02:13:36PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Thu, 28 Apr 2016 13:06:24 +0100, Liviu Dudau wrote:
-> 
-> > I am OK with the suggestion that Thomas has to add a parameter to
-> > pci_remap_iospace() to pass on the pgprot_t value one wants and get rid of
-> > pci_remap_io(), but I would suggest first to him to convert the ARMADA XP
-> > platform to generic PCI code and see if it doesn't work OK by default. We
-> > (well, Lorenzo driven nowadays) are pushing in that direction for a while now.
-> 
-> Armada XP itself is not affected by the HW issue that requires use to
-> use strongly-ordered mappings, it's only the Cortex-A9 based SoC, i.e
-> Armada 375, 38x and 39x.
+When a process is created, various address randomisations may end up
+colluding to place the address of brk in the stack memory.
 
-Sorry, I blame my unfamiliarity with the Armada family of devices when I
-said Armada XP (I know the name better than any other).
+One consequence of this, is that even for processes that make no use of
+brk, the output of /proc/*/maps may show the stack area listed as
+'[heap]' rather than '[stack]'. Apart from being misleading to this causes
+fatal errors with the Android run-time like:
+"No [stack] line found in /proc/self/task/*/maps"
 
-> 
-> That being said, could you point to me to which bits of the generic PCI
-> code I should convert our PCI support to? I'd be happy to take a look.
+To prevent this problem pick a limit for brk that allows for the stack's
+memory. At the same time we remove randomize_base() as that was only
+used by arch_randomize_brk().
 
-Hmm, looking at the DT bindings there seem to be a lot of custom stuff in there.
-I would start with trying to see if you can replace the custom parsing of
-ranges with the generic of_pci_range_to_resource() and then look at the
-pcie-designware.c how they got rid of the pci_common_init_dev() and the
-need to use hw_pci structure. You want to end up with calling
-of_pci_get_host_bridge_resources() to get back your list of MEM and IO
-resources (it parses the bus ranges as well) and then use those to map IO
-space and start the root bus scanning.
+Note, in practice, since commit d1fd836dcf00 ("mm: split ET_DYN ASLR
+from mmap ASLR") this problem shouldn't occur because the address chosen
+for loading binaries is well clear of the stack, however, prior to that
+the problem does occur because of the following...
 
-Best regards,
-Liviu
+The memory layout of a task is determined by arch_pick_mmap_layout. If
+address randomisation is enabled (task has flag PF_RANDOMIZE) this sets
+mmap_base to a random address at the top of task memory just below a
+region calculated to allow for a stack which itself may have a random
+base address. Any mmap operations that then happen which require an
+address allocating will use the topdown allocation method, i.e. the
+first allocated memory will be at the top of memory, just below the
+area set aside for the stack.
 
-> 
-> Thanks!
-> 
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-> 
+When a relocatable binary is loaded into a new process by
+load_elf_binary and randomised address are enabled, it uses a
+'load_bias' of zero, so that when mmap is called to create a memory
+region for it, a new address is picked (address zero not being
+available). As this is the first memory region in the task, it gets the
+region just below the stack, as described previously.
 
+The loader then set's brk to the end of the elf data section, which will
+be near the end of the loaded binary and then it calls
+arch_randomize_brk. As this currently stands, this adds a random amount
+to brk, which unfortunately may take it into the address range where the
+stack lies.
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+
+I don't know if a change like this is needed for the latest Linux
+versions - where it's more like defensive coding than solving a current
+issue.
+
+For earlier versions, like 3.18 LTS where I diagnosed the problem, I
+don't know if this is a suitable fix, of if the later ASLR changes
+should be backported (seems somewhat more invasive).
+
+Perhaps this issue isn't important enough for LTS and is just needed for
+people maintaining Android trees.
+
+ arch/arm64/kernel/process.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 8062482..7126a5a 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -382,13 +382,24 @@ unsigned long arch_align_stack(unsigned long sp)
+ 	return sp & ~0xf;
+ }
+ 
+-static unsigned long randomize_base(unsigned long base)
++unsigned long arch_randomize_brk(struct mm_struct *mm)
+ {
+ 	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
+-	return randomize_range(base, range_end, 0) ? : base;
+-}
++	unsigned long max_stack, range_limit;
+ 
+-unsigned long arch_randomize_brk(struct mm_struct *mm)
+-{
+-	return randomize_base(mm->brk);
++	/*
++	 * Determine how much room do we need to leave available for the stack.
++	 * We limit this to a reasonable value, because extremely large or
++	 * unlimited stacks are always going to bump up against brk at some
++	 * point and we don't want to fail to randomise brk in those cases.
++	 */
++	max_stack = rlimit(RLIMIT_STACK);
++	if (max_stack > SZ_128M)
++		max_stack = SZ_128M;
++
++	range_limit = mm->start_stack - max_stack - 1;
++	if (range_end > range_limit)
++		range_end > range_limit
++
++	return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
+ }
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.1.4
