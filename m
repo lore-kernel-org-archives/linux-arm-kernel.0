@@ -1,114 +1,39 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 28 Apr 2016 10:27:54 +0100
-Subject: [PATCH 02/12] ARM: provide improved virt_to_idmap() functionality
+Date: Thu, 28 Apr 2016 10:27:59 +0100
+Subject: [PATCH 03/12] ARM: kexec: remove 512MB restriction on kexec crashdump
 In-Reply-To: <20160428092644.GX19428@n2100.arm.linux.org.uk>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
-Message-ID: <E1aviEk-0000il-44@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1aviEp-0000ir-7s@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For kexec, we need more functionality from the IDMAP system.  We need to
-be able to convert physical addresses to their identity mappped versions
-as well as virtual addresses.
-
-Convert the existing arch_virt_to_idmap() to deal with physical
-addresses instead.
-
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/memory.h     | 33 ++++++++++++++++++++++++++-------
- arch/arm/mach-keystone/keystone.c |  7 +------
- arch/arm/mm/idmap.c               |  2 +-
- 3 files changed, 28 insertions(+), 14 deletions(-)
+ arch/arm/kernel/setup.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 9427fd632552..ca208335fde6 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -288,19 +288,38 @@ static inline void *phys_to_virt(phys_addr_t x)
- #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
- #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
- 
--extern unsigned long (*arch_virt_to_idmap)(unsigned long x);
-+extern long long arch_phys_to_idmap_offset;
- 
- /*
-- * These are for systems that have a hardware interconnect supported alias of
-- * physical memory for idmap purposes.  Most cases should leave these
-+ * These are for systems that have a hardware interconnect supported alias
-+ * of physical memory for idmap purposes.  Most cases should leave these
-  * untouched.  Note: this can only return addresses less than 4GiB.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 77b54c461c52..d9317eec1eba 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -943,7 +943,6 @@ late_initcall(init_machine_late);
+  * zImage relocating below the reserved region.
   */
-+#define IDMAP_INVALID_ADDR ((u32)~0)
-+
-+static inline unsigned long phys_to_idmap(phys_addr_t addr)
-+{
-+	if (IS_ENABLED(CONFIG_MMU) && arch_phys_to_idmap_offset) {
-+		addr += arch_phys_to_idmap_offset;
-+		if (addr > (u32)~0)
-+			addr = IDMAP_INVALID_ADDR;
-+	}
-+	return addr;
-+}
-+
-+static inline phys_addr_t idmap_to_phys(unsigned long idmap)
-+{
-+	phys_addr_t addr = idmap;
-+
-+	if (IS_ENABLED(CONFIG_MMU) && arch_phys_to_idmap_offset)
-+		addr -= arch_phys_to_idmap_offset;
-+
-+	return addr;
-+}
-+
- static inline unsigned long __virt_to_idmap(unsigned long x)
+ #define CRASH_ALIGN	(128 << 20)
+-#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
+ 
+ static inline unsigned long long get_total_mem(void)
  {
--	if (IS_ENABLED(CONFIG_MMU) && arch_virt_to_idmap)
--		return arch_virt_to_idmap(x);
--	else
--		return __virt_to_phys(x);
-+	return phys_to_idmap(__virt_to_phys(x));
- }
+@@ -973,9 +972,7 @@ static void __init reserve_crashkernel(void)
+ 		return;
  
- #define virt_to_idmap(x)	__virt_to_idmap((unsigned long)(x))
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index e6b9cb1e6709..a33a296b00dc 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -63,11 +63,6 @@ static void __init keystone_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static unsigned long keystone_virt_to_idmap(unsigned long x)
--{
--	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
--}
--
- static long long __init keystone_pv_fixup(void)
- {
- 	long long offset;
-@@ -91,7 +86,7 @@ static long long __init keystone_pv_fixup(void)
- 	offset = KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START;
- 
- 	/* Populate the arch idmap hook */
--	arch_virt_to_idmap = keystone_virt_to_idmap;
-+	arch_phys_to_idmap_offset = -offset;
- 
- 	return offset;
- }
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index bd274a05b8ff..c1a48f88764e 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -15,7 +15,7 @@
-  * page tables.
-  */
- pgd_t *idmap_pgd;
--unsigned long (*arch_virt_to_idmap)(unsigned long x);
-+long long arch_phys_to_idmap_offset;
- 
- #ifdef CONFIG_ARM_LPAE
- static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	if (crash_base <= 0) {
+-		unsigned long long crash_max = CRASH_ADDR_MAX;
+-		if (crash_max > (u32)~0)
+-			crash_max = (u32)~0;
++		unsigned long long crash_max = idmap_to_phys((u32)~0);
+ 		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+ 						    crash_size, CRASH_ALIGN);
+ 		if (!crash_base) {
 -- 
 2.1.0
