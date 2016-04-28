@@ -1,50 +1,33 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 28 Apr 2016 15:35:46 +0530
-Subject: [PATCH RESEND 1/4] ARM: dts: am57xx: Introduce commercial grade
+Date: Thu, 28 Apr 2016 15:35:49 +0530
+Subject: [PATCH RESEND 4/4] ARM: dts: am57xx-idk: Include Industrial grade
  thermal thresholds
 In-Reply-To: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
 References: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1461837949-11116-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <1461837949-11116-5-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The silicon versions which are non ES2.0 are commercial grade silicon
-and have lower thermal thresholds.
+am57xx-idk have Industrial grade samples whose thermal
+thresholds are different as compared with dra7. Hence correcting the same.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/am57xx-commercial-grade.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 arch/arm/boot/dts/am57xx-commercial-grade.dtsi
+ arch/arm/boot/dts/am57xx-idk-common.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-commercial-grade.dtsi b/arch/arm/boot/dts/am57xx-commercial-grade.dtsi
-new file mode 100644
-index 0000000..c183654
---- /dev/null
-+++ b/arch/arm/boot/dts/am57xx-commercial-grade.dtsi
-@@ -0,0 +1,23 @@
-+&cpu_alert0 {
-+	temperature = <80000>; /* milliCelsius */
-+};
+diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
+index 2805b68..b01a594 100644
+--- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
++++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
+@@ -6,6 +6,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include "am57xx-industrial-grade.dtsi"
 +
-+&cpu_crit {
-+	temperature = <90000>; /* milliCelsius */
-+};
-+
-+&gpu_crit {
-+	temperature = <90000>; /* milliCelsius */
-+};
-+
-+&core_crit {
-+	temperature = <90000>; /* milliCelsius */
-+};
-+
-+&dspeve_crit {
-+	temperature = <90000>; /* milliCelsius */
-+};
-+
-+&iva_crit {
-+	temperature = <90000>; /* milliCelsius */
-+};
+ / {
+ 	aliases {
+ 		rtc0 = &tps659038_rtc;
 -- 
 1.9.1
