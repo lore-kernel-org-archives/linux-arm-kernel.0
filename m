@@ -1,42 +1,36 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 28 Apr 2016 23:33:38 +0300
-Subject: [PATCH 0/2] Pass n900 MMC slot names in pdata for legacy user
- space
-In-Reply-To: <1461714383-9956-1-git-send-email-tony@atomide.com>
-References: <1461714383-9956-1-git-send-email-tony@atomide.com>
-Message-ID: <572273A2.4050104@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2016 22:37:53 +0200
+Subject: [GIT PULL 1/3] ARM: dts: exynos: Secound round of DTS for v4.7
+In-Reply-To: <20160428190428.GA10520@kozik-lap>
+References: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
+ <1956683.Gv388axJqA@wuerfel> <20160428190428.GA10520@kozik-lap>
+Message-ID: <3806573.U95ZyAj1xD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 28 April 2016 21:04:28 Krzysztof Kozlowski wrote:
+> On Thu, Apr 28, 2016 at 04:06:54PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 27 April 2016 11:10:54 Krzysztof Kozlowski wrote:
+> > >   kernel.org:/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.7-2
+> > > 
+> > 
+> > Pulled into next/dt after I figured out that the URL was wrong.
+> > 
+> > Please check your git configuration to make sure you send an address
+> > I can pull from.
+> 
+> Ah, indeed, sorry for that. I still did not automate entirely this process
+> so apparently I am doing simple mistakes. I'll be more carefull next
+> time.
 
-On 27.04.2016 02:46, Tony Lindgren wrote:
-> Hi all,
->
-> N900 needs the MMC slot names to work. Let's pass them in pdata
-> for now to remove the last remaining blocker for removing omap3
-> legacy booting support for v4.8.
->
-> Then when we have a generic DT binding for the slot names, we
-> can use that assuming it will work for the n900 legacy user space.
->
-> Regards,
->
-> Tony
->
->
-> Tony Lindgren (2):
->    ARM: OMAP2+: n900 needs MMC slot names for legacy user space
->    mmc: omap_hsmmc: Check if MMC slot name is passed in pdata
->
->   arch/arm/mach-omap2/pdata-quirks.c | 7 +++++++
->   drivers/mmc/host/omap_hsmmc.c      | 6 +++++-
->   2 files changed, 12 insertions(+), 1 deletion(-)
->
+Ok. The trick is to have a separate 'url' and 'pushurl' entry in your
+git config, like
 
-For both patches, you may add:
+[remote "origin"]
+        url = git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+        pushurl = git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
 
-Tested-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+That way, 'git request-pull' will pick the first one, but 'git push' will
+use the second.
 
-Thanks,
-Ivo
+	Arnd
