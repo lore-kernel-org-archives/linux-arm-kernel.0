@@ -1,43 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Apr 2016 13:55:57 -0700
-Subject: [PATCH 2/2] [media] ir-rx51: Fix build after multiarch changes
- broke it
-In-Reply-To: <572275DB.8090300@gmail.com>
-References: <1461714709-10455-1-git-send-email-tony@atomide.com>
- <1461714709-10455-3-git-send-email-tony@atomide.com>
- <572266AF.9020601@gmail.com> <20160428202248.GG5995@atomide.com>
- <572275DB.8090300@gmail.com>
-Message-ID: <20160428205557.GH5995@atomide.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 28 Apr 2016 22:56:29 +0200
+Subject: [PATCH V3] clk: bcm2835: mark enabled clocks with
+ CLK_ENABLE_HAND_OFF
+In-Reply-To: <87d1p9v5z5.fsf@eliezer.anholt.net>
+References: <1461770664-29384-1-git-send-email-kernel@martin.sperl.org>
+ <87d1p9v5z5.fsf@eliezer.anholt.net>
+Message-ID: <66DC3759-FEAB-4B65-BAB4-94D0C2BD70F8@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 13:44]:
-> ??,
-> 
-> On 28.04.2016 23:22, Tony Lindgren wrote:
-> >* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 12:39]:
-> >>On 27.04.2016 02:51, Tony Lindgren wrote:
-> >>
-> >>omap_dm_timer_request_specific always fails with message "Please use
-> >>omap_dm_timer_request_by_cap/node()" with DT boot.
-> >>
-> >>I hacked the code to use omap_dm_timer_request_by_cap(OMAP_TIMER_HAS_PWM)
-> >>and it seems to use the correct timer (IR LED blinks, checked with the
-> >>camera of Samsung S4 mini), but it doesn't actually control either of the TV
-> >>sets here. The same SW(pierogi) controls them when device is booted to stock
-> >>kernel. However, this seems another problem not related to the patch.
-> >
-> >OK thanks for testing, I'll apply the pdata patch then.
-> >
-> >I assume you'll post a separate fix for the request_by_cap
-> >driver change?
-> >
-> 
-> Well, it was a hack, it just happens that the first matched timer is GPT9, I
-> think we should aim for a proper solution (request_by_node()).
-> 
-> Shall I prepare a patch that gets the timer from the DT?
 
-Sounds good to me!
 
-Tony
+> On 28.04.2016, at 22:22, Eric Anholt <eric@anholt.net> wrote:
+> 
+> kernel at martin.sperl.org writes:
+> 
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> The bcm2835 firmware enables several clocks and plls before
+>> booting the linux kernel.
+>> 
+>> These plls should never get disabled as it may result in a
+>> stopped system clock and more.
+>> 
+>> So during probing we check if the clock is enabled
+>> and if it is then mark that clock with CLK_ENABLE_HAND_OFF.
+>> As a consequence this will also enable the corresponding
+>> parent plls and pll-divs.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> --
+> 
+>> ---
+>> drivers/clk/bcm/clk-bcm2835.c | 8 ++++++++
+>> 1 file changed, 8 insertions(+)
+>> 
+>> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+>> index 35f8de7..65d62c2 100644
+>> --- a/drivers/clk/bcm/clk-bcm2835.c
+>> +++ b/drivers/clk/bcm/clk-bcm2835.c
+>> @@ -1251,7 +1251,14 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+>>        init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+>>    }
+>> 
+>> +    /* if the clock is running then enable HAND_OFF */
+>> +    if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
+>> +        dev_info(cprman->dev,
+>> +             "found enabled clock %s - enabling hand off\n",
+>> +             data->name);
+>> +        init.flags |= CLK_ENABLE_HAND_OFF;
+>> +    }
+>> +
+> 
+> The debug shouldn't be at dev_info() level, but other than that this
+> seems like a good plan once CLK_ENABLE_HAND_OFF lands.
+
+Until that point in time we can make those clocks critical.
+
+I could split it into a 2 part patch first with critical and when we
+have hand off then we can apply the second part that moves to
+hand-off.
+
+That way the current issue is solved - even if in a sub-optimal way.
+But the path forward is shown.
+
+Should I do this?
+
+Martin
