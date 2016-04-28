@@ -1,184 +1,54 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 28 Apr 2016 08:50:34 +0200
-Subject: [PATCH 11/12] nvmem: mxs-ocotp: remove nvmem regmap dependency
-In-Reply-To: <1461526096-29584-12-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1461526096-29584-12-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5721B2BA.4080100@i2se.com>
+From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
+Date: Thu, 28 Apr 2016 15:01:37 +0800
+Subject: [PATCH net-next 05/10] net: hns: add syscon operation for dsaf
+In-Reply-To: <1461826902-51368-1-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1461826902-51368-1-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <1461826902-51368-6-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+From: Daode Huang <huangdaode@hisilicon.com>
 
-Am 24.04.2016 um 21:28 schrieb Srinivas Kandagatla:
-> This patch moves to nvmem support in the driver to use callback
-> instead of regmap.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/nvmem/mxs-ocotp.c | 79 +++++++++++++----------------------------------
->  1 file changed, 21 insertions(+), 58 deletions(-)
->
-> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-> index 8ba19bb..3bf962c 100644
-> --- a/drivers/nvmem/mxs-ocotp.c
-> +++ b/drivers/nvmem/mxs-ocotp.c
+This patch provides the read/write function for dsaf to
+access the registers through syscon methods.
 
-the include of regmap.h should also be removed.
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Yuzeng Zhuang <yisen.zhuang@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-> @@ -66,11 +66,10 @@ static int mxs_ocotp_wait(struct mxs_ocotp *otp)
->  	return 0;
->  }
->  
-> -static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
-> -			  void *val, size_t val_size)
-> +static int mxs_ocotp_read(void *context, unsigned int offset,
-> +			  void *val, size_t bytes)
->  {
->  	struct mxs_ocotp *otp = context;
-> -	unsigned int offset = *(u32 *)reg;
->  	u32 *buf = val;
->  	int ret;
->  
-> @@ -94,17 +93,16 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->  	if (ret)
->  		goto close_banks;
->  
-> -	while (val_size) {
-> +	while (bytes) {
->  		if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
->  			/* fill up non-data register */
-> -			*buf = 0;
-> +			*buf++ = 0;
->  		} else {
-> -			*buf = readl(otp->base + offset);
-> +			*buf++ = readl(otp->base + offset);
->  		}
->  
-> -		buf++;
-> -		val_size--;
-> -		offset += reg_size;
-> +		bytes -= 4;
-> +		offset += 4;
-
-This change would also fix the buffer overflow but Stanislav's patch
-should be applied before to get the fix in stable.
-
->  	}
->  
->  close_banks:
-> @@ -117,57 +115,28 @@ disable_clk:
->  	return ret;
->  }
->  
-> -static int mxs_ocotp_write(void *context, const void *data, size_t count)
-> -{
-> -	/* We don't want to support writing */
-> -	return 0;
-> -}
-> -
-> -static bool mxs_ocotp_writeable_reg(struct device *dev, unsigned int reg)
-> -{
-> -	return false;
-> -}
-> -
->  static struct nvmem_config ocotp_config = {
->  	.name = "mxs-ocotp",
-> +	.stride = 16,
-> +	.word_size = 4,
->  	.owner = THIS_MODULE,
-
-.reg_read = mxs_ocotp_read,
-
->  };
->  
-> -static const struct regmap_range imx23_ranges[] = {
-> -	regmap_reg_range(OCOTP_DATA_OFFSET, 0x210),
-> -};
-> -
-> -static const struct regmap_access_table imx23_access = {
-> -	.yes_ranges = imx23_ranges,
-> -	.n_yes_ranges = ARRAY_SIZE(imx23_ranges),
-> -};
-> -
-> -static const struct regmap_range imx28_ranges[] = {
-> -	regmap_reg_range(OCOTP_DATA_OFFSET, 0x290),
-> -};
-> -
-> -static const struct regmap_access_table imx28_access = {
-> -	.yes_ranges = imx28_ranges,
-> -	.n_yes_ranges = ARRAY_SIZE(imx28_ranges),
-> +struct imx_data {
-struct mxs_data
-
-These chips are named imx2x but the platform is mxs. Please don't ask why.
-> +	int max_reg;
-Since nvmem_config uses "size" instead of "max_reg" we better use "size"
-here, too. This avoids confusion and potential issues see below.
->  };
->  
-> -static struct regmap_bus mxs_ocotp_bus = {
-> -	.read = mxs_ocotp_read,
-> -	.write = mxs_ocotp_write, /* make regmap_init() happy */
-> -	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
-> -	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
-> +static const struct imx_data imx23_data = {
-static const struct mxs_data imx23_data
-> +	.max_reg = 0x210,
-.size = 0x220,
->  };
->  
-> -static struct regmap_config mxs_ocotp_config = {
-> -	.reg_bits = 32,
-> -	.val_bits = 32,
-> -	.reg_stride = 16,
-> -	.writeable_reg = mxs_ocotp_writeable_reg,
-> +static const struct imx_data imx28_data = {
-static const struct mxs_data imx28_data
-> +	.max_reg = 0x290,
-.size = 0x2a0,
->  };
->  
->  static const struct of_device_id mxs_ocotp_match[] = {
-> -	{ .compatible = "fsl,imx23-ocotp", .data = &imx23_access },
-> -	{ .compatible = "fsl,imx28-ocotp", .data = &imx28_access },
-> +	{ .compatible = "fsl,imx23-ocotp", .data = &imx23_data },
-> +	{ .compatible = "fsl,imx28-ocotp", .data = &imx23_data },
-.compatible = "fsl,imx28-ocotp", .data = &imx28_data
->  	{ /* sentinel */},
->  };
->  MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
-> @@ -175,6 +144,7 @@ MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
->  static int mxs_ocotp_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> +	struct imx_data *data;
-const struct mxs_data *data
->  	struct mxs_ocotp *otp;
->  	struct resource *res;
->  	const struct of_device_id *match;
-> @@ -205,17 +175,10 @@ static int mxs_ocotp_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	access = match->data;
-> -	mxs_ocotp_config.rd_table = access;
-> -	mxs_ocotp_config.max_register = access->yes_ranges[0].range_max;
-> -
-> -	regmap = devm_regmap_init(dev, &mxs_ocotp_bus, otp, &mxs_ocotp_config);
-> -	if (IS_ERR(regmap)) {
-> -		dev_err(dev, "regmap init failed\n");
-> -		ret = PTR_ERR(regmap);
-> -		goto err_clk;
-> -	}
-> +	data = match->data;
->  
-> +	ocotp_config.size = data->max_reg;
-data->size
-
-Regards
-Stefan
-> +	ocotp_config.priv = otp;
->  	ocotp_config.dev = dev;
->  	otp->nvmem = nvmem_register(&ocotp_config);
->  	if (IS_ERR(otp->nvmem)) {
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+index ed0043a..6a03c94 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+@@ -10,6 +10,7 @@
+ #ifndef _DSAF_REG_H_
+ #define _DSAF_REG_H_
+ 
++#include <linux/regmap.h>
+ #define HNS_DEBUG_RING_IRQ_IDX 0
+ #define HNS_SERVICE_RING_IRQ_IDX 59
+ #define HNSV2_SERVICE_RING_IRQ_IDX 25
+@@ -989,6 +990,19 @@ static inline u32 dsaf_read_reg(u8 __iomem *base, u32 reg)
+ 	return readl(reg_addr + reg);
+ }
+ 
++static inline void dsaf_write_syscon(struct regmap *base, u32 reg, u32 value)
++{
++	regmap_write(base, reg, value);
++}
++
++static inline u32 dsaf_read_syscon(struct regmap *base, u32 reg)
++{
++	unsigned int val;
++
++	regmap_read(base, reg, &val);
++	return val;
++}
++
+ #define dsaf_read_dev(a, reg) \
+ 	dsaf_read_reg((a)->io_base, (reg))
+ 
+-- 
+1.9.1
