@@ -1,32 +1,47 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 28 Apr 2016 11:42:20 +0800
-Subject: [PATCH v2 1/2] usb: core: buffer: avoid NULL pointer dereferrence
-Message-ID: <1461814941-28345-1-git-send-email-chunfeng.yun@mediatek.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 28 Apr 2016 10:28:54 +0530
+Subject: [PATCH v2 2/2] phy: Group vendor specific phy drivers
+In-Reply-To: <CAFp+6iHGSuTGbyWv4dV3GCNr=7VDRnBpcodwnoeB1i0zocUg5g@mail.gmail.com>
+References: <1459951665-28708-1-git-send-email-gautam.vivek@samsung.com>
+ <1459951665-28708-2-git-send-email-gautam.vivek@samsung.com>
+ <CAFp+6iHGSuTGbyWv4dV3GCNr=7VDRnBpcodwnoeB1i0zocUg5g@mail.gmail.com>
+Message-ID: <5721988E.7000105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NULL pointer dereferrence will happen when class driver
-wants to allocate zero length buffer and pool_max[0]
-can't be used, so simply returns NULL in the case.
+Hi,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/core/buffer.c |    3 +++
- 1 file changed, 3 insertions(+)
+On Tuesday 26 April 2016 11:36 AM, Vivek Gautam wrote:
+> Hi Kishon,
+> 
+> 
+> On Wed, Apr 6, 2016 at 7:37 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> Adding vendor specific directories in phy to group
+>> phy drivers under their respective vendor umbrella.
+>>
+>> Also updated the MAINTAINERS file to reflect the correct
+>> directory structure for phy drivers.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> Acked-by: Heiko Stuebner <heiko@sntech.de>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> ---
+>>
+>> Changes from v1:
+>>  - Updated the MAINTAINERS file to reflect the same change
+>>    in directory structure.
+>>  - Removed PHY_PLAT config as pointed out by Kishon.
+>>    So we don't require the second patch in the v1 of this series:
+>>    [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
+>>  - Renamed sunxi --> allwinner; rcar --> renesas.
+>>  - Fixed error coming with qcom Makefile.
+> 
+> Does this change looks okay now ?
+> I think you must be planning to take this in after 4.7 rc1 is out, isn't it ?
 
-diff --git a/drivers/usb/core/buffer.c b/drivers/usb/core/buffer.c
-index 2741566..98e39f9 100644
---- a/drivers/usb/core/buffer.c
-+++ b/drivers/usb/core/buffer.c
-@@ -122,6 +122,9 @@ void *hcd_buffer_alloc(
- 	struct usb_hcd		*hcd = bus_to_hcd(bus);
- 	int			i;
- 
-+	if (size == 0)
-+		return NULL;
-+
- 	/* some USB hosts just use PIO */
- 	if (!IS_ENABLED(CONFIG_HAS_DMA) ||
- 	    (!bus->controller->dma_mask &&
--- 
-1.7.9.5
+I'm not sure. I'm thinking which should be the right way to group the phy
+drivers, by vendors or by type (usb, pcie, etc..). I'm more inclined to group
+it by type.
+
+Thanks
+Kishon
