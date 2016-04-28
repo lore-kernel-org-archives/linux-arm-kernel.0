@@ -1,41 +1,34 @@
 From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Thu, 28 Apr 2016 11:05:12 +0200
-Subject: [RFC v4 2/8] gpio: rename gpio-generic.c into gpio-mmio.c
+Date: Thu, 28 Apr 2016 11:05:11 +0200
+Subject: [RFC v4 1/8] gpio: generic: fix GPIO_GENERIC_PLATFORM is set to
+ module case
 In-Reply-To: <cover.1461806071.git.chunkeey@googlemail.com>
 References: <cover.1461806071.git.chunkeey@googlemail.com>
-Message-ID: <5d6d06726e8ed05aea6cae0aaa9166b10c408dd0.1461806071.git.chunkeey@googlemail.com>
+Message-ID: <5891890cfc1c8ce45c310e3876485011518aeba9.1461806071.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames the gpio-generic.c into gpio-mmio.c.
-This is because currently the file only contains code
-for a memory-mapped GPIO driver. There isn't any support
-for ioports or other resource type.
+GPIO_GENERIC_PLATFORM is a tristate. If the module option is
+selected the resulting gpio-generic.ko will lack most of the
+module initialzation and probe code.
 
 Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
 ---
- drivers/gpio/Makefile                        | 3 +++
- drivers/gpio/{gpio-generic.c => gpio-mmio.c} | 0
- 2 files changed, 3 insertions(+)
- rename drivers/gpio/{gpio-generic.c => gpio-mmio.c} (100%)
+ drivers/gpio/gpio-generic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 74eb1a7..991598e 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -12,6 +12,9 @@ obj-$(CONFIG_GPIO_ACPI)		+= gpiolib-acpi.o
- # Device drivers. Generally keep list sorted alphabetically
- obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
+diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
+index 54cddfa..6c1cb3b 100644
+--- a/drivers/gpio/gpio-generic.c
++++ b/drivers/gpio/gpio-generic.c
+@@ -549,7 +549,7 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(bgpio_init);
  
-+# directly supported by gpio-generic
-+gpio-generic-$(CONFIG_GPIO_GENERIC)	+= gpio-mmio.o
-+
- obj-$(CONFIG_GPIO_104_DIO_48E)	+= gpio-104-dio-48e.o
- obj-$(CONFIG_GPIO_104_IDIO_16)	+= gpio-104-idio-16.o
- obj-$(CONFIG_GPIO_104_IDI_48)	+= gpio-104-idi-48.o
-diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-mmio.c
-similarity index 100%
-rename from drivers/gpio/gpio-generic.c
-rename to drivers/gpio/gpio-mmio.c
+-#ifdef CONFIG_GPIO_GENERIC_PLATFORM
++#if IS_ENABLED(CONFIG_GPIO_GENERIC_PLATFORM)
+ 
+ static void __iomem *bgpio_map(struct platform_device *pdev,
+ 			       const char *name,
 -- 
 2.8.1
