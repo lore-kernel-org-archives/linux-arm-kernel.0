@@ -1,49 +1,68 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 29 Apr 2016 01:47:00 +0300
-Subject: NXP LPC32xx Mach Updates for v4.7
-Message-ID: <572292E4.9010209@mleia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 29 Apr 2016 09:04:06 +1000
+Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
+In-Reply-To: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+Message-ID: <20160428230406.GA18128@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+Hi Russell,
 
-please consider to include NXP LPC32xx mach clean-up updates for v4.7.
+On Thu, Apr 28, 2016 at 10:26:44AM +0100, Russell King - ARM Linux wrote:
+> These changes are required for TI Keystone2 kexec to be functional.  TI
+> Keystone2 has the run-time view of physical memory above 4GiB, but with
+> a boot time alias below 4GiB which can only be used during the early
+> boot.
+> 
+> This means we need to translate run-time physical addresses (which the
+> kernel uses) to boot-time physical addresses, which, having discussed
+> with Eric, is what the kexec tools and kexec kernel API requires.
+> 
+> We publish a special set of boot time resources in /proc/iomem, which
+> the (modified) kexec tools look for in preference to the normal resources.
+> Hence, if these are found, the kexec tools make use of these resources,
+> and thus kexec tools use the boot-time view of physical memory.
+> 
+> The first three patches have been sitting in linux-next for a while.
+> I'm going to put the next ARM specific three into linux-next next week.
+> 
+> I've sent Eric over a month ago all the patches, including the kexec
+> tools patches, but I've heard nothing back.  I'm at a loss how to
+> make progress on these patches - and as I'm being hassled about this,
+> I'm going to be hassling the community about it, possibly with regular
+> re-posts until there is some progress.
 
-I'm adding an official LPC32xx maintainer Roland to Cc, however
-he seems to be unresponsive for a quite long time.
+My experience is that usually Andrew Morton takes kexec patches
+and that this has been the situation for many years now.
 
-Thank you in advance.
+With regards to any kexec-tools patches that are appropriate for upstream:
+please send them to the kexec mailing list with me CCed and I will see
+about including them in the next release. If you have done so already then
+I apologise for having missed them.
 
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://github.com/vzapolskiy/linux-lpc32xx.git tags/lpc32xx-soc-4.7
-
-for you to fetch changes up to 71d42e9c71d7fca2eca98eac315cb485b5d2314d:
-
-  ARM: lpc32xx: remove duplicate const on lpc32xx_auxdata_lookup (2016-04-28 00:45:12 +0300)
-
-----------------------------------------------------------------
-NXP LPC32xx mach updates for v4.7
-
-This includes a few nonfunctional clean-ups for NXP LPC32xx:
-* removed leftover from restart code migration to a watchdog driver
-* removed dead code leftovers from migration to CCF driver
-* fix double const qualifier
-
-----------------------------------------------------------------
-Sylvain Lemieux (1):
-      ARM: lpc32xx: remove reboot header file
-
-Vladimir Zapolskiy (2):
-      ARM: lpc32xx: remove leftovers of legacy clock source and provider drivers
-      ARM: lpc32xx: remove duplicate const on lpc32xx_auxdata_lookup
-
- arch/arm/mach-lpc32xx/common.c  | 95 -----------------------------------------
- arch/arm/mach-lpc32xx/common.h  | 24 +----------
- arch/arm/mach-lpc32xx/phy3250.c |  2 +-
- 3 files changed, 2 insertions(+), 119 deletions(-)
+>  Documentation/kdump/kdump.txt     | 13 ++------
+>  arch/arm/boot/dts/keystone.dtsi   |  8 +++++
+>  arch/arm/include/asm/kexec.h      | 24 +++++++++++++++
+>  arch/arm/include/asm/memory.h     | 38 ++++++++++++++++++-----
+>  arch/arm/kernel/machine_kexec.c   |  2 +-
+>  arch/arm/kernel/setup.c           | 65 +++++++++++++++++++++++++++++++++++++--
+>  arch/arm/mach-keystone/keystone.c |  7 +----
+>  arch/arm/mm/idmap.c               |  2 +-
+>  arch/ia64/kernel/machine_kexec.c  |  2 +-
+>  include/linux/kexec.h             | 42 +++++++++++++++++++++++--
+>  kernel/kexec.c                    |  3 +-
+>  kernel/kexec_core.c               | 30 +++++++++---------
+>  kernel/ksysfs.c                   |  4 +--
+>  13 files changed, 193 insertions(+), 47 deletions(-)
+> 
+> -- 
+> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
+> 
