@@ -1,47 +1,61 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 28 Apr 2016 17:19:11 +0200
-Subject: [PATCH v6 0/3] dmaengine: sun6i: Upgrade for audio transfers
-Message-ID: <cover.1461856751.git.moinejf@free.fr>
+Date: Thu, 28 Apr 2016 17:07:02 +0200
+Subject: [PATCH v6 1/3] dmaengine: sun6i: Set default maxburst size and bus
+ width
+In-Reply-To: <cover.1461856751.git.moinejf@free.fr>
+References: <cover.1461856751.git.moinejf@free.fr>
+Message-ID: <4c37c2c717077f2ebf201e141acdc8ad76d341a7.1461856751.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains most of the remaining changes to
-the sun6i DMA driver for audio streaming (tested in
-a Allwinner H3 - Orange PI 2).
-The lacking patch (Add 4 as a possible burst value for H3) will be
-submitted when a consensus with Maxime Ripard will be found.
-This series is based on the previous patches applied by Vinod Koul.
+Some DMA clients, as audio, don't set the maxburst size and bus width
+on the memory side when starting DMA transfers.
+This patch prevents such transfers to be aborted by providing system
+default values to the lacking ones.
 
-v6
- - check the transfer direction in all cases (Vinod Koul)
- - a new patch about useless check has been added
- - the applied patch has been removed from this series
-v5
- - fix checkpatch error (Vinod Koul)
-v4
- - remove 'Add 4 as a possible burst value for H3'
-	(no consensus yet)
- - remove 'Simplify some macros' (Maxime Ripard)
- - remove 'Compact a bit some config constants' (not critical)
- - split 'lli setting' into 'simplify' and 'default burst and bus width'
-	(Maxime Ripard)
-v3
- - do some optimizations
- - add a check about the maxburst value '4' (Maxime Ripard)
- - remove the driver fixes
-v2 (comments from Vinod Koul and Sergei Shtylyov - thanks)
- - typo fixes
- - change some comments
- - better handling of burst and bus width
- - remove useless code in the cyclic capability patch
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/dma/sun6i-dma.c | 28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
 
-Jean-Francois Moine (3):
-  dmaengine: sun6i: Set default maxburst size and bus width
-  dmaengine: sun6i: Remove useless check
-  dmaengine: sun6i: Add cyclic capability
-
- drivers/dma/sun6i-dma.c | 162 +++++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 146 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index b08245e..cd436c6 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -470,10 +470,30 @@ static int set_config(struct sun6i_dma_dev *sdev,
+ {
+ 	s8 src_width, dst_width, src_burst, dst_burst;
+ 
+-	src_burst = convert_burst(sconfig->src_maxburst);
+-	src_width = convert_buswidth(sconfig->src_addr_width);
+-	dst_burst = convert_burst(sconfig->dst_maxburst);
+-	dst_width = convert_buswidth(sconfig->dst_addr_width);
++	switch (direction) {
++	case DMA_MEM_TO_DEV:
++		src_burst = convert_burst(sconfig->src_maxburst ?
++					sconfig->src_maxburst : 8);
++		src_width = convert_buswidth(sconfig->src_addr_width !=
++						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
++				sconfig->src_addr_width :
++				DMA_SLAVE_BUSWIDTH_4_BYTES);
++		dst_burst = convert_burst(sconfig->dst_maxburst);
++		dst_width = convert_buswidth(sconfig->dst_addr_width);
++		break;
++	case DMA_DEV_TO_MEM:
++		src_burst = convert_burst(sconfig->src_maxburst);
++		src_width = convert_buswidth(sconfig->src_addr_width);
++		dst_burst = convert_burst(sconfig->dst_maxburst ?
++					sconfig->dst_maxburst : 8);
++		dst_width = convert_buswidth(sconfig->dst_addr_width !=
++						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
++				sconfig->dst_addr_width :
++				DMA_SLAVE_BUSWIDTH_4_BYTES);
++		break;
++	default:
++		return -EINVAL;
++	}
+ 
+ 	if (src_burst < 0)
+ 		return src_burst;
 -- 
 2.8.1
