@@ -1,54 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Apr 2016 07:28:32 -0700
-Subject: [PATCH net v3 0/5] drivers: net: cpsw: phy-handle fixes
-In-Reply-To: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1461805808-4102-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <20160428142832.GD5995@atomide.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 28 Apr 2016 17:27:14 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <2806018.GHhm6tEuKR@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <87y47ykzmz.fsf@intel.com> <20160428141611.GK19428@n2100.arm.linux.org.uk>
+ <2806018.GHhm6tEuKR@wuerfel>
+Message-ID: <87vb31kdvh.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* David Rivshin (Allworx) <drivshin.allworx@gmail.com> [160427 18:13]:
-> From: David Rivshin <drivshin@allworx.com>
-> 
-> This series fixes a number of related issues around using phy-handle
-> properties in cpsw emac nodes.
-> 
-> Patch 1 fixes a bug if more than one slave is used, and either
-> slave uses the phy-handle property in the devicetree.
-> 
-> Patch 2 fixes a NULL pointer dereference which can occur if a
-> phy-handle property is used and of_phy_connect() return NULL,
-> such as with a bad devicetree.
-> 
-> Patch 3 fixes an issue where the phy-mode property would be ignored
-> if a phy-handle property was used. This also fixes a bogus error
-> message that would be emitted.
-> 
-> Patch 4 fixes makes the binding documentation more explicit that
-> exactly one PHY property should be used, and also marks phy_id as
-> deprecated.
-> 
-> Patch 5 cleans up the fixed-link case to work like the now-fixed
-> phy-handle case.
-> 
-> I have tested on the following hardware configurations:
->  - (EVMSK) dual emac, phy_id property in both slaves
->  - (EVMSK) dual emac, phy-handle property in both slaves
->  - (EVMSK) a bad phy-handle property pointing to &mmc1
->  - (EVMSK) phy_id property with incorrect PHY address
->  - (BeagleBoneBlack) single emac, phy_id property
->  - (custom) single emac, fixed-link subnode
-> 
-> Andrew Goodbody reported testing v2 on a board that doesn't use
-> dual_emac mode, but with 2 PHYs using phy-handle properties [1].
-> 
-> Nicolas Chauvet reported testing v2 on an HP t410 (dm8148).
-> 
-> Markus Brunner reported testing v1 on the following [2]:
->  - emac0 with phy_id and emac1 with fixed phy
->  - emac0 with phy-handle and emac1 with fixed phy
->  - emac0 with fixed phy and emac1 with fixed phy
 
-Quickly boot tested these against next on dra62x-j5eco EVM:
+Hi,
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Arnd Bergmann <arnd@arndb.de> writes:
+> On Thursday 28 April 2016 15:16:12 Russell King - ARM Linux wrote:
+>> On Thu, Apr 28, 2016 at 09:37:08AM +0300, Felipe Balbi wrote:
+>> > 
+>> > Hi,
+>> > 
+>> > Arnd Bergmann <arnd@arndb.de> writes:
+>> > >    pointer and pass that in platform_data. This is really easy, it's
+>> > 
+>> > Sorry but passing a struct device pointer in platform_data is
+>> > ridiculous. Not to mention that, as I said before, we can't assume which
+>> > device to pass to xhci_plat in the first place. It might be dwc->dev and
+>> > it might be dwc->dev->parent.
+>> 
+>> +1.  Passing an unref-counted struct device through platform data is
+>> totally mad, Arnd you're off your rocker if you think that's a good
+>> idea.  What's more is that there's no way to properly refcount the
+>> thing.
+>
+> It's the parent device (or NULL), there is no way it can ever go away as
+> it's already refcounted through the device subsystem by the creation
+> of the child device.
+
+you're assuming that based on what we have today. We could get into a
+situation where we need to use a completely unrelated device and the
+problem exists again.
+
+> I do realize that it's a hack, but the idea is to get rid of that
+> as soon as possibly by fixing the way the xhci device is probe so
+> we no longer need to fake a platform_device as the child here and
+> can just use the device itself.
+
+okay, let me try to be extra clear here:
+
+We will *not* remove the extra platform_device because it actually
+*does* exist and helps me hide/abstract a bunch of details and make
+assumptions about order of certain events. We have already gone through
+that in the past when I explained why I wrote dwc3 the way it is; if you
+need a refresher, there are mailing list archives for that.
+
+Moreover, this same problem exists for anything under drivers/mfd. It
+just so happens that they're usually some i2c or spi device which don't
+do DMA by themselves.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/a6f1334a/attachment.sig>
