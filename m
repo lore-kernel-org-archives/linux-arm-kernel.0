@@ -1,92 +1,108 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:48 +0100
-Subject: [PATCH v2 29/54] KVM: arm/arm64: vgic-new: Add TARGET registers
- handlers
+Date: Thu, 28 Apr 2016 17:45:52 +0100
+Subject: [PATCH v2 33/54] KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR,
+ TYPER handlers
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-30-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-34-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The target register handlers are v2 emulation specific, so their
-implementation lives entirely in vgic-mmio-v2.c.
-We copy the old VGIC behaviour of assigning an IRQ to the first VCPU
-set in the target mask instead of making it possibly pending on
-multiple VCPUs.
+As in the GICv2 emulation we handle those three registers in one
+function.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
 Changelog RFC..v1:
-- remove runtime VCPU determination from this v2-only register
-- fold in implementation of vgic_v2_irq_change_affinity()
-- replace ffs() with __ffs()
+- kick VCPUs if distributor gets enabled
 
 Changelog v1 .. v2:
-- adapt to new MMIO framework
+- rewrite write handler to use switch statement
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 50 +++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h         |  2 ++
+ 2 files changed, 51 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 008a466..7364fd7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -66,6 +66,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
- 	}
- }
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index c6765d4..64c0a8f 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -22,6 +22,54 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
  
-+static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
-+					   gpa_t addr, unsigned int len)
++static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
 +{
-+	u32 intid = addr & 0x3ff;
-+	int i;
-+	u64 val = 0;
++	u32 value = 0;
 +
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		val |= (u64)irq->targets << (i * 8);
++	switch (addr & 0x0c) {
++	case GICD_CTLR:
++		if (vcpu->kvm->arch.vgic.enabled)
++			value |= GICD_CTLR_ENABLE_SS_G1;
++		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
++		break;
++	case GICD_TYPER:
++		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = (value >> 5) - 1;
++		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
++		break;
++	case GICD_IIDR:
++		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++		break;
++	default:
++		return 0;
 +	}
 +
-+	return val;
++	return extract_bytes(value, addr & 3, len);
 +}
 +
-+static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
-+				   gpa_t addr, unsigned int len,
-+				   unsigned long val)
++static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val)
 +{
-+	u32 intid = addr & 0x3ff;
-+	int i;
++	switch (addr & 0x0c) {
++	case GICD_CTLR:
++		if (!(addr & 1)) {
++			struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++			bool was_enabled = dist->enabled;
 +
-+	/* GICD_ITARGETSR[0-7] are read-only */
-+	if (intid < VGIC_NR_PRIVATE_IRQS)
++			dist->enabled = val & GICD_CTLR_ENABLE_SS_G1;
++
++			if (!was_enabled && dist->enabled)
++				vgic_kick_vcpus(vcpu->kvm);
++		}
++		break;
++	case GICD_TYPER:
++	case GICD_IIDR:
 +		return;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
-+		int target;
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->targets = (val >> (i * 8)) & 0xff;
-+		target = irq->targets ? __ffs(irq->targets) : 0;
-+		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
-+
-+		spin_unlock(&irq->irq_lock);
 +	}
 +}
 +
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-@@ -86,7 +127,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
- 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-+		vgic_mmio_read_target, vgic_mmio_write_target, 8),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
- 		vgic_mmio_read_config, vgic_mmio_write_config, 2),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+ /*
+  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+  * redistributors, while SPIs are covered by registers in the distributor
+@@ -46,7 +94,7 @@
+ 
+ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 16),
++		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 6fe07df..86e9830 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -19,6 +19,8 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
+ 
++#define INTERRUPT_ID_BITS_SPIS	10
++
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ 
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
 -- 
 2.7.3
