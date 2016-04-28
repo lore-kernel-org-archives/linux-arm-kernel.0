@@ -1,59 +1,32 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 28 Apr 2016 13:22:22 -0700
-Subject: [PATCH V3] clk: bcm2835: mark enabled clocks with
- CLK_ENABLE_HAND_OFF
-In-Reply-To: <1461770664-29384-1-git-send-email-kernel@martin.sperl.org>
-References: <1461770664-29384-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87d1p9v5z5.fsf@eliezer.anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Apr 2016 13:22:49 -0700
+Subject: [PATCH 2/2] [media] ir-rx51: Fix build after multiarch changes
+ broke it
+In-Reply-To: <572266AF.9020601@gmail.com>
+References: <1461714709-10455-1-git-send-email-tony@atomide.com>
+ <1461714709-10455-3-git-send-email-tony@atomide.com>
+ <572266AF.9020601@gmail.com>
+Message-ID: <20160428202248.GG5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 12:39]:
+> On 27.04.2016 02:51, Tony Lindgren wrote:
+> 
+> omap_dm_timer_request_specific always fails with message "Please use
+> omap_dm_timer_request_by_cap/node()" with DT boot.
+> 
+> I hacked the code to use omap_dm_timer_request_by_cap(OMAP_TIMER_HAS_PWM)
+> and it seems to use the correct timer (IR LED blinks, checked with the
+> camera of Samsung S4 mini), but it doesn't actually control either of the TV
+> sets here. The same SW(pierogi) controls them when device is booted to stock
+> kernel. However, this seems another problem not related to the patch.
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> The bcm2835 firmware enables several clocks and plls before
-> booting the linux kernel.
->
-> These plls should never get disabled as it may result in a
-> stopped system clock and more.
->
-> So during probing we check if the clock is enabled
-> and if it is then mark that clock with CLK_ENABLE_HAND_OFF.
-> As a consequence this will also enable the corresponding
-> parent plls and pll-divs.
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->
-> --
+OK thanks for testing, I'll apply the pdata patch then.
 
-> ---
->  drivers/clk/bcm/clk-bcm2835.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-> index 35f8de7..65d62c2 100644
-> --- a/drivers/clk/bcm/clk-bcm2835.c
-> +++ b/drivers/clk/bcm/clk-bcm2835.c
-> @@ -1251,7 +1251,14 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
->  		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
->  	}
->
-> +	/* if the clock is running then enable HAND_OFF */
-> +	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
-> +		dev_info(cprman->dev,
-> +			 "found enabled clock %s - enabling hand off\n",
-> +			 data->name);
-> +		init.flags |= CLK_ENABLE_HAND_OFF;
-> +	}
-> +
+I assume you'll post a separate fix for the request_by_cap
+driver change?
 
-The debug shouldn't be at dev_info() level, but other than that this
-seems like a good plan once CLK_ENABLE_HAND_OFF lands.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/1def9988/attachment-0001.sig>
+Regards,
+
+Tony
