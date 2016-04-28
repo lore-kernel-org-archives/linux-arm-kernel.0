@@ -1,134 +1,182 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:46:13 +0100
-Subject: [PATCH v2 54/54] KVM: arm/arm64: vgic-new: enable build
+Date: Thu, 28 Apr 2016 17:46:02 +0100
+Subject: [PATCH v2 43/54] KVM: arm/arm64: vgic-new: vgic_kvm_device: implement
+ kvm_vgic_addr
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-55-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-44-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the new VGIC implementation has reached feature parity with
-the old one, add the new files to the build system and add a Kconfig
-option to switch between the two versions.
-We set the default to the new version to get maximum test coverage,
-in case people experience problems they can switch back to the old
-behaviour if needed.
+From: Eric Auger <eric.auger@linaro.org>
 
+kvm_vgic_addr is used by the userspace to set the base address of
+the following register regions, as seen by the guest:
+- distributor(v2 and v3),
+- re-distributors (v3),
+- CPU interface (v2).
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog v1 .. v2:
-- adjust the changed filenames in the Makefiles
-- add vgic-mmio-v2.c and vgic-mmio-v3.c to the Makefiles
+ include/kvm/vgic/vgic.h             |   2 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 112 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |   3 +
+ 3 files changed, 117 insertions(+)
 
- arch/arm/kvm/Kconfig          |  7 +++++++
- arch/arm/kvm/Makefile         | 11 +++++++++++
- arch/arm64/kvm/Kconfig        |  7 +++++++
- arch/arm64/kvm/Makefile       | 12 ++++++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c |  5 +++++
- 5 files changed, 42 insertions(+)
-
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 95a0005..02abfff 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -46,6 +46,13 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 2c43eb8..73cab36 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -194,6 +194,8 @@ struct vgic_cpu {
+ 	u64 live_lrs;
+ };
  
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+	---help---
-+	  uses the new VGIC implementation
++int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
 +
- source drivers/vhost/Kconfig
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level);
  
- endif # VIRTUALIZATION
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index eb1bf43..a596b58 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -21,7 +21,18 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index dfe40a0..d9f2383 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -16,10 +16,122 @@
+ #include <linux/kvm_host.h>
+ #include <kvm/vgic/vgic.h>
+ #include <linux/uaccess.h>
++#include <asm/kvm_mmu.h>
+ #include "vgic.h"
+ 
+ /* common helpers */
+ 
++static int vgic_ioaddr_overlap(struct kvm *kvm)
++{
++	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
++	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
 +
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+obj-y += $(KVM)/arm/vgic/vgic.o
-+obj-y += $(KVM)/arm/vgic/vgic-init.o
-+obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
-+obj-y += $(KVM)/arm/vgic/vgic-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic-mmio.o
-+obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
-+else
- obj-y += $(KVM)/arm/vgic.o
- obj-y += $(KVM)/arm/vgic-v2.o
- obj-y += $(KVM)/arm/vgic-v2-emul.o
-+endif
- obj-y += $(KVM)/arm/arch_timer.o
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index de7450d..3f0e1ce 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -55,6 +55,13 @@ config KVM_ARM_PMU
- 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
- 	  virtual machines.
- 
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+        ---help---
-+          uses the new VGIC implementation
++	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
++		return 0;
++	if ((dist <= cpu && dist + KVM_VGIC_V2_DIST_SIZE > cpu) ||
++	    (cpu <= dist && cpu + KVM_VGIC_V2_CPU_SIZE > dist))
++		return -EBUSY;
++	return 0;
++}
 +
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 122cff4..a7a958c 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -20,10 +20,22 @@ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
-+else
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
-+endif
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index caac41f..a3f12b3 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -21,7 +21,12 @@
- 
- #include <asm/kvm_hyp.h>
- 
-+#ifdef CONFIG_KVM_NEW_VGIC
-+extern struct vgic_global kvm_vgic_global_state;
-+#define vgic_v2_params kvm_vgic_global_state
-+#else
- extern struct vgic_params vgic_v2_params;
++static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
++			      phys_addr_t addr, phys_addr_t size)
++{
++	int ret;
++
++	if (addr & ~KVM_PHYS_MASK)
++		return -E2BIG;
++
++	if (addr & (SZ_4K - 1))
++		return -EINVAL;
++
++	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
++		return -EEXIST;
++	if (addr + size < addr)
++		return -EINVAL;
++
++	*ioaddr = addr;
++	ret = vgic_ioaddr_overlap(kvm);
++	if (ret)
++		*ioaddr = VGIC_ADDR_UNDEF;
++
++	return ret;
++}
++
++/**
++ * kvm_vgic_addr - set or get vgic VM base addresses
++ * @kvm:   pointer to the vm struct
++ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
++ * @addr:  pointer to address value
++ * @write: if true set the address in the VM address space, if false read the
++ *          address
++ *
++ * Set or get the vgic base addresses for the distributor and the virtual CPU
++ * interface in the VM physical address space.  These addresses are properties
++ * of the emulated core/SoC and therefore user space initially knows this
++ * information.
++ */
++int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
++{
++	int r = 0;
++	struct vgic_dist *vgic = &kvm->arch.vgic;
++	int type_needed;
++	phys_addr_t *addr_ptr, block_size;
++	phys_addr_t alignment;
++
++	mutex_lock(&kvm->lock);
++	switch (type) {
++	case KVM_VGIC_V2_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V2_DIST_SIZE;
++		alignment = SZ_4K;
++		break;
++	case KVM_VGIC_V2_ADDR_TYPE_CPU:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_cpu_base;
++		block_size = KVM_VGIC_V2_CPU_SIZE;
++		alignment = SZ_4K;
++		break;
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++	case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V3_DIST_SIZE;
++		alignment = SZ_64K;
++		break;
++	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_redist_base;
++		block_size = KVM_VGIC_V3_REDIST_SIZE;
++		alignment = SZ_64K;
++		break;
 +#endif
++	default:
++		r = -ENODEV;
++		goto out;
++	}
++
++	if (vgic->vgic_model != type_needed) {
++		r = -ENODEV;
++		goto out;
++	}
++
++	if (write) {
++		if (!IS_ALIGNED(*addr, alignment))
++			r = -EINVAL;
++		else
++			r = vgic_ioaddr_assign(kvm, addr_ptr,
++					       *addr, block_size);
++	} else {
++		*addr = *addr_ptr;
++	}
++
++out:
++	mutex_unlock(&kvm->lock);
++	return r;
++}
++
+ static int vgic_set_common_attr(struct kvm_device *dev,
+ 				struct kvm_device_attr *attr)
+ {
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index e8f8dbf..a048a2b 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -19,6 +19,9 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
  
- static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 					    void __iomem *base)
++#define VGIC_ADDR_UNDEF		(-1)
++#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
++
+ #define INTERRUPT_ID_BITS_SPIS	10
+ 
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
 -- 
 2.7.3
