@@ -1,103 +1,92 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 28 Apr 2016 17:45:32 +0100
-Subject: [PATCH v2 13/54] KVM: arm/arm64: vgic-new: Add acccessor to new
- struct vgic_irq instance
+Date: Thu, 28 Apr 2016 17:45:48 +0100
+Subject: [PATCH v2 29/54] KVM: arm/arm64: vgic-new: Add TARGET registers
+ handlers
 In-Reply-To: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
 References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1461861973-26464-14-git-send-email-andre.przywara@arm.com>
+Message-ID: <1461861973-26464-30-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+The target register handlers are v2 emulation specific, so their
+implementation lives entirely in vgic-mmio-v2.c.
+We copy the old VGIC behaviour of assigning an IRQ to the first VCPU
+set in the target mask instead of making it possibly pending on
+multiple VCPUs.
 
-The new VGIC implementation centers around a struct vgic_irq instance
-per virtual IRQ.
-Provide a function to retrieve the right instance for a given IRQ
-number and (in case of private interrupts) the right VCPU.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic.c
- create mode 100644 virt/kvm/arm/vgic/vgic.h
+Changelog RFC..v1:
+- remove runtime VCPU determination from this v2-only register
+- fold in implementation of vgic_v2_irq_change_affinity()
+- replace ffs() with __ffs()
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-new file mode 100644
-index 0000000..fb45537
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include "vgic.h"
-+
-+struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid)
+Changelog v1 .. v2:
+- adapt to new MMIO framework
+
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 008a466..7364fd7 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -66,6 +66,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
+ 	}
+ }
+ 
++static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len)
 +{
-+	/* SGIs and PPIs */
-+	if (intid <= VGIC_MAX_PRIVATE)
-+		return &vcpu->arch.vgic_cpu.private_irqs[intid];
++	u32 intid = addr & 0x3ff;
++	int i;
++	u64 val = 0;
 +
-+	/* SPIs */
-+	if (intid <= VGIC_MAX_SPI)
-+		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+	/* LPIs are not yet covered */
-+	if (intid >= VGIC_MIN_LPI)
-+		return NULL;
++		val |= (u64)irq->targets << (i * 8);
++	}
 +
-+	WARN(1, "Looking up struct vgic_irq for reserved INTID");
-+	return NULL;
++	return val;
 +}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-new file mode 100644
-index 0000000..61b8d22
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __KVM_ARM_VGIC_NEW_H__
-+#define __KVM_ARM_VGIC_NEW_H__
 +
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid);
++static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
++				   gpa_t addr, unsigned int len,
++				   unsigned long val)
++{
++	u32 intid = addr & 0x3ff;
++	int i;
 +
-+#endif
++	/* GICD_ITARGETSR[0-7] are read-only */
++	if (intid < VGIC_NR_PRIVATE_IRQS)
++		return;
++
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
++		int target;
++
++		spin_lock(&irq->irq_lock);
++
++		irq->targets = (val >> (i * 8)) & 0xff;
++		target = irq->targets ? __ffs(irq->targets) : 0;
++		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
++
++		spin_unlock(&irq->irq_lock);
++	}
++}
++
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+@@ -86,7 +127,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+ 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
++		vgic_mmio_read_target, vgic_mmio_write_target, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+ 		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
 -- 
 2.7.3
