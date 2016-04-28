@@ -1,33 +1,32 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 28 Apr 2016 15:35:49 +0530
-Subject: [PATCH RESEND 4/4] ARM: dts: am57xx-idk: Include Industrial grade
- thermal thresholds
+Date: Thu, 28 Apr 2016 15:35:48 +0530
+Subject: [PATCH RESEND 3/4] ARM: dts: am57xx-beagle-x15: Include the
+ commercial grade thresholds
 In-Reply-To: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
 References: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1461837949-11116-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <1461837949-11116-4-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-am57xx-idk have Industrial grade samples whose thermal
-thresholds are different as compared with dra7. Hence correcting the same.
+am57xx-beagle-x15 have commercial grade samples whose
+thermal thresholds lower than dra7. Hence correcting the same.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/am57xx-idk-common.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-index 2805b68..b01a594 100644
---- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-@@ -6,6 +6,8 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index f0a0efb..f6904f6 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -8,6 +8,7 @@
+ /dts-v1/;
  
-+#include "am57xx-industrial-grade.dtsi"
-+
- / {
- 	aliases {
- 		rtc0 = &tps659038_rtc;
+ #include "dra74x.dtsi"
++#include "am57xx-commercial-grade.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
 -- 
 1.9.1
