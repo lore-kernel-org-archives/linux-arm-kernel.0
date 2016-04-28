@@ -1,48 +1,177 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Apr 2016 13:15:18 +0100
-Subject: [PATCH v9 12/14] PM / Hibernate: Call flush_icache_range() on
- pages restored in-place
-In-Reply-To: <1461775633-29715-13-git-send-email-james.morse@arm.com>
-References: <1461775633-29715-1-git-send-email-james.morse@arm.com>
- <1461775633-29715-13-git-send-email-james.morse@arm.com>
-Message-ID: <20160428121517.GF24693@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 28 Apr 2016 20:18:01 +0800
+Subject: [patch V3] lib: GCD: add binary GCD algorithm
+In-Reply-To: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
+Message-ID: <201604282003.CNnbFCBq%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 05:47:11PM +0100, James Morse wrote:
-> Some architectures require code written to memory as if it were data to be
-> 'cleaned' from any data caches before the processor can fetch them as new
-> instructions.
-> 
-> During resume from hibernate, the snapshot code copies some pages directly,
-> meaning these architectures do not get a chance to perform their cache
-> maintenance. Modify the read and decompress code to call
-> flush_icache_range() on all pages that are restored, so that the restored
-> in-place pages are guaranteed to be executable on these architectures.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  kernel/power/swap.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-> index 12cd989dadf6..a30645d2e93f 100644
-> --- a/kernel/power/swap.c
-> +++ b/kernel/power/swap.c
-> @@ -37,6 +37,14 @@
->  #define HIBERNATE_SIG	"S1SUSPEND"
->  
->  /*
-> + * When reading an {un,}compressed image, we may restore pages in place,
-> + * in which case some architectures need these pages cleaning before they
-> + * can be executed. We don't know which pages these may be, so clean the lot.
-> + */
-> +bool clean_pages_on_read = false;
-> +bool clean_pages_on_decompress = false;
+Hi,
 
-Should these be static?
+[auto build test ERROR on v4.6-rc5]
+[cannot apply to next-20160428]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Will
+url:    https://github.com/0day-ci/linux/commits/zengzhaoxiu-163-com/lib-GCD-add-binary-GCD-algorithm/20160428-195527
+config: mips-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
+
+All error/warnings (new ones prefixed by >>):
+
+   In file included from arch/mips/include/asm/bitops.h:21:0,
+                    from include/linux/bitops.h:36,
+                    from include/linux/kernel.h:10,
+                    from include/asm-generic/bug.h:13,
+                    from arch/mips/include/asm/bug.h:41,
+                    from include/linux/bug.h:4,
+                    from include/linux/page-flags.h:9,
+                    from kernel/bounds.c:9:
+>> arch/mips/include/asm/cpu-features.h:205:28: warning: "cpu_data" is not defined [-Wundef]
+    # define cpu_has_mips32r6 (cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
+                               ^
+>> arch/mips/include/asm/cpu-features.h:241:5: note: in expansion of macro 'cpu_has_mips32r6'
+        cpu_has_mips32r6 | cpu_has_mips64r1 | \
+        ^
+>> arch/mips/include/asm/cpu-features.h:289:25: note: in expansion of macro 'cpu_has_mips_r'
+    #define cpu_has_clo_clz cpu_has_mips_r
+                            ^
+>> arch/mips/include/asm/cpu-features.h:291:6: note: in expansion of macro 'cpu_has_clo_clz'
+    #if !cpu_has_clo_clz
+         ^
+>> arch/mips/include/asm/cpu-features.h:205:36: error: token "[" is not valid in preprocessor expressions
+    # define cpu_has_mips32r6 (cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
+                                       ^
+>> arch/mips/include/asm/cpu-features.h:241:5: note: in expansion of macro 'cpu_has_mips32r6'
+        cpu_has_mips32r6 | cpu_has_mips64r1 | \
+        ^
+>> arch/mips/include/asm/cpu-features.h:289:25: note: in expansion of macro 'cpu_has_mips_r'
+    #define cpu_has_clo_clz cpu_has_mips_r
+                            ^
+>> arch/mips/include/asm/cpu-features.h:291:6: note: in expansion of macro 'cpu_has_clo_clz'
+    #if !cpu_has_clo_clz
+         ^
+   make[2]: *** [kernel/bounds.s] Error 1
+   make[2]: Target '__build' not remade because of errors.
+   make[1]: *** [prepare0] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
+
+vim +205 arch/mips/include/asm/cpu-features.h
+
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  199  # define cpu_has_mips32r1	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R1)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  200  #endif
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  201  #ifndef cpu_has_mips32r2
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  202  # define cpu_has_mips32r2	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R2)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  203  #endif
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  204  #ifndef cpu_has_mips32r6
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13 @205  # define cpu_has_mips32r6	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  206  #endif
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  207  #ifndef cpu_has_mips64r1
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  208  # define cpu_has_mips64r1	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R1)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  209  #endif
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  210  #ifndef cpu_has_mips64r2
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  211  # define cpu_has_mips64r2	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R2)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  212  #endif
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  213  #ifndef cpu_has_mips64r6
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  214  # define cpu_has_mips64r6	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R6)
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  215  #endif
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  216  
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  217  /*
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  218   * Shortcuts ...
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  219   */
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  220  #define cpu_has_mips_2_3_4_5	(cpu_has_mips_2 | cpu_has_mips_3_4_5)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  221  #define cpu_has_mips_3_4_5	(cpu_has_mips_3 | cpu_has_mips_4_5)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  222  #define cpu_has_mips_4_5	(cpu_has_mips_4 | cpu_has_mips_5)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  223  
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  224  #define cpu_has_mips_2_3_4_5_r	(cpu_has_mips_2 | cpu_has_mips_3_4_5_r)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  225  #define cpu_has_mips_3_4_5_r	(cpu_has_mips_3 | cpu_has_mips_4_5_r)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  226  #define cpu_has_mips_4_5_r	(cpu_has_mips_4 | cpu_has_mips_5_r)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  227  #define cpu_has_mips_5_r	(cpu_has_mips_5 | cpu_has_mips_r)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  228  
+2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  229  #define cpu_has_mips_3_4_5_64_r2_r6					\
+2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  230  				(cpu_has_mips_3 | cpu_has_mips_4_5_64_r2_r6)
+2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  231  #define cpu_has_mips_4_5_64_r2_r6					\
+2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  232  				(cpu_has_mips_4_5 | cpu_has_mips64r1 |	\
+2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  233  				 cpu_has_mips_r2 | cpu_has_mips_r6)
+08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  234  
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  235  #define cpu_has_mips32	(cpu_has_mips32r1 | cpu_has_mips32r2 | cpu_has_mips32r6)
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  236  #define cpu_has_mips64	(cpu_has_mips64r1 | cpu_has_mips64r2 | cpu_has_mips64r6)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  237  #define cpu_has_mips_r1 (cpu_has_mips32r1 | cpu_has_mips64r1)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  238  #define cpu_has_mips_r2 (cpu_has_mips32r2 | cpu_has_mips64r2)
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  239  #define cpu_has_mips_r6	(cpu_has_mips32r6 | cpu_has_mips64r6)
+c46b302b9 arch/mips/include/asm/cpu-features.h Ralf Baechle      2008-10-28  240  #define cpu_has_mips_r	(cpu_has_mips32r1 | cpu_has_mips32r2 | \
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13 @241  			 cpu_has_mips32r6 | cpu_has_mips64r1 | \
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  242  			 cpu_has_mips64r2 | cpu_has_mips64r6)
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  243  
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  244  /* MIPSR2 and MIPSR6 have a lot of similarities */
+34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  245  #define cpu_has_mips_r2_r6	(cpu_has_mips_r2 | cpu_has_mips_r6)
+0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  246  
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  247  /*
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  248   * cpu_has_mips_r2_exec_hazard - return if IHB is required on current processor
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  249   *
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  250   * Returns non-zero value if the current processor implementation requires
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  251   * an IHB instruction to deal with an instruction hazard as per MIPS R2
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  252   * architecture specification, zero otherwise.
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  253   */
+41f0e4d04 arch/mips/include/asm/cpu-features.h David Daney       2009-05-12  254  #ifndef cpu_has_mips_r2_exec_hazard
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  255  #define cpu_has_mips_r2_exec_hazard					\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  256  ({									\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  257  	int __res;							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  258  									\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  259  	switch (current_cpu_type()) {					\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  260  	case CPU_M14KC:							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  261  	case CPU_74K:							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  262  	case CPU_1074K:							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  263  	case CPU_PROAPTIV:						\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  264  	case CPU_P5600:							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  265  	case CPU_M5150:							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  266  	case CPU_QEMU_GENERIC:						\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  267  	case CPU_CAVIUM_OCTEON:						\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  268  	case CPU_CAVIUM_OCTEON_PLUS:					\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  269  	case CPU_CAVIUM_OCTEON2:					\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  270  	case CPU_CAVIUM_OCTEON3:					\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  271  		__res = 0;						\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  272  		break;							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  273  									\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  274  	default:							\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  275  		__res = 1;						\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  276  	}								\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  277  									\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  278  	__res;								\
+9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  279  })
+41f0e4d04 arch/mips/include/asm/cpu-features.h David Daney       2009-05-12  280  #endif
+41f0e4d04 arch/mips/include/asm/cpu-features.h David Daney       2009-05-12  281  
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  282  /*
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  283   * MIPS32, MIPS64, VR5500, IDT32332, IDT32334 and maybe a few other
+becee6b8c arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2013-09-22  284   * pre-MIPS32/MIPS64 processors have CLO, CLZ.	The IDT RC64574 is 64-bit and
+417a5eb02 arch/mips/include/asm/cpu-features.h Ralf Baechle      2010-08-05  285   * has CLO and CLZ but not DCLO nor DCLZ.  For 64-bit kernels
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  286   * cpu_has_clo_clz also indicates the availability of DCLO and DCLZ.
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  287   */
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  288  #ifndef cpu_has_clo_clz
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19 @289  #define cpu_has_clo_clz	cpu_has_mips_r
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  290  #endif
+35e1a24e8 arch/mips/include/asm/cpu-features.h Zhaoxiu Zeng      2016-04-28 @291  #if !cpu_has_clo_clz
+35e1a24e8 arch/mips/include/asm/cpu-features.h Zhaoxiu Zeng      2016-04-28  292  #define CONFIG_CPU_NO_EFFICIENT_FFS 1
+35e1a24e8 arch/mips/include/asm/cpu-features.h Zhaoxiu Zeng      2016-04-28  293  #endif
+47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  294  
+
+:::::: The code at line 205 was first introduced by commit
+:::::: 34c56fc1c167facc375d927687df0a3891d164ac MIPS: asm: cpu: Add MIPSR6 ISA definitions
+
+:::::: TO: Leonid Yegoshin <Leonid.Yegoshin@imgtec.com>
+:::::: CC: Markos Chandras <markos.chandras@imgtec.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 41439 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/e52ea3dd/attachment-0001.obj>
