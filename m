@@ -1,80 +1,44 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 28 Apr 2016 14:23:19 +0200
-Subject: [PATCH] mmc: sdhci-of-at91: add presets setup
-In-Reply-To: <5721CAB2.5000207@intel.com>
-References: <1461246846-30925-1-git-send-email-ludovic.desroches@atmel.com>
- <5721CAB2.5000207@intel.com>
-Message-ID: <20160428122319.GB3891@odux.rfo.atmel.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 28 Apr 2016 13:23:32 +0100
+Subject: [PATCH v9 12/14] PM / Hibernate: Call flush_icache_range() on
+ pages restored in-place
+In-Reply-To: <20160428121517.GF24693@arm.com>
+References: <1461775633-29715-1-git-send-email-james.morse@arm.com>
+ <1461775633-29715-13-git-send-email-james.morse@arm.com>
+ <20160428121517.GF24693@arm.com>
+Message-ID: <572200C4.90701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 11:32:50AM +0300, Adrian Hunter wrote:
-> On 21/04/16 16:54, Ludovic Desroches wrote:
-> > The controller claims to support SDR104. In fact, it only supports a
-> > degraded SDR104 since the maximum frequency of the SD clock is 120 MHz
-> > instead of 208 MHz.
-> > The sdhci core is unaware of it and will compute a wrong clock divider.
-> > We can deal with this specific case by using presets.
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > ---
-> >  drivers/mmc/host/sdhci-of-at91.c | 24 ++++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-> > index c1923c0..76308b1 100644
-> > --- a/drivers/mmc/host/sdhci-of-at91.c
-> > +++ b/drivers/mmc/host/sdhci-of-at91.c
-> > @@ -18,6 +18,7 @@
-> >  #include <linux/delay.h>
-> >  #include <linux/err.h>
-> >  #include <linux/io.h>
-> > +#include <linux/kernel.h>
-> >  #include <linux/mmc/host.h>
-> >  #include <linux/mmc/slot-gpio.h>
-> >  #include <linux/module.h>
-> > @@ -163,6 +164,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
-> >  	unsigned int			clk_base, clk_mul;
-> >  	unsigned int			gck_rate, real_gck_rate;
-> >  	int				ret;
-> > +	unsigned int			preset_div, preset_common = 0x400; /* drv type B, programmable clock mode */
-> 
-> preset_common is a constant, so why not #define it?
+Hi Will,
 
-No reason, a mistake, I'll fix it.
+On 28/04/16 13:15, Will Deacon wrote:
+> On Wed, Apr 27, 2016 at 05:47:11PM +0100, James Morse wrote:
+>>  kernel/power/swap.c | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+>> index 12cd989dadf6..a30645d2e93f 100644
+>> --- a/kernel/power/swap.c
+>> +++ b/kernel/power/swap.c
+>> @@ -37,6 +37,14 @@
+>>  #define HIBERNATE_SIG	"S1SUSPEND"
+>>  
+>>  /*
+>> + * When reading an {un,}compressed image, we may restore pages in place,
+>> + * in which case some architectures need these pages cleaning before they
+>> + * can be executed. We don't know which pages these may be, so clean the lot.
+>> + */
+>> +bool clean_pages_on_read = false;
+>> +bool clean_pages_on_decompress = false;
+> 
+> Should these be static?
 
-> 
-> >  
-> >  	match = of_match_device(sdhci_at91_dt_match, &pdev->dev);
-> >  	if (!match)
-> > @@ -230,6 +232,28 @@ static int sdhci_at91_probe(struct platform_device *pdev)
-> >  			 clk_mul, real_gck_rate);
-> >  	}
-> >  
-> > +	/*
-> > +	 * We have to set preset values because it depends on the clk_mul
-> > +	 * value. Moreover, SDR104 is supported in a degraded mode since the
-> > +	 * maximum sd clock value is 120 MHz instead of 208 MHz. For that
-> > +	 * reason, we need to use presets to support SDR104.
-> > +	 */
-> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 24000000) - 1;
-> > +	writew(preset_common | preset_div,
-> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR12);
-> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
-> > +	writew(preset_common | preset_div,
-> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR25);
-> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 100000000) - 1;
-> > +	writew(preset_common | preset_div,
-> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR50);
-> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 120000000) - 1;
-> > +	writew(preset_common | preset_div,
-> > +	       host->ioaddr + SDHCI_PRESET_FOR_SDR104);
-> > +	preset_div = DIV_ROUND_UP(real_gck_rate, 50000000) - 1;
-> > +	writew(preset_common | preset_div,
-> > +	       host->ioaddr + SDHCI_PRESET_FOR_DDR50);
-> > +
-> >  	clk_prepare_enable(priv->mainck);
-> >  	clk_prepare_enable(priv->gck);
-> >  
-> > 
-> 
+Bother, yes.
+
+(They probably shouldn't be explicitly initialised either...)
+
+
+Thanks,
+
+James
