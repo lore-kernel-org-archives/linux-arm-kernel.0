@@ -1,93 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Apr 2016 10:25:09 -0700
-Subject: [GIT PULL 3/3] omap device tree changes for v4.7 merge window, part 2
-In-Reply-To: <pull-1461856674-976179>
-References: <pull-1461856674-976179>
-Message-ID: <pull-1461856674-976179-3>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 28 Apr 2016 18:31:12 +0100
+Subject: [PATCH v9 00/14] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+In-Reply-To: <20160428124054.GC30834@arm.com>
+References: <1461775633-29715-1-git-send-email-james.morse@arm.com>
+ <20160428124054.GC30834@arm.com>
+Message-ID: <572248E0.6050009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a4240d3af6771339c3557afe261a8a89573980a9:
+Hi Will,
 
-  ARM: dts: Add support for dra72-evm rev C (SR2.0) (2016-04-14 13:43:10 -0700)
+On 28/04/16 13:40, Will Deacon wrote:
+> On Wed, Apr 27, 2016 at 05:46:59PM +0100, James Morse wrote:
+>> This is the today's version of hibernate for arm64, based on arm64's
+>> for-next/core with latest commit 6a1f54711447 ("arm64: acpi: add acpi=on
+>> cmdline option to prefer ACPI boot over DT").
+> 
+> I've queued this locally, but it breaks an allmodconfig build:
 
-are available in the git repository at:
+... I should have tested that ...
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/dt-signed
 
-for you to fetch changes up to 5b6042237dc85b7e2dc26806957ebf95d205e864:
+> kernel/built-in.o: In function `saveable_page':
+> memremap.c:(.text+0x100f90): undefined reference to `kernel_page_present'
+> kernel/built-in.o: In function `swsusp_save':
+> memremap.c:(.text+0x1026f0): undefined reference to `kernel_page_present'
+> make: *** [vmlinux] Error 1
+> 
+> Can you take a look, please?
 
-  ARM: dts: am57xx-idk: Include Industrial grade  thermal thresholds (2016-04-28 08:08:48 -0700)
+This is caused by DEBUG_PAGEALLOC, which clears the PTE_VALID bit from 'free'
+pages. Hibernate uses it as a hint that it shouldn't save/access that page. This
+function is used to test whether the PTE_VALID bit has been cleared by
+kernel_map_pages(), hibernate is the only user.
 
-----------------------------------------------------------------
-Part two of device tree changes for omaps for v4.7 merge window:
+Fixing this exposes a bigger problem with that configuration though: if the
+resume kernel has cut free pages out of the linear map, we copy this
+swiss-cheese view of memory, and try to use it to restore...
 
-- Fix few typos for address-cells and interrupt-names
+We can fixup the copy of the linear map, but it then explodes in my lazy 'clean
+the whole kernel to PoC' after resume, as now both the kernel and linear map
+have holes in them.
 
-- Update dra7 voltage rail limits
+For now I think forbidding this configuration is best. ARCH_HIBERNATION_POSSIBLE
+depends on !DEBUG_PAGEALLOC would be best, but we can't do that, as
+DEBUG_PAGEALLOC has:
+> depends on !HIBERNATION || ARCH_SUPPORTS_DEBUG_PAGEALLOC && !PPC && !SPARC
+which causes kconfig to winge about loops in its dependencies.
 
-- Update compatible string for pcf8575 for both nxp and ti prefix
+-----------------------%<-----------------------
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b87f303765d4..0a7ff709a851 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -579,6 +579,7 @@ source kernel/Kconfig.hz
 
-- Add omap5 configuration for gpadc
+ config ARCH_SUPPORTS_DEBUG_PAGEALLOC
+        def_bool y
++       depends on !HIBERNATION
 
-- Update dra7 for qspi to remove pinmux as it needs to be done by
-  the bootloader in isolation. Also update the qspi for 64MHz
-  frequency.
+ config ARCH_HAS_HOLES_MEMORYMODEL
+        def_bool y if SPARSEMEM
+-----------------------%<-----------------------
 
-- Add support for Baltos ir2110 and ir3220
 
-- Add industrial and commercial grade thermal thresholds for am57xx
+Thanks,
 
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: dts: omap5-board-common: DT spelling s/interrupt-name/interrupt-names/
-      ARM: dts: omap5-cm-t54: DT spelling s/interrupt-name/interrupt-names/
-      ARM: dts: OMAP36xx: : DT spelling s/#address-cell/#address-cells/
-
-H. Nikolaus Schaller (2):
-      ARM: dts: twl6030: describe gpadc
-      ARM: dts: omap5-board-common: describe gpadc for Palmas
-
-Keerthy (4):
-      ARM: dts: am57xx: Introduce commercial grade thermal thresholds
-      ARM: dts: am57xx: Introduce industrial grade thermal thresholds
-      ARM: dts: am57xx-beagle-x15: Include the commercial grade thresholds
-      ARM: dts: am57xx-idk: Include Industrial grade  thermal thresholds
-
-Nishanth Menon (1):
-      ARM: dts: AM57xx/DRA7: Update SoC voltage rail limits to match data sheet
-
-Roger Quadros (1):
-      ARM: dts: dra7xx: Fix compatible string for PCF8575 chip
-
-Vignesh R (2):
-      ARM: dts: dra7x: Remove QSPI pinmux
-      ARM: dts: dra7x: Support QSPI MODE-0 operation at 64MHz
-
-Yegor Yefremov (3):
-      ARM: dts: split am335x-baltos-ir5221 into dts and dtsi files
-      ARM: dts: add DTS for Baltos IR3220
-      ARM: dts: add DTS for Baltos IR2110
-
- Documentation/devicetree/bindings/spi/ti_qspi.txt |   7 +
- arch/arm/boot/dts/Makefile                        |   2 +
- arch/arm/boot/dts/am335x-baltos-ir2110.dts        |  71 ++++
- arch/arm/boot/dts/am335x-baltos-ir3220.dts        | 119 +++++++
- arch/arm/boot/dts/am335x-baltos-ir5221.dts        | 387 +-------------------
- arch/arm/boot/dts/am335x-baltos.dtsi              | 408 ++++++++++++++++++++++
- arch/arm/boot/dts/am57xx-beagle-x15.dts           |   5 +-
- arch/arm/boot/dts/am57xx-commercial-grade.dtsi    |  23 ++
- arch/arm/boot/dts/am57xx-idk-common.dtsi          |   2 +
- arch/arm/boot/dts/am57xx-industrial-grade.dtsi    |  23 ++
- arch/arm/boot/dts/dra7-evm.dts                    |  33 +-
- arch/arm/boot/dts/dra72-evm-common.dtsi           |  26 +-
- arch/arm/boot/dts/omap36xx.dtsi                   |   2 +-
- arch/arm/boot/dts/omap5-board-common.dtsi         |  12 +-
- arch/arm/boot/dts/omap5-cm-t54.dts                |   2 +-
- arch/arm/boot/dts/twl6030.dtsi                    |   6 +
- 16 files changed, 690 insertions(+), 438 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-baltos-ir2110.dts
- create mode 100644 arch/arm/boot/dts/am335x-baltos-ir3220.dts
- create mode 100644 arch/arm/boot/dts/am335x-baltos.dtsi
- create mode 100644 arch/arm/boot/dts/am57xx-commercial-grade.dtsi
- create mode 100644 arch/arm/boot/dts/am57xx-industrial-grade.dtsi
+James
