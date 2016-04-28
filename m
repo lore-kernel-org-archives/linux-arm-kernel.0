@@ -1,94 +1,46 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Apr 2016 16:36:46 +0200
+Date: Thu, 28 Apr 2016 16:38:49 +0200
 Subject: pci_ioremap_set_mem_type(), pci_remap_iospace()
-In-Reply-To: <20160428141920.GB12470@localhost>
+In-Reply-To: <20160428143332.GC12470@localhost>
 References: <20160427225827.GC17629@localhost>
- <20160428141920.GB12470@localhost>
-Message-ID: <20160428163646.432e2c68@free-electrons.com>
+ <20160428143332.GC12470@localhost>
+Message-ID: <20160428163849.2fb5607b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, 28 Apr 2016 09:19:20 -0500, Bjorn Helgaas wrote:
-
-> >         coherency_cpu_base = of_iomap(np, 0);
-> > -       arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
-> > +       arch_ioremap_caller = armada_wa_ioremap_caller;
-> > +       pci_ioremap_set_mem_type(MT_UNCACHED);
+On Thu, 28 Apr 2016 09:33:32 -0500, Bjorn Helgaas wrote:
+> [+cc linux-pci, manually inserted reply, sorry again]
 > 
-> This makes sense to me because I think this changes ioremap() to do
-> the right thing.
-
-What changes ioremap() to do the right thing for all mappings *except*
-PCI I/O mappings:
-
-   arch_ioremap_caller = armada_wa_ioremap_caller;
-
->  But my concern is that ioremap_page_range() doesn't
-> actually use ioremap(), so pci_ioremap_set_mem_type() has no effect on
-> that path.  pci_remap_iospace() uses ioremap_page_range(), so I
-> suspect it will use the wrong attributes.
-
-Indeed, ioremap_page_range() doesn't use ioremap(), and that's why
-there is this separate pci_ioremap_set_mem_type() to ensure that
-mappings done for PCI I/O space are done with MT_UNCACHED.
-
-And indeed, pci_remap_iospace() would not work for me, as it wouldn't
-use the memory attributes set by pci_ioremap_set_mem_type().
-
-To be honest, I am wondering why we're not using the same memory
-attribute for PCI I/O space as the memory attributes used for anything
-else that's ioremapped. In practice, that's what happens on ARM:
-ioremap() uses MT_DEVICE by default, and pci_ioremap_io() uses
-MT_DEVICE as well.
-
-> >  1/ Providing an alternate version of pci_remap_iospace() that allows
-> >     to pass the memory attribute to be used.
+> Liviu wrote:
+> > On Wed, Apr 27, 2016 at 05:58:27PM -0500, Bjorn Helgaas wrote:
+> >> Looking at __arm_ioremap_pfn_caller() makes me
+> >> suspect that pci_remap_iospace() is not safe on arm.
 > 
-> I'd rather fix ioremap_page_range() somehow, because that's an
-> exported interface, and if we only fix pci_remap_iospace(), we still
-> have to worry about ioremap_page_range() doing the wrong thing.
+> > Hmm, not sure how you reached that conclusion. __arm_ioremap_pfn_caller()
+> > does call in the end ioremap_page_range() for ARMv7 || ARM_LPAE, which is
+> > what pci_remap_iospace() does as well. Beside the possibly different
+> > pgprot_t values, what would make it unsafe for arm?
+> 
+> The different pgprot_t is exactly what I'm worried about.  The callers of
+> pci_ioremap_io() probably get the right thing (a pgprot tweaked to deal
+> with this Cortex problem), but other callers of ioremap_page_range(),
+> pci_remap_iospace() in particular, don't get that tweak:
+> 
+>   pci_ioremap_io
+>     ioremap_page_range(..., __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte))
+> 
+>   pci_remap_iospace
+>     ioremap_page_range(..., pgprot_device(PAGE_KERNEL))
+>       ioremap_pud_range(..., pgprot_device(PAGE_KERNEL))
+>         ioremap_pmd_range(..., pgprot_device(PAGE_KERNEL))
+>           ioremap_pte_range(..., pgprot_device(PAGE_KERNEL))
+>             set_pte_at(..., pfn_pte(pfn, pgprot_device(PAGE_KERNEL)))
 
-What do you want to fix in ioremap_page_range() ? It already allows
-passing the memory type that you want, so I'm not sure to understand.
-
-It is worth mentioning that on ARM, the arch_ioremap_caller mechanism
-allows platform-specific to do its own magic for each mapping. I.e, it
-might decide to use some specific memory attributes, or some specific
-way of doing the mappings.
-
-It is used on 5 platforms:
-
- * EBSA110, where it does a 1:1 mapping with the physical address if I
-   understand correctly:
-
-static void __iomem *ebsa110_ioremap_caller(phys_addr_t cookie, size_t size,
-                                            unsigned int flags, void *caller)
-{
-        return (void __iomem *)cookie;
-}
-
- * i.MX3, where it forces the memory attribute to be
-   MT_DEVICE_NONSHARED, but only for the mappings that are below
-   0x80000000 and not within the L2 cache registers. Otherwise, the
-   default memory attribute is used.
-
- * iop13xx, where it really does some magic calculations to get the
-   virtual addresses matching some specific physical addresses (and
-   falls back to a real ioremap for other areas).
-
- * ixp4xx, which does a normal ioremap() for non-PCI devices, and a 1:1
-   mapping for PCI stuff.
-
- * mvebu, where we currently override the memory attribute to strongly
-   ordered for PCI devices only (but I need to change that so that all
-   mappings are strongly ordered)
-
-All in all, the pgprot_device() mechanism added by Liviu is not really
-sufficient to address all those customizations, which is why ARM has
-this more complicated way of allowing platform specific code to
-override the ioremap behavior.
+Indeed. Which is why we should get rid of one of the two interfaces.
+Since pci_remap_iospace() is the generic one, I guess that's the one we
+should migrate to.
 
 Thomas
 -- 
