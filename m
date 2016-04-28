@@ -1,78 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Apr 2016 15:47:49 -0500
-Subject: [Patch v2 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
-In-Reply-To: <CAPBZ5QceWcTCTJSnp-OpoeK_YdV8DOWe+569+6yXpSWhR243Og@mail.gmail.com>
-References: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
- <1461625725-32425-2-git-send-email-andy.gross@linaro.org>
- <20160426014906.GH29990@codeaurora.org>
- <CAPBZ5QceWcTCTJSnp-OpoeK_YdV8DOWe+569+6yXpSWhR243Og@mail.gmail.com>
-Message-ID: <20160428204749.GA12941@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Apr 2016 13:55:57 -0700
+Subject: [PATCH 2/2] [media] ir-rx51: Fix build after multiarch changes
+ broke it
+In-Reply-To: <572275DB.8090300@gmail.com>
+References: <1461714709-10455-1-git-send-email-tony@atomide.com>
+ <1461714709-10455-3-git-send-email-tony@atomide.com>
+ <572266AF.9020601@gmail.com> <20160428202248.GG5995@atomide.com>
+ <572275DB.8090300@gmail.com>
+Message-ID: <20160428205557.GH5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 09:14:59PM -0500, Andy Gross wrote:
-> On 25 April 2016 at 20:49, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 04/25, Andy Gross wrote:
-> >> This patch adds the device tree support for the Qualcomm SCM firmware.
-> >>
-> >> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> >> ---
-> >>  .../devicetree/bindings/firmware/qcom,scm.txt      | 28 ++++++++++++++++++++++
-> >>  1 file changed, 28 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> >> new file mode 100644
-> >> index 0000000..a679a87
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> >> @@ -0,0 +1,28 @@
-> >> +QCOM Secure Channel Manager (SCM)
-> >> +
-> >> +Qualcomm processors include an interface to communicate to the secure firmware.
-> >> +This interface allows for clients to request different types of actions.  These
-> >> +can include CPU power up/down, HDCP requests, loading of firmware, and other
-> >> +assorted actions.
-> >> +
-> >> +Required properties:
-> >> +- compatible: must contain one of the following:
-> >> + * "qcom,scm-apq8064" for APQ8064
-> >> + * "qcom,scm-apq8084" for APQ8084
-> >> + * "qcom,scm-msm8916" for MSM8916
-> >> + * "qcom,scm-msm8974" for MSM8974
-> >
-> > Do we need to keep adding these into the driver for every SoC
-> > that we support? My understanding is apq8064 can be the one that
-> > requires one clk, and msm8974 can be the one that requires three.
-> > The driver can just have those two compatibles for now, and we
-> > can keep adding compatibles here for the different SoCs, but
-> > really we don't care, that's just to save ourselves if something
-> > pops up and needs a workaround.
-> >
-> > It will certainly look weird if it's firmware that's compatible
-> > with qcom,scm-msm8974 but on an apq8084, so perhaps something
-
-Not if the first string has apq8084.
-
-> > more generic like, qcom-scm-v1 and qcom,scm-v2 can be used as the
-> > generic compatible in the driver:
-> >
-> >         compatible = "qcom,scm-apq8064", "qcom,scm-v1";
-> >
-> >         vs.
-> >
-> >         compatible = "qcom,scm-apq8084", "qcom,scm-v2";
-> >
-> > ?
-> >
-> > I just want to avoid the constant SoC churn update here if we can.
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 13:44]:
+> ??,
 > 
-> Right.  We can certainly do it that way.  Its just that the v1/v2
-> aren't the real versions.  What if we did qcom,scm vs
-> qcom,scm-apq8064?
+> On 28.04.2016 23:22, Tony Lindgren wrote:
+> >* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 12:39]:
+> >>On 27.04.2016 02:51, Tony Lindgren wrote:
+> >>
+> >>omap_dm_timer_request_specific always fails with message "Please use
+> >>omap_dm_timer_request_by_cap/node()" with DT boot.
+> >>
+> >>I hacked the code to use omap_dm_timer_request_by_cap(OMAP_TIMER_HAS_PWM)
+> >>and it seems to use the correct timer (IR LED blinks, checked with the
+> >>camera of Samsung S4 mini), but it doesn't actually control either of the TV
+> >>sets here. The same SW(pierogi) controls them when device is booted to stock
+> >>kernel. However, this seems another problem not related to the patch.
+> >
+> >OK thanks for testing, I'll apply the pdata patch then.
+> >
+> >I assume you'll post a separate fix for the request_by_cap
+> >driver change?
+> >
+> 
+> Well, it was a hack, it just happens that the first matched timer is GPT9, I
+> think we should aim for a proper solution (request_by_node()).
+> 
+> Shall I prepare a patch that gets the timer from the DT?
 
-I'd prefer this over fake version numbers.
+Sounds good to me!
 
-Is there any sane versioning of the firmware itself that could be used?
-
-Rob
+Tony
