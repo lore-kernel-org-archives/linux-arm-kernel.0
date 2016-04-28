@@ -1,177 +1,180 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 28 Apr 2016 20:18:01 +0800
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
-Message-ID: <201604282003.CNnbFCBq%fengguang.wu@intel.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 28 Apr 2016 14:18:25 +0200
+Subject: [PATCH v6 2/2] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <20160428104925.7eb12ca2@bbrezillon>
+References: <1461767754-12189-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1461767754-12189-3-git-send-email-boris.brezillon@free-electrons.com>
+ <CACh+v5OO+UQ_EiWVyewdMHnMB-p3nd6N=R5P7K4V_4=ymy-YuQ@mail.gmail.com>
+ <20160428104925.7eb12ca2@bbrezillon>
+Message-ID: <CACh+v5Mi2Qd58SZkwW0mZ3ZJx3Rv3mwSkRqzgHwBTxpUbwjVFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2016-04-28 10:49 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+> Hi Jean-Jacques,
+>
+> On Thu, 28 Apr 2016 10:32:49 +0200
+> Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
+>
+>> Hi Boris,
+>>
+>> i haven't seen this code in a while :) I'm glad you're working on it
+>>
+>> 2016-04-27 16:35 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+>> > The EBI (External Bus Interface) is used to access external peripherals
+>> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+>> > Each device is assigned a CS line and an address range and can have its
+>> > own configuration (timings, access mode, bus width, ...).
+>> > This driver provides a generic DT binding to configure a device according
+>> > to its requirements.
+>> > For specific device controllers (like the NAND one) the SMC timings
+>> > should be configured by the controller driver through the matrix and smc
+>> > syscon regmaps.
+>> >
+>> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> > ---
+>> >  .../bindings/memory-controllers/atmel,ebi.txt      | 146 +++++++++++++++++++++
+>> >  1 file changed, 146 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+>> > new file mode 100644
+>> > index 0000000..0f332d2
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+>> > @@ -0,0 +1,146 @@
+>> > +* Device tree bindings for Atmel EBI
+>> > +
+>> > +The External Bus Interface (EBI) controller is a bus where you can connect
+>> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+>> > +The EBI provides a glue-less interface to asynchronous memories though the SMC
+>> > +(Static Memory Controller).
+>> > +Synchronous memories (and some asynchronous memories like NANDs) can be
+>> > +attached to specialized controllers which are responsible for configuring the
+>> > +bus appropriately according to the connected device.
+>> > +In the other hand, the bus interface can be automated for simple asynchronous
+>> > +devices.
+>> > +
+>> > +Required properties:
+>> > +
+>> > +- compatible:          "atmel,at91sam9260-ebi"
+>> > +                       "atmel,at91sam9261-ebi"
+>> > +                       "atmel,at91sam9263-ebi0"
+>> > +                       "atmel,at91sam9263-ebi1"
+>> > +                       "atmel,at91sam9rl-ebi"
+>> > +                       "atmel,at91sam9g45-ebi"
+>> > +                       "atmel,at91sam9x5-ebi"
+>> > +                       "atmel,sama5d3-ebi"
+>> > +
+>> > +- reg:                 Contains offset/length value for EBI memory mapping.
+>> > +                       This property might contain several entries if the EBI
+>> > +                       memory range is not contiguous
+>> > +
+>> > +- #address-cells:      Must be 2.
+>> > +                       The first cell encodes the CS.
+>> > +                       The second cell encode the offset into the CS memory
+>> > +                       range.
+>> > +
+>> > +- #size-cells:         Must be set to 1.
+>> > +
+>> > +- ranges:              Encodes CS to memory region association.
+>> > +
+>> > +- clocks:              Clock feeding the EBI controller.
+>> > +                       See clock-bindings.txt
+>> > +
+>> > +Child chip-select (cs) nodes contain the memory devices nodes connected to
+>> > +such as NOR (e.g. cfi-flash) and NAND.
+>> > +There might be board specific devices like FPGAs.
+>> > +You'll define you device requirements in these child nodes.
+>> > +
+>> > +Required child cs node properties:
+>> > +
+>> > +- #address-cells:      Must be 2.
+>> > +
+>> > +- #size-cells:         Must be 1.
+>> > +
+>> > +- ranges:              Empty property indicating that child nodes can inherit
+>> > +                       memory layout.
+>> > +
+>> > +Optional child cs node properties:
+>> > +- atmel,bus-width:             width of the asynchronous device's data bus
+>> > +                               8, 16 or 32.
+>> > +                               8 if not present.
+>> > +
+>> > +- atmel,byte-access-type       "write" or "select" (see Atmel datasheet).
+>> > +                               "select" if not present.
+>> > +
+>> > +- atmel,read-mode              "nrd" or "ncs".
+>> > +                               "ncs" is not present.
+>> > +
+>> > +- atmel,write-mode             "nwe" or "ncs".
+>> > +                               "ncs" is not present.
+>> > +
+>> > +- atmel,exnw-mode              "disabled", "frozen" or "ready".
+>> > +                               "disabled" if not present.
+>> > +
+>> > +- atmel,page-mode              enable page mode if present. The provided value
+>> > +                               defines the page size (supported values: 4, 8,
+>> > +                               16 and 32).
+>> > +
+>> > +Optional device timings expressed in nanoseconds (if the property is not
+>> > +present 0 is assumed):
+>>
+>> IMO If no timing information is provided, it's probably better not to
+>> change it. It may have been configured by the bootloader or romboot.
+>> It may not be the perfect timings but at least it could work, whereas
+>> filling up with 0 is most probably going to break the access: it's a
+>> kind of very agressive timing optimization
+>
+> Yes, probably. I'll make all those timings mandatory in the next
+> version.
+>
+>>
+>> > +
+>> > +- atmel,ncs-rd-setup-ns
+>> > +- atmel,nrd-setup-ns
+>> > +- atmel,ncs-wr-setup-ns
+>> > +- atmel,nwe-setup-ns
+>> > +- atmel,ncs-rd-pulse-ns
+>> > +- atmel,nrd-pulse-ns
+>> > +- atmel,ncs-wr-pulse-ns
+>> > +- atmel,nwe-pulse-ns
+>> > +- atmel,nwe-cycle-ns
+>> > +- atmel,nrd-cycle-ns
+>> > +- atmel,tdf-ns
+>>
+>> One thought about the configuration in 'ns' unit: Some devices may
+>> have requirements expressed in clock cycles (I'm thinking of FPGA
+>> here). At  a fixed frequency one can always convert manually from 'ns'
+>> to 'clocks' but it's a bit tedious and prone to rounding errors. And
+>> It 'll  break when the EBI frequency is changed
+>
+> If you don't mind, I'd like to first get this version accepted, and
+> we'll extend it with timings expressed in clock cycles afterward.
+>
+> BTW, could you describe a real use case where timings should be
+> expressed in clock cycles? I mean, usually the devices have some timing
+> constraints (tXX_min = Y ns), and I don't see why it would differ for
+> FPGA interfaces, but I'm clearly not an FPGA expert.
 
-[auto build test ERROR on v4.6-rc5]
-[cannot apply to next-20160428]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+I'm not either, I only toyed with FPGA. That's just what experienced
+FPGA designer told me.
+I guess that it boils down to: FPGA are more suited for a synchronous
+design than an asynchronous one.
 
-url:    https://github.com/0day-ci/linux/commits/zengzhaoxiu-163-com/lib-GCD-add-binary-GCD-algorithm/20160428-195527
-config: mips-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+JJ
 
-All error/warnings (new ones prefixed by >>):
-
-   In file included from arch/mips/include/asm/bitops.h:21:0,
-                    from include/linux/bitops.h:36,
-                    from include/linux/kernel.h:10,
-                    from include/asm-generic/bug.h:13,
-                    from arch/mips/include/asm/bug.h:41,
-                    from include/linux/bug.h:4,
-                    from include/linux/page-flags.h:9,
-                    from kernel/bounds.c:9:
->> arch/mips/include/asm/cpu-features.h:205:28: warning: "cpu_data" is not defined [-Wundef]
-    # define cpu_has_mips32r6 (cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
-                               ^
->> arch/mips/include/asm/cpu-features.h:241:5: note: in expansion of macro 'cpu_has_mips32r6'
-        cpu_has_mips32r6 | cpu_has_mips64r1 | \
-        ^
->> arch/mips/include/asm/cpu-features.h:289:25: note: in expansion of macro 'cpu_has_mips_r'
-    #define cpu_has_clo_clz cpu_has_mips_r
-                            ^
->> arch/mips/include/asm/cpu-features.h:291:6: note: in expansion of macro 'cpu_has_clo_clz'
-    #if !cpu_has_clo_clz
-         ^
->> arch/mips/include/asm/cpu-features.h:205:36: error: token "[" is not valid in preprocessor expressions
-    # define cpu_has_mips32r6 (cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
-                                       ^
->> arch/mips/include/asm/cpu-features.h:241:5: note: in expansion of macro 'cpu_has_mips32r6'
-        cpu_has_mips32r6 | cpu_has_mips64r1 | \
-        ^
->> arch/mips/include/asm/cpu-features.h:289:25: note: in expansion of macro 'cpu_has_mips_r'
-    #define cpu_has_clo_clz cpu_has_mips_r
-                            ^
->> arch/mips/include/asm/cpu-features.h:291:6: note: in expansion of macro 'cpu_has_clo_clz'
-    #if !cpu_has_clo_clz
-         ^
-   make[2]: *** [kernel/bounds.s] Error 1
-   make[2]: Target '__build' not remade because of errors.
-   make[1]: *** [prepare0] Error 2
-   make[1]: Target 'prepare' not remade because of errors.
-   make: *** [sub-make] Error 2
-
-vim +205 arch/mips/include/asm/cpu-features.h
-
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  199  # define cpu_has_mips32r1	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R1)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  200  #endif
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  201  #ifndef cpu_has_mips32r2
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  202  # define cpu_has_mips32r2	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R2)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  203  #endif
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  204  #ifndef cpu_has_mips32r6
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13 @205  # define cpu_has_mips32r6	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  206  #endif
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  207  #ifndef cpu_has_mips64r1
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  208  # define cpu_has_mips64r1	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R1)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  209  #endif
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  210  #ifndef cpu_has_mips64r2
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  211  # define cpu_has_mips64r2	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R2)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  212  #endif
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  213  #ifndef cpu_has_mips64r6
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  214  # define cpu_has_mips64r6	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R6)
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  215  #endif
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  216  
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  217  /*
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  218   * Shortcuts ...
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  219   */
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  220  #define cpu_has_mips_2_3_4_5	(cpu_has_mips_2 | cpu_has_mips_3_4_5)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  221  #define cpu_has_mips_3_4_5	(cpu_has_mips_3 | cpu_has_mips_4_5)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  222  #define cpu_has_mips_4_5	(cpu_has_mips_4 | cpu_has_mips_5)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  223  
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  224  #define cpu_has_mips_2_3_4_5_r	(cpu_has_mips_2 | cpu_has_mips_3_4_5_r)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  225  #define cpu_has_mips_3_4_5_r	(cpu_has_mips_3 | cpu_has_mips_4_5_r)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  226  #define cpu_has_mips_4_5_r	(cpu_has_mips_4 | cpu_has_mips_5_r)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  227  #define cpu_has_mips_5_r	(cpu_has_mips_5 | cpu_has_mips_r)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  228  
-2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  229  #define cpu_has_mips_3_4_5_64_r2_r6					\
-2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  230  				(cpu_has_mips_3 | cpu_has_mips_4_5_64_r2_r6)
-2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  231  #define cpu_has_mips_4_5_64_r2_r6					\
-2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  232  				(cpu_has_mips_4_5 | cpu_has_mips64r1 |	\
-2d83fea78 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  233  				 cpu_has_mips_r2 | cpu_has_mips_r6)
-08a07904e arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  234  
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  235  #define cpu_has_mips32	(cpu_has_mips32r1 | cpu_has_mips32r2 | cpu_has_mips32r6)
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  236  #define cpu_has_mips64	(cpu_has_mips64r1 | cpu_has_mips64r2 | cpu_has_mips64r6)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  237  #define cpu_has_mips_r1 (cpu_has_mips32r1 | cpu_has_mips64r1)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  238  #define cpu_has_mips_r2 (cpu_has_mips32r2 | cpu_has_mips64r2)
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  239  #define cpu_has_mips_r6	(cpu_has_mips32r6 | cpu_has_mips64r6)
-c46b302b9 arch/mips/include/asm/cpu-features.h Ralf Baechle      2008-10-28  240  #define cpu_has_mips_r	(cpu_has_mips32r1 | cpu_has_mips32r2 | \
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13 @241  			 cpu_has_mips32r6 | cpu_has_mips64r1 | \
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  242  			 cpu_has_mips64r2 | cpu_has_mips64r6)
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  243  
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  244  /* MIPSR2 and MIPSR6 have a lot of similarities */
-34c56fc1c arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  245  #define cpu_has_mips_r2_r6	(cpu_has_mips_r2 | cpu_has_mips_r6)
-0401572a9 include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  246  
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  247  /*
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  248   * cpu_has_mips_r2_exec_hazard - return if IHB is required on current processor
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  249   *
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  250   * Returns non-zero value if the current processor implementation requires
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  251   * an IHB instruction to deal with an instruction hazard as per MIPS R2
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  252   * architecture specification, zero otherwise.
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  253   */
-41f0e4d04 arch/mips/include/asm/cpu-features.h David Daney       2009-05-12  254  #ifndef cpu_has_mips_r2_exec_hazard
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  255  #define cpu_has_mips_r2_exec_hazard					\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  256  ({									\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  257  	int __res;							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  258  									\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  259  	switch (current_cpu_type()) {					\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  260  	case CPU_M14KC:							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  261  	case CPU_74K:							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  262  	case CPU_1074K:							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  263  	case CPU_PROAPTIV:						\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  264  	case CPU_P5600:							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  265  	case CPU_M5150:							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  266  	case CPU_QEMU_GENERIC:						\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  267  	case CPU_CAVIUM_OCTEON:						\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  268  	case CPU_CAVIUM_OCTEON_PLUS:					\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  269  	case CPU_CAVIUM_OCTEON2:					\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  270  	case CPU_CAVIUM_OCTEON3:					\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  271  		__res = 0;						\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  272  		break;							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  273  									\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  274  	default:							\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  275  		__res = 1;						\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  276  	}								\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  277  									\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  278  	__res;								\
-9cdf30bd3 arch/mips/include/asm/cpu-features.h Ralf Baechle      2015-03-25  279  })
-41f0e4d04 arch/mips/include/asm/cpu-features.h David Daney       2009-05-12  280  #endif
-41f0e4d04 arch/mips/include/asm/cpu-features.h David Daney       2009-05-12  281  
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  282  /*
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  283   * MIPS32, MIPS64, VR5500, IDT32332, IDT32334 and maybe a few other
-becee6b8c arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2013-09-22  284   * pre-MIPS32/MIPS64 processors have CLO, CLZ.	The IDT RC64574 is 64-bit and
-417a5eb02 arch/mips/include/asm/cpu-features.h Ralf Baechle      2010-08-05  285   * has CLO and CLZ but not DCLO nor DCLZ.  For 64-bit kernels
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  286   * cpu_has_clo_clz also indicates the availability of DCLO and DCLZ.
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  287   */
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  288  #ifndef cpu_has_clo_clz
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19 @289  #define cpu_has_clo_clz	cpu_has_mips_r
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  290  #endif
-35e1a24e8 arch/mips/include/asm/cpu-features.h Zhaoxiu Zeng      2016-04-28 @291  #if !cpu_has_clo_clz
-35e1a24e8 arch/mips/include/asm/cpu-features.h Zhaoxiu Zeng      2016-04-28  292  #define CONFIG_CPU_NO_EFFICIENT_FFS 1
-35e1a24e8 arch/mips/include/asm/cpu-features.h Zhaoxiu Zeng      2016-04-28  293  #endif
-47740eb88 arch/mips/include/asm/cpu-features.h Ralf Baechle      2009-04-19  294  
-
-:::::: The code at line 205 was first introduced by commit
-:::::: 34c56fc1c167facc375d927687df0a3891d164ac MIPS: asm: cpu: Add MIPSR6 ISA definitions
-
-:::::: TO: Leonid Yegoshin <Leonid.Yegoshin@imgtec.com>
-:::::: CC: Markos Chandras <markos.chandras@imgtec.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 41439 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160428/e52ea3dd/attachment-0001.obj>
+>
+> Thanks,
+>
+> Boris
+>
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
