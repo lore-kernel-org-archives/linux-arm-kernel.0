@@ -1,21 +1,22 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 28 Apr 2016 18:38:26 +1000
-Subject: [PATCH v2 03/11] doc/devicetree: Add Aspeed clock bindings
-In-Reply-To: <4459295.XmBqACy0jk@diego>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <4956403.scaVRGhPEf@diego>
- <CACPK8XfvLR+yZv77C0Eq=RsPOufrwvQjdPtBhnufNc=eJRLZYg@mail.gmail.com>
- <4459295.XmBqACy0jk@diego>
-Message-ID: <1461832706.2791.0.camel@kernel.crashing.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 28 Apr 2016 10:45:46 +0200
+Subject: drivers/media/i2c/adp1653.c: does not show as /dev/video* or
+ v4l-subdev*
+Message-ID: <20160428084546.GA9957@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-04-27 at 11:12 +0200, Heiko St?bner wrote:
-> I guess the design would depend on the actual layout of your clock- /
-> system-
-> controller - aka what else is contained there.
+Hi!
 
-One register controls most clocks so it makes sense to have one driver.
+On n900, probe finishes ok (verified by adding printks), and the
+device shows up in /sys, but I  don't get /dev/video* or
+/dev/v4l-subdev*.
 
-Cheers,
-Ben.
+Other drivers (back and front camera) load ok, and actually work. Any
+idea what could be wrong?
+
+Thanks,
+								Pavel
+--
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
