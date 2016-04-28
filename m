@@ -1,93 +1,71 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 28 Apr 2016 08:15:16 +0000
-Subject: [PATCH v8 1/8] iommu: Add iommu_domain_msi_geometry and
- DOMAIN_ATTR_MSI_GEOMETRY
+Date: Thu, 28 Apr 2016 08:15:17 +0000
+Subject: [PATCH v8 2/8] iommu/arm-smmu: sets the MSI geometry to programmable
 In-Reply-To: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
 References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461831323-5480-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461831323-5480-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new DOMAIN_ATTR_MSI_GEOMETRY domain attribute. It enables
-to query the IOVA window dedicated to MSIs and whether this window is
-programmable or fixed/reserved.
-
-x86 IOMMUs will typically expose an MSI aperture matching the 1MB
-region [FEE0_0000h - FEF0_000h] corresponding to the the APIC
-configuration space and not programmable. On ARM we will report a
-programmable region and start/end will be set to 0.
-
-In case the MSI IOVA aperture is programmable, the msi-iommu API needs
-to be used to set it.
+On ARM, MSI write transactions from device upstream to the smmu
+are conveyed through the iommu. Therefore target physical addresses
+must be mapped and DOMAIN_ATTR_MSI_GEOMETRY advertises a programmable
+MSI IOVA region.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Suggested-by: Alex Williamson <alex.williamson@redhat.com>
 
 ---
+v7 -> v8:
+- use DOMAIN_ATTR_MSI_GEOMETRY
 
-v8: creation
-- deprecates DOMAIN_ATTR_MSI_MAPPING flag
+v4 -> v5:
+- don't handle fsl_pamu_domain anymore
+- handle arm-smmu-v3
 ---
- drivers/iommu/iommu.c | 5 +++++
- include/linux/iommu.h | 9 +++++++++
- 2 files changed, 14 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 2 ++
+ drivers/iommu/arm-smmu.c    | 3 +++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index b9df141..71ed58f 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1498,6 +1498,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
- 			  enum iommu_attr attr, void *data)
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4ff73ff..bf222b5 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1396,6 +1396,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
  {
- 	struct iommu_domain_geometry *geometry;
-+	struct iommu_domain_msi_geometry *msi_geometry;
- 	bool *paging;
- 	int ret = 0;
- 	u32 *count;
-@@ -1508,6 +1509,10 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
- 		*geometry = domain->geometry;
+ 	struct arm_smmu_domain *smmu_domain;
++	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
  
- 		break;
-+	case DOMAIN_ATTR_MSI_GEOMETRY:
-+		msi_geometry  = data;
-+		*msi_geometry = domain->msi_geometry;
-+		break;
- 	case DOMAIN_ATTR_PAGING:
- 		paging  = data;
- 		*paging = (domain->ops->pgsize_bitmap != 0UL);
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 62a5eae..ea5d288 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -52,6 +52,13 @@ struct iommu_domain_geometry {
- 	bool force_aperture;       /* DMA only allowed in mappable range? */
- };
+ 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+@@ -1414,6 +1415,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		kfree(smmu_domain);
+ 		return NULL;
+ 	}
++	smmu_domain->domain.msi_geometry = msi_geometry;
  
-+struct iommu_domain_msi_geometry {
-+	dma_addr_t aperture_start; /* First address used for MSI IOVA    */
-+	dma_addr_t aperture_end;   /* Last address used for MSI IOVA     */
-+	bool programmable;         /* Is the aperture programmable?	 */
-+	/* In case the aperture is programmable, start/end are set to 0 */
-+};
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 7c39ac4..55f429d 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -976,6 +976,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ {
+ 	struct arm_smmu_domain *smmu_domain;
++	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
+ 
+ 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+@@ -994,6 +995,8 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		return NULL;
+ 	}
+ 
++	smmu_domain->domain.msi_geometry = msi_geometry;
 +
- /* Domain feature flags */
- #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
- #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
-@@ -82,6 +89,7 @@ struct iommu_domain {
- 	iommu_fault_handler_t handler;
- 	void *handler_token;
- 	struct iommu_domain_geometry geometry;
-+	struct iommu_domain_msi_geometry msi_geometry;
- 	void *iova_cookie;
- };
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
  
-@@ -107,6 +115,7 @@ enum iommu_cap {
- 
- enum iommu_attr {
- 	DOMAIN_ATTR_GEOMETRY,
-+	DOMAIN_ATTR_MSI_GEOMETRY,
- 	DOMAIN_ATTR_PAGING,
- 	DOMAIN_ATTR_WINDOWS,
- 	DOMAIN_ATTR_FSL_PAMU_STASH,
 -- 
 1.9.1
