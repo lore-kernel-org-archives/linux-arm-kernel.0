@@ -1,102 +1,78 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Thu, 28 Apr 2016 11:05:18 +0200
-Subject: [RFC v4 8/8] gpio: dt-bindings: add gpio-mmio bindings
-In-Reply-To: <cover.1461806071.git.chunkeey@googlemail.com>
-References: <cover.1461806071.git.chunkeey@googlemail.com>
-Message-ID: <262d58824524c19917e6bf760da1c8ea2b6a616c.1461806071.git.chunkeey@googlemail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 Apr 2016 11:24:07 +0200
+Subject: [PATCH 2/3] mmc: core: remove the invalid message in
+ mmc_select_timing
+In-Reply-To: <1461171092-30631-2-git-send-email-aisheng.dong@nxp.com>
+References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
+ <1461171092-30631-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAPDyKFqvXTtbZsaWJ1gr7gm-jTpWwL0hAYxDje+LsC4ScyF2bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+On 20 April 2016 at 18:51, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+> mmc_select_hs200() and mmc_select_hs() will keep the timing
+> as before if switch fails. So it's meaningless to print the
+> failed switched mode outside based on the current host timing.
+>
+> Furthermore, the original print is wrong, it should be:
+> pr_warn("%s: switch to %s failed\n",
+>         mmc_hostname(card->host),
+>         mmc_card_hs(card) ? "high-speed" :
+>         (mmc_card_hs200(card) ? "hs200" : ""));
+>
+> Since we already have error message in mmc_select_hs200(),
+> simply remove it outside.
+>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/mmc/core/mmc.c | 10 +---------
+>  1 file changed, 1 insertion(+), 9 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index f6683a9..55c8201 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1321,21 +1321,13 @@ static int mmc_select_timing(struct mmc_card *card)
+>         if (err && err != -EBADMSG)
+>                 return err;
+>
+> -       if (err) {
+> -               pr_warn("%s: switch to %s failed\n",
+> -                       mmc_card_hs(card) ? "high-speed" :
+> -                       (mmc_card_hs200(card) ? "hs200" : ""),
+> -                       mmc_hostname(card->host));
+> -               err = 0;
+> -       }
+> -
 
-This patch adds the device tree bindings for the gpio-mmio.
-The gpio-mmio is already part of a the GPIO generic library.
+No, this is not correct.
 
-Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
-Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
----
- .../devicetree/bindings/gpio/gpio-mmio.txt         | 73 ++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mmio.txt
+First, in patch1/3, you change to return an error code immediately
+when __mmc_set_signal_voltage() fails, instead of using the "goto
+err". Thus there will be no error printed for this case any more.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-mmio.txt b/Documentation/devicetree/bindings/gpio/gpio-mmio.txt
-new file mode 100644
-index 0000000..cc7f0b1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-mmio.txt
-@@ -0,0 +1,73 @@
-+Bindings for the generic driver for memory-mapped GPIO controllers.
-+
-+Required properties:
-+	- compatible: should be "linux,gpio-mmio"
-+	- reg-names: must contain
-+		"dat" - data register
-+		may contain
-+		"set" - data set register
-+		"clr" - data clear register
-+		"dirout" - direction output register
-+		"dirin" - direction input register
-+	- reg: address + size pairs describing the GPIO register sets;
-+		order must correspond with the order of entries in reg-names
-+	- #gpio-cells = must be set to 2
-+	- gpio-controller: Marks the device node as a gpio controller.
-+
-+Optional properties:
-+	- ngpio: specifies the number of gpio mapped in the register.
-+	- big-endian: force big endian register accesses.
-+	- big-endian-byte-order: assign GPIOs in reverse order.
-+	- unreadable-reg-set: data set register is not readable.
-+	- read-output-reg-set: cache value set for reads.
-+	- unreadable-reg-dir: dirout/dirin register is not readable.
-+	- no-output: GPIOs are read-only.
-+
-+The GPIO generic library provides support for memory-mapped GPIO
-+controllers. The configuration is detected by which resources are present.
-+The simplest form of a GPIO controller that the driver support is just a
-+single "dat" register, where GPIO state can be read and/or written.
-+However, the driver supports far more:
-+	- 8/16/32/64 bits registers. The number of GPIOs is automatically
-+	  determined by the width of the registers.
-+	- GPIO controllers with clear/set registers.
-+	- GPIO controllers with a single "dat" register.
-+	- Big endian bits/GPIOs ordering.
-+
-+For setting GPIO's there are three configurations:
-+	1. single input/output register resource (named "dat"),
-+	2. set/clear pair (named "set" and "clr"),
-+	3. single output register resource and single input resource
-+	   ("set" and dat").
-+
-+For setting the GPIO direction, there are three configurations:
-+	a. simple bidirectional GPIOs that requires no configuration.
-+	b. an output direction register (named "dirout")
-+	   where a 1 bit indicates the GPIO is an output.
-+	c. an input direction register (named "dirin")
-+	   where a 1 bit indicates the GPIO is an input.
-+
-+Examples:
-+
-+	/* Configuration for single input/output register
-+	 * for eight simple bidirectional GPIOs.
-+	 */
-+	gpio_a_1 {
-+		compatible = "linux,gpio-mmio";
-+		reg = <0x18000000 0x1>;
-+		reg-names = "dat";
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	/* Configuration for set/clear pair registers with
-+	 * 32 output direction register GPIOs.
-+	 */
-+	gpio_b_2 {
-+		compatible = "linux,gpio-mmio";
-+		reg = <0x18000000 0x4>, <0x18000010 0x4>,
-+		      <0x18000004 0x4>, <0x18000008 0x4>;
-+		reg-names = "dat", "set", "clr", "dirout";
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
--- 
-2.8.1
+Second, mmc_select_hs() may fail and there is no print done within
+that function which is why above print is also needed.
+
+On the other hand I agree with you, it doesn't seems necessary to
+print two messages when mmc_select_hs200() fails. One should be
+enough. Can we change this so *only* mmc_select_timing() will deal
+with the print at all errors?
+
+>  bus_speed:
+>         /*
+>          * Set the bus speed to the selected bus timing.
+>          * If timing is not selected, backward compatible is the default.
+>          */
+>         mmc_set_bus_speed(card);
+> -       return err;
+> +       return 0;
+>  }
+>
+>  /*
+> --
+> 1.9.1
+>
+
+Kind regards
+Uffe
