@@ -1,38 +1,47 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 28 Apr 2016 11:18:57 -0400
-Subject: [RFC 5/5] arm64: Gain VDSO unmap and remap powers
-In-Reply-To: <1461856737-17071-1-git-send-email-cov@codeaurora.org>
-References: <20151202121918.GA4523@arm.com>
- <1461856737-17071-1-git-send-email-cov@codeaurora.org>
-Message-ID: <1461856737-17071-6-git-send-email-cov@codeaurora.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 28 Apr 2016 17:19:11 +0200
+Subject: [PATCH v6 0/3] dmaengine: sun6i: Upgrade for audio transfers
+Message-ID: <cover.1461856751.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Checkpoint/Restore In Userspace (CRIU) must be able to remap and unmap the
-Virtual Dynamic Shared Object (VDSO) to be able to handle the changing
-addresses that result from address space layout randomization. Now that the
-support for this originally written for PowerPC has been moved to a generic
-location and arm64 has adopted unsigned long for the type of mm->context.vdso,
-simply opt-in to VDSO unmap and remap support.
+This patch series contains most of the remaining changes to
+the sun6i DMA driver for audio streaming (tested in
+a Allwinner H3 - Orange PI 2).
+The lacking patch (Add 4 as a possible burst value for H3) will be
+submitted when a consensus with Maxime Ripard will be found.
+This series is based on the previous patches applied by Vinod Koul.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+v6
+ - check the transfer direction in all cases (Vinod Koul)
+ - a new patch about useless check has been added
+ - the applied patch has been removed from this series
+v5
+ - fix checkpatch error (Vinod Koul)
+v4
+ - remove 'Add 4 as a possible burst value for H3'
+	(no consensus yet)
+ - remove 'Simplify some macros' (Maxime Ripard)
+ - remove 'Compact a bit some config constants' (not critical)
+ - split 'lli setting' into 'simplify' and 'default burst and bus width'
+	(Maxime Ripard)
+v3
+ - do some optimizations
+ - add a check about the maxburst value '4' (Maxime Ripard)
+ - remove the driver fixes
+v2 (comments from Vinod Koul and Sergei Shtylyov - thanks)
+ - typo fixes
+ - change some comments
+ - better handling of burst and bus width
+ - remove useless code in the cyclic capability patch
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f43622..cbdce39 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -14,6 +14,7 @@ config ARM64
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
-+	select ARCH_WANT_VDSO_MAP
- 	select ARCH_HAS_UBSAN_SANITIZE_ALL
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
+Jean-Francois Moine (3):
+  dmaengine: sun6i: Set default maxburst size and bus width
+  dmaengine: sun6i: Remove useless check
+  dmaengine: sun6i: Add cyclic capability
+
+ drivers/dma/sun6i-dma.c | 162 +++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 146 insertions(+), 16 deletions(-)
+
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.8.1
