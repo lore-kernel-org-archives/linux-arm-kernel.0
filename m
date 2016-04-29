@@ -1,43 +1,41 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 29 Apr 2016 12:06:15 -0700
-Subject: [GIT PULL] Allwinner fixes for 4.6
-In-Reply-To: <20160429163904.GA6708@lukather> (Maxime Ripard's message of
- "Fri, 29 Apr 2016 18:39:04 +0200")
-References: <20160429163904.GA6708@lukather>
-Message-ID: <m2eg9oi6ag.fsf@baylibre.com>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Fri, 29 Apr 2016 21:06:11 +0200
+Subject: [RFC v5 3/4] gpio: move clps711x, moxart,
+ ts4800 and gpio-ge into gpio-generic
+In-Reply-To: <CACRpkdaX1xeGJxV9K-GkTAh87SctqyhkJ+VN6mwUdtD19tz99g@mail.gmail.com>
+References: <cover.1461888822.git.chunkeey@googlemail.com>
+ <9e5cc9e957144bd5d4081573ef959f931281eaaa.1461888822.git.chunkeey@googlemail.com>
+ <CACRpkdaX1xeGJxV9K-GkTAh87SctqyhkJ+VN6mwUdtD19tz99g@mail.gmail.com>
+Message-ID: <1518049.pLhlI1cuZi@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On Friday, April 29, 2016 04:18:20 PM Linus Walleij wrote:
+> On Fri, Apr 29, 2016 at 2:53 AM, Christian Lamparter
+> <chunkeey@googlemail.com> wrote:
+> 
+> > This patch integrates these GPIO drivers into gpio-generic.
+> >
+> > Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+> 
+> Very elegant. Let's wait for some feedback/ACKs from
+> the driver maintainers, but this looks very nice.
+Oh by the way: who's maintaining them? get_maintainer.pl just
+lists the usual gpio people. I can try to add the module authors.
+However, I don't know if these are working or dead. I ran into an
+issue once (for something else) that I got the dreaded "delivery
+notification failed" messages, but I can't rebroadcast them on the
+ML (because that would be very silly).
 
-> Hi Arnd, Kevin, Olof,
->
-> Please pull the patch below for the next 4.6-rc*.
->
-> thanks!
-> Maxime
->
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
->
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.6
->
-> for you to fetch changes up to dcf5341f0150bc4c5bf37786e1198d2ff8fc2c38:
->
->   ARM: dts: sun8i-q8-common: Do not set constraints on dc1sw regulator (2016-03-27 16:13:51 +0200)
->
-> ----------------------------------------------------------------
-> Allwinner fixes for 4.6
->
-> A single regulator fix
->
-> ----------------------------------------------------------------
+Anyway, I'll rebase my patch series (without the two patches you
+had already merged)
 
-Pulled into fixes,
+> Do you want to address Andy's optimization suggestion directly
+> or as a follow-on patch?
+Oh, this is a RFC. I didn't expect anything to be merged just yet.
+Of course, I'll try to integrate his suggestion. I'll do that once
+I reply to Rob/Mark/You about the "linux,gpio-mmio",
+"memory-mapped-gpio" situation etc.
 
-Thanks,
-
-Kevin
+Regards,
+Christian Lamparter
