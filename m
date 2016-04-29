@@ -1,43 +1,60 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 29 Apr 2016 11:10:15 -0700
-Subject: [PATCH v2 3/3] dtb: xgene: Add channel property
+Date: Fri, 29 Apr 2016 11:10:13 -0700
+Subject: [PATCH v2 1/3] drivers: net: xgene: Get channel number from device
+ binding
 In-Reply-To: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
 References: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1461953415-9741-4-git-send-email-isubramanian@apm.com>
+Message-ID: <1461953415-9741-2-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added 'channel' property, describing ethernet to CPU channel number.
+This patch gets ethernet to CPU channel (prefetch buffer number) from
+the newly added 'channel' property, thus decoupling Linux driver from
+resource management.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 1 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi     | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-index a055a5d..ba04877 100644
---- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-@@ -653,6 +653,7 @@
- 				     <0 113 4>,
- 				     <0 114 4>,
- 				     <0 115 4>;
-+			channel = <12>;
- 			port-id = <1>;
- 			dma-coherent;
- 			clocks = <&xge1clk 0>;
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index ae4a173..5147d76 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -993,6 +993,7 @@
- 				     <0x0 0x65 0x4>,
- 				     <0x0 0x66 0x4>,
- 				     <0x0 0x67 0x4>;
-+			channel = <0>;
- 			dma-coherent;
- 			clocks = <&xge0clk 0>;
- 			/* mac address will be overwritten by the bootloader */
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 8d4c1ad..409152b 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -973,6 +973,17 @@ static enum xgene_ring_owner xgene_derive_ring_owner(struct xgene_enet_pdata *p)
+ 	return owner;
+ }
+ 
++static u8 xgene_start_cpu_bufnum(struct xgene_enet_pdata *pdata)
++{
++	struct device *dev = &pdata->pdev->dev;
++	u32 cpu_bufnum;
++	int ret;
++
++	ret = device_property_read_u32(dev, "channel", &cpu_bufnum);
++
++	return (!ret) ? cpu_bufnum : pdata->cpu_bufnum;
++}
++
+ static int xgene_enet_create_desc_rings(struct net_device *ndev)
+ {
+ 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+@@ -981,13 +992,15 @@ static int xgene_enet_create_desc_rings(struct net_device *ndev)
+ 	struct xgene_enet_desc_ring *buf_pool = NULL;
+ 	enum xgene_ring_owner owner;
+ 	dma_addr_t dma_exp_bufs;
+-	u8 cpu_bufnum = pdata->cpu_bufnum;
++	u8 cpu_bufnum;
+ 	u8 eth_bufnum = pdata->eth_bufnum;
+ 	u8 bp_bufnum = pdata->bp_bufnum;
+ 	u16 ring_num = pdata->ring_num;
+ 	u16 ring_id;
+ 	int i, ret, size;
+ 
++	cpu_bufnum = xgene_start_cpu_bufnum(pdata);
++
+ 	for (i = 0; i < pdata->rxq_cnt; i++) {
+ 		/* allocate rx descriptor ring */
+ 		owner = xgene_derive_ring_owner(pdata);
 -- 
 1.9.1
