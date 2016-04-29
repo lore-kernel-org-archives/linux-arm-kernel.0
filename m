@@ -1,71 +1,108 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 29 Apr 2016 09:22:11 -0400
-Subject: VDSO unmap and remap support for additional architectures
-In-Reply-To: <2ce7203f-305c-6edf-0ef9-448c141cb103@kernel.org>
-References: <20151202121918.GA4523@arm.com>
- <1461856737-17071-1-git-send-email-cov@codeaurora.org>
- <2ce7203f-305c-6edf-0ef9-448c141cb103@kernel.org>
-Message-ID: <57236003.5060804@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 29 Apr 2016 08:41:26 -0500
+Subject: [PATCH] arm64: Relocate screen_info.lfb_base on PCI BAR allocation
+In-Reply-To: <57228317.1030808@suse.de>
+References: <1461795744-28837-1-git-send-email-agraf@suse.de>
+ <20160428162035.GB19785@localhost> <57223D46.7070102@suse.de>
+ <20160428180641.GA25125@localhost> <57228317.1030808@suse.de>
+Message-ID: <20160429134126.GA949@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On Thu, Apr 28, 2016 at 11:39:35PM +0200, Alexander Graf wrote:
+> On 28.04.16 20:06, Bjorn Helgaas wrote:
+> > On Thu, Apr 28, 2016 at 06:41:42PM +0200, Alexander Graf wrote:
+> >> On 04/28/2016 06:20 PM, Bjorn Helgaas wrote:
+> >>> On Thu, Apr 28, 2016 at 12:22:24AM +0200, Alexander Graf wrote:
+> >>>> When booting with efifb, we get a frame buffer address passed into the system.
+> >>>> This address can be backed by any device, including PCI devices.
+> >>> I guess we get the frame buffer address via EFI, but it doesn't tell
+> >>> us what PCI device it's connected to?
+> >>
+> >> Pretty much, yes. We can get the frame buffer address from a
+> >> multitude of sources using various boot protocols, but the case
+> >> where I ran into this was with efi on arm64.
+> >>
+> >>> This same thing could happen on any EFI arch, I guess.  Maybe even on
+> >>
+> >> Yes and no :). I would've put it into whatever code "owns"
+> >> screen_info, but I couldn't find any. So instead I figured I'd make
+> >> the approach as generic as I could and implemented the calculation
+> >> for the case where I saw it break.
+> >>
+> >> The reason we don't see this on x86 (if I understand all pieces of
+> >> the puzzle correctly) is that we get the BAR allocation from
+> >> firmware using _CRS attributes in ACPI, so firmware tells the OS
+> >> where to put the BARs. 
+> > 
+> > I think the real reason is that on x86, firmware typically assigns all
+> > the BARs and Linux typically doesn't change them.  PCI host bridges
+> 
+> Can you point me to the code that "doesn't change them"? I couldn't find
+> it, but I haven't see Linux reallocate BARs on x86.
 
-On 04/28/2016 02:53 PM, Andy Lutomirski wrote:
-> On 04/28/2016 08:18 AM, Christopher Covington wrote:
->> Please take a look at the following prototype of sharing the PowerPC
->> VDSO unmap and remap code with other architectures. I've only hooked
->> up arm64 to begin with. If folks think this is a reasonable approach I
->> can work on 32 bit ARM as well. Not hearing back from an earlier
->> request for guidance [1], I simply dove in and started hacking.
->> Laurent's test case [2][3] is a compelling illustration of whether VDSO
->> remap works or not on a given architecture.
-> 
-> I think there's a much nicer way:
-> 
-> https://lkml.kernel.org/r/1461584223-9418-1-git-send-email-dsafonov at virtuozzo.com
-> 
-> Could arm64 and ppc use this approach?  These arch_xyz hooks are gross.
+Lorenzo already answered this, I think.  I'll just reiterate that all
+we can really do is check whether a BAR's current value is inside the
+upstream bridge aperture.  If it is, we assume the BAR has been
+assigned and we try to use that assignment unchanged.  Zero is a valid
+BAR value, so we can't just check for something non-zero.
 
-Thanks for the pointer. Any thoughts on how to keep essentially
-identical definitions of vdso_mremap from proliferating into every
-architecture and variant?
+> >> In the device tree case (which is what I'm
+> >> running on arm64) we however allocate BARs dynamically.
 
-> Also, at some point, possibly quite soon, x86 will want a way for
-> user code to ask the kernel to map a specific vdso variant at a specific
-> address. Could we perhaps add a new pair of syscalls:
-> 
-> struct vdso_info {
->     unsigned long space_needed_before;
->     unsigned long space_needed_after;
->     unsigned long alignment;
-> };
-> 
-> long vdso_get_info(unsigned int vdso_type, struct vdso_info *info);
-> 
-> long vdso_remap(unsigned int vdso_type, unsigned long addr, unsigned int flags);
-> 
-> #define VDSO_X86_I386 0
-> #define VDSO_X86_64 1
-> #define VDSO_X86_X32 2
-> // etc.
-> 
-> vdso_remap will map the vdso of the chosen type such at
-> AT_SYSINFO_EHDR lines up with addr. It will use up to
-> space_needed_before bytes before that address and space_needed_after
-> after than address. It will also unmap the old vdso (or maybe only do
-> that if some flag is set).
-> 
-> On x86, mremap is *not* sufficient for everything that's needed,
-> because some programs will need to change the vdso type.
+Side note, from a PCI core point of view, this is not a DT vs. ACPI
+issue.  It's just a question of whether the BARs have been assigned
+already, which might appear to correlate with DT or ACPI, but AFAIK
+it's outside the scope of those specs.
 
-I don't I understand. Why can't people just exec() the ELF type that
-corresponds to the VDSO they want?
+> >>> ... if there's a way to discover the frame buffer address
+> >>> as a bare address rather than a "offset X into BAR Y of PCI device Z"
+> >>> sort of thing.
+> >>
+> >> It'd be perfectly doable today - we do get a cpu physical address
+> >> and use that in the notifier. All we would need to do is move the
+> >> code that I added in arm64/efi.c to something more generic that
+> >> "owns" the frame buffer address. Then any boot protocol that passes
+> >> a screen_info in would get the frame buffer relocated on BAR remap.
+> > 
+> > We could consider a quirk that would mark any BAR that happened to
+> > contain the frame buffer address as IORESOURCE_PCI_FIXED.  That would
+> > (in theory, anyway) keep the PCI core from moving it.
+> 
+> That's what I thought I should do at first. Then I realized that we
+> could have a PCIe GPU in the system that provides a really big BAR which
+> we would need to map into an mmio64 region to make full use of it.
+> Firmware however - because of limitations - only maps it into the mmio32
+> space though.
+> 
+> That means we now break a case that would work without efifb, right?
 
-Thanks,
-Cov
+I'm not sure I understand.  Are you saying you might have, say, a 2GB
+BAR, and firmware might put it in an mmio32 1GB host bridge aperture?
+I guess you *could* program the BAR that way, but obviously a driver
+would only be able to see the first 1GB of the BAR.
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Linux would consider that invalid because the BAR doesn't fit in the
+aperture and would reassign it.  But I don't think I understand the
+whole picture.
+
+> > If firmware is giving us a bare address of something, that seems like
+> > a clue that it might depend on that address staying the same.
+> 
+> Well, I'd look at it from the other side. It gives us a correct address
+> on entry with the system configured at exactly the state it's in on
+> entry. If Linux changes the system, some guarantees obviously don't work
+> anymore.
+
+Can you point me to the part of the EFI spec that communicates this?
+I'm curious what the intent is and whether there's any indication that
+EFI expects the OS to preserve some configuration.  I don't think it's
+reasonable for the OS to preserve this sort of configuration because
+it limits how well we can support hotplug.
+
+I wonder if we're using this frame buffer address as more than what
+EFI intended.  For example, maybe it was intended for use by an early
+console driver, but there's some other mechanism we should be using
+after that.
+
+Bjorn
