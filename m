@@ -1,68 +1,81 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Apr 2016 12:15:06 +0200
-Subject: v4l subdevs without big device was Re:
- drivers/media/i2c/adp1653.c: does not show as /dev/video* or v4l-subdev*
-In-Reply-To: <20160429075649.GG32125@valkosipuli.retiisi.org.uk>
-References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
- <57230DE7.3020701@xs4all.nl>
- <20160429075649.GG32125@valkosipuli.retiisi.org.uk>
-Message-ID: <20160429101506.GB22743@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 29 Apr 2016 11:35:15 +0100
+Subject: [PATCH] arm64: dts: r8a7795: Increase the size of GIC-400
+ mapped registers
+In-Reply-To: <20160428234345.GD18128@verge.net.au>
+References: <1461047395-6532-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160427233028.GA5155@verge.net.au>
+ <5721A2A5.9010908@de.bosch.com>
+ <20160428234345.GD18128@verge.net.au>
+Message-ID: <20160429113515.333c42ef@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, 29 Apr 2016 09:43:45 +1000
+Simon Horman <horms@verge.net.au> wrote:
 
-> > Warning: I'm no DT expert, so this is just a first attempt.
+> [Cc Mark Zyngier, linux-arm-kernel]
+> 
+> Hi Dirk,
+> 
+> On Thu, Apr 28, 2016 at 07:41:57AM +0200, Dirk Behme wrote:
+> > Hi Simon,
 > > 
-> > Platform drivers (omap3isp) will have to add these controller devices to the list
-> > of subdevs to load asynchronously.
+> > On 28.04.2016 01:30, Simon Horman wrote:
+> > >Hi Dirk,
+> > >
+> > >I understand that there is an issue here but I'm not yet able
+> > >to convince myself that this is the correct solution.
+> > >
+> > >In revision r0p1 of the CoreLink GIC-400 Generic Interrupt Controller
+> > >Technical Reference Manual[1] I see in Section 3.2. "GIC-400 register map"
+> > >that the size of both the CPU interfaces and Virtual CPU interfaces are
+> > >0x2000 bytes. And assuming that the hardware follows the specification it
+> > >appears that DT is correctly describing the hardware.
+> > 
+> > 
+> > I think you are missing the details described by ARM in
+> > 
+> > http://xenbits.xen.org/gitweb/?p=xen.git;a=commit;h=21550029f709072aacf3b9
+> > 
+> > 
+> > Maybe Julien could help if you have some more doubts?
 > 
-> I seem to have patches I haven't had time to push back then:
+> I guess I am confused.
 > 
-> <URL:http://salottisipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=shortlog;h=refs/heads/leds-as3645a>
-> 
-> This seems to be mostly in line with what has been discussed in the meeting,
-> except that the patches add a device specific property. Please ignore the
-> led patches in that tree for now (i.e. four patches on the top are the
-> relevant ones here).
+> I see that there is now handling of the case where the region size is
+> 128Kbytes. But I'm still not seeing the bit which describes that the
+> GIC-400  has a region size of 128Kbytes. Perhaps the later is somehow
+> implied by the former. Or perhaps I need to check with the hw team.
 
-Ok, I attempted to forward-port the patches to v4.6. Not sure if I was successful.
+Please have a look at the SBSA document, and in particular the
+Appendix-F (registration and selling your soul required - only kidding):
 
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
+
+This requires that, in order for the two halves of GICV to be trappable
+*separately* by a hypervisor using 64kB pages at Stage-2, the two 4kB
+pages that describe that region are aliased as such:
+- the first 4kB page is aliased 16 times over a 64kB region
+- the second 4kB page is aliased 16 times over another contiguous 64kB
+  region
+
+This means that your GIC is indeed covering a 128kB region, with the
+mapping corresponding to the GICv2 memory map located at offset 0xf000
+from the base of that 128kB region. Also, this GICV requirement also
+applies to GICC (most likely because the two regions use the same
+decoding logic).
+
+The OS must of course be aware of this (see gic_check_eoimode in the
+GIC driver). Of course, almost nobody got that right (I only know of
+the APM Xgene-1 so far). If you actually did, great!
+
+Also, the ACPI spec fails to recognize this by not providing the length
+of the region, meaning that those who got it right with DT are likely
+to get it wrong with ACPI, and vice-versa.
+
+It's a wonderful world.
+
+	M.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-omap3isp-Fix-async-notifier-registration-order.patch
-Type: text/x-diff
-Size: 4550 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/250b3c03/attachment-0005.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-Solve-conflict-I-missed.patch
-Type: text/x-diff
-Size: 1354 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/250b3c03/attachment-0006.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-Cherry-pick-manually.patch
-Type: text/x-diff
-Size: 5662 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/250b3c03/attachment-0007.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-omap3isp-Assign-a-group-ID-for-sensor-and-flash-enti.patch
-Type: text/x-diff
-Size: 3782 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/250b3c03/attachment-0008.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0005-Fix-work-around-compilation.patch
-Type: text/x-diff
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/250b3c03/attachment-0009.bin>
+Jazz is not dead. It just smells funny.
