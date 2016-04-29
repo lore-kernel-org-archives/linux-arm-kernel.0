@@ -1,41 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 29 Apr 2016 14:01:05 +0200
-Subject: [GIT PULL 1/3] ARM: dts: exynos: Secound round of DTS for v4.7
-In-Reply-To: <3806573.U95ZyAj1xD@wuerfel>
-References: <1461748256-4394-1-git-send-email-k.kozlowski@samsung.com>
- <1956683.Gv388axJqA@wuerfel> <20160428190428.GA10520@kozik-lap>
- <3806573.U95ZyAj1xD@wuerfel>
-Message-ID: <57234D01.90105@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 29 Apr 2016 17:37:07 +0530
+Subject: [GIT PULL 4/4] DaVinci documentation update for v4.7
+In-Reply-To: <1461931627-27761-1-git-send-email-nsekhar@ti.com>
+References: <1461931627-27761-1-git-send-email-nsekhar@ti.com>
+Message-ID: <1461931627-27761-4-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2016 10:37 PM, Arnd Bergmann wrote:
-> On Thursday 28 April 2016 21:04:28 Krzysztof Kozlowski wrote:
->> On Thu, Apr 28, 2016 at 04:06:54PM +0200, Arnd Bergmann wrote:
->>> On Wednesday 27 April 2016 11:10:54 Krzysztof Kozlowski wrote:
->>>>   kernel.org:/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.7-2
->>>>
->>>
->>> Pulled into next/dt after I figured out that the URL was wrong.
->>>
->>> Please check your git configuration to make sure you send an address
->>> I can pull from.
->>
->> Ah, indeed, sorry for that. I still did not automate entirely this process
->> so apparently I am doing simple mistakes. I'll be more carefull next
->> time.
-> 
-> Ok. The trick is to have a separate 'url' and 'pushurl' entry in your
-> git config, like
-> 
-> [remote "origin"]
->         url = git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
->         pushurl = git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> 
-> That way, 'git request-pull' will pick the first one, but 'git push' will
-> use the second.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-I was using two remotes but your config is easier.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Thanks for hint,
-Krzysztof
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.7/doc
+
+for you to fetch changes up to 42c031dfaaadc48d0e7a8484b5ea383fe6054de0:
+
+  MAINTAINERS: fix stale TI DaVinci entries (2016-04-25 18:17:13 +0530)
+
+----------------------------------------------------------------
+MAINTAINERS file update to fix some
+stale entries.
+
+----------------------------------------------------------------
+Sekhar Nori (1):
+      MAINTAINERS: fix stale TI DaVinci entries
+
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
