@@ -1,33 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Apr 2016 16:16:39 +0100
-Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
- return phys_addr_t
-In-Reply-To: <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
- <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
-Message-ID: <20160429151639.GC23726@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Apr 2016 08:34:30 -0700
+Subject: [PATCH v3 1/7] ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+In-Reply-To: <1461927202-17677-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
+ <1461927202-17677-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20160429153430.GK5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 08:36:43PM +0530, Pratyush Anand wrote:
-> > +       phys_addr_t vmcore_base = paddr_vmcoreinfo_note();
-> > +       return sprintf(buf, "%pa %x\n", &vmcore_base,
-> 
-> Why do we pass &vmcore_base? Shouldn't it be vmcore_base?
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160429 03:55]:
+> The McBSPLP's sidetone main clock is the McBSPLP's ICLK, not FCLK as the
+> sidetone only receives the ICLK from the main McBSP module.
+> Since the McBSP and sidetone is using the very same clock from PRCM level
+> the sidetone must not have the prcm section to check the clock status since
+> the sidetone is only used when McBSP is already configured.
+> If two separate hwmods looking at the same bit and they would use
+> pm_runtime in nested way (as it must happen with McBSP and it's ST module)
+> the hwmod would warn, because the idlest will not match what it is expected
+> after enable/disable of the clocks.
 
-The %pa* printk format specifiers take the value by reference (as
-phys_addr_t and friends are not necessarily the same width as a
-pointer). Per Documentation/printk-formats.txt:
+Thanks for looking into it, this looks right to me.
 
-Physical addresses types phys_addr_t:
-
-        %pa[p]  0x01234567 or 0x0123456789abcdef
-
-        For printing a phys_addr_t type (and its derivatives, such as
-        resource_size_t) which can vary based on build options, regardless of
-        the width of the CPU data path. Passed by reference.
-
-So the above prints the value of vmcore_base as expected.
-
-Mark.
+Tony
