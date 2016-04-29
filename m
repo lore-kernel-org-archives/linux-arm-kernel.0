@@ -1,92 +1,126 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 29 Apr 2016 19:23:06 +0000
-Subject: [PATCH v2 00/10] STMPE fixes/rework and add STMPE1600 support
-In-Reply-To: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
-References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1461957784.3869.50.camel@toradex.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 29 Apr 2016 14:25:54 -0500
+Subject: [Patch v2 2/8] firmware: qcom: scm: Convert SCM to platform driver
+In-Reply-To: <20160426012935.GE29990@codeaurora.org>
+References: <1461625725-32425-1-git-send-email-andy.gross@linaro.org>
+ <1461625725-32425-3-git-send-email-andy.gross@linaro.org>
+ <20160426012935.GE29990@codeaurora.org>
+Message-ID: <20160429192554.GA6666@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-04-28 at 14:12 +0200, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
+On Mon, Apr 25, 2016 at 06:29:35PM -0700, Stephen Boyd wrote:
+> On 04/25, Andy Gross wrote:
+> > This patch converts the Qualcomm SCM firmware driver into a platform
+> > driver.
+> > 
+> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > ---
+> >  arch/arm64/Kconfig.platforms |   1 +
+> >  drivers/firmware/qcom_scm.c  | 163 ++++++++++++++++++++++++++++++++++++++++---
+> >  2 files changed, 155 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> > index efa77c1..6f0876f 100644
+> > --- a/arch/arm64/Kconfig.platforms
+> > +++ b/arch/arm64/Kconfig.platforms
+> > @@ -76,6 +76,7 @@ config ARCH_MVEBU
+> >  config ARCH_QCOM
+> >  	bool "Qualcomm Platforms"
+> >  	select PINCTRL
+> > +	select QCOM_SCM
 > 
-> 
-> This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and
-> prepare
-> ?the ground to add new STMPE1600 support.
-> 
-> STMPE1600 datasheet is available here :?
-> http://www2.st.com/content/st_com/en/products/interfaces-and-transcei
-> vers/
-> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
-> 
-> Only STMPE1600 has been tested on STM32 platform. As i have no board
-> with
-> others STMPE
-> variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
-> and STMPE2403), i put in CC boards's maintainers which are using
-> others STMPE variant.
-> 
-> If they can kindly check that no regression has been introduce by
-> this series
-> :
-> 
-> For ARM/FREESCALE IMX / MXC ARM ARCHITECTURE:
-> 	_ Shawn Guo <shawnguo@kernel.org>
-> 	_ Sascha Hauer <kernel@pengutronix.de>
-> 
-> For ARM/SOCFPGA ARCHITECTURE
-> 	_ Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
-> For SPEAR PLATFORM SUPPORT
-> 	_ Viresh Kumar <vireshk@kernel.org>
-> 	_ Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-> 
-> For Apalis/Colibri board SUPPORT
-> 	_ marcel.ziswiler at toradex.com
-> 	_ stefan at agner.ch
-> 	_ dev at lynxeye.de
-> 	_ Thierry Reding <thierry.reding@gmail.com>
-> 	_ Alexandre Courbot <gnurou@gmail.com>
-> 
-> For ARM/Ux500 ARM ARCHITECTURE
-> 	_ Linus Walleij <linus.walleij@linaro.org>
-> 
-> 
-> v1 => v2:
-> 	_ update Cc list
-> 	_ fix kbuild test robot warnings on original patch 3
-> 	_ split patch 6 to extract usage of generic bitmask name
-> 	_ split patch 6 and 7 and introduce a new way to access
-> registers
-> 	??for both mfd/stmpe and gpio/gpio-stmpe drivers.
-> 	_ remove patch 8
-> 
-> Patrice Chotard (10):
-> ? mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
-> ? mfd: stmpe: Add reset support for all STMPE variant
-> ? gpio: stmpe: fix edge and rising/falling edge detection
-> ? gpio: stmpe: write int status register only when needed
-> ? mfd: stmpe: use generic bit mask name
-> ? mfd: stmpe: rework registers access
-> ? gpio: stmpe: rework registers access
-> ? Documentation: dt: add stmpe1600 compatible string to stmpe mfd
-> ? mfd: Add STMPE1600 support
-> ? gpio: stmpe: Add STMPE1600 support
-> 
-> ?Documentation/devicetree/bindings/mfd/stmpe.txt |???2 +-
-> ?drivers/gpio/gpio-stmpe.c???????????????????????| 167
-> +++++++++++++++++-------
-> ?drivers/mfd/stmpe-i2c.c?????????????????????????|???2 +
-> ?drivers/mfd/stmpe.c?????????????????????????????| 161
-> +++++++++++++++++++----
-> ?drivers/mfd/stmpe.h?????????????????????????????|??85 ++++++++++--
-> ?include/linux/mfd/stmpe.h???????????????????????|??21 +++
-> ?6 files changed, 352 insertions(+), 86 deletions(-)
+> So far we've left this selection up to the consumer drivers of
+> the qcom_scm_*() APIs. Any reason why that's changing here? I
+> don't see mention in the commit text.
 
-I gave the whole series a spin both on Apalis iMX6Q 2GB IT V1.1B as
-well as Apalis T30 2GB V1.1A both featuring a STMPE811 and an EDT VGA
-touch panel connected to it still works perfectly running LXDE on top
-of the modesetting X driver.
+We can leave it that way.
+> 
+> >  	help
+> >  	  This enables support for the ARMv8 based Qualcomm chipsets.
+> >  
+> > +
+> > +/**
+> > + * qcom_scm_is_available() - Checks if SCM is available
+> > + */
+> > +bool qcom_scm_is_available(void)
+> > +{
+> > +	return !!__scm;
+> > +}
+> > +EXPORT_SYMBOL(qcom_scm_is_available);
+> 
+> What's the planned user of this? If we need it can we bury it
+> inside the qcom_scm_*() functions?
 
-Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Hmmmm doing a little searching, I don't see this being used anymore.  I'll drop
+it for now.
+
+> > +
+> > +static int qcom_scm_probe(struct platform_device *pdev)
+> > +{
+> [...]
+> > +
+> > +	/* vote for max clk rate for highest performance */
+> > +	rate = clk_round_rate(scm->core_clk, INT_MAX);
+> > +	ret = clk_set_rate(scm->core_clk, rate);
+> 
+> You can just do clk_set_rate(scm->core_clk, INT_MAX) and it will
+> round internally for you and do the right thing. 
+
+I'll change this to do that.
+
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	__scm = scm;
+> > +	__scm->dev = &pdev->dev;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id qcom_scm_dt_match[] = {
+> > +	{ .compatible = "qcom,scm-apq8064",},
+> > +	{ .compatible = "qcom,scm-apq8084",},
+> > +	{ .compatible = "qcom,scm-msm8916",},
+> > +	{ .compatible = "qcom,scm-msm8974",},
+> > +	{},
+> 
+> Nitpick: drop , here because it's always going to be the last
+> entry.
+
+will fix.
+
+> > +};
+> > +
+> > +MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
+> > +
+> > +static struct platform_driver qcom_scm_driver = {
+> > +	.driver = {
+> > +		.name	= "qcom_scm",
+> > +		.of_match_table = qcom_scm_dt_match,
+> > +	},
+> > +	.probe = qcom_scm_probe,
+> > +};
+> > +
+> > +builtin_platform_driver(qcom_scm_driver);
+> > +
+> > +static int __init qcom_scm_init(void)
+> > +{
+> > +	struct device_node *np;
+> > +
+> > +	np = of_find_node_by_name(NULL, "firmware");
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> > +	return of_platform_populate(np, qcom_scm_dt_match, NULL, NULL);
+> > +
+> 
+> Weird newline and also we need an of_node_put() on the firmware
+> node at the end of this function.
+
+Ah thanks for catching that.
+
+
+Regards,
+
+Andy
