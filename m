@@ -1,53 +1,81 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 29 Apr 2016 16:51:27 -0300
-Subject: [PATCH v4 1/2] dt-bindings: Add vendor prefix for TechNexion
-In-Reply-To: <20160427062628.GI30692@tiger>
-References: <1461729621-13283-1-git-send-email-festevam@gmail.com>
- <20160427062628.GI30692@tiger>
-Message-ID: <CAOMZO5DAwEPhP-tFYOvoBqt49vMMhheN3sQxD8dB0PP0Ai=s6g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2016 20:57:41 +0100
+Subject: [PATCH v2 0/4] Patches to allow consistent mmc / mmcblk
+ numbering w/ device tree
+In-Reply-To: <CAD=FV=VMxBYXOYOyHPeqcaWX7oU8pVrdLHOsWOWUgq-q5FshAw@mail.gmail.com>
+References: <1461951139-6109-1-git-send-email-dianders@chromium.org>
+ <20160429181248.GW19428@n2100.arm.linux.org.uk>
+ <CAD=FV=VMxBYXOYOyHPeqcaWX7oU8pVrdLHOsWOWUgq-q5FshAw@mail.gmail.com>
+Message-ID: <20160429195741.GY19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, Apr 29, 2016 at 12:43:39PM -0700, Doug Anderson wrote:
+> Russell,
+> 
+> On Fri, Apr 29, 2016 at 11:12 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Apr 29, 2016 at 10:32:15AM -0700, Douglas Anderson wrote:
+> >> This series picks patches from various different places to produce what
+> >> I consider the best solution to getting consistent mmc and mmcblk
+> >> ordering.
+> >>
+> >> Why consistent ordering and why not just use UUIDs?  IMHO consistent
+> >> ordering solves a few different problems:
+> >
+> > NAK.  Really.  Use UUIDs, that's the proper solution here.
+> 
+> Un-NAK.  UUIDs don't solve point #1.
 
-On Wed, Apr 27, 2016 at 3:26 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Apr 27, 2016 at 01:00:20AM -0300, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@nxp.com>
->>
->> TechNexion designs and manufactures embedded computing systems:
->> http://www.technexion.com/
->>
->> Cc: Rob Herring <robh@kernel.org>
->> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
->
-> Hi Rob,
->
-> Are you okay with this patch?
+Re-NAK.  I don't think your point #1 is valid.  See my other reply.
 
-Any comments, please?
+> * Presumably on a PC you've got an extra bit in the middle (like grub
+> or something like that) that can help you resolve your UUIDs even if
+> you get your kernel from somewhere else.
 
-> Shawn
->
->> ---
->> Changes since v3:
->> - None
->>
->>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 6bc179e..ea63459 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -251,6 +251,7 @@ synology  Synology, Inc.
->>  SUNW Sun Microsystems, Inc
->>  tbs  TBS Technologies
->>  tcl  Toby Churchill Ltd.
->> +technexion   TechNexion
->>  technologic  Technologic Systems
->>  thine        THine Electronics, Inc.
->>  ti   Texas Instruments
->> --
->> 1.9.1
->>
->>
+You are over-estimating what grub does.  Grub doesn't resolve UUIDs at
+all.  Grub just passes the kernel arguments in its configuration file
+for the entry it is booting to the kernel.  It's a static configuration
+found in /boot/grub/grub.conf.
+
+It doesn't probe devices for UUIDs.
+
+> * Presumably in the non-embedded world kernel hackers have a different
+> workflow.  They probably don't swap between different devices with
+> different configurations on an hourly basis.  They're not in the habit
+> of totally reimaging their system periodically.  Etc.  Trying to force
+> the workflow of a PC kernel hacker and an embedded kernel hacker to be
+> the same doesn't seem like a worthwhile goal.
+
+In _my_ world with the "embedded" devices I have, I mount by UUID on
+platforms which have multiple MMC devices to avoid exactly the problem
+you're having.  This works fine.
+
+If I were to switch the SD card, and I wanted to avoid changing the
+boot loader configuration, I'd use label instead, and I'd label all
+the SD card rootfs using the same label so I could just swap the cards.
+
+> * Presumably an embedded kernel hacker running with ATA / SCSI could
+> _usually_ assume that "sda" is his/her root filesystem.  It's unlikely
+> an embedded system would have more than one "sda" disk builtin and
+> it's nearly guaranteed (I think) that a builtin ATA / SCSI controller
+> would probe before any USB based devices.
+
+You've got a funny view again.  N2100 has two hard disks.  The clearfog
+board from SolidRun has two mini-PCIe slots, each of which can have two
+SATA interfaces... If you want to use it as a server-type platform with
+lots of disks...
+
+> Sure, if your root
+> filesystem is USB based (really?) and you've got additional USB
+> storage devices then you're SOL.  Sorry.
+
+One of my Versatile Express platforms boots from USB, and has a MMC
+slot...  So this argument does not stack up.
+
+Sorry.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
