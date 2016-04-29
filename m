@@ -1,36 +1,81 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 29 Apr 2016 13:19:14 -0700
-Subject: (v4.4/v4.5)-stable-queue build and qemu failures (arm:allmodconfig,
- arm:pxa_defconfig, arm:omap2plus_defconfig)
-Message-ID: <20160429201914.GA27596@roeck-us.net>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 29 Apr 2016 22:20:49 +0200
+Subject: [PATCH] ARM: dts: imx6: apalis: parallel lcd display support on ixora
+Message-ID: <1461961249-3792-1-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4.4 (arm:allmodconfig):
+Add parallel LCD display support for the EDT ET057090DHU 5.7" LCD TFT
+panel.
 
-drivers/mtd/nand/pxa3xx_nand.c: In function 'alloc_nand_resource':
-drivers/mtd/nand/pxa3xx_nand.c:1753:7: error: 'np' undeclared
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+---
 
-v4.5 (arm:allmodconfig, arm:pxa_defconfig):
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts | 45 ++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-drivers/dma/pxa_dma.c: In function 'pxad_probe':
-drivers/dma/pxa_dma.c:1421:24: error: 'struct mmp_dma_platdata' has no member named 'nb_requestors'
-
-There is also a qemu runtime failure with omap2plus_defconfig in v4.4.
-
-[    2.412322] omap_i2c 48070000.i2c: bus 0 rev3.3 at 2600 kHz
-[    2.417541] omap_i2c 48060000.i2c: bus 2 rev3.3 at 100 kHz
-[    2.429443] 
-[    2.429534] =====================================
-[    2.429718] [ BUG: bad unlock balance detected! ]
-[    2.429962] 4.4.8-00025-gcd58757 #1 Not tainted
-[    2.430145] -------------------------------------
-[    2.430328] kworker/u2:0/6 is trying to release lock (&rdev->mutex) at:
-[    2.430694] [<c03b40e4>] regulator_set_voltage+0x40/0x54
-[    2.430877] but there are no more locks to release!
-
-See logs at http://kerneltests.org/builders for details.
-Please let me know if I need to bisect.
-
-Thanks,
-Guenter
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+index 4b533cb..8e67ca2 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+@@ -80,6 +80,47 @@
+ 		};
+ 	};
+ 
++	lcd_display: display at di0 {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interface-pix-fmt = "rgb24";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu1_lcdif>;
++		status = "okay";
++
++		port at 0 {
++			reg = <0>;
++
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp1>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			lcd_display_out: endpoint {
++				remote-endpoint = <&lcd_panel_in>;
++			};
++		};
++	};
++
++	panel: panel {
++		/*
++		 * edt,et057090dhu: EDT 5.7" LCD TFT
++		 * edt,et070080dh6: EDT 7.0" LCD TFT
++		 */
++		compatible = "edt,et057090dhu";
++		backlight = <&backlight>;
++
++		port {
++			lcd_panel_in: endpoint {
++				remote-endpoint = <&lcd_display_out>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -169,6 +210,10 @@
+ 	};
+ };
+ 
++&ipu1_di0_disp1 {
++	remote-endpoint = <&lcd_display_in>;
++};
++
+ &ldb {
+ 	status = "okay";
+ };
+-- 
+2.5.5
