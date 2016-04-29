@@ -1,32 +1,60 @@
-From: rric.net@gmail.com (Robert Richter)
-Date: Fri, 29 Apr 2016 15:02:30 +0200
-Subject: [RFC PATCH] irqchip/gic-v3-its: Allocate ITS tables from
- corresponding node memory
-In-Reply-To: <1461932322-1206-1-git-send-email-ashoks@broadcom.com>
-References: <1461932322-1206-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160429130230.GU4914@rric.localdomain>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 29 Apr 2016 16:13:38 +0300
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <4271094.ei7kj5zJxn@wuerfel>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <2760348.qmm1L3yQch@wuerfel> <20160428222137.GB18227@yury-N73SV>
+ <4271094.ei7kj5zJxn@wuerfel>
+Message-ID: <20160429131338.GB32007@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.04.16 05:18:42, Ashok Kumar wrote:
-> In the case of systems having multi socket and multi ITS, allocating
-> local node memory for ITS device table, collection table, interrupt
-> translation table and command queue will help in reducing inter-chip
-> traffic even though they(except command queue) could be cached in the GIC.
+On Fri, Apr 29, 2016 at 12:43:41AM +0200, Arnd Bergmann wrote:
+> On Friday 29 April 2016 01:21:37 Yury Norov wrote:
+> > index 1458ad7..410d817 100644
+> > --- a/arch/arm64/kernel/sys_ilp32.c
+> > +++ b/arch/arm64/kernel/sys_ilp32.c
+> > @@ -17,6 +17,8 @@
+> >  * along with this program.  If not, see
+> >  * <http://www.gnu.org/licenses/>.
+> >  */
+> >     
+> > +#define __SYSCALL_COMPAT
+> > +
+> >  #include <linux/compiler.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/fs.h>
+> > @@ -48,13 +50,12 @@ asmlinkage long
+> >  ilp32_sys_rt_sigreturn_wrapper(void);
+> >    
+> >  #include <asm/syscall.h>
+> >      
+> > -#undef __SYSCALL
+> > -#undef __SC_COMP
+> > -#undef __SC_WRAP
+> > -#undef __SC_3264
+> > -#undef __SC_COMP_3264
+> >  
+> > -#define __SYSCALL_COMPAT
+> >  #define __SYSCALL(nr, sym)     [nr] = sym,
+> >  #define __SC_WRAP(nr, sym)     [nr] = compat_##sym,
+> >          
+> > This patch makes gcc warn about redefinition.
+> > 
+> > arch/arm64/kernel/sys_ilp32.c:59:0: warning: "__SYSCALL" redefined
+> >  #define __SYSCALL(nr, sym) [nr] = sym,
+> >  ^
+> > In file included from include/asm-generic/unistd.h:1:0,
+> > 
 > 
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> ---
-> This patch is created on top of Cavium thunderx erratum 23144 patch [1].
+> Ok, I think I see it now. Can you #undef the two symbols at the
+> end of arch/arm64/include/uapi/asm/unistd.h
+
+I think it doesn't look better than what we have now, but not worse
+as well. If you like it, I'll change.
+
+> or possibly
+> include/uapi/asm-generic/unistd.h?
 > 
-> I am not sure how to do this for ACPI as GIC ITS ID in MADT doesn't map to
-> _PXM. Am I missing something here? Any thoughts?
-
-For ACPI we enable the #23144 workaround differently. In that case we
-determine the node using MPIDR_AFFINITY_LEVEL() for this. I am going
-to send a patch for this soon (but this is ThunderX specific and only
-works for the errata handler).
-
--Robert
-
-> [1] https://lkml.org/lkml/2016/4/15/830 - [PATCH v5] irqchip, gicv3-its, \
-> numa: Enable workaround for Cavium thunderx erratum 23144
+> 	Arnd
