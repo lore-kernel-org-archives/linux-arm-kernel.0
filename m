@@ -1,102 +1,46 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Fri, 29 Apr 2016 19:45:18 +0200
-Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
-In-Reply-To: <572379F5.8000501@i2se.com>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
- <572379F5.8000501@i2se.com>
-Message-ID: <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2016 19:00:24 +0100
+Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
+In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
+ <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+Message-ID: <20160429180024.GS19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan!
+On Fri, Apr 29, 2016 at 08:26:00PM +0530, Pratyush Anand wrote:
+> Hi Russell,
+> 
+> On Thu, Apr 28, 2016 at 2:58 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > Advertise the location of bootable RAM to kexec-tools.  kexec needs to
+> > know where it can place the kernel in RAM, and so be executable when
+> > the system needs to jump into it.
+> >
+> > Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
+> > tag.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Can you please also share git tree path of corresponding kexec-tools changes?
+> 
+> Could it be a better idea (if things in user space become simpler)
+> that in stead of patch 5 and 6, we pass arch_phys_to_idmap_offset to
+> user space, and then user space manipulates existing "Crash kernel"
+> and "System RAM" resources.
 
-On 29.04.2016 17:12, Stefan Wahren wrote:
-> Hi Harald,
->
-> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
->> Patch 1/3 changes the driver and updates the binding documentation
->> (I guess it is still in staging.)
->>
->> Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 
->> boards.
->> I'd like to get input whether this is actually desired. On boards 
->> where
->> these regulators would never be enabled this costs a few extra bytes 
->> of
->> RAM for allocation of the device data, because the nodes can't be 
->> easily
->> removed in .dts files which are including the .dtsi files. The 
->> alternative
->> is to add the new nodes to many .dts files, which would be a lot 
->> code
->> duplication.
->
-> if i get it right the real intention of this patch series is to make 
-> the
-> mxs-lradc provide resistance values instead of voltages.
+Given that it's only _one_ platform right now, I don't think that
+additional complexity is worth it.  It means that we have to invent
+some API to do it, and I don't see why userspace should even care
+about having the delta exported - especially when the conversion
+may not be as trivial.
 
-... or even temperature values if a thermistor is connected.
-
-> So how about
-> dropping the whole regulator stuff and provide the values as
-> IIO_RESISTANCE via iio interface?
-
-Can you elaborate on this?
-
-My thinking is that there should be a thermistor (or whatever else) 
-driver,
-that is a consumer of the regulator and a consumer of the IIO_VOLTAGE
-iio channel and provides a new device with an IIO_RESISTANCE or 
-IIO_TEMP
-channel. Maybe there is a simpler solution, that I'm missing?
-
-Actually I'm not 100% happy with the above solution myself, because if 
-we
-start supporting devices that act as an iio-multiplexer (some device 
-that
-is an iio consumer and provides many new iio channels and can control
-via gpios which of it child channels is actually routed to the upstream
-device) I don't know how to properly manage the regulator device.
-However since this is only hypothetical ATM, I think we don't have to
-worry about this too much.
-
-> Btw this feature should be only added to dts files where is actually 
-> used.
-
-Ok, so how do we figure out which boards these are?
-I use this on the olinuxino and I guess all evaluation boards support 
-the
-use case too. The others I don't know enough about to be sure and I 
-guess
-it's not a good idea to just wait until somebody speaks up and 
-complains
-that the feature is missing on board X ...
-
-Thanks,
-Harald
-
-> Regards
-> Stefan
->
->>
->> Harald Geyer (3):
->>   iio: mxs-lradc: Add regulators for current sources
->>   ARM: dts: imx23: Provide regulators for the current sources of the
->>     LRADC
->>   ARM: dts: imx28: Provide regulators for the current sources of the
->>     LRADC
->>
->>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
->>  arch/arm/boot/dts/imx23.dtsi                       |   8 ++
->>  arch/arm/boot/dts/imx28.dtsi                       |   8 ++
->>  drivers/iio/adc/Kconfig                            |   1 +
->>  drivers/iio/adc/mxs-lradc.c                        | 152 
->> +++++++++++++++++++++
->>  5 files changed, 198 insertions(+)
->>
+The method I've implemented here keeps things completely independent
+of whatever conversion between boot and running physical addresses
+may be present on the kernel side as far as userspace is concerned.
 
 -- 
-If you want to support my work:
-see http://friends.ccbib.org/harald/supporting/
-or donate via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
-or bitcoin 1FUtd8T9jRN1rFz63vZz7s2fDtB6d6A7aS
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
