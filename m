@@ -1,60 +1,29 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 29 Apr 2016 11:10:13 -0700
-Subject: [PATCH v2 1/3] drivers: net: xgene: Get channel number from device
- binding
+Date: Fri, 29 Apr 2016 11:10:14 -0700
+Subject: [PATCH v2 2/3] Documentation: dtb: xgene: Add channel property
 In-Reply-To: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
 References: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1461953415-9741-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1461953415-9741-3-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch gets ethernet to CPU channel (prefetch buffer number) from
-the newly added 'channel' property, thus decoupling Linux driver from
-resource management.
-
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 8d4c1ad..409152b 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -973,6 +973,17 @@ static enum xgene_ring_owner xgene_derive_ring_owner(struct xgene_enet_pdata *p)
- 	return owner;
- }
- 
-+static u8 xgene_start_cpu_bufnum(struct xgene_enet_pdata *pdata)
-+{
-+	struct device *dev = &pdata->pdev->dev;
-+	u32 cpu_bufnum;
-+	int ret;
-+
-+	ret = device_property_read_u32(dev, "channel", &cpu_bufnum);
-+
-+	return (!ret) ? cpu_bufnum : pdata->cpu_bufnum;
-+}
-+
- static int xgene_enet_create_desc_rings(struct net_device *ndev)
- {
- 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-@@ -981,13 +992,15 @@ static int xgene_enet_create_desc_rings(struct net_device *ndev)
- 	struct xgene_enet_desc_ring *buf_pool = NULL;
- 	enum xgene_ring_owner owner;
- 	dma_addr_t dma_exp_bufs;
--	u8 cpu_bufnum = pdata->cpu_bufnum;
-+	u8 cpu_bufnum;
- 	u8 eth_bufnum = pdata->eth_bufnum;
- 	u8 bp_bufnum = pdata->bp_bufnum;
- 	u16 ring_num = pdata->ring_num;
- 	u16 ring_id;
- 	int i, ret, size;
- 
-+	cpu_bufnum = xgene_start_cpu_bufnum(pdata);
-+
- 	for (i = 0; i < pdata->rxq_cnt; i++) {
- 		/* allocate rx descriptor ring */
- 		owner = xgene_derive_ring_owner(pdata);
+diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+index 078060a..05f705e3 100644
+--- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
++++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+@@ -18,6 +18,8 @@ Required properties for all the ethernet interfaces:
+   - First is the Rx interrupt.  This irq is mandatory.
+   - Second is the Tx completion interrupt.
+     This is supported only on SGMII based 1GbE and 10GbE interfaces.
++- channel: Ethernet to CPU, start channel (prefetch buffer) number
++  - Must map to the first irq and irqs must be sequential
+ - port-id: Port number (0 or 1)
+ - clocks: Reference to the clock entry.
+ - local-mac-address: MAC address assigned to this device
 -- 
 1.9.1
