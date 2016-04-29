@@ -1,37 +1,21 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 29 Apr 2016 21:17:40 +0530
-Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
- return phys_addr_t
-In-Reply-To: <20160429151639.GC23726@leverpostej>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
- <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
- <20160429151639.GC23726@leverpostej>
-Message-ID: <CAHB_GurwYqPbccLU9UHppLxbBr4Cfs47myKAer-RJicT=T7uBw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Apr 2016 17:52:25 +0200
+Subject: [GIT PULL 0/4] ARM: tegra: Add XUSB controller support
+Message-ID: <1461945149-23686-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 8:46 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Apr 29, 2016 at 08:36:43PM +0530, Pratyush Anand wrote:
->> > +       phys_addr_t vmcore_base = paddr_vmcoreinfo_note();
->> > +       return sprintf(buf, "%pa %x\n", &vmcore_base,
->>
->> Why do we pass &vmcore_base? Shouldn't it be vmcore_base?
->
-> The %pa* printk format specifiers take the value by reference (as
-> phys_addr_t and friends are not necessarily the same width as a
-> pointer). Per Documentation/printk-formats.txt:
->
-> Physical addresses types phys_addr_t:
->
->         %pa[p]  0x01234567 or 0x0123456789abcdef
->
->         For printing a phys_addr_t type (and its derivatives, such as
->         resource_size_t) which can vary based on build options, regardless of
->         the width of the CPU data path. Passed by reference.
->
-> So the above prints the value of vmcore_base as expected.
+Hi everyone,
 
-Thanks a lot Mark for explaining :-)
+This is a fairly complicated series of pull requests because of the
+dependencies involved. The goal is to take all of the patches through
+the ARM-SoC tree but I'm sending out these individual pull requests
+to document this. Also, if these branches were starting to cause
+conflicts they can be pulled into their respective subsystem trees
+for resolution.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
+Technically it would be enough to pull request 4/4 because it depends
+on all the others and will pull them in implicitly.
+
+Thanks,
+Thierry
