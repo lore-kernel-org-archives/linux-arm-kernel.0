@@ -1,87 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Apr 2016 10:52:32 +0200
-Subject: [PATCH] sched/core: don't include asm/mmu_context from drivers
-Message-ID: <1461919995-21001-1-git-send-email-arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Apr 2016 10:55:03 +0200
+Subject: [PATCH v2 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
+References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
+ <CALszF6CUFKAjzUpEh3pDtSDdJuFan1ON0Kcu_uKD_OX36kXOHQ@mail.gmail.com>
+ <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
+Message-ID: <CACRpkdbXtM68EDDbR3zFJq72HeRy=qJOXyE0WgHEwiuwK3RcOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of switch_mm_irqs_off() brought back an old bug
-regarding the use of preempt_enable_no_resched:
+On Fri, Apr 29, 2016 at 10:53 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Apr 19, 2016 at 11:04 AM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
+>> 2016-04-08 11:43 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+>>> On Thu, Mar 31, 2016 at 5:09 PM, Maxime Coquelin
+>>> <mcoquelin.stm32@gmail.com> wrote:
+>>>
+>>>> +static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+>>>> +{
+>>>> +       struct stm32_pinctrl *pctl = dev_get_drvdata(chip->parent);
+>>>> +       struct stm32_gpio_bank *bank = gpiochip_get_data(chip);
+>>>> +       unsigned int irq;
+>>>> +
+>>>> +       regmap_field_write(pctl->irqmux[offset], bank->range.id);
+>>>
+>>> No. You must implement the irqchip and GPIO controllers to
+>>> be orthogonal, doing things like this creates a semantic that
+>>> assumes .to_irq() is always called before using the IRQ and
+>>> that is not guaranteed at all. A consumer may very well
+>>> use an interrupt right off the irqchip without this being called
+>>> first. All this function should do is translate a number. No
+>>> other semantics.
+>>>
+>>> This needs to be done from the irqchip (sorry).
+>>
+>> Actually, the register written here is not part of the irqchip.
+>> It is a system config register that is only used when using a GPIO as
+>> external interrupt.
+>> Its aim is to mux the GPIO bank on a line.
+>
+> Then it should be done in .request() for the GPIO, not in
+> .to_irq().
+>
+> It should *also* be done in the set-up path for the irqchip
+> side, if that line is used without any interaction with the
+> gpio side of things.
 
-As part of 62b94a08da1b ("sched/preempt: Take away
-preempt_enable_no_resched() from modules"), the definition of
-preempt_enable_no_resched() is only available in built-in code,
-not in loadable modules, so we can't generally use it from header
-files. However, the ARM version of finish_arch_post_lock_switch()
-calls preempt_enable_no_resched() and is defined as a static
-inline function in asm/mmu_context.h. This in turn means we cannot
-include asm/mmu_context.h from modules.
+Or, hm, maybe not in the irqchip then if it is as you say
+that the interrupt can be used anyway, without this being
+set up.
 
-With today's tip tree, asm/mmu_context.h gets included from
-linux/mmu_context.h, which is normally the exact pattern one would
-expect, but unfortunately, linux/mmu_context.h can be included from
-the vhost driver that is a loadable module, now causing this compile
-time error:
+But it should certainly not be done in .to_irq(), rather in
+.request().
 
-In file included from ../include/linux/mmu_context.h:4:0,
-                 from ../drivers/vhost/vhost.c:18:
-../arch/arm/include/asm/mmu_context.h: In function 'finish_arch_post_lock_switch':
-../arch/arm/include/asm/mmu_context.h:88:3: error: implicit declaration of function 'preempt_enable_no_resched' [-Werror=implicit-function-declaration]
-   preempt_enable_no_resched();
-
-Andy already tried to fix the bug by including linux/preempt.h
-from asm/mmu_context.h, but that obviously didn't help.
-
-This reverts the earlier fix attempt and works around the problem
-by including both linux/mmu_context.h and asm/mmu_context.h from
-kernel/sched/core.c. This is not a good solution but seems less
-hacky than the alternatives.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: f98db6013c55 ("sched/core: Add switch_mm_irqs_off() and use it in the scheduler")
-Reverts: 88f10e37e150 ("sched/core, ARM: Include linux/preempt.h from asm/mmu_context.h")
----
- arch/arm/include/asm/mmu_context.h | 1 -
- include/linux/mmu_context.h        | 2 --
- kernel/sched/core.c                | 1 +
- 3 files changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index ed73babc0dc9..fa5b42d44985 100644
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -15,7 +15,6 @@
- 
- #include <linux/compiler.h>
- #include <linux/sched.h>
--#include <linux/preempt.h>
- #include <asm/cacheflush.h>
- #include <asm/cachetype.h>
- #include <asm/proc-fns.h>
-diff --git a/include/linux/mmu_context.h b/include/linux/mmu_context.h
-index a4441784503b..88d270706792 100644
---- a/include/linux/mmu_context.h
-+++ b/include/linux/mmu_context.h
-@@ -1,8 +1,6 @@
- #ifndef _LINUX_MMU_CONTEXT_H
- #define _LINUX_MMU_CONTEXT_H
- 
--#include <asm/mmu_context.h>
--
- struct mm_struct;
- 
- void use_mm(struct mm_struct *mm);
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index c82ca6eccfec..baa2a5152658 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -78,6 +78,7 @@
- #include <asm/switch_to.h>
- #include <asm/tlb.h>
- #include <asm/irq_regs.h>
-+#include <asm/mmu_context.h>
- #include <asm/mutex.h>
- #ifdef CONFIG_PARAVIRT
- #include <asm/paravirt.h>
--- 
-2.7.0
+Yours,
+Linus Walleij
