@@ -1,61 +1,83 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 29 Apr 2016 13:22:32 +0300
-Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
-In-Reply-To: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Fri, 29 Apr 2016 05:18:42 -0700
+Subject: [RFC PATCH] irqchip/gic-v3-its: Allocate ITS tables from
+ corresponding node memory
+Message-ID: <1461932322-1206-1-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/16 13:21, Peter Ujfalusi wrote:
-> ldo7_reg should not work as regulator since it is set to 'disabled' state
-> in the omap5-board-common.dtsi and the state is not changed to 'okay'
-> this means that the ldo7_reg is not available to be used in the igep0050
-> DTS file.
-> ldo4_reg is used by all other OMAP5 boards and this is most likely the
-> correct regulator to use with hdmi.
-> The hdmi needs 1.8V, but the ldo7_reg, based on the dtsi is 2V only.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Tony,
-> 
-> I don't have access to the schematics, but I believe tha the ldo7_reg is not the
-> correct regulator to be used for hdmi.
-> 
-> If you have access and it is really ldo7_reg, then we should have this in the
-> omap5-igep0050.dts file:
-> 
-> &ldo5_reg {
+In the case of systems having multi socket and multi ITS, allocating
+local node memory for ITS device table, collection table, interrupt
+translation table and command queue will help in reducing inter-chip
+traffic even though they(except command queue) could be cached in the GIC.
 
-ldo7_reg, obviously ;)
+Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+---
+This patch is created on top of Cavium thunderx erratum 23144 patch [1].
 
-> 	status = "okay";
-> 	regulator-min-microvolt = <1800000>;
-> 	regulator-max-microvolt = <1800000>;
-> };
-> 
-> Regards,
-> Peter
-> 
->  arch/arm/boot/dts/omap5-igep0050.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
-> index 46ecb1dd3b5c..6c8d40327c68 100644
-> --- a/arch/arm/boot/dts/omap5-igep0050.dts
-> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
-> @@ -20,7 +20,7 @@
->  };
->  
->  &hdmi {
-> -	vdda-supply = <&ldo7_reg>;
-> +	vdda-supply = <&ldo4_reg>;
->  };
->  
->  &i2c4 {
-> 
+I am not sure how to do this for ACPI as GIC ITS ID in MADT doesn't map to
+_PXM. Am I missing something here? Any thoughts?
 
+[1] https://lkml.org/lkml/2016/4/15/830 - [PATCH v5] irqchip, gicv3-its, \
+numa: Enable workaround for Cavium thunderx erratum 23144
 
+Thanks,
+Ashok
+
+CC: marc.zyngier at arm.com
+CC: rrichter at caviumnetworks.com
+CC: gkulkarni at caviumnetworks.com
+CC: jchandra at broadcom.com
+
+ drivers/irqchip/irq-gic-v3-its.c |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 75f258f..9a187c0 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -860,6 +860,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		int alloc_pages;
+ 		u64 tmp;
+ 		void *base;
++		struct page *pg;
+ 
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
+@@ -897,11 +898,13 @@ retry_alloc_baser:
+ 				node_name, order, alloc_pages);
+ 		}
+ 
+-		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+-		if (!base) {
++		pg = alloc_pages_node(its->numa_node,
++				      GFP_KERNEL | __GFP_ZERO, order);
++		if (!pg) {
+ 			err = -ENOMEM;
+ 			goto out_free;
+ 		}
++		base = page_address(pg);
+ 
+ 		its->tables[i].base = base;
+ 		its->tables[i].order = order;
+@@ -1184,7 +1187,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+ 	sz = nr_ites * its->ite_size;
+ 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+-	itt = kzalloc(sz, GFP_KERNEL);
++	itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+ 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+ 	if (lpi_map)
+ 		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+@@ -1526,7 +1529,8 @@ static int __init its_probe(struct device_node *node,
+ 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+ 	its->numa_node = of_node_to_nid(node);
+ 
+-	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
++	its->cmd_base = kzalloc_node(ITS_CMD_QUEUE_SZ, GFP_KERNEL,
++				     its->numa_node);
+ 	if (!its->cmd_base) {
+ 		err = -ENOMEM;
+ 		goto out_free_its;
 -- 
-P?ter
+1.7.1
