@@ -1,31 +1,52 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 29 Apr 2016 17:42:34 +0000
-Subject: [PATCH V4 0/2] clk: bcm2835: use CLK_IS_CRITICAL/CLK_ENABLE_HAND_OFF
-Message-ID: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
+Date: Fri, 29 Apr 2016 17:42:35 +0000
+Subject: [PATCH V4 1/2] clk: bcm2835: mark enabled clocks with CLK_IS_CRITICAL
+In-Reply-To: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
+References: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1461951756-16804-2-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
 The bcm2835 firmware enables several clocks and plls before
-booting the linux kernel, when these later are claimed by a driver
-(temporarily) and then released, then the corresponding plls are
-disabled, which result in a crashed system.
+booting the linux kernel.
 
-Ideally we want to use CLK_ENABLE_HAND_OFF to mark those already
-enabled clocks, but as CLK_ENABLE_HAND_OFF is not merged
-yet this patchset takes a 2 setp approach:
-In the first patch it first makes use of the - already in
-clk-next - CLK_IS_CRITICAL.
-The second patch will change the use to CLK_ENABLE_HAND_OFF,
-which can get applied when the HAND_OFF patch-set goes in.
+These plls should never get disabled as it may result in a
+stopped system clock and more.
 
-Martin Sperl (2):
-  clk: bcm2835: mark enabled clocks with CLK_IS_CRITICAL
-  clk: bcm2835: use CLK_ENABLE_HAND_OFF instead of CLK_IS_CRITICAL
+So during probing we check if the clock is enabled
+and if it is then mark that clock with CLK_IS_CRITICAL.
 
+As a consequence this will also enable the corresponding
+parent plls and pll-divs.
+
+This is intended as a stop-gap until CLK_ENABLE_HAND_OFF
+becomes available, at which point it should be used instead.
+
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
  drivers/clk/bcm/clk-bcm2835.c | 8 ++++++++
  1 file changed, 8 insertions(+)
 
---
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 35f8de7..03b7f01 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1251,6 +1251,14 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+ 	}
+ 
++	/* if the clock is running, then enable CRITICAL */
++	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
++		dev_dbg(cprman->dev,
++			"found firmware enabled clock %s - enabling critical\n",
++			data->name);
++		init.flags |= CLK_IS_CRITICAL;
++	}
++
+ 	clock = devm_kzalloc(cprman->dev, sizeof(*clock), GFP_KERNEL);
+ 	if (!clock)
+ 		return NULL;
+-- 
 2.1.4
