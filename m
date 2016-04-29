@@ -1,81 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 29 Apr 2016 11:35:15 +0100
-Subject: [PATCH] arm64: dts: r8a7795: Increase the size of GIC-400
- mapped registers
-In-Reply-To: <20160428234345.GD18128@verge.net.au>
-References: <1461047395-6532-1-git-send-email-dirk.behme@de.bosch.com>
- <20160427233028.GA5155@verge.net.au>
- <5721A2A5.9010908@de.bosch.com>
- <20160428234345.GD18128@verge.net.au>
-Message-ID: <20160429113515.333c42ef@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 29 Apr 2016 13:53:15 +0300
+Subject: [PATCH v3 0/7] ARM/ASoC: OMAP3: Fix McBSP2/3 sidetone support
+Message-ID: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2016 09:43:45 +1000
-Simon Horman <horms@verge.net.au> wrote:
+Hi,
 
-> [Cc Mark Zyngier, linux-arm-kernel]
-> 
-> Hi Dirk,
-> 
-> On Thu, Apr 28, 2016 at 07:41:57AM +0200, Dirk Behme wrote:
-> > Hi Simon,
-> > 
-> > On 28.04.2016 01:30, Simon Horman wrote:
-> > >Hi Dirk,
-> > >
-> > >I understand that there is an issue here but I'm not yet able
-> > >to convince myself that this is the correct solution.
-> > >
-> > >In revision r0p1 of the CoreLink GIC-400 Generic Interrupt Controller
-> > >Technical Reference Manual[1] I see in Section 3.2. "GIC-400 register map"
-> > >that the size of both the CPU interfaces and Virtual CPU interfaces are
-> > >0x2000 bytes. And assuming that the hardware follows the specification it
-> > >appears that DT is correctly describing the hardware.
-> > 
-> > 
-> > I think you are missing the details described by ARM in
-> > 
-> > http://xenbits.xen.org/gitweb/?p=xen.git;a=commit;h=21550029f709072aacf3b9
-> > 
-> > 
-> > Maybe Julien could help if you have some more doubts?
-> 
-> I guess I am confused.
-> 
-> I see that there is now handling of the case where the region size is
-> 128Kbytes. But I'm still not seeing the bit which describes that the
-> GIC-400  has a region size of 128Kbytes. Perhaps the later is somehow
-> implied by the former. Or perhaps I need to check with the hw team.
+Based on the ongoing discussion on v2 (ARM: OMAP3: Fix McBSP2/3 hwmod setup for
+sidetone) I have dropped the removal of the sidetone hwmod and only corrected
+it. The series now includes all related changes needed to have correct sidetone
+support whenever we boot in legacy or in DT mode.
 
-Please have a look at the SBSA document, and in particular the
-Appendix-F (registration and selling your soul required - only kidding):
+This time the ASoC part have dependency on earlier patches so they can not be
+applied separately.
 
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+  ARM: dts: omap3: Add clocks to McBSP nodes
+  ARM: OMAP3: McBSP: New callback for McBSP2/3 ICLK idle configuration
+  ARM: OMAP3: pdata-quirks: Add support for McBSP2/3 sidetone handling
+  ASoc: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to
+    omap_mcbsp_cleanup()
+  ASoC: omap-mcbsp: sidetone: Use the new callback for iclk handling
+  ARM: OMAP2+: McBSP: Remove the old iclk allow/deny idle code
 
-This requires that, in order for the two halves of GICV to be trappable
-*separately* by a hypervisor using 64kB pages at Stage-2, the two 4kB
-pages that describe that region are aliased as such:
-- the first 4kB page is aliased 16 times over a 64kB region
-- the second 4kB page is aliased 16 times over another contiguous 64kB
-  region
+ arch/arm/boot/dts/omap3.dtsi                | 10 ++++++++++
+ arch/arm/mach-omap2/mcbsp.c                 | 31 ++++++++++++++++-------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 24 ++++------------------
+ arch/arm/mach-omap2/pdata-quirks.c          | 18 +++++++++++++++++
+ include/linux/platform_data/asoc-ti-mcbsp.h |  4 +++-
+ sound/soc/omap/mcbsp.c                      | 21 +++++++++++++------
+ sound/soc/omap/mcbsp.h                      |  3 ++-
+ sound/soc/omap/omap-mcbsp.c                 |  5 ++++-
+ 8 files changed, 73 insertions(+), 43 deletions(-)
 
-This means that your GIC is indeed covering a 128kB region, with the
-mapping corresponding to the GICv2 memory map located at offset 0xf000
-from the base of that 128kB region. Also, this GICV requirement also
-applies to GICC (most likely because the two regions use the same
-decoding logic).
-
-The OS must of course be aware of this (see gic_check_eoimode in the
-GIC driver). Of course, almost nobody got that right (I only know of
-the APM Xgene-1 so far). If you actually did, great!
-
-Also, the ACPI spec fails to recognize this by not providing the length
-of the region, meaning that those who got it right with DT are likely
-to get it wrong with ACPI, and vice-versa.
-
-It's a wonderful world.
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+2.8.1
