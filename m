@@ -1,35 +1,33 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 29 Apr 2016 20:44:29 +0530
-Subject: [PATCH 11/12] kexec: allow architectures to override boot mapping
-In-Reply-To: <E1aviFU-0000jk-9q@rmk-PC.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Apr 2016 16:16:39 +0100
+Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
+ return phys_addr_t
+In-Reply-To: <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFU-0000jk-9q@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAHB_GuoPDxqKbbfGHW8UEiuCxdMeEVBCMJpouaO--dbLomkzrQ@mail.gmail.com>
+ <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
+ <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
+Message-ID: <20160429151639.GC23726@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 2:58 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> kexec physical addresses are the boot-time view of the system.  For
-> certain ARM systems (such as Keystone 2), the boot view of the system
-> does not match the kernel's view of the system: the boot view uses a
-> special alias in the lower 4GB of the physical address space.
->
-> To cater for these kinds of setups, we need to translate between the
-> boot view physical addresses and the normal kernel view physical
-> addresses.  This patch extracts the current transation points into
-> linux/kexec.h, and allows an architecture to override the functions.
->
-> Due to the translations required, we unfortunately end up with six
-> translation functions, which are reduced down to four that the
-> architecture can override.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Fri, Apr 29, 2016 at 08:36:43PM +0530, Pratyush Anand wrote:
+> > +       phys_addr_t vmcore_base = paddr_vmcoreinfo_note();
+> > +       return sprintf(buf, "%pa %x\n", &vmcore_base,
+> 
+> Why do we pass &vmcore_base? Shouldn't it be vmcore_base?
 
-I must be missing something when I am thinking that, had we passed
-arch_phys_to_idmap_offset to user space, this patch would not have
-been needed, and things would have been more simpler. Please help me
-to understand why passing arch_phys_to_idmap_offset to user space
-would not be a good idea.
+The %pa* printk format specifiers take the value by reference (as
+phys_addr_t and friends are not necessarily the same width as a
+pointer). Per Documentation/printk-formats.txt:
 
-~Pratyush
+Physical addresses types phys_addr_t:
+
+        %pa[p]  0x01234567 or 0x0123456789abcdef
+
+        For printing a phys_addr_t type (and its derivatives, such as
+        resource_size_t) which can vary based on build options, regardless of
+        the width of the CPU data path. Passed by reference.
+
+So the above prints the value of vmcore_base as expected.
+
+Mark.
