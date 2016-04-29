@@ -1,58 +1,31 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 29 Apr 2016 03:02:30 +0300
-Subject: [PATCH 0/3] MAINTAINERS: add new maintainers of NXP LPC32xx SoC
-In-Reply-To: <3148840.0dvKHvK2Ga@wuerfel>
-References: <1461714919-25577-1-git-send-email-vz@mleia.com>
- <4622738.ujCxg0gb7N@wuerfel> <57229868.30403@mleia.com>
- <3148840.0dvKHvK2Ga@wuerfel>
-Message-ID: <5722A496.90806@mleia.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 28 Apr 2016 17:42:44 -0700
+Subject: [PATCH v7 1/5] of/serial: move earlycon early_param handling to
+ serial
+In-Reply-To: <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
+References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
+ <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <20160429004244.GA31752@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.04.2016 02:14, Arnd Bergmann wrote:
-> On Friday 29 April 2016 02:10:32 Vladimir Zapolskiy wrote:
->> Hi Arnd,
->>
->> On 27.04.2016 12:39, Arnd Bergmann wrote:
->>> On Wednesday 27 April 2016 02:55:16 Vladimir Zapolskiy wrote:
->>>> Roland Stigge added initial support of NXP LPC32xx SoC series and
->>>> first boards powered by it, but for a while since v3.18-rc1 the
->>>> SoC support is unmaintained and became stale.
->>>>
->>>> Vladimir Zapolskiy and Sylvain Lemieux expressed interest in
->>>> continuation of NXP LPC32xx maintenance, reflect this in MAINTAINERS
->>>> record file for better communication with Linux kernel community.
->>>>
->>>> The maintenance change is in agreement with Arnd Bergmann:
->>>>
->>>
->>> Looks good. Let's give Roland some time to reply (hopefully with
->>> and Ack), and then merge it for 4.7.
->>>
->>
->> to simplify the matter and to legitimate the process somehow I decided
->> not to include this change of maintainers into my last LPC32xx SoC pull
->> request, hence the pull request contains only code changes.
->>
->> In other words please let me explicitly delegate a decision to you or
->> other ARM maintainers when and which way to apply this change. As for
->> me here I would prefer to get Signed-off-by tags from one of you.
->>
->> If I'm worried for nothing, or if you don't consider to pick these
->> changes up directly from linux-arm-kernel at lists.infradead.org, for
->> your convenience I'll send a pull request to arm at kernel.org.
+On Thu, Mar 31, 2016 at 04:40:23PM +0300, Aleksey Makarov wrote:
+> From: Leif Lindholm <leif.lindholm@linaro.org>
 > 
-> It's all fine with me. My plan so far is to pick up the patches
-> separately in a couple of days, but if you send a pull request,
-> I'll take that instead. If Roland still wants to be listed in
-> the MAINTAINERS file, we can change it again, but I'm considering
-> the two of you the primary contacts now.
+> We have multiple "earlycon" early_param handlers - merge the DT one into
+> the main earlycon one.  It's a cleanup that also will be useful
+> to defer setting up DT console until ACPI/DT decision is made.
 > 
+> Rename the exported function to avoid clashing with the function from
+> arch/microblaze/kernel/prom.c
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/of/fdt.c              | 11 +----------
+>  drivers/tty/serial/earlycon.c |  2 +-
+>  include/linux/of_fdt.h        |  2 ++
+>  3 files changed, 4 insertions(+), 11 deletions(-)
 
-Sounds good, I offload that anxiety from my mind then.
-
-Thank you.
-
---
-With best wishes,
-Vladimir
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
