@@ -1,98 +1,171 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 29 Apr 2016 13:14:54 +0200
-Subject: [PATCH v9 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-In-Reply-To: <1461661117-4657-1-git-send-email-tiffany.lin@mediatek.com>
-References: <1461661117-4657-1-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <5723422E.4030109@xs4all.nl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Apr 2016 12:15:01 +0100
+Subject: [RFC v5 4/4] gpio: dt-bindings: add gpio-mmio bindings
+In-Reply-To: <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
+References: <cover.1461888822.git.chunkeey@googlemail.com>
+ <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
+Message-ID: <20160429111500.GA23726@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tiffany,
+Hi,
 
-On 04/26/2016 10:58 AM, Tiffany Lin wrote:
-> ==============
->  Introduction
-> ==============
+As a general thing, please put the binding earlier in a series than code
+implemeting it, as that that makes it easier to review the series
+in-order (with context from the binding making code review easier). See
+Documentation/devicetree/bindings/submitting-patches.txt
+
+On Fri, Apr 29, 2016 at 02:53:17AM +0200, Christian Lamparter wrote:
+> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
 > 
-> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
-> Mediatek Video Codec is able to handle video encoding of in a range of formats.
+> This patch adds the device tree bindings for the gpio-mmio.
+> The gpio-mmio is already part of a the GPIO generic library.
 > 
-> This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
-> communicate with VPU.
+> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-mmio.txt         | 73 ++++++++++++++++++++++
+>  1 file changed, 73 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mmio.txt
 > 
-> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mmio.txt b/Documentation/devicetree/bindings/gpio/gpio-mmio.txt
+> new file mode 100644
+> index 0000000..cc7f0b1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-mmio.txt
+> @@ -0,0 +1,73 @@
+> +Bindings for the generic driver for memory-mapped GPIO controllers.
+> +
+
+Bindings should be for hardware (either specific device models, or for
+classes), and not for Linux drivers. The latter is subject to arbitrary
+changes while the former is not, as old hardware continues to exist and
+does not change while drivers get completely reworked.
+
+So please frame this binding document in terms of the class of hardware
+you are trying to address. Please provide some introduction to the
+assumptions that you are making about said hardware, such that it's
+obvious when one needs a more specific binding.
+
+I share the same fears that Rob mentioned in that while this may appear
+simple now, the limitations are unclear, and this effectively prevents
+us from accurately/specifically describing some hardware.
+
+Regardless, I've taken the time to review the below, and I have a number
+of comments.
+
+> +Required properties:
+> +	- compatible: should be "linux,gpio-mmio"
+
+Even with the above comments, this binding name would be valid.
+
+> +	- reg-names: must contain
+> +		"dat" - data register
+> +		may contain
+> +		"set" - data set register
+> +		"clr" - data clear register
+> +		"dirout" - direction output register
+> +		"dirin" - direction input register
+
+Below, we mention endianness. Are registers an arbitrary number of bytes
+long? In what unit size are they grouped (e.g. {8,16,32,64}-bit)?
+
+What are the expectations for the set/clear/dirin/dirout registers? Are
+they write-one to modify, or write-zero to modify?
+
+For the names, don't bother abbreviating (i.e. use "data", "set",
+"clear").
+
+These names might clash with the real names a specific HW model applies
+to its register sets, which means that this binding is exclusive w.r.t.
+a specific binding for a device (i.e. it cannot be extended with
+device-specific information).
+
+If we're happy with that, then we must call out the expected limitations
+on the use of this binding, or we end up with the not-so-simple-any-more
+issues Rob mentioned previously. 
+
+> +	- reg: address + size pairs describing the GPIO register sets;
+> +		order must correspond with the order of entries in reg-names
+> +	- #gpio-cells = must be set to 2
+
+Where the cells encode what? I'm guessing this is <$idx $flags>, but you
+should spell that out explicitly.
+
+> +	- gpio-controller: Marks the device node as a gpio controller.
+> +
+> +Optional properties:
+> +	- ngpio: specifies the number of gpio mapped in the register.
+> +	- big-endian: force big endian register accesses.
+> +	- big-endian-byte-order: assign GPIOs in reverse order.
+
+I cannot parse this last description. It needs a better wording.
+
+I guess this means that the indices (in the first GPIO cell) are applied
+in descending order for ascending chunks of the registers (and that is a
+poor description, too).
+
+> +	- unreadable-reg-set: data set register is not readable.
+> +	- read-output-reg-set: cache value set for reads.
+> +	- unreadable-reg-dir: dirout/dirin register is not readable.
+> +	- no-output: GPIOs are read-only.
+> +
+> +The GPIO generic library provides support for memory-mapped GPIO
+> +controllers. The configuration is detected by which resources are present.
+> +The simplest form of a GPIO controller that the driver support is just a
+> +single "dat" register, where GPIO state can be read and/or written.
+> +However, the driver supports far more:
+> +	- 8/16/32/64 bits registers. The number of GPIOs is automatically
+> +	  determined by the width of the registers.
+> +	- GPIO controllers with clear/set registers.
+> +	- GPIO controllers with a single "dat" register.
+> +	- Big endian bits/GPIOs ordering.
+
+Reword this in terms of the class of hardware you are trying to support,
+(rather than the specific library code you are using), and move it to
+the introduction at the top of the binding.
+
+Thanks,
+Mark.
+
+> +
+> +For setting GPIO's there are three configurations:
+> +	1. single input/output register resource (named "dat"),
+> +	2. set/clear pair (named "set" and "clr"),
+> +	3. single output register resource and single input resource
+> +	   ("set" and dat").
+> +
+> +For setting the GPIO direction, there are three configurations:
+> +	a. simple bidirectional GPIOs that requires no configuration.
+> +	b. an output direction register (named "dirout")
+> +	   where a 1 bit indicates the GPIO is an output.
+> +	c. an input direction register (named "dirin")
+> +	   where a 1 bit indicates the GPIO is an input.
+> +
+> +Examples:
+> +
+> +	/* Configuration for single input/output register
+> +	 * for eight simple bidirectional GPIOs.
+> +	 */
+> +	gpio_a_1 {
+> +		compatible = "linux,gpio-mmio";
+> +		reg = <0x18000000 0x1>;
+> +		reg-names = "dat";
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	/* Configuration for set/clear pair registers with
+> +	 * 32 output direction register GPIOs.
+> +	 */
+> +	gpio_b_2 {
+> +		compatible = "linux,gpio-mmio";
+> +		reg = <0x18000000 0x4>, <0x18000010 0x4>,
+> +		      <0x18000004 0x4>, <0x18000008 0x4>;
+> +		reg-names = "dat", "set", "clr", "dirout";
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> -- 
+> 2.8.1
 > 
-> ==================
->  Device interface
-> ==================
-> 
-> In principle the driver bases on v4l2 memory-to-memory framework:
-> it provides a single video node and each opened file handle gets its own private context with separate
-> buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. raw video
-> frames) and CAPTURE (for destination buffers, i.e. encoded video frames).
-> 
-> ==============================
->  VPU (Video Processor Unit)
-> ==============================
-> The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
-> It is able to handle video decoding/encoding in a range of formats.
-> The driver provides with VPU firmware download, memory management and the communication interface between CPU and VPU.
-> For VPU initialization, it will create virtual memory for CPU access and physical address for VPU hw device access. 
-> When a decode/encode instance opens a device node, vpu driver will download vpu firmware to the device.
-> A decode/encode instant will decode/encode a frame using VPU interface to interrupt vpu to handle decoding/encoding jobs.
-> 
-> Please have a look at the code and comments will be very much appreciated.
-
-I build this using my daily build setup and got a bunch of errors and warnings
-from both the compiler (when this driver is compile-tested on a 32 bit arch)
-and from sparse/smatch.
-
-Can you fix these?
-
-linux-git-i686: WARNINGS
-
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c: In function 'load_requested_vpu':
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:498:117: warning: format '%lx' expects argument of type 'long unsigned int', but argument 4 has type 'size_t {aka unsigned int}' [-Wformat=]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:498:117: warning: format '%lx' expects argument of type 'long unsigned int', but argument 5 has type 'size_t {aka unsigned int}' [-Wformat=]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:501:410: warning: format '%lx' expects argument of type 'long unsigned int', but argument 4 has type 'size_t {aka unsigned int}' [-Wformat=]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc_vpu_if.c: In function 'vpu_enc_ipi_handler':
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc_vpu_if.c:40:30: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
-                              ^
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c: In function 'mtk_venc_worker':
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:1046:43: warning: format '%lx' expects argument of type 'long unsigned int', but argument 7 has type 'size_t {aka unsigned int}' [-Wformat=]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:1046:43: warning: format '%lx' expects argument of type 'long unsigned int', but argument 10 has type 'size_t {aka unsigned int}' [-Wformat=]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:1046:43: warning: format '%lx' expects argument of type 'long unsigned int', but argument 13 has type 'size_t {aka unsigned int}' [-Wformat=]
-
-Tip: use %zu or %zx for size_t.
-
-sparse: ERRORS
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:261:24: warning: incorrect type in assignment (different base types)
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:476:23: warning: symbol 'get_vp8_enc_comm_if' was not declared. Should it be static?
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:237:6: warning: symbol 'vpu_clock_disable' was not declared. Should it be static?
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:250:5: warning: symbol 'vpu_clock_enable' was not declared. Should it be static?
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:436:54: warning: incorrect type in return expression (different address spaces)
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:504:14: warning: incorrect type in assignment (different address spaces)
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:710:26: warning: cast removes address space of expression
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c:674:23: warning: symbol 'get_h264_enc_comm_if' was not declared. Should it be static?
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:804:41: warning: Using plain integer as NULL pointer
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:905:25: warning: Using plain integer as NULL pointer
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:989:50: warning: Using plain integer as NULL pointer
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:133:15: error: undefined identifier 'kzalloc'
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:206:9: error: undefined identifier 'kfree'
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:228:9: error: undefined identifier 'kfree'
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:548:6: warning: 'vpu_fw' may be used uninitialized in this function [-Wmaybe-uninitialized]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:133:8: error: implicit declaration of function 'kzalloc' [-Werror=implicit-function-declaration]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:133:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:206:2: error: implicit declaration of function 'kfree' [-Werror=implicit-function-declaration]
-
-smatch: ERRORS
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:921 mtk_venc_encode_header() warn: inconsistent indenting
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:397 vpu_wdt_reg_handler() warn: variable dereferenced before check 'vpu' (see line 395)
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:398 vpu_wdt_reg_handler() error: we previously assumed 'vpu' could be null (see line 397)
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:142 fops_vcodec_open() error: we previously assumed 'ctx' could be null (see line 134)
-/home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:363 mtk_vcodec_probe() warn: passing zero to 'PTR_ERR'
-
-Thanks!
-
-	Hans
