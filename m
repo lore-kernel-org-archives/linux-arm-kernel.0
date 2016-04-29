@@ -1,29 +1,52 @@
 From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 29 Apr 2016 14:50:02 +0200
-Subject: [PATCH 1/2] pinctrl: at91: Make at91_gpio_template const
-Message-ID: <1461934203-3206-1-git-send-email-alexanders83@web.de>
+Date: Fri, 29 Apr 2016 14:50:03 +0200
+Subject: [PATCH 2/2] pinctrl: at91: Merge clk_prepare and clk_enable into
+ clk_prepare_enable
+In-Reply-To: <1461934203-3206-1-git-send-email-alexanders83@web.de>
+References: <1461934203-3206-1-git-send-email-alexanders83@web.de>
+Message-ID: <1461934203-3206-2-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This template is only assigned, so make it const.
+This simplifies the normal as well as the error path.
 
 Signed-off-by: Alexander Stein <alexanders83@web.de>
 ---
- drivers/pinctrl/pinctrl-at91.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/pinctrl-at91.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 523b6b794d1f..29d57118e35c 100644
+index 29d57118e35c..e380333dad46 100644
 --- a/drivers/pinctrl/pinctrl-at91.c
 +++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1660,7 +1660,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
- }
+@@ -1730,14 +1730,9 @@ static int at91_gpio_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
  
- /* This structure is replicated for each GPIO block allocated at probe time */
--static struct gpio_chip at91_gpio_template = {
-+static const struct gpio_chip at91_gpio_template = {
- 	.request		= gpiochip_generic_request,
- 	.free			= gpiochip_generic_free,
- 	.get_direction		= at91_gpio_get_direction,
+-	ret = clk_prepare(at91_chip->clock);
+-	if (ret)
+-		goto clk_prepare_err;
+-
+-	/* enable PIO controller's clock */
+-	ret = clk_enable(at91_chip->clock);
++	ret = clk_prepare_enable(at91_chip->clock);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "failed to enable clock, ignoring.\n");
++		dev_err(&pdev->dev, "failed to prepare and enable clock, ignoring.\n");
+ 		goto clk_enable_err;
+ 	}
+ 
+@@ -1797,10 +1792,8 @@ static int at91_gpio_probe(struct platform_device *pdev)
+ irq_setup_err:
+ 	gpiochip_remove(chip);
+ gpiochip_add_err:
+-	clk_disable(at91_chip->clock);
+ clk_enable_err:
+-	clk_unprepare(at91_chip->clock);
+-clk_prepare_err:
++	clk_disable_unprepare(at91_chip->clock);
+ err:
+ 	dev_err(&pdev->dev, "Failure %i for GPIO %i\n", ret, alias_idx);
+ 
 -- 
 2.8.1
