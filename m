@@ -1,34 +1,43 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 29 Apr 2016 11:10:12 -0700
-Subject: [PATCH v2 0/3] drivers: net: xgene: fix: Get channel number from
- device binding
-Message-ID: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
+Date: Fri, 29 Apr 2016 11:10:15 -0700
+Subject: [PATCH v2 3/3] dtb: xgene: Add channel property
+In-Reply-To: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
+References: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1461953415-9741-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds 'channel' property to get ethernet to CPU channel number,
-thus decoupling the Linux driver from static resource selection.
-
-v2: Address review comments from v1
-- removed irq reference from Linux driver
-- added 'channel' property to get ethernet to CPU channel number
-
-v1:
-- Initial version
+Added 'channel' property, describing ethernet to CPU channel number.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 1 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 1 +
+ 2 files changed, 2 insertions(+)
 
-Iyappan Subramanian (3):
-  drivers: net: xgene: Get channel number from device binding
-  Documentation: dtb: xgene: Add channel property
-  dtb: xgene: Add channel property
-
- Documentation/devicetree/bindings/net/apm-xgene-enet.txt |  2 ++
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi               |  1 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi                   |  1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c         | 15 ++++++++++++++-
- 4 files changed, 18 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+index a055a5d..ba04877 100644
+--- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+@@ -653,6 +653,7 @@
+ 				     <0 113 4>,
+ 				     <0 114 4>,
+ 				     <0 115 4>;
++			channel = <12>;
+ 			port-id = <1>;
+ 			dma-coherent;
+ 			clocks = <&xge1clk 0>;
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index ae4a173..5147d76 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -993,6 +993,7 @@
+ 				     <0x0 0x65 0x4>,
+ 				     <0x0 0x66 0x4>,
+ 				     <0x0 0x67 0x4>;
++			channel = <0>;
+ 			dma-coherent;
+ 			clocks = <&xge0clk 0>;
+ 			/* mac address will be overwritten by the bootloader */
 -- 
 1.9.1
