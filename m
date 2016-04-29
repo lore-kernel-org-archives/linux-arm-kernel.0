@@ -1,164 +1,126 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 29 Apr 2016 17:55:00 +0800
-Subject: [RFC PATCH 1/1] clk: imx7d: move clk setting out of
- imx7d_clocks_init
-In-Reply-To: <1461923115-16563-1-git-send-email-aisheng.dong@nxp.com>
-References: <alpine.DEB.2.11.1604271212290.3941@nanos>
- <1461923115-16563-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20160429095500.GC28427@shlinux2.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 29 Apr 2016 11:03:01 +0100
+Subject: [PATCH] arm64: Relocate screen_info.lfb_base on PCI BAR allocation
+In-Reply-To: <57228317.1030808@suse.de>
+References: <1461795744-28837-1-git-send-email-agraf@suse.de>
+ <20160428162035.GB19785@localhost> <57223D46.7070102@suse.de>
+ <20160428180641.GA25125@localhost> <57228317.1030808@suse.de>
+Message-ID: <20160429100301.GC3249@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 05:45:15PM +0800, Dong Aisheng wrote:
-> During kernel early booting(e.g. in time_init()), there's only one
-> init idle task running, and the idle sched class indicates that it's
-> not valid to schedule for idle task. If it happens the kernel
-> will complain with a error message as follows:
-> [    0.000000] bad: scheduling from the idle thread!
+On Thu, Apr 28, 2016 at 11:39:35PM +0200, Alexander Graf wrote:
 > 
-> We can observe this warning on an i.MX7D SDB board. See full log below.
-> It is caused by imx7d_clocks_init function called in time_init
-> invokes a lot clk_prepare_enable to enable many clocks and it happens
-> that the Audio/Video PLLs need large delay causes a sleep.
 > 
-> Since we should not sleep during time_init, this patch fundamentally
-> moves all clk_prepare_enable and clk_set_parent out of imx7d_clocks_init
-> and use a postcore init function imx7d_clocks_setup to do it later instead.
-> Then we simply reply on the bootloader settings to do early boot.
+> On 28.04.16 20:06, Bjorn Helgaas wrote:
+> > On Thu, Apr 28, 2016 at 06:41:42PM +0200, Alexander Graf wrote:
+> >> On 04/28/2016 06:20 PM, Bjorn Helgaas wrote:
+> >>> On Thu, Apr 28, 2016 at 12:22:24AM +0200, Alexander Graf wrote:
+> >>>> When booting with efifb, we get a frame buffer address passed into the system.
+> >>>> This address can be backed by any device, including PCI devices.
+> >>> I guess we get the frame buffer address via EFI, but it doesn't tell
+> >>> us what PCI device it's connected to?
+> >>
+> >> Pretty much, yes. We can get the frame buffer address from a
+> >> multitude of sources using various boot protocols, but the case
+> >> where I ran into this was with efi on arm64.
+> >>
+> >>> This same thing could happen on any EFI arch, I guess.  Maybe even on
+> >>
+> >> Yes and no :). I would've put it into whatever code "owns"
+> >> screen_info, but I couldn't find any. So instead I figured I'd make
+> >> the approach as generic as I could and implemented the calculation
+> >> for the case where I saw it break.
+> >>
+> >> The reason we don't see this on x86 (if I understand all pieces of
+> >> the puzzle correctly) is that we get the BAR allocation from
+> >> firmware using _CRS attributes in ACPI, so firmware tells the OS
+> >> where to put the BARs. 
+> > 
+> > I think the real reason is that on x86, firmware typically assigns all
+> > the BARs and Linux typically doesn't change them.  PCI host bridges
 > 
+> Can you point me to the code that "doesn't change them"? I couldn't find
+> it, but I haven't see Linux reallocate BARs on x86.
+> 
+> The thing is that if a BAR is already allocated, we could as well not
+> remap it on arm as well - but how do we know?
 
-Hi Shawn,
+We don't. Long story short: if I understand X86 code correctly,
+on X86 PCI resources are claimed at boot:
 
-This is a draft RFC patch. Pls help check if you can accept
-this way. If yes, i can also convert other platforms.
+arch/x86/pci/i386.c (pcibios_resource_survey())
 
-BTW, one know issue is we may need check if need extra fix
-for imx_register_uart_clocks(uart_clks) separately in case
-the uart clocks are not enabled in bootloader.
+which means that if the BARs are set-up in a way that passes the resource
+claiming validation tests (ie the resource fits into the resource tree),
+the BAR resources are inserted into the resource tree and are not touched
+by the code that reassigns the PCI resources.
 
-Regards
-Dong Aisheng
+Ergo, FW set-up is kept intact, that's my understanding of X86 code.
 
-> [    0.000000] bad: scheduling from the idle thread!
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.6.0-rc3-00064-gded8bc08fb45-dirty #836
-> [    0.000000] Hardware name: Freescale i.MX7 Dual (Device Tree)
-> [    0.000000] Backtrace:
-> [    0.000000] [<c010c42c>] (dump_backtrace) from [<c010c624>] (show_stack+0x18/0x1c)
-> [    0.000000]  r6:60000053 r5:00000000 r4:c0d21f9c r3:00000000
-> [    0.000000] [<c010c60c>] (show_stack) from [<c03e0228>] (dump_stack+0xb4/0xe8)
-> [    0.000000] [<c03e0174>] (dump_stack) from [<c0154388>] (dequeue_task_idle+0x20/0x30)
-> [    0.000000]  r10:c08f5554 r9:c0d02b0c r8:c0d06844 r7:ef7c14d0 r6:00000001 r5:ef7c14c0
-> [    0.000000]  r4:ef7c14c0 r3:00000000
-> [    0.000000] [<c0154368>] (dequeue_task_idle) from [<c014c968>] (deactivate_task+0x64/0x68)
-> [    0.000000]  r4:c0d06500 r3:c0154368
-> [    0.000000] [<c014c904>] (deactivate_task) from [<c08f50bc>] (__schedule+0x2e8/0x738)
-> [    0.000000]  r6:c0d06500 r5:ef7c14c0 r4:c0c744c0 r3:00000002
-> [    0.000000] [<c08f4dd4>] (__schedule) from [<c08f5554>] (schedule+0x48/0xa0)
-> [    0.000000]  r10:000001b6 r9:00000003 r8:00000036 r7:00000000 r6:0007a120 r5:00000000
-> [    0.000000]  r4:c0d00000
-> [    0.000000] [<c08f550c>] (schedule) from [<c08f9cc8>] (schedule_hrtimeout_range_clock+0xac/0x12c)
-> [    0.000000]  r4:0006ddd0 r3:c0d06500
-> [    0.000000] [<c08f9c1c>] (schedule_hrtimeout_range_clock) from [<c08f9d6c>] (schedule_hrtimeout_range+0x24/0x2c)
-> [    0.000000]  r7:c0d5d434 r6:c0d02100 r5:ffff8ad1 r4:ef00c040
-> [    0.000000] [<c08f9d48>] (schedule_hrtimeout_range) from [<c08f97a4>] (usleep_range+0x54/0x5c)
-> [    0.000000] [<c08f9750>] (usleep_range) from [<c06984c8>] (clk_pllv3_wait_lock+0x7c/0xb4)
-> [    0.000000] [<c069844c>] (clk_pllv3_wait_lock) from [<c069852c>] (clk_pllv3_prepare+0x2c/0x30)
-> [    0.000000]  r6:00000000 r5:c15603f4 r4:ef007680 r3:0000201b
-> [    0.000000] [<c0698500>] (clk_pllv3_prepare) from [<c0691eb8>] (clk_core_prepare+0x98/0xc8)
-> [    0.000000] [<c0691e20>] (clk_core_prepare) from [<c06923d4>] (clk_prepare+0x20/0x38)
-> [    0.000000]  r5:c15603f4 r4:ef00c100
-> [    0.000000] [<c06923b4>] (clk_prepare) from [<c0c4a55c>] (imx7d_clocks_init+0x6108/0x6188)
-> [    0.000000]  r4:ef00c100 r3:00000001
-> [    0.000000] [<c0c44454>] (imx7d_clocks_init) from [<c0c30e38>] (of_clk_init+0x10c/0x1d4)
-> [    0.000000]  r10:00000001 r9:c0d01f68 r8:00000000 r7:c0d01f60 r6:ef7e3d60 r5:ef004340
-> [    0.000000]  r4:00000002
-> [    0.000000] [<c0c30d2c>] (of_clk_init) from [<c0c048b0>] (time_init+0x2c/0x38)
-> [    0.000000]  r10:efffcac0 r9:c0c5ca48 r8:c0d76000 r7:c0d028c0 r6:ffffffff r5:c0d76000
-> [    0.000000]  r4:00000000
-> [    0.000000] [<c0c04884>] (time_init) from [<c0c00b7c>] (start_kernel+0x218/0x398)
-> [    0.000000] [<c0c00964>] (start_kernel) from [<8000807c>] (0x8000807c)
-> [    0.000000]  r10:00000000 r9:410fc075 r8:8000406a r7:c0d07e8c r6:c0c5ca44 r5:c0d0296c
-> [    0.000000]  r4:c0d76294
-> [    0.000000] Architected cp15 timer(s) running at 8.00MHz (virt).
-> [    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x1d854df40, max_idle_ns: 440795202120 ns
+The other way of preventing a PCI resource to be moved is by marking it
+IORESOURCE_PCI_FIXED, I am not sure that's what X86 does in your specific
+case though.
+
+> > have _CRS, which tells us where the host bridge windows are.  PCI
+> > devices themselves don't normally have _CRS; we just make sure their
+> > BARs are inside the ranges of an upstream _CRS.  If/when we get x86
+> > boxes where firmware doesn't assign all the BARs, we should see the
+> > same problem there.
 > 
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/clk/imx/clk-imx7d.c | 25 ++++++++++++++++---------
->  1 file changed, 16 insertions(+), 9 deletions(-)
+> So the check is whether all BARs get assigned by firmware?
+
+Eheh, the problem, and I am glad that you raised the point, is how
+do we know that FW assigned the BARs ? The only thing we can do is
+we try to claim the BAR resource, if it fits into the resource tree
+we successfully claim the resource and the kernel won't reassign it.
+
+On ARM PCI resources are never claimed, they are always reassigned,
+and that's the reason why you are experiencing these failures.
+
+> >> In the device tree case (which is what I'm
+> >> running on arm64) we however allocate BARs dynamically.
+> >>
+> >>> non-EFI arches, if there's a way to discover the frame buffer address
+> >>> as a bare address rather than a "offset X into BAR Y of PCI device Z"
+> >>> sort of thing.
+> >>
+> >> It'd be perfectly doable today - we do get a cpu physical address
+> >> and use that in the notifier. All we would need to do is move the
+> >> code that I added in arm64/efi.c to something more generic that
+> >> "owns" the frame buffer address. Then any boot protocol that passes
+> >> a screen_info in would get the frame buffer relocated on BAR remap.
+> > 
+> > We could consider a quirk that would mark any BAR that happened to
+> > contain the frame buffer address as IORESOURCE_PCI_FIXED.  That would
+> > (in theory, anyway) keep the PCI core from moving it.
 > 
-> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-> index 7912be83c4af..3be2e9371491 100644
-> --- a/drivers/clk/imx/clk-imx7d.c
-> +++ b/drivers/clk/imx/clk-imx7d.c
-> @@ -378,7 +378,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  {
->  	struct device_node *np;
->  	void __iomem *base;
-> -	int i;
->  
->  	clks[IMX7D_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
->  	clks[IMX7D_OSC_24M_CLK] = of_clk_get_by_name(ccm_node, "osc");
-> @@ -409,13 +408,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  	clks[IMX7D_PLL_AUDIO_MAIN_BYPASS] = imx_clk_mux_flags("pll_audio_main_bypass", base + 0xf0, 16, 1, pll_audio_bypass_sel, ARRAY_SIZE(pll_audio_bypass_sel), CLK_SET_RATE_PARENT);
->  	clks[IMX7D_PLL_VIDEO_MAIN_BYPASS] = imx_clk_mux_flags("pll_video_main_bypass", base + 0x130, 16, 1, pll_video_bypass_sel, ARRAY_SIZE(pll_video_bypass_sel), CLK_SET_RATE_PARENT);
->  
-> -	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
-> -
->  	clks[IMX7D_PLL_ARM_MAIN_CLK] = imx_clk_gate("pll_arm_main_clk", "pll_arm_main_bypass", base + 0x60, 13);
->  	clks[IMX7D_PLL_DRAM_MAIN_CLK] = imx_clk_gate("pll_dram_main_clk", "pll_dram_main_bypass", base + 0x70, 13);
->  	clks[IMX7D_PLL_SYS_MAIN_CLK] = imx_clk_gate("pll_sys_main_clk", "pll_sys_main_bypass", base + 0xb0, 13);
-> @@ -846,6 +838,13 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  	clk_data.clk_num = ARRAY_SIZE(clks);
->  	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->  
-> +}
-> +CLK_OF_DECLARE(imx7d, "fsl,imx7d-ccm", imx7d_clocks_init);
-> +
-> +static int __init imx7d_clocks_setup(void)
-> +{
-> +	int i;
-> +
->  	/* TO BE FIXED LATER
->  	 * Enable all clock to bring up imx7, otherwise system will be halt and block
->  	 * the other part upstream Because imx7d clock design changed, clock framework
-> @@ -855,6 +854,13 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  	for (i = 0; i < IMX7D_CLK_END; i++)
->  		clk_prepare_enable(clks[i]);
->  
-> +	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
-> +
->  	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
->  	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
->  
-> @@ -874,5 +880,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  
->  	imx_register_uart_clocks(uart_clks);
->  
-> +	return 0;
->  }
-> -CLK_OF_DECLARE(imx7d, "fsl,imx7d-ccm", imx7d_clocks_init);
-> +postcore_initcall(imx7d_clocks_setup);
-> -- 
-> 1.9.1
+> That's what I thought I should do at first. Then I realized that we
+> could have a PCIe GPU in the system that provides a really big BAR which
+> we would need to map into an mmio64 region to make full use of it.
+> Firmware however - because of limitations - only maps it into the mmio32
+> space though.
 > 
+> That means we now break a case that would work without efifb, right?
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > Is there any run-time EFI (or other firmware) dependency on the frame
+> > buffer address?  If there is, things will break when we move it, even
+> > if we have your notifier to tell efifb about it.
+> 
+> Simple answer is no :).
+> 
+> >> Drivers like vesafb might benefit from this as well - though
+> >> apparently x86 fixed this using ACPI.
+> > 
+> > Where is this x86 vesafb ACPI fix?  I don't see anything ACPI-related
+> > in drivers/video/fbdev/vesafb.c.  I'm just curious what this fix looks
+> > like.
+> 
+> I don't know of any - I haven't found the code that would actually
+> prevent the same thing from happening on x86. Ard pointed to ACPI as the
+> reason it works there. I couldn't really identify why though.
+
+See above, please let me know how you get along.
+
+Thanks !
+Lorenzo
