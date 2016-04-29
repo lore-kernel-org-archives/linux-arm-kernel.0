@@ -1,19 +1,21 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 28 Apr 2016 22:46:17 -0300
-Subject: [PATCH v3 1/3] PCI: imx6: Use enum instead of bool for variant
- indicator
-In-Reply-To: <1461167131-26025-1-git-send-email-andrew.smirnov@gmail.com>
+Date: Thu, 28 Apr 2016 22:47:10 -0300
+Subject: [PATCH v3 2/3] PCI: imx6: Implement reset sequence for i.MX6+
+In-Reply-To: <1461167131-26025-2-git-send-email-andrew.smirnov@gmail.com>
 References: <1461167131-26025-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <CAOMZO5ArMbdSDrh+V4EpUS+HOdqJa94XLm+U0vQiwfrD7gVyuQ@mail.gmail.com>
+ <1461167131-26025-2-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5AiaNFashMd6XEz=zjyodm6UEAuBMsK=otQ5nHeE+voqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Apr 20, 2016 at 12:45 PM, Andrey Smirnov
 <andrew.smirnov@gmail.com> wrote:
-> Use enumerated type instead of a boolean flag to specify the variant of
-> the PCIe IP block (6Q, 6SX, etc). This patch has zero functional impact,
-> however it makes the code easier to extend for the case of more than 2
-> possible variants of an IP block (of which there are).
+> I.MX6+ has a dedicated bit for reseting PCIe core, which should be used
+> instead of a regular reset sequence since using the latter will hang the
+> SoC.
+>
+> This commit is based on c34068d48273e24d392d9a49a38be807954420ed from
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git
 >
 > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
