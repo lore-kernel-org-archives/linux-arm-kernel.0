@@ -1,38 +1,105 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Fri, 29 Apr 2016 10:32:19 -0700
-Subject: [PATCH v2 4/4] ARM: dts: rockchip: Add mmc aliases for rk3288 platform
-In-Reply-To: <1461951139-6109-1-git-send-email-dianders@chromium.org>
-References: <1461951139-6109-1-git-send-email-dianders@chromium.org>
-Message-ID: <1461951139-6109-5-git-send-email-dianders@chromium.org>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Fri, 29 Apr 2016 23:05:34 +0530
+Subject: [PATCH V6 09/13] pci, acpi: Support for ACPI based generic PCI
+ host controller
+In-Reply-To: <20160429083709.GA3249@red-moon>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-10-git-send-email-tn@semihalf.com>
+ <20160428214800.GG25125@localhost> <20160429083709.GA3249@red-moon>
+Message-ID: <CAKc_7PUcjKkCrCTj9q26P8a+Tb3N_MffynnTXnJRacm6VNmFRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that mmc aliases are officially in bindings, add them to rk3288.
-This could be done to lots of platforms, but this is the one I tested
-with.
+On Fri, Apr 29, 2016 at 2:07 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Thu, Apr 28, 2016 at 04:48:00PM -0500, Bjorn Helgaas wrote:
+>
+> [...]
+>
+>> > +static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
+>> > +                                  struct acpi_pci_generic_root_info *ri)
+>> > +{
+>> > +   u16 seg = root->segment;
+>> > +   u8 bus_start = root->secondary.start;
+>> > +   u8 bus_end = root->secondary.end;
+>> > +   struct pci_config_window *cfg;
+>> > +   struct mcfg_entry *e;
+>> > +   phys_addr_t addr;
+>> > +   int err = 0;
+>> > +
+>> > +   mutex_lock(&pci_mcfg_lock);
+>>
+>> What does this lock protect?  The pci_mcfg_list should already be
+>> initialized by the time we get there, and it should be immutable for
+>> the life of the system.  In fact, I would prefer if we could just
+>> search the static table itself whenever we need it rather than caching
+>> it in our own list.  But I don't think we can easily do that because
+>> acpi_table_parse() is __init.
+>>
+>> > +   e = pci_mcfg_lookup(seg, bus_start);
+>>
+>> I would argue that we should check for _CBA first, and fall back to
+>> MCFG if _CBA doesn't exist.
+>>
+>> > +   if (!e) {
+>> > +           addr = acpi_pci_root_get_mcfg_addr(root->device->handle);
+>>
+>> IMO, acpi_pci_root_get_mcfg_addr() is misnamed.  It should be
+>> acpi_pci_config_base_addr() or similar.  It definitely is not related
+>> to MCFG.  Not your fault, obviously.
+>>
+>> > +           if (addr == 0) {
+>> > +                   pr_err(PREFIX"%04x:%02x-%02x bus range error\n",
+>> > +                          seg, bus_start, bus_end);
+>> > +                   err = -ENOENT;
+>> > +                   goto err_out;
+>> > +           }
+>> > +   } else {
+>> > +           if (bus_start != e->bus_start) {
+>> > +                   pr_err("%04x:%02x-%02x bus range mismatch %02x\n",
+>> > +                          seg, bus_start, bus_end, e->bus_start);
+>> > +                   err = -EINVAL;
+>> > +                   goto err_out;
+>> > +           } else if (bus_end != e->bus_end) {
+>> > +                   pr_warn("%04x:%02x-%02x bus end mismatch %02x\n",
+>> > +                           seg, bus_start, bus_end, e->bus_end);
+>> > +                   bus_end = min(bus_end, e->bus_end);
+>> > +           }
+>> > +           addr = e->addr;
+>> > +   }
+>>
+>> I really don't think you need a lock around this, so you can factor
+>> out the address lookup into something like:
+>>
+>>   addr = acpi_pci_config_base_addr(...);
+>>   if (addr)
+>>     return addr;
+>>
+>>   return acpi_pci_mcfg_lookup(seg, busn_res);
+>>
+>> You can check inside acpi_pci_mcfg_lookup() to make sure the entry you
+>> find covers the entire [busn_res.start-busn_res.end] range and return
+>> failure if it doesn't.  At this point, I'm not sure it's worth it to
+>> truncate the host bridge bus range to match something we find in MCFG.
+>>
+>> If the MCFG entry covers *more* than the host bridge range from _CRS,
+>> that's fine.  In any case, we have to be careful with the start address,
+>> because the MCFG start address is always based on bus 0, but I think
+>> pci_generic_ecam_create() expects the start address based on the
+>> bus_start you pass to it.
+>
+> Yes, I spotted this too, it is unfortunate but DT and MCFG handle
+> the ECAM regions differently. In DT the reg property is relative
+> to bus_start - ie reg MMIO region maps config space starting at
+> the first bus in bus-range:
+>
+> Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>
+> in ACPI(MCFG) as you said it is always relative to bus 0, it is
+> unfortunate but the address to be mapped should be computed
+> differently in the ECAM layer.
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-Changes in v2:
-- rk3288 patch new for v2
+Can't this be handled by fixing up the address before passing to
+pci_generic_ecam_create?
 
- arch/arm/boot/dts/rk3288.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 31f7e20ef418..4cb15dcd1c1e 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -60,6 +60,10 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		mmc0 = &emmc;
-+		mmc1 = &sdmmc;
-+		mmc2 = &sdio0;
-+		mmc3 = &sdio1;
- 		mshc0 = &emmc;
- 		mshc1 = &sdmmc;
- 		mshc2 = &sdio0;
--- 
-2.8.0.rc3.226.g39d4020
+JC.
