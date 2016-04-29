@@ -1,139 +1,232 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 29 Apr 2016 15:22:51 +0100
-Subject: [PATCH v2 32/54] KVM: arm/arm64: vgic-new: Add GICv3 MMIO
- handling framework
-In-Reply-To: <572369F0.20704@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-33-git-send-email-andre.przywara@arm.com>
- <572369F0.20704@arm.com>
-Message-ID: <57236E3B.2000501@arm.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Fri, 29 Apr 2016 16:25:43 +0200
+Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
+Message-ID: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/16 15:04, Vladimir Murzin wrote:
-> Hi Andre,
-> 
-> On 28/04/16 17:45, Andre Przywara wrote:
->> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->> +{
->> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
->> +	struct kvm_vcpu *vcpu;
->> +	struct vgic_io_device *devices, *device;
->> +	int c, ret = 0;
->> +
->> +	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
->> +			  GFP_KERNEL);
->> +	if (!devices)
->> +		return -ENOMEM;
->> +
->> +	device = devices;
->> +	kvm_for_each_vcpu(c, vcpu, kvm) {
->> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
->> +		device->base_addr = redist_base_address;
->> +		device->regions = vgic_v3_redist_registers;
->> +		device->nr_regions = ARRAY_SIZE(vgic_v3_redist_registers);
->> +		device->redist_vcpu = vcpu;
->> +
->> +		mutex_lock(&kvm->slots_lock);
->> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
->> +					      redist_base_address,
->> +					      SZ_64K, &device->dev);
->> +		mutex_unlock(&kvm->slots_lock);
->> +
->> +		if (ret)
->> +			break;
->> +
->> +		device++;
->> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
->> +		device->base_addr = redist_base_address + SZ_64K;
->> +		device->regions = vgic_v3_private_registers;
->> +		device->nr_regions = ARRAY_SIZE(vgic_v3_private_registers);
->> +		device->redist_vcpu = vcpu;
->> +
->> +		mutex_lock(&kvm->slots_lock);
->> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
->> +					      redist_base_address + SZ_64K,
->> +					      SZ_64K, &device->dev);
->> +		mutex_unlock(&kvm->slots_lock);
->> +		if (ret) {
->> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
->> +						  &devices[c * 2].dev);
->> +			break;
->> +		}
->> +		device++;
->> +		redist_base_address += 2 * SZ_64K;
->> +	}
-> 
-> Can we put cond_resched() somewhere in kvm_for_each_vcpu to avoid
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Apologies, it seems to come from kvm_io_bus infrastructure.
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ drivers/pinctrl/stm32/pinctrl-stm32.c | 174 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 174 insertions(+)
 
-Vladimir
-
-> complains with CONFIG_PREEMPT_NONE=y and many many cpus been used?
-> 
->>   # lkvm run -k gic-test.flat.a64 -m 316 -c 255 --name guest-727
->>   Info: Loaded kernel to 0x80080000 (69624 bytes)
->>   Info: Placing fdt at 0x8fe00000 - 0x8fffffff
->>   # Warning: The maximum recommended amount of VCPUs is 4
->>   Info: virtio-mmio.devices=0x200 at 0x10000:36
->>
->>   Info: virtio-mmio.devices=0x200 at 0x10200:37
->>
->>   Info: virtio-mmio.devices=0x200 at 0x10400:38
->>
->>   Info: virtio-mmio.devices=0x200 at 0x10600:39
->>
->> INFO: rcu_sched self-detected stall on CPU
->>  0-...: (5249 ticks this GP) idle=589/140000000000001/0 softirq=393/393 fqs=5244 
->>   (t=5250 jiffies g=-166 c=-167 q=0)
->> Task dump for CPU 0:
->> kvm-vcpu-0      R  running task        0   735      1 0x00000002
->> Call trace:
->> [<ffffff8008088cc4>] dump_backtrace+0x0/0x194
->> [<ffffff8008088e6c>] show_stack+0x14/0x1c
->> [<ffffff80080d4dd0>] sched_show_task+0xa4/0xe8
->> [<ffffff80080d6ddc>] dump_cpu_task+0x40/0x4c
->> [<ffffff80080fd398>] rcu_dump_cpu_stacks+0xa8/0xdc
->> [<ffffff8008100214>] rcu_check_callbacks+0x28c/0x7a4
->> [<ffffff80081034a8>] update_process_times+0x3c/0x68
->> [<ffffff8008111820>] tick_sched_handle.isra.15+0x50/0x60
->> [<ffffff8008111874>] tick_sched_timer+0x44/0x7c
->> [<ffffff8008103bf8>] __hrtimer_run_queues+0xc8/0x150
->> [<ffffff8008104110>] hrtimer_interrupt+0x9c/0x1b0
->> [<ffffff80083b8b74>] arch_timer_handler_phys+0x2c/0x38
->> [<ffffff80080f6d14>] handle_percpu_devid_irq+0x78/0x98
->> [<ffffff80080f2a2c>] generic_handle_irq+0x24/0x38
->> [<ffffff80080f2d98>] __handle_domain_irq+0x84/0xa8
->> [<ffffff80080825e0>] gic_handle_irq+0x74/0x178
->> Exception stack(0xffffffc0173e3830 to 0xffffffc0173e3950)
->> 3820:                                   ffffffc0165ac038 ffffffc0165ac080
->> 3840: 0000000000000018 0000000000000004 0000000000000014 000000000000003f
->> 3860: ffffffc0165aeea8 ffffffc000010000 ffffffc017ef5af0 ffffffc0173ecd28
->> 3880: 000000003fef0000 cfdfdfdf00010000 ffffffc0173ecd50 000000003ff00000
->> 38a0: cfdfdfdf00010000 0000000000000000 ffffff80081acaf0 0000000000000000
->> 38c0: 0000000000000000 00000000000000f0 ffffffc0165ac008 0000000000000018
->> 38e0: ffffff80080992e8 0000000000000078 ffffff8008276b54 0000000000002970
->> 3900: 0000000000000018 ffffffc0165ac080 ffffffc0165ac038 ffffffc0173e3950
->> 3920: ffffff8008276d8c ffffffc0173e3950 ffffff8008276b58 0000000020000145
->> 3940: 0000000000000000 0000000000000001
->> [<ffffff8008084f20>] el1_irq+0xa0/0x100
->> [<ffffff8008276b58>] generic_swap+0x4/0x28
->> [<ffffff800809e108>] kvm_io_bus_register_dev+0xc8/0x110
->> [<ffffff80080ab054>] vgic_register_redist_iodevs+0xd8/0x20c
->> [<ffffff80080a98f8>] vgic_v3_map_resources+0x98/0xec
->> [<ffffff80080a8cd8>] kvm_vgic_map_resources+0x4c/0x6c
->> [<ffffff80080a06d4>] kvm_arch_vcpu_ioctl_run+0x68/0x424
->> [<ffffff800809bc98>] kvm_vcpu_ioctl+0x1b4/0x6f8
->> [<ffffff80081aca98>] do_vfs_ioctl+0x708/0x760
->> [<ffffff80081acb4c>] SyS_ioctl+0x5c/0x8c
->> [<ffffff8008085630>] el0_svc_naked+0x24/0x28
-> 
-> Cheers
-> Vladimir
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
-> 
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+index 8a7fe97..1527740 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+@@ -477,6 +477,29 @@ static void stm32_pmx_set_mode(struct stm32_gpio_bank *bank,
+ 	clk_disable(bank->clk);
+ }
+ 
++static void stm32_pmx_get_mode(struct stm32_gpio_bank *bank,
++		int pin, u32 *mode, u32 *alt)
++{
++	u32 val;
++	int alt_shift = (pin % 8) * 4;
++	int alt_offset = STM32_GPIO_AFRL + (pin / 8) * 4;
++	unsigned long flags;
++
++	clk_enable(bank->clk);
++	spin_lock_irqsave(&bank->lock, flags);
++
++	val = readl_relaxed(bank->base + alt_offset);
++	val &= GENMASK(alt_shift + 3, alt_shift);
++	*alt = val >> alt_shift;
++
++	val = readl_relaxed(bank->base + STM32_GPIO_MODER);
++	val &= GENMASK(pin * 2 + 1, pin * 2);
++	*mode = val >> (pin * 2);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	clk_disable(bank->clk);
++}
++
+ static int stm32_pmx_set_mux(struct pinctrl_dev *pctldev,
+ 			    unsigned function,
+ 			    unsigned group)
+@@ -548,6 +571,24 @@ static void stm32_pconf_set_driving(struct stm32_gpio_bank *bank,
+ 	clk_disable(bank->clk);
+ }
+ 
++static u32 stm32_pconf_get_driving(struct stm32_gpio_bank *bank,
++	unsigned int offset)
++{
++	unsigned long flags;
++	u32 val;
++
++	clk_enable(bank->clk);
++	spin_lock_irqsave(&bank->lock, flags);
++
++	val = readl_relaxed(bank->base + STM32_GPIO_TYPER);
++	val &= BIT(offset);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	clk_disable(bank->clk);
++
++	return (val >> offset);
++}
++
+ static void stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
+ 	unsigned offset, u32 speed)
+ {
+@@ -566,6 +607,24 @@ static void stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
+ 	clk_disable(bank->clk);
+ }
+ 
++static u32 stm32_pconf_get_speed(struct stm32_gpio_bank *bank,
++	unsigned int offset)
++{
++	unsigned long flags;
++	u32 val;
++
++	clk_enable(bank->clk);
++	spin_lock_irqsave(&bank->lock, flags);
++
++	val = readl_relaxed(bank->base + STM32_GPIO_SPEEDR);
++	val &= GENMASK(offset * 2 + 1, offset * 2);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	clk_disable(bank->clk);
++
++	return (val >> (offset * 2));
++}
++
+ static void stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
+ 	unsigned offset, u32 bias)
+ {
+@@ -584,6 +643,57 @@ static void stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
+ 	clk_disable(bank->clk);
+ }
+ 
++static u32 stm32_pconf_get_bias(struct stm32_gpio_bank *bank,
++	unsigned int offset)
++{
++	unsigned long flags;
++	u32 val;
++
++	clk_enable(bank->clk);
++	spin_lock_irqsave(&bank->lock, flags);
++
++	val = readl_relaxed(bank->base + STM32_GPIO_PUPDR);
++	val &= GENMASK(offset * 2 + 1, offset * 2);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	clk_disable(bank->clk);
++
++	return (val >> (offset * 2));
++}
++
++static bool stm32_pconf_input_get(struct stm32_gpio_bank *bank,
++	unsigned int offset)
++{
++	unsigned long flags;
++	u32 val;
++
++	clk_enable(bank->clk);
++	spin_lock_irqsave(&bank->lock, flags);
++
++	val = !!(readl_relaxed(bank->base + STM32_GPIO_IDR) & BIT(offset));
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	clk_disable(bank->clk);
++
++	return val;
++}
++
++static bool stm32_pconf_output_get(struct stm32_gpio_bank *bank,
++	unsigned int offset)
++{
++	unsigned long flags;
++	u32 val;
++
++	clk_enable(bank->clk);
++	spin_lock_irqsave(&bank->lock, flags);
++	val = !!(readl_relaxed(bank->base + STM32_GPIO_ODR) & BIT(offset));
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	clk_disable(bank->clk);
++
++	return val;
++}
++
+ static int stm32_pconf_parse_conf(struct pinctrl_dev *pctldev,
+ 		unsigned int pin, enum pin_config_param param,
+ 		enum pin_config_param arg)
+@@ -657,9 +767,73 @@ static int stm32_pconf_group_set(struct pinctrl_dev *pctldev, unsigned group,
+ 	return 0;
+ }
+ 
++static void stm32_pconf_dbg_show(struct pinctrl_dev *pctldev,
++				 struct seq_file *s,
++				 unsigned int pin)
++{
++	struct pinctrl_gpio_range *range;
++	struct stm32_gpio_bank *bank;
++	int offset;
++	u32 mode, alt, drive, speed, bias;
++	static const char * const modes[] = {
++			"input", "output", "alternate", "analog" };
++	static const char * const speeds[] = {
++			"low", "medium", "high", "very high" };
++	static const char * const biasing[] = {
++			"floating", "pull up", "pull down", "" };
++	bool val;
++
++	range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
++	bank = gpio_range_to_bank(range);
++	offset = stm32_gpio_pin(pin);
++
++	stm32_pmx_get_mode(bank, offset, &mode, &alt);
++	bias = stm32_pconf_get_bias(bank, offset);
++
++	seq_printf(s, "%s ", modes[mode]);
++
++	switch (mode) {
++	/* input */
++	case 0:
++		val = stm32_pconf_input_get(bank, offset);
++		seq_printf(s, "- %s - %s",
++			   val ? "high" : "low",
++			   biasing[bias]);
++		break;
++
++	/* output */
++	case 1:
++		drive = stm32_pconf_get_driving(bank, offset);
++		speed = stm32_pconf_get_speed(bank, offset);
++		val = stm32_pconf_output_get(bank, offset);
++		seq_printf(s, "- %s - %s - %s - %s %s",
++			   val ? "high" : "low",
++			   drive ? "open drain" : "push pull",
++			   biasing[bias],
++			   speeds[speed], "speed");
++		break;
++
++	/* alternate */
++	case 2:
++		drive = stm32_pconf_get_driving(bank, offset);
++		speed = stm32_pconf_get_speed(bank, offset);
++		seq_printf(s, "%d - %s -%s", alt,
++			   drive ? "open drain" : "push pull",
++			   biasing[bias],
++			   speeds[speed], "speed");
++		break;
++
++	/* analog */
++	case 3:
++		break;
++	}
++}
++
++
+ static const struct pinconf_ops stm32_pconf_ops = {
+ 	.pin_config_group_get	= stm32_pconf_group_get,
+ 	.pin_config_group_set	= stm32_pconf_group_set,
++	.pin_config_dbg_show	= stm32_pconf_dbg_show,
+ };
+ 
+ static int stm32_gpiolib_register_bank(struct stm32_pinctrl *pctl,
+-- 
+1.9.1
