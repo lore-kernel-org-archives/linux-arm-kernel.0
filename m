@@ -1,47 +1,106 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Apr 2016 17:52:28 +0200
-Subject: [GIT PULL 3/4]: usb: host: xhci-tegra: Changes for v4.7-rc1
+Date: Fri, 29 Apr 2016 17:52:29 +0200
+Subject: [GIT PULL 4/4]: ARM: tegra: Enable the XUSB controller
 In-Reply-To: <1461945149-23686-1-git-send-email-thierry.reding@gmail.com>
 References: <1461945149-23686-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1461945149-23686-4-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1461945149-23686-5-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 87d66f280672800c9c2ad1ce3b7a993ce1e04769:
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-  phy: tegra: Add Tegra210 support (2016-04-29 16:44:48 +0200)
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.7-xhci
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.7-xusb
 
-for you to fetch changes up to ab065e969640d9afd3967266eb3193fb3ac298bd:
+for you to fetch changes up to 7bdf9d2308192bf732798bff6af0781528ebb5f0:
 
-  usb: xhci: tegra: Add Tegra210 support (2016-04-29 16:48:59 +0200)
+  ARM: multi_v7: Enable Tegra XUSB controller in defconfig (2016-04-29 16:49:57 +0200)
 
-This depends on pull request 1/4 containing the PHY changes.
+This depends on pull requests 1/4, 2/4 and 3/4. I've included the full
+shortlog and diffstat since v4.6-rc1 to make it more obvious what this
+will pull in exactly (and because I have no idea how to generate them
+since the union of all three dependencies).
 
 Thierry
 
 ----------------------------------------------------------------
-usb: host: xhci-tegra: Changes for v4.7-rc1
+ARM: tegra: Enable the XUSB controller
 
-This set of patches introduces a driver for the XUSB controller found on
-NVIDIA Tegra SoCs. When loaded with a firmware (available via the linux-
-firmware repository), it provides an XHCI-compatible interface.
+These changes add support for the XUSB controller on Tegra124. It is an
+XHCI compatible controller that replaces the existing EHCI controllers.
+Support is enabled on Venice2, Jetson TK1 and Nyan-based Chromebooks.
 
 ----------------------------------------------------------------
-Thierry Reding (5):
+Andrew Bresticker (1):
+      clk: tegra: Add interface to enable hardware control of SATA/XUSB PLLs
+
+Thierry Reding (24):
+      Merge branch 'for-4.7/clk' into for-4.7/phy
+      phy: core: Allow children node to be overridden
+      dt-bindings: phy: Add NVIDIA Tegra XUSB pad controller binding
+      dt-bindings: phy: tegra-xusb-padctl: Add Tegra210 support
+      phy: Add Tegra XUSB pad controller support
+      phy: tegra: Add Tegra210 support
+      Merge branch 'for-4.7/phy' into for-4.7/pci
+      dt-bindings: pci: tegra: Update for per-lane PHYs
+      PCI: tegra: Support per-lane PHYs
       Merge branch 'for-4.7/phy' into for-4.7/xhci
       dt-bindings: usb: Add NVIDIA Tegra XUSB controller binding
       dt-bindings: usb: xhci-tegra: Add Tegra210 XUSB controller support
       usb: xhci: Add NVIDIA Tegra XUSB controller driver
       usb: xhci: tegra: Add Tegra210 support
+      Merge branch 'for-4.7/phy' into for-4.7/xusb
+      Merge branch 'for-4.7/pci' into for-4.7/xusb
+      Merge branch 'for-4.7/xhci' into for-4.7/xusb
+      ARM: tegra: Move Tegra124 to the new XUSB pad controller binding
+      ARM: tegra: Add Tegra124 XUSB controller
+      ARM: tegra: Enable XUSB on Venice2
+      ARM: tegra: Enable XUSB on Jetson TK1
+      ARM: tegra: Enable XUSB on Nyan
+      ARM: tegra: Enable XUSB controller in defconfig
+      ARM: multi_v7: Enable Tegra XUSB controller in defconfig
 
+ .../bindings/pci/nvidia,tegra20-pcie.txt           |  224 ++-
+ .../bindings/phy/nvidia,tegra124-xusb-padctl.txt   |  733 +++++++
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |    6 +
  .../bindings/usb/nvidia,tegra124-xusb.txt          |  120 ++
+ Documentation/phy.txt                              |   16 +-
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  116 +-
+ arch/arm/boot/dts/tegra124-nyan.dtsi               |  122 +-
+ arch/arm/boot/dts/tegra124-venice2.dts             |  101 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |  167 +-
+ arch/arm/configs/multi_v7_defconfig                |    2 +
+ arch/arm/configs/tegra_defconfig                   |    2 +
+ drivers/clk/tegra/clk-tegra210.c                   |   58 +
+ drivers/pci/host/pci-tegra.c                       |  244 ++-
+ drivers/phy/Kconfig                                |    2 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-core.c                             |   50 +-
+ drivers/phy/tegra/Kconfig                          |    8 +
+ drivers/phy/tegra/Makefile                         |    6 +
+ drivers/phy/tegra/xusb-tegra124.c                  | 1752 +++++++++++++++++
+ drivers/phy/tegra/xusb-tegra210.c                  | 2045 ++++++++++++++++++++
+ drivers/phy/tegra/xusb.c                           | 1021 ++++++++++
+ drivers/phy/tegra/xusb.h                           |  421 ++++
+ drivers/pinctrl/tegra/pinctrl-tegra-xusb.c         |   20 +-
  drivers/usb/host/Kconfig                           |    9 +
  drivers/usb/host/Makefile                          |    1 +
- drivers/usb/host/xhci-tegra.c                      | 1331 ++++++++++++++++++++
- 4 files changed, 1461 insertions(+)
+ drivers/usb/host/xhci-tegra.c                      | 1331 +++++++++++++
+ include/linux/clk/tegra.h                          |    5 +
+ include/linux/phy/phy.h                            |   31 +-
+ include/linux/phy/tegra/xusb.h                     |   30 +
+ include/soc/tegra/fuse.h                           |    1 +
+ 30 files changed, 8540 insertions(+), 106 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt
  create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
+ create mode 100644 drivers/phy/tegra/Kconfig
+ create mode 100644 drivers/phy/tegra/Makefile
+ create mode 100644 drivers/phy/tegra/xusb-tegra124.c
+ create mode 100644 drivers/phy/tegra/xusb-tegra210.c
+ create mode 100644 drivers/phy/tegra/xusb.c
+ create mode 100644 drivers/phy/tegra/xusb.h
  create mode 100644 drivers/usb/host/xhci-tegra.c
+ create mode 100644 include/linux/phy/tegra/xusb.h
