@@ -1,370 +1,357 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Fri, 29 Apr 2016 13:31:58 +0530
-Subject: [PATCH V6 07/13] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <20160428214749.GF25125@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-8-git-send-email-tn@semihalf.com>
- <20160428214749.GF25125@localhost>
-Message-ID: <CAKc_7PUJQsUrCuOg1iafZ9amANk=E9eu0MrF=UOrVEVbseMz2w@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 29 Apr 2016 11:05:34 +0300
+Subject: [RFC v5 3/4] gpio: move clps711x, moxart,
+ ts4800 and gpio-ge into gpio-generic
+In-Reply-To: <9e5cc9e957144bd5d4081573ef959f931281eaaa.1461888822.git.chunkeey@googlemail.com>
+References: <cover.1461888822.git.chunkeey@googlemail.com>
+ <9e5cc9e957144bd5d4081573ef959f931281eaaa.1461888822.git.chunkeey@googlemail.com>
+Message-ID: <CAHp75Vf_+3ja07Z99k1Grvvg-w3mj0inPdiE69zTs=fa_nn5=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 3:17 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Fri, Apr 15, 2016 at 07:06:42PM +0200, Tomasz Nowicki wrote:
->> From: Jayachandran C <jchandra@broadcom.com>
->>
->> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
->> provide generic functions for accessing memory mapped PCI config space.
->>
->> The API is defined in drivers/pci/ecam.h and is written to replace the
->> API in drivers/pci/host/pci-host-common.h. The file defines a new
->> 'struct pci_config_window' to hold the information related to a PCI
->> config area and its mapping. This structure is expected to be used as
->> sysdata for controllers that have ECAM based mapping.
->>
->> Helper functions are provided to setup the mapping, free the mapping
->> and to implement the map_bus method in 'struct pci_ops'
+On Fri, Apr 29, 2016 at 3:53 AM, Christian Lamparter
+<chunkeey@googlemail.com> wrote:
+> This patch integrates these GPIO drivers into gpio-generic.
 >
-> Spec reference: PCI Express Base Specification, rev 3.0, sec 7.2.2.
+
 >
->> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->> ---
->>  drivers/pci/Kconfig  |   3 ++
->>  drivers/pci/Makefile |   2 +
->>  drivers/pci/ecam.c   | 137 +++++++++++++++++++++++++++++++++++++++++++++++++++
->>  drivers/pci/ecam.h   |  61 +++++++++++++++++++++++
->>  4 files changed, 203 insertions(+)
->>  create mode 100644 drivers/pci/ecam.c
->>  create mode 100644 drivers/pci/ecam.h
->>
->> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
->> index 209292e..e930d62 100644
->> --- a/drivers/pci/Kconfig
->> +++ b/drivers/pci/Kconfig
->> @@ -83,6 +83,9 @@ config HT_IRQ
->>  config PCI_ATS
->>       bool
->>
->> +config PCI_GENERIC_ECAM
->> +     bool
+> +static int clps711x_parse_dt(struct platform_device *pdev,
+> +                            struct bgpio_pdata *pdata,
+> +                            unsigned long *flags)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +       int id = np ? of_alias_get_id(np, "gpio") : pdev->id;
+> +       struct resource *res;
+> +
+> +       if ((id < 0) || (id > 4))
+> +               return -ENODEV;
+> +
+> +       /* PORTE is 3 lines only */
+> +       if (id == 4)
+> +               pdata->ngpio = 3;
+> +
+> +       pdata->base = id * 8;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!res)
+> +               return -EINVAL;
+> +
+> +       res->name = "dat";
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +       if (!res)
+> +               return -EINVAL;
+> +
+> +       /* PORTD is inverted logic for direction register */
+> +       res->name = (id == 3) ? "dirin" : "dirout";
+> +       return 0;
+> +}
+> +
+
+I think the three below have enough in common to reorganize data
+structure and use one parse function.
+
+So, instead of providing just parsing function, something like
+
+ngpios (0 ? read from property)
+resource size
+start, end pairs for dat/set/dirin.
+flags
+
+Have no idea if it's possible to re-use this approach for case above.
+
+> +static int ge_parse_dt(struct platform_device *pdev,
+> +                      struct bgpio_pdata *pdata,
+> +                      unsigned long *flags)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +
+> +       struct resource *res;
+> +       struct resource nres[] = {
+> +               DEFINE_RES_MEM_NAMED(0, 1, "dat"),
+> +               DEFINE_RES_MEM_NAMED(0, 1, "set"),
+> +               DEFINE_RES_MEM_NAMED(0, 1, "dirin"),
+> +       };
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!res || resource_size(res) != 0x24)
+> +               return -EINVAL;
+> +
+> +       nres[0].start = res->start + 0x04;
+> +       nres[0].end = nres[0].start + 3;
+> +       nres[1].start = res->start + 0x08;
+> +       nres[1].end = nres[1].start + 3;
+> +       nres[2].start = res->start + 0x00;
+> +       nres[2].end = nres[2].start + 3;
+> +       *flags |= BGPIOF_BIG_ENDIAN_BYTE_ORDER;
+> +       pdata->label = devm_kstrdup(&pdev->dev, np->full_name, GFP_KERNEL);
+> +       if (!pdata->label)
+> +               return -ENOMEM;
+> +
+> +       if (of_device_is_compatible(np, "ge,imp3a-gpio"))
+> +               pdata->ngpio = 16;
+> +       else if (of_device_is_compatible(np, "gef,sbc310-gpio"))
+> +               pdata->ngpio = 6;
+> +       else if (of_device_is_compatible(np, "gef,sbc610-gpio"))
+> +               pdata->ngpio = 19;
+> +
+> +       return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
+> +}
+> +
+> +static int moxart_parse_dt(struct platform_device *pdev,
+> +                          struct bgpio_pdata *pdata,
+> +                          unsigned long *flags)
+> +{
+> +       struct resource *res;
+> +       struct resource nres[] = {
+> +               DEFINE_RES_MEM_NAMED(0, 1, "dat"),
+> +               DEFINE_RES_MEM_NAMED(0, 1, "set"),
+> +               DEFINE_RES_MEM_NAMED(0, 1, "dirout"),
+> +       };
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!res || resource_size(res) != 0xc)
+> +               return -EINVAL;
+> +
+> +       pdata->label = "moxart-gpio";
+> +       *flags |= BGPIOF_READ_OUTPUT_REG_SET;
+> +       nres[0].start = res->start + 0x04;
+> +       nres[0].end = nres[0].start + 3;
+> +       nres[1].start = res->start + 0x00;
+> +       nres[1].end = nres[1].start + 3;
+> +       nres[2].start = res->start + 0x08;
+> +       nres[2].end = nres[2].start + 3;
+> +       return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
+> +}
+> +
+> +static int ts4800_parse_dt(struct platform_device *pdev,
+> +                          struct bgpio_pdata *pdata,
+> +                          unsigned long *flags)
+> +{
+> +       int err;
+> +       struct resource *res;
+> +       struct resource nres[] = {
+> +               DEFINE_RES_MEM_NAMED(0, 1, "dat"),
+> +               DEFINE_RES_MEM_NAMED(0, 1, "set"),
+> +               DEFINE_RES_MEM_NAMED(0, 1, "dirout"),
+> +       };
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!res || resource_size(res) != 0x6)
+> +               return -EINVAL;
+> +
+> +       nres[0].start = res->start;
+> +       nres[0].end = nres[0].start + 1;
+> +       nres[1].start = res->start + 0x02;
+> +       nres[1].end = nres[1].start + 1;
+> +       nres[2].start = res->start + 0x04;
+> +       nres[2].end = nres[2].start + 1;
+> +
+> +       err = of_property_read_u32(pdev->dev.of_node, "ngpios", &pdata->ngpio);
+> +       if (err == -EINVAL)
+> +               pdata->ngpio = 16;
+> +       else if (err)
+> +               return err;
+> +
+> +       return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
+> +}
+> +
+>  #define ADD(_name, _func) { .compatible = _name, .data = _func }
 >
-> "PCI_ECAM" is enough, I think.  It's defined by and required by the
-> spec unless there's some arch-specific interface.  Plus, if I
-
-Ok. Looking at the comments I think I have to take out generic from
-all the names - will do this in next version.
-
-> understand correctly, this infrastructure supports non-generic ECAM
-> implementations as well, since the caller supplies "struct
-> pci_generic_ecam_ops *ops".
-
-Yes, the idea was to support ECAM with quirks (and CAM) on both
-32 and 64 bit, otherwise it would be too trivial to have a separate
-implementation.
-
->>  config PCI_IOV
->>       bool "PCI IOV support"
->>       depends on PCI
->> diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
->> index 2154092..810aec8 100644
->> --- a/drivers/pci/Makefile
->> +++ b/drivers/pci/Makefile
->> @@ -55,6 +55,8 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
->>
->>  obj-$(CONFIG_PCI_STUB) += pci-stub.o
->>
->> +obj-$(CONFIG_PCI_GENERIC_ECAM) += ecam.o
->> +
->>  obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
->>
->>  obj-$(CONFIG_OF) += of.o
->> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
->> new file mode 100644
->> index 0000000..ff04c01
->> --- /dev/null
->> +++ b/drivers/pci/ecam.c
->> @@ -0,0 +1,137 @@
->> +/*
->> + * Copyright 2016 Broadcom
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License, version 2, as
->> + * published by the Free Software Foundation (the "GPL").
->> + *
->> + * This program is distributed in the hope that it will be useful, but
->> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License version 2 (GPLv2) for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * version 2 (GPLv2) along with this source code.
->> + */
->> +
->> +#include <linux/device.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/pci.h>
->> +#include <linux/slab.h>
->> +
->> +#include "ecam.h"
->> +
->> +/*
->> + * On 64 bit systems, we do a single ioremap for the whole config space
->> + * since we have enough virtual address range available. On 32 bit, do an
->> + * ioremap per bus.
->> + */
->> +static const bool per_bus_mapping = !config_enabled(CONFIG_64BIT);
->> +
->> +/*
->> + * Create a PCI config space window
->> + *  - reserve mem region
->> + *  - alloc struct pci_config_window with space for all mappings
->> + *  - ioremap the config space
->> + */
->> +struct pci_config_window *pci_generic_ecam_create(struct device *dev,
->> +                             phys_addr_t addr, u8 bus_start, u8 bus_end,
+>  static const struct of_device_id bgpio_of_match[] = {
+>         ADD("linux,gpio-mmio", bgpio_basic_mmio_parse_dt),
+> +       ADD("cirrus,clps711x-gpio", clps711x_parse_dt),
+> +       ADD("ge,imp3a-gpio", ge_parse_dt),
+> +       ADD("gef,sbc310-gpio", ge_parse_dt),
+> +       ADD("gef,sbc610-gpio", ge_parse_dt),
+> +       ADD("moxa,moxart-gpio", moxart_parse_dt),
+> +       ADD("technologic,ts4800-gpio", ts4800_parse_dt),
+>         { }
+>  };
+>  #undef ADD
+> diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
+> deleted file mode 100644
+> index d58d389..0000000
+> --- a/drivers/gpio/gpio-moxart.c
+> +++ /dev/null
+> @@ -1,84 +0,0 @@
+> -/*
+> - * MOXA ART SoCs GPIO driver.
+> - *
+> - * Copyright (C) 2013 Jonas Jensen
+> - *
+> - * Jonas Jensen <jonas.jensen@gmail.com>
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#include <linux/err.h>
+> -#include <linux/init.h>
+> -#include <linux/irq.h>
+> -#include <linux/io.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/of_address.h>
+> -#include <linux/of_gpio.h>
+> -#include <linux/pinctrl/consumer.h>
+> -#include <linux/delay.h>
+> -#include <linux/timer.h>
+> -#include <linux/bitops.h>
+> -#include <linux/gpio/driver.h>
+> -
+> -#define GPIO_DATA_OUT          0x00
+> -#define GPIO_DATA_IN           0x04
+> -#define GPIO_PIN_DIRECTION     0x08
+> -
+> -static int moxart_gpio_probe(struct platform_device *pdev)
+> -{
+> -       struct device *dev = &pdev->dev;
+> -       struct resource *res;
+> -       struct gpio_chip *gc;
+> -       void __iomem *base;
+> -       int ret;
+> -
+> -       gc = devm_kzalloc(dev, sizeof(*gc), GFP_KERNEL);
+> -       if (!gc)
+> -               return -ENOMEM;
+> -
+> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -       base = devm_ioremap_resource(dev, res);
+> -       if (IS_ERR(base))
+> -               return PTR_ERR(base);
+> -
+> -       ret = bgpio_init(gc, dev, 4, base + GPIO_DATA_IN,
+> -                        base + GPIO_DATA_OUT, NULL,
+> -                        base + GPIO_PIN_DIRECTION, NULL,
+> -                        BGPIOF_READ_OUTPUT_REG_SET);
+> -       if (ret) {
+> -               dev_err(&pdev->dev, "bgpio_init failed\n");
+> -               return ret;
+> -       }
+> -
+> -       gc->label = "moxart-gpio";
+> -       gc->request = gpiochip_generic_request;
+> -       gc->free = gpiochip_generic_free;
+> -       gc->base = 0;
+> -       gc->owner = THIS_MODULE;
+> -
+> -       ret = devm_gpiochip_add_data(dev, gc, NULL);
+> -       if (ret) {
+> -               dev_err(dev, "%s: gpiochip_add failed\n",
+> -                       dev->of_node->full_name);
+> -               return ret;
+> -       }
+> -
+> -       return ret;
+> -}
+> -
+> -static const struct of_device_id moxart_gpio_match[] = {
+> -       { .compatible = "moxa,moxart-gpio" },
+> -       { }
+> -};
+> -
+> -static struct platform_driver moxart_gpio_driver = {
+> -       .driver = {
+> -               .name           = "moxart-gpio",
+> -               .of_match_table = moxart_gpio_match,
+> -       },
+> -       .probe  = moxart_gpio_probe,
+> -};
+> -builtin_platform_driver(moxart_gpio_driver);
+> diff --git a/drivers/gpio/gpio-ts4800.c b/drivers/gpio/gpio-ts4800.c
+> deleted file mode 100644
+> index 0c144a7..0000000
+> --- a/drivers/gpio/gpio-ts4800.c
+> +++ /dev/null
+> @@ -1,81 +0,0 @@
+> -/*
+> - * GPIO driver for the TS-4800 board
+> - *
+> - * Copyright (c) 2016 - Savoir-faire Linux
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2. This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#include <linux/gpio/driver.h>
+> -#include <linux/of_address.h>
+> -#include <linux/of_device.h>
+> -#include <linux/platform_device.h>
+> -
+> -#define DEFAULT_PIN_NUMBER      16
+> -#define INPUT_REG_OFFSET        0x00
+> -#define OUTPUT_REG_OFFSET       0x02
+> -#define DIRECTION_REG_OFFSET    0x04
+> -
+> -static int ts4800_gpio_probe(struct platform_device *pdev)
+> -{
+> -       struct device_node *node;
+> -       struct gpio_chip *chip;
+> -       struct resource *res;
+> -       void __iomem *base_addr;
+> -       int retval;
+> -       u32 ngpios;
+> -
+> -       chip = devm_kzalloc(&pdev->dev, sizeof(struct gpio_chip), GFP_KERNEL);
+> -       if (!chip)
+> -               return -ENOMEM;
+> -
+> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -       base_addr = devm_ioremap_resource(&pdev->dev, res);
+> -       if (IS_ERR(base_addr))
+> -               return PTR_ERR(base_addr);
+> -
+> -       node = pdev->dev.of_node;
+> -       if (!node)
+> -               return -EINVAL;
+> -
+> -       retval = of_property_read_u32(node, "ngpios", &ngpios);
+> -       if (retval == -EINVAL)
+> -               ngpios = DEFAULT_PIN_NUMBER;
+> -       else if (retval)
+> -               return retval;
+> -
+> -       retval = bgpio_init(chip, &pdev->dev, 2, base_addr + INPUT_REG_OFFSET,
+> -                           base_addr + OUTPUT_REG_OFFSET, NULL,
+> -                           base_addr + DIRECTION_REG_OFFSET, NULL, 0);
+> -       if (retval) {
+> -               dev_err(&pdev->dev, "bgpio_init failed\n");
+> -               return retval;
+> -       }
+> -
+> -       chip->ngpio = ngpios;
+> -
+> -       platform_set_drvdata(pdev, chip);
+> -
+> -       return devm_gpiochip_add_data(&pdev->dev, chip, NULL);
+> -}
+> -
+> -static const struct of_device_id ts4800_gpio_of_match[] = {
+> -       { .compatible = "technologic,ts4800-gpio", },
+> -       {},
+> -};
+> -
+> -static struct platform_driver ts4800_gpio_driver = {
+> -       .driver = {
+> -                  .name = "ts4800-gpio",
+> -                  .of_match_table = ts4800_gpio_of_match,
+> -                  },
+> -       .probe = ts4800_gpio_probe,
+> -};
+> -
+> -module_platform_driver_probe(ts4800_gpio_driver, ts4800_gpio_probe);
+> -
+> -MODULE_AUTHOR("Julien Grossholtz <julien.grossholtz@savoirfairelinux.com>");
+> -MODULE_DESCRIPTION("TS4800 FPGA GPIO driver");
+> -MODULE_LICENSE("GPL v2");
+> --
+> 2.8.1
 >
-> Can you take pointers to struct resources here instead of addr,
-> bus_start, and bus_end?  The caller probably has them already, and
-> then you could add a useful printk like:
->
->   dev_info(dev, "ECAM for %pR at %pR\n", busn_res, mmio_res);
->
-> Would have to be careful about the struct resource lifetimes though.
 
-Yes, I had thought of this. The reason I did not go down that path was
-that we are using request_mem_region() which takes the address
-and creates a resource .internally.
 
-Beyond that, as you noted, the ownership and lifetime is slightly
-more complex. Either the calling code has to allocate the
-resource and handoff, or the ecam code has to make a copy of
-the resource. I would go with copy since it is much more simple
-to use.
 
-Since resource based API seems to be preferred, I will switch
-to passing bus and mmio resource and will use
-request_resource_conflict() to allocate the ECAM mem region,
-
-> If you had the MMIO resource here, you could also do the range
-> checking you currently have in gen_pci_init() here instead, so all
-> callers could benefit.
-
-Ok.
-
->> +                             struct pci_generic_ecam_ops *ops)
->> +{
->> +     struct pci_config_window *cfg;
->> +     unsigned int bus_shift, bus_range, bsz, mapsz;
->> +     int i, nidx;
->> +     int err = -ENOMEM;
->> +
->> +     if (bus_end < bus_start)
->> +             return ERR_PTR(-EINVAL);
->> +
->> +     bus_shift = ops->bus_shift;
->> +     bus_range = bus_end - bus_start + 1;
->> +     bsz = 1 << bus_shift;
->> +     nidx = per_bus_mapping ? bus_range : 1;
->> +     mapsz = per_bus_mapping ? bsz : bus_range * bsz;
->> +     cfg = kzalloc(sizeof(*cfg) + nidx * sizeof(cfg->win[0]), GFP_KERNEL);
->> +     if (!cfg)
->> +             return ERR_PTR(-ENOMEM);
->> +
->> +     cfg->bus_start = bus_start;
->> +     cfg->bus_end = bus_end;
->> +     cfg->ops = ops;
->> +
->> +     if (!request_mem_region(addr, bus_range * bsz, "Configuration Space"))
->> +             goto err_exit;
->> +
->> +     /* cfgaddr has to be set after request_mem_region */
->> +     cfg->cfgaddr = addr;
->> +
->> +     for (i = 0; i < nidx; i++) {
->> +             cfg->win[i] = ioremap(addr + i * mapsz, mapsz);
->> +             if (!cfg->win[i])
->> +                     goto err_exit;
->> +     }
->> +
->> +     if (cfg->ops->init) {
->> +             err = cfg->ops->init(dev, cfg);
->> +             if (err)
->> +                     goto err_exit;
->> +     }
->> +     return cfg;
->> +
->> +err_exit:
->> +     pci_generic_ecam_free(cfg);
->> +     return ERR_PTR(err);
->> +}
->> +
->> +/*
->> + * Free a config space mapping
->> + */
->
-> Superfluous comment.
-
-Ok, will trim comments to keep the ones that are useful.
-
->> +void pci_generic_ecam_free(struct pci_config_window *cfg)
->> +{
->> +     unsigned int bus_range;
->> +     int i, nidx;
->> +
->> +     bus_range = cfg->bus_end - cfg->bus_start + 1;
->> +     nidx = per_bus_mapping ? bus_range : 1;
->> +     for (i = 0; i < nidx; i++)
->> +             if (cfg->win[i])
->> +                     iounmap(cfg->win[i]);
->> +     if (cfg->cfgaddr)
->> +             release_mem_region(cfg->cfgaddr,
->> +                                bus_range << cfg->ops->bus_shift);
->> +     kfree(cfg);
->> +}
->> +
->> +/*
->> + * Function to implement the pci_ops ->map_bus method
->> + */
->> +void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
->> +                                    int where)
->> +{
->> +     struct pci_config_window *cfg = bus->sysdata;
->
-> I don't really like the use of bus->sysdata here, because sysdata is
-> explicitly arch-specific.
->
-> But I guess we're in a bind right now: it'd be nice to save the cfg
-> pointer in struct pci_host_bridge, but you have to call
-> pci_generic_ecam_create() before the struct pci_host_bridge has been
-> allocated, and you have to pass the pointer into pci_scan_root_bus(),
-> and there's no generic way to do that yet.
->
-> So I guess this will have to do for now.
-
-I could call the structure pci_ecam_sysdata instead of pci_config_window
-to make it clear that it is to be used as sysdata for ECAM based PCI host
-controllers.
-
-The current push (at least on ARM/ARM64) seems to be to make
-bus->sysdata controller specific and avoid arch specific sysdata.
-
->> +     unsigned int devfn_shift = cfg->ops->bus_shift - 8;
->> +     unsigned int busn = bus->number;
->> +     void __iomem *base;
->> +
->> +     if (busn < cfg->bus_start || busn > cfg->bus_end)
->> +             return NULL;
->> +
->> +     busn -= cfg->bus_start;
->> +     if (per_bus_mapping)
->> +             base = cfg->win[busn];
->> +     else
->> +             base = cfg->win[0] + (busn << cfg->ops->bus_shift);
->> +     return base + (devfn << devfn_shift) + where;
->> +}
->> +
->> +/* default ECAM ops */
->> +struct pci_generic_ecam_ops pci_generic_ecam_default_ops = {
->
-> Using both "generic" and "default" seems overkill.  Maybe just:
->
->   struct pci_ecam_ops pci_generic_ecam_ops = { ... ?
-
-Ok.
-
->> +     .bus_shift      = 20,
->> +     .pci_ops                = {
->> +             .map_bus        = pci_generic_ecam_map_bus,
->> +             .read           = pci_generic_config_read,
->> +             .write          = pci_generic_config_write,
->> +     }
->> +};
->> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
->> new file mode 100644
->> index 0000000..34c0aba
->> --- /dev/null
->> +++ b/drivers/pci/ecam.h
->> @@ -0,0 +1,61 @@
->> +/*
->> + * Copyright 2016 Broadcom
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License, version 2, as
->> + * published by the Free Software Foundation (the "GPL").
->> + *
->> + * This program is distributed in the hope that it will be useful, but
->> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License version 2 (GPLv2) for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * version 2 (GPLv2) along with this source code.
->> + */
->> +#ifndef DRIVERS_PCI_ECAM_H
->> +#define DRIVERS_PCI_ECAM_H
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/platform_device.h>
->> +
->> +/*
->> + * struct to hold pci ops and bus shift of the config window
->> + * for a PCI controller.
->> + */
->> +struct pci_config_window;
->> +struct pci_generic_ecam_ops {
->
-> "struct pci_ecam_ops"
-
-Ok.
-
->> +     unsigned int                    bus_shift;
->> +     struct pci_ops                  pci_ops;
->> +     int                             (*init)(struct device *,
->> +                                             struct pci_config_window *);
->> +};
->> +
->> +/*
->> + * struct to hold the mappings of a config space window. This
->> + * will be allocated with enough entries in win[] to hold all
->> + * the mappings for the bus range.
->> + */
->> +struct pci_config_window {
->> +     phys_addr_t                     cfgaddr;
->> +     u16                             domain;
->> +     u8                              bus_start;
->> +     u8                              bus_end;
->> +     void                            *priv;
->> +     struct pci_generic_ecam_ops     *ops;
->> +     void __iomem                    *win[0];
->> +};
->> +
->> +/* create and free for pci_config_window */
->
-> Superfluous comment.
->
->> +struct pci_config_window *pci_generic_ecam_create(struct device *dev,
->> +                             phys_addr_t addr, u8 bus_start, u8 bus_end,
->> +                             struct pci_generic_ecam_ops *ops);
->> +void pci_generic_ecam_free(struct pci_config_window *cfg);
->
-> "pci_ecam_create" and "pci_ecam_free"?  I suspect you're going to call
-> these for flavors of ECAM that are definitely not "generic".
->
->> +/* map_bus when ->sysdata is an instance of pci_config_window */
->> +void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
->> +                                    int where);
->> +/* default ECAM ops, bus shift 20, generic read and write */
->> +extern struct pci_generic_ecam_ops pci_generic_ecam_default_ops;
->> +
->> +#endif
-
-Thanks for the review. The ECAM patchset can be merged separately
-if you do not want to tie it the ACPI changes.
-
-Please let me know how you want to proceed. Depending on that, I will
-either post it as a separate patchset or ask Tomasz to pick up my
-changes and post the ACPI patchset. again.
-
-JC.
+-- 
+With Best Regards,
+Andy Shevchenko
