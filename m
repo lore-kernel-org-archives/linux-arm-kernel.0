@@ -1,39 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Apr 2016 23:57:23 +0200
-Subject: [PATCH] arm64: always use STRICT_MM_TYPECHECKS
-In-Reply-To: <1461964074-12544-1-git-send-email-yang.shi@linaro.org>
-References: <1461964074-12544-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <1809032.lDnjZlAtrr@wuerfel>
+From: agraf@suse.de (Alexander Graf)
+Date: Sat, 30 Apr 2016 00:03:55 +0200
+Subject: [PATCH] arm64: Relocate screen_info.lfb_base on PCI BAR allocation
+In-Reply-To: <5723D7AF.3080108@suse.de>
+References: <1461795744-28837-1-git-send-email-agraf@suse.de>
+ <20160428162035.GB19785@localhost> <57223D46.7070102@suse.de>
+ <20160428180641.GA25125@localhost> <57228317.1030808@suse.de>
+ <20160429134126.GA949@localhost>
+ <CAKv+Gu-4vqT-tQXdwJbLV0r3FhtrYk=TOWxDYS6LjG_BNf=b_A@mail.gmail.com>
+ <20160429200609.GA28261@localhost>
+ <35998183-0322-49D4-91CD-4D441577C44F@linaro.org> <5723C956.4040907@suse.de>
+ <20160429213751.GB5359@localhost> <5723D7AF.3080108@suse.de>
+Message-ID: <5723DA4B.5010501@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 April 2016 14:07:54 Yang Shi wrote:
-> Inspired by the counterpart of powerpc [1], which shows there is no negative
-> effect on code generation from enabling STRICT_MM_TYPECHECKS with a modern
-> compiler.
-> 
-> And, Arnd's comment [2] about that patch says STRICT_MM_TYPECHECKS could
-> be default as long as the architecture can pass structures in registers as
-> function arguments. ARM64 can do it as long as the size of structure <= 16
-> bytes. All the page table value types are u64 on ARM64.
-> 
-> The below disassembly demonstrates it, entry is pte_t type:
-> 
->             entry = arch_make_huge_pte(entry, vma, page, writable);
->    0xffff00000826fc38 <+80>:    and     x0, x0, #0xfffffffffffffffd
->    0xffff00000826fc3c <+84>:    mov     w3, w21
->    0xffff00000826fc40 <+88>:    mov     x2, x20
->    0xffff00000826fc44 <+92>:    mov     x1, x19
->    0xffff00000826fc48 <+96>:    orr     x0, x0, #0x400
->    0xffff00000826fc4c <+100>:   bl      0xffff00000809bcc0 <arch_make_huge_pte>
-> 
-> [1] http://www.spinics.net/lists/linux-mm/msg105951.html
-> [2] http://www.spinics.net/lists/linux-mm/msg105969.html
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+On 29.04.16 23:52, Alexander Graf wrote:
+> 
+> 
+> On 29.04.16 23:37, Bjorn Helgaas wrote:
+>
+> Can you point me to the code that does "read[ing] the BARs"? So far my
+> impression was that we don't even try to read out the current BAR values
+> from pci config space, but I can't claim I fully grasp the Linux pci
+> code quite yet.
+
+I should've probably read Lorenzos email more closely before - it
+contains the pointer.
+
+
+Alex
