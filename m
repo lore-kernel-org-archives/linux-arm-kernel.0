@@ -1,60 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Apr 2016 10:55:03 +0200
-Subject: [PATCH v2 6/9] pinctrl: Add IRQ support to STM32 gpios
-In-Reply-To: <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
-References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
- <CALszF6CUFKAjzUpEh3pDtSDdJuFan1ON0Kcu_uKD_OX36kXOHQ@mail.gmail.com>
- <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
-Message-ID: <CACRpkdbXtM68EDDbR3zFJq72HeRy=qJOXyE0WgHEwiuwK3RcOQ@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 29 Apr 2016 11:59:39 +0300
+Subject: Potential issue with SDHCI DMA
+In-Reply-To: <57232233.1030702@intel.com>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <6297512.2KmasKu6UN@wuerfel> <5714857C.9070002@intel.com>
+ <7893683.FFM02uuNdT@wuerfel> <57232233.1030702@intel.com>
+Message-ID: <5723227B.9070006@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 10:53 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Tue, Apr 19, 2016 at 11:04 AM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->> 2016-04-08 11:43 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
->>> On Thu, Mar 31, 2016 at 5:09 PM, Maxime Coquelin
->>> <mcoquelin.stm32@gmail.com> wrote:
++ linux-mmc
+
+On 29/04/16 11:58, Adrian Hunter wrote:
+> On 18/04/16 17:33, Arnd Bergmann wrote:
+>> On Monday 18 April 2016 09:58:04 Adrian Hunter wrote:
 >>>
->>>> +static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->>>> +{
->>>> +       struct stm32_pinctrl *pctl = dev_get_drvdata(chip->parent);
->>>> +       struct stm32_gpio_bank *bank = gpiochip_get_data(chip);
->>>> +       unsigned int irq;
->>>> +
->>>> +       regmap_field_write(pctl->irqmux[offset], bank->range.id);
+>>> Thanks for looking.
 >>>
->>> No. You must implement the irqchip and GPIO controllers to
->>> be orthogonal, doing things like this creates a semantic that
->>> assumes .to_irq() is always called before using the IRQ and
->>> that is not guaranteed at all. A consumer may very well
->>> use an interrupt right off the irqchip without this being called
->>> first. All this function should do is translate a number. No
->>> other semantics.
+>>> It looked to me like sdhci-pxav3 devices created by mmp2_add_sdhost() might
+>>> also be candidates.
 >>>
->>> This needs to be done from the irqchip (sorry).
 >>
->> Actually, the register written here is not part of the irqchip.
->> It is a system config register that is only used when using a GPIO as
->> external interrupt.
->> Its aim is to mux the GPIO bank on a line.
->
-> Then it should be done in .request() for the GPIO, not in
-> .to_irq().
->
-> It should *also* be done in the set-up path for the irqchip
-> side, if that line is used without any interaction with the
-> gpio side of things.
-
-Or, hm, maybe not in the irqchip then if it is as you say
-that the interrupt can be used anyway, without this being
-set up.
-
-But it should certainly not be done in .to_irq(), rather in
-.request().
-
-Yours,
-Linus Walleij
+>> Oh, you are right, I missed that.
+>>
+>> I remember looking at sdhci-pxav2 and not finding any machine defining one,
+>> but I must have skipped over sdhci-pxav3 failing to realize that this is
+>> a different one.
+>>
+>> 	Arnd
+>>
+> 
+> OK, so my plan to email sdhci driver maintainers ran into a snag.  It turned
+> out to be too hard to dig up email addresses.  I have grabbed a few names
+> and cc'ed them to this email anyway.
+> 
+> For those people, the issue is this:
+> 
+> An unexpected side-effect of commit 7b91369b4655 ("mmc: sdhci: Set DMA mask
+> when adding host") is that SDHCI devices that do not define a DMA mask may
+> find that DMA no longer works.  That was the case for a sdhci-esdhc-imx
+> device, but that has been fixed - refer commit fc26fe9c3869 ("ARM: mach-imx:
+> sdhci-esdhc-imx: initialize DMA mask").
+> 
+> DeviceTree, ACPI and PCI always set up a DMA mask for devices that they
+> enumerate, so only hard-coded platform devices are expected to be affected.
+> 
+> We found only one other candidate: sdhci-pxav3 devices created by
+> mmp2_add_sdhost().  Not sure if anyone has looked at that though.
+> 
+> Obviously, if you are unsure if your devices are affected, you can test and
+> if there is a problem you will see the warning messages "mmcX: Failed to set
+> 32-bit DMA mask" and "mmcX: No suitable DMA available - falling back to PIO".
+> 
+> Regards
+> Adrian
+> 
+> 
