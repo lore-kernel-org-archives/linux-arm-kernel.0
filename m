@@ -1,26 +1,23 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 29 Apr 2016 13:26:16 +0200
-Subject: [PATCH] i2c: st: Implement i2c_bus_recovery_info callbacks
-In-Reply-To: <20160428145720.GA1541@katana>
-References: <1460467759-11737-1-git-send-email-peter.griffin@linaro.org>
- <20160424211044.GD4317@katana> <5722107C.3000600@st.com>
- <20160428145720.GA1541@katana>
-Message-ID: <572344D8.6060401@st.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 29 Apr 2016 13:31:31 +0200
+Subject: [PATCH] arm/arm64: KVM: Enforce Break-Before-Make on Stage-2
+ page tables
+In-Reply-To: <1461856591-5751-1-git-send-email-marc.zyngier@arm.com>
+References: <1461856591-5751-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160429113131.GA24942@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 28, 2016 at 04:16:31PM +0100, Marc Zyngier wrote:
+> The ARM architecture mandates that when changing a page table entry
+> from a valid entry to another valid entry, an invalid entry is first
+> written, TLB invalidated, and only then the new entry being written.
+> 
+> The current code doesn't respect this, directly writing the new
+> entry and only then invalidating TLBs. Let's fix it up.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
+Thanks for fixing this, I've applied it to next.
 
-On 04/28/2016 04:57 PM, Wolfram Sang wrote:
->> The trick is to switch to SPI mode, 9 bits words and write a 0,
->> so that 9 clock pulses are generated.
-> Heh. As long as it works :) But as you said, it really needs a comment.
->
-:)
-I didn't faced the problem myself, but it looks good with an oscilloscope,
-and a customer reported it to work.
-
-Peter, will you resend with adding the explanations I provided as comment?
-
-Thanks in advance,
-Maxime
+-Christoffer
