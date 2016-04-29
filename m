@@ -1,64 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Apr 2016 15:15:29 +0200
-Subject: [PATCH v4 5/5] arm64: dts: marvell: add XOR node for Armada 3700
- SoC
-In-Reply-To: <1461916149-30900-6-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Fri, 29 Apr 2016 09:49:09 +0200")
-References: <1461916149-30900-1-git-send-email-gregory.clement@free-electrons.com>
- <1461916149-30900-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87vb30sgi6.fsf@free-electrons.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 29 Apr 2016 09:22:11 -0400
+Subject: VDSO unmap and remap support for additional architectures
+In-Reply-To: <2ce7203f-305c-6edf-0ef9-448c141cb103@kernel.org>
+References: <20151202121918.GA4523@arm.com>
+ <1461856737-17071-1-git-send-email-cov@codeaurora.org>
+ <2ce7203f-305c-6edf-0ef9-448c141cb103@kernel.org>
+Message-ID: <57236003.5060804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On ven., avril 29 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hi Andy,
 
-> Armada 3700 SoC comprise one dual-channel XOR engine and this
-> patch adds its according representation.
->
+On 04/28/2016 02:53 PM, Andy Lutomirski wrote:
+> On 04/28/2016 08:18 AM, Christopher Covington wrote:
+>> Please take a look at the following prototype of sharing the PowerPC
+>> VDSO unmap and remap code with other architectures. I've only hooked
+>> up arm64 to begin with. If folks think this is a reasonable approach I
+>> can work on 32 bit ARM as well. Not hearing back from an earlier
+>> request for guidance [1], I simply dove in and started hacking.
+>> Laurent's test case [2][3] is a compelling illustration of whether VDSO
+>> remap works or not on a given architecture.
+> 
+> I think there's a much nicer way:
+> 
+> https://lkml.kernel.org/r/1461584223-9418-1-git-send-email-dsafonov at virtuozzo.com
+> 
+> Could arm64 and ppc use this approach?  These arch_xyz hooks are gross.
 
-I applied this patch on mvebu/dt64 (the new binding was appouved since
-the v3).
+Thanks for the pointer. Any thoughts on how to keep essentially
+identical definitions of vdso_mremap from proliferating into every
+architecture and variant?
 
-Gregory
+> Also, at some point, possibly quite soon, x86 will want a way for
+> user code to ask the kernel to map a specific vdso variant at a specific
+> address. Could we perhaps add a new pair of syscalls:
+> 
+> struct vdso_info {
+>     unsigned long space_needed_before;
+>     unsigned long space_needed_after;
+>     unsigned long alignment;
+> };
+> 
+> long vdso_get_info(unsigned int vdso_type, struct vdso_info *info);
+> 
+> long vdso_remap(unsigned int vdso_type, unsigned long addr, unsigned int flags);
+> 
+> #define VDSO_X86_I386 0
+> #define VDSO_X86_64 1
+> #define VDSO_X86_X32 2
+> // etc.
+> 
+> vdso_remap will map the vdso of the chosen type such at
+> AT_SYSINFO_EHDR lines up with addr. It will use up to
+> space_needed_before bytes before that address and space_needed_after
+> after than address. It will also unmap the old vdso (or maybe only do
+> that if some flag is set).
+> 
+> On x86, mremap is *not* sufficient for everything that's needed,
+> because some programs will need to change the vdso type.
 
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index 1d4fb4d27787..9e2efb882983 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -113,6 +113,19 @@
->  				status = "disabled";
->  			};
->  
-> +			xor at 60900 {
-> +				compatible = "marvell,armada-3700-xor";
-> +				reg = <0x60900 0x100
-> +				       0x60b00 0x100>;
-> +
-> +				xor10 {
-> +					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-> +				};
-> +				xor11 {
-> +					interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-> +				};
-> +			};
-> +
->  			sata: sata at e0000 {
->  				compatible = "marvell,armada-3700-ahci";
->  				reg = <0xe0000 0x2000>;
-> -- 
-> 2.5.0
->
+I don't I understand. Why can't people just exec() the ELF type that
+corresponds to the VDSO they want?
+
+Thanks,
+Cov
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
