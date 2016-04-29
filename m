@@ -1,171 +1,114 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Apr 2016 12:15:01 +0100
-Subject: [RFC v5 4/4] gpio: dt-bindings: add gpio-mmio bindings
-In-Reply-To: <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
-References: <cover.1461888822.git.chunkeey@googlemail.com>
- <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
-Message-ID: <20160429111500.GA23726@leverpostej>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 29 Apr 2016 13:19:15 +0200
+Subject: [PATCH v2 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
+References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
+ <CALszF6CUFKAjzUpEh3pDtSDdJuFan1ON0Kcu_uKD_OX36kXOHQ@mail.gmail.com>
+ <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
+Message-ID: <CALszF6D1nPJ8NVghWo27y1KABwN7-QQfjPTmgY2pgdY_8jjkTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2016-04-29 10:53 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Apr 19, 2016 at 11:04 AM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
+>> 2016-04-08 11:43 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+>>> On Thu, Mar 31, 2016 at 5:09 PM, Maxime Coquelin
+>>> <mcoquelin.stm32@gmail.com> wrote:
+>>>
+>>>> +static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+>>>> +{
+>>>> +       struct stm32_pinctrl *pctl = dev_get_drvdata(chip->parent);
+>>>> +       struct stm32_gpio_bank *bank = gpiochip_get_data(chip);
+>>>> +       unsigned int irq;
+>>>> +
+>>>> +       regmap_field_write(pctl->irqmux[offset], bank->range.id);
+>>>
+>>> No. You must implement the irqchip and GPIO controllers to
+>>> be orthogonal, doing things like this creates a semantic that
+>>> assumes .to_irq() is always called before using the IRQ and
+>>> that is not guaranteed at all. A consumer may very well
+>>> use an interrupt right off the irqchip without this being called
+>>> first. All this function should do is translate a number. No
+>>> other semantics.
+>>>
+>>> This needs to be done from the irqchip (sorry).
+>>
+>> Actually, the register written here is not part of the irqchip.
+>> It is a system config register that is only used when using a GPIO as
+>> external interrupt.
+>> Its aim is to mux the GPIO bank on a line.
+>
+> Then it should be done in .request() for the GPIO, not in
+> .to_irq().
+Problem is that at request time, we don't know whether the GPIO is to
+be used as an interrupt or not.
 
-As a general thing, please put the binding earlier in a series than code
-implemeting it, as that that makes it easier to review the series
-in-order (with context from the binding making code review easier). See
-Documentation/devicetree/bindings/submitting-patches.txt
+I think I may have not been clear enough in the HW architecture description.
+Indeed, I used the term "mux", but should instead use the term "selector".
 
-On Fri, Apr 29, 2016 at 02:53:17AM +0200, Christian Lamparter wrote:
-> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
-> 
-> This patch adds the device tree bindings for the gpio-mmio.
-> The gpio-mmio is already part of a the GPIO generic library.
-> 
-> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
-> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
-> ---
->  .../devicetree/bindings/gpio/gpio-mmio.txt         | 73 ++++++++++++++++++++++
->  1 file changed, 73 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mmio.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mmio.txt b/Documentation/devicetree/bindings/gpio/gpio-mmio.txt
-> new file mode 100644
-> index 0000000..cc7f0b1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-mmio.txt
-> @@ -0,0 +1,73 @@
-> +Bindings for the generic driver for memory-mapped GPIO controllers.
-> +
+The idea is that between the GPIO controllers and the EXTI controller,
+there is one selector for each line number, to select the controller used as
+interrupt source.
 
-Bindings should be for hardware (either specific device models, or for
-classes), and not for Linux drivers. The latter is subject to arbitrary
-changes while the former is not, as old hardware continues to exist and
-does not change while drivers get completely reworked.
+For example, there is a selector on line 0 to select between gpioa0, gpiob0,
+gpioc0,.., gpiok0, which one is connected to exti0.
 
-So please frame this binding document in terms of the class of hardware
-you are trying to address. Please provide some introduction to the
-assumptions that you are making about said hardware, such that it's
-obvious when one needs a more specific binding.
+It means there is a HW restriction that makes impossible to use both GPIOA0
+or GPIOB0 as interrupts at the same time.
 
-I share the same fears that Rob mentioned in that while this may appear
-simple now, the limitations are unclear, and this effectively prevents
-us from accurately/specifically describing some hardware.
+It looks like this: http://pastebin.com/raw/cs2WiNKZ
+You can directly check section 12.2.5 of the stm32f429 reference manual:
+http://www2.st.com/resource/en/reference_manual/dm00031020.pdf
 
-Regardless, I've taken the time to review the below, and I have a number
-of comments.
+For example, we can imagine a board where gpioa0 is used SD's card detect,
+and gpiob0 used to control a led.
 
-> +Required properties:
-> +	- compatible: should be "linux,gpio-mmio"
+If we set the mux at request time, gpiob0 request may overwrite the mux
+configuration set by gpioa0, whereas it is not used as interrupt.
 
-Even with the above comments, this binding name would be valid.
+That is the reason why I did it in .to_irq().
 
-> +	- reg-names: must contain
-> +		"dat" - data register
-> +		may contain
-> +		"set" - data set register
-> +		"clr" - data clear register
-> +		"dirout" - direction output register
-> +		"dirin" - direction input register
+>
+> It should *also* be done in the set-up path for the irqchip
+> side, if that line is used without any interaction with the
+> gpio side of things.
+Actually, a line is either used by a GPIO, (exclusive) or another purpose.
+In the case of a GPIO line, I think we should always go through the gpio.
 
-Below, we mention endianness. Are registers an arbitrary number of bytes
-long? In what unit size are they grouped (e.g. {8,16,32,64}-bit)?
+>
+>> For example on line 1, it can be muxed to select either gpioa1,
+>> gpiob1, gpioc1, ...
+>> How could I do it in the irqchip that has no gpio knowledge?
+>
+> I don't understand this.
+>
+> We are discussing an irqchip that is tightly coupled with
+> a gpiochip. Usually d->hwirq is the same as the GPIO offset
+> but that varies.
+>
+> The point is that each IRQ that ever get used
+> has a 1-to-1 relationship to a certain GPIO line, and if that
+> relationship cannot be resolved from the irqchip side,
+> something is wrong. The irqchip needs to enable the
+> GPIO line it is backing to recieve interrupts without any
+> requirements that .to_irq() have been called first.
 
-What are the expectations for the set/clear/dirin/dirout registers? Are
-they write-one to modify, or write-zero to modify?
+Actually, this is not a 1:1 relationship, as for example, exti0 can be connected
+to either gpioa0, or gpiob0,..., or gpiok0.
 
-For the names, don't bother abbreviating (i.e. use "data", "set",
-"clear").
+So for the exti entries that are connected to gpios, I don't see how
+we can reference it
+from the exti controller,
+>
+> If to_irq() does something else than translate to an IRQ
+> something is wrong.
 
-These names might clash with the real names a specific HW model applies
-to its register sets, which means that this binding is exclusive w.r.t.
-a specific binding for a device (i.e. it cannot be extended with
-device-specific information).
+Ok, so maybe we need an intermediate layer between gpio and exti to manage the
+selectors sysconf?
+I wiil have a look in that direction, but I think it could be over-engineered.
 
-If we're happy with that, then we must call out the expected limitations
-on the use of this binding, or we end up with the not-so-simple-any-more
-issues Rob mentioned previously. 
-
-> +	- reg: address + size pairs describing the GPIO register sets;
-> +		order must correspond with the order of entries in reg-names
-> +	- #gpio-cells = must be set to 2
-
-Where the cells encode what? I'm guessing this is <$idx $flags>, but you
-should spell that out explicitly.
-
-> +	- gpio-controller: Marks the device node as a gpio controller.
-> +
-> +Optional properties:
-> +	- ngpio: specifies the number of gpio mapped in the register.
-> +	- big-endian: force big endian register accesses.
-> +	- big-endian-byte-order: assign GPIOs in reverse order.
-
-I cannot parse this last description. It needs a better wording.
-
-I guess this means that the indices (in the first GPIO cell) are applied
-in descending order for ascending chunks of the registers (and that is a
-poor description, too).
-
-> +	- unreadable-reg-set: data set register is not readable.
-> +	- read-output-reg-set: cache value set for reads.
-> +	- unreadable-reg-dir: dirout/dirin register is not readable.
-> +	- no-output: GPIOs are read-only.
-> +
-> +The GPIO generic library provides support for memory-mapped GPIO
-> +controllers. The configuration is detected by which resources are present.
-> +The simplest form of a GPIO controller that the driver support is just a
-> +single "dat" register, where GPIO state can be read and/or written.
-> +However, the driver supports far more:
-> +	- 8/16/32/64 bits registers. The number of GPIOs is automatically
-> +	  determined by the width of the registers.
-> +	- GPIO controllers with clear/set registers.
-> +	- GPIO controllers with a single "dat" register.
-> +	- Big endian bits/GPIOs ordering.
-
-Reword this in terms of the class of hardware you are trying to support,
-(rather than the specific library code you are using), and move it to
-the introduction at the top of the binding.
-
-Thanks,
-Mark.
-
-> +
-> +For setting GPIO's there are three configurations:
-> +	1. single input/output register resource (named "dat"),
-> +	2. set/clear pair (named "set" and "clr"),
-> +	3. single output register resource and single input resource
-> +	   ("set" and dat").
-> +
-> +For setting the GPIO direction, there are three configurations:
-> +	a. simple bidirectional GPIOs that requires no configuration.
-> +	b. an output direction register (named "dirout")
-> +	   where a 1 bit indicates the GPIO is an output.
-> +	c. an input direction register (named "dirin")
-> +	   where a 1 bit indicates the GPIO is an input.
-> +
-> +Examples:
-> +
-> +	/* Configuration for single input/output register
-> +	 * for eight simple bidirectional GPIOs.
-> +	 */
-> +	gpio_a_1 {
-> +		compatible = "linux,gpio-mmio";
-> +		reg = <0x18000000 0x1>;
-> +		reg-names = "dat";
-> +		#gpio-cells = <2>;
-> +		gpio-controller;
-> +	};
-> +
-> +	/* Configuration for set/clear pair registers with
-> +	 * 32 output direction register GPIOs.
-> +	 */
-> +	gpio_b_2 {
-> +		compatible = "linux,gpio-mmio";
-> +		reg = <0x18000000 0x4>, <0x18000010 0x4>,
-> +		      <0x18000004 0x4>, <0x18000008 0x4>;
-> +		reg-names = "dat", "set", "clr", "dirout";
-> +		#gpio-cells = <2>;
-> +		gpio-controller;
-> +	};
-> -- 
-> 2.8.1
-> 
+Thanks!
+Maxime
