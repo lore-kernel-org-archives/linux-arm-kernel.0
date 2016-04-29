@@ -1,27 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Apr 2016 09:44:13 +0200
-Subject: [PATCH v2 10/10] gpio: stmpe: Add STMPE1600 support
-In-Reply-To: <1461845589-4826-11-git-send-email-patrice.chotard@st.com>
-References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
- <1461845589-4826-11-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkda=EtfuQZT6wcrZM4R4FhvM9A9N6sXRrvWV2bYgiDShGw@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Fri, 29 Apr 2016 15:42:17 +0800
+Subject: [PATCH] drm/rockchip: vop: Initialize vskiplines to zero
+Message-ID: <1461915737-23156-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 2:13 PM,  <patrice.chotard@st.com> wrote:
+There is a path that use vskiplines with non-initialize.
+That would cause vop abnormal behavior.
 
-> From: Patrice Chotard <patrice.chotard@st.com>
->
-> The particularities of this variant are:
-> - GPIO_XXX_LSB and GPIO_XXX_MSB memory locations are inverted compared
->   to other variants.
-> - There is no Edge detection, Rising Edge and Falling Edge registers.
-> - IRQ flags are cleared when read, no need to write in Status register.
->
-> Signed-off-by: Amelie DELAUNAY <amelie.delaunay@st.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 8652bb1..bf55cda 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -310,7 +310,7 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
+ 	uint16_t vsu_mode;
+ 	uint16_t lb_mode;
+ 	uint32_t val;
+-	int vskiplines;
++	int vskiplines = 0;
+ 
+ 	if (dst_w > 3840) {
+ 		DRM_ERROR("Maximum destination width (3840) exceeded\n");
+-- 
+1.9.1
