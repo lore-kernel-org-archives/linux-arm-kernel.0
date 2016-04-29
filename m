@@ -1,60 +1,64 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 29 Apr 2016 16:13:38 +0300
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <4271094.ei7kj5zJxn@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <2760348.qmm1L3yQch@wuerfel> <20160428222137.GB18227@yury-N73SV>
- <4271094.ei7kj5zJxn@wuerfel>
-Message-ID: <20160429131338.GB32007@yury-N73SV>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 29 Apr 2016 15:15:29 +0200
+Subject: [PATCH v4 5/5] arm64: dts: marvell: add XOR node for Armada 3700
+ SoC
+In-Reply-To: <1461916149-30900-6-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Fri, 29 Apr 2016 09:49:09 +0200")
+References: <1461916149-30900-1-git-send-email-gregory.clement@free-electrons.com>
+ <1461916149-30900-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87vb30sgi6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 12:43:41AM +0200, Arnd Bergmann wrote:
-> On Friday 29 April 2016 01:21:37 Yury Norov wrote:
-> > index 1458ad7..410d817 100644
-> > --- a/arch/arm64/kernel/sys_ilp32.c
-> > +++ b/arch/arm64/kernel/sys_ilp32.c
-> > @@ -17,6 +17,8 @@
-> >  * along with this program.  If not, see
-> >  * <http://www.gnu.org/licenses/>.
-> >  */
-> >     
-> > +#define __SYSCALL_COMPAT
-> > +
-> >  #include <linux/compiler.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/fs.h>
-> > @@ -48,13 +50,12 @@ asmlinkage long
-> >  ilp32_sys_rt_sigreturn_wrapper(void);
-> >    
-> >  #include <asm/syscall.h>
-> >      
-> > -#undef __SYSCALL
-> > -#undef __SC_COMP
-> > -#undef __SC_WRAP
-> > -#undef __SC_3264
-> > -#undef __SC_COMP_3264
-> >  
-> > -#define __SYSCALL_COMPAT
-> >  #define __SYSCALL(nr, sym)     [nr] = sym,
-> >  #define __SC_WRAP(nr, sym)     [nr] = compat_##sym,
-> >          
-> > This patch makes gcc warn about redefinition.
-> > 
-> > arch/arm64/kernel/sys_ilp32.c:59:0: warning: "__SYSCALL" redefined
-> >  #define __SYSCALL(nr, sym) [nr] = sym,
-> >  ^
-> > In file included from include/asm-generic/unistd.h:1:0,
-> > 
-> 
-> Ok, I think I see it now. Can you #undef the two symbols at the
-> end of arch/arm64/include/uapi/asm/unistd.h
+Hi,
+ 
+ On ven., avril 29 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-I think it doesn't look better than what we have now, but not worse
-as well. If you like it, I'll change.
+> Armada 3700 SoC comprise one dual-channel XOR engine and this
+> patch adds its according representation.
+>
 
-> or possibly
-> include/uapi/asm-generic/unistd.h?
-> 
-> 	Arnd
+I applied this patch on mvebu/dt64 (the new binding was appouved since
+the v3).
+
+Gregory
+
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index 1d4fb4d27787..9e2efb882983 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -113,6 +113,19 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			xor at 60900 {
+> +				compatible = "marvell,armada-3700-xor";
+> +				reg = <0x60900 0x100
+> +				       0x60b00 0x100>;
+> +
+> +				xor10 {
+> +					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+> +				};
+> +				xor11 {
+> +					interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+> +				};
+> +			};
+> +
+>  			sata: sata at e0000 {
+>  				compatible = "marvell,armada-3700-ahci";
+>  				reg = <0xe0000 0x2000>;
+> -- 
+> 2.5.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
