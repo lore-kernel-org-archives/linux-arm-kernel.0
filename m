@@ -1,38 +1,49 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Apr 2016 09:49:08 +0200
-Subject: [PATCH v4 4/5] dmaengine: mv_xor: Allow selecting mv_xor for mvebu
- only compatible SoC
+Date: Fri, 29 Apr 2016 09:49:05 +0200
+Subject: [PATCH v4 1/5] dmaengine: mv_xor: make the code 64 bits compliant
 In-Reply-To: <1461916149-30900-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1461916149-30900-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1461916149-30900-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1461916149-30900-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 3700 SoC uses the mv_xor driver but don't select anymore the
-PLAT_ORION symbol. This commit extends the dependency of the mv_xor
-driver to the more modern SoCs only compatible with ARCH_MVEBU, which
-allows using it with the Armada 3700 SoC.
+Fix two warnings which appear when building for 64 bits target:
 
-In the same time it also add the COMPILE_TEST dependency allowing a wider
-test coverage.
+drivers/dma/mv_xor.c: In function ?mv_xor_prep_dma_xor?:
+drivers/dma/mv_xor.c:480:3: warning: format ?%u? expects argument of type ?unsigned int?, but argument 6 has type ?size_t {aka long unsigned int}? [-Wformat=]
+   "%s src_cnt: %d len: %u dest %pad flags: %ld\n",
+   ^
+drivers/dma/mv_xor.c: In function ?mv_xor_probe?:
+drivers/dma/mv_xor.c:1223:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+    op_in_desc = (int)of_id->data;
+                 ^
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/dma/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/mv_xor.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index d96d87c56f2e..67b37ce94143 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -332,7 +332,7 @@ config MPC512X_DMA
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 3922a5d56806..a6ec82776cbc 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -477,7 +477,7 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
  
- config MV_XOR
- 	bool "Marvell XOR engine support"
--	depends on PLAT_ORION
-+	depends on PLAT_ORION || ARCH_MVEBU || COMPILE_TEST
- 	select DMA_ENGINE
- 	select DMA_ENGINE_RAID
- 	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+-		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
++		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+ 		__func__, src_cnt, len, &dest, flags);
+ 
+ 	sw_desc = mv_chan_alloc_slot(mv_chan);
+@@ -1220,7 +1220,7 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 			struct mv_xor_chan *chan;
+ 			dma_cap_mask_t cap_mask;
+ 			int irq;
+-			op_in_desc = (int)of_id->data;
++			op_in_desc = (uintptr_t)of_id->data;
+ 
+ 			if (i >= max_channels)
+ 				continue;
 -- 
 2.5.0
