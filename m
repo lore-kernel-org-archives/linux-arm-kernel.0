@@ -1,58 +1,29 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 29 Apr 2016 11:59:39 +0300
-Subject: Potential issue with SDHCI DMA
-In-Reply-To: <57232233.1030702@intel.com>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <6297512.2KmasKu6UN@wuerfel> <5714857C.9070002@intel.com>
- <7893683.FFM02uuNdT@wuerfel> <57232233.1030702@intel.com>
-Message-ID: <5723227B.9070006@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Apr 2016 11:17:08 +0200
+Subject: [PATCH] pinctrl: at91-pio4: fix pull-up/down logic
+In-Reply-To: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CACRpkdbxu4guLjaaMrQ5h1H=4nByuzbSc-aOBdb2S7m8BfZ5Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-mmc
+On Tue, Apr 19, 2016 at 4:03 PM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
 
-On 29/04/16 11:58, Adrian Hunter wrote:
-> On 18/04/16 17:33, Arnd Bergmann wrote:
->> On Monday 18 April 2016 09:58:04 Adrian Hunter wrote:
->>>
->>> Thanks for looking.
->>>
->>> It looked to me like sdhci-pxav3 devices created by mmp2_add_sdhost() might
->>> also be candidates.
->>>
->>
->> Oh, you are right, I missed that.
->>
->> I remember looking at sdhci-pxav2 and not finding any machine defining one,
->> but I must have skipped over sdhci-pxav3 failing to realize that this is
->> a different one.
->>
->> 	Arnd
->>
-> 
-> OK, so my plan to email sdhci driver maintainers ran into a snag.  It turned
-> out to be too hard to dig up email addresses.  I have grabbed a few names
-> and cc'ed them to this email anyway.
-> 
-> For those people, the issue is this:
-> 
-> An unexpected side-effect of commit 7b91369b4655 ("mmc: sdhci: Set DMA mask
-> when adding host") is that SDHCI devices that do not define a DMA mask may
-> find that DMA no longer works.  That was the case for a sdhci-esdhc-imx
-> device, but that has been fixed - refer commit fc26fe9c3869 ("ARM: mach-imx:
-> sdhci-esdhc-imx: initialize DMA mask").
-> 
-> DeviceTree, ACPI and PCI always set up a DMA mask for devices that they
-> enumerate, so only hard-coded platform devices are expected to be affected.
-> 
-> We found only one other candidate: sdhci-pxav3 devices created by
-> mmp2_add_sdhost().  Not sure if anyone has looked at that though.
-> 
-> Obviously, if you are unsure if your devices are affected, you can test and
-> if there is a problem you will see the warning messages "mmcX: Failed to set
-> 32-bit DMA mask" and "mmcX: No suitable DMA available - falling back to PIO".
-> 
-> Regards
-> Adrian
-> 
-> 
+> The default configuration of a pin is often with a value in the
+> pull-up/down field at chip reset. So, even if the internal logic of the
+> controller prevents writing a configuration with pull-up and pull-down at
+> the same time, we must ensure explicitly this condition before writing the
+> register.
+>
+> This was leading to a pull-down condition not taken into account for
+> instance.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: 776180848b57 ("pinctrl: introduce driver for Atmel PIO4 controller")
+> Cc: stable at vger.kernel.org #v4.4 and later
+
+Patch applied for fixes with the ACKs.
+
+Yours,
+Linus Walleij
