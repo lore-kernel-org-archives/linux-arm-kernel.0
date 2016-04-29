@@ -1,48 +1,51 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 29 Apr 2016 14:31:59 +0200
-Subject: [RFC PATCH 1/1] clk: imx7d: move clk setting out of
- imx7d_clocks_init
-In-Reply-To: <20160429095500.GC28427@shlinux2.ap.freescale.net>
-References: <alpine.DEB.2.11.1604271212290.3941@nanos>
- <1461923115-16563-1-git-send-email-aisheng.dong@nxp.com>
- <20160429095500.GC28427@shlinux2.ap.freescale.net>
-Message-ID: <1461933119.3482.19.camel@pengutronix.de>
+Date: Fri, 29 Apr 2016 14:43:13 +0200
+Subject: [PATCH v2 2/3] ARM: imx6: rework GPC to support multiple power
+ domains
+In-Reply-To: <20160407024857.GA3111@x250>
+References: <1458128514-9560-1-git-send-email-l.stach@pengutronix.de>
+ <1458128514-9560-2-git-send-email-l.stach@pengutronix.de>
+ <20160407024857.GA3111@x250>
+Message-ID: <1461933793.3482.24.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 29.04.2016, 17:55 +0800 schrieb Dong Aisheng:
-> On Fri, Apr 29, 2016 at 05:45:15PM +0800, Dong Aisheng wrote:
-> > During kernel early booting(e.g. in time_init()), there's only one
-> > init idle task running, and the idle sched class indicates that it's
-> > not valid to schedule for idle task. If it happens the kernel
-> > will complain with a error message as follows:
-> > [    0.000000] bad: scheduling from the idle thread!
+Am Donnerstag, den 07.04.2016, 10:48 +0800 schrieb Shawn Guo:
+> On Wed, Mar 16, 2016 at 12:41:53PM +0100, Lucas Stach wrote:
+> > This largely reworks the GPC driver to better accommodate multiple
+> > power domains. This allows to extend the driver to support more domains
+> > (like present on i.MX6SX) easily later on.
 > > 
-> > We can observe this warning on an i.MX7D SDB board. See full log below.
-> > It is caused by imx7d_clocks_init function called in time_init
-> > invokes a lot clk_prepare_enable to enable many clocks and it happens
-> > that the Audio/Video PLLs need large delay causes a sleep.
+> > Compatibility to the old DT bindings is provided to keep the currently
+> > supported i.MX6 devices working with the same feature level as before.
+> > New DTs and SoC support should only use the new binding from now on.
 > > 
-> > Since we should not sleep during time_init, this patch fundamentally
-> > moves all clk_prepare_enable and clk_set_parent out of imx7d_clocks_init
-> > and use a postcore init function imx7d_clocks_setup to do it later instead.
-> > Then we simply reply on the bootloader settings to do early boot.
-> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> > v2: correct spelling in commit message
+> > ---
+> >  arch/arm/mach-imx/gpc.c | 435 ++++++++++++++++++++++++++++++++++++------------
+> >  1 file changed, 329 insertions(+), 106 deletions(-)
 > 
-> Hi Shawn,
+> There are too many changes in this single patch.  It makes the review
+> quite difficult.  Is it possible to split it a bit into some incremental
+> patches?
 > 
-> This is a draft RFC patch. Pls help check if you can accept
-> this way. If yes, i can also convert other platforms.
-> 
-> BTW, one know issue is we may need check if need extra fix
-> for imx_register_uart_clocks(uart_clks) separately in case
-> the uart clocks are not enabled in bootloader.
+I see that this is a quite difficult transformation and hard to review,
+but it's also equally hard to split up without introducing regressions
+and breaking bisectability in the series. This would cost me at least a
+full day to revalidate the changes, time which I currently don't have
+available.
 
-The sole purpose of imx_register_uart_clocks() is to keep earlycon
-clocks enabled. Earlycon already operates under the assumption that the
-relevant clocks are enabled by the bootloader as earlycon must work
-before the clock driver is initialized. So there is no problem here to
-fix here.
+Maybe it's easier to review if you apply the change and look at the
+resulting code?
+
+> Also please rebase against v4.6-rc1, which has the commit eaa2d73ef998
+> (ARM: imx6: pm: declare pm domain latency on power_state struct)
+> conflicting with your changes.
+> 
+I can do that if you are willing to take it in the current form. If you
+still want to have it split up, I'll keep it blocked on -ENOTIME.
 
 Regards,
 Lucas
