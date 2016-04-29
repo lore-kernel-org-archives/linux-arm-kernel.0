@@ -1,82 +1,39 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 29 Apr 2016 13:04:48 -0700
-Subject: [PATCH v2 0/4] Patches to allow consistent mmc / mmcblk numbering
- w/ device tree
-In-Reply-To: <20160429195741.GY19428@n2100.arm.linux.org.uk>
-References: <1461951139-6109-1-git-send-email-dianders@chromium.org>
- <20160429181248.GW19428@n2100.arm.linux.org.uk>
- <CAD=FV=VMxBYXOYOyHPeqcaWX7oU8pVrdLHOsWOWUgq-q5FshAw@mail.gmail.com>
- <20160429195741.GY19428@n2100.arm.linux.org.uk>
-Message-ID: <CAD=FV=UGyi0r3kDmc1cpcANTP-2u+7UEgW3r9kRvF2f8qcWH+g@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 29 Apr 2016 22:06:00 +0200
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160421130450.GQ29406@pali>
+References: <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
+ <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
+ <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
+ <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
+ <20160417175539.GA502@amd> <20160421130450.GQ29406@pali>
+Message-ID: <20160429200559.GA16598@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi,
 
-On Fri, Apr 29, 2016 at 12:57 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->> * Presumably on a PC you've got an extra bit in the middle (like grub
->> or something like that) that can help you resolve your UUIDs even if
->> you get your kernel from somewhere else.
->
-> You are over-estimating what grub does.  Grub doesn't resolve UUIDs at
-> all.  Grub just passes the kernel arguments in its configuration file
-> for the entry it is booting to the kernel.  It's a static configuration
-> found in /boot/grub/grub.conf.
->
-> It doesn't probe devices for UUIDs.
+On Thu, Apr 21, 2016 at 03:04:50PM +0200, Pali Roh?r wrote:
+> > CONFIG_HSI breaks power management completely, so power management
+> > with modem will be another topic.  
+> 
+> Sebastian, any idea why power management does not work for HSI?
 
-OK.  The point was: if folks on PCs have a workflow that works for
-them, wonderful.  That workflow doesn't work so great for me.  My
-workflow doesn't hurt them.  Why is it bad?
+I wasn't aware, that pm_runtime_irq_safe() basically breaks runtime
+PM until Tony's fix for musb (even though it's logical when thinking
+about it). Currently omap-ssi and omap-ssi-port make use of
+pm_runtime_irq_safe().
 
+Since pm_runtime_get_sync/pm_runtime_put_sync is called from
+tasklets in omap-ssi (and omap-ssi-port) it cannot be simply
+removed. So fixing PM for the ssi controller requires reworking
+the driver in a non trivial way.
 
->> * Presumably in the non-embedded world kernel hackers have a different
->> workflow.  They probably don't swap between different devices with
->> different configurations on an hourly basis.  They're not in the habit
->> of totally reimaging their system periodically.  Etc.  Trying to force
->> the workflow of a PC kernel hacker and an embedded kernel hacker to be
->> the same doesn't seem like a worthwhile goal.
->
-> In _my_ world with the "embedded" devices I have, I mount by UUID on
-> platforms which have multiple MMC devices to avoid exactly the problem
-> you're having.  This works fine.
->
-> If I were to switch the SD card, and I wanted to avoid changing the
-> boot loader configuration, I'd use label instead, and I'd label all
-> the SD card rootfs using the same label so I could just swap the cards.
-
-OK.  The point was: if you have a workflow that works for you,
-wonderful.  That workflow doesn't work so great for me.  My workflow
-doesn't hurt you.  Why is it bad?
-
-
->> * Presumably an embedded kernel hacker running with ATA / SCSI could
->> _usually_ assume that "sda" is his/her root filesystem.  It's unlikely
->> an embedded system would have more than one "sda" disk builtin and
->> it's nearly guaranteed (I think) that a builtin ATA / SCSI controller
->> would probe before any USB based devices.
->
-> You've got a funny view again.  N2100 has two hard disks.  The clearfog
-> board from SolidRun has two mini-PCIe slots, each of which can have two
-> SATA interfaces... If you want to use it as a server-type platform with
-> lots of disks...
-
-OK.  The point was: if you have a workflow that works for you,
-wonderful.  That workflow doesn't work so great for me.  My workflow
-doesn't hurt you.  Why is it bad?
-
-
->> Sure, if your root
->> filesystem is USB based (really?) and you've got additional USB
->> storage devices then you're SOL.  Sorry.
->
-> One of my Versatile Express platforms boots from USB, and has a MMC
-> slot...  So this argument does not stack up.
-
-OK.  The point was: if you have a workflow that works for you,
-wonderful.  That workflow doesn't work so great for me.  My workflow
-doesn't hurt you.  Why is it bad?
-
-
--Doug
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/91c1c8c2/attachment-0001.sig>
