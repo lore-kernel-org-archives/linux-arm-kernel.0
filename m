@@ -1,77 +1,118 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 29 Apr 2016 13:53:22 +0300
-Subject: [PATCH v3 7/7] ARM: OMAP2+: McBSP: Remove the old iclk allow/deny
- idle code
-In-Reply-To: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1461927202-17677-8-git-send-email-peter.ujfalusi@ti.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 29 Apr 2016 13:59:44 +0300
+Subject: v4l subdevs without big device was Re:
+ drivers/media/i2c/adp1653.c: does not show as /dev/video* or v4l-subdev*
+In-Reply-To: <20160429095002.GA22743@amd>
+References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
+ <57230DE7.3020701@xs4all.nl>
+ <20160429075649.GG32125@valkosipuli.retiisi.org.uk>
+ <20160429095002.GA22743@amd>
+Message-ID: <20160429105944.GH32125@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new pdata callback (force_ick_on) is now used by the driver and the old
-callback related code can be removed.
+Hi Pavel,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/mcbsp.c                 | 18 ------------------
- include/linux/platform_data/asoc-ti-mcbsp.h |  1 -
- 2 files changed, 19 deletions(-)
+On Fri, Apr 29, 2016 at 11:50:02AM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > > adp1653 registers itself as a subdev, but there's no device that
+> > > > register it as its part.
+> > > > 
+> > > > (ad5820 driver seems to have the same problem).
+> > > > 
+> > > > Is there example "dummy" device I could use, for sole purpose of
+> > > > having these devices appear in /dev? They are on i2c, so both can work
+> > > > on their own.
+> > > 
+> > > Ah, interesting. This was discussed a little bit during the Media Summit
+> > > a few weeks back:
+> > > 
+> > > http://linuxtv.org/news.php?entry=2016-04-20.mchehab
+> > > 
+> > > See section 5:
+> > > 
+> > > "5. DT Bindings for flash & lens controllers
+> > > 
+> > > There are drivers that create their MC topology using the device tree information,
+> > > which works great for entities that transport data, but how to detect entities
+> > > that don?t transport data such as flash devices, focusers, etc.? How can those be
+> > > deduced using the device tree?
+> > > 
+> > > Sensor DT node add phandle to focus controller: add generic v4l binding properties
+> > > to reference such devices."
+> > > 
+> > > This wasn't a problem with the original N900 since that didn't use DT AFAIK and
+> > > these devices were loaded explicitly through board code.
+> 
+> > > But now you run into the same problem that I have.
+> 
+> Actually... being able to do board-code solution for testing for now
+> would be nice...
+> 
+> > > 
+> > > The solution is that sensor devices have to provide phandles to those controller
+> > > devices. And to do that you need to define bindings which is always the hard part.
+> > > 
+> > > Look in Documentation/devicetree/bindings/media/video-interfaces.txt, section
+> > > "Optional endpoint properties".
+> > > 
+> > > Something like:
+> > > 
+> > > controllers: an array of phandles to controller devices associated with this
+> > > endpoint such as flash and lens controllers.
+> > > 
+> > > Warning: I'm no DT expert, so this is just a first attempt.
+> > > 
+> > > Platform drivers (omap3isp) will have to add these controller devices to the list
+> > > of subdevs to load asynchronously.
+> > 
+> > I seem to have patches I haven't had time to push back then:
+> > 
+> > <URL:http://salottisipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=shortlog;h=refs/heads/leds-as3645a>
+> >
+> 
+> That gitweb is a bit confused about its own address, but I figured it
+> out. Let me check...
+> 
+> pavel at amd:/data/l/linux-n900$ git fetch
+> git://git.retiisi.org.uk/~sailus/linux.git leds-as3645a:leds-as3645a
+> fatal: unable to connect to git.retiisi.org.uk:
+> git.retiisi.org.uk: Name or service not known
+> 
+> pavel at amd:/data/l/linux-n900$ git fetch
+> git://salottisipuli.retiisi.org.uk/~sailus/linux.git
+> leds-as3645a:leds-as3645a
+> remote: Counting objects: 132, done.
+> remote: Compressing objects: 100% (46/46), done.
+> remote: Total 132 (delta 111), reused 107 (delta 86)
+> Receiving objects: 100% (132/132), 22.80 KiB | 0 bytes/s, done.
+> Resolving deltas: 100% (111/111), completed with 34 local objects.
+> From git://salottisipuli.retiisi.org.uk/~sailus/linux
+>  * [new branch]      leds-as3645a -> leds-as3645a
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index edf4f41c0135..fc04be74e064 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -34,20 +34,6 @@
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
- 
--static struct clk *mcbsp_iclks[5];
--
--static int omap3_enable_st_clock(unsigned int id, bool enable)
--{
--	/*
--	 * Sidetone uses McBSP ICLK - which must not idle when sidetones
--	 * are enabled or sidetones start sounding ugly.
--	 */
--	if (enable)
--		return omap2_clk_deny_idle(mcbsp_iclks[id]);
--	else
--		return omap2_clk_allow_idle(mcbsp_iclks[id]);
--}
--
- static int omap3_mcbsp_force_ick_on(struct clk *clk, bool force_on)
- {
- 	if (!clk)
-@@ -75,7 +61,6 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	struct omap_hwmod *oh_device[2];
- 	struct omap_mcbsp_platform_data *pdata = NULL;
- 	struct platform_device *pdev;
--	char clk_name[11];
- 
- 	sscanf(oh->name, "mcbsp%d", &id);
- 
-@@ -116,10 +101,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	if (oh->dev_attr) {
- 		oh_device[1] = omap_hwmod_lookup((
- 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
--		pdata->enable_st_clock = omap3_enable_st_clock;
- 		pdata->force_ick_on = omap3_mcbsp_force_ick_on;
--		sprintf(clk_name, "mcbsp%d_ick", id);
--		mcbsp_iclks[id] = clk_get(NULL, clk_name);
- 		count++;
- 	}
- 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
-diff --git a/include/linux/platform_data/asoc-ti-mcbsp.h b/include/linux/platform_data/asoc-ti-mcbsp.h
-index 5530971abf4d..e684543254f3 100644
---- a/include/linux/platform_data/asoc-ti-mcbsp.h
-+++ b/include/linux/platform_data/asoc-ti-mcbsp.h
-@@ -44,7 +44,6 @@ struct omap_mcbsp_platform_data {
- 	/* McBSP platform and instance specific features */
- 	bool has_wakeup; /* Wakeup capability */
- 	bool has_ccr; /* Transceiver has configuration control registers */
--	int (*enable_st_clock)(unsigned int, bool);
- 	int (*force_ick_on)(struct clk *clk, bool force_on);
- };
- 
+Yeah, that works, too. git alias has been added some three weeks ago so
+there seem to be something strange going on with DNS.
+
+>  
+> 
+> > This seems to be mostly in line with what has been discussed in the meeting,
+> > except that the patches add a device specific property. Please ignore the
+> > led patches in that tree for now (i.e. four patches on the top are the
+> > relevant ones here).
+> > 
+> 
+> I'm currently trying to apply them to v4.6, but am getting rather ugly
+> rejects :-(.
+
+:-\
+
+There have been patches applied to the omap3isp driver since that I suppose.
+These aren't overly complex, feel free to take the patches if they're still
+useful.
+
 -- 
-2.8.1
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
