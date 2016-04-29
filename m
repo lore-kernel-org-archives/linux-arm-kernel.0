@@ -1,95 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Apr 2016 16:29:13 +0200
-Subject: [RFC v5 4/4] gpio: dt-bindings: add gpio-mmio bindings
-In-Reply-To: <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
-References: <cover.1461888822.git.chunkeey@googlemail.com>
- <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
-Message-ID: <CACRpkdYXqcQ1a=S5c6Cev__nqfquo7tFA=3uJSu9wf96txfBwQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 29 Apr 2016 16:33:55 +0200
+Subject: [GIT PULL] ARM: mvebu: soc for v4.7 (#1)
+Message-ID: <87twikscvg.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 2:53 AM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
+Hi,
 
-> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
->
-> This patch adds the device tree bindings for the gpio-mmio.
-> The gpio-mmio is already part of a the GPIO generic library.
->
-> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
-> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+Here is the first pull request for soc for mvebu for v4.7.
 
-I share your ambition to create something generic for this class
-of hardware(s).
+Gregory
 
-> +Bindings for the generic driver for memory-mapped GPIO controllers.
-> +
-> +Required properties:
-> +       - compatible: should be "linux,gpio-mmio"
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Why?
-"memory-mapped-gpio" sits nicely with me.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Read another very generic binding for inspiration:
-Documentation/devicetree/bindings/leds/register-bit-led.txt
+are available in the git repository at:
 
-> +       - reg-names: must contain
-> +               "dat" - data register
-> +               may contain
-> +               "set" - data set register
-> +               "clr" - data clear register
-> +               "dirout" - direction output register
-> +               "dirin" - direction input register
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.7-1
 
-I would just be more verbose:
+for you to fetch changes up to 3a1a4559624a51e1f4ed8954d546ccc7367bb8d4:
 
-data-in-register
-data-out-set-register
-data-out-clear-register
-direction-output-register
-direction-input-register
+  ARM: dove: Remove CLK_IS_ROOT (2016-04-27 13:55:52 +0200)
 
-Some should be optional so we can support input-only
-and output-only GPIO controllers too.
+----------------------------------------------------------------
+mvebu soc for 4.7
 
-I would take this opportunity to add bindings also for stuff that
-the generic MMIO driver does not support today but
-could be made to support:
+- Clock framework cleanup with the "Remove CLK_IS_ROOT" series
 
-open-drain-register
-open-source-register
-debounce-register
+----------------------------------------------------------------
+Stephen Boyd (3):
+      ARM: mv78xx0: Remove CLK_IS_ROOT
+      ARM: orion5x: Remove CLK_IS_ROOT
+      ARM: dove: Remove CLK_IS_ROOT
 
-etc
-
-> +Optional properties:
-> +       - ngpio: specifies the number of gpio mapped in the register.
-
-Just reference the generic docs.
-
-> +       - big-endian: force big endian register accesses.
-> +       - big-endian-byte-order: assign GPIOs in reverse order.
-> +       - unreadable-reg-set: data set register is not readable.
-> +       - read-output-reg-set: cache value set for reads.
-> +       - unreadable-reg-dir: dirout/dirin register is not readable.
-> +       - no-output: GPIOs are read-only.
-
-I think it's better to imply that if there is no data-in-register
-specified, then it is output-only etc.
-
-> +The GPIO generic library provides support for memory-mapped GPIO
-> +controllers. The configuration is detected by which resources are present.
-> +The simplest form of a GPIO controller that the driver support is just a
-> +single "dat" register, where GPIO state can be read and/or written.
-> +However, the driver supports far more:
-> +       - 8/16/32/64 bits registers. The number of GPIOs is automatically
-> +         determined by the width of the registers.
-> +       - GPIO controllers with clear/set registers.
-> +       - GPIO controllers with a single "dat" register.
-> +       - Big endian bits/GPIOs ordering.
-
-
-Skip this. It is Linux-specific.
-
-Yours,
-Linus Walleij
+ arch/arm/mach-dove/common.c    | 3 +--
+ arch/arm/mach-mv78xx0/common.c | 3 +--
+ arch/arm/mach-orion5x/common.c | 3 +--
+ 3 files changed, 3 insertions(+), 6 deletions(-)
