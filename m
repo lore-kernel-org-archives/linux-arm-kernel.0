@@ -1,357 +1,278 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 29 Apr 2016 11:05:34 +0300
-Subject: [RFC v5 3/4] gpio: move clps711x, moxart,
- ts4800 and gpio-ge into gpio-generic
-In-Reply-To: <9e5cc9e957144bd5d4081573ef959f931281eaaa.1461888822.git.chunkeey@googlemail.com>
-References: <cover.1461888822.git.chunkeey@googlemail.com>
- <9e5cc9e957144bd5d4081573ef959f931281eaaa.1461888822.git.chunkeey@googlemail.com>
-Message-ID: <CAHp75Vf_+3ja07Z99k1Grvvg-w3mj0inPdiE69zTs=fa_nn5=g@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 29 Apr 2016 15:57:45 +0800
+Subject: [PATCH 04/23] mmc: sdhci: re-factor sdhci_start_signal_voltage()
+In-Reply-To: <57230E14.7060704@intel.com>
+References: <1460741387-23815-5-git-send-email-aisheng.dong@nxp.com>
+ <571A0E5E.4090904@intel.com>
+ <CAA+hA=SygBBr+-C_r4Geodni+hj2Mg71o+ecVq_AD8vv22=UPA@mail.gmail.com>
+ <5721208C.2090509@intel.com>
+ <20160428030941.GA23362@shlinux2.ap.freescale.net>
+ <5721B03A.5030006@intel.com>
+ <20160428131451.GA27560@shlinux2.ap.freescale.net>
+ <572211D9.5010605@intel.com>
+ <20160428142843.GE27560@shlinux2.ap.freescale.net>
+ <57230E14.7060704@intel.com>
+Message-ID: <20160429075745.GB28427@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 3:53 AM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
-> This patch integrates these GPIO drivers into gpio-generic.
->
+On Fri, Apr 29, 2016 at 10:32:36AM +0300, Adrian Hunter wrote:
+> On 28/04/16 17:28, Dong Aisheng wrote:
+> > On Thu, Apr 28, 2016 at 04:36:25PM +0300, Adrian Hunter wrote:
+> >> On 28/04/16 16:14, Dong Aisheng wrote:
+> >>> On Thu, Apr 28, 2016 at 09:39:54AM +0300, Adrian Hunter wrote:
+> >>>> On 28/04/16 06:09, Dong Aisheng wrote:
+> >>>>> On Wed, Apr 27, 2016 at 11:26:52PM +0300, Adrian Hunter wrote:
+> >>>>>> On 24/04/2016 12:14 p.m., Dong Aisheng wrote:
+> >>>>>>> Hi Adrian,
+> >>>>>>>
+> >>>>>>> Thanks for the review first.
+> >>>>>>>
+> >>>>>>> On Fri, Apr 22, 2016 at 7:43 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> >>>>>>>> On 15/04/16 20:29, Dong Aisheng wrote:
+> >>>>>>>>> Handle host and regulator signal voltage switch separately.
+> >>>>>>>>> Move host signal voltage switch code into a separated function
+> >>>>>>>>> sdhci_do_signal_voltage_switch() first, the following patches will
+> >>>>>>>>> remove the regulator voltage switch code and use the common
+> >>>>>>>>> mmc_regulator_set_vqmmc() instead.
+> >>>>>>>>
+> >>>>>>>> You have changed the order that things are done.
+> >>>>>>>
+> >>>>>>> Yes, the oder changes a bit that we always do controller voltage switch first.
+> >>>>>>> I suppose the order is irrelevant here since i don't recall any
+> >>>>>>> requirement from card.
+> >>>>>>>
+> >>>>>>> Actually the original order is also a bit mass.
+> >>>>>>> e.g.
+> >>>>>>> For MMC_SIGNAL_VOLTAGE_330, switch controller first, then vqmmc.
+> >>>>>>> But for MMC_SIGNAL_VOLTAGE_180, switch vqmmc first, then controller.
+> >>>>>>> It looks to us the original one also order irrelevant.
+> >>>>>>>
+> >>>>>>>> There is no way to know
+> >>>>>>>> what that will break, so let's not do that.  What about just changing
+> >>>>>>>> regulator_set_voltage() to mmc_regulator_set_vqmmc()?
+> >>>>>>>>
+> >>>>>>>
+> >>>>>>> Currently what i can think out VIO switch using are three cases: (Pls
+> >>>>>>> help add if any)
+> >>>>>>> 1) Both host IO and card IO use external vqmmc to do switch
+> >>>>>>> (e.g eMMC 1.8V DDR/HS200/HS400 mode)
+> >>>>>>>
+> >>>>>>> eMMC has no IO voltage switch protocol and requirement, so usually
+> >>>>>>> board designed
+> >>>>>>> using fixed 1.8V for eMMC and host IO.
+> >>>>>>> Event it's switchable, it should be done in the first mmc_power_up().
+> >>>>>>> Dynamical switch later may cause eMMC unable to work properly.
+> >>>>>>> (We have been confirmed about this issue by many eMMC vendors
+> >>>>>>> like Micron and Sandisk. I'm not sure if any exceptions in the community
+> >>>>>>> still doing VIO dynamical switch for eMMC, if yes, please help share
+> >>>>>>> the experience!).
+> >>>>>>>
+> >>>>>>> Event some people still do dynamical IO switch for eMMC, since eMMC
+> >>>>>>> spec has no requirement, so the order should also not care.
+> >>>>>>>
+> >>>>>>> 2) Host using controller IO switch while card using standard CMD (SD/SDIO3.0)
+> >>>>>>>
+> >>>>>>> SD/SDIO 3.0 spec defines the standard IO switch process and using it's internal
+> >>>>>>> regulator to do card IO voltage switch. It does not use external vqmmc
+> >>>>>>> regulator.
+> >>>>>>> So order irrelevant too.
+> >>>>>>>
+> >>>>>>> 3) Host using controller IO switch while card using external vqmmc
+> >>>>>>> (special SDIO3.0 or eMMC)
+> >>>>>>> I have met some special SDIO3.0 card like Broadcom WiFi which does not follow
+> >>>>>>> the spec and using external regulator for card IO voltage.
+> >>>>>>> Usually it's required to fix to 1.8v and also not order irrelevant.
+> >>>>>>>
+> >>>>>>> For eMMC, refer to case 1), it should be fixed to 1.8v at power up.
+> >>>>>>>
+> >>>>>>> So it looks all cases seems are not order required.
+> >>>>>>
+> >>>>>> I don't agree that there is any way to know that other host controllers
+> >>>>>> are not affected.  I don't want a repeat of sdhci_set_power().
+> >>>>>>
+> >>>>>
+> >>>>> Can you share some more info about sdhci_set_power() issue?
+> >>>>> I'd like to see if we are same the issue.
+> >>>>
+> >>>> Not the same issue, but the same concept.  People changing the code under
+> >>>> the impression that their way was correct, and then breaking other people's
+> >>>> drivers.  Check the git history and mailing list.
+> >>>>
+> >>>> 	http://marc.info/?l=linux-mmc&m=145880454106474&w=2
+> >>>>
+> >>>
+> >>> Yes, now i understand your concern.
+> >>>
+> >>>>>
+> >>>>> BTW, IMHO i don't think we should stop keep moving only afraid of potential
+> >>>>> break if it's correct way. Because .start_signal_voltage_switch() interface
+> >>>>> seems shouldn't be order dependant.
+> >>>>> If it is, then it should be fixed and handled in high layer like MMC core
+> >>>>> rather than in host driver. Right?
+> >>>>
+> >>>> The SDHCI spec. does not define how to use external regulators, so there is
+> >>>> no "correct way".
+> >>>>
+> >>>
+> >>> The "correct way" i mean here is .start_signal_voltage_switch() shouldn't be
+> >>> order dependant, would you agree?
+> >>
+> >> No.  There is no way to know if the regulator must be switched before or
+> >> after the host controller register is changed.
+> >>
+> > 
+> > Hmm... If there is no way to know the correct order, how can we
+> > assume the exist order is correct?
+> 
+> There is no correct order.  This is outside the SDHCI spec. and so belongs
+> to individual drivers.
+> 
+> If it mattered we could push the ugly code down onto the drivers, and then
+> driver maintainers could opt to use the new pretty code.  However at the
+> moment there is a lot more important work, so I would want to avoid that
+> code churn.
+> 
+> > And i already pointed out, the exist order is also confused that
+> > it switch controller first then vqmmc for 3.3v and switch vqmmc
+> > first, then controller for 1.8v
+> > 
+> > If we can't sure the exist order is correct, why do we block
+> > the changing to correctly use mmc_regulator_set_vqmmc() to
+> > improve the driver stability?
+> 
+> Not sure what you mean here.  I have already showed how we can use
+> mmc_regulator_set_vqmmc().
+> 
+> > 
+> > And actually the change is not made arbitrarily, i already list
+> > all possibilities based on my knowledge. People can raise more
+> > if any.
+> 
+> You are assuming every driver has a maintainer and every maintainer is
+> following this thread, and understands how it might affect all the
+> different versions of their hardware.  That is extremely unlikely.
+> 
 
->
-> +static int clps711x_parse_dt(struct platform_device *pdev,
-> +                            struct bgpio_pdata *pdata,
-> +                            unsigned long *flags)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       int id = np ? of_alias_get_id(np, "gpio") : pdev->id;
-> +       struct resource *res;
-> +
-> +       if ((id < 0) || (id > 4))
-> +               return -ENODEV;
-> +
-> +       /* PORTE is 3 lines only */
-> +       if (id == 4)
-> +               pdata->ngpio = 3;
-> +
-> +       pdata->base = id * 8;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res)
-> +               return -EINVAL;
-> +
-> +       res->name = "dat";
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +       if (!res)
-> +               return -EINVAL;
-> +
-> +       /* PORTD is inverted logic for direction register */
-> +       res->name = (id == 3) ? "dirin" : "dirout";
-> +       return 0;
-> +}
-> +
+Yes, we can't sure it.
+All we can do on breaking old rules is do it early and test people.
+Potential break shouldn't block us to going forward IMHO.
+But i understand at this time you may not want it.
 
-I think the three below have enough in common to reorganize data
-structure and use one parse function.
+> > The target is correct that we make start_signal_voltage_switch()
+> > order independant.
+> > It's worth a try even there's a potential very low possibility
+> > break IMHO.
+> 
+> And so we disagree.
+> 
+> Aren't your needs met by changing to use mmc_regulator_set_vqmmc() the way I
+> suggested?
+> 
 
-So, instead of providing just parsing function, something like
+Well, although i'm not in favor of that way.
+But as you insist, i will re-cook the patch to fix the issue first.
 
-ngpios (0 ? read from property)
-resource size
-start, end pairs for dat/set/dirin.
-flags
+Regards
+Dong Aisheng
 
-Have no idea if it's possible to re-use this approach for case above.
-
-> +static int ge_parse_dt(struct platform_device *pdev,
-> +                      struct bgpio_pdata *pdata,
-> +                      unsigned long *flags)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +
-> +       struct resource *res;
-> +       struct resource nres[] = {
-> +               DEFINE_RES_MEM_NAMED(0, 1, "dat"),
-> +               DEFINE_RES_MEM_NAMED(0, 1, "set"),
-> +               DEFINE_RES_MEM_NAMED(0, 1, "dirin"),
-> +       };
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res || resource_size(res) != 0x24)
-> +               return -EINVAL;
-> +
-> +       nres[0].start = res->start + 0x04;
-> +       nres[0].end = nres[0].start + 3;
-> +       nres[1].start = res->start + 0x08;
-> +       nres[1].end = nres[1].start + 3;
-> +       nres[2].start = res->start + 0x00;
-> +       nres[2].end = nres[2].start + 3;
-> +       *flags |= BGPIOF_BIG_ENDIAN_BYTE_ORDER;
-> +       pdata->label = devm_kstrdup(&pdev->dev, np->full_name, GFP_KERNEL);
-> +       if (!pdata->label)
-> +               return -ENOMEM;
-> +
-> +       if (of_device_is_compatible(np, "ge,imp3a-gpio"))
-> +               pdata->ngpio = 16;
-> +       else if (of_device_is_compatible(np, "gef,sbc310-gpio"))
-> +               pdata->ngpio = 6;
-> +       else if (of_device_is_compatible(np, "gef,sbc610-gpio"))
-> +               pdata->ngpio = 19;
-> +
-> +       return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
-> +}
-> +
-> +static int moxart_parse_dt(struct platform_device *pdev,
-> +                          struct bgpio_pdata *pdata,
-> +                          unsigned long *flags)
-> +{
-> +       struct resource *res;
-> +       struct resource nres[] = {
-> +               DEFINE_RES_MEM_NAMED(0, 1, "dat"),
-> +               DEFINE_RES_MEM_NAMED(0, 1, "set"),
-> +               DEFINE_RES_MEM_NAMED(0, 1, "dirout"),
-> +       };
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res || resource_size(res) != 0xc)
-> +               return -EINVAL;
-> +
-> +       pdata->label = "moxart-gpio";
-> +       *flags |= BGPIOF_READ_OUTPUT_REG_SET;
-> +       nres[0].start = res->start + 0x04;
-> +       nres[0].end = nres[0].start + 3;
-> +       nres[1].start = res->start + 0x00;
-> +       nres[1].end = nres[1].start + 3;
-> +       nres[2].start = res->start + 0x08;
-> +       nres[2].end = nres[2].start + 3;
-> +       return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
-> +}
-> +
-> +static int ts4800_parse_dt(struct platform_device *pdev,
-> +                          struct bgpio_pdata *pdata,
-> +                          unsigned long *flags)
-> +{
-> +       int err;
-> +       struct resource *res;
-> +       struct resource nres[] = {
-> +               DEFINE_RES_MEM_NAMED(0, 1, "dat"),
-> +               DEFINE_RES_MEM_NAMED(0, 1, "set"),
-> +               DEFINE_RES_MEM_NAMED(0, 1, "dirout"),
-> +       };
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res || resource_size(res) != 0x6)
-> +               return -EINVAL;
-> +
-> +       nres[0].start = res->start;
-> +       nres[0].end = nres[0].start + 1;
-> +       nres[1].start = res->start + 0x02;
-> +       nres[1].end = nres[1].start + 1;
-> +       nres[2].start = res->start + 0x04;
-> +       nres[2].end = nres[2].start + 1;
-> +
-> +       err = of_property_read_u32(pdev->dev.of_node, "ngpios", &pdata->ngpio);
-> +       if (err == -EINVAL)
-> +               pdata->ngpio = 16;
-> +       else if (err)
-> +               return err;
-> +
-> +       return platform_device_add_resources(pdev, nres, ARRAY_SIZE(nres));
-> +}
-> +
->  #define ADD(_name, _func) { .compatible = _name, .data = _func }
->
->  static const struct of_device_id bgpio_of_match[] = {
->         ADD("linux,gpio-mmio", bgpio_basic_mmio_parse_dt),
-> +       ADD("cirrus,clps711x-gpio", clps711x_parse_dt),
-> +       ADD("ge,imp3a-gpio", ge_parse_dt),
-> +       ADD("gef,sbc310-gpio", ge_parse_dt),
-> +       ADD("gef,sbc610-gpio", ge_parse_dt),
-> +       ADD("moxa,moxart-gpio", moxart_parse_dt),
-> +       ADD("technologic,ts4800-gpio", ts4800_parse_dt),
->         { }
->  };
->  #undef ADD
-> diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
-> deleted file mode 100644
-> index d58d389..0000000
-> --- a/drivers/gpio/gpio-moxart.c
-> +++ /dev/null
-> @@ -1,84 +0,0 @@
-> -/*
-> - * MOXA ART SoCs GPIO driver.
-> - *
-> - * Copyright (C) 2013 Jonas Jensen
-> - *
-> - * Jonas Jensen <jonas.jensen@gmail.com>
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#include <linux/err.h>
-> -#include <linux/init.h>
-> -#include <linux/irq.h>
-> -#include <linux/io.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/of_address.h>
-> -#include <linux/of_gpio.h>
-> -#include <linux/pinctrl/consumer.h>
-> -#include <linux/delay.h>
-> -#include <linux/timer.h>
-> -#include <linux/bitops.h>
-> -#include <linux/gpio/driver.h>
-> -
-> -#define GPIO_DATA_OUT          0x00
-> -#define GPIO_DATA_IN           0x04
-> -#define GPIO_PIN_DIRECTION     0x08
-> -
-> -static int moxart_gpio_probe(struct platform_device *pdev)
-> -{
-> -       struct device *dev = &pdev->dev;
-> -       struct resource *res;
-> -       struct gpio_chip *gc;
-> -       void __iomem *base;
-> -       int ret;
-> -
-> -       gc = devm_kzalloc(dev, sizeof(*gc), GFP_KERNEL);
-> -       if (!gc)
-> -               return -ENOMEM;
-> -
-> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -       base = devm_ioremap_resource(dev, res);
-> -       if (IS_ERR(base))
-> -               return PTR_ERR(base);
-> -
-> -       ret = bgpio_init(gc, dev, 4, base + GPIO_DATA_IN,
-> -                        base + GPIO_DATA_OUT, NULL,
-> -                        base + GPIO_PIN_DIRECTION, NULL,
-> -                        BGPIOF_READ_OUTPUT_REG_SET);
-> -       if (ret) {
-> -               dev_err(&pdev->dev, "bgpio_init failed\n");
-> -               return ret;
-> -       }
-> -
-> -       gc->label = "moxart-gpio";
-> -       gc->request = gpiochip_generic_request;
-> -       gc->free = gpiochip_generic_free;
-> -       gc->base = 0;
-> -       gc->owner = THIS_MODULE;
-> -
-> -       ret = devm_gpiochip_add_data(dev, gc, NULL);
-> -       if (ret) {
-> -               dev_err(dev, "%s: gpiochip_add failed\n",
-> -                       dev->of_node->full_name);
-> -               return ret;
-> -       }
-> -
-> -       return ret;
-> -}
-> -
-> -static const struct of_device_id moxart_gpio_match[] = {
-> -       { .compatible = "moxa,moxart-gpio" },
-> -       { }
-> -};
-> -
-> -static struct platform_driver moxart_gpio_driver = {
-> -       .driver = {
-> -               .name           = "moxart-gpio",
-> -               .of_match_table = moxart_gpio_match,
-> -       },
-> -       .probe  = moxart_gpio_probe,
-> -};
-> -builtin_platform_driver(moxart_gpio_driver);
-> diff --git a/drivers/gpio/gpio-ts4800.c b/drivers/gpio/gpio-ts4800.c
-> deleted file mode 100644
-> index 0c144a7..0000000
-> --- a/drivers/gpio/gpio-ts4800.c
-> +++ /dev/null
-> @@ -1,81 +0,0 @@
-> -/*
-> - * GPIO driver for the TS-4800 board
-> - *
-> - * Copyright (c) 2016 - Savoir-faire Linux
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2. This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#include <linux/gpio/driver.h>
-> -#include <linux/of_address.h>
-> -#include <linux/of_device.h>
-> -#include <linux/platform_device.h>
-> -
-> -#define DEFAULT_PIN_NUMBER      16
-> -#define INPUT_REG_OFFSET        0x00
-> -#define OUTPUT_REG_OFFSET       0x02
-> -#define DIRECTION_REG_OFFSET    0x04
-> -
-> -static int ts4800_gpio_probe(struct platform_device *pdev)
-> -{
-> -       struct device_node *node;
-> -       struct gpio_chip *chip;
-> -       struct resource *res;
-> -       void __iomem *base_addr;
-> -       int retval;
-> -       u32 ngpios;
-> -
-> -       chip = devm_kzalloc(&pdev->dev, sizeof(struct gpio_chip), GFP_KERNEL);
-> -       if (!chip)
-> -               return -ENOMEM;
-> -
-> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -       base_addr = devm_ioremap_resource(&pdev->dev, res);
-> -       if (IS_ERR(base_addr))
-> -               return PTR_ERR(base_addr);
-> -
-> -       node = pdev->dev.of_node;
-> -       if (!node)
-> -               return -EINVAL;
-> -
-> -       retval = of_property_read_u32(node, "ngpios", &ngpios);
-> -       if (retval == -EINVAL)
-> -               ngpios = DEFAULT_PIN_NUMBER;
-> -       else if (retval)
-> -               return retval;
-> -
-> -       retval = bgpio_init(chip, &pdev->dev, 2, base_addr + INPUT_REG_OFFSET,
-> -                           base_addr + OUTPUT_REG_OFFSET, NULL,
-> -                           base_addr + DIRECTION_REG_OFFSET, NULL, 0);
-> -       if (retval) {
-> -               dev_err(&pdev->dev, "bgpio_init failed\n");
-> -               return retval;
-> -       }
-> -
-> -       chip->ngpio = ngpios;
-> -
-> -       platform_set_drvdata(pdev, chip);
-> -
-> -       return devm_gpiochip_add_data(&pdev->dev, chip, NULL);
-> -}
-> -
-> -static const struct of_device_id ts4800_gpio_of_match[] = {
-> -       { .compatible = "technologic,ts4800-gpio", },
-> -       {},
-> -};
-> -
-> -static struct platform_driver ts4800_gpio_driver = {
-> -       .driver = {
-> -                  .name = "ts4800-gpio",
-> -                  .of_match_table = ts4800_gpio_of_match,
-> -                  },
-> -       .probe = ts4800_gpio_probe,
-> -};
-> -
-> -module_platform_driver_probe(ts4800_gpio_driver, ts4800_gpio_probe);
-> -
-> -MODULE_AUTHOR("Julien Grossholtz <julien.grossholtz@savoirfairelinux.com>");
-> -MODULE_DESCRIPTION("TS4800 FPGA GPIO driver");
-> -MODULE_LICENSE("GPL v2");
-> --
-> 2.8.1
->
-
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+> > 
+> > Or else if we can find a better way to switch to
+> > mmc_regulator_set_vqmmc i would also love to try.
+> >  
+> > Maybe we need more people's thought on it!
+> > 
+> > Ulf,
+> > Would you give some inputs?
+> > 
+> > Regards
+> > Dong Aisheng
+> > 
+> >>>
+> >>>> We have to move forward *and* avoid potential breakage.
+> >>>>
+> >>>
+> >>> If really break happens, fix platform driver, not common SDHCI.
+> >>> That's the same thing you done for sdhci_set_power().
+> >>
+> >> In that case the original behaviour was kept in the common SDHCI code and
+> >> the driver had to provide its own way.
+> >>
+> >>>
+> >>>> In this case it seems me that the risk of breakage outweighs the value of
+> >>>> prettier code.
+> >>>>
+> >>>
+> >>> Actually my main purpose is patch 6: using mmc_regulator_set_vqmmc()
+> >>> which is worth and it does improve the stability and eliminate the
+> >>> potential signal issue.
+> >>> However it's not the same way as you proposed.
+> >>> See below.
+> >>>
+> >>>> By the way, there are ways to get rid of the ugliness - such as pushing it down
+> >>>> into individual drivers.
+> >>>>
+> >>>>>
+> >>>>>> Please instead send a patch for just using mmc_regulator_set_vqmmc()
+> >>>>>> in place of regulator_set_voltage().
+> >>>>>
+> >>>>> Just using mmc_regulator_set_vqmmc() also changes the order which
+> >>>>> is the same situation.
+> >>>>
+> >>>> How so?  It looks like a drop-in replacement to me:
+> >>>>
+> >>>
+> >>> Sorry, i did not get that you want to change like below.
+> >>> However, it looks that it does not make too much sense to call
+> >>> mmc_regulator_set_vqmmc() for each VOLTAGE type like 3.3v/1.8v/1.2v
+> >>> which introduces ugliness because mmc_regulator_set_vqmmc()
+> >>> already handles it internally, right?
+> >>> Only because we want to keep an "ASSUMED" order as before?
+> >>
+> >> Yes
+> >>
+> >>>
+> >>> Regards
+> >>> Dong Aisheng
+> >>>
+> >>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> >>>> index 94cffa77490a..69b4d48aff87 100644
+> >>>> --- a/drivers/mmc/host/sdhci.c
+> >>>> +++ b/drivers/mmc/host/sdhci.c
+> >>>> @@ -1757,8 +1757,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+> >>>>  		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+> >>>>  
+> >>>>  		if (!IS_ERR(mmc->supply.vqmmc)) {
+> >>>> -			ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
+> >>>> -						    3600000);
+> >>>> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
+> >>>>  			if (ret) {
+> >>>>  				pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
+> >>>>  					mmc_hostname(mmc));
+> >>>> @@ -1779,8 +1778,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+> >>>>  		return -EAGAIN;
+> >>>>  	case MMC_SIGNAL_VOLTAGE_180:
+> >>>>  		if (!IS_ERR(mmc->supply.vqmmc)) {
+> >>>> -			ret = regulator_set_voltage(mmc->supply.vqmmc,
+> >>>> -					1700000, 1950000);
+> >>>> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
+> >>>>  			if (ret) {
+> >>>>  				pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
+> >>>>  					mmc_hostname(mmc));
+> >>>> @@ -1810,8 +1808,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+> >>>>  		return -EAGAIN;
+> >>>>  	case MMC_SIGNAL_VOLTAGE_120:
+> >>>>  		if (!IS_ERR(mmc->supply.vqmmc)) {
+> >>>> -			ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
+> >>>> -						    1300000);
+> >>>> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
+> >>>>  			if (ret) {
+> >>>>  				pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
+> >>>>  					mmc_hostname(mmc));
+> >>>>
+> >>>>
+> >>>>
+> >>>
+> >>
+> > 
+> 
