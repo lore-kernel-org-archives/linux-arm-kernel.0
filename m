@@ -1,29 +1,64 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 29 Apr 2016 11:10:14 -0700
-Subject: [PATCH v2 2/3] Documentation: dtb: xgene: Add channel property
-In-Reply-To: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
-References: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1461953415-9741-3-git-send-email-isubramanian@apm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2016 19:10:09 +0100
+Subject: [PATCH 03/12] ARM: kexec: remove 512MB restriction on kexec
+ crashdump
+In-Reply-To: <CAHB_GuqOvRof94QdHztPy2B2kKuyKzQ-9uxXHY_g+i5WxsexZg@mail.gmail.com>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <E1aviEp-0000ir-7s@rmk-PC.arm.linux.org.uk>
+ <CAHB_GuqOvRof94QdHztPy2B2kKuyKzQ-9uxXHY_g+i5WxsexZg@mail.gmail.com>
+Message-ID: <20160429181008.GV19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
----
- Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 2 ++
- 1 file changed, 2 insertions(+)
+On Fri, Apr 29, 2016 at 07:49:45PM +0530, Pratyush Anand wrote:
+> On Thu, Apr 28, 2016 at 2:57 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/kernel/setup.c | 5 +----
+> >  1 file changed, 1 insertion(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 77b54c461c52..d9317eec1eba 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -943,7 +943,6 @@ late_initcall(init_machine_late);
+> >   * zImage relocating below the reserved region.
+> >   */
+> >  #define CRASH_ALIGN    (128 << 20)
+> > -#define CRASH_ADDR_MAX (PHYS_OFFSET + (512 << 20))
+> >
+> >  static inline unsigned long long get_total_mem(void)
+> >  {
+> > @@ -973,9 +972,7 @@ static void __init reserve_crashkernel(void)
+> >                 return;
+> >
+> >         if (crash_base <= 0) {
+> > -               unsigned long long crash_max = CRASH_ADDR_MAX;
+> > -               if (crash_max > (u32)~0)
+> > -                       crash_max = (u32)~0;
+> > +               unsigned long long crash_max = idmap_to_phys((u32)~0);
+> >                 crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+> >                                                     crash_size, CRASH_ALIGN);
+> >                 if (!crash_base) {
+> 
+> Reviewed-by: Pratyush Anand <panand@redhat.com>
+> 
+> Unrelated to these modification:
+> In function arch/arm/mm/init.c: arm_memblock_steal() may be  following
+> would be more appropriate?
+> memblock_alloc_base(size, align, idmap_to_phys(MEMBLOCK_ALLOC_ANYWHERE));
 
-diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-index 078060a..05f705e3 100644
---- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-+++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-@@ -18,6 +18,8 @@ Required properties for all the ethernet interfaces:
-   - First is the Rx interrupt.  This irq is mandatory.
-   - Second is the Tx completion interrupt.
-     This is supported only on SGMII based 1GbE and 10GbE interfaces.
-+- channel: Ethernet to CPU, start channel (prefetch buffer) number
-+  - Must map to the first irq and irqs must be sequential
- - port-id: Port number (0 or 1)
- - clocks: Reference to the clock entry.
- - local-mac-address: MAC address assigned to this device
+No, arm_memblock_steal() is totally unsuitable.  arm_memblock_steal()
+*removes* the memory range from memblock, including removing the 
+mapping of that memory.  It will make the memory range inaccessible to
+the kernel.
+
+Since kexec wants to write directly to this memory, using
+arm_memblock_steal() will have the cause the kernel to OOPS when
+it hits the resulting hole.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
