@@ -1,48 +1,42 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 29 Apr 2016 12:02:59 -0700
-Subject: [GIT PULL] DaVinci fixes for v4.6
-In-Reply-To: <5723286E.7050601@ti.com> (Sekhar Nori's message of "Fri, 29 Apr
- 2016 14:55:02 +0530")
-References: <5723286E.7050601@ti.com>
-Message-ID: <m2inz0i6fw.fsf@baylibre.com>
+Date: Fri, 29 Apr 2016 12:06:15 -0700
+Subject: [GIT PULL] Allwinner fixes for 4.6
+In-Reply-To: <20160429163904.GA6708@lukather> (Maxime Ripard's message of
+ "Fri, 29 Apr 2016 18:39:04 +0200")
+References: <20160429163904.GA6708@lukather>
+Message-ID: <m2eg9oi6ag.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-> Sorry for sending this late, but I was waiting to see if
-> Greg would rather send this (because the issue came
-> through patches he merged). I have not received a response
-> and there is danger of missing v4.6 altogether if we wait
-> any further.
+> Hi Arnd, Kevin, Olof,
 >
-> So here it is. Its based on latest in Linus's tree.
+> Please pull the patch below for the next 4.6-rc*.
 >
-> Regards,
-> Sekhar
+> thanks!
+> Maxime
 >
-> The following changes since commit 92c19ea9535707701861b7533253a516c7d115c9:
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 >
->   Merge branch 'x86-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2016-04-28 20:24:27 -0700)
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.6
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.6
 >
-> for you to fetch changes up to 29b933b6d84219af8456dee172ddc6d676ebbcd3:
+> for you to fetch changes up to dcf5341f0150bc4c5bf37786e1198d2ff8fc2c38:
 >
->   ARM: davinci: only use NVMEM when available (2016-04-29 14:21:14 +0530)
+>   ARM: dts: sun8i-q8-common: Do not set constraints on dc1sw regulator (2016-03-27 16:13:51 +0200)
 >
 > ----------------------------------------------------------------
-> This patch fixes build breakage when
-> nvmem framework is built as module.
+> Allwinner fixes for 4.6
+>
+> A single regulator fix
 >
 > ----------------------------------------------------------------
 
-Our fixes branch was based on -rc5 and yours was on -rc6, so rather than
-pulling in all of -rc6, I just cherry-picked this one patch.
-
-Anyways, pushed to arm-soc/fixes.
+Pulled into fixes,
 
 Thanks,
 
