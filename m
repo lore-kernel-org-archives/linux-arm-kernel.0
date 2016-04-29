@@ -1,49 +1,60 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 29 Apr 2016 12:59:50 +0200
-Subject: [RFT PATCH 2/3] ARM: dts: exynos: Provide regulator for usb3503 on
- Odroid to fix device detection
+Date: Fri, 29 Apr 2016 12:59:51 +0200
+Subject: [PATCH 3/3] regulator: max77686: Configure enable time to properly
+ handle regulator enable
 In-Reply-To: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
 References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1461927591-7864-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1461927591-7864-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Odroid U3 (Exynos4412-based) board if USB was initialized by
-bootloader (in U-Boot "usb start" before tftpboot), the HUB after
-successful probing was not visible in the system ("lsusb"). Connected
-devices were not visible neither.
+The enable time for buck regulators was not configured but actually is
+essential: consumers, like usb3503, doing hard reset (regulator off/on)
+should wait for the regulator to settle.
 
-The USB3503 takes optional regulator so provide one - buck8 on Odroid
-U3.
-
-Additionally switch the control of buck8 to GPIO mode. It is faster than
-I2C/register mode and it is the easiest way to disable it (regulator
-state is a logical OR state of GPIO and register value).
+Configure the enable time according to datasheet.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4412-odroidu3.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/regulator/max77686-regulator.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index d73aa6c58fe3..5308a955ede4 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -74,6 +74,7 @@
- 	regulator-name = "BUCK8_P3V3";
- 	regulator-min-microvolt = <3300000>;
- 	regulator-max-microvolt = <3300000>;
-+	maxim,ena-gpios = <&gpa1 1 GPIO_ACTIVE_HIGH>;
- };
- 
- /* VDDQ for MSHC (eMMC card) */
-@@ -98,6 +99,7 @@
- 	clock-names = "refclk";
- 	clocks = <&pmu_system_controller 0>;
- 	refclk-frequency = <24000000>;
-+	vdd33-supply = <&buck8_reg>;
- };
- 
- &ehci {
+diff --git a/drivers/regulator/max77686-regulator.c b/drivers/regulator/max77686-regulator.c
+index d1ab6a4da88f..ac4fa581e0a5 100644
+--- a/drivers/regulator/max77686-regulator.c
++++ b/drivers/regulator/max77686-regulator.c
+@@ -41,6 +41,8 @@
+ #define MAX77686_LDO_LOW_UVSTEP	25000
+ #define MAX77686_BUCK_MINUV	750000
+ #define MAX77686_BUCK_UVSTEP	50000
++#define MAX77686_BUCK_ENABLE_TIME	40		/* us */
++#define MAX77686_DVS_ENABLE_TIME	22		/* us */
+ #define MAX77686_RAMP_DELAY	100000			/* uV/us */
+ #define MAX77686_DVS_RAMP_DELAY	27500			/* uV/us */
+ #define MAX77686_DVS_MINUV	600000
+@@ -422,6 +424,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
+ 	.min_uV		= MAX77686_BUCK_MINUV,				\
+ 	.uV_step	= MAX77686_BUCK_UVSTEP,				\
+ 	.ramp_delay	= MAX77686_RAMP_DELAY,				\
++	.enable_time	= MAX77686_BUCK_ENABLE_TIME,			\
+ 	.n_voltages	= MAX77686_VSEL_MASK + 1,			\
+ 	.vsel_reg	= MAX77686_REG_BUCK5OUT + (num - 5) * 2,	\
+ 	.vsel_mask	= MAX77686_VSEL_MASK,				\
+@@ -439,6 +442,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
+ 	.min_uV		= MAX77686_BUCK_MINUV,				\
+ 	.uV_step	= MAX77686_BUCK_UVSTEP,				\
+ 	.ramp_delay	= MAX77686_RAMP_DELAY,				\
++	.enable_time	= MAX77686_BUCK_ENABLE_TIME,			\
+ 	.n_voltages	= MAX77686_VSEL_MASK + 1,			\
+ 	.vsel_reg	= MAX77686_REG_BUCK1OUT,			\
+ 	.vsel_mask	= MAX77686_VSEL_MASK,				\
+@@ -456,6 +460,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
+ 	.min_uV		= MAX77686_DVS_MINUV,				\
+ 	.uV_step	= MAX77686_DVS_UVSTEP,				\
+ 	.ramp_delay	= MAX77686_DVS_RAMP_DELAY,			\
++	.enable_time	= MAX77686_DVS_ENABLE_TIME,			\
+ 	.n_voltages	= MAX77686_DVS_VSEL_MASK + 1,			\
+ 	.vsel_reg	= MAX77686_REG_BUCK2DVS1 + (num - 2) * 10,	\
+ 	.vsel_mask	= MAX77686_DVS_VSEL_MASK,			\
 -- 
 1.9.1
