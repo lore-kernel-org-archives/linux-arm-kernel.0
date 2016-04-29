@@ -1,213 +1,83 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 29 Apr 2016 22:29:26 +0100
-Subject: [PATCH v2] asm-generic: Drop renameat syscall from default list
-Message-ID: <1461965366-7893-1-git-send-email-james.hogan@imgtec.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2016 22:29:20 +0100
+Subject: [PATCH v2 0/4] Patches to allow consistent mmc / mmcblk
+ numbering w/ device tree
+In-Reply-To: <CAD=FV=V8BOsO36eUOGAcXp04xCiN13UGG0Vaf2yhh1MQn85FjA@mail.gmail.com>
+References: <1461951139-6109-1-git-send-email-dianders@chromium.org>
+ <20160429181248.GW19428@n2100.arm.linux.org.uk>
+ <CAD=FV=VMxBYXOYOyHPeqcaWX7oU8pVrdLHOsWOWUgq-q5FshAw@mail.gmail.com>
+ <20160429195741.GY19428@n2100.arm.linux.org.uk>
+ <CAD=FV=UGyi0r3kDmc1cpcANTP-2u+7UEgW3r9kRvF2f8qcWH+g@mail.gmail.com>
+ <20160429211328.GZ19428@n2100.arm.linux.org.uk>
+ <CAD=FV=V8BOsO36eUOGAcXp04xCiN13UGG0Vaf2yhh1MQn85FjA@mail.gmail.com>
+Message-ID: <20160429212920.GA19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newer renameat2 syscall provides all the functionality provided by
-the renameat syscall and adds flags, so future architectures won't need
-to include renameat.
+On Fri, Apr 29, 2016 at 02:17:45PM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Fri, Apr 29, 2016 at 2:13 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Apr 29, 2016 at 01:04:48PM -0700, Doug Anderson wrote:
+> >> Russell,
+> >>
+> >> On Fri, Apr 29, 2016 at 12:57 PM, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> >> * Presumably on a PC you've got an extra bit in the middle (like grub
+> >> >> or something like that) that can help you resolve your UUIDs even if
+> >> >> you get your kernel from somewhere else.
+> >> >
+> >> > You are over-estimating what grub does.  Grub doesn't resolve UUIDs at
+> >> > all.  Grub just passes the kernel arguments in its configuration file
+> >> > for the entry it is booting to the kernel.  It's a static configuration
+> >> > found in /boot/grub/grub.conf.
+> >> >
+> >> > It doesn't probe devices for UUIDs.
+> >>
+> >> OK.  The point was: if folks on PCs have a workflow that works for
+> >> them, wonderful.  That workflow doesn't work so great for me.  My
+> >> workflow doesn't hurt them.  Why is it bad?
+> >
+> > This discussion is over, since you're not willing to actually discuss
+> > it (illustrated by you cutting and pasting this same thing four
+> > times in your reply.)
+> >
+> > My NAK stands until such time that you can partake in a reasonable
+> > discussion.
+> 
+> The point of pasting it several times was that you'd answer it.
+> Apparently that failed.
+> 
+> Perhaps you could answer the question I posed?
 
-Therefore drop the renameat syscall from the generic syscall list unless
-__ARCH_WANT_RENAMEAT is defined by the architecture's unistd.h prior to
-including asm-generic/unistd.h, and adjust all architectures using the
-generic syscall list to define it so that no in-tree architectures are
-affected.
+No, because you haven't taken the time to think and consider my
+reply, which gives you insight into how your "problem" is no
+different from the situation that everyone else has, where it
+isn't a problem.
 
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-arch at vger.kernel.org
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: linux-snps-arc at lists.infradead.org
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-Cc: linux-c6x-dev at linux-c6x.org
-Cc: Richard Kuo <rkuo@codeaurora.org>
-Cc: linux-hexagon at vger.kernel.org
-Cc: linux-metag at vger.kernel.org
-Cc: Jonas Bonn <jonas@southpole.se>
-Cc: linux at lists.openrisc.net
-Cc: Chen Liqin <liqin.linux@gmail.com>
-Cc: Lennox Wu <lennox.wu@gmail.com>
-Cc: Chris Metcalf <cmetcalf@mellanox.com>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-Cc: Ley Foon Tan <lftan@altera.com>
-Cc: nios2-dev at lists.rocketboards.org
-Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-Cc: uclinux-h8-devel at lists.sourceforge.jp
----
-I just found this patch on an old branch, it appears to have slipped
-through the cracks. Time for a respon.
+I think the "problem" here is that you've got used to coreboot
+doing something that very few other boot loaders do, namely it
+automatically extracting a rootfs UUID for you.  The rest of the
+world doesn't have that luxury.
 
-Changes in v2:
-- Rebase onto v4.6-rc5.
-- Add __ARCH_WANT_RENAMEAT to h8300 and nios2 arches too.
----
- arch/arc/include/uapi/asm/unistd.h       | 1 +
- arch/arm64/include/uapi/asm/unistd.h     | 3 +++
- arch/c6x/include/uapi/asm/unistd.h       | 1 +
- arch/h8300/include/uapi/asm/unistd.h     | 2 ++
- arch/hexagon/include/uapi/asm/unistd.h   | 1 +
- arch/metag/include/uapi/asm/unistd.h     | 2 ++
- arch/nios2/include/uapi/asm/unistd.h     | 2 ++
- arch/openrisc/include/uapi/asm/unistd.h  | 1 +
- arch/score/include/uapi/asm/unistd.h     | 1 +
- arch/tile/include/uapi/asm/unistd.h      | 1 +
- arch/unicore32/include/uapi/asm/unistd.h | 2 ++
- include/uapi/asm-generic/unistd.h        | 3 +++
- 12 files changed, 20 insertions(+)
+So, instead, you want to stuff more code into the kernel to work
+around what you think is a problem - a problem which seems to be
+unique to yourself.
 
-diff --git a/arch/arc/include/uapi/asm/unistd.h b/arch/arc/include/uapi/asm/unistd.h
-index 39e58d1cdf90..41fa2ec9e02c 100644
---- a/arch/arc/include/uapi/asm/unistd.h
-+++ b/arch/arc/include/uapi/asm/unistd.h
-@@ -15,6 +15,7 @@
- #if !defined(_UAPI_ASM_ARC_UNISTD_H) || defined(__SYSCALL)
- #define _UAPI_ASM_ARC_UNISTD_H
- 
-+#define __ARCH_WANT_RENAMEAT
- #define __ARCH_WANT_SYS_EXECVE
- #define __ARCH_WANT_SYS_CLONE
- #define __ARCH_WANT_SYS_VFORK
-diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
-index 1caadc24e3fe..043d17a21342 100644
---- a/arch/arm64/include/uapi/asm/unistd.h
-+++ b/arch/arm64/include/uapi/asm/unistd.h
-@@ -13,4 +13,7 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+
-+#define __ARCH_WANT_RENAMEAT
-+
- #include <asm-generic/unistd.h>
-diff --git a/arch/c6x/include/uapi/asm/unistd.h b/arch/c6x/include/uapi/asm/unistd.h
-index e7d09a614d10..12d73d9d81f5 100644
---- a/arch/c6x/include/uapi/asm/unistd.h
-+++ b/arch/c6x/include/uapi/asm/unistd.h
-@@ -14,6 +14,7 @@
-  *   more details.
-  */
- 
-+#define __ARCH_WANT_RENAMEAT
- #define __ARCH_WANT_SYS_CLONE
- 
- /* Use the standard ABI for syscalls. */
-diff --git a/arch/h8300/include/uapi/asm/unistd.h b/arch/h8300/include/uapi/asm/unistd.h
-index 7a2eb698def3..7dd20ef7625a 100644
---- a/arch/h8300/include/uapi/asm/unistd.h
-+++ b/arch/h8300/include/uapi/asm/unistd.h
-@@ -1,3 +1,5 @@
- #define __ARCH_NOMMU
- 
-+#define __ARCH_WANT_RENAMEAT
-+
- #include <asm-generic/unistd.h>
-diff --git a/arch/hexagon/include/uapi/asm/unistd.h b/arch/hexagon/include/uapi/asm/unistd.h
-index ffee405d6803..21517600432b 100644
---- a/arch/hexagon/include/uapi/asm/unistd.h
-+++ b/arch/hexagon/include/uapi/asm/unistd.h
-@@ -27,6 +27,7 @@
-  */
- 
- #define sys_mmap2 sys_mmap_pgoff
-+#define __ARCH_WANT_RENAMEAT
- #define __ARCH_WANT_SYS_EXECVE
- #define __ARCH_WANT_SYS_CLONE
- #define __ARCH_WANT_SYS_VFORK
-diff --git a/arch/metag/include/uapi/asm/unistd.h b/arch/metag/include/uapi/asm/unistd.h
-index b80b8e899d22..459b6ec15848 100644
---- a/arch/metag/include/uapi/asm/unistd.h
-+++ b/arch/metag/include/uapi/asm/unistd.h
-@@ -7,6 +7,8 @@
-  * (at your option) any later version.
-  */
- 
-+#define __ARCH_WANT_RENAMEAT
-+
- /* Use the standard ABI for syscalls. */
- #include <asm-generic/unistd.h>
- 
-diff --git a/arch/nios2/include/uapi/asm/unistd.h b/arch/nios2/include/uapi/asm/unistd.h
-index c4bf79510461..51a32c71ce2b 100644
---- a/arch/nios2/include/uapi/asm/unistd.h
-+++ b/arch/nios2/include/uapi/asm/unistd.h
-@@ -17,6 +17,8 @@
- 
-  #define sys_mmap2 sys_mmap_pgoff
- 
-+#define __ARCH_WANT_RENAMEAT
-+
- /* Use the standard ABI for syscalls */
- #include <asm-generic/unistd.h>
- 
-diff --git a/arch/openrisc/include/uapi/asm/unistd.h b/arch/openrisc/include/uapi/asm/unistd.h
-index ce40b71df006..471905bd7745 100644
---- a/arch/openrisc/include/uapi/asm/unistd.h
-+++ b/arch/openrisc/include/uapi/asm/unistd.h
-@@ -20,6 +20,7 @@
- 
- #define sys_mmap2 sys_mmap_pgoff
- 
-+#define __ARCH_WANT_RENAMEAT
- #define __ARCH_WANT_SYS_FORK
- #define __ARCH_WANT_SYS_CLONE
- 
-diff --git a/arch/score/include/uapi/asm/unistd.h b/arch/score/include/uapi/asm/unistd.h
-index 9cb4260a5f3e..d4008c339e89 100644
---- a/arch/score/include/uapi/asm/unistd.h
-+++ b/arch/score/include/uapi/asm/unistd.h
-@@ -1,5 +1,6 @@
- #define __ARCH_HAVE_MMU
- 
-+#define __ARCH_WANT_RENAMEAT
- #define __ARCH_WANT_SYSCALL_NO_AT
- #define __ARCH_WANT_SYSCALL_NO_FLAGS
- #define __ARCH_WANT_SYSCALL_OFF_T
-diff --git a/arch/tile/include/uapi/asm/unistd.h b/arch/tile/include/uapi/asm/unistd.h
-index 3866397aaf5a..24e9187e85a8 100644
---- a/arch/tile/include/uapi/asm/unistd.h
-+++ b/arch/tile/include/uapi/asm/unistd.h
-@@ -12,6 +12,7 @@
-  *   more details.
-  */
- 
-+#define __ARCH_WANT_RENAMEAT
- #if !defined(__LP64__) || defined(__SYSCALL_COMPAT)
- /* Use the flavor of this syscall that matches the 32-bit API better. */
- #define __ARCH_WANT_SYNC_FILE_RANGE2
-diff --git a/arch/unicore32/include/uapi/asm/unistd.h b/arch/unicore32/include/uapi/asm/unistd.h
-index d4cc4559d848..1f63c476528e 100644
---- a/arch/unicore32/include/uapi/asm/unistd.h
-+++ b/arch/unicore32/include/uapi/asm/unistd.h
-@@ -10,6 +10,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#define __ARCH_WANT_RENAMEAT
-+
- /* Use the standard ABI for syscalls. */
- #include <asm-generic/unistd.h>
- #define __ARCH_WANT_SYS_CLONE
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index 6e0f5f01734c..8fdb796c0540 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -127,8 +127,11 @@ __SYSCALL(__NR_unlinkat, sys_unlinkat)
- __SYSCALL(__NR_symlinkat, sys_symlinkat)
- #define __NR_linkat 37
- __SYSCALL(__NR_linkat, sys_linkat)
-+#ifdef __ARCH_WANT_RENAMEAT
-+/* renameat is superseded with flags by renameat2 */
- #define __NR_renameat 38
- __SYSCALL(__NR_renameat, sys_renameat)
-+#endif /* __ARCH_WANT_RENAMEAT */
- 
- /* fs/namespace.c */
- #define __NR_umount2 39
+The UUID and label solutions were created by x86 people to work
+around exactly this dynamic device problem, and as my previous
+replies have shown, it is superior to fixing the device assignment
+as you're trying to do.
+
+However, I don't expect that you'll like this answer, and you'll
+probably just re-post your same question after each and every
+paragraph rather than considering whether the already existing
+solutions could solve your "problem".  So I'm just wasting my time.
+
+This is my last reply.
+
 -- 
-2.4.10
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
