@@ -1,34 +1,56 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 29 Apr 2016 14:52:50 +0200
-Subject: [PATCH v3 3/3] ARM: dts: imx6qp: Specify imx6qp version of PCIe
- core
-In-Reply-To: <CAOMZO5DFd4+NQcBHgaoXVNnixOQ4xYbi_LJsUcWzjMzTidGcgA@mail.gmail.com>
-References: <1461167131-26025-1-git-send-email-andrew.smirnov@gmail.com>
- <1461167131-26025-3-git-send-email-andrew.smirnov@gmail.com>
- <CAOMZO5DFd4+NQcBHgaoXVNnixOQ4xYbi_LJsUcWzjMzTidGcgA@mail.gmail.com>
-Message-ID: <CAAMH-yt8fGJzhhHENFobWO86E3JZ-Xgc0tZso_HkdScoKdfVDA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 29 Apr 2016 15:00:28 +0200
+Subject: [PATCH 0/3] arm64: marvell: few improvment for Armada 37xx device
+ tree
+In-Reply-To: <1461771989-15662-1-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Wed, 27 Apr 2016 17:46:26 +0200")
+References: <1461771989-15662-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87ziscsh77.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
+ 
+ On mer., avril 27 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-On Fri, Apr 29, 2016 at 3:48 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Wed, Apr 20, 2016 at 12:45 PM, Andrey Smirnov
-> <andrew.smirnov@gmail.com> wrote:
->> I.MX6Quad Plus has a slightly different version of PCIe core than
->> reqular i.MX6Quad.
->>
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Hi,
 >
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> This series add few improvement on the dts for Armada 37xx. First it
+> send a second version of the patch from Andreas with the modification
+> initially asked. I also fix the compatibility property for the xHCI
+> node to conform to the documentation.
+>
+>
 
-Tested on a Nitrogen6QP_MAX with an Intel WiFi Link 5300 PCIe card.
-Everything is working properly (Gen1 speed).
-# lspci
-00:00.0 Class 0604: 16c3:abcd
-01:00.0 Class 0280: 8086:4235
+I just want to let you know that this series was already applied on
+mvebu/dt64
 
-Tested-by: Gary Bisson <gary.bisson@boundarydevices.com>
+Gregory
 
-Thanks,
-Gary
+> Thanks,
+>
+> Gregory
+>
+> Andreas F?rber (2):
+>   arm64: dts: marvell: Clean up armada-3720-db
+>   arm64: dts: marvell: Rename armada-37xx USB node
+>
+> Gregory CLEMENT (1):
+>   arm64: dts: marvell: Use a SoC-specific compatible for xHCI on
+>     Armada37xx
+>
+>  Documentation/devicetree/bindings/usb/usb-xhci.txt |  1 +
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 32 ++++++++--------------
+>  arch/arm64/boot/dts/marvell/armada-372x.dtsi       |  1 -
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  7 +++--
+>  4 files changed, 17 insertions(+), 24 deletions(-)
+>
+> -- 
+> 2.5.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
