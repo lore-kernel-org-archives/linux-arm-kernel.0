@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Apr 2016 09:42:06 +0200
-Subject: [PATCH v2 06/10] mfd: stmpe: rework registers access
-In-Reply-To: <1461845589-4826-7-git-send-email-patrice.chotard@st.com>
+Date: Fri, 29 Apr 2016 09:42:55 +0200
+Subject: [PATCH v2 07/10] gpio: stmpe: rework registers access
+In-Reply-To: <1461845589-4826-8-git-send-email-patrice.chotard@st.com>
 References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
- <1461845589-4826-7-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdbPGjmKb6V+QhxnjV+FxcTDhFDmMdjfHhS4fUEHVXEs6A@mail.gmail.com>
+ <1461845589-4826-8-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdZ8NsXCaRgVCVKKiuGoCEWvAUx81Do5XangEq3Fptj3ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,7 +12,7 @@ On Thu, Apr 28, 2016 at 2:13 PM,  <patrice.chotard@st.com> wrote:
 
 > From: Patrice Chotard <patrice.chotard@st.com>
 >
-> this update allows to use registers map as following :
+> This update allows to use registers map as following :
 > regs[reg_index + offset] instead of
 > regs[reg_index] + offset
 >
@@ -28,8 +28,6 @@ On Thu, Apr 28, 2016 at 2:13 PM,  <patrice.chotard@st.com> wrote:
 > In this case the CSB index contains the MSB regs address (STMPE 1601).
 >
 > Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-
-Yep this is so much clearer!
 
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
