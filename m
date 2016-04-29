@@ -1,72 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Apr 2016 18:49:33 +0200
-Subject: [GIT PULL] Allwinner clocks additions for 4.7
-Message-ID: <20160429164933.GA8913@lukather>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Fri, 29 Apr 2016 10:08:12 -0700
+Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
+ SoC PMU DTS binding
+In-Reply-To: <20160420113121.GE2514@arm.com>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+ <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
+ <20160418170009.GA15338@rob-hp-laptop>
+ <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
+ <20160420113121.GE2514@arm.com>
+Message-ID: <CACgAJHwYRU_Z6hbgnjFyw9SXhRqHzTt3z2kyp9-T=8Jq70T2Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi Mark and Rob,
 
-Please pull the following tag for the next merge window.
+[...]
 
-Thanks!
-Maxime
+>
+> Regardless, I'll need an ack from Rob or Mark before I can merge this.
+>
+> Will
 
-The following changes since commit 92a39d9043ba5ff98adb1c31491f00c7bea5466e:
+Do you have any more comments, please?
 
-  clk: composite: Add unregister function (2016-04-21 14:43:28 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-4.7
-
-for you to fetch changes up to ff2bb89335daec6053b5ac778369f7f72b931142:
-
-  clk: sunxi: Let divs clocks read the base factor clock name from devicetree (2016-04-25 10:57:45 +0200)
-
-----------------------------------------------------------------
-Allwinner clocks additions for 4.7
-
-As usual, a bunch of clocks patches for 4.7, mostly fixes and cleanups, and
-display-related clocks.
-
-----------------------------------------------------------------
-Andrea Venturi (1):
-      clk: sunxi: mod1 clock should modify it's parent
-
-Jean-Francois Moine (1):
-      clk: sunxi: Add sun6i/8i display support
-
-Jens Kuske (1):
-      clk: sunxi: Let divs clocks read the base factor clock name from devicetree
-
-Maxime Ripard (3):
-      dt-bindings: clk: sun5i: add DRAM gates compatible
-      clk: sunxi: Add PLL3 clock
-      clk: sunxi: Add TCON channel1 clock
-
-Vaishali Thakkar (1):
-      clk: sunxi: Use resource_size
-
- Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
- drivers/clk/sunxi/Makefile                        |   2 +
- drivers/clk/sunxi/clk-a10-mod1.c                  |   2 +-
- drivers/clk/sunxi/clk-sun4i-pll3.c                |  98 +++++++
- drivers/clk/sunxi/clk-sun4i-tcon-ch1.c            | 300 ++++++++++++++++++++++
- drivers/clk/sunxi/clk-sun9i-mmc.c                 |   2 +-
- drivers/clk/sunxi/clk-sunxi.c                     |  79 +++++-
- 7 files changed, 474 insertions(+), 13 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-sun4i-pll3.c
- create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-
+Thanks,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/b872c32c/attachment-0001.sig>
+Tai
