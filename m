@@ -1,52 +1,102 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 29 Apr 2016 17:42:36 +0000
-Subject: [PATCH V4 2/2] clk: bcm2835: use CLK_ENABLE_HAND_OFF instead of
- CLK_IS_CRITICAL
-In-Reply-To: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
-References: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1461951756-16804-3-git-send-email-kernel@martin.sperl.org>
+From: harald@ccbib.org (Harald Geyer)
+Date: Fri, 29 Apr 2016 19:45:18 +0200
+Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
+In-Reply-To: <572379F5.8000501@i2se.com>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <572379F5.8000501@i2se.com>
+Message-ID: <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Hi Stefan!
 
-The use of CLK_IS_CRITICAL is just a stop-gap to avoid unpreparing
-essential PLLs that may result stopping the system without intention.
+On 29.04.2016 17:12, Stefan Wahren wrote:
+> Hi Harald,
+>
+> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
+>> Patch 1/3 changes the driver and updates the binding documentation
+>> (I guess it is still in staging.)
+>>
+>> Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 
+>> boards.
+>> I'd like to get input whether this is actually desired. On boards 
+>> where
+>> these regulators would never be enabled this costs a few extra bytes 
+>> of
+>> RAM for allocation of the device data, because the nodes can't be 
+>> easily
+>> removed in .dts files which are including the .dtsi files. The 
+>> alternative
+>> is to add the new nodes to many .dts files, which would be a lot 
+>> code
+>> duplication.
+>
+> if i get it right the real intention of this patch series is to make 
+> the
+> mxs-lradc provide resistance values instead of voltages.
 
-This moves to use CLK_ENABLE_HAND_OFF instead of CLK_IS_CRITICAL,
-so that clocks (and their parents) may get released
-if there is a driver that claims (and then later releases) a
-specific clock.
+... or even temperature values if a thermistor is connected.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> So how about
+> dropping the whole regulator stuff and provide the values as
+> IIO_RESISTANCE via iio interface?
 
---
-Note that this requires the following patches applied:
-* clk: introduce CLK_ENABLE_HAND_OFF flag
-* clk: per-user clk prepare & enable ref counts
----
- drivers/clk/bcm/clk-bcm2835.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Can you elaborate on this?
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 03b7f01..6303c3a 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1251,12 +1251,12 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
- 	}
- 
--	/* if the clock is running, then enable CRITICAL */
-+	/* if the clock is running, then enable CLK_ENABLE_HAND_OFF */
- 	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
- 		dev_dbg(cprman->dev,
--			"found firmware enabled clock %s - enabling critical\n",
-+			"found firmware enabled clock %s - enabling hand off\n",
- 			data->name);
--		init.flags |= CLK_IS_CRITICAL;
-+		init.flags |= CLK_ENABLE_HAND_OFF;
- 	}
- 
- 	clock = devm_kzalloc(cprman->dev, sizeof(*clock), GFP_KERNEL);
+My thinking is that there should be a thermistor (or whatever else) 
+driver,
+that is a consumer of the regulator and a consumer of the IIO_VOLTAGE
+iio channel and provides a new device with an IIO_RESISTANCE or 
+IIO_TEMP
+channel. Maybe there is a simpler solution, that I'm missing?
+
+Actually I'm not 100% happy with the above solution myself, because if 
+we
+start supporting devices that act as an iio-multiplexer (some device 
+that
+is an iio consumer and provides many new iio channels and can control
+via gpios which of it child channels is actually routed to the upstream
+device) I don't know how to properly manage the regulator device.
+However since this is only hypothetical ATM, I think we don't have to
+worry about this too much.
+
+> Btw this feature should be only added to dts files where is actually 
+> used.
+
+Ok, so how do we figure out which boards these are?
+I use this on the olinuxino and I guess all evaluation boards support 
+the
+use case too. The others I don't know enough about to be sure and I 
+guess
+it's not a good idea to just wait until somebody speaks up and 
+complains
+that the feature is missing on board X ...
+
+Thanks,
+Harald
+
+> Regards
+> Stefan
+>
+>>
+>> Harald Geyer (3):
+>>   iio: mxs-lradc: Add regulators for current sources
+>>   ARM: dts: imx23: Provide regulators for the current sources of the
+>>     LRADC
+>>   ARM: dts: imx28: Provide regulators for the current sources of the
+>>     LRADC
+>>
+>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>>  arch/arm/boot/dts/imx23.dtsi                       |   8 ++
+>>  arch/arm/boot/dts/imx28.dtsi                       |   8 ++
+>>  drivers/iio/adc/Kconfig                            |   1 +
+>>  drivers/iio/adc/mxs-lradc.c                        | 152 
+>> +++++++++++++++++++++
+>>  5 files changed, 198 insertions(+)
+>>
+
 -- 
-2.1.4
+If you want to support my work:
+see http://friends.ccbib.org/harald/supporting/
+or donate via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
+or bitcoin 1FUtd8T9jRN1rFz63vZz7s2fDtB6d6A7aS
