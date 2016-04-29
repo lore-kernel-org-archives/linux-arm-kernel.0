@@ -1,48 +1,35 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 29 Apr 2016 17:12:53 +0200
-Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
-In-Reply-To: <1461333147-11873-1-git-send-email-harald@ccbib.org>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
-Message-ID: <572379F5.8000501@i2se.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 29 Apr 2016 20:44:29 +0530
+Subject: [PATCH 11/12] kexec: allow architectures to override boot mapping
+In-Reply-To: <E1aviFU-0000jk-9q@rmk-PC.arm.linux.org.uk>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <E1aviFU-0000jk-9q@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAHB_GuoPDxqKbbfGHW8UEiuCxdMeEVBCMJpouaO--dbLomkzrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harald,
-
-Am 22.04.2016 um 15:52 schrieb Harald Geyer:
-> Patch 1/3 changes the driver and updates the binding documentation
-> (I guess it is still in staging.)
+On Thu, Apr 28, 2016 at 2:58 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> kexec physical addresses are the boot-time view of the system.  For
+> certain ARM systems (such as Keystone 2), the boot view of the system
+> does not match the kernel's view of the system: the boot view uses a
+> special alias in the lower 4GB of the physical address space.
 >
-> Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 boards.
-> I'd like to get input whether this is actually desired. On boards where
-> these regulators would never be enabled this costs a few extra bytes of
-> RAM for allocation of the device data, because the nodes can't be easily
-> removed in .dts files which are including the .dtsi files. The alternative
-> is to add the new nodes to many .dts files, which would be a lot code
-> duplication.
-
-if i get it right the real intention of this patch series is to make the
-mxs-lradc provide resistance values instead of voltages. So how about
-dropping the whole regulator stuff and provide the values as
-IIO_RESISTANCE via iio interface?
-
-Btw this feature should be only added to dts files where is actually used.
-
-Regards
-Stefan
-
+> To cater for these kinds of setups, we need to translate between the
+> boot view physical addresses and the normal kernel view physical
+> addresses.  This patch extracts the current transation points into
+> linux/kexec.h, and allows an architecture to override the functions.
 >
-> Harald Geyer (3):
->   iio: mxs-lradc: Add regulators for current sources
->   ARM: dts: imx23: Provide regulators for the current sources of the
->     LRADC
->   ARM: dts: imx28: Provide regulators for the current sources of the
->     LRADC
+> Due to the translations required, we unfortunately end up with six
+> translation functions, which are reduced down to four that the
+> architecture can override.
 >
->  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
->  arch/arm/boot/dts/imx23.dtsi                       |   8 ++
->  arch/arm/boot/dts/imx28.dtsi                       |   8 ++
->  drivers/iio/adc/Kconfig                            |   1 +
->  drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
->  5 files changed, 198 insertions(+)
->
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+I must be missing something when I am thinking that, had we passed
+arch_phys_to_idmap_offset to user space, this patch would not have
+been needed, and things would have been more simpler. Please help me
+to understand why passing arch_phys_to_idmap_offset to user space
+would not be a good idea.
+
+~Pratyush
