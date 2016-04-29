@@ -1,52 +1,35 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 29 Apr 2016 14:50:03 +0200
-Subject: [PATCH 2/2] pinctrl: at91: Merge clk_prepare and clk_enable into
- clk_prepare_enable
-In-Reply-To: <1461934203-3206-1-git-send-email-alexanders83@web.de>
-References: <1461934203-3206-1-git-send-email-alexanders83@web.de>
-Message-ID: <1461934203-3206-2-git-send-email-alexanders83@web.de>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Fri, 29 Apr 2016 08:51:37 -0400
+Subject: [PATCH v2 0/2] pinmux support for Broadcom NS2 SoC
+Message-ID: <1461934299-14774-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This simplifies the normal as well as the error path.
+This patchset contains the pinmux support for the Broadcom's
+Northstar 2 (NS2) SoC.
 
-Signed-off-by: Alexander Stein <alexanders83@web.de>
----
- drivers/pinctrl/pinctrl-at91.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+The first patch provides the driver details and the second patch contains
+the enable method. The documentation details patch is already merged.
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 29d57118e35c..e380333dad46 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1730,14 +1730,9 @@ static int at91_gpio_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	ret = clk_prepare(at91_chip->clock);
--	if (ret)
--		goto clk_prepare_err;
--
--	/* enable PIO controller's clock */
--	ret = clk_enable(at91_chip->clock);
-+	ret = clk_prepare_enable(at91_chip->clock);
- 	if (ret) {
--		dev_err(&pdev->dev, "failed to enable clock, ignoring.\n");
-+		dev_err(&pdev->dev, "failed to prepare and enable clock, ignoring.\n");
- 		goto clk_enable_err;
- 	}
- 
-@@ -1797,10 +1792,8 @@ static int at91_gpio_probe(struct platform_device *pdev)
- irq_setup_err:
- 	gpiochip_remove(chip);
- gpiochip_add_err:
--	clk_disable(at91_chip->clock);
- clk_enable_err:
--	clk_unprepare(at91_chip->clock);
--clk_prepare_err:
-+	clk_disable_unprepare(at91_chip->clock);
- err:
- 	dev_err(&pdev->dev, "Failure %i for GPIO %i\n", ret, alias_idx);
- 
+This patch set has been tested on NS2 bcm958712K board.
+This patch set is based on v4.6.0-rc1 and is available from github
+repo: https://github.com/Broadcom/arm64-linux.git
+branch: ns2-pinmux-v2
+
+Changes since v1:
+ removed module macros in the file as suggested by Linus
+
+Yendapally Reddy Dhananjaya Reddy (2):
+  pinctrl: ns2: add pinmux driver support for Broadcom NS2 SoC
+  ARM: dts: enable pinctrl for Broadcom NS2 SoC
+
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts |    9 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    |    7 +
+ drivers/pinctrl/bcm/Kconfig              |   13 +
+ drivers/pinctrl/bcm/Makefile             |    1 +
+ drivers/pinctrl/bcm/pinctrl-ns2-mux.c    | 1117 ++++++++++++++++++++++++++++++
+ 5 files changed, 1147 insertions(+)
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-ns2-mux.c
+
 -- 
-2.8.1
+2.1.0
