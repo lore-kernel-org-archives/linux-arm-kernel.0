@@ -1,100 +1,44 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 29 Apr 2016 09:37:09 +0100
-Subject: [PATCH V6 09/13] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <20160428214800.GG25125@localhost>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-10-git-send-email-tn@semihalf.com>
- <20160428214800.GG25125@localhost>
-Message-ID: <20160429083709.GA3249@red-moon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Apr 2016 10:40:59 +0200
+Subject: [PATCH RESEND 1/2] pinctrl: ns2: add pinmux driver support for
+ Broadcom NS2 SoC
+In-Reply-To: <dc5a5c07-7acd-ae28-cf5c-187d58de64c9@broadcom.com>
+References: <CAL2FKYnJNVOcB7aYwkwRAGSq5ufg+CJowJCnzpBEYiTMev0B9A@mail.gmail.com>
+ <dc5a5c07-7acd-ae28-cf5c-187d58de64c9@broadcom.com>
+Message-ID: <CACRpkdZb=jc8pAhxPWSF2nJnEeAU3JenTfNyZwZDrtgq4QoGsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 04:48:00PM -0500, Bjorn Helgaas wrote:
+On Mon, Apr 18, 2016 at 8:24 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+> On 4/17/2016 8:34 PM, Yendapally Reddy Dhananjaya Reddy wrote:
 
-[...]
+>>>
+>>>         /* not all Iproc GPIO pins can be muxed individually */
+>>>         if (!chip->pinmux_is_supported)
+>>>                 return 0;
+>
+>
+> NS2 does not support GPIO pins to be muxed individually. The call to
+> iproc_gpio_request should be rejected for NS2 since
+> 'chip->pinmux_is_supported' is false.
 
-> > +static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
-> > +				       struct acpi_pci_generic_root_info *ri)
-> > +{
-> > +	u16 seg = root->segment;
-> > +	u8 bus_start = root->secondary.start;
-> > +	u8 bus_end = root->secondary.end;
-> > +	struct pci_config_window *cfg;
-> > +	struct mcfg_entry *e;
-> > +	phys_addr_t addr;
-> > +	int err = 0;
-> > +
-> > +	mutex_lock(&pci_mcfg_lock);
-> 
-> What does this lock protect?  The pci_mcfg_list should already be
-> initialized by the time we get there, and it should be immutable for
-> the life of the system.  In fact, I would prefer if we could just
-> search the static table itself whenever we need it rather than caching
-> it in our own list.  But I don't think we can easily do that because
-> acpi_table_parse() is __init.
-> 
-> > +	e = pci_mcfg_lookup(seg, bus_start);
-> 
-> I would argue that we should check for _CBA first, and fall back to
-> MCFG if _CBA doesn't exist.
-> 
-> > +	if (!e) {
-> > +		addr = acpi_pci_root_get_mcfg_addr(root->device->handle);
-> 
-> IMO, acpi_pci_root_get_mcfg_addr() is misnamed.  It should be
-> acpi_pci_config_base_addr() or similar.  It definitely is not related
-> to MCFG.  Not your fault, obviously.
-> 
-> > +		if (addr == 0) {
-> > +			pr_err(PREFIX"%04x:%02x-%02x bus range error\n",
-> > +			       seg, bus_start, bus_end);
-> > +			err = -ENOENT;
-> > +			goto err_out;
-> > +		}
-> > +	} else {
-> > +		if (bus_start != e->bus_start) {
-> > +			pr_err("%04x:%02x-%02x bus range mismatch %02x\n",
-> > +			       seg, bus_start, bus_end, e->bus_start);
-> > +			err = -EINVAL;
-> > +			goto err_out;
-> > +		} else if (bus_end != e->bus_end) {
-> > +			pr_warn("%04x:%02x-%02x bus end mismatch %02x\n",
-> > +				seg, bus_start, bus_end, e->bus_end);
-> > +			bus_end = min(bus_end, e->bus_end);
-> > +		}
-> > +		addr = e->addr;
-> > +	}
-> 
-> I really don't think you need a lock around this, so you can factor
-> out the address lookup into something like:
-> 
->   addr = acpi_pci_config_base_addr(...);
->   if (addr)
->     return addr;
-> 
->   return acpi_pci_mcfg_lookup(seg, busn_res);
-> 
-> You can check inside acpi_pci_mcfg_lookup() to make sure the entry you
-> find covers the entire [busn_res.start-busn_res.end] range and return
-> failure if it doesn't.  At this point, I'm not sure it's worth it to
-> truncate the host bridge bus range to match something we find in MCFG.
-> 
-> If the MCFG entry covers *more* than the host bridge range from _CRS,
-> that's fine.  In any case, we have to be careful with the start address,
-> because the MCFG start address is always based on bus 0, but I think
-> pci_generic_ecam_create() expects the start address based on the
-> bus_start you pass to it.
+Aha, I see.
 
-Yes, I spotted this too, it is unfortunate but DT and MCFG handle
-the ECAM regions differently. In DT the reg property is relative
-to bus_start - ie reg MMIO region maps config space starting at
-the first bus in bus-range:
+> since NS2 can only support group based GPIO configuration, the
+> above functions will be rejected because "pinmux_is_supported" is false:
+>
+> chip->pinmux_is_supported = of_property_read_bool(dev->of_node,
+> "gpio-ranges");
+>
+> Here, "gpio-ranges" should never be defined on NS2 DT files.
 
-Documentation/devicetree/bindings/pci/host-generic-pci.txt
+Makes perfect sense.
 
-in ACPI(MCFG) as you said it is always relative to bus 0, it is
-unfortunate but the address to be mapped should be computed
-differently in the ECAM layer.
+So for this hardware, muxing will always be done orthogonally
+(using some pinctrl hogs or similar for GPIO).
 
-Lorenzo
+I'm waiting for a version fixing the bool Kconfig issue, then I guess
+the driver is ready for inclusion.
+
+Yours,
+Linus Waleij
