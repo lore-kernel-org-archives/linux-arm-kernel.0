@@ -1,36 +1,38 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 29 Apr 2016 17:37:06 +0530
-Subject: [GIT PULL 3/4] DaVinci defconfig updates for v4.7
+Date: Fri, 29 Apr 2016 17:37:05 +0530
+Subject: [GIT PULL 2/4] DaVinci DT updates for v4.7 (part 2)
 In-Reply-To: <1461931627-27761-1-git-send-email-nsekhar@ti.com>
 References: <1461931627-27761-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1461931627-27761-3-git-send-email-nsekhar@ti.com>
+Message-ID: <1461931627-27761-2-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+The following changes since commit 6c8f73592203b8611c6ba5d4c670c82a059ecf27:
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+  ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for i2c1 (2016-04-14 11:41:04 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.7/defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.7/dt-part2
 
-for you to fetch changes up to 8b182f395aa6e41973eff14619f3cdd36a6c67de:
+for you to fetch changes up to c6d3b5dd8e6fd802a354590314df28d6024906d8:
 
-  ARM: davinci_all_defconfig: enable SPI and NOR as modules (2016-04-25 18:37:57 +0530)
-
-----------------------------------------------------------------
-Some defconfig updates to support systemd
-based filesystems, SPI NOR and GPIO sysfs
-entries.
+  ARM: dts: da850: There are 101 interrupts. (2016-04-25 18:59:16 +0530)
 
 ----------------------------------------------------------------
-Kevin Hilman (1):
-      ARM: davinci_all_defconfig: enable SPI and NOR as modules
+Second set of DT updates for DaVinci
+adding support for SPI0 and some low
+priority fixes for ethernet and interrupt
+controller.
 
-Sekhar Nori (2):
-      ARM: davinci_all_defconfig: enable GPIO_SYSFS
-      ARM: davinci_all_defconfig: support systemd
+----------------------------------------------------------------
+David Lechner (4):
+      ARM: dts: da850: add spi0 to device tree
+      ARM: davinci: da8xx-dt: Add spi0 lookup for clock matching
+      ARM: dts: da850: disable mdio and eth0 in da850.dtsi
+      ARM: dts: da850: There are 101 interrupts.
 
- arch/arm/configs/davinci_all_defconfig | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/da850-enbw-cmc.dts |  6 ++++++
+ arch/arm/boot/dts/da850.dtsi         | 28 ++++++++++++++++++++++++++--
+ arch/arm/mach-davinci/da8xx-dt.c     |  1 +
+ 3 files changed, 33 insertions(+), 2 deletions(-)
