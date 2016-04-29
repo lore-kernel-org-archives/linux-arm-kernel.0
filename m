@@ -1,39 +1,80 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 29 Apr 2016 22:06:00 +0200
-Subject: Nokia N900 retention mode in v4.6, camera buttons fun
-In-Reply-To: <20160421130450.GQ29406@pali>
-References: <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
- <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
- <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
- <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
- <20160417175539.GA502@amd> <20160421130450.GQ29406@pali>
-Message-ID: <20160429200559.GA16598@earth>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 29 Apr 2016 15:06:09 -0500
+Subject: [PATCH] arm64: Relocate screen_info.lfb_base on PCI BAR allocation
+In-Reply-To: <CAKv+Gu-4vqT-tQXdwJbLV0r3FhtrYk=TOWxDYS6LjG_BNf=b_A@mail.gmail.com>
+References: <1461795744-28837-1-git-send-email-agraf@suse.de>
+ <20160428162035.GB19785@localhost> <57223D46.7070102@suse.de>
+ <20160428180641.GA25125@localhost> <57228317.1030808@suse.de>
+ <20160429134126.GA949@localhost>
+ <CAKv+Gu-4vqT-tQXdwJbLV0r3FhtrYk=TOWxDYS6LjG_BNf=b_A@mail.gmail.com>
+Message-ID: <20160429200609.GA28261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 29, 2016 at 03:51:49PM +0200, Ard Biesheuvel wrote:
+> On 29 April 2016 at 15:41, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Thu, Apr 28, 2016 at 11:39:35PM +0200, Alexander Graf wrote:
+> >> On 28.04.16 20:06, Bjorn Helgaas wrote:
 
-On Thu, Apr 21, 2016 at 03:04:50PM +0200, Pali Roh?r wrote:
-> > CONFIG_HSI breaks power management completely, so power management
-> > with modem will be another topic.  
+> >> > If firmware is giving us a bare address of something, that seems like
+> >> > a clue that it might depend on that address staying the same.
+> >>
+> >> Well, I'd look at it from the other side. It gives us a correct address
+> >> on entry with the system configured at exactly the state it's in on
+> >> entry. If Linux changes the system, some guarantees obviously don't work
+> >> anymore.
+> >
+> > Can you point me to the part of the EFI spec that communicates this?
+> > I'm curious what the intent is and whether there's any indication that
+> > EFI expects the OS to preserve some configuration.  I don't think it's
+> > reasonable for the OS to preserve this sort of configuration because
+> > it limits how well we can support hotplug.
+> >
+> > I wonder if we're using this frame buffer address as more than what
+> > EFI intended.  For example, maybe it was intended for use by an early
+> > console driver, but there's some other mechanism we should be using
+> > after that.
+> >
 > 
-> Sebastian, any idea why power management does not work for HSI?
+> The UEFI spec describes this as follows (UEFIv2.6 section 11.9)
+> 
+> """
+> Graphics output may also be required as part of the startup of an
+> operating system. There are
+> potentially times in modern operating systems prior to the loading of
+> a high performance OS
+> graphics driver where access to graphics output device is required.
+> The Graphics Output Protocol
+> supports this capability by providing the EFI OS loader access to a
+> hardware frame buffer and
+> enough information to allow the OS to draw directly to the graphics
+> output device.
+> """
+> 
+> So the intent is to provide minimal framebuffer services until the
+> 'real' driver takes over.
 
-I wasn't aware, that pm_runtime_irq_safe() basically breaks runtime
-PM until Tony's fix for musb (even though it's logical when thinking
-about it). Currently omap-ssi and omap-ssi-port make use of
-pm_runtime_irq_safe().
+Makes sense.  A 'real' driver for a PCI device would use
+pci_register_driver() and use pci_resource_start() or similar to
+locate the framebuffer, which would avoid the problem because the PCI
+core doesn't change BARs while a driver owns the device.
 
-Since pm_runtime_get_sync/pm_runtime_put_sync is called from
-tasklets in omap-ssi (and omap-ssi-port) it cannot be simply
-removed. So fixing PM for the ssi controller requires reworking
-the driver in a non trivial way.
+> The GOP protocol only describes the base and size of the framebuffer,
+> and the pixel format. At boot time, the early UEFI code in the kernel
+> could potentially figure out which PCI device it is related to, if
+> necessary, but i am not sure if this would solve the x86 case as well.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160429/91c1c8c2/attachment-0001.sig>
+Does drivers/video/fbdev/efifb.c support only a single framebuffer
+device?  If a system has several, how does it decide which to use?  I
+assume UEFI would provide GOP for all the framebuffers?
+
+If we could fix this by making efifb claim a PCI device, I think that
+would be cleaner.  I don't know how to figure out the correct device,
+but that would solve the "BAR changed" problem, and it would have
+cleaner ownership semantics, too.
+
+It looks like the current situation is that a device-specific driver
+(radeon, i915, etc.) could claim the device via the usual
+pci_register_driver() path, and the efifb driver could think it owns
+the device at the same time.  This seems like too obvious a problem,
+so maybe there's some ad hoc mechanism that resolves this?
