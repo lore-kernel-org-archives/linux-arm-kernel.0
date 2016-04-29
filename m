@@ -1,35 +1,23 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Apr 2016 17:01:55 +0100
-Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <1459894127-17698-25-git-send-email-ynorov@caviumnetworks.com>
+Date: Fri, 29 Apr 2016 17:03:34 +0100
+Subject: [PATCH 25/25] arm64:ilp32: add ARM64_ILP32 to Kconfig
+In-Reply-To: <1459894127-17698-26-git-send-email-ynorov@caviumnetworks.com>
 References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-25-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160429160154.GC30316@e104818-lin.cambridge.arm.com>
+ <1459894127-17698-26-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20160429160334.GD30316@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 01:08:46AM +0300, Yury Norov wrote:
-> ILP32 VDSO exports next symbols:
->  __kernel_rt_sigreturn;
->  __kernel_gettimeofday;
->  __kernel_clock_gettime;
->  __kernel_clock_getres;
+On Wed, Apr 06, 2016 at 01:08:47AM +0300, Yury Norov wrote:
+> +config ARM64_ILP32
+> +	bool "Kernel support for ILP32"
+> +	select COMPAT_WRAPPER
+> +	help
+> +	  This option enables support for AArch64 ILP32 user space.  ILP32
+> +	  is an ABI where long and pointers are 32bits but it uses the AARCH64
+> +	  instruction set.
 
-[...]
-
-> +$(obj)/gettimeofday-ilp32.o: $(src)/../vdso/gettimeofday.S
-> +	$(call if_changed_dep,vdso-ilp32as)
-
-Are struct timeval and timespec the same between ILP32 and LP64? For
-example, __kernel_gettimeofday() assumes TVAL_TV_SEC offset defined in
-asm-offsets.c based on the LP64 timeval.
-
-> +$(obj)/sigreturn-ilp32.o: $(src)/../vdso/sigreturn.S
-> +	$(call if_changed_dep,vdso-ilp32as)
-
-This one should be fine because ILP32 uses the same generic
-__NR_rt_sigreturn syscall number.
+Is there any penalty for AArch32 tasks when selecting COMPAT_WRAPPER?
 
 -- 
 Catalin
