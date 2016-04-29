@@ -1,126 +1,271 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 29 Apr 2016 15:04:32 +0100
-Subject: [PATCH v2 32/54] KVM: arm/arm64: vgic-new: Add GICv3 MMIO
- handling framework
-In-Reply-To: <1461861973-26464-33-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-33-git-send-email-andre.przywara@arm.com>
-Message-ID: <572369F0.20704@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 29 Apr 2016 16:06:49 +0200
+Subject: v4l subdevs without big device was Re:
+ drivers/media/i2c/adp1653.c: does not show as /dev/video* or v4l-subdev*
+In-Reply-To: <20160429105944.GH32125@valkosipuli.retiisi.org.uk>
+References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
+ <57230DE7.3020701@xs4all.nl>
+ <20160429075649.GG32125@valkosipuli.retiisi.org.uk>
+ <20160429095002.GA22743@amd>
+ <20160429105944.GH32125@valkosipuli.retiisi.org.uk>
+Message-ID: <20160429140649.GE21251@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hi!
 
-On 28/04/16 17:45, Andre Przywara wrote:
-> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
-> +{
-> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
-> +	struct kvm_vcpu *vcpu;
-> +	struct vgic_io_device *devices, *device;
-> +	int c, ret = 0;
-> +
-> +	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
-> +			  GFP_KERNEL);
-> +	if (!devices)
-> +		return -ENOMEM;
-> +
-> +	device = devices;
-> +	kvm_for_each_vcpu(c, vcpu, kvm) {
-> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
-> +		device->base_addr = redist_base_address;
-> +		device->regions = vgic_v3_redist_registers;
-> +		device->nr_regions = ARRAY_SIZE(vgic_v3_redist_registers);
-> +		device->redist_vcpu = vcpu;
-> +
-> +		mutex_lock(&kvm->slots_lock);
-> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> +					      redist_base_address,
-> +					      SZ_64K, &device->dev);
-> +		mutex_unlock(&kvm->slots_lock);
-> +
-> +		if (ret)
-> +			break;
-> +
-> +		device++;
-> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
-> +		device->base_addr = redist_base_address + SZ_64K;
-> +		device->regions = vgic_v3_private_registers;
-> +		device->nr_regions = ARRAY_SIZE(vgic_v3_private_registers);
-> +		device->redist_vcpu = vcpu;
-> +
-> +		mutex_lock(&kvm->slots_lock);
-> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> +					      redist_base_address + SZ_64K,
-> +					      SZ_64K, &device->dev);
-> +		mutex_unlock(&kvm->slots_lock);
-> +		if (ret) {
-> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
-> +						  &devices[c * 2].dev);
-> +			break;
-> +		}
-> +		device++;
-> +		redist_base_address += 2 * SZ_64K;
-> +	}
+> > > This seems to be mostly in line with what has been discussed in the meeting,
+> > > except that the patches add a device specific property. Please ignore the
+> > > led patches in that tree for now (i.e. four patches on the top are the
+> > > relevant ones here).
+> > > 
+> > 
+> > I'm currently trying to apply them to v4.6, but am getting rather ugly
+> > rejects :-(.
+> 
+> :-\
+> 
+> There have been patches applied to the omap3isp driver since that I suppose.
+> These aren't overly complex, feel free to take the patches if they're still
+> useful.
 
-Can we put cond_resched() somewhere in kvm_for_each_vcpu to avoid
-complains with CONFIG_PREEMPT_NONE=y and many many cpus been used?
+Ok, I got it to work. I can split it back, if needed. I've got patches
+on camera-fm3 branch. And yes, that gets flash to work.
 
->   # lkvm run -k gic-test.flat.a64 -m 316 -c 255 --name guest-727
->   Info: Loaded kernel to 0x80080000 (69624 bytes)
->   Info: Placing fdt at 0x8fe00000 - 0x8fffffff
->   # Warning: The maximum recommended amount of VCPUs is 4
->   Info: virtio-mmio.devices=0x200 at 0x10000:36
-> 
->   Info: virtio-mmio.devices=0x200 at 0x10200:37
-> 
->   Info: virtio-mmio.devices=0x200 at 0x10400:38
-> 
->   Info: virtio-mmio.devices=0x200 at 0x10600:39
-> 
-> INFO: rcu_sched self-detected stall on CPU
->  0-...: (5249 ticks this GP) idle=589/140000000000001/0 softirq=393/393 fqs=5244 
->   (t=5250 jiffies g=-166 c=-167 q=0)
-> Task dump for CPU 0:
-> kvm-vcpu-0      R  running task        0   735      1 0x00000002
-> Call trace:
-> [<ffffff8008088cc4>] dump_backtrace+0x0/0x194
-> [<ffffff8008088e6c>] show_stack+0x14/0x1c
-> [<ffffff80080d4dd0>] sched_show_task+0xa4/0xe8
-> [<ffffff80080d6ddc>] dump_cpu_task+0x40/0x4c
-> [<ffffff80080fd398>] rcu_dump_cpu_stacks+0xa8/0xdc
-> [<ffffff8008100214>] rcu_check_callbacks+0x28c/0x7a4
-> [<ffffff80081034a8>] update_process_times+0x3c/0x68
-> [<ffffff8008111820>] tick_sched_handle.isra.15+0x50/0x60
-> [<ffffff8008111874>] tick_sched_timer+0x44/0x7c
-> [<ffffff8008103bf8>] __hrtimer_run_queues+0xc8/0x150
-> [<ffffff8008104110>] hrtimer_interrupt+0x9c/0x1b0
-> [<ffffff80083b8b74>] arch_timer_handler_phys+0x2c/0x38
-> [<ffffff80080f6d14>] handle_percpu_devid_irq+0x78/0x98
-> [<ffffff80080f2a2c>] generic_handle_irq+0x24/0x38
-> [<ffffff80080f2d98>] __handle_domain_irq+0x84/0xa8
-> [<ffffff80080825e0>] gic_handle_irq+0x74/0x178
-> Exception stack(0xffffffc0173e3830 to 0xffffffc0173e3950)
-> 3820:                                   ffffffc0165ac038 ffffffc0165ac080
-> 3840: 0000000000000018 0000000000000004 0000000000000014 000000000000003f
-> 3860: ffffffc0165aeea8 ffffffc000010000 ffffffc017ef5af0 ffffffc0173ecd28
-> 3880: 000000003fef0000 cfdfdfdf00010000 ffffffc0173ecd50 000000003ff00000
-> 38a0: cfdfdfdf00010000 0000000000000000 ffffff80081acaf0 0000000000000000
-> 38c0: 0000000000000000 00000000000000f0 ffffffc0165ac008 0000000000000018
-> 38e0: ffffff80080992e8 0000000000000078 ffffff8008276b54 0000000000002970
-> 3900: 0000000000000018 ffffffc0165ac080 ffffffc0165ac038 ffffffc0173e3950
-> 3920: ffffff8008276d8c ffffffc0173e3950 ffffff8008276b58 0000000020000145
-> 3940: 0000000000000000 0000000000000001
-> [<ffffff8008084f20>] el1_irq+0xa0/0x100
-> [<ffffff8008276b58>] generic_swap+0x4/0x28
-> [<ffffff800809e108>] kvm_io_bus_register_dev+0xc8/0x110
-> [<ffffff80080ab054>] vgic_register_redist_iodevs+0xd8/0x20c
-> [<ffffff80080a98f8>] vgic_v3_map_resources+0x98/0xec
-> [<ffffff80080a8cd8>] kvm_vgic_map_resources+0x4c/0x6c
-> [<ffffff80080a06d4>] kvm_arch_vcpu_ioctl_run+0x68/0x424
-> [<ffffff800809bc98>] kvm_vcpu_ioctl+0x1b4/0x6f8
-> [<ffffff80081aca98>] do_vfs_ioctl+0x708/0x760
-> [<ffffff80081acb4c>] SyS_ioctl+0x5c/0x8c
-> [<ffffff8008085630>] el0_svc_naked+0x24/0x28
+(I don't know how to turn flash into torch, which is what I really
+wanted, but I guess I'll figure it out.)
 
-Cheers
-Vladimir
+									Pavel
+
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 640d409..a6b9fac 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -239,6 +239,7 @@
+ 
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&camera_pins>;
++	ti,camera-flashes = <&adp1653 &cam1>;
+ 
+ 	ports {
+ 		port at 1 {
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index 6361fde..23d484c 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -2095,13 +2095,20 @@ static void isp_of_parse_node_csi2(struct device *dev,
+ 	buscfg->bus.csi2.crc = 1;
+ }
+ 
+-static int isp_of_parse_node(struct device *dev, struct device_node *node,
+-			     struct isp_async_subdev *isd)
++static int isp_of_parse_node_endpoint(struct device *dev,
++				      struct device_node *node,
++				      struct isp_async_subdev *isd)
+ {
+-	struct isp_bus_cfg *buscfg = &isd->bus;
++	struct isp_bus_cfg *buscfg;
+ 	struct v4l2_of_endpoint vep;
+ 	int ret;
+ 
++	isd->bus = devm_kzalloc(dev, sizeof(*isd->bus), GFP_KERNEL);
++	if (!isd->bus)
++		return -ENOMEM;
++
++	buscfg = isd->bus;
++
+ 	ret = v4l2_of_parse_endpoint(node, &vep);
+ 	if (ret)
+ 		return ret;
+@@ -2144,10 +2151,51 @@ static int isp_of_parse_node(struct device *dev, struct device_node *node,
+ 	return 0;
+ }
+ 
++static int isp_of_parse_node(struct device *dev, struct device_node *node,
++			     struct v4l2_async_notifier *notifier,
++			     u32 group_id, bool link)
++{
++	struct isp_async_subdev *isd;
++
++	isd = devm_kzalloc(dev, sizeof(*isd), GFP_KERNEL);
++	if (!isd) {
++		of_node_put(node);
++		return -ENOMEM;
++	}
++
++	notifier->subdevs[notifier->num_subdevs] = &isd->asd;
++
++	if (link) {
++		if (isp_of_parse_node_endpoint(dev, node, isd)) {
++			of_node_put(node);
++			return -EINVAL;
++		}
++
++		isd->asd.match.of.node = of_graph_get_remote_port_parent(node);
++		of_node_put(node);
++	} else {
++		isd->asd.match.of.node = node;
++	}
++
++	if (!isd->asd.match.of.node) {
++		dev_warn(dev, "bad remote port parent\n");
++		return -EINVAL;
++	}
++
++	isd->asd.match_type = V4L2_ASYNC_MATCH_OF;
++	isd->group_id = group_id;
++	notifier->num_subdevs++;
++
++	return 0;
++}
++
+ static int isp_of_parse_nodes(struct device *dev,
+ 			      struct v4l2_async_notifier *notifier)
+ {
+ 	struct device_node *node = NULL;
++	int ret;
++	unsigned int flash = 0;
++	u32 group_id = 0;
+ 
+ 	notifier->subdevs = devm_kcalloc(
+ 		dev, ISP_MAX_SUBDEVS, sizeof(*notifier->subdevs), GFP_KERNEL);
+@@ -2156,30 +2204,57 @@ static int isp_of_parse_nodes(struct device *dev,
+ 
+ 	while (notifier->num_subdevs < ISP_MAX_SUBDEVS &&
+ 	       (node = of_graph_get_next_endpoint(dev->of_node, node))) {
+-		struct isp_async_subdev *isd;
++		ret = isp_of_parse_node(dev, node, notifier, group_id++, true);
++		if (ret)
++			return ret;
++	}
+ 
+-		isd = devm_kzalloc(dev, sizeof(*isd), GFP_KERNEL);
+-		if (!isd) {
+-			of_node_put(node);
+-			return -ENOMEM;
+-		}
++	while (notifier->num_subdevs < ISP_MAX_SUBDEVS &&
++	       (node = of_parse_phandle(dev->of_node, "ti,camera-flashes",
++					flash++))) {
++		struct device_node *sensor_node =
++			of_parse_phandle(dev->of_node, "ti,camera-flashes",
++					 flash++);
++		unsigned int i;
++		u32 flash_group_id;
++
++		if (!sensor_node)
++			return -EINVAL;
+ 
+-		notifier->subdevs[notifier->num_subdevs] = &isd->asd;
++		for (i = 0; i < notifier->num_subdevs; i++) {
++			struct isp_async_subdev *isd = container_of(
++				notifier->subdevs[i], struct isp_async_subdev,
++				asd);
+ 
+-		if (isp_of_parse_node(dev, node, isd)) {
+-			of_node_put(node);
+-			return -EINVAL;
++			if (!isd->bus)
++				continue;
++
++			dev_dbg(dev, "match \"%s\", \"%s\"\n",sensor_node->name,
++				isd->asd.match.of.node->name);
++
++			if (sensor_node != isd->asd.match.of.node)
++				continue;
++
++			dev_dbg(dev, "found\n");
++
++			flash_group_id = isd->group_id;
++			break;
+ 		}
+ 
+-		isd->asd.match.of.node = of_graph_get_remote_port_parent(node);
+-		of_node_put(node);
+-		if (!isd->asd.match.of.node) {
+-			dev_warn(dev, "bad remote port parent\n");
+-			return -EINVAL;
++		/*
++		 * No sensor was found --- complain and allocate a new
++		 * group ID.
++		 */
++		if (i == notifier->num_subdevs) {
++			dev_warn(dev, "no device node \"%s\" was found",
++				 sensor_node->name);
++			flash_group_id = group_id++;
+ 		}
+ 
+-		isd->asd.match_type = V4L2_ASYNC_MATCH_OF;
+-		notifier->num_subdevs++;
++		ret = isp_of_parse_node(dev, node, notifier, flash_group_id,
++					false);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	return notifier->num_subdevs;
+@@ -2192,8 +2267,9 @@ static int isp_subdev_notifier_bound(struct v4l2_async_notifier *async,
+ 	struct isp_async_subdev *isd =
+ 		container_of(asd, struct isp_async_subdev, asd);
+ 
++//	subdev->entity.group_id = isd->group_id;
+ 	isd->sd = subdev;
+-	isd->sd->host_priv = &isd->bus;
++	isd->sd->host_priv = isd->bus;
+ 
+ 	return 0;
+ }
+@@ -2396,12 +2472,15 @@ static int isp_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto error_register_entities;
+ 
+-	isp->notifier.bound = isp_subdev_notifier_bound;
+-	isp->notifier.complete = isp_subdev_notifier_complete;
++	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
++		isp->notifier.bound = isp_subdev_notifier_bound;
++		isp->notifier.complete = isp_subdev_notifier_complete;
+ 
+-	ret = v4l2_async_notifier_register(&isp->v4l2_dev, &isp->notifier);
+-	if (ret)
+-		goto error_register_entities;
++		ret = v4l2_async_notifier_register(&isp->v4l2_dev,
++						   &isp->notifier);
++		if (ret)
++			goto error_register_entities;
++	}
+ 
+ 	isp_core_init(isp, 1);
+ 	omap3isp_put(isp);
+diff --git a/drivers/media/platform/omap3isp/isp.h b/drivers/media/platform/omap3isp/isp.h
+index 7e6f663..639b3ca 100644
+--- a/drivers/media/platform/omap3isp/isp.h
++++ b/drivers/media/platform/omap3isp/isp.h
+@@ -228,8 +228,9 @@ struct isp_device {
+ 
+ struct isp_async_subdev {
+ 	struct v4l2_subdev *sd;
+-	struct isp_bus_cfg bus;
++	struct isp_bus_cfg *bus;
+ 	struct v4l2_async_subdev asd;
++	u32 group_id;
+ };
+ 
+ #define v4l2_dev_to_isp_device(dev) \
+diff --git a/drivers/media/platform/omap3isp/ispcsiphy.c b/drivers/media/platform/omap3isp/ispcsiphy.c
+index 495447d..750ce93 100644
+--- a/drivers/media/platform/omap3isp/ispcsiphy.c
++++ b/drivers/media/platform/omap3isp/ispcsiphy.c
+@@ -177,7 +177,7 @@ static int omap3isp_csiphy_config(struct isp_csiphy *phy)
+ 		struct isp_async_subdev *isd =
+ 			container_of(pipe->external->asd,
+ 				     struct isp_async_subdev, asd);
+-		buscfg = &isd->bus;
++		buscfg = isd->bus;
+ 	}
+ 
+ 	if (buscfg->interface == ISP_INTERFACE_CCP2B_PHY1
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
