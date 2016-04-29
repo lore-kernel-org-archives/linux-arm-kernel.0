@@ -1,149 +1,27 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Apr 2016 09:49:06 +0200
-Subject: [PATCH v4 2/5] dmaengine: mv_xor: use SoC type instead of directly
- the operation mode
-In-Reply-To: <1461916149-30900-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1461916149-30900-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1461916149-30900-3-git-send-email-gregory.clement@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Apr 2016 09:49:30 +0200
+Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
+In-Reply-To: <20160428092608.GE17159@lukather>
+References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+ <20160425115758.GA4874@lukather>
+ <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
+ <20160428092608.GE17159@lukather>
+Message-ID: <CACRpkdaFJV3OmEgUyyTPj5GCHvavaTiU2fz9S-2x36ivJ-W_RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the main difference between legacy XOR engine and newer one, is
-the way the engine modes are setup (either in the descriptor or through
-the controller registers). In order to be able to take into account new
-generation of the XOR engine for the ARM64 SoC, we need to identify them
-by type, and then depending to the type the engine setup will be
-selected.
+On Thu, Apr 28, 2016 at 11:26 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/dma/mv_xor.c | 40 ++++++++++++++++++++++++++++------------
- drivers/dma/mv_xor.h |  1 +
- 2 files changed, 29 insertions(+), 12 deletions(-)
+> Still, moving it to a "framework" that has been inactive for so long
+> (and you even mention it in your PR) doesn't seem like the right move.
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index a6ec82776cbc..6d012a56b97b 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -31,6 +31,11 @@
- #include "dmaengine.h"
- #include "mv_xor.h"
- 
-+enum mv_xor_type {
-+	XOR_ORION,
-+	XOR_ARMADA_38X,
-+};
-+
- enum mv_xor_mode {
- 	XOR_MODE_IN_REG,
- 	XOR_MODE_IN_DESC,
-@@ -933,7 +938,7 @@ static int mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
- static struct mv_xor_chan *
- mv_xor_channel_add(struct mv_xor_device *xordev,
- 		   struct platform_device *pdev,
--		   int idx, dma_cap_mask_t cap_mask, int irq, int op_in_desc)
-+		   int idx, dma_cap_mask_t cap_mask, int irq)
- {
- 	int ret = 0;
- 	struct mv_xor_chan *mv_chan;
-@@ -945,7 +950,10 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
- 
- 	mv_chan->idx = idx;
- 	mv_chan->irq = irq;
--	mv_chan->op_in_desc = op_in_desc;
-+	if (xordev->xor_type == XOR_ORION)
-+		mv_chan->op_in_desc = XOR_MODE_IN_REG;
-+	else
-+		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
- 
- 	dma_dev = &mv_chan->dmadev;
- 
-@@ -1137,8 +1145,8 @@ static int mv_xor_resume(struct platform_device *dev)
- }
- 
- static const struct of_device_id mv_xor_dt_ids[] = {
--	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
--	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
-+	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_ORION },
-+	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_ARMADA_38X },
- 	{},
- };
- 
-@@ -1152,7 +1160,6 @@ static int mv_xor_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	unsigned int max_engines, max_channels;
- 	int i, ret;
--	int op_in_desc;
- 
- 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
- 
-@@ -1180,6 +1187,20 @@ static int mv_xor_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, xordev);
- 
-+
-+	/*
-+	 * We need to know which type of XOR device we use before
-+	 * setting up. In non-dt case it can only be the legacy one.
-+	 */
-+	xordev->xor_type = XOR_ORION;
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *of_id =
-+			of_match_device(mv_xor_dt_ids,
-+					&pdev->dev);
-+
-+		xordev->xor_type = (uintptr_t)of_id->data;
-+	}
-+
- 	/*
- 	 * (Re-)program MBUS remapping windows if we are asked to.
- 	 */
-@@ -1212,15 +1233,11 @@ static int mv_xor_probe(struct platform_device *pdev)
- 	if (pdev->dev.of_node) {
- 		struct device_node *np;
- 		int i = 0;
--		const struct of_device_id *of_id =
--			of_match_device(mv_xor_dt_ids,
--					&pdev->dev);
- 
- 		for_each_child_of_node(pdev->dev.of_node, np) {
- 			struct mv_xor_chan *chan;
- 			dma_cap_mask_t cap_mask;
- 			int irq;
--			op_in_desc = (uintptr_t)of_id->data;
- 
- 			if (i >= max_channels)
- 				continue;
-@@ -1237,7 +1254,7 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			}
- 
- 			chan = mv_xor_channel_add(xordev, pdev, i,
--						  cap_mask, irq, op_in_desc);
-+						  cap_mask, irq);
- 			if (IS_ERR(chan)) {
- 				ret = PTR_ERR(chan);
- 				irq_dispose_mapping(irq);
-@@ -1266,8 +1283,7 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			}
- 
- 			chan = mv_xor_channel_add(xordev, pdev, i,
--						  cd->cap_mask, irq,
--						  XOR_MODE_IN_REG);
-+						  cd->cap_mask, irq);
- 			if (IS_ERR(chan)) {
- 				ret = PTR_ERR(chan);
- 				goto err_channel_add;
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index c19fe30e5ae9..bf56e082e7cd 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -85,6 +85,7 @@ struct mv_xor_device {
- 	void __iomem	     *xor_high_base;
- 	struct clk	     *clk;
- 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
-+	int		     xor_type;
- };
- 
- /**
--- 
-2.5.0
+I still think sorting the driver into the right bucket has a value.
+
+When/if the Linux LCD support gets an upstream push they
+will know where to put their stuff: here, and then common stuff
+can be abstracted. With drivers floating around in misc the
+situation is even worse. http://lcd-linux.sourceforge.net/
+
+Yours,
+Linus Walleij
