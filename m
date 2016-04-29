@@ -1,59 +1,69 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 29 Apr 2016 13:53:20 +0300
-Subject: [PATCH v3 5/7] ASoc: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to
- omap_mcbsp_cleanup()
+Date: Fri, 29 Apr 2016 13:53:17 +0300
+Subject: [PATCH v3 2/7] ARM: dts: omap3: Add clocks to McBSP nodes
 In-Reply-To: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1461927202-17677-6-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1461927202-17677-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function will do more then removing the sysfs files in the future.
+Add clock properties to the McBSP nodes. McBSP2 and 3 need to have ick also
+since the Sidetone block of these modules are operating using the McBSP
+interface clock.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- sound/soc/omap/mcbsp.c      | 2 +-
- sound/soc/omap/mcbsp.h      | 2 +-
- sound/soc/omap/omap-mcbsp.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/omap3.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/sound/soc/omap/mcbsp.c b/sound/soc/omap/mcbsp.c
-index 4a16e778966b..ace73b97769f 100644
---- a/sound/soc/omap/mcbsp.c
-+++ b/sound/soc/omap/mcbsp.c
-@@ -1088,7 +1088,7 @@ err_thres:
- 	return ret;
- }
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 9fbda38528dc..4c3c471d2a83 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -493,6 +493,8 @@
+ 			dmas = <&sdma 31>,
+ 			       <&sdma 32>;
+ 			dma-names = "tx", "rx";
++			clocks = <&mcbsp1_fck>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
  
--void omap_mcbsp_sysfs_remove(struct omap_mcbsp *mcbsp)
-+void omap_mcbsp_cleanup(struct omap_mcbsp *mcbsp)
- {
- 	if (mcbsp->pdata->buffer_size)
- 		sysfs_remove_group(&mcbsp->dev->kobj, &additional_attr_group);
-diff --git a/sound/soc/omap/mcbsp.h b/sound/soc/omap/mcbsp.h
-index 96d1b086bcf8..ce6cbbf923a4 100644
---- a/sound/soc/omap/mcbsp.h
-+++ b/sound/soc/omap/mcbsp.h
-@@ -349,6 +349,6 @@ int omap_st_disable(struct omap_mcbsp *mcbsp);
- int omap_st_is_enabled(struct omap_mcbsp *mcbsp);
+@@ -511,6 +513,8 @@
+ 			dmas = <&sdma 33>,
+ 			       <&sdma 34>;
+ 			dma-names = "tx", "rx";
++			clocks = <&mcbsp2_fck>, <&mcbsp2_ick>;
++			clock-names = "fck", "ick";
+ 			status = "disabled";
+ 		};
  
- int omap_mcbsp_init(struct platform_device *pdev);
--void omap_mcbsp_sysfs_remove(struct omap_mcbsp *mcbsp);
-+void omap_mcbsp_cleanup(struct omap_mcbsp *mcbsp);
+@@ -529,6 +533,8 @@
+ 			dmas = <&sdma 17>,
+ 			       <&sdma 18>;
+ 			dma-names = "tx", "rx";
++			clocks = <&mcbsp3_fck>, <&mcbsp3_ick>;
++			clock-names = "fck", "ick";
+ 			status = "disabled";
+ 		};
  
- #endif /* __ASOC_MCBSP_H */
-diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
-index fd99d89de6a8..db07debb4a9c 100644
---- a/sound/soc/omap/omap-mcbsp.c
-+++ b/sound/soc/omap/omap-mcbsp.c
-@@ -832,7 +832,7 @@ static int asoc_mcbsp_remove(struct platform_device *pdev)
- 	if (mcbsp->pdata->ops && mcbsp->pdata->ops->free)
- 		mcbsp->pdata->ops->free(mcbsp->id);
+@@ -545,6 +551,8 @@
+ 			dmas = <&sdma 19>,
+ 			       <&sdma 20>;
+ 			dma-names = "tx", "rx";
++			clocks = <&mcbsp4_fck>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
  
--	omap_mcbsp_sysfs_remove(mcbsp);
-+	omap_mcbsp_cleanup(mcbsp);
- 
- 	clk_put(mcbsp->fclk);
+@@ -561,6 +569,8 @@
+ 			dmas = <&sdma 21>,
+ 			       <&sdma 22>;
+ 			dma-names = "tx", "rx";
++			clocks = <&mcbsp5_fck>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
  
 -- 
 2.8.1
