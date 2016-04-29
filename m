@@ -1,80 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 29 Apr 2016 15:06:09 -0500
-Subject: [PATCH] arm64: Relocate screen_info.lfb_base on PCI BAR allocation
-In-Reply-To: <CAKv+Gu-4vqT-tQXdwJbLV0r3FhtrYk=TOWxDYS6LjG_BNf=b_A@mail.gmail.com>
-References: <1461795744-28837-1-git-send-email-agraf@suse.de>
- <20160428162035.GB19785@localhost> <57223D46.7070102@suse.de>
- <20160428180641.GA25125@localhost> <57228317.1030808@suse.de>
- <20160429134126.GA949@localhost>
- <CAKv+Gu-4vqT-tQXdwJbLV0r3FhtrYk=TOWxDYS6LjG_BNf=b_A@mail.gmail.com>
-Message-ID: <20160429200609.GA28261@localhost>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 29 Apr 2016 13:19:14 -0700
+Subject: (v4.4/v4.5)-stable-queue build and qemu failures (arm:allmodconfig,
+ arm:pxa_defconfig, arm:omap2plus_defconfig)
+Message-ID: <20160429201914.GA27596@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 03:51:49PM +0200, Ard Biesheuvel wrote:
-> On 29 April 2016 at 15:41, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Thu, Apr 28, 2016 at 11:39:35PM +0200, Alexander Graf wrote:
-> >> On 28.04.16 20:06, Bjorn Helgaas wrote:
+v4.4 (arm:allmodconfig):
 
-> >> > If firmware is giving us a bare address of something, that seems like
-> >> > a clue that it might depend on that address staying the same.
-> >>
-> >> Well, I'd look at it from the other side. It gives us a correct address
-> >> on entry with the system configured at exactly the state it's in on
-> >> entry. If Linux changes the system, some guarantees obviously don't work
-> >> anymore.
-> >
-> > Can you point me to the part of the EFI spec that communicates this?
-> > I'm curious what the intent is and whether there's any indication that
-> > EFI expects the OS to preserve some configuration.  I don't think it's
-> > reasonable for the OS to preserve this sort of configuration because
-> > it limits how well we can support hotplug.
-> >
-> > I wonder if we're using this frame buffer address as more than what
-> > EFI intended.  For example, maybe it was intended for use by an early
-> > console driver, but there's some other mechanism we should be using
-> > after that.
-> >
-> 
-> The UEFI spec describes this as follows (UEFIv2.6 section 11.9)
-> 
-> """
-> Graphics output may also be required as part of the startup of an
-> operating system. There are
-> potentially times in modern operating systems prior to the loading of
-> a high performance OS
-> graphics driver where access to graphics output device is required.
-> The Graphics Output Protocol
-> supports this capability by providing the EFI OS loader access to a
-> hardware frame buffer and
-> enough information to allow the OS to draw directly to the graphics
-> output device.
-> """
-> 
-> So the intent is to provide minimal framebuffer services until the
-> 'real' driver takes over.
+drivers/mtd/nand/pxa3xx_nand.c: In function 'alloc_nand_resource':
+drivers/mtd/nand/pxa3xx_nand.c:1753:7: error: 'np' undeclared
 
-Makes sense.  A 'real' driver for a PCI device would use
-pci_register_driver() and use pci_resource_start() or similar to
-locate the framebuffer, which would avoid the problem because the PCI
-core doesn't change BARs while a driver owns the device.
+v4.5 (arm:allmodconfig, arm:pxa_defconfig):
 
-> The GOP protocol only describes the base and size of the framebuffer,
-> and the pixel format. At boot time, the early UEFI code in the kernel
-> could potentially figure out which PCI device it is related to, if
-> necessary, but i am not sure if this would solve the x86 case as well.
+drivers/dma/pxa_dma.c: In function 'pxad_probe':
+drivers/dma/pxa_dma.c:1421:24: error: 'struct mmp_dma_platdata' has no member named 'nb_requestors'
 
-Does drivers/video/fbdev/efifb.c support only a single framebuffer
-device?  If a system has several, how does it decide which to use?  I
-assume UEFI would provide GOP for all the framebuffers?
+There is also a qemu runtime failure with omap2plus_defconfig in v4.4.
 
-If we could fix this by making efifb claim a PCI device, I think that
-would be cleaner.  I don't know how to figure out the correct device,
-but that would solve the "BAR changed" problem, and it would have
-cleaner ownership semantics, too.
+[    2.412322] omap_i2c 48070000.i2c: bus 0 rev3.3 at 2600 kHz
+[    2.417541] omap_i2c 48060000.i2c: bus 2 rev3.3 at 100 kHz
+[    2.429443] 
+[    2.429534] =====================================
+[    2.429718] [ BUG: bad unlock balance detected! ]
+[    2.429962] 4.4.8-00025-gcd58757 #1 Not tainted
+[    2.430145] -------------------------------------
+[    2.430328] kworker/u2:0/6 is trying to release lock (&rdev->mutex) at:
+[    2.430694] [<c03b40e4>] regulator_set_voltage+0x40/0x54
+[    2.430877] but there are no more locks to release!
 
-It looks like the current situation is that a device-specific driver
-(radeon, i915, etc.) could claim the device via the usual
-pci_register_driver() path, and the efifb driver could think it owns
-the device at the same time.  This seems like too obvious a problem,
-so maybe there's some ad hoc mechanism that resolves this?
+See logs at http://kerneltests.org/builders for details.
+Please let me know if I need to bisect.
+
+Thanks,
+Guenter
