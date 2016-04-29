@@ -1,34 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Apr 2016 17:14:46 +0100
-Subject: [PATCH 25/25] arm64:ilp32: add ARM64_ILP32 to Kconfig
-In-Reply-To: <20160429160855.GA16451@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-26-git-send-email-ynorov@caviumnetworks.com>
- <20160429160334.GD30316@e104818-lin.cambridge.arm.com>
- <20160429160855.GA16451@yury-N73SV>
-Message-ID: <20160429161445.GE30316@e104818-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Apr 2016 18:21:07 +0200
+Subject: [GIT PULL] dt-bindings: gpio: tegra: Add Tegra186 support
+Message-ID: <1461946869-26124-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 07:08:55PM +0300, Yury Norov wrote:
-> On Fri, Apr 29, 2016 at 05:03:34PM +0100, Catalin Marinas wrote:
-> > On Wed, Apr 06, 2016 at 01:08:47AM +0300, Yury Norov wrote:
-> > > +config ARM64_ILP32
-> > > +	bool "Kernel support for ILP32"
-> > > +	select COMPAT_WRAPPER
-> > > +	help
-> > > +	  This option enables support for AArch64 ILP32 user space.  ILP32
-> > > +	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-> > > +	  instruction set.
-> > 
-> > Is there any penalty for AArch32 tasks when selecting COMPAT_WRAPPER?
-> 
-> No. AARCH32 doesn't define __SC_WRAP and so __SYSCALL macro is used,
-> which fills syscall table with sys_xxx versions, not compat_sys_xxx.
+Hi ARM-SoC maintainers,
 
-Ah, I forgot it has its own unistd32.h.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Thanks.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
--- 
-Catalin
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.7-gpio
+
+for you to fetch changes up to ec6b925579b40225d58f0374ada0e40a003cde16:
+
+  ARM: tegra: Add DT binding for Tegra186 GPIO controllers (2016-04-22 13:32:29 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+dt-bindings: gpio: tegra: Add Tegra186 support
+
+Adds device tree bindings for the GPIO and AON controllers found on the
+Tegra186 SoC.
+
+----------------------------------------------------------------
+Stephen Warren (2):
+      ARM: tegra: Fix naming in GPIO DT binding header
+      ARM: tegra: Add DT binding for Tegra186 GPIO controllers
+
+ .../bindings/gpio/nvidia,tegra186-gpio.txt         | 161 +++++++++++++++++++++
+ include/dt-bindings/gpio/tegra-gpio.h              |  68 ++++-----
+ include/dt-bindings/gpio/tegra186-gpio.h           |  56 +++++++
+ 3 files changed, 251 insertions(+), 34 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt
+ create mode 100644 include/dt-bindings/gpio/tegra186-gpio.h
