@@ -1,60 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 29 Apr 2016 12:59:51 +0200
-Subject: [PATCH 3/3] regulator: max77686: Configure enable time to properly
- handle regulator enable
-In-Reply-To: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
-References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1461927591-7864-4-git-send-email-k.kozlowski@samsung.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 29 Apr 2016 13:05:46 +0200
+Subject: v4l subdevs without big device was Re:
+ drivers/media/i2c/adp1653.c: does not show as /dev/video* or v4l-subdev*
+In-Reply-To: <20160429105944.GH32125@valkosipuli.retiisi.org.uk>
+References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
+ <57230DE7.3020701@xs4all.nl>
+ <20160429075649.GG32125@valkosipuli.retiisi.org.uk>
+ <20160429095002.GA22743@amd>
+ <20160429105944.GH32125@valkosipuli.retiisi.org.uk>
+Message-ID: <20160429110546.GU12528@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The enable time for buck regulators was not configured but actually is
-essential: consumers, like usb3503, doing hard reset (regulator off/on)
-should wait for the regulator to settle.
+On Friday 29 April 2016 13:59:44 Sakari Ailus wrote:
+> > pavel at amd:/data/l/linux-n900$ git fetch
+> > git://git.retiisi.org.uk/~sailus/linux.git leds-as3645a:leds-as3645a
+> > fatal: unable to connect to git.retiisi.org.uk:
+> > git.retiisi.org.uk: Name or service not known
+> > 
+> > pavel at amd:/data/l/linux-n900$ git fetch
+> > git://salottisipuli.retiisi.org.uk/~sailus/linux.git
+> > leds-as3645a:leds-as3645a
+> > remote: Counting objects: 132, done.
+> > remote: Compressing objects: 100% (46/46), done.
+> > remote: Total 132 (delta 111), reused 107 (delta 86)
+> > Receiving objects: 100% (132/132), 22.80 KiB | 0 bytes/s, done.
+> > Resolving deltas: 100% (111/111), completed with 34 local objects.
+> > From git://salottisipuli.retiisi.org.uk/~sailus/linux
+> >  * [new branch]      leds-as3645a -> leds-as3645a
+> 
+> Yeah, that works, too. git alias has been added some three weeks ago so
+> there seem to be something strange going on with DNS.
 
-Configure the enable time according to datasheet.
+Maybe update SOA record?
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/regulator/max77686-regulator.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/regulator/max77686-regulator.c b/drivers/regulator/max77686-regulator.c
-index d1ab6a4da88f..ac4fa581e0a5 100644
---- a/drivers/regulator/max77686-regulator.c
-+++ b/drivers/regulator/max77686-regulator.c
-@@ -41,6 +41,8 @@
- #define MAX77686_LDO_LOW_UVSTEP	25000
- #define MAX77686_BUCK_MINUV	750000
- #define MAX77686_BUCK_UVSTEP	50000
-+#define MAX77686_BUCK_ENABLE_TIME	40		/* us */
-+#define MAX77686_DVS_ENABLE_TIME	22		/* us */
- #define MAX77686_RAMP_DELAY	100000			/* uV/us */
- #define MAX77686_DVS_RAMP_DELAY	27500			/* uV/us */
- #define MAX77686_DVS_MINUV	600000
-@@ -422,6 +424,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 	.min_uV		= MAX77686_BUCK_MINUV,				\
- 	.uV_step	= MAX77686_BUCK_UVSTEP,				\
- 	.ramp_delay	= MAX77686_RAMP_DELAY,				\
-+	.enable_time	= MAX77686_BUCK_ENABLE_TIME,			\
- 	.n_voltages	= MAX77686_VSEL_MASK + 1,			\
- 	.vsel_reg	= MAX77686_REG_BUCK5OUT + (num - 5) * 2,	\
- 	.vsel_mask	= MAX77686_VSEL_MASK,				\
-@@ -439,6 +442,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 	.min_uV		= MAX77686_BUCK_MINUV,				\
- 	.uV_step	= MAX77686_BUCK_UVSTEP,				\
- 	.ramp_delay	= MAX77686_RAMP_DELAY,				\
-+	.enable_time	= MAX77686_BUCK_ENABLE_TIME,			\
- 	.n_voltages	= MAX77686_VSEL_MASK + 1,			\
- 	.vsel_reg	= MAX77686_REG_BUCK1OUT,			\
- 	.vsel_mask	= MAX77686_VSEL_MASK,				\
-@@ -456,6 +460,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 	.min_uV		= MAX77686_DVS_MINUV,				\
- 	.uV_step	= MAX77686_DVS_UVSTEP,				\
- 	.ramp_delay	= MAX77686_DVS_RAMP_DELAY,			\
-+	.enable_time	= MAX77686_DVS_ENABLE_TIME,			\
- 	.n_voltages	= MAX77686_DVS_VSEL_MASK + 1,			\
- 	.vsel_reg	= MAX77686_REG_BUCK2DVS1 + (num - 2) * 10,	\
- 	.vsel_mask	= MAX77686_DVS_VSEL_MASK,			\
 -- 
-1.9.1
+Pali Roh?r
+pali.rohar at gmail.com
