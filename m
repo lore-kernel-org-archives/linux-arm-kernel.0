@@ -1,93 +1,95 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Apr 2016 12:31:53 +0100
-Subject: Applied "regulator: max77686: Configure enable time to properly
- handle regulator enable" to the regulator tree
-In-Reply-To: <1461927591-7864-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <E1aw6eH-0003js-IV@debutante>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 29 Apr 2016 13:55:14 +0200
+Subject: [RFT PATCH 1/3] usb: misc: usb3503: Fix HUB mode after bootloader
+ initialization
+In-Reply-To: <20160429113059.GX3217@sirena.org.uk>
+References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
+ <1461927591-7864-2-git-send-email-k.kozlowski@samsung.com>
+ <20160429113059.GX3217@sirena.org.uk>
+Message-ID: <57234BA2.6020304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 04/29/2016 01:30 PM, Mark Brown wrote:
+> On Fri, Apr 29, 2016 at 12:59:49PM +0200, Krzysztof Kozlowski wrote:
+> 
+>> +++ b/Documentation/devicetree/bindings/usb/usb3503.txt
+>> @@ -24,6 +24,7 @@ Optional properties:
+>>  	pins (optional, if not provided, driver will not set rate of the
+>>  	REFCLK signal and assume that a value from the primary reference
+>>  	clock frequencies table is used)
+>> +- vdd33-supply: Optional supply for VDD 3.3 V power source.
+> 
+> Supplies are only optional if they may be physically absent.  In this
+> case it's possible that on device regulators may be used instead, a
+> pattern more like that used for arizona-ldo1 where we represent those
+> regulators might be better as it's more clearly describing the
+> situation.  I'm just wondering if the supply lookup stuff there should
+> be factored out as this is not an uncommon pattern..
+> 
+> It should at least be clearly stated what's going on, ignoring failure
+> to get supplies is generally a bug and people will tend to blindly cut
+> and paste things (witness all the breakage in graphics drivers with
+> this).
 
-   regulator: max77686: Configure enable time to properly handle regulator enable
+The device has four power input lines (called VBAT, VDD33, VDD_CORE and
+VDD_12). Datasheet describes 4 valid configurations... but impression of
+the Odroid U3 board schematics is that they used another (custom?)
+configuration.
 
-has been applied to the regulator tree at
+I did not add rest of regulators on purpose:
+1. I don't have other configurations to test.
+2. It is rather old device, so I don't expect active development.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+The VDD33 is really optional. The device can work in different
+configuration, e.g. only on VBAT. How the reset logic would work then? I
+don't know... I would suspect that it could be exactly the same (just
+replace VDD33 with VBAT) but I am not sure.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+>>  static int usb3503_reset(struct usb3503 *hub, int state)
+>>  {
+>> +	int err;
+>> +
+>> +	err = usb3503_regulator(hub, state);
+>> +	if (err) {
+>> +		dev_err(hub->dev, "unable to %s VDD33 regulator to (%d)\n",
+>> +			(state ? "enable" : "disable"), err);
+>> +	}
+> 
+> Are we sure that the callers all balance enables and disables and we
+> don't ever end up going through reset more than once on the way down?
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+I double checked the code and there might be in-balance if DT or
+platform data sets initial mode to suspend. Otherwise it should be balanced.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+I'll re-think the patch and fix this.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> 
+>> +		hub->vdd_reg = devm_regulator_get_optional(dev, "vdd33");
+>> +		if (IS_ERR(hub->vdd_reg)) {
+>> +			if (PTR_ERR(hub->vdd_reg) == -EPROBE_DEFER)
+>> +				return -EPROBE_DEFER;
+> 
+> This should explicitly check for -ENODEV and return the error if it gets
+> anything else, that will mean that if the supply is needed but lookup
+> fails somehow due to a non-deferral error we'll handle it properly.
 
-Thanks,
-Mark
+I must admit I wasn't sure about handling the ENODEV and some other
+examples (drivers) were handling this just like that.
 
->From a9597305d97f6cf7c9e89dc1461e834c446d91fd Mon Sep 17 00:00:00 2001
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Date: Fri, 29 Apr 2016 12:59:51 +0200
-Subject: [PATCH] regulator: max77686: Configure enable time to properly handle
- regulator enable
+Thanks for pointing this out.
 
-The enable time for buck regulators was not configured but actually is
-essential: consumers, like usb3503, doing hard reset (regulator off/on)
-should wait for the regulator to settle.
+> 
+>> +	err = usb3503_regulator(hub, true);
+> 
+> The naming on this function is very obscure (and there's also a couple
+> of other supplies).  I'd suggest just folding this into the reset
+> function, or at least renaming so the reader can tell what these calls
+> do.
 
-Configure the enable time according to datasheet.
+Okay.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/regulator/max77686-regulator.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Thanks for feedback!
 
-diff --git a/drivers/regulator/max77686-regulator.c b/drivers/regulator/max77686-regulator.c
-index d1ab6a4da88f..ac4fa581e0a5 100644
---- a/drivers/regulator/max77686-regulator.c
-+++ b/drivers/regulator/max77686-regulator.c
-@@ -41,6 +41,8 @@
- #define MAX77686_LDO_LOW_UVSTEP	25000
- #define MAX77686_BUCK_MINUV	750000
- #define MAX77686_BUCK_UVSTEP	50000
-+#define MAX77686_BUCK_ENABLE_TIME	40		/* us */
-+#define MAX77686_DVS_ENABLE_TIME	22		/* us */
- #define MAX77686_RAMP_DELAY	100000			/* uV/us */
- #define MAX77686_DVS_RAMP_DELAY	27500			/* uV/us */
- #define MAX77686_DVS_MINUV	600000
-@@ -422,6 +424,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 	.min_uV		= MAX77686_BUCK_MINUV,				\
- 	.uV_step	= MAX77686_BUCK_UVSTEP,				\
- 	.ramp_delay	= MAX77686_RAMP_DELAY,				\
-+	.enable_time	= MAX77686_BUCK_ENABLE_TIME,			\
- 	.n_voltages	= MAX77686_VSEL_MASK + 1,			\
- 	.vsel_reg	= MAX77686_REG_BUCK5OUT + (num - 5) * 2,	\
- 	.vsel_mask	= MAX77686_VSEL_MASK,				\
-@@ -439,6 +442,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 	.min_uV		= MAX77686_BUCK_MINUV,				\
- 	.uV_step	= MAX77686_BUCK_UVSTEP,				\
- 	.ramp_delay	= MAX77686_RAMP_DELAY,				\
-+	.enable_time	= MAX77686_BUCK_ENABLE_TIME,			\
- 	.n_voltages	= MAX77686_VSEL_MASK + 1,			\
- 	.vsel_reg	= MAX77686_REG_BUCK1OUT,			\
- 	.vsel_mask	= MAX77686_VSEL_MASK,				\
-@@ -456,6 +460,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 	.min_uV		= MAX77686_DVS_MINUV,				\
- 	.uV_step	= MAX77686_DVS_UVSTEP,				\
- 	.ramp_delay	= MAX77686_DVS_RAMP_DELAY,			\
-+	.enable_time	= MAX77686_DVS_ENABLE_TIME,			\
- 	.n_voltages	= MAX77686_DVS_VSEL_MASK + 1,			\
- 	.vsel_reg	= MAX77686_REG_BUCK2DVS1 + (num - 2) * 10,	\
- 	.vsel_mask	= MAX77686_DVS_VSEL_MASK,			\
--- 
-2.8.0.rc3
+Best regards,
+Krzysztof
