@@ -1,34 +1,37 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 29 Apr 2016 09:40:10 +0200
-Subject: [PATCH v2 00/11] pwm: Add support for PWM Capture
-In-Reply-To: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
-References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160429094010.6bfb131c@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Apr 2016 09:42:06 +0200
+Subject: [PATCH v2 06/10] mfd: stmpe: rework registers access
+In-Reply-To: <1461845589-4826-7-git-send-email-patrice.chotard@st.com>
+References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
+ <1461845589-4826-7-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdbPGjmKb6V+QhxnjV+FxcTDhFDmMdjfHhS4fUEHVXEs6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Thu, Apr 28, 2016 at 2:13 PM,  <patrice.chotard@st.com> wrote:
 
-On Fri, 22 Apr 2016 11:18:04 +0100
-Lee Jones <lee.jones@linaro.org> wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> this update allows to use registers map as following :
+> regs[reg_index + offset] instead of
+> regs[reg_index] + offset
+>
+> This makes code clearer and will facilitate the addition of STMPE1600
+> on which LSB and MSB registers are respectively located at addr and addr + 1.
+> Despite for all others STMPE variant, LSB and MSB registers are respectively
+> located in reverse order at addr + 1 and addr.
+>
+> For variant which have 3 registers's bank, we use LSB,CSB and MSB indexes
+> which contains respectively LSB (or LOW), CSB (or MID) and MSB (or HIGH)
+> register addresses (STMPE1801/STMPE24xx).
+> For variant which have 2 registers's bank, we use LSB and CSB indexes only.
+> In this case the CSB index contains the MSB regs address (STMPE 1601).
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
-> The first part of this set extends the current PWM API to allow external
-> code to request a PWM Capture.  Subsequent patches then make use of the
-> new API by providing a userspace offering via /sysfs.  The final part of
-> the set supplies PWM Capture functionality into the already existing STi
-> PWM driver.
+Yep this is so much clearer!
 
-Is there a reason you decided to not put this driver in IIO? IMHO, it
-would be more appropriate to make your PWM device an MFD that can either
-bind to the PWM or the capture driver.
-And BTW, IIO already has a sysfs interface (you may have to extend the
-API to support your type of capture though).
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
