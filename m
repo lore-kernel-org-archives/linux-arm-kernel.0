@@ -1,25 +1,22 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 29 Apr 2016 14:52:34 +0200
-Subject: [PATCH v3 2/3] PCI: imx6: Implement reset sequence for i.MX6+
-In-Reply-To: <CAOMZO5AiaNFashMd6XEz=zjyodm6UEAuBMsK=otQ5nHeE+voqw@mail.gmail.com>
+Date: Fri, 29 Apr 2016 14:52:50 +0200
+Subject: [PATCH v3 3/3] ARM: dts: imx6qp: Specify imx6qp version of PCIe
+ core
+In-Reply-To: <CAOMZO5DFd4+NQcBHgaoXVNnixOQ4xYbi_LJsUcWzjMzTidGcgA@mail.gmail.com>
 References: <1461167131-26025-1-git-send-email-andrew.smirnov@gmail.com>
- <1461167131-26025-2-git-send-email-andrew.smirnov@gmail.com>
- <CAOMZO5AiaNFashMd6XEz=zjyodm6UEAuBMsK=otQ5nHeE+voqw@mail.gmail.com>
-Message-ID: <CAAMH-yumeh+MUADCk7wbeSO-hdVLT82jmkn2swYmuD8HndrKFA@mail.gmail.com>
+ <1461167131-26025-3-git-send-email-andrew.smirnov@gmail.com>
+ <CAOMZO5DFd4+NQcBHgaoXVNnixOQ4xYbi_LJsUcWzjMzTidGcgA@mail.gmail.com>
+Message-ID: <CAAMH-yt8fGJzhhHENFobWO86E3JZ-Xgc0tZso_HkdScoKdfVDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-On Fri, Apr 29, 2016 at 3:47 AM, Fabio Estevam <festevam@gmail.com> wrote:
+On Fri, Apr 29, 2016 at 3:48 AM, Fabio Estevam <festevam@gmail.com> wrote:
 > On Wed, Apr 20, 2016 at 12:45 PM, Andrey Smirnov
 > <andrew.smirnov@gmail.com> wrote:
->> I.MX6+ has a dedicated bit for reseting PCIe core, which should be used
->> instead of a regular reset sequence since using the latter will hang the
->> SoC.
->>
->> This commit is based on c34068d48273e24d392d9a49a38be807954420ed from
->> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git
+>> I.MX6Quad Plus has a slightly different version of PCIe core than
+>> reqular i.MX6Quad.
 >>
 >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 >
