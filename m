@@ -1,96 +1,74 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Fri, 29 Apr 2016 11:22:01 +0200
-Subject: [PATCH] tty: serial, return values platform_get_irq, part II.
-Message-ID: <1461921721-30169-1-git-send-email-jslaby@suse.cz>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 29 Apr 2016 17:19:40 +0800
+Subject: Potential issue with SDHCI DMA
+In-Reply-To: <5723227B.9070006@intel.com>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <6297512.2KmasKu6UN@wuerfel>	<5714857C.9070002@intel.com>
+ <7893683.FFM02uuNdT@wuerfel>	<57232233.1030702@intel.com>
+ <5723227B.9070006@intel.com>
+Message-ID: <20160429171940.576ca5eb@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When commit "TTY: serial, handle platform_get_irq retval properly" was
-merged, it was pointed out, that platform_get_irq is more peculiar
-than it seems.
+Dear Adrian,
 
-platform_get_irq can actually return zero for some platforms. So
-reverts parts of the aforementioned commits which did the worng thing
-on those platforms.
+On Fri, 29 Apr 2016 11:59:39 +0300 Adrian Hunter wrote:
 
-Signed-off-by: Jiri Slaby <jslaby@suse.cz>
-Cc: "Uwe Kleine-K?nig" <kernel@pengutronix.de>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Peter Korsgaard <jacmet@sunsite.dk>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-Cc: linux-serial at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
----
- drivers/tty/serial/efm32-uart.c    | 4 ++--
- drivers/tty/serial/pmac_zilog.c    | 2 +-
- drivers/tty/serial/uartlite.c      | 2 +-
- drivers/tty/serial/xilinx_uartps.c | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+> + linux-mmc
+> 
+> On 29/04/16 11:58, Adrian Hunter wrote:
+> > On 18/04/16 17:33, Arnd Bergmann wrote:  
+> >> On Monday 18 April 2016 09:58:04 Adrian Hunter wrote:  
+> >>>
+> >>> Thanks for looking.
+> >>>
+> >>> It looked to me like sdhci-pxav3 devices created by mmp2_add_sdhost() might
+> >>> also be candidates.
+> >>>  
+> >>
+> >> Oh, you are right, I missed that.
+> >>
+> >> I remember looking at sdhci-pxav2 and not finding any machine defining one,
+> >> but I must have skipped over sdhci-pxav3 failing to realize that this is
+> >> a different one.
+> >>
+> >> 	Arnd
+> >>  
+> > 
+> > OK, so my plan to email sdhci driver maintainers ran into a snag.  It turned
+> > out to be too hard to dig up email addresses.  I have grabbed a few names
+> > and cc'ed them to this email anyway.
+> > 
+> > For those people, the issue is this:
+> > 
+> > An unexpected side-effect of commit 7b91369b4655 ("mmc: sdhci: Set DMA mask
+> > when adding host") is that SDHCI devices that do not define a DMA mask may
+> > find that DMA no longer works.  That was the case for a sdhci-esdhc-imx
+> > device, but that has been fixed - refer commit fc26fe9c3869 ("ARM: mach-imx:
+> > sdhci-esdhc-imx: initialize DMA mask").
+> > 
+> > DeviceTree, ACPI and PCI always set up a DMA mask for devices that they
+> > enumerate, so only hard-coded platform devices are expected to be affected.
+> > 
+> > We found only one other candidate: sdhci-pxav3 devices created by
+> > mmp2_add_sdhost().  Not sure if anyone has looked at that though.
 
-diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
-index efadba355a20..195acc868763 100644
---- a/drivers/tty/serial/efm32-uart.c
-+++ b/drivers/tty/serial/efm32-uart.c
-@@ -724,7 +724,7 @@ static int efm32_uart_probe(struct platform_device *pdev)
- 	}
- 
- 	ret = platform_get_irq(pdev, 0);
--	if (ret < 0) {
-+	if (ret <= 0) {
- 		dev_dbg(&pdev->dev, "failed to get rx irq\n");
- 		goto err_get_rxirq;
- 	}
-@@ -732,7 +732,7 @@ static int efm32_uart_probe(struct platform_device *pdev)
- 	efm_port->port.irq = ret;
- 
- 	ret = platform_get_irq(pdev, 1);
--	if (ret < 0)
-+	if (ret <= 0)
- 		ret = efm_port->port.irq + 1;
- 
- 	efm_port->txirq = ret;
-diff --git a/drivers/tty/serial/pmac_zilog.c b/drivers/tty/serial/pmac_zilog.c
-index 0f086a2559ff..b24b0556f5a8 100644
---- a/drivers/tty/serial/pmac_zilog.c
-+++ b/drivers/tty/serial/pmac_zilog.c
-@@ -1720,7 +1720,7 @@ static int __init pmz_init_port(struct uart_pmac_port *uap)
- 
- 	r_ports = platform_get_resource(uap->pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(uap->pdev, 0);
--	if (!r_ports || irq < 0)
-+	if (!r_ports || irq <= 0)
- 		return -ENODEV;
- 
- 	uap->port.mapbase  = r_ports->start;
-diff --git a/drivers/tty/serial/uartlite.c b/drivers/tty/serial/uartlite.c
-index 0e4e398c66c0..c9fdfc8bf47f 100644
---- a/drivers/tty/serial/uartlite.c
-+++ b/drivers/tty/serial/uartlite.c
-@@ -693,7 +693,7 @@ static int ulite_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	irq = platform_get_irq(pdev, 0);
--	if (irq < 0)
-+	if (irq <= 0)
- 		return -ENXIO;
- 
- 	return ulite_assign(&pdev->dev, id, res->start, irq);
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 34a705b15a4f..cd46e64c4255 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1368,7 +1368,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	}
- 
- 	irq = platform_get_irq(pdev, 0);
--	if (irq < 0) {
-+	if (irq <= 0) {
- 		rc = -ENXIO;
- 		goto err_out_clk_disable;
- 	}
--- 
-2.8.1
+Thanks for the kind remind. All Marvell berlin SoCs' linux kernel (no matter
+upstreamed or internal) are DT based, so we (berlin SoCs) are not affected by
+this issue.
+
+I'm not sure who is maintaining mmp.
+
+Thanks,
+Jisheng
+
+> > 
+> > Obviously, if you are unsure if your devices are affected, you can test and
+> > if there is a problem you will see the warning messages "mmcX: Failed to set
+> > 32-bit DMA mask" and "mmcX: No suitable DMA available - falling back to PIO".
+> > 
+> > Regards
+> > Adrian
+> > 
+> >   
+> 
