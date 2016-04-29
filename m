@@ -1,38 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Apr 2016 18:21:09 +0200
-Subject: [GIT PULL] ARM: tegra: Default configuration updates for v4.7-rc1
-Message-ID: <1461946869-26124-4-git-send-email-thierry.reding@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 29 Apr 2016 19:26:12 +0300
+Subject: [PATCH 25/25] arm64:ilp32: add ARM64_ILP32 to Kconfig
+In-Reply-To: <20160429161445.GE30316@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-26-git-send-email-ynorov@caviumnetworks.com>
+ <20160429160334.GD30316@e104818-lin.cambridge.arm.com>
+ <20160429160855.GA16451@yury-N73SV>
+ <20160429161445.GE30316@e104818-lin.cambridge.arm.com>
+Message-ID: <20160429162612.GB16451@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC maintainers,
+On Fri, Apr 29, 2016 at 05:14:46PM +0100, Catalin Marinas wrote:
+> On Fri, Apr 29, 2016 at 07:08:55PM +0300, Yury Norov wrote:
+> > On Fri, Apr 29, 2016 at 05:03:34PM +0100, Catalin Marinas wrote:
+> > > On Wed, Apr 06, 2016 at 01:08:47AM +0300, Yury Norov wrote:
+> > > > +config ARM64_ILP32
+> > > > +	bool "Kernel support for ILP32"
+> > > > +	select COMPAT_WRAPPER
+> > > > +	help
+> > > > +	  This option enables support for AArch64 ILP32 user space.  ILP32
+> > > > +	  is an ABI where long and pointers are 32bits but it uses the AARCH64
+> > > > +	  instruction set.
+> > > 
+> > > Is there any penalty for AArch32 tasks when selecting COMPAT_WRAPPER?
+> > 
+> > No. AARCH32 doesn't define __SC_WRAP and so __SYSCALL macro is used,
+> > which fills syscall table with sys_xxx versions, not compat_sys_xxx.
+> 
+> Ah, I forgot it has its own unistd32.h.
+> 
+> Thanks.
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+Even if it was sharing generic unistd,h, it's OK as well. To use
+wrappers, you have to enable COMPAT_WRAPPER (which is enabled even if
+only a single ABI needs it) *and* define  __SC_WRAP in corresponding
+sys_xxx.c, which is individual for each abi, of course.
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.7-defconfig
-
-for you to fetch changes up to fe42f031765e2cfaf5363b52664a634a4fe19c1a:
-
-  ARM: multi_v7: Enable Tegra XUSB controller in defconfig (2016-04-29 18:13:52 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-ARM: tegra: Default configuration updates for v4.7-rc1
-
-Enable the XUSB pad controller and XUSB controller drivers on the Tegra
-and multi-v7 default configurations.
-
-----------------------------------------------------------------
-Thierry Reding (2):
-      ARM: tegra: Enable XUSB controller in defconfig
-      ARM: multi_v7: Enable Tegra XUSB controller in defconfig
-
- arch/arm/configs/multi_v7_defconfig | 2 ++
- arch/arm/configs/tegra_defconfig    | 2 ++
- 2 files changed, 4 insertions(+)
+> 
+> -- 
+> Catalin
