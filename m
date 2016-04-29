@@ -1,81 +1,46 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 29 Apr 2016 22:20:49 +0200
-Subject: [PATCH] ARM: dts: imx6: apalis: parallel lcd display support on ixora
-Message-ID: <1461961249-3792-1-git-send-email-marcel.ziswiler@toradex.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Fri, 29 Apr 2016 22:09:07 +0200
+Subject: [PATCH 0/5] Use dma_pool_zalloc
+Message-ID: <1461960552-7429-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add parallel LCD display support for the EDT ET057090DHU 5.7" LCD TFT
-panel.
+Dma_pool_zalloc combines dma_pool_alloc and memset 0.  The semantic patch
+that makes this transformation is as follows: (http://coccinelle.lip6.fr/)
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+// <smpl>
+@@
+type T;
+T *d;
+expression e;
+statement S;
+@@
+
+        d =
+-            dma_pool_alloc
++            dma_pool_zalloc
+             (...);
+        if (!d) S
+-       memset(d, 0, sizeof(T));
+
+@@
+expression d,e;
+statement S;
+@@
+
+        d =
+-            dma_pool_alloc
++            dma_pool_zalloc
+             (...);
+        if (!d) S
+-       memset(d, 0, sizeof(*d));
+// </smpl>
+
 ---
 
- arch/arm/boot/dts/imx6q-apalis-ixora.dts | 45 ++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-index 4b533cb..8e67ca2 100644
---- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-@@ -80,6 +80,47 @@
- 		};
- 	};
- 
-+	lcd_display: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interface-pix-fmt = "rgb24";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu1_lcdif>;
-+		status = "okay";
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			lcd_display_in: endpoint {
-+				remote-endpoint = <&ipu1_di0_disp1>;
-+			};
-+		};
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			lcd_display_out: endpoint {
-+				remote-endpoint = <&lcd_panel_in>;
-+			};
-+		};
-+	};
-+
-+	panel: panel {
-+		/*
-+		 * edt,et057090dhu: EDT 5.7" LCD TFT
-+		 * edt,et070080dh6: EDT 7.0" LCD TFT
-+		 */
-+		compatible = "edt,et057090dhu";
-+		backlight = <&backlight>;
-+
-+		port {
-+			lcd_panel_in: endpoint {
-+				remote-endpoint = <&lcd_display_out>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -169,6 +210,10 @@
- 	};
- };
- 
-+&ipu1_di0_disp1 {
-+	remote-endpoint = <&lcd_display_in>;
-+};
-+
- &ldb {
- 	status = "okay";
- };
--- 
-2.5.5
+ drivers/crypto/marvell/tdma.c    |    5 ++---
+ drivers/dma/fsldma.c             |    3 +--
+ drivers/dma/ioat/init.c          |    5 ++---
+ drivers/dma/mmp_pdma.c           |    3 +--
+ drivers/dma/xilinx/xilinx_vdma.c |    3 +--
+ 5 files changed, 7 insertions(+), 12 deletions(-)
