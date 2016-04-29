@@ -1,72 +1,85 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 29 Apr 2016 15:22:50 -0700
-Subject: [PATCH v2 0/4] Patches to allow consistent mmc / mmcblk numbering
- w/ device tree
-In-Reply-To: <20160429221606.GE19428@n2100.arm.linux.org.uk>
-References: <20160429181248.GW19428@n2100.arm.linux.org.uk>
- <CAD=FV=VMxBYXOYOyHPeqcaWX7oU8pVrdLHOsWOWUgq-q5FshAw@mail.gmail.com>
- <20160429195741.GY19428@n2100.arm.linux.org.uk>
- <CAD=FV=UGyi0r3kDmc1cpcANTP-2u+7UEgW3r9kRvF2f8qcWH+g@mail.gmail.com>
- <20160429211328.GZ19428@n2100.arm.linux.org.uk>
- <CAD=FV=V8BOsO36eUOGAcXp04xCiN13UGG0Vaf2yhh1MQn85FjA@mail.gmail.com>
- <20160429212920.GA19428@n2100.arm.linux.org.uk>
- <CAD=FV=V9V8P=d59RX1eaAdVxJgMxub1F6hzQNw1QW+7t=3POBw@mail.gmail.com>
- <20160429215017.GC19428@n2100.arm.linux.org.uk>
- <CAD=FV=VgQX_EVhUUCugzv+CZqjzTS8LwyeU5419aX9FbDnWJDg@mail.gmail.com>
- <20160429221606.GE19428@n2100.arm.linux.org.uk>
-Message-ID: <CAD=FV=WzgGFzzpeYAPrOpMS684_G=XRoSRjTegK-vre=fX=kpw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 29 Apr 2016 19:39:45 -0300
+Subject: [PATCH] ARM: dts: imx6qdl: Remove unneeded unit-addresses
+Message-ID: <1461969585-17784-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Fri, Apr 29, 2016 at 3:16 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 29, 2016 at 02:56:38PM -0700, Doug Anderson wrote:
->> Russell,
->>
->> On Fri, Apr 29, 2016 at 2:50 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Apr 29, 2016 at 02:39:35PM -0700, Doug Anderson wrote:
->> > [didn't read most of your reply]
->> >
->> >> Really I just reposted it several times because I notice that you seem
->> >> to ignore many points of my emails.  I was really hoping to get you to
->> >> address this point.  I notice that you still didn't.  Either you are
->> >> just trying to annoy me, or you don't have an answer to how my patch
->> >> series hurts you.
->> >
->> > I don't see you treating Rob with the same contempt that you have
->> > treated me in this thread, despite Rob and myself both telling you
->> > basically the same thing.
->>
->> Rob wrote a nice thoughtful reply and I tried to give a nice
->> thoughtful reply back to him.  He raised some good points and I raised
->> some good points back to him.  I look forward to his future thoughts
->> on the topic.
->
-> Meanwhile, I've pointed out that you appear to be coming from a
-> misunderstanding (that's certainly clear because you believed
-> initially that grub did something it doesn't), showing that the
-> "problem" you have is no different from the majority of other
-> systems running Linux, and you treat me with contempt.
->
-> What are you going to do to resolve this?
+The following build warnings are seen when building with 'W=1' option:
 
-As I tried to indicate in earlier emails, I don't actually care how
-grub works in this case.  It was originally meant to illustrate the
-other people's workflows and mine are not the same.  If they have a
-solution that works for them, that's great.
+Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-1p1 at 110 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-3p0 at 120 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-2p5 at 130 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddcore at 140 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddpu at 140 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddsoc at 140 has a unit name, but no reg property
 
-I want my MMC and MMCBLK device numbers to be sane and consistent to
-help me parse through dmesg and sysfs.  If it happens to also make it
-easy / possible to specify a root filesystem using "mmcblkN" that's
-great and I'll probably take advantage of that.
+Fix them by removing the unneeded unit-addresses.
 
-I'm very sorry if those using SATA and ATA disks don't have a way to
-get sane and consistent device number ordering.  I really am.  ...but
-just because they don't have a well defined ordering doesn't mean
-those of us using MMC should have to suffer.  ...and I don't think
-giving a sane ordering to MMC devices hurts anyone, does it?
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
--Doug
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 294afa7..ed613eb 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -621,7 +621,7 @@
+ 					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-				regulator-1p1 at 110 {
++				regulator-1p1 {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vdd1p1";
+ 					regulator-min-microvolt = <800000>;
+@@ -635,7 +635,7 @@
+ 					anatop-max-voltage = <1375000>;
+ 				};
+ 
+-				regulator-3p0 at 120 {
++				regulator-3p0 {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vdd3p0";
+ 					regulator-min-microvolt = <2800000>;
+@@ -649,7 +649,7 @@
+ 					anatop-max-voltage = <3400000>;
+ 				};
+ 
+-				regulator-2p5 at 130 {
++				regulator-2p5 {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vdd2p5";
+ 					regulator-min-microvolt = <2000000>;
+@@ -663,7 +663,7 @@
+ 					anatop-max-voltage = <2750000>;
+ 				};
+ 
+-				reg_arm: regulator-vddcore at 140 {
++				reg_arm: regulator-vddcore {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vddarm";
+ 					regulator-min-microvolt = <725000>;
+@@ -680,7 +680,7 @@
+ 					anatop-max-voltage = <1450000>;
+ 				};
+ 
+-				reg_pu: regulator-vddpu at 140 {
++				reg_pu: regulator-vddpu {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vddpu";
+ 					regulator-min-microvolt = <725000>;
+@@ -697,7 +697,7 @@
+ 					anatop-max-voltage = <1450000>;
+ 				};
+ 
+-				reg_soc: regulator-vddsoc at 140 {
++				reg_soc: regulator-vddsoc {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vddsoc";
+ 					regulator-min-microvolt = <725000>;
+-- 
+1.9.1
