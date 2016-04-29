@@ -1,232 +1,95 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 29 Apr 2016 16:25:43 +0200
-Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
-Message-ID: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Apr 2016 16:29:13 +0200
+Subject: [RFC v5 4/4] gpio: dt-bindings: add gpio-mmio bindings
+In-Reply-To: <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
+References: <cover.1461888822.git.chunkeey@googlemail.com>
+ <a0ded4d0161f7ab3cd1945741d95d2718dbe4f44.1461888822.git.chunkeey@googlemail.com>
+Message-ID: <CACRpkdYXqcQ1a=S5c6Cev__nqfquo7tFA=3uJSu9wf96txfBwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On Fri, Apr 29, 2016 at 2:53 AM, Christian Lamparter
+<chunkeey@googlemail.com> wrote:
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- drivers/pinctrl/stm32/pinctrl-stm32.c | 174 ++++++++++++++++++++++++++++++++++
- 1 file changed, 174 insertions(+)
+> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+>
+> This patch adds the device tree bindings for the gpio-mmio.
+> The gpio-mmio is already part of a the GPIO generic library.
+>
+> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index 8a7fe97..1527740 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -477,6 +477,29 @@ static void stm32_pmx_set_mode(struct stm32_gpio_bank *bank,
- 	clk_disable(bank->clk);
- }
- 
-+static void stm32_pmx_get_mode(struct stm32_gpio_bank *bank,
-+		int pin, u32 *mode, u32 *alt)
-+{
-+	u32 val;
-+	int alt_shift = (pin % 8) * 4;
-+	int alt_offset = STM32_GPIO_AFRL + (pin / 8) * 4;
-+	unsigned long flags;
-+
-+	clk_enable(bank->clk);
-+	spin_lock_irqsave(&bank->lock, flags);
-+
-+	val = readl_relaxed(bank->base + alt_offset);
-+	val &= GENMASK(alt_shift + 3, alt_shift);
-+	*alt = val >> alt_shift;
-+
-+	val = readl_relaxed(bank->base + STM32_GPIO_MODER);
-+	val &= GENMASK(pin * 2 + 1, pin * 2);
-+	*mode = val >> (pin * 2);
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	clk_disable(bank->clk);
-+}
-+
- static int stm32_pmx_set_mux(struct pinctrl_dev *pctldev,
- 			    unsigned function,
- 			    unsigned group)
-@@ -548,6 +571,24 @@ static void stm32_pconf_set_driving(struct stm32_gpio_bank *bank,
- 	clk_disable(bank->clk);
- }
- 
-+static u32 stm32_pconf_get_driving(struct stm32_gpio_bank *bank,
-+	unsigned int offset)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	clk_enable(bank->clk);
-+	spin_lock_irqsave(&bank->lock, flags);
-+
-+	val = readl_relaxed(bank->base + STM32_GPIO_TYPER);
-+	val &= BIT(offset);
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	clk_disable(bank->clk);
-+
-+	return (val >> offset);
-+}
-+
- static void stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
- 	unsigned offset, u32 speed)
- {
-@@ -566,6 +607,24 @@ static void stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
- 	clk_disable(bank->clk);
- }
- 
-+static u32 stm32_pconf_get_speed(struct stm32_gpio_bank *bank,
-+	unsigned int offset)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	clk_enable(bank->clk);
-+	spin_lock_irqsave(&bank->lock, flags);
-+
-+	val = readl_relaxed(bank->base + STM32_GPIO_SPEEDR);
-+	val &= GENMASK(offset * 2 + 1, offset * 2);
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	clk_disable(bank->clk);
-+
-+	return (val >> (offset * 2));
-+}
-+
- static void stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
- 	unsigned offset, u32 bias)
- {
-@@ -584,6 +643,57 @@ static void stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
- 	clk_disable(bank->clk);
- }
- 
-+static u32 stm32_pconf_get_bias(struct stm32_gpio_bank *bank,
-+	unsigned int offset)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	clk_enable(bank->clk);
-+	spin_lock_irqsave(&bank->lock, flags);
-+
-+	val = readl_relaxed(bank->base + STM32_GPIO_PUPDR);
-+	val &= GENMASK(offset * 2 + 1, offset * 2);
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	clk_disable(bank->clk);
-+
-+	return (val >> (offset * 2));
-+}
-+
-+static bool stm32_pconf_input_get(struct stm32_gpio_bank *bank,
-+	unsigned int offset)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	clk_enable(bank->clk);
-+	spin_lock_irqsave(&bank->lock, flags);
-+
-+	val = !!(readl_relaxed(bank->base + STM32_GPIO_IDR) & BIT(offset));
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	clk_disable(bank->clk);
-+
-+	return val;
-+}
-+
-+static bool stm32_pconf_output_get(struct stm32_gpio_bank *bank,
-+	unsigned int offset)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	clk_enable(bank->clk);
-+	spin_lock_irqsave(&bank->lock, flags);
-+	val = !!(readl_relaxed(bank->base + STM32_GPIO_ODR) & BIT(offset));
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	clk_disable(bank->clk);
-+
-+	return val;
-+}
-+
- static int stm32_pconf_parse_conf(struct pinctrl_dev *pctldev,
- 		unsigned int pin, enum pin_config_param param,
- 		enum pin_config_param arg)
-@@ -657,9 +767,73 @@ static int stm32_pconf_group_set(struct pinctrl_dev *pctldev, unsigned group,
- 	return 0;
- }
- 
-+static void stm32_pconf_dbg_show(struct pinctrl_dev *pctldev,
-+				 struct seq_file *s,
-+				 unsigned int pin)
-+{
-+	struct pinctrl_gpio_range *range;
-+	struct stm32_gpio_bank *bank;
-+	int offset;
-+	u32 mode, alt, drive, speed, bias;
-+	static const char * const modes[] = {
-+			"input", "output", "alternate", "analog" };
-+	static const char * const speeds[] = {
-+			"low", "medium", "high", "very high" };
-+	static const char * const biasing[] = {
-+			"floating", "pull up", "pull down", "" };
-+	bool val;
-+
-+	range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
-+	bank = gpio_range_to_bank(range);
-+	offset = stm32_gpio_pin(pin);
-+
-+	stm32_pmx_get_mode(bank, offset, &mode, &alt);
-+	bias = stm32_pconf_get_bias(bank, offset);
-+
-+	seq_printf(s, "%s ", modes[mode]);
-+
-+	switch (mode) {
-+	/* input */
-+	case 0:
-+		val = stm32_pconf_input_get(bank, offset);
-+		seq_printf(s, "- %s - %s",
-+			   val ? "high" : "low",
-+			   biasing[bias]);
-+		break;
-+
-+	/* output */
-+	case 1:
-+		drive = stm32_pconf_get_driving(bank, offset);
-+		speed = stm32_pconf_get_speed(bank, offset);
-+		val = stm32_pconf_output_get(bank, offset);
-+		seq_printf(s, "- %s - %s - %s - %s %s",
-+			   val ? "high" : "low",
-+			   drive ? "open drain" : "push pull",
-+			   biasing[bias],
-+			   speeds[speed], "speed");
-+		break;
-+
-+	/* alternate */
-+	case 2:
-+		drive = stm32_pconf_get_driving(bank, offset);
-+		speed = stm32_pconf_get_speed(bank, offset);
-+		seq_printf(s, "%d - %s -%s", alt,
-+			   drive ? "open drain" : "push pull",
-+			   biasing[bias],
-+			   speeds[speed], "speed");
-+		break;
-+
-+	/* analog */
-+	case 3:
-+		break;
-+	}
-+}
-+
-+
- static const struct pinconf_ops stm32_pconf_ops = {
- 	.pin_config_group_get	= stm32_pconf_group_get,
- 	.pin_config_group_set	= stm32_pconf_group_set,
-+	.pin_config_dbg_show	= stm32_pconf_dbg_show,
- };
- 
- static int stm32_gpiolib_register_bank(struct stm32_pinctrl *pctl,
--- 
-1.9.1
+I share your ambition to create something generic for this class
+of hardware(s).
+
+> +Bindings for the generic driver for memory-mapped GPIO controllers.
+> +
+> +Required properties:
+> +       - compatible: should be "linux,gpio-mmio"
+
+Why?
+"memory-mapped-gpio" sits nicely with me.
+
+Read another very generic binding for inspiration:
+Documentation/devicetree/bindings/leds/register-bit-led.txt
+
+> +       - reg-names: must contain
+> +               "dat" - data register
+> +               may contain
+> +               "set" - data set register
+> +               "clr" - data clear register
+> +               "dirout" - direction output register
+> +               "dirin" - direction input register
+
+I would just be more verbose:
+
+data-in-register
+data-out-set-register
+data-out-clear-register
+direction-output-register
+direction-input-register
+
+Some should be optional so we can support input-only
+and output-only GPIO controllers too.
+
+I would take this opportunity to add bindings also for stuff that
+the generic MMIO driver does not support today but
+could be made to support:
+
+open-drain-register
+open-source-register
+debounce-register
+
+etc
+
+> +Optional properties:
+> +       - ngpio: specifies the number of gpio mapped in the register.
+
+Just reference the generic docs.
+
+> +       - big-endian: force big endian register accesses.
+> +       - big-endian-byte-order: assign GPIOs in reverse order.
+> +       - unreadable-reg-set: data set register is not readable.
+> +       - read-output-reg-set: cache value set for reads.
+> +       - unreadable-reg-dir: dirout/dirin register is not readable.
+> +       - no-output: GPIOs are read-only.
+
+I think it's better to imply that if there is no data-in-register
+specified, then it is output-only etc.
+
+> +The GPIO generic library provides support for memory-mapped GPIO
+> +controllers. The configuration is detected by which resources are present.
+> +The simplest form of a GPIO controller that the driver support is just a
+> +single "dat" register, where GPIO state can be read and/or written.
+> +However, the driver supports far more:
+> +       - 8/16/32/64 bits registers. The number of GPIOs is automatically
+> +         determined by the width of the registers.
+> +       - GPIO controllers with clear/set registers.
+> +       - GPIO controllers with a single "dat" register.
+> +       - Big endian bits/GPIOs ordering.
+
+
+Skip this. It is Linux-specific.
+
+Yours,
+Linus Walleij
