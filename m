@@ -1,49 +1,31 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sat, 30 Apr 2016 20:52:11 +0300
-Subject: [PATCH 0/2] Fix ir-rx51 by using PWM pdata
-In-Reply-To: <20160428212748.GI5995@atomide.com>
-References: <1461714709-10455-1-git-send-email-tony@atomide.com>
- <57227E63.4040907@gmail.com> <20160428212748.GI5995@atomide.com>
-Message-ID: <5724F0CB.6060807@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 30 Apr 2016 10:55:04 -0700
+Subject: [PATCH v2 2/2] ARM: dts: enable pinctrl for Broadcom NS2 SoC
+In-Reply-To: <CACRpkdbsti48b+G8uHfzJvFPzUD8HivE8Fp57CBp_7eGF5wX5Q@mail.gmail.com>
+References: <1461934299-14774-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1461934299-14774-3-git-send-email-yendapally.reddy@broadcom.com>
+ <CACRpkdbsti48b+G8uHfzJvFPzUD8HivE8Fp57CBp_7eGF5wX5Q@mail.gmail.com>
+Message-ID: <5724F178.20509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 29.04.2016 00:27, Tony Lindgren wrote:
-> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 14:21]:
+Le 30/04/2016 04:13, Linus Walleij a ?crit :
+> On Fri, Apr 29, 2016 at 2:51 PM, Yendapally Reddy Dhananjaya Reddy
+> <yendapally.reddy@broadcom.com> wrote:
+> 
+>> This enables the pinctrl support for Broadcom NS2 SoC
 >>
->> I didn't test legacy boot, as I don't really see any value of doing it now
->> the end of the legacy boot is near, the driver does not function correctly,
->> however the patchset at least allows for the driver to be build and we have
->> something to improve on. And I am going to send a patch that fixes the
->> problem with omap_dm_timer_request_specific(). So, for both patches, you may
->> add:
->>
->> Tested-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
->
-> OK thanks.
->
-> Mauro, do the driver changes look OK to you?
->
-> If so, I could queue the driver too for v4.7 because of the
-> dependency with your ack. Or I can provide you an immutable
-> branch with just the pdata changes against v4.6-rc1 if you
-> prefer that.
->
+>> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Please take this in through the apropriate BCM tree to ARM SoC.
 
-In the meanwhile I was able to make the driver functional (on top of the 
-$subject series) - for that purpose I had to fix dmtimer.c - it turns 
-out that PM runtime get()/put() is called in almost every function 
-exported by dmtimer, which in turn slows down IR transmission to 4-5s 
-instead of 0.5s. I also replaced GPT9 dmtimer with PWM framework API 
-(pwm-omap-dmtimer needs a patch) and implemented some DT support.
+Applied to devicetree-arm64/next, there was a small conflict due to the
+crmu node removal while switching to PSCI, Dhanajay, please double check
+the result here:
 
-Now, how shall I proceed with those - wait for the $subject series to be 
-accepted or post the patches now?
-
-Tony, I was unable to find the tree on kernel.org your patches are in. 
-Which tree to use to base my patches on?
-
-Thanks,
-Ivo
+https://github.com/Broadcom/stblinux/commit/8eab685dda30fb15e74d6be07baa9d430a75b8ca
+-- 
+Florian
