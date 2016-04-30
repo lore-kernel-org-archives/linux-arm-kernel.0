@@ -1,16 +1,14 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 30 Apr 2016 21:27:05 +0200
-Subject: [GIT PULL] pxa for v4.7
-Message-ID: <87a8karj7a.fsf@belgarion.home>
+Date: Sat, 30 Apr 2016 21:31:18 +0200
+Subject: [GIT PULL] pxa-dt for v4.7
+Message-ID: <8760uyrj09.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+Hi Arnd, Kevin, and Olof,
 
-This is the pxa pull request for 4.7 cycle. I didn't include the plat-pxa/dma.c
-obliteration considering it was not posted for enough time, nor the pxa25x
-device-tree support. That leaves a tiny pull request, could you please consider
-pulling ?
+This is the pxa pull request for 4.7 device-tree. It is a tiny collection of
+fixes and pin control addition. Can you please consider pulling ?
 
 The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
@@ -18,29 +16,32 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.7
+  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.7
 
-for you to fetch changes up to e4c740e23969470f779a4c67861be4f09f87d8a0:
+for you to fetch changes up to fca43c3f7e6fe421194e9b21eabc72604edac16c:
 
-  ARM: pxa: Remove CLK_IS_ROOT (2016-04-30 10:27:09 +0200)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.7 cycle.
-
-This is a minor cycle with :
- - cleanup fix from Stephen on clocks (CLK_ROOT deprecated)
- - pin control activation for device-tree platforms
+  ARM: dts: pxa3xx: add pincontrol helpers (2016-04-20 20:20:26 +0200)
 
 ----------------------------------------------------------------
-Robert Jarzmik (1):
-      ARM: pxa: activate pinctrl for device-tree machines
+This device-tree pxa update brings :
+ - pin control nodes for pxa2xx and pxa3xx
+ - the LCD controller for pxa2xx
+ - the missing pxa3xx pulse width modulator nodes
+ - an USB Host fix for pxa3xx
 
-Stephen Boyd (1):
-      ARM: pxa: Remove CLK_IS_ROOT
+----------------------------------------------------------------
+Robert Jarzmik (6):
+      ARM: dts: pxa: add pxa framebuffer device
+      ARM: dts: pxa: add pxa3xx pwm nodes
+      ARM: dts: add pincontroller to pxa27x
+      ARM: dts: pxa: fix the ohci clock for pxa3xx
+      ARM: dts: pxa: add pinctrl to pxa3xx
+      ARM: dts: pxa3xx: add pincontrol helpers
 
- arch/arm/mach-pxa/Kconfig   | 2 ++
- arch/arm/mach-pxa/eseries.c | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/pxa27x.dtsi |   7 +++
+ arch/arm/boot/dts/pxa2xx.dtsi |   8 +++
+ arch/arm/boot/dts/pxa3xx.dtsi | 133 +++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 147 insertions(+), 1 deletion(-)
 
 -- 
 Robert
