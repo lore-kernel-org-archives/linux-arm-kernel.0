@@ -1,38 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 30 Apr 2016 18:52:13 +0200
-Subject: [GIT PULL v2] ARM: mvebu: defconfig for v4.7 (#2)
-Message-ID: <87r3dnqbsy.fsf@free-electrons.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 30 Apr 2016 19:21:13 +0200
+Subject: [PATCH 0/2] amlogic: GXBB: Add pin controller
+Message-ID: <1462036875-22625-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Carlo Caione <carlo@endlessm.com>
 
-Here is the second version of the second pull request for defconfig
-for mvebu for v4.7! In the previous version I applied the wrong
-patch. I apology for the disturbance!
+Patchset to add and enable the pin controller driver on a couple of Amlogic
+boards with a Meson GXBB SoC.
 
-Gregory
+Please note that:
 
-The following changes since commit 23d2af622de748bf57d31a4125d06d183c29e908:
+* This patch depends on http://www.spinics.net/lists/devicetree/msg120964.html
+  ([PATCH] ARM64: dts: amlogic: Add hiu and periphs buses).
 
-  ARM: mvebu_v5_defconfig: Switching to the new Marvell's cryptographic engine driver (2016-04-14 18:57:19 +0200)
+* The platform driver is still missing a lot of muxing configurations. This is
+  because Amlogic still hasn't publicly released documentation for the GXBB.
+  Since Kevin has already this documentation under NDA, he will integrate and
+  complete this driver with a separate submission.
 
-are available in the git repository at:
+Carlo Caione (2):
+  pinctrl: amlogic: Add support for Amlogic Meson GXBB SoC
+  ARM64: dts: amlogic: Enable pin controller on GXBB-based platforms
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.7-2
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   2 +
+ arch/arm64/Kconfig.platforms                       |   2 +
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  13 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |   2 +
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |   3 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  41 ++
+ drivers/pinctrl/meson/Makefile                     |   2 +-
+ drivers/pinctrl/meson/pinctrl-meson-gxbb.c         | 432 +++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.c              |   8 +
+ drivers/pinctrl/meson/pinctrl-meson.h              |   2 +
+ include/dt-bindings/gpio/meson-gxbb-gpio.h         | 154 ++++++++
+ 11 files changed, 660 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+ create mode 100644 include/dt-bindings/gpio/meson-gxbb-gpio.h
 
-for you to fetch changes up to 9cdea854ba58de132b1e240bd0bf515ea086297d:
-
-  arm64: configs: add options useful for Armada 7K/8K support (2016-04-30 18:44:37 +0200)
-
-----------------------------------------------------------------
-mvebu defconfig for 4.7 (part 2)
-
-- update arm64 defconfig with options useful for Armada 7K/8K support
-
-----------------------------------------------------------------
-Thomas Petazzoni (1):
-      arm64: configs: add options useful for Armada 7K/8K support
-
- arch/arm64/configs/defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+-- 
+2.7.4
