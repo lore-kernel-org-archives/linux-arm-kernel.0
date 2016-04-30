@@ -1,31 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 30 Apr 2016 10:55:04 -0700
-Subject: [PATCH v2 2/2] ARM: dts: enable pinctrl for Broadcom NS2 SoC
-In-Reply-To: <CACRpkdbsti48b+G8uHfzJvFPzUD8HivE8Fp57CBp_7eGF5wX5Q@mail.gmail.com>
-References: <1461934299-14774-1-git-send-email-yendapally.reddy@broadcom.com>
- <1461934299-14774-3-git-send-email-yendapally.reddy@broadcom.com>
- <CACRpkdbsti48b+G8uHfzJvFPzUD8HivE8Fp57CBp_7eGF5wX5Q@mail.gmail.com>
-Message-ID: <5724F178.20509@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 30 Apr 2016 21:27:05 +0200
+Subject: [GIT PULL] pxa for v4.7
+Message-ID: <87a8karj7a.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/04/2016 04:13, Linus Walleij a ?crit :
-> On Fri, Apr 29, 2016 at 2:51 PM, Yendapally Reddy Dhananjaya Reddy
-> <yendapally.reddy@broadcom.com> wrote:
-> 
->> This enables the pinctrl support for Broadcom NS2 SoC
->>
->> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Please take this in through the apropriate BCM tree to ARM SoC.
+Hi Arnd, Kevin and Olof,
 
-Applied to devicetree-arm64/next, there was a small conflict due to the
-crmu node removal while switching to PSCI, Dhanajay, please double check
-the result here:
+This is the pxa pull request for 4.7 cycle. I didn't include the plat-pxa/dma.c
+obliteration considering it was not posted for enough time, nor the pxa25x
+device-tree support. That leaves a tiny pull request, could you please consider
+pulling ?
 
-https://github.com/Broadcom/stblinux/commit/8eab685dda30fb15e74d6be07baa9d430a75b8ca
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-for-4.7
+
+for you to fetch changes up to e4c740e23969470f779a4c67861be4f09f87d8a0:
+
+  ARM: pxa: Remove CLK_IS_ROOT (2016-04-30 10:27:09 +0200)
+
+----------------------------------------------------------------
+This is the pxa changes for v4.7 cycle.
+
+This is a minor cycle with :
+ - cleanup fix from Stephen on clocks (CLK_ROOT deprecated)
+ - pin control activation for device-tree platforms
+
+----------------------------------------------------------------
+Robert Jarzmik (1):
+      ARM: pxa: activate pinctrl for device-tree machines
+
+Stephen Boyd (1):
+      ARM: pxa: Remove CLK_IS_ROOT
+
+ arch/arm/mach-pxa/Kconfig   | 2 ++
+ arch/arm/mach-pxa/eseries.c | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
 -- 
-Florian
+Robert
