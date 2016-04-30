@@ -1,46 +1,69 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Sat, 30 Apr 2016 09:00:44 +0530
-Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
- return phys_addr_t
-In-Reply-To: <20160429180619.GT19428@n2100.arm.linux.org.uk>
+Date: Sat, 30 Apr 2016 09:06:19 +0530
+Subject: [PATCH 03/12] ARM: kexec: remove 512MB restriction on kexec
+ crashdump
+In-Reply-To: <20160429181008.GV19428@n2100.arm.linux.org.uk>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
- <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
- <20160429180619.GT19428@n2100.arm.linux.org.uk>
-Message-ID: <CAHB_Gup5EMF36qECiWUP+_6D+4+DCQ5JyKkiK_88+n-sJ0BriQ@mail.gmail.com>
+ <E1aviEp-0000ir-7s@rmk-PC.arm.linux.org.uk>
+ <CAHB_GuqOvRof94QdHztPy2B2kKuyKzQ-9uxXHY_g+i5WxsexZg@mail.gmail.com>
+ <20160429181008.GV19428@n2100.arm.linux.org.uk>
+Message-ID: <CAHB_GuoQM9dzgyd+67QPOReLW4HYNqyuzKGzB7Fzq=dpWYHf_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 11:36 PM, Russell King - ARM Linux
+On Fri, Apr 29, 2016 at 11:40 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 29, 2016 at 08:36:43PM +0530, Pratyush Anand wrote:
->> On Thu, Apr 28, 2016 at 2:58 PM, Russell King
+> On Fri, Apr 29, 2016 at 07:49:45PM +0530, Pratyush Anand wrote:
+>> On Thu, Apr 28, 2016 at 2:57 PM, Russell King
 >> <rmk+kernel@arm.linux.org.uk> wrote:
->> > diff --git a/kernel/ksysfs.c b/kernel/ksysfs.c
->> > index 152da4a48867..9f1920d2d0c6 100644
->> > --- a/kernel/ksysfs.c
->> > +++ b/kernel/ksysfs.c
->> > @@ -128,8 +128,8 @@ KERNEL_ATTR_RW(kexec_crash_size);
->> >  static ssize_t vmcoreinfo_show(struct kobject *kobj,
->> >                                struct kobj_attribute *attr, char *buf)
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > ---
+>> >  arch/arm/kernel/setup.c | 5 +----
+>> >  1 file changed, 1 insertion(+), 4 deletions(-)
+>> >
+>> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> > index 77b54c461c52..d9317eec1eba 100644
+>> > --- a/arch/arm/kernel/setup.c
+>> > +++ b/arch/arm/kernel/setup.c
+>> > @@ -943,7 +943,6 @@ late_initcall(init_machine_late);
+>> >   * zImage relocating below the reserved region.
+>> >   */
+>> >  #define CRASH_ALIGN    (128 << 20)
+>> > -#define CRASH_ADDR_MAX (PHYS_OFFSET + (512 << 20))
+>> >
+>> >  static inline unsigned long long get_total_mem(void)
 >> >  {
->> > -       return sprintf(buf, "%lx %x\n",
->> > -                      paddr_vmcoreinfo_note(),
->> > +       phys_addr_t vmcore_base = paddr_vmcoreinfo_note();
->> > +       return sprintf(buf, "%pa %x\n", &vmcore_base,
+>> > @@ -973,9 +972,7 @@ static void __init reserve_crashkernel(void)
+>> >                 return;
+>> >
+>> >         if (crash_base <= 0) {
+>> > -               unsigned long long crash_max = CRASH_ADDR_MAX;
+>> > -               if (crash_max > (u32)~0)
+>> > -                       crash_max = (u32)~0;
+>> > +               unsigned long long crash_max = idmap_to_phys((u32)~0);
+>> >                 crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+>> >                                                     crash_size, CRASH_ALIGN);
+>> >                 if (!crash_base) {
 >>
->> Why do we pass &vmcore_base? Shouldn't it be vmcore_base?
+>> Reviewed-by: Pratyush Anand <panand@redhat.com>
+>>
+>> Unrelated to these modification:
+>> In function arch/arm/mm/init.c: arm_memblock_steal() may be  following
+>> would be more appropriate?
+>> memblock_alloc_base(size, align, idmap_to_phys(MEMBLOCK_ALLOC_ANYWHERE));
 >
-> You seem to not know what the "%pa" format string means.
-
-Apologies, Yes, yes.. it was my negligence.
-
+> No, arm_memblock_steal() is totally unsuitable.  arm_memblock_steal()
+> *removes* the memory range from memblock, including removing the
+> mapping of that memory.  It will make the memory range inaccessible to
+> the kernel.
 >
-> %p always takes a _pointer_ as per C standard, so the printf argument
-> must be a pointer.  However, the kernel format strings are extended
-> with additional suffixes - in this case 'a', which means that we want
-> to print the contents of a _pointer_ to a phys_addr_t.
+> Since kexec wants to write directly to this memory, using
+> arm_memblock_steal() will have the cause the kernel to OOPS when
+> it hits the resulting hole.
 >
-> Full details in Documentation/printk-formats.txt in the kernel.
 
-Thanks for explaining :-)
+Sorry, I was not trying to say that we should use arm_memblock_steal()
+here. As I said, this comment is totally unrelated to this patch
+series. In arm_memblock_steal() we pass MEMBLOCK_ALLOC_ANYWHERE as
+max_addr. Probably,  it would be good to pass
+idmap_to_phys(MEMBLOCK_ALLOC_ANYWHERE).
