@@ -1,30 +1,25 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 30 Apr 2016 12:02:15 +0100
-Subject: Devicetree specification process
-In-Reply-To: <CACxGe6uY-b49YfgBEkJmhjrZ5Pv3+_GPGj+eZOWOkJ43Qc2e4A@mail.gmail.com>
-References: <CACxGe6uY-b49YfgBEkJmhjrZ5Pv3+_GPGj+eZOWOkJ43Qc2e4A@mail.gmail.com>
-Message-ID: <CACxGe6u==fS-0s6swtfXOzi0t3RvNQtCS9MSr147G-uf_+fUZw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 30 Apr 2016 13:12:10 +0200
+Subject: [PATCH v2 1/2] pinctrl: ns2: add pinmux driver support for
+ Broadcom NS2 SoC
+In-Reply-To: <1461934299-14774-2-git-send-email-yendapally.reddy@broadcom.com>
+References: <1461934299-14774-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1461934299-14774-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <CACRpkdZLse5yGbb720owMDMffH=t3H9F1-sOGzme-bS8Bbccyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 30, 2016 at 12:23 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> I'm pleased to announce the first *very early draft* of the new
-> devicetree specification that I and several others have been working
-> on since January. This document picks up where ePAPR left off in 2012.
-> I'm announcing it now along with the new devicetree.org organization
-> which will handle governance for the spec.
+On Fri, Apr 29, 2016 at 2:51 PM, Yendapally Reddy Dhananjaya Reddy
+<yendapally.reddy@broadcom.com> wrote:
+
+> This adds the initial support of the Broadcom NS2 pinmux driver
 >
-> We're still in the process of getting all the details sorted out (not
-> everything on the website is accurate at the moment), but in the mean
-> time you can look at the current state of the document. At the moment,
-> it is little more than repackaging the ePAPR text. The next step will
-> be pulling in the new core bindings that were never covered by ePAPR.
-> You can look at a draft copy of the document here:
->
-> https://github.com/kvekaria/devicetree-specification-released/blob/master/prerelease/DevicetreeSpecification-20160429-pre1.pdf
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 
-Oops, wrong link. This should be:
+Patch applied!
 
-https://github.com/devicetree-org/devicetree-specification-released/blob/master/prerelease/devicetree-specification-v0.1-pre1-20160429.pdf
+Pushing to the build servers soon.
 
-g.
+Yours,
+Linus Walleij
