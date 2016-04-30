@@ -1,162 +1,45 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Sat, 30 Apr 2016 09:13:52 +0200
-Subject: [PATCH v4] ARM: bcm2835: dt: Add the ethernet to the device trees
-Message-ID: <1462000432-18452-1-git-send-email-lkundrak@v3.sk>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Sat, 30 Apr 2016 11:28:25 +0200
+Subject: [PATCH 2/2] clk: bcm2835: Skip PLLC clocks when deciding on a new
+ clock parent
+In-Reply-To: <1461699585-6649-2-git-send-email-eric@anholt.net>
+References: <1461699585-6649-1-git-send-email-eric@anholt.net>
+ <1461699585-6649-2-git-send-email-eric@anholt.net>
+Message-ID: <C771F70C-2F88-49E1-A370-D76D13262C1E@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hub and the ethernet in its port 1 are hardwired on the board.
 
-Compared to the adapters that can be plugged into the USB ports, this
-one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
-has the MAC address for this adapter in its ROM, accessible from its
-firmware.
+> On 26.04.2016, at 21:39, Eric Anholt <eric@anholt.net> wrote:
+> 
+> If the firmware had set up a clock to source from PLLC, go along with
+> it.  But if we're looking for a new parent, we don't want to switch it
+> to PLLC because the firmware will force PLLC (and thus the AXI bus
+> clock) to different frequencies during over-temp/under-voltage,
+> without notification to Linux.
+> 
+> On my system, this moves the Linux-enabled HDMI state machine and DSI1
+> escape clock over to plld_per from pllc_per.  EMMC still ends up on
+> pllc_per, because the firmware had set it up to use that.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+> ?
 
-U-Boot can read out the address and set the local-mac-address property of the
-node with "ethernet" alias. Let's add the node so that U-Boot can do its
-business.
+I guess this patch looks to me as if it is a policy inside the kernel,
+which is AFAIK frowned upon.
 
-Model B rev2 and Model B+ entries were verified by me, the hierarchy and
-pid/vid pair for the Version 2 was provided by Peter Chen. Original
-Model B is a blind short, though very likely correct.
+I am looking into making "assigned-clock-parents? inside the dt 
+work with the driver.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
----
-Changes since v3:
-  - Include the ethernet alias in 9514 dtsi too
+Could look something like this:
+i2s: i2s at 7e203000 {
+	assigned-clock-parents = <&cprman BCM2835_PLLD_PER>, <&clk_osc>;
+	assigned-clocks = <&cprman BCM2835_CLOCK_PCM>, <&cprman BCM2835_CLOCK_PCM>;
+};
+(not sure if that works really - the same clock in assigned-clocks looks suspicious)
 
-Changes since v2:
-  - Removed leading zeroes in vendor name and reg
-  - Split the common files in separate includes per model
+This would move the policy out of the kernel into the device-tree,
+which - i guess is a better solution.
 
-Changes since v1:
-  - s/@01/@1/ for ethernet and the hub
-  - Corrected the vid/pid pairs for hub and ethernet
-  - Added Model B rev2 and version 2 board changes
-  - Fixed a missing semicolon typo
-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts         |  1 +
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |  1 +
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi              |  2 ++
- 7 files changed, 45 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index ef54050..c3e01ce 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 86f1f2f..364086a 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 4859e9d..4420b09 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index ff94666..b975f29 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2836.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
- 
- / {
- 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-new file mode 100644
-index 0000000..7200238
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-@@ -0,0 +1,20 @@
-+
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9512";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-new file mode 100644
-index 0000000..3f0a56e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9514";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 8aaf193..04504b7 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -230,6 +230,8 @@
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
- 			interrupts = <1 9>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 	};
- 
--- 
-2.7.4
+Martin
