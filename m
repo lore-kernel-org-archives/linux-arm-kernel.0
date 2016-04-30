@@ -1,116 +1,91 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 30 Apr 2016 09:20:55 +0100
-Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
-In-Reply-To: <CAHB_GuqhPJ7J-MNbjxqeQnogW-J6=Bt2e1STKSG5kzJT+4PJpg@mail.gmail.com>
+Date: Sat, 30 Apr 2016 09:25:47 +0100
+Subject: [PATCH 03/12] ARM: kexec: remove 512MB restriction on kexec
+ crashdump
+In-Reply-To: <CAHB_GuoQM9dzgyd+67QPOReLW4HYNqyuzKGzB7Fzq=dpWYHf_w@mail.gmail.com>
 References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
- <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <20160429180024.GS19428@n2100.arm.linux.org.uk>
- <CAHB_GuqhPJ7J-MNbjxqeQnogW-J6=Bt2e1STKSG5kzJT+4PJpg@mail.gmail.com>
-Message-ID: <20160430082055.GG19428@n2100.arm.linux.org.uk>
+ <E1aviEp-0000ir-7s@rmk-PC.arm.linux.org.uk>
+ <CAHB_GuqOvRof94QdHztPy2B2kKuyKzQ-9uxXHY_g+i5WxsexZg@mail.gmail.com>
+ <20160429181008.GV19428@n2100.arm.linux.org.uk>
+ <CAHB_GuoQM9dzgyd+67QPOReLW4HYNqyuzKGzB7Fzq=dpWYHf_w@mail.gmail.com>
+Message-ID: <20160430082547.GH19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 30, 2016 at 08:57:34AM +0530, Pratyush Anand wrote:
-> On Fri, Apr 29, 2016 at 11:30 PM, Russell King - ARM Linux
+On Sat, Apr 30, 2016 at 09:06:19AM +0530, Pratyush Anand wrote:
+> On Fri, Apr 29, 2016 at 11:40 PM, Russell King - ARM Linux
 > <linux@arm.linux.org.uk> wrote:
-> > On Fri, Apr 29, 2016 at 08:26:00PM +0530, Pratyush Anand wrote:
-> >> Hi Russell,
-> >>
-> >> On Thu, Apr 28, 2016 at 2:58 PM, Russell King
+> > On Fri, Apr 29, 2016 at 07:49:45PM +0530, Pratyush Anand wrote:
+> >> On Thu, Apr 28, 2016 at 2:57 PM, Russell King
 > >> <rmk+kernel@arm.linux.org.uk> wrote:
-> >> > Advertise the location of bootable RAM to kexec-tools.  kexec needs to
-> >> > know where it can place the kernel in RAM, and so be executable when
-> >> > the system needs to jump into it.
-> >> >
-> >> > Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
-> >> > tag.
-> >> >
 > >> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >> > ---
+> >> >  arch/arm/kernel/setup.c | 5 +----
+> >> >  1 file changed, 1 insertion(+), 4 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> >> > index 77b54c461c52..d9317eec1eba 100644
+> >> > --- a/arch/arm/kernel/setup.c
+> >> > +++ b/arch/arm/kernel/setup.c
+> >> > @@ -943,7 +943,6 @@ late_initcall(init_machine_late);
+> >> >   * zImage relocating below the reserved region.
+> >> >   */
+> >> >  #define CRASH_ALIGN    (128 << 20)
+> >> > -#define CRASH_ADDR_MAX (PHYS_OFFSET + (512 << 20))
+> >> >
+> >> >  static inline unsigned long long get_total_mem(void)
+> >> >  {
+> >> > @@ -973,9 +972,7 @@ static void __init reserve_crashkernel(void)
+> >> >                 return;
+> >> >
+> >> >         if (crash_base <= 0) {
+> >> > -               unsigned long long crash_max = CRASH_ADDR_MAX;
+> >> > -               if (crash_max > (u32)~0)
+> >> > -                       crash_max = (u32)~0;
+> >> > +               unsigned long long crash_max = idmap_to_phys((u32)~0);
+> >> >                 crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+> >> >                                                     crash_size, CRASH_ALIGN);
+> >> >                 if (!crash_base) {
 > >>
-> >> Can you please also share git tree path of corresponding kexec-tools changes?
+> >> Reviewed-by: Pratyush Anand <panand@redhat.com>
 > >>
-> >> Could it be a better idea (if things in user space become simpler)
-> >> that in stead of patch 5 and 6, we pass arch_phys_to_idmap_offset to
-> >> user space, and then user space manipulates existing "Crash kernel"
-> >> and "System RAM" resources.
+> >> Unrelated to these modification:
+> >> In function arch/arm/mm/init.c: arm_memblock_steal() may be  following
+> >> would be more appropriate?
+> >> memblock_alloc_base(size, align, idmap_to_phys(MEMBLOCK_ALLOC_ANYWHERE));
 > >
-> > Given that it's only _one_ platform right now, I don't think that
-> > additional complexity is worth it.  It means that we have to invent
+> > No, arm_memblock_steal() is totally unsuitable.  arm_memblock_steal()
+> > *removes* the memory range from memblock, including removing the
+> > mapping of that memory.  It will make the memory range inaccessible to
+> > the kernel.
+> >
+> > Since kexec wants to write directly to this memory, using
+> > arm_memblock_steal() will have the cause the kernel to OOPS when
+> > it hits the resulting hole.
+> >
 > 
-> Probably, I could not communicate it well.  I was not trying  to have
-> *additional* complexity. Wanted to see if things could be simpler
-> rather. So this is what my understanding was:
-> -- We create one patch to pass arch_phys_to_idmap_offset to user space
-> (say in /sys/kernel/bootmem_idmap_offset)
-> -- We do not use patch 5,6,11 and 12 of this series. Probably few more
-> content of the series will go away.
+> Sorry, I was not trying to say that we should use arm_memblock_steal()
+> here. As I said, this comment is totally unrelated to this patch
+> series. In arm_memblock_steal() we pass MEMBLOCK_ALLOC_ANYWHERE as
+> max_addr. Probably,  it would be good to pass
+> idmap_to_phys(MEMBLOCK_ALLOC_ANYWHERE).
 
-Patches 11 and 12 don't go away with what you're suggesting.  Patches
-11 and 12 are necessary to allow the boot-view addresses to be passed
-into the kernel through kexec, and to allow kexec to find appropriate
-memory resources.
+No.
 
-For example, from patch 11:
+	idmap_to_phys((u32)~0)
 
-@@ -48,7 +48,8 @@ static int kimage_alloc_init(struct kimage **rimage, unsigned
-long entry,
+This returns the maximum running-view physical address that corresponds
+with the top of the boot-view physical address space.  That's exactly
+what we want, not "any physical address".  In any case,
+MEMBLOCK_ALLOC_ANYWHERE is a 64-bit physical address consisting of all-
+ones.  The compiler will truncate it down to a 32-bit address due to
+idmap_to_phys()'s prototype, but that's really not the point - it's the
+wrong constant to be used here.  This isn't a memblock function, and
+it shouldn't be passed a 64-bit address.
 
--               if ((entry < crashk_res.start) || (entry > crashk_res.end))
-+               if ((entry < phys_to_boot_phys(crashk_res.start)) ||
-+                   (entry > phys_to_boot_phys(crashk_res.end)))
-
-"entry" is limited to a 32-bit physical address as it is unsigned long,
-and is the boot-view physical address.  crashk_res.start is the
-running-view physical address.  Without this change, the rest will
-always be true on Keystone 2.
-
-@@ -229,8 +229,8 @@ int sanity_check_segment_list(struct kimage *image)
--                       if ((mstart < crashk_res.start) ||
--                           (mend > crashk_res.end))
-+                       if ((mstart < phys_to_boot_phys(crashk_res.start)) ||
-+                           (mend > phys_to_boot_phys(crashk_res.end)))
-
-Same problem - mstart and mend are both 32-bit quantities.  The result
-is the segment list validation always fails.
-
-@@ -354,7 +354,7 @@ static struct page *kimage_alloc_normal_control_pages(struct kimage *image,
--               pfn   = page_to_pfn(pages);
-+               pfn   = page_to_boot_pfn(pages);
-
-The result without this change is that we allocate _all_ system memory
-looking for a suitable page, never finding one because we never find
-a page which matches.  Without a previous patch, killing many
-processes and taking the system down.
-
-@@ -480,7 +480,7 @@ static int kimage_add_entry(struct kimage *image, kimage_entry_t entry)
--               *image->entry = virt_to_phys(ind_page) | IND_INDIRECTION;
-+               *image->entry = virt_to_boot_phys(ind_page) | IND_INDIRECTION;
-
-The physical address would end up being truncated to 32-bits, but
-would actually be larger than 4GiB.  So, *image->entry would point
-at the incorrect address, and kexec would fail.
-
-@@ -535,13 +535,13 @@ void kimage_terminate(struct kimage *image)
- #define for_each_kimage_entry(image, ptr, entry) \
-        for (ptr = &image->head; (entry = *ptr) && !(entry & IND_DONE); \
-                ptr = (entry & IND_INDIRECTION) ? \
--                       phys_to_virt((entry & PAGE_MASK)) : ptr + 1)
-+                       boot_phys_to_virt((entry & PAGE_MASK)) : ptr + 1)
-
-"entry" is truncated to 32-bit, and so this passes an invalid
-physical address which is not part of the lowmem mapping to
-phys_to_virt().  The resulting virtual address is undefined.
-
--       page = pfn_to_page(entry >> PAGE_SHIFT);
-+       page = boot_pfn_to_page(entry >> PAGE_SHIFT);
-
-Same, except the resulting struct page pointer is undefined.
-
-... and so it goes on.
-
-The only patches which get replaced are patches 5 and 6 with a new
-userspace API.
+The difference is that arm_memblock_steal() is about stealing memory
+from the system which can be allocated in the running-view.  It's got
+nothing to do with boot-view stuff.
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
