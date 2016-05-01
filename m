@@ -1,32 +1,66 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon,  2 May 2016 00:24:35 +0530
-Subject: [PATCH V3 7/7] iommu/msm: Remove driver BROKEN
-In-Reply-To: <1462128875-20988-1-git-send-email-sricharan@codeaurora.org>
-References: <1462128875-20988-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1462128875-20988-8-git-send-email-sricharan@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 1 May 2016 21:21:31 +0200
+Subject: camera application for testing (was Re: v4l subdevs without big
+ device)
+In-Reply-To: <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
+References: <20160428084546.GA9957@amd> <20160429071525.GA4823@amd>
+ <57230DE7.3020701@xs4all.nl> <20160429221359.GA29297@amd>
+ <20160501140831.GH26360@valkosipuli.retiisi.org.uk>
+Message-ID: <20160501192131.GH14243@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the driver is DT adapted, bus_set_iommu gets called only
-when on compatible matching. So the driver should not break multiplatform
-builds now. So remove the BROKEN config.
+Hi!
+> > 
+> > What is reasonable camera application for testing?
+> > 
+> > N900 looks like a low-end digital camera. I have now have the hardware
+> > working (can set focus to X cm using command line), but that's not
+> > going to be useful for taking photos.
+> 
+> I guess you already knew about omap3camd; it's proprietary but from purely
+> practical point of view it'd be an option to support taking photos on the
+> N900. That would not be extensible any way, the best possible functionality
+> is limited what the daemon implements.
+> 
+> I'm just mentioning the option of implementing wrapper for the omap3camd so
+> that it can work with upsteam APIs, I don't propose that however.
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/iommu/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+I knew it existed, but I'd prefer not to touch proprietary code.
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 1f5d496..b81a0bb 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -90,7 +90,6 @@ config MSM_IOMMU
- 	bool "MSM IOMMU Support"
- 	depends on ARM
- 	depends on ARCH_MSM8X60 || ARCH_MSM8960 || COMPILE_TEST
--	depends on BROKEN
- 	select IOMMU_API
- 	select IOMMU_IO_PGTABLE_ARMV7S
- 	help
+> > In particular, who is going to do computation neccessary for
+> > autofocus, whitebalance and exposure/gain?
+> 
+> I think libv4l itself has algorithms to control at least some of these. It
+> relies on the image data so the CPU time consumption will be high.
+> 
+> AFAIR Laurent has also worked on implementing some algorithms that use the
+> histogram and some of the statistics. Add him to cc list.
+
+Aha, good, let me know.
+
+> > There's http://fcam.garage.maemo.org/gettingStarted.html that should
+> > work on maemo, but a) it is not in Debian, b) it has non-trivial
+> > dependencies and c) will be a lot of fun to get working...
+> > 
+> > (and d), will not be too useful, anyway, due to 1sec shutter lag:
+> 
+> I believe this will be shorter nowadays. I don't remember the exact
+> technical solution which the text below refers to but I'm pretty sure it'll
+> be better with the current upstream. API-wise, there's work to be done there
+> (to port FCAM to upsteram APIs) but it's a possibility.
+
+I took a look at fcam-dev in the meantime... and it does not look too
+bad. It is quite n900-specific -- it needs hardware support for
+histograms and sharpness maps -- but it should not be too hard to
+modify.
+
+Relying on hardware support without having fallback software
+implementation feels wrong, but... it should actually be ok as I
+already have the hardware...
+
+(Is there accepted "upstream" for it?)
+									Pavel
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
