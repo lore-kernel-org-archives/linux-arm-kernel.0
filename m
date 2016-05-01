@@ -1,265 +1,93 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun,  1 May 2016 00:25:28 -0400
-Subject: [PATCH V18 3/3] dmaengine: qcom_hidma: add support for object
- hierarchy
-In-Reply-To: <1462076728-14367-1-git-send-email-okaya@codeaurora.org>
-References: <1462076728-14367-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1462076728-14367-4-git-send-email-okaya@codeaurora.org>
+Date: Sun, 1 May 2016 00:35:37 -0400
+Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
+In-Reply-To: <2c7ac0732fb16f952db24b7c70065318@codeaurora.org>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
+ <20160426033029.GB2274@localhost>
+ <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
+ <20160426162529.GK2274@localhost> <571F9D76.2060809@codeaurora.org>
+ <20160427081501.GV2274@localhost>
+ <2c7ac0732fb16f952db24b7c70065318@codeaurora.org>
+Message-ID: <57258799.70803@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to create a relationship model between the channels and the
-management object, we are adding support for object hierarchy to the
-drivers. This patch simplifies the userspace application development.
-We will not have to traverse different firmware paths based on device
-tree or ACPI based kernels.
+On 4/27/2016 8:51 AM, okaya at codeaurora.org wrote:
+> On 2016-04-27 04:15, Vinod Koul wrote:
+>> On Tue, Apr 26, 2016 at 12:55:18PM -0400, Sinan Kaya wrote:
+>>> On 4/26/2016 12:25 PM, Vinod Koul wrote:
+>>> > On Tue, Apr 26, 2016 at 08:08:16AM -0400, okaya at codeaurora.org wrote:
+>>> >> On 2016-04-25 23:30, Vinod Koul wrote:
+>>> >>> On Mon, Apr 11, 2016 at 10:21:12AM -0400, Sinan Kaya wrote:
+>>> >>>
+>>> >>>> +static int hidma_chan_stats(struct seq_file *s, void *unused)
+>>> >>>> +{
+>>> >>>> +    struct hidma_chan *mchan = s->private;
+>>> >>>> +    struct hidma_desc *mdesc;
+>>> >>>> +    struct hidma_dev *dmadev = mchan->dmadev;
+>>> >>>> +
+>>> >>>> +    pm_runtime_get_sync(dmadev->ddev.dev);
+>>> >>>
+>>> >>> debug shouldn't power up device, why do you want to do that
+>>> >>
+>>> >>
+>>> >> Clocks are turned off while the hw is idle. I can?t reach hw
+>>> >> registers without restoring power.
+>>> >
+>>> > Hmm, have you thought about using regmap?
+>>> >
+>>>
+>>> To be honest, I didn't know what regmap is but I just read some code
+>>> and looked at how it is used. Feel free to correct me if I got it
+>>> wrong.
+>>>
+>>> Regmap seems to be designed for *slow* speed peripherals to improve frequent
+>>> accesses by the SW. It looks like it is used by MFD, SPI and I2C drivers.
+>>>
+>>> It seems to cache the register contents and flush/invalidate them only when
+>>> needed.
+>>>
+>>> The MMIO version seems to be assuming the presence of device-tree like CLK
+>>> API which doesn't exist on ACPI systems and is not portable.
+>>>
+>>> My reaction is that it is a lot of code with no added functionality to what
+>>> HIDMA driver is trying to achieve.
+>>>
+>>> Given that the use case here is only for debug purposes; I think it is OK
+>>> to keep this runtime call here. I don't want to add any overhead into the
+>>> existing code just to support the debug use case.
+>>>
+>>> None of my register read/writes are slow. This file will only be used to
+>>> troubleshoot customer issues.
+>>
+>> $ is always faster than MMIO. This way you can give reg contents to users
+>> without waking up hw.
+>>
+>> Also we at Intel use regmap on ACPI systems without CLK API
+> 
+> I can try and see the performance impact is. What happens to registers that hw updates like status registers. Those will be most interesting during debug. How does remap get updated for those? Is there a way to tell it not to cache certain registers
 
-No matter what flavor of kernel is used, objects will be represented as
-platform devices.
+My evaluation turned out negative. The regmap code is nice for bus like peripherals
+like I2C and SPI where everything is bitwise accessed. This is not the case
+in this code. 
 
-The new layout is as follows:
+Regmap is a nice tool if used properly but it doesn't mean that it will work
+in every single case. It doesn't match with the goal of this driver. 
 
-hidmam_10: hidma-mgmt at 0x5A000000 {
-	compatible = "qcom,hidma-mgmt-1.0";
-	...
+As soon as I abstract register accesses, the regmap code writes all MMIO registers
+with the readl variant functions.
 
-	hidma_10: hidma at 0x5a010000 {
-			compatible = "qcom,hidma-1.0";
-			...
-	}
-}
+Barriers are really expensive on ARM. I paid very special attention in the 
+code to decide when to use relaxed version vs. the readl version. I lose 
+all of this optimization. 
 
-The hidma_mgmt_init detects each instance of the hidma-mgmt-1.0 objects
-in device tree and calls into the channel driver to create platform devices
-for each child of the management object.
+Since the clocks are restored only during the debug case, I don't see any
+problems here. It is not worth the effort to do redo the whole thing and 
+introduce errors as I see a lot of tripping points like regmap_sync variants.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- Documentation/ABI/testing/sysfs-platform-hidma |   9 ++
- drivers/dma/qcom/hidma.c                       |  39 ++++++++-
- drivers/dma/qcom/hidma_mgmt.c                  | 113 ++++++++++++++++++++++++-
- 3 files changed, 156 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
 
-diff --git a/Documentation/ABI/testing/sysfs-platform-hidma b/Documentation/ABI/testing/sysfs-platform-hidma
-new file mode 100644
-index 0000000..d364415
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-platform-hidma
-@@ -0,0 +1,9 @@
-+What:		/sys/devices/platform/hidma-*/chid
-+		/sys/devices/platform/QCOM8061:*/chid
-+Date:		Dec 2015
-+KernelVersion:	4.4
-+Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
-+Description:
-+		Contains the ID of the channel within the HIDMA instance.
-+		It is used to associate a given HIDMA channel with the
-+		priority and weight calls in the management interface.
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 44c6491..033ac03 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -549,6 +549,43 @@ static irqreturn_t hidma_chirq_handler(int chirq, void *arg)
- 	return hidma_ll_inthandler(chirq, lldev);
- }
- 
-+static ssize_t hidma_show_values(struct device *dev,
-+				 struct device_attribute *attr, char *buf)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct hidma_dev *mdev = platform_get_drvdata(pdev);
-+
-+	buf[0] = 0;
-+
-+	if (strcmp(attr->attr.name, "chid") == 0)
-+		sprintf(buf, "%d\n", mdev->chidx);
-+
-+	return strlen(buf);
-+}
-+
-+static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
-+				    int mode)
-+{
-+	struct device_attribute *attrs;
-+	char *name_copy;
-+
-+	attrs = devm_kmalloc(dev->ddev.dev, sizeof(struct device_attribute),
-+			     GFP_KERNEL);
-+	if (!attrs)
-+		return -ENOMEM;
-+
-+	name_copy = devm_kstrdup(dev->ddev.dev, name, GFP_KERNEL);
-+	if (!name_copy)
-+		return -ENOMEM;
-+
-+	attrs->attr.name = name_copy;
-+	attrs->attr.mode = mode;
-+	attrs->show = hidma_show_values;
-+	sysfs_attr_init(&attrs->attr);
-+
-+	return device_create_file(dev->ddev.dev, attrs);
-+}
-+
- static int hidma_probe(struct platform_device *pdev)
- {
- 	struct hidma_dev *dmadev;
-@@ -682,6 +719,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	dmadev->irq = chirq;
- 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
- 	hidma_debug_init(dmadev);
-+	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
- 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
- 	platform_set_drvdata(pdev, dmadev);
- 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-@@ -730,7 +768,6 @@ static const struct of_device_id hidma_match[] = {
- 	{.compatible = "qcom,hidma-1.0",},
- 	{},
- };
--
- MODULE_DEVICE_TABLE(of, hidma_match);
- 
- static struct platform_driver hidma_driver = {
-diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
-index ef491b8..c0e3653 100644
---- a/drivers/dma/qcom/hidma_mgmt.c
-+++ b/drivers/dma/qcom/hidma_mgmt.c
-@@ -1,7 +1,7 @@
- /*
-  * Qualcomm Technologies HIDMA DMA engine Management interface
-  *
-- * Copyright (c) 2015, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -17,13 +17,14 @@
- #include <linux/acpi.h>
- #include <linux/of.h>
- #include <linux/property.h>
--#include <linux/interrupt.h>
--#include <linux/platform_device.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
- #include <linux/module.h>
- #include <linux/uaccess.h>
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
- #include <linux/bitops.h>
-+#include <linux/dma-mapping.h>
- 
- #include "hidma_mgmt.h"
- 
-@@ -298,5 +299,109 @@ static struct platform_driver hidma_mgmt_driver = {
- 	},
- };
- 
--module_platform_driver(hidma_mgmt_driver);
-+#if defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
-+static int object_counter;
-+
-+static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
-+{
-+	struct platform_device *pdev_parent = of_find_device_by_node(np);
-+	struct platform_device_info pdevinfo;
-+	struct of_phandle_args out_irq;
-+	struct device_node *child;
-+	struct resource *res;
-+	const __be32 *cell;
-+	int ret = 0, size, i, num;
-+	u64 addr, addr_size;
-+
-+	for_each_available_child_of_node(np, child) {
-+		struct resource *res_iter;
-+		struct platform_device *new_pdev;
-+
-+		cell = of_get_property(child, "reg", &size);
-+		if (!cell) {
-+			ret = -EINVAL;
-+			goto out;
-+		}
-+
-+		size /= sizeof(*cell);
-+		num = size /
-+			(of_n_addr_cells(child) + of_n_size_cells(child)) + 1;
-+
-+		/* allocate a resource array */
-+		res = kcalloc(num, sizeof(*res), GFP_KERNEL);
-+		if (!res) {
-+			ret = -ENOMEM;
-+			goto out;
-+		}
-+
-+		/* read each reg value */
-+		i = 0;
-+		res_iter = res;
-+		while (i < size) {
-+			addr = of_read_number(&cell[i],
-+					      of_n_addr_cells(child));
-+			i += of_n_addr_cells(child);
-+
-+			addr_size = of_read_number(&cell[i],
-+						   of_n_size_cells(child));
-+			i += of_n_size_cells(child);
-+
-+			res_iter->start = addr;
-+			res_iter->end = res_iter->start + addr_size - 1;
-+			res_iter->flags = IORESOURCE_MEM;
-+			res_iter++;
-+		}
-+
-+		ret = of_irq_parse_one(child, 0, &out_irq);
-+		if (ret)
-+			goto out;
-+
-+		res_iter->start = irq_create_of_mapping(&out_irq);
-+		res_iter->name = "hidma event irq";
-+		res_iter->flags = IORESOURCE_IRQ;
-+
-+		memset(&pdevinfo, 0, sizeof(pdevinfo));
-+		pdevinfo.fwnode = &child->fwnode;
-+		pdevinfo.parent = pdev_parent ? &pdev_parent->dev : NULL;
-+		pdevinfo.name = child->name;
-+		pdevinfo.id = object_counter++;
-+		pdevinfo.res = res;
-+		pdevinfo.num_res = num;
-+		pdevinfo.data = NULL;
-+		pdevinfo.size_data = 0;
-+		pdevinfo.dma_mask = DMA_BIT_MASK(64);
-+		new_pdev = platform_device_register_full(&pdevinfo);
-+		if (!new_pdev) {
-+			ret = -ENODEV;
-+			goto out;
-+		}
-+		of_dma_configure(&new_pdev->dev, child);
-+
-+		kfree(res);
-+		res = NULL;
-+	}
-+out:
-+	kfree(res);
-+
-+	return ret;
-+}
-+#endif
-+
-+static int __init hidma_mgmt_init(void)
-+{
-+#if defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
-+	struct device_node *child;
-+
-+	for (child = of_find_matching_node(NULL, hidma_mgmt_match); child;
-+	     child = of_find_matching_node(child, hidma_mgmt_match)) {
-+		/* device tree based firmware here */
-+		hidma_mgmt_of_populate_channels(child);
-+		of_node_put(child);
-+	}
-+#endif
-+	platform_driver_register(&hidma_mgmt_driver);
-+
-+	return 0;
-+}
-+module_init(hidma_mgmt_init);
- MODULE_LICENSE("GPL v2");
 -- 
-1.8.2.1
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
