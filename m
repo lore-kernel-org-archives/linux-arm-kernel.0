@@ -1,127 +1,119 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon,  2 May 2016 00:24:32 +0530
-Subject: [PATCH V3 4/7] iommu/msm: Add support for generic master bindings
+Date: Mon,  2 May 2016 00:24:34 +0530
+Subject: [PATCH V3 6/7] iommu/msm: Use writel_relaxed and add a barrier
 In-Reply-To: <1462128875-20988-1-git-send-email-sricharan@codeaurora.org>
 References: <1462128875-20988-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1462128875-20988-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1462128875-20988-7-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the xlate callback which gets invoked during
-device registration from DT. The master devices gets added
-through this.
+While using the generic pagetable ops the tlb maintenance
+operation gets completed in the sync callback. So use writel_relaxed
+for all register access and add a mb() at appropriate places.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/iommu/msm_iommu.c | 61 +++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 59 insertions(+), 2 deletions(-)
+ drivers/iommu/msm_iommu.c         | 11 ++++++++---
+ drivers/iommu/msm_iommu_hw-8xxx.h |  7 ++++---
+ 2 files changed, 12 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index 459cd43..71b04c7 100644
+index db82f4a..39e81d3 100644
 --- a/drivers/iommu/msm_iommu.c
 +++ b/drivers/iommu/msm_iommu.c
-@@ -28,6 +28,7 @@
- #include <linux/iommu.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/of_iommu.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/sizes.h>
-@@ -702,6 +703,54 @@ static void print_ctx_regs(void __iomem *base, int ctx)
- 	       GET_PRRR(base, ctx), GET_NMRR(base, ctx));
- }
- 
-+static void insert_iommu_master(struct device *dev,
-+				struct msm_iommu_dev **iommu,
-+				struct of_phandle_args *spec)
-+{
-+	struct msm_iommu_ctx_dev *master = dev->archdata.iommu;
-+	int sid;
-+
-+	if (list_empty(&(*iommu)->ctx_list)) {
-+		master = kzalloc(sizeof(*master), GFP_ATOMIC);
-+		master->of_node = dev->of_node;
-+		list_add(&master->list, &(*iommu)->ctx_list);
-+		dev->archdata.iommu = master;
-+	}
-+
-+	for (sid = 0; sid < master->num_mids; sid++)
-+		if (master->mids[sid] == spec->args[0]) {
-+			dev_warn(dev, "Stream ID 0x%hx repeated; ignoring\n",
-+				 sid);
-+			return;
-+		}
-+
-+	master->mids[master->num_mids++] = spec->args[0];
-+}
-+
-+static int qcom_iommu_of_xlate(struct device *dev,
-+			       struct of_phandle_args *spec)
-+{
-+	struct msm_iommu_dev *iommu;
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	spin_lock_irqsave(&msm_iommu_lock, flags);
-+	list_for_each_entry(iommu, &qcom_iommu_devices, dev_node)
-+		if (iommu->dev->of_node == spec->np)
-+			break;
-+
-+	if (!iommu || iommu->dev->of_node != spec->np) {
-+		ret = -ENODEV;
-+		goto fail;
-+	}
-+
-+	insert_iommu_master(dev, &iommu, spec);
-+fail:
-+	spin_unlock_irqrestore(&msm_iommu_lock, flags);
-+
-+	return ret;
-+}
-+
- irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
- {
- 	struct msm_iommu_dev *iommu = dev_id;
-@@ -737,7 +786,7 @@ fail:
- 	return 0;
- }
- 
--static const struct iommu_ops msm_iommu_ops = {
-+static struct iommu_ops msm_iommu_ops = {
- 	.capable = msm_iommu_capable,
- 	.domain_alloc = msm_iommu_domain_alloc,
- 	.domain_free = msm_iommu_domain_free,
-@@ -748,6 +797,7 @@ static const struct iommu_ops msm_iommu_ops = {
- 	.map_sg = default_iommu_map_sg,
- 	.iova_to_phys = msm_iommu_iova_to_phys,
- 	.pgsize_bitmap = MSM_IOMMU_PGSIZES,
-+	.of_xlate = qcom_iommu_of_xlate,
- };
- 
- static int msm_iommu_probe(struct platform_device *pdev)
-@@ -837,6 +887,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+@@ -124,6 +124,7 @@ static void msm_iommu_reset(void __iomem *base, int ncb)
+ 		SET_TLBLKCR(base, ctx, 0);
+ 		SET_CONTEXTIDR(base, ctx, 0);
  	}
- 
- 	list_add(&iommu->dev_node, &qcom_iommu_devices);
-+	of_iommu_set_ops(pdev->dev.of_node, &msm_iommu_ops);
- 
- 	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
- 		iommu->base, iommu->irq, iommu->ncb);
-@@ -935,7 +986,13 @@ static int __init msm_iommu_init(void)
- 	return 0;
++	mb(); /* sync */
  }
  
--subsys_initcall(msm_iommu_init);
-+static int __init msm_iommu_of_setup(struct device_node *np)
-+{
-+	msm_iommu_init();
-+	return 0;
-+}
-+
-+IOMMU_OF_DECLARE(msm_iommu_of, "msm,iommu-v0", msm_iommu_of_setup);
+ static void __flush_iotlb(void *cookie)
+@@ -143,6 +144,7 @@ static void __flush_iotlb(void *cookie)
  
- MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
+ 		__disable_clocks(iommu);
+ 	}
++	mb(); /* sync */
+ fail:
+ 	return;
+ }
+@@ -181,7 +183,7 @@ fail:
+ 
+ static void __flush_iotlb_sync(void *cookie)
+ {
+-	/* To avoid a null function pointer */
++	mb(); /* sync */
+ }
+ 
+ static const struct iommu_gather_ops msm_iommu_gather_ops = {
+@@ -235,6 +237,7 @@ static void config_mids(struct msm_iommu_dev *iommu,
+ 		/* Set security bit override to be Non-secure */
+ 		SET_NSCFG(iommu->base, mid, 3);
+ 	}
++	mb(); /* sync */
+ }
+ 
+ static void __reset_context(void __iomem *base, int ctx)
+@@ -257,6 +260,7 @@ static void __reset_context(void __iomem *base, int ctx)
+ 	SET_TLBFLPTER(base, ctx, 0);
+ 	SET_TLBSLPTER(base, ctx, 0);
+ 	SET_TLBLKCR(base, ctx, 0);
++	mb(); /* sync */
+ }
+ 
+ static void __program_context(void __iomem *base, int ctx,
+@@ -305,6 +309,7 @@ static void __program_context(void __iomem *base, int ctx,
+ 
+ 	/* Enable the MMU */
+ 	SET_M(base, ctx, 1);
++	mb(); /* sync */
+ }
+ 
+ static struct iommu_domain *msm_iommu_domain_alloc(unsigned type)
+@@ -500,7 +505,7 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	/* Invalidate context TLB */
+ 	SET_CTX_TLBIALL(iommu->base, master->num, 0);
+ 	SET_V2PPR(iommu->base, master->num, va & V2Pxx_VA);
+-
++	mb(); /* sync */
+ 	par = GET_PAR(iommu->base, master->num);
+ 
+ 	/* We are dealing with a supersection */
+@@ -714,7 +719,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 	par = GET_PAR(iommu->base, 0);
+ 	SET_V2PCFG(iommu->base, 0, 0);
+ 	SET_M(iommu->base, 0, 0);
+-
++	mb(); /* sync */
+ 	if (!par) {
+ 		pr_err("Invalid PAR value detected\n");
+ 		ret = -ENODEV;
+diff --git a/drivers/iommu/msm_iommu_hw-8xxx.h b/drivers/iommu/msm_iommu_hw-8xxx.h
+index 84ba5739..161036c 100644
+--- a/drivers/iommu/msm_iommu_hw-8xxx.h
++++ b/drivers/iommu/msm_iommu_hw-8xxx.h
+@@ -24,10 +24,10 @@
+ #define GET_CTX_REG(reg, base, ctx) \
+ 				(readl((base) + (reg) + ((ctx) << CTX_SHIFT)))
+ 
+-#define SET_GLOBAL_REG(reg, base, val)	writel((val), ((base) + (reg)))
++#define SET_GLOBAL_REG(reg, base, val)	writel_relaxed((val), ((base) + (reg)))
+ 
+ #define SET_CTX_REG(reg, base, ctx, val) \
+-			writel((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
++		writel_relaxed((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
+ 
+ /* Wrappers for numbered registers */
+ #define SET_GLOBAL_REG_N(b, n, r, v) SET_GLOBAL_REG(b, ((r) + (n << 2)), (v))
+@@ -48,7 +48,8 @@
+ #define SET_FIELD(addr, mask, shift, v) \
+ do { \
+ 	int t = readl(addr); \
+-	writel((t & ~((mask) << (shift))) + (((v) & (mask)) << (shift)), addr);\
++	writel_relaxed((t & ~((mask) << (shift))) + \
++		       (((v) & (mask)) << (shift)), addr);\
+ } while (0)
+ 
+ 
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
