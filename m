@@ -1,104 +1,329 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun,  1 May 2016 17:07:52 -0400
-Subject: [PATCH V4 2/2] vfio,
- platform: make reset driver a requirement by default
+Date: Sun,  1 May 2016 17:07:51 -0400
+Subject: [PATCH V4 1/2] vfio,
+ platform: add support for ACPI during probe and reset
 In-Reply-To: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
 References: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1462136872-17590-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1462136872-17590-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code was allowing platform devices to be used without a supporting VFIO
-reset driver. The hardware can be left in some inconsistent state after a
-guest machine abort.
+The code is using the compatible DT string to associate a reset driver with
+the actual device itself. The compatible string does not exist on ACPI
+based systems. HID is the unique identifier for a device driver instead.
 
-The reset driver will put the hardware back to safe state and disable
-interrupts before returning the control back to the host machine.
+When ACPI is enabled, the change will query the presence of _RST method
+and will call it instead of querying an external reset driver.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/vfio/platform/vfio_amba.c             | 5 +++++
- drivers/vfio/platform/vfio_platform.c         | 5 +++++
- drivers/vfio/platform/vfio_platform_common.c  | 8 +++++++-
- drivers/vfio/platform/vfio_platform_private.h | 1 +
- 4 files changed, 18 insertions(+), 1 deletion(-)
+ drivers/vfio/platform/vfio_platform_common.c  | 176 +++++++++++++++++++++-----
+ drivers/vfio/platform/vfio_platform_private.h |   7 +-
+ 2 files changed, 147 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
-index a66479b..7585902 100644
---- a/drivers/vfio/platform/vfio_amba.c
-+++ b/drivers/vfio/platform/vfio_amba.c
-@@ -23,6 +23,10 @@
- #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
- #define DRIVER_DESC     "VFIO for AMBA devices - User Level meta-driver"
- 
-+static bool reset_required = true;
-+module_param(reset_required, bool, 0644);
-+MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
-+
- /* probing devices from the AMBA bus */
- 
- static struct resource *get_amba_resource(struct vfio_platform_device *vdev,
-@@ -68,6 +72,7 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
- 	vdev->get_resource = get_amba_resource;
- 	vdev->get_irq = get_amba_irq;
- 	vdev->parent_module = THIS_MODULE;
-+	vdev->reset_required = reset_required;
- 
- 	ret = vfio_platform_probe_common(vdev, &adev->dev);
- 	if (ret) {
-diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
-index b1cc3a7..ef89146 100644
---- a/drivers/vfio/platform/vfio_platform.c
-+++ b/drivers/vfio/platform/vfio_platform.c
-@@ -23,6 +23,10 @@
- #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
- #define DRIVER_DESC     "VFIO for platform devices - User Level meta-driver"
- 
-+static bool reset_required = true;
-+module_param(reset_required, bool, 0644);
-+MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
-+
- /* probing devices from the linux platform bus */
- 
- static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
-@@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
- 	vdev->get_resource = get_platform_resource;
- 	vdev->get_irq = get_platform_irq;
- 	vdev->parent_module = THIS_MODULE;
-+	vdev->reset_required = reset_required;
- 
- 	ret = vfio_platform_probe_common(vdev, &pdev->dev);
- 	if (ret)
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 528ec04..b342538 100644
+index e65b142..528ec04 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -683,7 +683,13 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 		return ret;
+@@ -13,6 +13,7 @@
+  */
+ 
+ #include <linux/device.h>
++#include <linux/acpi.h>
+ #include <linux/iommu.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+@@ -41,7 +42,7 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+ 		if (!strcmp(iter->compat, compat) &&
+ 			try_module_get(iter->owner)) {
+ 			*module = iter->owner;
+-			reset_fn = iter->reset;
++			reset_fn = iter->of_reset;
+ 			break;
+ 		}
+ 	}
+@@ -49,20 +50,111 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+ 	return reset_fn;
+ }
+ 
+-static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
++
++#ifdef CONFIG_ACPI
++int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
++			     struct device *dev)
+ {
+-	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+-						&vdev->reset_module);
+-	if (!vdev->reset) {
+-		request_module("vfio-reset:%s", vdev->compat);
+-		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+-							 &vdev->reset_module);
++	struct acpi_device *adev = ACPI_COMPANION(dev);
++
++	if (acpi_disabled)
++		return -ENODEV;
++
++	if (!adev)
++		return -ENODEV;
++
++	vdev->acpihid = acpi_device_hid(adev);
++	if (!vdev->acpihid) {
++		pr_err("VFIO: cannot find ACPI HID for %s\n",
++		       vdev->name);
++		return -ENODEV;
+ 	}
++	return 0;
++}
++
++static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
++{
++	struct device *dev = vdev->device;
++	acpi_handle handle = ACPI_HANDLE(dev);
++	acpi_status acpi_ret;
++	unsigned long long val;
++
++	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
++	if (ACPI_FAILURE(acpi_ret))
++		return -EINVAL;
++
++	return 0;
++}
++
++static int vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
++{
++	struct device *dev = vdev->device;
++	acpi_handle handle = ACPI_HANDLE(dev);
++
++	if (acpi_has_method(handle, "_RST"))
++		return 0;
++
++	return -EINVAL;
++}
++#else
++int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
++			     struct device *dev)
++{
++	return -EINVAL;
++}
++
++static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
++{
++	return -EINVAL;
++}
++
++static int vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
++{
++	return -EINVAL;
++}
++#endif
++
++static int vfio_platform_has_reset(struct vfio_platform_device *vdev)
++{
++	if (vdev->acpihid)
++		return vfio_platform_acpi_has_reset(vdev);
++
++	if (vdev->of_reset)
++		return 0;
++
++	return -EINVAL;
++}
++
++static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
++{
++	int rc;
++
++	if (vdev->acpihid)
++		return vfio_platform_acpi_has_reset(vdev);
++
++	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
++						    &vdev->reset_module);
++	if (vdev->of_reset)
++		return 0;
++
++	rc = request_module("vfio-reset:%s", vdev->compat);
++	if (rc)
++		return rc;
++
++	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
++						    &vdev->reset_module);
++	if (vdev->of_reset)
++		return 0;
++
++	return -EINVAL;
+ }
+ 
+ static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+ {
+-	if (vdev->reset)
++	if (vdev->acpihid)
++		return;
++
++	if (vdev->of_reset)
+ 		module_put(vdev->reset_module);
+ }
+ 
+@@ -134,6 +226,20 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+ 	kfree(vdev->regions);
+ }
+ 
++static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
++{
++	if (vdev->of_reset) {
++		dev_info(vdev->device, "reset\n");
++		vdev->of_reset(vdev);
++		return 0;
++	} else if (vdev->acpihid) {
++		return vfio_platform_acpi_call_reset(vdev);
++	}
++
++	dev_warn(vdev->device, "no reset function found!\n");
++	return -EINVAL;
++}
++
+ static void vfio_platform_release(void *device_data)
+ {
+ 	struct vfio_platform_device *vdev = device_data;
+@@ -141,12 +247,7 @@ static void vfio_platform_release(void *device_data)
+ 	mutex_lock(&driver_lock);
+ 
+ 	if (!(--vdev->refcnt)) {
+-		if (vdev->reset) {
+-			dev_info(vdev->device, "reset\n");
+-			vdev->reset(vdev);
+-		} else {
+-			dev_warn(vdev->device, "no reset function found!\n");
+-		}
++		vfio_platform_call_reset(vdev);
+ 		vfio_platform_regions_cleanup(vdev);
+ 		vfio_platform_irq_cleanup(vdev);
+ 	}
+@@ -175,12 +276,9 @@ static int vfio_platform_open(void *device_data)
+ 		if (ret)
+ 			goto err_irq;
+ 
+-		if (vdev->reset) {
+-			dev_info(vdev->device, "reset\n");
+-			vdev->reset(vdev);
+-		} else {
+-			dev_warn(vdev->device, "no reset function found!\n");
+-		}
++		ret = vfio_platform_call_reset(vdev);
++		if (ret)
++			goto err_irq;
  	}
  
--	vfio_platform_get_reset(vdev);
-+	ret = vfio_platform_get_reset(vdev);
-+	if (ret && vdev->reset_required) {
-+		pr_err("vfio: no reset function found for device %s\n",
-+		       vdev->name);
-+		iommu_group_put(group);
-+		return ret;
-+	}
+ 	vdev->refcnt++;
+@@ -213,7 +311,7 @@ static long vfio_platform_ioctl(void *device_data,
+ 		if (info.argsz < minsz)
+ 			return -EINVAL;
  
- 	mutex_init(&vdev->igate);
+-		if (vdev->reset)
++		if (!vfio_platform_has_reset(vdev))
+ 			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
+ 		info.flags = vdev->flags;
+ 		info.num_regions = vdev->num_regions;
+@@ -312,10 +410,7 @@ static long vfio_platform_ioctl(void *device_data,
+ 		return ret;
  
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index ba9e4f8..68fbc00 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -50,6 +50,7 @@ struct vfio_platform_region {
+ 	} else if (cmd == VFIO_DEVICE_RESET) {
+-		if (vdev->reset)
+-			return vdev->reset(vdev);
+-		else
+-			return -EINVAL;
++		return vfio_platform_call_reset(vdev);
+ 	}
+ 
+ 	return -ENOTTY;
+@@ -544,6 +639,21 @@ static const struct vfio_device_ops vfio_platform_ops = {
+ 	.mmap		= vfio_platform_mmap,
  };
  
- struct vfio_platform_device {
-+	bool				reset_required;
- 	struct vfio_platform_region	*regions;
- 	u32				num_regions;
- 	struct vfio_platform_irq	*irqs;
++int vfio_platform_of_probe(struct vfio_platform_device *vdev,
++			   struct device *dev)
++{
++	int ret;
++
++	ret = device_property_read_string(dev, "compatible",
++					  &vdev->compat);
++	if (ret) {
++		pr_err("VFIO: cannot retrieve compat for %s\n",
++			vdev->name);
++		return ret;
++	}
++	return 0;
++}
++
+ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 			       struct device *dev)
+ {
+@@ -553,14 +663,14 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 	if (!vdev)
+ 		return -EINVAL;
+ 
+-	ret = device_property_read_string(dev, "compatible", &vdev->compat);
+-	if (ret) {
+-		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
+-		return -EINVAL;
+-	}
++	ret = vfio_platform_acpi_probe(vdev, dev);
++	if (ret)
++		ret = vfio_platform_of_probe(vdev, dev);
+ 
+-	vdev->device = dev;
++	if (ret)
++		return ret;
+ 
++	vdev->device = dev;
+ 	group = iommu_group_get(dev);
+ 	if (!group) {
+ 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
+@@ -611,7 +721,7 @@ void vfio_platform_unregister_reset(const char *compat,
+ 
+ 	mutex_lock(&driver_lock);
+ 	list_for_each_entry_safe(iter, temp, &reset_list, link) {
+-		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
++		if (!strcmp(iter->compat, compat) && (iter->of_reset == fn)) {
+ 			list_del(&iter->link);
+ 			break;
+ 		}
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 42816dd..ba9e4f8 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -58,6 +58,7 @@ struct vfio_platform_device {
+ 	struct mutex			igate;
+ 	struct module			*parent_module;
+ 	const char			*compat;
++	const char			*acpihid;
+ 	struct module			*reset_module;
+ 	struct device			*device;
+ 
+@@ -71,7 +72,7 @@ struct vfio_platform_device {
+ 	struct resource*
+ 		(*get_resource)(struct vfio_platform_device *vdev, int i);
+ 	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
+-	int	(*reset)(struct vfio_platform_device *vdev);
++	int	(*of_reset)(struct vfio_platform_device *vdev);
+ };
+ 
+ typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
+@@ -80,7 +81,7 @@ struct vfio_platform_reset_node {
+ 	struct list_head link;
+ 	char *compat;
+ 	struct module *owner;
+-	vfio_platform_reset_fn_t reset;
++	vfio_platform_reset_fn_t of_reset;
+ };
+ 
+ extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+@@ -103,7 +104,7 @@ extern void vfio_platform_unregister_reset(const char *compat,
+ static struct vfio_platform_reset_node __reset ## _node = {	\
+ 	.owner = THIS_MODULE,					\
+ 	.compat = __compat,					\
+-	.reset = __reset,					\
++	.of_reset = __reset,					\
+ };								\
+ __vfio_platform_register_reset(&__reset ## _node)
+ 
 -- 
 1.8.2.1
