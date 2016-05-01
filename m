@@ -1,100 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 01 Apr 2016 15:57:54 +0900
-Subject: [PATCH 11/11] ARM: dts: s5p: Fix DTC unit name warnings in S5Pv210
- boards
-In-Reply-To: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
-References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1459493874-2366-11-git-send-email-k.kozlowski@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 1 May 2016 10:52:36 +0200
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160429200559.GA16598@earth>
+References: <20160407234134.GQ16484@atomide.com> <20160411093023.GC11814@amd>
+ <20160411094130.GA5753@amd> <20160411211026.GH5995@atomide.com>
+ <20160412121658.GA32486@amd> <20160412123013.GA12296@amd>
+ <20160412163055.GP5995@atomide.com> <20160417175539.GA502@amd>
+ <20160421130450.GQ29406@pali> <20160429200559.GA16598@earth>
+Message-ID: <20160501085236.GA14243@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following DTC warnings in S5Pv210 boards:
+On Fri 2016-04-29 22:06:00, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Thu, Apr 21, 2016 at 03:04:50PM +0200, Pali Roh?r wrote:
+> > > CONFIG_HSI breaks power management completely, so power management
+> > > with modem will be another topic.  
+> > 
+> > Sebastian, any idea why power management does not work for HSI?
+> 
+> I wasn't aware, that pm_runtime_irq_safe() basically breaks runtime
+> PM until Tony's fix for musb (even though it's logical when thinking
+> about it). Currently omap-ssi and omap-ssi-port make use of
+> pm_runtime_irq_safe().
+> 
+> Since pm_runtime_get_sync/pm_runtime_put_sync is called from
+> tasklets in omap-ssi (and omap-ssi-port) it cannot be simply
+> removed. So fixing PM for the ssi controller requires reworking
+> the driver in a non trivial way.
 
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): Node /soc/fimd at f8000000/display-timings/timing at 0 has a unit name, but no reg property
+I see latest series, and it also talks about frequency scaling. But I
+guess it is not going to fix this issue?
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/s5pv210-aquila.dts   | 2 +-
- arch/arm/boot/dts/s5pv210-goni.dts     | 2 +-
- arch/arm/boot/dts/s5pv210-smdkc110.dts | 2 +-
- arch/arm/boot/dts/s5pv210-smdkv210.dts | 4 ++--
- arch/arm/boot/dts/s5pv210-torbreck.dts | 2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/s5pv210-aquila.dts b/arch/arm/boot/dts/s5pv210-aquila.dts
-index da24ab570b0e..d763c5b4c65d 100644
---- a/arch/arm/boot/dts/s5pv210-aquila.dts
-+++ b/arch/arm/boot/dts/s5pv210-aquila.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC2,115200n8 root=/dev/mmcblk1p5 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 30000000 {
- 		device_type = "memory";
- 		reg = <0x30000000 0x05000000
- 			0x40000000 0x18000000>;
-diff --git a/arch/arm/boot/dts/s5pv210-goni.dts b/arch/arm/boot/dts/s5pv210-goni.dts
-index 0a33d402138e..c56f51ee7897 100644
---- a/arch/arm/boot/dts/s5pv210-goni.dts
-+++ b/arch/arm/boot/dts/s5pv210-goni.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p5 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 30000000 {
- 		device_type = "memory";
- 		reg = <0x30000000 0x05000000
- 			0x40000000 0x10000000
-diff --git a/arch/arm/boot/dts/s5pv210-smdkc110.dts b/arch/arm/boot/dts/s5pv210-smdkc110.dts
-index 1eedab7ffe94..5d14da911aa5 100644
---- a/arch/arm/boot/dts/s5pv210-smdkc110.dts
-+++ b/arch/arm/boot/dts/s5pv210-smdkc110.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory@20000000 {
- 		device_type = "memory";
- 		reg = <0x20000000 0x20000000>;
- 	};
-diff --git a/arch/arm/boot/dts/s5pv210-smdkv210.dts b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-index 54fcc3fc82e2..75398318ed57 100644
---- a/arch/arm/boot/dts/s5pv210-smdkv210.dts
-+++ b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 20000000 {
- 		device_type = "memory";
- 		reg = <0x20000000 0x40000000>;
- 	};
-@@ -197,7 +197,7 @@
- 	display-timings {
- 		native-mode = <&timing0>;
- 
--		timing0: timing at 0 {
-+		timing0: timing {
- 			/* 800x480 at 60Hz */
- 			clock-frequency = <24373920>;
- 			hactive = <800>;
-diff --git a/arch/arm/boot/dts/s5pv210-torbreck.dts b/arch/arm/boot/dts/s5pv210-torbreck.dts
-index 622599fd2cfa..7cb50bcee888 100644
---- a/arch/arm/boot/dts/s5pv210-torbreck.dts
-+++ b/arch/arm/boot/dts/s5pv210-torbreck.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 20000000 {
- 		device_type = "memory";
- 		reg = <0x20000000 0x20000000>;
- 	};
+Thanks,
+									Pavel
 -- 
-2.5.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
