@@ -1,89 +1,52 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 1 May 2016 19:02:50 +0100
-Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
-In-Reply-To: <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
- <572379F5.8000501@i2se.com> <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
-Message-ID: <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
+Date: Sun, 1 May 2016 21:08:50 +0100
+Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
+In-Reply-To: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
+References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <500c5874-4ef8-b37b-e12f-80fd5205c172@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/16 18:45, Harald Geyer wrote:
-> Hi Stefan!
+Ksenija,
+
+How would you prefer we handle this interaction of this set and your series.
+Options are:
+
+1. I apply these now and you rebase on top of the result.
+2. You pull these into your series, probably after the driver split making sure these
+   improvements end up in the new drivers.
+3. We ask Stephan to re roll them at a later date (least preferred option as that adds
+another person we need to chase down to get to the end of this process!)
+
+No immediate rush on any of the above as we've probably missed this cycle now anyway.
+I've been cut off today so not sure what Linus has said today.
+
+Jonathan
+On 23/04/16 20:57, Stefan Wahren wrote:
+> This patch series simplifies TS handling of mxs-lradc.
 > 
-> On 29.04.2016 17:12, Stefan Wahren wrote:
->> Hi Harald,
->>
->> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
->>> Patch 1/3 changes the driver and updates the binding documentation
->>> (I guess it is still in staging.)
->>>
->>> Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 boards.
->>> I'd like to get input whether this is actually desired. On boards where
->>> these regulators would never be enabled this costs a few extra bytes of
->>> RAM for allocation of the device data, because the nodes can't be easily
->>> removed in .dts files which are including the .dtsi files. The alternative
->>> is to add the new nodes to many .dts files, which would be a lot code
->>> duplication.
->>
->> if i get it right the real intention of this patch series is to make the
->> mxs-lradc provide resistance values instead of voltages.
+> These patches has been tested with i.MX23 and i.MX28 but without
+> a touchscreen. I added only a bogus touchscreen in devicetree.
 > 
-> ... or even temperature values if a thermistor is connected.
+> It would be nice if someone with a real touchscreen could test it.
 > 
->> So how about
->> dropping the whole regulator stuff and provide the values as
->> IIO_RESISTANCE via iio interface?
+> Changes in V3:
+> - remove dev.parent assignment as suggested by Dimitry
+> - add new patch to remove mxs_lradc_ts_unregister
+> - remove PM implementation from series in order to wait until 
+>   Ksenija has split the driver
 > 
-> Can you elaborate on this?
+> Changes in V2:
+> - rebase on iio/testing since patch 2 and 3 from V1 has been applied
+> - also remove input_unregister_device in patch 1
+> - use mask of virtual channels for IRQ disabling in patch 2
 > 
-> My thinking is that there should be a thermistor (or whatever else) driver,
-> that is a consumer of the regulator and a consumer of the IIO_VOLTAGE
-> iio channel and provides a new device with an IIO_RESISTANCE or IIO_TEMP
-> channel. Maybe there is a simpler solution, that I'm missing?
-I agree with that approach - need a way to describe the upstream hardware - so
-will need a thermistor driver
+> Stefan Wahren (3):
+>   iio: mxs-lradc: simplify TS registration
+>   iio: mxs-lradc: remove mxs_lradc_ts_unregister
+>   iio: mxs-lradc: disable only masked channels in     
+>     mxs_lradc_hw_stop
 > 
-> Actually I'm not 100% happy with the above solution myself, because if we
-> start supporting devices that act as an iio-multiplexer (some device that
-> is an iio consumer and provides many new iio channels and can control
-> via gpios which of it child channels is actually routed to the upstream
-> device) I don't know how to properly manage the regulator device.
-Hmm. Are you talking about muxing the regulator as well?  That will get
-complex indeed.  Might be possible to cheat and imply the regulators are
-always connected to all inputs...  or do you want to dynamically change
-the regulator output?  That gets messy fast - though in theory might be
-possible...
-> However since this is only hypothetical ATM, I think we don't have to
-> worry about this too much.
-> 
->> Btw this feature should be only added to dts files where is actually used.
-> 
-> Ok, so how do we figure out which boards these are?
-> I use this on the olinuxino and I guess all evaluation boards support the
-> use case too. The others I don't know enough about to be sure and I guess
-> it's not a good idea to just wait until somebody speaks up and complains
-> that the feature is missing on board X ...
-> 
-> Thanks,
-> Harald
-> 
->> Regards
->> Stefan
->>
->>>
->>> Harald Geyer (3):
->>>   iio: mxs-lradc: Add regulators for current sources
->>>   ARM: dts: imx23: Provide regulators for the current sources of the
->>>     LRADC
->>>   ARM: dts: imx28: Provide regulators for the current sources of the
->>>     LRADC
->>>
->>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
->>>  arch/arm/boot/dts/imx23.dtsi                       |   8 ++
->>>  arch/arm/boot/dts/imx28.dtsi                       |   8 ++
->>>  drivers/iio/adc/Kconfig                            |   1 +
->>>  drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
->>>  5 files changed, 198 insertions(+)
->>>
+>  drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
+>  1 file changed, 6 insertions(+), 28 deletions(-)
 > 
