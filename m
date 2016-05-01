@@ -1,52 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 1 May 2016 21:08:50 +0100
-Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
-In-Reply-To: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
-References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <500c5874-4ef8-b37b-e12f-80fd5205c172@kernel.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Sun, 01 May 2016 16:48:51 -0700
+Subject: [PATCH 1/2] pinctrl: amlogic: Add support for Amlogic Meson GXBB
+ SoC
+In-Reply-To: <CAOQ7t2YEVsk9cB-kmp-fXSVsVVtXynFbMSxPzTPE_0+s0qY9PQ@mail.gmail.com>
+ (Carlo Caione's message of "Sun, 1 May 2016 11:20:14 +0200")
+References: <1462036875-22625-1-git-send-email-carlo@caione.org>
+ <1462036875-22625-2-git-send-email-carlo@caione.org>
+ <CACRpkdbfSgVH_zGMdgyfvBbnpiTkd7dzugza4_w0_7MLMVNzyA@mail.gmail.com>
+ <CAOQ7t2YEVsk9cB-kmp-fXSVsVVtXynFbMSxPzTPE_0+s0qY9PQ@mail.gmail.com>
+Message-ID: <m2y47tuyos.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ksenija,
+Carlo Caione <carlo@caione.org> writes:
 
-How would you prefer we handle this interaction of this set and your series.
-Options are:
+> On Sun, May 1, 2016 at 11:03 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Sat, Apr 30, 2016 at 7:21 PM, Carlo Caione <carlo@caione.org> wrote:
+>>
+>>> From: Carlo Caione <carlo@endlessm.com>
+>>>
+>>> This patch adds the basic platform file to support the pin controller
+>>> found on the Amlogic Meson GXBB SoCs.
+>>>
+>>> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>>
+>>>  .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   2 +
+>>
+>> This thing conflicts with upstream. Make a separate patch for
+>> updating the bindings I think.
+>
+> This patch is based on linux-next where the documentation is correctly
+> updated (see 11ca8735) but apparently this is missing from upstream.
+> Probably slipped through the cracks with the latest PR.
+>
+> Kevin, did you merge both the commits in
+> https://patchwork.ozlabs.org/patch/603580/ or just the DT changes?
 
-1. I apply these now and you rebase on top of the result.
-2. You pull these into your series, probably after the driver split making sure these
-   improvements end up in the new drivers.
-3. We ask Stephan to re roll them at a later date (least preferred option as that adds
-another person we need to chase down to get to the end of this process!)
+Yes, I just pulled your branch.
 
-No immediate rush on any of the above as we've probably missed this cycle now anyway.
-I've been cut off today so not sure what Linus has said today.
+That pull was merged for v4.7, which is why it's in next, but not yet
+mainline (where v4.6 is just now being finalized.)
 
-Jonathan
-On 23/04/16 20:57, Stefan Wahren wrote:
-> This patch series simplifies TS handling of mxs-lradc.
-> 
-> These patches has been tested with i.MX23 and i.MX28 but without
-> a touchscreen. I added only a bogus touchscreen in devicetree.
-> 
-> It would be nice if someone with a real touchscreen could test it.
-> 
-> Changes in V3:
-> - remove dev.parent assignment as suggested by Dimitry
-> - add new patch to remove mxs_lradc_ts_unregister
-> - remove PM implementation from series in order to wait until 
->   Ksenija has split the driver
-> 
-> Changes in V2:
-> - rebase on iio/testing since patch 2 and 3 from V1 has been applied
-> - also remove input_unregister_device in patch 1
-> - use mask of virtual channels for IRQ disabling in patch 2
-> 
-> Stefan Wahren (3):
->   iio: mxs-lradc: simplify TS registration
->   iio: mxs-lradc: remove mxs_lradc_ts_unregister
->   iio: mxs-lradc: disable only masked channels in     
->     mxs_lradc_hw_stop
-> 
->  drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
->  1 file changed, 6 insertions(+), 28 deletions(-)
-> 
+Kevin
