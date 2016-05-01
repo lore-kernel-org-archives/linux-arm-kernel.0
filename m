@@ -1,43 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 1 May 2016 18:42:52 +0200
-Subject: [RFT PATCH 0/3] usb: misc: usb3503: Fix missing device when TFTP
- booting
-In-Reply-To: <57262844.7060809@xs4all.nl>
-References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
- <57247E50.1020000@xs4all.nl> <20160501131746.GA16766@kozik-lap>
- <57260E1E.70205@xs4all.nl> <57262844.7060809@xs4all.nl>
-Message-ID: <20160501164252.GA3581@kozik-lap>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sun, 1 May 2016 10:58:43 -0600
+Subject: [PATCH v4] ARM: bcm2835: dt: Add the ethernet to the device trees
+In-Reply-To: <1462000432-18452-1-git-send-email-lkundrak@v3.sk>
+References: <1462000432-18452-1-git-send-email-lkundrak@v3.sk>
+Message-ID: <572635C3.7070102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 01, 2016 at 06:01:08PM +0200, Hans Verkuil wrote:
-> > Sorry, I meant the hanging issue I got in 4.6, not the ethernet issue.
-> > I get the same problem with linux-next. Can you mail me the .config you are using?
-> 
-> Never mind.
-> 
-> > After some more testing I don't think it is hanging, instead it seems that the mmc
-> > isn't enabled/found and so it just sits waiting for the root partition to appear.
-> 
-> That was fun. There are two problems that both caused the boot to end at the same
-> place: first of all the root partition is now called mmcblk1p1 instead of mmcblk0p1
-> in 4.6, so it was just waiting for the root partition to appear. Nothing to do with
-> your patch series, just unexpected.
+On 04/30/2016 01:13 AM, Lubomir Rintel wrote:
+> The hub and the ethernet in its port 1 are hardwired on the board.
+>
+> Compared to the adapters that can be plugged into the USB ports, this
+> one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
+> has the MAC address for this adapter in its ROM, accessible from its
+> firmware.
+>
+> U-Boot can read out the address and set the local-mac-address property of the
+> node with "ethernet" alias. Let's add the node so that U-Boot can do its
+> business.
+>
+> Model B rev2 and Model B+ entries were verified by me, the hierarchy and
+> pid/vid pair for the Version 2 was provided by Peter Chen. Original
+> Model B is a blind short, though very likely correct.
 
-Yes, annoying issue and unfortunately this is known... recommended
-solution is to use root=PARTUUID=xxxx (you can get the PARTUUID with
-blkid)... or replace the mmc device.
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-> The second is that enabling CONFIG_VIDEO_S5P_FIMC causes the boot to hang at that
-> same place. I suspect there is a deadlock somewhere. I'm digging deeper into that
-> but again, unrelated to your patch series.
-> 
-> Anyway, after disabling that config option I was finally able to test your patch
-> series:
-> 
-> Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+One nit:
 
-Thanks!
+> diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+> new file mode 100644
+> index 0000000..7200238
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+> @@ -0,0 +1,20 @@
+> +
+> +/ {
 
-Best regards,
-Krzysztof
+There's an extra blank line at the top of the file.
