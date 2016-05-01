@@ -1,47 +1,41 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun,  1 May 2016 19:37:01 +0900
-Subject: [PATCH 5/7] reset: sunxi: use devm_reset_controller_register()
+Date: Sun,  1 May 2016 19:36:58 +0900
+Subject: [PATCH 2/7] reset: ath79: use devm_reset_controller_register()
 In-Reply-To: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1462099023-11819-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462099023-11819-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use devm_reset_controller_register() for the reset controller
-registration and drop the .remove callback.
+registration and remove the unregister call from the .remove callback.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/reset/reset-sunxi.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/reset/reset-ath79.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-index 677f865..3080190 100644
---- a/drivers/reset/reset-sunxi.c
-+++ b/drivers/reset/reset-sunxi.c
-@@ -165,21 +165,11 @@ static int sunxi_reset_probe(struct platform_device *pdev)
- 	data->rcdev.ops = &sunxi_reset_ops;
- 	data->rcdev.of_node = pdev->dev.of_node;
+diff --git a/drivers/reset/reset-ath79.c b/drivers/reset/reset-ath79.c
+index ccb940a..16d410c 100644
+--- a/drivers/reset/reset-ath79.c
++++ b/drivers/reset/reset-ath79.c
+@@ -112,7 +112,7 @@ static int ath79_reset_probe(struct platform_device *pdev)
+ 	ath79_reset->rcdev.of_reset_n_cells = 1;
+ 	ath79_reset->rcdev.nr_resets = 32;
  
--	return reset_controller_register(&data->rcdev);
--}
--
--static int sunxi_reset_remove(struct platform_device *pdev)
--{
--	struct sunxi_reset_data *data = platform_get_drvdata(pdev);
--
--	reset_controller_unregister(&data->rcdev);
--
--	return 0;
-+	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
+-	err = reset_controller_register(&ath79_reset->rcdev);
++	err = devm_reset_controller_register(&pdev->dev, &ath79_reset->rcdev);
+ 	if (err)
+ 		return err;
+ 
+@@ -131,7 +131,6 @@ static int ath79_reset_remove(struct platform_device *pdev)
+ 	struct ath79_reset *ath79_reset = platform_get_drvdata(pdev);
+ 
+ 	unregister_restart_handler(&ath79_reset->restart_nb);
+-	reset_controller_unregister(&ath79_reset->rcdev);
+ 
+ 	return 0;
  }
- 
- static struct platform_driver sunxi_reset_driver = {
- 	.probe	= sunxi_reset_probe,
--	.remove	= sunxi_reset_remove,
- 	.driver = {
- 		.name		= "sunxi-reset",
- 		.of_match_table	= sunxi_reset_dt_ids,
 -- 
 1.9.1
