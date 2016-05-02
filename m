@@ -1,103 +1,30 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 2 May 2016 13:31:46 +0200
-Subject: [PATCH V6 09/13] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <CAKc_7PUcjKkCrCTj9q26P8a+Tb3N_MffynnTXnJRacm6VNmFRw@mail.gmail.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-10-git-send-email-tn@semihalf.com>
- <20160428214800.GG25125@localhost> <20160429083709.GA3249@red-moon>
- <CAKc_7PUcjKkCrCTj9q26P8a+Tb3N_MffynnTXnJRacm6VNmFRw@mail.gmail.com>
-Message-ID: <57273AA2.4080806@semihalf.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 2 May 2016 08:31:57 -0300
+Subject: [PATCH v4 2/2] ARM: dts: imx6ul-pico-hobbit: Add initial support
+In-Reply-To: <1461729621-13283-2-git-send-email-festevam@gmail.com>
+References: <1461729621-13283-1-git-send-email-festevam@gmail.com>
+ <1461729621-13283-2-git-send-email-festevam@gmail.com>
+Message-ID: <CAOMZO5DX-QAB+kH=xeM6Pp6rzD6TjVkyuaHrBPUPn-BA0Xmefg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2016 07:35 PM, Jayachandran C wrote:
-> On Fri, Apr 29, 2016 at 2:07 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
->> On Thu, Apr 28, 2016 at 04:48:00PM -0500, Bjorn Helgaas wrote:
->>
->> [...]
->>
->>>> +static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
->>>> +                                  struct acpi_pci_generic_root_info *ri)
->>>> +{
->>>> +   u16 seg = root->segment;
->>>> +   u8 bus_start = root->secondary.start;
->>>> +   u8 bus_end = root->secondary.end;
->>>> +   struct pci_config_window *cfg;
->>>> +   struct mcfg_entry *e;
->>>> +   phys_addr_t addr;
->>>> +   int err = 0;
->>>> +
->>>> +   mutex_lock(&pci_mcfg_lock);
->>> What does this lock protect?  The pci_mcfg_list should already be
->>> initialized by the time we get there, and it should be immutable for
->>> the life of the system.  In fact, I would prefer if we could just
->>> search the static table itself whenever we need it rather than caching
->>> it in our own list.  But I don't think we can easily do that because
->>> acpi_table_parse() is __init.
->>>
->>>> +   e = pci_mcfg_lookup(seg, bus_start);
->>> I would argue that we should check for _CBA first, and fall back to
->>> MCFG if _CBA doesn't exist.
->>>
->>>> +   if (!e) {
->>>> +           addr = acpi_pci_root_get_mcfg_addr(root->device->handle);
->>> IMO, acpi_pci_root_get_mcfg_addr() is misnamed.  It should be
->>> acpi_pci_config_base_addr() or similar.  It definitely is not related
->>> to MCFG.  Not your fault, obviously.
->>>
->>>> +           if (addr == 0) {
->>>> +                   pr_err(PREFIX"%04x:%02x-%02x bus range error\n",
->>>> +                          seg, bus_start, bus_end);
->>>> +                   err = -ENOENT;
->>>> +                   goto err_out;
->>>> +           }
->>>> +   } else {
->>>> +           if (bus_start != e->bus_start) {
->>>> +                   pr_err("%04x:%02x-%02x bus range mismatch %02x\n",
->>>> +                          seg, bus_start, bus_end, e->bus_start);
->>>> +                   err = -EINVAL;
->>>> +                   goto err_out;
->>>> +           } else if (bus_end != e->bus_end) {
->>>> +                   pr_warn("%04x:%02x-%02x bus end mismatch %02x\n",
->>>> +                           seg, bus_start, bus_end, e->bus_end);
->>>> +                   bus_end = min(bus_end, e->bus_end);
->>>> +           }
->>>> +           addr = e->addr;
->>>> +   }
->>> I really don't think you need a lock around this, so you can factor
->>> out the address lookup into something like:
->>>
->>>    addr = acpi_pci_config_base_addr(...);
->>>    if (addr)
->>>      return addr;
->>>
->>>    return acpi_pci_mcfg_lookup(seg, busn_res);
->>>
->>> You can check inside acpi_pci_mcfg_lookup() to make sure the entry you
->>> find covers the entire [busn_res.start-busn_res.end] range and return
->>> failure if it doesn't.  At this point, I'm not sure it's worth it to
->>> truncate the host bridge bus range to match something we find in MCFG.
->>>
->>> If the MCFG entry covers *more* than the host bridge range from _CRS,
->>> that's fine.  In any case, we have to be careful with the start address,
->>> because the MCFG start address is always based on bus 0, but I think
->>> pci_generic_ecam_create() expects the start address based on the
->>> bus_start you pass to it.
->> Yes, I spotted this too, it is unfortunate but DT and MCFG handle
->> the ECAM regions differently. In DT the reg property is relative
->> to bus_start - ie reg MMIO region maps config space starting at
->> the first bus in bus-range:
->>
->> Documentation/devicetree/bindings/pci/host-generic-pci.txt
->>
->> in ACPI(MCFG) as you said it is always relative to bus 0, it is
->> unfortunate but the address to be mapped should be computed
->> differently in the ECAM layer.
-> Can't this be handled by fixing up the address before passing to
-> pci_generic_ecam_create?
->
-I agree, this should work, IMO.
+Hi Shawn,
 
-Tomasz
+On Wed, Apr 27, 2016 at 1:00 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+>
+> Add initial support for imx6ul pico hobbit board.
+>
+> For information about this board, please visit:
+> http://www.wandboard.org/images/hobbit/hobbitboard-imx6ul-reva1.pdf
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+I understand we are still waiting for Rob's Ack on the first patch of
+this series.
+
+Could this one be applied to your tree in case you are happy with it?
+
+Would like to get this one for 4.7 if possible.
+
+Thanks
