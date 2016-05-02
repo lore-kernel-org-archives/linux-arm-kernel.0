@@ -1,62 +1,48 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 2 May 2016 13:04:28 +0530
-Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
-In-Reply-To: <20160430082055.GG19428@n2100.arm.linux.org.uk>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
- <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <20160429180024.GS19428@n2100.arm.linux.org.uk>
- <CAHB_GuqhPJ7J-MNbjxqeQnogW-J6=Bt2e1STKSG5kzJT+4PJpg@mail.gmail.com>
- <20160430082055.GG19428@n2100.arm.linux.org.uk>
-Message-ID: <CAHB_Guq+w7JKXEpLHkefMaYuYowh7dqsdvxgG_dnGv-GdkX39A@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon,  2 May 2016 10:02:14 +0200
+Subject: [PATCH v2 0/4] Amlogic: GXBB: Add pin controller
+Message-ID: <1462176138-29433-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 30, 2016 at 1:50 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Apr 30, 2016 at 08:57:34AM +0530, Pratyush Anand wrote:
->> On Fri, Apr 29, 2016 at 11:30 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Apr 29, 2016 at 08:26:00PM +0530, Pratyush Anand wrote:
->> >> Hi Russell,
->> >>
->> >> On Thu, Apr 28, 2016 at 2:58 PM, Russell King
->> >> <rmk+kernel@arm.linux.org.uk> wrote:
->> >> > Advertise the location of bootable RAM to kexec-tools.  kexec needs to
->> >> > know where it can place the kernel in RAM, and so be executable when
->> >> > the system needs to jump into it.
->> >> >
->> >> > Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
->> >> > tag.
->> >> >
->> >> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >>
->> >> Can you please also share git tree path of corresponding kexec-tools changes?
->> >>
->> >> Could it be a better idea (if things in user space become simpler)
->> >> that in stead of patch 5 and 6, we pass arch_phys_to_idmap_offset to
->> >> user space, and then user space manipulates existing "Crash kernel"
->> >> and "System RAM" resources.
->> >
->> > Given that it's only _one_ platform right now, I don't think that
->> > additional complexity is worth it.  It means that we have to invent
->>
->> Probably, I could not communicate it well.  I was not trying  to have
->> *additional* complexity. Wanted to see if things could be simpler
->> rather. So this is what my understanding was:
->> -- We create one patch to pass arch_phys_to_idmap_offset to user space
->> (say in /sys/kernel/bootmem_idmap_offset)
->> -- We do not use patch 5,6,11 and 12 of this series. Probably few more
->> content of the series will go away.
->
-> Patches 11 and 12 don't go away with what you're suggesting.  Patches
-> 11 and 12 are necessary to allow the boot-view addresses to be passed
-> into the kernel through kexec, and to allow kexec to find appropriate
-> memory resources.
+From: Carlo Caione <carlo@endlessm.com>
 
-But once we would have manipulated "start" and "end" of "Crash Kernel"
-and "System RAM" resources in user space using
-/sys/kernel/bootmem_idmap_offset , then kernel through kexec system
-call would have already receive boot-view addresses, no?
+Patchset to add and enable the pin controller driver on a couple of Amlogic
+boards with a Meson GXBB SoC.
 
-~Pratyush
+Please note that:
+* This patch depends on http://www.spinics.net/lists/devicetree/msg120964.html
+  ([PATCH] ARM64: dts: amlogic: Add hiu and periphs buses).
+
+* The platform driver is still missing a lot of muxing configurations. This is
+  because Amlogic still hasn't publicly released documentation for the GXBB.
+  Since Kevin has already this documentation under NDA, he will integrate and
+  complete this driver with a separate submission.
+
+Changelog:
+* v2:
+  - Split patchset in 4 different patches
+
+Carlo Caione (4):
+  pinctrl: amlogic: Add support for Amlogic Meson GXBB SoC
+  documentation: Add compatibles for Amlogic Meson GXBB pin controllers
+  ARM64: Kconfig: Select the Amlogic Meson pin controller driver
+  ARM64: dts: amlogic: Enable pin controller on GXBB-based platforms
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   2 +
+ arch/arm64/Kconfig.platforms                       |   2 +
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  13 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |   2 +
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |   3 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  41 ++
+ drivers/pinctrl/meson/Makefile                     |   2 +-
+ drivers/pinctrl/meson/pinctrl-meson-gxbb.c         | 432 +++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.c              |   8 +
+ drivers/pinctrl/meson/pinctrl-meson.h              |   2 +
+ include/dt-bindings/gpio/meson-gxbb-gpio.h         | 154 ++++++++
+ 11 files changed, 660 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+ create mode 100644 include/dt-bindings/gpio/meson-gxbb-gpio.h
+
+-- 
+2.7.4
