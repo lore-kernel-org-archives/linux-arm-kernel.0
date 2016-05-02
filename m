@@ -1,101 +1,68 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 2 May 2016 16:18:47 +0530
-Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
-In-Reply-To: <20160502101030.GK19428@n2100.arm.linux.org.uk>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
- <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <20160429180024.GS19428@n2100.arm.linux.org.uk>
- <CAHB_GuqhPJ7J-MNbjxqeQnogW-J6=Bt2e1STKSG5kzJT+4PJpg@mail.gmail.com>
- <20160430082055.GG19428@n2100.arm.linux.org.uk>
- <CAHB_Guq+w7JKXEpLHkefMaYuYowh7dqsdvxgG_dnGv-GdkX39A@mail.gmail.com>
- <20160502101030.GK19428@n2100.arm.linux.org.uk>
-Message-ID: <CAHB_GuoUcVPexeaHzZ6O1bVTSksd39jVZpO63+jX=rACEe1QsA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 02 May 2016 12:49:16 +0200
+Subject: [RFT PATCH 1/3] usb: misc: usb3503: Fix HUB mode after bootloader
+ initialization
+In-Reply-To: <57272298.50701@samsung.com>
+References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
+ <1461927591-7864-2-git-send-email-k.kozlowski@samsung.com>
+ <20160429113059.GX3217@sirena.org.uk> <57234BA2.6020304@samsung.com>
+ <20160429164448.GY3217@sirena.org.uk> <57272298.50701@samsung.com>
+Message-ID: <572730AC.4030602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 2, 2016 at 3:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, May 02, 2016 at 01:04:28PM +0530, Pratyush Anand wrote:
->> On Sat, Apr 30, 2016 at 1:50 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Sat, Apr 30, 2016 at 08:57:34AM +0530, Pratyush Anand wrote:
->> >> On Fri, Apr 29, 2016 at 11:30 PM, Russell King - ARM Linux
->> >> <linux@arm.linux.org.uk> wrote:
->> >> > On Fri, Apr 29, 2016 at 08:26:00PM +0530, Pratyush Anand wrote:
->> >> >> Hi Russell,
->> >> >>
->> >> >> On Thu, Apr 28, 2016 at 2:58 PM, Russell King
->> >> >> <rmk+kernel@arm.linux.org.uk> wrote:
->> >> >> > Advertise the location of bootable RAM to kexec-tools.  kexec needs to
->> >> >> > know where it can place the kernel in RAM, and so be executable when
->> >> >> > the system needs to jump into it.
->> >> >> >
->> >> >> > Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
->> >> >> > tag.
->> >> >> >
->> >> >> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >> >>
->> >> >> Can you please also share git tree path of corresponding kexec-tools changes?
->> >> >>
->> >> >> Could it be a better idea (if things in user space become simpler)
->> >> >> that in stead of patch 5 and 6, we pass arch_phys_to_idmap_offset to
->> >> >> user space, and then user space manipulates existing "Crash kernel"
->> >> >> and "System RAM" resources.
->> >> >
->> >> > Given that it's only _one_ platform right now, I don't think that
->> >> > additional complexity is worth it.  It means that we have to invent
->> >>
->> >> Probably, I could not communicate it well.  I was not trying  to have
->> >> *additional* complexity. Wanted to see if things could be simpler
->> >> rather. So this is what my understanding was:
->> >> -- We create one patch to pass arch_phys_to_idmap_offset to user space
->> >> (say in /sys/kernel/bootmem_idmap_offset)
->> >> -- We do not use patch 5,6,11 and 12 of this series. Probably few more
->> >> content of the series will go away.
->> >
->> > Patches 11 and 12 don't go away with what you're suggesting.  Patches
->> > 11 and 12 are necessary to allow the boot-view addresses to be passed
->> > into the kernel through kexec, and to allow kexec to find appropriate
->> > memory resources.
+On 05/02/2016 11:49 AM, Krzysztof Kozlowski wrote:
+> On 04/29/2016 06:44 PM, Mark Brown wrote:
+>> On Fri, Apr 29, 2016 at 01:55:14PM +0200, Krzysztof Kozlowski wrote:
+>>> On 04/29/2016 01:30 PM, Mark Brown wrote:
 >>
->> But once we would have manipulated "start" and "end" of "Crash Kernel"
->> and "System RAM" resources in user space using
->> /sys/kernel/bootmem_idmap_offset , then kernel through kexec system
->> call would have already receive boot-view addresses, no?
->
-> Correct, but that's still a problem for all the reasons I gave in the
-> email to which you replied to.
->
-> I'm not sure where the misunderstanding is.
+>>>> Supplies are only optional if they may be physically absent.  In this
+>>>> case it's possible that on device regulators may be used instead, a
+>>>> pattern more like that used for arizona-ldo1 where we represent those
+>>>> regulators might be better as it's more clearly describing the
+>>>> situation.  I'm just wondering if the supply lookup stuff there should
+>>>> be factored out as this is not an uncommon pattern..
+>>
+>>>> It should at least be clearly stated what's going on, ignoring failure
+>>>> to get supplies is generally a bug and people will tend to blindly cut
+>>>> and paste things (witness all the breakage in graphics drivers with
+>>>> this).
+>>
+>>> The VDD33 is really optional. The device can work in different
+>>> configuration, e.g. only on VBAT. How the reset logic would work then? I
+>>> don't know... I would suspect that it could be exactly the same (just
+>>> replace VDD33 with VBAT) but I am not sure.
+>>
+>> What the Arizona example I mentioned does is look for the property
+>> specifying an external supply in DT and if there isn't one assumes that
+>> it must be using the internal regulator.  That's a bit icky but it does
+>> the right thing and is much simpler from a user point of view.
+> 
+> Okay, that indeed looks similar... in case of lack of external supplies
+> the usb3503 pins should be tied to the internal regulators.
+> 
+> However it seems I was wrong at the beginning. We've been looking here
+> at the schematics and the datasheet. The design is unfortunately a
+> little bit confusing but finally I think we got the impression how does
+> it work.
+> 
+> This VDD regulator supply actually is not a usb3503 USB HUB regulator
+> supply... but a supply to the LAN attached to this HUB. Regulator off/on
+> is needed for LAN to show up. The hub will show up with typical reset
+> (which is also missing before my patchset btw).
+> 
+> The LAN, as a USB device, is auto-probed so it cannot take the regulator
+> and play with it. The simplest idea I have is to add it as "external
+> supply"  to the parent: usb3503.
 
-No, no..there is no misunderstanding. I agreed to your implementation
-because that will work for generic cases and for me complete series is
-OK.
+I run some more tests which adds more confusion. If the usb3503 hub does
+not turn off/on the supply (LAN regulator supply in reality) it usually
+does not show up as USB device (lsusb) neither. In such case sometimes
+it is present, sometimes not.
 
-I just wanted to clarify my understanding, and so was the last argument.
+"Hardware" reset with regulator fixes all the problems: with LAN and
+with USB hub... It really does not match the schematics but apparently
+usb3503 also needs the regulator.
 
->
-> Let me repeat: even if we do what you're suggesting, patches 11 and 12
-> do *not* go away.  I've explained in detail why each of the changes are
-> necessary (which you have cut from your reply.)
->
-
-Again, it is just for clarifying myself.
-I cut the reply because I understood that in patch 11 and 12, you
-convert addresses passed by kexec tools from run time view to boot
-view using different helpers like phys_to_boot_phys(). So, had kexec
-system call passed boot view addresses, we would have not needed 11
-and 12. This is what I wanted to clarify.
-
-> In other words: exporting this offset via
-> /sys/kernel/bootmem_idmap_offset is technically inferior to the solution
-> I have come up with here, and it saves very little complexity and code.
-
-I still have opinion that code will probably be more simple and reduce
-significantly, however solution will siege to work the moment
-idmap_offset is not a simple additive value.
-
-Therefore, I am OK with your implementation.
-
-~Pratyush
+Best regards,
+Krzysztof
