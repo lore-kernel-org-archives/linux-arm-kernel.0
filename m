@@ -1,45 +1,35 @@
 From: petr@barix.com (Petr Kulhavy)
-Date: Mon,  2 May 2016 15:40:38 +0200
-Subject: [PATCH 1/2] ARM: DTS: da850: add pinmux configuration for mmc1
-Message-ID: <1462196439-4693-1-git-send-email-petr@barix.com>
+Date: Mon,  2 May 2016 15:40:39 +0200
+Subject: [PATCH 2/2] ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for mmc1
+In-Reply-To: <1462196439-4693-1-git-send-email-petr@barix.com>
+References: <1462196439-4693-1-git-send-email-petr@barix.com>
+Message-ID: <1462196439-4693-2-git-send-email-petr@barix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The da850.dtsi defined a pinmux configuration only for MMC0
-and not for MMC1.
-This adds a (4-bit) pinmux configuration for MMC1.
+The da8xx-dt.c contained OF_DEV_AUXDATA entry for mmc0 only. The usage of
+mmc1 was not possible from device tree because the probe was failing to
+get the related MMC clock.
+
+Add OF_DEV_AUXDATA entry for mmc1 in order to be able to use the mmc1
+clocks and therefore the mmc1 interface.
 
 Signed-off-by: Petr Kulhavy <petr@barix.com>
 ---
- arch/arm/boot/dts/da850.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-davinci/da8xx-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 226cda76e77c..4983b3d0be55 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -72,6 +72,22 @@
- 					0x28 0x00222222  0x00ffffff
- 				>;
- 			};
-+			mmc1_pins: pinmux_mmc1_pins {
-+				pinctrl-single,bits = <
-+					/*
-+					 * PINMUX18:
-+					 * MMCSD1_CMD MMCSD1_CLK
-+					 * MMCSD0_DAT[0]
-+					 */
-+					0x48 0x00022200  0x000fff00
-+					/*
-+					 * PINMUX19:
-+					 * MMCSD0_DAT[1] MMCSD0_DAT[2]
-+					 * MMCSD0_DAT[3]
-+					 */
-+					0x4c 0x00022200  0x000fff00
-+				>;
-+			};
- 			ehrpwm0a_pins: pinmux_ehrpwm0a_pins {
- 				pinctrl-single,bits = <
- 					/* EPWM0A */
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index c4b5808ca7c1..115c316e9b76 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -34,6 +34,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+ 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
++	OF_DEV_AUXDATA("ti,da830-mmc", 0x01e1b000, "da830-mmc.1", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
 -- 
 1.9.1
