@@ -1,82 +1,100 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon,  2 May 2016 07:22:16 -0700
-Subject: [PATCH omap 6/6] arm: Whack an expected event-trace-from-idle mole
+Date: Mon,  2 May 2016 07:22:11 -0700
+Subject: [PATCH omap 1/6] arm: Use _rcuidle tracepoint to allow use from idle
 In-Reply-To: <20160502142117.GA2911@linux.vnet.ibm.com>
 References: <20160502142117.GA2911@linux.vnet.ibm.com>
-Message-ID: <1462198936-3496-6-git-send-email-paulmck@linux.vnet.ibm.com>
+Message-ID: <1462198936-3496-1-git-send-email-paulmck@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the RCU use-from-idle bug corresponding the following
-splat:
+Testing on ARM encountered the following pair of lockdep-RCU splats:
 
-> [ INFO: suspicious RCU usage. ]
-> 4.6.0-rc5-next-20160426+ #1127 Not tainted
-> -------------------------------
-> include/trace/events/clk.h:45 suspicious rcu_dereference_check() usage!
->
-> other info that might help us debug this:
->
->
-> RCU used illegally from idle CPU!
-> rcu_scheduler_active = 1, debug_locks = 0
-> RCU used illegally from extended quiescent state!
-> 2 locks held by swapper/0/0:
->  #0:  (&oh->hwmod_key#30){......}, at: [<c0121afc>] omap_hwmod_enable+0x18/0x44
->  #1:  (enable_lock){......}, at: [<c0630684>] clk_enable_lock+0x18/0x124
->
-> stack backtrace:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1127
-> Hardware name: Generic OMAP36xx (Flattened Device Tree)
-> [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-> [<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
-> [<c047fd68>] (dump_stack) from [<c06315c0>] (clk_core_enable+0x1e0/0x36c)
-> [<c06315c0>] (clk_core_enable) from [<c0632298>] (clk_enable+0x1c/0x38)
-> [<c0632298>] (clk_enable) from [<c01204e0>] (_enable_clocks+0x18/0x7c)
-> [<c01204e0>] (_enable_clocks) from [<c012137c>] (_enable+0x114/0x2ec)
-> [<c012137c>] (_enable) from [<c0121b08>] (omap_hwmod_enable+0x24/0x44)
-> [<c0121b08>] (omap_hwmod_enable) from [<c0122ad0>] (omap_device_enable+0x3c/0x90)
-> [<c0122ad0>] (omap_device_enable) from [<c0122b34>] (_od_runtime_resume+0x10/0x38)
-> [<c0122b34>] (_od_runtime_resume) from [<c052cc00>] (__rpm_callback+0x2c/0x60)
-> [<c052cc00>] (__rpm_callback) from [<c052cc54>] (rpm_callback+0x20/0x80)
-> [<c052cc54>] (rpm_callback) from [<c052df7c>] (rpm_resume+0x3d0/0x6f0)
-> [<c052df7c>] (rpm_resume) from [<c052e2e8>] (__pm_runtime_resume+0x4c/0x64)
-> [<c052e2e8>] (__pm_runtime_resume) from [<c04bf2c4>] (omap2_gpio_resume_after_idle+0x54/0x68)
-> [<c04bf2c4>] (omap2_gpio_resume_after_idle) from [<c01269dc>] (omap3_enter_idle_bm+0xfc/0x1ec)
-> [<c01269dc>] (omap3_enter_idle_bm) from [<c0601888>] (cpuidle_enter_state+0x80/0x3d4)
-> [<c0601888>] (cpuidle_enter_state) from [<c0183b08>] (cpu_startup_entry+0x198/0x3a0)
-> [<c0183b08>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
-> [<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
+------------------------------------------------------------------------
 
-Reported-by: Tony Lindgren <tony@atomide.com>
+===============================
+[ INFO: suspicious RCU usage. ]
+4.6.0-rc4-next-20160422 #1 Not tainted
+-------------------------------
+include/trace/events/power.h:328 suspicious rcu_dereference_check() usage!
+
+other info that might help us debug this:
+
+RCU used illegally from idle CPU!
+rcu_scheduler_active = 1, debug_locks = 0
+RCU used illegally from extended quiescent state!
+no locks held by swapper/0/0.
+
+stack backtrace:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc4-next-20160422 #1
+Hardware name: Generic OMAP3-GP (Flattened Device Tree)
+[<c010f55c>] (unwind_backtrace) from [<c010b64c>] (show_stack+0x10/0x14)
+[<c010b64c>] (show_stack) from [<c047acbc>] (dump_stack+0xa8/0xe0)
+[<c047acbc>] (dump_stack) from [<c012bc10>] (pwrdm_set_next_pwrst+0xf8/0x1cc)
+[<c012bc10>] (pwrdm_set_next_pwrst) from [<c01269fc>] (omap3_enter_idle_bm+0x1b8/0x1e8)
+[<c01269fc>] (omap3_enter_idle_bm) from [<c05fa0b8>] (cpuidle_enter_state+0x84/0x408)
+[<c05fa0b8>] (cpuidle_enter_state) from [<c0182c1c>] (cpu_startup_entry+0x1c8/0x3f0)
+[<c0182c1c>] (cpu_startup_entry) from [<c0b00c20>] (start_kernel+0x354/0x3cc)
+
+------------------------------------------------------------------------
+
+[<c010f55c>] (unwind_backtrace) from [<c010b64c>] (show_stack+0x10/0x14)
+[<c010b64c>] (show_stack) from [<c047ac3c>] (dump_stack+0xa8/0xe0)
+[<c047ac3c>] (dump_stack) from [<c012c340>] (_pwrdm_state_switch+0x188/0x32c)
+[<c012c340>] (_pwrdm_state_switch) from [<c012c4f0>] (_pwrdm_post_transition_cb+0xc/0x14)
+[<c012c4f0>] (_pwrdm_post_transition_cb) from [<c012ba74>] (pwrdm_for_each+0x30/0x5c)
+[<c012ba74>] (pwrdm_for_each) from [<c012c72c>] (pwrdm_post_transition+0x24/0x30)
+[<c012c72c>] (pwrdm_post_transition) from [<c012548c>] (omap_sram_idle+0xfc/0x240)
+[<c012548c>] (omap_sram_idle) from [<c0126934>] (omap3_enter_idle_bm+0xf0/0x1e8)
+[<c0126934>] (omap3_enter_idle_bm) from [<c05fa038>] (cpuidle_enter_state+0x84/0x408)
+[<c05fa038>] (cpuidle_enter_state) from [<c0182b90>] (cpu_startup_entry+0x1c8/0x3f0)
+[<c0182b90>] (cpu_startup_entry) from [<c0b00c20>] (start_kernel+0x354/0x3cc)
+
+------------------------------------------------------------------------
+
+These are caused by event tracing from the idle loop, and they were
+exposed by commit 293e2421fe25 ("rcu: Remove superfluous versions of
+rcu_read_lock_sched_held()"), which suppressed some false negatives.
+The current commit therefore adds the _rcuidle suffix to make RCU aware
+of this implicit use of RCU by event tracing, thus preventing both splats.
+
+Reported-by: Guenter Roeck <linux@roeck-us.net>
 Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Tested-by: Guenter Roeck <linux@roeck-us.net>
 Tested-by: Tony Lindgren <tony@atomide.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Steven Rostedt <rostedt@goodmis.org>
+Reviewed-by: Steven Rostedt <rostedt@goodmis.org>
 Cc: <linux-omap@vger.kernel.org>
 Cc: <linux-arm-kernel@lists.infradead.org>
 ---
- drivers/clk/clk.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 4fa43c02d682..ec83f404c1d2 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -735,12 +735,12 @@ static int clk_core_enable(struct clk_core *core)
- 		if (ret)
- 			return ret;
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 78af6d8cf2e2..daf2753de7aa 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -186,8 +186,9 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 			trace_state = (PWRDM_TRACE_STATES_FLAG |
+ 				       ((next & OMAP_POWERSTATE_MASK) << 8) |
+ 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
+-			trace_power_domain_target(pwrdm->name, trace_state,
+-						  smp_processor_id());
++			trace_power_domain_target_rcuidle(pwrdm->name,
++							  trace_state,
++							  smp_processor_id());
+ 		}
+ 		break;
+ 	default:
+@@ -523,8 +524,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
  
--		trace_clk_enable(core);
-+		trace_clk_enable_rcuidle(core);
- 
- 		if (core->ops->enable)
- 			ret = core->ops->enable(core->hw);
- 
--		trace_clk_enable_complete(core);
-+		trace_clk_enable_complete_rcuidle(core);
- 
- 		if (ret) {
- 			clk_core_disable(core->parent);
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+ 		/* Trace the pwrdm desired target state */
+-		trace_power_domain_target(pwrdm->name, pwrst,
+-					  smp_processor_id());
++		trace_power_domain_target_rcuidle(pwrdm->name, pwrst,
++						  smp_processor_id());
+ 		/* Program the pwrdm desired target state */
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+ 	}
 -- 
 2.5.2
