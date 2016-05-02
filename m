@@ -1,42 +1,41 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 02 May 2016 08:29:30 -0700
-Subject: [PATCH 2/2] clk: bcm2835: Skip PLLC clocks when deciding on a new
- clock parent
-In-Reply-To: <C771F70C-2F88-49E1-A370-D76D13262C1E@martin.sperl.org>
-References: <1461699585-6649-1-git-send-email-eric@anholt.net>
- <1461699585-6649-2-git-send-email-eric@anholt.net>
- <C771F70C-2F88-49E1-A370-D76D13262C1E@martin.sperl.org>
-Message-ID: <878tzsiilh.fsf@eliezer.anholt.net>
+Date: Mon, 02 May 2016 08:34:28 -0700
+Subject: [PATCH v5] ARM: bcm2835: dt: Add the ethernet to the device trees
+In-Reply-To: <1462172811-24206-1-git-send-email-lkundrak@v3.sk>
+References: <1462172811-24206-1-git-send-email-lkundrak@v3.sk>
+Message-ID: <8737q0iid7.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Sperl <kernel@martin.sperl.org> writes:
+Lubomir Rintel <lkundrak@v3.sk> writes:
 
->> On 26.04.2016, at 21:39, Eric Anholt <eric@anholt.net> wrote:
->> 
->> If the firmware had set up a clock to source from PLLC, go along with
->> it.  But if we're looking for a new parent, we don't want to switch it
->> to PLLC because the firmware will force PLLC (and thus the AXI bus
->> clock) to different frequencies during over-temp/under-voltage,
->> without notification to Linux.
->> 
->> On my system, this moves the Linux-enabled HDMI state machine and DSI1
->> escape clock over to plld_per from pllc_per.  EMMC still ends up on
->> pllc_per, because the firmware had set it up to use that.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
->> ?
+> The hub and the ethernet in its port 1 are hardwired on the board.
 >
-> I guess this patch looks to me as if it is a policy inside the kernel,
-> which is AFAIK frowned upon.
+> Compared to the adapters that can be plugged into the USB ports, this
+> one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
+> has the MAC address for this adapter in its ROM, accessible from its
+> firmware.
+>
+> U-Boot can read out the address and set the local-mac-address property of the
+> node with "ethernet" alias. Let's add the node so that U-Boot can do its
+> business.
+>
+> Model B rev2 and Model B+ entries were verified by me, the hierarchy and
+> pid/vid pair for the Version 2 was provided by Peter Chen. Original
+> Model B is a blind shot, though very likely correct.
+>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
 
-Can you come up with a use for putting peripherals on PLLC ever, such
-that we need choice?
+Applied to bcm2835-dt-next locally.  We've already sent out pull
+requests for 4.7, so I'll push it once 4.7-rc1 happens.
+
+Thanks!
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/32cf10a4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/5a998f3f/attachment-0001.sig>
