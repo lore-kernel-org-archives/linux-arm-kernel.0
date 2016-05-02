@@ -1,112 +1,80 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 2 May 2016 14:24:53 +0200
-Subject: [PATCH v2 19/54] KVM: arm/arm64: vgic-new: Implement
-In-Reply-To: <1461861973-26464-20-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-20-git-send-email-andre.przywara@arm.com>
-Message-ID: <57274715.8080801@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 2 May 2016 14:29:08 +0200
+Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
+In-Reply-To: <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <572379F5.8000501@i2se.com> <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
+ <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
+Message-ID: <57274814.3090208@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hi Harald,
 
-minor comment: patch title has been altered since v1, should be
+Am 01.05.2016 um 20:02 schrieb Jonathan Cameron:
+> On 29/04/16 18:45, Harald Geyer wrote:
+>> Hi Stefan!
+>>
+>> On 29.04.2016 17:12, Stefan Wahren wrote:
+>>> Hi Harald,
+>>>
+>>> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
+>>>> Patch 1/3 changes the driver and updates the binding documentation
+>>>> (I guess it is still in staging.)
+>>>>
+>>>> Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 boards.
+>>>> I'd like to get input whether this is actually desired. On boards where
+>>>> these regulators would never be enabled this costs a few extra bytes of
+>>>> RAM for allocation of the device data, because the nodes can't be easily
+>>>> removed in .dts files which are including the .dtsi files. The alternative
+>>>> is to add the new nodes to many .dts files, which would be a lot code
+>>>> duplication.
+>>> if i get it right the real intention of this patch series is to make the
+>>> mxs-lradc provide resistance values instead of voltages.
+>> ... or even temperature values if a thermistor is connected.
+>>
+>>> So how about
+>>> dropping the whole regulator stuff and provide the values as
+>>> IIO_RESISTANCE via iio interface?
+>> Can you elaborate on this?
+>>
+>> My thinking is that there should be a thermistor (or whatever else) driver,
+>> that is a consumer of the regulator and a consumer of the IIO_VOLTAGE
+>> iio channel and provides a new device with an IIO_RESISTANCE or IIO_TEMP
+>> channel. Maybe there is a simpler solution, that I'm missing?
+> I agree with that approach - need a way to describe the upstream hardware - so
+> will need a thermistor driver
 
-KVM: arm/arm64: vgic-new: Implement kvm_vgic_vcpu_pending_irq
+okay, this makes more sense to me. In this case it would be good to have
+this new driver in this patch series. So it's possible to verify the
+matching binding.
 
-Cheers
+>> Actually I'm not 100% happy with the above solution myself, because if we
+>> start supporting devices that act as an iio-multiplexer (some device that
+>> is an iio consumer and provides many new iio channels and can control
+>> via gpios which of it child channels is actually routed to the upstream
+>> device) I don't know how to properly manage the regulator device.
+> Hmm. Are you talking about muxing the regulator as well?  That will get
+> complex indeed.  Might be possible to cheat and imply the regulators are
+> always connected to all inputs...  or do you want to dynamically change
+> the regulator output?  That gets messy fast - though in theory might be
+> possible...
+>> However since this is only hypothetical ATM, I think we don't have to
+>> worry about this too much.
+>>
+>>> Btw this feature should be only added to dts files where is actually used.
+>> Ok, so how do we figure out which boards these are?
+>> I use this on the olinuxino and I guess all evaluation boards support the
+>> use case too. The others I don't know enough about to be sure and I guess
+>> it's not a good idea to just wait until somebody speaks up and complains
+>> that the feature is missing on board X ...
 
-Eric
+The imx23 dtsi file specifies features on SoC level and i think this
+should be kept. We shouldn't implement features for ADC pins without
+deeper knowledge about these boards.
 
-On 04/28/2016 06:45 PM, Andre Przywara wrote:
-> From: Eric Auger <eric.auger@linaro.org>
-> 
-> Tell KVM whether a particular VCPU has an IRQ that needs handling
-> in the guest. This is used to decide whether a VCPU is runnable.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - return false if distributor is disabled
-> - add vgic_kick_vcpus() implementations
-> 
->  include/kvm/vgic/vgic.h  |  2 ++
->  virt/kvm/arm/vgic/vgic.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h |  1 +
->  3 files changed, 43 insertions(+)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 5fae4a9..2615205 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -184,6 +184,8 @@ struct vgic_cpu {
->  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->  			bool level);
->  
-> +int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> +
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(false)
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index ae52928..eeb766e 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -519,3 +519,43 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
->  	vgic_flush_lr_state(vcpu);
->  	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
->  }
-> +
-> +int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	struct vgic_irq *irq;
-> +	bool pending = false;
-> +
-> +	if (!vcpu->kvm->arch.vgic.enabled)
-> +		return false;
-> +
-> +	spin_lock(&vgic_cpu->ap_list_lock);
-> +
-> +	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-> +		spin_lock(&irq->irq_lock);
-> +		pending = irq->pending && irq->enabled;
-> +		spin_unlock(&irq->irq_lock);
-> +
-> +		if (pending)
-> +			break;
-> +	}
-> +
-> +	spin_unlock(&vgic_cpu->ap_list_lock);
-> +
-> +	return pending;
-> +}
-> +
-> +void vgic_kick_vcpus(struct kvm *kvm)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +	int c;
-> +
-> +	/*
-> +	 * We've injected an interrupt, time to find out who deserves
-> +	 * a good kick...
-> +	 */
-> +	kvm_for_each_vcpu(c, vcpu, kvm) {
-> +		if (kvm_vgic_vcpu_pending_irq(vcpu))
-> +			kvm_vcpu_kick(vcpu);
-> +	}
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 81b1a20..0c92cda 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -21,6 +21,7 @@
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
-> +void vgic_kick_vcpus(struct kvm *kvm);
->  
->  void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
->  void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
-> 
+Maybe we could introduce a new dtsi file in order to reduce copy &
+paste. But at first the OlinuXino should be a good starting point ...
+
+Regards
+Stefan
