@@ -1,51 +1,66 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 02 May 2016 14:22:04 -0700
-Subject: [PATCH] drm/fsl-dcu: add COMMON_CLK dependency
-In-Reply-To: <1462186839-2224021-1-git-send-email-arnd@arndb.de>
-References: <1462186839-2224021-1-git-send-email-arnd@arndb.de>
-Message-ID: <96882621acf64dca8d6c1d2f25307385@agner.ch>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Mon, 2 May 2016 14:46:05 -0700
+Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
+ SoC PMU DTS binding
+In-Reply-To: <20160502205648.GA7374@rob-hp-laptop>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+ <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
+ <20160418170009.GA15338@rob-hp-laptop>
+ <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
+ <20160420113121.GE2514@arm.com>
+ <20160502205648.GA7374@rob-hp-laptop>
+Message-ID: <CACgAJHyT31DuVNoyRQZVKjv=zM5Fc-EY0gy=y=pHHrBTT+1Xow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-05-02 04:00, Arnd Bergmann wrote:
-> The fsl dcu now uses the clk-provider interfaces, which are not available
-> when CONFIG_COMMON_CLK is disabled:
-> 
-> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c: In function 'fsl_dcu_drm_probe':
-> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c:362:20: error: implicit
-> declaration of function '__clk_get_name'
-> [-Werror=implicit-function-declaration]
->   pix_clk_in_name = __clk_get_name(pix_clk_in);
-> 
-> This adds a Kconfig dependency to prevent the driver from being enabled
-> in this case.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 2d701449bce1 ("drm/fsl-dcu: use common clock framework for
-> pixel clock divider")
+Hi Rob,
 
-Oh right, thx!
+On Mon, May 2, 2016 at 1:56 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Apr 20, 2016 at 12:31:22PM +0100, Will Deacon wrote:
+>> On Mon, Apr 18, 2016 at 01:04:53PM -0700, Tai Tri Nguyen wrote:
+>> > >> +Required properties for MCB subnode:
+>> > >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
+>> > >> +- reg                        : First resource shall be the MCB PMU resource.
+>> > >> +- index                      : Instance number of the MCB PMU.
+>> > >> +
+>> > >> +Required properties for MC subnode:
+>> > >> +- compatible         : Shall be "apm,xgene-pmu-mc".
+>> > >> +- reg                        : First resource shall be the MC PMU resource.
+>> > >> +- index                      : Instance number of the MC PMU.
+>> > >
+>> > > Don't use indexes. You probably need phandles to the nodes these are
+>> > > related to.
+>> > >
+>> > > How many variations of child nodes do you expect to have? 2, 10, 50? You
+>> > > might want to just collapse all this down to a single node and put this
+>> > > information in the driver if it is fixed for each SoC and there's only a
+>> > > handful.
+>> > >
+>> >
+>> > For each kind of PMU, for example memory controller PMU, I expect to
+>> > have the number of instances up to 8.
+>> > They are actually all independent PMU nodes and have their own CSR memory bases.
+>> > The indexes are used for exposing the devices to perf user only. It
+>> > doesn't have an impact on the programming model.
+>> > Mark also had the same concern.
+>>
+>> Regardless, I'll need an ack from Rob or Mark before I can merge this.
+>
+> I still have a concern with this. Needing an index to expose to the user
+> is generally not a valid reason. That's OS specific and therefore
+> doesn't belong in DT.
+>
+> Rob
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+I can use device name here. However, the perf event names will be
+different between DT and ACPI which I want to avoid.
+And the names don't look good at all.
+Also, specifically for MC and MCB PMUs, the indexes are compared
+against the active MC/MCB mask to find out whether they are populated
+or not.
+Without using the index property, I will also need a mapping function
+of physical device addresses and their physical ids.
 
-@Dave, can you pick that up directly or do you prefer a pull request?
-
---
-Stefan
-
-> ---
->  drivers/gpu/drm/fsl-dcu/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/fsl-dcu/Kconfig b/drivers/gpu/drm/fsl-dcu/Kconfig
-> index c78cf3f605d0..b9c714de6e40 100644
-> --- a/drivers/gpu/drm/fsl-dcu/Kconfig
-> +++ b/drivers/gpu/drm/fsl-dcu/Kconfig
-> @@ -1,6 +1,6 @@
->  config DRM_FSL_DCU
->  	tristate "DRM Support for Freescale DCU"
-> -	depends on DRM && OF && ARM
-> +	depends on DRM && OF && ARM && COMMON_CLK
->  	select BACKLIGHT_CLASS_DEVICE
->  	select BACKLIGHT_LCD_SUPPORT
->  	select DRM_KMS_HELPER
+Thanks,
+-- 
+Tai
