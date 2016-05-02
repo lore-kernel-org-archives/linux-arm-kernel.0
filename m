@@ -1,39 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  2 May 2016 12:59:19 +0200
-Subject: [PATCH] of: include errno.h in of_graph.h
-Message-ID: <1462186769-2205767-1-git-send-email-arnd@arndb.de>
+Date: Mon,  2 May 2016 12:59:48 +0200
+Subject: [PATCH] drm/sun4i: add COMMON_CLK dependency
+Message-ID: <1462186805-2211918-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_OF is disabled, we have to include linux/errno.h before
-including of_graph.h, or get build errors like in the newly added
-sun4i drm driver:
+The sun4i drm driver uses the clk-provider interfaces, which are not available
+when CONFIG_COMMON_CLK is disabled:
 
-In file included from ../drivers/gpu/drm/sun4i/sun4i_drv.c:14:0:
-include/linux/of_graph.h: In function 'of_graph_parse_endpoint':
-include/linux/of_graph.h:58:10: error: 'ENOSYS' undeclared (first use in this function)
+drivers/gpu/drm/sun4i/sun4i_dotclock.c:19:16: error: field 'hw' has incomplete type
+  struct clk_hw hw;
+In file included from ../include/asm-generic/bug.h:13:0,
+                 from ../arch/arm/include/asm/bug.h:59,
+                 from ../include/linux/bug.h:4,
+                 from ../include/linux/io.h:23,
+                 from ../include/linux/clk-provider.h:14,
+                 from ../drivers/gpu/drm/sun4i/sun4i_dotclock.c:13:
+drivers/gpu/drm/sun4i/sun4i_dotclock.c: In function 'hw_to_dclk':
+include/linux/kernel.h:831:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+...
 
-A better solution is to ensure that the header can be included
-by itself, so let's include linux/errno.h here to fix the error
-we just got, and any similar future error.
+This adds a Kconfig dependency to prevent the driver from being enabled
+in this case.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 ---
- include/linux/of_graph.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/sun4i/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/of_graph.h b/include/linux/of_graph.h
-index f8bcd0e21a26..bb3a5a2cd570 100644
---- a/include/linux/of_graph.h
-+++ b/include/linux/of_graph.h
-@@ -15,6 +15,7 @@
- #define __LINUX_OF_GRAPH_H
- 
- #include <linux/types.h>
-+#include <linux/errno.h>
- 
- /**
-  * struct of_endpoint - the OF graph endpoint data structure
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index 99510e64e91a..a4b357db8856 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -1,6 +1,6 @@
+ config DRM_SUN4I
+ 	tristate "DRM Support for Allwinner A10 Display Engine"
+-	depends on DRM && ARM
++	depends on DRM && ARM && COMMON_CLK
+ 	depends on ARCH_SUNXI || COMPILE_TEST
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
 -- 
 2.7.0
