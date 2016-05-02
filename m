@@ -1,38 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 May 2016 11:55:01 +0100
-Subject: [RFT PATCH 1/3] usb: misc: usb3503: Fix HUB mode after
- bootloader initialization
-In-Reply-To: <57272298.50701@samsung.com>
-References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
- <1461927591-7864-2-git-send-email-k.kozlowski@samsung.com>
- <20160429113059.GX3217@sirena.org.uk>
- <57234BA2.6020304@samsung.com>
- <20160429164448.GY3217@sirena.org.uk> <57272298.50701@samsung.com>
-Message-ID: <20160502105501.GE6292@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 2 May 2016 12:55:46 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160502105546.GN17159@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 11:49:12AM +0200, Krzysztof Kozlowski wrote:
+Hi,
 
-> This VDD regulator supply actually is not a usb3503 USB HUB regulator
-> supply... but a supply to the LAN attached to this HUB. Regulator off/on
-> is needed for LAN to show up. The hub will show up with typical reset
-> (which is also missing before my patchset btw).
+On Thu, Apr 28, 2016 at 09:19:58AM +0200, Olliver Schinagl wrote:
+> There are 3 kinds of OLinuXino Lime2 boards.
+> One without any on board storage, one with NAND storage and one with
+> eMMC storage. This patch adds the eMMC variant of boards.
+> 
+> eMMC storage is different from a regular SD card in that it is soldered
+> on the board and cannot be changed. Additionally, it shares pins with
+> the NAND module and with the second SPI port.
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 
-> The LAN, as a USB device, is auto-probed so it cannot take the regulator
-> and play with it. The simplest idea I have is to add it as "external
-> supply"  to the parent: usb3503.
+Is it a publicly available board, or is it a private hack you made
+yourself?
 
-This is common enough that that just isn't going to scale well I fear
-without some generic handling, either walking child devices at the bus
-level or at the device level with a pre-probe() callback to get the
-device to power on.  The latter is more appropriate to things like
-Slimbus where the device is more likely to do active management at
-runtime, it's not clear people are building USB devices like that.
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/7f61db57/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/16ec5bd4/attachment.sig>
