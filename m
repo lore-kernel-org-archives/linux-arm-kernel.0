@@ -1,30 +1,19 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 May 2016 08:31:57 -0300
-Subject: [PATCH v4 2/2] ARM: dts: imx6ul-pico-hobbit: Add initial support
-In-Reply-To: <1461729621-13283-2-git-send-email-festevam@gmail.com>
-References: <1461729621-13283-1-git-send-email-festevam@gmail.com>
- <1461729621-13283-2-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5DX-QAB+kH=xeM6Pp6rzD6TjVkyuaHrBPUPn-BA0Xmefg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 2 May 2016 13:52:31 +0200
+Subject: [PATCH 1/2] pinctrl: at91: Make at91_gpio_template const
+In-Reply-To: <1461934203-3206-1-git-send-email-alexanders83@web.de>
+References: <1461934203-3206-1-git-send-email-alexanders83@web.de>
+Message-ID: <CACRpkdbLB3s3AbgB7rexY8GFueAY_ywpKY3krX6tTVrq1X4Wcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Fri, Apr 29, 2016 at 2:50 PM, Alexander Stein <alexanders83@web.de> wrote:
 
-On Wed, Apr 27, 2016 at 1:00 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+> This template is only assigned, so make it const.
 >
-> Add initial support for imx6ul pico hobbit board.
->
-> For information about this board, please visit:
-> http://www.wandboard.org/images/hobbit/hobbitboard-imx6ul-reva1.pdf
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
 
-I understand we are still waiting for Rob's Ack on the first patch of
-this series.
+Patch applied.
 
-Could this one be applied to your tree in case you are happy with it?
-
-Would like to get this one for 4.7 if possible.
-
-Thanks
+Yours,
+Linus Walleij
