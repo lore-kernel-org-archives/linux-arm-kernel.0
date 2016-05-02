@@ -1,84 +1,97 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon,  2 May 2016 12:34:59 +0530
-Subject: [PATCH v2 0/5] Implement SoC bus driver for Vybrid
-Message-ID: <cover.1462171989.git.maitysanchayan@gmail.com>
+Date: Mon,  2 May 2016 12:35:00 +0530
+Subject: [PATCH v2 1/5] mfd: syscon: Introduce syscon_regmap_read_from_offset
+In-Reply-To: <cover.1462171989.git.maitysanchayan@gmail.com>
+References: <cover.1462171989.git.maitysanchayan@gmail.com>
+Message-ID: <b234b680c77ae5f0678be10a226eac7976a83c34.1462171990.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Currently syscon does not provide an abstraction to access a
+register from syscon reference like below
 
-This second patch series is rebased on top of shawn's for-next branch
-and tested on Colibri Vybrid VF50 and VF61 modules.
+ocotp-cfg1 = <&ocotp 0x20>
 
-This patchset implements SoC bus support for Freescale Vybrid platform,
-implementing the following
-https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+syscon_regmap_read_from_offset provides a generic abstraction to
+access a register from syscon reference as above. It allows to
+specify the node and node name of phandle reference, reading the
+offset from the node entry and providing the value from the offset
+in the register map.
 
-This a reworked version of an older patchset series posted in June 2015
-which was at v5 then [1]. Since the NVMEM framework was then getting
-introduced, we decided that first a NVMEM driver for OCOTP peripheral
-being in place would be better.
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ drivers/mfd/syscon.c       | 30 ++++++++++++++++++++++++++++++
+ include/linux/mfd/syscon.h | 10 ++++++++++
+ 2 files changed, 40 insertions(+)
 
-Compared to the older revisions, this driver now relies on NVMEM
-consumer API using the NVMEM based vf610_ocotp driver which has
-already been in mainline for a while now. Also now a new syscon
-abstraction "syscon_regmap_read_from_offset" is implemented and
-exported from syscon allowing accessing a register from a syscon
-reference like this
-
-ocotp-cfg1 = <&ocotp 0x20>;
-
-avoiding code repetition in the driver.
-
-One point on which we were not sure here is whether we really should
-introduce a new Kconfig symbol as being introduced here. While we
-could just enable it when SOC_VF610 is selected, this however would
-introduce circular dependencies.
-
-Feedback is most welcome.
-
-Changes since v1:
-Add device tree binding documentation.
-
-v1 new patchset
-https://lkml.org/lkml/2016/3/11/132
-
-[1] Older v5:
-http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
-Even earlier versions:
-Version 4 of the patchset can be found here
-https://lkml.org/lkml/2015/5/26/199
-Version 3 of the patchset can be found here
-http://www.spinics.net/lists/arm-kernel/msg420847.html
-Version 2 of the patchset can be found here
-http://www.spinics.net/lists/devicetree/msg80654.html
-Version 1 of the patchset can be found here
-http://www.spinics.net/lists/devicetree/msg80257.html
-The RFC version can be found here
-https://lkml.org/lkml/2015/5/11/13
-
-Regards,
-Sanchayan.
-
-Sanchayan Maity (5):
-  mfd: syscon: Introduce syscon_regmap_read_from_offset
-  ARM: dts: vfxxx: Add device tree node for OCOTP
-  ARM: dts: vfxxx: Add OCROM and phandle entries for Vybrid SoC bus driver
-  soc: Add SoC bus driver for Freescale Vybrid Platform
-  vf610-soc: Add Vybrid SoC device tree binding documentation
-
- .../bindings/arm/freescale/fsl,vf610-soc.txt       |  35 +++++
- arch/arm/boot/dts/vfxxx.dtsi                       |  28 +++-
- drivers/mfd/syscon.c                               |  30 ++++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/fsl/Kconfig                            |  10 ++
- drivers/soc/fsl/Makefile                           |   1 +
- drivers/soc/fsl/soc-vf610.c                        | 160 +++++++++++++++++++++
- include/linux/mfd/syscon.h                         |  10 ++
- 8 files changed, 274 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
- create mode 100644 drivers/soc/fsl/Kconfig
- create mode 100644 drivers/soc/fsl/soc-vf610.c
-
+diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+index 2f2225e..74724c3 100644
+--- a/drivers/mfd/syscon.c
++++ b/drivers/mfd/syscon.c
+@@ -136,6 +136,36 @@ struct regmap *syscon_node_to_regmap(struct device_node *np)
+ }
+ EXPORT_SYMBOL_GPL(syscon_node_to_regmap);
+ 
++int syscon_regmap_read_from_offset(struct device_node *np,
++				const char *s, unsigned int *val)
++{
++	struct of_phandle_args pargs;
++	struct regmap *regmap;
++	int offset;
++	int ret;
++
++	if (!np)
++		return -ENODEV;
++
++	ret = of_parse_phandle_with_fixed_args(np, s, 1, 0, &pargs);
++	if (ret)
++		return ret;
++
++	regmap = syscon_node_to_regmap(pargs.np);
++	if (IS_ERR(regmap)) {
++		of_node_put(pargs.np);
++		return PTR_ERR(regmap);
++	}
++
++	offset = pargs.args[0];
++	of_node_put(pargs.np);
++
++	ret = regmap_read(regmap, offset, val);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(syscon_regmap_read_from_offset);
++
+ struct regmap *syscon_regmap_lookup_by_compatible(const char *s)
+ {
+ 	struct device_node *syscon_np;
+diff --git a/include/linux/mfd/syscon.h b/include/linux/mfd/syscon.h
+index 1088149..42b0759 100644
+--- a/include/linux/mfd/syscon.h
++++ b/include/linux/mfd/syscon.h
+@@ -26,6 +26,9 @@ extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
+ extern struct regmap *syscon_regmap_lookup_by_phandle(
+ 					struct device_node *np,
+ 					const char *property);
++extern int syscon_regmap_read_from_offset(struct device_node *np,
++					  const char *s,
++					  unsigned int *val);
+ #else
+ static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
+ {
+@@ -48,6 +51,13 @@ static inline struct regmap *syscon_regmap_lookup_by_phandle(
+ {
+ 	return ERR_PTR(-ENOTSUPP);
+ }
++
++static inline int syscon_regmap_read_from_offset(struct device_node *np,
++						 const char *s,
++						 unsigned int *val)
++{
++	return ERR_PTR(-ENOSYS);
++}
+ #endif
+ 
+ #endif /* __LINUX_MFD_SYSCON_H__ */
 -- 
 2.8.2
