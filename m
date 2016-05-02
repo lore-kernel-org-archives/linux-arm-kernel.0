@@ -1,53 +1,31 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 2 May 2016 15:55:53 +0200
-Subject: [PATCH v2] nvmem/mxs-ocotp: fix buffer overflow in read
-In-Reply-To: <1f26dfe5-c75f-39df-e21e-77aeea408258@meduna.org>
-References: <1f26dfe5-c75f-39df-e21e-77aeea408258@meduna.org>
-Message-ID: <57275C69.9060902@i2se.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 2 May 2016 09:00:32 -0500
+Subject: [PATCH] of: include errno.h in of_graph.h
+In-Reply-To: <1462186769-2205767-1-git-send-email-arnd@arndb.de>
+References: <1462186769-2205767-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160502140032.GA12801@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
-hi Greg,
-
-Am 27.04.2016 um 14:39 schrieb Stanislav Meduna:
-> This patch fixes the issue where the mxs_ocotp_read is reading
-> the ocotp in reg_size steps but decrements the remaining size
-> by 1. The number of iterations is thus four times higher,
-> overwriting the area behind the output buffer.
->
-> Fixes: c01e9a11ab6f ("nvmem: add driver for ocotp in i.MX23 and i.MX28")
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Signed-off-by: Stanislav Meduna <stano@meduna.org>
-
-any change to get this critical fix into 4.6?
-
-Regards
-Stefan
-
+On Mon, May 02, 2016 at 12:59:19PM +0200, Arnd Bergmann wrote:
+> When CONFIG_OF is disabled, we have to include linux/errno.h before
+> including of_graph.h, or get build errors like in the newly added
+> sun4i drm driver:
+> 
+> In file included from ../drivers/gpu/drm/sun4i/sun4i_drv.c:14:0:
+> include/linux/of_graph.h: In function 'of_graph_parse_endpoint':
+> include/linux/of_graph.h:58:10: error: 'ENOSYS' undeclared (first use in this function)
+> 
+> A better solution is to ensure that the header can be included
+> by itself, so let's include linux/errno.h here to fix the error
+> we just got, and any similar future error.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 > ---
->  drivers/nvmem/mxs-ocotp.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-> index 8ba19bb..2bb3c57 100644
-> --- a/drivers/nvmem/mxs-ocotp.c
-> +++ b/drivers/nvmem/mxs-ocotp.c
-> @@ -94,7 +94,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->  	if (ret)
->  		goto close_banks;
->
-> -	while (val_size) {
-> +	while (val_size >= reg_size) {
->  		if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
->  			/* fill up non-data register */
->  			*buf = 0;
-> @@ -103,7 +103,7 @@ static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->  		}
->
->  		buf++;
-> -		val_size--;
-> +		val_size -= reg_size;
->  		offset += reg_size;
->  	}
->
+>  include/linux/of_graph.h | 1 +
+>  1 file changed, 1 insertion(+)
+
+Applied.
+
+Rob
