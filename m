@@ -1,37 +1,74 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 2 May 2016 22:12:17 +0200
-Subject: Nokia N900 retention mode in v4.6, camera buttons fun
-In-Reply-To: <20160501154855.GA24970@earth>
-References: <20160411094130.GA5753@amd> <20160411211026.GH5995@atomide.com>
- <20160412121658.GA32486@amd> <20160412123013.GA12296@amd>
- <20160412163055.GP5995@atomide.com> <20160417175539.GA502@amd>
- <20160421130450.GQ29406@pali> <20160429200559.GA16598@earth>
- <20160501085236.GA14243@amd> <20160501154855.GA24970@earth>
-Message-ID: <20160502201216.GA19211@earth>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 2 May 2016 14:19:32 -0600
+Subject: [PATCH v5 0/1] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <1461619287-27211-1-git-send-email-al.stone@linaro.org>
+References: <1461619287-27211-1-git-send-email-al.stone@linaro.org>
+Message-ID: <3b6d5be3-40ab-94dc-2590-8b2638cbdc15@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Sun, May 01, 2016 at 05:48:56PM +0200, Sebastian Reichel wrote:
-> > I see latest series, and it also talks about frequency scaling.
-> > But I guess it is not going to fix this issue?
+On 04/25/2016 03:21 PM, Al Stone wrote:
+> The ACPI 6.1 specification was recently released at the end of January
+> 2016, but the arm64 kernel documentation for the use of ACPI was written
+> for the 5.1 version of the spec.  There were significant additions to the
+> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> added to make it easier to define processors and low power idle states,
+> as well as the 6.1 addition allowing regular interrupts (not just from
+> GPIO) be used to signal ACPI general purpose events.
 > 
-> No, this is independent of the runtime PM problems. I also worked
-> on runtime PM/idling yesterday and pm_runtime_irq_safe is the main
-> culprit for breaking it (not the only one, though). It's not yet
-> finished though
+> This patch reflects going back through and examining the specs in detail
+> and updating content appropriately.  Whilst there, a few odds and ends of
+> typos were caught as well.  This brings the documentation up to date with
+> ACPI 6.1 for arm64.
+> 
+> Changes for v5:
+>    -- Miscellaneous typos and corrections (Lorenzo Pieralisi)
+>    -- Add linux-acpi@ ML to the distribution list (Alexey Klimov)
+>    -- Corrections to CPPC information (Alexey Klimov)
+>    -- ACK from Lorenzo Pieralisi
+>    -- Updated bibliographic info (Al Stone)
+> 
+> Changes for v4:
+>    -- Clarify that IORT can sometimes be optional (Jon Masters).
+>    -- Remove "Use as needed" descriptions of ACPI objects; they provide
+>       no substantive information and doing so simplifies maintenance of
+>       this document over time.  These have been replaced with a simpler
+>       notice that states that unless otherwise noted, do what the ACPI
+>       specification says is needed.
+>    -- Corrected the _OSI object usage recommendation; it described kernel
+>       behavior that does not exist (Al Stone).
+> 
+> Changes for v3:
+>    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+>    -- Whitespace cleanup as pointed out by checkpatch
+> 
+> Changes for v2:
+>    -- Clean up white space (Harb Abdulhahmid)
+>    -- Clarification on _CCA usage (Harb Abdulhamid)
+>    -- IORT moved to required from recommended (Hanjun Guo)
+>    -- Clarify IORT description (Hanjun Guo)
+> 
+> 
+> Al Stone (1):
+>   ARM64: ACPI: Update documentation for latest specification version
+> 
+>  Documentation/arm64/acpi_object_usage.txt | 343 ++++++++++++++++--------------
+>  Documentation/arm64/arm-acpi.txt          |  40 ++--
+>  2 files changed, 213 insertions(+), 170 deletions(-)
+> 
 
-I will be on vacation for a week starting tomorrow. If you want to
-play around with my intermediate SSI PM status, you can try this branch:
+Ping?  If there are no further comments, can this be pulled in through
+either the documentation or arm64 tree?
 
-https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/log/?h=runtime-pm-fixes
+Thanks.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/70e10112/attachment.sig>
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
