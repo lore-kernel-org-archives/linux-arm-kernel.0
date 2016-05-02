@@ -1,204 +1,109 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 2 May 2016 19:06:08 +0100
-Subject: [PATCH v2 2/2] nvmem: mxs-ocotp: remove nvmem regmap dependency
-In-Reply-To: <1787061216.114034.428859d7-5360-40c1-b83f-7fe418a8fcaa.open-xchange@email.1und1.de>
-References: <1462202578-15433-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1462202578-15433-3-git-send-email-srinivas.kandagatla@linaro.org>
- <1787061216.114034.428859d7-5360-40c1-b83f-7fe418a8fcaa.open-xchange@email.1und1.de>
-Message-ID: <57279710.3080005@linaro.org>
+Date: Mon,  2 May 2016 19:36:13 +0100
+Subject: [PATCH v3 1/2] nvmem: mtk-efuse: remove nvmem regmap dependency
+In-Reply-To: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1462214174-469-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Regmap raw accessors are bus specific implementations, using regmap raw
+apis in nvmem breaks nvmem providers based on regmap mmio.
+This patch moves to nvmem support in the driver to use callback
+instead of regmap, which is what the nvmem core supports now.
 
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/Kconfig     |  1 -
+ drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++++++++++++++++---------------
+ 2 files changed, 32 insertions(+), 16 deletions(-)
 
-On 02/05/16 17:26, Stefan Wahren wrote:
-> Hi Srinivas,
->
-> unfortunately still some points from V1.
-Thanks for reviewing.
-
-Oops, Will take care of them in v3.
-
-thanks,
-srini
->
->> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 2. Mai 2016 um
->> 17:22 geschrieben:
->>
->> This patch moves to nvmem support in the driver to use callback
->> instead of regmap.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/nvmem/mxs-ocotp.c | 81
->> +++++++++++++----------------------------------
->>   1 file changed, 22 insertions(+), 59 deletions(-)
->>
->> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
->> index 2bb3c57..9bf59d6 100644
->> --- a/drivers/nvmem/mxs-ocotp.c
->> +++ b/drivers/nvmem/mxs-ocotp.c
->> @@ -25,7 +25,6 @@
->>   #include <linux/nvmem-provider.h>
->>   #include <linux/of_device.h>
->>   #include <linux/platform_device.h>
->> -#include <linux/regmap.h>
->>   #include <linux/slab.h>
->>   #include <linux/stmp_device.h>
->>
->> @@ -66,11 +65,10 @@ static int mxs_ocotp_wait(struct mxs_ocotp *otp)
->>   return 0;
->>   }
->>
->> -static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
->> - void *val, size_t val_size)
->> +static int mxs_ocotp_read(void *context, unsigned int offset,
->> + void *val, size_t bytes)
->>   {
->>   struct mxs_ocotp *otp = context;
->> - unsigned int offset = *(u32 *)reg;
->>   u32 *buf = val;
->>   int ret;
->>
->> @@ -94,17 +92,16 @@ static int mxs_ocotp_read(void *context, const void *reg,
->> size_t reg_size,
->>   if (ret)
->>   goto close_banks;
->>
->> - while (val_size >= reg_size) {
->> + while (bytes) {
->>   if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
->>   /* fill up non-data register */
->> - *buf = 0;
->> + *buf++ = 0;
->>   } else {
->> - *buf = readl(otp->base + offset);
->> + *buf++ = readl(otp->base + offset);
->>   }
->>
->> - buf++;
->> - val_size -= reg_size;
->> - offset += reg_size;
->> + bytes -= 4;
->> + offset += 4;
->>   }
->>
->>   close_banks:
->> @@ -117,57 +114,29 @@ disable_clk:
->>   return ret;
->>   }
->>
->> -static int mxs_ocotp_write(void *context, const void *data, size_t count)
->> -{
->> - /* We don't want to support writing */
->> - return 0;
->> -}
->> -
->> -static bool mxs_ocotp_writeable_reg(struct device *dev, unsigned int reg)
->> -{
->> - return false;
->> -}
->> -
->>   static struct nvmem_config ocotp_config = {
->>   .name = "mxs-ocotp",
->> + .stride = 16,
->> + .word_size = 4,
->>   .owner = THIS_MODULE,
->> + .reg_read = mxs_ocotp_read,
->>   };
->>
->> -static const struct regmap_range imx23_ranges[] = {
->> - regmap_reg_range(OCOTP_DATA_OFFSET, 0x210),
->> -};
->> -
->> -static const struct regmap_access_table imx23_access = {
->> - .yes_ranges = imx23_ranges,
->> - .n_yes_ranges = ARRAY_SIZE(imx23_ranges),
->> -};
->> -
->> -static const struct regmap_range imx28_ranges[] = {
->> - regmap_reg_range(OCOTP_DATA_OFFSET, 0x290),
->> -};
->> -
->> -static const struct regmap_access_table imx28_access = {
->> - .yes_ranges = imx28_ranges,
->> - .n_yes_ranges = ARRAY_SIZE(imx28_ranges),
->> +struct mxs_data {
->> + int size;
->>   };
->>
->> -static struct regmap_bus mxs_ocotp_bus = {
->> - .read = mxs_ocotp_read,
->> - .write = mxs_ocotp_write, /* make regmap_init() happy */
->> - .reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
->> - .val_format_endian_default = REGMAP_ENDIAN_NATIVE,
->> +static const struct mxs_data imx23_data = {
->> + .size = 0x210,
->
-> 0x220
->
-> because the regmap_reg_range defined the max register instead of size.
->
->>   };
->>
->> -static struct regmap_config mxs_ocotp_config = {
->> - .reg_bits = 32,
->> - .val_bits = 32,
->> - .reg_stride = 16,
->> - .writeable_reg = mxs_ocotp_writeable_reg,
->> +static const struct mxs_data imx28_data = {
->> + .size = 0x290,
->
-> 0x2a0
->
-> ditto
->
->>   };
->>
->>   static const struct of_device_id mxs_ocotp_match[] = {
->> - { .compatible = "fsl,imx23-ocotp", .data = &imx23_access },
->> - { .compatible = "fsl,imx28-ocotp", .data = &imx28_access },
->> + { .compatible = "fsl,imx23-ocotp", .data = &imx23_data },
->> + { .compatible = "fsl,imx28-ocotp", .data = &imx23_data },
->
-> s/imx23_data/imx28_data/
->
->>   { /* sentinel */},
->>   };
->>   MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
->> @@ -175,6 +144,7 @@ MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
->>   static int mxs_ocotp_probe(struct platform_device *pdev)
->>   {
->>   struct device *dev = &pdev->dev;
->> + struct mxs_data *data;
->
-> I made this "const" in order to avoid a compiler warning below.
->
-> Stefan
->
->>   struct mxs_ocotp *otp;
->>   struct resource *res;
->>   const struct of_device_id *match;
->> @@ -205,17 +175,10 @@ static int mxs_ocotp_probe(struct platform_device *pdev)
->>   return ret;
->>   }
->>
->> - access = match->data;
->> - mxs_ocotp_config.rd_table = access;
->> - mxs_ocotp_config.max_register = access->yes_ranges[0].range_max;
->> -
->> - regmap = devm_regmap_init(dev, &mxs_ocotp_bus, otp, &mxs_ocotp_config);
->> - if (IS_ERR(regmap)) {
->> - dev_err(dev, "regmap init failed\n");
->> - ret = PTR_ERR(regmap);
->> - goto err_clk;
->> - }
->> + data = match->data;
->>
->> + ocotp_config.size = data->size;
->> + ocotp_config.priv = otp;
->>   ocotp_config.dev = dev;
->>   otp->nvmem = nvmem_register(&ocotp_config);
->>   if (IS_ERR(otp->nvmem)) {
->> --
->> 2.5.0
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index 3041d48..5ff2189 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -50,7 +50,6 @@ config MTK_EFUSE
+ 	tristate "Mediatek SoCs EFUSE support"
+ 	depends on ARCH_MEDIATEK || COMPILE_TEST
+ 	depends on HAS_IOMEM
+-	select REGMAP_MMIO
+ 	help
+ 	  This is a driver to access hardware related data like sensor
+ 	  calibration, HDMI impedance etc.
+diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
+index 9c49369..32fd572 100644
+--- a/drivers/nvmem/mtk-efuse.c
++++ b/drivers/nvmem/mtk-efuse.c
+@@ -14,15 +14,35 @@
+ 
+ #include <linux/device.h>
+ #include <linux/module.h>
++#include <linux/io.h>
+ #include <linux/nvmem-provider.h>
+ #include <linux/platform_device.h>
+-#include <linux/regmap.h>
+ 
+-static struct regmap_config mtk_regmap_config = {
+-	.reg_bits = 32,
+-	.val_bits = 32,
+-	.reg_stride = 4,
+-};
++static int mtk_reg_read(void *context,
++			unsigned int reg, void *_val, size_t bytes)
++{
++	void __iomem *base = context;
++	u32 *val = _val;
++	int i = 0, words = bytes / 4;
++
++	while (words--)
++		*val++ = readl(base + reg + (i++ * 4));
++
++	return 0;
++}
++
++static int mtk_reg_write(void *context,
++			 unsigned int reg, void *_val, size_t bytes)
++{
++	void __iomem *base = context;
++	u32 *val = _val;
++	int i = 0, words = bytes / 4;
++
++	while (words--)
++		writel(*val++, base + reg + (i++ * 4));
++
++	return 0;
++}
+ 
+ static int mtk_efuse_probe(struct platform_device *pdev)
+ {
+@@ -30,7 +50,6 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct nvmem_device *nvmem;
+ 	struct nvmem_config *econfig;
+-	struct regmap *regmap;
+ 	void __iomem *base;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -42,14 +61,12 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+ 	if (!econfig)
+ 		return -ENOMEM;
+ 
+-	mtk_regmap_config.max_register = resource_size(res) - 1;
+-
+-	regmap = devm_regmap_init_mmio(dev, base, &mtk_regmap_config);
+-	if (IS_ERR(regmap)) {
+-		dev_err(dev, "regmap init failed\n");
+-		return PTR_ERR(regmap);
+-	}
+-
++	econfig->stride = 4;
++	econfig->word_size = 4;
++	econfig->reg_read = mtk_reg_read;
++	econfig->reg_write = mtk_reg_write;
++	econfig->size = resource_size(res);
++	econfig->priv = base;
+ 	econfig->dev = dev;
+ 	econfig->owner = THIS_MODULE;
+ 	nvmem = nvmem_register(econfig);
+-- 
+2.5.0
