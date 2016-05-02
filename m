@@ -1,194 +1,59 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 2 May 2016 18:26:48 +0200 (CEST)
-Subject: [PATCH v2 2/2] nvmem: mxs-ocotp: remove nvmem regmap dependency
-In-Reply-To: <1462202578-15433-3-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1462202578-15433-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1462202578-15433-3-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1787061216.114034.428859d7-5360-40c1-b83f-7fe418a8fcaa.open-xchange@email.1und1.de>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 2 May 2016 18:36:24 +0200
+Subject: [PATCH 2/2] clk: bcm2835: Skip PLLC clocks when deciding on a new
+ clock parent
+In-Reply-To: <878tzsiilh.fsf@eliezer.anholt.net>
+References: <1461699585-6649-1-git-send-email-eric@anholt.net>
+ <1461699585-6649-2-git-send-email-eric@anholt.net>
+ <C771F70C-2F88-49E1-A370-D76D13262C1E@martin.sperl.org>
+ <878tzsiilh.fsf@eliezer.anholt.net>
+Message-ID: <FB575328-E891-4ECC-B0D5-E7243CDEE44E@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
 
-unfortunately still some points from V1.
+> On 02.05.2016, at 17:29, Eric Anholt <eric@anholt.net> wrote:
+> 
+> Martin Sperl <kernel@martin.sperl.org> writes:
+> 
+>>> On 26.04.2016, at 21:39, Eric Anholt <eric@anholt.net> wrote:
+>>> 
+>>> If the firmware had set up a clock to source from PLLC, go along with
+>>> it.  But if we're looking for a new parent, we don't want to switch it
+>>> to PLLC because the firmware will force PLLC (and thus the AXI bus
+>>> clock) to different frequencies during over-temp/under-voltage,
+>>> without notification to Linux.
+>>> 
+>>> On my system, this moves the Linux-enabled HDMI state machine and DSI1
+>>> escape clock over to plld_per from pllc_per.  EMMC still ends up on
+>>> pllc_per, because the firmware had set it up to use that.
+>>> 
+>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+>>> ?
+>> 
+>> I guess this patch looks to me as if it is a policy inside the kernel,
+>> which is AFAIK frowned upon.
+> 
+> Can you come up with a use for putting peripherals on PLLC ever, such
+> that we need choice?
 
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 2. Mai 2016 um
-> 17:22 geschrieben:
-> 
-> This patch moves to nvmem support in the driver to use callback
-> instead of regmap.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/nvmem/mxs-ocotp.c | 81
-> +++++++++++++----------------------------------
->  1 file changed, 22 insertions(+), 59 deletions(-)
-> 
-> diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-> index 2bb3c57..9bf59d6 100644
-> --- a/drivers/nvmem/mxs-ocotp.c
-> +++ b/drivers/nvmem/mxs-ocotp.c
-> @@ -25,7 +25,6 @@
->  #include <linux/nvmem-provider.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> -#include <linux/regmap.h>
->  #include <linux/slab.h>
->  #include <linux/stmp_device.h>
-> 
-> @@ -66,11 +65,10 @@ static int mxs_ocotp_wait(struct mxs_ocotp *otp)
->  return 0;
->  }
-> 
-> -static int mxs_ocotp_read(void *context, const void *reg, size_t reg_size,
-> - void *val, size_t val_size)
-> +static int mxs_ocotp_read(void *context, unsigned int offset,
-> + void *val, size_t bytes)
->  {
->  struct mxs_ocotp *otp = context;
-> - unsigned int offset = *(u32 *)reg;
->  u32 *buf = val;
->  int ret;
-> 
-> @@ -94,17 +92,16 @@ static int mxs_ocotp_read(void *context, const void *reg,
-> size_t reg_size,
->  if (ret)
->  goto close_banks;
-> 
-> - while (val_size >= reg_size) {
-> + while (bytes) {
->  if ((offset < OCOTP_DATA_OFFSET) || (offset % 16)) {
->  /* fill up non-data register */
-> - *buf = 0;
-> + *buf++ = 0;
->  } else {
-> - *buf = readl(otp->base + offset);
-> + *buf++ = readl(otp->base + offset);
->  }
-> 
-> - buf++;
-> - val_size -= reg_size;
-> - offset += reg_size;
-> + bytes -= 4;
-> + offset += 4;
->  }
-> 
->  close_banks:
-> @@ -117,57 +114,29 @@ disable_clk:
->  return ret;
->  }
-> 
-> -static int mxs_ocotp_write(void *context, const void *data, size_t count)
-> -{
-> - /* We don't want to support writing */
-> - return 0;
-> -}
-> -
-> -static bool mxs_ocotp_writeable_reg(struct device *dev, unsigned int reg)
-> -{
-> - return false;
-> -}
-> -
->  static struct nvmem_config ocotp_config = {
->  .name = "mxs-ocotp",
-> + .stride = 16,
-> + .word_size = 4,
->  .owner = THIS_MODULE,
-> + .reg_read = mxs_ocotp_read,
->  };
-> 
-> -static const struct regmap_range imx23_ranges[] = {
-> - regmap_reg_range(OCOTP_DATA_OFFSET, 0x210),
-> -};
-> -
-> -static const struct regmap_access_table imx23_access = {
-> - .yes_ranges = imx23_ranges,
-> - .n_yes_ranges = ARRAY_SIZE(imx23_ranges),
-> -};
-> -
-> -static const struct regmap_range imx28_ranges[] = {
-> - regmap_reg_range(OCOTP_DATA_OFFSET, 0x290),
-> -};
-> -
-> -static const struct regmap_access_table imx28_access = {
-> - .yes_ranges = imx28_ranges,
-> - .n_yes_ranges = ARRAY_SIZE(imx28_ranges),
-> +struct mxs_data {
-> + int size;
->  };
-> 
-> -static struct regmap_bus mxs_ocotp_bus = {
-> - .read = mxs_ocotp_read,
-> - .write = mxs_ocotp_write, /* make regmap_init() happy */
-> - .reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
-> - .val_format_endian_default = REGMAP_ENDIAN_NATIVE,
-> +static const struct mxs_data imx23_data = {
-> + .size = 0x210,
+For PLLC not right now, but with clk_notifier_register drivers could
+work around those clock changes (assuming we get that information
+from the firmware somehow - or if we could move this decision into the
+kernel: even better).
 
-0x220
+But I can come up with a scenario that would make use of the pllh_aux
+under some circumstances - e.g when requesting 290039Hz on clock gp0/1/2.
 
-because the regmap_reg_range defined the max register instead of size.
+Similarly: if we ever enable the testdebugX clocks these become immediate
+candidates for parent-clocks as well which can result in more headache.
 
->  };
-> 
-> -static struct regmap_config mxs_ocotp_config = {
-> - .reg_bits = 32,
-> - .val_bits = 32,
-> - .reg_stride = 16,
-> - .writeable_reg = mxs_ocotp_writeable_reg,
-> +static const struct mxs_data imx28_data = {
-> + .size = 0x290,
+Being able to define which clocks to use at least give the dts author
+a means also to control clock selection if he wants to enable the
+testdebug clocks.
 
-0x2a0
+Another similar situation can occur with plla_per - under some
+circumstances it may get used unexpectedly.
 
-ditto
-
->  };
-> 
->  static const struct of_device_id mxs_ocotp_match[] = {
-> - { .compatible = "fsl,imx23-ocotp", .data = &imx23_access },
-> - { .compatible = "fsl,imx28-ocotp", .data = &imx28_access },
-> + { .compatible = "fsl,imx23-ocotp", .data = &imx23_data },
-> + { .compatible = "fsl,imx28-ocotp", .data = &imx23_data },
-
-s/imx23_data/imx28_data/
-
->  { /* sentinel */},
->  };
->  MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
-> @@ -175,6 +144,7 @@ MODULE_DEVICE_TABLE(of, mxs_ocotp_match);
->  static int mxs_ocotp_probe(struct platform_device *pdev)
->  {
->  struct device *dev = &pdev->dev;
-> + struct mxs_data *data;
-
-I made this "const" in order to avoid a compiler warning below.
-
-Stefan
-
->  struct mxs_ocotp *otp;
->  struct resource *res;
->  const struct of_device_id *match;
-> @@ -205,17 +175,10 @@ static int mxs_ocotp_probe(struct platform_device *pdev)
->  return ret;
->  }
-> 
-> - access = match->data;
-> - mxs_ocotp_config.rd_table = access;
-> - mxs_ocotp_config.max_register = access->yes_ranges[0].range_max;
-> -
-> - regmap = devm_regmap_init(dev, &mxs_ocotp_bus, otp, &mxs_ocotp_config);
-> - if (IS_ERR(regmap)) {
-> - dev_err(dev, "regmap init failed\n");
-> - ret = PTR_ERR(regmap);
-> - goto err_clk;
-> - }
-> + data = match->data;
-> 
-> + ocotp_config.size = data->size;
-> + ocotp_config.priv = otp;
->  ocotp_config.dev = dev;
->  otp->nvmem = nvmem_register(&ocotp_config);
->  if (IS_ERR(otp->nvmem)) {
-> -- 
-> 2.5.0
+Martin
