@@ -1,53 +1,126 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon,  2 May 2016 13:27:54 -0400
-Subject: [PATCH] s5p-mfc: Don't try to put pm->clock if lookup failed
-Message-ID: <1462210075-5320-1-git-send-email-javier@osg.samsung.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 2 May 2016 12:34:08 -0500
+Subject: [PATCH] pci, pci-thunder-pem: Don't clobber read-only bits in
+ bridge config registers.
+In-Reply-To: <1460417372-13147-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1460417372-13147-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160502173408.GG24851@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Failing to get the struct s5p_mfc_pm .clock is a non-fatal error so the
-clock field can have a errno pointer value. But s5p_mfc_final_pm() only
-checks if .clock is not NULL before attempting to unprepare and put it.
+On Mon, Apr 11, 2016 at 04:29:32PM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The 32-bit addressing modes in the I/O and Prefetchable Memory
+> registers are required to be read-only.  Since the underlying access
+> method allows them to be set, we must emulate their read-only nature
+> and always set them.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-This leads to the following warning in clk_put() due s5p_mfc_final_pm():
+Applied to pci/host-thunder for v4.7, thanks, David!
 
-WARNING: CPU: 3 PID: 1023 at drivers/clk/clk.c:2814 s5p_mfc_final_pm+0x48/0x74 [s5p_mfc]
-CPU: 3 PID: 1023 Comm: rmmod Tainted: G        W       4.6.0-rc6-next-20160502-00005-g5a15a49106bc #9
-Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[<c010e1bc>] (unwind_backtrace) from [<c010af28>] (show_stack+0x10/0x14)
-[<c010af28>] (show_stack) from [<c032485c>] (dump_stack+0x88/0x9c)
-[<c032485c>] (dump_stack) from [<c011b8e8>] (__warn+0xe8/0x100)
-[<c011b8e8>] (__warn) from [<c011b9b0>] (warn_slowpath_null+0x20/0x28)
-[<c011b9b0>] (warn_slowpath_null) from [<bf16004c>] (s5p_mfc_final_pm+0x48/0x74 [s5p_mfc])
-[<bf16004c>] (s5p_mfc_final_pm [s5p_mfc]) from [<bf157414>] (s5p_mfc_remove+0x8c/0x94 [s5p_mfc])
-[<bf157414>] (s5p_mfc_remove [s5p_mfc]) from [<c03fe1f8>] (platform_drv_remove+0x24/0x3c)
-[<c03fe1f8>] (platform_drv_remove) from [<c03fcc70>] (__device_release_driver+0x84/0x110)
-[<c03fcc70>] (__device_release_driver) from [<c03fcdd8>] (driver_detach+0xac/0xb0)
-[<c03fcdd8>] (driver_detach) from [<c03fbff8>] (bus_remove_driver+0x4c/0xa0)
-[<c03fbff8>] (bus_remove_driver) from [<c01886a8>] (SyS_delete_module+0x174/0x1b8)
-[<c01886a8>] (SyS_delete_module) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
-
-So check if the pointer is not an errno value before calling clk_put().
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- drivers/media/platform/s5p-mfc/s5p_mfc_pm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
-index 5f97a3398c11..d011f30be265 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
-@@ -85,7 +85,7 @@ err_g_ip_clk:
- void s5p_mfc_final_pm(struct s5p_mfc_dev *dev)
- {
- 	if (dev->variant->version != MFC_VERSION_V6 &&
--	    pm->clock) {
-+	    !IS_ERR_OR_NULL(pm->clock)) {
- 		clk_disable_unprepare(pm->clock);
- 		clk_put(pm->clock);
- 	}
--- 
-2.5.5
+> ---
+>  drivers/pci/host/pci-thunder-pem.c | 42 ++++++++++++++++++++++++++++++--------
+>  1 file changed, 34 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index cabb92a..196adf6 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -153,11 +153,11 @@ static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
+>   * reserved bits, this makes the code simpler and is OK as the bits
+>   * are not affected by writing zeros to them.
+>   */
+> -static u32 thunder_pem_bridge_w1c_bits(int where)
+> +static u32 thunder_pem_bridge_w1c_bits(u64 where_aligned)
+>  {
+>  	u32 w1c_bits = 0;
+>  
+> -	switch (where & ~3) {
+> +	switch (where_aligned) {
+>  	case 0x04: /* Command/Status */
+>  	case 0x1c: /* Base and I/O Limit/Secondary Status */
+>  		w1c_bits = 0xff000000;
+> @@ -184,12 +184,34 @@ static u32 thunder_pem_bridge_w1c_bits(int where)
+>  	return w1c_bits;
+>  }
+>  
+> +/* Some bits must be written to one so they appear to be read-only. */
+> +static u32 thunder_pem_bridge_w1_bits(u64 where_aligned)
+> +{
+> +	u32 w1_bits;
+> +
+> +	switch (where_aligned) {
+> +	case 0x1c: /* I/O Base / I/O Limit, Secondary Status*/
+> +		/* Force 32-bit I/O addressing. */
+> +		w1_bits = 0x0101;
+> +		break;
+> +	case 0x24: /* Prefetchable Memory Base / Prefetchable Memory Limit */
+> +		/* Force 64-bit addressing */
+> +		w1_bits = 0x00010001;
+> +		break;
+> +	default:
+> +		w1_bits = 0;
+> +		break;
+> +	}
+> +	return w1_bits;
+> +}
+> +
+>  static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+>  				    int where, int size, u32 val)
+>  {
+>  	struct gen_pci *pci = bus->sysdata;
+>  	struct thunder_pem_pci *pem_pci;
+>  	u64 write_val, read_val;
+> +	u64 where_aligned = where & ~3ull;
+>  	u32 mask = 0;
+>  
+>  	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+> @@ -205,8 +227,7 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+>  	 */
+>  	switch (size) {
+>  	case 1:
+> -		read_val = where & ~3ull;
+> -		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		writeq(where_aligned, pem_pci->pem_reg_base + PEM_CFG_RD);
+>  		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+>  		read_val >>= 32;
+>  		mask = ~(0xff << (8 * (where & 3)));
+> @@ -215,8 +236,7 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+>  		val |= (u32)read_val;
+>  		break;
+>  	case 2:
+> -		read_val = where & ~3ull;
+> -		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		writeq(where_aligned, pem_pci->pem_reg_base + PEM_CFG_RD);
+>  		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+>  		read_val >>= 32;
+>  		mask = ~(0xffff << (8 * (where & 3)));
+> @@ -244,11 +264,17 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+>  	}
+>  
+>  	/*
+> +	 * Some bits must be read-only with value of one.  Since the
+> +	 * access method allows these to be cleared if a zero is
+> +	 * written, force them to one before writing.
+> +	 */
+> +	val |= thunder_pem_bridge_w1_bits(where_aligned);
+> +
+> +	/*
+>  	 * Low order bits are the config address, the high order 32
+>  	 * bits are the data to be written.
+>  	 */
+> -	write_val = where & ~3ull;
+> -	write_val |= (((u64)val) << 32);
+> +	write_val = (((u64)val) << 32) | where_aligned;
+>  	writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
+>  	return PCIBIOS_SUCCESSFUL;
+>  }
+> -- 
+> 1.8.3.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
