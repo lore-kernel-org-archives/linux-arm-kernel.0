@@ -1,114 +1,26 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 2 May 2016 14:23:28 -0600
-Subject: [PATCH v8 6/8] iommu/msi-iommu: iommu_msi_domain
-In-Reply-To: <572776BD.2080503@linaro.org>
-References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
- <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
- <20160428162740.28db4b8d@t450s.home> <572776BD.2080503@linaro.org>
-Message-ID: <20160502142328.2d97f7a4@t450s.home>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 02 May 2016 16:48:18 -0400 (EDT)
+Subject: [PATCH v2 0/3] drivers: net: xgene: fix: Get channel number
+ from device binding
+In-Reply-To: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
+References: <1461953415-9741-1-git-send-email-isubramanian@apm.com>
+Message-ID: <20160502.164818.1876590443775185144.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Fri, 29 Apr 2016 11:10:12 -0700
 
-On Mon, 2 May 2016 17:48:13 +0200
-Eric Auger <eric.auger@linaro.org> wrote:
+> This patch set adds 'channel' property to get ethernet to CPU channel number,
+> thus decoupling the Linux driver from static resource selection.
+> 
+> v2: Address review comments from v1
+> - removed irq reference from Linux driver
+> - added 'channel' property to get ethernet to CPU channel number
+> 
+> v1:
+> - Initial version
+> 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 
-> Hi Alex,
-> On 04/29/2016 12:27 AM, Alex Williamson wrote:
-> > On Thu, 28 Apr 2016 08:15:21 +0000
-> > Eric Auger <eric.auger@linaro.org> wrote:
-> >   
-> >> This function checks whether
-> >> - the device belongs to a non default iommu domain
-> >> - this iommu domain requires the MSI address to be mapped.
-> >>
-> >> If those conditions are met, the function returns the iommu domain
-> >> to be used for mapping the MSI doorbell; else it returns NULL.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >>
-> >> ---
-> >>
-> >> v7 -> v8:
-> >> - renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
-> >> - the function now takes a struct device *
-> >> - use DOMAIN_ATTR_MSI_GEOMETRY attribute
-> >> ---
-> >>  drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
-> >>  include/linux/msi-iommu.h | 14 ++++++++++++++
-> >>  2 files changed, 31 insertions(+)
-> >>
-> >> diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
-> >> index 203e86e..023ff17 100644
-> >> --- a/drivers/iommu/msi-iommu.c
-> >> +++ b/drivers/iommu/msi-iommu.c
-> >> @@ -243,3 +243,20 @@ unlock:
-> >>  	}
-> >>  }
-> >>  EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
-> >> +
-> >> +struct iommu_domain *iommu_msi_domain(struct device *dev)
-> >> +{
-> >> +	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
-> >> +	struct iommu_domain_msi_geometry msi_geometry;
-> >> +
-> >> +	if (!d || (d->type == IOMMU_DOMAIN_DMA))
-> >> +		return NULL;
-> >> +
-> >> +	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
-> >> +	if (!msi_geometry.programmable)  
-> > 
-> > It feels like we're conflating ideas with using the "programmable" flag
-> > in this way.  AIUI the IOMMU API consumer is supposed to see the
-> > invalid MSI geometry with the programmable feature set and know to call
-> > iommu_msi_set_aperture().  Looking for the msi_cookie would tell us if
-> > that had been done, but that doesn't tell us if it should have been
-> > done.  iommu_msi_msg_pa_to_va() handles this later, if we return
-> > NULL here that function returns success otherwise it goes on to fail if
-> > the iova or msi cookie is not set.  So really what we're trying to flag
-> > is that the MSI geometry participates in the IOMMU-MSI API you've
-> > created and we should pick a feature name that says that rather than
-> > something as vague a "programmable".  Perhaps simply iommu_msi_api
-> > rather than programmable.  
-> Yes I had the same questioning too when I wrote this code. So if my
-> understanding is correct we would have
-> - programmable: tells whether the MSI range is fixed or pogrammable and,
-> - mapping_required (new boolean field): indicating whether MSIs need to
-> be mapped in the IOMMU
-
-Let's say we had a flag "iommu_msi_supported", doesn't that already
-tell us whether the MSI range is programmable and the API to use to do
-it?  Can't we figure out if mapping is required based on whether
-iommu_msi_supported is set and aperture_start and aperture_end indicate
-a valid range?  It seems like what we want on this code path is to
-simply know whether the IOMMU domain is relevant to the IOMMU MSI API,
-which would be abundantly clear with such a flag.
-
-> > 
-> > BTW, I don't see that you ever set aperture_start/end once
-> > iommu_msi_set_aperture() has been called.  It seems like doing so would
-> > add some consistency to that MSI geometry attribute.  
-> Indeed currently I mentionned:
-> /* In case the aperture is programmable, start/end are set to 0 */
-
-Which is confusing, if a user sets an aperture, I would think they'd
-like to see the MSI geometry updated to reflect that.
-
-> If I set start/end in iommu_msi_set_aperture then I think I should also
-> return the actual values in iommu_domain_get_attr. I thought the extra
-> care to handle the possible race between the set_aperture (msi_iommu)
-> and the get_attr (iommu) was maybe not worth the benefits:
-> is_aperture_set is not visible to get_attr so I would be forced to
-> introduce a mutex at iommu_domain level or call an msi-iommu function
-> from iommu implementation. So I preferred to keep start/end as read-only
-> info initialized by the iommu driver.
-
-Seems like a race between iommu_msi_set_aperture() and
-iommu_domain_get_attr() is the caller's problem.  We can always define
-that start >= end is invalid and set them in the right order that
-iommu_domain_get_attr() may get different versions of invalid, but it
-will always be invalid or valid.  A helper function could tell us if we
-have a valid range rather than using is_aperture_set.  Thanks,
-
-Alex
+Series applied, thanks.
