@@ -1,153 +1,267 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 2 May 2016 12:34:05 -0700
-Subject: [RFC PATCH] arm64: Make arch_randomize_brk avoid stack area
-In-Reply-To: <1461853042.2848.24.camel@linaro.org>
-References: <1461848638.2848.19.camel@linaro.org>
- <1461853042.2848.24.camel@linaro.org>
-Message-ID: <CAGXu5jJKDE_pLCxy-FF7PN5+YC7wyvpQ_9DTDGqHuk+tb1mvJA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 2 May 2016 14:37:51 -0500
+Subject: [PATCH v3 1/3] PCI: imx6: Use enum instead of bool for variant
+ indicator
+In-Reply-To: <1461167131-26025-1-git-send-email-andrew.smirnov@gmail.com>
+References: <1461167131-26025-1-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <20160502193751.GJ24851@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 7:17 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> Sorry, the code patch has errors (I forgot to commit fixes before
-> running git format-patch), the correct code, which was in the kernel I
-> built and tested, is at the end of this email.
+On Wed, Apr 20, 2016 at 08:45:29AM -0700, Andrey Smirnov wrote:
+> Use enumerated type instead of a boolean flag to specify the variant of
+> the PCIe IP block (6Q, 6SX, etc). This patch has zero functional impact,
+> however it makes the code easier to extend for the case of more than 2
+> possible variants of an IP block (of which there are).
+> 
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Please resend this as a v2 (with a changelog, etc). Conceptually, it
-looks fine to me: it will limit the entropy of the brk base address
-when close to the stack on old kernels and should be effectively a
-no-op on modern kernels. However, I have some notes inline below.
+Applied with Fabio's Reviewed-by and Gary's Tested-by to pci/host-imx6
+for v4.7, thanks, Andrey!  Also, thank you Fabio, Gary, and Lucas for
+reviewing and testing.
 
-Also, for v2, can you validate the text vs brk offset entropy on a 4.6
-kernel before/after this patch?
-
-This (aslr.c) may be helpful in running a few thousand iterations:
-
-http://bazaar.launchpad.net/~ubuntu-bugcontrol/qa-regression-testing/master/files/head:/scripts/kernel-security/aslr/
-
-$ for i in $(seq 10000); do ./aslr --report brk ; done | ...
-
->
-> On Thu, 2016-04-28 at 14:03 +0100, Jon Medhurst (Tixy) wrote:
-> Some incorrect code...
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 8062482..7126a5a 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -382,13 +382,24 @@ unsigned long arch_align_stack(unsigned long sp)
->>       return sp & ~0xf;
->>  }
->>
->> -static unsigned long randomize_base(unsigned long base)
->> +unsigned long arch_randomize_brk(struct mm_struct *mm)
->>  {
->>       unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
->> -     return randomize_range(base, range_end, 0) ? : base;
->> -}
->> +     unsigned long max_stack, range_limit;
->>
->> -unsigned long arch_randomize_brk(struct mm_struct *mm)
->> -{
->> -     return randomize_base(mm->brk);
->> +     /*
->> +      * Determine how much room do we need to leave available for the stack.
->> +      * We limit this to a reasonable value, because extremely large or
->> +      * unlimited stacks are always going to bump up against brk at some
->> +      * point and we don't want to fail to randomise brk in those cases.
->> +      */
->> +     max_stack = rlimit(RLIMIT_STACK);
->> +     if (max_stack > SZ_128M)
->> +             max_stack = SZ_128M;
->> +
->> +     range_limit = mm->start_stack - max_stack - 1;
->> +     if (range_end > range_limit)
->> +             range_end > range_limit
->> +
->> +     return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
->>  }
->
-> Corrected code...
->
->  arch/arm64/kernel/process.c | 24 ++++++++++++++++++------
->  1 file changed, 18 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 07c4c53..7e0f404 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -434,13 +434,25 @@ unsigned long arch_align_stack(unsigned long sp)
->         return sp & ~0xf;
+> ---
+> 
+> Changes since v2:
+> 	- Removed default clause in all introduced switch statements
+> 	- Switched to using of_device_get_match_data instead of
+>           explicit of_device_is_compatible checks
+> 	- Added a mention of the new DT compatibility string in the documentation
+> 
+> Changes since v1:
+> 
+> 	- Patchset is rebased against
+>           https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-imx6
+> 
+> 	- DTS files changes moved into a separate patch
+> 
+>  drivers/pci/host/pci-imx6.c | 124 ++++++++++++++++++++++++--------------------
+>  1 file changed, 67 insertions(+), 57 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 0f6d630..a77e7fd 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+>  #include <linux/module.h>
+>  #include <linux/of_gpio.h>
+> +#include <linux/of_device.h>
+>  #include <linux/pci.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> @@ -31,6 +32,11 @@
+>  
+>  #define to_imx6_pcie(x)	container_of(x, struct imx6_pcie, pp)
+>  
+> +enum imx6_pcie_variants {
+> +	IMX6Q,
+> +	IMX6SX
+> +};
+> +
+>  struct imx6_pcie {
+>  	struct gpio_desc	*reset_gpio;
+>  	struct clk		*pcie_bus;
+> @@ -39,7 +45,7 @@ struct imx6_pcie {
+>  	struct clk		*pcie;
+>  	struct pcie_port	pp;
+>  	struct regmap		*iomuxc_gpr;
+> -	bool			is_imx6sx;
+> +	enum imx6_pcie_variants variant;
+>  	void __iomem		*mem_base;
+>  	u32			tx_deemph_gen1;
+>  	u32			tx_deemph_gen2_3p5db;
+> @@ -238,7 +244,8 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+>  	u32 val, gpr1, gpr12;
+>  
+> -	if (imx6_pcie->is_imx6sx) {
+> +	switch (imx6_pcie->variant) {
+> +	case IMX6SX:
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
+>  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN);
+> @@ -246,72 +253,76 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
+>  				   IMX6SX_GPR5_PCIE_BTNRST_RESET,
+>  				   IMX6SX_GPR5_PCIE_BTNRST_RESET);
+> -		return 0;
+> -	}
+> -
+> -	/*
+> -	 * If the bootloader already enabled the link we need some special
+> -	 * handling to get the core back into a state where it is safe to
+> -	 * touch it for configuration.  As there is no dedicated reset signal
+> -	 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
+> -	 * state before completely disabling LTSSM, which is a prerequisite
+> -	 * for core configuration.
+> -	 *
+> -	 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have a strong
+> -	 * indication that the bootloader activated the link.
+> -	 */
+> -	regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
+> -	regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
+> -
+> -	if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
+> -	    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+> -		val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> -		val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> -		val |= PCIE_PL_PFLR_FORCE_LINK;
+> -		writel(val, pp->dbi_base + PCIE_PL_PFLR);
+> +		break;
+> +	case IMX6Q:
+> +		/*
+> +		 * If the bootloader already enabled the link we need some special
+> +		 * handling to get the core back into a state where it is safe to
+> +		 * touch it for configuration.  As there is no dedicated reset signal
+> +		 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
+> +		 * state before completely disabling LTSSM, which is a prerequisite
+> +		 * for core configuration.
+> +		 *
+> +		 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have a strong
+> +		 * indication that the bootloader activated the link.
+> +		 */
+> +		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
+> +		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
+> +
+> +		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
+> +		    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+> +			val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> +			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> +			val |= PCIE_PL_PFLR_FORCE_LINK;
+> +			writel(val, pp->dbi_base + PCIE_PL_PFLR);
+> +
+> +			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +					   IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+> +		}
+>  
+> -		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> -				IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +				   IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +				   IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+> +		break;
+>  	}
+>  
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+> -
+>  	return 0;
 >  }
->
-> -static unsigned long randomize_base(unsigned long base)
-> +unsigned long arch_randomize_brk(struct mm_struct *mm)
+>  
+>  static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
 >  {
-> +       unsigned long base = mm->brk;
->         unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
-
-This looks wrong. Shouldn't it be (STACK_RND_MASK + 1) << PAGE_SHIFT ?
-
-STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit):
-
-#define STACK_RND_MASK                  (test_thread_flag(TIF_32BIT) ? \
-                                                0x7ff >> (PAGE_SHIFT - 12) : \
-                                                0x3ffff >> (PAGE_SHIFT - 12))
-
-(4K paged PAGE_SHIFT is 12)
-
-So the correct offset max would be 0x800000 (32-bit) and 0x40000000
-(64-bit), instead of
-0x7ff0001 and 0x3ffff0001.
-
-Even with that correction, this looks wrong for 32-bit, which uses
-0x2000000 natively:
-
-unsigned long arch_randomize_brk(struct mm_struct *mm)
-{
-        unsigned long range_end = mm->brk + 0x02000000;
-        return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
-}
-
-Seems like arm64 compat is using 4 times less entropy than native arm?
-(Note that STACK_RND_MASK is correct for arm64 compat: this matches
-the default in fs/binfmt_elf.c that arm uses. It just seems like the
-brk randomization is accidentally too small on arm64 compat since arm
-uses a fixed value unrelated to stack randomization.)
-
-0x02000000 arm native
-0x00800000 arm64 compat  <- bug?
-0x40000000 arm64
-
-
-> -       return randomize_range(base, range_end, 0) ? : base;
-> -}
-> +       unsigned long max_stack, range_limit;
->
-> -unsigned long arch_randomize_brk(struct mm_struct *mm)
-> -{
-> -       return randomize_base(mm->brk);
-> +       /*
-> +        * Determine how much room do we need to leave available for the stack.
-> +        * We limit this to a reasonable value, because extremely large or
-> +        * unlimited stacks are always going to bump up against brk at some
-> +        * point and we don't want to fail to randomise brk in those cases.
-> +        */
-> +       max_stack = rlimit(RLIMIT_STACK);
-> +       if (max_stack > SZ_128M)
-> +               max_stack = SZ_128M;
-> +
-> +       range_limit = mm->start_stack - max_stack - 1;
-> +       if (range_end > range_limit)
-> +               range_end = range_limit;
-> +
-> +       return randomize_range(base, range_end, 0) ? : base;
+>  	struct pcie_port *pp = &imx6_pcie->pp;
+> -	int ret;
+> +	int ret = 0;
+>  
+> -	if (imx6_pcie->is_imx6sx) {
+> +	switch (imx6_pcie->variant) {
+> +	case IMX6SX:
+>  		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
+>  		if (ret) {
+>  			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
+> -			return ret;
+> +			break;
+>  		}
+>  
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
+> -		return ret;
+> +		break;
+> +	case IMX6Q:
+> +		/* power up core phy and enable ref clock */
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +				   IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> +		/*
+> +		 * the async reset input need ref clock to sync internally,
+> +		 * when the ref clock comes after reset, internal synced
+> +		 * reset time is too short, cannot meet the requirement.
+> +		 * add one ~10us delay here.
+> +		 */
+> +		udelay(10);
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +				   IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +		break;
+>  	}
+>  
+> -	/* power up core phy and enable ref clock */
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> -	/*
+> -	 * the async reset input need ref clock to sync internally,
+> -	 * when the ref clock comes after reset, internal synced
+> -	 * reset time is too short, cannot meet the requirement.
+> -	 * add one ~10us delay here.
+> -	 */
+> -	udelay(10);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> -	return 0;
+> +	return ret;
 >  }
+>  
+>  static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+> @@ -353,7 +364,7 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+>  	}
+>  
+> -	if (imx6_pcie->is_imx6sx)
+> +	if (imx6_pcie->variant == IMX6SX)
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
+>  				   IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
+>  
+> @@ -374,11 +385,10 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
+>  {
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+>  
+> -	if (imx6_pcie->is_imx6sx) {
+> +	if (imx6_pcie->variant == IMX6SX)
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  				   IMX6SX_GPR12_PCIE_RX_EQ_MASK,
+>  				   IMX6SX_GPR12_PCIE_RX_EQ_2);
+> -	}
+>  
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+> @@ -585,8 +595,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  	pp = &imx6_pcie->pp;
+>  	pp->dev = &pdev->dev;
+>  
+> -	imx6_pcie->is_imx6sx = of_device_is_compatible(pp->dev->of_node,
+> -						       "fsl,imx6sx-pcie");
+> +	imx6_pcie->variant =
+> +		(enum imx6_pcie_variants)of_device_get_match_data(&pdev->dev);
+>  
+>  	/* Added for PCI abort handling */
+>  	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
+> @@ -623,7 +633,7 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  		return PTR_ERR(imx6_pcie->pcie);
+>  	}
+>  
+> -	if (imx6_pcie->is_imx6sx) {
+> +	if (imx6_pcie->variant == IMX6SX) {
+>  		imx6_pcie->pcie_inbound_axi = devm_clk_get(&pdev->dev,
+>  							   "pcie_inbound_axi");
+>  		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
+> @@ -679,8 +689,8 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
+>  }
+>  
+>  static const struct of_device_id imx6_pcie_of_match[] = {
+> -	{ .compatible = "fsl,imx6q-pcie", },
+> -	{ .compatible = "fsl,imx6sx-pcie", },
+> +	{ .compatible = "fsl,imx6q-pcie",  .data = (void *)IMX6Q,  },
+> +	{ .compatible = "fsl,imx6sx-pcie", .data = (void *)IMX6SX, },
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
+> -- 
+> 2.5.5
+> 
 > --
-> 2.1.4
->
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
