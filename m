@@ -1,13 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 2 May 2016 16:35:20 +0200
-Subject: [GIT PULL] ARM: mediatek: kconfig updates for v4.7
-Message-ID: <CABuKBeLwgcZ10pcSoOBnOFhFOMzr9sjoj28Qbi1pqAXGt0h0GQ@mail.gmail.com>
+Date: Mon, 2 May 2016 16:37:23 +0200
+Subject: [GIT PULL] ARM: mediatek: dts updates for v4.7
+Message-ID: <CABuKBe+jtD4nLXFrxTxKJ_Fq9t9D9a_ibXsSkvvZw5e5p_fZeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-Please take the following patches for v4.7.
+Please take the following updates.
 
 Thanks,
 Matthias
@@ -20,19 +20,30 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  https://github.com/mbgg/linux-mediatek.git tags/v4.6-next-kconfig
+  https://github.com/mbgg/linux-mediatek.git tags/v4.6-next-dts
 
-for you to fetch changes up to d86786474babdf1a2b0dfe245e38f18afc203cc2:
+for you to fetch changes up to 610175b7972afc78f0e4a622a17a32b1fccad4bf:
 
-  ARM: mediatek: Add MT2701 config options for mediatek SoCs.
-(2016-04-13 11:31:56 +0200)
-
-----------------------------------------------------------------
-Add mt2701 support
+  dt-bindings: MediaTek: Add binding document for the AUXADC
+(2016-04-20 13:32:57 +0200)
 
 ----------------------------------------------------------------
-Erin Lo (1):
-      ARM: mediatek: Add MT2701 config options for mediatek SoCs.
+- add pinctrl node for mt2701
+- add mt2701 pmic wrapper binding
+- add auxadc binding document
 
- arch/arm/mach-mediatek/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+----------------------------------------------------------------
+Biao Huang (1):
+      arm: dts: Add pinctrl/GPIO/EINT node for mt2701
+
+John Crispin (1):
+      dt-bindings: ARM: Mediatek: add MT2701/7623 string to the PMIC wrapper doc
+
+Sascha Hauer (1):
+      dt-bindings: MediaTek: Add binding document for the AUXADC
+
+ .../devicetree/bindings/soc/mediatek/auxadc.txt     | 21 +++++++++++++++++++++
+ .../devicetree/bindings/soc/mediatek/pwrap.txt      |  1 +
+ arch/arm/boot/dts/mt2701.dtsi                       | 19 +++++++++++++++++++
+ 3 files changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
