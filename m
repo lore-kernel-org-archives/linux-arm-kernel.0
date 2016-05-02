@@ -1,103 +1,80 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 2 May 2016 15:39:53 +0530
-Subject: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
- device tree binding documentation
-In-Reply-To: <5721D38A.8010501@metafoo.de>
-References: <1461740729-30715-1-git-send-email-appanad@xilinx.com>
- <57206632.7010508@metafoo.de>
- <C246CAC1457055469EF09E3A7AC4E11A4A57B840@XAP-PVEXMBX01.xlnx.xilinx.com>
- <5720B333.4000804@metafoo.de>
- <C246CAC1457055469EF09E3A7AC4E11A4A57C2E2@XAP-PVEXMBX01.xlnx.xilinx.com>
- <5721D38A.8010501@metafoo.de>
-Message-ID: <20160502100953.GJ2274@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 May 2016 11:10:30 +0100
+Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
+In-Reply-To: <CAHB_Guq+w7JKXEpLHkefMaYuYowh7dqsdvxgG_dnGv-GdkX39A@mail.gmail.com>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
+ <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <20160429180024.GS19428@n2100.arm.linux.org.uk>
+ <CAHB_GuqhPJ7J-MNbjxqeQnogW-J6=Bt2e1STKSG5kzJT+4PJpg@mail.gmail.com>
+ <20160430082055.GG19428@n2100.arm.linux.org.uk>
+ <CAHB_Guq+w7JKXEpLHkefMaYuYowh7dqsdvxgG_dnGv-GdkX39A@mail.gmail.com>
+Message-ID: <20160502101030.GK19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 11:10:34AM +0200, Lars-Peter Clausen wrote:
-> >> -----Original Message-----
-> >> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
-> >> Sent: Wednesday, April 27, 2016 6:10 PM
-> >> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>;
-> >> robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> >> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> >> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> >> vinod.koul at intel.com; dan.j.williams at intel.com; moritz.fischer at ettus.com;
-> >> laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Anirudha
-> >> Sarangi <anirudh@xilinx.com>; Punnaiah Choudary Kalluri
-> >> <punnaia@xilinx.com>
-> >> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> >> kernel at vger.kernel.org; dmaengine at vger.kernel.org
-> >> Subject: Re: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
-> >> device tree binding documentation
+On Mon, May 02, 2016 at 01:04:28PM +0530, Pratyush Anand wrote:
+> On Sat, Apr 30, 2016 at 1:50 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sat, Apr 30, 2016 at 08:57:34AM +0530, Pratyush Anand wrote:
+> >> On Fri, Apr 29, 2016 at 11:30 PM, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Fri, Apr 29, 2016 at 08:26:00PM +0530, Pratyush Anand wrote:
+> >> >> Hi Russell,
+> >> >>
+> >> >> On Thu, Apr 28, 2016 at 2:58 PM, Russell King
+> >> >> <rmk+kernel@arm.linux.org.uk> wrote:
+> >> >> > Advertise the location of bootable RAM to kexec-tools.  kexec needs to
+> >> >> > know where it can place the kernel in RAM, and so be executable when
+> >> >> > the system needs to jump into it.
+> >> >> >
+> >> >> > Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
+> >> >> > tag.
+> >> >> >
+> >> >> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >> >>
+> >> >> Can you please also share git tree path of corresponding kexec-tools changes?
+> >> >>
+> >> >> Could it be a better idea (if things in user space become simpler)
+> >> >> that in stead of patch 5 and 6, we pass arch_phys_to_idmap_offset to
+> >> >> user space, and then user space manipulates existing "Crash kernel"
+> >> >> and "System RAM" resources.
+> >> >
+> >> > Given that it's only _one_ platform right now, I don't think that
+> >> > additional complexity is worth it.  It means that we have to invent
 > >>
-> >> On 04/27/2016 09:33 AM, Appana Durga Kedareswara Rao wrote:
-> >>> Hi Lars,
-> >>>
-> >>>> -----Original Message-----
-> >>>> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
-> >>>> Sent: Wednesday, April 27, 2016 12:42 PM
-> >>>> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>;
-> >>>> robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> >>>> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> >>>> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> >>>> vinod.koul at intel.com; dan.j.williams at intel.com; Appana Durga
-> >>>> Kedareswara Rao <appanad@xilinx.com>; moritz.fischer at ettus.com;
-> >>>> laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Anirudha
-> >>>> Sarangi <anirudh@xilinx.com>; Punnaiah Choudary Kalluri
-> >>>> <punnaia@xilinx.com>
-> >>>> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >>>> linux- kernel at vger.kernel.org; dmaengine at vger.kernel.org
-> >>>> Subject: Re: [PATCH v7 1/2] Documentation: DT: dma: Add Xilinx zynqmp
-
-PLEASE strip the crap from your MUA, better use a linux MUA
-
-
-> >>>>> +- xlnx,include-sg	: Indicates the controller to operate in simple or
-> >>>>> +			  scatter gather dma mode
-> >>>>> +- xlnx,ratectrl		: Scheduling interval in terms of clock cycles for
-> >>>>> +			  source AXI transaction
-> >>>>> +- xlnx,overfetch	: Tells whether the channel is allowed to over
-> >>>>> +			  fetch the data
-> >>>>> +- xlnx,src-issue	: Number of AXI outstanding transactions on source
-> >>>> side
-> >>>>> +- xlnx,src-burst-len	: AXI length for data read. Support only power of
-> >>>>> +			  2 byte values.
-> >>>>> +- xlnx,dst-burst-len	: AXI length for data write. Support only power of
-> >>>>
-> >>>> These are all software runtime configuration parameters that you'd
-> >>>> want to change at runtime depending on which peripheral you are
-> >>>> targeting with a specific DMA transfer. These really do not belong into the
-> >> devicetree.
-> >>>
-> >>> You mean to have a separate config structure in the driver and handle
-> >>> the above parameters Through that structure???
-> >>>
-> >>> I understand that above will work for slave dma transfer types what
-> >>> about memory to memory Transfers where we don't have provision to the use
-> >> this parameters...
-> >>
-> >> These parameters are just as application specific as e.g. the DMA
-> >> source/destination address or the DMA transfer length. If you want to use the
-> >> DMA controller in a different configuration you'd have to re-compile the DTB
-> >> and reboot your board, that is not really practical. Especially considering that
-> >> you'd typically have multiple applications using the DMA controller in different
-> >> configurations concurrently. In general if I have to reconfigure the DT depending
-> >> on what application software is running something is fundamentally broken.
-> >>
-> >> Derive these parameters at runtime depending on the requested transfer. E.g.
-> >> some transfer types only work in SG mode, others only work in non-SG modes.
-> >> For those which can work in both modes choose the one that is more efficient.
-> >> Similar for the other parameters.
-> > 
-> > Ok will fix in the next version...
-> > Will use module_params for the above properties.
+> >> Probably, I could not communicate it well.  I was not trying  to have
+> >> *additional* complexity. Wanted to see if things could be simpler
+> >> rather. So this is what my understanding was:
+> >> -- We create one patch to pass arch_phys_to_idmap_offset to user space
+> >> (say in /sys/kernel/bootmem_idmap_offset)
+> >> -- We do not use patch 5,6,11 and 12 of this series. Probably few more
+> >> content of the series will go away.
+> >
+> > Patches 11 and 12 don't go away with what you're suggesting.  Patches
+> > 11 and 12 are necessary to allow the boot-view addresses to be passed
+> > into the kernel through kexec, and to allow kexec to find appropriate
+> > memory resources.
 > 
-> Sorry, but that is just as broken. You need to derive those parameters from
-> the DMA transfer as they are transfer specific.
+> But once we would have manipulated "start" and "end" of "Crash Kernel"
+> and "System RAM" resources in user space using
+> /sys/kernel/bootmem_idmap_offset , then kernel through kexec system
+> call would have already receive boot-view addresses, no?
 
-Right, for memcpy you should derive the parameters. Frankly burst size
-and lengths, rate control should be set to maximun to achives best
-performance on mecpy.  People want memcpy to be done asap
+Correct, but that's still a problem for all the reasons I gave in the
+email to which you replied to.
+
+I'm not sure where the misunderstanding is.
+
+Let me repeat: even if we do what you're suggesting, patches 11 and 12
+do *not* go away.  I've explained in detail why each of the changes are
+necessary (which you have cut from your reply.)
+
+In other words: exporting this offset via
+/sys/kernel/bootmem_idmap_offset is technically inferior to the solution
+I have come up with here, and it saves very little complexity and code.
 
 -- 
-~Vinod
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
