@@ -1,80 +1,54 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 2 May 2016 14:29:08 +0200
-Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
-In-Reply-To: <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
- <572379F5.8000501@i2se.com> <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
- <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
-Message-ID: <57274814.3090208@i2se.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 2 May 2016 14:43:56 +0200
+Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <20160427111758.GA6234@red-moon>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-3-git-send-email-tn@semihalf.com>
+ <20160427022649.GD6789@localhost> <20160427111758.GA6234@red-moon>
+Message-ID: <57274B8C.5030304@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harald,
-
-Am 01.05.2016 um 20:02 schrieb Jonathan Cameron:
-> On 29/04/16 18:45, Harald Geyer wrote:
->> Hi Stefan!
+On 04/27/2016 01:17 PM, Lorenzo Pieralisi wrote:
+> On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
+>> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
+[...]
+>>   
+>> +int acpi_pci_bus_domain_nr(struct device *parent)
+>> +{
+>> +	struct acpi_device *acpi_dev = to_acpi_device(parent);
+>> +	unsigned long long segment = 0;
+>> +	acpi_status status;
+>> +
+>> +	/*
+>> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
+>> +	 * all PCI buses belong to domain 0.
+>> +	 */
+>> +	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
+>> +				       &segment);
+>> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
+>> don't want to evaluate it *twice*, do we?
 >>
->> On 29.04.2016 17:12, Stefan Wahren wrote:
->>> Hi Harald,
->>>
->>> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
->>>> Patch 1/3 changes the driver and updates the binding documentation
->>>> (I guess it is still in staging.)
->>>>
->>>> Patches 2/3 and 3/3 add the devicetree nodes to imx23 and imx28 boards.
->>>> I'd like to get input whether this is actually desired. On boards where
->>>> these regulators would never be enabled this costs a few extra bytes of
->>>> RAM for allocation of the device data, because the nodes can't be easily
->>>> removed in .dts files which are including the .dtsi files. The alternative
->>>> is to add the new nodes to many .dts files, which would be a lot code
->>>> duplication.
->>> if i get it right the real intention of this patch series is to make the
->>> mxs-lradc provide resistance values instead of voltages.
->> ... or even temperature values if a thermistor is connected.
->>
->>> So how about
->>> dropping the whole regulator stuff and provide the values as
->>> IIO_RESISTANCE via iio interface?
->> Can you elaborate on this?
->>
->> My thinking is that there should be a thermistor (or whatever else) driver,
->> that is a consumer of the regulator and a consumer of the IIO_VOLTAGE
->> iio channel and provides a new device with an IIO_RESISTANCE or IIO_TEMP
->> channel. Maybe there is a simpler solution, that I'm missing?
-> I agree with that approach - need a way to describe the upstream hardware - so
-> will need a thermistor driver
+>> I was sort of expecting that if you added it here, we'd remove the
+>> existing call, but it looks like you're keeping both?
+> We can't remove the existing call, since it is used on X86 and IA64
+> to store the segment number that, in the process, is used in their
+> pci_domain_nr() arch specific callback to retrieve the domain nr.
+>
+> On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
+> to retrieve the domain number that is not arch dependent, since
+> this is generic code, we can't rely on any bus->sysdata format (unless
+> we do something like JC did below), therefore the only way is to call
+> the _SEG method *again* here, which also forced Tomasz to go through
+> the ACPI_COMPANION setting song and dance and pass the parent pointer
+> to pci_create_root_bus() (see patch 1), which BTW is a source of
+> trouble on its own as you noticed.
+What trouble in patch 1 do you mean? I may miss something.
 
-okay, this makes more sense to me. In this case it would be good to have
-this new driver in this patch series. So it's possible to verify the
-matching binding.
+I agree that patch 1 is not necessary if we decide to use sysdata or 
+rework root bus scanning to move domain to host bridge. Nevertheless, 
+patch 1 is still a cleanup IMO.
 
->> Actually I'm not 100% happy with the above solution myself, because if we
->> start supporting devices that act as an iio-multiplexer (some device that
->> is an iio consumer and provides many new iio channels and can control
->> via gpios which of it child channels is actually routed to the upstream
->> device) I don't know how to properly manage the regulator device.
-> Hmm. Are you talking about muxing the regulator as well?  That will get
-> complex indeed.  Might be possible to cheat and imply the regulators are
-> always connected to all inputs...  or do you want to dynamically change
-> the regulator output?  That gets messy fast - though in theory might be
-> possible...
->> However since this is only hypothetical ATM, I think we don't have to
->> worry about this too much.
->>
->>> Btw this feature should be only added to dts files where is actually used.
->> Ok, so how do we figure out which boards these are?
->> I use this on the olinuxino and I guess all evaluation boards support the
->> use case too. The others I don't know enough about to be sure and I guess
->> it's not a good idea to just wait until somebody speaks up and complains
->> that the feature is missing on board X ...
-
-The imx23 dtsi file specifies features on SoC level and i think this
-should be kept. We shouldn't implement features for ADC pins without
-deeper knowledge about these boards.
-
-Maybe we could introduce a new dtsi file in order to reduce copy &
-paste. But at first the OlinuXino should be a good starting point ...
-
-Regards
-Stefan
+Thanks,
+Tomasz
