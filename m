@@ -1,41 +1,43 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 02 May 2016 08:34:28 -0700
-Subject: [PATCH v5] ARM: bcm2835: dt: Add the ethernet to the device trees
-In-Reply-To: <1462172811-24206-1-git-send-email-lkundrak@v3.sk>
-References: <1462172811-24206-1-git-send-email-lkundrak@v3.sk>
-Message-ID: <8737q0iid7.fsf@eliezer.anholt.net>
+Date: Mon, 02 May 2016 08:36:18 -0700
+Subject: [PATCH V4 1/2] clk: bcm2835: mark enabled clocks with
+ CLK_IS_CRITICAL
+In-Reply-To: <1461951756-16804-2-git-send-email-kernel@martin.sperl.org>
+References: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
+ <1461951756-16804-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87zis8h3pp.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lubomir Rintel <lkundrak@v3.sk> writes:
+kernel at martin.sperl.org writes:
 
-> The hub and the ethernet in its port 1 are hardwired on the board.
+> From: Martin Sperl <kernel@martin.sperl.org>
 >
-> Compared to the adapters that can be plugged into the USB ports, this
-> one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
-> has the MAC address for this adapter in its ROM, accessible from its
-> firmware.
+> The bcm2835 firmware enables several clocks and plls before
+> booting the linux kernel.
 >
-> U-Boot can read out the address and set the local-mac-address property of the
-> node with "ethernet" alias. Let's add the node so that U-Boot can do its
-> business.
+> These plls should never get disabled as it may result in a
+> stopped system clock and more.
 >
-> Model B rev2 and Model B+ entries were verified by me, the hierarchy and
-> pid/vid pair for the Version 2 was provided by Peter Chen. Original
-> Model B is a blind shot, though very likely correct.
+> So during probing we check if the clock is enabled
+> and if it is then mark that clock with CLK_IS_CRITICAL.
 >
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
+> As a consequence this will also enable the corresponding
+> parent plls and pll-divs.
+>
+> This is intended as a stop-gap until CLK_ENABLE_HAND_OFF
+> becomes available, at which point it should be used instead.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-Applied to bcm2835-dt-next locally.  We've already sent out pull
-requests for 4.7, so I'll push it once 4.7-rc1 happens.
-
-Thanks!
+I still think that we don't want this patch.  We should be able to
+disable clocks that the firmware turned on, unless they really need to
+stay on.  If you have troubles on the upstream DT, let's talk about
+individual clocks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/5a998f3f/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/6d3b4a8c/attachment.sig>
