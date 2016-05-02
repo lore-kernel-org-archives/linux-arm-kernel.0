@@ -1,63 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 May 2016 08:46:45 +0200
-Subject: [PATCH v2 1/1] add missing UARTs pins and I2C entriesfor
- AllWinner H3 DTSI
-In-Reply-To: <CAKQ8BtjPhfJC+njOUvo-4ZQ+Oj==LqQEhJ1LQROjY85hswE9Mg@mail.gmail.com>
-References: <CAKQ8BtjPhfJC+njOUvo-4ZQ+Oj==LqQEhJ1LQROjY85hswE9Mg@mail.gmail.com>
-Message-ID: <20160502064645.GK17159@lukather>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 2 May 2016 08:47:15 +0200
+Subject: [PATCH v6] spi: orion.c: Add direct access mode
+In-Reply-To: <1461147068-4829-1-git-send-email-sr@denx.de>
+References: <1461147068-4829-1-git-send-email-sr@denx.de>
+Message-ID: <5726F7F3.9070700@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Apr 19, 2016 at 03:50:39PM -0400, Martin Ayotte wrote:
-> Hi everyone,
+On 20.04.2016 12:11, Stefan Roese wrote:
+> This patch adds support for the direct write mode to the Orion SPI
+> driver which is used on the Marvell Armada based SoCs. In this direct
+> mode, all data written to (or read from) a specifically mapped MBus
+> window (linked to one SPI chip-select on one of the SPI controllers)
+> will be transferred directly to the SPI bus. Without the need to control
+> the SPI registers in between. This can improve the SPI transfer rate in
+> such cases.
 > 
-> This patch is submit to provide endusers access to additional UARTs on
-> AllWinner H3 SoC along with I2C ports.
+> Currently only the direct write mode is supported. This mode especially
+> benefits from the SPI direct mode, as the data bytes are written
+> head-to-head to the SPI bus, without any additional addresses, that
+> are also written in the direct read mode.
+> 
+> One use-case for this direct write mode is, programming a FPGA bitstream
+> image into the FPGA connected to the SPI bus at maximum speed.
+> 
+> This mode is described in chapter "22.5.2 Direct Write to SPI" in the
+> Marvell Armada XP Functional Spec Datasheet.
+> 
+> It should be possible to support SPI-NOR and SPI-NAND devices via
+> this direct access mode as well. But this needs further work, e.g.:
+> - The mapping of the MBus window needs to get extended to span
+>    the complete flash device size
+> - The address / control data needs to get inserted into the SPI
+>    controller registers
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mark Brown <broonie@kernel.org>
 
-Unfortunately, your patch cannot be applied in its current form, both
-because of process and technical reasons:
+Its been a while since v6 of this direct write access mode has been
+posted. This is a gentle ping on its status.
 
-  * Every commits should have a commit title and log. While you do
-    have a title, you used the log to store your cover letter. This is
-    an issue, because that will be kept in the git history, which is
-    obviously something we don't want.
-    If you want to make a cover letter, you can either send it as a
-    separate mail, or after the "---" below that will be ignored when
-    applying the mails.
-    On the other hand, the commit log should be used to say why ?our
-    doing this patch and why it was needed.
-
-  * You do not have a Signed-off-by tag in your commit log. This and
-    the point above is documented in Documentation/SubmittingPatches,
-    please make sure to read that first.
-
-  * Your mailer completely corrupted the patch when you sent it,
-    replacing all tabs by spaces, and wrapping the longer lines. That
-    means that the patch cannot be applied anymore. Please fix your
-    mailer, or use one that just works, like git send-email.
-
-  * Finally, like Chen-Yu already told you, you're doing several
-    different things here in a single patch, while you should have
-    done separate patches. From what I can see, you're adding pinctrl
-    groups for the uart and i2c pins, and adding the i2c controller
-    nodes. That should have been ideally 3 patches: 1 for the uart
-    pinctrl groups, 1 for the i2c pinctrl groups, 1 for the i2c
-    controller nodes. We also don't take pinctrl groups that are not
-    enabled on any boards to keep the DT size as small as possible.
+Arnd / Mark, do you have any additional change requests or are you okay
+with the current version?
 
 Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/9ea79816/attachment.sig>
+Stefan
