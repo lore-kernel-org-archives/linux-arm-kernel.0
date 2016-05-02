@@ -1,109 +1,52 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon,  2 May 2016 19:36:13 +0100
-Subject: [PATCH v3 1/2] nvmem: mtk-efuse: remove nvmem regmap dependency
-In-Reply-To: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1462214174-469-2-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Mon,  2 May 2016 19:36:12 +0100
+Subject: [PATCH v3 0/2] nvmem: remove regmap dependency
+Message-ID: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regmap raw accessors are bus specific implementations, using regmap raw
-apis in nvmem breaks nvmem providers based on regmap mmio.
-This patch moves to nvmem support in the driver to use callback
-instead of regmap, which is what the nvmem core supports now.
+Hi Greg, 
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
+This is v3 patchset for the leftover 2 patches for nvmem regmap
+removal series [1]. These patches are based on char-misc tree.
+
+nvmem uses regmap_raw_read/write apis to read/write data from providers,
+With recent patch 922a9f936e40 ("regmap: mmio: Convert to regmap_bus
+and fix accessor usage") nvmem providers based on regmap-mmio stopped
+working, as nvmem core was using raw accessors.
+This issue can be fixed temporarly by moving to other regmap apis,
+but we might hit same issue in future, and regmap looks like an
+overdo for nvmem. Moving to interfaces based on read/write callbacks
+from providers would be more robust.
+
+This patchset converts the nvmem core and nvmem provider drivers to
+use the new callbacks. Tested this patchset on qfprom and at24 drivers.
+Other driver are only compile tested, any testing on them would be great.
+
+Most of the patches have been applied to char-misc tree, these are the
+two patches which had some outstanding comments on mxs nvmemprovider,
+which are now fixed.
+
+Changes since v2:
+ - Fixed the mxs size and dt data pointer spotted by Stefan and Fabio
+
+Changes since v1:
+ - rebased mtk-efuse on top of char-misc
+ - addressed concerns raised by Stefan Wahren.
+
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1130026.html
+
+Thanks,
+srini
+
+Srinivas Kandagatla (2):
+  nvmem: mtk-efuse: remove nvmem regmap dependency
+  nvmem: mxs-ocotp: remove nvmem regmap dependency
+
  drivers/nvmem/Kconfig     |  1 -
- drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++++++++++++++++---------------
- 2 files changed, 32 insertions(+), 16 deletions(-)
+ drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++---------
+ drivers/nvmem/mxs-ocotp.c | 83 +++++++++++++----------------------------------
+ 3 files changed, 54 insertions(+), 77 deletions(-)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 3041d48..5ff2189 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -50,7 +50,6 @@ config MTK_EFUSE
- 	tristate "Mediatek SoCs EFUSE support"
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
- 	depends on HAS_IOMEM
--	select REGMAP_MMIO
- 	help
- 	  This is a driver to access hardware related data like sensor
- 	  calibration, HDMI impedance etc.
-diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-index 9c49369..32fd572 100644
---- a/drivers/nvmem/mtk-efuse.c
-+++ b/drivers/nvmem/mtk-efuse.c
-@@ -14,15 +14,35 @@
- 
- #include <linux/device.h>
- #include <linux/module.h>
-+#include <linux/io.h>
- #include <linux/nvmem-provider.h>
- #include <linux/platform_device.h>
--#include <linux/regmap.h>
- 
--static struct regmap_config mtk_regmap_config = {
--	.reg_bits = 32,
--	.val_bits = 32,
--	.reg_stride = 4,
--};
-+static int mtk_reg_read(void *context,
-+			unsigned int reg, void *_val, size_t bytes)
-+{
-+	void __iomem *base = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		*val++ = readl(base + reg + (i++ * 4));
-+
-+	return 0;
-+}
-+
-+static int mtk_reg_write(void *context,
-+			 unsigned int reg, void *_val, size_t bytes)
-+{
-+	void __iomem *base = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		writel(*val++, base + reg + (i++ * 4));
-+
-+	return 0;
-+}
- 
- static int mtk_efuse_probe(struct platform_device *pdev)
- {
-@@ -30,7 +50,6 @@ static int mtk_efuse_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct nvmem_config *econfig;
--	struct regmap *regmap;
- 	void __iomem *base;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -42,14 +61,12 @@ static int mtk_efuse_probe(struct platform_device *pdev)
- 	if (!econfig)
- 		return -ENOMEM;
- 
--	mtk_regmap_config.max_register = resource_size(res) - 1;
--
--	regmap = devm_regmap_init_mmio(dev, base, &mtk_regmap_config);
--	if (IS_ERR(regmap)) {
--		dev_err(dev, "regmap init failed\n");
--		return PTR_ERR(regmap);
--	}
--
-+	econfig->stride = 4;
-+	econfig->word_size = 4;
-+	econfig->reg_read = mtk_reg_read;
-+	econfig->reg_write = mtk_reg_write;
-+	econfig->size = resource_size(res);
-+	econfig->priv = base;
- 	econfig->dev = dev;
- 	econfig->owner = THIS_MODULE;
- 	nvmem = nvmem_register(econfig);
 -- 
 2.5.0
