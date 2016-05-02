@@ -1,22 +1,29 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 2 May 2016 17:22:48 +0200
-Subject: [question] pread2, pwrite2 unistd symbols for compat
-In-Reply-To: <9552994.HgmuyIW9Ty@wuerfel>
-References: <20160502134706.GA11396@yury-N73SV> <9552994.HgmuyIW9Ty@wuerfel>
-Message-ID: <20160502152248.GA716@lst.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon,  2 May 2016 16:22:56 +0100
+Subject: [PATCH v2 0/2] nvmem: remove regmap dependency
+Message-ID: <1462202578-15433-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 05:20:22PM +0200, Arnd Bergmann wrote:
-> After I got the original patch from Andre and the same one from Christoph,
-> I did not consider the possibility that they were both wrong and so I
-> applied Andre's version.
+Hi Greg, 
 
-It's because adding syscalls is simple a giant pain, full of pitfalls
-that are completely non-obvious.  When asked to add syscalls for
-architectures I can't personally test I'll have to rely on the test
-bot giving me some feedback - and it seems the wrong thing here will
-just silently pass without any notice.
+This is v2 patchset for the leftover 2 patches on top of char-misc tree.
 
-The change looks fine to me, but then again I just demonstrated a complete
-lack of clue on asm-generic syscalls..
+Changes since v1:
+ - rebased mtk-efuse on top of char-misc
+ - addressed concerns raised by Stefan Wahren.
+
+Thanks,
+srini
+
+Srinivas Kandagatla (2):
+  nvmem: mtk-efuse: remove nvmem regmap dependency
+  nvmem: mxs-ocotp: remove nvmem regmap dependency
+
+ drivers/nvmem/Kconfig     |  1 -
+ drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++---------
+ drivers/nvmem/mxs-ocotp.c | 81 +++++++++++++----------------------------------
+ 3 files changed, 54 insertions(+), 75 deletions(-)
+
+-- 
+2.5.0
