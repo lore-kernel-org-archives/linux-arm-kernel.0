@@ -1,88 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 2 May 2016 13:16:37 +0100
-Subject: [PATCH v2 17/54] KVM: arm/arm64: vgic-new: Add GICv2 world
- switch backend
-In-Reply-To: <1461861973-26464-18-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-18-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160502131637.054b6b23@arm.com>
+From: harald@ccbib.org (Harald Geyer)
+Date: Mon, 02 May 2016 14:25:00 +0200
+Subject: [PATCH 0/3] mxs-lradc: Add support for current sources
+In-Reply-To: <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <572379F5.8000501@i2se.com> <aadb3f41413d093312c0af3e4c207a8a@ccbib.org>
+ <ac57f3e9-f8f2-a6ef-52fa-0a13d7df5d4f@kernel.org>
+Message-ID: <a0d59747ffca9d900feecece4cfcae82@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2016 17:45:36 +0100
-Andre Przywara <andre.przywara@arm.com> wrote:
+On 01.05.2016 20:02, Jonathan Cameron wrote:
+> On 29/04/16 18:45, Harald Geyer wrote:
+>> My thinking is that there should be a thermistor (or whatever else) 
+>> driver,
+>> that is a consumer of the regulator and a consumer of the 
+>> IIO_VOLTAGE
+>> iio channel and provides a new device with an IIO_RESISTANCE or 
+>> IIO_TEMP
+>> channel. Maybe there is a simpler solution, that I'm missing?
+> I agree with that approach - need a way to describe the upstream
+> hardware - so
+> will need a thermistor driver
+>>
+>> Actually I'm not 100% happy with the above solution myself, because 
+>> if we
+>> start supporting devices that act as an iio-multiplexer (some device 
+>> that
+>> is an iio consumer and provides many new iio channels and can 
+>> control
+>> via gpios which of it child channels is actually routed to the 
+>> upstream
+>> device) I don't know how to properly manage the regulator device.
+> Hmm. Are you talking about muxing the regulator as well?  That will 
+> get
+> complex indeed.  Might be possible to cheat and imply the regulators 
+> are
+> always connected to all inputs...  or do you want to dynamically 
+> change
+> the regulator output?  That gets messy fast - though in theory might 
+> be
+> possible...
 
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Processing maintenance interrupts and accessing the list registers
-> are dependent on the host's GIC version.
-> Introduce vgic-v2.c to contain GICv2 specific functions.
-> Implement the GICv2 specific code for syncing the emulation state
-> into the VGIC registers.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - remove explicit LR_STATE clearing on maintenance interrupt handling
-> - improve documentation for vgic_v2_populate_lr()
-> - remove WARN_ON on non-edge IRQs in maintenance interrupts
-> - simplify multi-CPU source SGI handling
-> 
-> Changelog v1 .. v2:
-> - inject the IRQ priority into the list register
-> 
->  include/linux/irqchip/arm-gic.h |   1 +
->  virt/kvm/arm/vgic/vgic-v2.c     | 178 ++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.c        |  19 ++---
->  virt/kvm/arm/vgic/vgic.h        |   6 ++
->  4 files changed, 194 insertions(+), 10 deletions(-)
->  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
-> 
-
-[...]
-
-> @@ -441,14 +447,12 @@ static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
->  static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> -	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> -	u32 model = dist->vgic_model;
->  	struct vgic_irq *irq;
->  	int count = 0;
->  
->  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(vgic_cpu->ap_list_lock));
->  
-> -	if (unlikely(!dist->enabled))
-> +	if (unlikely(!vcpu->kvm->arch.vgic.enabled))
->  		goto out_clean;
->  
->  	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr) {
-> @@ -466,14 +470,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
->  		 * If we get an SGI with multiple sources, try to get
->  		 * them in all at once.
->  		 */
-> -		if (model == KVM_DEV_TYPE_ARM_VGIC_V2 &&
-> -		    vgic_irq_is_sgi(irq->intid)) {
-> -			while (irq->source &&
-> -			       count < kvm_vgic_global_state.nr_lr)
-> -				vgic_populate_lr(vcpu, irq, count++);
-> -		} else {
-> +		do {
->  			vgic_populate_lr(vcpu, irq, count++);
-> -		}
-> +		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
->  
->  next:
-
-Most, if not all of the changes in this function should be folded in the
-previous patch, as we only have generic code in this file (this looks
-like a leftover from an earlier rework).
+Yes, that's a good summary of what I'm thinking. As there is no
+iio-multiplexer yet, this is sort of an academic question. But it's
+kind of an obvious thing to want, so we shouldn't be surprised when
+somebody actually starts working on that.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Harald
