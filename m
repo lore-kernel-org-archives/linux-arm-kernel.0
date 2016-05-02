@@ -1,83 +1,152 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 2 May 2016 10:32:14 +0200
-Subject: [PATCH v2 6/9] pinctrl: Add IRQ support to STM32 gpios
-In-Reply-To: <CACRpkdbW133h_HNXhszzk2MdtMyrX5WBC_5GnqD5wrmo=yT27A@mail.gmail.com>
-References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
- <CALszF6CUFKAjzUpEh3pDtSDdJuFan1ON0Kcu_uKD_OX36kXOHQ@mail.gmail.com>
- <CACRpkdZXz8-UnOd6ee48AWqDX2X9Hvux=+ZQ7qdg6a4KVoArww@mail.gmail.com>
- <CALszF6D1nPJ8NVghWo27y1KABwN7-QQfjPTmgY2pgdY_8jjkTQ@mail.gmail.com>
- <CACRpkdbW133h_HNXhszzk2MdtMyrX5WBC_5GnqD5wrmo=yT27A@mail.gmail.com>
-Message-ID: <CALszF6C7_9pZt-xywczinNFDppmwWmJjwrjVGyx6VL08yJFxgA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 2 May 2016 10:38:50 +0200
+Subject: [PATCH v2 32/54] KVM: arm/arm64: vgic-new: Add GICv3 MMIO
+ handling framework
+In-Reply-To: <57236E3B.2000501@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-33-git-send-email-andre.przywara@arm.com>
+ <572369F0.20704@arm.com> <57236E3B.2000501@arm.com>
+Message-ID: <20160502083850.GC963@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-04-30 13:32 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Apr 29, 2016 at 1:19 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->> It looks like this: http://pastebin.com/raw/cs2WiNKZ
->> You can directly check section 12.2.5 of the stm32f429 reference manual:
->> http://www2.st.com/resource/en/reference_manual/dm00031020.pdf
->
-> Nice ASCII art, include that into the commit message :)
+On Fri, Apr 29, 2016 at 03:22:51PM +0100, Vladimir Murzin wrote:
+> On 29/04/16 15:04, Vladimir Murzin wrote:
+> > Hi Andre,
+> > 
+> > On 28/04/16 17:45, Andre Przywara wrote:
+> >> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+> >> +{
+> >> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+> >> +	struct kvm_vcpu *vcpu;
+> >> +	struct vgic_io_device *devices, *device;
+> >> +	int c, ret = 0;
+> >> +
+> >> +	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+> >> +			  GFP_KERNEL);
+> >> +	if (!devices)
+> >> +		return -ENOMEM;
+> >> +
+> >> +	device = devices;
+> >> +	kvm_for_each_vcpu(c, vcpu, kvm) {
+> >> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
+> >> +		device->base_addr = redist_base_address;
+> >> +		device->regions = vgic_v3_redist_registers;
+> >> +		device->nr_regions = ARRAY_SIZE(vgic_v3_redist_registers);
+> >> +		device->redist_vcpu = vcpu;
+> >> +
+> >> +		mutex_lock(&kvm->slots_lock);
+> >> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+> >> +					      redist_base_address,
+> >> +					      SZ_64K, &device->dev);
+> >> +		mutex_unlock(&kvm->slots_lock);
+> >> +
+> >> +		if (ret)
+> >> +			break;
+> >> +
+> >> +		device++;
+> >> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
+> >> +		device->base_addr = redist_base_address + SZ_64K;
+> >> +		device->regions = vgic_v3_private_registers;
+> >> +		device->nr_regions = ARRAY_SIZE(vgic_v3_private_registers);
+> >> +		device->redist_vcpu = vcpu;
+> >> +
+> >> +		mutex_lock(&kvm->slots_lock);
+> >> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+> >> +					      redist_base_address + SZ_64K,
+> >> +					      SZ_64K, &device->dev);
+> >> +		mutex_unlock(&kvm->slots_lock);
+> >> +		if (ret) {
+> >> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> >> +						  &devices[c * 2].dev);
+> >> +			break;
+> >> +		}
+> >> +		device++;
+> >> +		redist_base_address += 2 * SZ_64K;
+> >> +	}
+> > 
+> > Can we put cond_resched() somewhere in kvm_for_each_vcpu to avoid
+> 
+> Apologies, it seems to come from kvm_io_bus infrastructure.
+> 
+The stack trace seems to indicate that this comes from the fact that the
+kvm_io_bus logic does a full heapsort on the regions for every
+insertion.  (My analysis skills fails me here as I have no idea what an
+arithmetic series of an n*log(n) bound is.)
 
-I will! :)
+But if that's the case, then the io_bus framework must either implement
+a more clever insertion logic using a better data structure which
+optimizes for this case, or provide a way to lock the whole thing,
+insert unsorted, and sort in the end.
 
->
->> For example, we can imagine a board where gpioa0 is used SD's card detect,
->> and gpiob0 used to control a led.
->>
->> If we set the mux at request time, gpiob0 request may overwrite the mux
->> configuration set by gpioa0, whereas it is not used as interrupt.
->>
->> That is the reason why I did it in .to_irq().
->
-> Well now I am even *more* convinced that this should not happen in
-> .to_irq(). .to_irq() should not do *anything*.
->
-> This needs to happen as part of the irqchip setting up the actual
-> interrupt.
->
-> And it seems the problem is that this driver does *not* define its
-> own irqchip, but it *should*.
->
-> What you want to do is implement an hierarchical irqdomain in your
-> irqchip, which is what other drivers of this type are doing, see:
-> drivers/gpio/gpio-xgene-sb.c
-> irq_domain_create_hierarchy() is your friend.
->
->>> It should *also* be done in the set-up path for the irqchip
->>> side, if that line is used without any interaction with the
->>> gpio side of things.
->>
->> Actually, a line is either used by a GPIO, (exclusive) or another purpose.
->> In the case of a GPIO line, I think we should always go through the gpio.
->
-> This is a textbook example of a hierarchichal irq domain I think.
->
->>> The point is that each IRQ that ever get used
->>> has a 1-to-1 relationship to a certain GPIO line, and if that
->>> relationship cannot be resolved from the irqchip side,
->>> something is wrong. The irqchip needs to enable the
->>> GPIO line it is backing to recieve interrupts without any
->>> requirements that .to_irq() have been called first.
->>
->> Actually, this is not a 1:1 relationship, as for example, exti0 can be connected
->> to either gpioa0, or gpiob0,..., or gpiok0.
->
-> That is what hierarchical irqdomain is for.
->
-> You should expose an irqchip from the gpio driver, that give you
-> unique irq translations for *all* GPIO lines.
->
-> Then, at runtime, if the hierarchical irqdomain cannot map
-> (i.e. mux) the interrupt onto one of the available lines,
-> you will get an error.
+-Christoffer
 
-Thanks a lot for this valuable feedback.
-I will have a look at hierachical irq domains, and hope to come back this week
-with an implementation.
-
-Regards,
-Maxime
+> 
+> > complains with CONFIG_PREEMPT_NONE=y and many many cpus been used?
+> > 
+> >>   # lkvm run -k gic-test.flat.a64 -m 316 -c 255 --name guest-727
+> >>   Info: Loaded kernel to 0x80080000 (69624 bytes)
+> >>   Info: Placing fdt at 0x8fe00000 - 0x8fffffff
+> >>   # Warning: The maximum recommended amount of VCPUs is 4
+> >>   Info: virtio-mmio.devices=0x200 at 0x10000:36
+> >>
+> >>   Info: virtio-mmio.devices=0x200 at 0x10200:37
+> >>
+> >>   Info: virtio-mmio.devices=0x200 at 0x10400:38
+> >>
+> >>   Info: virtio-mmio.devices=0x200 at 0x10600:39
+> >>
+> >> INFO: rcu_sched self-detected stall on CPU
+> >>  0-...: (5249 ticks this GP) idle=589/140000000000001/0 softirq=393/393 fqs=5244 
+> >>   (t=5250 jiffies g=-166 c=-167 q=0)
+> >> Task dump for CPU 0:
+> >> kvm-vcpu-0      R  running task        0   735      1 0x00000002
+> >> Call trace:
+> >> [<ffffff8008088cc4>] dump_backtrace+0x0/0x194
+> >> [<ffffff8008088e6c>] show_stack+0x14/0x1c
+> >> [<ffffff80080d4dd0>] sched_show_task+0xa4/0xe8
+> >> [<ffffff80080d6ddc>] dump_cpu_task+0x40/0x4c
+> >> [<ffffff80080fd398>] rcu_dump_cpu_stacks+0xa8/0xdc
+> >> [<ffffff8008100214>] rcu_check_callbacks+0x28c/0x7a4
+> >> [<ffffff80081034a8>] update_process_times+0x3c/0x68
+> >> [<ffffff8008111820>] tick_sched_handle.isra.15+0x50/0x60
+> >> [<ffffff8008111874>] tick_sched_timer+0x44/0x7c
+> >> [<ffffff8008103bf8>] __hrtimer_run_queues+0xc8/0x150
+> >> [<ffffff8008104110>] hrtimer_interrupt+0x9c/0x1b0
+> >> [<ffffff80083b8b74>] arch_timer_handler_phys+0x2c/0x38
+> >> [<ffffff80080f6d14>] handle_percpu_devid_irq+0x78/0x98
+> >> [<ffffff80080f2a2c>] generic_handle_irq+0x24/0x38
+> >> [<ffffff80080f2d98>] __handle_domain_irq+0x84/0xa8
+> >> [<ffffff80080825e0>] gic_handle_irq+0x74/0x178
+> >> Exception stack(0xffffffc0173e3830 to 0xffffffc0173e3950)
+> >> 3820:                                   ffffffc0165ac038 ffffffc0165ac080
+> >> 3840: 0000000000000018 0000000000000004 0000000000000014 000000000000003f
+> >> 3860: ffffffc0165aeea8 ffffffc000010000 ffffffc017ef5af0 ffffffc0173ecd28
+> >> 3880: 000000003fef0000 cfdfdfdf00010000 ffffffc0173ecd50 000000003ff00000
+> >> 38a0: cfdfdfdf00010000 0000000000000000 ffffff80081acaf0 0000000000000000
+> >> 38c0: 0000000000000000 00000000000000f0 ffffffc0165ac008 0000000000000018
+> >> 38e0: ffffff80080992e8 0000000000000078 ffffff8008276b54 0000000000002970
+> >> 3900: 0000000000000018 ffffffc0165ac080 ffffffc0165ac038 ffffffc0173e3950
+> >> 3920: ffffff8008276d8c ffffffc0173e3950 ffffff8008276b58 0000000020000145
+> >> 3940: 0000000000000000 0000000000000001
+> >> [<ffffff8008084f20>] el1_irq+0xa0/0x100
+> >> [<ffffff8008276b58>] generic_swap+0x4/0x28
+> >> [<ffffff800809e108>] kvm_io_bus_register_dev+0xc8/0x110
+> >> [<ffffff80080ab054>] vgic_register_redist_iodevs+0xd8/0x20c
+> >> [<ffffff80080a98f8>] vgic_v3_map_resources+0x98/0xec
+> >> [<ffffff80080a8cd8>] kvm_vgic_map_resources+0x4c/0x6c
+> >> [<ffffff80080a06d4>] kvm_arch_vcpu_ioctl_run+0x68/0x424
+> >> [<ffffff800809bc98>] kvm_vcpu_ioctl+0x1b4/0x6f8
+> >> [<ffffff80081aca98>] do_vfs_ioctl+0x708/0x760
+> >> [<ffffff80081acb4c>] SyS_ioctl+0x5c/0x8c
+> >> [<ffffff8008085630>] el0_svc_naked+0x24/0x28
+> > 
+> > Cheers
+> > Vladimir
+> > _______________________________________________
+> > kvmarm mailing list
+> > kvmarm at lists.cs.columbia.edu
+> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> > 
+> > 
+> 
