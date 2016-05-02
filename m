@@ -1,61 +1,65 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon,  2 May 2016 12:35:04 +0530
-Subject: [PATCH v2 5/5] vf610-soc: Add Vybrid SoC device tree binding
- documentation
-In-Reply-To: <cover.1462171989.git.maitysanchayan@gmail.com>
-References: <cover.1462171989.git.maitysanchayan@gmail.com>
-Message-ID: <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 May 2016 09:28:34 +0200
+Subject: [PATCH v6] spi: orion.c: Add direct access mode
+In-Reply-To: <5726F7F3.9070700@denx.de>
+References: <1461147068-4829-1-git-send-email-sr@denx.de>
+ <5726F7F3.9070700@denx.de>
+Message-ID: <8919835.yGyvx4h0Tr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for Vybrid SoC.
+On Monday 02 May 2016 08:47:15 Stefan Roese wrote:
+> On 20.04.2016 12:11, Stefan Roese wrote:
+> > This patch adds support for the direct write mode to the Orion SPI
+> > driver which is used on the Marvell Armada based SoCs. In this direct
+> > mode, all data written to (or read from) a specifically mapped MBus
+> > window (linked to one SPI chip-select on one of the SPI controllers)
+> > will be transferred directly to the SPI bus. Without the need to control
+> > the SPI registers in between. This can improve the SPI transfer rate in
+> > such cases.
+> > 
+> > Currently only the direct write mode is supported. This mode especially
+> > benefits from the SPI direct mode, as the data bytes are written
+> > head-to-head to the SPI bus, without any additional addresses, that
+> > are also written in the direct read mode.
+> > 
+> > One use-case for this direct write mode is, programming a FPGA bitstream
+> > image into the FPGA connected to the SPI bus at maximum speed.
+> > 
+> > This mode is described in chapter "22.5.2 Direct Write to SPI" in the
+> > Marvell Armada XP Functional Spec Datasheet.
+> > 
+> > It should be possible to support SPI-NOR and SPI-NAND devices via
+> > this direct access mode as well. But this needs further work, e.g.:
+> > - The mapping of the MBus window needs to get extended to span
+> >    the complete flash device size
+> > - The address / control data needs to get inserted into the SPI
+> >    controller registers
+> > 
+> > Signed-off-by: Stefan Roese <sr@denx.de>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Mark Brown <broonie@kernel.org>
+> 
+> Its been a while since v6 of this direct write access mode has been
+> posted. This is a gentle ping on its status.
+> 
+> Arnd / Mark, do you have any additional change requests or are you okay
+> with the current version?
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- .../bindings/arm/freescale/fsl,vf610-soc.txt       | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+No objections, please add
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-new file mode 100644
-index 0000000..bdd95e8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-@@ -0,0 +1,35 @@
-+Vybrid System-on-Chip
-+---------------------
-+
-+Required properties:
-+
-+- #address-cells: must be 1
-+- #size-cells: must be 1
-+- compatible: "fsl,vf610-soc-bus", "simple-bus"
-+- interrupt-parent: phandle to the MSCM interrupt router node
-+- ranges
-+- fsl,rom-revision: phandle to the on-chip ROM node and address of rom
-+  revision register
-+- fsl,cpu-count: phandle to the MSCM CPU configuration node and address of
-+  CPU count register
-+- fsl,l2-size: phandle to the MSCM CPU configuration node and address of
-+  L2 cache size register
-+- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
-+- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
-+
-+Example:
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "fsl,vf610-soc-bus", "simple-bus";
-+		interrupt-parent = <&mscm_ir>;
-+		ranges;
-+		fsl,rom-revision = <&ocrom 0x80>;
-+		fsl,cpu-count = <&mscm_cpucfg 0x2C>;
-+		fsl,l2-size = <&mscm_cpucfg 0x14>;
-+		nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
-+		nvmem-cell-names = "cfg0", "cfg1";
-+
-+		...
-+	};
--- 
-2.8.2
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Two questions though:
+
+- you now always send a multiple of four byte in each transfer, are
+  there any downsides in doing this, e.g. some SPI devices that might
+  get confused by receiving additional uninitialized data?
+
+- How does the performance compare to the normal mode, is it basically
+  unchanged, or does this patch make things faster?
+
+	Arnd
