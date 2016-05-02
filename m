@@ -1,148 +1,119 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon,  2 May 2016 10:02:18 +0200
-Subject: [PATCH v2 4/4] ARM64: dts: amlogic: Enable pin controller on
- GXBB-based platforms
-In-Reply-To: <1462176138-29433-1-git-send-email-carlo@caione.org>
-References: <1462176138-29433-1-git-send-email-carlo@caione.org>
-Message-ID: <1462176138-29433-5-git-send-email-carlo@caione.org>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 2 May 2016 13:42:12 +0530
+Subject: [PATCH v2 2/5] ARM: dts: vfxxx: Add device tree node for OCOTP
+In-Reply-To: <4759698.elnRBldlxl@wuerfel>
+References: <cover.1462171989.git.maitysanchayan@gmail.com>
+ <b5c1ff5a805eae3e53f07f8d0161f0af51586c00.1462171990.git.maitysanchayan@gmail.com>
+ <4759698.elnRBldlxl@wuerfel>
+Message-ID: <20160502081211.GA7847@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Hello Arnd,
 
-Update DTS and DTSI files to enable the pin controller. We also now
-support the blinking blue LED on the Odroid-C2.
+On 16-05-02 09:31:12, Arnd Bergmann wrote:
+> On Monday 02 May 2016 12:35:01 Sanchayan Maity wrote:
+> > +                       ocotp at 400a5000 {
+> > +                               compatible = "fsl,vf610-ocotp";
+> > +                               #address-cells = <1>;
+> > +                               #size-cells = <1>;
+> > +                               reg = <0x400a5000 0xCF0>;
+> > +                               clocks = <&clks VF610_CLK_OCOTP>;
+> > +
+> > +                               ocotp_cfg0: cfg0 at 410 {
+> > +                                       reg = <0x410 0x4>;
+> > +                               };
+> > +
+> > +                               ocotp_cfg1: cfg1 at 420 {
+> > +                                       reg = <0x420 0x4>;
+> > +                               };
+> > +                       };
+> 
+> How do the registers of the child nodes relate to the registers of the
+> parent? If there are in the same address space, it might be good to
+> add a "ranges" property to describe it.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 13 +++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  2 ++
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  3 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 41 ++++++++++++++++++++++
- 4 files changed, 59 insertions(+)
+cfg0 and cfg1 are in the same address space viz. 0x400a5410 and 0x400a5420
+respectively. These nodes are primarily for use by the NVMEM consumer API in
+the SoC bus driver to retrieve the values from these registers leveraging
+the NVMEM vf610 ocotp driver.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 7f2c674..41e1e66 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -45,6 +45,7 @@
- /dts-v1/;
- 
- #include "meson-gxbb.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
-@@ -62,8 +63,20 @@
- 		device_type = "memory";
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		blue {
-+			label = "c2:blue:alive";
-+			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+	};
- };
- 
- &uart_AO {
- 	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index bf7ff1d..22e6298 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -62,4 +62,6 @@
- /* This UART is brought out to the DB9 connector */
- &uart_AO {
- 	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index 012cdcc..54bb7c7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -56,4 +56,7 @@
- 
- &uart_AO {
- 	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
-+
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 3126f0c..6dd2768 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -43,6 +43,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/gpio/meson-gxbb-gpio.h>
- 
- / {
- 	compatible = "amlogic,meson-gxbb";
-@@ -158,6 +159,29 @@
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
- 
-+			pinctrl_aobus: pinctrl at 14 {
-+				compatible = "amlogic,meson-gxbb-aobus-pinctrl";
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				ranges;
-+
-+				gpio_ao: bank at 14 {
-+					reg = <0x0 0x00014 0x0 0x8>,
-+					      <0x0 0x0002c 0x0 0x4>,
-+					      <0x0 0x00024 0x0 0x8>;
-+					reg-names = "mux", "pull", "gpio";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+				};
-+
-+				uart_ao_a_pins: uart_ao_a {
-+					mux {
-+						groups = "uart_tx_ao_a", "uart_rx_ao_a";
-+						function = "uart_ao";
-+					};
-+				};
-+			};
-+
- 			uart_AO: serial at 4c0 {
- 				compatible = "amlogic,meson-uart";
- 				reg = <0x0 0x004c0 0x0 0x14>;
-@@ -173,6 +197,23 @@
- 			#address-cells = <2>;
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xc8834000 0x0 0x2000>;
-+
-+			pinctrl_periphs: pinctrl at 4b0 {
-+				compatible = "amlogic,meson-gxbb-periphs-pinctrl";
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				ranges;
-+
-+				gpio: bank at 4b0 {
-+					reg = <0x0 0x004b0 0x0 0x28>,
-+					      <0x0 0x004e8 0x0 0x14>,
-+					      <0x0 0x00120 0x0 0x14>,
-+					      <0x0 0x00430 0x0 0x40>;
-+					reg-names = "mux", "pull", "pull-enable", "gpio";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+				};
-+			};
- 		};
- 
- 		hiubus: hiubus at c883c000 {
--- 
-2.7.4
+Based on the NVMEM bindings here
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/nvmem/nvmem.txt#L33
+
+Thanks.
+
+Regards,
+Sanchayan.
+
+> 
+> 	Arnd
+
+> Date: Mon, 02 May 2016 12:02:21 +1000
+> From: Gavin Shan <gwshan@linux.vnet.ibm.com>
+> To: Rob Herring <robherring2@gmail.com>
+> Cc: "devicetree at vger.kernel.org" <devicetree@vger.kernel.org>,
+>  aik at ozlabs.ru, Gavin Shan <gwshan@linux.vnet.ibm.com>, Grant Likely
+>  <grant.likely@linaro.org>, "linux-pci at vger.kernel.org"
+>  <linux-pci@vger.kernel.org>, Bjorn Helgaas <bhelgaas@google.com>,
+>  linuxppc-dev <linuxppc-dev@lists.ozlabs.org>, dja at axtens.net
+> Subject: Re: [PATCH v8 40/45] drivers/of: Split unflatten_dt_node()
+> 
+> On Wed, Feb 17, 2016 at 08:30:42AM -0600, Rob Herring wrote:
+> >On Tue, Feb 16, 2016 at 9:44 PM, Gavin Shan <gwshan@linux.vnet.ibm.com> wrote:
+> >> The function unflatten_dt_node() is called recursively to unflatten
+> >> device nodes and properties in the FDT blob. It looks complicated
+> >> and hard to be understood.
+> >>
+> >> This splits the function into 3 functions: populate_properties(),
+> >> populate_node() and unflatten_dt_node(). populate_properties(),
+> >> which is called by populate_node(), creates properties for the
+> >> indicated device node. The later one creates the device nodes
+> >> from FDT blob. populate_node() gets the offset in FDT blob for
+> >> next device nodes and then calls populate_node(). No logical
+> >> changes introduced.
+> >>
+> >> Signed-off-by: Gavin Shan <gwshan@linux.vnet.ibm.com>
+> >> ---
+> >>  drivers/of/fdt.c | 249 ++++++++++++++++++++++++++++++++-----------------------
+> >>  1 file changed, 147 insertions(+), 102 deletions(-)
+> >
+> >One nit, otherwise:
+> >
+> >Acked-by: Rob Herring <robh@kernel.org>
+> >
+> >[...]
+> >
+> >> +               /* And we process the "ibm,phandle" property
+> >> +                * used in pSeries dynamic device tree
+> >> +                * stuff
+> >> +                */
+> >> +               if (!strcmp(pname, "ibm,phandle"))
+> >> +                       np->phandle = be32_to_cpup(val);
+> >> +
+> >> +               pp->name   = (char *)pname;
+> >> +               pp->length = sz;
+> >> +               pp->value  = (__be32 *)val;
+> >
+> >This cast should not be needed.
+> >
+> 
+> It's needed. Otherwise, we will have warning. So I will keep it. I just
+> went through this one for next revision and sorry for late response.
+> 
+> drivers/of/fdt.c:225:14: warning: assignment discards ?const? qualifier from pointer target type
+>    pp->value  = val;
+>               ^
+> 
+> Thanks,
+> Gavin
+> 
+> >> +               *pprev     = pp;
+> >> +               pprev      = &pp->next;
+> >> +       }
+> >
+> 
+> _______________________________________________
+> Linuxppc-dev mailing list
+> Linuxppc-dev at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/linuxppc-dev
