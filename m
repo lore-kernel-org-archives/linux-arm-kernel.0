@@ -1,65 +1,110 @@
-From: ksenija.stanojevic@gmail.com (=?UTF-8?Q?Ksenija_Stanojevi=C4=87?=)
-Date: Mon, 2 May 2016 08:06:58 +0200
-Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
-In-Reply-To: <500c5874-4ef8-b37b-e12f-80fd5205c172@kernel.org>
-References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
- <500c5874-4ef8-b37b-e12f-80fd5205c172@kernel.org>
-Message-ID: <CAL7P5jJF9EL4Zk-AC9csyadfrmUp4R+6ceVAN_kNm7dKgo+ZgQ@mail.gmail.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 2 May 2016 14:22:03 +0800
+Subject: [PATCH v9 0/8] Add MT8173 Video Encoder Driver and VPU Driver
+In-Reply-To: <5723422E.4030109@xs4all.nl>
+References: <1461661117-4657-1-git-send-email-tiffany.lin@mediatek.com>
+ <5723422E.4030109@xs4all.nl>
+Message-ID: <1462170123.18420.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Hi Hans,
 
-On Sun, May 1, 2016 at 10:08 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-> Ksenija,
->
-> How would you prefer we handle this interaction of this set and your series.
-> Options are:
->
-> 1. I apply these now and you rebase on top of the result.
-> 2. You pull these into your series, probably after the driver split making sure these
->    improvements end up in the new drivers.
-> 3. We ask Stephan to re roll them at a later date (least preferred option as that adds
-> another person we need to chase down to get to the end of this process!)
->
-> No immediate rush on any of the above as we've probably missed this cycle now anyway.
-> I've been cut off today so not sure what Linus has said today.
+On Fri, 2016-04-29 at 13:14 +0200, Hans Verkuil wrote:
+> Hi Tiffany,
+> 
+> On 04/26/2016 10:58 AM, Tiffany Lin wrote:
+> > ==============
+> >  Introduction
+> > ==============
+> > 
+> > The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+> > Mediatek Video Codec is able to handle video encoding of in a range of formats.
+> > 
+> > This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
+> > communicate with VPU.
+> > 
+> > Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+> > 
+> > ==================
+> >  Device interface
+> > ==================
+> > 
+> > In principle the driver bases on v4l2 memory-to-memory framework:
+> > it provides a single video node and each opened file handle gets its own private context with separate
+> > buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. raw video
+> > frames) and CAPTURE (for destination buffers, i.e. encoded video frames).
+> > 
+> > ==============================
+> >  VPU (Video Processor Unit)
+> > ==============================
+> > The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
+> > It is able to handle video decoding/encoding in a range of formats.
+> > The driver provides with VPU firmware download, memory management and the communication interface between CPU and VPU.
+> > For VPU initialization, it will create virtual memory for CPU access and physical address for VPU hw device access. 
+> > When a decode/encode instance opens a device node, vpu driver will download vpu firmware to the device.
+> > A decode/encode instant will decode/encode a frame using VPU interface to interrupt vpu to handle decoding/encoding jobs.
+> > 
+> > Please have a look at the code and comments will be very much appreciated.
+> 
+> I build this using my daily build setup and got a bunch of errors and warnings
+> from both the compiler (when this driver is compile-tested on a 32 bit arch)
+> and from sparse/smatch.
+> 
+> Can you fix these?
 
-My understanding was that you will take this patch series so I already included
-changes made by this patch set in touchscreen part, I will check if I missed
-something.
-I think the best is to apply these now.
+Our driver only support for ARM/ARM64 architecture.
+I will add 
+MTK_IOMMU [=y] && (ARM || ARM64) to Kconfig for VIDEO_MEDIATEK_VCODEC.
+And we will fix compiler warning.
 
-Thanks,
-Ksenija
-
-> Jonathan
-> On 23/04/16 20:57, Stefan Wahren wrote:
->> This patch series simplifies TS handling of mxs-lradc.
->>
->> These patches has been tested with i.MX23 and i.MX28 but without
->> a touchscreen. I added only a bogus touchscreen in devicetree.
->>
->> It would be nice if someone with a real touchscreen could test it.
->>
->> Changes in V3:
->> - remove dev.parent assignment as suggested by Dimitry
->> - add new patch to remove mxs_lradc_ts_unregister
->> - remove PM implementation from series in order to wait until
->>   Ksenija has split the driver
->>
->> Changes in V2:
->> - rebase on iio/testing since patch 2 and 3 from V1 has been applied
->> - also remove input_unregister_device in patch 1
->> - use mask of virtual channels for IRQ disabling in patch 2
->>
->> Stefan Wahren (3):
->>   iio: mxs-lradc: simplify TS registration
->>   iio: mxs-lradc: remove mxs_lradc_ts_unregister
->>   iio: mxs-lradc: disable only masked channels in
->>     mxs_lradc_hw_stop
->>
->>  drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
->>  1 file changed, 6 insertions(+), 28 deletions(-)
->>
->
+best regards,
+Tiffany
+> 
+> linux-git-i686: WARNINGS
+> 
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c: In function 'load_requested_vpu':
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:498:117: warning: format '%lx' expects argument of type 'long unsigned int', but argument 4 has type 'size_t {aka unsigned int}' [-Wformat=]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:498:117: warning: format '%lx' expects argument of type 'long unsigned int', but argument 5 has type 'size_t {aka unsigned int}' [-Wformat=]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:501:410: warning: format '%lx' expects argument of type 'long unsigned int', but argument 4 has type 'size_t {aka unsigned int}' [-Wformat=]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc_vpu_if.c: In function 'vpu_enc_ipi_handler':
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc_vpu_if.c:40:30: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>   struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
+>                               ^
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c: In function 'mtk_venc_worker':
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:1046:43: warning: format '%lx' expects argument of type 'long unsigned int', but argument 7 has type 'size_t {aka unsigned int}' [-Wformat=]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:1046:43: warning: format '%lx' expects argument of type 'long unsigned int', but argument 10 has type 'size_t {aka unsigned int}' [-Wformat=]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:1046:43: warning: format '%lx' expects argument of type 'long unsigned int', but argument 13 has type 'size_t {aka unsigned int}' [-Wformat=]
+> 
+> Tip: use %zu or %zx for size_t.
+> 
+> sparse: ERRORS
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:261:24: warning: incorrect type in assignment (different base types)
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:476:23: warning: symbol 'get_vp8_enc_comm_if' was not declared. Should it be static?
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:237:6: warning: symbol 'vpu_clock_disable' was not declared. Should it be static?
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:250:5: warning: symbol 'vpu_clock_enable' was not declared. Should it be static?
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:436:54: warning: incorrect type in return expression (different address spaces)
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:504:14: warning: incorrect type in assignment (different address spaces)
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:710:26: warning: cast removes address space of expression
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c:674:23: warning: symbol 'get_h264_enc_comm_if' was not declared. Should it be static?
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:804:41: warning: Using plain integer as NULL pointer
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:905:25: warning: Using plain integer as NULL pointer
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:989:50: warning: Using plain integer as NULL pointer
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:133:15: error: undefined identifier 'kzalloc'
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:206:9: error: undefined identifier 'kfree'
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:228:9: error: undefined identifier 'kfree'
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:548:6: warning: 'vpu_fw' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:133:8: error: implicit declaration of function 'kzalloc' [-Werror=implicit-function-declaration]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:133:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:206:2: error: implicit declaration of function 'kfree' [-Werror=implicit-function-declaration]
+> 
+> smatch: ERRORS
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c:921 mtk_venc_encode_header() warn: inconsistent indenting
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:397 vpu_wdt_reg_handler() warn: variable dereferenced before check 'vpu' (see line 395)
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vpu/mtk_vpu.c:398 vpu_wdt_reg_handler() error: we previously assumed 'vpu' could be null (see line 397)
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:142 fops_vcodec_open() error: we previously assumed 'ctx' could be null (see line 134)
+> /home/hans/work/build/media-git/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c:363 mtk_vcodec_probe() warn: passing zero to 'PTR_ERR'
+> 
+> Thanks!
+> 
+> 	Hans
