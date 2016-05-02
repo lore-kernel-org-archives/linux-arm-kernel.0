@@ -1,94 +1,54 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 2 May 2016 12:33:21 +0200
-Subject: [PATCH v6] spi: orion.c: Add direct access mode
-In-Reply-To: <8919835.yGyvx4h0Tr@wuerfel>
-References: <1461147068-4829-1-git-send-email-sr@denx.de>
- <5726F7F3.9070700@denx.de> <8919835.yGyvx4h0Tr@wuerfel>
-Message-ID: <57272CF1.9060706@denx.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 May 2016 11:40:49 +0100
+Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
+In-Reply-To: <20160502092552.GC2274@localhost>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
+ <20160426033029.GB2274@localhost>
+ <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
+ <20160426162529.GK2274@localhost> <571F9D76.2060809@codeaurora.org>
+ <20160427081501.GV2274@localhost>
+ <2c7ac0732fb16f952db24b7c70065318@codeaurora.org>
+ <57258799.70803@codeaurora.org> <20160502092552.GC2274@localhost>
+Message-ID: <20160502104049.GB6292@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, May 02, 2016 at 02:55:52PM +0530, Vinod Koul wrote:
+> On Sun, May 01, 2016 at 12:35:37AM -0400, Sinan Kaya wrote:
 
-On 02.05.2016 09:28, Arnd Bergmann wrote:
-> On Monday 02 May 2016 08:47:15 Stefan Roese wrote:
->> On 20.04.2016 12:11, Stefan Roese wrote:
->>> This patch adds support for the direct write mode to the Orion SPI
->>> driver which is used on the Marvell Armada based SoCs. In this direct
->>> mode, all data written to (or read from) a specifically mapped MBus
->>> window (linked to one SPI chip-select on one of the SPI controllers)
->>> will be transferred directly to the SPI bus. Without the need to control
->>> the SPI registers in between. This can improve the SPI transfer rate in
->>> such cases.
->>>
->>> Currently only the direct write mode is supported. This mode especially
->>> benefits from the SPI direct mode, as the data bytes are written
->>> head-to-head to the SPI bus, without any additional addresses, that
->>> are also written in the direct read mode.
->>>
->>> One use-case for this direct write mode is, programming a FPGA bitstream
->>> image into the FPGA connected to the SPI bus at maximum speed.
->>>
->>> This mode is described in chapter "22.5.2 Direct Write to SPI" in the
->>> Marvell Armada XP Functional Spec Datasheet.
->>>
->>> It should be possible to support SPI-NOR and SPI-NAND devices via
->>> this direct access mode as well. But this needs further work, e.g.:
->>> - The mapping of the MBus window needs to get extended to span
->>>     the complete flash device size
->>> - The address / control data needs to get inserted into the SPI
->>>     controller registers
->>>
->>> Signed-off-by: Stefan Roese <sr@denx.de>
->>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> Cc: Andrew Lunn <andrew@lunn.ch>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Mark Brown <broonie@kernel.org>
->>
->> Its been a while since v6 of this direct write access mode has been
->> posted. This is a gentle ping on its status.
->>
->> Arnd / Mark, do you have any additional change requests or are you okay
->> with the current version?
-> 
-> No objections, please add
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > My evaluation turned out negative. The regmap code is nice for bus like peripherals
+> > like I2C and SPI where everything is bitwise accessed. This is not the case
+> > in this code. 
 
-Thanks.
- 
-> Two questions though:
-> 
-> - you now always send a multiple of four byte in each transfer, are
->    there any downsides in doing this, e.g. some SPI devices that might
->    get confused by receiving additional uninitialized data?
+> I do not entirely agree with the statements here, it does give big benefit
+> on our systems with MMIO. I am going to ask Mark to comment on this, he
+> know better and understands ARM.
 
-Yes, this is something that might happen on such devices. AFAIK, my
-device (Altera FPGA) has no such restriction though. IIRC, the
-size of the bitfiles is always 4-byte aligned.
+> I am probably going to be okay with this not using regmap and it is debug
+> but you should give that a try in future for better performance and ofcourse
+> you can add to regmap to get a better model for your device
 
-I'll try to send v7 of this patch with a fully byte-size correct 
-handling later today.
- 
-> - How does the performance compare to the normal mode, is it basically
->    unchanged, or does this patch make things faster?
+I've no idea what "this" is, sorry.  All I've got here is an enormous
+backtrace with a bunch of the messages not even word wrapped.
 
-The performance is increased. The factor of course depends on the SPI
-transfer speed. Here the numbers for a ~70KiB image transferred at
-27MHz SPI speed:
+Please be aware that I get CCed on so much irrelevant crap that copying
+me into the middle of a thread about some other subsystem is likely to
+get missed - almost always it's review of some patch I've got no
+interest in.
 
-Using the PIO SPI transfer:
+> > Barriers are really expensive on ARM. I paid very special attention in the 
+> > code to decide when to use relaxed version vs. the readl version. I lose 
+> > all of this optimization. 
 
-real    0m0.128s
-user    0m0.010s
-sys     0m0.120s
-
-Using the direct write mode:
-
-real    0m0.040s
-user    0m0.000s
-sys     0m0.020s
-
-Thanks,
-Stefan
+Drivers should not be using the relaxed accessors, they are there for
+the generic code to build on not for drivers and they really need the
+cache flush operations.  Getting the cache flush operations right,
+especially on ARM, isn't easy and needs detailed review.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/15836f4d/attachment.sig>
