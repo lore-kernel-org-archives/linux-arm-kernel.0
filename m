@@ -1,166 +1,78 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Mon, 2 May 2016 11:13:31 +0200
-Subject: [PATCH 1/2] ASoC: rockchip: i2s: separate capture and playback
-In-Reply-To: <20160430070049.GF14612@serenity.lan>
-References: <1449657147-26959-1-git-send-email-john@metanate.com>
- <CAFqH_52C4JKno4uyt54UdWKAJKM4FPGRiQaQQ9_H-Mz1Cr+Hqg@mail.gmail.com>
- <20160430070049.GF14612@serenity.lan>
-Message-ID: <CAFqH_51sSqaoUtadYux+A38wQ1y9T-GKU3_PEcgT9rp_19_b8g@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 2 May 2016 14:55:52 +0530
+Subject: [PATCH V17 2/3] dmaengine: qcom_hidma: add debugfs hooks
+In-Reply-To: <57258799.70803@codeaurora.org>
+References: <1460384473-5775-1-git-send-email-okaya@codeaurora.org>
+ <1460384473-5775-3-git-send-email-okaya@codeaurora.org>
+ <20160426033029.GB2274@localhost>
+ <b068ead6474f2ffee5acef9ea799aba3@codeaurora.org>
+ <20160426162529.GK2274@localhost> <571F9D76.2060809@codeaurora.org>
+ <20160427081501.GV2274@localhost>
+ <2c7ac0732fb16f952db24b7c70065318@codeaurora.org>
+ <57258799.70803@codeaurora.org>
+Message-ID: <20160502092552.GC2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On Sun, May 01, 2016 at 12:35:37AM -0400, Sinan Kaya wrote:
+> >>> >
+> >>> > Hmm, have you thought about using regmap?
+> >>>
+> >>> To be honest, I didn't know what regmap is but I just read some code
+> >>> and looked at how it is used. Feel free to correct me if I got it
+> >>> wrong.
+> >>>
+> >>> Regmap seems to be designed for *slow* speed peripherals to improve frequent
+> >>> accesses by the SW. It looks like it is used by MFD, SPI and I2C drivers.
+> >>>
+> >>> It seems to cache the register contents and flush/invalidate them only when
+> >>> needed.
+> >>>
+> >>> The MMIO version seems to be assuming the presence of device-tree like CLK
+> >>> API which doesn't exist on ACPI systems and is not portable.
+> >>>
+> >>> My reaction is that it is a lot of code with no added functionality to what
+> >>> HIDMA driver is trying to achieve.
+> >>>
+> >>> Given that the use case here is only for debug purposes; I think it is OK
+> >>> to keep this runtime call here. I don't want to add any overhead into the
+> >>> existing code just to support the debug use case.
+> >>>
+> >>> None of my register read/writes are slow. This file will only be used to
+> >>> troubleshoot customer issues.
+> >>
+> >> $ is always faster than MMIO. This way you can give reg contents to users
+> >> without waking up hw.
+> >>
+> >> Also we at Intel use regmap on ACPI systems without CLK API
+> > 
+> > I can try and see the performance impact is. What happens to registers that hw updates like status registers. Those will be most interesting during debug. How does remap get updated for those? Is there a way to tell it not to cache certain registers
+> 
+> My evaluation turned out negative. The regmap code is nice for bus like peripherals
+> like I2C and SPI where everything is bitwise accessed. This is not the case
+> in this code. 
 
-Thanks for answer.
+I do not entirely agree with the statements here, it does give big benefit
+on our systems with MMIO. I am going to ask Mark to comment on this, he
+know better and understands ARM.
 
-2016-04-30 9:00 GMT+02:00 John Keeping <john@keeping.me.uk>:
-> Hi Enric,
->
-> On Fri, Apr 29, 2016 at 04:59:27PM +0200, Enric Balletbo Serra wrote:
->> 2015-12-09 11:32 GMT+01:00 John Keeping <john@metanate.com>:
->> > If we only clear the tx/rx state when both are disabled it is not
->> > possible to start/stop one multiple times while the other is running.
->> > Since the two are independently controlled, treat them as such and
->> > remove the false dependency between capture and playback.
->> >
->> > Signed-off-by: John Keeping <john@metanate.com>
->> > ---
->> >  sound/soc/rockchip/rockchip_i2s.c | 72 +++++++++++++++++----------------------
->> >  1 file changed, 32 insertions(+), 40 deletions(-)
->> >
->> > diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
->> > index 83b1b9c..acc6225 100644
->> > --- a/sound/soc/rockchip/rockchip_i2s.c
->> > +++ b/sound/soc/rockchip/rockchip_i2s.c
->> > @@ -82,8 +82,8 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
->> >                                    I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_ENABLE);
->> >
->> >                 regmap_update_bits(i2s->regmap, I2S_XFER,
->> > -                                  I2S_XFER_TXS_START | I2S_XFER_RXS_START,
->> > -                                  I2S_XFER_TXS_START | I2S_XFER_RXS_START);
->> > +                                  I2S_XFER_TXS_START,
->> > +                                  I2S_XFER_TXS_START);
->> >
->> >                 i2s->tx_start = true;
->> >         } else {
->> > @@ -92,27 +92,23 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
->> >                 regmap_update_bits(i2s->regmap, I2S_DMACR,
->> >                                    I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
->> >
->> > -               if (!i2s->rx_start) {
->> > -                       regmap_update_bits(i2s->regmap, I2S_XFER,
->> > -                                          I2S_XFER_TXS_START |
->> > -                                          I2S_XFER_RXS_START,
->> > -                                          I2S_XFER_TXS_STOP |
->> > -                                          I2S_XFER_RXS_STOP);
->> > +               regmap_update_bits(i2s->regmap, I2S_XFER,
->> > +                                  I2S_XFER_TXS_START,
->> > +                                  I2S_XFER_TXS_STOP);
->> >
->> > -                       regmap_update_bits(i2s->regmap, I2S_CLR,
->> > -                                          I2S_CLR_TXC | I2S_CLR_RXC,
->> > -                                          I2S_CLR_TXC | I2S_CLR_RXC);
->> > +               regmap_update_bits(i2s->regmap, I2S_CLR,
->> > +                                  I2S_CLR_TXC,
->> > +                                  I2S_CLR_TXC);
->> >
->> > -                       regmap_read(i2s->regmap, I2S_CLR, &val);
->> > +               regmap_read(i2s->regmap, I2S_CLR, &val);
->> >
->> > -                       /* Should wait for clear operation to finish */
->> > -                       while (val) {
->> > -                               regmap_read(i2s->regmap, I2S_CLR, &val);
->> > -                               retry--;
->> > -                               if (!retry) {
->> > -                                       dev_warn(i2s->dev, "fail to clear\n");
->> > -                                       break;
->> > -                               }
->> > +               /* Should wait for clear operation to finish */
->> > +               while (val & I2S_CLR_TXC) {
->> > +                       regmap_read(i2s->regmap, I2S_CLR, &val);
->> > +                       retry--;
->> > +                       if (!retry) {
->> > +                               dev_warn(i2s->dev, "fail to clear\n");
->> > +                               break;
->> >                         }
->> >                 }
->> >         }
->> > @@ -128,8 +124,8 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
->> >                                    I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_ENABLE);
->> >
->> >                 regmap_update_bits(i2s->regmap, I2S_XFER,
->> > -                                  I2S_XFER_TXS_START | I2S_XFER_RXS_START,
->> > -                                  I2S_XFER_TXS_START | I2S_XFER_RXS_START);
->> > +                                  I2S_XFER_RXS_START,
->> > +                                  I2S_XFER_RXS_START);
->> >
->> >                 i2s->rx_start = true;
->> >         } else {
->> > @@ -138,27 +134,23 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
->> >                 regmap_update_bits(i2s->regmap, I2S_DMACR,
->> >                                    I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
->> >
->> > -               if (!i2s->tx_start) {
->> > -                       regmap_update_bits(i2s->regmap, I2S_XFER,
->> > -                                          I2S_XFER_TXS_START |
->> > -                                          I2S_XFER_RXS_START,
->> > -                                          I2S_XFER_TXS_STOP |
->> > -                                          I2S_XFER_RXS_STOP);
->> > +               regmap_update_bits(i2s->regmap, I2S_XFER,
->> > +                                  I2S_XFER_RXS_START,
->> > +                                  I2S_XFER_RXS_STOP);
->> >
->> > -                       regmap_update_bits(i2s->regmap, I2S_CLR,
->> > -                                          I2S_CLR_TXC | I2S_CLR_RXC,
->> > -                                          I2S_CLR_TXC | I2S_CLR_RXC);
->> > +               regmap_update_bits(i2s->regmap, I2S_CLR,
->> > +                                  I2S_CLR_RXC,
->> > +                                  I2S_CLR_RXC);
->> >
->> > -                       regmap_read(i2s->regmap, I2S_CLR, &val);
->> > +               regmap_read(i2s->regmap, I2S_CLR, &val);
->> >
->> > -                       /* Should wait for clear operation to finish */
->> > -                       while (val) {
->> > -                               regmap_read(i2s->regmap, I2S_CLR, &val);
->> > -                               retry--;
->> > -                               if (!retry) {
->> > -                                       dev_warn(i2s->dev, "fail to clear\n");
->> > -                                       break;
->> > -                               }
->> > +               /* Should wait for clear operation to finish */
->> > +               while (val & I2S_CLR_RXC) {
->> > +                       regmap_read(i2s->regmap, I2S_CLR, &val);
->> > +                       retry--;
->> > +                       if (!retry) {
->> > +                               dev_warn(i2s->dev, "fail to clear\n");
->> > +                               break;
->> >                         }
->> >                 }
->> >         }
->> > --
->> > 2.6.3.462.gbe2c914
->>
->> Using my Veyron Jerry Chromebook wiht latest kernel I found that the
->> speakers doesn't work. Bisect points to this patch as the offending
->> commit. However your changes looks reasonable the fact is that
->> reverting the patch makes the audio work again on my device. I need to
->> dig a bit more into the issue, but meanwhile, any idea on what is
->> happening ? Can I ask which device did you test?
->
-> I tested this on a Radxa Rock2 square.  This change fixed an issue I
-> found when running separate processes for playback and recording (I was
-> testing with arecord and speaker-test IIRC) but I don't think that
-> should be relevant.  I just read through the patch again and I can't see
-> anything obviously wrong so I'm afraid I don't have any idea what's
-> causing the problem you're seeing.
->
+I am probably going to be okay with this not using regmap and it is debug
+but you should give that a try in future for better performance and ofcourse
+you can add to regmap to get a better model for your device
 
-By chance, do you have a git repo containing the changes required to
-test the sound on Radxa Rock2? Guess this is not in mainline.
+> Regmap is a nice tool if used properly but it doesn't mean that it will work
+> in every single case. It doesn't match with the goal of this driver. 
+> 
+> As soon as I abstract register accesses, the regmap code writes all MMIO registers
+> with the readl variant functions.
+> 
+> Barriers are really expensive on ARM. I paid very special attention in the 
+> code to decide when to use relaxed version vs. the readl version. I lose 
+> all of this optimization. 
+> 
+> Since the clocks are restored only during the debug case, I don't see any
+> problems here. It is not worth the effort to do redo the whole thing and 
+> introduce errors as I see a lot of tripping points like regmap_sync variants.
 
-Thanks,
- Enric
-
->
-> John
+-- 
+~Vinod
