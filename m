@@ -1,137 +1,73 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  2 May 2016 20:56:26 -0300
-Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: Add audio support
-Message-ID: <1462233386-23185-1-git-send-email-festevam@gmail.com>
+Date: Mon, 2 May 2016 20:59:17 -0300
+Subject: mx6ul: Finding a good place to configure SAI2_MCLK
+Message-ID: <CAOMZO5CvT1rcHFPm6KoCBBgM1UACByLUQcJ_zDxY9ucbxCpgYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi,
 
-imx6ul-14x14-evk has a wm8960 codec connected via SAI2 port.
+In order to get audio working on imx6ul-evk board we need to enable
+the SAI2 MCLK clock by setting bit 20 (SAI2_MCLK_DIR) of the
+IOMUXC_GPR_GPR1 register.
 
-Add support for it.
+I am not sure where is the appropriate place to set this bit.
 
-Thanks to Petr Kulhavy <brain@jikos.cz> for the hint on initializing
-the PLL4 frequency to get a correct MCLK.
+Doing like this works fine:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Shawn,
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -447,5 +447,6 @@
+ #define IMX6UL_GPR1_ENET2_CLK_OUTPUT           (0x1 << 18)
+ #define IMX6UL_GPR1_ENET_CLK_DIR               (0x3 << 17)
+ #define IMX6UL_GPR1_ENET_CLK_OUTPUT            (0x3 << 17)
++#define IMX6UL_GPR1_SAI2_MCLK_DIR              (0x1 << 20)
 
-In order to get audio functional it is still needed to get bit 20
-of GPR1 register.
+index a38b16b..92cfb0f 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -56,6 +56,19 @@ static inline void imx6ul_enet_init(void)
+        imx6ul_enet_phy_init();
+ }
 
-This is a separate patch though and I will discuss it on another thread.
++static void __init imx6ul_mclk_init(void)
++{
++       struct regmap *gpr;
++
++       gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
++       if (!IS_ERR(gpr))
++               regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_SAI2_MCLK_DIR,
++                                  IMX6UL_GPR1_SAI2_MCLK_DIR);
++       else
++               pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
++
++}
++
+ static void __init imx6ul_init_machine(void)
+ {
+        struct device *parent;
+@@ -68,6 +81,7 @@ static void __init imx6ul_init_machine(void)
+        imx6ul_enet_init();
+        imx_anatop_init();
+        imx6ul_pm_init();
++       imx6ul_mclk_init();
+ }
 
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 75 ++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+but it does not seem correct as this should be board specific. Should
+we call it only if the compatible string matches imx6sl-14x14-evk
+string? Looks like that will not scale as well.
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index 7207280..8b4776a 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -36,6 +36,45 @@
- 			enable-active-high;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "mx6ul-wm8960";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Speaker", "Speaker",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"Headphone Jack", "HP_L",
-+			"Headphone Jack", "HP_R",
-+			"Speaker", "SPK_LP",
-+			"Speaker", "SPK_LN",
-+			"Speaker", "SPK_RP",
-+			"Speaker", "SPK_RN",
-+			"LINPUT1", "Mic Jack",
-+			"LINPUT3", "Mic Jack",
-+			"RINPUT1", "Mic Jack",
-+			"RINPUT2", "Mic Jack";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&clks IMX6UL_CLK_SAI2>;
-+		};
-+	};
-+};
-+
-+&clks {
-+	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <786432000>;
- };
- 
- &cpu0 {
-@@ -43,6 +82,20 @@
- 	soc-supply = <&reg_soc>;
- };
- 
-+&i2c2 {
-+	clock_frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	codec: wm8960 at 1a {
-+		#sound-dai-cells = <0>;
-+		compatible = "wlf,wm8960";
-+		reg = <0x1a>;
-+		wlf,shared-lrclk;
-+	};
-+};
-+
- &fec1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet1>;
-@@ -86,6 +139,17 @@
- 	};
- };
- 
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2>;
-+
-+	assigned-clocks = <&clks IMX6UL_CLK_SAI2_SEL>,
-+			  <&clks IMX6UL_CLK_SAI2>;
-+	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <0>, <12288000>;
-+	status = "okay";
-+};
-+
- &snvs_poweroff {
- 	status = "okay";
- };
-@@ -272,6 +336,17 @@
- 		>;
- 	};
- 
-+	pinctrl_sai2: sai2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
-+			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
-+			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x11088
-+			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x11088
-+			MX6UL_PAD_JTAG_TMS__SAI2_MCLK		0x17088
-+			MX6UL_PAD_SNVS_TAMPER4__GPIO5_IO04	0x17059
-+		>;
-+	};
-+
- 	pinctrl_pwm1: pwm1grp {
- 		fsl,pins = <
- 			MX6UL_PAD_GPIO1_IO08__PWM1_OUT   0x110b0
--- 
-1.9.1
+Currently in arch/arm/mach-imx/mach-imx6ul.c we also have
+imx6ul_enet_clk_init() function which sets the ENET_CLK in the GPR1
+register.
+
+IMHO this is not correct because not all mx6ul boards need such clock
+and then we need to change this too.
+
+So where should we set the SAI2_MCLK_DIR bit of GPR1? Inside the SAI driver?
+
+Appreciate some feedback.
+
+Thanks,
+
+Fabio Estevam
