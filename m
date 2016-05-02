@@ -1,22 +1,19 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 2 May 2016 15:09:09 +0530
-Subject: [PATCH V2] dmaengine: bcm2835: fix typo/added newline in
- legacy-mode warning message
-In-Reply-To: <1461309168-21221-1-git-send-email-kernel@martin.sperl.org>
-References: <1461309168-21221-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20160502093909.GF2274@localhost>
+Date: Mon, 2 May 2016 15:22:15 +0530
+Subject: [PATCH v4 0/3] dmaengine: Add clock support for AXI DMAS
+In-Reply-To: <1461305630-4826-1-git-send-email-appanad@xilinx.com>
+References: <1461305630-4826-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160502095214.GG2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 07:12:48AM +0000, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> Fix typo in warning message that there is no "interrupt-names"
-> property defined in the device-tree and legacy-mode is used.
-> 
-> Also added newline to end of message.
+On Fri, Apr 22, 2016 at 11:43:47AM +0530, Kedareswara rao Appana wrote:
+> This patch series adds basic clock support for AXI DMAS
+> This patch series is created on top of the
+> "dmaengine: vdma: AXI DMA's enhancments" patch series.
 
-Applied, thanks
+This fails due to above series not merged. Please resubmit once that one is
+merged
 
 -- 
 ~Vinod
