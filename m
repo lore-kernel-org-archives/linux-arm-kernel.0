@@ -1,66 +1,137 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Mon, 2 May 2016 14:46:05 -0700
-Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
- SoC PMU DTS binding
-In-Reply-To: <20160502205648.GA7374@rob-hp-laptop>
-References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
- <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
- <20160418170009.GA15338@rob-hp-laptop>
- <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
- <20160420113121.GE2514@arm.com>
- <20160502205648.GA7374@rob-hp-laptop>
-Message-ID: <CACgAJHyT31DuVNoyRQZVKjv=zM5Fc-EY0gy=y=pHHrBTT+1Xow@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  2 May 2016 20:56:26 -0300
+Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: Add audio support
+Message-ID: <1462233386-23185-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Mon, May 2, 2016 at 1:56 PM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Apr 20, 2016 at 12:31:22PM +0100, Will Deacon wrote:
->> On Mon, Apr 18, 2016 at 01:04:53PM -0700, Tai Tri Nguyen wrote:
->> > >> +Required properties for MCB subnode:
->> > >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
->> > >> +- reg                        : First resource shall be the MCB PMU resource.
->> > >> +- index                      : Instance number of the MCB PMU.
->> > >> +
->> > >> +Required properties for MC subnode:
->> > >> +- compatible         : Shall be "apm,xgene-pmu-mc".
->> > >> +- reg                        : First resource shall be the MC PMU resource.
->> > >> +- index                      : Instance number of the MC PMU.
->> > >
->> > > Don't use indexes. You probably need phandles to the nodes these are
->> > > related to.
->> > >
->> > > How many variations of child nodes do you expect to have? 2, 10, 50? You
->> > > might want to just collapse all this down to a single node and put this
->> > > information in the driver if it is fixed for each SoC and there's only a
->> > > handful.
->> > >
->> >
->> > For each kind of PMU, for example memory controller PMU, I expect to
->> > have the number of instances up to 8.
->> > They are actually all independent PMU nodes and have their own CSR memory bases.
->> > The indexes are used for exposing the devices to perf user only. It
->> > doesn't have an impact on the programming model.
->> > Mark also had the same concern.
->>
->> Regardless, I'll need an ack from Rob or Mark before I can merge this.
->
-> I still have a concern with this. Needing an index to expose to the user
-> is generally not a valid reason. That's OS specific and therefore
-> doesn't belong in DT.
->
-> Rob
+imx6ul-14x14-evk has a wm8960 codec connected via SAI2 port.
 
-I can use device name here. However, the perf event names will be
-different between DT and ACPI which I want to avoid.
-And the names don't look good at all.
-Also, specifically for MC and MCB PMUs, the indexes are compared
-against the active MC/MCB mask to find out whether they are populated
-or not.
-Without using the index property, I will also need a mapping function
-of physical device addresses and their physical ids.
+Add support for it.
 
-Thanks,
+Thanks to Petr Kulhavy <brain@jikos.cz> for the hint on initializing
+the PLL4 frequency to get a correct MCLK.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Shawn,
+
+In order to get audio functional it is still needed to get bit 20
+of GPR1 register.
+
+This is a separate patch though and I will discuss it on another thread.
+
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 75 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 7207280..8b4776a 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -36,6 +36,45 @@
+ 			enable-active-high;
+ 		};
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "mx6ul-wm8960";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Line", "Line In",
++			"Line", "Line Out",
++			"Speaker", "Speaker",
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
++			"Headphone Jack", "HP_L",
++			"Headphone Jack", "HP_R",
++			"Speaker", "SPK_LP",
++			"Speaker", "SPK_LN",
++			"Speaker", "SPK_RP",
++			"Speaker", "SPK_RN",
++			"LINPUT1", "Mic Jack",
++			"LINPUT3", "Mic Jack",
++			"RINPUT1", "Mic Jack",
++			"RINPUT2", "Mic Jack";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++		};
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&codec>;
++			clocks = <&clks IMX6UL_CLK_SAI2>;
++		};
++	};
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
++	assigned-clock-rates = <786432000>;
+ };
+ 
+ &cpu0 {
+@@ -43,6 +82,20 @@
+ 	soc-supply = <&reg_soc>;
+ };
+ 
++&i2c2 {
++	clock_frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	codec: wm8960 at 1a {
++		#sound-dai-cells = <0>;
++		compatible = "wlf,wm8960";
++		reg = <0x1a>;
++		wlf,shared-lrclk;
++	};
++};
++
+ &fec1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet1>;
+@@ -86,6 +139,17 @@
+ 	};
+ };
+ 
++&sai2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++
++	assigned-clocks = <&clks IMX6UL_CLK_SAI2_SEL>,
++			  <&clks IMX6UL_CLK_SAI2>;
++	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
++	assigned-clock-rates = <0>, <12288000>;
++	status = "okay";
++};
++
+ &snvs_poweroff {
+ 	status = "okay";
+ };
+@@ -272,6 +336,17 @@
+ 		>;
+ 	};
+ 
++	pinctrl_sai2: sai2grp {
++		fsl,pins = <
++			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
++			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
++			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x11088
++			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x11088
++			MX6UL_PAD_JTAG_TMS__SAI2_MCLK		0x17088
++			MX6UL_PAD_SNVS_TAMPER4__GPIO5_IO04	0x17059
++		>;
++	};
++
+ 	pinctrl_pwm1: pwm1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_GPIO1_IO08__PWM1_OUT   0x110b0
 -- 
-Tai
+1.9.1
