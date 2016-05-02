@@ -1,165 +1,84 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon,  2 May 2016 09:06:51 +0200
-Subject: [PATCH v5] ARM: bcm2835: dt: Add the ethernet to the device trees
-Message-ID: <1462172811-24206-1-git-send-email-lkundrak@v3.sk>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon,  2 May 2016 12:34:59 +0530
+Subject: [PATCH v2 0/5] Implement SoC bus driver for Vybrid
+Message-ID: <cover.1462171989.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hub and the ethernet in its port 1 are hardwired on the board.
+Hello,
 
-Compared to the adapters that can be plugged into the USB ports, this
-one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
-has the MAC address for this adapter in its ROM, accessible from its
-firmware.
+This second patch series is rebased on top of shawn's for-next branch
+and tested on Colibri Vybrid VF50 and VF61 modules.
 
-U-Boot can read out the address and set the local-mac-address property of the
-node with "ethernet" alias. Let's add the node so that U-Boot can do its
-business.
+This patchset implements SoC bus support for Freescale Vybrid platform,
+implementing the following
+https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
 
-Model B rev2 and Model B+ entries were verified by me, the hierarchy and
-pid/vid pair for the Version 2 was provided by Peter Chen. Original
-Model B is a blind shot, though very likely correct.
+This a reworked version of an older patchset series posted in June 2015
+which was at v5 then [1]. Since the NVMEM framework was then getting
+introduced, we decided that first a NVMEM driver for OCOTP peripheral
+being in place would be better.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
----
-Changes since v4:
-  - A whitespace fix
+Compared to the older revisions, this driver now relies on NVMEM
+consumer API using the NVMEM based vf610_ocotp driver which has
+already been in mainline for a while now. Also now a new syscon
+abstraction "syscon_regmap_read_from_offset" is implemented and
+exported from syscon allowing accessing a register from a syscon
+reference like this
 
-Changes since v3:
-  - Include the ethernet alias in 9514 dtsi too
+ocotp-cfg1 = <&ocotp 0x20>;
 
-Changes since v2:
-  - Removed leading zeroes in vendor name and reg
-  - Split the common files in separate includes per model
+avoiding code repetition in the driver.
+
+One point on which we were not sure here is whether we really should
+introduce a new Kconfig symbol as being introduced here. While we
+could just enable it when SOC_VF610 is selected, this however would
+introduce circular dependencies.
+
+Feedback is most welcome.
 
 Changes since v1:
-  - s/@01/@1/ for ethernet and the hub
-  - Corrected the vid/pid pairs for hub and ethernet
-  - Added Model B rev2 and version 2 board changes
-  - Fixed a missing semicolon typo
+Add device tree binding documentation.
 
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts         |  1 +
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |  1 +
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi              |  2 ++
- 7 files changed, 44 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+v1 new patchset
+https://lkml.org/lkml/2016/3/11/132
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index ef54050..c3e01ce 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 86f1f2f..364086a 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 4859e9d..4420b09 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index ff94666..b975f29 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2836.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
- 
- / {
- 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-new file mode 100644
-index 0000000..12c981e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9512";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-new file mode 100644
-index 0000000..3f0a56e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9514";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 8aaf193..04504b7 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -230,6 +230,8 @@
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
- 			interrupts = <1 9>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 	};
- 
+[1] Older v5:
+http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
+Even earlier versions:
+Version 4 of the patchset can be found here
+https://lkml.org/lkml/2015/5/26/199
+Version 3 of the patchset can be found here
+http://www.spinics.net/lists/arm-kernel/msg420847.html
+Version 2 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80654.html
+Version 1 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80257.html
+The RFC version can be found here
+https://lkml.org/lkml/2015/5/11/13
+
+Regards,
+Sanchayan.
+
+Sanchayan Maity (5):
+  mfd: syscon: Introduce syscon_regmap_read_from_offset
+  ARM: dts: vfxxx: Add device tree node for OCOTP
+  ARM: dts: vfxxx: Add OCROM and phandle entries for Vybrid SoC bus driver
+  soc: Add SoC bus driver for Freescale Vybrid Platform
+  vf610-soc: Add Vybrid SoC device tree binding documentation
+
+ .../bindings/arm/freescale/fsl,vf610-soc.txt       |  35 +++++
+ arch/arm/boot/dts/vfxxx.dtsi                       |  28 +++-
+ drivers/mfd/syscon.c                               |  30 ++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/fsl/Kconfig                            |  10 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/soc-vf610.c                        | 160 +++++++++++++++++++++
+ include/linux/mfd/syscon.h                         |  10 ++
+ 8 files changed, 274 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/soc-vf610.c
+
 -- 
-2.7.4
+2.8.2
