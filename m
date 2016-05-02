@@ -1,40 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 May 2016 16:40:23 +0100
-Subject: [PATCH v6] spi: orion.c: Add direct access mode
-In-Reply-To: <8919835.yGyvx4h0Tr@wuerfel>
-References: <1461147068-4829-1-git-send-email-sr@denx.de>
- <5726F7F3.9070700@denx.de> <8919835.yGyvx4h0Tr@wuerfel>
-Message-ID: <20160502154023.GI6292@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 May 2016 17:40:30 +0200
+Subject: [question] pread2, pwrite2 unistd symbols for compat
+In-Reply-To: <20160502152248.GA716@lst.de>
+References: <20160502134706.GA11396@yury-N73SV> <9552994.HgmuyIW9Ty@wuerfel>
+ <20160502152248.GA716@lst.de>
+Message-ID: <1979597.XqcnTZ9GDk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 09:28:34AM +0200, Arnd Bergmann wrote:
-> On Monday 02 May 2016 08:47:15 Stefan Roese wrote:
+On Monday 02 May 2016 17:22:48 Christoph Hellwig wrote:
+> On Mon, May 02, 2016 at 05:20:22PM +0200, Arnd Bergmann wrote:
+> > After I got the original patch from Andre and the same one from Christoph,
+> > I did not consider the possibility that they were both wrong and so I
+> > applied Andre's version.
+> 
+> It's because adding syscalls is simple a giant pain, full of pitfalls
+> that are completely non-obvious.  When asked to add syscalls for
+> architectures I can't personally test I'll have to rely on the test
+> bot giving me some feedback - and it seems the wrong thing here will
+> just silently pass without any notice.
+> 
+> The change looks fine to me, but then again I just demonstrated a complete
+> lack of clue on asm-generic syscalls..
 
-> > Its been a while since v6 of this direct write access mode has been
-> > posted. This is a gentle ping on its status.
+Ok, so I didn't miss anything obvious here and will forward the patch
+as soon as Yury sends it.
 
-> > Arnd / Mark, do you have any additional change requests or are you okay
-> > with the current version?
+I guess this is one more reason for me to finally do the job of
+generalizing the system call tables to the point where we only
+add them in one place of the kernel. There are probably 22 new syscalls
+we need for 64-bit time_t, so doing it right then can also some
+copy-paste errors.
 
-Please don't send content free pings and please allow a reasonable time
-for review.  People get busy, go on holiday, attend conferences and so 
-on so unless there is some reason for urgency (like critical bug fixes)
-please allow at least a couple of weeks for review.  If there have been
-review comments then people may be waiting for those to be addressed.
-Sending content free pings just adds to the mail volume (if they are
-seen at all) and if something has gone wrong you'll have to resend the
-patches anyway.
-
-> - you now always send a multiple of four byte in each transfer, are
->   there any downsides in doing this, e.g. some SPI devices that might
->   get confused by receiving additional uninitialized data?
-
-Yes, this will break a large proportion of devices.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160502/b84af846/attachment.sig>
+	Arnd
