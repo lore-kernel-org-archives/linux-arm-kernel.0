@@ -1,66 +1,53 @@
-From: Linux.HWI@garmin.com (J.D. Schroeder)
-Date: Mon, 2 May 2016 12:12:01 -0500
-Subject: [PATCH v2 1/3] DRA7: Fix clock data for gmac_gmii_ref_clk_div
-In-Reply-To: <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
-References: <20160427171658.GA5995@atomide.com>
- <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
-Message-ID: <1462209123-7332-2-git-send-email-Linux.HWI@garmin.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon,  2 May 2016 13:27:54 -0400
+Subject: [PATCH] s5p-mfc: Don't try to put pm->clock if lookup failed
+Message-ID: <1462210075-5320-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "J.D. Schroeder" <jay.schroeder@garmin.com>
+Failing to get the struct s5p_mfc_pm .clock is a non-fatal error so the
+clock field can have a errno pointer value. But s5p_mfc_final_pm() only
+checks if .clock is not NULL before attempting to unprepare and put it.
 
-This commit fixes the clock data inside the DRA7xx clocks device tree
-structure for the gmac_gmii_ref_clk_div clock. This clock is actually
-the GMAC_MAIN_CLK and has nothing to do with the register at address
-0x4a0093d0. If CLKSEL_REF bit 24 inside of CM_GMAC_GMAC_CLKCTRL, is
-set to 1 in order to use the GMAC_RMII_CLK instead of the
-GMAC_RMII_HS_CLK, the kernel generates a clock divider warning:
-    WARNING: CPU: 0 PID: 0 at drivers/clk/clk-divider.c:129 clk_divider_recalc_rate+0xa8/0xe0()
-    gmac_gmii_ref_clk_div: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set
+This leads to the following warning in clk_put() due s5p_mfc_final_pm():
 
-By properly configuring the gmac_gmii_ref_clk_div (GMAC_MAIN_CLK) to
-have the parent of dpll_gmac_m2_ck always divided by 2 the warning is
-resolved and the clock tree is fixed up.
+WARNING: CPU: 3 PID: 1023 at drivers/clk/clk.c:2814 s5p_mfc_final_pm+0x48/0x74 [s5p_mfc]
+CPU: 3 PID: 1023 Comm: rmmod Tainted: G        W       4.6.0-rc6-next-20160502-00005-g5a15a49106bc #9
+Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[<c010e1bc>] (unwind_backtrace) from [<c010af28>] (show_stack+0x10/0x14)
+[<c010af28>] (show_stack) from [<c032485c>] (dump_stack+0x88/0x9c)
+[<c032485c>] (dump_stack) from [<c011b8e8>] (__warn+0xe8/0x100)
+[<c011b8e8>] (__warn) from [<c011b9b0>] (warn_slowpath_null+0x20/0x28)
+[<c011b9b0>] (warn_slowpath_null) from [<bf16004c>] (s5p_mfc_final_pm+0x48/0x74 [s5p_mfc])
+[<bf16004c>] (s5p_mfc_final_pm [s5p_mfc]) from [<bf157414>] (s5p_mfc_remove+0x8c/0x94 [s5p_mfc])
+[<bf157414>] (s5p_mfc_remove [s5p_mfc]) from [<c03fe1f8>] (platform_drv_remove+0x24/0x3c)
+[<c03fe1f8>] (platform_drv_remove) from [<c03fcc70>] (__device_release_driver+0x84/0x110)
+[<c03fcc70>] (__device_release_driver) from [<c03fcdd8>] (driver_detach+0xac/0xb0)
+[<c03fcdd8>] (driver_detach) from [<c03fbff8>] (bus_remove_driver+0x4c/0xa0)
+[<c03fbff8>] (bus_remove_driver) from [<c01886a8>] (SyS_delete_module+0x174/0x1b8)
+[<c01886a8>] (SyS_delete_module) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
 
-Additionally, a new clock called rmii_50mhz_clk_mux is defined that
-does utilize CM_GMAC_GMAC_CLKCTRL[24] CLKSEL_REF to configure the
-source clock for the RMII_50MHZ_CLK.
+So check if the pointer is not an errno value before calling clk_put().
 
-Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
-Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 8378b44..3f0c61d 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1718,13 +1718,20 @@
- 		reg = <0x0c00>;
- 	};
- 
--	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div at 13d0 {
-+	rmii_50mhz_clk_mux: rmii_50mhz_clk_mux at 13d0 {
- 		#clock-cells = <0>;
--		compatible = "ti,divider-clock";
--		clocks = <&dpll_gmac_m2_ck>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&dpll_gmac_h11x2_ck>, <&rmii_clk_ck>;
- 		ti,bit-shift = <24>;
- 		reg = <0x13d0>;
--		ti,dividers = <2>;
-+	};
-+
-+	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&dpll_gmac_m2_ck>;
-+		clock-mult = <1>;
-+		clock-div = <2>;
- 	};
- 
- 	gmac_rft_clk_mux: gmac_rft_clk_mux at 13d0 {
+ drivers/media/platform/s5p-mfc/s5p_mfc_pm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+index 5f97a3398c11..d011f30be265 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+@@ -85,7 +85,7 @@ err_g_ip_clk:
+ void s5p_mfc_final_pm(struct s5p_mfc_dev *dev)
+ {
+ 	if (dev->variant->version != MFC_VERSION_V6 &&
+-	    pm->clock) {
++	    !IS_ERR_OR_NULL(pm->clock)) {
+ 		clk_disable_unprepare(pm->clock);
+ 		clk_put(pm->clock);
+ 	}
 -- 
-1.9.1
+2.5.5
