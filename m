@@ -1,75 +1,38 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  3 May 2016 11:33:39 -0600
-Subject: [PATCH 05/27] coresight: stm: Bindings for System Trace Macrocell
+Date: Tue,  3 May 2016 11:33:41 -0600
+Subject: [PATCH 07/27] coresight: etb10: fixing the right amount of words to
+ read
 In-Reply-To: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1462296841-12327-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1462296841-12327-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Trace Macrocell (STM) is an IP block falling under the
-CoreSight umbrella.  It's main purpose it so expose stimulus channels
-to any system component for the purpose of information logging.
+This patch rectifies the amount of words to read when the internal
+buffer is deemed bigger than the amount of space available in the
+perf ring buffer.
 
-Bindings for this IP block adds a couple of items to the current
-mandatory definition for CoreSight components.
+The amount to read is set to the amount of space in the perf ring
+buffer rather than being subtracted by it.
 
+Reported-by: Suzuki K Poulose <Suzuki.Poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 ---
- .../devicetree/bindings/arm/coresight.txt          | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/hwtracing/coresight/coresight-etb10.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 62938eb9697f..93147c0c8a0e 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -19,6 +19,7 @@ its hardware characteristcs.
- 		- "arm,coresight-etm3x", "arm,primecell";
- 		- "arm,coresight-etm4x", "arm,primecell";
- 		- "qcom,coresight-replicator1x", "arm,primecell";
-+		- "arm,coresight-stm", "arm,primecell"; [1]
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 2461d5c8c157..b0d402dbfeae 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -440,7 +440,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 		u32 mask = ~(ETB_FRAME_SIZE_WORDS - 1);
  
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
-@@ -36,6 +37,14 @@ its hardware characteristcs.
- 	  layout using the generic DT graph presentation found in
- 	  "bindings/graph.txt".
- 
-+* Additional required properties for System Trace Macrocells (STM):
-+	* reg: along with the physical base address and length of the register
-+	  set as described above, another entry is required to describe the
-+	  mapping of the extended stimulus port area.
-+
-+	* reg-names: the only acceptable values are "stm-base" and
-+	  "stm-stimulus-base", each corresponding to the areas defined in "reg".
-+
- * Required properties for devices that don't show up on the AMBA bus, such as
-   non-configurable replicators:
- 
-@@ -202,3 +211,22 @@ Example:
- 			};
- 		};
- 	};
-+
-+4. STM
-+	stm at 20100000 {
-+		compatible = "arm,coresight-stm", "arm,primecell";
-+		reg = <0 0x20100000 0 0x1000>,
-+		      <0 0x28000000 0 0x180000>;
-+		reg-names = "stm-base", "stm-stimulus-base";
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		port {
-+			stm_out_port: endpoint {
-+				remote-endpoint = <&main_funnel_in_port2>;
-+			};
-+		};
-+	};
-+
-+[1]. There is currently two version of STM: STM32 and STM500.  Both
-+have the same HW interface and as such don't need an explicit binding name.
+ 		/* The new read pointer must be frame size aligned */
+-		to_read -= handle->size & mask;
++		to_read = handle->size & mask;
+ 		/*
+ 		 * Move the RAM read pointer up, keeping in mind that
+ 		 * everything is in frame size units.
 -- 
 2.5.0
