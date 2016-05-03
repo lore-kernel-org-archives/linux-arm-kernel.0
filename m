@@ -1,88 +1,59 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue, 3 May 2016 20:50:43 +0800
-Subject: [PATCH] iommu/arm-smmu: clear cache lock bit of ACR
-In-Reply-To: <57288868.9020908@arm.com>
-References: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
- <57288868.9020908@arm.com>
-Message-ID: <20160503125041.GA18127@linux-7smt.suse>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 May 2016 20:52:22 +0800
+Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: Add audio support
+In-Reply-To: <1462233386-23185-1-git-send-email-festevam@gmail.com>
+References: <1462233386-23185-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160503125222.GK5874@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, May 02, 2016 at 08:56:26PM -0300, Fabio Estevam wrote:
+> @@ -86,6 +139,17 @@
+>  	};
+>  };
+>  
+> +&sai2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_sai2>;
+> +
 
-On Tue, May 03, 2016 at 12:15:52PM +0100, Robin Murphy wrote:
->On 03/05/16 11:15, Peng Fan wrote:
->>According MMU-500 TRM, section 3.7.1 Auxiliary Control registers,
->>You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
->>
->>So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
->>need clear CACHE_LOCK bit of ACR register first.
->
->Ah, good catch - I think I misread CACHE_LOCK as resetting to 0, and
->proceeded to forget about it. However, it's only present in MMU-500r2
->onwards, so we'd also want to check IDR7 before touching ACR.
+Forgot to mention that I dropped this newline when applying.
 
-Thanks for comments. I'll add code to check IDR7 and send out V2.
+Shawn
 
-Thanks,
-Peng.
-
->
->Thanks,
->Robin.
->
->>Signed-off-by: Peng Fan <van.freenix@gmail.com>
->>Cc: Will Deacon <will.deacon@arm.com>
->>Cc: Robin Murphy <robin.murphy@arm.com>
->>---
->>
->>Hi Will,
->>
->>  Patch based on iommu/devel branch.
->>
->>
->>  drivers/iommu/arm-smmu.c | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->>diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>index acff332..d094a5a 100644
->>--- a/drivers/iommu/arm-smmu.c
->>+++ b/drivers/iommu/arm-smmu.c
->>@@ -98,6 +98,9 @@
->>  #define sCR0_BSU_SHIFT			14
->>  #define sCR0_BSU_MASK			0x3
->>
->>+/* Auxiliary Configuration register */
->>+#define ARM_SMMU_GR0_sACR		0x10
->>+
->>  /* Identification registers */
->>  #define ARM_SMMU_GR0_ID0		0x20
->>  #define ARM_SMMU_GR0_ID1		0x24
->>@@ -235,6 +238,8 @@
->>
->>  #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
->>
->>+#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
->>+
->>  #define CB_PAR_F			(1 << 0)
->>
->>  #define ATSR_ACTIVE			(1 << 0)
->>@@ -1506,6 +1511,16 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->>  		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
->>  	}
->>
->>+	/*
->>+	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
->>+	 * clear CACHE_LOCK bit of ACR first.
->>+	 */
->>+	if (smmu->model == ARM_MMU500) {
->>+		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
->>+		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
->>+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
->>+	}
->>+
->>  	/* Make sure all context banks are disabled and clear CB_FSR  */
->>  	for (i = 0; i < smmu->num_context_banks; ++i) {
->>  		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
->>
->
+> +	assigned-clocks = <&clks IMX6UL_CLK_SAI2_SEL>,
+> +			  <&clks IMX6UL_CLK_SAI2>;
+> +	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
+> +	assigned-clock-rates = <0>, <12288000>;
+> +	status = "okay";
+> +};
+> +
+>  &snvs_poweroff {
+>  	status = "okay";
+>  };
+> @@ -272,6 +336,17 @@
+>  		>;
+>  	};
+>  
+> +	pinctrl_sai2: sai2grp {
+> +		fsl,pins = <
+> +			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
+> +			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
+> +			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x11088
+> +			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x11088
+> +			MX6UL_PAD_JTAG_TMS__SAI2_MCLK		0x17088
+> +			MX6UL_PAD_SNVS_TAMPER4__GPIO5_IO04	0x17059
+> +		>;
+> +	};
+> +
+>  	pinctrl_pwm1: pwm1grp {
+>  		fsl,pins = <
+>  			MX6UL_PAD_GPIO1_IO08__PWM1_OUT   0x110b0
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
