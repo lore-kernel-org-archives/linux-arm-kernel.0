@@ -1,84 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 May 2016 11:47:37 +0100
-Subject: [PATCH v2 50/54] KVM: arm/arm64: vgic-new: vgic_init: implement
- map_resources
-In-Reply-To: <1461861973-26464-51-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-51-git-send-email-andre.przywara@arm.com>
-Message-ID: <572881C9.300@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 03 May 2016 19:48:24 +0900
+Subject: [PATCH v2 0/8] PM / devfreq: Add NoCP devfreq-event and support
+ busfreq on exyno5422-odroidxu3
+In-Reply-To: <20160503102922.GD3956@kozik-lap>
+References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
+ <20160503102922.GD3956@kozik-lap>
+Message-ID: <572881F8.3020701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/16 17:46, Andre Przywara wrote:
-> From: Eric Auger <eric.auger@linaro.org>
+Hi Krzysztof,
+
+On 2016? 05? 03? 19:29, Krzysztof Kozlowski wrote:
+> On Fri, Apr 15, 2016 at 03:32:47PM +0900, Chanwoo Choi wrote:
+>> This patchset support the AMBA bus frequency scaling on Exynos5422-based
+>> Odroid-XU3 board. But, this series only support the bus frequency scaling
+>> for INT (Internal) block using VDD_INT power line.
+>>
+>> Also, to support the bus frequency scaling for Exynos542x SoC,
+>> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
+>> to measure the transfered data traffic on NoC (Network on Chip)
+>> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
+>> provide the utilization for INT block of Exynos542x SoC.
+>>
+>> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
+>> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
+>> Just add the phandle of 'NoC Probe' dt node to bus dt node.
+>>
+>> Depend on:
+>> This patchset depends on patch[1] which support the generic exynos-bus
+>> frequency driver.
+>> [1] http://www.spinics.net/lists/arm-kernel/msg495976.html
+>> - [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
+>>
+>>
+>> Changse from v1:
+>> (https://lkml.org/lkml/2016/4/8/28)
+>> - Simplify the documentation of exynos-nocp.txt
+>> - Check the return value of regmap function
+>> - Modify Device Tree node name using general device name
+>>  : nocp_memX_X@ nocp_memX_X -> nocp_memX_X@ nocp
+>> - Fix wrong node name about nocp device tree node
+>> - Drop the CLK_SET_RATE_PARENT flag
+>> - Reorder bus device tree node alpabetically
+>> - Add the tested-by tag from Anand Moon and Markus Reichl
+>> - Add the reviewed-by tag to patch5/7 from Exynos SoC Maintainer
+>> - Add patch2 to modify the devfreq_event_get_edev_by_phandle()
+>>   to get the instance of devfreq-event device by using the phandle
+>>
+>> Chanwoo Choi (8):
+>>   PM / devfreq: event: Add new Exynos NoC probe driver
+>>   PM / devfreq: event: Find the instance of devfreq-event device by using phandle
+>>   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
+>>   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
+>>   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
+>>   clk: samsung: exynos542x: Add the clock id for ACLK
+>>   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
+>>   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
 > 
-> map_resources is the last initialization step. It is executed on
-> 1st VCPU run. At that stage the code checks the userspace has provided
-> the base addresses for the relevant VGIC regions, which depend on
-> the type of VGIC that is exposed to the guest.
 > 
-> The function also forces the vgic_init if it has not been executed yet
-> (only allowed for VGIC v2).
-> 
-> for GICv2, The VGIC CPU interface is mapped onto the GIC virtual CPU
-> interface.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/vgic/vgic.h       |  1 +
->  virt/kvm/arm/vgic/vgic-init.c | 27 +++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v2.c   | 47 +++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c   | 44 ++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h      | 16 +++++++++++++++
->  5 files changed, 135 insertions(+)
+> Applied DTS patches for late v4.7 (hopefully).
 
-[...]
+Thanks for your review and apply.
 
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 444210f..f970e3e 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -43,6 +43,9 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v2_enable(struct kvm_vcpu *vcpu);
->  int vgic_v2_probe(struct device_node *vgic_node);
-> +int vgic_v2_map_resources(struct kvm *kvm);
-> +int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
-> +			     enum vgic_type);
->  
->  #ifdef CONFIG_KVM_ARM_VGIC_V3
->  void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
-> @@ -54,6 +57,8 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v3_enable(struct kvm_vcpu *vcpu);
->  int vgic_v3_probe(struct device_node *vgic_node);
-> +int vgic_v3_map_resources(struct kvm *kvm);
-> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
->  #else
->  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
->  {
-> @@ -94,6 +99,17 @@ static inline int vgic_v3_probe(struct device_node *vgic_node)
->  {
->  	return -ENODEV;
->  }
-> +
-> +static inline int vgic_v3_map_resources(struct kvm *kvm)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +static inline int vgic_register_redist_iodevs(struct kvm *kvm,
-> +					      gpa_t dist_base_address)
-> +{
-> +	return -ENODEV;
-> +}
-
-It would make sense to move this stub to patch 32, where the non-stub
-implementation is.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best Regards,
+Chanwoo Choi
