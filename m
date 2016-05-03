@@ -1,82 +1,108 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 May 2016 12:02:25 +0100
-Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <CAKc_7PU1AszF4y0OjZ3KVGaTEx9OL1cuT5YgOxQKhAQgQom7tA@mail.gmail.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-3-git-send-email-tn@semihalf.com>
- <20160427022649.GD6789@localhost> <20160427111758.GA6234@red-moon>
- <57274B8C.5030304@semihalf.com>
- <CAKc_7PU1AszF4y0OjZ3KVGaTEx9OL1cuT5YgOxQKhAQgQom7tA@mail.gmail.com>
-Message-ID: <20160503110225.GA1055@red-moon>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 3 May 2016 13:07:32 +0200
+Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
+In-Reply-To: <1461333147-11873-2-git-send-email-harald@ccbib.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <1461333147-11873-2-git-send-email-harald@ccbib.org>
+Message-ID: <57288674.9050601@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 06:56:13PM +0530, Jayachandran C wrote:
-> On Mon, May 2, 2016 at 6:13 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> > On 04/27/2016 01:17 PM, Lorenzo Pieralisi wrote:
-> >>
-> >> On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
-> >>>
-> >>> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
-> >
-> > [...]
-> >
-> >>>   +int acpi_pci_bus_domain_nr(struct device *parent)
-> >>> +{
-> >>> +       struct acpi_device *acpi_dev = to_acpi_device(parent);
-> >>> +       unsigned long long segment = 0;
-> >>> +       acpi_status status;
-> >>> +
-> >>> +       /*
-> >>> +        * If _SEG method does not exist, following ACPI spec (6.5.6)
-> >>> +        * all PCI buses belong to domain 0.
-> >>> +        */
-> >>> +       status = acpi_evaluate_integer(acpi_dev->handle,
-> >>> METHOD_NAME__SEG, NULL,
-> >>> +                                      &segment);
-> >>> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
-> >>> don't want to evaluate it *twice*, do we?
-> >>>
-> >>> I was sort of expecting that if you added it here, we'd remove the
-> >>> existing call, but it looks like you're keeping both?
-> >>
-> >> We can't remove the existing call, since it is used on X86 and IA64
-> >> to store the segment number that, in the process, is used in their
-> >> pci_domain_nr() arch specific callback to retrieve the domain nr.
-> >>
-> >> On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
-> >> to retrieve the domain number that is not arch dependent, since
-> >> this is generic code, we can't rely on any bus->sysdata format (unless
-> >> we do something like JC did below), therefore the only way is to call
-> >> the _SEG method *again* here, which also forced Tomasz to go through
-> >> the ACPI_COMPANION setting song and dance and pass the parent pointer
-> >> to pci_create_root_bus() (see patch 1), which BTW is a source of
-> >> trouble on its own as you noticed.
-> >
-> > What trouble in patch 1 do you mean? I may miss something.
-> >
-> > I agree that patch 1 is not necessary if we decide to use sysdata or rework
-> > root bus scanning to move domain to host bridge. Nevertheless, patch 1 is
-> > still a cleanup IMO.
-> 
-> In this case, getting the domain should be trivial since the ACPI
-> companion on parent is already set, this should work
-> 
-> int acpi_pci_bus_domain_nr(struct device *parent)
-> {
->         struct acpi_device *acpi_dev = to_acpi_device(parent);
->         struct acpi_pci_root *root = acpi_dev->driver_data;
-> 
->         return root->segment;
-> }
-> 
-> Or am I missing something here?
+Hi Harald,
 
-Well, I thought that the whole idea behind this exercise was to move
-the domain number into struct pci_host_bridge (Arnd did not do it with
-his first set but this does not mean we can't add it as Bjorn suggested),
-so that the domain number could be read from there straight away in an
-arch (and FW) independent manner, right ?
+Am 22.04.2016 um 15:52 schrieb Harald Geyer:
+> The hardware has two current sources ISRC0 and ISRC1 to allow measuring
+> resistors without additional circuitry. This commit makes them available
+> as regulators.
+>
+> Tested on an imx233-olinuxino board.
+>
+> Signed-off-by: Harald Geyer <harald@ccbib.org>
+> ---
+> The current regulator API doesn't fit this type of device very well: Typically
+> consumers will want to set a defined current, ie. min_uA == max_uA, but they
+> can't without help from configuration data, because the valid values aren't
+> reported by the API for current regulators. I have been thinking about
+> extending the API, but currently AFAIK no such consumers exist and most
+> users, like myself, will force the regulator to a defined value in
+> devicetree anyway.
+>
+>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>  drivers/iio/adc/Kconfig                            |   1 +
+>  drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
+>  3 files changed, 182 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+> index 555fb11..983952c 100644
+> --- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+> +++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+> @@ -19,6 +19,15 @@ Optional properties:
+>  - fsl,settling: delay between plate switch to next sample. Allowed value is
+>                  1 ... 2047. It counts at 2 kHz and its default is
+>                  10 (= 5 ms)
+> +- ISRC0: A node describing the regulator of internal current source 0
+> +- ISRC1: A node describing the regulator of internal current source 1
+> +
+> +Required properties for the ISRCx sub-nodes:
+> +- regulator-max-microamp: See standard regulator binding documentation.
+> +                          Valid values are from 0 to 300 in steps of 20.
+> +
+> +Optional properties for the ISRCx sub-nodes:
+> +Any standard regulator properties that apply to current regulators.
+>  
+>  Example for i.MX23 SoC:
+>  
+> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
+>  		fsl,ave-ctrl = <4>;
+>  		fsl,ave-delay = <2>;
+>  		fsl,settling = <10>;
+> +
+> +		isrc_lradc0: ISRC0 {
+> +			regulator-max-microamp = <300>;
+> +		};
+> +
+> +		isrc_lradc1: ISRC1 {
+> +			regulator-max-microamp = <120>;
+> +			regulator-min-microamp = <120>;
+> +			regulator-always-on;
+> +		};
 
-Lorenzo
+IMHO the binding should represent the direct connection between the
+current source and the physical channel. I think a node label isn't
+enough. Unfortunately i don't have an idea to do it the "right way".
+
+>  	};
+>  
+>  Example for i.MX28 SoC:
+> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
+>  		fsl,ave-ctrl = <4>;
+>  		fsl,ave-delay = <2>;
+>  		fsl,settling = <10>;
+> +
+> +		isrc_lradc0: ISRC0 {
+> +			regulator-max-microamp = <300>;
+> +		};
+> +
+> +		isrc_lradc6: ISRC1 {
+> +			regulator-max-microamp = <120>;
+> +			regulator-min-microamp = <120>;
+> +			regulator-always-on;
+> +		};
+>  	};
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 5937030..1968d1c 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -319,6 +319,7 @@ config MXS_LRADC
+>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+>          depends on INPUT
+> +        depends on REGULATOR
+
+Any chance to avoid this dependency for an optional feature?
+
+Stefan
+
+>          select STMP_DEVICE
+>          select IIO_BUFFER
+>          select IIO_TRIGGERED_BUFFER
