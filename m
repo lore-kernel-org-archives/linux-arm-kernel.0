@@ -1,49 +1,70 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  3 May 2016 17:23:28 +0200
-Subject: [PATCH] drm: sun4i: print DMA address correctly
-Message-ID: <1462289020-774976-1-git-send-email-arnd@arndb.de>
+Date: Tue,  3 May 2016 17:26:53 +0200
+Subject: [PATCH 1/2] pinctrl: nomadik: hide nmk_gpio_get_mode when unused
+Message-ID: <1462289221-861102-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added sun4i drm driver prints a dma address using the %x
-format string, which cannot work when dma_addr_t is 64 bit,
-and gcc warns about this configuration:
+nmk_gpio_get_mode is only used in one place, and that is conditionally
+compiled if DEBUG_FS is enabled. A recent cleanup has marked the
+definition 'static', which now leads to a warning:
 
-drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_update_layer_buffer':
-drm/sun4i/sun4i_backend.c:193:84: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-  DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
-drm/sun4i/sun4i_backend.c:201:84: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-  DRM_DEBUG_DRIVER("Setting buffer address to 0x%x\n", paddr);
+drivers/pinctrl/nomadik/pinctrl-nomadik.c:614:12: error: 'nmk_gpio_get_mode' defined but not used [-Werror=unused-function]
+ static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
+            ^~~~~~~~~~~~~~~~~
 
-This changes the code to use the explicit %pad format string, which
-always prints the right length.
+Moving the function itself inside the #ifdef shuts it up again.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 5e81e0a0913c ("pinctrl: nomadik: use BIT() with offsets consequently")
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index f7a15c1a93bf..3ab560450a82 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -190,7 +190,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	/* Get the physical address of the buffer in memory */
- 	gem = drm_fb_cma_get_gem_obj(fb, 0);
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index e5c71acd9506..ccbfc325c778 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -611,20 +611,6 @@ static int __maybe_unused nmk_prcm_gpiocr_get_mode(struct pinctrl_dev *pctldev,
+ 	return NMK_GPIO_ALT_C;
+ }
  
--	DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
-+	DRM_DEBUG_DRIVER("Using GEM @ %pad\n", &gem->paddr);
+-static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
+-{
+-	u32 afunc, bfunc;
+-
+-	clk_enable(nmk_chip->clk);
+-
+-	afunc = readl(nmk_chip->addr + NMK_GPIO_AFSLA) & BIT(offset);
+-	bfunc = readl(nmk_chip->addr + NMK_GPIO_AFSLB) & BIT(offset);
+-
+-	clk_disable(nmk_chip->clk);
+-
+-	return (afunc ? NMK_GPIO_ALT_A : 0) | (bfunc ? NMK_GPIO_ALT_B : 0);
+-}
+-
+ /* IRQ functions */
  
- 	/* Compute the start of the displayed memory */
- 	bpp = drm_format_plane_cpp(fb->pixel_format, 0);
-@@ -198,7 +198,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	paddr += (state->src_x >> 16) * bpp;
- 	paddr += (state->src_y >> 16) * fb->pitches[0];
+ static void nmk_gpio_irq_ack(struct irq_data *d)
+@@ -929,6 +915,19 @@ static int nmk_gpio_make_output(struct gpio_chip *chip, unsigned offset,
+ }
  
--	DRM_DEBUG_DRIVER("Setting buffer address to 0x%x\n", paddr);
-+	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+ #ifdef CONFIG_DEBUG_FS
++static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
++{
++	u32 afunc, bfunc;
++
++	clk_enable(nmk_chip->clk);
++
++	afunc = readl(nmk_chip->addr + NMK_GPIO_AFSLA) & BIT(offset);
++	bfunc = readl(nmk_chip->addr + NMK_GPIO_AFSLB) & BIT(offset);
++
++	clk_disable(nmk_chip->clk);
++
++	return (afunc ? NMK_GPIO_ALT_A : 0) | (bfunc ? NMK_GPIO_ALT_B : 0);
++}
  
- 	/* Write the 32 lower bits of the address (in bits) */
- 	lo_paddr = paddr << 3;
+ #include <linux/seq_file.h>
+ 
 -- 
 2.7.0
