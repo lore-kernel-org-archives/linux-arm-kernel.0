@@ -1,65 +1,53 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 3 May 2016 15:26:33 +0930
-Subject: [PATCH v2 04/11] clocksource/moxart: Generalise timer for use on
- other socs
-In-Reply-To: <571A5FBA.9010204@linaro.org>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-5-git-send-email-joel@jms.id.au>
- <571A5FBA.9010204@linaro.org>
-Message-ID: <CACPK8XfgDPPYG=ON-Z+gEKSg1fe4PuqRWoMz8P-9oCMvgQKmhw@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  3 May 2016 15:29:52 +0900
+Subject: [PATCH] reset: fix Kconfig menu to include reset drivers in sub-menu
+Message-ID: <1462256992-31063-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Daniel,
+In "make menuconfig", reset drivers are currently lined up together
+with the reset sub-system menu, like this:
 
-Thanks for the review.
+    -*- Reset Controller Support  ----
+    < > Hi6220 Reset Driver
 
-On Sat, Apr 23, 2016 at 3:00 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 04/21/2016 10:04 AM, Joel Stanley wrote:
->>
->> The moxart timer IP is shared with another soc made by Aspeed.
->> Generalise the registers that differ so the same driver can be used for
->> both.
->>
->> As we now depend on CLKSRC_MMIO, create a Kconfig symbol for the driver
->> so we can express this dependency.
->>
->> Signed-off-by: Joel Stanley <joel@jms.id.au>
->> ---
->
->
-> In the future, please Cc the maintainers.
+(It also means, the menu "Reset Controller Support" is always empty.)
 
-Sure.
+"Hi6220 Reset Driver" should go into the sub-menu of the
+"Reset Controller Support".
 
->
-> You probably can remove all the unused macro definition here for both MOXART
-> and ASPEED to have something just a couple of definition.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-I agree with Ben; we're helping out by documenting the hardware in
-lieu of a public datasheet. I'd prefer to keep this here.
+ drivers/reset/Kconfig     | 4 ++++
+ drivers/reset/sti/Kconfig | 1 -
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
->>   static void __iomem *base;
->>   static unsigned int clock_count_per_tick;
->> +static unsigned int t1_disable_val, t1_enable_val;
->
->
-> It will be cleaner to:
->
-> 1. Factor out:
->         writel(TIMER1_DISABLE, base + TIMER_CR);
->         writel(TIMER1_ENABLE, base + TIMER_CR);
-
-I considered this myself but went with the minimal change. I'm not
-fussed, so I will rework it as you suggest.
-
->From the register layout I suspect this IP block is a Faraday Tech
-FTTMR010[1], but I don't have any other evidence. Would you take a
-patch to change the name or would you prefer leaving it as moxart?
-
-Cheers,
-
-Joel
-
-[1] https://lists.nongnu.org/archive/html/qemu-devel/2013-03/msg04333.html
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index df37212..6a0b24b 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -12,5 +12,9 @@ menuconfig RESET_CONTROLLER
+ 
+ 	  If unsure, say no.
+ 
++if RESET_CONTROLLER
++
+ source "drivers/reset/sti/Kconfig"
+ source "drivers/reset/hisilicon/Kconfig"
++
++endif
+diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
+index f8c15a3..6131785 100644
+--- a/drivers/reset/sti/Kconfig
++++ b/drivers/reset/sti/Kconfig
+@@ -2,7 +2,6 @@ if ARCH_STI
+ 
+ config STI_RESET_SYSCFG
+ 	bool
+-	select RESET_CONTROLLER
+ 
+ config STIH415_RESET
+ 	bool
+-- 
+1.9.1
