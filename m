@@ -1,57 +1,63 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Tue, 3 May 2016 17:01:20 +0800
-Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
- return phys_addr_t
-In-Reply-To: <20160503055329.GA13045@dhcppc6.redhat.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
- <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
- <20160429151639.GC23726@leverpostej>
- <CAHB_GurwYqPbccLU9UHppLxbBr4Cfs47myKAer-RJicT=T7uBw@mail.gmail.com>
- <20160503042441.GA2518@x1.redhat.com>
- <20160503055329.GA13045@dhcppc6.redhat.com>
-Message-ID: <20160503090120.GB3287@x1.redhat.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 03 May 2016 11:05:44 +0200
+Subject: [PATCH 3/7] reset: lpc18xx: use devm_reset_controller_register()
+In-Reply-To: <CAK7LNAQ5LztGBbHCQxfLyWT7c_kWL=zpdKfkC9vsOKw95XL_Yw@mail.gmail.com>
+References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
+ <1462099023-11819-4-git-send-email-yamada.masahiro@socionext.com>
+ <1462177581.3933.7.camel@pengutronix.de>
+ <CAK7LNAQ5LztGBbHCQxfLyWT7c_kWL=zpdKfkC9vsOKw95XL_Yw@mail.gmail.com>
+Message-ID: <1462266344.3617.12.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/16 at 11:23am, Pratyush Anand wrote:
-> Hi Baoquan,
+Am Dienstag, den 03.05.2016, 00:52 +0900 schrieb Masahiro Yamada:
+> 2016-05-02 17:26 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> > Am Sonntag, den 01.05.2016, 19:36 +0900 schrieb Masahiro Yamada:
+> >> Use devm_reset_controller_register() for the reset controller
+> >> registration and remove the unregister call from the .remove callback.
+> >>
+> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> >> ---
+> >>
+> >>  drivers/reset/reset-lpc18xx.c | 4 +---
+> >>  1 file changed, 1 insertion(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/reset/reset-lpc18xx.c b/drivers/reset/reset-lpc18xx.c
+> >> index 3b8a4f5..dd4f27e 100644
+> >> --- a/drivers/reset/reset-lpc18xx.c
+> >> +++ b/drivers/reset/reset-lpc18xx.c
+> >> @@ -199,7 +199,7 @@ static int lpc18xx_rgu_probe(struct platform_device *pdev)
+> >>
+> >>       platform_set_drvdata(pdev, rc);
+> >>
+> >> -     ret = reset_controller_register(&rc->rcdev);
+> >> +     ret = devm_reset_controller_register(&pdev->dev, &rc->rcdev);
+> >>       if (ret) {
+> >>               dev_err(&pdev->dev, "unable to register device\n");
+> >>               goto dis_clks;
+> >> @@ -229,8 +229,6 @@ static int lpc18xx_rgu_remove(struct platform_device *pdev)
+> >>       if (ret)
+> >>               dev_warn(&pdev->dev, "failed to unregister restart handler\n");
+> >>
+> >> -     reset_controller_unregister(&rc->rcdev);
+> >> -
+> >>       clk_disable_unprepare(rc->clk_delay);
+> >>       clk_disable_unprepare(rc->clk_reg);
+> >>
+> >
+> > Hmm, would this patch theoretically allow a window between the calls to
+> > clk_disable_unprepare(clk_reg) and devm_reset_controller_release() where
+> > reset_control_get() + reset_control_(de)assert() would access unclocked
+> > registers?
 > 
-> On 03/05/2016:12:24:41 PM, Baoquan He wrote:
-> > Hi Pratyush,
-> > 
-> > Could you please help tell why arm PAE kernel can be put above 4G?
+> This is not clear to me.
 > 
-> PAE system can have physical addresses above 4G. So, if a CPU is supporting the
-> LPAE page table format then we should be able to access physical addresses
-> beyond 4G.
+> Why reset_control_get() + reset_control_(de)assert() would happen here?
 
-OK, after patient explanation from Pratush on irc, I finally understand on
-arm LPAE there's PHYS_OFFSET which indicats the physical address of main
-memory since arm could map some amount of device memory to cpu address space
-below 4G. Then physical ram has to be started from above 4G form cpu
-point of view. That's why kernel need be put above 4G. It's fair enough to
-fix it in this patch. Certainly if this explanation is also added into
-patch log, non arm developer will understand the change better.
+I suppose on a non-SMP device, without parallel probing this can't
+really happen in practice.
+It still seems weird that suddenly we disable the clocks before
+unregistering the reset controller instead of afterwards.
 
-Thanks
-Baoquan
-
-> 
-> > Since the change is related to common code, I am curious about how
-> > it's so different with other ARCHs.
-> 
-> paddr_vmcoreinfo_note() returns a physical address, so returning phys_addr_t
-> seems most appropriate. So, kernel variable may land into above 4G locations,
-> even with the platform in other architecture (with PAE support), if start of RAM
-> is located very high,
-> 
-> So, in my opinion it would be safer to have these changes for other ARCHs as
-> well.
-> 
-> ~Pratyush
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+regards
+Philipp
