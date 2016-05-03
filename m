@@ -1,54 +1,33 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue,  3 May 2016 16:27:16 -0400
-Subject: [PATCH 1/3] [media] s5p-mfc: Set device name for reserved memory
- region devs
-In-Reply-To: <1462307238-21815-1-git-send-email-javier@osg.samsung.com>
-References: <1462307238-21815-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1462307238-21815-2-git-send-email-javier@osg.samsung.com>
+Date: Tue,  3 May 2016 16:27:15 -0400
+Subject: [PATCH 0/3] [media] s5p-mfc: Fixes for issues when module is removed
+Message-ID: <1462307238-21815-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The devices don't have a name set, so makes dev_name() returns NULL which
-makes harder to identify the devices that are causing issues, for example:
+Hello,
 
-WARNING: CPU: 2 PID: 616 at drivers/base/core.c:251 device_release+0x8c/0x90
-Device '(null)' does not have a release() function, it is broken and must be fixed.
+This patch series fixes some issues that I noticed when trying to remove
+the s5p-mfc driver when built as a module.
 
-And after setting the device name:
+Some of these issues will be fixed once Marek's patches to convert the
+custom memory region reservation code is replaced by a generic one that
+supports named memory region reservation [0]. But the fixes are trivial
+so we can fix the current code until his rework patch lands.
 
-WARNING: CPU: 0 PID: 591 at drivers/base/core.c:251 device_release+0x8c/0x90
-Device 's5p-mfc-l' does not have a release() function, it is broken and must be fixed.
+[0]: https://patchwork.linuxtv.org/patch/32287/
 
-Cc: <stable@vger.kernel.org>
-Fixes: 6e83e6e25eb4 ("[media] s5p-mfc: Fix kernel warning on memory init")
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Best regards,
+Javier
 
----
 
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Javier Martinez Canillas (3):
+  [media] s5p-mfc: Set device name for reserved memory region devs
+  [media] s5p-mfc: Add release callback for memory region devs
+  [media] s5p-mfc: Fix race between s5p_mfc_probe() and s5p_mfc_open()
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index b16466fe35ee..8fc1fd4ee2ed 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1062,6 +1062,8 @@ static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
- 		mfc_err("Not enough memory\n");
- 		return -ENOMEM;
- 	}
-+
-+	dev_set_name(dev->mem_dev_l, "%s", "s5p-mfc-l");
- 	device_initialize(dev->mem_dev_l);
- 	of_property_read_u32_array(dev->plat_dev->dev.of_node,
- 			"samsung,mfc-l", mem_info, 2);
-@@ -1079,6 +1081,8 @@ static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
- 		mfc_err("Not enough memory\n");
- 		return -ENOMEM;
- 	}
-+
-+	dev_set_name(dev->mem_dev_r, "%s", "s5p-mfc-r");
- 	device_initialize(dev->mem_dev_r);
- 	of_property_read_u32_array(dev->plat_dev->dev.of_node,
- 			"samsung,mfc-r", mem_info, 2);
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 50 ++++++++++++++++++++------------
+ 1 file changed, 32 insertions(+), 18 deletions(-)
+
 -- 
 2.5.5
