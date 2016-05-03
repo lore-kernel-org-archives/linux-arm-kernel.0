@@ -1,140 +1,111 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 May 2016 14:11:04 -0500
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20160503185153.5cfddc32@bbrezillon>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop> <20160503185153.5cfddc32@bbrezillon>
-Message-ID: <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
+From: tpiepho@kymetacorp.com (Trent Piepho)
+Date: Tue, 3 May 2016 19:17:34 +0000
+Subject: [PATCH v2 0/4] Patches to allow consistent mmc / mmcblk numbering
+ w/ device tree
+In-Reply-To: <20160430104832.GJ19428@n2100.arm.linux.org.uk>
+References: <20160429195741.GY19428@n2100.arm.linux.org.uk>
+ <CAD=FV=UGyi0r3kDmc1cpcANTP-2u+7UEgW3r9kRvF2f8qcWH+g@mail.gmail.com>
+ <20160429211328.GZ19428@n2100.arm.linux.org.uk>
+ <CAD=FV=V8BOsO36eUOGAcXp04xCiN13UGG0Vaf2yhh1MQn85FjA@mail.gmail.com>
+ <20160429212920.GA19428@n2100.arm.linux.org.uk>
+ <CAD=FV=V9V8P=d59RX1eaAdVxJgMxub1F6hzQNw1QW+7t=3POBw@mail.gmail.com>
+ <20160429215017.GC19428@n2100.arm.linux.org.uk>
+ <CAD=FV=VgQX_EVhUUCugzv+CZqjzTS8LwyeU5419aX9FbDnWJDg@mail.gmail.com>
+ <20160429221606.GE19428@n2100.arm.linux.org.uk>
+ <CABxcv==4C+RrEV1Fd+DkbMdGrLyObw36vsmo3wTGdxO=UnAa8w@mail.gmail.com>
+ <20160430104832.GJ19428@n2100.arm.linux.org.uk>
+Message-ID: <1462303111.9103.225.camel@rtred1test09.kymeta.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Hi Rob,
->
-> On Tue, 3 May 2016 11:40:19 -0500
-> Rob Herring <robh@kernel.org> wrote:
->
->> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
->> > The EBI (External Bus Interface) is used to access external peripherals
->> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
->> > Each device is assigned a CS line and an address range and can have its
->> > own configuration (timings, access mode, bus width, ...).
->> > This driver provides a generic DT binding to configure a device according
->> > to its requirements.
->> > For specific device controllers (like the NAND one) the SMC timings
->> > should be configured by the controller driver through the matrix and smc
->> > syscon regmaps.
->> >
->> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> > ---
->> >  .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
->> >  1 file changed, 136 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->> > new file mode 100644
->> > index 0000000..a6dca5c
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->> > @@ -0,0 +1,136 @@
->> > +* Device tree bindings for Atmel EBI
->> > +
->> > +The External Bus Interface (EBI) controller is a bus where you can connect
->> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
->> > +The EBI provides a glue-less interface to asynchronous memories through the SMC
->> > +(Static Memory Controller).
->> > +
->> > +Required properties:
->> > +
->> > +- compatible:              "atmel,at91sam9260-ebi"
->> > +                   "atmel,at91sam9261-ebi"
->> > +                   "atmel,at91sam9263-ebi0"
->> > +                   "atmel,at91sam9263-ebi1"
->>
->> What are the differences between 0 and 1?
->
-> Because this SoC has 2 EBI busses with different capabilities.
+On Sat, 2016-04-30 at 11:48 +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 29, 2016 at 06:42:35PM -0400, Javier Martinez Canillas wrote:
+> > Maybe a third opinion could make this conversation constructive again.
 
-Okay, correct answer. :)
+And maybe a forth.
 
-[...]
+> > I think Doug's point is that using a UUID or labels for consistency is
+> > orthogonal to having a deterministic numbering for MMC devices. And I
+> > agree with his point of view for what is worth.
+> 
+> Yes, it may be orthogonal, but there are two issues here:
+> 
+> 1. How does the system know which MMC device to mount for its rootfs.
+> 
+> This is the point that I've picked up on, which has been solved for
+> years, and actually pre-dates MMC support in the kernel, and that is
+> mount by UUID.
 
->>
->> > +                   of the memory region requested by the device.
->> > +
->> > +EBI bus configuration associated with specific chip-select will be defined in
->> > +the configs subnode. This configs node will in turn contain several subnodes
->> > +named config-<cs-id>, each of them containing the following properties.
->>
->> This is a bit unusual. Why not just part of the child device nodes?
->
-> Oh, come on! I reworked the binding because Mark complained about the
-> previous binding which was doing exactly what you're suggesting. Can
-> you please be consistent in your reviews...
+What about eMMC boot blocks and replay protected memory block?  These
+are special sub-device like features of eMMC that provide storage from
+different areas than the normal flash.  The kernel names them something
+like "/dev/mmcblk0boot0" and "/dev/mmcblk1rpmb".
 
-No, Mark and I both have our opinions. Which part of this patch
-explains the history? If the revision history is not in the patch, I'm
-not looking at it.
+They typically don't have partition tables and in fact the kernel
+xplicitly does not scan them for a partition table.  So how can they
+have a UUID?
 
-My issue with it this way is that it has invented yet another way to
-describe timings. I would like to be consistent across external bus
-descriptions, but we're not very consistent to begin with though. The
-most common seems to be the way you first did it. But I agree that it
-is kind of screwy to have an intermediate node unless the controller
-itself has sub-blocks within it and is not the established way to
-describe a bus with chip selects. I would either put the properties
-directly in the child nodes (e.g. flash at 0,0) or put your config nodes
-in the device node. I'd call it timings instead of config, but that's
-just bikeshedding.
+Suppose your device has two SD slots, neither with an SD card inserted
+in it, one external and one internal behind a locked access panel.  They
+serve different purposes.  How do you determine which is which via UUID
+when they have no media?
 
-memory-controller at 1000 {
-  ...
-  flash at 0,0 {
-    timings {
-      ...
-    };
-  };
-};
+> The kernel itself has no support for mount-by-label, which is normally
+> solved by using an initramfs, which contains programs such as mount
+> etc which will scan the block devices looking for an appropriately
+> labelled filesystem.  Label has slightly more issues since its possible
 
->> > +
->> > +Optional config-<cs-id> node properties:
->> > +
->> > +- atmel,bus-width:         width of the asynchronous device's data bus
->> > +                           8, 16 or 32.
->> > +                           Default to 8 when undefined.
->> > +
->> > +- atmel,byte-access-type   "write" or "select" (see Atmel datasheet).
->> > +                           Default to "select" when undefined.
->> > +
->> > +- atmel,read-mode          "nrd" or "ncs".
->> > +                           Default to "ncs" when undefined.
->> > +
->> > +- atmel,write-mode         "nwe" or "ncs".
->> > +                           Default to "ncs" when undefined.
->> > +
->> > +- atmel,exnw-mode          "disabled", "frozen" or "ready".
->> > +                           Default to "disabled" when undefined.
->> > +
->> > +- atmel,page-mode          enable page mode if present. The provided value
->> > +                           defines the page size (supported values: 4, 8,
->> > +                           16 and 32).
->> > +
->> > +- atmel,tdf-mode:          "normal" or "optimized". When set to
->>
->> This should be boolean.
->
-> It was a formerly defined as a boolean, and when it's done like that we
-> have no way to identify whether the property was forgotten or
-> intentionally set to normal mode. What's the problem with this approach?
+But what is faster, using an initramfs that loads a working userspace
+into RAM, scans the flash device for partition labels, determines the
+device ID, and then switches to the real rootfs.  Or having the
+bootloader, which already knows the partition the rootfs is in, tell the
+kernel what device to mount from the beginning?
 
-Only preference to use boolean when that is sufficient. With your
-argument, then we should never have booleans. You state that missing
-means "normal", not forgotten, so all these properties should be
-required with no default.
+Which brings me to another reason for providing device enumeration
+information via the device tree that isn't just about mounting the root
+filesystem.
 
-BTW, I debated the same thing on the other properties, but I could see
-them being expanded to a 3rd mode. I don't see that here though.
+The bootloader will create an enumeration of devices so that it can
+access them.  The kernel will also create an enumeration of the same
+devices.  Should these enumerations be the same, or should they be
+different?
 
-Rob
+Clearly there are advantages to the enumeration being the same.  It's
+easier on users if device IDs can be the same between the two
+environments, bootloader and kernel, the device can be accessed from.
+
+It also makes it easier if information about a device needs to be passed
+from the bootloader to the kernel.  This could be the root filesystem,
+but that's not the only thing.  Console serial port is another.  But we
+could also want to kernel to know which of the SoC's ports is connected
+to the blank eMMC chip it should create a partition table on and format,
+and which is connected to the SD card it should store logging data to.
+
+I can't think of any advantage of the enumerations being different.
+
+So if identical enumerations are desirable, how to achieve it?
+
+One way would be to have the bootloader create its enumeration and then
+throw it away when the kernel boots.  The the kernel creates a new
+enumeration from scratch, using a different system with different code
+and a different design, that happens to create the same enumeration that
+the bootloader did.  This seems like a bad design to me.  Two different
+code bases will need to kept in sync, to always to the same thing in a
+different way.  It will be hard to avoid bugs from corner cases that
+fail to produce the same enumerations.
+
+Another way would be to have the bootloader tell the kernel what it
+enumerated and then have the kernel use this enumeration.  This avoids
+the need to keep two code bases in sync.  It avoids bugs where they fail
+to produce the same enumeration.
+
+And how to do this pass the enumeration from the bootloader to the
+kernel?  The same way all other information from the bootloader is
+passed to the kernel, via the device tree.
+
+The alias system that already exists allows the bootloader to tell the
+kernel about enumerations it has already created, which it must do since
+it runs before the kernel, and would like the kernel to continue to use.
+
+So this isn't just about finding the root filesystem.  It's about
+passing enumeration information from the bootloader to the kernel.
