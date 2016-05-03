@@ -1,45 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 3 May 2016 16:46:29 -0400
-Subject: [PATCH V4 0/2] vfio, platform: add ACPI support
-In-Reply-To: <3322250.xDEDujoeAM@wuerfel>
-References: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
- <3322250.xDEDujoeAM@wuerfel>
-Message-ID: <57290E25.7010501@codeaurora.org>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 3 May 2016 14:01:51 -0700
+Subject: Bunch of serial warnings in next at least with omap-serial
+In-Reply-To: <20160503203930.GQ5995@atomide.com>
+References: <20160503203930.GQ5995@atomide.com>
+Message-ID: <572911BF.8000803@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/3/2016 4:12 PM, Arnd Bergmann wrote:
-> On Sunday 01 May 2016 17:07:50 Sinan Kaya wrote:
->> The patchset makes three different changes.
->> 1. Add support for probing ACPI platform devices.
->> 2. Add support for ACPI _RST method support during reset
->> 3. Make reset driver a requirement by default with an optional
->>    kernel command line override
-> 
-> Looks nice, thanks for rewriting this!
-> 
-> For future submissions, it would help to have a list of changes
-> compared to the previous versions a the patch set in the cover
-> letter to help reviewers, but this time my memory was still fresh
-> enough.
-> 
-> 	Arnd
-> 
+Hi Tony,
 
-Sure, will do. I asked Rafael to review the ACPI code. 
+On 05/03/2016 01:39 PM, Tony Lindgren wrote:
+> Hi Peter,
+> 
+> Looks like probably commit 4047b37122d1 ("serial: core: Prevent unsafe
+> uart port access, part 1") in Linux next causes tons of warnings with at
+> least omap-serial. It does not revert cleanly I have not tested with that
+> reverted. Any ideas? Dmesg output of the errors below.
 
-+		ret = vfio_platform_call_reset(vdev);
+Thanks for the report.
+Patch below should fix that.
 
-This is the only problem I'm seeing in the code. I tested the ACPI path only. 
-I'm wondering if Eric could test the device tree version.
+--- >% ---
+Subject: [PATCH] serial: core: Fix port mutex assert if lockdep disabled
 
-+		if (ret)
-+			goto err_irq;
+commit 4047b37122d1 ("serial: core: Prevent unsafe uart port access,
+part 1") added lockdep assertion for port mutex but fails to check
+if debug_locks has disabled lockdep (so lock state is no longer
+reliable).
+
+Use lockdep_assert_held() instead, which properly checks lockdep
+state as well.
+
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+---
+ drivers/tty/serial/serial_core.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index 0e66923..b88a054 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -95,9 +95,7 @@ static inline void uart_port_deref(struct uart_port *uport)
  
-I'll get rid of this line on the first patch and move it to second
-patch along with reset_required check.
-
+ static inline struct uart_port *uart_port_check(struct uart_state *state)
+ {
+-#ifdef CONFIG_LOCKDEP
+-	WARN_ON(!lockdep_is_held(&state->port.mutex));
+-#endif
++	lockdep_assert_held(&state->port.mutex);
+ 	return state->uart_port;
+ }
+ 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.8.2
