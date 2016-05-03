@@ -1,98 +1,52 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Tue, 3 May 2016 12:52:31 -0700
-Subject: mx6ul: Finding a good place to configure SAI2_MCLK
-In-Reply-To: <20160503124203.GH5874@tiger>
-References: <CAOMZO5CvT1rcHFPm6KoCBBgM1UACByLUQcJ_zDxY9ucbxCpgYA@mail.gmail.com>
- <20160503124203.GH5874@tiger>
-Message-ID: <20160503195230.GA25881@Asurada-Nvidia>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 3 May 2016 14:02:49 -0600
+Subject: VFIO MSIX Query
+In-Reply-To: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>
+References: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>
+Message-ID: <20160503140249.4edaf3cc@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 08:42:03PM +0800, Shawn Guo wrote:
-> On Mon, May 02, 2016 at 08:59:17PM -0300, Fabio Estevam wrote:
-> > Hi,
-> > 
-> > In order to get audio working on imx6ul-evk board we need to enable
-> > the SAI2 MCLK clock by setting bit 20 (SAI2_MCLK_DIR) of the
-> > IOMUXC_GPR_GPR1 register.
-> > 
-> > I am not sure where is the appropriate place to set this bit.
-> > 
-> > Doing like this works fine:
-> > 
-> > --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > @@ -447,5 +447,6 @@
-> >  #define IMX6UL_GPR1_ENET2_CLK_OUTPUT           (0x1 << 18)
-> >  #define IMX6UL_GPR1_ENET_CLK_DIR               (0x3 << 17)
-> >  #define IMX6UL_GPR1_ENET_CLK_OUTPUT            (0x3 << 17)
-> > +#define IMX6UL_GPR1_SAI2_MCLK_DIR              (0x1 << 20)
-> > 
-> > index a38b16b..92cfb0f 100644
-> > --- a/arch/arm/mach-imx/mach-imx6ul.c
-> > +++ b/arch/arm/mach-imx/mach-imx6ul.c
-> > @@ -56,6 +56,19 @@ static inline void imx6ul_enet_init(void)
-> >         imx6ul_enet_phy_init();
-> >  }
-> > 
-> > +static void __init imx6ul_mclk_init(void)
-> > +{
-> > +       struct regmap *gpr;
-> > +
-> > +       gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
-> > +       if (!IS_ERR(gpr))
-> > +               regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_SAI2_MCLK_DIR,
-> > +                                  IMX6UL_GPR1_SAI2_MCLK_DIR);
-> > +       else
-> > +               pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
-> > +
-> > +}
-> > +
-> >  static void __init imx6ul_init_machine(void)
-> >  {
-> >         struct device *parent;
-> > @@ -68,6 +81,7 @@ static void __init imx6ul_init_machine(void)
-> >         imx6ul_enet_init();
-> >         imx_anatop_init();
-> >         imx6ul_pm_init();
-> > +       imx6ul_mclk_init();
-> >  }
-> > 
-> > but it does not seem correct as this should be board specific. Should
-> > we call it only if the compatible string matches imx6sl-14x14-evk
-> > string? Looks like that will not scale as well.
-> > 
-> > Currently in arch/arm/mach-imx/mach-imx6ul.c we also have
-> > imx6ul_enet_clk_init() function which sets the ENET_CLK in the GPR1
-> > register.
-> > 
-> > IMHO this is not correct because not all mx6ul boards need such clock
-> > and then we need to change this too.
-> > 
-> > So where should we set the SAI2_MCLK_DIR bit of GPR1? Inside the SAI driver?
-> 
-> To me, it's the best if we can handle this in SAI driver.
+Hi,
 
-Since the clock relationships are being handled by DT now, I feel
-plausible to put this GPR hack in an audio driver, SAI or machine.
+On Tue, 3 May 2016 23:56:38 +0530
+Nitin Saxena <nitin.lnx@gmail.com> wrote:
 
-For SAI driver, it requires a DT property to indicate whether the
-controller has the capability of getting/driving the MCLK from/to
-the pad because it may not have this GPR hack, SAI1 for example.
-Meanwhile, ASoC has a set_dai_sysclk() to configure the direction
-of sysclk (MCLK).
+> Hi,
+> 
+> I am a newbie to VFIO framework and trying to use it for MSIX interrupt
+> handling in my userspace application. My userspace application is like
+> intel's dpdk.
+> 
+> My query is why vfio kernel code does not support msix masking/ unmasking
+> i.e VFIO_SET_ACTION_TRIGGER is not implemented in kernel vfio code for MSIX
+> but its present for legacy INTX?
 
-> 
-> Shawn
-> 
-> > 
-> > Appreciate some feedback.
-> > 
-> > Thanks,
-> > 
-> > Fabio Estevam
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I think you mean VFIO_IRQ_SET_ACTION_MASK and
+VFIO_IRQ_SET_ACTION_UNMASK are not implemented for MSI/X,
+VFIO_IRQ_SET_ACTION_TRIGGER is the only one that is implemented.  It
+mostly comes down to it hasn't been needed.  We would just need to
+verify that disable_irq() and enable_irq() do the right thing and
+enable the features through the existing VFIO API.  The reason we have
+these for INTx is that INTx is level triggered and we must mask the
+interrupt on the host while it's serviced by the user because the
+interrupt will continue to assert and we have no service guarantees
+from the user.  MSI/X is of course edge triggered, so doesn't have this
+problem.  The device would need to continue to re-assert the
+interrupt.  In cases like a QEMU user, we might want to continue to
+receive guest masked interrupts to QEMU for emulating the pending bits
+array, so even if we had VFIO masking support for these interrupts, QEMU
+probably would not use it.  If MSI/X masking is useful for you vs simply
+ignoring the eventfd, patches welcome.
+
+> Another question since MSIX interrupt masking is absent in kernel who is
+> supposed to mask/unmask msix interrupt? does userspace needs to mask/unmask
+> interrupt after getting notified by eventfd. Is there any usecase where
+> MSIX handling is done via VFIO framework?
+
+MSI/X is edge triggered and VFIO does not set the AUTOMASKED flag on
+them, so there is simply no masking of them at all aside from fully
+disabling them.  QEMU has full support for MSI/X through VFIO that you
+can use for reference.  Thanks,
+
+Alex
