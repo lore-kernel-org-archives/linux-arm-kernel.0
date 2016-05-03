@@ -1,142 +1,122 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 3 May 2016 15:25:25 +0800
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
-In-Reply-To: <57285162.2000704@schinagl.nl>
-References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
- <CAGb2v66E2TuN3+tYaAbniV3q67waDZOfqKAW14VJz6xZFomZ=Q@mail.gmail.com>
- <57285162.2000704@schinagl.nl>
-Message-ID: <CAGb2v66r9m7qVW6BszeT2wqs0KyEr4x5ivTJYqu2Fes=R9-Ltw@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Tue, 3 May 2016 15:44:18 +0800
+Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
+ suspend
+In-Reply-To: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1462261458.11651.7.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 3:21 PM, Olliver Schinagl <oliver@schinagl.nl> wrote:
-> Hey Chen,
+Hi Mathias,
 
-ChenYu :)
+On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
+> Click mouse after xhci suspend completion but before system suspend
+> completion, system will not be waken up by mouse if the duration of
+> them is larger than 20ms which is the device UFP's resume signaling
+> lasted. Another reason is that the SPM is not enabled before system
+> suspend compeltion, this causes SPM also not notice the resume signal.
+> So in order to reduce the duration less than 20ms, make use of
+> syscore's suspend/resume interface.
+> In fact it is a work around solution which only reduces the
+> probability of failure, because we can't ensure that the duration from
+> syscore's suspend completion to SPM working is always less than 20ms.
+> 
+> Because the syscore runs on irq disabled context, and xhci's
+> suspend/resume calls some sleeping functions, enable local irq
+> and then disable it during suspend/resume. This may be not a problem,
+> since only boot CPU is runing.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c |   31 ++++++++++++++++++++++++++++++-
+>  1 file changed, 30 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index 79959f1..8277f02 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+>  #include <linux/regulator/consumer.h>
+> +#include <linux/syscore_ops.h>
+>  
+>  #include "xhci.h"
+>  #include "xhci-mtk.h"
+> @@ -490,6 +491,8 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+>  	return xhci_gen_setup(hcd, xhci_mtk_quirks);
+>  }
+>  
+> +static struct device *xhci_mtk_syscore_dev;
+> +
+>  static int xhci_mtk_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -512,6 +515,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  	if (!mtk)
+>  		return -ENOMEM;
+>  
+> +	xhci_mtk_syscore_dev = dev;
+>  	mtk->dev = dev;
+>  	mtk->vbus = devm_regulator_get(dev, "vbus");
+>  	if (IS_ERR(mtk->vbus)) {
+> @@ -740,6 +744,29 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
+>  	return 0;
+>  }
+>  
+> +static int xhci_mtk_syscore_suspend(void)
+> +{
+> +	local_irq_enable();
+> +	xhci_mtk_suspend(xhci_mtk_syscore_dev);
+> +	local_irq_disable();
+> +
+> +	return 0;
+> +}
+> +
+> +static void xhci_mtk_syscore_resume(void)
+> +{
+> +	local_irq_enable();
+> +	xhci_mtk_resume(xhci_mtk_syscore_dev);
+> +	local_irq_disable();
+> +
+> +	return;
+> +}
+> +
+> +static struct syscore_ops xhci_mtk_syscore_ops = {
+> +	.suspend = xhci_mtk_syscore_suspend,
+> +	.resume = xhci_mtk_syscore_resume,
+> +};
+> +
+>  static const struct dev_pm_ops xhci_mtk_pm_ops = {
+>  	SET_SYSTEM_SLEEP_PM_OPS(xhci_mtk_suspend, xhci_mtk_resume)
+>  };
+> @@ -758,7 +785,7 @@ static struct platform_driver mtk_xhci_driver = {
+>  	.remove	= xhci_mtk_remove,
+>  	.driver	= {
+>  		.name = "xhci-mtk",
+> -		.pm = DEV_PM_OPS,
+> +		/*.pm = DEV_PM_OPS,*/
+>  		.of_match_table = of_match_ptr(mtk_xhci_of_match),
+>  	},
+>  };
+> @@ -766,6 +793,7 @@ MODULE_ALIAS("platform:xhci-mtk");
+>  
+>  static int __init xhci_mtk_init(void)
+>  {
+> +	register_syscore_ops(&xhci_mtk_syscore_ops);
+>  	xhci_init_driver(&xhci_mtk_hc_driver, &xhci_mtk_overrides);
+>  	return platform_driver_register(&mtk_xhci_driver);
+>  }
+> @@ -774,6 +802,7 @@ module_init(xhci_mtk_init);
+>  static void __exit xhci_mtk_exit(void)
+>  {
+>  	platform_driver_unregister(&mtk_xhci_driver);
+> +	unregister_syscore_ops(&xhci_mtk_syscore_ops);
+>  }
+>  module_exit(xhci_mtk_exit);
 
->
->
-> On 03-05-16 05:33, Chen-Yu Tsai wrote:
->>
->> Hi,
->>
->> On Thu, Apr 28, 2016 at 3:19 PM, Olliver Schinagl <oliver@schinagl.nl>
->> wrote:
->>>
->>> There are 3 kinds of OLinuXino Lime2 boards.
->>> One without any on board storage, one with NAND storage and one with
->>> eMMC storage. This patch adds the eMMC variant of boards.
->>>
->>> eMMC storage is different from a regular SD card in that it is soldered
->>> on the board and cannot be changed. Additionally, it shares pins with
->>> the NAND module and with the second SPI port.
->>>
->>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->>> ---
->>>   .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    | 64
->>> ++++++++++++++++++++++
->>>   1 file changed, 64 insertions(+)
->>>   create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
->>>
->>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
->>> b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
->>> new file mode 100644
->>> index 0000000..689da36
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
->>> @@ -0,0 +1,64 @@
->>> + /*
->>> + * Copyright 2015 - Ultimaker B.V.
->>> + * Author Olliver Schinagl <oliver@schinagl.nl>
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This file is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of
->>> the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This file is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +#include "sun7i-a20-olinuxino-lime2.dts"
->>> +
->>> +/ {
->>> +       model = "Olimex A20-OLinuXino-LIME2-eMMC";
->>> +};
->>> +
->>> +&mmc2 {
->>> +       pinctrl-names = "default";
->>> +       pinctrl-0 = <&mmc2_pins_a>;
->>> +       vmmc-supply = <&reg_vcc3v3>;
->>> +       bus-width = <4>;
->>
->> Only 4 bits? We normally see eMMC with 8 bits. 4 bits are some kind of
->> embedded SD card.
->
-> On A20 as well? Our investigations so far have concluded that the A10 and
-> A20 have those pins not mapped out to pads. The IP does support it however
-> we assume.
-
-You're right. My bad. First time A10/A20 sees eMMC support.
-
->>
->>
->>> +       non-removable;
->>> +       no-1-8-v;
->>
->> This flag is not supported on sunxi.
->>
->> Instead, use the vqmmc-supply with the correct regulator and constraints.
->
-> That was not supposed to be there, i'll fix it! Sorry.
+Do you have any suggestions about the patch?
 
 Thanks
-ChenYu
-
->
->>
->> ChenYu
->>
->>> +       status = "okay";
->>> +
->>> +       emmc: emmc at 0 {
->>> +               reg = <0>;
->>> +               compatible = "mmc-card";
->>> +               broken-hpi;
->>> +       };
->>> +};
->>> --
->>> 2.8.0.rc3
->>>
->
+>  
