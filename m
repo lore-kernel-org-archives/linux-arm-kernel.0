@@ -1,26 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 3 May 2016 14:58:20 -0700
-Subject: [PATCH 01/27] coresight: no need to do the forced type conversion
-In-Reply-To: <1462296841-12327-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
- <1462296841-12327-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20160503215820.GA21470@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 May 2016 14:58:21 -0700
+Subject: Bunch of serial warnings in next at least with omap-serial
+In-Reply-To: <572911BF.8000803@hurleysoftware.com>
+References: <20160503203930.GQ5995@atomide.com>
+ <572911BF.8000803@hurleysoftware.com>
+Message-ID: <20160503215821.GR5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 11:33:35AM -0600, Mathieu Poirier wrote:
-> From: lipengcheng <lipengcheng8@huawei.com>
-
-That name, doesn't match:
-
+* Peter Hurley <peter@hurleysoftware.com> [160503 14:03]:
+> Hi Tony,
 > 
-> activated and enable are already unsigned type,
-> no need to change them to unsigned.
+> On 05/03/2016 01:39 PM, Tony Lindgren wrote:
+> > Hi Peter,
+> > 
+> > Looks like probably commit 4047b37122d1 ("serial: core: Prevent unsafe
+> > uart port access, part 1") in Linux next causes tons of warnings with at
+> > least omap-serial. It does not revert cleanly I have not tested with that
+> > reverted. Any ideas? Dmesg output of the errors below.
 > 
-> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+> Thanks for the report.
+> Patch below should fix that.
 
-That name :(
+Yes thanks that fixes it:
 
-Please be more careful here.
-
-I'll edit this by hand this time :(
+Tested-by: Tony Lindgren <tony@atomide.com>
