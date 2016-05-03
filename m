@@ -1,27 +1,63 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 03 May 2016 12:17:50 +0200
-Subject: [PATCH 1/7] reset: add devm_reset_controller_register API
-In-Reply-To: <1462099023-11819-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
- <1462099023-11819-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1462270670.3617.49.camel@pengutronix.de>
+Date: Tue, 03 May 2016 12:17:53 +0200
+Subject: [PATCH] reset: fix Kconfig menu to include reset drivers in
+ sub-menu
+In-Reply-To: <1462256992-31063-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1462256992-31063-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462270673.3617.50.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
-
-Am Sonntag, den 01.05.2016, 19:36 +0900 schrieb Masahiro Yamada:
-> Add a device managed API for reset_controller_register().
+Am Dienstag, den 03.05.2016, 15:29 +0900 schrieb Masahiro Yamada:
+> In "make menuconfig", reset drivers are currently lined up together
+> with the reset sub-system menu, like this:
 > 
-> This helps in reducing code in .remove callbacks and sometimes
-> dropping .remove callbacks entirely.
+>     -*- Reset Controller Support  ----
+>     < > Hi6220 Reset Driver
+> 
+> (It also means, the menu "Reset Controller Support" is always empty.)
+
+Unless ARCH_HISI is enabled it still will be empty.
+
+> "Hi6220 Reset Driver" should go into the sub-menu of the
+> "Reset Controller Support".
 > 
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  drivers/reset/Kconfig     | 4 ++++
+>  drivers/reset/sti/Kconfig | 1 -
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index df37212..6a0b24b 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -12,5 +12,9 @@ menuconfig RESET_CONTROLLER
+>  
+>  	  If unsure, say no.
+>  
+> +if RESET_CONTROLLER
+> +
+>  source "drivers/reset/sti/Kconfig"
+>  source "drivers/reset/hisilicon/Kconfig"
+> +
+> +endif
+> diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
+> index f8c15a3..6131785 100644
+> --- a/drivers/reset/sti/Kconfig
+> +++ b/drivers/reset/sti/Kconfig
+> @@ -2,7 +2,6 @@ if ARCH_STI
+>  
+>  config STI_RESET_SYSCFG
+>  	bool
+> -	select RESET_CONTROLLER
+>  
+>  config STIH415_RESET
+>  	bool
 
-Thank you for these patches. Except for the issue with the lpc18xx patch
-they all look good to me.
-If you don't mind, I'll drop the lpc18xx patch for now and apply the
-others.
+Looks good to me. ARCH_STI already selects RESET_CONTROLLER and nothing
+selects COMMON_RESET_HI6220.
 
 regards
 Philipp
