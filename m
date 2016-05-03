@@ -1,207 +1,119 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue,  3 May 2016 13:50:42 +0530
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-Message-ID: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 3 May 2016 09:26:23 +0100
+Subject: [PATCH v2 19/54] KVM: arm/arm64: vgic-new: Implement
+In-Reply-To: <57274715.8080801@linaro.org>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-20-git-send-email-andre.przywara@arm.com>
+ <57274715.8080801@linaro.org>
+Message-ID: <572860AF.5000202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently only WOR is used to program both first and second stage which
-provided very limited range of timeout.
+Hi Eric,
 
-This patch uses WCV as well to achieve higher range of timeout. This patch
-programs max_timeout as 255, but that can be increased further as well.
+On 02/05/16 13:24, Eric Auger wrote:
+> Hi Andre,
+> 
+> minor comment: patch title has been altered since v1, should be
+> 
+> KVM: arm/arm64: vgic-new: Implement kvm_vgic_vcpu_pending_irq
 
-Following testing shows that we can happily achieve 40 second default timeout.
+Indeed, that was line-broken accidentally when I added the Changelog.
+Thanks for pointing out!
 
- # modprobe sbsa_gwdt action=1
- [  131.187562] sbsa-gwdt sbsa-gwdt.0: Initialized with 40s timeout @ 250000000 Hz, action=1.
- # cd /sys/class/watchdog/watchdog0/
- # cat state
- inactive
- # cat /dev/watchdog0
- cat: /dev/watchdog0: Invalid argument
- [  161.710593] watchdog: watchdog0: watchdog did not stop!
- # cat state
- active
- # cat timeout
- 40
- # cat timeleft
- 38
- # cat timeleft
- 25
- # cat /dev/watchdog0
- cat: /dev/watchdog0: Invalid argument
- [  184.931030] watchdog: watchdog0: watchdog did not stop!
- # cat timeleft
- 37
- # cat timeleft
- 21
- ...
- ...
- # cat timeleft
- 1
+Cheers,
+Andre.
 
-panic() is called upon timeout of 40s. See timestamp of last kick (cat) and
-next panic() message.
-
- [  224.939065] Kernel panic - not syncing: SBSA Watchdog timeout
-
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- drivers/watchdog/sbsa_gwdt.c | 83 +++++++++++++++++++++++++++++++++-----------
- 1 file changed, 62 insertions(+), 21 deletions(-)
-
-diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-index ad383f6f15fc..529dd5e99fcd 100644
---- a/drivers/watchdog/sbsa_gwdt.c
-+++ b/drivers/watchdog/sbsa_gwdt.c
-@@ -35,17 +35,23 @@
-  *
-  * SBSA GWDT:
-  * if action is 1 (the two stages mode):
-- * |--------WOR-------WS0--------WOR-------WS1
-+ * |--------WCV-------WS0--------WCV-------WS1
-  * |----timeout-----(panic)----timeout-----reset
-  *
-  * if action is 0 (the single stage mode):
-- * |------WOR-----WS0(ignored)-----WOR------WS1
-+ * |------WCV-----WS0(ignored)-----WOR------WS1
-  * |--------------timeout-------------------reset
-  *
-- * Note: Since this watchdog timer has two stages, and each stage is determined
-- * by WOR, in the single stage mode, the timeout is (WOR * 2); in the two
-- * stages mode, the timeout is WOR. The maximum timeout in the two stages mode
-- * is half of that in the single stage mode.
-+ * Note: This watchdog timer has two stages. If action is 0, first stage is
-+ * determined by directly programming WCV and second by WOR. When first
-+ * timeout is reached, WS0 is triggered and WCV is reloaded with value in
-+ * WOR. WS0 interrupt will be ignored, then the second watch period starts;
-+ * when second timeout is reached, then WS1 is triggered, system resets. WCV
-+ * and WOR are programmed in such a way that total time corresponding to
-+ * WCV+WOR becomes equivalent to user programmed "timeout".
-+ * If action is 1, then we expect to call panic() at user programmed
-+ * "timeout". Therefore, we program both first and second stage using WCV
-+ * only.
-  *
-  */
- 
-@@ -95,7 +101,17 @@ struct sbsa_gwdt {
- 	void __iomem		*control_base;
- };
- 
--#define DEFAULT_TIMEOUT		10 /* seconds */
-+/*
-+ * Max Timeout Can be in days, but 255 seconds seems reasonable for all use
-+ * cases
-+ */
-+#define MAX_TIMEOUT		255
-+
-+/* Default timeout is 40 seconds, which is the 1st + 2nd watch periods when
-+ * action is 0. When action is 1 then both 1st and 2nd watch periods will
-+ * be of 40 seconds.
-+ */
-+#define DEFAULT_TIMEOUT		40 /* seconds */
- 
- static unsigned int timeout;
- module_param(timeout, uint, 0);
-@@ -127,20 +143,21 @@ static int sbsa_gwdt_set_timeout(struct watchdog_device *wdd,
- 				 unsigned int timeout)
- {
- 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
-+	u64 timeout_1, timeout_2;
- 
- 	wdd->timeout = timeout;
- 
- 	if (action)
--		writel(gwdt->clk * timeout,
--		       gwdt->control_base + SBSA_GWDT_WOR);
-+		timeout_1 = (u64)gwdt->clk * timeout;
- 	else
--		/*
--		 * In the single stage mode, The first signal (WS0) is ignored,
--		 * the timeout is (WOR * 2), so the WOR should be configured
--		 * to half value of timeout.
--		 */
--		writel(gwdt->clk / 2 * timeout,
--		       gwdt->control_base + SBSA_GWDT_WOR);
-+		timeout_1 = (u64)gwdt->clk * (timeout - wdd->min_timeout);
-+
-+	/* when action=1, timeout_2 will be overwritten in ISR */
-+	timeout_2 = (u64)gwdt->clk * wdd->min_timeout;
-+
-+	writel(timeout_2, gwdt->control_base + SBSA_GWDT_WOR);
-+	writeq(timeout_1 + arch_counter_get_cntvct(),
-+		gwdt->control_base + SBSA_GWDT_WCV);
- 
- 	return 0;
- }
-@@ -172,12 +189,17 @@ static int sbsa_gwdt_keepalive(struct watchdog_device *wdd)
- 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
- 
- 	/*
--	 * Writing WRR for an explicit watchdog refresh.
--	 * You can write anyting (like 0).
-+	 * play safe: program WOR with max value so that we have sufficient
-+	 * time to overwrite them after explicit refresh
- 	 */
-+	writel(U32_MAX, gwdt->control_base + SBSA_GWDT_WOR);
-+	/*
-+	* Writing WRR for an explicit watchdog refresh.
-+	* You can write anyting (like 0).
-+	*/
- 	writel(0, gwdt->refresh_base + SBSA_GWDT_WRR);
- 
--	return 0;
-+	return sbsa_gwdt_set_timeout(wdd, wdd->timeout);;
- }
- 
- static unsigned int sbsa_gwdt_status(struct watchdog_device *wdd)
-@@ -193,10 +215,15 @@ static int sbsa_gwdt_start(struct watchdog_device *wdd)
- {
- 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
- 
-+	/*
-+	 * play safe: program WOR with max value so that we have sufficient
-+	 * time to overwrite them after explicit refresh
-+	 */
-+	writel(U32_MAX, gwdt->control_base + SBSA_GWDT_WOR);
- 	/* writing WCS will cause an explicit watchdog refresh */
- 	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
- 
--	return 0;
-+	return sbsa_gwdt_set_timeout(wdd, wdd->timeout);;
- }
- 
- static int sbsa_gwdt_stop(struct watchdog_device *wdd)
-@@ -211,6 +238,20 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
- 
- static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
- {
-+	struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
-+	struct watchdog_device *wdd = &gwdt->wdd;
-+	u64 timeout_2 = (u64)gwdt->clk * wdd->timeout;
-+
-+	/*
-+	 * Since we can not trust system at this moment, therefore re-write
-+	 * WCV only if wdd->timeout <= MAX_TIMEOUT to avoid a corner
-+	 * scenario when we might have corrupted wdd->timeout values at
-+	 * this point.
-+	 */
-+	if (wdd->timeout <= MAX_TIMEOUT)
-+		writeq(timeout_2 + arch_counter_get_cntvct(),
-+			gwdt->control_base + SBSA_GWDT_WCV);
-+
- 	panic(WATCHDOG_NAME " timeout");
- 
- 	return IRQ_HANDLED;
-@@ -273,7 +314,7 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
- 	wdd->info = &sbsa_gwdt_info;
- 	wdd->ops = &sbsa_gwdt_ops;
- 	wdd->min_timeout = 1;
--	wdd->max_timeout = U32_MAX / gwdt->clk;
-+	wdd->max_timeout = MAX_TIMEOUT;
- 	wdd->timeout = DEFAULT_TIMEOUT;
- 	watchdog_set_drvdata(wdd, gwdt);
- 	watchdog_set_nowayout(wdd, nowayout);
--- 
-2.5.5
+> On 04/28/2016 06:45 PM, Andre Przywara wrote:
+>> From: Eric Auger <eric.auger@linaro.org>
+>>
+>> Tell KVM whether a particular VCPU has an IRQ that needs handling
+>> in the guest. This is used to decide whether a VCPU is runnable.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog RFC..v1:
+>> - return false if distributor is disabled
+>> - add vgic_kick_vcpus() implementations
+>>
+>>  include/kvm/vgic/vgic.h  |  2 ++
+>>  virt/kvm/arm/vgic/vgic.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic.h |  1 +
+>>  3 files changed, 43 insertions(+)
+>>
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> index 5fae4a9..2615205 100644
+>> --- a/include/kvm/vgic/vgic.h
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -184,6 +184,8 @@ struct vgic_cpu {
+>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>>  			bool level);
+>>  
+>> +int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>> +
+>>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>>  #define vgic_initialized(k)	(false)
+>>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index ae52928..eeb766e 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>> @@ -519,3 +519,43 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>>  	vgic_flush_lr_state(vcpu);
+>>  	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+>>  }
+>> +
+>> +int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +	struct vgic_irq *irq;
+>> +	bool pending = false;
+>> +
+>> +	if (!vcpu->kvm->arch.vgic.enabled)
+>> +		return false;
+>> +
+>> +	spin_lock(&vgic_cpu->ap_list_lock);
+>> +
+>> +	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+>> +		spin_lock(&irq->irq_lock);
+>> +		pending = irq->pending && irq->enabled;
+>> +		spin_unlock(&irq->irq_lock);
+>> +
+>> +		if (pending)
+>> +			break;
+>> +	}
+>> +
+>> +	spin_unlock(&vgic_cpu->ap_list_lock);
+>> +
+>> +	return pending;
+>> +}
+>> +
+>> +void vgic_kick_vcpus(struct kvm *kvm)
+>> +{
+>> +	struct kvm_vcpu *vcpu;
+>> +	int c;
+>> +
+>> +	/*
+>> +	 * We've injected an interrupt, time to find out who deserves
+>> +	 * a good kick...
+>> +	 */
+>> +	kvm_for_each_vcpu(c, vcpu, kvm) {
+>> +		if (kvm_vgic_vcpu_pending_irq(vcpu))
+>> +			kvm_vcpu_kick(vcpu);
+>> +	}
+>> +}
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 81b1a20..0c92cda 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -21,6 +21,7 @@
+>>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>>  			      u32 intid);
+>>  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+>> +void vgic_kick_vcpus(struct kvm *kvm);
+>>  
+>>  void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
+>>  void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
+>>
+> 
