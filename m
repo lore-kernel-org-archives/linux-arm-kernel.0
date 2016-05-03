@@ -1,228 +1,91 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 3 May 2016 10:43:18 +0100
-Subject: [alsa-devel] [PATCH 1/2] ASoC: rockchip: i2s: separate capture
- and playback
-In-Reply-To: <CAFqH_50D5PQOkpCDefds3Nyktvitoe2Wx=YcXM2POox1ooO=0g@mail.gmail.com>
-References: <1449657147-26959-1-git-send-email-john@metanate.com>
- <CAFqH_52C4JKno4uyt54UdWKAJKM4FPGRiQaQQ9_H-Mz1Cr+Hqg@mail.gmail.com>
- <20160430070049.GF14612@serenity.lan>
- <57282532.7000402@rock-chips.com>
- <CAFqH_50D5PQOkpCDefds3Nyktvitoe2Wx=YcXM2POox1ooO=0g@mail.gmail.com>
-Message-ID: <20160503104318.62739a91.john@metanate.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 10:50:13 +0100
+Subject: [PATCH v2 2/4] irqchip: add LPC32xx interrupt controller driver
+In-Reply-To: <572871A4.5050003@mleia.com>
+References: <1461545990-25560-1-git-send-email-vz@mleia.com>
+ <1461546038-25668-1-git-send-email-vz@mleia.com>
+ <1461678082.9433.3.camel@localhost> <57228B68.8030706@mleia.com>
+ <5728627B.1020602@arm.com> <572871A4.5050003@mleia.com>
+Message-ID: <57287455.8050706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
-
-On Tue, 3 May 2016 11:16:58 +0200, Enric Balletbo Serra wrote:
-> 2016-05-03 6:12 GMT+02:00 sugar <sugar.zhang@rock-chips.com>:
-> > On 4/30/2016 15:00, John Keeping Wrote:  
-> >> On Fri, Apr 29, 2016 at 04:59:27PM +0200, Enric Balletbo Serra wrote:  
-> >>>
-> >>> 2015-12-09 11:32 GMT+01:00 John Keeping <john@metanate.com>:  
-> >>>>
-> >>>> If we only clear the tx/rx state when both are disabled it is not
-> >>>> possible to start/stop one multiple times while the other is running.
-> >>>> Since the two are independently controlled, treat them as such and
-> >>>> remove the false dependency between capture and playback.
-> >>>>
-> >>>> Signed-off-by: John Keeping <john@metanate.com>
-> >>>> ---
-> >>>>   sound/soc/rockchip/rockchip_i2s.c | 72
-> >>>> +++++++++++++++++----------------------
-> >>>>   1 file changed, 32 insertions(+), 40 deletions(-)
-> >>>>
-> >>>> diff --git a/sound/soc/rockchip/rockchip_i2s.c
-> >>>> b/sound/soc/rockchip/rockchip_i2s.c
-> >>>> index 83b1b9c..acc6225 100644
-> >>>> --- a/sound/soc/rockchip/rockchip_i2s.c
-> >>>> +++ b/sound/soc/rockchip/rockchip_i2s.c
-> >>>> @@ -82,8 +82,8 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev
-> >>>> *i2s, int on)
-> >>>>                                     I2S_DMACR_TDE_ENABLE,
-> >>>> I2S_DMACR_TDE_ENABLE);
-> >>>>
-> >>>>                  regmap_update_bits(i2s->regmap, I2S_XFER,
-> >>>> -                                  I2S_XFER_TXS_START |
-> >>>> I2S_XFER_RXS_START,
-> >>>> -                                  I2S_XFER_TXS_START |
-> >>>> I2S_XFER_RXS_START);
-> >>>> +                                  I2S_XFER_TXS_START,
-> >>>> +                                  I2S_XFER_TXS_START);
-> >>>>
-> >>>>                  i2s->tx_start = true;
-> >>>>          } else {
-> >>>> @@ -92,27 +92,23 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev
-> >>>> *i2s, int on)
-> >>>>                  regmap_update_bits(i2s->regmap, I2S_DMACR,
-> >>>>                                     I2S_DMACR_TDE_ENABLE,
-> >>>> I2S_DMACR_TDE_DISABLE);
-> >>>>
-> >>>> -               if (!i2s->rx_start) {
-> >>>> -                       regmap_update_bits(i2s->regmap, I2S_XFER,
-> >>>> -                                          I2S_XFER_TXS_START |
-> >>>> -                                          I2S_XFER_RXS_START,
-> >>>> -                                          I2S_XFER_TXS_STOP |
-> >>>> -                                          I2S_XFER_RXS_STOP);
-> >>>> +               regmap_update_bits(i2s->regmap, I2S_XFER,
-> >>>> +                                  I2S_XFER_TXS_START,
-> >>>> +                                  I2S_XFER_TXS_STOP);
-> >>>>
-> >>>> -                       regmap_update_bits(i2s->regmap, I2S_CLR,
-> >>>> -                                          I2S_CLR_TXC | I2S_CLR_RXC,
-> >>>> -                                          I2S_CLR_TXC | I2S_CLR_RXC);
-> >>>> +               regmap_update_bits(i2s->regmap, I2S_CLR,
-> >>>> +                                  I2S_CLR_TXC,
-> >>>> +                                  I2S_CLR_TXC);
-> >>>>
-> >>>> -                       regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>> +               regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>>
-> >>>> -                       /* Should wait for clear operation to finish */
-> >>>> -                       while (val) {
-> >>>> -                               regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>> -                               retry--;
-> >>>> -                               if (!retry) {
-> >>>> -                                       dev_warn(i2s->dev, "fail to
-> >>>> clear\n");
-> >>>> -                                       break;
-> >>>> -                               }
-> >>>> +               /* Should wait for clear operation to finish */
-> >>>> +               while (val & I2S_CLR_TXC) {
-> >>>> +                       regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>> +                       retry--;
-> >>>> +                       if (!retry) {
-> >>>> +                               dev_warn(i2s->dev, "fail to clear\n");
-> >>>> +                               break;
-> >>>>                          }
-> >>>>                  }
-> >>>>          }
-> >>>> @@ -128,8 +124,8 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev
-> >>>> *i2s, int on)
-> >>>>                                     I2S_DMACR_RDE_ENABLE,
-> >>>> I2S_DMACR_RDE_ENABLE);
-> >>>>
-> >>>>                  regmap_update_bits(i2s->regmap, I2S_XFER,
-> >>>> -                                  I2S_XFER_TXS_START |
-> >>>> I2S_XFER_RXS_START,
-> >>>> -                                  I2S_XFER_TXS_START |
-> >>>> I2S_XFER_RXS_START);
-> >>>> +                                  I2S_XFER_RXS_START,
-> >>>> +                                  I2S_XFER_RXS_START);
-> >>>>
-> >>>>                  i2s->rx_start = true;
-> >>>>          } else {
-> >>>> @@ -138,27 +134,23 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev
-> >>>> *i2s, int on)
-> >>>>                  regmap_update_bits(i2s->regmap, I2S_DMACR,
-> >>>>                                     I2S_DMACR_RDE_ENABLE,
-> >>>> I2S_DMACR_RDE_DISABLE);
-> >>>>
-> >>>> -               if (!i2s->tx_start) {
-> >>>> -                       regmap_update_bits(i2s->regmap, I2S_XFER,
-> >>>> -                                          I2S_XFER_TXS_START |
-> >>>> -                                          I2S_XFER_RXS_START,
-> >>>> -                                          I2S_XFER_TXS_STOP |
-> >>>> -                                          I2S_XFER_RXS_STOP);
-> >>>> +               regmap_update_bits(i2s->regmap, I2S_XFER,
-> >>>> +                                  I2S_XFER_RXS_START,
-> >>>> +                                  I2S_XFER_RXS_STOP);
-> >>>>
-> >>>> -                       regmap_update_bits(i2s->regmap, I2S_CLR,
-> >>>> -                                          I2S_CLR_TXC | I2S_CLR_RXC,
-> >>>> -                                          I2S_CLR_TXC | I2S_CLR_RXC);
-> >>>> +               regmap_update_bits(i2s->regmap, I2S_CLR,
-> >>>> +                                  I2S_CLR_RXC,
-> >>>> +                                  I2S_CLR_RXC);
-> >>>>
-> >>>> -                       regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>> +               regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>>
-> >>>> -                       /* Should wait for clear operation to finish */
-> >>>> -                       while (val) {
-> >>>> -                               regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>> -                               retry--;
-> >>>> -                               if (!retry) {
-> >>>> -                                       dev_warn(i2s->dev, "fail to
-> >>>> clear\n");
-> >>>> -                                       break;
-> >>>> -                               }
-> >>>> +               /* Should wait for clear operation to finish */
-> >>>> +               while (val & I2S_CLR_RXC) {
-> >>>> +                       regmap_read(i2s->regmap, I2S_CLR, &val);
-> >>>> +                       retry--;
-> >>>> +                       if (!retry) {
-> >>>> +                               dev_warn(i2s->dev, "fail to clear\n");
-> >>>> +                               break;
-> >>>>                          }
-> >>>>                  }
-> >>>>          }
-> >>>> --
-> >>>> 2.6.3.462.gbe2c914  
-> >>>
-> >>>
-> >>> Using my Veyron Jerry Chromebook wiht latest kernel I found that the
-> >>> speakers doesn't work. Bisect points to this patch as the offending
-> >>> commit. However your changes looks reasonable the fact is that
-> >>> reverting the patch makes the audio work again on my device. I need to
-> >>> dig a bit more into the issue, but meanwhile, any idea on what is
-> >>> happening ? Can I ask which device did you test?  
-> >>
-> >>
-> >> I tested this on a Radxa Rock2 square.  This change fixed an issue I
-> >> found when running separate processes for playback and recording (I was
-> >> testing with arecord and speaker-test IIRC) but I don't think that
-> >> should be relevant.  I just read through the patch again and I can't see
-> >> anything obviously wrong so I'm afraid I don't have any idea what's
-> >> causing the problem you're seeing.
-> >>  
-> > Do you have test playback/capture at the same time? I think you may
-> > reproduce this issue if you do as follows:
-> >
-> > step 1: tinyplay test.wav -D 0 -d 0 -p 1024 -n 4 &
-> > step 2: tinycap r.wav -D 0 -d 0 -p 1024 -n 4 &
-> >
-> > you will find that there is no music now.
-> >
-> > because of this problem, we enable tx/rx at the same time to WA this issue.
-> >  
+On 03/05/16 10:38, Vladimir Zapolskiy wrote:
+> On 03.05.2016 11:34, Marc Zyngier wrote:
+>> On 28/04/16 23:15, Vladimir Zapolskiy wrote:
+>>> On 26.04.2016 16:41, Sylvain Lemieux wrote:
+>>>> Hi Vladimir,
+>>>>
+>>>> On Mon, 2016-04-25 at 04:00 +0300, Vladimir Zapolskiy wrote:
+>>>>> The change adds improved support of NXP LPC32xx MIC, SIC1 and SIC2
+>>>>> interrupt controllers.
+>>>>>
+>>>>> This is a list of new features in comparison to the legacy driver:
+>>>>> * irq types are taken from device tree settings, no more need to
+>>>>>   hardcode them,
+>>>>> * old driver is based on irq_domain_add_legacy, which causes problems
+>>>>>   with handling MIC hardware interrupt 0 produced by SIC1,
+>>>>> * there is one driver for MIC, SIC1 and SIC2, no more need to handle
+>>>>>   them separately, e.g. have two separate handlers for SIC1 and SIC2,
+>>>>> * the driver does not have any dependencies on hardcoded register
+>>>>>   offsets,
+>>>>> * the driver is much simpler for maintenance,
+>>>>> * SPARSE_IRQS option is supported.
+>>>>>
+>>>>> Legacy LPC32xx interrupt controller driver was broken since commit
+>>>>> 76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler"), which
+>>>>> requires a private interrupt handler, otherwise any SIC1 generated
+>>>>> interrupt (mapped to MIC hwirq 0) breaks the kernel with the message
+>>>>> "unexpected IRQ trap at vector 00".
+>>>>>
+>>>>> The change disables compilation of a legacy driver found at
+>>>>> arch/arm/mach-lpc32xx/irq.c, the file will be removed in a separate
+>>>>> commit.
+>>>>>
+>>>>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>>>>> ---
+>>>>> Changes from v1 to v2:
+>>>>> * added chained_irq_{enter,exit} for SIC chained handler,
+>>>>> * use {writel,readl}_relaxed flavour of io access functions,
+>>>>> * changed anchor data type to access iomem from struct irq_domain
+>>>>>   to private struct lpc32xx_irq_chip,
+>>>>> * do not read irq status register twice on every irq event,
+>>>>> * resource deallocation fixes on error path of irqchip driver init,
+>>>>> * removed handling of "interrupt-controller-name" property, name
+>>>>>   is constructed from mic/sic type and controller's physical address,
+>>>>> * minor improvements (renames, __ffs instead of ffs, etc.)
+>>>>>
+>>>>> Many kudos to Marc for review of v1.
+>>>>>
+>>>>>  arch/arm/Kconfig                |   2 +
+>>>>>  arch/arm/mach-lpc32xx/phy3250.c |   1 -
+>>>>>  drivers/irqchip/Makefile        |   1 +
+>>>>>  drivers/irqchip/irq-lpc32xx.c   | 238 ++++++++++++++++++++++++++++++++++++++++
+>>>>>  4 files changed, 241 insertions(+), 1 deletion(-)
+>>>>>  create mode 100644 drivers/irqchip/irq-lpc32xx.c
+>>>>>
+>>>> I tested the driver on a custom LPC3250 board; I was having at
+>>>> least 1 interrupt generated from each source (MIC/SIC1/SIC2).
+>>>>
+>>>> Tested-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+>>>>
+>>>
+>>> Thomas, Marc, Jason, Russell,
+>>>
+>>> in your opinion would it be still possible to accept this change v2 2/4 for v4.7?
+>>
+>> I'll queue them.
+>>
 > 
-> I can confirm that reverting John's patch audio playback/capture at
-> the same time works on my Veyron Jerry Chromebook.
+> Marc, thank you in advance, please note that I ask to review/pick up
+> only 2/4 for v4.7 ("irqchip: add LPC32xx interrupt controller driver"),
+> DT changes are merged through arm-soc and the last 4/4 clean-up can
+> be deferred till v4.8.
 
-Have you tried stopping one of the processes and then starting it again
-(without touching the other process)?  That's the case that was broken
-for me without this patch.
+Right. I'll drop patch 1/4 then.
 
-I have had a quick look through the code I'm using and I noticed that I
-have another change that hasn't been sent upstream, which marks the
-I2S_FIFOLR register as volatile in rockchip_i2s_volatile_reg():
+Thanks,
 
--- >8 --
-Subject: [PATCH] ASoC: rockchip: i2s: mark FIFOLR register volatile
-
-The FIFO levels will be updated by the device so they should not be
-cached.
-
-Signed-off-by: John Keeping <john@metanate.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index d78f4c925b02..b517d8abcc40 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -434,6 +434,7 @@ static bool rockchip_i2s_volatile_reg(struct device *dev, unsigned int reg)
- 	switch (reg) {
- 	case I2S_INTSR:
- 	case I2S_CLR:
-+	case I2S_FIFOLR:
- 		return true;
- 	default:
- 		return false;
--- 8< --
-
-
-Regards,
-John
+	M.
+-- 
+Jazz is not dead. It just smells funny...
