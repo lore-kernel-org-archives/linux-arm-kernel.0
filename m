@@ -1,49 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon,  2 May 2016 17:12:20 -0700
-Subject: [PATCH 4.5 141/200] irqchip/mxs: Fix error check of
- of_io_request_and_map()
-In-Reply-To: <20160503000554.631204776@linuxfoundation.org>
-References: <20160503000554.631204776@linuxfoundation.org>
-Message-ID: <20160503000559.246766070@linuxfoundation.org>
+From: Yisen.zhuang@huawei.com (Yisen Zhuang)
+Date: Tue, 3 May 2016 08:54:11 +0800
+Subject: [PATCH net-next 0/4] net: hns: update DT properties according to
+ Rob's comments
+In-Reply-To: <20160429.133949.1719521222260369497.davem@davemloft.net>
+References: <1461827344-52230-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <20160429.133949.1719521222260369497.davem@davemloft.net>
+Message-ID: <5727F6B3.2080007@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.5-stable review patch.  If anyone has any objections, please let me know.
+Hi David,
 
-------------------
+Thanks for applying the patches.
 
-From: Vladimir Zapolskiy <vz@mleia.com>
+The series which i reposted is my misoperation. Please ignore them.
 
-commit edf8fcdc6b254236be005851af35ea5e826e7e09 upstream.
+Thanks,
 
-The of_io_request_and_map() returns a valid pointer in iomem region or
-ERR_PTR(), check for NULL always fails and may cause a NULL pointer
-dereference on error path.
+Yisen
 
-Fixes: 25e34b44313b ("irqchip/mxs: Prepare driver for hardware with different offsets")
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Oleksij Rempel <linux@rempel-privat.de>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1457486500-10237-1-git-send-email-vz at mleia.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/irqchip/irq-mxs.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -183,7 +183,7 @@ static void __iomem * __init icoll_init_
- 	void __iomem *icoll_base;
- 
- 	icoll_base = of_io_request_and_map(np, 0, np->name);
--	if (!icoll_base)
-+	if (IS_ERR(icoll_base))
- 		panic("%s: unable to map resource", np->full_name);
- 	return icoll_base;
- }
+? 2016/4/30 1:39, David Miller ??:
+> From: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+> Date: Thu, 28 Apr 2016 15:09:00 +0800
+> 
+>> There are some inappropriate properties definition in hns DT. We update the definition
+>> according to Rob's review comments and fix some typos in binding.
+>>
+>> For more details, please see individual patches.
+> 
+> Series applied, thanks.
+> 
+> BTW, you reposted your 10 part series for adding the dsaf-debug device, but I
+> already applied the series you posted for that nearly a week ago.
+> 
+> .
+> 
