@@ -1,68 +1,79 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue,  3 May 2016 18:15:27 +0800
-Subject: [PATCH] iommu/arm-smmu: clear cache lock bit of ACR
-Message-ID: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 11:16:41 +0100
+Subject: [PATCH v2 42/54] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ access to VGIC registers
+In-Reply-To: <572878C8.5070306@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-43-git-send-email-andre.przywara@arm.com>
+ <57287671.3000902@arm.com> <572878C8.5070306@arm.com>
+Message-ID: <57287A89.9010809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According MMU-500 TRM, section 3.7.1 Auxiliary Control registers,
-You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
+On 03/05/16 11:09, Andre Przywara wrote:
+> Hi,
+> 
+> On 03/05/16 10:59, Marc Zyngier wrote:
+>> On 28/04/16 17:46, Andre Przywara wrote:
+>>> From: Eric Auger <eric.auger@linaro.org>
+>>>
+>>> This patch implements the switches for KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>>> and KVM_DEV_ARM_VGIC_GRP_CPU_REGS API which allows the userspace to
+>>> access VGIC registers.
+>>>
+>>> At that stage the interfaces with the MMIO API are not implemented:
+>>> - vgic_attr_regs_access
+>>> - vgic_v2_has_attr_regs
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>  virt/kvm/arm/vgic/vgic-kvm-device.c | 53 +++++++++++++++++++++++++++++++++++--
+>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c    | 34 ++++++++++++++++++++++++
+>>>  virt/kvm/arm/vgic/vgic.h            |  1 +
+>>>  3 files changed, 86 insertions(+), 2 deletions(-)
+>>>
+>>
+>> [...]
+>>
+>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>> index ae6077e..f2a8efe 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>> @@ -276,3 +276,37 @@ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>>>  
+>>>  	return ret;
+>>>  }
+>>> +
+>>> +int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>>> +{
+>>> +	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+>>> +	const struct vgic_register_region *regions;
+>>> +	gpa_t addr;
+>>> +	int nr_regions, i, len;
+>>> +
+>>> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+>>> +
+>>> +	switch (attr->group) {
+>>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>>> +		regions = vgic_v2_dist_registers;
+>>> +		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
+>>> +		break;
+>>> +	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+>>> +		return -ENXIO;		/* TODO: describe CPU i/f regs also */
+>>
+>> This definitely needs addressing, as it breaks guest migration.
+> 
+> It is implemented in patch 46/54.
+> Shall I remove the TODO to avoid confusion and/or replace it with a note
+> either in a comment or in this commit message that the implementation
+> will follow in one the next patches?
 
-So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
-need clear CACHE_LOCK bit of ACR register first.
+I just checked, and I stand by my initial comment. Patch 46 does
+implement the accessors, but nothing actually wires them here.
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
----
+Thanks,
 
-Hi Will,
-
- Patch based on iommu/devel branch.
-
-
- drivers/iommu/arm-smmu.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index acff332..d094a5a 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -98,6 +98,9 @@
- #define sCR0_BSU_SHIFT			14
- #define sCR0_BSU_MASK			0x3
- 
-+/* Auxiliary Configuration register */
-+#define ARM_SMMU_GR0_sACR		0x10
-+
- /* Identification registers */
- #define ARM_SMMU_GR0_ID0		0x20
- #define ARM_SMMU_GR0_ID1		0x24
-@@ -235,6 +238,8 @@
- 
- #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
- 
-+#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
-+
- #define CB_PAR_F			(1 << 0)
- 
- #define ATSR_ACTIVE			(1 << 0)
-@@ -1506,6 +1511,16 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
- 	}
- 
-+	/*
-+	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
-+	 * clear CACHE_LOCK bit of ACR first.
-+	 */
-+	if (smmu->model == ARM_MMU500) {
-+		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-+		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
-+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
-+	}
-+
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
- 	for (i = 0; i < smmu->num_context_banks; ++i) {
- 		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
+	M.
 -- 
-2.6.2
+Jazz is not dead. It just smells funny...
