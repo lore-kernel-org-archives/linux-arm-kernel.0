@@ -1,49 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 May 2016 11:05:02 +0200
-Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1554541.oDP7Ro5zB2@wuerfel>
- <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
-Message-ID: <3846428.6xx69KGEja@wuerfel>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Tue, 3 May 2016 17:09:51 +0800
+Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
+ suspend
+In-Reply-To: <87vb2vfujq.fsf@intel.com>
+References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
+Message-ID: <1462266591.11651.34.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2016 10:00:45 Catalin Marinas wrote:
-> On Fri, Apr 29, 2016 at 07:30:19PM +0200, Arnd Bergmann wrote:
-> > On Friday 29 April 2016 17:01:55 Catalin Marinas wrote:
-> > > On Wed, Apr 06, 2016 at 01:08:46AM +0300, Yury Norov wrote:
-> > > > ILP32 VDSO exports next symbols:
-> > > >  __kernel_rt_sigreturn;
-> > > >  __kernel_gettimeofday;
-> > > >  __kernel_clock_gettime;
-> > > >  __kernel_clock_getres;
-> > > 
-> > > [...]
-> > > 
-> > > > +$(obj)/gettimeofday-ilp32.o: $(src)/../vdso/gettimeofday.S
-> > > > + $(call if_changed_dep,vdso-ilp32as)
-> > > 
-> > > Are struct timeval and timespec the same between ILP32 and LP64? For
-> > > example, __kernel_gettimeofday() assumes TVAL_TV_SEC offset defined in
-> > > asm-offsets.c based on the LP64 timeval.
-> > 
-> > No, ilp32 uses the generic 32-bit data structures, which have a 32-bit
-> > time_t. I guess that means it can work for little-endian but not
-> > big-endian, right?
+On Tue, 2016-05-03 at 10:51 +0300, Felipe Balbi wrote:
+> Hi,
 > 
-> I don't think it works for little-endian either. The LP64 struct timeval
-> is 16 bytes while the ILP32 one is 8 bytes. The VDSO gettimeofday is
-> storing 16 bytes (stp x10, x11, [x0, #TVAL_TV_SEC])
+> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
+> >> Click mouse after xhci suspend completion but before system suspend
+> >> completion, system will not be waken up by mouse if the duration of
+> >> them is larger than 20ms which is the device UFP's resume signaling
+> 
+> what is "them" here ? The duration of what is longer than 20ms ?
+They are "xhci suspend completion" and "system suspend completion";
 
-You are right. Yury asked pointed out the same thing on IRC as well.
-Using the 64-bit gettimeofday() will put the right number in the
-.tv_sec member on little-endian, but will write zeroes to tv_nsec
-and corrupt the memory following it.
+It's time duration
 
-Yury also tried it out and noticed that for a (so far) unknown reason,
-the vdso gets never used by his glibc build, so it has not triggered
-any test case failures.
+> 
+> >> lasted. Another reason is that the SPM is not enabled before system
+> 
+> what's SPM ?
+It is System Power Management which is powered off when system is
+running in normal mode, and is powered on when system enters suspend
+mode. It is used to wakeup system when some wakeup sources, such as
+bluetooth or powerkey etc, tigger wakeup event.
 
-	Arnd
+> 
+> >> suspend compeltion, this causes SPM also not notice the resume signal.
+>            ^^^^^^^^^^
+>            completion
+> 
+> >> So in order to reduce the duration less than 20ms, make use of
+> >> syscore's suspend/resume interface.
+> 
+> no, this is the wrong approach
+But it seems only one workable approach from software side
+
+> 
+> >> In fact it is a work around solution which only reduces the
+> >> probability of failure, because we can't ensure that the duration from
+> >> syscore's suspend completion to SPM working is always less than 20ms.
+> 
+> right, which means you're not really fixing anything. Morevoer, you make
+> it so that this won't work with multiple instances of the XHCI IP in
+> your SoC.
+> 
+It can be easily fixed up from hardware side by latching resume signal
+until SPM is powered on.
+
+I forgot to take into account of multiple instances
+ 
+> >> Because the syscore runs on irq disabled context, and xhci's
+> >> suspend/resume calls some sleeping functions, enable local irq
+> >> and then disable it during suspend/resume. This may be not a problem,
+> >> since only boot CPU is runing.
+> 
+> another problem :) calling local_irq_{enable,disable}() is an indication
+> that something's wrong.
+Oh!
+
+BTW: There will be warning logs if they are not called.
+
+Thanks a lot
+> 
+> >> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> >> ---
+> >>  drivers/usb/host/xhci-mtk.c |   31 ++++++++++++++++++++++++++++++-
+> >>  1 file changed, 30 insertions(+), 1 deletion(-)
+> >> 
+> >> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> >> index 79959f1..8277f02 100644
+> >> --- a/drivers/usb/host/xhci-mtk.c
+> >> +++ b/drivers/usb/host/xhci-mtk.c
+> >> @@ -28,6 +28,7 @@
+> >>  #include <linux/pm_runtime.h>
+> >>  #include <linux/regmap.h>
+> >>  #include <linux/regulator/consumer.h>
+> >> +#include <linux/syscore_ops.h>
+> >>  
+> >>  #include "xhci.h"
+> >>  #include "xhci-mtk.h"
+> >> @@ -490,6 +491,8 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+> >>  	return xhci_gen_setup(hcd, xhci_mtk_quirks);
+> >>  }
+> >>  
+> >> +static struct device *xhci_mtk_syscore_dev;
+> 
+> now, what happens when you have more than one XHCI instance ?
+> 
