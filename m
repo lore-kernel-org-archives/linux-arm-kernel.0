@@ -1,27 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 May 2016 11:24:44 -0500
-Subject: [PATCH net-next 0/4] net: hns: update DT properties according to
- Rob's comments
-In-Reply-To: <20160429.133949.1719521222260369497.davem@davemloft.net>
-References: <1461827344-52230-1-git-send-email-Yisen.Zhuang@huawei.com>
- <20160429.133949.1719521222260369497.davem@davemloft.net>
-Message-ID: <20160503162444.GA4087@rob-hp-laptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 May 2016 17:29:38 +0100
+Subject: [RFC PATCH 2/7] ALSA: ac97: add an ac97 bus
+In-Reply-To: <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
+References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
+ <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160503162938.GT6292@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 01:39:49PM -0400, David Miller wrote:
-> From: Yisen Zhuang <Yisen.Zhuang@huawei.com>
-> Date: Thu, 28 Apr 2016 15:09:00 +0800
-> 
-> > There are some inappropriate properties definition in hns DT. We update the definition
-> > according to Rob's review comments and fix some typos in binding.
-> > 
-> > For more details, please see individual patches.
-> 
-> Series applied, thanks.
+On Sat, Apr 30, 2016 at 11:15:34PM +0200, Robert Jarzmik wrote:
+> AC97 is a bus for sound usage. It enables for a AC97 AC-Link to link one
+> controller to 0 to 4 AC97 codecs.
 
-It would be nice to review patches addressing my comments before they 
-get applied. Can you please give series with DT bindings a few more days 
-for review before applying.
+> The goal of this new implementation is to implement a device/driver
+> model for AC97, with an automatic scan of the bus and automatic
+> discovery of AC97 codec devices.
 
-Rob
+I think this is basically what I was thinking of, yes.  One thing we'll
+need to do is work out how to handle systems that need some explicit
+action to start clocks for the bus clock, though they were never very
+common and it's entirely possible nobody cares any more so perhaps we
+just punt and see if anyone notices for now.
+
+> +int ac97_digital_controller_register(const struct ac97_controller_ops *ops,
+> +				     struct device *dev);
+> +int ac97_digital_controller_unregister(const struct device *dev);
+
+Why "digital"? 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160503/22fb87c5/attachment.sig>
