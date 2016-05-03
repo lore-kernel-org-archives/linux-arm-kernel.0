@@ -1,107 +1,199 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 3 May 2016 17:50:19 +0100
-Subject: [PATCH V2] iommu/arm-smmu: clear cache lock bit of ACR
-In-Reply-To: <1462283430-9559-1-git-send-email-van.freenix@gmail.com>
-References: <1462283430-9559-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <5728D6CB.3010003@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 3 May 2016 18:51:53 +0200
+Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <20160503164019.GA1604@rob-hp-laptop>
+References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20160503164019.GA1604@rob-hp-laptop>
+Message-ID: <20160503185153.5cfddc32@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/16 14:50, Peng Fan wrote:
-> According MMU-500r2 TRM, section 3.7.1 Auxiliary Control registers,
-> You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
->
-> So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
-> need clear CACHE_LOCK bit of ACR register first.
->
-> Since CACHE_LOCK bit is only present in MMU-500r2 onwards,
-> need to check the major number of IDR7.
->
-> Signed-off-by: Peng Fan <van.freenix@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> ---
->
-> V2:
->   Following Robin's comments, need to check IDR7 before clearing
->   CACHE_LOCK bit of ACR.
->
-> V1:
->   Patch based on iommu/devel
->
->   drivers/iommu/arm-smmu.c | 23 ++++++++++++++++++++++-
->   1 file changed, 22 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index acff332..c7ad23e 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -98,6 +98,9 @@
->   #define sCR0_BSU_SHIFT			14
->   #define sCR0_BSU_MASK			0x3
->
-> +/* Auxiliary Configuration register */
-> +#define ARM_SMMU_GR0_sACR		0x10
-> +
->   /* Identification registers */
->   #define ARM_SMMU_GR0_ID0		0x20
->   #define ARM_SMMU_GR0_ID1		0x24
-> @@ -144,6 +147,9 @@
->   #define ID2_PTFS_64K			(1 << 14)
->   #define ID2_VMID16			(1 << 15)
->
-> +#define ID7_MAJOR_SHIFT			4
-> +#define ID7_MAJOR_MASK			0xf
-> +
->   /* Global TLB invalidation */
->   #define ARM_SMMU_GR0_TLBIVMID		0x64
->   #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
-> @@ -235,6 +241,8 @@
->
->   #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
->
-> +#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
-> +
->   #define CB_PAR_F			(1 << 0)
->
->   #define ATSR_ACTIVE			(1 << 0)
-> @@ -1493,7 +1501,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->   	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
->   	void __iomem *cb_base;
->   	int i = 0;
-> -	u32 reg;
-> +	u32 reg, major;
->
->   	/* clear global FSR */
->   	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
-> @@ -1506,6 +1514,19 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->   		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
->   	}
->
-> +	/*
-> +	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
-> +	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
-> +	 * bit is only present in MMU-500r2 onwards.
-> +	 */
-> +	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
-> +	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
-> +	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
-> +		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-> +		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
-> +		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
-> +	}
-> +
+Hi Rob,
 
-I'd have been inclined to make the ID reg read conditional on ARM_MMU500 
-as well, but this way is marginally more compact, and it's not like 
-we're in a frequently-used hot path anyway.
+On Tue, 3 May 2016 11:40:19 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
+> > The EBI (External Bus Interface) is used to access external peripherals
+> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > Each device is assigned a CS line and an address range and can have its
+> > own configuration (timings, access mode, bus width, ...).
+> > This driver provides a generic DT binding to configure a device according
+> > to its requirements.
+> > For specific device controllers (like the NAND one) the SMC timings
+> > should be configured by the controller driver through the matrix and smc
+> > syscon regmaps.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
+> >  1 file changed, 136 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> > new file mode 100644
+> > index 0000000..a6dca5c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> > @@ -0,0 +1,136 @@
+> > +* Device tree bindings for Atmel EBI
+> > +
+> > +The External Bus Interface (EBI) controller is a bus where you can connect
+> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+> > +The EBI provides a glue-less interface to asynchronous memories through the SMC
+> > +(Static Memory Controller).
+> > +
+> > +Required properties:
+> > +
+> > +- compatible:		"atmel,at91sam9260-ebi"
+> > +			"atmel,at91sam9261-ebi"
+> > +			"atmel,at91sam9263-ebi0"
+> > +			"atmel,at91sam9263-ebi1"  
+> 
+> What are the differences between 0 and 1?
 
-Thanks,
-Robin.
+Because this SoC has 2 EBI busses with different capabilities.
 
->   	/* Make sure all context banks are disabled and clear CB_FSR  */
->   	for (i = 0; i < smmu->num_context_banks; ++i) {
->   		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
->
+> 
+> > +			"atmel,at91sam9rl-ebi"
+> > +			"atmel,at91sam9g45-ebi"
+> > +			"atmel,at91sam9x5-ebi"
+> > +			"atmel,sama5d3-ebi"
+> > +
+> > +- reg:			Contains offset/length value for EBI memory mapping.
+> > +			This property might contain several entries if the EBI
+> > +			memory range is not contiguous
+> > +
+> > +- #address-cells:	Must be 2.
+> > +			The first cell encodes the CS.
+> > +			The second cell encode the offset into the CS memory
+> > +			range.
+> > +
+> > +- #size-cells:		Must be set to 1.
+> > +
+> > +- ranges:		Encodes CS to memory region association.
+> > +
+> > +- clocks:		Clock feeding the EBI controller.
+> > +			See clock-bindings.txt
+> > +
+> > +Children device nodes are representing device connected to the EBI bus.
+> > +
+> > +Required device node properties:
+> > +
+> > +- #reg:			Contains the chip-select id, the offset and the length  
+> 
+> s/#reg/reg/
+
+Will fix that.
+
+> 
+> > +			of the memory region requested by the device.
+> > +
+> > +EBI bus configuration associated with specific chip-select will be defined in
+> > +the configs subnode. This configs node will in turn contain several subnodes
+> > +named config-<cs-id>, each of them containing the following properties.  
+> 
+> This is a bit unusual. Why not just part of the child device nodes?
+
+Oh, come on! I reworked the binding because Mark complained about the
+previous binding which was doing exactly what you're suggesting. Can
+you please be consistent in your reviews... 
+
+
+> 
+> > +
+> > +Optional config-<cs-id> node properties:
+> > +
+> > +- atmel,bus-width:		width of the asynchronous device's data bus
+> > +				8, 16 or 32.
+> > +				Default to 8 when undefined.
+> > +
+> > +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
+> > +				Default to "select" when undefined.
+> > +
+> > +- atmel,read-mode		"nrd" or "ncs".
+> > +				Default to "ncs" when undefined.
+> > +
+> > +- atmel,write-mode		"nwe" or "ncs".
+> > +				Default to "ncs" when undefined.
+> > +
+> > +- atmel,exnw-mode		"disabled", "frozen" or "ready".
+> > +				Default to "disabled" when undefined.
+> > +
+> > +- atmel,page-mode		enable page mode if present. The provided value
+> > +				defines the page size (supported values: 4, 8,
+> > +				16 and 32).
+> > +
+> > +- atmel,tdf-mode:		"normal" or "optimized". When set to  
+> 
+> This should be boolean.
+
+It was a formerly defined as a boolean, and when it's done like that we
+have no way to identify whether the property was forgotten or
+intentionally set to normal mode. What's the problem with this approach?
+
+> 
+> > +				"optimized" the data float time is optimized
+> > +				depending on the next device being accessed
+> > +				(next device setup time is subtracted to the
+> > +				current device data float time).
+> > +				Default to "normal" when undefined.
+> > +
+> > +Mandatory timings expressed in nanoseconds (see Atmel datasheet for a full
+> > +description).  
+> 
+> Required first, then optional properties please.
+
+Okay.
+
+> 
+> > +
+> > +- atmel,ncs-rd-setup-ns
+> > +- atmel,nrd-setup-ns
+> > +- atmel,ncs-wr-setup-ns
+> > +- atmel,nwe-setup-ns
+> > +- atmel,ncs-rd-pulse-ns
+> > +- atmel,nrd-pulse-ns
+> > +- atmel,ncs-wr-pulse-ns
+> > +- atmel,nwe-pulse-ns
+> > +- atmel,nwe-cycle-ns
+> > +- atmel,nrd-cycle-ns
+> > +- atmel,tdf-ns
+> > +
+> > +Example:
+> > +
+> > +	ebi: ebi at 10000000 {
+> > +		compatible = "atmel,sama5d3-ebi";
+> > +		#address-cells = <2>;
+> > +		#size-cells = <1>;  
+> 
+> > +		atmel,smc = <&hsmc>;
+> > +		atmel,matrix = <&matrix>;  
+> 
+> What are these? 
+> 
+> > +		reg = <0x10000000 0x10000000
+> > +		       0x40000000 0x30000000>;
+> > +		ranges = <0x0 0x0 0x10000000 0x10000000
+> > +			  0x1 0x0 0x40000000 0x10000000
+> > +			  0x2 0x0 0x50000000 0x10000000
+> > +			  0x3 0x0 0x60000000 0x10000000>;
+> > +		clocks = <&mck>;
+> > +
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pinctrl_ebi_addr>;  
+> 
+> Not documented.
+
+Will document those properties.
+
+Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
