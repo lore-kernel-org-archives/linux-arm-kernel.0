@@ -1,28 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2016 11:12:59 +0100
-Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
- return phys_addr_t
-In-Reply-To: <20160503042441.GA2518@x1.redhat.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
- <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
- <20160429151639.GC23726@leverpostej>
- <CAHB_GurwYqPbccLU9UHppLxbBr4Cfs47myKAer-RJicT=T7uBw@mail.gmail.com>
- <20160503042441.GA2518@x1.redhat.com>
-Message-ID: <20160503101258.GL19428@n2100.arm.linux.org.uk>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Tue,  3 May 2016 18:15:27 +0800
+Subject: [PATCH] iommu/arm-smmu: clear cache lock bit of ACR
+Message-ID: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 12:24:41PM +0800, Baoquan He wrote:
-> Could you please help tell why arm PAE kernel can be put above 4G?
-> Since the change is related to common code, I am curious about how
-> it's so different with other ARCHs.
+According MMU-500 TRM, section 3.7.1 Auxiliary Control registers,
+You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
 
-This is explained in the covering email to the series.
+So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
+need clear CACHE_LOCK bit of ACR register first.
 
-The explanation given by Pratyush was incomplete.
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+---
 
+Hi Will,
+
+ Patch based on iommu/devel branch.
+
+
+ drivers/iommu/arm-smmu.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index acff332..d094a5a 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -98,6 +98,9 @@
+ #define sCR0_BSU_SHIFT			14
+ #define sCR0_BSU_MASK			0x3
+ 
++/* Auxiliary Configuration register */
++#define ARM_SMMU_GR0_sACR		0x10
++
+ /* Identification registers */
+ #define ARM_SMMU_GR0_ID0		0x20
+ #define ARM_SMMU_GR0_ID1		0x24
+@@ -235,6 +238,8 @@
+ 
+ #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+ 
++#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
++
+ #define CB_PAR_F			(1 << 0)
+ 
+ #define ATSR_ACTIVE			(1 << 0)
+@@ -1506,6 +1511,16 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
+ 	}
+ 
++	/*
++	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
++	 * clear CACHE_LOCK bit of ACR first.
++	 */
++	if (smmu->model == ARM_MMU500) {
++		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
++		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
++		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
++	}
++
+ 	/* Make sure all context banks are disabled and clear CB_FSR  */
+ 	for (i = 0; i < smmu->num_context_banks; ++i) {
+ 		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.6.2
