@@ -1,45 +1,84 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 3 May 2016 11:41:51 +0100
-Subject: [PATCH v2 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <20160503103237.GN19428@n2100.arm.linux.org.uk>
-References: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
- <57287BD9.6090907@arm.com> <20160503103237.GN19428@n2100.arm.linux.org.uk>
-Message-ID: <5728806F.7000208@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 11:47:37 +0100
+Subject: [PATCH v2 50/54] KVM: arm/arm64: vgic-new: vgic_init: implement
+ map_resources
+In-Reply-To: <1461861973-26464-51-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-51-git-send-email-andre.przywara@arm.com>
+Message-ID: <572881C9.300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/16 11:32, Russell King - ARM Linux wrote:
-> On Tue, May 03, 2016 at 11:22:17AM +0100, Vladimir Murzin wrote:
->> On 28/04/16 17:51, Vladimir Murzin wrote:
->>> Small set of fixes discovered with R-class cores.
->>>
->>> Jean-Philippe Brucker (2):
->>>   ARM: nommu: fix PMSAv7 setup
->>>   ARM: nommu: change memory reserve for the vectors
->>>
->>> Vladimir Murzin (1):
->>>   ARM: domain: move {set,get}_domain under config guard
->>>
->>>  arch/arm/include/asm/domain.h |   11 +++++++++++
->>>  arch/arm/kernel/head-nommu.S  |    2 +-
->>>  arch/arm/mm/nommu.c           |   15 ++++++++-------
->>>  3 files changed, 20 insertions(+), 8 deletions(-)
->>>
->>
->> Russell, any objection to get it into patch tracker?
+On 28/04/16 17:46, Andre Przywara wrote:
+> From: Eric Auger <eric.auger@linaro.org>
 > 
-> I've not had any chance to look at them yet - last weekend, I was away
-> from Thursday through until late Tuesday, then I spent most of Wednesday
-> and Thursday catching up.  Friday I was able to look at some stuff, and
-> then I've spent the bank holiday weekend digging out laurels in the front
-> garden.  I've only just today got back to looking at some kernel stuff.
+> map_resources is the last initialization step. It is executed on
+> 1st VCPU run. At that stage the code checks the userspace has provided
+> the base addresses for the relevant VGIC regions, which depend on
+> the type of VGIC that is exposed to the guest.
 > 
-> So really, I've only had two days in the last week and a half to look at
-> anything.
+> The function also forces the vgic_init if it has not been executed yet
+> (only allowed for VGIC v2).
 > 
-> Please wait a little while longer.  Thanks.
+> for GICv2, The VGIC CPU interface is mapped onto the GIC virtual CPU
+> interface.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/vgic/vgic.h       |  1 +
+>  virt/kvm/arm/vgic/vgic-init.c | 27 +++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-v2.c   | 47 +++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-v3.c   | 44 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h      | 16 +++++++++++++++
+>  5 files changed, 135 insertions(+)
 
-Thanks for prompt reply! I wasn't aware you've been off, patches can wait.
+[...]
 
-Cheers
-Vladimir
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 444210f..f970e3e 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -43,6 +43,9 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  void vgic_v2_enable(struct kvm_vcpu *vcpu);
+>  int vgic_v2_probe(struct device_node *vgic_node);
+> +int vgic_v2_map_resources(struct kvm *kvm);
+> +int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
+> +			     enum vgic_type);
+>  
+>  #ifdef CONFIG_KVM_ARM_VGIC_V3
+>  void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
+> @@ -54,6 +57,8 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  void vgic_v3_enable(struct kvm_vcpu *vcpu);
+>  int vgic_v3_probe(struct device_node *vgic_node);
+> +int vgic_v3_map_resources(struct kvm *kvm);
+> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -94,6 +99,17 @@ static inline int vgic_v3_probe(struct device_node *vgic_node)
+>  {
+>  	return -ENODEV;
+>  }
+> +
+> +static inline int vgic_v3_map_resources(struct kvm *kvm)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+> +					      gpa_t dist_base_address)
+> +{
+> +	return -ENODEV;
+> +}
+
+It would make sense to move this stub to patch 32, where the non-stub
+implementation is.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
