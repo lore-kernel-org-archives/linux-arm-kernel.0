@@ -1,70 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  3 May 2016 17:26:53 +0200
-Subject: [PATCH 1/2] pinctrl: nomadik: hide nmk_gpio_get_mode when unused
-Message-ID: <1462289221-861102-1-git-send-email-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 16:32:51 +0100
+Subject: [PATCH v2 21/54] KVM: arm/arm64: vgic-new: Add GICv2 MMIO
+ handling framework
+In-Reply-To: <1461861973-26464-22-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-22-git-send-email-andre.przywara@arm.com>
+Message-ID: <5728C4A3.10708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nmk_gpio_get_mode is only used in one place, and that is conditionally
-compiled if DEBUG_FS is enabled. A recent cleanup has marked the
-definition 'static', which now leads to a warning:
+On 28/04/16 17:45, Andre Przywara wrote:
+> Create vgic-mmio-v2.c to describe GICv2 emulation specific handlers
+> using the initializer macros provided by the VGIC MMIO framework.
+> Provide a function to register the GICv2 distributor registers to
+> the kvm_io_bus framework.
+> The actual handler functions are still stubs in this patch.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Changelog v1 .. v2:
+> - new patch, split out from the generic MMIO framework patch
+> - use a separate file to hold GICv2 emulation specific handlers
+> - replace _nyi stub functions with raz/wi versions
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 26 +++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h    |  2 ++
+>  3 files changed, 90 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v2.c
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> new file mode 100644
+> index 0000000..afee778
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -0,0 +1,62 @@
+> +/*
+> + * VGICv2 MMIO handling functions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/irqchip/arm-gic.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <kvm/iodev.h>
+> +#include <kvm/vgic/vgic.h>
 
-drivers/pinctrl/nomadik/pinctrl-nomadik.c:614:12: error: 'nmk_gpio_get_mode' defined but not used [-Werror=unused-function]
- static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
-            ^~~~~~~~~~~~~~~~~
+Please use kvm/arm_vgic.h so that it doesn't break once we rename
+kvm/vgic/vgic.h.
 
-Moving the function itself inside the #ifdef shuts it up again.
+Thanks,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5e81e0a0913c ("pinctrl: nomadik: use BIT() with offsets consequently")
----
- drivers/pinctrl/nomadik/pinctrl-nomadik.c | 27 +++++++++++++--------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index e5c71acd9506..ccbfc325c778 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -611,20 +611,6 @@ static int __maybe_unused nmk_prcm_gpiocr_get_mode(struct pinctrl_dev *pctldev,
- 	return NMK_GPIO_ALT_C;
- }
- 
--static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
--{
--	u32 afunc, bfunc;
--
--	clk_enable(nmk_chip->clk);
--
--	afunc = readl(nmk_chip->addr + NMK_GPIO_AFSLA) & BIT(offset);
--	bfunc = readl(nmk_chip->addr + NMK_GPIO_AFSLB) & BIT(offset);
--
--	clk_disable(nmk_chip->clk);
--
--	return (afunc ? NMK_GPIO_ALT_A : 0) | (bfunc ? NMK_GPIO_ALT_B : 0);
--}
--
- /* IRQ functions */
- 
- static void nmk_gpio_irq_ack(struct irq_data *d)
-@@ -929,6 +915,19 @@ static int nmk_gpio_make_output(struct gpio_chip *chip, unsigned offset,
- }
- 
- #ifdef CONFIG_DEBUG_FS
-+static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
-+{
-+	u32 afunc, bfunc;
-+
-+	clk_enable(nmk_chip->clk);
-+
-+	afunc = readl(nmk_chip->addr + NMK_GPIO_AFSLA) & BIT(offset);
-+	bfunc = readl(nmk_chip->addr + NMK_GPIO_AFSLB) & BIT(offset);
-+
-+	clk_disable(nmk_chip->clk);
-+
-+	return (afunc ? NMK_GPIO_ALT_A : 0) | (bfunc ? NMK_GPIO_ALT_B : 0);
-+}
- 
- #include <linux/seq_file.h>
- 
+	M.
 -- 
-2.7.0
+Jazz is not dead. It just smells funny...
