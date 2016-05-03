@@ -1,200 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 May 2016 18:59:15 +0100
-Subject: [PATCH] KVM: arm/arm64: new-vgic: add proper GICv2 CPU interface
- userland access
-In-Reply-To: <5728D92A.9010503@arm.com>
-References: <57287A89.9010809@arm.com>
- <1462291649-9906-1-git-send-email-andre.przywara@arm.com>
- <5728D92A.9010503@arm.com>
-Message-ID: <5728E6F3.6000801@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 May 2016 13:00:22 -0500
+Subject: [RFT PATCH 1/3] usb: misc: usb3503: Fix HUB mode after
+ bootloader initialization
+In-Reply-To: <20160502105501.GE6292@sirena.org.uk>
+References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
+ <1461927591-7864-2-git-send-email-k.kozlowski@samsung.com>
+ <20160429113059.GX3217@sirena.org.uk>
+ <57234BA2.6020304@samsung.com>
+ <20160429164448.GY3217@sirena.org.uk> <57272298.50701@samsung.com>
+ <20160502105501.GE6292@sirena.org.uk>
+Message-ID: <20160503180022.GA3008@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/16 18:00, Marc Zyngier wrote:
-> On 03/05/16 17:07, Andre Przywara wrote:
->> Although the actual register access was wired, the availability check
->> for the GICv2 CPU interface register interface was not - leading to
->> any attempt of saving or restoring GICv2 CPU i/f registers to fail.
->>
->> This patch fixes this by modelling the CPU i/f registers similarily to
->> the distributor registers, thereby piggy backing on the existing
->> distributor save/restore code to do the heavy lifting.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Hi,
->>
->> this is a fix for the missing CPU i/f migration that Marc spotted.
->> In a repost I will merge this somehow into the existing patches, but
->> for now this goes on top of the series.
->> Can any of you have a look whether this is the right way to go?
+On Mon, May 02, 2016 at 11:55:01AM +0100, Mark Brown wrote:
+> On Mon, May 02, 2016 at 11:49:12AM +0200, Krzysztof Kozlowski wrote:
 > 
-> The whole VMCR story feels very convoluted. It caters for GICv3 (which
-> has no way to use it), has global symbols where it should be static,
-> and indirections that serve no apparent purpose. And the vgic_vmcr
-> structure should really per implementation. </rant> ;-)
+> > This VDD regulator supply actually is not a usb3503 USB HUB regulator
+> > supply... but a supply to the LAN attached to this HUB. Regulator off/on
+> > is needed for LAN to show up. The hub will show up with typical reset
+> > (which is also missing before my patchset btw).
 > 
-> So here's my take on this particular patch:
+> > The LAN, as a USB device, is auto-probed so it cannot take the regulator
+> > and play with it. The simplest idea I have is to add it as "external
+> > supply"  to the parent: usb3503.
+> 
+> This is common enough that that just isn't going to scale well I fear
+> without some generic handling, either walking child devices at the bus
+> level or at the device level with a pre-probe() callback to get the
+> device to power on.  The latter is more appropriate to things like
+> Slimbus where the device is more likely to do active management at
+> runtime, it's not clear people are building USB devices like that.
 
-[... lots of stupid code deleted ...]
+There's a new binding and support in -next (.../usb/usb-device.txt) for 
+USB devices that should help here. Though, how to handle a hub on USB 
+and I2C buses would need to be worked out.
 
-Which is completely wrong. I missed the case where we emulate GICv2 on GICv3. So, here's a much smaller patch that goes on top of yours (making the vmcr accessors static and reworking the MMIO handlers):
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index dddd8e1..1967a52 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -206,6 +206,22 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_set_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_set_vmcr(vcpu, vmcr);
-+}
-+
-+static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_get_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_get_vmcr(vcpu, vmcr);
-+}
-+
- #define GICC_ARCH_VERSION_V2	0x2
- 
- /* These are for userland accesses only, there is no guest-facing emulation. */
-@@ -213,33 +229,33 @@ static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
- 					   gpa_t addr, unsigned int len)
- {
- 	struct vgic_vmcr vmcr;
--	u32 *field;
-+	u32 val;
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
- 
- 	switch (addr & 0xff) {
- 	case GIC_CPU_CTRL:
--		field = &vmcr.ctlr;
-+		val = vmcr.ctlr;
- 		break;
- 	case GIC_CPU_PRIMASK:
--		field = &vmcr.pmr;
-+		val = vmcr.pmr;
- 		break;
- 	case GIC_CPU_BINPOINT:
--		field = &vmcr.bpr;
-+		val = vmcr.bpr;
- 		break;
- 	case GIC_CPU_ALIAS_BINPOINT:
--		field = &vmcr.abpr;
-+		val = vmcr.abpr;
- 		break;
- 	case GIC_CPU_IDENT:
--		return extract_bytes((PRODUCT_ID_KVM << 20) |
--				     (GICC_ARCH_VERSION_V2 << 16) |
--				     (IMPLEMENTER_ARM << 0),
--				     addr & 3, len);
-+		val = ((PRODUCT_ID_KVM << 20) |
-+		       (GICC_ARCH_VERSION_V2 << 16) |
-+		       IMPLEMENTER_ARM);
-+		break;
- 	default:
- 		return 0;
- 	}
- 
--	vgic_get_vmcr(vcpu, &vmcr);
--
--	return extract_bytes(*field, addr & 3, len);
-+	return extract_bytes(val, addr & 3, len);
- }
- 
- static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
-@@ -247,30 +263,24 @@ static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
- 				   unsigned long val)
- {
- 	struct vgic_vmcr vmcr;
--	u32 *field;
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
- 
- 	switch (addr & 0xff) {
- 	case GIC_CPU_CTRL:
--		field = &vmcr.ctlr;
-+		vmcr.ctlr = val;
- 		break;
- 	case GIC_CPU_PRIMASK:
--		field = &vmcr.pmr;
-+		vmcr.pmr = val;
- 		break;
- 	case GIC_CPU_BINPOINT:
--		field = &vmcr.bpr;
-+		vmcr.bpr = val;
- 		break;
- 	case GIC_CPU_ALIAS_BINPOINT:
--		field = &vmcr.abpr;
-+		vmcr.abpr = val;
- 		break;
--	default:
--		return;
- 	}
- 
--	vgic_get_vmcr(vcpu, &vmcr);
--	if (*field == val)
--		return;
--
--	*field = val;
- 	vgic_set_vmcr(vcpu, &vmcr);
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 5f21742..b22e2ac 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -482,22 +482,6 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
- 		vgic_v3_set_underflow(vcpu);
- }
- 
--void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
--{
--	if (kvm_vgic_global_state.type == VGIC_V2)
--		vgic_v2_set_vmcr(vcpu, vmcr);
--	else
--		vgic_v3_set_vmcr(vcpu, vmcr);
--}
--
--void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
--{
--	if (kvm_vgic_global_state.type == VGIC_V2)
--		vgic_v2_get_vmcr(vcpu, vmcr);
--	else
--		vgic_v3_get_vmcr(vcpu, vmcr);
--}
--
- static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index c1f3751..800be90 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -116,9 +116,6 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
- }
- #endif
- 
--void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
--void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
--
- int vgic_lazy_init(struct kvm *kvm);
- int vgic_init(struct kvm *kvm);
- void kvm_register_vgic_device(unsigned long type);
-
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Rob
