@@ -1,32 +1,96 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 3 May 2016 07:12:04 -0500
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
-Message-ID: <57289594.3050801@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 13:15:44 +0100
+Subject: [PATCH v2 05/54] KVM: arm/arm64: Remove the IRQ field from struct
+ irq_phys_map
+In-Reply-To: <1461861973-26464-6-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <57289670.6030405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pratyush Anand wrote:
-> + * Note: This watchdog timer has two stages. If action is 0, first stage is
-> + * determined by directly programming WCV and second by WOR. When first
-> + * timeout is reached, WS0 is triggered and WCV is reloaded with value in
-> + * WOR. WS0 interrupt will be ignored, then the second watch period starts;
-> + * when second timeout is reached, then WS1 is triggered, system resets. WCV
-> + * and WOR are programmed in such a way that total time corresponding to
-> + * WCV+WOR becomes equivalent to user programmed "timeout".
-> + * If action is 1, then we expect to call panic() at user programmed
-> + * "timeout". Therefore, we program both first and second stage using WCV
-> + * only.
+On 28/04/16 17:45, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> The communication of a Linux IRQ number from outside the VGIC to the
+> vgic was a leftover from the day when the vgic code cared about how a
+> particular device injects virtual interrupts mapped to a physical
+> interrupt.
+> 
+> We can safely remove this notion, leaving all physical IRQ handling to
+> be done in the device driver (the arch timer in this case), which makes
+> room for a saner API for the new VGIC.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> ---
+> Changelog v1 .. v2:
+> - update kerneldoc comments on kvm_vgic_map_phys_irq()
+> 
+>  include/kvm/arm_vgic.h    |  3 +--
+>  virt/kvm/arm/arch_timer.c | 22 ++++++++++++++++++++--
+>  virt/kvm/arm/vgic.c       | 28 ++++++----------------------
+>  3 files changed, 27 insertions(+), 26 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 43eeb18..49c559e 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -157,7 +157,6 @@ struct vgic_io_device {
+>  struct irq_phys_map {
+>  	u32			virt_irq;
+>  	u32			phys_irq;
+> -	u32			irq;
+>  };
+>  
+>  struct irq_phys_map_entry {
+> @@ -345,7 +344,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+> -					   int virt_irq, int irq);
+> +					   int virt_irq, int phys_irq);
+>  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>  bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>  
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 58b2439..b470632 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -301,7 +301,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>  	if (timer->active_cleared_last && !phys_active)
+>  		return;
+>  
+> -	ret = irq_set_irqchip_state(timer->map->irq,
+> +	ret = irq_set_irqchip_state(host_vtimer_irq,
+>  				    IRQCHIP_STATE_ACTIVE,
+>  				    phys_active);
+>  	WARN_ON(ret);
+> @@ -334,6 +334,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct irq_phys_map *map;
+> +	struct irq_desc *desc;
+> +	struct irq_data *data;
+> +	int phys_irq;
+>  
+>  	/*
+>  	 * The vcpu timer irq number cannot be determined in
+> @@ -353,10 +356,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  	kvm_timer_update_state(vcpu);
+>  
+>  	/*
+> +	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+> +	 */
+> +	desc = irq_to_desc(host_vtimer_irq);
 
-So I'm not sure I understand how this works yet, but there was an 
-earlier version of Fu's driver that did something similar.  It depended 
-on being able to reprogram the hardware during the WS0 interrupt, and 
-that was rejected by the community.
+Consider adding a #include <linux/irq.h> at the top of this file. Things
+do break once the linux/of_irq.h include is removed with the KVM/ACPI
+patches.
 
-How is what you are doing different?
+Thanks,
 
+	M.
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Jazz is not dead. It just smells funny...
