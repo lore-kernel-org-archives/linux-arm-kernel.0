@@ -1,104 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 May 2016 15:55:12 +0100
-Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <CAKc_7PXBrVduNkdVr13argTNekvhV+XJFB7XD6aYOnP1CY6A6w@mail.gmail.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-3-git-send-email-tn@semihalf.com>
- <20160427022649.GD6789@localhost> <20160427111758.GA6234@red-moon>
- <57274B8C.5030304@semihalf.com>
- <CAKc_7PU1AszF4y0OjZ3KVGaTEx9OL1cuT5YgOxQKhAQgQom7tA@mail.gmail.com>
- <20160503110225.GA1055@red-moon>
- <CAKc_7PXBrVduNkdVr13argTNekvhV+XJFB7XD6aYOnP1CY6A6w@mail.gmail.com>
-Message-ID: <20160503145512.GA2429@red-moon>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 3 May 2016 15:58:44 +0100
+Subject: Tegra baseline test results for v4.6-rc6
+Message-ID: <5728BCA4.6000201@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 07:52:52PM +0530, Jayachandran C wrote:
-> On Tue, May 3, 2016 at 4:32 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > On Mon, May 02, 2016 at 06:56:13PM +0530, Jayachandran C wrote:
-> >> On Mon, May 2, 2016 at 6:13 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> >> > On 04/27/2016 01:17 PM, Lorenzo Pieralisi wrote:
-> >> >>
-> >> >> On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
-> >> >>>
-> >> >>> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
-> >> >
-> >> > [...]
-> >> >
-> >> >>>   +int acpi_pci_bus_domain_nr(struct device *parent)
-> >> >>> +{
-> >> >>> +       struct acpi_device *acpi_dev = to_acpi_device(parent);
-> >> >>> +       unsigned long long segment = 0;
-> >> >>> +       acpi_status status;
-> >> >>> +
-> >> >>> +       /*
-> >> >>> +        * If _SEG method does not exist, following ACPI spec (6.5.6)
-> >> >>> +        * all PCI buses belong to domain 0.
-> >> >>> +        */
-> >> >>> +       status = acpi_evaluate_integer(acpi_dev->handle,
-> >> >>> METHOD_NAME__SEG, NULL,
-> >> >>> +                                      &segment);
-> >> >>> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
-> >> >>> don't want to evaluate it *twice*, do we?
-> >> >>>
-> >> >>> I was sort of expecting that if you added it here, we'd remove the
-> >> >>> existing call, but it looks like you're keeping both?
-> >> >>
-> >> >> We can't remove the existing call, since it is used on X86 and IA64
-> >> >> to store the segment number that, in the process, is used in their
-> >> >> pci_domain_nr() arch specific callback to retrieve the domain nr.
-> >> >>
-> >> >> On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
-> >> >> to retrieve the domain number that is not arch dependent, since
-> >> >> this is generic code, we can't rely on any bus->sysdata format (unless
-> >> >> we do something like JC did below), therefore the only way is to call
-> >> >> the _SEG method *again* here, which also forced Tomasz to go through
-> >> >> the ACPI_COMPANION setting song and dance and pass the parent pointer
-> >> >> to pci_create_root_bus() (see patch 1), which BTW is a source of
-> >> >> trouble on its own as you noticed.
-> >> >
-> >> > What trouble in patch 1 do you mean? I may miss something.
-> >> >
-> >> > I agree that patch 1 is not necessary if we decide to use sysdata or rework
-> >> > root bus scanning to move domain to host bridge. Nevertheless, patch 1 is
-> >> > still a cleanup IMO.
-> >>
-> >> In this case, getting the domain should be trivial since the ACPI
-> >> companion on parent is already set, this should work
-> >>
-> >> int acpi_pci_bus_domain_nr(struct device *parent)
-> >> {
-> >>         struct acpi_device *acpi_dev = to_acpi_device(parent);
-> >>         struct acpi_pci_root *root = acpi_dev->driver_data;
-> >>
-> >>         return root->segment;
-> >> }
-> >>
-> >> Or am I missing something here?
-> >
-> > Well, I thought that the whole idea behind this exercise was to move
-> > the domain number into struct pci_host_bridge (Arnd did not do it with
-> > his first set but this does not mean we can't add it as Bjorn suggested),
-> > so that the domain number could be read from there straight away in an
-> > arch (and FW) independent manner, right ?
-> 
-> The original issue was using _SEG call again instead of using
-> the value from acpi_pci_root, and the solution for that problem
-> is very simple.
-> 
-> The pci host bridge work is of course very useful, but creating a
-> dependency with that work for an issue that can be so easily solved
-> is unnecessary.
+Here are some basic Tegra test results for Linux v4.6-rc6.
+Logs and other details at:
 
-It can be easily solved if we do not drop patch 1 (I understood the
-additional call to _SEG was only part of the problem). If we keep patch
-1 the code above is fine by me, if we have to drop patch 1 (IIRC by
-passing the parent pointer to pci_create_root_bus() we are affecting
-IA64 and X86 code, if that's acceptable that's fine by me) I do not
-think we can use the code above anymore, that's what my comment was
-all about because Bjorn was concerned about the fragility of the code
-setting the ACPI companion.
+    https://nvtb.github.io//linux/test_v4.6-rc6/20160503073103/
 
-Lorenzo
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.6-rc5 (02da2d72174c61988eb4456b53f405e3ebdebce4)):
+   text     data      bss    total  kernel
+      0        0        0        0  defconfig
+   +136        0        0     +136  multi_v7_defconfig
+   +568      +64        0     +632  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.6-rc5 (02da2d72174c61988eb4456b53f405e3ebdebce4))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
