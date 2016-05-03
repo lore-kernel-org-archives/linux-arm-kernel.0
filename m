@@ -1,81 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  3 May 2016 17:16:22 +0200
-Subject: [PATCH 3/3] HSI: omap-ssi: move omap_ssi_port_update_fclk
-In-Reply-To: <1462288586-584690-1-git-send-email-arnd@arndb.de>
-References: <1462288586-584690-1-git-send-email-arnd@arndb.de>
-Message-ID: <1462288586-584690-4-git-send-email-arnd@arndb.de>
+Date: Tue,  3 May 2016 17:23:28 +0200
+Subject: [PATCH] drm: sun4i: print DMA address correctly
+Message-ID: <1462289020-774976-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the clk change support, the ssi omap ssi core driver
-now calls into the port driver to change fclk. This function
-was previously inside of an #ifdef, because it was only used
-when CONFIG_PM is enabled. Now it also gets used without
-power management support:
+The newly added sun4i drm driver prints a dma address using the %x
+format string, which cannot work when dma_addr_t is 64 bit,
+and gcc warns about this configuration:
 
-drivers/hsi/built-in.o: In function `ssi_clk_event':
-omap_ssi_port.c:(.text+0x1bf8): undefined reference to `omap_ssi_port_update_fclk'
+drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_update_layer_buffer':
+drm/sun4i/sun4i_backend.c:193:84: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+  DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
+drm/sun4i/sun4i_backend.c:201:84: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+  DRM_DEBUG_DRIVER("Setting buffer address to 0x%x\n", paddr);
 
-This moves the function outside of the CONFIG_PM guard.
+This changes the code to use the explicit %pad format string, which
+always prints the right length.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 4bcf7414528a ("HSI: omap-ssi: add clk change support")
 ---
- drivers/hsi/controllers/omap_ssi_port.c | 35 ++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 18 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hsi/controllers/omap_ssi_port.c b/drivers/hsi/controllers/omap_ssi_port.c
-index ca7139eaaa1d..6b8f7739768a 100644
---- a/drivers/hsi/controllers/omap_ssi_port.c
-+++ b/drivers/hsi/controllers/omap_ssi_port.c
-@@ -1253,6 +1253,23 @@ static int ssi_port_remove(struct platform_device *pd)
- 	return 0;
- }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index f7a15c1a93bf..3ab560450a82 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -190,7 +190,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 	/* Get the physical address of the buffer in memory */
+ 	gem = drm_fb_cma_get_gem_obj(fb, 0);
  
-+static int ssi_restore_divisor(struct omap_ssi_port *omap_port)
-+{
-+	writel_relaxed(omap_port->sst.divisor,
-+				omap_port->sst_base + SSI_SST_DIVISOR_REG);
-+
-+	return 0;
-+}
-+
-+void omap_ssi_port_update_fclk(struct hsi_controller *ssi,
-+			       struct omap_ssi_port *omap_port)
-+{
-+	/* update divisor */
-+	u32 div = ssi_calculate_div(ssi);
-+	omap_port->sst.divisor = div;
-+	ssi_restore_divisor(omap_port);
-+}
-+
- #ifdef CONFIG_PM
- static int ssi_save_port_ctx(struct omap_ssi_port *omap_port)
- {
-@@ -1305,24 +1322,6 @@ static int ssi_restore_port_mode(struct omap_ssi_port *omap_port)
- 	return 0;
- }
+-	DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
++	DRM_DEBUG_DRIVER("Using GEM @ %pad\n", &gem->paddr);
  
--static int ssi_restore_divisor(struct omap_ssi_port *omap_port)
--{
--	writel_relaxed(omap_port->sst.divisor,
--				omap_port->sst_base + SSI_SST_DIVISOR_REG);
--
--	return 0;
--}
--
--void omap_ssi_port_update_fclk(struct hsi_controller *ssi,
--			       struct omap_ssi_port *omap_port)
--{
--	/* update divisor */
--	u32 div = ssi_calculate_div(ssi);
--	omap_port->sst.divisor = div;
--	ssi_restore_divisor(omap_port);
--}
--EXPORT_SYMBOL_GPL(omap_ssi_port_update_fclk);
--
- static int omap_ssi_port_runtime_suspend(struct device *dev)
- {
- 	struct hsi_port *port = dev_get_drvdata(dev);
+ 	/* Compute the start of the displayed memory */
+ 	bpp = drm_format_plane_cpp(fb->pixel_format, 0);
+@@ -198,7 +198,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 	paddr += (state->src_x >> 16) * bpp;
+ 	paddr += (state->src_y >> 16) * fb->pitches[0];
+ 
+-	DRM_DEBUG_DRIVER("Setting buffer address to 0x%x\n", paddr);
++	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+ 
+ 	/* Write the 32 lower bits of the address (in bits) */
+ 	lo_paddr = paddr << 3;
 -- 
 2.7.0
