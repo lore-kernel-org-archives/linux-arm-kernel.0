@@ -1,15 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  3 May 2016 17:16:19 +0200
-Subject: [PATCH 0/3] HSI: omap-ssi: regressions against yesterday's linux-next
-Message-ID: <1462288586-584690-1-git-send-email-arnd@arndb.de>
+Date: Tue,  3 May 2016 17:16:20 +0200
+Subject: [PATCH 1/3] HSI: omap-ssi: add COMMON_CLK dependency
+In-Reply-To: <1462288586-584690-1-git-send-email-arnd@arndb.de>
+References: <1462288586-584690-1-git-send-email-arnd@arndb.de>
+Message-ID: <1462288586-584690-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Enabling the omap ssi driver without COMMON_CLK results in a build failure:
 
-One patch you added yesterday unfortunately caused (at least) three
-separate build problems with 32-bit ARM randconfig builds.
+drivers/hsi/controllers/omap_ssi_core.c: In function 'ssi_clk_event':
+drivers/hsi/controllers/omap_ssi_core.c:304:7: error: 'PRE_RATE_CHANGE' undeclared (first use in this function)
 
-These three patches should make it all work again.
+This adds a Kconfig dependency to avoid the invalid configuration.
 
-        Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 4bcf7414528a ("HSI: omap-ssi: add clk change support")
+---
+ drivers/hsi/controllers/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/hsi/controllers/Kconfig b/drivers/hsi/controllers/Kconfig
+index 084ec97eec64..48e4eda186cc 100644
+--- a/drivers/hsi/controllers/Kconfig
++++ b/drivers/hsi/controllers/Kconfig
+@@ -5,7 +5,8 @@ comment "HSI controllers"
+ 
+ config OMAP_SSI
+ 	tristate "OMAP SSI hardware driver"
+-	depends on HSI && OF && (ARCH_OMAP3 || (ARM && COMPILE_TEST))
++	depends on HSI && OF && ARM && COMMON_CLK
++	depends on ARCH_OMAP3 || COMPILE_TEST
+ 	---help---
+ 	  SSI is a legacy version of HSI. It is usually used to connect
+ 	  an application engine with a cellular modem.
+-- 
+2.7.0
