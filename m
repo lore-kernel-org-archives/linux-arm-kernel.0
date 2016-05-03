@@ -1,54 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2016 21:44:19 +0100
-Subject: [PATCH v2 0/3] ARM: nommu: R-class fixes
-In-Reply-To: <5728806F.7000208@arm.com>
-References: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
- <57287BD9.6090907@arm.com>
- <20160503103237.GN19428@n2100.arm.linux.org.uk>
- <5728806F.7000208@arm.com>
-Message-ID: <20160503204419.GP19428@n2100.arm.linux.org.uk>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 3 May 2016 16:46:29 -0400
+Subject: [PATCH V4 0/2] vfio, platform: add ACPI support
+In-Reply-To: <3322250.xDEDujoeAM@wuerfel>
+References: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
+ <3322250.xDEDujoeAM@wuerfel>
+Message-ID: <57290E25.7010501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 11:41:51AM +0100, Vladimir Murzin wrote:
-> On 03/05/16 11:32, Russell King - ARM Linux wrote:
-> > On Tue, May 03, 2016 at 11:22:17AM +0100, Vladimir Murzin wrote:
-> >> On 28/04/16 17:51, Vladimir Murzin wrote:
-> >>> Small set of fixes discovered with R-class cores.
-> >>>
-> >>> Jean-Philippe Brucker (2):
-> >>>   ARM: nommu: fix PMSAv7 setup
-> >>>   ARM: nommu: change memory reserve for the vectors
-> >>>
-> >>> Vladimir Murzin (1):
-> >>>   ARM: domain: move {set,get}_domain under config guard
-> >>>
-> >>>  arch/arm/include/asm/domain.h |   11 +++++++++++
-> >>>  arch/arm/kernel/head-nommu.S  |    2 +-
-> >>>  arch/arm/mm/nommu.c           |   15 ++++++++-------
-> >>>  3 files changed, 20 insertions(+), 8 deletions(-)
-> >>>
-> >>
-> >> Russell, any objection to get it into patch tracker?
-> > 
-> > I've not had any chance to look at them yet - last weekend, I was away
-> > from Thursday through until late Tuesday, then I spent most of Wednesday
-> > and Thursday catching up.  Friday I was able to look at some stuff, and
-> > then I've spent the bank holiday weekend digging out laurels in the front
-> > garden.  I've only just today got back to looking at some kernel stuff.
-> > 
-> > So really, I've only had two days in the last week and a half to look at
-> > anything.
-> > 
-> > Please wait a little while longer.  Thanks.
+On 5/3/2016 4:12 PM, Arnd Bergmann wrote:
+> On Sunday 01 May 2016 17:07:50 Sinan Kaya wrote:
+>> The patchset makes three different changes.
+>> 1. Add support for probing ACPI platform devices.
+>> 2. Add support for ACPI _RST method support during reset
+>> 3. Make reset driver a requirement by default with an optional
+>>    kernel command line override
 > 
-> Thanks for prompt reply! I wasn't aware you've been off, patches can wait.
+> Looks nice, thanks for rewriting this!
+> 
+> For future submissions, it would help to have a list of changes
+> compared to the previous versions a the patch set in the cover
+> letter to help reviewers, but this time my memory was still fresh
+> enough.
+> 
+> 	Arnd
+> 
 
-Thanks for waiting, I've now looked through them and they look fine to me.
+Sure, will do. I asked Rafael to review the ACPI code. 
 
-Please put them in the patch system, thanks.
++		ret = vfio_platform_call_reset(vdev);
+
+This is the only problem I'm seeing in the code. I tested the ACPI path only. 
+I'm wondering if Eric could test the device tree version.
+
++		if (ret)
++			goto err_irq;
+ 
+I'll get rid of this line on the first patch and move it to second
+patch along with reset_required check.
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
