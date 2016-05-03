@@ -1,108 +1,64 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue,  3 May 2016 23:58:03 +0800
-Subject: [GIT PULL 3/6] i.MX device tree updates for 4.7, take 2
+Date: Tue,  3 May 2016 23:58:04 +0800
+Subject: [GIT PULL 4/6] Freescale/NXP arm64 device tree updates for 4.7
 In-Reply-To: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
 References: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1462291086-19925-3-git-send-email-shawnguo@kernel.org>
+Message-ID: <1462291086-19925-4-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc folks,
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-This is the second round of my imx/dt branch pull request.  It's based
-on the first take [1], which has been pulled some days ago.
-
-Please pull, thanks.
-
-Shawn
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/493365
-
-
-The following changes since commit 880e1509db9732d5696d2a092e9bd61d80ad00be:
-
-  ARM: dts: imx6qdl-udoo: add 7 inch LCD touchscreen panel support (2016-04-18 12:54:21 +0800)
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-4.7-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.7
 
-for you to fetch changes up to 194521f72380d0e78caa71013e9e7de1703d8c85:
+for you to fetch changes up to bb4b4e93febc139003e2af2f36e438df58b4803c:
 
-  ARM: mx5: dts: Enable USB OTG on M53EVK (2016-05-03 21:10:11 +0800)
-
-----------------------------------------------------------------
-The i.MX device tree updates for 4.7, take 2:
- - Update display clock configuration for imx6q-b850v3 board
- - Use watchdog external reset for imx6q-ba16 board
- - Update operating points settings for i.MX6UL/SX/DL
- - New board support: imx6ul-pico-hobbit and imx6q-marsboard
- - Add SAI audio support for imx6ul-14x14-evk board
- - Enable USB OTG support for M53EVK board
- - A couple of fixes on DTC warnings
+  arm64: dts: ls2080a: fsl-mc dt node updates (2016-04-26 11:25:44 +0800)
 
 ----------------------------------------------------------------
-Akshay Bhat (4):
-      ARM: dts: imx6q-b850v3: Remove ldb panel
-      ARM: dts: imx6q-b850v3: Update display clock source
-      ARM: dts: imx: b450/b650v3: Move ldb_di clk assignment
-      ARM: dts: imx6q-ba16: use wdog external reset
+The Freescale/NXP arm64 device tree updates for 4.7:
+ - New board support of LS1043a-QDS from Freescale/NXP
+ - Add new compatible for LS1043A and LS2080A GPIO devices
+ - Update device tree bindings and sources for LS2080A fsl-mc device
+ - Update QSPI and DSPI support on LS1043A and LS2080A
 
-Fabio Estevam (9):
-      ARM: dts: imx6ul: Fix operating points
-      ARM: dts: imx6sx: Add 198MHz operating point
-      ARM: dts: imx6dl: Fix the VDD_ARM_CAP voltage for 396MHz operation
-      ARM: dts: imx6: Do not hardcode the CLKO clock
-      ARM: dts: imx6ul-pico-hobbit: Add initial support
-      ARM: dts: imx28-m28: Remove unneeded partition nodes
-      ARM: dts: imx6sx-sdb: Add 198MHz operational point
-      ARM: dts: imx6qdl: Remove unneeded unit-addresses
-      ARM: dts: imx6ul-14x14-evk: Add audio support
+----------------------------------------------------------------
+Hou Zhiqiang (1):
+      Documentation: DT: Add entry for Freescale LS1043a-QDS board
 
-Joshua Clayton (1):
-      ARM: dts: imx6: fix dtc warnings for ipu endpoints
+Liu Gang (2):
+      arm64: dts: ls1043a: Add compatible "fsl,qoriq-gpio" for ls1043a gpio nodes
+      arm64: dts: ls2080a: Add compatible "fsl,ls2080a-gpio" for ls2080a gpio nodes
 
-Marcel Ziswiler (1):
-      ARM: dts: imx6: apalis: parallel lcd display support on ixora
+Shaohui Xie (1):
+      arm64: dts: add LS1043a-QDS board support
 
-Marek Vasut (1):
-      ARM: mx5: dts: Enable USB OTG on M53EVK
+Stuart Yoder (2):
+      Documentation: fsl-mc: binding updates for MSIs, ranges, PHYs
+      arm64: dts: ls2080a: fsl-mc dt node updates
 
-Sergio Prado (1):
-      ARM: dts: imx6: Add dts for Embest MarS Board
+Yuan Yao (4):
+      Documentation: fsl: dspi: Add fsl,ls2080a-dspi compatible string
+      arm64: dts: ls2080a: update the DTS for QSPI and DSPI support
+      Documentation: fsl-quadspi: Add fsl,ls1043a-qspi compatible string
+      arm64: dts: ls1043a: add the DTS node for QSPI support
 
- arch/arm/boot/dts/Makefile                   |   2 +
- arch/arm/boot/dts/imx28-m28.dtsi             |  26 --
- arch/arm/boot/dts/imx53-m53evk.dts           |  21 +-
- arch/arm/boot/dts/imx6dl-riotboard.dts       |   2 +-
- arch/arm/boot/dts/imx6dl.dtsi                |   2 +-
- arch/arm/boot/dts/imx6q-apalis-ixora.dts     |  45 +++
- arch/arm/boot/dts/imx6q-b450v3.dts           |   5 +-
- arch/arm/boot/dts/imx6q-b650v3.dts           |   5 +-
- arch/arm/boot/dts/imx6q-b850v3.dts           |  33 +-
- arch/arm/boot/dts/imx6q-ba16.dtsi            |   1 +
- arch/arm/boot/dts/imx6q-gw5400-a.dts         |   2 +-
- arch/arm/boot/dts/imx6q-marsboard.dts        | 403 +++++++++++++++++++++
- arch/arm/boot/dts/imx6q-tbs2910.dts          |   2 +-
- arch/arm/boot/dts/imx6q.dtsi                 |  18 +-
- arch/arm/boot/dts/imx6qdl-apalis.dtsi        |   2 +-
- arch/arm/boot/dts/imx6qdl-apf6dev.dtsi       |   2 +-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi        |   2 +-
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi        |   2 +-
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi        |   2 +-
- arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi     |   2 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi |   2 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi    |   2 +-
- arch/arm/boot/dts/imx6qdl-rex.dtsi           |   2 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi     |   2 +-
- arch/arm/boot/dts/imx6qdl-udoo.dtsi          |   2 +-
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi     |   2 +-
- arch/arm/boot/dts/imx6qdl.dtsi               |  32 +-
- arch/arm/boot/dts/imx6sx-sdb.dts             |   2 +
- arch/arm/boot/dts/imx6sx.dtsi                |   2 +
- arch/arm/boot/dts/imx6ul-14x14-evk.dts       |  74 ++++
- arch/arm/boot/dts/imx6ul-pico-hobbit.dts     | 516 +++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6ul.dtsi                |  12 +-
- 32 files changed, 1130 insertions(+), 99 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-marsboard.dts
- create mode 100644 arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+Yunhui Cui (1):
+      arm64: dts: ls1043a-rdb: add the DTS for DSPI support
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |   4 +
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  81 ++++++++-
+ .../devicetree/bindings/mtd/fsl-quadspi.txt        |   3 +-
+ .../devicetree/bindings/spi/spi-fsl-dspi.txt       |   5 +-
+ arch/arm64/boot/dts/freescale/Makefile             |   3 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 181 +++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  13 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  22 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |   9 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 110 ++++++++++++-
+ 10 files changed, 416 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
