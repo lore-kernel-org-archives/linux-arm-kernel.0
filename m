@@ -1,51 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2016 11:36:40 +0100
-Subject: [PATCH v2 04/13] clkdev: Add clk_hw based registration APIs
-In-Reply-To: <20160503003716.GH3492@codeaurora.org>
-References: <1461277324-27185-1-git-send-email-sboyd@codeaurora.org>
- <1461277324-27185-5-git-send-email-sboyd@codeaurora.org>
- <20160503003716.GH3492@codeaurora.org>
-Message-ID: <20160503103640.GO19428@n2100.arm.linux.org.uk>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Tue, 03 May 2016 11:23:33 +0100
+Subject: [PATCH kexec-tools 29/32] arm: add debug of reserved and coredump
+ memory ranges
+In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+Message-ID: <E1axXUL-0004jm-W0@e0050434b2927.dyn.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 05:37:16PM -0700, Stephen Boyd wrote:
-> On 04/21, Stephen Boyd wrote:
-> > Now that we have a clk registration API that doesn't return
-> > struct clks, we need to have some way to hand out struct clks via
-> > the clk_get() APIs that doesn't involve associating struct clk
-> > pointers with a struct clk_lookup. Luckily, clkdev already
-> > operates on struct clk_hw pointers, except for the registration
-> > facing APIs where it converts struct clk pointers into struct
-> > clk_hw pointers almost immediately.
-> > 
-> > Let's add clk_hw based registration APIs so that we can skip the
-> > conversion step and provide a way for clk provider drivers to
-> > operate exclusively on clk_hw structs. This way we clearly
-> > split the API between consumers and providers.
-> > 
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> 
-> Applied to clk-next
+Add debug of the reserved and coredump memory ranges for validation.
 
-It would have been nice if you could wait a little longer.  As I've just
-explained in another email, I've been away last weekend from Thursday
-21st through until Tuesday 26th.  I then spent Wednesday and Thursday
-catching up with the resulting backlog of email, and last weekend (30th
-through to the 2nd May) was a bank holiday weekend in the UK.  So
-there's only been _one_ day that I could have looked at your patches,
-but unfortunately the little matter of doing stuff for paying customers
-got in the way.
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+---
+ kexec/arch/arm/crashdump-arm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-A little more patience would have been nice.
-
-I'll try to look at them this evening.
-
-Thanks.
-
+diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
+index 25fdbe9..2dc8846 100644
+--- a/kexec/arch/arm/crashdump-arm.c
++++ b/kexec/arch/arm/crashdump-arm.c
+@@ -158,6 +158,10 @@ static int crash_get_memory_ranges(void)
+ 		return -1;
+ 	}
+ 
++	dbgprint_mem_range("Reserved memory ranges",
++			   crash_reserved_rgns.ranges,
++			   crash_reserved_rgns.size);
++
+ 	/*
+ 	 * Exclude all reserved memory from the usable memory regions.
+ 	 * We want to avoid dumping the crashkernel region itself.  Note
+@@ -179,6 +183,9 @@ static int crash_get_memory_ranges(void)
+ 	 */
+ 	mem_regions_sort(&usablemem_rgns);
+ 
++	dbgprint_mem_range("Coredump memory ranges",
++			   usablemem_rgns.ranges, usablemem_rgns.size);
++
+ 	return 0;
+ }
+ 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
