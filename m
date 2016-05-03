@@ -1,44 +1,138 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 3 May 2016 10:16:02 -0700
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20160503155141.GF13045@dhcppc6.redhat.com>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com>
- <5728BEC4.6050603@codeaurora.org>
- <20160503155141.GF13045@dhcppc6.redhat.com>
-Message-ID: <20160503171602.GA2518@roeck-us.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 3 May 2016 10:26:52 -0700
+Subject: [RFC PATCH] arm64: Make arch_randomize_brk avoid stack area
+In-Reply-To: <1462274013.2862.46.camel@linaro.org>
+References: <1461848638.2848.19.camel@linaro.org>
+ <1461853042.2848.24.camel@linaro.org>
+ <CAGXu5jJKDE_pLCxy-FF7PN5+YC7wyvpQ_9DTDGqHuk+tb1mvJA@mail.gmail.com>
+ <1462274013.2862.46.camel@linaro.org>
+Message-ID: <CAGXu5jLjPZRxgiudps0rTj2KRbTPZGhWsGjYdDDSL6B5RhXktg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 09:21:41PM +0530, Pratyush Anand wrote:
-> On 03/05/2016:10:07:48 AM, Timur Tabi wrote:
-> > Pratyush Anand wrote:
-> > >In fact after supporting max_hw_heartbeat_ms, there should be no change for
-> > >action=0 functionally. However, we would still need some changes for action=1.
-> > 
-> > IMHO, action=1 is more of a debugging option, and not something that would
-> > be used normally.  I would need to see some evidence that real users want to
-> > have action=1 and a longer timeout.
-> > 
-> If action=1 need to be used effectively, then we should have something which
-> would help to increase timeout values.
-> 
-> Currently you have only 10 second to execute secondary kernel, which might not
-> be sufficient.
-> 
-Previously the argument was that the 10 seconds (assuming the clock runs at
-maximum speed) would not be sufficient to load the watchdog application. Now it
-seems the 10 seconds are deemed insufficient to load the watchdog driver (since
-the infrastructure can handle the heartbeats). Is there actual evidence that
-this is the case ?
+On Tue, May 3, 2016 at 4:13 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Mon, 2016-05-02 at 12:34 -0700, Kees Cook wrote:
+>> On Thu, Apr 28, 2016 at 7:17 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> [...]
+>
+>> >  arch/arm64/kernel/process.c | 24 ++++++++++++++++++------
+>> >  1 file changed, 18 insertions(+), 6 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> > index 07c4c53..7e0f404 100644
+>> > --- a/arch/arm64/kernel/process.c
+>> > +++ b/arch/arm64/kernel/process.c
+>> > @@ -434,13 +434,25 @@ unsigned long arch_align_stack(unsigned long sp)
+>> >         return sp & ~0xf;
+>> >  }
+>> >
+>> > -static unsigned long randomize_base(unsigned long base)
+>> > +unsigned long arch_randomize_brk(struct mm_struct *mm)
+>> >  {
+>> > +       unsigned long base = mm->brk;
+>> >         unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
+>>
+>> This looks wrong. Shouldn't it be (STACK_RND_MASK + 1) << PAGE_SHIFT ?
+>
+> That value is the same as before my changes and it matches the gap left
+> for stack randomisation in arch/arm64/mm/mmap.c
 
-Guenter
+True, I didn't mean it was part of your patch. It just jumped out at
+me as something that didn't look right that should probably get fixed
+too.
 
-> > I've never been a fan of the action=1 option, and I'm certainly not keen any
-> > patches that make action=1 more complicated than it already is.
-> 
-> I think, with max_hw_heartbeat_ms it would be far more simpler. Will attempt and
-> send another RFC.
-> 
-> ~Pratyush
+>> STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit):
+>>
+>> #define STACK_RND_MASK                  (test_thread_flag(TIF_32BIT) ? \
+>>                                                 0x7ff >> (PAGE_SHIFT - 12) : \
+>>                                                 0x3ffff >> (PAGE_SHIFT - 12))
+>>
+>> (4K paged PAGE_SHIFT is 12)
+>>
+>> So the correct offset max would be 0x800000 (32-bit) and 0x40000000
+>> (64-bit), instead of
+>> 0x7ff0001 and 0x3ffff0001.
+>
+> It seems to me there isn't a 'correct' and 'incorrect' range to use here
+> and that randomising brk is not directly related to stack randomisation,
+> they just have similar requirements and constraints.
+
+Well, I think it's a typo. The code seemed to be wanting to convert a
+mask to a range, but when adding PAGE_SHIFT, it went in the wrong
+place.
+
+> Anyway, for stack randomisation, in fs/binfmt_elf.c,
+> randomize_stack_top() has
+>
+>                 random_variable = get_random_long();
+>                 random_variable &= STACK_RND_MASK;
+>                 random_variable <<= PAGE_SHIFT;
+>
+> so stack top can be randomised by adding a number from zero to
+> (STACK_RND_MASK << PAGE_SHIFT) inclusive. As the end value passed to
+> randomize_range() is exclusive, then adding one to the last permissible
+
+Well, no, this is using the mask correctly. It removes keeps the bits
+it's interested in and then promotes them above the page size.
+
+> value seems the like the right, I.e. arm64's usage of
+>
+>   (STACK_RND_MASK << PAGE_SHIFT) + 1
+>
+> for brk is 'correct' in that it's consistent with what happens to the
+> stack. Though the different functions align values to pages at different
+> stages, so possibly neither that nor
+>
+>   (STACK_RND_MASK + 1)  << PAGE_SHIFT
+>
+> when used for brk, would be the same as the stack code.
+
+Anyway, this can be a separate fix. Your changes should make sense in
+either place (well, it should be a no-op for current kernel, but
+that's fine).
+
+>> Even with that correction, this looks wrong for 32-bit, which uses
+>> 0x2000000 natively:
+>>
+>> unsigned long arch_randomize_brk(struct mm_struct *mm)
+>> {
+>>         unsigned long range_end = mm->brk + 0x02000000;
+>>         return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
+>> }
+>>
+>> Seems like arm64 compat is using 4 times less entropy than native arm?
+>> (Note that STACK_RND_MASK is correct for arm64 compat: this matches
+>> the default in fs/binfmt_elf.c that arm uses. It just seems like the
+>> brk randomization is accidentally too small on arm64 compat since arm
+>> uses a fixed value unrelated to stack randomization.)
+>>
+>> 0x02000000 arm native
+>> 0x00800000 arm64 compat  <- bug?
+>> 0x40000000 arm64
+>
+> Well, it's a difference for which there probably isn't a good reason,
+> don't know if people would call it a bug.
+
+It's a behavioral change between native and compat which reduces the
+entropy of brk randomization, so I'm comfortable to call it a bug. :)
+
+> As changing the range of values used for randomisation seems like a
+> separate issue I won't include any changes for that in my patch for
+> getting brk to avoid the stack.
+
+Sounds fine. Can you resend your change as a v2 with the changelog, etc?
+
+Thanks!
+
+-Kees
+
+>
+> --
+> Tixy
+>
+
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
