@@ -1,25 +1,90 @@
-From: Linux.HWI@garmin.com (J.D. Schroeder)
-Date: Tue, 3 May 2016 12:49:09 -0500
-Subject: [PATCH v2 2/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
-In-Reply-To: <5728E0BC.3080509@ti.com>
-References: <20160427171658.GA5995@atomide.com>
- <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
- <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
- <57285E66.2000708@ti.com> <5728A81F.4050906@garmin.com>
- <20160503164323.GN5995@atomide.com> <5728E0BC.3080509@ti.com>
-Message-ID: <5728E495.4010502@garmin.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue,  3 May 2016 19:52:18 +0200
+Subject: [RFC PATCH 01/12] dt-bindings: clock: Add license and reformat
+ Exynos5410 clock IDs
+In-Reply-To: <1462297949-13824-1-git-send-email-krzk@kernel.org>
+References: <1462297949-13824-1-git-send-email-krzk@kernel.org>
+Message-ID: <1462297949-13824-2-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2016 12:32 PM, Tero Kristo wrote:
-> Personally I would not recommend using this clock for any timing sensitive
-> applications. May I ask why you are interested in the exact clock rate of this
-> clock anyway?
+Add license and copyrights (file introduced in 2014) to header with
+Exynos5410 clock IDs. Additionally reformat it to improve readability.
 
-I'm not interested in using this clock and I'm not sure how anyone would use
-this clock outside of the processor. See the inline comment that is part of
-the change and the commit message for the change. There is no hint in my
-change that this is an exact clock rate. It is a clarifying change to help
-others avoid using this clock as a 32 kHz clock (which the current clock name
-and frequency imply) and it more accurately represents the actual hardware
-behavior.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ include/dt-bindings/clock/exynos5410.h | 54 ++++++++++++++++++++--------------
+ 1 file changed, 32 insertions(+), 22 deletions(-)
+
+diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
+index 9b180f032e2d..213f19e02870 100644
+--- a/include/dt-bindings/clock/exynos5410.h
++++ b/include/dt-bindings/clock/exynos5410.h
+@@ -1,33 +1,43 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Device Tree binding constants for Exynos5421 clock controller.
++*/
++
+ #ifndef _DT_BINDINGS_CLOCK_EXYNOS_5410_H
+ #define _DT_BINDINGS_CLOCK_EXYNOS_5410_H
+ 
+ /* core clocks */
+-#define CLK_FIN_PLL 1
+-#define CLK_FOUT_APLL 2
+-#define CLK_FOUT_CPLL 3
+-#define CLK_FOUT_MPLL 4
+-#define CLK_FOUT_BPLL 5
+-#define CLK_FOUT_KPLL 6
++#define CLK_FIN_PLL		1
++#define CLK_FOUT_APLL		2
++#define CLK_FOUT_CPLL		3
++#define CLK_FOUT_MPLL		4
++#define CLK_FOUT_BPLL		5
++#define CLK_FOUT_KPLL		6
+ 
+ /* gate for special clocks (sclk) */
+-#define CLK_SCLK_UART0 128
+-#define CLK_SCLK_UART1 129
+-#define CLK_SCLK_UART2 130
+-#define CLK_SCLK_UART3 131
+-#define CLK_SCLK_MMC0 132
+-#define CLK_SCLK_MMC1 133
+-#define CLK_SCLK_MMC2 134
++#define CLK_SCLK_UART0		128
++#define CLK_SCLK_UART1		129
++#define CLK_SCLK_UART2		130
++#define CLK_SCLK_UART3		131
++#define CLK_SCLK_MMC0		132
++#define CLK_SCLK_MMC1		133
++#define CLK_SCLK_MMC2		134
+ 
+ /* gate clocks */
+-#define CLK_UART0 257
+-#define CLK_UART1 258
+-#define CLK_UART2 259
+-#define CLK_UART3 260
+-#define CLK_MCT 315
+-#define CLK_MMC0 351
+-#define CLK_MMC1 352
+-#define CLK_MMC2 353
++#define CLK_UART0		257
++#define CLK_UART1		258
++#define CLK_UART2		259
++#define CLK_UART3		260
++#define CLK_MCT			315
++#define CLK_MMC0		351
++#define CLK_MMC1		352
++#define CLK_MMC2		353
+ 
+-#define CLK_NR_CLKS 512
++#define CLK_NR_CLKS		512
+ 
+ #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5410_H */
+-- 
+2.5.0
