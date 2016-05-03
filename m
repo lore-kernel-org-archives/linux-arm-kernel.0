@@ -1,105 +1,77 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 03 May 2016 12:13:33 +0100
-Subject: [RFC PATCH] arm64: Make arch_randomize_brk avoid stack area
-In-Reply-To: <CAGXu5jJKDE_pLCxy-FF7PN5+YC7wyvpQ_9DTDGqHuk+tb1mvJA@mail.gmail.com>
-References: <1461848638.2848.19.camel@linaro.org>
- <1461853042.2848.24.camel@linaro.org>
- <CAGXu5jJKDE_pLCxy-FF7PN5+YC7wyvpQ_9DTDGqHuk+tb1mvJA@mail.gmail.com>
-Message-ID: <1462274013.2862.46.camel@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 3 May 2016 12:15:52 +0100
+Subject: [PATCH] iommu/arm-smmu: clear cache lock bit of ACR
+In-Reply-To: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
+References: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
+Message-ID: <57288868.9020908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-05-02 at 12:34 -0700, Kees Cook wrote:
-> On Thu, Apr 28, 2016 at 7:17 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-[...]
+On 03/05/16 11:15, Peng Fan wrote:
+> According MMU-500 TRM, section 3.7.1 Auxiliary Control registers,
+> You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
+>
+> So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
+> need clear CACHE_LOCK bit of ACR register first.
 
-> >  arch/arm64/kernel/process.c | 24 ++++++++++++++++++------
-> >  1 file changed, 18 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > index 07c4c53..7e0f404 100644
-> > --- a/arch/arm64/kernel/process.c
-> > +++ b/arch/arm64/kernel/process.c
-> > @@ -434,13 +434,25 @@ unsigned long arch_align_stack(unsigned long sp)
-> >         return sp & ~0xf;
-> >  }
-> >
-> > -static unsigned long randomize_base(unsigned long base)
-> > +unsigned long arch_randomize_brk(struct mm_struct *mm)
-> >  {
-> > +       unsigned long base = mm->brk;
-> >         unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
-> 
-> This looks wrong. Shouldn't it be (STACK_RND_MASK + 1) << PAGE_SHIFT ?
+Ah, good catch - I think I misread CACHE_LOCK as resetting to 0, and 
+proceeded to forget about it. However, it's only present in MMU-500r2 
+onwards, so we'd also want to check IDR7 before touching ACR.
 
-That value is the same as before my changes and it matches the gap left
-for stack randomisation in arch/arm64/mm/mmap.c
+Thanks,
+Robin.
 
-> 
-> STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit):
-> 
-> #define STACK_RND_MASK                  (test_thread_flag(TIF_32BIT) ? \
->                                                 0x7ff >> (PAGE_SHIFT - 12) : \
->                                                 0x3ffff >> (PAGE_SHIFT - 12))
-> 
-> (4K paged PAGE_SHIFT is 12)
-> 
-> So the correct offset max would be 0x800000 (32-bit) and 0x40000000
-> (64-bit), instead of
-> 0x7ff0001 and 0x3ffff0001.
-
-It seems to me there isn't a 'correct' and 'incorrect' range to use here
-and that randomising brk is not directly related to stack randomisation,
-they just have similar requirements and constraints.
-
-Anyway, for stack randomisation, in fs/binfmt_elf.c,
-randomize_stack_top() has
-
-		random_variable = get_random_long();
-		random_variable &= STACK_RND_MASK;
-		random_variable <<= PAGE_SHIFT;
-
-so stack top can be randomised by adding a number from zero to
-(STACK_RND_MASK << PAGE_SHIFT) inclusive. As the end value passed to
-randomize_range() is exclusive, then adding one to the last permissible
-value seems the like the right, I.e. arm64's usage of
-
-  (STACK_RND_MASK << PAGE_SHIFT) + 1
-
-for brk is 'correct' in that it's consistent with what happens to the
-stack. Though the different functions align values to pages@different
-stages, so possibly neither that nor 
-
-  (STACK_RND_MASK + 1)  << PAGE_SHIFT
-
-when used for brk, would be the same as the stack code.
-
-
-> Even with that correction, this looks wrong for 32-bit, which uses
-> 0x2000000 natively:
-> 
-> unsigned long arch_randomize_brk(struct mm_struct *mm)
-> {
->         unsigned long range_end = mm->brk + 0x02000000;
->         return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
-> }
-> 
-> Seems like arm64 compat is using 4 times less entropy than native arm?
-> (Note that STACK_RND_MASK is correct for arm64 compat: this matches
-> the default in fs/binfmt_elf.c that arm uses. It just seems like the
-> brk randomization is accidentally too small on arm64 compat since arm
-> uses a fixed value unrelated to stack randomization.)
-> 
-> 0x02000000 arm native
-> 0x00800000 arm64 compat  <- bug?
-> 0x40000000 arm64
-
-Well, it's a difference for which there probably isn't a good reason,
-don't know if people would call it a bug.
-
-As changing the range of values used for randomisation seems like a
-separate issue I won't include any changes for that in my patch for
-getting brk to avoid the stack.
-
--- 
-Tixy
+> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> ---
+>
+> Hi Will,
+>
+>   Patch based on iommu/devel branch.
+>
+>
+>   drivers/iommu/arm-smmu.c | 15 +++++++++++++++
+>   1 file changed, 15 insertions(+)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index acff332..d094a5a 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -98,6 +98,9 @@
+>   #define sCR0_BSU_SHIFT			14
+>   #define sCR0_BSU_MASK			0x3
+>
+> +/* Auxiliary Configuration register */
+> +#define ARM_SMMU_GR0_sACR		0x10
+> +
+>   /* Identification registers */
+>   #define ARM_SMMU_GR0_ID0		0x20
+>   #define ARM_SMMU_GR0_ID1		0x24
+> @@ -235,6 +238,8 @@
+>
+>   #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+>
+> +#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
+> +
+>   #define CB_PAR_F			(1 << 0)
+>
+>   #define ATSR_ACTIVE			(1 << 0)
+> @@ -1506,6 +1511,16 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>   		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
+>   	}
+>
+> +	/*
+> +	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
+> +	 * clear CACHE_LOCK bit of ACR first.
+> +	 */
+> +	if (smmu->model == ARM_MMU500) {
+> +		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
+> +		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
+> +		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+> +	}
+> +
+>   	/* Make sure all context banks are disabled and clear CB_FSR  */
+>   	for (i = 0; i < smmu->num_context_banks; ++i) {
+>   		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
+>
