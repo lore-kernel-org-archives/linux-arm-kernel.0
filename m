@@ -1,66 +1,58 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 03 May 2016 11:22:21 +0100
-Subject: [PATCH kexec-tools 15/32] arm: fix get_kernel_stext_sym() to close
- its file
+Date: Tue, 03 May 2016 11:23:28 +0100
+Subject: [PATCH kexec-tools 28/32] arm: add support for boot-time crash kernel
+ resource
 In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
 References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-Message-ID: <E1axXTB-0004iP-5Y@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <E1axXUG-0004jg-PD@e0050434b2927.dyn.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix get_kernel_stext_sym() so that it closes its file once it's
-finsihed with it - there's no need to leak file descriptors.
+Add support for detecting and using the boot-time crash kernel
+resource, which is needed for systems which have special boot-time
+memory views, such as Keystone 2.
 
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/crashdump-arm.c | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
+ kexec/arch/arm/crashdump-arm.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index b523e5f..a390187 100644
+index 9113f5e..25fdbe9 100644
 --- a/kexec/arch/arm/crashdump-arm.c
 +++ b/kexec/arch/arm/crashdump-arm.c
-@@ -71,25 +71,34 @@ static unsigned long long get_kernel_stext_sym(void)
- 	char sym[128];
- 	char line[128];
- 	FILE *fp;
--	unsigned long long vaddr;
-+	unsigned long long vaddr = 0;
- 	char type;
+@@ -52,7 +52,7 @@ struct memory_ranges usablemem_rgns = {
+ 	.ranges = crash_memory_ranges,
+ };
  
--	fp = fopen(kallsyms, "r");	if (!fp) {
-+	fp = fopen(kallsyms, "r");
-+	if (!fp) {
- 		fprintf(stderr, "Cannot open %s\n", kallsyms);
- 		return 0;
+-/* memory range reserved for crashkernel */
++/* The boot-time physical memory range reserved for crashkernel region */
+ static struct memory_range crash_kernel_mem;
+ 
+ /* reserved regions */
+@@ -366,13 +366,22 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
+ 				char *str, unsigned long long base,
+ 				unsigned long long length)
+ {
+-	if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0) {
++	if (strncmp(str, CRASH_KERNEL_BOOT, strlen(CRASH_KERNEL_BOOT)) == 0) {
+ 		crash_kernel_mem.start = base;
+ 		crash_kernel_mem.end = base + length - 1;
+ 		crash_kernel_mem.type = RANGE_RAM;
+ 		return mem_regions_add(&crash_reserved_rgns,
+ 				       base, length, RANGE_RAM);
  	}
- 
- 	while(fgets(line, sizeof(line), fp) != NULL) {
--		if (sscanf(line, "%Lx %c %s", &vaddr, &type, sym) != 3)
-+		unsigned long long addr;
-+
-+		if (sscanf(line, "%Lx %c %s", &addr, &type, sym) != 3)
- 			continue;
-+
- 		if (strcmp(sym, stext) == 0) {
--			dbgprintf("kernel symbol %s vaddr = %16llx\n", stext, vaddr);
--			return vaddr;
-+			dbgprintf("kernel symbol %s vaddr = %#llx\n", stext, addr);
-+			vaddr = addr;
-+			break;
- 		}
- 	}
- 
--	fprintf(stderr, "Cannot get kernel %s symbol address\n", stext);
--	return 0;
-+	fclose(fp);
-+
-+	if (vaddr == 0)
-+		fprintf(stderr, "Cannot get kernel %s symbol address\n", stext);
-+
-+	return vaddr;
- }
- 
- static int get_kernel_page_offset(struct kexec_info *info,
++	else if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0) {
++		if (crash_kernel_mem.start == crash_kernel_mem.end) {
++			crash_kernel_mem.start = base;
++			crash_kernel_mem.end = base + length - 1;
++			crash_kernel_mem.type = RANGE_RAM;
++		}
++		return mem_regions_add(&crash_reserved_rgns,
++				       base, length, RANGE_RAM);
++	}
+ 	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0) {
+ 		return mem_regions_add(&usablemem_rgns,
+ 				       base, length, RANGE_RAM);
 -- 
 1.9.1
