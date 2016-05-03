@@ -1,129 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 May 2016 11:21:36 +0100
-Subject: [PATCH v2 46/54] KVM: arm/arm64: vgic-new: Add userland GIC CPU
- interface access
-In-Reply-To: <1461861973-26464-47-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-47-git-send-email-andre.przywara@arm.com>
-Message-ID: <57287BB0.7000709@arm.com>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Tue, 03 May 2016 11:21:28 +0100
+Subject: [PATCH kexec-tools 05/32] arm: fix kdump to work on LPAE systems
+In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+Message-ID: <E1axXSK-0004hN-V7@e0050434b2927.dyn.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/16 17:46, Andre Przywara wrote:
-> Using the VMCR accessors we provide access to GIC CPU interface state
-> to userland by wiring it up to the existing userland interface.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 72 ++++++++++++++++++++++++++++++++++++-
->  1 file changed, 71 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index 38260ae..eaf5c1d 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -17,8 +17,11 @@
->  #include <kvm/vgic/vgic.h>
->  #include <linux/uaccess.h>
->  #include <asm/kvm_mmu.h>
-> +#include <linux/irqchip/arm-gic.h>
->  #include "vgic.h"
->  
-> +#define GICC_ARCH_VERSION_V2		0x2
-> +
->  /* common helpers */
->  
->  static int vgic_ioaddr_overlap(struct kvm *kvm)
-> @@ -252,6 +255,69 @@ void kvm_register_vgic_device(unsigned long type)
->  	}
->  }
->  
-> +static u32 vgic_read_vcpuif(struct kvm_vcpu *vcpu, int offset)
-> +{
-> +	struct vgic_vmcr vmcr;
-> +	u32 *field;
-> +
-> +	switch (offset) {
-> +	case GIC_CPU_CTRL:
-> +		field = &vmcr.ctlr;
-> +		break;
-> +	case GIC_CPU_PRIMASK:
-> +		field = &vmcr.pmr;
-> +		break;
-> +	case GIC_CPU_BINPOINT:
-> +		field = &vmcr.bpr;
-> +		break;
-> +	case GIC_CPU_ALIAS_BINPOINT:
-> +		field = &vmcr.abpr;
-> +		break;
-> +	case GIC_CPU_IDENT:
-> +		return (PRODUCT_ID_KVM << 20) |
-> +		       (GICC_ARCH_VERSION_V2 << 16) |
-> +		       (IMPLEMENTER_ARM << 0);
-> +	default:
-> +		return 0;
-> +	}
-> +
-> +	vgic_get_vmcr(vcpu, &vmcr);
-> +
-> +	return *field;
-> +}
-> +
-> +static bool vgic_write_vcpuif(struct kvm_vcpu *vcpu, int offset, u32 value)
-> +{
-> +	struct vgic_vmcr vmcr;
-> +	u32 *field;
-> +
-> +	switch (offset) {
-> +	case GIC_CPU_CTRL:
-> +		field = &vmcr.ctlr;
-> +		break;
-> +	case GIC_CPU_PRIMASK:
-> +		field = &vmcr.pmr;
-> +		break;
-> +	case GIC_CPU_BINPOINT:
-> +		field = &vmcr.bpr;
-> +		break;
-> +	case GIC_CPU_ALIAS_BINPOINT:
-> +		field = &vmcr.abpr;
-> +		break;
-> +	default:
-> +		return false;
-> +	}
-> +
-> +	vgic_get_vmcr(vcpu, &vmcr);
-> +	if (*field == value)
-> +		return false;
-> +
-> +	*field = value;
-> +	vgic_set_vmcr(vcpu, &vmcr);
-> +
-> +	return true;
-> +}
-> +
->  /** vgic_attr_regs_access: allows user space to read/write VGIC registers
->   *
->   * @dev: kvm device handle
-> @@ -300,7 +366,11 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
->  
->  	switch (attr->group) {
->  	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
-> -		ret = -EINVAL;
-> +		ret = 0;
-> +		if (is_write)
-> +			vgic_write_vcpuif(vcpu, addr, *reg);
-> +		else
-> +			*reg = vgic_read_vcpuif(vcpu, addr);
->  		break;
->  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
->  		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
-> 
+We need to use 64-bit file IO when mapping system memory and the core
+dump file as we may be running on a LPAE system, otherwise we risk
+mapping memory we shouldn't, and causing a kernel oops:
 
-Shouldn't we have this implemented as an MMIO table, and moved to the
-vgic-v2-mmio.c file?
+Unhandled fault: asynchronous external abort (0x211) at 0x00000000
+pgd = edd2c740
+[00000000] *pgd=82ec98003, *pmd=82dcd2003, *pte=00000000
 
-Thanks,
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+---
+ kexec/arch/arm/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
 
-	M.
+diff --git a/kexec/arch/arm/Makefile b/kexec/arch/arm/Makefile
+index 38137d7..60e433a 100644
+--- a/kexec/arch/arm/Makefile
++++ b/kexec/arch/arm/Makefile
+@@ -18,6 +18,9 @@ libfdt_SRCS += $(LIBFDT_SRCS:%=kexec/libfdt/%)
+ 
+ arm_CPPFLAGS = -I$(srcdir)/kexec/libfdt
+ 
++# We want 64-bit file IO for kdump to work correctly on LPAE systems
++arm_CPPFLAGS += -D_FILE_OFFSET_BITS=64
++
+ arm_KEXEC_SRCS += $(libfdt_SRCS)
+ 
+ arm_UIMAGE = kexec/kexec-uImage.c
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
