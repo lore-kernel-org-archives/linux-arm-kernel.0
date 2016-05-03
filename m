@@ -1,44 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 03 May 2016 16:20:42 +0200
-Subject: [PATCH 1/7] reset: add devm_reset_controller_register API
-In-Reply-To: <CAK7LNAT-fK9zMSov4h8CaG0nbqq=N466zBGFOnZA5LWuxgwDOg@mail.gmail.com>
-References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
- <1462099023-11819-2-git-send-email-yamada.masahiro@socionext.com>
- <1462270670.3617.49.camel@pengutronix.de>
- <CAK7LNAR699QqYvWdFPtnBc=bLyMLvhCvnKJQCR4YHCy7HQTjUQ@mail.gmail.com>
- <CAK7LNAT-fK9zMSov4h8CaG0nbqq=N466zBGFOnZA5LWuxgwDOg@mail.gmail.com>
-Message-ID: <1462285242.3617.74.camel@pengutronix.de>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 3 May 2016 09:13:58 -0500
+Subject: [PATCH] ARM: dts: socfpga: add ethernet alias on Arria10
+Message-ID: <1462284838-14852-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 03.05.2016, 20:41 +0900 schrieb Masahiro Yamada:
-> 2016-05-03 19:26 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> > 2016-05-03 19:17 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> >> Hi Masahiro,
-> >>
-> >> Am Sonntag, den 01.05.2016, 19:36 +0900 schrieb Masahiro Yamada:
-> >>> Add a device managed API for reset_controller_register().
-> >>>
-> >>> This helps in reducing code in .remove callbacks and sometimes
-> >>> dropping .remove callbacks entirely.
-> >>>
-> >>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> >>
-> >> Thank you for these patches. Except for the issue with the lpc18xx patch
-> >> they all look good to me.
-> >> If you don't mind, I'll drop the lpc18xx patch for now and apply the
-> >> others.
-> >>
-> >
-> > It is OK with me, but I do not understand what is the problem.
-> >
-> > Could you answer my question in the 3/7 thread?
->
-> Now I am convinced.
-> 
-> I leave 3/7 to your decision.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Ok, I applied all but 3/7 to my reset/next branch.
+Without having an ethernet alias, ethernet will have a random MAC address,
+versus take an address that was provided from the bootloader.
 
-thanks
-Philipp
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+index 567df98..ab33ee3 100644
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+@@ -20,6 +20,10 @@
+ 	model = "Altera SOCFPGA Arria 10";
+ 	compatible = "altr,socfpga-arria10", "altr,socfpga";
+ 
++	aliases {
++		ethernet0 = &gmac0;
++	};
++
+ 	chosen {
+ 		bootargs = "earlyprintk";
+ 		stdout-path = "serial1:115200n8";
+-- 
+2.6.2
