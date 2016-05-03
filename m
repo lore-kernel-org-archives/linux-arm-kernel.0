@@ -1,93 +1,77 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Tue, 3 May 2016 19:52:52 +0530
-Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <20160503110225.GA1055@red-moon>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-3-git-send-email-tn@semihalf.com>
- <20160427022649.GD6789@localhost>
- <20160427111758.GA6234@red-moon> <57274B8C.5030304@semihalf.com>
- <CAKc_7PU1AszF4y0OjZ3KVGaTEx9OL1cuT5YgOxQKhAQgQom7tA@mail.gmail.com>
- <20160503110225.GA1055@red-moon>
-Message-ID: <CAKc_7PXBrVduNkdVr13argTNekvhV+XJFB7XD6aYOnP1CY6A6w@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 3 May 2016 20:08:56 +0530
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <5728A7C3.4010001@roeck-us.net>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net>
+Message-ID: <20160503143856.GE13045@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 4:32 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Mon, May 02, 2016 at 06:56:13PM +0530, Jayachandran C wrote:
->> On Mon, May 2, 2016 at 6:13 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->> > On 04/27/2016 01:17 PM, Lorenzo Pieralisi wrote:
->> >>
->> >> On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
->> >>>
->> >>> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
->> >
->> > [...]
->> >
->> >>>   +int acpi_pci_bus_domain_nr(struct device *parent)
->> >>> +{
->> >>> +       struct acpi_device *acpi_dev = to_acpi_device(parent);
->> >>> +       unsigned long long segment = 0;
->> >>> +       acpi_status status;
->> >>> +
->> >>> +       /*
->> >>> +        * If _SEG method does not exist, following ACPI spec (6.5.6)
->> >>> +        * all PCI buses belong to domain 0.
->> >>> +        */
->> >>> +       status = acpi_evaluate_integer(acpi_dev->handle,
->> >>> METHOD_NAME__SEG, NULL,
->> >>> +                                      &segment);
->> >>> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
->> >>> don't want to evaluate it *twice*, do we?
->> >>>
->> >>> I was sort of expecting that if you added it here, we'd remove the
->> >>> existing call, but it looks like you're keeping both?
->> >>
->> >> We can't remove the existing call, since it is used on X86 and IA64
->> >> to store the segment number that, in the process, is used in their
->> >> pci_domain_nr() arch specific callback to retrieve the domain nr.
->> >>
->> >> On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
->> >> to retrieve the domain number that is not arch dependent, since
->> >> this is generic code, we can't rely on any bus->sysdata format (unless
->> >> we do something like JC did below), therefore the only way is to call
->> >> the _SEG method *again* here, which also forced Tomasz to go through
->> >> the ACPI_COMPANION setting song and dance and pass the parent pointer
->> >> to pci_create_root_bus() (see patch 1), which BTW is a source of
->> >> trouble on its own as you noticed.
->> >
->> > What trouble in patch 1 do you mean? I may miss something.
->> >
->> > I agree that patch 1 is not necessary if we decide to use sysdata or rework
->> > root bus scanning to move domain to host bridge. Nevertheless, patch 1 is
->> > still a cleanup IMO.
->>
->> In this case, getting the domain should be trivial since the ACPI
->> companion on parent is already set, this should work
->>
->> int acpi_pci_bus_domain_nr(struct device *parent)
->> {
->>         struct acpi_device *acpi_dev = to_acpi_device(parent);
->>         struct acpi_pci_root *root = acpi_dev->driver_data;
->>
->>         return root->segment;
->> }
->>
->> Or am I missing something here?
->
-> Well, I thought that the whole idea behind this exercise was to move
-> the domain number into struct pci_host_bridge (Arnd did not do it with
-> his first set but this does not mean we can't add it as Bjorn suggested),
-> so that the domain number could be read from there straight away in an
-> arch (and FW) independent manner, right ?
+Hi Guenter,
 
-The original issue was using _SEG call again instead of using
-the value from acpi_pci_root, and the solution for that problem
-is very simple.
+On 03/05/2016:06:29:39 AM, Guenter Roeck wrote:
+> On 05/03/2016 01:20 AM, Pratyush Anand wrote:
+> >Currently only WOR is used to program both first and second stage which
+> >provided very limited range of timeout.
+> >
+> >This patch uses WCV as well to achieve higher range of timeout. This patch
+> >programs max_timeout as 255, but that can be increased further as well.
+> >
+> >Following testing shows that we can happily achieve 40 second default timeout.
+> >
+> >  # modprobe sbsa_gwdt action=1
+> >  [  131.187562] sbsa-gwdt sbsa-gwdt.0: Initialized with 40s timeout @ 250000000 Hz, action=1.
+> >  # cd /sys/class/watchdog/watchdog0/
+> >  # cat state
+> >  inactive
+> >  # cat /dev/watchdog0
+> >  cat: /dev/watchdog0: Invalid argument
+> >  [  161.710593] watchdog: watchdog0: watchdog did not stop!
+> >  # cat state
+> >  active
+> >  # cat timeout
+> >  40
+> >  # cat timeleft
+> >  38
+> >  # cat timeleft
+> >  25
+> >  # cat /dev/watchdog0
+> >  cat: /dev/watchdog0: Invalid argument
+> >  [  184.931030] watchdog: watchdog0: watchdog did not stop!
+> >  # cat timeleft
+> >  37
+> >  # cat timeleft
+> >  21
+> >  ...
+> >  ...
+> >  # cat timeleft
+> >  1
+> >
+> >panic() is called upon timeout of 40s. See timestamp of last kick (cat) and
+> >next panic() message.
+> >
+> >  [  224.939065] Kernel panic - not syncing: SBSA Watchdog timeout
+> >
+> >Signed-off-by: Pratyush Anand <panand@redhat.com>
+> 
+> You could also use the new infrastructure (specify max_hw_heartbeat_ms instead
+> of max_timeout), and not depend on the correct implementation of WCV.
 
-The pci host bridge work is of course very useful, but creating a
-dependency with that work for an issue that can be so easily solved
-is unnecessary.
+Thanks for pointing to max_hw_heartbeat_ms. Just gone through it. Certainly it
+would be helpful, and some part of this patch will go away. 
 
-JC.
+In fact after supporting max_hw_heartbeat_ms, there should be no change for
+action=0 functionally. However, we would still need some changes for action=1.
+
+When action=1, isr is called, which calls panic(). Calling panic() will further
+trigger a dump saving mechanism, which can cause to execute a secondary kernel.
+Now, it might happen that with the limited timeout (max_hw_heartbeat_ms)
+programmed in first kernel, we land into a reset before secondary kernel could
+start kicking it again or would complete dump save. 
+So, in my opinion:
+(1) We should use max_hw_heartbeat_ms.
+(2) Then we should overwrite WCV in ISR so that it ensures a timeout of user
+programmed "timeout" value for hardware reset.
+
+~Pratyush
