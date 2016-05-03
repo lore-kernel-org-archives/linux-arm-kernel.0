@@ -1,256 +1,86 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  3 May 2016 11:33:59 -0600
-Subject: [PATCH 25/27] coresight: tmc: implementing TMC-ETF AUX space API
-In-Reply-To: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1462296841-12327-26-git-send-email-mathieu.poirier@linaro.org>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 3 May 2016 19:48:32 +0200
+Subject: [PATCH] arm64: dts: r8a7795: Increase the size of GIC-400 mapped
+ registers
+In-Reply-To: <20160429113515.333c42ef@arm.com>
+References: <1461047395-6532-1-git-send-email-dirk.behme@de.bosch.com>
+ <20160427233028.GA5155@verge.net.au> <5721A2A5.9010908@de.bosch.com>
+ <20160428234345.GD18128@verge.net.au> <20160429113515.333c42ef@arm.com>
+Message-ID: <5728E470.7050408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implement the AUX area interfaces required to
-use the TMC (configured as an ETF) from the Perf sub-system.
+Hi Simon,
 
-The heuristic is heavily borrowed from the ETB10 implementation.
+On 29.04.2016 12:35, Marc Zyngier wrote:
+> On Fri, 29 Apr 2016 09:43:45 +1000
+> Simon Horman <horms@verge.net.au> wrote:
+>
+>> [Cc Mark Zyngier, linux-arm-kernel]
+>>
+>> Hi Dirk,
+>>
+>> On Thu, Apr 28, 2016 at 07:41:57AM +0200, Dirk Behme wrote:
+>>> Hi Simon,
+>>>
+>>> On 28.04.2016 01:30, Simon Horman wrote:
+>>>> Hi Dirk,
+>>>>
+>>>> I understand that there is an issue here but I'm not yet able
+>>>> to convince myself that this is the correct solution.
+>>>>
+>>>> In revision r0p1 of the CoreLink GIC-400 Generic Interrupt Controller
+>>>> Technical Reference Manual[1] I see in Section 3.2. "GIC-400 register map"
+>>>> that the size of both the CPU interfaces and Virtual CPU interfaces are
+>>>> 0x2000 bytes. And assuming that the hardware follows the specification it
+>>>> appears that DT is correctly describing the hardware.
+>>>
+>>>
+>>> I think you are missing the details described by ARM in
+>>>
+>>> http://xenbits.xen.org/gitweb/?p=xen.git;a=commit;h=21550029f709072aacf3b9
+>>>
+>>>
+>>> Maybe Julien could help if you have some more doubts?
+>>
+>> I guess I am confused.
+>>
+>> I see that there is now handling of the case where the region size is
+>> 128Kbytes. But I'm still not seeing the bit which describes that the
+>> GIC-400  has a region size of 128Kbytes. Perhaps the later is somehow
+>> implied by the former. Or perhaps I need to check with the hw team.
+>
+> Please have a look at the SBSA document, and in particular the
+> Appendix-F (registration and selling your soul required - only kidding):
+>
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
+>
+> This requires that, in order for the two halves of GICV to be trappable
+> *separately* by a hypervisor using 64kB pages at Stage-2, the two 4kB
+> pages that describe that region are aliased as such:
+> - the first 4kB page is aliased 16 times over a 64kB region
+> - the second 4kB page is aliased 16 times over another contiguous 64kB
+>    region
+>
+> This means that your GIC is indeed covering a 128kB region, with the
+> mapping corresponding to the GICv2 memory map located at offset 0xf000
+> from the base of that 128kB region. Also, this GICV requirement also
+> applies to GICC (most likely because the two regions use the same
+> decoding logic).
+>
+> The OS must of course be aware of this (see gic_check_eoimode in the
+> GIC driver). Of course, almost nobody got that right (I only know of
+> the APM Xgene-1 so far). If you actually did, great!
+>
+> Also, the ACPI spec fails to recognize this by not providing the length
+> of the region, meaning that those who got it right with DT are likely
+> to get it wrong with ACPI, and vice-versa.
+>
+> It's a wonderful world.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 199 ++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-tmc.h     |   1 +
- 2 files changed, 200 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index ba3384781f71..466af86fd76f 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -15,7 +15,9 @@
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/circ_buf.h>
- #include <linux/coresight.h>
-+#include <linux/perf_event.h>
- #include <linux/slab.h>
- #include "coresight-priv.h"
- #include "coresight-tmc.h"
-@@ -282,9 +284,206 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 	dev_info(drvdata->dev, "TMC disabled\n");
- }
- 
-+static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
-+				  void **pages, int nr_pages, bool overwrite)
-+{
-+	int node;
-+	struct cs_buffers *buf;
-+
-+	if (cpu == -1)
-+		cpu = smp_processor_id();
-+	node = cpu_to_node(cpu);
-+
-+	/* Allocate memory structure for interaction with Perf */
-+	buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
-+	if (!buf)
-+		return NULL;
-+
-+	buf->snapshot = overwrite;
-+	buf->nr_pages = nr_pages;
-+	buf->data_pages = pages;
-+
-+	return buf;
-+}
-+
-+static void tmc_free_etf_buffer(void *config)
-+{
-+	struct cs_buffers *buf = config;
-+
-+	kfree(buf);
-+}
-+
-+static int tmc_set_etf_buffer(struct coresight_device *csdev,
-+			      struct perf_output_handle *handle,
-+			      void *sink_config)
-+{
-+	int ret = 0;
-+	unsigned long head;
-+	struct cs_buffers *buf = sink_config;
-+
-+	/* wrap head around to the amount of space we have */
-+	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
-+
-+	/* find the page to write to */
-+	buf->cur = head / PAGE_SIZE;
-+
-+	/* and offset within that page */
-+	buf->offset = head % PAGE_SIZE;
-+
-+	local_set(&buf->data_size, 0);
-+
-+	return ret;
-+}
-+
-+static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
-+					  struct perf_output_handle *handle,
-+					  void *sink_config, bool *lost)
-+{
-+	long size = 0;
-+	struct cs_buffers *buf = sink_config;
-+
-+	if (buf) {
-+		/*
-+		 * In snapshot mode ->data_size holds the new address of the
-+		 * ring buffer's head.  The size itself is the whole address
-+		 * range since we want the latest information.
-+		 */
-+		if (buf->snapshot)
-+			handle->head = local_xchg(&buf->data_size,
-+						  buf->nr_pages << PAGE_SHIFT);
-+		/*
-+		 * Tell the tracer PMU how much we got in this run and if
-+		 * something went wrong along the way.  Nobody else can use
-+		 * this cs_buffers instance until we are done.  As such
-+		 * resetting parameters here and squaring off with the ring
-+		 * buffer API in the tracer PMU is fine.
-+		 */
-+		*lost = !!local_xchg(&buf->lost, 0);
-+		size = local_xchg(&buf->data_size, 0);
-+	}
-+
-+	return size;
-+}
-+
-+static void tmc_update_etf_buffer(struct coresight_device *csdev,
-+				  struct perf_output_handle *handle,
-+				  void *sink_config)
-+{
-+	int i, cur;
-+	u32 *buf_ptr;
-+	u32 read_ptr, write_ptr;
-+	u32 status, to_read;
-+	unsigned long offset;
-+	struct cs_buffers *buf = sink_config;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (!buf)
-+		return;
-+
-+	/* This shouldn't happen */
-+	if (WARN_ON_ONCE(local_read(&drvdata->mode) != CS_MODE_PERF))
-+		return;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	tmc_flush_and_stop(drvdata);
-+
-+	read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
-+	write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
-+
-+	/*
-+	 * Get a hold of the status register and see if a wrap around
-+	 * has occurred.  If so adjust things accordingly.
-+	 */
-+	status = readl_relaxed(drvdata->base + TMC_STS);
-+	if (status & TMC_STS_FULL) {
-+		local_inc(&buf->lost);
-+		to_read = drvdata->size;
-+	} else {
-+		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->size);
-+	}
-+
-+	/*
-+	 * The TMC RAM buffer may be bigger than the space available in the
-+	 * perf ring buffer (handle->size).  If so advance the RRP so that we
-+	 * get the latest trace data.
-+	 */
-+	if (to_read > handle->size) {
-+		u32 mask = 0;
-+
-+		/*
-+		 * The value written to RRP must be byte-address aligned to
-+		 * the width of the trace memory databus _and_ to a frame
-+		 * boundary (16 byte), whichever is the biggest. For example,
-+		 * for 32-bit, 64-bit and 128-bit wide trace memory, the four
-+		 * LSBs must be 0s. For 256-bit wide trace memory, the five
-+		 * LSBs must be 0s.
-+		 */
-+		switch (drvdata->memwidth) {
-+		case TMC_MEM_INTF_WIDTH_32BITS:
-+		case TMC_MEM_INTF_WIDTH_64BITS:
-+		case TMC_MEM_INTF_WIDTH_128BITS:
-+			mask = GENMASK(31, 5);
-+			break;
-+		case TMC_MEM_INTF_WIDTH_256BITS:
-+			mask = GENMASK(31, 6);
-+			break;
-+		}
-+
-+		/*
-+		 * Make sure the new size is aligned in accordance with the
-+		 * requirement explained above.
-+		 */
-+		to_read = handle->size & mask;
-+		/* Move the RAM read pointer up */
-+		read_ptr = (write_ptr + drvdata->size) - to_read;
-+		/* Make sure we are still within our limits */
-+		if (read_ptr > (drvdata->size - 1))
-+			read_ptr -= drvdata->size;
-+		/* Tell the HW */
-+		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
-+		local_inc(&buf->lost);
-+	}
-+
-+	cur = buf->cur;
-+	offset = buf->offset;
-+
-+	/* for every byte to read */
-+	for (i = 0; i < to_read; i += 4) {
-+		buf_ptr = buf->data_pages[cur] + offset;
-+		*buf_ptr = readl_relaxed(drvdata->base + TMC_RRD);
-+
-+		offset += 4;
-+		if (offset >= PAGE_SIZE) {
-+			offset = 0;
-+			cur++;
-+			/* wrap around at the end of the buffer */
-+			cur &= buf->nr_pages - 1;
-+		}
-+	}
-+
-+	/*
-+	 * In snapshot mode all we have to do is communicate to
-+	 * perf_aux_output_end() the address of the current head.  In full
-+	 * trace mode the same function expects a size to move rb->aux_head
-+	 * forward.
-+	 */
-+	if (buf->snapshot)
-+		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
-+	else
-+		local_add(to_read, &buf->data_size);
-+
-+	CS_LOCK(drvdata->base);
-+}
-+
- static const struct coresight_ops_sink tmc_etf_sink_ops = {
- 	.enable		= tmc_enable_etf_sink,
- 	.disable	= tmc_disable_etf_sink,
-+	.alloc_buffer	= tmc_alloc_etf_buffer,
-+	.free_buffer	= tmc_free_etf_buffer,
-+	.set_buffer	= tmc_set_etf_buffer,
-+	.reset_buffer	= tmc_reset_etf_buffer,
-+	.update_buffer	= tmc_update_etf_buffer,
- };
- 
- static const struct coresight_ops_link tmc_etf_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index c5d06fd57fa8..5c5fe2ad2ca7 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -52,6 +52,7 @@
- #define TMC_CTL_CAPT_EN		BIT(0)
- /* TMC_STS - 0x00C */
- #define TMC_STS_TMCREADY_BIT	2
-+#define TMC_STS_FULL		BIT(0)
- #define TMC_STS_TRIGGERED	BIT(1)
- /* TMC_AXICTL - 0x110 */
- #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
--- 
-2.5.0
+Could this patch be applied, then?
+
+Best regards
+
+Dirk
