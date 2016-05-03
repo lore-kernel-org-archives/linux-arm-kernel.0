@@ -1,138 +1,104 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 3 May 2016 10:26:52 -0700
-Subject: [RFC PATCH] arm64: Make arch_randomize_brk avoid stack area
-In-Reply-To: <1462274013.2862.46.camel@linaro.org>
-References: <1461848638.2848.19.camel@linaro.org>
- <1461853042.2848.24.camel@linaro.org>
- <CAGXu5jJKDE_pLCxy-FF7PN5+YC7wyvpQ_9DTDGqHuk+tb1mvJA@mail.gmail.com>
- <1462274013.2862.46.camel@linaro.org>
-Message-ID: <CAGXu5jLjPZRxgiudps0rTj2KRbTPZGhWsGjYdDDSL6B5RhXktg@mail.gmail.com>
+From: dhaab@luxul.com (Dan Haab)
+Date: Tue, 3 May 2016 11:28:16 -0600
+Subject: [PATCH] ARM: BCM5301X: Add DT for Luxul XAP-1510
+Message-ID: <1462296501-5209-1-git-send-email-dhaab@luxul.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 4:13 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Mon, 2016-05-02 at 12:34 -0700, Kees Cook wrote:
->> On Thu, Apr 28, 2016 at 7:17 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> [...]
->
->> >  arch/arm64/kernel/process.c | 24 ++++++++++++++++++------
->> >  1 file changed, 18 insertions(+), 6 deletions(-)
->> >
->> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> > index 07c4c53..7e0f404 100644
->> > --- a/arch/arm64/kernel/process.c
->> > +++ b/arch/arm64/kernel/process.c
->> > @@ -434,13 +434,25 @@ unsigned long arch_align_stack(unsigned long sp)
->> >         return sp & ~0xf;
->> >  }
->> >
->> > -static unsigned long randomize_base(unsigned long base)
->> > +unsigned long arch_randomize_brk(struct mm_struct *mm)
->> >  {
->> > +       unsigned long base = mm->brk;
->> >         unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
->>
->> This looks wrong. Shouldn't it be (STACK_RND_MASK + 1) << PAGE_SHIFT ?
->
-> That value is the same as before my changes and it matches the gap left
-> for stack randomisation in arch/arm64/mm/mmap.c
+Luxul XAP-1510 is an AP device based on BCM4708 SoC. It uses flash
+memory connected to the SPI controller.
 
-True, I didn't mean it was part of your patch. It just jumped out at
-me as something that didn't look right that should probably get fixed
-too.
+Signed-off-by: Dan Haab <dhaab@luxul.com>
+---
+ arch/arm/boot/dts/Makefile                   |    1 +
+ arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts |   67 ++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
 
->> STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit):
->>
->> #define STACK_RND_MASK                  (test_thread_flag(TIF_32BIT) ? \
->>                                                 0x7ff >> (PAGE_SHIFT - 12) : \
->>                                                 0x3ffff >> (PAGE_SHIFT - 12))
->>
->> (4K paged PAGE_SHIFT is 12)
->>
->> So the correct offset max would be 0x800000 (32-bit) and 0x40000000
->> (64-bit), instead of
->> 0x7ff0001 and 0x3ffff0001.
->
-> It seems to me there isn't a 'correct' and 'incorrect' range to use here
-> and that randomising brk is not directly related to stack randomisation,
-> they just have similar requirements and constraints.
-
-Well, I think it's a typo. The code seemed to be wanting to convert a
-mask to a range, but when adding PAGE_SHIFT, it went in the wrong
-place.
-
-> Anyway, for stack randomisation, in fs/binfmt_elf.c,
-> randomize_stack_top() has
->
->                 random_variable = get_random_long();
->                 random_variable &= STACK_RND_MASK;
->                 random_variable <<= PAGE_SHIFT;
->
-> so stack top can be randomised by adding a number from zero to
-> (STACK_RND_MASK << PAGE_SHIFT) inclusive. As the end value passed to
-> randomize_range() is exclusive, then adding one to the last permissible
-
-Well, no, this is using the mask correctly. It removes keeps the bits
-it's interested in and then promotes them above the page size.
-
-> value seems the like the right, I.e. arm64's usage of
->
->   (STACK_RND_MASK << PAGE_SHIFT) + 1
->
-> for brk is 'correct' in that it's consistent with what happens to the
-> stack. Though the different functions align values to pages at different
-> stages, so possibly neither that nor
->
->   (STACK_RND_MASK + 1)  << PAGE_SHIFT
->
-> when used for brk, would be the same as the stack code.
-
-Anyway, this can be a separate fix. Your changes should make sense in
-either place (well, it should be a no-op for current kernel, but
-that's fine).
-
->> Even with that correction, this looks wrong for 32-bit, which uses
->> 0x2000000 natively:
->>
->> unsigned long arch_randomize_brk(struct mm_struct *mm)
->> {
->>         unsigned long range_end = mm->brk + 0x02000000;
->>         return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
->> }
->>
->> Seems like arm64 compat is using 4 times less entropy than native arm?
->> (Note that STACK_RND_MASK is correct for arm64 compat: this matches
->> the default in fs/binfmt_elf.c that arm uses. It just seems like the
->> brk randomization is accidentally too small on arm64 compat since arm
->> uses a fixed value unrelated to stack randomization.)
->>
->> 0x02000000 arm native
->> 0x00800000 arm64 compat  <- bug?
->> 0x40000000 arm64
->
-> Well, it's a difference for which there probably isn't a good reason,
-> don't know if people would call it a bug.
-
-It's a behavioral change between native and compat which reduces the
-entropy of brk randomization, so I'm comfortable to call it a bug. :)
-
-> As changing the range of values used for randomisation seems like a
-> separate issue I won't include any changes for that in my patch for
-> getting brk to avoid the stack.
-
-Sounds fine. Can you resend your change as a v2 with the changelog, etc?
-
-Thanks!
-
--Kees
-
->
-> --
-> Tixy
->
-
-
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 95c1923..c499d09 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -71,6 +71,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-asus-rt-ac56u.dtb \
+ 	bcm4708-asus-rt-ac68u.dtb \
+ 	bcm4708-buffalo-wzr-1750dhp.dtb \
++	bcm4708-luxul-xap-1510.dtb \
+ 	bcm4708-luxul-xwc-1000.dtb \
+ 	bcm4708-netgear-r6250.dtb \
+ 	bcm4708-netgear-r6300-v2.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+new file mode 100644
+index 0000000..f4460b5
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+@@ -0,0 +1,67 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Luxul XAP-1510
++ *
++ * Copyright 2015 Luxul Inc.
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "luxul,xap-1510v1", "brcm,bcm4708";
++	model = "Luxul XAP-1510 V1";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		5ghz {
++			label = "bcm53xx:blue:5ghz";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++
++		2ghz {
++			label = "bcm53xx:blue:2ghz";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++
++		status {
++			label = "bcm53xx:green:status";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "timer";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&spi_nor {
++	status = "okay";
++};
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+1.7.9.5
