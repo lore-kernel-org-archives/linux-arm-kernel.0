@@ -1,96 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 May 2016 13:15:44 +0100
-Subject: [PATCH v2 05/54] KVM: arm/arm64: Remove the IRQ field from struct
- irq_phys_map
-In-Reply-To: <1461861973-26464-6-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <57289670.6030405@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 3 May 2016 08:17:45 -0400
+Subject: [PATCH v2] s5p-mfc: Don't try to put pm->clock if lookup failed
+In-Reply-To: <20160503101509.GB3956@kozik-lap>
+References: <1462216462-32665-1-git-send-email-javier@osg.samsung.com>
+ <20160503101509.GB3956@kozik-lap>
+Message-ID: <6290517d-3d9a-c512-875e-6b1871a2ebba@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/16 17:45, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> The communication of a Linux IRQ number from outside the VGIC to the
-> vgic was a leftover from the day when the vgic code cared about how a
-> particular device injects virtual interrupts mapped to a physical
-> interrupt.
-> 
-> We can safely remove this notion, leaving all physical IRQ handling to
-> be done in the device driver (the arch timer in this case), which makes
-> room for a saner API for the new VGIC.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> ---
-> Changelog v1 .. v2:
-> - update kerneldoc comments on kvm_vgic_map_phys_irq()
-> 
->  include/kvm/arm_vgic.h    |  3 +--
->  virt/kvm/arm/arch_timer.c | 22 ++++++++++++++++++++--
->  virt/kvm/arm/vgic.c       | 28 ++++++----------------------
->  3 files changed, 27 insertions(+), 26 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 43eeb18..49c559e 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -157,7 +157,6 @@ struct vgic_io_device {
->  struct irq_phys_map {
->  	u32			virt_irq;
->  	u32			phys_irq;
-> -	u32			irq;
->  };
->  
->  struct irq_phys_map_entry {
-> @@ -345,7 +344,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> -					   int virt_irq, int irq);
-> +					   int virt_irq, int phys_irq);
->  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 58b2439..b470632 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -301,7 +301,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
->  	if (timer->active_cleared_last && !phys_active)
->  		return;
->  
-> -	ret = irq_set_irqchip_state(timer->map->irq,
-> +	ret = irq_set_irqchip_state(host_vtimer_irq,
->  				    IRQCHIP_STATE_ACTIVE,
->  				    phys_active);
->  	WARN_ON(ret);
-> @@ -334,6 +334,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	struct irq_phys_map *map;
-> +	struct irq_desc *desc;
-> +	struct irq_data *data;
-> +	int phys_irq;
->  
->  	/*
->  	 * The vcpu timer irq number cannot be determined in
-> @@ -353,10 +356,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  	kvm_timer_update_state(vcpu);
->  
->  	/*
-> +	 * Find the physical IRQ number corresponding to the host_vtimer_irq
-> +	 */
-> +	desc = irq_to_desc(host_vtimer_irq);
+Hello Krzysztof,
 
-Consider adding a #include <linux/irq.h> at the top of this file. Things
-do break once the linux/of_irq.h include is removed with the KVM/ACPI
-patches.
+On 05/03/2016 06:15 AM, Krzysztof Kozlowski wrote:
+> On Mon, May 02, 2016 at 03:14:22PM -0400, Javier Martinez Canillas wrote:
+>> Failing to get the struct s5p_mfc_pm .clock is a non-fatal error so the
+>> clock field can have a errno pointer value. But s5p_mfc_final_pm() only
+>> checks if .clock is not NULL before attempting to unprepare and put it.
+>>
+>> This leads to the following warning in clk_put() due s5p_mfc_final_pm():
+>>
+>> WARNING: CPU: 3 PID: 1023 at drivers/clk/clk.c:2814 s5p_mfc_final_pm+0x48/0x74 [s5p_mfc]
+>> CPU: 3 PID: 1023 Comm: rmmod Tainted: G        W       4.6.0-rc6-next-20160502-00005-g5a15a49106bc #9
+>> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+>> [<c010e1bc>] (unwind_backtrace) from [<c010af28>] (show_stack+0x10/0x14)
+>> [<c010af28>] (show_stack) from [<c032485c>] (dump_stack+0x88/0x9c)
+>> [<c032485c>] (dump_stack) from [<c011b8e8>] (__warn+0xe8/0x100)
+>> [<c011b8e8>] (__warn) from [<c011b9b0>] (warn_slowpath_null+0x20/0x28)
+>> [<c011b9b0>] (warn_slowpath_null) from [<bf16004c>] (s5p_mfc_final_pm+0x48/0x74 [s5p_mfc])
+>> [<bf16004c>] (s5p_mfc_final_pm [s5p_mfc]) from [<bf157414>] (s5p_mfc_remove+0x8c/0x94 [s5p_mfc])
+>> [<bf157414>] (s5p_mfc_remove [s5p_mfc]) from [<c03fe1f8>] (platform_drv_remove+0x24/0x3c)
+>> [<c03fe1f8>] (platform_drv_remove) from [<c03fcc70>] (__device_release_driver+0x84/0x110)
+>> [<c03fcc70>] (__device_release_driver) from [<c03fcdd8>] (driver_detach+0xac/0xb0)
+>> [<c03fcdd8>] (driver_detach) from [<c03fbff8>] (bus_remove_driver+0x4c/0xa0)
+>> [<c03fbff8>] (bus_remove_driver) from [<c01886a8>] (SyS_delete_module+0x174/0x1b8)
+>> [<c01886a8>] (SyS_delete_module) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
+>>
+>> Assign the pointer to NULL in case of a lookup failure to fix the issue.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
+>> ---
+>>
+>> Changes in v2:
+>> - Set the clock pointer to NULL instead of checking for !IS_ERR_OR_NULL().
+>>   Suggested by Arnd Bergmann.
+>>
+>>  drivers/media/platform/s5p-mfc/s5p_mfc_pm.c | 1 +
+>>  1 file changed, 1 insertion(+)
+> 
+> This is a fix for bug, so for statistics:
+> Fixes: d19f405a5a8d ("[media] s5p-mfc: Fix selective sclk_mfc init")
+> 
+> ... and although not fatal, but annoying so I think this deserves:
+> Cc: <stable@vger.kernel.org>
+>
 
-Thanks,
+Indeed, sorry for missing those.
+ 
+> Anyway:
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
 
-	M.
+Thanks a lot for your feedback.
+ 
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
 -- 
-Jazz is not dead. It just smells funny...
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
