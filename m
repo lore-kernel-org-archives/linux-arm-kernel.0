@@ -1,63 +1,45 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 03 May 2016 11:17:45 +0900
-Subject: Fwd: [PATCH v2 0/8] PM / devfreq: Add NoCP devfreq-event and
- support busfreq on exyno5422-odroidxu3
-In-Reply-To: <1894783822.297231462168123817.JavaMail.weblogic@ep2mlwas04a>
-References: <1894783822.297231462168123817.JavaMail.weblogic@ep2mlwas04a>
-Message-ID: <57280A49.6060609@samsung.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue,  3 May 2016 10:23:50 +0800
+Subject: [PATCH] thermal: rockchip: use the usleep_range instead of udelay
+Message-ID: <1462242230-20873-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Myungjoo,
+Documentation/timers/timers-howto.txt recommends to use
+usleep_range on delays > 10usec.
+The usleep_range indeed reduces CPU load, since the udelay will busy wait
+for enough loop cycles to achieve the desired delay.
 
-On 2016? 05? 02? 14:48, MyungJoo Ham wrote:
-> Sender : ???<cw00.choi@samsung.com> S5(??)/Change Agent/Tizen Platform Lab(S/W??)/????
-> Date : 2016-04-15 15:32 (GMT+09:00)
->>
->> This patchset support the AMBA bus frequency scaling on Exynos5422-based
->> Odroid-XU3 board. But, this series only support the bus frequency scaling
->> for INT (Internal) block using VDD_INT power line.
-> 
-> Along with Devfreq/Passive patchset, the patchset is merged in
-> devfreq for-4.7 tree.
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/mzx/devfreq.git/log/?h=for-4.7
-> 
-> @Chanwoo: If there are commits to be merged by a tree other than Linux/PM,
-> please let me know. I'll send out pull-request soon.
+Fixes commit b06c52db39fd ("thermal: rockchip:
+handle the power sequence for tsadc controller").
 
-On Krzysztof Kozlowski's reply, dts patches will be merged on samsung-soc tree.
-and then the clock patches about exynos5420 was already merged to samsung-clk tree
-by Sylwester.
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Suggested-by: Eduardo Valentin <edubezval@gmail.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Only devfreq patches should be merged on devfreq tree.
+---
 
-We already discussed this topic on offline. I expect that you will again handle
-this patchset according to reply of both Krzysztof and me.
+ drivers/thermal/rockchip_thermal.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Best Regards,
-Chanwoo Choi
-
-> 
-> 
-> Cheers,
-> MyungJoo
-> 
->>
->> Also, to support the bus frequency scaling for Exynos542x SoC,
->> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
->> to measure the transfered data traffic on NoC (Network on Chip)
->> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
->> provide the utilization for INT block of Exynos542x SoC.
->>
->> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
->> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
->> Just add the phandle of 'NoC Probe' dt node to bus dt node.
->>
->> Depend on:
->> This patchset depends on patch[1] which support the generic exynos-bus
->> frequency driver.
->> [1] http://www.spinics.net/lists/arm-kernel/msg495976.html
->> - [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
->>
->>
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index 86a1ab0..5d491f1 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -547,10 +547,10 @@ static void rk_tsadcv3_initialize(struct regmap *grf, void __iomem *regs,
+ 		regmap_write(grf, GRF_TSADC_TESTBIT_L, GRF_TSADC_TSEN_PD_ON);
+ 		mdelay(10);
+ 		regmap_write(grf, GRF_TSADC_TESTBIT_L, GRF_TSADC_TSEN_PD_OFF);
+-		udelay(100); /* The spec note says at least 15 us */
++		usleep_range(15, 100); /* The spec note says at least 15 us */
+ 		regmap_write(grf, GRF_SARADC_TESTBIT, GRF_SARADC_TESTBIT_ON);
+ 		regmap_write(grf, GRF_TSADC_TESTBIT_H, GRF_TSADC_TESTBIT_H_ON);
+-		udelay(200); /* The spec note says at least 90 us */
++		usleep_range(90, 200); /* The spec note says at least 90 us */
+ 	}
+ 
+ 	if (tshut_polarity == TSHUT_HIGH_ACTIVE)
+-- 
+1.9.1
