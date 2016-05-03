@@ -1,78 +1,95 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 3 May 2016 06:47:12 -0700
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20160503132439.GC13045@dhcppc6.redhat.com>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <57289594.3050801@codeaurora.org> <20160503132439.GC13045@dhcppc6.redhat.com>
-Message-ID: <5728ABE0.5040000@roeck-us.net>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Tue,  3 May 2016 21:50:30 +0800
+Subject: [PATCH V2] iommu/arm-smmu: clear cache lock bit of ACR
+Message-ID: <1462283430-9559-1-git-send-email-van.freenix@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2016 06:24 AM, Pratyush Anand wrote:
-> On 03/05/2016:07:12:04 AM, Timur Tabi wrote:
->> Pratyush Anand wrote:
->>> + * Note: This watchdog timer has two stages. If action is 0, first stage is
->>> + * determined by directly programming WCV and second by WOR. When first
->>> + * timeout is reached, WS0 is triggered and WCV is reloaded with value in
->>> + * WOR. WS0 interrupt will be ignored, then the second watch period starts;
->>> + * when second timeout is reached, then WS1 is triggered, system resets. WCV
->>> + * and WOR are programmed in such a way that total time corresponding to
->>> + * WCV+WOR becomes equivalent to user programmed "timeout".
->>> + * If action is 1, then we expect to call panic() at user programmed
->>> + * "timeout". Therefore, we program both first and second stage using WCV
->>> + * only.
->>
->> So I'm not sure I understand how this works yet, but there was an earlier
->> version of Fu's driver that did something similar.  It depended on being
->> able to reprogram the hardware during the WS0 interrupt, and that was
->> rejected by the community.
->>
->> How is what you are doing different?
->
-> * Following was the comment for Fu Wei's primitive version of patch [1], because
-> * of which community rejected it.
->
->> The triggering of the hardware reset should never depend on an interrupt being
->> handled properly.  You should always program WCV correctly in advance.
->
-> Now, there are couple of things different:
->
-> (1) There is an important difference in upstreamed version than the version [1]
-> which was rejected on above ground. In upstreamed version,  there would be no
-> interrupt handler when we are in normal mode ie action=0.  So, there is no
-> possibility of doing any thing in ISR for all normal usage of this timer. In
-> this mode WCV is always programmed well in advance now.
->
-> (2)action=1 mechanism was introduced to implement a dump saving mechanism if
-> watchdog timeout expires before next kick. So, the current upstream version
-> calls panic() in ISR. When action=1, then we do write WCV now in ISR, but there
-> too some precaution have been taken.
->
-> When action=1, and we land into isr handler sbsa_gwdt_interrupt() we can not
-> trust watchdog data structure any more. That might have been corrupted.
+According MMU-500r2 TRM, section 3.7.1 Auxiliary Control registers,
+You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
 
-Why ?
+So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
+need clear CACHE_LOCK bit of ACR register first.
 
-> (i) So it might happen that gwdt or wdd pointers have a corrupted value and as
-> soon as we access gwdt->wdd or wdd->timeout, kernel panics. *No harm*, just
-> panic() is called a bit early, which dump saving mechanism would be able to
-> find. So, in fact it will give an extra information to dump saving mechanism
-> that watchdog structure was corrupted as well.
-> (ii) Another case, It might happen that wdd->timeout has been corrupted with
-> large values. This patch does a protection while programming WCV in ISR. It
+Since CACHE_LOCK bit is only present in MMU-500r2 onwards,
+need to check the major number of IDR7.
 
-How would wdd->timeout be corrupted ?
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+---
 
-If what you are say is correct, the interrupt handler can not be trusted, period,
-and should be disabled entirely.
+V2:
+ Following Robin's comments, need to check IDR7 before clearing
+ CACHE_LOCK bit of ACR.
 
-Guenter
+V1:
+ Patch based on iommu/devel
 
-> checks wdd->timeout against MAX_TIMEOUT value and reprograms WCV only when
-> wdd->timeout is lesser than MAX_TIMEOUT. So, here too, there would be watchdog
-> reset for sure if dump saving mechanism hangs.
->
-> ~Pratyush
->
-> [1] https://lists.linaro.org/pipermail/linaro-acpi/2015-June/004956.html
->
+ drivers/iommu/arm-smmu.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index acff332..c7ad23e 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -98,6 +98,9 @@
+ #define sCR0_BSU_SHIFT			14
+ #define sCR0_BSU_MASK			0x3
+ 
++/* Auxiliary Configuration register */
++#define ARM_SMMU_GR0_sACR		0x10
++
+ /* Identification registers */
+ #define ARM_SMMU_GR0_ID0		0x20
+ #define ARM_SMMU_GR0_ID1		0x24
+@@ -144,6 +147,9 @@
+ #define ID2_PTFS_64K			(1 << 14)
+ #define ID2_VMID16			(1 << 15)
+ 
++#define ID7_MAJOR_SHIFT			4
++#define ID7_MAJOR_MASK			0xf
++
+ /* Global TLB invalidation */
+ #define ARM_SMMU_GR0_TLBIVMID		0x64
+ #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
+@@ -235,6 +241,8 @@
+ 
+ #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+ 
++#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
++
+ #define CB_PAR_F			(1 << 0)
+ 
+ #define ATSR_ACTIVE			(1 << 0)
+@@ -1493,7 +1501,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+ 	void __iomem *cb_base;
+ 	int i = 0;
+-	u32 reg;
++	u32 reg, major;
+ 
+ 	/* clear global FSR */
+ 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
+@@ -1506,6 +1514,19 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
+ 	}
+ 
++	/*
++	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
++	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
++	 * bit is only present in MMU-500r2 onwards.
++	 */
++	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
++	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
++	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
++		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
++		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
++		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
++	}
++
+ 	/* Make sure all context banks are disabled and clear CB_FSR  */
+ 	for (i = 0; i < smmu->num_context_banks; ++i) {
+ 		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
+-- 
+2.6.2
