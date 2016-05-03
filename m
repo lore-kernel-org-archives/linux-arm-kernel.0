@@ -1,37 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 3 May 2016 19:26:51 +0900
-Subject: [PATCH 1/7] reset: add devm_reset_controller_register API
-In-Reply-To: <1462270670.3617.49.camel@pengutronix.de>
-References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
- <1462099023-11819-2-git-send-email-yamada.masahiro@socionext.com>
- <1462270670.3617.49.camel@pengutronix.de>
-Message-ID: <CAK7LNAR699QqYvWdFPtnBc=bLyMLvhCvnKJQCR4YHCy7HQTjUQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 3 May 2016 12:29:22 +0200
+Subject: [PATCH v2 0/8] PM / devfreq: Add NoCP devfreq-event and support
+ busfreq on exyno5422-odroidxu3
+In-Reply-To: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
+References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20160503102922.GD3956@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-03 19:17 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Hi Masahiro,
->
-> Am Sonntag, den 01.05.2016, 19:36 +0900 schrieb Masahiro Yamada:
->> Add a device managed API for reset_controller_register().
->>
->> This helps in reducing code in .remove callbacks and sometimes
->> dropping .remove callbacks entirely.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
-> Thank you for these patches. Except for the issue with the lpc18xx patch
-> they all look good to me.
-> If you don't mind, I'll drop the lpc18xx patch for now and apply the
-> others.
->
+On Fri, Apr 15, 2016 at 03:32:47PM +0900, Chanwoo Choi wrote:
+> This patchset support the AMBA bus frequency scaling on Exynos5422-based
+> Odroid-XU3 board. But, this series only support the bus frequency scaling
+> for INT (Internal) block using VDD_INT power line.
+> 
+> Also, to support the bus frequency scaling for Exynos542x SoC,
+> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
+> to measure the transfered data traffic on NoC (Network on Chip)
+> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
+> provide the utilization for INT block of Exynos542x SoC.
+> 
+> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
+> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
+> Just add the phandle of 'NoC Probe' dt node to bus dt node.
+> 
+> Depend on:
+> This patchset depends on patch[1] which support the generic exynos-bus
+> frequency driver.
+> [1] http://www.spinics.net/lists/arm-kernel/msg495976.html
+> - [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
+> 
+> 
+> Changse from v1:
+> (https://lkml.org/lkml/2016/4/8/28)
+> - Simplify the documentation of exynos-nocp.txt
+> - Check the return value of regmap function
+> - Modify Device Tree node name using general device name
+>  : nocp_memX_X@ nocp_memX_X -> nocp_memX_X@ nocp
+> - Fix wrong node name about nocp device tree node
+> - Drop the CLK_SET_RATE_PARENT flag
+> - Reorder bus device tree node alpabetically
+> - Add the tested-by tag from Anand Moon and Markus Reichl
+> - Add the reviewed-by tag to patch5/7 from Exynos SoC Maintainer
+> - Add patch2 to modify the devfreq_event_get_edev_by_phandle()
+>   to get the instance of devfreq-event device by using the phandle
+> 
+> Chanwoo Choi (8):
+>   PM / devfreq: event: Add new Exynos NoC probe driver
+>   PM / devfreq: event: Find the instance of devfreq-event device by using phandle
+>   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
+>   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
+>   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
+>   clk: samsung: exynos542x: Add the clock id for ACLK
+>   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
+>   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
 
-It is OK with me, but I do not understand what is the problem.
 
-Could you answer my question in the 3/7 thread?
+Applied DTS patches for late v4.7 (hopefully).
 
-
-
--- 
-Best Regards
-Masahiro Yamada
+Best regards,
+Krzysztof
