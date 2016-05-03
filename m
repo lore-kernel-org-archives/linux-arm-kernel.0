@@ -1,199 +1,203 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue,  3 May 2016 10:56:53 -0500
-Subject: [PATCH v8 7/9] ARM: dts: am437x/am33xx: Remove hwmod entries for ECAP
- and EPWM nodes
+Date: Tue,  3 May 2016 10:56:55 -0500
+Subject: [PATCH v8 9/9] ARM: dts: DRA7: Add dt nodes for PWMSS
 In-Reply-To: <1462291015-1919-1-git-send-email-fcooper@ti.com>
 References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
-Message-ID: <1462291015-1919-8-git-send-email-fcooper@ti.com>
+Message-ID: <1462291015-1919-10-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous patches switched the ECAP and EPWM to use the new bindings.
-These bindings explicitly adds the various required clocks via DT rather
-than depending on hwmod.
+From: Vignesh R <vigneshr@ti.com>
 
-Therefore, it is safe to remove the hwmod entries since they are no longer
-needed.
+Add PWMSS device tree nodes for DRA7 SoC family and add documentation
+for dt bindings.
 
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+[fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Paul Walmsley <paul@pwsan.com>
 ---
- Documentation/devicetree/bindings/pwm/pwm-tiecap.txt   | 3 ---
- Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 3 ---
- arch/arm/boot/dts/am33xx.dtsi                          | 6 ------
- arch/arm/boot/dts/am4372.dtsi                          | 9 ---------
- 4 files changed, 21 deletions(-)
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 12 +++
+ arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
+ 4 files changed, 120 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-index ee0a8bd..f2a9a7c 100644
+index f2a9a7c..8007e83 100644
 --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
 +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-@@ -11,8 +11,6 @@ Required properties:
- - reg: physical base address and size of the registers map.
- 
- Optional properties:
--- ti,hwmods: Name of the hwmod associated to the ECAP:
--  "ecap<x>", <x> being the 0-based instance number from the HW spec
- - clocks: Handle to the ECAP's functional clock.
- - clock-names: Must be set to "fck".
- 
-@@ -22,7 +20,6 @@ ecap0: ecap at 48300100 { /* ECAP on am33xx */
- 	compatible = "ti,am3352-ecap", "ti,am33xx-ecap";
+@@ -5,6 +5,7 @@ Required properties:
+   for am33xx - compatible = "ti,am3352-ecap", "ti,am33xx-ecap";
+   for am4372 - compatible = "ti,am4372-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
+   for da850  - compatible = "ti,da850-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
++  for dra746 - compatible = "ti,dra746-ecap", "ti,am3352-ecap";
+ - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+   the cells format. The PWM channel index ranges from 0 to 4. The only third
+   cell flag supported by this binding is PWM_POLARITY_INVERTED.
+@@ -38,3 +39,11 @@ ecap0: ecap at 1f06000 { /* ECAP on da850 */
  	#pwm-cells = <3>;
- 	reg = <0x48300100 0x80>;
--	ti,hwmods = "ecap0";
- 	clocks = <&l4ls_gclk>;
- 	clock-names = "fck";
+ 	reg = <0x1f06000 0x80>;
  };
++
++ecap0: ecap at 4843e100 {
++	compatible = "ti,dra746-ecap", "ti,am3352-ecap";
++	#pwm-cells = <3>;
++	reg = <0x4843e100 0x80>;
++	clocks = <&l4_root_clk_div>;
++	clock-names = "fck";
++};
 diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-index e9a156b..41a2bd4 100644
+index 41a2bd4..944fe35 100644
 --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
 +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-@@ -11,8 +11,6 @@ Required properties:
- - reg: physical base address and size of the registers map.
- 
- Optional properties:
--- ti,hwmods: Name of the hwmod associated to the EHRPWM:
--  "ehrpwm<x>", <x> being the 0-based instance number from the HW spec
- - clocks: Handle to the PWM's time-base and functional clock.
- - clock-names: Must be set to "tbclk" and "fck".
- 
-@@ -24,7 +22,6 @@ ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
- 	reg = <0x48300200 0x100>;
- 	clocks = <&ehrpwm0_tbclk>, <&l4ls_gclk>;
- 	clock-names = "tbclk", "fck";
--	ti,hwmods = "ehrpwm0";
+@@ -5,6 +5,7 @@ Required properties:
+   for am33xx  - compatible = "ti,am3352-ehrpwm", "ti,am33xx-ehrpwm";
+   for am4372  - compatible = "ti,am4372-ehrpwm", "ti-am3352-ehrpwm", "ti,am33xx-ehrpwm";
+   for da850   - compatible = "ti,da850-ehrpwm", "ti-am3352-ehrpwm", "ti,am33xx-ehrpwm";
++  for dra746 - compatible = "ti,dra746-ehrpwm", "ti-am3352-ehrpwm";
+ - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+   the cells format. The only third cell flag supported by this binding is
+   PWM_POLARITY_INVERTED.
+@@ -38,3 +39,11 @@ ehrpwm0: pwm at 1f00000 { /* EHRPWM on da850 */
+ 	#pwm-cells = <3>;
+ 	reg = <0x1f00000 0x2000>;
  };
++
++ehrpwm0: pwm at 4843e200 { /* EHRPWM on dra746 */
++	compatible = "ti,dra746-ehrpwm", "ti,am3352-ehrpwm";
++	#pwm-cells = <3>;
++	reg = <0x4843e200 0x80>;
++	clocks = <&ehrpwm0_tbclk>, <&l4_root_clk_div>;
++	clock-names = "tbclk", "fck";
++};
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+index fd8e87c..1a5d7b7 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: Must be "ti,<soc>-pwmss".
+   for am33xx  - compatible = "ti,am33xx-pwmss";
+   for am4372  - compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
++  for dra746 - compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss"
  
- ehrpwm0: pwm at 48300200 { /* EHRPWM on am4372 */
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 999ba2f..2661acc 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -687,7 +687,6 @@
- 				clock-names = "fck";
- 				interrupts = <31>;
- 				interrupt-names = "ecap0";
--				ti,hwmods = "ecap0";
- 				status = "disabled";
- 			};
+ - reg: physical base address and size of the registers map.
+ - address-cells: Specify the number of u32 entries needed in child nodes.
+@@ -46,3 +47,14 @@ epwmss0: epwmss at 48300000 { /* PWMSS for am4372 */
  
-@@ -696,7 +695,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48300200 0x80>;
--				ti,hwmods = "ehrpwm0";
- 				clocks = <&ehrpwm0_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -723,7 +721,6 @@
- 				clock-names = "fck";
- 				interrupts = <47>;
- 				interrupt-names = "ecap1";
--				ti,hwmods = "ecap1";
- 				status = "disabled";
- 			};
- 
-@@ -732,7 +729,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48302200 0x80>;
--				ti,hwmods = "ehrpwm1";
- 				clocks = <&ehrpwm1_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -759,7 +755,6 @@
- 				clock-names = "fck";
- 				interrupts = <61>;
- 				interrupt-names = "ecap2";
--				ti,hwmods = "ecap2";
- 				status = "disabled";
- 			};
- 
-@@ -768,7 +763,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48304200 0x80>;
--				ti,hwmods = "ehrpwm2";
- 				clocks = <&ehrpwm2_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index e858460..cfdd4b7 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -677,7 +677,6 @@
- 					     "ti,am33xx-ecap";
- 				#pwm-cells = <3>;
- 				reg = <0x48300100 0x80>;
--				ti,hwmods = "ecap0";
- 				clocks = <&l4ls_gclk>;
- 				clock-names = "fck";
- 				status = "disabled";
-@@ -689,7 +688,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48300200 0x80>;
--				ti,hwmods = "ehrpwm0";
- 				clocks = <&ehrpwm0_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -711,7 +709,6 @@
- 					     "ti,am33xx-ecap";
- 				#pwm-cells = <3>;
- 				reg = <0x48302100 0x80>;
--				ti,hwmods = "ecap1";
- 				clocks = <&l4ls_gclk>;
- 				clock-names = "fck";
- 				status = "disabled";
-@@ -723,7 +720,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48302200 0x80>;
--				ti,hwmods = "ehrpwm1";
- 				clocks = <&ehrpwm1_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -747,7 +743,6 @@
- 				reg = <0x48304100 0x80>;
- 				clocks = <&l4ls_gclk>;
- 				clock-names = "fck";
--				ti,hwmods = "ecap2";
- 				status = "disabled";
- 			};
- 
-@@ -757,7 +752,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48304200 0x80>;
--				ti,hwmods = "ehrpwm2";
- 				clocks = <&ehrpwm2_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -779,7 +773,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48306200 0x80>;
--				ti,hwmods = "ehrpwm3";
- 				clocks = <&ehrpwm3_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -801,7 +794,6 @@
- 					     "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48308200 0x80>;
--				ti,hwmods = "ehrpwm4";
- 				clocks = <&ehrpwm4_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
- 				status = "disabled";
-@@ -825,7 +817,6 @@
- 				reg = <0x4830a200 0x80>;
- 				clocks = <&ehrpwm5_tbclk>, <&l4ls_gclk>;
- 				clock-names = "tbclk", "fck";
--				ti,hwmods = "ehrpwm5";
- 				status = "disabled";
+ 	/* child nodes go here */
+ };
++
++epwmss0: epwmss at 4843e000 { /* PWMSS for DRA7xx */
++	compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
++	reg = <0x4843e000 0x30>;
++	ti,hwmods = "epwmss0";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	/* child nodes go here */
++};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index e007401..5a21e46 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1743,6 +1743,96 @@
+ 				clock-names = "fck", "sys_clk";
  			};
  		};
++
++		epwmss0: epwmss at 4843e000 {
++			compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
++			reg = <0x4843e000 0x30>;
++			ti,hwmods = "epwmss0";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges;
++
++			ehrpwm0: pwm at 4843e200 {
++				compatible = "ti,dra746-ehrpwm",
++					     "ti,am3352-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x4843e200 0x80>;
++				clocks = <&ehrpwm0_tbclk>, <&l4_root_clk_div>;
++				clock-names = "tbclk", "fck";
++				status = "disabled";
++			};
++
++			ecap0: ecap at 4843e100 {
++				compatible = "ti,dra746-ecap",
++					     "ti,am3352-ecap";
++				#pwm-cells = <3>;
++				reg = <0x4843e100 0x80>;
++				clocks = <&l4_root_clk_div>;
++				clock-names = "fck";
++				status = "disabled";
++			};
++		};
++
++		epwmss1: epwmss at 48440000 {
++			compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
++			reg = <0x48440000 0x30>;
++			ti,hwmods = "epwmss1";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges;
++
++			ehrpwm1: pwm at 48440200 {
++				compatible = "ti,dra746-ehrpwm",
++					     "ti,am3352-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48440200 0x80>;
++				clocks = <&ehrpwm1_tbclk>, <&l4_root_clk_div>;
++				clock-names = "tbclk", "fck";
++				status = "disabled";
++			};
++
++			ecap1: ecap at 48440100 {
++				compatible = "ti,dra746-ecap",
++					     "ti,am3352-ecap";
++				#pwm-cells = <3>;
++				reg = <0x48440100 0x80>;
++				clocks = <&l4_root_clk_div>;
++				clock-names = "fck";
++				status = "disabled";
++			};
++		};
++
++		epwmss2: epwmss at 48442000 {
++			compatible = "ti,dra746-pwmss", "ti,am33xx-pwmss";
++			reg = <0x48442000 0x30>;
++			ti,hwmods = "epwmss2";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges;
++
++			ehrpwm2: pwm at 48442200 {
++				compatible = "ti,dra746-ehrpwm",
++					     "ti,am3352-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48442200 0x80>;
++				clocks = <&ehrpwm2_tbclk>, <&l4_root_clk_div>;
++				clock-names = "tbclk", "fck";
++				status = "disabled";
++			};
++
++			ecap2: ecap at 48442100 {
++				compatible = "ti,dra746-ecap",
++					     "ti,am3352-ecap";
++				#pwm-cells = <3>;
++				reg = <0x48442100 0x80>;
++				clocks = <&l4_root_clk_div>;
++				clock-names = "fck";
++				status = "disabled";
++			};
++		};
+ 	};
+ 
+ 	thermal_zones: thermal-zones {
 -- 
 2.7.0
