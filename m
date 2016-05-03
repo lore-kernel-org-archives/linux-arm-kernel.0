@@ -1,112 +1,104 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 3 May 2016 07:46:23 -0700
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20160503141717.GD13045@dhcppc6.redhat.com>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <57289594.3050801@codeaurora.org> <20160503132439.GC13045@dhcppc6.redhat.com>
- <5728ABE0.5040000@roeck-us.net> <20160503141717.GD13045@dhcppc6.redhat.com>
-Message-ID: <5728B9BF.8050501@roeck-us.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 3 May 2016 15:55:12 +0100
+Subject: [PATCH V6 02/13] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <CAKc_7PXBrVduNkdVr13argTNekvhV+XJFB7XD6aYOnP1CY6A6w@mail.gmail.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-3-git-send-email-tn@semihalf.com>
+ <20160427022649.GD6789@localhost> <20160427111758.GA6234@red-moon>
+ <57274B8C.5030304@semihalf.com>
+ <CAKc_7PU1AszF4y0OjZ3KVGaTEx9OL1cuT5YgOxQKhAQgQom7tA@mail.gmail.com>
+ <20160503110225.GA1055@red-moon>
+ <CAKc_7PXBrVduNkdVr13argTNekvhV+XJFB7XD6aYOnP1CY6A6w@mail.gmail.com>
+Message-ID: <20160503145512.GA2429@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2016 07:17 AM, Pratyush Anand wrote:
-> Hi Guenter,
->
-> On 03/05/2016:06:47:12 AM, Guenter Roeck wrote:
->> On 05/03/2016 06:24 AM, Pratyush Anand wrote:
->>> On 03/05/2016:07:12:04 AM, Timur Tabi wrote:
->>>> Pratyush Anand wrote:
->>>>> + * Note: This watchdog timer has two stages. If action is 0, first stage is
->>>>> + * determined by directly programming WCV and second by WOR. When first
->>>>> + * timeout is reached, WS0 is triggered and WCV is reloaded with value in
->>>>> + * WOR. WS0 interrupt will be ignored, then the second watch period starts;
->>>>> + * when second timeout is reached, then WS1 is triggered, system resets. WCV
->>>>> + * and WOR are programmed in such a way that total time corresponding to
->>>>> + * WCV+WOR becomes equivalent to user programmed "timeout".
->>>>> + * If action is 1, then we expect to call panic() at user programmed
->>>>> + * "timeout". Therefore, we program both first and second stage using WCV
->>>>> + * only.
->>>>
->>>> So I'm not sure I understand how this works yet, but there was an earlier
->>>> version of Fu's driver that did something similar.  It depended on being
->>>> able to reprogram the hardware during the WS0 interrupt, and that was
->>>> rejected by the community.
->>>>
->>>> How is what you are doing different?
->>>
->>> * Following was the comment for Fu Wei's primitive version of patch [1], because
->>> * of which community rejected it.
->>>
->>>> The triggering of the hardware reset should never depend on an interrupt being
->>>> handled properly.  You should always program WCV correctly in advance.
->>>
->>> Now, there are couple of things different:
->>>
->>> (1) There is an important difference in upstreamed version than the version [1]
->>> which was rejected on above ground. In upstreamed version,  there would be no
->>> interrupt handler when we are in normal mode ie action=0.  So, there is no
->>> possibility of doing any thing in ISR for all normal usage of this timer. In
->>> this mode WCV is always programmed well in advance now.
->>>
->>> (2)action=1 mechanism was introduced to implement a dump saving mechanism if
->>> watchdog timeout expires before next kick. So, the current upstream version
->>> calls panic() in ISR. When action=1, then we do write WCV now in ISR, but there
->>> too some precaution have been taken.
->>>
->>> When action=1, and we land into isr handler sbsa_gwdt_interrupt() we can not
->>> trust watchdog data structure any more. That might have been corrupted.
->>
->> Why ?
->>
->>> (i) So it might happen that gwdt or wdd pointers have a corrupted value and as
->>> soon as we access gwdt->wdd or wdd->timeout, kernel panics. *No harm*, just
->>> panic() is called a bit early, which dump saving mechanism would be able to
->>> find. So, in fact it will give an extra information to dump saving mechanism
->>> that watchdog structure was corrupted as well.
->>> (ii) Another case, It might happen that wdd->timeout has been corrupted with
->>> large values. This patch does a protection while programming WCV in ISR. It
->>
->> How would wdd->timeout be corrupted ?
->
-> Most likely it will not be corrupted. But, if ISR has been called it means
-> something went wrong, and watchdog was not kicked for the time programmed as
-> "timeout". So, probably we should be extra careful.
->
-This logic would apply to _every_ watchdog driver implementing interrupts.
-Actually, it would apply to _all_ kernel code, and the logic could be used
-to introduce hyper-defensive programming all over the place, bloat the kernel
-and ultimately make it all but unusable. I do not believe in such programming
-in an operating system kernel.
+On Tue, May 03, 2016 at 07:52:52PM +0530, Jayachandran C wrote:
+> On Tue, May 3, 2016 at 4:32 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Mon, May 02, 2016 at 06:56:13PM +0530, Jayachandran C wrote:
+> >> On Mon, May 2, 2016 at 6:13 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> >> > On 04/27/2016 01:17 PM, Lorenzo Pieralisi wrote:
+> >> >>
+> >> >> On Tue, Apr 26, 2016 at 09:26:49PM -0500, Bjorn Helgaas wrote:
+> >> >>>
+> >> >>> On Fri, Apr 15, 2016 at 07:06:37PM +0200, Tomasz Nowicki wrote:
+> >> >
+> >> > [...]
+> >> >
+> >> >>>   +int acpi_pci_bus_domain_nr(struct device *parent)
+> >> >>> +{
+> >> >>> +       struct acpi_device *acpi_dev = to_acpi_device(parent);
+> >> >>> +       unsigned long long segment = 0;
+> >> >>> +       acpi_status status;
+> >> >>> +
+> >> >>> +       /*
+> >> >>> +        * If _SEG method does not exist, following ACPI spec (6.5.6)
+> >> >>> +        * all PCI buses belong to domain 0.
+> >> >>> +        */
+> >> >>> +       status = acpi_evaluate_integer(acpi_dev->handle,
+> >> >>> METHOD_NAME__SEG, NULL,
+> >> >>> +                                      &segment);
+> >> >>> We already have code in acpi_pci_root_add() to evaluate _SEG.  We
+> >> >>> don't want to evaluate it *twice*, do we?
+> >> >>>
+> >> >>> I was sort of expecting that if you added it here, we'd remove the
+> >> >>> existing call, but it looks like you're keeping both?
+> >> >>
+> >> >> We can't remove the existing call, since it is used on X86 and IA64
+> >> >> to store the segment number that, in the process, is used in their
+> >> >> pci_domain_nr() arch specific callback to retrieve the domain nr.
+> >> >>
+> >> >> On ARM64, that selects PCI_DOMAINS_GENERIC, we have to find a way
+> >> >> to retrieve the domain number that is not arch dependent, since
+> >> >> this is generic code, we can't rely on any bus->sysdata format (unless
+> >> >> we do something like JC did below), therefore the only way is to call
+> >> >> the _SEG method *again* here, which also forced Tomasz to go through
+> >> >> the ACPI_COMPANION setting song and dance and pass the parent pointer
+> >> >> to pci_create_root_bus() (see patch 1), which BTW is a source of
+> >> >> trouble on its own as you noticed.
+> >> >
+> >> > What trouble in patch 1 do you mean? I may miss something.
+> >> >
+> >> > I agree that patch 1 is not necessary if we decide to use sysdata or rework
+> >> > root bus scanning to move domain to host bridge. Nevertheless, patch 1 is
+> >> > still a cleanup IMO.
+> >>
+> >> In this case, getting the domain should be trivial since the ACPI
+> >> companion on parent is already set, this should work
+> >>
+> >> int acpi_pci_bus_domain_nr(struct device *parent)
+> >> {
+> >>         struct acpi_device *acpi_dev = to_acpi_device(parent);
+> >>         struct acpi_pci_root *root = acpi_dev->driver_data;
+> >>
+> >>         return root->segment;
+> >> }
+> >>
+> >> Or am I missing something here?
+> >
+> > Well, I thought that the whole idea behind this exercise was to move
+> > the domain number into struct pci_host_bridge (Arnd did not do it with
+> > his first set but this does not mean we can't add it as Bjorn suggested),
+> > so that the domain number could be read from there straight away in an
+> > arch (and FW) independent manner, right ?
+> 
+> The original issue was using _SEG call again instead of using
+> the value from acpi_pci_root, and the solution for that problem
+> is very simple.
+> 
+> The pci host bridge work is of course very useful, but creating a
+> dependency with that work for an issue that can be so easily solved
+> is unnecessary.
 
-On top of that, the assumption that the kernel would be still sane enough
-to call the interrupt handler, but not sane enough to actually execute it,
-seems to be a bit far-fetched.
+It can be easily solved if we do not drop patch 1 (I understood the
+additional call to _SEG was only part of the problem). If we keep patch
+1 the code above is fine by me, if we have to drop patch 1 (IIRC by
+passing the parent pointer to pci_create_root_bus() we are affecting
+IA64 and X86 code, if that's acceptable that's fine by me) I do not
+think we can use the code above anymore, that's what my comment was
+all about because Bjorn was concerned about the fragility of the code
+setting the ACPI companion.
 
-> Anyway, there is no side effect of checking wdd->timeout against MAX_TIMEOUT.
->
-The side effect is increased code size.
-
-> Moreover, I was unable to envisage any regression with this patch other than
-> that it introduces a bit complexity. But, then it gives us an advantage of
-> having any timeout value.
->
->> If what you are say is correct, the interrupt handler can not be trusted, period,
->> and should be disabled entirely.
->
-> Yes, When system is hang, then probably we can not trust even interrupt handler.
-> We can not be 100% sure that handler will be called, but that is the case with
-> existing upstream code as well. In such situation upstream code will also
-> misbehave. There is little we can do for such cases.
->
-... other than wait for the hard reset, which will be just fine, at least
-with the current code.
-
-> If one wants to be fully assured for a hardware watchdog reset then the choice
-> is action=0. Even after current patch, action=0 will ensure that there would be
-> a hardware reset upon timeout.
->
-Sorry, I don't buy into this. You'll have to convince Wim, or simply
-change the driver to use the infrastructure to achieve larger timeouts.
-
-Thanks,
-Guenter
+Lorenzo
