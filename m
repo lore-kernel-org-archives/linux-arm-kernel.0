@@ -1,23 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 May 2016 12:51:59 +0100
-Subject: [RFC PATCH 1/7] ALSA: ac97: split out the generic ac97 registers
-In-Reply-To: <1462050939-27940-2-git-send-email-robert.jarzmik@free.fr>
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20160503115159.GP6292@sirena.org.uk>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 3 May 2016 07:12:04 -0500
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+Message-ID: <57289594.3050801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 30, 2016 at 11:15:33PM +0200, Robert Jarzmik wrote:
-> Split out from the ac97_codec.h the ac97 generic registers, which can be
-> used by a codec, typically a generic ac97 codec, and by the ac97 bus, to
-> scan an ac97 AC-Link.
+Pratyush Anand wrote:
+> + * Note: This watchdog timer has two stages. If action is 0, first stage is
+> + * determined by directly programming WCV and second by WOR. When first
+> + * timeout is reached, WS0 is triggered and WCV is reloaded with value in
+> + * WOR. WS0 interrupt will be ignored, then the second watch period starts;
+> + * when second timeout is reached, then WS1 is triggered, system resets. WCV
+> + * and WOR are programmed in such a way that total time corresponding to
+> + * WCV+WOR becomes equivalent to user programmed "timeout".
+> + * If action is 1, then we expect to call panic() at user programmed
+> + * "timeout". Therefore, we program both first and second stage using WCV
+> + * only.
 
-I don't entirely see the value in this one but equally it does no harm.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160503/bbd13938/attachment.sig>
+So I'm not sure I understand how this works yet, but there was an 
+earlier version of Fu's driver that did something similar.  It depended 
+on being able to reprogram the hardware during the WS0 interrupt, and 
+that was rejected by the community.
+
+How is what you are doing different?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
