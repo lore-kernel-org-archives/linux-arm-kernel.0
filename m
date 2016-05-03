@@ -1,31 +1,45 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 03 May 2016 11:22:15 +0100
-Subject: [PATCH kexec-tools 14/32] arm: fix off-by-one on memory end
-In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-Message-ID: <E1axXT5-0004iJ-VX@e0050434b2927.dyn.arm.linux.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 3 May 2016 11:41:51 +0100
+Subject: [PATCH v2 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <20160503103237.GN19428@n2100.arm.linux.org.uk>
+References: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
+ <57287BD9.6090907@arm.com> <20160503103237.GN19428@n2100.arm.linux.org.uk>
+Message-ID: <5728806F.7000208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory range end is inclusive, not exclusive (see x86).  We should
-not be adding one to the value parsed from the /proc/iomem resources.
+On 03/05/16 11:32, Russell King - ARM Linux wrote:
+> On Tue, May 03, 2016 at 11:22:17AM +0100, Vladimir Murzin wrote:
+>> On 28/04/16 17:51, Vladimir Murzin wrote:
+>>> Small set of fixes discovered with R-class cores.
+>>>
+>>> Jean-Philippe Brucker (2):
+>>>   ARM: nommu: fix PMSAv7 setup
+>>>   ARM: nommu: change memory reserve for the vectors
+>>>
+>>> Vladimir Murzin (1):
+>>>   ARM: domain: move {set,get}_domain under config guard
+>>>
+>>>  arch/arm/include/asm/domain.h |   11 +++++++++++
+>>>  arch/arm/kernel/head-nommu.S  |    2 +-
+>>>  arch/arm/mm/nommu.c           |   15 ++++++++-------
+>>>  3 files changed, 20 insertions(+), 8 deletions(-)
+>>>
+>>
+>> Russell, any objection to get it into patch tracker?
+> 
+> I've not had any chance to look at them yet - last weekend, I was away
+> from Thursday through until late Tuesday, then I spent most of Wednesday
+> and Thursday catching up.  Friday I was able to look at some stuff, and
+> then I've spent the bank holiday weekend digging out laurels in the front
+> garden.  I've only just today got back to looking at some kernel stuff.
+> 
+> So really, I've only had two days in the last week and a half to look at
+> anything.
+> 
+> Please wait a little while longer.  Thanks.
 
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/arch/arm/kexec-arm.c | 1 -
- 1 file changed, 1 deletion(-)
+Thanks for prompt reply! I wasn't aware you've been off, patches can wait.
 
-diff --git a/kexec/arch/arm/kexec-arm.c b/kexec/arch/arm/kexec-arm.c
-index 4e90e69..e47fc00 100644
---- a/kexec/arch/arm/kexec-arm.c
-+++ b/kexec/arch/arm/kexec-arm.c
-@@ -51,7 +51,6 @@ int get_memory_ranges(struct memory_range **range, int *ranges,
- 		if (count != 2)
- 			continue;
- 		str = line + consumed;
--		end = end + 1;
- 
- 		if (memcmp(str, "System RAM\n", 11) == 0) {
- 			type = RANGE_RAM;
--- 
-1.9.1
+Cheers
+Vladimir
