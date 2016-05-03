@@ -1,61 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 3 May 2016 12:29:22 +0200
-Subject: [PATCH v2 0/8] PM / devfreq: Add NoCP devfreq-event and support
- busfreq on exyno5422-odroidxu3
-In-Reply-To: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
-References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160503102922.GD3956@kozik-lap>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Tue, 03 May 2016 11:22:26 +0100
+Subject: [PATCH kexec-tools 16/32] arm: fix ELF32/ELF64 check
+In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+Message-ID: <E1axXTG-0004iV-C6@e0050434b2927.dyn.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 03:32:47PM +0900, Chanwoo Choi wrote:
-> This patchset support the AMBA bus frequency scaling on Exynos5422-based
-> Odroid-XU3 board. But, this series only support the bus frequency scaling
-> for INT (Internal) block using VDD_INT power line.
-> 
-> Also, to support the bus frequency scaling for Exynos542x SoC,
-> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
-> to measure the transfered data traffic on NoC (Network on Chip)
-> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
-> provide the utilization for INT block of Exynos542x SoC.
-> 
-> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
-> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
-> Just add the phandle of 'NoC Probe' dt node to bus dt node.
-> 
-> Depend on:
-> This patchset depends on patch[1] which support the generic exynos-bus
-> frequency driver.
-> [1] http://www.spinics.net/lists/arm-kernel/msg495976.html
-> - [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
-> 
-> 
-> Changse from v1:
-> (https://lkml.org/lkml/2016/4/8/28)
-> - Simplify the documentation of exynos-nocp.txt
-> - Check the return value of regmap function
-> - Modify Device Tree node name using general device name
->  : nocp_memX_X@ nocp_memX_X -> nocp_memX_X@ nocp
-> - Fix wrong node name about nocp device tree node
-> - Drop the CLK_SET_RATE_PARENT flag
-> - Reorder bus device tree node alpabetically
-> - Add the tested-by tag from Anand Moon and Markus Reichl
-> - Add the reviewed-by tag to patch5/7 from Exynos SoC Maintainer
-> - Add patch2 to modify the devfreq_event_get_edev_by_phandle()
->   to get the instance of devfreq-event device by using the phandle
-> 
-> Chanwoo Choi (8):
->   PM / devfreq: event: Add new Exynos NoC probe driver
->   PM / devfreq: event: Find the instance of devfreq-event device by using phandle
->   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
->   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
->   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
->   clk: samsung: exynos542x: Add the clock id for ACLK
->   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
->   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
+Rather than using ULONG_MAX to decide whether to use the ELF64 or ELF32
+core dump format, use UINT32_MAX instead - we include stdint.h, so we
+might as well use a constant which is meaningful for the limits of
+the 32-bit ELF format.
 
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+---
+ kexec/arch/arm/crashdump-arm.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Applied DTS patches for late v4.7 (hopefully).
-
-Best regards,
-Krzysztof
+diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
+index a390187..fcc4d42 100644
+--- a/kexec/arch/arm/crashdump-arm.c
++++ b/kexec/arch/arm/crashdump-arm.c
+@@ -369,8 +369,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	if (last_ranges < 0)
+ 		last_ranges = 0;
+ 
+-	if (crash_memory_ranges[last_ranges].end > ULONG_MAX) {
+-
++	if (crash_memory_ranges[last_ranges].end > UINT32_MAX) {
+ 		/* for support LPAE enabled kernel*/
+ 		elf_info.class = ELFCLASS64;
+ 
+-- 
+1.9.1
