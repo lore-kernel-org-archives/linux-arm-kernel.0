@@ -1,47 +1,34 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 3 May 2016 17:46:00 +0200
-Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
- code
-In-Reply-To: <20160426110229.GA5374@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-10-git-send-email-peter.griffin@linaro.org>
- <20160421155753.GS3217@sirena.org.uk>
- <20160426110229.GA5374@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <5728C7B8.5050903@st.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 3 May 2016 21:21:41 +0530
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <5728BEC4.6050603@codeaurora.org>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net>
+ <20160503143856.GE13045@dhcppc6.redhat.com>
+ <5728BEC4.6050603@codeaurora.org>
+Message-ID: <20160503155141.GF13045@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/05/2016:10:07:48 AM, Timur Tabi wrote:
+> Pratyush Anand wrote:
+> >In fact after supporting max_hw_heartbeat_ms, there should be no change for
+> >action=0 functionally. However, we would still need some changes for action=1.
+> 
+> IMHO, action=1 is more of a debugging option, and not something that would
+> be used normally.  I would need to see some evidence that real users want to
+> have action=1 and a longer timeout.
+> 
+If action=1 need to be used effectively, then we should have something which
+would help to increase timeout values.
 
+Currently you have only 10 second to execute secondary kernel, which might not
+be sufficient.
 
-On 04/26/2016 01:02 PM, Peter Griffin wrote:
-> Hi Mark,
-> 
-> On Thu, 21 Apr 2016, Mark Brown wrote:
-> 
->> On Thu, Apr 21, 2016 at 12:04:26PM +0100, Peter Griffin wrote:
->>> uniperiph-id, version and mode are ST specific bindings and
->>> need the 'st,' prefix. Update the examples, as otherwise copying
->>> them yields a runtime error parsing the DT node.
->>
->> I'm not sure what connection this or the other ASoC documentation update
->> have to the rest of the series?
-> 
-> The ASoC DT bindings are missing upstream as the ASoC driver depends on the
-> fdma driver. So this series adds the fdma driver, fdma dt bindings,
-> and also the missing ASoC dt bindings.
-> 
-> Whilst doing this and getting it working I noticed a few discrepencies
-> in the ASoC dt binding documentation versus the driver so also fixed that.
-> 
-> Once this whole series is applied the end result is working
-> audio upstream for STi platforms (as ASoC is the only upstream driver
-> using fdma currently).
+> I've never been a fan of the action=1 option, and I'm certainly not keen any
+> patches that make action=1 more complicated than it already is.
 
-Hi Peter,
-I also noticed the error in bindings, i'm planning to correct it with
-DTS upstream for STI ASoC after FDMA has been accepted.
-So if you estimate that it is simplier for FDMA upstream, you can drop
-ASoC patches in you next version.
+I think, with max_hw_heartbeat_ms it would be far more simpler. Will attempt and
+send another RFC.
 
-Regards,
-Arnaud
+~Pratyush
