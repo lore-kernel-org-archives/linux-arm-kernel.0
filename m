@@ -1,62 +1,89 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 03 May 2016 11:21:49 +0100
-Subject: [PATCH kexec-tools 09/32] kexec: phys_to_virt() must take unsigned
- long long
+Date: Tue, 03 May 2016 11:21:55 +0100
+Subject: [PATCH kexec-tools 10/32] kexec: add generic helper to add to
+ memory_regions
 In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
 References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-Message-ID: <E1axXSf-0004hl-PC@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <E1axXSl-0004hr-0T@e0050434b2927.dyn.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-crashdump-elf.c passes unsigned long long addresses into phys_to_virt()
-so make phys_to_virt() accept such addresses without truncating them.
-This is important for ARM LPAE systems.
+Add a helper to add a memory range to a memory_regions array.
 
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/phys_to_virt.c | 2 +-
- kexec/crashdump.h             | 2 +-
- kexec/phys_to_virt.c          | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ kexec/Makefile      |  4 ++++
+ kexec/mem_regions.c | 30 ++++++++++++++++++++++++++++++
+ kexec/mem_regions.h |  9 +++++++++
+ 3 files changed, 43 insertions(+)
+ create mode 100644 kexec/mem_regions.c
+ create mode 100644 kexec/mem_regions.h
 
-diff --git a/kexec/arch/arm/phys_to_virt.c b/kexec/arch/arm/phys_to_virt.c
-index bcced52..c2fe2ea 100644
---- a/kexec/arch/arm/phys_to_virt.c
-+++ b/kexec/arch/arm/phys_to_virt.c
-@@ -14,7 +14,7 @@
-  * http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html
-  */
- unsigned long
--phys_to_virt(struct crash_elf_info *elf_info, unsigned long paddr)
-+phys_to_virt(struct crash_elf_info *elf_info, unsigned long long paddr)
- {
- 	return paddr + elf_info->page_offset - phys_offset;
- }
-diff --git a/kexec/crashdump.h b/kexec/crashdump.h
-index 95f1f0c..96219a8 100644
---- a/kexec/crashdump.h
-+++ b/kexec/crashdump.h
-@@ -55,7 +55,7 @@ int crash_create_elf64_headers(struct kexec_info *info,
- unsigned long crash_architecture(struct crash_elf_info *elf_info);
+diff --git a/kexec/Makefile b/kexec/Makefile
+index a758b4a..e2aee84 100644
+--- a/kexec/Makefile
++++ b/kexec/Makefile
+@@ -69,6 +69,10 @@ dist				+= kexec/fs2dt.c kexec/fs2dt.h
+ $(ARCH)_FS2DT			=
+ KEXEC_SRCS			+= $($(ARCH)_FS2DT)
  
- unsigned long phys_to_virt(struct crash_elf_info *elf_info,
--			   unsigned long paddr);
-+			   unsigned long long paddr);
- 
- unsigned long xen_architecture(struct crash_elf_info *elf_info);
- int xen_get_nr_phys_cpus(void);
-diff --git a/kexec/phys_to_virt.c b/kexec/phys_to_virt.c
-index 91b6d01..5e8c4e3 100644
---- a/kexec/phys_to_virt.c
-+++ b/kexec/phys_to_virt.c
-@@ -10,7 +10,7 @@
-  * their own implementation.
-  */
- unsigned long
--phys_to_virt(struct crash_elf_info *elf_info, unsigned long paddr)
-+phys_to_virt(struct crash_elf_info *elf_info, unsigned long long paddr)
- {
- 	return paddr + elf_info->page_offset;
- }
++dist				+= kexec/mem_regions.c kexec/mem_regions.h
++$(ARCH)_MEM_REGIONS		=
++KEXEC_SRCS			+= $($(ARCH)_MEM_REGIONS)
++
+ include $(srcdir)/kexec/arch/alpha/Makefile
+ include $(srcdir)/kexec/arch/arm/Makefile
+ include $(srcdir)/kexec/arch/i386/Makefile
+diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
+new file mode 100644
+index 0000000..a4952ff
+--- /dev/null
++++ b/kexec/mem_regions.c
+@@ -0,0 +1,30 @@
++#include "kexec.h"
++#include "mem_regions.h"
++
++/**
++ * mem_regions_add() - add a memory region to a set of ranges
++ * @ranges: ranges to add the memory region to
++ * @max: maximum number of entries in memory region
++ * @base: base address of memory region
++ * @length: length of memory region in bytes
++ * @type: type of memory region
++ *
++ * Add the memory region to the set of ranges, and return %0 if successful,
++ * or %-1 if we ran out of space.
++ */
++int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
++                    unsigned long long length, int type)
++{
++	struct memory_range *range;
++
++	if (ranges->size >= ranges->max_size)
++		return -1;
++
++	range = ranges->ranges + ranges->size++;
++	range->start = base;
++	range->end = base + length - 1;
++	range->type = type;
++
++	return 0;
++}
++
+diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
+new file mode 100644
+index 0000000..b9cfba1
+--- /dev/null
++++ b/kexec/mem_regions.h
+@@ -0,0 +1,9 @@
++#ifndef MEM_REGIONS_H
++#define MEM_REGIONS_H
++
++struct memory_ranges;
++
++int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
++                    unsigned long long length, int type);
++
++#endif
 -- 
 1.9.1
