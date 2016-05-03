@@ -1,275 +1,145 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  3 May 2016 11:33:51 -0600
-Subject: [PATCH 17/27] coresight: tmc: making prepare/unprepare functions
- generic
+Date: Tue,  3 May 2016 11:33:53 -0600
+Subject: [PATCH 19/27] coresight: tmc: getting rid of multiple read access
 In-Reply-To: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1462296841-12327-18-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1462296841-12327-20-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dealing with HW related matters in tmc_read_prepare/unprepare
-becomes convoluted when many cases need to be handled distinctively.
+Allowing multiple readers to access the trace data simultaniously
+via sysFS provides no shortage of opportunity for race condition,
+mandates two variable to be maintained (drvdata::read_count and
+drvdata::reading), makes the code complex and provide little
+advantages, if any.
 
-As such moving processing related to HW setup to individual driver
-files and keep the core driver generic.
+This patch streamlines the read process by restricting trace data
+access to a single user.  That way drvdata::read_count can
+be eliminated and race conditions (along with faulty error handling)
+in function tmc_open() and tmc_release() eliminated.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 62 ++++++++++++++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 42 ++++++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.c     | 55 +++++-----------------
- drivers/hwtracing/coresight/coresight-tmc.h     |  8 ++--
- 4 files changed, 117 insertions(+), 50 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c |  5 +++++
+ drivers/hwtracing/coresight/coresight-tmc-etr.c |  4 ++++
+ drivers/hwtracing/coresight/coresight-tmc.c     | 24 +++++++++---------------
+ drivers/hwtracing/coresight/coresight-tmc.h     |  2 --
+ 4 files changed, 18 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 467d19221f7b..91e43572ce9f 100644
+index 6eb1665cfc9c..60edf4d1968f 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -71,7 +71,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- 	}
- }
+@@ -260,6 +260,11 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
  
--void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
-+static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
  
-@@ -202,3 +202,63 @@ const struct coresight_ops tmc_etf_cs_ops = {
- 	.sink_ops	= &tmc_etf_sink_ops,
- 	.link_ops	= &tmc_etf_link_ops,
- };
-+
-+int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
-+{
-+	enum tmc_mode mode;
-+	int ret = 0;
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* There is no point in reading a TMC in HW FIFO mode */
-+	mode = readl_relaxed(drvdata->base + TMC_MODE);
-+	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-+		ret = -EINVAL;
++	if (drvdata->reading) {
++		ret = -EBUSY;
 +		goto out;
 +	}
 +
-+	/* Disable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etb_disable_hw(drvdata);
-+
-+	drvdata->reading = true;
-+out:
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return ret;
-+}
-+
-+int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
-+{
-+	enum tmc_mode mode;
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* There is no point in reading a TMC in HW FIFO mode */
-+	mode = readl_relaxed(drvdata->base + TMC_MODE);
-+	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-+		spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+		return -EINVAL;
-+	}
-+
-+	/* Re-enable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etb_enable_hw(drvdata);
-+
-+	drvdata->reading = false;
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return 0;
-+}
+ 	/* There is no point in reading a TMC in HW FIFO mode */
+ 	mode = readl_relaxed(drvdata->base + TMC_MODE);
+ 	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 5d9333ec49ae..3483d139a4ac 100644
+index ac37bf904fb7..d6999b457fb8 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -70,7 +70,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
- 		drvdata->buf = drvdata->vaddr;
- }
+@@ -188,6 +188,10 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 		return -EINVAL;
  
--void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
-+static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
++	if (drvdata->reading) {
++		ret = -EBUSY;
++		goto out;
++	}
  
-@@ -126,3 +126,43 @@ static const struct coresight_ops_sink tmc_etr_sink_ops = {
- const struct coresight_ops tmc_etr_cs_ops = {
- 	.sink_ops	= &tmc_etr_sink_ops,
- };
-+
-+int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
-+{
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETR))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* Disable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etr_disable_hw(drvdata);
-+
-+	drvdata->reading = true;
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return 0;
-+}
-+
-+int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
-+{
-+	unsigned long flags;
-+
-+	/* config types are set a boot time and never change */
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETR))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* RE-enable the TMC if need be */
-+	if (drvdata->enable)
-+		tmc_etr_enable_hw(drvdata);
-+
-+	drvdata->reading = false;
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	return 0;
-+}
+ 	/* If drvdata::buf is NULL the trace data has been read already */
+ 	if (drvdata->buf == NULL) {
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 8d7f6d54c9b0..63f8e55116a6 100644
+index e8e12a9b917a..ae7525a2b94a 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -76,76 +76,43 @@ void tmc_disable_hw(struct tmc_drvdata *drvdata)
- static int tmc_read_prepare(struct tmc_drvdata *drvdata)
- {
- 	int ret = 0;
--	unsigned long flags;
--	enum tmc_mode mode;
--
--	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (!drvdata->enable)
--		goto out;
- 
- 	switch (drvdata->config_type) {
- 	case TMC_CONFIG_TYPE_ETB:
--		tmc_etb_disable_hw(drvdata);
--		break;
- 	case TMC_CONFIG_TYPE_ETF:
--		/* There is no point in reading a TMC in HW FIFO mode */
--		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
--			ret = -EINVAL;
--			goto err;
--		}
--
--		tmc_etb_disable_hw(drvdata);
-+		ret = tmc_read_prepare_etb(drvdata);
- 		break;
- 	case TMC_CONFIG_TYPE_ETR:
--		tmc_etr_disable_hw(drvdata);
-+		ret = tmc_read_prepare_etr(drvdata);
- 		break;
- 	default:
- 		ret = -EINVAL;
--		goto err;
- 	}
- 
--out:
--	drvdata->reading = true;
--	dev_info(drvdata->dev, "TMC read start\n");
--err:
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+	if (!ret)
-+		dev_info(drvdata->dev, "TMC read start\n");
-+
+@@ -95,7 +95,7 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
  	return ret;
  }
  
- static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
+-static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
++static int tmc_read_unprepare(struct tmc_drvdata *drvdata)
  {
--	unsigned long flags;
--	enum tmc_mode mode;
--
--	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (!drvdata->enable)
--		goto out;
-+	int ret = 0;
+ 	int ret = 0;
  
- 	switch (drvdata->config_type) {
- 	case TMC_CONFIG_TYPE_ETB:
--		tmc_etb_enable_hw(drvdata);
--		break;
- 	case TMC_CONFIG_TYPE_ETF:
--		/* Make sure we don't re-enable a TMC in HW FIFO mode */
--		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode != TMC_MODE_CIRCULAR_BUFFER)
--			goto err;
--
--		tmc_etb_enable_hw(drvdata);
-+		ret = tmc_read_unprepare_etb(drvdata);
- 		break;
- 	case TMC_CONFIG_TYPE_ETR:
--		tmc_etr_disable_hw(drvdata);
-+		ret = tmc_read_unprepare_etr(drvdata);
- 		break;
- 	default:
--		goto err;
-+		ret = -EINVAL;
- 	}
+@@ -113,21 +113,20 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
  
--out:
--	drvdata->reading = false;
--	dev_info(drvdata->dev, "TMC read end\n");
--err:
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+	if (!ret)
-+		dev_info(drvdata->dev, "TMC read end\n");
+ 	if (!ret)
+ 		dev_info(drvdata->dev, "TMC read end\n");
++
++	return ret;
  }
  
  static int tmc_open(struct inode *inode, struct file *file)
+ {
++	int ret;
+ 	struct tmc_drvdata *drvdata = container_of(file->private_data,
+ 						   struct tmc_drvdata, miscdev);
+-	int ret = 0;
+-
+-	if (drvdata->read_count++)
+-		goto out;
+ 
+ 	ret = tmc_read_prepare(drvdata);
+ 	if (ret)
+ 		return ret;
+-out:
++
+ 	nonseekable_open(inode, file);
+ 
+ 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
+@@ -167,19 +166,14 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+ 
+ static int tmc_release(struct inode *inode, struct file *file)
+ {
++	int ret;
+ 	struct tmc_drvdata *drvdata = container_of(file->private_data,
+ 						   struct tmc_drvdata, miscdev);
+ 
+-	if (--drvdata->read_count) {
+-		if (drvdata->read_count < 0) {
+-			dev_err(drvdata->dev, "mismatched close\n");
+-			drvdata->read_count = 0;
+-		}
+-		goto out;
+-	}
++	ret = tmc_read_unprepare(drvdata);
++	if (ret)
++		return ret;
+ 
+-	tmc_read_unprepare(drvdata);
+-out:
+ 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
+ 	return 0;
+ }
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index b3017e115c4d..df661903f83c 100644
+index df661903f83c..592eb149fe3a 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -127,13 +127,13 @@ void tmc_enable_hw(struct tmc_drvdata *drvdata);
- void tmc_disable_hw(struct tmc_drvdata *drvdata);
- 
- /* ETB/ETF functions */
--void tmc_etb_enable_hw(struct tmc_drvdata *drvdata);
--void tmc_etb_disable_hw(struct tmc_drvdata *drvdata);
-+int tmc_read_prepare_etb(struct tmc_drvdata *drvdata);
-+int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata);
- extern const struct coresight_ops tmc_etb_cs_ops;
- extern const struct coresight_ops tmc_etf_cs_ops;
- 
- /* ETR functions */
--void tmc_etr_enable_hw(struct tmc_drvdata *drvdata);
--void tmc_etr_disable_hw(struct tmc_drvdata *drvdata);
-+int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
-+int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
- extern const struct coresight_ops tmc_etr_cs_ops;
- #endif
+@@ -94,7 +94,6 @@ enum tmc_mem_intf_width {
+  * @csdev:	component vitals needed by the framework.
+  * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
+  * @spinlock:	only one at a time pls.
+- * @read_count:	manages preparation of buffer for reading.
+  * @buf:	area of memory where trace data get sent.
+  * @paddr:	DMA start location in RAM.
+  * @vaddr:	virtual representation of @paddr.
+@@ -109,7 +108,6 @@ struct tmc_drvdata {
+ 	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+-	int			read_count;
+ 	bool			reading;
+ 	char			*buf;
+ 	dma_addr_t		paddr;
 -- 
 2.5.0
