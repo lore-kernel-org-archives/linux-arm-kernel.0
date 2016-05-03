@@ -1,27 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 May 2016 14:58:21 -0700
-Subject: Bunch of serial warnings in next at least with omap-serial
-In-Reply-To: <572911BF.8000803@hurleysoftware.com>
-References: <20160503203930.GQ5995@atomide.com>
- <572911BF.8000803@hurleysoftware.com>
-Message-ID: <20160503215821.GR5995@atomide.com>
+From: thomas.hanson@linaro.org (Tom Hanson)
+Date: Tue, 3 May 2016 16:22:37 -0600
+Subject: [PATCH v2 07/54] KVM: arm/arm64: vgic: Remove irq_phys_map from
+ interface
+In-Reply-To: <1461861973-26464-8-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <572924AD.9050902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Hurley <peter@hurleysoftware.com> [160503 14:03]:
-> Hi Tony,
-> 
-> On 05/03/2016 01:39 PM, Tony Lindgren wrote:
-> > Hi Peter,
-> > 
-> > Looks like probably commit 4047b37122d1 ("serial: core: Prevent unsafe
-> > uart port access, part 1") in Linux next causes tons of warnings with at
-> > least omap-serial. It does not revert cleanly I have not tested with that
-> > reverted. Any ideas? Dmesg output of the errors below.
-> 
-> Thanks for the report.
-> Patch below should fix that.
+On 04/28/2016 10:45 AM, Andre Przywara wrote:
+...
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 3a74b17..9475000 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -333,10 +333,10 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+...
+> +	ret = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
+> +	if (ret)
+> +		return ret;
+>
+>   	return 0;
+>   }
 
-Yes thanks that fixes it:
-
-Tested-by: Tony Lindgren <tony@atomide.com>
+This isn't wrong, but it is overly complicated.  I'd recommend either:
+     ret = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
+     return ret;
+OR
+     return kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
