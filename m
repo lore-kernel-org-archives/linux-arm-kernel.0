@@ -1,81 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 May 2016 11:12:41 +0100
-Subject: [PATCH v2 42/54] KVM: arm/arm64: vgic-new: vgic_kvm_device:
- access to VGIC registers
-In-Reply-To: <572878C8.5070306@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-43-git-send-email-andre.przywara@arm.com>
- <57287671.3000902@arm.com> <572878C8.5070306@arm.com>
-Message-ID: <57287999.4040801@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 3 May 2016 12:15:09 +0200
+Subject: [PATCH v2] s5p-mfc: Don't try to put pm->clock if lookup failed
+In-Reply-To: <1462216462-32665-1-git-send-email-javier@osg.samsung.com>
+References: <1462216462-32665-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20160503101509.GB3956@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/16 11:09, Andre Przywara wrote:
-> Hi,
+On Mon, May 02, 2016 at 03:14:22PM -0400, Javier Martinez Canillas wrote:
+> Failing to get the struct s5p_mfc_pm .clock is a non-fatal error so the
+> clock field can have a errno pointer value. But s5p_mfc_final_pm() only
+> checks if .clock is not NULL before attempting to unprepare and put it.
 > 
-> On 03/05/16 10:59, Marc Zyngier wrote:
->> On 28/04/16 17:46, Andre Przywara wrote:
->>> From: Eric Auger <eric.auger@linaro.org>
->>>
->>> This patch implements the switches for KVM_DEV_ARM_VGIC_GRP_DIST_REGS
->>> and KVM_DEV_ARM_VGIC_GRP_CPU_REGS API which allows the userspace to
->>> access VGIC registers.
->>>
->>> At that stage the interfaces with the MMIO API are not implemented:
->>> - vgic_attr_regs_access
->>> - vgic_v2_has_attr_regs
->>>
->>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-kvm-device.c | 53 +++++++++++++++++++++++++++++++++++--
->>>  virt/kvm/arm/vgic/vgic-mmio-v2.c    | 34 ++++++++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic.h            |  1 +
->>>  3 files changed, 86 insertions(+), 2 deletions(-)
->>>
->>
->> [...]
->>
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>> index ae6077e..f2a8efe 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>> @@ -276,3 +276,37 @@ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->>>  
->>>  	return ret;
->>>  }
->>> +
->>> +int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
->>> +{
->>> +	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
->>> +	const struct vgic_register_region *regions;
->>> +	gpa_t addr;
->>> +	int nr_regions, i, len;
->>> +
->>> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
->>> +
->>> +	switch (attr->group) {
->>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
->>> +		regions = vgic_v2_dist_registers;
->>> +		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
->>> +		break;
->>> +	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
->>> +		return -ENXIO;		/* TODO: describe CPU i/f regs also */
->>
->> This definitely needs addressing, as it breaks guest migration.
+> This leads to the following warning in clk_put() due s5p_mfc_final_pm():
 > 
-> It is implemented in patch 46/54.
+> WARNING: CPU: 3 PID: 1023 at drivers/clk/clk.c:2814 s5p_mfc_final_pm+0x48/0x74 [s5p_mfc]
+> CPU: 3 PID: 1023 Comm: rmmod Tainted: G        W       4.6.0-rc6-next-20160502-00005-g5a15a49106bc #9
+> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> [<c010e1bc>] (unwind_backtrace) from [<c010af28>] (show_stack+0x10/0x14)
+> [<c010af28>] (show_stack) from [<c032485c>] (dump_stack+0x88/0x9c)
+> [<c032485c>] (dump_stack) from [<c011b8e8>] (__warn+0xe8/0x100)
+> [<c011b8e8>] (__warn) from [<c011b9b0>] (warn_slowpath_null+0x20/0x28)
+> [<c011b9b0>] (warn_slowpath_null) from [<bf16004c>] (s5p_mfc_final_pm+0x48/0x74 [s5p_mfc])
+> [<bf16004c>] (s5p_mfc_final_pm [s5p_mfc]) from [<bf157414>] (s5p_mfc_remove+0x8c/0x94 [s5p_mfc])
+> [<bf157414>] (s5p_mfc_remove [s5p_mfc]) from [<c03fe1f8>] (platform_drv_remove+0x24/0x3c)
+> [<c03fe1f8>] (platform_drv_remove) from [<c03fcc70>] (__device_release_driver+0x84/0x110)
+> [<c03fcc70>] (__device_release_driver) from [<c03fcdd8>] (driver_detach+0xac/0xb0)
+> [<c03fcdd8>] (driver_detach) from [<c03fbff8>] (bus_remove_driver+0x4c/0xa0)
+> [<c03fbff8>] (bus_remove_driver) from [<c01886a8>] (SyS_delete_module+0x174/0x1b8)
+> [<c01886a8>] (SyS_delete_module) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
+> 
+> Assign the pointer to NULL in case of a lookup failure to fix the issue.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+> Changes in v2:
+> - Set the clock pointer to NULL instead of checking for !IS_ERR_OR_NULL().
+>   Suggested by Arnd Bergmann.
+> 
+>  drivers/media/platform/s5p-mfc/s5p_mfc_pm.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Ah, sorry. I was on my way there...
+This is a fix for bug, so for statistics:
+Fixes: d19f405a5a8d ("[media] s5p-mfc: Fix selective sclk_mfc init")
 
-> Shall I remove the TODO to avoid confusion and/or replace it with a note
-> either in a comment or in this commit message that the implementation
-> will follow in one the next patches?
+... and although not fatal, but annoying so I think this deserves:
+Cc: <stable@vger.kernel.org>
 
-Just drop the comment.
+Anyway:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Krzysztof
