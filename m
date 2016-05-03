@@ -1,48 +1,63 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 3 May 2016 18:17:38 -0500
-Subject: [PATCH v2 2/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
-In-Reply-To: <5728E936.2010503@ti.com>
-References: <20160427171658.GA5995@atomide.com>
- <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
- <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
- <57285E66.2000708@ti.com> <5728A81F.4050906@garmin.com>
- <20160503164323.GN5995@atomide.com> <5728E0BC.3080509@ti.com>
- <5728E495.4010502@garmin.com> <5728E936.2010503@ti.com>
-Message-ID: <57293192.7060802@ti.com>
+From: thomas.hanson@linaro.org (Tom Hanson)
+Date: Tue, 3 May 2016 17:46:12 -0600
+Subject: [PATCH v2 14/54] KVM: arm/arm64: vgic-new: Implement virtual IRQ
+ injection
+In-Reply-To: <1461861973-26464-15-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-15-git-send-email-andre.przywara@arm.com>
+Message-ID: <57293844.1060802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2016 01:08 PM, Tero Kristo wrote:
-> On 03/05/16 20:49, J.D. Schroeder wrote:
->> On 05/03/2016 12:32 PM, Tero Kristo wrote:
->>> Personally I would not recommend using this clock for any timing sensitive
->>> applications. May I ask why you are interested in the exact clock rate of this
->>> clock anyway?
->>
->> I'm not interested in using this clock and I'm not sure how anyone would use
->> this clock outside of the processor. See the inline comment that is part of
->> the change and the commit message for the change. There is no hint in my
->> change that this is an exact clock rate. It is a clarifying change to help
->> others avoid using this clock as a 32 kHz clock (which the current clock name
->> and frequency imply) and it more accurately represents the actual hardware
->> behavior.
->>
-> 
-> Imo, if you want to clarify things up, the whole secure_32k_ck should be 
-> removed from linux kernel.
+On 04/28/2016 10:45 AM, Andre Przywara wrote:
+...
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index fb45537..92b78a0 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -19,8 +19,31 @@
+...  
+> +/*
+> + * Locking order is always:
+> + *   vgic_cpu->ap_list_lock
+> + *     vgic_irq->irq_lock
+> + *
+> + * (that is, always take the ap_list_lock before the struct vgic_irq lock).
+> + *
+> + * When taking more than one ap_list_lock at the same time, always take the
+> + * lowest numbered VCPU's ap_list_lock first, so:
+> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
+> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
+> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
+> + */
 
-This is actually the RC oscillator clock[1] which also happens to
-source the secure_32k_clk. Jay is right that this is not an accurate
-32k clock, however the actual range of this internal clock source is
-pretty wide (I am trying to get that information into public domain
-TRM - but that will take some time - since this patch just started the
-internal thread on the topic). since it is infact an accurate clock
-source from inside the SoC, how do we model that (a clock with a
-frequency range with nominal frequency expected to be around 32k - but
-not exactly 32k?). I think having a rename makes sense and modelling
-it as an in-accurate clock source is probably the need.
+The code would be safer and easier to maintain in the long run if there were functions provided which implement these 2 rules.  Something along the line of:
 
-[1] Search for "On-die 32K RC Osc" in http://www.ti.com/lit/pdf/spruhz6
--- 
-Regards,
-Nishanth Menon
+   void vgic_lock_aplist_irq(spinlock_t ap_list_lock, spinlock_t irq_lock){
+       spin_lock(ap_list_lock);
+       spin_lock(irq_lock);
+   }
+
+and  (borrowing from patch 16/54):
+
+   void vgic_lock_cpu_aplist_pair(struct kvm_vcpu *vcpu1, struct kvm_vcpu *vcpu2){
+       struct kvm_vcpu *vcpuA, *vcpuB;
+       /*
+        * Ensure locking order by always locking the smallest
+        * ID first.
+        */
+      if (vcpu1->vcpu_id < vcpu2->vcpu_id) {
+           vcpuA = vcpu1;
+           vcpuB = vcpu2;
+       } else {
+           vcpuA = vcpu2;
+           vcpuB = vcpu1;
+       }
+
+       spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+       spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+   }
+
+With, of course the matching unlock functions.
+
+Then, as long as new code calls the correct function, the order is always correct.  Easy to write, easy to review.  And beats the heck out of chasing a deadlock at some point in the future.
