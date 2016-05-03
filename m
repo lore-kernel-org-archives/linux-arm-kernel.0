@@ -1,77 +1,144 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 3 May 2016 12:15:52 +0100
-Subject: [PATCH] iommu/arm-smmu: clear cache lock bit of ACR
-In-Reply-To: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
-References: <1462270527-17074-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <57288868.9020908@arm.com>
+From: harald@ccbib.org (Harald Geyer)
+Date: Tue, 03 May 2016 13:22:55 +0200
+Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
+In-Reply-To: <57288674.9050601@i2se.com>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <1461333147-11873-2-git-send-email-harald@ccbib.org>
+ <57288674.9050601@i2se.com>
+Message-ID: <6cdd4f858dacf72e192a292f29c12feb@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/16 11:15, Peng Fan wrote:
-> According MMU-500 TRM, section 3.7.1 Auxiliary Control registers,
-> You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
->
-> So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
-> need clear CACHE_LOCK bit of ACR register first.
+Hi Stefan!
 
-Ah, good catch - I think I misread CACHE_LOCK as resetting to 0, and 
-proceeded to forget about it. However, it's only present in MMU-500r2 
-onwards, so we'd also want to check IDR7 before touching ACR.
+On 03.05.2016 13:07, Stefan Wahren wrote:
+> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
+>> The hardware has two current sources ISRC0 and ISRC1 to allow 
+>> measuring
+>> resistors without additional circuitry. This commit makes them 
+>> available
+>> as regulators.
+>>
+>> Tested on an imx233-olinuxino board.
+>>
+>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+>> ---
+>> The current regulator API doesn't fit this type of device very well: 
+>> Typically
+>> consumers will want to set a defined current, ie. min_uA == max_uA, 
+>> but they
+>> can't without help from configuration data, because the valid values 
+>> aren't
+>> reported by the API for current regulators. I have been thinking 
+>> about
+>> extending the API, but currently AFAIK no such consumers exist and 
+>> most
+>> users, like myself, will force the regulator to a defined value in
+>> devicetree anyway.
+>>
+>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>>  drivers/iio/adc/Kconfig                            |   1 +
+>>  drivers/iio/adc/mxs-lradc.c                        | 152 
+>> +++++++++++++++++++++
+>>  3 files changed, 182 insertions(+)
+>>
+>> diff --git 
+>> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt 
+>> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>> index 555fb11..983952c 100644
+>> --- 
+>> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>> +++ 
+>> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>> @@ -19,6 +19,15 @@ Optional properties:
+>>  - fsl,settling: delay between plate switch to next sample. Allowed 
+>> value is
+>>                  1 ... 2047. It counts at 2 kHz and its default is
+>>                  10 (= 5 ms)
+>> +- ISRC0: A node describing the regulator of internal current source 
+>> 0
+>> +- ISRC1: A node describing the regulator of internal current source 
+>> 1
+>> +
+>> +Required properties for the ISRCx sub-nodes:
+>> +- regulator-max-microamp: See standard regulator binding 
+>> documentation.
+>> +                          Valid values are from 0 to 300 in steps 
+>> of 20.
+>> +
+>> +Optional properties for the ISRCx sub-nodes:
+>> +Any standard regulator properties that apply to current regulators.
+>>
+>>  Example for i.MX23 SoC:
+>>
+>> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
+>>  		fsl,ave-ctrl = <4>;
+>>  		fsl,ave-delay = <2>;
+>>  		fsl,settling = <10>;
+>> +
+>> +		isrc_lradc0: ISRC0 {
+>> +			regulator-max-microamp = <300>;
+>> +		};
+>> +
+>> +		isrc_lradc1: ISRC1 {
+>> +			regulator-max-microamp = <120>;
+>> +			regulator-min-microamp = <120>;
+>> +			regulator-always-on;
+>> +		};
+>
+> IMHO the binding should represent the direct connection between the
+> current source and the physical channel. I think a node label isn't
+> enough. Unfortunately i don't have an idea to do it the "right way".
+
+I strictly followed the names of the data sheet here: imx23 and imx28
+reference manuals both call the current sources ISRC0 and ISRC1 even
+if they are attached to different channels of the ADC. I think
+inventing some ISRC6 for imx28 would do more harm then good.
+
+>>  	};
+>>
+>>  Example for i.MX28 SoC:
+>> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
+>>  		fsl,ave-ctrl = <4>;
+>>  		fsl,ave-delay = <2>;
+>>  		fsl,settling = <10>;
+>> +
+>> +		isrc_lradc0: ISRC0 {
+>> +			regulator-max-microamp = <300>;
+>> +		};
+>> +
+>> +		isrc_lradc6: ISRC1 {
+>> +			regulator-max-microamp = <120>;
+>> +			regulator-min-microamp = <120>;
+>> +			regulator-always-on;
+>> +		};
+>>  	};
+>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>> index 5937030..1968d1c 100644
+>> --- a/drivers/iio/adc/Kconfig
+>> +++ b/drivers/iio/adc/Kconfig
+>> @@ -319,6 +319,7 @@ config MXS_LRADC
+>>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+>>          depends on INPUT
+>> +        depends on REGULATOR
+>
+> Any chance to avoid this dependency for an optional feature?
+
+I haven't looked into it yet, but I expect that that the mfd
+conversion will avoid this neatly.
 
 Thanks,
-Robin.
+Harald
 
-> Signed-off-by: Peng Fan <van.freenix@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> ---
+> Stefan
 >
-> Hi Will,
->
->   Patch based on iommu/devel branch.
->
->
->   drivers/iommu/arm-smmu.c | 15 +++++++++++++++
->   1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index acff332..d094a5a 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -98,6 +98,9 @@
->   #define sCR0_BSU_SHIFT			14
->   #define sCR0_BSU_MASK			0x3
->
-> +/* Auxiliary Configuration register */
-> +#define ARM_SMMU_GR0_sACR		0x10
-> +
->   /* Identification registers */
->   #define ARM_SMMU_GR0_ID0		0x20
->   #define ARM_SMMU_GR0_ID1		0x24
-> @@ -235,6 +238,8 @@
->
->   #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
->
-> +#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
-> +
->   #define CB_PAR_F			(1 << 0)
->
->   #define ATSR_ACTIVE			(1 << 0)
-> @@ -1506,6 +1511,16 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->   		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
->   	}
->
-> +	/*
-> +	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
-> +	 * clear CACHE_LOCK bit of ACR first.
-> +	 */
-> +	if (smmu->model == ARM_MMU500) {
-> +		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-> +		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
-> +		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
-> +	}
-> +
->   	/* Make sure all context banks are disabled and clear CB_FSR  */
->   	for (i = 0; i < smmu->num_context_banks; ++i) {
->   		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
->
+>>          select STMP_DEVICE
+>>          select IIO_BUFFER
+>>          select IIO_TRIGGERED_BUFFER
+
+-- 
+If you want to support my work:
+see http://friends.ccbib.org/harald/supporting/
+or donate via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
+or bitcoin 1FUtd8T9jRN1rFz63vZz7s2fDtB6d6A7aS
