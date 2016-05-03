@@ -1,231 +1,62 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 3 May 2016 06:29:39 -0700
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
-Message-ID: <5728A7C3.4010001@roeck-us.net>
+From: Linux.HWI@garmin.com (J.D. Schroeder)
+Date: Tue, 3 May 2016 08:31:11 -0500
+Subject: [PATCH v2 2/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
+In-Reply-To: <57285E66.2000708@ti.com>
+References: <20160427171658.GA5995@atomide.com>
+ <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
+ <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
+ <57285E66.2000708@ti.com>
+Message-ID: <5728A81F.4050906@garmin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2016 01:20 AM, Pratyush Anand wrote:
-> Currently only WOR is used to program both first and second stage which
-> provided very limited range of timeout.
->
-> This patch uses WCV as well to achieve higher range of timeout. This patch
-> programs max_timeout as 255, but that can be increased further as well.
->
-> Following testing shows that we can happily achieve 40 second default timeout.
->
->   # modprobe sbsa_gwdt action=1
->   [  131.187562] sbsa-gwdt sbsa-gwdt.0: Initialized with 40s timeout @ 250000000 Hz, action=1.
->   # cd /sys/class/watchdog/watchdog0/
->   # cat state
->   inactive
->   # cat /dev/watchdog0
->   cat: /dev/watchdog0: Invalid argument
->   [  161.710593] watchdog: watchdog0: watchdog did not stop!
->   # cat state
->   active
->   # cat timeout
->   40
->   # cat timeleft
->   38
->   # cat timeleft
->   25
->   # cat /dev/watchdog0
->   cat: /dev/watchdog0: Invalid argument
->   [  184.931030] watchdog: watchdog0: watchdog did not stop!
->   # cat timeleft
->   37
->   # cat timeleft
->   21
->   ...
->   ...
->   # cat timeleft
->   1
->
-> panic() is called upon timeout of 40s. See timestamp of last kick (cat) and
-> next panic() message.
->
->   [  224.939065] Kernel panic - not syncing: SBSA Watchdog timeout
->
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
+On 05/03/2016 03:16 AM, Tero Kristo wrote:
+> On 02/05/16 20:12, J.D. Schroeder wrote:
+>> From: "J.D. Schroeder" <jay.schroeder@garmin.com>
+>>
+>> This commit updates the OSC_32K_CLK (secure_32k_clk_src_ck) frequency
+>> from the precise 32kHz frequency (i.e., 32.768 kHz) to a more
+>> accurate frequency of ~34.6 kHz. Actual measured frequencies of the
+>> clock vary from processor to processor anywhere from 34.4 kHz up to
+>> 34.8 kHz. Note that the ~34 kHz frequency clock is generated
+>> internally by the processor, not an input to the processor. This
+>> change makes it more clear that the consumer of the
+>> secure_32k_clk_src_ck will not get a precise 32.768 kHz frequency
+>> output.
+>>
+>> Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
+>> Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
+>> ---
+>>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> index 3f0c61d..f7ec976 100644
+>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> @@ -95,7 +95,7 @@
+>>       secure_32k_clk_src_ck: secure_32k_clk_src_ck {
+>>           #clock-cells = <0>;
+>>           compatible = "fixed-clock";
+>> -        clock-frequency = <32768>;
+>> +        clock-frequency = <34600>; /* approximate frequency */
+>>       };
+>>
+>>       sys_clk32_crystal_ck: sys_clk32_crystal_ck {
+>>
+> 
+> I still don't agree with this patch. The actual frequency can drift much more,
+> you are just seeing this number at your setup.
 
-You could also use the new infrastructure (specify max_hw_heartbeat_ms instead
-of max_timeout), and not depend on the correct implementation of WCV.
+Yes, it can drift significantly from processor to processor. Do you agree that
+this frequency is closer to what can be expected than 32768 Hz?
 
-Overall this adds a lot of complexity for something that could by now easily
-be handled by the infrastructure. Is this really necessary ?
+Like I said, I would have renamed the clock also but I opted to go the less
+obtrusive route while still helping others that might think they can
+reasonably use this clock in their design as a 32768 Hz clock source. Perhaps
+my comment and selection of the approximate frequency is not the best (I'm
+open for suggestions). However, I do think this change is an improvement and
+clarifying change to what is currently present in the clock description.
 
-Guenter
-
-> ---
->   drivers/watchdog/sbsa_gwdt.c | 83 +++++++++++++++++++++++++++++++++-----------
->   1 file changed, 62 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-> index ad383f6f15fc..529dd5e99fcd 100644
-> --- a/drivers/watchdog/sbsa_gwdt.c
-> +++ b/drivers/watchdog/sbsa_gwdt.c
-> @@ -35,17 +35,23 @@
->    *
->    * SBSA GWDT:
->    * if action is 1 (the two stages mode):
-> - * |--------WOR-------WS0--------WOR-------WS1
-> + * |--------WCV-------WS0--------WCV-------WS1
->    * |----timeout-----(panic)----timeout-----reset
->    *
->    * if action is 0 (the single stage mode):
-> - * |------WOR-----WS0(ignored)-----WOR------WS1
-> + * |------WCV-----WS0(ignored)-----WOR------WS1
->    * |--------------timeout-------------------reset
->    *
-> - * Note: Since this watchdog timer has two stages, and each stage is determined
-> - * by WOR, in the single stage mode, the timeout is (WOR * 2); in the two
-> - * stages mode, the timeout is WOR. The maximum timeout in the two stages mode
-> - * is half of that in the single stage mode.
-> + * Note: This watchdog timer has two stages. If action is 0, first stage is
-> + * determined by directly programming WCV and second by WOR. When first
-> + * timeout is reached, WS0 is triggered and WCV is reloaded with value in
-> + * WOR. WS0 interrupt will be ignored, then the second watch period starts;
-> + * when second timeout is reached, then WS1 is triggered, system resets. WCV
-> + * and WOR are programmed in such a way that total time corresponding to
-> + * WCV+WOR becomes equivalent to user programmed "timeout".
-> + * If action is 1, then we expect to call panic() at user programmed
-> + * "timeout". Therefore, we program both first and second stage using WCV
-> + * only.
->    *
->    */
->
-> @@ -95,7 +101,17 @@ struct sbsa_gwdt {
->   	void __iomem		*control_base;
->   };
->
-> -#define DEFAULT_TIMEOUT		10 /* seconds */
-> +/*
-> + * Max Timeout Can be in days, but 255 seconds seems reasonable for all use
-> + * cases
-> + */
-> +#define MAX_TIMEOUT		255
-
-We don't usually define such arbitrary limits.
-
-> +
-> +/* Default timeout is 40 seconds, which is the 1st + 2nd watch periods when
-> + * action is 0. When action is 1 then both 1st and 2nd watch periods will
-> + * be of 40 seconds.
-> + */
-> +#define DEFAULT_TIMEOUT		40 /* seconds */
->
->   static unsigned int timeout;
->   module_param(timeout, uint, 0);
-> @@ -127,20 +143,21 @@ static int sbsa_gwdt_set_timeout(struct watchdog_device *wdd,
->   				 unsigned int timeout)
->   {
->   	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
-> +	u64 timeout_1, timeout_2;
->
->   	wdd->timeout = timeout;
->
->   	if (action)
-> -		writel(gwdt->clk * timeout,
-> -		       gwdt->control_base + SBSA_GWDT_WOR);
-> +		timeout_1 = (u64)gwdt->clk * timeout;
->   	else
-> -		/*
-> -		 * In the single stage mode, The first signal (WS0) is ignored,
-> -		 * the timeout is (WOR * 2), so the WOR should be configured
-> -		 * to half value of timeout.
-> -		 */
-> -		writel(gwdt->clk / 2 * timeout,
-> -		       gwdt->control_base + SBSA_GWDT_WOR);
-> +		timeout_1 = (u64)gwdt->clk * (timeout - wdd->min_timeout);
-> +
-> +	/* when action=1, timeout_2 will be overwritten in ISR */
-> +	timeout_2 = (u64)gwdt->clk * wdd->min_timeout;
-> +
-Why min_timeout ? Also, where is it overwritten in the interrupt handler,
-and to which value ?
-
-> +	writel(timeout_2, gwdt->control_base + SBSA_GWDT_WOR);
-> +	writeq(timeout_1 + arch_counter_get_cntvct(),
-> +		gwdt->control_base + SBSA_GWDT_WCV);
->
->   	return 0;
->   }
-> @@ -172,12 +189,17 @@ static int sbsa_gwdt_keepalive(struct watchdog_device *wdd)
->   	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
->
->   	/*
-> -	 * Writing WRR for an explicit watchdog refresh.
-> -	 * You can write anyting (like 0).
-> +	 * play safe: program WOR with max value so that we have sufficient
-> +	 * time to overwrite them after explicit refresh
->   	 */
-> +	writel(U32_MAX, gwdt->control_base + SBSA_GWDT_WOR);
-> +	/*
-> +	* Writing WRR for an explicit watchdog refresh.
-> +	* You can write anyting (like 0).
-> +	*/
-
-Please stick with standard multi-line comments.
-
->   	writel(0, gwdt->refresh_base + SBSA_GWDT_WRR);
->
-> -	return 0;
-> +	return sbsa_gwdt_set_timeout(wdd, wdd->timeout);;
->   }
->
->   static unsigned int sbsa_gwdt_status(struct watchdog_device *wdd)
-> @@ -193,10 +215,15 @@ static int sbsa_gwdt_start(struct watchdog_device *wdd)
->   {
->   	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
->
-> +	/*
-> +	 * play safe: program WOR with max value so that we have sufficient
-> +	 * time to overwrite them after explicit refresh
-> +	 */
-> +	writel(U32_MAX, gwdt->control_base + SBSA_GWDT_WOR);
->   	/* writing WCS will cause an explicit watchdog refresh */
->   	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
->
-> -	return 0;
-> +	return sbsa_gwdt_set_timeout(wdd, wdd->timeout);;
->   }
->
->   static int sbsa_gwdt_stop(struct watchdog_device *wdd)
-> @@ -211,6 +238,20 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
->
->   static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
->   {
-> +	struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
-> +	struct watchdog_device *wdd = &gwdt->wdd;
-> +	u64 timeout_2 = (u64)gwdt->clk * wdd->timeout;
-> +
-> +	/*
-> +	 * Since we can not trust system at this moment, therefore re-write
-> +	 * WCV only if wdd->timeout <= MAX_TIMEOUT to avoid a corner
-> +	 * scenario when we might have corrupted wdd->timeout values at
-> +	 * this point.
-> +	 */
-
-This is quite vague. What is this corner scenario where wdd->timeout
-would be corrupted ? How can wdd->timeout ever be larger than MAX_TIMEOUT ?
-
-> +	if (wdd->timeout <= MAX_TIMEOUT)
-> +		writeq(timeout_2 + arch_counter_get_cntvct(),
-> +			gwdt->control_base + SBSA_GWDT_WCV);
-> +
->   	panic(WATCHDOG_NAME " timeout");
->
->   	return IRQ_HANDLED;
-> @@ -273,7 +314,7 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
->   	wdd->info = &sbsa_gwdt_info;
->   	wdd->ops = &sbsa_gwdt_ops;
->   	wdd->min_timeout = 1;
-> -	wdd->max_timeout = U32_MAX / gwdt->clk;
-> +	wdd->max_timeout = MAX_TIMEOUT;
->   	wdd->timeout = DEFAULT_TIMEOUT;
->   	watchdog_set_drvdata(wdd, gwdt);
->   	watchdog_set_nowayout(wdd, nowayout);
->
+-JD
