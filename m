@@ -1,25 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 May 2016 16:37:19 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Add 198MHz operational point
-In-Reply-To: <1461897267-20458-1-git-send-email-festevam@gmail.com>
-References: <1461897267-20458-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160503083719.GD5874@tiger>
+Date: Tue, 3 May 2016 16:39:30 +0800
+Subject: [PATCH] ARM: dts: imx6: apalis: parallel lcd display support on
+ ixora
+In-Reply-To: <1461961249-3792-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1461961249-3792-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <20160503083930.GE5874@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 11:34:27PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Fri, Apr 29, 2016 at 10:20:49PM +0200, Marcel Ziswiler wrote:
+> Add parallel LCD display support for the EDT ET057090DHU 5.7" LCD TFT
+> panel.
 > 
-> imx6sx-sdb has custom operating points entries because it has one
-> power supply that drives both VDDARM_IN and VDDSOC_IN.
-> 
-> As per the MX6UL datasheet we have the following minimum voltages for
-> 198 MHz operation (after adding the 25mV margin value):
-> VDDARM_IN = 0.975 V
-> VDDSOC_IN = 1.175 V
-> 
-> So use 1.175V for the 198MHz operation.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
 Applied, thanks.
