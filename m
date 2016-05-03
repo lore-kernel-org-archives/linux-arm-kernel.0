@@ -1,34 +1,55 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 3 May 2016 21:21:41 +0530
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <5728BEC4.6050603@codeaurora.org>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com>
- <5728BEC4.6050603@codeaurora.org>
-Message-ID: <20160503155141.GF13045@dhcppc6.redhat.com>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Tue, 3 May 2016 17:52:09 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <66e4c452-1e34-474b-8973-2d57d9f036d0@googlegroups.com>
+References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+ <f3da30a6-9ac0-4d5e-8611-ebb80cb3589e@googlegroups.com>
+ <20160503131437.GV17159@lukather>
+ <66e4c452-1e34-474b-8973-2d57d9f036d0@googlegroups.com>
+Message-ID: <5728C929.3040709@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2016:10:07:48 AM, Timur Tabi wrote:
-> Pratyush Anand wrote:
-> >In fact after supporting max_hw_heartbeat_ms, there should be no change for
-> >action=0 functionally. However, we would still need some changes for action=1.
-> 
-> IMHO, action=1 is more of a debugging option, and not something that would
-> be used normally.  I would need to see some evidence that real users want to
-> have action=1 and a longer timeout.
-> 
-If action=1 need to be used effectively, then we should have something which
-would help to increase timeout values.
+Hey all,
 
-Currently you have only 10 second to execute secondary kernel, which might not
-be sufficient.
+On 03-05-16 17:02, christo.radev at gmail.com wrote:
+> On Tuesday, May 3, 2016 at 4:14:41 PM UTC+3, Maxime Ripard wrote:
+>> Hi,
+>>
+>> On Tue, May 03, 2016 at 4:12:06 PM UTC+3, Christo Radev wrote:
+>>> Hi to All,
+>>>
+>>> I have already solved and tested this issue on Armbian build.  Find
+>>> patches for both legacy (3.4.111) and mainline (4.5.2) kernels on:
+>>> http://forum.armbian.com/index.php/topic/853-armbian-customization/page-2#entry7494
+>>> There it is also described how to do eMMC bootable and much more.
+>>>
+>>> About the board - Olimex already sold all 3 kinds after migration to
+>>> their HW rev. E. One have to specify Lime2-eMMC as
+>>> A20-Olinuxino-Lime2-eMMC instead of their old 2 options
+>>> A20-Olinuxino-Lime2(-4GB).
+>> Interesting, you have a link to that device?
+>>
+>> Thanks,
+>> Maxime
+>>
+>> -- 
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
+> I have really 2 boards delivered by their local distributor.
+>
+> Unfortunately, they do not update their site. Use the link for NAND option:
+> https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2-4GB/open-source-hardware
+> There you can find Users Manual where it is described that eMMC option is available from HW rev. D. The schematic for HW rev. E is also available on their repository:
+> https://github.com/OLIMEX/OLINUXINO/tree/master/HARDWARE/A20-OLinuXino-LIME2
+>
+> On the board both 4GB NAND and eMMC Flash chips can be placed alternatively on the same place. There is difference in some other components as well.
+>
+> If one want to order it from the site probably has to order A20-Olinuxino-Lime2-4GB with note that eMMC option is required. The price is the same.
+Sorry for the late reply, but yeah the board exists, we asked Olimex to 
+develop the eMMC variant for us. I currently have a dozen or so on my 
+desk :)
 
-> I've never been a fan of the action=1 option, and I'm certainly not keen any
-> patches that make action=1 more complicated than it already is.
-
-I think, with max_hw_heartbeat_ms it would be far more simpler. Will attempt and
-send another RFC.
-
-~Pratyush
+I don't know when Olimex will update their webshop with the new designs, 
+but they simply might not have enough eMMC chips available yet?
