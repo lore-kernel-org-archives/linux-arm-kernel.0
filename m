@@ -1,34 +1,107 @@
-From: mike@mikebwilliams.com (Mike Williams)
-Date: Tue,  3 May 2016 12:44:24 -0400
-Subject: [PATCH 3/3] ARM: at91/dt: sama5d4: add trng node
-In-Reply-To: <1462293864-32551-1-git-send-email-mike@mikebwilliams.com>
-References: <1462293864-32551-1-git-send-email-mike@mikebwilliams.com>
-Message-ID: <1462293864-32551-4-git-send-email-mike@mikebwilliams.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 3 May 2016 17:50:19 +0100
+Subject: [PATCH V2] iommu/arm-smmu: clear cache lock bit of ACR
+In-Reply-To: <1462283430-9559-1-git-send-email-van.freenix@gmail.com>
+References: <1462283430-9559-1-git-send-email-van.freenix@gmail.com>
+Message-ID: <5728D6CB.3010003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node to support SAMA5D4 hardware random number generator.
----
- arch/arm/boot/dts/sama5d4.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+On 03/05/16 14:50, Peng Fan wrote:
+> According MMU-500r2 TRM, section 3.7.1 Auxiliary Control registers,
+> You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
+>
+> So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
+> need clear CACHE_LOCK bit of ACR register first.
+>
+> Since CACHE_LOCK bit is only present in MMU-500r2 onwards,
+> need to check the major number of IDR7.
+>
+> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> ---
+>
+> V2:
+>   Following Robin's comments, need to check IDR7 before clearing
+>   CACHE_LOCK bit of ACR.
+>
+> V1:
+>   Patch based on iommu/devel
+>
+>   drivers/iommu/arm-smmu.c | 23 ++++++++++++++++++++++-
+>   1 file changed, 22 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index acff332..c7ad23e 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -98,6 +98,9 @@
+>   #define sCR0_BSU_SHIFT			14
+>   #define sCR0_BSU_MASK			0x3
+>
+> +/* Auxiliary Configuration register */
+> +#define ARM_SMMU_GR0_sACR		0x10
+> +
+>   /* Identification registers */
+>   #define ARM_SMMU_GR0_ID0		0x20
+>   #define ARM_SMMU_GR0_ID1		0x24
+> @@ -144,6 +147,9 @@
+>   #define ID2_PTFS_64K			(1 << 14)
+>   #define ID2_VMID16			(1 << 15)
+>
+> +#define ID7_MAJOR_SHIFT			4
+> +#define ID7_MAJOR_MASK			0xf
+> +
+>   /* Global TLB invalidation */
+>   #define ARM_SMMU_GR0_TLBIVMID		0x64
+>   #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
+> @@ -235,6 +241,8 @@
+>
+>   #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+>
+> +#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
+> +
+>   #define CB_PAR_F			(1 << 0)
+>
+>   #define ATSR_ACTIVE			(1 << 0)
+> @@ -1493,7 +1501,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>   	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+>   	void __iomem *cb_base;
+>   	int i = 0;
+> -	u32 reg;
+> +	u32 reg, major;
+>
+>   	/* clear global FSR */
+>   	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
+> @@ -1506,6 +1514,19 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>   		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
+>   	}
+>
+> +	/*
+> +	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
+> +	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
+> +	 * bit is only present in MMU-500r2 onwards.
+> +	 */
+> +	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
+> +	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
+> +	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
+> +		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
+> +		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
+> +		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+> +	}
+> +
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index db1151c..a95eb36 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1202,6 +1202,13 @@
- 				status = "disabled";
- 			};
- 
-+			trng at fc030000 {
-+				compatible = "atmel,at91sam9g45-trng";
-+				reg = <0xfc030000 0x4000>;
-+				interrupts = <53 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&trng_clk>;
-+			};
-+
- 			adc0: adc at fc034000 {
- 				compatible = "atmel,at91sam9x5-adc";
- 				reg = <0xfc034000 0x100>;
--- 
-2.5.0
+I'd have been inclined to make the ID reg read conditional on ARM_MMU500 
+as well, but this way is marginally more compact, and it's not like 
+we're in a frequently-used hot path anyway.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+Thanks,
+Robin.
+
+>   	/* Make sure all context banks are disabled and clear CB_FSR  */
+>   	for (i = 0; i < smmu->num_context_banks; ++i) {
+>   		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
+>
