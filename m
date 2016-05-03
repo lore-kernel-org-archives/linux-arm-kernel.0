@@ -1,41 +1,93 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 May 2016 20:37:19 +0800
-Subject: [PATCH] clk: imx: fix ahb clock mux 1
-In-Reply-To: <CAA+hA=Rkfii=Mi-NuESpX8E3W37+PnCxa464yOAe5dYMgpt43g@mail.gmail.com>
-References: <1461877623-26838-1-git-send-email-stefan@agner.ch>
- <20160503083253.GC5874@tiger>
- <CAA+hA=Rkfii=Mi-NuESpX8E3W37+PnCxa464yOAe5dYMgpt43g@mail.gmail.com>
-Message-ID: <20160503123718.GG5874@tiger>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Tue,  3 May 2016 14:42:06 +0200
+Subject: [PATCHv2] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+Message-ID: <1462279326-9852-1-git-send-email-oliver@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 06:50:21PM +0800, Dong Aisheng wrote:
-> Hi Shawn,
-> 
-> On Tue, May 3, 2016 at 4:32 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Thu, Apr 28, 2016 at 02:07:03PM -0700, Stefan Agner wrote:
-> >> The clock parent of the AHB root clock when using mux option 1
-> >> is the SYS PLL 270MHz clock. This is specified in  Table 5-11
-> >> Clock Root Table of the i.MX 7Dual Applications Processor
-> >> Reference Manual.
-> >>
-> >> While it could be a documentation error, the 270MHz parent is
-> >> also mentioned in the boot ROM configuration in Table 6-28: The
-> >> clock is by default at 135MHz due to a POST_PODF value of 1
-> >> (=> divider of 2).
-> >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >
-> > Anson, Frank,
-> >
-> > Can you guys confirm this change is correct?
-> >
-> 
-> I just checked the doc,
-> it's correct the parent should be SYS_PLL_PFD2(270Mhz).
-> It's a documentation error of early version and it's already fixed
-> in latest internal doc.
+There are 3 kinds of OLinuXino Lime2 boards.
+One without any on board storage, one with NAND storage and one with
+eMMC storage. This patch adds the eMMC variant of boards.
 
-Thanks for the confirmation.
+eMMC storage is different from a regular SD card in that it is soldered
+on the board and cannot be changed. Additionally, it shares pins with
+the NAND module and with the second SPI port.
 
-Shawn
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+---
+ .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    | 64 ++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+new file mode 100644
+index 0000000..b49aafe
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+@@ -0,0 +1,64 @@
++ /*
++ * Copyright 2015 - Ultimaker B.V.
++ * Author Olliver Schinagl <oliver@schinagl.nl>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sun7i-a20-olinuxino-lime2.dts"
++
++/ {
++	model = "Olimex A20-OLinuXino-LIME2-eMMC";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	emmc: emmc at 0 {
++		reg = <0>;
++		compatible = "mmc-card";
++		broken-hpi;
++	};
++};
+-- 
+2.8.1
