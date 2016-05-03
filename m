@@ -1,73 +1,127 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 3 May 2016 08:17:45 -0400
-Subject: [PATCH v2] s5p-mfc: Don't try to put pm->clock if lookup failed
-In-Reply-To: <20160503101509.GB3956@kozik-lap>
-References: <1462216462-32665-1-git-send-email-javier@osg.samsung.com>
- <20160503101509.GB3956@kozik-lap>
-Message-ID: <6290517d-3d9a-c512-875e-6b1871a2ebba@osg.samsung.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 3 May 2016 14:27:08 +0200
+Subject: [PATCH v8 6/8] iommu/msi-iommu: iommu_msi_domain
+In-Reply-To: <20160502142328.2d97f7a4@t450s.home>
+References: <1461831323-5480-1-git-send-email-eric.auger@linaro.org>
+ <1461831323-5480-7-git-send-email-eric.auger@linaro.org>
+ <20160428162740.28db4b8d@t450s.home> <572776BD.2080503@linaro.org>
+ <20160502142328.2d97f7a4@t450s.home>
+Message-ID: <5728991C.5060807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 05/03/2016 06:15 AM, Krzysztof Kozlowski wrote:
-> On Mon, May 02, 2016 at 03:14:22PM -0400, Javier Martinez Canillas wrote:
->> Failing to get the struct s5p_mfc_pm .clock is a non-fatal error so the
->> clock field can have a errno pointer value. But s5p_mfc_final_pm() only
->> checks if .clock is not NULL before attempting to unprepare and put it.
->>
->> This leads to the following warning in clk_put() due s5p_mfc_final_pm():
->>
->> WARNING: CPU: 3 PID: 1023 at drivers/clk/clk.c:2814 s5p_mfc_final_pm+0x48/0x74 [s5p_mfc]
->> CPU: 3 PID: 1023 Comm: rmmod Tainted: G        W       4.6.0-rc6-next-20160502-00005-g5a15a49106bc #9
->> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
->> [<c010e1bc>] (unwind_backtrace) from [<c010af28>] (show_stack+0x10/0x14)
->> [<c010af28>] (show_stack) from [<c032485c>] (dump_stack+0x88/0x9c)
->> [<c032485c>] (dump_stack) from [<c011b8e8>] (__warn+0xe8/0x100)
->> [<c011b8e8>] (__warn) from [<c011b9b0>] (warn_slowpath_null+0x20/0x28)
->> [<c011b9b0>] (warn_slowpath_null) from [<bf16004c>] (s5p_mfc_final_pm+0x48/0x74 [s5p_mfc])
->> [<bf16004c>] (s5p_mfc_final_pm [s5p_mfc]) from [<bf157414>] (s5p_mfc_remove+0x8c/0x94 [s5p_mfc])
->> [<bf157414>] (s5p_mfc_remove [s5p_mfc]) from [<c03fe1f8>] (platform_drv_remove+0x24/0x3c)
->> [<c03fe1f8>] (platform_drv_remove) from [<c03fcc70>] (__device_release_driver+0x84/0x110)
->> [<c03fcc70>] (__device_release_driver) from [<c03fcdd8>] (driver_detach+0xac/0xb0)
->> [<c03fcdd8>] (driver_detach) from [<c03fbff8>] (bus_remove_driver+0x4c/0xa0)
->> [<c03fbff8>] (bus_remove_driver) from [<c01886a8>] (SyS_delete_module+0x174/0x1b8)
->> [<c01886a8>] (SyS_delete_module) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
->>
->> Assign the pointer to NULL in case of a lookup failure to fix the issue.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->>
->> Changes in v2:
->> - Set the clock pointer to NULL instead of checking for !IS_ERR_OR_NULL().
->>   Suggested by Arnd Bergmann.
->>
->>  drivers/media/platform/s5p-mfc/s5p_mfc_pm.c | 1 +
->>  1 file changed, 1 insertion(+)
+Hi Alex,
+On 05/02/2016 10:23 PM, Alex Williamson wrote:
+> Hi Eric,
 > 
-> This is a fix for bug, so for statistics:
-> Fixes: d19f405a5a8d ("[media] s5p-mfc: Fix selective sclk_mfc init")
+> On Mon, 2 May 2016 17:48:13 +0200
+> Eric Auger <eric.auger@linaro.org> wrote:
 > 
-> ... and although not fatal, but annoying so I think this deserves:
-> Cc: <stable@vger.kernel.org>
->
-
-Indeed, sorry for missing those.
- 
-> Anyway:
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-
-Thanks a lot for your feedback.
- 
-> Best regards,
-> Krzysztof
+>> Hi Alex,
+>> On 04/29/2016 12:27 AM, Alex Williamson wrote:
+>>> On Thu, 28 Apr 2016 08:15:21 +0000
+>>> Eric Auger <eric.auger@linaro.org> wrote:
+>>>   
+>>>> This function checks whether
+>>>> - the device belongs to a non default iommu domain
+>>>> - this iommu domain requires the MSI address to be mapped.
+>>>>
+>>>> If those conditions are met, the function returns the iommu domain
+>>>> to be used for mapping the MSI doorbell; else it returns NULL.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>
+>>>> ---
+>>>>
+>>>> v7 -> v8:
+>>>> - renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
+>>>> - the function now takes a struct device *
+>>>> - use DOMAIN_ATTR_MSI_GEOMETRY attribute
+>>>> ---
+>>>>  drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
+>>>>  include/linux/msi-iommu.h | 14 ++++++++++++++
+>>>>  2 files changed, 31 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
+>>>> index 203e86e..023ff17 100644
+>>>> --- a/drivers/iommu/msi-iommu.c
+>>>> +++ b/drivers/iommu/msi-iommu.c
+>>>> @@ -243,3 +243,20 @@ unlock:
+>>>>  	}
+>>>>  }
+>>>>  EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
+>>>> +
+>>>> +struct iommu_domain *iommu_msi_domain(struct device *dev)
+>>>> +{
+>>>> +	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
+>>>> +	struct iommu_domain_msi_geometry msi_geometry;
+>>>> +
+>>>> +	if (!d || (d->type == IOMMU_DOMAIN_DMA))
+>>>> +		return NULL;
+>>>> +
+>>>> +	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
+>>>> +	if (!msi_geometry.programmable)  
+>>>
+>>> It feels like we're conflating ideas with using the "programmable" flag
+>>> in this way.  AIUI the IOMMU API consumer is supposed to see the
+>>> invalid MSI geometry with the programmable feature set and know to call
+>>> iommu_msi_set_aperture().  Looking for the msi_cookie would tell us if
+>>> that had been done, but that doesn't tell us if it should have been
+>>> done.  iommu_msi_msg_pa_to_va() handles this later, if we return
+>>> NULL here that function returns success otherwise it goes on to fail if
+>>> the iova or msi cookie is not set.  So really what we're trying to flag
+>>> is that the MSI geometry participates in the IOMMU-MSI API you've
+>>> created and we should pick a feature name that says that rather than
+>>> something as vague a "programmable".  Perhaps simply iommu_msi_api
+>>> rather than programmable.  
+>> Yes I had the same questioning too when I wrote this code. So if my
+>> understanding is correct we would have
+>> - programmable: tells whether the MSI range is fixed or pogrammable and,
+>> - mapping_required (new boolean field): indicating whether MSIs need to
+>> be mapped in the IOMMU
 > 
+> Let's say we had a flag "iommu_msi_supported", doesn't that already
+> tell us whether the MSI range is programmable and the API to use to do
+> it?  Can't we figure out if mapping is required based on whether
+> iommu_msi_supported is set and aperture_start and aperture_end indicate
+> a valid range?  It seems like what we want on this code path is to
+> simply know whether the IOMMU domain is relevant to the IOMMU MSI API,
+> which would be abundantly clear with such a flag.
+OK I now get your point. Thanks for the clarification. I renamed
+programmable into iommu_msi_supported.
+> 
+>>>
+>>> BTW, I don't see that you ever set aperture_start/end once
+>>> iommu_msi_set_aperture() has been called.  It seems like doing so would
+>>> add some consistency to that MSI geometry attribute.  
+>> Indeed currently I mentionned:
+>> /* In case the aperture is programmable, start/end are set to 0 */
+> 
+> Which is confusing, if a user sets an aperture, I would think they'd
+> like to see the MSI geometry updated to reflect that.
+> 
+>> If I set start/end in iommu_msi_set_aperture then I think I should also
+>> return the actual values in iommu_domain_get_attr. I thought the extra
+>> care to handle the possible race between the set_aperture (msi_iommu)
+>> and the get_attr (iommu) was maybe not worth the benefits:
+>> is_aperture_set is not visible to get_attr so I would be forced to
+>> introduce a mutex at iommu_domain level or call an msi-iommu function
+>> from iommu implementation. So I preferred to keep start/end as read-only
+>> info initialized by the iommu driver.
+> 
+> Seems like a race between iommu_msi_set_aperture() and
+> iommu_domain_get_attr() is the caller's problem.  We can always define
+> that start >= end is invalid and set them in the right order that
+> iommu_domain_get_attr() may get different versions of invalid, but it
+> will always be invalid or valid.  A helper function could tell us if we
+> have a valid range rather than using is_aperture_set.  Thanks,
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+
+Agreed; I added an iommu_domain_msi_aperture_valid helper function.
+
+Thanks!
+
+Eric
+> 
+> Alex
+> 
