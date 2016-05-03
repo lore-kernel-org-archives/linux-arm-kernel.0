@@ -1,20 +1,44 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Tue,  3 May 2016 20:14:17 +0300
-Subject: [PATCH 0/2] ARM: dts: sunxi: Add pll3 and pll7 clock to sun[47]i.dtsi
-Message-ID: <1462295659-6945-1-git-send-email-plaes@plaes.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 3 May 2016 10:16:02 -0700
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <20160503155141.GF13045@dhcppc6.redhat.com>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net>
+ <20160503143856.GE13045@dhcppc6.redhat.com>
+ <5728BEC4.6050603@codeaurora.org>
+ <20160503155141.GF13045@dhcppc6.redhat.com>
+Message-ID: <20160503171602.GA2518@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the pll3 and pll7 clocks in the DT that are used to drive the
-display-related clocks.
+On Tue, May 03, 2016 at 09:21:41PM +0530, Pratyush Anand wrote:
+> On 03/05/2016:10:07:48 AM, Timur Tabi wrote:
+> > Pratyush Anand wrote:
+> > >In fact after supporting max_hw_heartbeat_ms, there should be no change for
+> > >action=0 functionally. However, we would still need some changes for action=1.
+> > 
+> > IMHO, action=1 is more of a debugging option, and not something that would
+> > be used normally.  I would need to see some evidence that real users want to
+> > have action=1 and a longer timeout.
+> > 
+> If action=1 need to be used effectively, then we should have something which
+> would help to increase timeout values.
+> 
+> Currently you have only 10 second to execute secondary kernel, which might not
+> be sufficient.
+> 
+Previously the argument was that the 10 seconds (assuming the clock runs at
+maximum speed) would not be sufficient to load the watchdog application. Now it
+seems the 10 seconds are deemed insufficient to load the watchdog driver (since
+the infrastructure can handle the heartbeats). Is there actual evidence that
+this is the case ?
 
-Priit Laes (2):
-  ARM: sun4i: dt: Add pll3 and pll7 clocks
-  ARM: sun7i: dt: Add pll3 and pll7 clocks
+Guenter
 
- arch/arm/boot/dts/sun4i-a10.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 41 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
-
--- 
-2.8.1
+> > I've never been a fan of the action=1 option, and I'm certainly not keen any
+> > patches that make action=1 more complicated than it already is.
+> 
+> I think, with max_hw_heartbeat_ms it would be far more simpler. Will attempt and
+> send another RFC.
+> 
+> ~Pratyush
