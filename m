@@ -1,41 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 May 2016 15:14:37 +0200
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
-In-Reply-To: <f3da30a6-9ac0-4d5e-8611-ebb80cb3589e@googlegroups.com>
-References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
- <f3da30a6-9ac0-4d5e-8611-ebb80cb3589e@googlegroups.com>
-Message-ID: <20160503131437.GV17159@lukather>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 3 May 2016 18:54:39 +0530
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <57289594.3050801@codeaurora.org>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <57289594.3050801@codeaurora.org>
+Message-ID: <20160503132439.GC13045@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, May 03, 2016 at 12:12:06AM -0700, christo.radev at gmail.com wrote:
-> Hi to All,
+On 03/05/2016:07:12:04 AM, Timur Tabi wrote:
+> Pratyush Anand wrote:
+> >+ * Note: This watchdog timer has two stages. If action is 0, first stage is
+> >+ * determined by directly programming WCV and second by WOR. When first
+> >+ * timeout is reached, WS0 is triggered and WCV is reloaded with value in
+> >+ * WOR. WS0 interrupt will be ignored, then the second watch period starts;
+> >+ * when second timeout is reached, then WS1 is triggered, system resets. WCV
+> >+ * and WOR are programmed in such a way that total time corresponding to
+> >+ * WCV+WOR becomes equivalent to user programmed "timeout".
+> >+ * If action is 1, then we expect to call panic() at user programmed
+> >+ * "timeout". Therefore, we program both first and second stage using WCV
+> >+ * only.
 > 
-> I have already solved and tested this issue on Armbian build.  Find
-> patches for both legacy (3.4.111) and mainline (4.5.2) kernels on:
-> http://forum.armbian.com/index.php/topic/853-armbian-customization/page-2#entry7494
-> There it is also described how to do eMMC bootable and much more.
+> So I'm not sure I understand how this works yet, but there was an earlier
+> version of Fu's driver that did something similar.  It depended on being
+> able to reprogram the hardware during the WS0 interrupt, and that was
+> rejected by the community.
 > 
-> About the board - Olimex already sold all 3 kinds after migration to
-> their HW rev. E. One have to specify Lime2-eMMC as
-> A20-Olinuxino-Lime2-eMMC instead of their old 2 options
-> A20-Olinuxino-Lime2(-4GB).
+> How is what you are doing different?
 
-Interesting, you have a link to that device?
+* Following was the comment for Fu Wei's primitive version of patch [1], because
+* of which community rejected it.
 
-Thanks,
-Maxime
+> The triggering of the hardware reset should never depend on an interrupt being
+> handled properly.  You should always program WCV correctly in advance.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160503/22f02f0f/attachment.sig>
+Now, there are couple of things different:
+
+(1) There is an important difference in upstreamed version than the version [1]
+which was rejected on above ground. In upstreamed version,  there would be no
+interrupt handler when we are in normal mode ie action=0.  So, there is no
+possibility of doing any thing in ISR for all normal usage of this timer. In
+this mode WCV is always programmed well in advance now.
+
+(2)action=1 mechanism was introduced to implement a dump saving mechanism if
+watchdog timeout expires before next kick. So, the current upstream version
+calls panic() in ISR. When action=1, then we do write WCV now in ISR, but there
+too some precaution have been taken. 
+
+When action=1, and we land into isr handler sbsa_gwdt_interrupt() we can not
+trust watchdog data structure any more. That might have been corrupted.
+(i) So it might happen that gwdt or wdd pointers have a corrupted value and as
+soon as we access gwdt->wdd or wdd->timeout, kernel panics. *No harm*, just
+panic() is called a bit early, which dump saving mechanism would be able to
+find. So, in fact it will give an extra information to dump saving mechanism
+that watchdog structure was corrupted as well.
+(ii) Another case, It might happen that wdd->timeout has been corrupted with
+large values. This patch does a protection while programming WCV in ISR. It
+checks wdd->timeout against MAX_TIMEOUT value and reprograms WCV only when
+wdd->timeout is lesser than MAX_TIMEOUT. So, here too, there would be watchdog
+reset for sure if dump saving mechanism hangs.
+
+~Pratyush
+
+[1] https://lists.linaro.org/pipermail/linaro-acpi/2015-June/004956.html
