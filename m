@@ -1,67 +1,76 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 03 May 2016 19:48:24 +0900
-Subject: [PATCH v2 0/8] PM / devfreq: Add NoCP devfreq-event and support
- busfreq on exyno5422-odroidxu3
-In-Reply-To: <20160503102922.GD3956@kozik-lap>
-References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
- <20160503102922.GD3956@kozik-lap>
-Message-ID: <572881F8.3020701@samsung.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 3 May 2016 18:50:21 +0800
+Subject: [PATCH] clk: imx: fix ahb clock mux 1
+In-Reply-To: <20160503083253.GC5874@tiger>
+References: <1461877623-26838-1-git-send-email-stefan@agner.ch>
+ <20160503083253.GC5874@tiger>
+Message-ID: <CAA+hA=Rkfii=Mi-NuESpX8E3W37+PnCxa464yOAe5dYMgpt43g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Shawn,
 
-On 2016? 05? 03? 19:29, Krzysztof Kozlowski wrote:
-> On Fri, Apr 15, 2016 at 03:32:47PM +0900, Chanwoo Choi wrote:
->> This patchset support the AMBA bus frequency scaling on Exynos5422-based
->> Odroid-XU3 board. But, this series only support the bus frequency scaling
->> for INT (Internal) block using VDD_INT power line.
+On Tue, May 3, 2016 at 4:32 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Apr 28, 2016 at 02:07:03PM -0700, Stefan Agner wrote:
+>> The clock parent of the AHB root clock when using mux option 1
+>> is the SYS PLL 270MHz clock. This is specified in  Table 5-11
+>> Clock Root Table of the i.MX 7Dual Applications Processor
+>> Reference Manual.
 >>
->> Also, to support the bus frequency scaling for Exynos542x SoC,
->> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
->> to measure the transfered data traffic on NoC (Network on Chip)
->> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
->> provide the utilization for INT block of Exynos542x SoC.
+>> While it could be a documentation error, the 270MHz parent is
+>> also mentioned in the boot ROM configuration in Table 6-28: The
+>> clock is by default at 135MHz due to a POST_PODF value of 1
+>> (=> divider of 2).
 >>
->> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
->> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
->> Just add the phandle of 'NoC Probe' dt node to bus dt node.
->>
->> Depend on:
->> This patchset depends on patch[1] which support the generic exynos-bus
->> frequency driver.
->> [1] http://www.spinics.net/lists/arm-kernel/msg495976.html
->> - [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
->>
->>
->> Changse from v1:
->> (https://lkml.org/lkml/2016/4/8/28)
->> - Simplify the documentation of exynos-nocp.txt
->> - Check the return value of regmap function
->> - Modify Device Tree node name using general device name
->>  : nocp_memX_X@ nocp_memX_X -> nocp_memX_X@ nocp
->> - Fix wrong node name about nocp device tree node
->> - Drop the CLK_SET_RATE_PARENT flag
->> - Reorder bus device tree node alpabetically
->> - Add the tested-by tag from Anand Moon and Markus Reichl
->> - Add the reviewed-by tag to patch5/7 from Exynos SoC Maintainer
->> - Add patch2 to modify the devfreq_event_get_edev_by_phandle()
->>   to get the instance of devfreq-event device by using the phandle
->>
->> Chanwoo Choi (8):
->>   PM / devfreq: event: Add new Exynos NoC probe driver
->>   PM / devfreq: event: Find the instance of devfreq-event device by using phandle
->>   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
->>   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
->>   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
->>   clk: samsung: exynos542x: Add the clock id for ACLK
->>   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
->>   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
-> 
-> 
-> Applied DTS patches for late v4.7 (hopefully).
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>
+> Anson, Frank,
+>
+> Can you guys confirm this change is correct?
+>
 
-Thanks for your review and apply.
+I just checked the doc,
+it's correct the parent should be SYS_PLL_PFD2(270Mhz).
+It's a documentation error of early version and it's already fixed
+in latest internal doc.
 
-Best Regards,
-Chanwoo Choi
+Regards
+Dong Aisheng
+
+> Shawn
+>
+>> ---
+>> Hi Shawn,
+>>
+>> I did not found a clock which was based on this clock which I
+>> could measure externally... But the change is backed by the
+>> documentation.
+>>
+>> --
+>> Stefan
+>>
+>>  drivers/clk/imx/clk-imx7d.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+>> index 7912be8..5229968 100644
+>> --- a/drivers/clk/imx/clk-imx7d.c
+>> +++ b/drivers/clk/imx/clk-imx7d.c
+>> @@ -56,7 +56,7 @@ static const char *nand_usdhc_bus_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
+>>       "pll_sys_pfd2_135m_clk", "pll_sys_pfd6_clk", "pll_enet_250m_clk",
+>>       "pll_audio_main_clk", };
+>>
+>> -static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+>> +static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
+>>       "pll_dram_533m_clk", "pll_sys_pfd0_392m_clk",
+>>       "pll_enet_125m_clk", "pll_usb_main_clk", "pll_audio_main_clk",
+>>       "pll_video_main_clk", };
+>> --
+>> 2.8.0
+>>
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
