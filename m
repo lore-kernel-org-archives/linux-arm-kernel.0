@@ -1,48 +1,79 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Tue, 3 May 2016 08:35:13 -0500
-Subject: (v4.4/v4.5)-stable-queue build and qemu failures
- (arm:allmodconfig, arm:pxa_defconfig, arm:omap2plus_defconfig)
-In-Reply-To: <20160429201914.GA27596@roeck-us.net>
-References: <20160429201914.GA27596@roeck-us.net>
-Message-ID: <CAHCN7xJ0vS9GHWmg__z5SQtHKfdCDGKD6m0_=zewbY65Jyf9PA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 3 May 2016 15:36:03 +0200
+Subject: [PATCH v2 04/11] clocksource/moxart: Generalise timer for use on
+ other socs
+In-Reply-To: <CACPK8XfgDPPYG=ON-Z+gEKSg1fe4PuqRWoMz8P-9oCMvgQKmhw@mail.gmail.com>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-5-git-send-email-joel@jms.id.au>
+ <571A5FBA.9010204@linaro.org>
+ <CACPK8XfgDPPYG=ON-Z+gEKSg1fe4PuqRWoMz8P-9oCMvgQKmhw@mail.gmail.com>
+Message-ID: <20160503133603.GA19298@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 3:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> v4.4 (arm:allmodconfig):
->
-> drivers/mtd/nand/pxa3xx_nand.c: In function 'alloc_nand_resource':
-> drivers/mtd/nand/pxa3xx_nand.c:1753:7: error: 'np' undeclared
->
-> v4.5 (arm:allmodconfig, arm:pxa_defconfig):
->
-> drivers/dma/pxa_dma.c: In function 'pxad_probe':
-> drivers/dma/pxa_dma.c:1421:24: error: 'struct mmp_dma_platdata' has no member named 'nb_requestors'
->
-> There is also a qemu runtime failure with omap2plus_defconfig in v4.4.
->
-> [    2.412322] omap_i2c 48070000.i2c: bus 0 rev3.3 at 2600 kHz
-> [    2.417541] omap_i2c 48060000.i2c: bus 2 rev3.3 at 100 kHz
-> [    2.429443]
-> [    2.429534] =====================================
-> [    2.429718] [ BUG: bad unlock balance detected! ]
-> [    2.429962] 4.4.8-00025-gcd58757 #1 Not tainted
-> [    2.430145] -------------------------------------
-> [    2.430328] kworker/u2:0/6 is trying to release lock (&rdev->mutex) at:
-> [    2.430694] [<c03b40e4>] regulator_set_voltage+0x40/0x54
-> [    2.430877] but there are no more locks to release!
->
+On Tue, May 03, 2016 at 03:26:33PM +0930, Joel Stanley wrote:
+> Hey Daniel,
+> 
+> Thanks for the review.
+> 
+> On Sat, Apr 23, 2016 at 3:00 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+> > On 04/21/2016 10:04 AM, Joel Stanley wrote:
+> >>
+> >> The moxart timer IP is shared with another soc made by Aspeed.
+> >> Generalise the registers that differ so the same driver can be used for
+> >> both.
+> >>
+> >> As we now depend on CLKSRC_MMIO, create a Kconfig symbol for the driver
+> >> so we can express this dependency.
+> >>
+> >> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> >> ---
+> >
+> >
+> > In the future, please Cc the maintainers.
+> 
+> Sure.
+> 
+> >
+> > You probably can remove all the unused macro definition here for both MOXART
+> > and ASPEED to have something just a couple of definition.
+> 
+> I agree with Ben; we're helping out by documenting the hardware in
+> lieu of a public datasheet. I'd prefer to keep this here.
 
-I am also seeing this in 4.4.8 on an DM3730.  I didn't see it in
-4.4.3.  I can also help bisect if it helps.
--adam
+Ok, let's keep it.
+ 
+> >>   static void __iomem *base;
+> >>   static unsigned int clock_count_per_tick;
+> >> +static unsigned int t1_disable_val, t1_enable_val;
+> >
+> >
+> > It will be cleaner to:
+> >
+> > 1. Factor out:
+> >         writel(TIMER1_DISABLE, base + TIMER_CR);
+> >         writel(TIMER1_ENABLE, base + TIMER_CR);
+> 
+> I considered this myself but went with the minimal change. I'm not
+> fussed, so I will rework it as you suggest.
+> 
+> From the register layout I suspect this IP block is a Faraday Tech
+> FTTMR010[1], but I don't have any other evidence.
 
-> See logs at http://kerneltests.org/builders for details.
-> Please let me know if I need to bisect.
->
-> Thanks,
-> Guenter
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Apparently, it could be the fttmr010 [2].
+
+May be Jonas Jensen can confirm that.
+
+> Would you take a
+> patch to change the name or would you prefer leaving it as moxart?
+
+If Jonas can confirm the moxart SoC is using the faraday timer, then it 
+would make much more sense to rename it to timer-fttmr010.c and have the 
+different instance of this timer to set it up with the platform specific 
+bits.
+
+> [1] https://lists.nongnu.org/archive/html/qemu-devel/2013-03/msg04333.html
+
+[2] 
+http://git.denx.de/?p=u-boot.git;a=blob;f=include/faraday/fttmr010.h;h=2ab68d10218ed8241e5d2c916437c5918c17173d;hb=HEAD
