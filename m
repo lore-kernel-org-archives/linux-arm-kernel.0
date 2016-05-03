@@ -1,135 +1,84 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 3 May 2016 02:24:22 +0000 (UTC)
-Subject: OMAP baseline test results for v4.6-rc6
-Message-ID: <alpine.DEB.2.02.1605030223440.22468@utopia.booyaka.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Tue, 3 May 2016 10:27:26 +0800
+Subject: [PATCH 4/9] thermal: rockchip: handle the power sequence for
+ tsadc controller
+In-Reply-To: <20160428150432.GA20009@localhost.localdomain>
+References: <1460950562-20652-1-git-send-email-wxt@rock-chips.com>
+ <1460950562-20652-5-git-send-email-wxt@rock-chips.com>
+ <20160427234818.GB2590@localhost.localdomain> <57216C65.5040501@gmail.com>
+ <20160428150432.GA20009@localhost.localdomain>
+Message-ID: <57280C8E.5080406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Here are some basic OMAP test results for Linux v4.6-rc6.
-Logs and other details at:
 
-    http://www.pwsan.com/omap/testlogs/test_v4.6-rc6/20160502170254/
+? 2016?04?28? 23:04, Eduardo Valentin ??:
+> On Thu, Apr 28, 2016 at 09:50:29AM +0800, Caesar Wang wrote:
+>>
+>> ? 2016?04?28? 07:48, Eduardo Valentin ??:
+>>> On Mon, Apr 18, 2016 at 11:35:56AM +0800, Caesar Wang wrote:
+>>>> +		regmap_write(grf, GRF_TSADC_TESTBIT_L, GRF_TSADC_TSEN_PD_ON);
+>>>> +		mdelay(10);
+>>>> +		regmap_write(grf, GRF_TSADC_TESTBIT_L, GRF_TSADC_TSEN_PD_OFF);
+>>>> +		udelay(100); /* The spec note says at least 15 us */
+>>>> +		regmap_write(grf, GRF_SARADC_TESTBIT, GRF_SARADC_TESTBIT_ON);
+>>>> +		regmap_write(grf, GRF_TSADC_TESTBIT_H, GRF_TSADC_TESTBIT_H_ON);
+>>>> +		udelay(200); /* The spec note says at least 90 us */
+>>> Does it make sense to use usleep_range() instead?
+>> I think so in the past, but I'm digging into the the udelay/usleep for
+>> kernel.
+> What do you mean by in the past? timekeeping doc still recommends the
+> range 10us to 20ms for usleep_range()
+>
+>> In general,
+>>
+>> udelay < 10us ~100us
+>> mdelay > 1m, <1000ms/HZ
+>> usleep_range(min,max) > 100us, <20ms
+> even here, your udelays could be replaced by usleep_range().
+>
+> Any particular reason you believe spining is better than sleeping in
+> your case?
+>
+>> msleep > 20ms,  < 1000ms
+>>
+>> So the udelay is suit for tsadc power sequence.
+>> ---
+>>
+>>
+>> Also,  we have used the mdelay(10), so it doesn't matter if use the udelay.
+>> After all the udelay is stable than the usleep_range.
+> What do you mean udelay is stable than usleep_range? usleep_range will
+> give the opportunity to the scheduler to coalesce wakeups. udelay is a
+> busyloop spin. Besides, I am not sure the current situation, but
+> busylooping may be affected by cpu frequency.
 
+Okay, thanks for pointing out.
 
-Test summary
-------------
+Send the fixes patch on https://patchwork.kernel.org/patch/8999971/
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (18/18): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_ti81xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    (none)
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 1/18): multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/18): 2430sdp
-    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
-    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
-		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 5430es2uevm, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 2/18): 4430es2panda, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  3530es3beagle, 3530es31beagle, 2430sdp, 5430es2uevm
-    Pass ( 3/11): 4460pandaes, 3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
-    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
-    Pass ( 1/ 4): 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 1/18): 4430es2panda
-
-Obsolete Kconfig symbols:
-    FAIL ( 3/21): omap1_defconfig, omap2plus_defconfig,
-		  multi_v7_defconfig
+Thank you!
 
 
-vmlinux object size
-(delta in bytes from test_v4.6-rc5 (02da2d72174c61988eb4456b53f405e3ebdebce4)):
-   text     data      bss    total  kernel
-    +88        0        0      +88  omap1_defconfig
-    +56        0        0      +56  omap1_defconfig_1510innovator_only
-    +88        0        0      +88  omap1_defconfig_5912osk_only
-   +168        0        0     +168  multi_v7_defconfig
-   +268        0        0     +268  omap2plus_defconfig
-   +360      +32        0     +392  omap2plus_defconfig_2430sdp_only
-   +208        0        0     +208  omap2plus_defconfig_am33xx_only
-   +204        0        0     +204  omap2plus_defconfig_am43xx_only
-   +268    +4096        0    +4364  omap2plus_defconfig_cpupm
-   +268        0        0     +268  omap2plus_defconfig_dra7xx_only
-   +192      +64        0     +256  omap2plus_defconfig_n800_multi_omap2xxx
-   +160        0        0     +160  omap2plus_defconfig_n800_only_a
-   +260        0        0     +260  omap2plus_defconfig_no_pm
-   +268        0        0     +268  omap2plus_defconfig_omap2_4_only
-   +268        0        0     +268  omap2plus_defconfig_omap3_4_only
-   +268        0        0     +268  omap2plus_defconfig_omap5_only
-   +208        0        0     +208  omap2plus_defconfig_ti81xx_only
-    -24        0      +24        0  rmk_omap3430_ldp_allnoconfig
-   +128       +8        0     +136  rmk_omap3430_ldp_oldconfig
-      0        0      +16      +16  rmk_omap4430_sdp_allnoconfig
-   +128        0        0     +128  rmk_omap4430_sdp_oldconfig
+-Caesar
+>
+>> -Caesar
+>>
+>>> 1.9.1
+>>>
+>>>
+>>>
+>>>
+>>> -- 
+>>> Thanks,
+>>> Caesar
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
 
-Boot-time memory difference
-(delta in bytes from test_v4.6-rc5 (02da2d72174c61988eb4456b53f405e3ebdebce4))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+
+-- 
+Thanks,
+Caesar
