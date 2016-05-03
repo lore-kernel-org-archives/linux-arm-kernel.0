@@ -1,65 +1,47 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 3 May 2016 15:58:44 +0100
-Subject: Tegra baseline test results for v4.6-rc6
-Message-ID: <5728BCA4.6000201@nvidia.com>
+From: christo.radev@gmail.com (christo.radev at gmail.com)
+Date: Tue, 3 May 2016 08:02:12 -0700 (PDT)
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <20160503131437.GV17159@lukather>
+References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+ <f3da30a6-9ac0-4d5e-8611-ebb80cb3589e@googlegroups.com>
+ <20160503131437.GV17159@lukather>
+Message-ID: <66e4c452-1e34-474b-8973-2d57d9f036d0@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.6-rc6.
-Logs and other details at:
+On Tuesday, May 3, 2016 at 4:14:41 PM UTC+3, Maxime Ripard wrote:
+> Hi,
+> 
+> On Tue, May 03, 2016 at 4:12:06 PM UTC+3, Christo Radev wrote:
+> > Hi to All,
+> > 
+> > I have already solved and tested this issue on Armbian build.  Find
+> > patches for both legacy (3.4.111) and mainline (4.5.2) kernels on:
+> > http://forum.armbian.com/index.php/topic/853-armbian-customization/page-2#entry7494
+> > There it is also described how to do eMMC bootable and much more.
+> > 
+> > About the board - Olimex already sold all 3 kinds after migration to
+> > their HW rev. E. One have to specify Lime2-eMMC as
+> > A20-Olinuxino-Lime2-eMMC instead of their old 2 options
+> > A20-Olinuxino-Lime2(-4GB).
+> 
+> Interesting, you have a link to that device?
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-    https://nvtb.github.io//linux/test_v4.6-rc6/20160503073103/
+I have really 2 boards delivered by their local distributor.
 
+Unfortunately, they do not update their site. Use the link for NAND option:
+https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2-4GB/open-source-hardware
+There you can find Users Manual where it is described that eMMC option is available from HW rev. D. The schematic for HW rev. E is also available on their repository:
+https://github.com/OLIMEX/OLINUXINO/tree/master/HARDWARE/A20-OLinuXino-LIME2
 
-Test summary
-------------
+On the board both 4GB NAND and eMMC Flash chips can be placed alternatively on the same place. There is difference in some other components as well.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.6-rc5 (02da2d72174c61988eb4456b53f405e3ebdebce4)):
-   text     data      bss    total  kernel
-      0        0        0        0  defconfig
-   +136        0        0     +136  multi_v7_defconfig
-   +568      +64        0     +632  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.6-rc5 (02da2d72174c61988eb4456b53f405e3ebdebce4))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+If one want to order it from the site probably has to order A20-Olinuxino-Lime2-4GB with note that eMMC option is required. The price is the same.
