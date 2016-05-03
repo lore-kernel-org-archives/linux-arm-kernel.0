@@ -1,52 +1,116 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 3 May 2016 14:02:49 -0600
-Subject: VFIO MSIX Query
-In-Reply-To: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>
-References: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>
-Message-ID: <20160503140249.4edaf3cc@t450s.home>
+From: pku.leo@gmail.com (Leo Li)
+Date: Tue, 3 May 2016 15:05:33 -0500
+Subject: [v8, 6/7] MAINTAINERS: add entry for Freescale SoC specific driver
+In-Reply-To: <HE1PR04MB088907CD90586FC83D058003F8630@HE1PR04MB0889.eurprd04.prod.outlook.com>
+References: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
+ <1461306464-19521-7-git-send-email-yangbo.lu@nxp.com>
+ <1461367352.32510.218.camel@buserror.net>
+ <HE1PR04MB088907CD90586FC83D058003F8630@HE1PR04MB0889.eurprd04.prod.outlook.com>
+Message-ID: <CADRPPNQaLVHp_HnEcHvZE7ebcmhYKf4K8CeWHErRk-0Xv8cU3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 25, 2016 at 10:12 PM, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> Hi Scott and Leo,
+>
+>
+>> -----Original Message-----
+>> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
+>> owner at vger.kernel.org] On Behalf Of Scott Wood
+>> Sent: Saturday, April 23, 2016 7:23 AM
+>> To: Yangbo Lu; linux-mmc at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+>> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+>> Cc: ulf.hansson at linaro.org; Zhao Qiang; Russell King; Bhupesh Sharma;
+>> Scott Wood; Claudiu Manoil; Kumar Gala; Yang-Leo Li; Xiaobo Xie; Michael
+>> Ellerman
+>> Subject: Re: [v8, 6/7] MAINTAINERS: add entry for Freescale SoC specific
+>> driver
+>>
+>> On Fri, 2016-04-22 at 14:27 +0800, Yangbo Lu wrote:
+>> > Add maintainer entry for Freescale SoC specific driver including the
+>> > QE library and the GUTS driver. Also add entry for GUTS driver and add
+>> > maintainer for QE library.
+>> >
+>> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+>> > ---
+>> > Changes for v8:
+>> >     - Added this patch
+>> > ---
+>> >  MAINTAINERS | 16 +++++++++++++++-
+>> >  1 file changed, 15 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/MAINTAINERS b/MAINTAINERS index 1d5b4be..d20aeb6 100644
+>> > --- a/MAINTAINERS
+>> > +++ b/MAINTAINERS
+>> > @@ -4622,13 +4622,27 @@ F:  drivers/net/ethernet/freescale/fec_ptp.c
+>> >  F: drivers/net/ethernet/freescale/fec.h
+>> >  F: Documentation/devicetree/bindings/net/fsl-fec.txt
+>> >
+>> > +FREESCALE SOC SPECIFIC DRIVER
+>>
+>> FREESCALE SOC DRIVERS
+>
+> [Lu Yangbo-B47093] Ok, will change it to 'FREESCALE SOC DRIVERS'.
+>
+>>
+>> > +M: Scott Wood <oss@buserror.net>
+>>
+>> Please CC me at this address, not the NXP address that you sent this to...
+>
+> [Lu Yangbo-B47093] Sorry for mistaking your email. Will send the one you said.
+>
+>>
+>> > +L: linuxppc-dev at lists.ozlabs.org
+>> > +S: Maintained
+>> > +F: drivers/soc/fsl/
+>> > +F: include/linux/fsl/
+>>
+>> This directory will contain drivers that work on PPC and ARM... I'm not
+>> sure what to put here in terms of mailing lists (we could put both, but
+>> people probably shouldn't spam both lists if only one arch is relevant to
+>> the patch), and whom to make pull requests to.
+>
+> [Lu Yangbo-B47093] But sooner or later we need to do this for files in fsl/ ...
+> :)
+>
+> Hi Leo, do you have any idea?
 
-On Tue, 3 May 2016 23:56:38 +0530
-Nitin Saxena <nitin.lnx@gmail.com> wrote:
+I think it would be ok to put both linuxppc and linux-arm mailing
+lists here.  Driver doesn't fall into any of the functional based
+sub-systems would very likely be platform stuff.  And if patch author
+has the knowledge that a patch only impacts one arch, he can remove
+the other list to reduce the spam.
 
-> Hi,
-> 
-> I am a newbie to VFIO framework and trying to use it for MSIX interrupt
-> handling in my userspace application. My userspace application is like
-> intel's dpdk.
-> 
-> My query is why vfio kernel code does not support msix masking/ unmasking
-> i.e VFIO_SET_ACTION_TRIGGER is not implemented in kernel vfio code for MSIX
-> but its present for legacy INTX?
+>
+>
+>>
+>> > +FREESCALE GUTS DRIVER
+>> > +M: Yangbo Lu <yangbo.lu@nxp.com>
+>> > +L: linuxppc-dev at lists.ozlabs.org
+>> > +S: Maintained
+>> > +F: drivers/soc/fsl/guts.c
+>>
+>> What about the header?
+>>
+>> Does guts really need a separate maintainer from drivers/soc/fsl?
+>
+> [Lu Yangbo-B47093] I was hesitating to add the maintainer...
+> And I was not so familiar with it. Let me leave it to the fsl/ directory and remove this...
+>
+>>
+>> -Scott
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org More majordomo info at
+>> http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> Linuxppc-dev mailing list
+> Linuxppc-dev at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/linuxppc-dev
 
-I think you mean VFIO_IRQ_SET_ACTION_MASK and
-VFIO_IRQ_SET_ACTION_UNMASK are not implemented for MSI/X,
-VFIO_IRQ_SET_ACTION_TRIGGER is the only one that is implemented.  It
-mostly comes down to it hasn't been needed.  We would just need to
-verify that disable_irq() and enable_irq() do the right thing and
-enable the features through the existing VFIO API.  The reason we have
-these for INTx is that INTx is level triggered and we must mask the
-interrupt on the host while it's serviced by the user because the
-interrupt will continue to assert and we have no service guarantees
-from the user.  MSI/X is of course edge triggered, so doesn't have this
-problem.  The device would need to continue to re-assert the
-interrupt.  In cases like a QEMU user, we might want to continue to
-receive guest masked interrupts to QEMU for emulating the pending bits
-array, so even if we had VFIO masking support for these interrupts, QEMU
-probably would not use it.  If MSI/X masking is useful for you vs simply
-ignoring the eventfd, patches welcome.
 
-> Another question since MSIX interrupt masking is absent in kernel who is
-> supposed to mask/unmask msix interrupt? does userspace needs to mask/unmask
-> interrupt after getting notified by eventfd. Is there any usecase where
-> MSIX handling is done via VFIO framework?
 
-MSI/X is edge triggered and VFIO does not set the AUTOMASKED flag on
-them, so there is simply no masking of them at all aside from fully
-disabling them.  QEMU has full support for MSI/X through VFIO that you
-can use for reference.  Thanks,
-
-Alex
+-- 
+- Leo
