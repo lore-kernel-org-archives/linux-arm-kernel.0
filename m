@@ -1,25 +1,37 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 3 May 2016 12:25:51 +0200
-Subject: [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency
- driver and new passive governor
-In-Reply-To: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
-References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160503102551.GC3956@kozik-lap>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 3 May 2016 19:26:51 +0900
+Subject: [PATCH 1/7] reset: add devm_reset_controller_register API
+In-Reply-To: <1462270670.3617.49.camel@pengutronix.de>
+References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
+ <1462099023-11819-2-git-send-email-yamada.masahiro@socionext.com>
+ <1462270670.3617.49.camel@pengutronix.de>
+Message-ID: <CAK7LNAR699QqYvWdFPtnBc=bLyMLvhCvnKJQCR4YHCy7HQTjUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 12:57:38PM +0900, Chanwoo Choi wrote:
-> This patch-set includes the two features as following. The generic exynos bus
-> frequency driver is able to support almost Exynos SoCs for bus frequency
-> scaling. And the new passive governor is able to make the dependency on
-> between devices for frequency/voltage scaling. I had posted the patch-set[1]
-> with the similiar concept. This is is revised version for exynos bus frequency.
-> - Generic exynos bus frequency driver
-> - New passive governor of DEVFREQ framework
-> [1] https://lkml.org/lkml/2015/1/7/872
-> : [PATCHv3 0/8] devfreq: Add generic exynos memory-bus frequency driver
+2016-05-03 19:17 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Hi Masahiro,
+>
+> Am Sonntag, den 01.05.2016, 19:36 +0900 schrieb Masahiro Yamada:
+>> Add a device managed API for reset_controller_register().
+>>
+>> This helps in reducing code in .remove callbacks and sometimes
+>> dropping .remove callbacks entirely.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>
+> Thank you for these patches. Except for the issue with the lpc18xx patch
+> they all look good to me.
+> If you don't mind, I'll drop the lpc18xx patch for now and apply the
+> others.
+>
 
-Applied DTS patches for late v4.7 (hopefully).
+It is OK with me, but I do not understand what is the problem.
 
-Best regards,
-Krzysztof
+Could you answer my question in the 3/7 thread?
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
