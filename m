@@ -1,86 +1,26 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 May 2016 20:42:03 +0800
-Subject: mx6ul: Finding a good place to configure SAI2_MCLK
-In-Reply-To: <CAOMZO5CvT1rcHFPm6KoCBBgM1UACByLUQcJ_zDxY9ucbxCpgYA@mail.gmail.com>
-References: <CAOMZO5CvT1rcHFPm6KoCBBgM1UACByLUQcJ_zDxY9ucbxCpgYA@mail.gmail.com>
-Message-ID: <20160503124203.GH5874@tiger>
+Date: Tue, 3 May 2016 20:43:10 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: Remove unneeded unit-addresses
+In-Reply-To: <1461969585-17784-1-git-send-email-festevam@gmail.com>
+References: <1461969585-17784-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160503124309.GI5874@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 08:59:17PM -0300, Fabio Estevam wrote:
-> Hi,
+On Fri, Apr 29, 2016 at 07:39:45PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> In order to get audio working on imx6ul-evk board we need to enable
-> the SAI2 MCLK clock by setting bit 20 (SAI2_MCLK_DIR) of the
-> IOMUXC_GPR_GPR1 register.
+> The following build warnings are seen when building with 'W=1' option:
 > 
-> I am not sure where is the appropriate place to set this bit.
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-1p1 at 110 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-3p0 at 120 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-2p5 at 130 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddcore at 140 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddpu at 140 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddsoc at 140 has a unit name, but no reg property
 > 
-> Doing like this works fine:
+> Fix them by removing the unneeded unit-addresses.
 > 
-> --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> @@ -447,5 +447,6 @@
->  #define IMX6UL_GPR1_ENET2_CLK_OUTPUT           (0x1 << 18)
->  #define IMX6UL_GPR1_ENET_CLK_DIR               (0x3 << 17)
->  #define IMX6UL_GPR1_ENET_CLK_OUTPUT            (0x3 << 17)
-> +#define IMX6UL_GPR1_SAI2_MCLK_DIR              (0x1 << 20)
-> 
-> index a38b16b..92cfb0f 100644
-> --- a/arch/arm/mach-imx/mach-imx6ul.c
-> +++ b/arch/arm/mach-imx/mach-imx6ul.c
-> @@ -56,6 +56,19 @@ static inline void imx6ul_enet_init(void)
->         imx6ul_enet_phy_init();
->  }
-> 
-> +static void __init imx6ul_mclk_init(void)
-> +{
-> +       struct regmap *gpr;
-> +
-> +       gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
-> +       if (!IS_ERR(gpr))
-> +               regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_SAI2_MCLK_DIR,
-> +                                  IMX6UL_GPR1_SAI2_MCLK_DIR);
-> +       else
-> +               pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
-> +
-> +}
-> +
->  static void __init imx6ul_init_machine(void)
->  {
->         struct device *parent;
-> @@ -68,6 +81,7 @@ static void __init imx6ul_init_machine(void)
->         imx6ul_enet_init();
->         imx_anatop_init();
->         imx6ul_pm_init();
-> +       imx6ul_mclk_init();
->  }
-> 
-> but it does not seem correct as this should be board specific. Should
-> we call it only if the compatible string matches imx6sl-14x14-evk
-> string? Looks like that will not scale as well.
-> 
-> Currently in arch/arm/mach-imx/mach-imx6ul.c we also have
-> imx6ul_enet_clk_init() function which sets the ENET_CLK in the GPR1
-> register.
-> 
-> IMHO this is not correct because not all mx6ul boards need such clock
-> and then we need to change this too.
-> 
-> So where should we set the SAI2_MCLK_DIR bit of GPR1? Inside the SAI driver?
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-To me, it's the best if we can handle this in SAI driver.
-
-Shawn
-
-> 
-> Appreciate some feedback.
-> 
-> Thanks,
-> 
-> Fabio Estevam
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Applied, thanks.
