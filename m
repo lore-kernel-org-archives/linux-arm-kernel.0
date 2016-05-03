@@ -1,108 +1,87 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 3 May 2016 13:07:32 +0200
-Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
-In-Reply-To: <1461333147-11873-2-git-send-email-harald@ccbib.org>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
- <1461333147-11873-2-git-send-email-harald@ccbib.org>
-Message-ID: <57288674.9050601@i2se.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 03 May 2016 13:08:10 +0200
+Subject: [PATCH 3/7] reset: lpc18xx: use devm_reset_controller_register()
+In-Reply-To: <CAK7LNAQga-dCmAWevKMQx2DBzGim8DmNyeCxj4n5q-SjEapd+Q@mail.gmail.com>
+References: <1462099023-11819-1-git-send-email-yamada.masahiro@socionext.com>
+ <1462099023-11819-4-git-send-email-yamada.masahiro@socionext.com>
+ <1462177581.3933.7.camel@pengutronix.de>
+ <CAK7LNAQ5LztGBbHCQxfLyWT7c_kWL=zpdKfkC9vsOKw95XL_Yw@mail.gmail.com>
+ <1462266344.3617.12.camel@pengutronix.de>
+ <CAK7LNAQga-dCmAWevKMQx2DBzGim8DmNyeCxj4n5q-SjEapd+Q@mail.gmail.com>
+Message-ID: <1462273690.3617.56.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harald,
+Am Dienstag, den 03.05.2016, 19:25 +0900 schrieb Masahiro Yamada:
+> Hi Philipp,
+> 
+> 2016-05-03 18:05 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> > Am Dienstag, den 03.05.2016, 00:52 +0900 schrieb Masahiro Yamada:
+> >> 2016-05-02 17:26 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> >> > Am Sonntag, den 01.05.2016, 19:36 +0900 schrieb Masahiro Yamada:
+> >> >> Use devm_reset_controller_register() for the reset controller
+> >> >> registration and remove the unregister call from the .remove callback.
+> >> >>
+> >> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> >> >> ---
+> >> >>
+> >> >>  drivers/reset/reset-lpc18xx.c | 4 +---
+> >> >>  1 file changed, 1 insertion(+), 3 deletions(-)
+> >> >>
+> >> >> diff --git a/drivers/reset/reset-lpc18xx.c b/drivers/reset/reset-lpc18xx.c
+> >> >> index 3b8a4f5..dd4f27e 100644
+> >> >> --- a/drivers/reset/reset-lpc18xx.c
+> >> >> +++ b/drivers/reset/reset-lpc18xx.c
+> >> >> @@ -199,7 +199,7 @@ static int lpc18xx_rgu_probe(struct platform_device *pdev)
+> >> >>
+> >> >>       platform_set_drvdata(pdev, rc);
+> >> >>
+> >> >> -     ret = reset_controller_register(&rc->rcdev);
+> >> >> +     ret = devm_reset_controller_register(&pdev->dev, &rc->rcdev);
+> >> >>       if (ret) {
+> >> >>               dev_err(&pdev->dev, "unable to register device\n");
+> >> >>               goto dis_clks;
+> >> >> @@ -229,8 +229,6 @@ static int lpc18xx_rgu_remove(struct platform_device *pdev)
+> >> >>       if (ret)
+> >> >>               dev_warn(&pdev->dev, "failed to unregister restart handler\n");
+> >> >>
+> >> >> -     reset_controller_unregister(&rc->rcdev);
+> >> >> -
+> >> >>       clk_disable_unprepare(rc->clk_delay);
+> >> >>       clk_disable_unprepare(rc->clk_reg);
+> >> >>
+> >> >
+> >> > Hmm, would this patch theoretically allow a window between the calls to
+> >> > clk_disable_unprepare(clk_reg) and devm_reset_controller_release() where
+> >> > reset_control_get() + reset_control_(de)assert() would access unclocked
+> >> > registers?
+> >>
+> >> This is not clear to me.
+> >>
+> >> Why reset_control_get() + reset_control_(de)assert() would happen here?
+> >
+> > I suppose on a non-SMP device, without parallel probing this can't
+> > really happen in practice.
+> > It still seems weird that suddenly we disable the clocks before
+> > unregistering the reset controller instead of afterwards.
+> >
+> 
+> I still do not understand what you mean.
+> 
+> This patch moves the reset_controller_unregister() call
+> after clk_disable_unprepare().
 
-Am 22.04.2016 um 15:52 schrieb Harald Geyer:
-> The hardware has two current sources ISRC0 and ISRC1 to allow measuring
-> resistors without additional circuitry. This commit makes them available
-> as regulators.
->
-> Tested on an imx233-olinuxino board.
->
-> Signed-off-by: Harald Geyer <harald@ccbib.org>
-> ---
-> The current regulator API doesn't fit this type of device very well: Typically
-> consumers will want to set a defined current, ie. min_uA == max_uA, but they
-> can't without help from configuration data, because the valid values aren't
-> reported by the API for current regulators. I have been thinking about
-> extending the API, but currently AFAIK no such consumers exist and most
-> users, like myself, will force the regulator to a defined value in
-> devicetree anyway.
->
->  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
->  drivers/iio/adc/Kconfig                            |   1 +
->  drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
->  3 files changed, 182 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> index 555fb11..983952c 100644
-> --- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> +++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-> @@ -19,6 +19,15 @@ Optional properties:
->  - fsl,settling: delay between plate switch to next sample. Allowed value is
->                  1 ... 2047. It counts at 2 kHz and its default is
->                  10 (= 5 ms)
-> +- ISRC0: A node describing the regulator of internal current source 0
-> +- ISRC1: A node describing the regulator of internal current source 1
-> +
-> +Required properties for the ISRCx sub-nodes:
-> +- regulator-max-microamp: See standard regulator binding documentation.
-> +                          Valid values are from 0 to 300 in steps of 20.
-> +
-> +Optional properties for the ISRCx sub-nodes:
-> +Any standard regulator properties that apply to current regulators.
->  
->  Example for i.MX23 SoC:
->  
-> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
->  		fsl,ave-ctrl = <4>;
->  		fsl,ave-delay = <2>;
->  		fsl,settling = <10>;
-> +
-> +		isrc_lradc0: ISRC0 {
-> +			regulator-max-microamp = <300>;
-> +		};
-> +
-> +		isrc_lradc1: ISRC1 {
-> +			regulator-max-microamp = <120>;
-> +			regulator-min-microamp = <120>;
-> +			regulator-always-on;
-> +		};
+And so the register access is made impossible before the reset
+controller device actually vanishes from the publicly visible list.
 
-IMHO the binding should represent the direct connection between the
-current source and the physical channel. I think a node label isn't
-enough. Unfortunately i don't have an idea to do it the "right way".
+> But, reset_controller_unregister() is just a manipulation of a liked list.
+> It does not trigger any hardware access.
+> 
+> Am I wrong?
 
->  	};
->  
->  Example for i.MX28 SoC:
-> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
->  		fsl,ave-ctrl = <4>;
->  		fsl,ave-delay = <2>;
->  		fsl,settling = <10>;
-> +
-> +		isrc_lradc0: ISRC0 {
-> +			regulator-max-microamp = <300>;
-> +		};
-> +
-> +		isrc_lradc6: ISRC1 {
-> +			regulator-max-microamp = <120>;
-> +			regulator-min-microamp = <120>;
-> +			regulator-always-on;
-> +		};
->  	};
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 5937030..1968d1c 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -319,6 +319,7 @@ config MXS_LRADC
->          tristate "Freescale i.MX23/i.MX28 LRADC"
->          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
->          depends on INPUT
-> +        depends on REGULATOR
+No, you are perfectly right. I don't see how this can be a real problem
+unless at the same time another driver could try to request the still
+available reset control.
 
-Any chance to avoid this dependency for an optional feature?
-
-Stefan
-
->          select STMP_DEVICE
->          select IIO_BUFFER
->          select IIO_TRIGGERED_BUFFER
+regards
+Philipp
