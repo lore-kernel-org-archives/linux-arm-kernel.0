@@ -1,39 +1,69 @@
-From: dev@blino.org (Olivier Blin)
-Date: Tue, 03 May 2016 23:35:45 +0200
-Subject: [PATCH v5] ARM: bcm2835: dt: Add the ethernet to the device trees
-In-Reply-To: <1462172811-24206-1-git-send-email-lkundrak@v3.sk> (Lubomir
- Rintel's message of "Mon, 2 May 2016 09:06:51 +0200")
-References: <1462172811-24206-1-git-send-email-lkundrak@v3.sk>
-Message-ID: <m3lh3qrfim.fsf@euphor.blino.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 3 May 2016 17:37:25 -0400
+Subject: VDSO unmap and remap support for additional architectures
+In-Reply-To: <572367B7.6030105@virtuozzo.com>
+References: <20151202121918.GA4523@arm.com>
+ <1461856737-17071-1-git-send-email-cov@codeaurora.org>
+ <2ce7203f-305c-6edf-0ef9-448c141cb103@kernel.org>
+ <57236003.5060804@codeaurora.org> <572367B7.6030105@virtuozzo.com>
+Message-ID: <57291A15.8010105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lubomir Rintel <lkundrak@v3.sk> writes:
+On 04/29/2016 09:55 AM, Dmitry Safonov wrote:
+> On 04/29/2016 04:22 PM, Christopher Covington wrote:
+>> On 04/28/2016 02:53 PM, Andy Lutomirski wrote:
+>>> Also, at some point, possibly quite soon, x86 will want a way for
+>>> user code to ask the kernel to map a specific vdso variant at a specific
+>>> address. Could we perhaps add a new pair of syscalls:
+>>>
+>>> struct vdso_info {
+>>>      unsigned long space_needed_before;
+>>>      unsigned long space_needed_after;
+>>>      unsigned long alignment;
+>>> };
+>>>
+>>> long vdso_get_info(unsigned int vdso_type, struct vdso_info *info);
+>>>
+>>> long vdso_remap(unsigned int vdso_type, unsigned long addr, unsigned
+>>> int flags);
+>>>
+>>> #define VDSO_X86_I386 0
+>>> #define VDSO_X86_64 1
+>>> #define VDSO_X86_X32 2
+>>> // etc.
+>>>
+>>> vdso_remap will map the vdso of the chosen type such at
+>>> AT_SYSINFO_EHDR lines up with addr. It will use up to
+>>> space_needed_before bytes before that address and space_needed_after
+>>> after than address. It will also unmap the old vdso (or maybe only do
+>>> that if some flag is set).
+>>>
+>>> On x86, mremap is *not* sufficient for everything that's needed,
+>>> because some programs will need to change the vdso type.
+>> I don't I understand. Why can't people just exec() the ELF type that
+>> corresponds to the VDSO they want?
+> 
+> I may say about my needs in it: to not lose all the existing
+> information in application.
+> Imagine you're restoring a container with 64-bit and 32-bit
+> applications (in compatible mode). So you need somehow
+> switch vdso type in restorer for a 32-bit application.
+> Yes, you may exec() and then - all already restored application
+> properties will got lost. You will need to transpher information
+> about mappings, make protocol between restorer binary
+> and main criu application, finally you'll end up with some
+> really much more difficult architecture than it is now.
+> And it'll be slower.
 
-> The hub and the ethernet in its port 1 are hardwired on the board.
->
-> Compared to the adapters that can be plugged into the USB ports, this
-> one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
-> has the MAC address for this adapter in its ROM, accessible from its
-> firmware.
->
-> U-Boot can read out the address and set the local-mac-address property of the
-> node with "ethernet" alias. Let's add the node so that U-Boot can do its
-> business.
->
-> Model B rev2 and Model B+ entries were verified by me, the hierarchy and
-> pid/vid pair for the Version 2 was provided by Peter Chen. Original
-> Model B is a blind shot, though very likely correct.
->
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Perhaps a more modest exec based strategy would be for x86_64 criu to
+handle all of the x86_64 restores as usual but exec i386 and/or x32 criu
+service daemons and use them for restoring applications needing those ABIs.
 
-Tested-by: Olivier Blin <dev@blino.org>
-
-Though, I still need the following patch for this DT patch to be useful:
-net/smscx5xx: use the device tree for mac address
-
-Thanks for the update Lubomir
+Regards,
+Christopher Covington
 
 -- 
-Olivier Blin - blino
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
