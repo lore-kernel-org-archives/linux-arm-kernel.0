@@ -1,95 +1,51 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue,  3 May 2016 21:50:30 +0800
-Subject: [PATCH V2] iommu/arm-smmu: clear cache lock bit of ACR
-Message-ID: <1462283430-9559-1-git-send-email-van.freenix@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 3 May 2016 06:53:47 -0700
+Subject: (v4.4/v4.5)-stable-queue build and qemu failures
+ (arm:allmodconfig, arm:pxa_defconfig, arm:omap2plus_defconfig)
+In-Reply-To: <CAHCN7xJ0vS9GHWmg__z5SQtHKfdCDGKD6m0_=zewbY65Jyf9PA@mail.gmail.com>
+References: <20160429201914.GA27596@roeck-us.net>
+ <CAHCN7xJ0vS9GHWmg__z5SQtHKfdCDGKD6m0_=zewbY65Jyf9PA@mail.gmail.com>
+Message-ID: <5728AD6B.5020106@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According MMU-500r2 TRM, section 3.7.1 Auxiliary Control registers,
-You can modify ACTLR only when the ACR.CACHE_LOCK bit is 0.
+On 05/03/2016 06:35 AM, Adam Ford wrote:
+> On Fri, Apr 29, 2016 at 3:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> v4.4 (arm:allmodconfig):
+>>
+>> drivers/mtd/nand/pxa3xx_nand.c: In function 'alloc_nand_resource':
+>> drivers/mtd/nand/pxa3xx_nand.c:1753:7: error: 'np' undeclared
+>>
+>> v4.5 (arm:allmodconfig, arm:pxa_defconfig):
+>>
+>> drivers/dma/pxa_dma.c: In function 'pxad_probe':
+>> drivers/dma/pxa_dma.c:1421:24: error: 'struct mmp_dma_platdata' has no member named 'nb_requestors'
+>>
+>> There is also a qemu runtime failure with omap2plus_defconfig in v4.4.
+>>
+>> [    2.412322] omap_i2c 48070000.i2c: bus 0 rev3.3 at 2600 kHz
+>> [    2.417541] omap_i2c 48060000.i2c: bus 2 rev3.3 at 100 kHz
+>> [    2.429443]
+>> [    2.429534] =====================================
+>> [    2.429718] [ BUG: bad unlock balance detected! ]
+>> [    2.429962] 4.4.8-00025-gcd58757 #1 Not tainted
+>> [    2.430145] -------------------------------------
+>> [    2.430328] kworker/u2:0/6 is trying to release lock (&rdev->mutex) at:
+>> [    2.430694] [<c03b40e4>] regulator_set_voltage+0x40/0x54
+>> [    2.430877] but there are no more locks to release!
+>>
+>
+> I am also seeing this in 4.4.8 on an DM3730.  I didn't see it in
+> 4.4.3.  I can also help bisect if it helps.
+> -adam
+>
 
-So before clearing ARM_MMU500_ACTLR_CPRE of each context bank,
-need clear CACHE_LOCK bit of ACR register first.
+I ended up bisecting it [1]. The problem is seen in 4.4.7 and 4.4.8
+(I originally thought 4.4.6 was affected as well, but it was introduced
+in 4.4.7). It will be fixed in 4.4.9; the necessary patches are already
+in the queue.
 
-Since CACHE_LOCK bit is only present in MMU-500r2 onwards,
-need to check the major number of IDR7.
+Guenter
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
 ---
-
-V2:
- Following Robin's comments, need to check IDR7 before clearing
- CACHE_LOCK bit of ACR.
-
-V1:
- Patch based on iommu/devel
-
- drivers/iommu/arm-smmu.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index acff332..c7ad23e 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -98,6 +98,9 @@
- #define sCR0_BSU_SHIFT			14
- #define sCR0_BSU_MASK			0x3
- 
-+/* Auxiliary Configuration register */
-+#define ARM_SMMU_GR0_sACR		0x10
-+
- /* Identification registers */
- #define ARM_SMMU_GR0_ID0		0x20
- #define ARM_SMMU_GR0_ID1		0x24
-@@ -144,6 +147,9 @@
- #define ID2_PTFS_64K			(1 << 14)
- #define ID2_VMID16			(1 << 15)
- 
-+#define ID7_MAJOR_SHIFT			4
-+#define ID7_MAJOR_MASK			0xf
-+
- /* Global TLB invalidation */
- #define ARM_SMMU_GR0_TLBIVMID		0x64
- #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
-@@ -235,6 +241,8 @@
- 
- #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
- 
-+#define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
-+
- #define CB_PAR_F			(1 << 0)
- 
- #define ATSR_ACTIVE			(1 << 0)
-@@ -1493,7 +1501,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
- 	void __iomem *cb_base;
- 	int i = 0;
--	u32 reg;
-+	u32 reg, major;
- 
- 	/* clear global FSR */
- 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
-@@ -1506,6 +1514,19 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
- 	}
- 
-+	/*
-+	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
-+	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
-+	 * bit is only present in MMU-500r2 onwards.
-+	 */
-+	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
-+	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
-+	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
-+		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-+		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
-+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
-+	}
-+
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
- 	for (i = 0; i < smmu->num_context_banks; ++i) {
- 		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
--- 
-2.6.2
+[1] http://thread.gmane.org/gmane.linux.kernel.stable/176811
