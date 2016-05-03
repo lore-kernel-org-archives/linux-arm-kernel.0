@@ -1,144 +1,74 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Tue, 03 May 2016 13:22:55 +0200
-Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
-In-Reply-To: <57288674.9050601@i2se.com>
-References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
- <1461333147-11873-2-git-send-email-harald@ccbib.org>
- <57288674.9050601@i2se.com>
-Message-ID: <6cdd4f858dacf72e192a292f29c12feb@ccbib.org>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 03 May 2016 12:44:23 +0200
+Subject: [PATCH] ARM: mx5: dts: Enable USB OTG on M53EVK
+In-Reply-To: <1461105361-6742-1-git-send-email-marex@denx.de>
+References: <1461105361-6742-1-git-send-email-marex@denx.de>
+Message-ID: <57288107.4000908@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan!
+On 04/20/2016 12:36 AM, Marek Vasut wrote:
+> Add USB OTG support to M53EVK instead of just USB gadget.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-On 03.05.2016 13:07, Stefan Wahren wrote:
-> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
->> The hardware has two current sources ISRC0 and ISRC1 to allow 
->> measuring
->> resistors without additional circuitry. This commit makes them 
->> available
->> as regulators.
->>
->> Tested on an imx233-olinuxino board.
->>
->> Signed-off-by: Harald Geyer <harald@ccbib.org>
->> ---
->> The current regulator API doesn't fit this type of device very well: 
->> Typically
->> consumers will want to set a defined current, ie. min_uA == max_uA, 
->> but they
->> can't without help from configuration data, because the valid values 
->> aren't
->> reported by the API for current regulators. I have been thinking 
->> about
->> extending the API, but currently AFAIK no such consumers exist and 
->> most
->> users, like myself, will force the regulator to a defined value in
->> devicetree anyway.
->>
->>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
->>  drivers/iio/adc/Kconfig                            |   1 +
->>  drivers/iio/adc/mxs-lradc.c                        | 152 
->> +++++++++++++++++++++
->>  3 files changed, 182 insertions(+)
->>
->> diff --git 
->> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt 
->> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
->> index 555fb11..983952c 100644
->> --- 
->> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
->> +++ 
->> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
->> @@ -19,6 +19,15 @@ Optional properties:
->>  - fsl,settling: delay between plate switch to next sample. Allowed 
->> value is
->>                  1 ... 2047. It counts at 2 kHz and its default is
->>                  10 (= 5 ms)
->> +- ISRC0: A node describing the regulator of internal current source 
->> 0
->> +- ISRC1: A node describing the regulator of internal current source 
->> 1
->> +
->> +Required properties for the ISRCx sub-nodes:
->> +- regulator-max-microamp: See standard regulator binding 
->> documentation.
->> +                          Valid values are from 0 to 300 in steps 
->> of 20.
->> +
->> +Optional properties for the ISRCx sub-nodes:
->> +Any standard regulator properties that apply to current regulators.
->>
->>  Example for i.MX23 SoC:
->>
->> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
->>  		fsl,ave-ctrl = <4>;
->>  		fsl,ave-delay = <2>;
->>  		fsl,settling = <10>;
->> +
->> +		isrc_lradc0: ISRC0 {
->> +			regulator-max-microamp = <300>;
->> +		};
->> +
->> +		isrc_lradc1: ISRC1 {
->> +			regulator-max-microamp = <120>;
->> +			regulator-min-microamp = <120>;
->> +			regulator-always-on;
->> +		};
->
-> IMHO the binding should represent the direct connection between the
-> current source and the physical channel. I think a node label isn't
-> enough. Unfortunately i don't have an idea to do it the "right way".
+Bump ?
 
-I strictly followed the names of the data sheet here: imx23 and imx28
-reference manuals both call the current sources ISRC0 and ISRC1 even
-if they are attached to different channels of the ADC. I think
-inventing some ISRC6 for imx28 would do more harm then good.
+btw. Shawn, is the @k.org the address I should use now ?
 
->>  	};
->>
->>  Example for i.MX28 SoC:
->> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
->>  		fsl,ave-ctrl = <4>;
->>  		fsl,ave-delay = <2>;
->>  		fsl,settling = <10>;
->> +
->> +		isrc_lradc0: ISRC0 {
->> +			regulator-max-microamp = <300>;
->> +		};
->> +
->> +		isrc_lradc6: ISRC1 {
->> +			regulator-max-microamp = <120>;
->> +			regulator-min-microamp = <120>;
->> +			regulator-always-on;
->> +		};
->>  	};
->> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
->> index 5937030..1968d1c 100644
->> --- a/drivers/iio/adc/Kconfig
->> +++ b/drivers/iio/adc/Kconfig
->> @@ -319,6 +319,7 @@ config MXS_LRADC
->>          tristate "Freescale i.MX23/i.MX28 LRADC"
->>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
->>          depends on INPUT
->> +        depends on REGULATOR
->
-> Any chance to avoid this dependency for an optional feature?
+> ---
+>  arch/arm/boot/dts/imx53-m53evk.dts | 21 ++++++++++++++++++++-
+>  1 file changed, 20 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+> index 53f4088..dcee1e0f 100644
+> --- a/arch/arm/boot/dts/imx53-m53evk.dts
+> +++ b/arch/arm/boot/dts/imx53-m53evk.dts
+> @@ -84,6 +84,15 @@
+>  			regulator-max-microvolt = <5000000>;
+>  			gpio = <&gpio1 2 0>;
+>  		};
+> +
+> +		reg_usb_otg_vbus: regulator at 4 {
+> +			compatible = "regulator-fixed";
+> +			reg = <4>;
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio1 4 0>;
+> +		};
+>  	};
+>  
+>  	sound {
+> @@ -168,6 +177,12 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX53_PAD_GPIO_4__GPIO1_4		0x000b0
+> +			>;
+> +		};
+> +
+>  		led_pin_gpio: led_gpio at 0 {
+>  			fsl,pins = <
+>  				MX53_PAD_PATA_DATA8__GPIO2_8		0x80000000
+> @@ -351,6 +366,10 @@
+>  };
+>  
+>  &usbotg {
+> -	dr_mode = "peripheral";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	dr_mode = "otg";
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	disable-over-current;
+>  	status = "okay";
+>  };
+> 
 
-I haven't looked into it yet, but I expect that that the mfd
-conversion will avoid this neatly.
-
-Thanks,
-Harald
-
-> Stefan
->
->>          select STMP_DEVICE
->>          select IIO_BUFFER
->>          select IIO_TRIGGERED_BUFFER
 
 -- 
-If you want to support my work:
-see http://friends.ccbib.org/harald/supporting/
-or donate via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
-or bitcoin 1FUtd8T9jRN1rFz63vZz7s2fDtB6d6A7aS
+Best regards,
+Marek Vasut
