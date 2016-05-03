@@ -1,115 +1,54 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue,  3 May 2016 16:27:18 -0400
-Subject: [PATCH 3/3] [media] s5p-mfc: Fix race between s5p_mfc_probe() and
- s5p_mfc_open()
-In-Reply-To: <1462307238-21815-1-git-send-email-javier@osg.samsung.com>
-References: <1462307238-21815-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1462307238-21815-4-git-send-email-javier@osg.samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 May 2016 21:44:19 +0100
+Subject: [PATCH v2 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <5728806F.7000208@arm.com>
+References: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
+ <57287BD9.6090907@arm.com>
+ <20160503103237.GN19428@n2100.arm.linux.org.uk>
+ <5728806F.7000208@arm.com>
+Message-ID: <20160503204419.GP19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s5p_mfc_probe() function registers the video devices before all the
-resources needed by s5p_mfc_open() are correctly initalized.
+On Tue, May 03, 2016 at 11:41:51AM +0100, Vladimir Murzin wrote:
+> On 03/05/16 11:32, Russell King - ARM Linux wrote:
+> > On Tue, May 03, 2016 at 11:22:17AM +0100, Vladimir Murzin wrote:
+> >> On 28/04/16 17:51, Vladimir Murzin wrote:
+> >>> Small set of fixes discovered with R-class cores.
+> >>>
+> >>> Jean-Philippe Brucker (2):
+> >>>   ARM: nommu: fix PMSAv7 setup
+> >>>   ARM: nommu: change memory reserve for the vectors
+> >>>
+> >>> Vladimir Murzin (1):
+> >>>   ARM: domain: move {set,get}_domain under config guard
+> >>>
+> >>>  arch/arm/include/asm/domain.h |   11 +++++++++++
+> >>>  arch/arm/kernel/head-nommu.S  |    2 +-
+> >>>  arch/arm/mm/nommu.c           |   15 ++++++++-------
+> >>>  3 files changed, 20 insertions(+), 8 deletions(-)
+> >>>
+> >>
+> >> Russell, any objection to get it into patch tracker?
+> > 
+> > I've not had any chance to look at them yet - last weekend, I was away
+> > from Thursday through until late Tuesday, then I spent most of Wednesday
+> > and Thursday catching up.  Friday I was able to look at some stuff, and
+> > then I've spent the bank holiday weekend digging out laurels in the front
+> > garden.  I've only just today got back to looking at some kernel stuff.
+> > 
+> > So really, I've only had two days in the last week and a half to look at
+> > anything.
+> > 
+> > Please wait a little while longer.  Thanks.
+> 
+> Thanks for prompt reply! I wasn't aware you've been off, patches can wait.
 
-So if s5p_mfc_open() function is called before s5p_mfc_probe() finishes
-(since the video dev is already registered), a NULL pointer dereference
-will happen due s5p_mfc_open() accessing uninitialized vars such as the
-struct s5p_mfc_dev .watchdog_timer and .mfc_ops fields.
+Thanks for waiting, I've now looked through them and they look fine to me.
 
-An example is following BUG caused by add_timer() getting a NULL pointer:
+Please put them in the patch system, thanks.
 
-[   45.765374] kernel BUG at kernel/time/timer.c:790!
-[   45.765381] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
-...
-[   45.766149] [<c016fdf4>] (mod_timer) from [<bf181d18>] (s5p_mfc_open+0x274/0x4d4 [s5p_mfc])
-[   45.766416] [<bf181d18>] (s5p_mfc_open [s5p_mfc]) from [<bf0214a0>] (v4l2_open+0x9c/0x100 [videodev])
-[   45.766547] [<bf0214a0>] (v4l2_open [videodev]) from [<c01e355c>] (chrdev_open+0x9c/0x178)
-[   45.766575] [<c01e355c>] (chrdev_open) from [<c01dceb4>] (do_dentry_open+0x1e0/0x300)
-[   45.766595] [<c01dceb4>] (do_dentry_open) from [<c01ec2f0>] (path_openat+0x800/0x10d4)
-[   45.766610] [<c01ec2f0>] (path_openat) from [<c01ed8b8>] (do_filp_open+0x5c/0xc0)
-[   45.766624] [<c01ed8b8>] (do_filp_open) from [<c01de218>] (do_sys_open+0x10c/0x1bc)
-[   45.766642] [<c01de218>] (do_sys_open) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
-[   45.766655] Code: eaffffe3 e3a00001 e28dd008 e8bd81f0 (e7f001f2)
-
-Fix it by registering the video devs as the last step in s5p_mfc_probe().
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 39 +++++++++++++++++---------------
- 1 file changed, 21 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index beb4fd5bd326..501d822cad6b 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1212,14 +1212,6 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 	vfd->vfl_dir	= VFL_DIR_M2M;
- 	snprintf(vfd->name, sizeof(vfd->name), "%s", S5P_MFC_DEC_NAME);
- 	dev->vfd_dec	= vfd;
--	ret = video_register_device(vfd, VFL_TYPE_GRABBER, 0);
--	if (ret) {
--		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
--		video_device_release(vfd);
--		goto err_dec_reg;
--	}
--	v4l2_info(&dev->v4l2_dev,
--		  "decoder registered as /dev/video%d\n", vfd->num);
- 	video_set_drvdata(vfd, dev);
- 
- 	/* encoder */
-@@ -1237,14 +1229,6 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 	vfd->vfl_dir	= VFL_DIR_M2M;
- 	snprintf(vfd->name, sizeof(vfd->name), "%s", S5P_MFC_ENC_NAME);
- 	dev->vfd_enc	= vfd;
--	ret = video_register_device(vfd, VFL_TYPE_GRABBER, 0);
--	if (ret) {
--		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
--		video_device_release(vfd);
--		goto err_enc_reg;
--	}
--	v4l2_info(&dev->v4l2_dev,
--		  "encoder registered as /dev/video%d\n", vfd->num);
- 	video_set_drvdata(vfd, dev);
- 	platform_set_drvdata(pdev, dev);
- 
-@@ -1261,15 +1245,34 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 	s5p_mfc_init_hw_cmds(dev);
- 	s5p_mfc_init_regs(dev);
- 
-+	/* Register decoder and encoder */
-+	ret = video_register_device(dev->vfd_dec, VFL_TYPE_GRABBER, 0);
-+	if (ret) {
-+		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
-+		video_device_release(dev->vfd_dec);
-+		goto err_dec_reg;
-+	}
-+	v4l2_info(&dev->v4l2_dev,
-+		  "decoder registered as /dev/video%d\n", dev->vfd_dec->num);
-+
-+	ret = video_register_device(dev->vfd_enc, VFL_TYPE_GRABBER, 0);
-+	if (ret) {
-+		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
-+		video_device_release(dev->vfd_enc);
-+		goto err_enc_reg;
-+	}
-+	v4l2_info(&dev->v4l2_dev,
-+		  "encoder registered as /dev/video%d\n", dev->vfd_enc->num);
-+
- 	pr_debug("%s--\n", __func__);
- 	return 0;
- 
- /* Deinit MFC if probe had failed */
- err_enc_reg:
--	video_device_release(dev->vfd_enc);
--err_enc_alloc:
- 	video_unregister_device(dev->vfd_dec);
- err_dec_reg:
-+	video_device_release(dev->vfd_enc);
-+err_enc_alloc:
- 	video_device_release(dev->vfd_dec);
- err_dec_alloc:
- 	v4l2_device_unregister(&dev->v4l2_dev);
 -- 
-2.5.5
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
