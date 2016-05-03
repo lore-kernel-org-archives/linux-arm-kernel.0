@@ -1,41 +1,129 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 03 May 2016 11:21:23 +0100
-Subject: [PATCH kexec-tools 04/32] kdump: fix kdump mapping
-In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-Message-ID: <E1axXSF-0004hH-Oo@e0050434b2927.dyn.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 11:21:36 +0100
+Subject: [PATCH v2 46/54] KVM: arm/arm64: vgic-new: Add userland GIC CPU
+ interface access
+In-Reply-To: <1461861973-26464-47-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-47-git-send-email-andre.przywara@arm.com>
+Message-ID: <57287BB0.7000709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kdump tries to map the program header, it fails to take account
-of ehdr->e_phoff being an offset from the start of the ELF "file",
-which causes:
+On 28/04/16 17:46, Andre Przywara wrote:
+> Using the VMCR accessors we provide access to GIC CPU interface state
+> to userland by wiring it up to the existing userland interface.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-kvm-device.c | 72 ++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 71 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index 38260ae..eaf5c1d 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -17,8 +17,11 @@
+>  #include <kvm/vgic/vgic.h>
+>  #include <linux/uaccess.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <linux/irqchip/arm-gic.h>
+>  #include "vgic.h"
+>  
+> +#define GICC_ARCH_VERSION_V2		0x2
+> +
+>  /* common helpers */
+>  
+>  static int vgic_ioaddr_overlap(struct kvm *kvm)
+> @@ -252,6 +255,69 @@ void kvm_register_vgic_device(unsigned long type)
+>  	}
+>  }
+>  
+> +static u32 vgic_read_vcpuif(struct kvm_vcpu *vcpu, int offset)
+> +{
+> +	struct vgic_vmcr vmcr;
+> +	u32 *field;
+> +
+> +	switch (offset) {
+> +	case GIC_CPU_CTRL:
+> +		field = &vmcr.ctlr;
+> +		break;
+> +	case GIC_CPU_PRIMASK:
+> +		field = &vmcr.pmr;
+> +		break;
+> +	case GIC_CPU_BINPOINT:
+> +		field = &vmcr.bpr;
+> +		break;
+> +	case GIC_CPU_ALIAS_BINPOINT:
+> +		field = &vmcr.abpr;
+> +		break;
+> +	case GIC_CPU_IDENT:
+> +		return (PRODUCT_ID_KVM << 20) |
+> +		       (GICC_ARCH_VERSION_V2 << 16) |
+> +		       (IMPLEMENTER_ARM << 0);
+> +	default:
+> +		return 0;
+> +	}
+> +
+> +	vgic_get_vmcr(vcpu, &vmcr);
+> +
+> +	return *field;
+> +}
+> +
+> +static bool vgic_write_vcpuif(struct kvm_vcpu *vcpu, int offset, u32 value)
+> +{
+> +	struct vgic_vmcr vmcr;
+> +	u32 *field;
+> +
+> +	switch (offset) {
+> +	case GIC_CPU_CTRL:
+> +		field = &vmcr.ctlr;
+> +		break;
+> +	case GIC_CPU_PRIMASK:
+> +		field = &vmcr.pmr;
+> +		break;
+> +	case GIC_CPU_BINPOINT:
+> +		field = &vmcr.bpr;
+> +		break;
+> +	case GIC_CPU_ALIAS_BINPOINT:
+> +		field = &vmcr.abpr;
+> +		break;
+> +	default:
+> +		return false;
+> +	}
+> +
+> +	vgic_get_vmcr(vcpu, &vmcr);
+> +	if (*field == value)
+> +		return false;
+> +
+> +	*field = value;
+> +	vgic_set_vmcr(vcpu, &vmcr);
+> +
+> +	return true;
+> +}
+> +
+>  /** vgic_attr_regs_access: allows user space to read/write VGIC registers
+>   *
+>   * @dev: kvm device handle
+> @@ -300,7 +366,11 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+>  
+>  	switch (attr->group) {
+>  	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+> -		ret = -EINVAL;
+> +		ret = 0;
+> +		if (is_write)
+> +			vgic_write_vcpuif(vcpu, addr, *reg);
+> +		else
+> +			*reg = vgic_read_vcpuif(vcpu, addr);
+>  		break;
+>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>  		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
+> 
 
-Cannot mmap /dev/mem offset: 64 size: 392: Invalid argument
+Shouldn't we have this implemented as an MMIO table, and moved to the
+vgic-v2-mmio.c file?
 
-Ensure that we take account of the start address when mapping this.
+Thanks,
 
-This fix has been extracted from a larger patch by Vitaly Andrianov
-adding support for Keystone 2.
-
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kdump/kdump.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/kdump/kdump.c b/kdump/kdump.c
-index 1f5b984..34d2149 100644
---- a/kdump/kdump.c
-+++ b/kdump/kdump.c
-@@ -284,7 +284,8 @@ int main(int argc, char **argv)
- 	}
- 	
- 	/* Get the program header */
--	phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), ehdr->e_phoff);
-+	phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), 
-+			start_addr + ehdr->e_phoff);
- 
- 	/* Collect up the notes */
- 	note_bytes = 0;
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
