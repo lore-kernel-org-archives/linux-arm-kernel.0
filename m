@@ -1,51 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 3 May 2016 11:16:38 +0300
-Subject: [PATCH v2 2/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
-In-Reply-To: <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
-References: <20160427171658.GA5995@atomide.com>
- <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
- <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
-Message-ID: <57285E66.2000708@ti.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 3 May 2016 10:18:06 +0200
+Subject: [PATCH] drm/fsl-dcu: add COMMON_CLK dependency
+In-Reply-To: <96882621acf64dca8d6c1d2f25307385@agner.ch>
+References: <1462186839-2224021-1-git-send-email-arnd@arndb.de>
+ <96882621acf64dca8d6c1d2f25307385@agner.ch>
+Message-ID: <20160503081806.GE14148@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/16 20:12, J.D. Schroeder wrote:
-> From: "J.D. Schroeder" <jay.schroeder@garmin.com>
->
-> This commit updates the OSC_32K_CLK (secure_32k_clk_src_ck) frequency
-> from the precise 32kHz frequency (i.e., 32.768 kHz) to a more
-> accurate frequency of ~34.6 kHz. Actual measured frequencies of the
-> clock vary from processor to processor anywhere from 34.4 kHz up to
-> 34.8 kHz. Note that the ~34 kHz frequency clock is generated
-> internally by the processor, not an input to the processor. This
-> change makes it more clear that the consumer of the
-> secure_32k_clk_src_ck will not get a precise 32.768 kHz frequency
-> output.
->
-> Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
-> Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
-> ---
->   arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index 3f0c61d..f7ec976 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -95,7 +95,7 @@
->   	secure_32k_clk_src_ck: secure_32k_clk_src_ck {
->   		#clock-cells = <0>;
->   		compatible = "fixed-clock";
-> -		clock-frequency = <32768>;
-> +		clock-frequency = <34600>; /* approximate frequency */
->   	};
->
->   	sys_clk32_crystal_ck: sys_clk32_crystal_ck {
->
+On Mon, May 02, 2016 at 02:22:04PM -0700, Stefan Agner wrote:
+> On 2016-05-02 04:00, Arnd Bergmann wrote:
+> > The fsl dcu now uses the clk-provider interfaces, which are not available
+> > when CONFIG_COMMON_CLK is disabled:
+> > 
+> > drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c: In function 'fsl_dcu_drm_probe':
+> > drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c:362:20: error: implicit
+> > declaration of function '__clk_get_name'
+> > [-Werror=implicit-function-declaration]
+> >   pix_clk_in_name = __clk_get_name(pix_clk_in);
+> > 
+> > This adds a Kconfig dependency to prevent the driver from being enabled
+> > in this case.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: 2d701449bce1 ("drm/fsl-dcu: use common clock framework for
+> > pixel clock divider")
+> 
+> Oh right, thx!
+> 
+> Acked-by: Stefan Agner <stefan@agner.ch>
+> 
+> @Dave, can you pick that up directly or do you prefer a pull request?
 
-I still don't agree with this patch. The actual frequency can drift much 
-more, you are just seeing this number at your setup. There is some 
-internal discussion going on in TI about this, but I can't share any 
-data on this yet.
+Smashed into drm-misc, thanks.
+-Daniel
 
--Tero
+> 
+> --
+> Stefan
+> 
+> > ---
+> >  drivers/gpu/drm/fsl-dcu/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpu/drm/fsl-dcu/Kconfig b/drivers/gpu/drm/fsl-dcu/Kconfig
+> > index c78cf3f605d0..b9c714de6e40 100644
+> > --- a/drivers/gpu/drm/fsl-dcu/Kconfig
+> > +++ b/drivers/gpu/drm/fsl-dcu/Kconfig
+> > @@ -1,6 +1,6 @@
+> >  config DRM_FSL_DCU
+> >  	tristate "DRM Support for Freescale DCU"
+> > -	depends on DRM && OF && ARM
+> > +	depends on DRM && OF && ARM && COMMON_CLK
+> >  	select BACKLIGHT_CLASS_DEVICE
+> >  	select BACKLIGHT_LCD_SUPPORT
+> >  	select DRM_KMS_HELPER
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
