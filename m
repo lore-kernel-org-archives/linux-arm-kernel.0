@@ -1,9 +1,9 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue,  3 May 2016 23:58:04 +0800
-Subject: [GIT PULL 4/6] Freescale/NXP arm64 device tree updates for 4.7
+Date: Tue,  3 May 2016 23:58:05 +0800
+Subject: [GIT PULL 5/6] i.MX defconfig updates for 4.7
 In-Reply-To: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
 References: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1462291086-19925-4-git-send-email-shawnguo@kernel.org>
+Message-ID: <1462291086-19925-5-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,52 +13,32 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.7
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.7
 
-for you to fetch changes up to bb4b4e93febc139003e2af2f36e438df58b4803c:
+for you to fetch changes up to 2ead04d9d69ebded61da063cb5a8ade72da6c8f5:
 
-  arm64: dts: ls2080a: fsl-mc dt node updates (2016-04-26 11:25:44 +0800)
-
-----------------------------------------------------------------
-The Freescale/NXP arm64 device tree updates for 4.7:
- - New board support of LS1043a-QDS from Freescale/NXP
- - Add new compatible for LS1043A and LS2080A GPIO devices
- - Update device tree bindings and sources for LS2080A fsl-mc device
- - Update QSPI and DSPI support on LS1043A and LS2080A
+  ARM: imx_v6_v7_defconfig: add CONFIG_MICREL_PHY (2016-05-03 20:58:07 +0800)
 
 ----------------------------------------------------------------
-Hou Zhiqiang (1):
-      Documentation: DT: Add entry for Freescale LS1043a-QDS board
+The i.MX defconfig updates for 4.7:
+ - Update multi_v5_defconfig for i.MX21/27 and systemd support
+ - Update imx_v6_v7_defconfig to support devices found on various i.MX6
+   board: FT5x06 and TSC2004 touch, I2C GPIO, MICREL PHY and M41T80 RTC
 
-Liu Gang (2):
-      arm64: dts: ls1043a: Add compatible "fsl,qoriq-gpio" for ls1043a gpio nodes
-      arm64: dts: ls2080a: Add compatible "fsl,ls2080a-gpio" for ls2080a gpio nodes
+----------------------------------------------------------------
+Gary Bisson (3):
+      ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch support
+      ARM: imx_v6_v7_defconfig: add CONFIG_I2C_MUX_GPIO
+      ARM: imx_v6_v7_defconfig: add CONFIG_RTC_DRV_M41T80
 
-Shaohui Xie (1):
-      arm64: dts: add LS1043a-QDS board support
+Jan Luebbe (2):
+      ARM: multi_v5_defconfig: Enable support for MX21/MX27
+      ARM: multi_v5_defconfig: Enable recommended options for systemd
 
-Stuart Yoder (2):
-      Documentation: fsl-mc: binding updates for MSIs, ranges, PHYs
-      arm64: dts: ls2080a: fsl-mc dt node updates
+Marcel Ziswiler (2):
+      ARM: imx_v6_v7_defconfig: add CONFIG_I2C_GPIO
+      ARM: imx_v6_v7_defconfig: add CONFIG_MICREL_PHY
 
-Yuan Yao (4):
-      Documentation: fsl: dspi: Add fsl,ls2080a-dspi compatible string
-      arm64: dts: ls2080a: update the DTS for QSPI and DSPI support
-      Documentation: fsl-quadspi: Add fsl,ls1043a-qspi compatible string
-      arm64: dts: ls1043a: add the DTS node for QSPI support
-
-Yunhui Cui (1):
-      arm64: dts: ls1043a-rdb: add the DTS for DSPI support
-
- Documentation/devicetree/bindings/arm/fsl.txt      |   4 +
- .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  81 ++++++++-
- .../devicetree/bindings/mtd/fsl-quadspi.txt        |   3 +-
- .../devicetree/bindings/spi/spi-fsl-dspi.txt       |   5 +-
- arch/arm64/boot/dts/freescale/Makefile             |   3 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 181 +++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  13 ++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  22 ++-
- arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |   9 +-
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 110 ++++++++++++-
- 10 files changed, 416 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+ arch/arm/configs/imx_v6_v7_defconfig |  6 ++++++
+ arch/arm/configs/multi_v5_defconfig  | 21 ++++++++++++++++++---
+ 2 files changed, 24 insertions(+), 3 deletions(-)
