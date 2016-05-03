@@ -1,115 +1,37 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 03 May 2016 11:23:18 +0100
-Subject: [PATCH kexec-tools 26/32] arm: rename crash_reserved_mem to
- crash_kernel_mem
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 May 2016 11:29:59 +0100
+Subject: [PATCH 06/12] ARM: kexec: advertise location of bootable RAM
 In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-Message-ID: <E1axXU6-0004jU-At@e0050434b2927.dyn.arm.linux.org.uk>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <E1aviF4-0000jG-MO@rmk-PC.arm.linux.org.uk>
+ <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+Message-ID: <20160503102959.GM19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename crash_reserved_mem to crash_kernel_mem as we want to support
-multiple reserved memory ranges.
+On Fri, Apr 29, 2016 at 08:26:00PM +0530, Pratyush Anand wrote:
+> Can you please also share git tree path of corresponding kexec-tools changes?
 
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/arch/arm/crashdump-arm.c | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+On their way as a 32-patch series.  I've found the userspace tools to be
+in particularly poor shape, so some of the patches are fixing that up.
+I can't believe that anyone uses these userspace tools, because there
+are some fundamental bugs present in this code which go back years.
+However, the repository does seem to be maintained, with the latest
+commit within the last two months (or day when I started working on
+this.)
 
-diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index f2e6a0d..1a6ab88 100644
---- a/kexec/arch/arm/crashdump-arm.c
-+++ b/kexec/arch/arm/crashdump-arm.c
-@@ -53,7 +53,7 @@ struct memory_ranges usablemem_rgns = {
- };
- 
- /* memory range reserved for crashkernel */
--static struct memory_range crash_reserved_mem;
-+static struct memory_range crash_kernel_mem;
- 
- static struct crash_elf_info elf_info = {
- 	.class		= ELFCLASS32,
-@@ -140,7 +140,7 @@ static int get_kernel_page_offset(struct kexec_info *info,
-  */
- static void crash_exclude_range(void)
- {
--	const struct memory_range *range = &crash_reserved_mem;
-+	const struct memory_range *range = &crash_kernel_mem;
- 	int i;
- 
- 	for (i = 0; i < usablemem_rgns.size; i++) {
-@@ -262,8 +262,8 @@ static void dump_memory_ranges(void)
- 		return;
- 
- 	dbgprintf("crashkernel: [%#llx - %#llx] (%ldM)\n",
--		  crash_reserved_mem.start, crash_reserved_mem.end,
--		  (unsigned long)range_size(&crash_reserved_mem) >> 20);
-+		  crash_kernel_mem.start, crash_kernel_mem.end,
-+		  (unsigned long)range_size(&crash_kernel_mem) >> 20);
- 
- 	for (i = 0; i < usablemem_rgns.size; i++) {
- 		struct memory_range *r = usablemem_rgns.ranges + i;
-@@ -313,10 +313,10 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
- 	 * Ensure that the crash kernel memory range is sane. The crash kernel
- 	 * must be located within memory which is visible during booting.
- 	 */
--	if (crash_reserved_mem.end > ARM_MAX_VIRTUAL) {
-+	if (crash_kernel_mem.end > ARM_MAX_VIRTUAL) {
- 		fprintf(stderr,
- 			"Crash kernel memory [0x%llx-0x%llx] is inaccessible at boot - unable to load crash kernel\n",
--			crash_reserved_mem.start, crash_reserved_mem.end);
-+			crash_kernel_mem.start, crash_kernel_mem.end);
- 		return -1;
- 	}
- 
-@@ -349,8 +349,8 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
- 	 * regions to be aligned to SECTION_SIZE.
- 	 */
- 	elfcorehdr = add_buffer_phys_virt(info, buf, bufsz, bufsz, 1 << 20,
--					  crash_reserved_mem.start,
--					  crash_reserved_mem.end, -1, 0);
-+					  crash_kernel_mem.start,
-+					  crash_kernel_mem.end, -1, 0);
- 
- 	dbgprintf("elfcorehdr: %#lx\n", elfcorehdr);
- 	cmdline_add_elfcorehdr(mod_cmdline, elfcorehdr);
-@@ -360,7 +360,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
- 	 * prevents the dump capture kernel from using any other memory regions
- 	 * which belong to the primary kernel.
- 	 */
--	cmdline_add_mem(mod_cmdline, elfcorehdr - crash_reserved_mem.start);
-+	cmdline_add_mem(mod_cmdline, elfcorehdr - crash_kernel_mem.start);
- 
- 	dump_memory_ranges();
- 	dbgprintf("kernel command line: \"%s\"\n", mod_cmdline);
-@@ -377,7 +377,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
-  * @length: size of the memory region
-  *
-  * This function is called for each memory range in /proc/iomem, stores
-- * the location of the crash kernel range into @crash_reserved_mem, and
-+ * the location of the crash kernel range into @crash_kernel_mem, and
-  * stores the system RAM into @usablemem_rgns.
-  */
- static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
-@@ -385,9 +385,9 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
- 				unsigned long long length)
- {
- 	if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0) {
--		crash_reserved_mem.start = base;
--		crash_reserved_mem.end = base + length - 1;
--		crash_reserved_mem.type = RANGE_RAM;
-+		crash_kernel_mem.start = base;
-+		crash_kernel_mem.end = base + length - 1;
-+		crash_kernel_mem.type = RANGE_RAM;
- 	}
- 	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0) {
- 		return mem_regions_add(&usablemem_rgns,
-@@ -407,5 +407,5 @@ int is_crashkernel_mem_reserved(void)
- {
- 	kexec_iomem_for_each_line(NULL, iomem_range_callback, NULL);
- 
--	return crash_reserved_mem.start != crash_reserved_mem.end;
-+	return crash_kernel_mem.start != crash_kernel_mem.end;
- }
+They're based upon 2.0.12-rc1 (93d3a617) of the
+
+	git://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git
+
+repository, which was the latest commit when I started working on this
+back in March.  Things may have moved forwards since then - I've not
+been able to check yet.  However, this set of changes should be
+sufficient to get an idea of what's required on the userspace side.
+
+Thanks.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
