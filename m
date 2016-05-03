@@ -1,73 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 May 2016 20:59:17 -0300
-Subject: mx6ul: Finding a good place to configure SAI2_MCLK
-Message-ID: <CAOMZO5CvT1rcHFPm6KoCBBgM1UACByLUQcJ_zDxY9ucbxCpgYA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 2 May 2016 17:02:48 -0700
+Subject: [GIT PULL] clk: tegra: Changes for v4.7-rc1
+In-Reply-To: <1461945596-24090-1-git-send-email-thierry.reding@gmail.com>
+References: <1461945596-24090-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20160503000248.GB3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/29, Thierry Reding wrote:
+> Hi Michael, Stephen,
+> 
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> 
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.7-clk
+> 
+> for you to fetch changes up to 2690e912644e610854c4c3b23d0a0daec9d030ca:
+> 
+>   clk: tegra: dfll: Reformat CVB frequency table (2016-04-28 12:41:54 +0200)
+> 
+> Note that the first patch is this pull request is a dependency for a
+> larger series that will have to go in through the ARM-SoC tree in order
+> to properly handle the dependencies.
+> 
 
-In order to get audio working on imx6ul-evk board we need to enable
-the SAI2 MCLK clock by setting bit 20 (SAI2_MCLK_DIR) of the
-IOMUXC_GPR_GPR1 register.
+Thanks. Pulled.
 
-I am not sure where is the appropriate place to set this bit.
+Are there any thoughts on making that hw control stuff more
+generic? Perhaps using something like power domains to do that
+instead of having drivers cross-call to the clk driver with
+custom tegra APIs?
 
-Doing like this works fine:
-
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -447,5 +447,6 @@
- #define IMX6UL_GPR1_ENET2_CLK_OUTPUT           (0x1 << 18)
- #define IMX6UL_GPR1_ENET_CLK_DIR               (0x3 << 17)
- #define IMX6UL_GPR1_ENET_CLK_OUTPUT            (0x3 << 17)
-+#define IMX6UL_GPR1_SAI2_MCLK_DIR              (0x1 << 20)
-
-index a38b16b..92cfb0f 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -56,6 +56,19 @@ static inline void imx6ul_enet_init(void)
-        imx6ul_enet_phy_init();
- }
-
-+static void __init imx6ul_mclk_init(void)
-+{
-+       struct regmap *gpr;
-+
-+       gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
-+       if (!IS_ERR(gpr))
-+               regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_SAI2_MCLK_DIR,
-+                                  IMX6UL_GPR1_SAI2_MCLK_DIR);
-+       else
-+               pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
-+
-+}
-+
- static void __init imx6ul_init_machine(void)
- {
-        struct device *parent;
-@@ -68,6 +81,7 @@ static void __init imx6ul_init_machine(void)
-        imx6ul_enet_init();
-        imx_anatop_init();
-        imx6ul_pm_init();
-+       imx6ul_mclk_init();
- }
-
-but it does not seem correct as this should be board specific. Should
-we call it only if the compatible string matches imx6sl-14x14-evk
-string? Looks like that will not scale as well.
-
-Currently in arch/arm/mach-imx/mach-imx6ul.c we also have
-imx6ul_enet_clk_init() function which sets the ENET_CLK in the GPR1
-register.
-
-IMHO this is not correct because not all mx6ul boards need such clock
-and then we need to change this too.
-
-So where should we set the SAI2_MCLK_DIR bit of GPR1? Inside the SAI driver?
-
-Appreciate some feedback.
-
-Thanks,
-
-Fabio Estevam
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
