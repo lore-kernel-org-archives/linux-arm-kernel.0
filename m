@@ -1,34 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 3 May 2016 12:45:07 -0300
-Subject: [PATCH] ARM: dts: imx: Remove unneeded unit-addresses
-In-Reply-To: <CAOMZO5AO15UmNJARS9aL-U=CjYnUq0D9S38NYHC8w2DLwOeR_A@mail.gmail.com>
-References: <1462283851-10820-1-git-send-email-fabio.estevam@nxp.com>
- <CAL_JsqKv_7ufFG7DSkxqp9QOEjLEDVofyYMoudtJjqBA78ahcA@mail.gmail.com>
- <CAOMZO5AO15UmNJARS9aL-U=CjYnUq0D9S38NYHC8w2DLwOeR_A@mail.gmail.com>
-Message-ID: <CAOMZO5BXFL47p=WTPDDRFGq38yktmB1FnbOTWJ37mrWsKkeUSQ@mail.gmail.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 3 May 2016 17:46:00 +0200
+Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
+ code
+In-Reply-To: <20160426110229.GA5374@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <1461236675-10176-10-git-send-email-peter.griffin@linaro.org>
+ <20160421155753.GS3217@sirena.org.uk>
+ <20160426110229.GA5374@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <5728C7B8.5050903@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 12:42 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, May 3, 2016 at 12:37 PM, Rob Herring <robh@kernel.org> wrote:
->
->> Presumably these are register offsets which could be useful to have
->> even if the Linux driver doesn't use them. But either way is fine with
->> me.
->
-> Yes, these are register offsets.
->
->                 reg_3p0: regulator-3p0 {
->                     compatible = "fsl,anatop-regulator";
->                     regulator-name = "vdd3p0";
->                     regulator-min-microvolt = <2625000>;
->                     regulator-max-microvolt = <3400000>;
->                     anatop-reg-offset = <0x120>;
 
-Sorry, pressed the 'send' button too quickly.
 
-There is a "anatop-reg-offset = <0x120>;" property that is used to
-pass the offset to the anatop regulator driver, so that's why I
-preferred to remove the unneeded unit-address.
+On 04/26/2016 01:02 PM, Peter Griffin wrote:
+> Hi Mark,
+> 
+> On Thu, 21 Apr 2016, Mark Brown wrote:
+> 
+>> On Thu, Apr 21, 2016 at 12:04:26PM +0100, Peter Griffin wrote:
+>>> uniperiph-id, version and mode are ST specific bindings and
+>>> need the 'st,' prefix. Update the examples, as otherwise copying
+>>> them yields a runtime error parsing the DT node.
+>>
+>> I'm not sure what connection this or the other ASoC documentation update
+>> have to the rest of the series?
+> 
+> The ASoC DT bindings are missing upstream as the ASoC driver depends on the
+> fdma driver. So this series adds the fdma driver, fdma dt bindings,
+> and also the missing ASoC dt bindings.
+> 
+> Whilst doing this and getting it working I noticed a few discrepencies
+> in the ASoC dt binding documentation versus the driver so also fixed that.
+> 
+> Once this whole series is applied the end result is working
+> audio upstream for STi platforms (as ASoC is the only upstream driver
+> using fdma currently).
 
-Thanks
+Hi Peter,
+I also noticed the error in bindings, i'm planning to correct it with
+DTS upstream for STI ASoC after FDMA has been accepted.
+So if you estimate that it is simplier for FDMA upstream, you can drop
+ASoC patches in you next version.
+
+Regards,
+Arnaud
