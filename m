@@ -1,45 +1,96 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  3 May 2016 11:33:35 -0600
-Subject: [PATCH 01/27] coresight: no need to do the forced type conversion
+Date: Tue,  3 May 2016 11:33:37 -0600
+Subject: [PATCH 03/27] stm class: Support devices that override software
+ assigned masters
 In-Reply-To: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1462296841-12327-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1462296841-12327-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: lipengcheng <lipengcheng8@huawei.com>
+From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-activated and enable are already unsigned type,
-no need to change them to unsigned.
+Some STM devices adjust software assigned master numbers depending on
+the trace source and its runtime state and whatnot. This patch adds
+a sysfs attribute to inform the trace-side software that master numbers
+assigned to software sources will not match those in the STP stream,
+so that, for example, master/channel allocation policy can be adjusted
+accordingly.
 
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- drivers/hwtracing/coresight/coresight.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/ABI/testing/sysfs-class-stm | 10 ++++++++++
+ drivers/hwtracing/stm/core.c              | 15 +++++++++++++++
+ include/linux/stm.h                       |  3 +++
+ 3 files changed, 28 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 2ea5961092c1..945bc31f0ec5 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -514,7 +514,7 @@ static ssize_t enable_sink_show(struct device *dev,
- {
- 	struct coresight_device *csdev = to_coresight_device(dev);
+diff --git a/Documentation/ABI/testing/sysfs-class-stm b/Documentation/ABI/testing/sysfs-class-stm
+index c9aa4f3fc9a7..77ed3da0f68e 100644
+--- a/Documentation/ABI/testing/sysfs-class-stm
++++ b/Documentation/ABI/testing/sysfs-class-stm
+@@ -12,3 +12,13 @@ KernelVersion:	4.3
+ Contact:	Alexander Shishkin <alexander.shishkin@linux.intel.com>
+ Description:
+ 		Shows the number of channels per master on this STM device.
++
++What:		/sys/class/stm/<stm>/hw_override
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Alexander Shishkin <alexander.shishkin@linux.intel.com>
++Description:
++		Reads as 0 if master numbers in the STP stream produced by
++		this stm device will match the master numbers assigned by
++		the software or 1 if the stm hardware overrides software
++		assigned masters.
+diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
+index 2591442e2c5b..ff31108b066f 100644
+--- a/drivers/hwtracing/stm/core.c
++++ b/drivers/hwtracing/stm/core.c
+@@ -67,9 +67,24 @@ static ssize_t channels_show(struct device *dev,
  
--	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
-+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
- }
+ static DEVICE_ATTR_RO(channels);
  
- static ssize_t enable_sink_store(struct device *dev,
-@@ -544,7 +544,7 @@ static ssize_t enable_source_show(struct device *dev,
- {
- 	struct coresight_device *csdev = to_coresight_device(dev);
++static ssize_t hw_override_show(struct device *dev,
++				struct device_attribute *attr,
++				char *buf)
++{
++	struct stm_device *stm = to_stm_device(dev);
++	int ret;
++
++	ret = sprintf(buf, "%u\n", stm->data->hw_override);
++
++	return ret;
++}
++
++static DEVICE_ATTR_RO(hw_override);
++
+ static struct attribute *stm_attrs[] = {
+ 	&dev_attr_masters.attr,
+ 	&dev_attr_channels.attr,
++	&dev_attr_hw_override.attr,
+ 	NULL,
+ };
  
--	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
-+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
- }
- 
- static ssize_t enable_source_store(struct device *dev,
+diff --git a/include/linux/stm.h b/include/linux/stm.h
+index 1a79ed8e43da..8369d8a8cabd 100644
+--- a/include/linux/stm.h
++++ b/include/linux/stm.h
+@@ -50,6 +50,8 @@ struct stm_device;
+  * @sw_end:		last STP master available to software
+  * @sw_nchannels:	number of STP channels per master
+  * @sw_mmiosz:		size of one channel's IO space, for mmap, optional
++ * @hw_override:	masters in the STP stream will not match the ones
++ *			assigned by software, but are up to the STM hardware
+  * @packet:		callback that sends an STP packet
+  * @mmio_addr:		mmap callback, optional
+  * @link:		called when a new stm_source gets linked to us, optional
+@@ -85,6 +87,7 @@ struct stm_data {
+ 	unsigned int		sw_end;
+ 	unsigned int		sw_nchannels;
+ 	unsigned int		sw_mmiosz;
++	unsigned int		hw_override;
+ 	ssize_t			(*packet)(struct stm_data *, unsigned int,
+ 					  unsigned int, unsigned int,
+ 					  unsigned int, unsigned int,
 -- 
 2.5.0
