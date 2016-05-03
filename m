@@ -1,93 +1,25 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 3 May 2016 19:47:17 +0530
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <5728ABE0.5040000@roeck-us.net>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <57289594.3050801@codeaurora.org>
- <20160503132439.GC13045@dhcppc6.redhat.com>
- <5728ABE0.5040000@roeck-us.net>
-Message-ID: <20160503141717.GD13045@dhcppc6.redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 May 2016 15:17:23 +0100
+Subject: next-20160503 build: 1 failures 12 warnings (next-20160503)
+In-Reply-To: <E1axZpG-000664-AK@optimist>
+References: <E1axZpG-000664-AK@optimist>
+Message-ID: <20160503141723.GR6292@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On Tue, May 03, 2016 at 01:53:18PM +0100, Build bot for Mark Brown wrote:
 
-On 03/05/2016:06:47:12 AM, Guenter Roeck wrote:
-> On 05/03/2016 06:24 AM, Pratyush Anand wrote:
-> >On 03/05/2016:07:12:04 AM, Timur Tabi wrote:
-> >>Pratyush Anand wrote:
-> >>>+ * Note: This watchdog timer has two stages. If action is 0, first stage is
-> >>>+ * determined by directly programming WCV and second by WOR. When first
-> >>>+ * timeout is reached, WS0 is triggered and WCV is reloaded with value in
-> >>>+ * WOR. WS0 interrupt will be ignored, then the second watch period starts;
-> >>>+ * when second timeout is reached, then WS1 is triggered, system resets. WCV
-> >>>+ * and WOR are programmed in such a way that total time corresponding to
-> >>>+ * WCV+WOR becomes equivalent to user programmed "timeout".
-> >>>+ * If action is 1, then we expect to call panic() at user programmed
-> >>>+ * "timeout". Therefore, we program both first and second stage using WCV
-> >>>+ * only.
-> >>
-> >>So I'm not sure I understand how this works yet, but there was an earlier
-> >>version of Fu's driver that did something similar.  It depended on being
-> >>able to reprogram the hardware during the WS0 interrupt, and that was
-> >>rejected by the community.
-> >>
-> >>How is what you are doing different?
-> >
-> >* Following was the comment for Fu Wei's primitive version of patch [1], because
-> >* of which community rejected it.
-> >
-> >>The triggering of the hardware reset should never depend on an interrupt being
-> >>handled properly.  You should always program WCV correctly in advance.
-> >
-> >Now, there are couple of things different:
-> >
-> >(1) There is an important difference in upstreamed version than the version [1]
-> >which was rejected on above ground. In upstreamed version,  there would be no
-> >interrupt handler when we are in normal mode ie action=0.  So, there is no
-> >possibility of doing any thing in ISR for all normal usage of this timer. In
-> >this mode WCV is always programmed well in advance now.
-> >
-> >(2)action=1 mechanism was introduced to implement a dump saving mechanism if
-> >watchdog timeout expires before next kick. So, the current upstream version
-> >calls panic() in ISR. When action=1, then we do write WCV now in ISR, but there
-> >too some precaution have been taken.
-> >
-> >When action=1, and we land into isr handler sbsa_gwdt_interrupt() we can not
-> >trust watchdog data structure any more. That might have been corrupted.
-> 
-> Why ?
-> 
-> >(i) So it might happen that gwdt or wdd pointers have a corrupted value and as
-> >soon as we access gwdt->wdd or wdd->timeout, kernel panics. *No harm*, just
-> >panic() is called a bit early, which dump saving mechanism would be able to
-> >find. So, in fact it will give an extra information to dump saving mechanism
-> >that watchdog structure was corrupted as well.
-> >(ii) Another case, It might happen that wdd->timeout has been corrupted with
-> >large values. This patch does a protection while programming WCV in ISR. It
-> 
-> How would wdd->timeout be corrupted ?
+Today's -next fails to build an ARM allmodconfig due to:
 
-Most likely it will not be corrupted. But, if ISR has been called it means
-something went wrong, and watchdog was not kicked for the time programmed as
-"timeout". So, probably we should be extra careful.
+> 	arm-allmodconfig
+> ../drivers/pinctrl/bcm/pinctrl-ns2-mux.c:540:17: error: 'pinctrl_utils_dt_free_map' undeclared here (not in a function)
 
-Anyway, there is no side effect of checking wdd->timeout against MAX_TIMEOUT.
-
-Moreover, I was unable to envisage any regression with this patch other than
-that it introduces a bit complexity. But, then it gives us an advantage of
-having any timeout value.
-
-> If what you are say is correct, the interrupt handler can not be trusted, period,
-> and should be disabled entirely.
-
-Yes, When system is hang, then probably we can not trust even interrupt handler.
-We can not be 100% sure that handler will be called, but that is the case with
-existing upstream code as well. In such situation upstream code will also
-misbehave. There is little we can do for such cases.
-
-If one wants to be fully assured for a hardware watchdog reset then the choice
-is action=0. Even after current patch, action=0 will ensure that there would be
-a hardware reset upon timeout.
-
-~Pratyush
+caused by b5aa1006e4a93 (pinctrl: ns2: add pinmux driver support for
+Broadcom NS2 SoC) - presumably just a missing dependency.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160503/33e6ab74/attachment.sig>
