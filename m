@@ -1,90 +1,306 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Tue, 3 May 2016 07:07:11 +0200
-Subject: [PATCH V4 1/2] clk: bcm2835: mark enabled clocks with
- CLK_IS_CRITICAL
-In-Reply-To: <87wpncueoq.fsf@eliezer.anholt.net>
-References: <1461951756-16804-1-git-send-email-kernel@martin.sperl.org>
- <1461951756-16804-2-git-send-email-kernel@martin.sperl.org>
- <87zis8h3pp.fsf@eliezer.anholt.net>
- <5CC0D984-91E5-4401-8AB6-5827269C4395@martin.sperl.org>
- <87wpncueoq.fsf@eliezer.anholt.net>
-Message-ID: <399371FE-CC25-469C-9917-FDFCDA741D56@martin.sperl.org>
+From: sr@denx.de (Stefan Roese)
+Date: Tue,  3 May 2016 07:53:11 +0200
+Subject: [PATCH v8] spi: orion.c: Add direct access mode
+Message-ID: <1462254791-5694-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds support for the direct access mode to the Orion SPI
+driver which is used on the Marvell Armada based SoCs. In this direct
+mode, all data written to (or read from) a specifically mapped MBus
+window (linked to one SPI chip-select on one of the SPI controllers)
+will be transferred directly to the SPI bus. Without the need to control
+the SPI registers in between. This can improve the SPI transfer rate in
+such cases.
 
+Both, direct-read and -write mode are supported. But only the write
+mode has been tested. This mode especially benefits from the SPI direct
+mode, as the data bytes are written head-to-head to the SPI bus,
+without any additional addresses.
 
-> On 03.05.2016, at 03:13, Eric Anholt <eric@anholt.net> wrote:
-> 
-> Martin Sperl <kernel@martin.sperl.org> writes:
-> 
->>> On 02.05.2016, at 17:36, Eric Anholt <eric@anholt.net> wrote:
->>> 
->>> kernel at martin.sperl.org writes:
->>> 
->>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>> 
->>>> The bcm2835 firmware enables several clocks and plls before
->>>> booting the linux kernel.
->>>> 
->>>> These plls should never get disabled as it may result in a
->>>> stopped system clock and more.
->>>> 
->>>> So during probing we check if the clock is enabled
->>>> and if it is then mark that clock with CLK_IS_CRITICAL.
->>>> 
->>>> As a consequence this will also enable the corresponding
->>>> parent plls and pll-divs.
->>>> 
->>>> This is intended as a stop-gap until CLK_ENABLE_HAND_OFF
->>>> becomes available, at which point it should be used instead.
->>>> 
->>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->>> 
->>> I still think that we don't want this patch.  We should be able to
->>> disable clocks that the firmware turned on, unless they really need to
->>> stay on.  If you have troubles on the upstream DT, let's talk about
->>> individual clocks.
->> 
->> May I ask you what is your main concern about using
->> CLK_IS_CRITICAL as a stop-gap/in general?
-> 
-> Burning power when you shouldn't, which is a bug.
-It is a bug, but it is better than a crash that happens currently
-because of a stopped clock.
-Also there is a proposed way forward when hand-off
-becomes available.
+One use-case for this direct write mode is, programming a FPGA bitstream
+image into the FPGA connected to the SPI bus at maximum speed.
 
-> 
->> Also the current situation of the machine crashing when releasing the
->> PCM clock when the parent is PLLC or PLLD is worse than having some
->> clocks/pll running unnecessarily.
-> 
-> Are you saying this happens on the upstream kernel?  This sounds like a
-> bug you'd see in the downstream kernel because they haven't hooked up
-> the clocks in their DT.
-This happens for both upstream and downstream when using
-cprman...
+This mode is described in chapter "22.5.2 Direct Write to SPI" in the
+Marvell Armada XP Functional Spec Datasheet.
 
-You remember the main-uart crashing discussion (when 
-loaded as a module or not used as the kernel console?) it is
-exactly what an unclaimed clock is triggering when the clock
-Is prepared/enabled and then released.
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Mark Brown <broonie@kernel.org>
+---
+v8:
+- Use "/ 4" instead of ">> 2" as suggested by Mark
 
-I have also seen the same issue happen with PCM without
-the patch - as soon as we request a frequency which will use
-pllc/d-per as the parent, and we later release the clock the
-system crashes -  but there only if we run the dt with minimal
-clocks using cprman, as it is hidden as soon as you increase enable
-count of the plls because of an enabled clock by a different
-device that also consumes the same pll.
+v7:
+- Changed tx function to only write the really intended number of
+  bytes (drop DIV_ROUND_UP) as suggested by Arnd
+- Added Arnd's Acked-by
 
-So this bug is mostly hidden behind the complete dts that
-just consumes lots of parent clocks, but it still may occur 
-when we select a frequency that will select the firmware 
-enabled but not claimed plla_per - no idea what stopping
-that pll would trigger in the system.
+v6:
+- Switched from memcpy() to writesl() for the TX transfer.
+- Only one page is mapped via ioremap as this is sufficient for
+  the currently implemented simple TX transfer.
+- Removed max_transfer_size() as its not needed with the current
+  one page mapping that supports an unlimited amount of SPI data.
+- Added a comment to the 'reg' description in the DT bindings
+  documentation as suggested by Arnd.
+- Changed 'reg' and 'ranges' to use '<' and '>' in this file.
+- Changed size to 0xffffffff in this file.
+- Added a small paragraph to the commit text, describing the
+  possibility to support SPI-NOR & SPI-NAND devices via this
+  direct access mode.
 
-Hence we need this patch for the running clocks , but we
-also need it for the pll_divs, so actually my patch is
-incomplete!
+v5:
+- Added some documentation for the direct mode to the orion-spi DT
+  bindings document, including an example and a reference to the
+  mbus DT bindings documentation.
+
+v4:
+- Add max_transfer_size()
+- Fall back from direct-write mode to PIO mode when
+  - transfer size is exceedeed
+  - non-8bit transfers
+- Restrict to direct-write mode for now. SPI direct read mode can
+  be added later, when someone has a platform supporting this
+  mode.
+
+v3:
+- Used static MBus windows again, as suggested by Arnd
+- No new DT bindings needed for this. The MBus windows need to be
+  configured in the 'reg' property of the SPI controller. This is
+  done in a separate patch for the Armada platforms.
+- The direct mapping is configured and enable by adding the
+  specific MBus entry to the 'ranges' property of the 'soc' node
+  in the board dts file.
+
+v2:
+- Use one MBus window for each SPI controller instead of one for
+  for each SPI device. This MBus window is re-assigned, once the
+  CS changes.
+- Assert the CS over the entire message
+- Don't restrict the direct access mode to only direct write mode
+- Add check for max size before using memcpy()
+- Remove spidev from DT bindings documentation
+
+ .../devicetree/bindings/spi/spi-orion.txt          | 49 +++++++++++-
+ drivers/spi/spi-orion.c                            | 87 ++++++++++++++++++++++
+ 2 files changed, 135 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
+index 98bc698..4f629cc 100644
+--- a/Documentation/devicetree/bindings/spi/spi-orion.txt
++++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
+@@ -8,7 +8,15 @@ Required properties:
+     - "marvell,armada-380-spi", for the Armada 38x SoCs
+     - "marvell,armada-390-spi", for the Armada 39x SoCs
+     - "marvell,armada-xp-spi", for the Armada XP SoCs
+-- reg : offset and length of the register set for the device
++- reg : offset and length of the register set for the device.
++	This property can optionally have additional entries to configure
++	the SPI direct access mode that some of the Marvell SoCs support
++	additionally to the normal indirect access (PIO) mode. The values
++	for the MBus "target" and "attribute" are defined in the Marvell
++	SoC "Functional Specifications" Manual in the chapter "Marvell
++	Core Processor Address Decoding".
++	The eight register sets following the control registers refer to
++	chip-select lines 0 through 7 respectively.
+ - cell-index : Which of multiple SPI controllers is this.
+ Optional properties:
+ - interrupts : Is currently not used.
+@@ -23,3 +31,42 @@ Example:
+ 	       interrupts = <23>;
+ 	       status = "disabled";
+        };
++
++Example with SPI direct mode support (optionally):
++	spi0: spi at 10600 {
++		compatible = "marvell,orion-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cell-index = <0>;
++		reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>, /* control */
++		      <MBUS_ID(0x01, 0x1e) 0 0xffffffff>, /* CS0 */
++		      <MBUS_ID(0x01, 0x5e) 0 0xffffffff>, /* CS1 */
++		      <MBUS_ID(0x01, 0x9e) 0 0xffffffff>, /* CS2 */
++		      <MBUS_ID(0x01, 0xde) 0 0xffffffff>, /* CS3 */
++		      <MBUS_ID(0x01, 0x1f) 0 0xffffffff>, /* CS4 */
++		      <MBUS_ID(0x01, 0x5f) 0 0xffffffff>, /* CS5 */
++		      <MBUS_ID(0x01, 0x9f) 0 0xffffffff>, /* CS6 */
++		      <MBUS_ID(0x01, 0xdf) 0 0xffffffff>; /* CS7 */
++		interrupts = <23>;
++		status = "disabled";
++	};
++
++To enable the direct mode, the board specific 'ranges' property in the
++'soc' node needs to add the entries for the desired SPI controllers
++and its chip-selects that are used in the direct mode instead of PIO
++mode. Here an example for this (SPI controller 0, device 1 and SPI
++controller 1, device 2 are used in direct mode. All other SPI device
++are used in the default indirect (PIO) mode):
++	soc {
++		/*
++		 * Enable the SPI direct access by configuring an entry
++		 * here in the board-specific ranges property
++		 */
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000>,	/* internal regs */
++			 <MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>,	/* BootROM       */
++			 <MBUS_ID(0x01, 0x5e) 0 0 0xf1100000 0x10000>,	/* SPI0-DEV1 */
++			 <MBUS_ID(0x01, 0x9a) 0 0 0xf1110000 0x10000>;	/* SPI1-DEV2 */
++
++For further information on the MBus bindings, please see the MBus
++DT documentation:
++Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index a87cfd4..604b5dd 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_device.h>
+ #include <linux/clk.h>
+ #include <linux/sizes.h>
+@@ -43,6 +44,9 @@
+ #define ORION_SPI_INT_CAUSE_REG		0x10
+ #define ORION_SPI_TIMING_PARAMS_REG	0x18
+ 
++/* Register for the "Direct Mode" */
++#define SPI_DIRECT_WRITE_CONFIG_REG	0x20
++
+ #define ORION_SPI_TMISO_SAMPLE_MASK	(0x3 << 6)
+ #define ORION_SPI_TMISO_SAMPLE_1	(1 << 6)
+ #define ORION_SPI_TMISO_SAMPLE_2	(2 << 6)
+@@ -78,11 +82,18 @@ struct orion_spi_dev {
+ 	bool			is_errata_50mhz_ac;
+ };
+ 
++struct orion_direct_acc {
++	void __iomem		*vaddr;
++	u32			size;
++};
++
+ struct orion_spi {
+ 	struct spi_master	*master;
+ 	void __iomem		*base;
+ 	struct clk              *clk;
+ 	const struct orion_spi_dev *devdata;
++
++	struct orion_direct_acc	direct_access[ORION_NUM_CHIPSELECTS];
+ };
+ 
+ static inline void __iomem *spi_reg(struct orion_spi *orion_spi, u32 reg)
+@@ -372,10 +383,38 @@ orion_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
+ {
+ 	unsigned int count;
+ 	int word_len;
++	struct orion_spi *orion_spi;
++	int cs = spi->chip_select;
+ 
+ 	word_len = spi->bits_per_word;
+ 	count = xfer->len;
+ 
++	orion_spi = spi_master_get_devdata(spi->master);
++
++	/*
++	 * Use SPI direct write mode if base address is available. Otherwise
++	 * fall back to PIO mode for this transfer.
++	 */
++	if ((orion_spi->direct_access[cs].vaddr) && (xfer->tx_buf) &&
++	    (word_len == 8)) {
++		unsigned int cnt = count / 4;
++		unsigned int rem = count % 4;
++
++		/*
++		 * Send the TX-data to the SPI device via the direct
++		 * mapped address window
++		 */
++		writesl(orion_spi->direct_access[cs].vaddr, xfer->tx_buf, cnt);
++		if (rem) {
++			u32 *buf = (u32 *)xfer->tx_buf;
++
++			writesb(orion_spi->direct_access[cs].vaddr, &buf[cnt],
++				rem);
++		}
++
++		return count;
++	}
++
+ 	if (word_len == 8) {
+ 		const u8 *tx = xfer->tx_buf;
+ 		u8 *rx = xfer->rx_buf;
+@@ -425,6 +464,10 @@ static int orion_spi_reset(struct orion_spi *orion_spi)
+ {
+ 	/* Verify that the CS is deasserted */
+ 	orion_spi_clrbits(orion_spi, ORION_SPI_IF_CTRL_REG, 0x1);
++
++	/* Don't deassert CS between the direct mapped SPI transfers */
++	writel(0, spi_reg(orion_spi, SPI_DIRECT_WRITE_CONFIG_REG));
++
+ 	return 0;
+ }
+ 
+@@ -504,6 +547,7 @@ static int orion_spi_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	unsigned long tclk_hz;
+ 	int status = 0;
++	struct device_node *np;
+ 
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*spi));
+ 	if (master == NULL) {
+@@ -576,6 +620,49 @@ static int orion_spi_probe(struct platform_device *pdev)
+ 		goto out_rel_clk;
+ 	}
+ 
++	/* Scan all SPI devices of this controller for direct mapped devices */
++	for_each_available_child_of_node(pdev->dev.of_node, np) {
++		u32 cs;
++
++		/* Get chip-select number from the "reg" property */
++		status = of_property_read_u32(np, "reg", &cs);
++		if (status) {
++			dev_err(&pdev->dev,
++				"%s has no valid 'reg' property (%d)\n",
++				np->full_name, status);
++			status = 0;
++			continue;
++		}
++
++		/*
++		 * Check if an address is configured for this SPI device. If
++		 * not, the MBus mapping via the 'ranges' property in the 'soc'
++		 * node is not configured and this device should not use the
++		 * direct mode. In this case, just continue with the next
++		 * device.
++		 */
++		status = of_address_to_resource(pdev->dev.of_node, cs + 1, r);
++		if (status)
++			continue;
++
++		/*
++		 * Only map one page for direct access. This is enough for the
++		 * simple TX transfer which only writes to the first word.
++		 * This needs to get extended for the direct SPI-NOR / SPI-NAND
++		 * support, once this gets implemented.
++		 */
++		spi->direct_access[cs].vaddr = devm_ioremap(&pdev->dev,
++							    r->start,
++							    PAGE_SIZE);
++		if (IS_ERR(spi->direct_access[cs].vaddr)) {
++			status = PTR_ERR(spi->direct_access[cs].vaddr);
++			goto out_rel_clk;
++		}
++		spi->direct_access[cs].size = PAGE_SIZE;
++
++		dev_info(&pdev->dev, "CS%d configured for direct access\n", cs);
++	}
++
+ 	pm_runtime_set_active(&pdev->dev);
+ 	pm_runtime_use_autosuspend(&pdev->dev);
+ 	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
+-- 
+2.8.2
