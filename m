@@ -1,194 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 May 2016 11:40:19 -0500
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160503164019.GA1604@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 May 2016 09:43:23 -0700
+Subject: [PATCH v2 2/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
+In-Reply-To: <5728A81F.4050906@garmin.com>
+References: <20160427171658.GA5995@atomide.com>
+ <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
+ <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
+ <57285E66.2000708@ti.com> <5728A81F.4050906@garmin.com>
+Message-ID: <20160503164323.GN5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and smc
-> syscon regmaps.
+* J.D. Schroeder <Linux.HWI@garmin.com> [160503 06:32]:
+> On 05/03/2016 03:16 AM, Tero Kristo wrote:
+> > On 02/05/16 20:12, J.D. Schroeder wrote:
+> >> From: "J.D. Schroeder" <jay.schroeder@garmin.com>
+> >>
+> >> This commit updates the OSC_32K_CLK (secure_32k_clk_src_ck) frequency
+> >> from the precise 32kHz frequency (i.e., 32.768 kHz) to a more
+> >> accurate frequency of ~34.6 kHz. Actual measured frequencies of the
+> >> clock vary from processor to processor anywhere from 34.4 kHz up to
+> >> 34.8 kHz. Note that the ~34 kHz frequency clock is generated
+> >> internally by the processor, not an input to the processor. This
+> >> change makes it more clear that the consumer of the
+> >> secure_32k_clk_src_ck will not get a precise 32.768 kHz frequency
+> >> output.
+> >>
+> >> Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
+> >> Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
+> >> ---
+> >>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 +-
+> >>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> >> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> >> index 3f0c61d..f7ec976 100644
+> >> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> >> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> >> @@ -95,7 +95,7 @@
+> >>       secure_32k_clk_src_ck: secure_32k_clk_src_ck {
+> >>           #clock-cells = <0>;
+> >>           compatible = "fixed-clock";
+> >> -        clock-frequency = <32768>;
+> >> +        clock-frequency = <34600>; /* approximate frequency */
+> >>       };
+> >>
+> >>       sys_clk32_crystal_ck: sys_clk32_crystal_ck {
+> >>
+> > 
+> > I still don't agree with this patch. The actual frequency can drift much more,
+> > you are just seeing this number at your setup.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
->  1 file changed, 136 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> Yes, it can drift significantly from processor to processor. Do you agree that
+> this frequency is closer to what can be expected than 32768 Hz?
 > 
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> new file mode 100644
-> index 0000000..a6dca5c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> @@ -0,0 +1,136 @@
-> +* Device tree bindings for Atmel EBI
-> +
-> +The External Bus Interface (EBI) controller is a bus where you can connect
-> +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> +The EBI provides a glue-less interface to asynchronous memories through the SMC
-> +(Static Memory Controller).
-> +
-> +Required properties:
-> +
-> +- compatible:		"atmel,at91sam9260-ebi"
-> +			"atmel,at91sam9261-ebi"
-> +			"atmel,at91sam9263-ebi0"
-> +			"atmel,at91sam9263-ebi1"
+> Like I said, I would have renamed the clock also but I opted to go the less
+> obtrusive route while still helping others that might think they can
+> reasonably use this clock in their design as a 32768 Hz clock source. Perhaps
+> my comment and selection of the approximate frequency is not the best (I'm
+> open for suggestions). However, I do think this change is an improvement and
+> clarifying change to what is currently present in the clock description.
 
-What are the differences between 0 and 1?
+Does a fixed divider calculation of input * (32768 / 0x27e6) make sense
+here too as pointed out earlier by Matthijs for the ti81xx?
 
-> +			"atmel,at91sam9rl-ebi"
-> +			"atmel,at91sam9g45-ebi"
-> +			"atmel,at91sam9x5-ebi"
-> +			"atmel,sama5d3-ebi"
-> +
-> +- reg:			Contains offset/length value for EBI memory mapping.
-> +			This property might contain several entries if the EBI
-> +			memory range is not contiguous
-> +
-> +- #address-cells:	Must be 2.
-> +			The first cell encodes the CS.
-> +			The second cell encode the offset into the CS memory
-> +			range.
-> +
-> +- #size-cells:		Must be set to 1.
-> +
-> +- ranges:		Encodes CS to memory region association.
-> +
-> +- clocks:		Clock feeding the EBI controller.
-> +			See clock-bindings.txt
-> +
-> +Children device nodes are representing device connected to the EBI bus.
-> +
-> +Required device node properties:
-> +
-> +- #reg:			Contains the chip-select id, the offset and the length
+Regards,
 
-s/#reg/reg/
-
-> +			of the memory region requested by the device.
-> +
-> +EBI bus configuration associated with specific chip-select will be defined in
-> +the configs subnode. This configs node will in turn contain several subnodes
-> +named config-<cs-id>, each of them containing the following properties.
-
-This is a bit unusual. Why not just part of the child device nodes?
-
-> +
-> +Optional config-<cs-id> node properties:
-> +
-> +- atmel,bus-width:		width of the asynchronous device's data bus
-> +				8, 16 or 32.
-> +				Default to 8 when undefined.
-> +
-> +- atmel,byte-access-type	"write" or "select" (see Atmel datasheet).
-> +				Default to "select" when undefined.
-> +
-> +- atmel,read-mode		"nrd" or "ncs".
-> +				Default to "ncs" when undefined.
-> +
-> +- atmel,write-mode		"nwe" or "ncs".
-> +				Default to "ncs" when undefined.
-> +
-> +- atmel,exnw-mode		"disabled", "frozen" or "ready".
-> +				Default to "disabled" when undefined.
-> +
-> +- atmel,page-mode		enable page mode if present. The provided value
-> +				defines the page size (supported values: 4, 8,
-> +				16 and 32).
-> +
-> +- atmel,tdf-mode:		"normal" or "optimized". When set to
-
-This should be boolean.
-
-> +				"optimized" the data float time is optimized
-> +				depending on the next device being accessed
-> +				(next device setup time is subtracted to the
-> +				current device data float time).
-> +				Default to "normal" when undefined.
-> +
-> +Mandatory timings expressed in nanoseconds (see Atmel datasheet for a full
-> +description).
-
-Required first, then optional properties please.
-
-> +
-> +- atmel,ncs-rd-setup-ns
-> +- atmel,nrd-setup-ns
-> +- atmel,ncs-wr-setup-ns
-> +- atmel,nwe-setup-ns
-> +- atmel,ncs-rd-pulse-ns
-> +- atmel,nrd-pulse-ns
-> +- atmel,ncs-wr-pulse-ns
-> +- atmel,nwe-pulse-ns
-> +- atmel,nwe-cycle-ns
-> +- atmel,nrd-cycle-ns
-> +- atmel,tdf-ns
-> +
-> +Example:
-> +
-> +	ebi: ebi at 10000000 {
-> +		compatible = "atmel,sama5d3-ebi";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-
-> +		atmel,smc = <&hsmc>;
-> +		atmel,matrix = <&matrix>;
-
-What are these? 
-
-> +		reg = <0x10000000 0x10000000
-> +		       0x40000000 0x30000000>;
-> +		ranges = <0x0 0x0 0x10000000 0x10000000
-> +			  0x1 0x0 0x40000000 0x10000000
-> +			  0x2 0x0 0x50000000 0x10000000
-> +			  0x3 0x0 0x60000000 0x10000000>;
-> +		clocks = <&mck>;
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ebi_addr>;
-
-Not documented.
-
-> +
-> +		configs {
-> +			config-0 {
-> +				atmel,read-mode = "nrd";
-> +				atmel,write-mode = "nwe";
-> +				atmel,bus-width = <16>;
-> +				atmel,ncs-rd-setup-ns = <0>;
-> +				atmel,ncs-wr-setup-ns = <0>;
-> +				atmel,nwe-setup-ns = <8>;
-> +				atmel,nrd-setup-ns = <16>;
-> +				atmel,ncs-rd-pulse-ns = <84>;
-> +				atmel,ncs-wr-pulse-ns = <84>;
-> +				atmel,nrd-pulse-ns = <76>;
-> +				atmel,nwe-pulse-ns = <76>;
-> +				atmel,nrd-cycle-ns = <107>;
-> +				atmel,nwe-cycle-ns = <84>;
-> +				atmel,tdf-ns = <16>;
-> +			};
-> +		};
-> +
-> +		nor: flash at 0,0 {
-> +			compatible = "cfi-flash";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0x0 0x0 0x1000000>;
-> +			bank-width = <2>;
-> +		};
-> +	};
-> +
-> -- 
-> 2.7.4
-> 
+Tony
