@@ -1,34 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 03 May 2016 15:14:22 +0200
-Subject: [PATCH] ARM: mx5: dts: Enable USB OTG on M53EVK
-In-Reply-To: <20160503131157.GM5874@tiger>
-References: <1461105361-6742-1-git-send-email-marex@denx.de>
- <57288107.4000908@denx.de> <20160503131157.GM5874@tiger>
-Message-ID: <5728A42E.9060100@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 May 2016 15:14:37 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <f3da30a6-9ac0-4d5e-8611-ebb80cb3589e@googlegroups.com>
+References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+ <f3da30a6-9ac0-4d5e-8611-ebb80cb3589e@googlegroups.com>
+Message-ID: <20160503131437.GV17159@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2016 03:11 PM, Shawn Guo wrote:
-> On Tue, May 03, 2016 at 12:44:23PM +0200, Marek Vasut wrote:
->> On 04/20/2016 12:36 AM, Marek Vasut wrote:
->>> Add USB OTG support to M53EVK instead of just USB gadget.
->>>
->>> Signed-off-by: Marek Vasut <marex@denx.de>
->>> Cc: Shawn Guo <shawn.guo@linaro.org>
->>
->> Bump ?
+Hi,
+
+On Tue, May 03, 2016 at 12:12:06AM -0700, christo.radev at gmail.com wrote:
+> Hi to All,
 > 
-> Applied, thanks.
+> I have already solved and tested this issue on Armbian build.  Find
+> patches for both legacy (3.4.111) and mainline (4.5.2) kernels on:
+> http://forum.armbian.com/index.php/topic/853-armbian-customization/page-2#entry7494
+> There it is also described how to do eMMC bootable and much more.
 > 
->>
->> btw. Shawn, is the @k.org the address I should use now ?
-> 
-> Yes.
-> 
-> Shawn
-> 
-OK, will be careful next time. Thanks!
+> About the board - Olimex already sold all 3 kinds after migration to
+> their HW rev. E. One have to specify Lime2-eMMC as
+> A20-Olinuxino-Lime2-eMMC instead of their old 2 options
+> A20-Olinuxino-Lime2(-4GB).
+
+Interesting, you have a link to that device?
+
+Thanks,
+Maxime
 
 -- 
-Best regards,
-Marek Vasut
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160503/22f02f0f/attachment.sig>
