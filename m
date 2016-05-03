@@ -1,38 +1,65 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 3 May 2016 11:23:29 +0530
-Subject: [PATCH 10/12] kexec: arrange for paddr_vmcoreinfo_note() to
- return phys_addr_t
-In-Reply-To: <20160503042441.GA2518@x1.redhat.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFP-0000je-5t@rmk-PC.arm.linux.org.uk>
- <CAHB_Gur-6oyEheN-Pom7OwivdvrQpCBaXvM1V2H0JPFRCFZthA@mail.gmail.com>
- <20160429151639.GC23726@leverpostej>
- <CAHB_GurwYqPbccLU9UHppLxbBr4Cfs47myKAer-RJicT=T7uBw@mail.gmail.com>
- <20160503042441.GA2518@x1.redhat.com>
-Message-ID: <20160503055329.GA13045@dhcppc6.redhat.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 3 May 2016 15:26:33 +0930
+Subject: [PATCH v2 04/11] clocksource/moxart: Generalise timer for use on
+ other socs
+In-Reply-To: <571A5FBA.9010204@linaro.org>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-5-git-send-email-joel@jms.id.au>
+ <571A5FBA.9010204@linaro.org>
+Message-ID: <CACPK8XfgDPPYG=ON-Z+gEKSg1fe4PuqRWoMz8P-9oCMvgQKmhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baoquan,
+Hey Daniel,
 
-On 03/05/2016:12:24:41 PM, Baoquan He wrote:
-> Hi Pratyush,
-> 
-> Could you please help tell why arm PAE kernel can be put above 4G?
+Thanks for the review.
 
-PAE system can have physical addresses above 4G. So, if a CPU is supporting the
-LPAE page table format then we should be able to access physical addresses
-beyond 4G.
+On Sat, Apr 23, 2016 at 3:00 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 04/21/2016 10:04 AM, Joel Stanley wrote:
+>>
+>> The moxart timer IP is shared with another soc made by Aspeed.
+>> Generalise the registers that differ so the same driver can be used for
+>> both.
+>>
+>> As we now depend on CLKSRC_MMIO, create a Kconfig symbol for the driver
+>> so we can express this dependency.
+>>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> ---
+>
+>
+> In the future, please Cc the maintainers.
 
-> Since the change is related to common code, I am curious about how
-> it's so different with other ARCHs.
+Sure.
 
-paddr_vmcoreinfo_note() returns a physical address, so returning phys_addr_t
-seems most appropriate. So, kernel variable may land into above 4G locations,
-even with the platform in other architecture (with PAE support), if start of RAM
-is located very high,
+>
+> You probably can remove all the unused macro definition here for both MOXART
+> and ASPEED to have something just a couple of definition.
 
-So, in my opinion it would be safer to have these changes for other ARCHs as
-well.
+I agree with Ben; we're helping out by documenting the hardware in
+lieu of a public datasheet. I'd prefer to keep this here.
 
-~Pratyush
+>>   static void __iomem *base;
+>>   static unsigned int clock_count_per_tick;
+>> +static unsigned int t1_disable_val, t1_enable_val;
+>
+>
+> It will be cleaner to:
+>
+> 1. Factor out:
+>         writel(TIMER1_DISABLE, base + TIMER_CR);
+>         writel(TIMER1_ENABLE, base + TIMER_CR);
+
+I considered this myself but went with the minimal change. I'm not
+fussed, so I will rework it as you suggest.
+
+>From the register layout I suspect this IP block is a Faraday Tech
+FTTMR010[1], but I don't have any other evidence. Would you take a
+patch to change the name or would you prefer leaving it as moxart?
+
+Cheers,
+
+Joel
+
+[1] https://lists.nongnu.org/archive/html/qemu-devel/2013-03/msg04333.html
