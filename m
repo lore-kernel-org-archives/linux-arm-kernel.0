@@ -1,118 +1,43 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  3 May 2016 11:33:46 -0600
-Subject: [PATCH 12/27] coresight: tmc: re-implementing
- tmc_read_prepare/unprepare() functions
+Date: Tue,  3 May 2016 11:33:47 -0600
+Subject: [PATCH 13/27] coresight: tmc: clearly define number of transfers per
+ burst
 In-Reply-To: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1462296841-12327-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1462296841-12327-13-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1462296841-12327-14-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In their current implementation the tmc_read_prepare/unprepare()
-are a lump of if/else that is difficult to read.  This patch is
-alleviating that by using a switch statement.  The latter also
-allows for a better control on the error path.
+This patch makes the name of the define reflect the amount of
+data tranfers per burst, in this case 16.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 56 ++++++++++++++++++-----------
- 1 file changed, 36 insertions(+), 20 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 66fa7736d12f..d211aeec49f8 100644
+index d211aeec49f8..8751d53fa078 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -431,7 +431,7 @@ static const struct coresight_ops tmc_etf_cs_ops = {
+@@ -67,7 +67,7 @@
+ #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+ #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
+ #define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
+-#define TMC_AXICTL_WR_BURST_LEN 0xF00
++#define TMC_AXICTL_WR_BURST_16	0xF00
+ /* TMC_FFCR - 0x304 */
+ #define TMC_FFCR_EN_FMT		BIT(0)
+ #define TMC_FFCR_EN_TI		BIT(1)
+@@ -211,7 +211,7 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
  
- static int tmc_read_prepare(struct tmc_drvdata *drvdata)
- {
--	int ret;
-+	int ret = 0;
- 	unsigned long flags;
- 	enum tmc_mode mode;
- 
-@@ -439,25 +439,31 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
- 	if (!drvdata->enable)
- 		goto out;
- 
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-+	switch (drvdata->config_type) {
-+	case TMC_CONFIG_TYPE_ETB:
- 		tmc_etb_disable_hw(drvdata);
--	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
--		tmc_etr_disable_hw(drvdata);
--	} else {
-+		break;
-+	case TMC_CONFIG_TYPE_ETF:
-+		/* There is no point in reading a TMC in HW FIFO mode */
- 		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode == TMC_MODE_CIRCULAR_BUFFER) {
--			tmc_etb_disable_hw(drvdata);
--		} else {
--			ret = -ENODEV;
-+		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-+			ret = -EINVAL;
- 			goto err;
- 		}
-+
-+		tmc_etb_disable_hw(drvdata);
-+		break;
-+	case TMC_CONFIG_TYPE_ETR:
-+		tmc_etr_disable_hw(drvdata);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		goto err;
- 	}
-+
- out:
- 	drvdata->reading = true;
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--
- 	dev_info(drvdata->dev, "TMC read start\n");
--	return 0;
- err:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 	return ret;
-@@ -472,20 +478,30 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
- 	if (!drvdata->enable)
- 		goto out;
- 
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-+	switch (drvdata->config_type) {
-+	case TMC_CONFIG_TYPE_ETB:
- 		tmc_etb_enable_hw(drvdata);
--	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
--		tmc_etr_enable_hw(drvdata);
--	} else {
-+		break;
-+	case TMC_CONFIG_TYPE_ETF:
-+		/* Make sure we don't re-enable a TMC in HW FIFO mode */
- 		mode = readl_relaxed(drvdata->base + TMC_MODE);
--		if (mode == TMC_MODE_CIRCULAR_BUFFER)
--			tmc_etb_enable_hw(drvdata);
-+		if (mode != TMC_MODE_CIRCULAR_BUFFER)
-+			goto err;
-+
-+		tmc_etb_enable_hw(drvdata);
-+		break;
-+	case TMC_CONFIG_TYPE_ETR:
-+		tmc_etr_disable_hw(drvdata);
-+		break;
-+	default:
-+		goto err;
- 	}
-+
- out:
- 	drvdata->reading = false;
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--
- 	dev_info(drvdata->dev, "TMC read end\n");
-+err:
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- }
- 
- static int tmc_open(struct inode *inode, struct file *file)
+ 	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
+-	axictl |= TMC_AXICTL_WR_BURST_LEN;
++	axictl |= TMC_AXICTL_WR_BURST_16;
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+ 	axictl &= ~TMC_AXICTL_SCT_GAT_MODE;
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
 -- 
 2.5.0
