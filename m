@@ -1,53 +1,17 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  3 May 2016 15:29:52 +0900
-Subject: [PATCH] reset: fix Kconfig menu to include reset drivers in sub-menu
-Message-ID: <1462256992-31063-1-git-send-email-yamada.masahiro@socionext.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 3 May 2016 12:25:34 +0530
+Subject: [PATCH 0/5] Use dma_pool_zalloc
+In-Reply-To: <1461960552-7429-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1461960552-7429-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20160503065533.GO2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In "make menuconfig", reset drivers are currently lined up together
-with the reset sub-system menu, like this:
+On Fri, Apr 29, 2016 at 10:09:07PM +0200, Julia Lawall wrote:
+> Dma_pool_zalloc combines dma_pool_alloc and memset 0.  The semantic patch
+> that makes this transformation is as follows: (http://coccinelle.lip6.fr/)
 
-    -*- Reset Controller Support  ----
-    < > Hi6220 Reset Driver
+Applied all dmaengine patches
 
-(It also means, the menu "Reset Controller Support" is always empty.)
-
-"Hi6220 Reset Driver" should go into the sub-menu of the
-"Reset Controller Support".
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/reset/Kconfig     | 4 ++++
- drivers/reset/sti/Kconfig | 1 -
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index df37212..6a0b24b 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -12,5 +12,9 @@ menuconfig RESET_CONTROLLER
- 
- 	  If unsure, say no.
- 
-+if RESET_CONTROLLER
-+
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
-+
-+endif
-diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
-index f8c15a3..6131785 100644
---- a/drivers/reset/sti/Kconfig
-+++ b/drivers/reset/sti/Kconfig
-@@ -2,7 +2,6 @@ if ARCH_STI
- 
- config STI_RESET_SYSCFG
- 	bool
--	select RESET_CONTROLLER
- 
- config STIH415_RESET
- 	bool
 -- 
-1.9.1
+~Vinod
