@@ -1,17 +1,24 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 May 2016 20:58:38 +0800
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: add CONFIG_I2C_GPIO
-In-Reply-To: <1461962419-4715-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1461962419-4715-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <20160503125838.GL5874@tiger>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 3 May 2016 09:59:34 -0300
+Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: Add audio support
+In-Reply-To: <20160503125222.GK5874@tiger>
+References: <1462233386-23185-1-git-send-email-festevam@gmail.com>
+ <20160503125222.GK5874@tiger>
+Message-ID: <CAOMZO5Dkci6EmHkg4WSHHaESGW0z0YbNVMoEO5Tcc2N1mY16Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 10:40:18PM +0200, Marcel Ziswiler wrote:
-> The GPIO-based bitbanging I2C driver is required to make HDMI work on
-> the Apalis iMX6 module plugged into a Ixora carrier board featuring a
-> DDC channel to read a screen's EDID being hooked up to regular GPIOs.
-> 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+On Tue, May 3, 2016 at 9:52 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Mon, May 02, 2016 at 08:56:26PM -0300, Fabio Estevam wrote:
+>> @@ -86,6 +139,17 @@
+>>       };
+>>  };
+>>
+>> +&sai2 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_sai2>;
+>> +
+>
+> Forgot to mention that I dropped this newline when applying.
 
-Applied both, thanks.
+Thanks, Shawn!
