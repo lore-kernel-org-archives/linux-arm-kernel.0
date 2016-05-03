@@ -1,34 +1,66 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 03 May 2016 11:21:34 +0100
-Subject: [PATCH kexec-tools 06/32] kdump: print mmap() offset in hex
+Date: Tue, 03 May 2016 11:22:21 +0100
+Subject: [PATCH kexec-tools 15/32] arm: fix get_kernel_stext_sym() to close
+ its file
 In-Reply-To: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
 References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
-Message-ID: <E1axXSQ-0004hT-54@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <E1axXTB-0004iP-5Y@e0050434b2927.dyn.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mmap() fails, printing a large decimal number is mostly
-meaningless - it's not obvious what it means.  Printing a hex number
-is more obvious, because we can see whether it's over 32-bit, or not
-page aligned.
+Fix get_kernel_stext_sym() so that it closes its file once it's
+finsihed with it - there's no need to leak file descriptors.
 
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kdump/kdump.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ kexec/arch/arm/crashdump-arm.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/kdump/kdump.c b/kdump/kdump.c
-index 34d2149..f34727f 100644
---- a/kdump/kdump.c
-+++ b/kdump/kdump.c
-@@ -37,7 +37,7 @@ static void *map_addr(int fd, unsigned long size, off_t offset)
+diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
+index b523e5f..a390187 100644
+--- a/kexec/arch/arm/crashdump-arm.c
++++ b/kexec/arch/arm/crashdump-arm.c
+@@ -71,25 +71,34 @@ static unsigned long long get_kernel_stext_sym(void)
+ 	char sym[128];
+ 	char line[128];
+ 	FILE *fp;
+-	unsigned long long vaddr;
++	unsigned long long vaddr = 0;
+ 	char type;
  
- 	result = mmap(0, len, PROT_READ, MAP_SHARED, fd, offset - map_offset);
- 	if (result == MAP_FAILED) {
--		fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %llu size: %lu: %s\n",
-+		fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %#llx size: %lu: %s\n",
- 			(unsigned long long)offset, size, strerror(errno));
- 		exit(5);
+-	fp = fopen(kallsyms, "r");	if (!fp) {
++	fp = fopen(kallsyms, "r");
++	if (!fp) {
+ 		fprintf(stderr, "Cannot open %s\n", kallsyms);
+ 		return 0;
  	}
+ 
+ 	while(fgets(line, sizeof(line), fp) != NULL) {
+-		if (sscanf(line, "%Lx %c %s", &vaddr, &type, sym) != 3)
++		unsigned long long addr;
++
++		if (sscanf(line, "%Lx %c %s", &addr, &type, sym) != 3)
+ 			continue;
++
+ 		if (strcmp(sym, stext) == 0) {
+-			dbgprintf("kernel symbol %s vaddr = %16llx\n", stext, vaddr);
+-			return vaddr;
++			dbgprintf("kernel symbol %s vaddr = %#llx\n", stext, addr);
++			vaddr = addr;
++			break;
+ 		}
+ 	}
+ 
+-	fprintf(stderr, "Cannot get kernel %s symbol address\n", stext);
+-	return 0;
++	fclose(fp);
++
++	if (vaddr == 0)
++		fprintf(stderr, "Cannot get kernel %s symbol address\n", stext);
++
++	return vaddr;
+ }
+ 
+ static int get_kernel_page_offset(struct kexec_info *info,
 -- 
 1.9.1
