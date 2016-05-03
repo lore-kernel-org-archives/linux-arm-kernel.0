@@ -1,85 +1,99 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Tue, 03 May 2016 10:51:53 +0300
-Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
- suspend
-In-Reply-To: <1462261458.11651.7.camel@mhfsdcap03>
-References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462261458.11651.7.camel@mhfsdcap03>
-Message-ID: <87vb2vfujq.fsf@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 May 2016 08:54:27 +0100
+Subject: [RFC PATCH] irqchip/gic-v3-its: Allocate ITS tables from
+ corresponding node memory
+In-Reply-To: <1461932322-1206-1-git-send-email-ashoks@broadcom.com>
+References: <1461932322-1206-1-git-send-email-ashoks@broadcom.com>
+Message-ID: <57285933.3060300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[Please CC LKML and all the irqchip maintainers on these patches]
 
-Hi,
+On 29/04/16 13:18, Ashok Kumar wrote:
+> In the case of systems having multi socket and multi ITS, allocating
+> local node memory for ITS device table, collection table, interrupt
+> translation table and command queue will help in reducing inter-chip
+> traffic even though they(except command queue) could be cached in the GIC.
+> 
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> ---
+> This patch is created on top of Cavium thunderx erratum 23144 patch [1].
+> 
+> I am not sure how to do this for ACPI as GIC ITS ID in MADT doesn't map to
+> _PXM. Am I missing something here? Any thoughts?
 
-chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
->> Click mouse after xhci suspend completion but before system suspend
->> completion, system will not be waken up by mouse if the duration of
->> them is larger than 20ms which is the device UFP's resume signaling
+Indeed, and SRAT doesn't provide any valuable information either.
 
-what is "them" here ? The duration of what is longer than 20ms ?
+> 
+> [1] https://lkml.org/lkml/2016/4/15/830 - [PATCH v5] irqchip, gicv3-its, \
+> numa: Enable workaround for Cavium thunderx erratum 23144
+> 
+> Thanks,
+> Ashok
+> 
+> CC: marc.zyngier at arm.com
+> CC: rrichter at caviumnetworks.com
+> CC: gkulkarni at caviumnetworks.com
+> CC: jchandra at broadcom.com
+> 
+>  drivers/irqchip/irq-gic-v3-its.c |   12 ++++++++----
+>  1 files changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 75f258f..9a187c0 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -860,6 +860,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  		int alloc_pages;
+>  		u64 tmp;
+>  		void *base;
+> +		struct page *pg;
+>  
+>  		if (type == GITS_BASER_TYPE_NONE)
+>  			continue;
+> @@ -897,11 +898,13 @@ retry_alloc_baser:
+>  				node_name, order, alloc_pages);
+>  		}
+>  
+> -		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+> -		if (!base) {
+> +		pg = alloc_pages_node(its->numa_node,
+> +				      GFP_KERNEL | __GFP_ZERO, order);
+> +		if (!pg) {
+>  			err = -ENOMEM;
+>  			goto out_free;
+>  		}
+> +		base = page_address(pg);
+>  
+>  		its->tables[i].base = base;
+>  		its->tables[i].order = order;
+> @@ -1184,7 +1187,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>  	sz = nr_ites * its->ite_size;
+>  	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+> -	itt = kzalloc(sz, GFP_KERNEL);
+> +	itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+>  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>  	if (lpi_map)
+>  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+> @@ -1526,7 +1529,8 @@ static int __init its_probe(struct device_node *node,
+>  	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+>  	its->numa_node = of_node_to_nid(node);
+>  
+> -	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
+> +	its->cmd_base = kzalloc_node(ITS_CMD_QUEUE_SZ, GFP_KERNEL,
+> +				     its->numa_node);
+>  	if (!its->cmd_base) {
+>  		err = -ENOMEM;
+>  		goto out_free_its;
+> 
 
->> lasted. Another reason is that the SPM is not enabled before system
+Does this lead to an improvement you've actually measured? If so, I'd
+like to see numbers to back it up. Or is that purely theoretical?
 
-what's SPM ?
+Thanks,
 
->> suspend compeltion, this causes SPM also not notice the resume signal.
-           ^^^^^^^^^^
-           completion
-
->> So in order to reduce the duration less than 20ms, make use of
->> syscore's suspend/resume interface.
-
-no, this is the wrong approach
-
->> In fact it is a work around solution which only reduces the
->> probability of failure, because we can't ensure that the duration from
->> syscore's suspend completion to SPM working is always less than 20ms.
-
-right, which means you're not really fixing anything. Morevoer, you make
-it so that this won't work with multiple instances of the XHCI IP in
-your SoC.
-
->> Because the syscore runs on irq disabled context, and xhci's
->> suspend/resume calls some sleeping functions, enable local irq
->> and then disable it during suspend/resume. This may be not a problem,
->> since only boot CPU is runing.
-
-another problem :) calling local_irq_{enable,disable}() is an indication
-that something's wrong.
-
->> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->> ---
->>  drivers/usb/host/xhci-mtk.c |   31 ++++++++++++++++++++++++++++++-
->>  1 file changed, 30 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
->> index 79959f1..8277f02 100644
->> --- a/drivers/usb/host/xhci-mtk.c
->> +++ b/drivers/usb/host/xhci-mtk.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/pm_runtime.h>
->>  #include <linux/regmap.h>
->>  #include <linux/regulator/consumer.h>
->> +#include <linux/syscore_ops.h>
->>  
->>  #include "xhci.h"
->>  #include "xhci-mtk.h"
->> @@ -490,6 +491,8 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
->>  	return xhci_gen_setup(hcd, xhci_mtk_quirks);
->>  }
->>  
->> +static struct device *xhci_mtk_syscore_dev;
-
-now, what happens when you have more than one XHCI instance ?
-
+	M.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160503/58d632ac/attachment.sig>
+Jazz is not dead. It just smells funny...
