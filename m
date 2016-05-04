@@ -1,38 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 May 2016 19:25:55 +0100
-Subject: [RFT PATCH 1/3] usb: misc: usb3503: Fix HUB mode after
- bootloader initialization
-In-Reply-To: <5729E4B5.2090702@samsung.com>
-References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
- <1461927591-7864-2-git-send-email-k.kozlowski@samsung.com>
- <20160429113059.GX3217@sirena.org.uk>
- <57234BA2.6020304@samsung.com>
- <20160429164448.GY3217@sirena.org.uk> <57272298.50701@samsung.com>
- <20160502105501.GE6292@sirena.org.uk>
- <20160503180022.GA3008@rob-hp-laptop>
- <5729E4B5.2090702@samsung.com>
-Message-ID: <20160504182555.GE6292@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 May 2016 20:32:06 +0200
+Subject: [PATCH 1/2] ARM: sun4i: dt: Add pll3 and pll7 clocks
+In-Reply-To: <1462295659-6945-2-git-send-email-plaes@plaes.org>
+References: <1462295659-6945-1-git-send-email-plaes@plaes.org>
+ <1462295659-6945-2-git-send-email-plaes@plaes.org>
+Message-ID: <20160504183206.GC17159@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2016 at 02:01:57PM +0200, Krzysztof Kozlowski wrote:
+Hi,
 
-> This looks like pwrseq for MMC devices so the idea is to:
-> 1. Move drivers/mmc/core/pwrseq* to separate directory
-> (drivers/power/pwrseq ?)
-> 2. Add support for pwrseq to USB core,
-> 3. Add new pwrseq driver (or extend existing one): toggling the regulator.
-> 4. Add pwrseq phandle to the DT node of USB hub (to the binding
-> mentioned by Rob?).
+On Tue, May 03, 2016 at 08:14:18PM +0300, Priit Laes wrote:
+> Enable pll3 and pll7 clocks that are needed to drive display clocks.
+> 
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 268a150..c893744 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -184,6 +184,15 @@
+>  			clock-output-names = "osc24M";
+>  		};
+>  
+> +		osc3M: osc3M_clk {
+> +			compatible = "fixed-factor-clock";
+> +			#clock-cells = <0>;
+> +			clock-div = <8>;
+> +			clock-mult = <1>;
+> +			clocks = <&osc24M>;
+> +			clock-output-names = "osc3M";
+> +		};
+> +
+>  		osc32k: clk at 0 {
+>  			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+> @@ -208,6 +217,24 @@
+>  					     "pll2-4x", "pll2-8x";
+>  		};
+>  
+> +		pll3: clk at 01c20010 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-pll3-clk";
+> +			reg = <0x01c20010 0x4>;
+> +			clocks = <&osc3M>;
+> +			clock-output-names = "pll3";
+> +		};
+> +
+> +		pll3x2: pll3x2_clk {
+> +			compatible = "fixed-factor-clock";
+> +			#clock-cells = <0>;
+> +			clock-div = <1>;
+> +			clock-mult = <2>;
+> +			clocks = <&pll3>;
+> +			clock-output-names = "pll3-x2";
 
-> Does it look sensible?
+We usually call them -2x
 
-It certainly seems like a similar problem space, USB seems very much
-like MMC in both the spec and the way it tends to get used.
+> +		};
+> +
+> +
+
+One newline too many.
+
+Fixed it and applied the patch.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/c430248f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/7f876d71/attachment-0001.sig>
