@@ -1,39 +1,57 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 4 May 2016 11:17:29 -0500
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20160504155932.GH13045@dhcppc6.redhat.com>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <5728A7C3.4010001@roeck-us.net> <20160503143856.GE13045@dhcppc6.redhat.com>
- <5728BEC4.6050603@codeaurora.org> <20160503155141.GF13045@dhcppc6.redhat.com>
- <20160503171602.GA2518@roeck-us.net>
- <20160504141449.GG13045@dhcppc6.redhat.com> <572A0577.1070000@codeaurora.org>
- <20160504155932.GH13045@dhcppc6.redhat.com>
-Message-ID: <572A2099.4070901@codeaurora.org>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 4 May 2016 09:20:51 -0700
+Subject: [PATCH 2/2] irqchip/gic-v2m: Add workaround for Broadcom NS2
+ GICv2m erratum
+In-Reply-To: <5729A9A3.6070207@arm.com>
+References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
+ <1462319245-32532-3-git-send-email-ray.jui@broadcom.com>
+ <5729A9A3.6070207@arm.com>
+Message-ID: <964ae899-2fd1-baa4-521d-a31326281aa0@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pratyush Anand wrote:
-> Its unique to SBSA because you have very little timeout here. kexec-tools
-> upstream does not have any mechanism to handle watchdog timeout. Lets say even
-> if we implement a framework there, the best it can do is to ping the watchdog
-> again.
+Hi Marc,
 
-Ok, so it's more accurate to say that kexec has a minimum watchdog 
-timeout requirement.  What happens if the system admin sets the timeout 
-to 5 seconds arbitrarily?  The system will reset during kexec, no matter 
-which hardware is used.
+On 5/4/2016 12:49 AM, Marc Zyngier wrote:
+> On 04/05/16 00:47, Ray Jui wrote:
+>> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
+>> implementation has an erratum where the MSI data needs to be the SPI
+>> number subtracted by an offset of 32, for the correct MSI interrupt to
+>> be triggered.
+>>
+>> We are aware that APM X-Gene GICv2m has a similar erratum where the
+>> MSI data needs to be the offset from the spi_start. While APM's workaround
+>> is triggered based on readings from the MSI_IIDR register, this patch
+>> contains a more general solution by allowing this offset to be
+>> specified with an optional DT property 'arm,msi-offset-spi'. This patch
+>> also maintains compatibility with existing APM platforms
+>
+> It may be more generic, but it also fails to deal with less capable
+> firmware implementations. In contrast, reading MSI_IIDR is always
+> possible (assuming you have a unique ID for this v2m implementation).
+>
+> If you cannot uniquely identify it using an ID register, the usual
+> alternative is to have a new "compatible" string identifying the
+> defective part, and set the offset based on this string. This still
+> fails the ACPI test, but is the least invasive DT-wise.
 
-This still sounds like a band-aid to me.  We're just assuming that we 
-need a timeout of at least 20 seconds to support kexec.  Frankly, this 
-still sounds like a problem the kexec developers needs to acknowledge 
-and deal with.
+Okay. We do seem to have an ID. The JEP code looks a bit weird as the 
+IIDR register reads 0x13f. We were just a bit concerned that there's 
+another chip from Broadcom that may happen to have the same ID but may 
+already have this offset issue fixed (or made worse with a different 
+offset, :) ). Since that chip has not even taped out yet, we can wait 
+till later to confirm. If a compatible string is needed in the future, 
+we'll add that.
 
-Still I'm okay with a patch that extends the timeout by programming WCV, 
-but it has to be commented as a hack specifically to support kexec 
-because the timeout might be too short.  Then Wim can decide whether he 
-supports such changes.
+For now, I'm going to submit another patch to deal with this offset 
+based on IIDR reading 0x13f.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation collaborative project.
+>
+> Thanks,
+>
+> 	M.
+>
+
+Thanks,
+
+Ray
