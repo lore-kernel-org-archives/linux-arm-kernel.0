@@ -1,48 +1,53 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 4 May 2016 17:21:18 -0400
-Subject: [RFC 1/5] powerpc: Rename context.vdso_base to context.vdso
-In-Reply-To: <5726A7D5.7030305@gmail.com>
-References: <20151202121918.GA4523@arm.com>
- <1461856737-17071-1-git-send-email-cov@codeaurora.org>
- <1461856737-17071-2-git-send-email-cov@codeaurora.org>
- <5726A7D5.7030305@gmail.com>
-Message-ID: <572A67CE.4010109@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  4 May 2016 18:43:47 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx6ul: Specify the SAI index
+Message-ID: <1462398228-24447-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Balbir,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On 05/01/2016 09:05 PM, Balbir Singh wrote:
-> On 29/04/16 01:18, Christopher Covington wrote:
->> In order to share remap and unmap support for the VDSO with other
->> architectures without duplicating the code, we need a common name and type
->> for the address of the VDSO. An informal survey of the architectures
->> indicates unsigned long vdso is popular. Change the variable name in
->> powerpc from mm->context.vdso_base to simply mm->context.vdso.
-> 
-> Could you please provide additional details on why the remap/unmap operations are required?
+Introduce the "sai-index" property to indicate the index of the SAI port.
 
-The goal is to make checkpointing and restoring processes work on
-several different architectures and ABIs, in the face of Address Space
-Layout Randomization (ASLR) and other factors that might change the VDSO
-virtual address from one exec() to the next.
+This is useful for configuring the SAI_MCLK output as we need to write
+to bits 19, 20 and 21 of register GPR1 for SAI1, SAI2 and SAI3,
+respectively.
 
-Here's the patch adding PowerPC support:
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Change since v1:
+- None
 
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=83d3f0e90c6c8f833e3da91917c243a916fda69e
+ arch/arm/boot/dts/imx6ul.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> This patch does rename, but should it abstract via a function acesss
-> to vmap field using arch_* operations? Not sure
-
-I'm sorry, but I don't understand this question. Are you saying ARM,
-Power etc. need VDSO unmap and remap log that behave differently? So far
-I've found the differences to be stylistic rather than really affecting
-generated code behavior.
-
-Thanks,
-Christopher Covington
-
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 4356b65..b11d5a8 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -281,6 +281,7 @@
+ 					dmas = <&sdma 35 24 0>,
+ 					       <&sdma 36 24 0>;
+ 					dma-names = "rx", "tx";
++					sai-index = <1>;
+ 					status = "disabled";
+ 				};
+ 
+@@ -296,6 +297,7 @@
+ 					dmas = <&sdma 37 24 0>,
+ 					       <&sdma 38 24 0>;
+ 					dma-names = "rx", "tx";
++					sai-index = <2>;
+ 					status = "disabled";
+ 				};
+ 
+@@ -311,6 +313,7 @@
+ 					dmas = <&sdma 39 24 0>,
+ 					       <&sdma 40 24 0>;
+ 					dma-names = "rx", "tx";
++					sai-index = <3>;
+ 					status = "disabled";
+ 				};
+ 			};
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
