@@ -1,75 +1,86 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Wed, 4 May 2016 09:21:13 +0800
-Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
- suspend
-In-Reply-To: <87mvo7fpuc.fsf@intel.com>
-References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
- <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
-Message-ID: <1462324873.11651.57.camel@mhfsdcap03>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 4 May 2016 03:32:12 +0200
+Subject: [PATCH 02/12] eeprom: at24: remove nvmem regmap dependency
+In-Reply-To: <20160502073254.GA2015@tetsubishi>
+References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1461526096-29584-3-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160502073254.GA2015@tetsubishi>
+Message-ID: <20160504013212.GA7972@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
-> Hi,
+On Mon, May 02, 2016 at 09:32:54AM +0200, Wolfram Sang wrote:
+> On Sun, Apr 24, 2016 at 08:28:06PM +0100, Srinivas Kandagatla wrote:
+> > This patch moves to nvmem support in the driver to use callback instead
+> > of regmap.
+> > 
+> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > 
-> chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
-> >> >> Click mouse after xhci suspend completion but before system suspend
-> >> >> completion, system will not be waken up by mouse if the duration of
-> >> >> them is larger than 20ms which is the device UFP's resume signaling
-> >> 
-> >> what is "them" here ? The duration of what is longer than 20ms ?
-> > They are "xhci suspend completion" and "system suspend completion";
-> >
-> > It's time duration
+> Andrew, since you did the NVMEM implementation, could you have a look at
+> this? That would be awesome. Thanks!
 > 
-> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
-> wakeup ?
-It is not the time of xhci suspend consumed, but is the time of duration
-from xhci suspend completion to system suspend completion(after BOOT-CPU
-is turned off, SPM will be enabled to receive wakeup event)
+> > ---
+> >  drivers/misc/eeprom/Kconfig |   1 -
+> >  drivers/misc/eeprom/at24.c  | 103 ++++++++++----------------------------------
+> >  2 files changed, 22 insertions(+), 82 deletions(-)
+> > 
+> > diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
+> > index cfc493c..2d70464 100644
+> > --- a/drivers/misc/eeprom/Kconfig
+> > +++ b/drivers/misc/eeprom/Kconfig
+> > @@ -3,7 +3,6 @@ menu "EEPROM support"
+> >  config EEPROM_AT24
+> >  	tristate "I2C EEPROMs / RAMs / ROMs from most vendors"
+> >  	depends on I2C && SYSFS
+> > -	select REGMAP
+> >  	select NVMEM
+> >  	help
+> >  	  Enable this driver to get read/write support to most I2C EEPROMs
+> > diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
+> > index 089d694..de550a6 100644
+> > --- a/drivers/misc/eeprom/at24.c
+> > +++ b/drivers/misc/eeprom/at24.c
+> > @@ -23,7 +23,6 @@
+> >  #include <linux/acpi.h>
+> >  #include <linux/i2c.h>
+> >  #include <linux/nvmem-provider.h>
+> > -#include <linux/regmap.h>
+> >  #include <linux/platform_data/at24.h>
+> >  
+> >  /*
+> > @@ -69,7 +68,6 @@ struct at24_data {
+> >  	unsigned write_max;
+> >  	unsigned num_addresses;
+> >  
+> > -	struct regmap_config regmap_config;
+> >  	struct nvmem_config nvmem_config;
+> >  	struct nvmem_device *nvmem;
+> >  
+> > @@ -252,10 +250,10 @@ static ssize_t at24_eeprom_read(struct at24_data *at24, char *buf,
+> >  	return -ETIMEDOUT;
+> >  }
+> >  
+> > -static ssize_t at24_read(struct at24_data *at24,
+> > -		char *buf, loff_t off, size_t count)
+> > +static int at24_read(void *priv, unsigned int off, void *val, size_t count)
+> >  {
+> > -	ssize_t retval = 0;
+> > +	struct at24_data *at24 = priv;
+> > +	char *buf = val;
+> >  
+> >  	if (unlikely(!count))
+> >  		return count;
+> > @@ -267,23 +265,21 @@ static ssize_t at24_read(struct at24_data *at24,
+> >  	mutex_lock(&at24->lock);
+> >  
+> >  	while (count) {
+> > -		ssize_t	status;
+> > +		int	status;
+> >  
+> >  		status = at24_eeprom_read(at24, buf, off, count);
 
-> 
-> >> >> lasted. Another reason is that the SPM is not enabled before system
-> >> 
-> >> what's SPM ?
-> > It is System Power Management which is powered off when system is
-> > running in normal mode, and is powered on when system enters suspend
-> > mode. It is used to wakeup system when some wakeup sources, such as
-> > bluetooth or powerkey etc, tigger wakeup event.
-> 
-> okay, thanks
-> 
-> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
-> >>            ^^^^^^^^^^
-> >>            completion
-> >> 
-> >> >> So in order to reduce the duration less than 20ms, make use of
-> >> >> syscore's suspend/resume interface.
-> >> 
-> >> no, this is the wrong approach
-> > But it seems only one workable approach from software side
-> 
-> I wouldn't say that. It seems to me SPM should be enabled earlier.
-Yes, but normally SPM should be enabled after all CPUS are turned off,
-so it's difficult to do that, I mean enable SPM before turning off CPUS
-> 
-> >> >> Because the syscore runs on irq disabled context, and xhci's
-> >> >> suspend/resume calls some sleeping functions, enable local irq
-> >> >> and then disable it during suspend/resume. This may be not a problem,
-> >> >> since only boot CPU is runing.
-> >> 
-> >> another problem :) calling local_irq_{enable,disable}() is an indication
-> >> that something's wrong.
-> > Oh!
-> >
-> > BTW: There will be warning logs if they are not called.
-> 
-> yeah, I got that :-) But it's still wrong to use
-> local_irq_{enable,disable}() the way you're using them :-)
-Yes
+Since the patch replaces ssize_t with int here, it would also make
+sense to do the same to at24_eeprom_read and at24_eeprom_write. Either
+use ssize_t everywhere or nowhere.
 
-Thank you very much.
-> 
+      Andrew
