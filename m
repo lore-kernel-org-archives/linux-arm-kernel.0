@@ -1,38 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 May 2016 08:49:55 +0100
-Subject: [PATCH 2/2] irqchip/gic-v2m: Add workaround for Broadcom NS2
- GICv2m erratum
-In-Reply-To: <1462319245-32532-3-git-send-email-ray.jui@broadcom.com>
-References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
- <1462319245-32532-3-git-send-email-ray.jui@broadcom.com>
-Message-ID: <5729A9A3.6070207@arm.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Wed, 4 May 2016 09:52:19 +0200
+Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
+ code
+In-Reply-To: <5608365.uloflbeuqO@wuerfel>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <6161197.8XCk69TI60@wuerfel>
+ <20160426111532.GA5457@griffinp-ThinkPad-X1-Carbon-2nd>
+ <5608365.uloflbeuqO@wuerfel>
+Message-ID: <5729AA33.6020305@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/16 00:47, Ray Jui wrote:
-> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
-> implementation has an erratum where the MSI data needs to be the SPI
-> number subtracted by an offset of 32, for the correct MSI interrupt to
-> be triggered.
+hello Arnd, peter,
+
+On 04/26/2016 01:44 PM, Arnd Bergmann wrote:
+> On Tuesday 26 April 2016 12:15:32 Peter Griffin wrote:
+>>>
+>>>> If not what would you recommend instead? 
+>>>
+>>> It's still not clear to me what that bit in the syscfg register
+>>> is for. Given the error message about "sti-audio-clk-glue",
+>>> I suspect that this is actually a clock controller and that
+>>> it should be using the clock binding with a separate driver
+>>> instead of manipulating the regmap directly from the audio driver.
+>>
+>> Luckily I do have the datasheet for the audio-glue sysconf register.
+>>
+>> It says: -
+>>
+>> [11:8] PCM_CLK_SEL: Selects the frequency synthesizer clock or the external
+>> PCM clock for each channel.
+>>
+>> The driver only ever sets this to 1 which selects the frequency synthesizer
+>> clock. So the bitfield of the register which the driver is using (PCM_CLK_SEL)
+>> is a clock mux.
 > 
-> We are aware that APM X-Gene GICv2m has a similar erratum where the
-> MSI data needs to be the offset from the spi_start. While APM's workaround
-> is triggered based on readings from the MSI_IIDR register, this patch
-> contains a more general solution by allowing this offset to be
-> specified with an optional DT property 'arm,msi-offset-spi'. This patch
-> also maintains compatibility with existing APM platforms
+> Ok, that sounds like it could be either a really simple clock driver
+> with just a few lines, or integrated into an existing clock driver
+> if you already have one for this syscon node.
+> 
+> 	Arnd
+> 
+FYI, Name of this glue is related to the register name. But it does not
+concern only clock...
+ This glue register is used to :
+- select clock source ( clock framework or external clock from GPIO)
+=> one bit field per IP instance (player->clk_sel)
+- select uniperiph player IP instance for PCM out.
+(http://www.spinics.net/lists/alsa-devel/msg49034.html)
 
-It may be more generic, but it also fails to deal with less capable
-firmware implementations. In contrast, reading MSI_IIDR is always
-possible (assuming you have a unique ID for this v2m implementation).
-
-If you cannot uniquely identify it using an ID register, the usual
-alternative is to have a new "compatible" string identifying the
-defective part, and set the offset based on this string. This still
-fails the ACPI test, but is the least invasive DT-wise.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards
+Arnaud
