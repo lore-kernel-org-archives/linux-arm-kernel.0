@@ -1,150 +1,77 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 4 May 2016 12:06:43 +0200
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop> <20160503185153.5cfddc32@bbrezillon>
- <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
-Message-ID: <CACh+v5O2XpJyYWz70pVgtU5-g9td6J7EdmNtJwk0s5SUkAywaQ@mail.gmail.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 4 May 2016 12:25:33 +0200
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <20150914202533.GF4684@lukather>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com> <20150914202533.GF4684@lukather>
+Message-ID: <CAOMqctTa7Q-_dSf_4HaGt34=+YF4Sct=WvHjzp-n67J72zyLrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-03 21:11 GMT+02:00 Rob Herring <robh@kernel.org>:
-> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
->> Hi Rob,
+On 14 September 2015 at 22:25, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Sep 10, 2015 at 08:38:38PM +0200, Hans de Goede wrote:
+>> Hi,
 >>
->> On Tue, 3 May 2016 11:40:19 -0500
->> Rob Herring <robh@kernel.org> wrote:
+>> On 10-09-15 20:30, Maxime Ripard wrote:
+>> >On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+>> >>Hi,
+>> >>
+>> >>On 04-09-15 08:43, Olliver Schinagl wrote:
+>> >>>Hey Hans,
+>> >>>
+>> >>>On 07-08-15 10:45, Olliver Schinagl wrote:
+>> >>>><snip>
+>> >>>>>If you change the dr_mode to host then you _must_ also remove any id_det and vbus_det
+>> >>>>>gpio settings from the usb_phy node in the dts, as the sun4i phy code detects
+>> >>>>>host vs otg mode by checking for the presence of these.
+>> >>>>Yes, this fixes it and makes it work. Thanks.
+>> >>>>
+>> >>>I've been going back to this and am wondering if this is something I can look into to fix properly? E.g. if the dts sets dr_mode = host, can we simply ignore the pins and treat them as unset?
+>> >>
+>> >>AFAIK you cannot unset something in dts. The only solution I
+>> >>can comeup with is to add a dr_mode argument to the phy like
+>> >>we already have for the otg controller itself.
+>> >>
+>> >>This is something which we likely need to do anyways to add
+>> >>support for peripheral only mode, which we seem to need for
+>> >>some "hdmi sticks".
+>> >
+>> >I haven't really followed the rest of the discussion, so sorry if you
+>> >already talked about that, but why can't you just set the dr_mode to
+>> >peripheral in such a case?
 >>
->>> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
->>> > The EBI (External Bus Interface) is used to access external peripherals
->>> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
->>> > Each device is assigned a CS line and an address range and can have its
->>> > own configuration (timings, access mode, bus width, ...).
->>> > This driver provides a generic DT binding to configure a device according
->>> > to its requirements.
->>> > For specific device controllers (like the NAND one) the SMC timings
->>> > should be configured by the controller driver through the matrix and smc
->>> > syscon regmaps.
->>> >
->>> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> > ---
->>> >  .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
->>> >  1 file changed, 136 insertions(+)
->>> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->>> >
->>> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->>> > new file mode 100644
->>> > index 0000000..a6dca5c
->>> > --- /dev/null
->>> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
->>> > @@ -0,0 +1,136 @@
->>> > +* Device tree bindings for Atmel EBI
->>> > +
->>> > +The External Bus Interface (EBI) controller is a bus where you can connect
->>> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
->>> > +The EBI provides a glue-less interface to asynchronous memories through the SMC
->>> > +(Static Memory Controller).
->>> > +
->>> > +Required properties:
->>> > +
->>> > +- compatible:              "atmel,at91sam9260-ebi"
->>> > +                   "atmel,at91sam9261-ebi"
->>> > +                   "atmel,at91sam9263-ebi0"
->>> > +                   "atmel,at91sam9263-ebi1"
->>>
->>> What are the differences between 0 and 1?
+>> This is about the usbphy code not the musb-controller code, which are
+>> 2 different dts nodes, atm only the musb-controller node has a
+>> dr_mode property, and the phy code decides between host-only
+>> and otg mode based on whether an id pin is assigned or not.
 >>
->> Because this SoC has 2 EBI busses with different capabilities.
+>> My proposal is to get rid of the id-pin hack to determine the mode
+>> and add a dr_mode property to the usbphy dts node.
 >
-> Okay, correct answer. :)
+> I agree that we should get rid of that hack, especially since a lack
+> of an ID pin might also be used on a peripheral-only device.
 >
-> [...]
->
->>>
->>> > +                   of the memory region requested by the device.
->>> > +
->>> > +EBI bus configuration associated with specific chip-select will be defined in
->>> > +the configs subnode. This configs node will in turn contain several subnodes
->>> > +named config-<cs-id>, each of them containing the following properties.
->>>
->>> This is a bit unusual. Why not just part of the child device nodes?
->>
->> Oh, come on! I reworked the binding because Mark complained about the
->> previous binding which was doing exactly what you're suggesting. Can
->> you please be consistent in your reviews...
->
-> No, Mark and I both have our opinions. Which part of this patch
-> explains the history? If the revision history is not in the patch, I'm
-> not looking at it.
->
-> My issue with it this way is that it has invented yet another way to
-> describe timings. I would like to be consistent across external bus
-> descriptions, but we're not very consistent to begin with though. The
-> most common seems to be the way you first did it. But I agree that it
-> is kind of screwy to have an intermediate node unless the controller
-> itself has sub-blocks within it and is not the established way to
-> describe a bus with chip selects. I would either put the properties
-> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
-> in the device node. I'd call it timings instead of config, but that's
-> just bikeshedding.
->
-> memory-controller at 1000 {
->   ...
->   flash at 0,0 {
->     timings {
->       ...
->     };
->   };
-> };
+> However, we already have that information in the musb node, and
+> duplicating the info seems error prone. We already have a custom
+> function, maybe that's a case for another one, and that would allow to
+> handle "hard" cases more easily (like CONFIG_USB_MUSB_HOST selected,
+> with the otg node set to otg).
 >
 
-I don't think the timings belong in the child node as they really are
-for the chip select and the chip select may select several devices at
-once. I'm thinking (again) of a FPGA here that could implement or
-example 4 serial ports at different addresses.
+Hello,
 
-JJ
+was this solved somehow?
 
->>> > +
->>> > +Optional config-<cs-id> node properties:
->>> > +
->>> > +- atmel,bus-width:         width of the asynchronous device's data bus
->>> > +                           8, 16 or 32.
->>> > +                           Default to 8 when undefined.
->>> > +
->>> > +- atmel,byte-access-type   "write" or "select" (see Atmel datasheet).
->>> > +                           Default to "select" when undefined.
->>> > +
->>> > +- atmel,read-mode          "nrd" or "ncs".
->>> > +                           Default to "ncs" when undefined.
->>> > +
->>> > +- atmel,write-mode         "nwe" or "ncs".
->>> > +                           Default to "ncs" when undefined.
->>> > +
->>> > +- atmel,exnw-mode          "disabled", "frozen" or "ready".
->>> > +                           Default to "disabled" when undefined.
->>> > +
->>> > +- atmel,page-mode          enable page mode if present. The provided value
->>> > +                           defines the page size (supported values: 4, 8,
->>> > +                           16 and 32).
->>> > +
->>> > +- atmel,tdf-mode:          "normal" or "optimized". When set to
->>>
->>> This should be boolean.
->>
->> It was a formerly defined as a boolean, and when it's done like that we
->> have no way to identify whether the property was forgotten or
->> intentionally set to normal mode. What's the problem with this approach?
->
-> Only preference to use boolean when that is sufficient. With your
-> argument, then we should never have booleans. You state that missing
-> means "normal", not forgotten, so all these properties should be
-> required with no default.
->
-> BTW, I debated the same thing on the other properties, but I could see
-> them being expanded to a 3rd mode. I don't see that here though.
->
-> Rob
+What problem is there with referencing the phy node?
+
+Just like pinmux setting nodes and whatnot it can be named and
+referenced by name.
+
+Thanks
+
+Michal
