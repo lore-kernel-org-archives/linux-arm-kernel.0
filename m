@@ -1,66 +1,72 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 4 May 2016 19:44:49 +0530
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20160503171602.GA2518@roeck-us.net>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com>
- <5728BEC4.6050603@codeaurora.org>
- <20160503155141.GF13045@dhcppc6.redhat.com>
- <20160503171602.GA2518@roeck-us.net>
-Message-ID: <20160504141449.GG13045@dhcppc6.redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed,  4 May 2016 15:21:29 +0100
+Subject: [PATCH] KVM: arm/arm64: move GICv2 emulation defines into arm-gic-v3.h
+In-Reply-To: <5729FF19.3030205@arm.com>
+References: <5729FF19.3030205@arm.com>
+Message-ID: <1462371689-26046-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
+for the list register definition also apply to GICv3 LRs.
+At the moment we have those definitions in the KVM VGICv3
+implementation, so let's move them into the GICv3 header file to
+have them automatically defined.
 
-On 03/05/2016:10:16:02 AM, Guenter Roeck wrote:
-> On Tue, May 03, 2016 at 09:21:41PM +0530, Pratyush Anand wrote:
-> > On 03/05/2016:10:07:48 AM, Timur Tabi wrote:
-> > > Pratyush Anand wrote:
-> > > >In fact after supporting max_hw_heartbeat_ms, there should be no change for
-> > > >action=0 functionally. However, we would still need some changes for action=1.
-> > > 
-> > > IMHO, action=1 is more of a debugging option, and not something that would
-> > > be used normally.  I would need to see some evidence that real users want to
-> > > have action=1 and a longer timeout.
-> > > 
-> > If action=1 need to be used effectively, then we should have something which
-> > would help to increase timeout values.
-> > 
-> > Currently you have only 10 second to execute secondary kernel, which might not
-> > be sufficient.
-> > 
-> Previously the argument was that the 10 seconds (assuming the clock runs at
-> maximum speed) would not be sufficient to load the watchdog application. Now it
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+... and then just remove the #include <arm-gic.h> from vgic/vgic-v3.c.
 
-May be you meant "would be sufficient". OK..let me clarify on it.
+Does that make sense?
 
-Currently it takes 7-8 second from the point 1st kernel panics to the point
-second kernel boots. (Given, we have D-cache enabled in kexec-tools, for which
-community is not yet agreed), anyway..so, it is safe for me as of now. But,
-there is only 2-3 second margin. So, I am not sure if all sort of secondary
-kernel will be able to make it in that time.
+Cheers,
+Andre.
 
-Following minimal code will be able to extend timeout for secondary kernel, and
-I do not see anything wrong in it. We are anyway, panicking in ISR, so what
-could be disadvantage if we write a wdt register just before panicking?
+ include/linux/irqchip/arm-gic-v3.h | 5 +++++
+ virt/kvm/arm/vgic-v3.c             | 8 +-------
+ 2 files changed, 6 insertions(+), 7 deletions(-)
 
---- a/drivers/watchdog/sbsa_gwdt.c
-+++ b/drivers/watchdog/sbsa_gwdt.c
-@@ -221,6 +221,13 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 56fd2c5..35e93cf 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -277,6 +277,11 @@
+ #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+ #define ICH_LR_PRIORITY_SHIFT		48
  
-static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
-{
-+    struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
-+    struct watchdog_device *wdd = &gwdt->wdd;
-+    u64 timeout = (u64)gwdt->clk * wdd->timeout;
++/* These are for GICv2 emulation only */
++#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
++#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
++#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
 +
-+    writeq(timeout + arch_counter_get_cntvct(),
-+                    gwdt->control_base + SBSA_GWDT_WCV);
-+
-     panic(WATCHDOG_NAME " timeout");
-      
-             return IRQ_HANDLED;
-
-~Pratyush
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
+ 
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index 999bdc6..9c5cfc2 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -31,12 +31,6 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
+ 
+-/* These are for GICv2 emulation only */
+-#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+-#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+-#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+-#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+-
+ static u32 ich_vtr_el2;
+ 
+ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+@@ -45,7 +39,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
+ 
+ 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+-		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
++		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
+ 	else
+ 		lr_desc.irq = val & GICH_LR_VIRTUALID;
+ 
+-- 
+2.7.3
