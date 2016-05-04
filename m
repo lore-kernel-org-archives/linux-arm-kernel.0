@@ -1,164 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 4 May 2016 16:33:11 +0100
-Subject: [PATCH RESEND] iommu/dma: Implement scatterlist segment merging
-In-Reply-To: <b87bf47e79febb3ca904140db09cf095238b2817.1460373907.git.robin.murphy@arm.com>
-References: <b87bf47e79febb3ca904140db09cf095238b2817.1460373907.git.robin.murphy@arm.com>
-Message-ID: <572A1637.7000509@arm.com>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Wed, 4 May 2016 08:57:06 -0700
+Subject: [PATCH 1/2] dt-bindings: arm,gic: Indtroduce optional property
+ 'arm,msi-offset-spi' for gicv2m
+In-Reply-To: <1462319245-32532-2-git-send-email-ray.jui@broadcom.com>
+References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
+ <1462319245-32532-2-git-send-email-ray.jui@broadcom.com>
+Message-ID: <CAMsMSK_jwd6OMMJ8DfAckVJgav9U6p-oz9YcinUinaqj2xdwAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+You have a typo in the subject line - "Indtroduce".
 
-On 11/04/16 12:32, Robin Murphy wrote:
-> Stop wasting IOVA space by over-aligning scatterlist segments for a
-> theoretical worst-case segment boundary mask, and instead take the real
-> limits into account to merge consecutive segments wherever appropriate,
-> so our callers can benefit from getting back nicely simplified lists.
+Chris
+
+On Tue, May 3, 2016 at 4:47 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+> Update the GICv2m binding document by adding an optional property
+> 'arm,msi-offset-spi'.
 >
-> This also represents the last piece of functionality wanted by users of
-> the current arch/arm implementation, thus brings us a small step closer
-> to converting that over to the common code.
+> Some implementations of gicv2m have an erratum where the MSI data is
+> the SPI number subtracted by an offset. This is required for the
+> correct MSI interrupt to be triggered.
 >
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 > ---
+>  Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 >
-> As requested, reposting rebased onto -rc3.
-
-Just checking whether this has slipped through the cracks? It would be 
-nice to tick it off for 4.7 (even if the video folks seem to have gone 
-quiet lately).
-
-Thanks,
-Robin.
-
->   drivers/iommu/dma-iommu.c | 84 ++++++++++++++++++++++++++++++++++-------------
->   1 file changed, 61 insertions(+), 23 deletions(-)
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> index 793c20f..550960f 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> @@ -140,6 +140,12 @@ Optional properties:
+>                       value, this property should contain the number of
+>                       SPIs assigned to the frame, overriding the HW value.
 >
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 58f2fe6..886cb3a 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -389,26 +389,58 @@ void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
->
->   /*
->    * Prepare a successfully-mapped scatterlist to give back to the caller.
-> - * Handling IOVA concatenation can come later, if needed
-> + *
-> + * At this point the segments are already laid out by iommu_dma_map_sg() to
-> + * avoid individually crossing any boundaries, so we merely need to check a
-> + * segment's start address to avoid concatenating across one.
->    */
->   static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
->   		dma_addr_t dma_addr)
->   {
-> -	struct scatterlist *s;
-> -	int i;
-> +	struct scatterlist *s, *cur = sg;
-> +	unsigned long seg_mask = dma_get_seg_boundary(dev);
-> +	unsigned int cur_len = 0, max_len = dma_get_max_seg_size(dev);
-> +	int i, count = 0;
->
->   	for_each_sg(sg, s, nents, i) {
-> -		/* Un-swizzling the fields here, hence the naming mismatch */
-> -		unsigned int s_offset = sg_dma_address(s);
-> +		/* Restore this segment's original unaligned fields first */
-> +		unsigned int s_iova_off = sg_dma_address(s);
->   		unsigned int s_length = sg_dma_len(s);
-> -		unsigned int s_dma_len = s->length;
-> +		unsigned int s_iova_len = s->length;
->
-> -		s->offset += s_offset;
-> +		s->offset += s_iova_off;
->   		s->length = s_length;
-> -		sg_dma_address(s) = dma_addr + s_offset;
-> -		dma_addr += s_dma_len;
-> +		sg_dma_address(s) = DMA_ERROR_CODE;
-> +		sg_dma_len(s) = 0;
+> +- arm,msi-offset-spi: Some implementations of gicv2m have an erratum where
+> +                     the MSI data is the SPI number subtracted by an offset.
+> +                     This is required for the correct MSI interrupt to be
+> +                     triggered. This property should contain the required
+> +                     offset.
 > +
-> +		/*
-> +		 * Now fill in the real DMA data. If...
-> +		 * - there is a valid output segment to append to
-> +		 * - and this segment starts on an IOVA page boundary
-> +		 * - but doesn't fall at a segment boundary
-> +		 * - and wouldn't make the resulting output segment too long
-> +		 */
-> +		if (cur_len && !s_iova_off && (dma_addr & seg_mask) &&
-> +		    (cur_len + s_length <= max_len)) {
-> +			/* ...then concatenate it with the previous one */
-> +			cur_len += s_length;
-> +		} else {
-> +			/* Otherwise start the next output segment */
-> +			if (i > 0)
-> +				cur = sg_next(cur);
-> +			cur_len = s_length;
-> +			count++;
-> +
-> +			sg_dma_address(cur) = dma_addr + s_iova_off;
-> +		}
-> +
-> +		sg_dma_len(cur) = cur_len;
-> +		dma_addr += s_iova_len;
-> +
-> +		if (s_length + s_iova_off < s_iova_len)
-> +			cur_len = 0;
->   	}
-> -	return i;
-> +	return count;
->   }
+>  Example:
 >
->   /*
-> @@ -446,34 +478,40 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
->   	struct scatterlist *s, *prev = NULL;
->   	dma_addr_t dma_addr;
->   	size_t iova_len = 0;
-> +	unsigned long mask = dma_get_seg_boundary(dev);
->   	int i;
->
->   	/*
->   	 * Work out how much IOVA space we need, and align the segments to
->   	 * IOVA granules for the IOMMU driver to handle. With some clever
->   	 * trickery we can modify the list in-place, but reversibly, by
-> -	 * hiding the original data in the as-yet-unused DMA fields.
-> +	 * stashing the unaligned parts in the as-yet-unused DMA fields.
->   	 */
->   	for_each_sg(sg, s, nents, i) {
-> -		size_t s_offset = iova_offset(iovad, s->offset);
-> +		size_t s_iova_off = iova_offset(iovad, s->offset);
->   		size_t s_length = s->length;
-> +		size_t pad_len = (mask - iova_len + 1) & mask;
->
-> -		sg_dma_address(s) = s_offset;
-> +		sg_dma_address(s) = s_iova_off;
->   		sg_dma_len(s) = s_length;
-> -		s->offset -= s_offset;
-> -		s_length = iova_align(iovad, s_length + s_offset);
-> +		s->offset -= s_iova_off;
-> +		s_length = iova_align(iovad, s_length + s_iova_off);
->   		s->length = s_length;
->
->   		/*
-> -		 * The simple way to avoid the rare case of a segment
-> -		 * crossing the boundary mask is to pad the previous one
-> -		 * to end at a naturally-aligned IOVA for this one's size,
-> -		 * at the cost of potentially over-allocating a little.
-> +		 * Due to the alignment of our single IOVA allocation, we can
-> +		 * depend on these assumptions about the segment boundary mask:
-> +		 * - If mask size >= IOVA size, then the IOVA range cannot
-> +		 *   possibly fall across a boundary, so we don't care.
-> +		 * - If mask size < IOVA size, then the IOVA range must start
-> +		 *   exactly on a boundary, therefore we can lay things out
-> +		 *   based purely on segment lengths without needing to know
-> +		 *   the actual addresses beforehand.
-> +		 * - The mask must be a power of 2, so pad_len == 0 if
-> +		 *   iova_len == 0, thus we cannot dereference prev the first
-> +		 *   time through here (i.e. before it has a meaningful value).
->   		 */
-> -		if (prev) {
-> -			size_t pad_len = roundup_pow_of_two(s_length);
-> -
-> -			pad_len = (pad_len - iova_len) & (pad_len - 1);
-> +		if (pad_len && pad_len < s_length - 1) {
->   			prev->length += pad_len;
->   			iova_len += pad_len;
->   		}
+>         interrupt-controller at e1101000 {
+> --
+> 2.1.4
 >
