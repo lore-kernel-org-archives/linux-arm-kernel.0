@@ -1,46 +1,104 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  4 May 2016 11:43:17 +0200
-Subject: [PATCH v2 2/3] video: fbdev: imxfb: enable lcd regulator in .probe
+Date: Wed,  4 May 2016 11:43:18 +0200
+Subject: [PATCH v2 3/3] video: fbdev: imxfb: add some error handling
 In-Reply-To: <1462354998-5792-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1462354998-5792-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1462354998-5792-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1462354998-5792-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This asserts that the display is on after the driver is initialized.
-Otherwise, depending on how the boot loader handled the display, it is
-either disabled as the regulator doesn't seem in use, or it stays off.
+clk_prepare_enable can fail and if it does the controller must not be
+considered enabled. So check for errors, properly unwind and give the
+error code back to the caller.
 
+While touching the clock code also enable the clocks in the same
+direction and disable in reverse order.
+
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
 
-No changes since (implicit) v1, sent with
-Message-Id: 1457380425-20244-3-git-send-email-u.kleine-koenig at pengutronix.de
+Changes since (implicit) v1, sent with
+Message-Id: 1457380425-20244-4-git-send-email-u.kleine-koenig at pengutronix.de
 
- drivers/video/fbdev/imxfb.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ - Some simplifications suggested and Reviewed-by Philipp Zabel
+ - Rework goto labels to have them at the end of the function
+   (Tomi Valkeinen).
+
+ drivers/video/fbdev/imxfb.c | 35 +++++++++++++++++++++++++++--------
+ 1 file changed, 27 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
-index 6d402c1a0f2b..18388ca178a2 100644
+index 18388ca178a2..23a623688f1e 100644
 --- a/drivers/video/fbdev/imxfb.c
 +++ b/drivers/video/fbdev/imxfb.c
-@@ -995,8 +995,17 @@ static int imxfb_probe(struct platform_device *pdev)
- 	imxfb_enable_controller(fbi);
- 	fbi->pdev = pdev;
- 
-+	if (!IS_ERR(fbi->lcd_pwr)) {
-+		ret = regulator_enable(fbi->lcd_pwr);
-+		if (ret)
-+			goto failed_regulator;
-+	}
-+
+@@ -473,11 +473,12 @@ static int imxfb_set_par(struct fb_info *info)
  	return 0;
+ }
  
-+failed_regulator:
-+	imxfb_disable_controller(fbi);
+-static void imxfb_enable_controller(struct imxfb_info *fbi)
++static int imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
+@@ -496,10 +497,29 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 	 */
+ 	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+ 
+-	clk_prepare_enable(fbi->clk_ipg);
+-	clk_prepare_enable(fbi->clk_ahb);
+-	clk_prepare_enable(fbi->clk_per);
++	ret = clk_prepare_enable(fbi->clk_ipg);
++	if (ret)
++		goto err_enable_ipg;
 +
- failed_lcd:
- 	unregister_framebuffer(info);
++	ret = clk_prepare_enable(fbi->clk_ahb);
++	if (ret)
++		goto err_enable_ahb;
++
++	ret = clk_prepare_enable(fbi->clk_per);
++	if (ret)
++		goto err_enable_per;
++
+ 	fbi->enabled = true;
++	return 0;
++
++err_enable_per:
++	clk_disable_unprepare(fbi->clk_ahb);
++err_enable_ahb:
++	clk_disable_unprepare(fbi->clk_ipg);
++err_enable_ipg:
++	writel(0, fbi->regs + LCDC_RMCR);
++
++	return ret;
+ }
  
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+@@ -510,8 +530,8 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	pr_debug("Disabling LCD controller\n");
+ 
+ 	clk_disable_unprepare(fbi->clk_per);
+-	clk_disable_unprepare(fbi->clk_ipg);
+ 	clk_disable_unprepare(fbi->clk_ahb);
++	clk_disable_unprepare(fbi->clk_ipg);
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
+@@ -532,8 +552,7 @@ static int imxfb_blank(int blank, struct fb_info *info)
+ 		break;
+ 
+ 	case FB_BLANK_UNBLANK:
+-		imxfb_enable_controller(fbi);
+-		break;
++		return imxfb_enable_controller(fbi);
+ 	}
+ 	return 0;
+ }
 -- 
 2.8.0.rc3
