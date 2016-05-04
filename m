@@ -1,129 +1,61 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 04 May 2016 14:56:34 +0300
-Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
- suspend
-In-Reply-To: <1462359261.11651.69.camel@mhfsdcap03>
-References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
- <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
- <1462324873.11651.57.camel@mhfsdcap03> <871t5ifdxk.fsf@intel.com>
- <1462359261.11651.69.camel@mhfsdcap03>
-Message-ID: <87mvo6dojx.fsf@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 04 May 2016 14:01:57 +0200
+Subject: [RFT PATCH 1/3] usb: misc: usb3503: Fix HUB mode after bootloader
+ initialization
+In-Reply-To: <20160503180022.GA3008@rob-hp-laptop>
+References: <1461927591-7864-1-git-send-email-k.kozlowski@samsung.com>
+ <1461927591-7864-2-git-send-email-k.kozlowski@samsung.com>
+ <20160429113059.GX3217@sirena.org.uk> <57234BA2.6020304@samsung.com>
+ <20160429164448.GY3217@sirena.org.uk> <57272298.50701@samsung.com>
+ <20160502105501.GE6292@sirena.org.uk> <20160503180022.GA3008@rob-hp-laptop>
+Message-ID: <5729E4B5.2090702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/03/2016 08:00 PM, Rob Herring wrote:
+> On Mon, May 02, 2016 at 11:55:01AM +0100, Mark Brown wrote:
+>> On Mon, May 02, 2016 at 11:49:12AM +0200, Krzysztof Kozlowski wrote:
+>>
+>>> This VDD regulator supply actually is not a usb3503 USB HUB regulator
+>>> supply... but a supply to the LAN attached to this HUB. Regulator off/on
+>>> is needed for LAN to show up. The hub will show up with typical reset
+>>> (which is also missing before my patchset btw).
+>>
+>>> The LAN, as a USB device, is auto-probed so it cannot take the regulator
+>>> and play with it. The simplest idea I have is to add it as "external
+>>> supply"  to the parent: usb3503.
+>>
+>> This is common enough that that just isn't going to scale well I fear
+>> without some generic handling, either walking child devices at the bus
+>> level or at the device level with a pre-probe() callback to get the
+>> device to power on.  The latter is more appropriate to things like
+>> Slimbus where the device is more likely to do active management at
+>> runtime, it's not clear people are building USB devices like that.
+> 
+> There's a new binding and support in -next (.../usb/usb-device.txt) for 
+> USB devices that should help here. Though, how to handle a hub on USB 
+> and I2C buses would need to be worked out.
 
-Hi,
+This binding might help, especially with other idea we have - usage of
+pwrseq for the USB hub.
 
-chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> > On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
->> >> Hi,
->> >> 
->> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> >> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> >> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
->> >> >> >> Click mouse after xhci suspend completion but before system suspend
->> >> >> >> completion, system will not be waken up by mouse if the duration of
->> >> >> >> them is larger than 20ms which is the device UFP's resume signaling
->> >> >> 
->> >> >> what is "them" here ? The duration of what is longer than 20ms ?
->> >> > They are "xhci suspend completion" and "system suspend completion";
->> >> >
->> >> > It's time duration
->> >> 
->> >> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
->> >> wakeup ?
->> > It is not the time of xhci suspend consumed, but is the time of duration
->> > from xhci suspend completion to system suspend completion(after BOOT-CPU
->> > is turned off, SPM will be enabled to receive wakeup event)
->> 
->> Okay, so SPM will be the entity actually handling wakeups, right ? I'm
->> assuming something like this happens:
->> 
->> echo mem > /sys/power/state
->>  /* start suspending devices */
->>   xhci_suspend()
->>  /* all devices suspended */
->>  enable_spm()
->> 
->> so, if a mouse button is pressed after xhci_suspend() returns but before
->> enable_spm() runs, then we're gonna miss that event, am I right ?
-> Yes, you are right.
->> 
->> I can't think of any way to sort this out. Let's ask on linux-pm (I've
->> added linux-pm to Cc list)
-> Thanks
->> 
->> >> >> >> lasted. Another reason is that the SPM is not enabled before system
->> >> >> 
->> >> >> what's SPM ?
->> >> > It is System Power Management which is powered off when system is
->> >> > running in normal mode, and is powered on when system enters suspend
->> >> > mode. It is used to wakeup system when some wakeup sources, such as
->> >> > bluetooth or powerkey etc, tigger wakeup event.
->> >> 
->> >> okay, thanks
->> >> 
->> >> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
->> >> >>            ^^^^^^^^^^
->> >> >>            completion
->> >> >> 
->> >> >> >> So in order to reduce the duration less than 20ms, make use of
->> >> >> >> syscore's suspend/resume interface.
->> >> >> 
->> >> >> no, this is the wrong approach
->> >> > But it seems only one workable approach from software side
->> >> 
->> >> I wouldn't say that. It seems to me SPM should be enabled earlier.
->> > Yes, but normally SPM should be enabled after all CPUS are turned off,
->> > so it's difficult to do that, I mean enable SPM before turning off CPUS
->> 
->> is it a requirement that SPM should be enabled only after all CPUs are
->> turned off ? If that's the case, then any device in the system might
->> have missed wakeups. This doesn't seem like a good design to me; unless
->> I'm missing something...
-> Yes, it's a requirement.
->
-> If the wakeup source is level trigger, and will keep it until SPM notice
-> it. Although USB wakeup is level trigger, but it just last at most 20ms
-> and clear itself automatically.
+The USB hub, without toggling the regulator off/on, appears as USB
+device only sometimes. Apparently there is some timing or other
+behavior. not yet known to me.
 
-who's clearing USB wakeup after 20ms ? Sure, it's a requirement by the
-USB spec that host should drive reset for *at least* 20ms, but I don't
-remember the exact wordings WRT remote wakeup
+When playing with regulator, the USB hub and child USB device (LAN) will
+appear correctly.
 
-/me reads
+This looks like pwrseq for MMC devices so the idea is to:
+1. Move drivers/mmc/core/pwrseq* to separate directory
+(drivers/power/pwrseq ?)
+2. Add support for pwrseq to USB core,
+3. Add new pwrseq driver (or extend existing one): toggling the regulator.
+4. Add pwrseq phandle to the DT node of USB hub (to the binding
+mentioned by Rob?).
 
-Okay, here it is, section 7.1.7.7 of USB 2.0 Spec states:
 
-	"The remote wakeup device must hold the resume signaling for at
-        least 1 ms but for no more than 15 ms (TDRSMUP). At the end of
-        this period, the device stops driving the bus (puts its drivers
-        into the high-impedance state and does not drive the bus to the
-        J state)."
+Does it look sensible?
 
-IOW, the mouse is not at fault here. Remote wakeup can last anywhere
-between 1ms and 15ms. If your system can't cope with it, then I'd say
-it's a problem with your system and you shouldn't allow XHCI to go to
-such deep power states until SPM is enabled.
-
-I really tried finding the correct piece of code which does this for PCI
-devices, but basically it's treated as an IRQ and as long as
-enable_irq_wake() or the sysfs file is set to true, then PME gets
-enabled (hopefully PCI folks can confirm this statement).
-
-Very recently Tony Lindgren added proper handling of wakeup signals as
-IRQs for non-PCI systems too (see 4990d4fe327b PM / Wakeirq: Add
-automated device wake IRQ handling), wonder if you could treat SPM
-similarly.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/bec02f4f/attachment.sig>
+Best regards,
+Krzysztof
