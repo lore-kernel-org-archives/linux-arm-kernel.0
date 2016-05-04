@@ -1,62 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 May 2016 14:45:31 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.7
-Message-ID: <20160504134531.GA31744@arm.com>
+Date: Wed, 4 May 2016 14:46:42 +0100
+Subject: [PATCH] perf/core / arm_pmu: special-case hetereogeneous CPUs
+In-Reply-To: <20160504134419.GA15849@leverpostej>
+References: <20160425175837.GB3141@leverpostej>
+ <20160425190334.GK3448@twins.programming.kicks-ass.net>
+ <20160426103346.GA20836@leverpostej>
+ <20160504134419.GA15849@leverpostej>
+Message-ID: <20160504134641.GB31744@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Wed, May 04, 2016 at 02:44:20PM +0100, Mark Rutland wrote:
+> Hi,
+> 
+> On Tue, Apr 26, 2016 at 11:33:46AM +0100, Mark Rutland wrote:
+> > On Mon, Apr 25, 2016 at 09:03:34PM +0200, Peter Zijlstra wrote:
+> > > On Mon, Apr 25, 2016 at 06:58:37PM +0100, Mark Rutland wrote:
+> > > > Hi,
+> > > > 
+> > > > When booting an arm64 defconfig linux-next (next-20160422) on an ARM
+> > > > Juno system, I hit a WARN_ON_ONCE in perf_pmu_register (see backtrace at
+> > > > the end of this email).
+> > > > 
+> > > > This was introduced by commit 26657848502b7847 ("perf/core: Verify we
+> > > > have a single perf_hw_context PMU") where we forcefully prevent multiple
+> > > > PMUs from sharing perf_hw_context (with a warning), and force additional
+> > > > PMUs to use perf_invalid_context.
+> > 
+> > > > Are you happy to revert 26657848502b787 for the timebeing? Or to somehow
+> > > > predicate the check such that it doesn't adversely affect those HW PMUs?
+> > > 
+> > > I'm happy with a chicken bit for now, its already found two real issues,
+> > > so I'd like to keep it.
+> > 
+> > Ok, how about the below? (based on next-20160422).
+> 
+> Peter, any thoughts?
+> 
+> This is still an issue for us in next-20160504 (to which the patch still
+> applies).
+> 
+> Will, I assume that you're ok with the change to drivers/perf/arm_pmu.c.
 
-Please pull the following arm-smmu updates for 4.7. The highlights are:
-
-  * Support for 64k pages with SMMUv1 implementations (e.g MMU-401)
-  * Remove open-coded 64-bit MMIO accessors
-  * Initial support for 16-bit VMIDs, as supported by some ThunderX
-    SMMU implementations
-  * A couple of errata workarounds for silicon in the field
-
-As a result of the MMIO accessor rework, there is an asm-generic change
-here, but it has been Acked-by Arnd.
-
-Thanks,
+Yes, they're pretty straighforward.
 
 Will
-
---->8
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to 3ca3712a42f9e632eb41da94ca4eab4f1fb06fcb:
-
-  iommu/arm-smmu: Clear cache lock bit of ACR (2016-05-03 18:23:04 +0100)
-
-----------------------------------------------------------------
-Peng Fan (1):
-      iommu/arm-smmu: Clear cache lock bit of ACR
-
-Robin Murphy (7):
-      iommu/arm-smmu: Differentiate specific implementations
-      iommu/arm-smmu: Convert ThunderX workaround to new method
-      iommu/arm-smmu: Work around MMU-500 prefetch errata
-      io-64-nonatomic: Add relaxed accessor variants
-      iommu/arm-smmu: Tidy up 64-bit/atomic I/O accesses
-      iommu/arm-smmu: Decouple context format from kernel config
-      iommu/arm-smmu: Support SMMUv1 64KB supplement
-
-Tirumalesh Chalamarla (2):
-      iommu/arm-smmu: Add support for 16 bit VMID
-      iommu/arm-smmu: Workaround for ThunderX erratum #27704
-
- Documentation/arm64/silicon-errata.txt             |   2 +
- .../devicetree/bindings/iommu/arm,smmu.txt         |   1 +
- drivers/iommu/arm-smmu.c                           | 291 +++++++++++++++------
- include/asm-generic/io.h                           |   4 +-
- include/linux/io-64-nonatomic-hi-lo.h              |  25 ++
- include/linux/io-64-nonatomic-lo-hi.h              |  25 ++
- 6 files changed, 265 insertions(+), 83 deletions(-)
