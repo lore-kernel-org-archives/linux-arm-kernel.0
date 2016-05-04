@@ -1,63 +1,75 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed,  4 May 2016 22:37:48 +0800
-Subject: [PATCH v7 9/9] i2c: rk3x: support fast-mode plus for rk3399
-In-Reply-To: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
-References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1462372668-6583-1-git-send-email-david.wu@rock-chips.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 4 May 2016 10:40:08 +0100
+Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
+In-Reply-To: <CAL7P5jJF9EL4Zk-AC9csyadfrmUp4R+6ceVAN_kNm7dKgo+ZgQ@mail.gmail.com>
+References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
+ <500c5874-4ef8-b37b-e12f-80fd5205c172@kernel.org>
+ <CAL7P5jJF9EL4Zk-AC9csyadfrmUp4R+6ceVAN_kNm7dKgo+ZgQ@mail.gmail.com>
+Message-ID: <e0989150-8f22-4f36-fea7-65a86973833d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
----
- drivers/i2c/busses/i2c-rk3x.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+On 02/05/16 07:06, Ksenija Stanojevi? wrote:
+> Hi Jonathan,
+> 
+> On Sun, May 1, 2016 at 10:08 PM, Jonathan Cameron <jic23@kernel.org> wrote:
+>> Ksenija,
+>>
+>> How would you prefer we handle this interaction of this set and your series.
+>> Options are:
+>>
+>> 1. I apply these now and you rebase on top of the result.
+>> 2. You pull these into your series, probably after the driver split making sure these
+>>    improvements end up in the new drivers.
+>> 3. We ask Stephan to re roll them at a later date (least preferred option as that adds
+>> another person we need to chase down to get to the end of this process!)
+>>
+>> No immediate rush on any of the above as we've probably missed this cycle now anyway.
+>> I've been cut off today so not sure what Linus has said today.
+> 
+> My understanding was that you will take this patch series so I already included
+> changes made by this patch set in touchscreen part, I will check if I missed
+> something.
+> I think the best is to apply these now.
+Cool - that's even easier ;)
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 47368c4..c66cc39 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -124,6 +124,17 @@ static const struct i2c_spec_values fast_mode_spec = {
- 	.min_hold_buffer_ns = 1300,
- };
- 
-+static const struct i2c_spec_values fast_mode_plus_spec = {
-+	.min_hold_start_ns = 260,
-+	.min_low_ns = 500,
-+	.min_high_ns = 260,
-+	.min_setup_start_ns = 260,
-+	.max_data_hold_ns = 400,
-+	.min_data_setup_ns = 50,
-+	.min_setup_stop_ns = 260,
-+	.min_hold_buffer_ns = 500,
-+};
-+
- /**
-  * struct rk3x_i2c_calced_timings:
-  * @div_low: Divider output for low
-@@ -534,8 +545,10 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
- {
- 	if (speed <= 100000)
- 		return &standard_mode_spec;
--	else
-+	else if (speed <= 400000)
- 		return &fast_mode_spec;
-+	else
-+		return &fast_mode_plus_spec;
- }
- 
- /**
-@@ -746,9 +759,9 @@ static int rk3x_i2c_v1_calc_timings(unsigned long clk_rate,
- 	const struct i2c_spec_values *spec;
- 	int ret = 0;
- 
--	/* Support standard-mode and fast-mode */
--	if (WARN_ON(t->bus_freq_hz > 400000))
--		t->bus_freq_hz = 400000;
-+	/* Support standard-mode, fast-mode and fast-mode plus */
-+	if (WARN_ON(t->bus_freq_hz > 1000000))
-+		t->bus_freq_hz = 1000000;
- 
- 	/* prevent scl_rate_khz from becoming 0 */
- 	if (WARN_ON(t->bus_freq_hz < 1000))
--- 
-1.9.1
+Jonathan
+> 
+> Thanks,
+> Ksenija
+> 
+>> Jonathan
+>> On 23/04/16 20:57, Stefan Wahren wrote:
+>>> This patch series simplifies TS handling of mxs-lradc.
+>>>
+>>> These patches has been tested with i.MX23 and i.MX28 but without
+>>> a touchscreen. I added only a bogus touchscreen in devicetree.
+>>>
+>>> It would be nice if someone with a real touchscreen could test it.
+>>>
+>>> Changes in V3:
+>>> - remove dev.parent assignment as suggested by Dimitry
+>>> - add new patch to remove mxs_lradc_ts_unregister
+>>> - remove PM implementation from series in order to wait until
+>>>   Ksenija has split the driver
+>>>
+>>> Changes in V2:
+>>> - rebase on iio/testing since patch 2 and 3 from V1 has been applied
+>>> - also remove input_unregister_device in patch 1
+>>> - use mask of virtual channels for IRQ disabling in patch 2
+>>>
+>>> Stefan Wahren (3):
+>>>   iio: mxs-lradc: simplify TS registration
+>>>   iio: mxs-lradc: remove mxs_lradc_ts_unregister
+>>>   iio: mxs-lradc: disable only masked channels in
+>>>     mxs_lradc_hw_stop
+>>>
+>>>  drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
+>>>  1 file changed, 6 insertions(+), 28 deletions(-)
+>>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
