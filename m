@@ -1,37 +1,48 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 May 2016 23:20:28 +0200
-Subject: [PATCH] ARM: cpuidle: Pass on arm_cpuidle_suspend()'s return value
-In-Reply-To: <20160428082023.GA10216@linaro.org>
-References: <1461669301-30834-1-git-send-email-james.morse@arm.com>
- <20160427091434.GA4303@red-moon> <20160428082023.GA10216@linaro.org>
-Message-ID: <13315467.gEDWYxNU10@vostro.rjw.lan>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 4 May 2016 17:21:18 -0400
+Subject: [RFC 1/5] powerpc: Rename context.vdso_base to context.vdso
+In-Reply-To: <5726A7D5.7030305@gmail.com>
+References: <20151202121918.GA4523@arm.com>
+ <1461856737-17071-1-git-send-email-cov@codeaurora.org>
+ <1461856737-17071-2-git-send-email-cov@codeaurora.org>
+ <5726A7D5.7030305@gmail.com>
+Message-ID: <572A67CE.4010109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 28, 2016 10:20:23 AM Daniel Lezcano wrote:
-> On Wed, Apr 27, 2016 at 10:14:34AM +0100, Lorenzo Pieralisi wrote:
-> > [+ Lina]
-> > 
-> > On Tue, Apr 26, 2016 at 09:05:57PM +0200, Rafael J. Wysocki wrote:
-> > > On Tue, Apr 26, 2016 at 1:31 PM, Lorenzo Pieralisi
-> > > <lorenzo.pieralisi@arm.com> wrote:
-> > > > On Tue, Apr 26, 2016 at 12:15:01PM +0100, James Morse wrote:
-> > > >> arm_cpuidle_suspend() may return -EOPNOTSUPP, or any value returned
-> > > >> by the cpu_ops/cpuidle_ops suspend call. arm_enter_idle_state() doesn't
-> > > >> update 'ret' with this value, meaning we always signal success to
-> > > >> cpuidle_enter_state(), causing it to update the usage counters as if we
-> > > >> succeeded.
-> > > >>
-> > > >> Fixes: 191de17aa3c1 ("ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function")
-> > > >> Signed-off-by: James Morse <james.morse@arm.com>
-> > > >> ---
-> > > >>  drivers/cpuidle/cpuidle-arm.c | 2 +-
-> > > >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > >
-> > > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Balbir,
+
+On 05/01/2016 09:05 PM, Balbir Singh wrote:
+> On 29/04/16 01:18, Christopher Covington wrote:
+>> In order to share remap and unmap support for the VDSO with other
+>> architectures without duplicating the code, we need a common name and type
+>> for the address of the VDSO. An informal survey of the architectures
+>> indicates unsigned long vdso is popular. Change the variable name in
+>> powerpc from mm->context.vdso_base to simply mm->context.vdso.
 > 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Could you please provide additional details on why the remap/unmap operations are required?
 
-OK, applied, tagged for -stable (4.1+).
+The goal is to make checkpointing and restoring processes work on
+several different architectures and ABIs, in the face of Address Space
+Layout Randomization (ASLR) and other factors that might change the VDSO
+virtual address from one exec() to the next.
 
-Thanks everybody!
+Here's the patch adding PowerPC support:
+
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=83d3f0e90c6c8f833e3da91917c243a916fda69e
+
+> This patch does rename, but should it abstract via a function acesss
+> to vmap field using arch_* operations? Not sure
+
+I'm sorry, but I don't understand this question. Are you saying ARM,
+Power etc. need VDSO unmap and remap log that behave differently? So far
+I've found the differences to be stylistic rather than really affecting
+generated code behavior.
+
+Thanks,
+Christopher Covington
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
