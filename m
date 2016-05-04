@@ -1,133 +1,112 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 4 May 2016 11:44:48 +0100
-Subject: [PATCH v3] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
-In-Reply-To: <20160502064854.GL17159@lukather>
-References: <1461546292-21110-1-git-send-email-andre.przywara@arm.com>
- <20160502064854.GL17159@lukather>
-Message-ID: <5729D2A0.70900@arm.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Wed, 4 May 2016 18:54:21 +0800
+Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
+ suspend
+In-Reply-To: <871t5ifdxk.fsf@intel.com>
+References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
+ <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
+ <1462324873.11651.57.camel@mhfsdcap03> <871t5ifdxk.fsf@intel.com>
+Message-ID: <1462359261.11651.69.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On 02/05/16 07:48, Maxime Ripard wrote:
+On Wed, 2016-05-04 at 11:03 +0300, Felipe Balbi wrote:
 > Hi,
 > 
-> On Mon, Apr 25, 2016 at 02:04:52AM +0100, Andre Przywara wrote:
->> The Allwinner NMI irqchip driver requires GENERIC_IRQ_CHIP, but
->> we can't select it directly, because there is no specific Kconfig entry
->> for the driver. Compiling this NMI driver with certain arm64
->> configurations thus fails due to the missing dependency:
->>
->> drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
->> drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
->> drivers/built-in.o: In function `irq_domain_add_linear':
->> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
->> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
->> drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
->> drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
->> drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
->> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
->> drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
->> drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
->> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
->>
->> Add separate Kconfig options for both Allwinner specific irqchip
->> drivers and select GENERIC_IRQ_CHIP for the NMI driver.
->> The older sun4i IRQ driver only gets selected when support for these
->> specific SoCs is compiled, while the NMI driver is selected for all
->> Allwinner SoCs (copying the current behaviour and covering future SoCs
->> automatically).
->>
->> Reported-by: Suzuki K Poulose <Suzuki.Poulose@arm.com>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Hi,
->>
->> this is a new approach to the problem that Suzuki tried to address
->> already.
->> It separates the sun4i IRQ controller driver and the NMI driver as
->> Maxime requested.
->> While there should be no difference for the NMI driver, the sun4i
->> driver now only gets selected for certain SoCs, which is admittedly
->> a bold call for -rc5. If people find this too risky, I can bring the
->> sun4i in line with the NMI driver (selected for all ARCH_SUNXI) for
->> this release and re-create the more selective dependency as a merge
->> window patch, so that it gets more testing.
->> Please let me know.
->>
->> Cheers,
->> Andre.
->>
->>  arch/arm/mach-sunxi/Kconfig | 3 ++-
->>  drivers/irqchip/Kconfig     | 8 ++++++++
->>  drivers/irqchip/Makefile    | 4 ++--
->>  3 files changed, 12 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
->> index c124d65..c092bc2 100644
->> --- a/arch/arm/mach-sunxi/Kconfig
->> +++ b/arch/arm/mach-sunxi/Kconfig
->> @@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
->>  	select ARCH_REQUIRE_GPIOLIB
->>  	select ARCH_HAS_RESET_CONTROLLER
->>  	select CLKSRC_MMIO
->> -	select GENERIC_IRQ_CHIP
->>  	select PINCTRL
->>  	select SUN4I_TIMER
->>  	select RESET_CONTROLLER
->> @@ -14,11 +13,13 @@ if ARCH_SUNXI
->>  config MACH_SUN4I
->>  	bool "Allwinner A10 (sun4i) SoCs support"
->>  	default ARCH_SUNXI
->> +	select SUN4I_IRQCHIP
->>  
->>  config MACH_SUN5I
->>  	bool "Allwinner A10s / A13 (sun5i) SoCs support"
->>  	default ARCH_SUNXI
->>  	select SUN5I_HSTIMER
->> +	select SUN4I_IRQCHIP
->>  
->>  config MACH_SUN6I
->>  	bool "Allwinner A31 (sun6i) SoCs support"
->> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->> index 3e12479..94f3f42 100644
->> --- a/drivers/irqchip/Kconfig
->> +++ b/drivers/irqchip/Kconfig
->> @@ -165,6 +165,14 @@ config ST_IRQCHIP
->>  	help
->>  	  Enables SysCfg Controlled IRQs on STi based platforms.
->>  
->> +config SUN4I_IRQCHIP
->> +	bool
->> +
->> +config SUNXI_NMI
->> +	bool "Allwinner SoC NMI controller"
->> +	default ARCH_SUNXI
->> +	select GENERIC_IRQ_CHIP
+> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+> > On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
+> >> Hi,
+> >> 
+> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+> >> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+> >> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
+> >> >> >> Click mouse after xhci suspend completion but before system suspend
+> >> >> >> completion, system will not be waken up by mouse if the duration of
+> >> >> >> them is larger than 20ms which is the device UFP's resume signaling
+> >> >> 
+> >> >> what is "them" here ? The duration of what is longer than 20ms ?
+> >> > They are "xhci suspend completion" and "system suspend completion";
+> >> >
+> >> > It's time duration
+> >> 
+> >> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
+> >> wakeup ?
+> > It is not the time of xhci suspend consumed, but is the time of duration
+> > from xhci suspend completion to system suspend completion(after BOOT-CPU
+> > is turned off, SPM will be enabled to receive wakeup event)
 > 
-> This one is only used on SUN6I, SUN7I and SUN8I. There's no need to
-> enable it for all the SoCs.
+> Okay, so SPM will be the entity actually handling wakeups, right ? I'm
+> assuming something like this happens:
+> 
+> echo mem > /sys/power/state
+>  /* start suspending devices */
+>   xhci_suspend()
+>  /* all devices suspended */
+>  enable_spm()
+> 
+> so, if a mouse button is pressed after xhci_suspend() returns but before
+> enable_spm() runs, then we're gonna miss that event, am I right ?
+Yes, you are right.
+> 
+> I can't think of any way to sort this out. Let's ask on linux-pm (I've
+> added linux-pm to Cc list)
+Thanks
+> 
+> >> >> >> lasted. Another reason is that the SPM is not enabled before system
+> >> >> 
+> >> >> what's SPM ?
+> >> > It is System Power Management which is powered off when system is
+> >> > running in normal mode, and is powered on when system enters suspend
+> >> > mode. It is used to wakeup system when some wakeup sources, such as
+> >> > bluetooth or powerkey etc, tigger wakeup event.
+> >> 
+> >> okay, thanks
+> >> 
+> >> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
+> >> >>            ^^^^^^^^^^
+> >> >>            completion
+> >> >> 
+> >> >> >> So in order to reduce the duration less than 20ms, make use of
+> >> >> >> syscore's suspend/resume interface.
+> >> >> 
+> >> >> no, this is the wrong approach
+> >> > But it seems only one workable approach from software side
+> >> 
+> >> I wouldn't say that. It seems to me SPM should be enabled earlier.
+> > Yes, but normally SPM should be enabled after all CPUS are turned off,
+> > so it's difficult to do that, I mean enable SPM before turning off CPUS
+> 
+> is it a requirement that SPM should be enabled only after all CPUs are
+> turned off ? If that's the case, then any device in the system might
+> have missed wakeups. This doesn't seem like a good design to me; unless
+> I'm missing something...
+Yes, it's a requirement.
 
-But it is enabled for all SoCs at the moment - and as it is actually a
-fix (-rc1 does not compile for certain arm64 configs) I'd really like to
-not take chances here.
-As mentioned I am happy to send a follow up patch to restrict it further
-- given that it gets more testing, but at the moment I'd really like to
-just fix the arm64 build without accidentally breaking existing arm(32)
-boards.
+If the wakeup source is level trigger, and will keep it until SPM notice
+it. Although USB wakeup is level trigger, but it just last at most 20ms
+and clear itself automatically.
 
-Also as you mention sun8i here: AFAIK the H3, which I consider the
-32-bit sibling of the A64, is an sun8i, so it will include the code, but
-the A64 does not (atm) - which is a bit strange.
-As I don't plan to have MACH_SUN<n>I defines for arm64 unless
-desperately necessary, I'd really like to keep in on ARCH_SUNXI as it is
-in the moment.
-
-So how do we proceed from here?
-Is this too late for 4.6 now? That would be a pity as this qualifies as
-a fix. If not, I'd rather take this conservative patch for now and put a
-more fine grained selection into -next (or 4.7-rc1).
-
-Cheers,
-Andre.
+> 
+> >> >> >> Because the syscore runs on irq disabled context, and xhci's
+> >> >> >> suspend/resume calls some sleeping functions, enable local irq
+> >> >> >> and then disable it during suspend/resume. This may be not a problem,
+> >> >> >> since only boot CPU is runing.
+> >> >> 
+> >> >> another problem :) calling local_irq_{enable,disable}() is an indication
+> >> >> that something's wrong.
+> >> > Oh!
+> >> >
+> >> > BTW: There will be warning logs if they are not called.
+> >> 
+> >> yeah, I got that :-) But it's still wrong to use
+> >> local_irq_{enable,disable}() the way you're using them :-)
+> > Yes
+> >
+> > Thank you very much.
+> >> 
+> >
+> >
+> 
