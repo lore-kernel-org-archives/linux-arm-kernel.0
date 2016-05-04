@@ -1,75 +1,155 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed,  4 May 2016 11:40:01 +0000
-Subject: [PATCH v9 2/8] iommu/arm-smmu: initialize the msi geometry and
- advertise iommu-msi support
-In-Reply-To: <1462362007-2753-1-git-send-email-eric.auger@linaro.org>
-References: <1462362007-2753-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1462362007-2753-3-git-send-email-eric.auger@linaro.org>
+Date: Wed,  4 May 2016 11:39:59 +0000
+Subject: [PATCH v9 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
+ 1/3: iommu changes
+Message-ID: <1462362007-2753-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM, MSI write transactions from device upstream to the smmu
-are conveyed through the iommu. Therefore target physical addresses
-must be mapped and DOMAIN_ATTR_MSI_GEOMETRY advertises the support of
-the IOMMU-MSI API.
+This series introduces the msi-iommu api used to:
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+- allocate/free resources for MSI IOMMU mapping
+- set the MSI iova window aperture
+- map/unmap physical addresses onto MSI IOVAs.
+- determine whether an msi needs to be iommu mapped
+- overwrite an msi_msg PA address with its pre-allocated/mapped IOVA
 
----
+Also a new iommu domain attribute, DOMAIN_ATTR_MSI_GEOMETRY is introduced
+to report the MSI iova window geometry (aperture and iommu-msi API support).
+
+Currently:
+- iommu driver is supposed to allocate/free MSI mapping resources
+- VFIO subsystem is supposed to set the MSI IOVA aperture.
+- The MSI layer is supposed to allocate/free iova mappings and overwrite
+  msi_msg with IOVA at composition time
+
+More details & context can be found at:
+http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
+
+Best Regards
+
+Eric
+
+Git: complete series available at
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc6-pcie-passthrough-v9
+
+History:
+
 v8 -> v9:
-- reword the title and patch description
+- rename iommu_domain_msi_geometry programmable flag into iommu_msi_supported
+- introduce msi_apperture_valid helper and use this instead of is_aperture_set
 
 v7 -> v8:
-- use DOMAIN_ATTR_MSI_GEOMETRY
+- The API is retargetted for MSI: renamed msi-iommu
+  all "dma-reserved" namings removed
+- now implemented upon dma-iommu (get, put, init), ie. reuse iova_cookie,
+  and iova API
+- msi mapping resources now are guaranteed to exist during the whole iommu
+  domain's lifetime. No need to lock to garantee the cookie integrity
+- removed alloc/free_reserved_reserved_iova_domain. We now have a single
+  function that sets the aperture, looking like iommu_dma_init_domain.
+- we now use a list instead of an RB-tree
+- prot is not propagated anymore at domain creation due to the retargetting
+  for MSI
+- iommu_domain pointer removed from doorbell_mapping struct
+- replaced DOMAIN_ATTR_MSI_MAPPING by DOMAIN_ATTR_MSI_GEOMETRY
 
-v4 -> v5:
-- don't handle fsl_pamu_domain anymore
-- handle arm-smmu-v3
----
- drivers/iommu/arm-smmu-v3.c | 2 ++
- drivers/iommu/arm-smmu.c    | 3 +++
- 2 files changed, 5 insertions(+)
+v6 -> v7:
+- fixed known lock bugs and multiple page sized slots matching
+  (I only have a single MSI frame made of a single page)
+- reserved_iova_cookie now pointing to a struct that encapsulates the
+  iova domain handle + protection attribute passed from VFIO (Alex' req)
+- 2 new functions exposed: iommu_msi_mapping_translate_msg,
+  iommu_msi_mapping_desc_to_domain: not sure this is the right location/proto
+  though
+- iommu_put_reserved_iova now takes a phys_addr_t
+- everything now is cleanup on iommu_domain destruction
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4ff73ff..bf222b5 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1396,6 +1396,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- {
- 	struct arm_smmu_domain *smmu_domain;
-+	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
- 
- 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
- 		return NULL;
-@@ -1414,6 +1415,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		kfree(smmu_domain);
- 		return NULL;
- 	}
-+	smmu_domain->domain.msi_geometry = msi_geometry;
- 
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 7c39ac4..55f429d 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -976,6 +976,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- {
- 	struct arm_smmu_domain *smmu_domain;
-+	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
- 
- 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
- 		return NULL;
-@@ -994,6 +995,8 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 	}
- 
-+	smmu_domain->domain.msi_geometry = msi_geometry;
-+
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 
+RFC v5 -> patch v6:
+- split to ease the review process
+- in dma-reserved-api use a spin lock instead of a mutex (reported by
+  Jean-Philippe)
+- revisit iommu_get_reserved_iova API to pass a size parameter upon
+  Marc's request
+- Consistently use the page order passed when creating the iova domain.
+- init reserved_binding_list (reported by Julien)
+
+RFC v4 -> RFC v5:
+- take into account Thomas' comments on MSI related patches
+  - split "msi: IOMMU map the doorbell address when needed"
+  - increase readability and add comments
+  - fix style issues
+ - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+ - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+ - fix compilation issue with CONFIG_IOMMU API unset
+ - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+
+RFC v3 -> v4:
+- Move doorbell mapping/unmapping in msi.c
+- fix ref count issue on set_affinity: in case of a change in the address
+  the previous address is decremented
+- doorbell map/unmap now is done on msi composition. Should allow the use
+  case for platform MSI controllers
+- create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+  to reserved IOVA management (looking like dma-iommu glue)
+- series reordering to ease the review:
+  - first part is related to IOMMU
+  - second related to MSI sub-system
+  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+- expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+  [this partially addresses Marc's comments on iommu_get/put_single_reserved
+   size/alignment problematic - which I did not ignore - but I don't know
+   how much I can do at the moment]
+
+RFC v2 -> RFC v3:
+- should fix wrong handling of some CONFIG combinations:
+  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+- fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+
+PATCH v1 -> RFC v2:
+- reverted to RFC since it looks more reasonable ;-) the code is split
+  between VFIO, IOMMU, MSI controller and I am not sure I did the right
+  choices. Also API need to be further discussed.
+- iova API usage in arm-smmu.c.
+- MSI controller natively programs the MSI addr with either the PA or IOVA.
+  This is not done anymore in vfio-pci driver as suggested by Alex.
+- check irq remapping capability of the group
+
+RFC v1 [2] -> PATCH v1:
+- use the existing dma map/unmap ioctl interface with a flag to register a
+  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+- a single reserved IOVA contiguous region now is allowed
+- use of an RB tree indexed by PA to store allocated reserved slots
+- use of a vfio_domain iova_domain to manage iova allocation within the
+  window provided by the userspace
+- vfio alloc_map/unmap_free take a vfio_group handle
+- vfio_group handle is cached in vfio_pci_device
+- add ref counting to bindings
+- user modality enabled at the end of the series
+
+
+Eric Auger (8):
+  iommu: Add iommu_domain_msi_geometry and DOMAIN_ATTR_MSI_GEOMETRY
+  iommu/arm-smmu: initialize the msi geometry and advertise iommu-msi
+    support
+  iommu: introduce an msi cookie
+  iommu/msi-iommu: initialization
+  iommu/msi-iommu: iommu_msi_[get,put]_doorbell_iova
+  iommu/msi-iommu: iommu_msi_domain
+  iommu/msi-iommu: iommu_msi_msg_pa_to_va
+  iommu/arm-smmu: get/put the msi cookie
+
+ drivers/iommu/Kconfig       |   7 +
+ drivers/iommu/Makefile      |   1 +
+ drivers/iommu/arm-smmu-v3.c |  18 ++-
+ drivers/iommu/arm-smmu.c    |  18 ++-
+ drivers/iommu/iommu.c       |   5 +
+ drivers/iommu/msi-iommu.c   | 319 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/iommu.h       |  15 +++
+ include/linux/msi-iommu.h   | 144 ++++++++++++++++++++
+ 8 files changed, 519 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/iommu/msi-iommu.c
+ create mode 100644 include/linux/msi-iommu.h
+
 -- 
 1.9.1
