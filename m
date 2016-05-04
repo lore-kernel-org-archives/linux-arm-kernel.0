@@ -1,40 +1,78 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Wed, 4 May 2016 14:52:12 +0200
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
-In-Reply-To: <CANCTEQgjiuQXcaw=3Dr5kUsTPc3nsDQf2odwzs4nHvrkREAqrg@mail.gmail.com>
-References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
- <CAGb2v66E2TuN3+tYaAbniV3q67waDZOfqKAW14VJz6xZFomZ=Q@mail.gmail.com>
- <57285162.2000704@schinagl.nl>
- <CAGb2v66r9m7qVW6BszeT2wqs0KyEr4x5ivTJYqu2Fes=R9-Ltw@mail.gmail.com>
- <CANCTEQgjiuQXcaw=3Dr5kUsTPc3nsDQf2odwzs4nHvrkREAqrg@mail.gmail.com>
-Message-ID: <5729F07C.3080308@schinagl.nl>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 May 2016 13:57:30 +0100
+Subject: [PATCH v8 5/8] genirq/irq: introduce msi_doorbell_info
+In-Reply-To: <1461831730-5575-6-git-send-email-eric.auger@linaro.org>
+References: <1461831730-5575-1-git-send-email-eric.auger@linaro.org>
+ <1461831730-5575-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <5729F1BA.6060306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Radoslav,
+On 28/04/16 09:22, Eric Auger wrote:
+> The purpose is to be able to retrieve the MSI doorbells of an irqchip.
+> This is now needed since on some platforms those doorbells must be
+> iommu mapped (in case the MSIs transit through an IOMMU that do not
+> bypass those transactions).
+> 
+> The assumption is there is a maximum of one doorbell region per cpu.
+> 
+> A doorbell region is characterized by its physical address base, size and
+> IOMMU protection flag. Those 2 last characteristics are shared among all
+> doorbells.
+> 
+> irq_chip msi_doorbell_info callback enables to retrieve the doorbells of
+> the irqchip.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> v7 -> v8:
+> - size and prot now are shared among all doorbells
+> - doorbells now directly points to a percpu phys_addr_t
+> 
+> v7: creation
+> ---
+>  include/linux/irq.h | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index c4de623..5dbb26d 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -312,6 +312,19 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+>  	return d->hwirq;
+>  }
+>  
+> +/*
+> + * Describe all the MSI doorbell regions for an irqchip.
+> + * A single doorbell region per cpu is assumed.
+> + * In case a single doorbell is supported for the whole irqchip,
+> + * the region is described in as cpu #0's one
+> + */
+> +struct irq_chip_msi_doorbell_info {
+> +	phys_addr_t __percpu *percpu_doorbells; /* per cpu base address */
 
-On 04-05-16 14:30, Radoslav Kolev wrote:
-> 2016-05-03 10:25 GMT+03:00 Chen-Yu Tsai <wens@csie.org>:
->> On Tue, May 3, 2016 at 3:21 PM, Olliver Schinagl <oliver@schinagl.nl> wrote:
->>>>> +       bus-width = <4>;
->>>> Only 4 bits? We normally see eMMC with 8 bits. 4 bits are some kind of
->>>> embedded SD card.
->>> On A20 as well? Our investigations so far have concluded that the A10 and
->>> A20 have those pins not mapped out to pads. The IP does support it however
->>> we assume.
->> You're right. My bad. First time A10/A20 sees eMMC support.
-> I can't say anything about A10/A20, but I have a board with A13 and
-> the same eMMC chip and it works fine in 8 bit mode.
-Yep, sun5i actually brings them all out to pads, the A20 however does 
-not :( We first thought that the A20 would also be an 8bitter, because 
-the mmc IP appears to be the same as sun5i, but initial tests show it is 
-not. As for A10, it has older IP and it might not even support 8 bit 
-mode, let alone bring out the pins.
+Here's an idea: you could turn this field into a union:
 
-But with A20's + eMMC being available via the lime2, others may repeat 
-my experiments! The lime2 is 8 bit connected.
+	union {
+		phys_addr_t __percpu *percpu_doorbells;
+		phys_addr_t global_doorbell;
+	};
 
-Olliver
->
-> Regards,
-> Radoslav
+> +	size_t size;				/* size of a each doorbell */
+> +	int prot;				/* iommu protection flag */
+> +	int nb_doorbells;
+
+And this can be turned into a boolean:
+
+	bool doorbell_is_percpu;
+
+This allows you to avoid allocating a bunch of percpu doorbells for a
+MSI controller that only has a global one. And the number of doorbells
+is always either 1 or the number of CPUs anyway.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
