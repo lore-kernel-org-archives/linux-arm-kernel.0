@@ -1,33 +1,36 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 5 May 2016 00:49:49 +0300
-Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <57289C75.50904@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1554541.oDP7Ro5zB2@wuerfel>
- <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
- <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
- <57289C75.50904@huawei.com>
-Message-ID: <20160504214949.GA28217@yury-N73SV>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  4 May 2016 19:33:17 -0300
+Subject: [PATCH v3 1/2] ARM: dts: imx6ul: Add SAI alias
+Message-ID: <1462401198-931-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 08:41:25PM +0800, Zhangjian (Bamvor) wrote:
-> Hi, all
-> 
-> After apply this patch with my small testcase, the vsyscall of gettimeofday in
-> ilp32 works in both big endian and small endian. In this patch, I use the
-> different register and offset for ilp32 and lp64. Actually, the
-> COMPAT_TVAL_TV_SEC is same as TVAL_TV_SEC(so as to COMPAT_TSPEC_TV_SEC and
-> TSPEC_TV_SEC). I add it to keep the logic clear. I also change the version
-> of vdso to 4.6. It should change to 2.6.39 if glibc is not update.
-> 
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-[...]
+Add SAI alias entries, which makes it possibe for the SAI driver
+to retrieve the port instance.
 
-Hi Bamvor,
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Newly introduced in this series.
 
-It works for me as well. Thank you.
-I'll incorporate it in next submission.
+ arch/arm/boot/dts/imx6ul.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Yury.
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 4356b65..6d1c317 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -36,6 +36,9 @@
+ 		serial5 = &uart6;
+ 		serial6 = &uart7;
+ 		serial7 = &uart8;
++		sai1 = &sai1;
++		sai2 = &sai2;
++		sai3 = &sai3;
+ 		spi0 = &ecspi1;
+ 		spi1 = &ecspi2;
+ 		spi2 = &ecspi3;
+-- 
+1.9.1
