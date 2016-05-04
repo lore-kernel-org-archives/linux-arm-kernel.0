@@ -1,71 +1,56 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 4 May 2016 21:29:32 +0530
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <572A0577.1070000@codeaurora.org>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com>
- <5728BEC4.6050603@codeaurora.org>
- <20160503155141.GF13045@dhcppc6.redhat.com>
- <20160503171602.GA2518@roeck-us.net>
- <20160504141449.GG13045@dhcppc6.redhat.com>
- <572A0577.1070000@codeaurora.org>
-Message-ID: <20160504155932.GH13045@dhcppc6.redhat.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 4 May 2016 09:11:58 -0700
+Subject: [PATCH 1/2] dt-bindings: arm,gic: Indtroduce optional property
+ 'arm,msi-offset-spi' for gicv2m
+In-Reply-To: <CAMsMSK_jwd6OMMJ8DfAckVJgav9U6p-oz9YcinUinaqj2xdwAA@mail.gmail.com>
+References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
+ <1462319245-32532-2-git-send-email-ray.jui@broadcom.com>
+ <CAMsMSK_jwd6OMMJ8DfAckVJgav9U6p-oz9YcinUinaqj2xdwAA@mail.gmail.com>
+Message-ID: <3997ed69-760a-9bc1-a451-d07323a6e163@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Dave
 
-Hi Timur,
 
-On 04/05/2016:09:21:43 AM, Timur Tabi wrote:
-> Pratyush Anand wrote:
-> >static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
-> >{
-> >+    struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
-> >+    struct watchdog_device *wdd = &gwdt->wdd;
-> >+    u64 timeout = (u64)gwdt->clk * wdd->timeout;
-> >+
-> >+    writeq(timeout + arch_counter_get_cntvct(),
-> >+                    gwdt->control_base + SBSA_GWDT_WCV);
-> >+
-> >      panic(WATCHDOG_NAME " timeout");
-> 
-> I'm on the fence about this.
-> 
-> On one hand, I have always opposed the idea that the interrupt handler needs
-> to function properly in order for the timeout to be correct.  Fu's original
-> patch required this for every timeout.
-> 
-> The current code, however, only uses the interrupt when action=1.  In this
-> case, WCV is only reprogrammed in order to prevent the system from resetting
-> during the kexec.  Technically, the watchdog timeout has already been
-> handled.
+On 5/4/2016 8:57 AM, Chris Brand wrote:
+> You have a typo in the subject line - "Indtroduce".
 
-Yes.
+Thanks, but now this patch will be gone based on review comments from 
+Marc on PATCH 2/2.
 
-> 
-> However, this should be unnecessary, because it can't be a problem that's
-> unique to the SBSA watchdog.  Every system that kexecs another kernel needs
-> to be able to handle a watchdog timeout.  Shouldn't the kexec code already
-> ping or disable the watchdog?  We need a cross-platform solution.  Drivers
-> should not need to do this.
-
-Its unique to SBSA because you have very little timeout here. kexec-tools
-upstream does not have any mechanism to handle watchdog timeout. Lets say even
-if we implement a framework there, the best it can do is to ping the watchdog
-again. Disabling should not be an option in kexec-tools, because in that case if
-kexec-tools or secondary kernel stuck, we won't have a way out.
-Now, even if we ping it once in kexec tools, we will have to make sure that
-watchdog driver's probe is called before timeout. Therefore, user must have a
-way to specify this timeout, so that if a particular kernel take more time to
-boot then he can increase the timeout. Given, these variable conditions I do not
-see much advantage of implementing it in kexec-tools.
-
-However fedora/rhel kedumpctl mechanism does some  best case correction. It
-makes sure that watchdog module is loaded in second kernel if watchdog was
-active during first kernel, and loaded as early as possible [1].
-
-~Pratyush
-
-[1] https://github.com/pratyushanand/kexec-tools/commits/watchdog_fmaster
+>
+> Chris
+>
+> On Tue, May 3, 2016 at 4:47 PM, Ray Jui <ray.jui@broadcom.com> wrote:
+>> Update the GICv2m binding document by adding an optional property
+>> 'arm,msi-offset-spi'.
+>>
+>> Some implementations of gicv2m have an erratum where the MSI data is
+>> the SPI number subtracted by an offset. This is required for the
+>> correct MSI interrupt to be triggered.
+>>
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> ---
+>>  Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+>> index 793c20f..550960f 100644
+>> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+>> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+>> @@ -140,6 +140,12 @@ Optional properties:
+>>                       value, this property should contain the number of
+>>                       SPIs assigned to the frame, overriding the HW value.
+>>
+>> +- arm,msi-offset-spi: Some implementations of gicv2m have an erratum where
+>> +                     the MSI data is the SPI number subtracted by an offset.
+>> +                     This is required for the correct MSI interrupt to be
+>> +                     triggered. This property should contain the required
+>> +                     offset.
+>> +
+>>  Example:
+>>
+>>         interrupt-controller at e1101000 {
+>> --
+>> 2.1.4
+>>
