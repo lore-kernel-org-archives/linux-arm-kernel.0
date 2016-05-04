@@ -1,73 +1,59 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 4 May 2016 10:39:19 +0100
-Subject: [PATCH V3 2/3] iio: mxs-lradc: remove mxs_lradc_ts_unregister
-In-Reply-To: <20160425210041.GB26059@dtor-ws>
+Date: Wed, 4 May 2016 10:39:52 +0100
+Subject: [PATCH V3 3/3] iio: mxs-lradc: disable only masked channels in
+ mxs_lradc_hw_stop
+In-Reply-To: <1461441479-23218-4-git-send-email-stefan.wahren@i2se.com>
 References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
- <1461441479-23218-3-git-send-email-stefan.wahren@i2se.com>
- <20160425210041.GB26059@dtor-ws>
-Message-ID: <e1309837-633e-60db-3368-eaad6373dc35@kernel.org>
+ <1461441479-23218-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <240d09cb-8df3-01dd-ee84-6f5dd8cad64a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 22:00, Dmitry Torokhov wrote:
-> On Sat, Apr 23, 2016 at 07:57:58PM +0000, Stefan Wahren wrote:
->> After using devm_input_allocate_device for registration
->> the function mxs_lradc_ts_unregister isn't necessary anymore
->> since mxs_lradc_ts_close already does the job.
->>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+On 23/04/16 20:57, Stefan Wahren wrote:
+> Disabling of the touchscreen IRQs should be done in
+> mxs_lradc_disable_ts. So disable only the masked virtual channels
+> in mxs_lradc_hw_stop and finally remove the unused function
+> mxs_lradc_irq_en_mask.
 > 
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Applied.
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+> Tested-by: Marek Vasut <marex@denx.de>
+Applied to the togreg branch of iio.git
+
+Thanks,
+
+Jonathan
+> ---
+>  drivers/iio/adc/mxs-lradc.c |   11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
 > 
->> ---
->>  drivers/iio/adc/mxs-lradc.c |   13 +------------
->>  1 file changed, 1 insertion(+), 12 deletions(-)
->>
->> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->> index 3d1d370..90242ba 100644
->> --- a/drivers/iio/adc/mxs-lradc.c
->> +++ b/drivers/iio/adc/mxs-lradc.c
->> @@ -1148,14 +1148,6 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>  	return input_register_device(input);
->>  }
->>  
->> -static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
->> -{
->> -	if (!lradc->use_touchscreen)
->> -		return;
->> -
->> -	mxs_lradc_disable_ts(lradc);
->> -}
->> -
->>  /*
->>   * IRQ Handling
->>   */
->> @@ -1715,13 +1707,11 @@ static int mxs_lradc_probe(struct platform_device *pdev)
->>  	ret = iio_device_register(iio);
->>  	if (ret) {
->>  		dev_err(dev, "Failed to register IIO device\n");
->> -		goto err_ts;
->> +		return ret;
->>  	}
->>  
->>  	return 0;
->>  
->> -err_ts:
->> -	mxs_lradc_ts_unregister(lradc);
->>  err_ts_register:
->>  	mxs_lradc_hw_stop(lradc);
->>  err_dev:
->> @@ -1739,7 +1729,6 @@ static int mxs_lradc_remove(struct platform_device *pdev)
->>  	struct mxs_lradc *lradc = iio_priv(iio);
->>  
->>  	iio_device_unregister(iio);
->> -	mxs_lradc_ts_unregister(lradc);
->>  	mxs_lradc_hw_stop(lradc);
->>  	mxs_lradc_trigger_remove(iio);
->>  	iio_triggered_buffer_cleanup(iio);
->> -- 
->> 1.7.9.5
->>
+> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+> index 90242ba..b84d37c 100644
+> --- a/drivers/iio/adc/mxs-lradc.c
+> +++ b/drivers/iio/adc/mxs-lradc.c
+> @@ -373,13 +373,6 @@ static u32 mxs_lradc_plate_mask(struct mxs_lradc *lradc)
+>  	return LRADC_CTRL0_MX28_PLATE_MASK;
+>  }
+>  
+> -static u32 mxs_lradc_irq_en_mask(struct mxs_lradc *lradc)
+> -{
+> -	if (lradc->soc == IMX23_LRADC)
+> -		return LRADC_CTRL1_MX23_LRADC_IRQ_EN_MASK;
+> -	return LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK;
+> -}
+> -
+>  static u32 mxs_lradc_irq_mask(struct mxs_lradc *lradc)
+>  {
+>  	if (lradc->soc == IMX23_LRADC)
+> @@ -1496,7 +1489,9 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
+>  {
+>  	int i;
+>  
+> -	mxs_lradc_reg_clear(lradc, mxs_lradc_irq_en_mask(lradc), LRADC_CTRL1);
+> +	mxs_lradc_reg_clear(lradc,
+> +		lradc->buffer_vchans << LRADC_CTRL1_LRADC_IRQ_EN_OFFSET,
+> +		LRADC_CTRL1);
+>  
+>  	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
+>  		mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
 > 
