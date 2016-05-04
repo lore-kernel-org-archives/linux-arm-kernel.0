@@ -1,129 +1,223 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 May 2016 13:02:12 +0100
-Subject: [PATCH v3] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
-In-Reply-To: <5729D2A0.70900@arm.com>
-References: <1461546292-21110-1-git-send-email-andre.przywara@arm.com>
- <20160502064854.GL17159@lukather> <5729D2A0.70900@arm.com>
-Message-ID: <5729E4C4.60500@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 4 May 2016 14:06:19 +0200
+Subject: [PATCH v9 7/7] vfio/type1: return MSI geometry through
+ VFIO_IOMMU_GET_INFO capability chains
+In-Reply-To: <1462362858-2925-8-git-send-email-eric.auger@linaro.org>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <1462362858-2925-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <5729E5BB.1030101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/16 11:44, Andre Przywara wrote:
-> Hi Maxime,
+Hi Alex,
+On 05/04/2016 01:54 PM, Eric Auger wrote:
+> This patch allows the user-space to retrieve the MSI geometry. The
+> implementation is based on capability chains, now also added to
+> VFIO_IOMMU_GET_INFO.
+
+If you prefer we could consider this patch outside of the main series
+since it brings extra functionalities (MSI geometry reporting). In a
+first QEMU integration we would live without knowing the MSI geometry I
+think, all the more so I currently report an arbitrary number of
+requested IOVA pages. The computation of the exact number of doorbells
+to map brings extra complexity and I did not address this issue yet.
+
+It sketches a possible user API to report the MSI geometry based on the
+capability chains, as you suggested some time ago. I am currently busy
+drafting a QEMU integration.
+
+Best Regards
+
+Eric
 > 
-> On 02/05/16 07:48, Maxime Ripard wrote:
->> Hi,
->>
->> On Mon, Apr 25, 2016 at 02:04:52AM +0100, Andre Przywara wrote:
->>> The Allwinner NMI irqchip driver requires GENERIC_IRQ_CHIP, but
->>> we can't select it directly, because there is no specific Kconfig entry
->>> for the driver. Compiling this NMI driver with certain arm64
->>> configurations thus fails due to the missing dependency:
->>>
->>> drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
->>> drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
->>> drivers/built-in.o: In function `irq_domain_add_linear':
->>> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
->>> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
->>> drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
->>> drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
->>> drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
->>> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
->>> drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
->>> drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
->>> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
->>>
->>> Add separate Kconfig options for both Allwinner specific irqchip
->>> drivers and select GENERIC_IRQ_CHIP for the NMI driver.
->>> The older sun4i IRQ driver only gets selected when support for these
->>> specific SoCs is compiled, while the NMI driver is selected for all
->>> Allwinner SoCs (copying the current behaviour and covering future SoCs
->>> automatically).
->>>
->>> Reported-by: Suzuki K Poulose <Suzuki.Poulose@arm.com>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> Hi,
->>>
->>> this is a new approach to the problem that Suzuki tried to address
->>> already.
->>> It separates the sun4i IRQ controller driver and the NMI driver as
->>> Maxime requested.
->>> While there should be no difference for the NMI driver, the sun4i
->>> driver now only gets selected for certain SoCs, which is admittedly
->>> a bold call for -rc5. If people find this too risky, I can bring the
->>> sun4i in line with the NMI driver (selected for all ARCH_SUNXI) for
->>> this release and re-create the more selective dependency as a merge
->>> window patch, so that it gets more testing.
->>> Please let me know.
->>>
->>> Cheers,
->>> Andre.
->>>
->>>  arch/arm/mach-sunxi/Kconfig | 3 ++-
->>>  drivers/irqchip/Kconfig     | 8 ++++++++
->>>  drivers/irqchip/Makefile    | 4 ++--
->>>  3 files changed, 12 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
->>> index c124d65..c092bc2 100644
->>> --- a/arch/arm/mach-sunxi/Kconfig
->>> +++ b/arch/arm/mach-sunxi/Kconfig
->>> @@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
->>>  	select ARCH_REQUIRE_GPIOLIB
->>>  	select ARCH_HAS_RESET_CONTROLLER
->>>  	select CLKSRC_MMIO
->>> -	select GENERIC_IRQ_CHIP
->>>  	select PINCTRL
->>>  	select SUN4I_TIMER
->>>  	select RESET_CONTROLLER
->>> @@ -14,11 +13,13 @@ if ARCH_SUNXI
->>>  config MACH_SUN4I
->>>  	bool "Allwinner A10 (sun4i) SoCs support"
->>>  	default ARCH_SUNXI
->>> +	select SUN4I_IRQCHIP
->>>  
->>>  config MACH_SUN5I
->>>  	bool "Allwinner A10s / A13 (sun5i) SoCs support"
->>>  	default ARCH_SUNXI
->>>  	select SUN5I_HSTIMER
->>> +	select SUN4I_IRQCHIP
->>>  
->>>  config MACH_SUN6I
->>>  	bool "Allwinner A31 (sun6i) SoCs support"
->>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->>> index 3e12479..94f3f42 100644
->>> --- a/drivers/irqchip/Kconfig
->>> +++ b/drivers/irqchip/Kconfig
->>> @@ -165,6 +165,14 @@ config ST_IRQCHIP
->>>  	help
->>>  	  Enables SysCfg Controlled IRQs on STi based platforms.
->>>  
->>> +config SUN4I_IRQCHIP
->>> +	bool
->>> +
->>> +config SUNXI_NMI
->>> +	bool "Allwinner SoC NMI controller"
->>> +	default ARCH_SUNXI
->>> +	select GENERIC_IRQ_CHIP
->>
->> This one is only used on SUN6I, SUN7I and SUN8I. There's no need to
->> enable it for all the SoCs.
+> The returned info comprise:
+> - whether the MSI IOVA are constrained to a reserved range (x86 case) and
+>   in the positive, the start/end of the aperture,
+> - or whether the IOVA aperture need to be set by the userspace. In that
+>   case, the size and alignment of the IOVA region to be provided are
+>   returned.
 > 
-> But it is enabled for all SoCs at the moment - and as it is actually a
-> fix (-rc1 does not compile for certain arm64 configs) I'd really like to
-> not take chances here.
-
-If there is an arm64 config that breaks, let's revert the patch that
-introduces the breakage (ce3dd55), because it doesn't look like we're
-making forward progress on this (and given that we're -rc6, that's
-probably a suitable course of action).
-
-We can always merge the fixed patch when the interested parties have
-settled on a suitable shade of green for the shed...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> In case the userspace must provide the IOVA range, we currently return
+> an arbitrary number of IOVA pages (16), supposed to fulfill the needs of
+> current ARM platforms. This may be deprecated by a more sophisticated
+> computation later on.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> v8 -> v9:
+> - use iommu_msi_supported flag instead of programmable
+> - replace IOMMU_INFO_REQUIRE_MSI_MAP flag by a more sophisticated
+>   capability chain, reporting the MSI geometry
+> 
+> v7 -> v8:
+> - use iommu_domain_msi_geometry
+> 
+> v6 -> v7:
+> - remove the computation of the number of IOVA pages to be provisionned.
+>   This number depends on the domain/group/device topology which can
+>   dynamically change. Let's rely instead rely on an arbitrary max depending
+>   on the system
+> 
+> v4 -> v5:
+> - move msi_info and ret declaration within the conditional code
+> 
+> v3 -> v4:
+> - replace former vfio_domains_require_msi_mapping by
+>   more complex computation of MSI mapping requirements, especially the
+>   number of pages to be provided by the user-space.
+> - reword patch title
+> 
+> RFC v1 -> v1:
+> - derived from
+>   [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
+> - renamed allow_msi_reconfig into require_msi_mapping
+> - fixed VFIO_IOMMU_GET_INFO
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 69 +++++++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/vfio.h       | 30 +++++++++++++++++-
+>  2 files changed, 98 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 2fc8197..841360b 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -1134,6 +1134,50 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
+>  	return ret;
+>  }
+>  
+> +static int compute_msi_geometry_caps(struct vfio_iommu *iommu,
+> +				     struct vfio_info_cap *caps)
+> +{
+> +	struct vfio_iommu_type1_info_cap_msi_geometry *vfio_msi_geometry;
+> +	struct iommu_domain_msi_geometry msi_geometry;
+> +	struct vfio_info_cap_header *header;
+> +	struct vfio_domain *d;
+> +	bool mapping_required;
+> +	size_t size;
+> +
+> +	mutex_lock(&iommu->lock);
+> +	/* All domains have same require_msi_map property, pick first */
+> +	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
+> +	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
+> +			      &msi_geometry);
+> +	mapping_required = msi_geometry.iommu_msi_supported;
+> +
+> +	mutex_unlock(&iommu->lock);
+> +
+> +	size = sizeof(*vfio_msi_geometry);
+> +	header = vfio_info_cap_add(caps, size,
+> +				   VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY, 1);
+> +
+> +	if (IS_ERR(header))
+> +		return PTR_ERR(header);
+> +
+> +	vfio_msi_geometry = container_of(header,
+> +				struct vfio_iommu_type1_info_cap_msi_geometry,
+> +				header);
+> +
+> +	vfio_msi_geometry->reserved = !mapping_required;
+> +	if (vfio_msi_geometry->reserved) {
+> +		vfio_msi_geometry->aperture_start = msi_geometry.aperture_start;
+> +		vfio_msi_geometry->aperture_end = msi_geometry.aperture_end;
+> +		return 0;
+> +	}
+> +
+> +	vfio_msi_geometry->alignment = 1 << __ffs(vfio_pgsize_bitmap(iommu));
+> +	/* we currently report the need for an arbitray number of 16 pages */
+> +	vfio_msi_geometry->size = 16 * vfio_msi_geometry->alignment;
+> +
+> +	return 0;
+> +}
+> +
+>  static long vfio_iommu_type1_ioctl(void *iommu_data,
+>  				   unsigned int cmd, unsigned long arg)
+>  {
+> @@ -1155,6 +1199,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>  		}
+>  	} else if (cmd == VFIO_IOMMU_GET_INFO) {
+>  		struct vfio_iommu_type1_info info;
+> +		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
+> +		int ret;
+>  
+>  		minsz = offsetofend(struct vfio_iommu_type1_info, iova_pgsizes);
+>  
+> @@ -1168,6 +1214,29 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>  
+>  		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
+>  
+> +		ret = compute_msi_geometry_caps(iommu, &caps);
+> +		if (ret)
+> +			return ret;
+> +
+> +		if (caps.size) {
+> +			info.flags |= VFIO_IOMMU_INFO_CAPS;
+> +			if (info.argsz < sizeof(info) + caps.size) {
+> +				info.argsz = sizeof(info) + caps.size;
+> +				info.cap_offset = 0;
+> +			} else {
+> +				vfio_info_cap_shift(&caps, sizeof(info));
+> +				if (copy_to_user((void __user *)arg +
+> +						sizeof(info), caps.buf,
+> +						caps.size)) {
+> +					kfree(caps.buf);
+> +					return -EFAULT;
+> +				}
+> +				info.cap_offset = sizeof(info);
+> +			}
+> +
+> +			kfree(caps.buf);
+> +		}
+> +
+>  		return copy_to_user((void __user *)arg, &info, minsz) ?
+>  			-EFAULT : 0;
+>  
+> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+> index 4a9dbc2..0ff6a8d 100644
+> --- a/include/uapi/linux/vfio.h
+> +++ b/include/uapi/linux/vfio.h
+> @@ -488,7 +488,33 @@ struct vfio_iommu_type1_info {
+>  	__u32	argsz;
+>  	__u32	flags;
+>  #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
+> -	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
+> +#define VFIO_IOMMU_INFO_CAPS	(1 << 1)	/* Info supports caps */
+> +	__u32   cap_offset;	/* Offset within info struct of first cap */
+> +	__u64	iova_pgsizes;	/* Bitmap of supported page sizes */
+> +};
+> +
+> +#define VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY	1
+> +
+> +/*
+> + * The MSI geometry capability allows to report the MSI IOVA geometry:
+> + * - either the MSI IOVAs are constrained within a reserved IOVA aperture
+> + *   whose boundaries are given by [@aperture_start, @aperture_end].
+> + *   this is typically the case on x86 host. The userspace is not allowed
+> + *   to map userspace memory at IOVAs intersecting this range using
+> + *   VFIO_IOMMU_MAP_DMA.
+> + * - or the MSI IOVAs are not requested to belong to any reserved range;
+> + *   in that case the userspace must provide an IOVA window characterized by
+> + *   @size and @alignment using VFIO_IOMMU_MAP_DMA with RESERVED_MSI_IOVA flag.
+> + */
+> +struct vfio_iommu_type1_info_cap_msi_geometry {
+> +	struct vfio_info_cap_header header;
+> +	bool reserved; /* Are MSI IOVAs within a reserved aperture? */
+> +	/* reserved */
+> +	__u64 aperture_start;
+> +	__u64 aperture_end;
+> +	/* not reserved */
+> +	__u64 size; /* IOVA aperture size in bytes the userspace must provide */
+> +	__u64 alignment; /* alignment of the window, in bytes */
+>  };
+>  
+>  #define VFIO_IOMMU_GET_INFO _IO(VFIO_TYPE, VFIO_BASE + 12)
+> @@ -503,6 +529,8 @@ struct vfio_iommu_type1_info {
+>   * IOVA region that will be used on some platforms to map the host MSI frames.
+>   * In that specific case, vaddr is ignored. Once registered, an MSI reserved
+>   * IOVA region stays until the container is closed.
+> + * The requirement for provisioning such reserved IOVA range can be checked by
+> + * checking the VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY capability.
+>   */
+>  struct vfio_iommu_type1_dma_map {
+>  	__u32	argsz;
+> 
