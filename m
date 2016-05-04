@@ -1,43 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 May 2016 07:32:02 -0500
-Subject: [RFC v6 1/3] gpio: dt-bindings: add wd,mbl-gpio bindings
-In-Reply-To: <4330813.s9mxBLCsXA@debian64>
-References: <cover.1462104492.git.chunkeey@googlemail.com>
- <103bf8fceb426a9c3b09641ea989955e3ec1c7d4.1462104492.git.chunkeey@googlemail.com>
- <20160504022210.GA9913@rob-hp-laptop> <4330813.s9mxBLCsXA@debian64>
-Message-ID: <CAL_JsqLQV-k9O9SjaTnHG5G_JhYqn69xHzLWrqXJAJvGAc=2Og@mail.gmail.com>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Wed, 4 May 2016 20:32:13 +0800
+Subject: [RFC v5 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1462365137-715-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 11:53 PM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
-> On Tuesday, May 03, 2016 09:22:10 PM Rob Herring wrote:
->> On Sun, May 01, 2016 at 02:18:37PM +0200, Christian Lamparter wrote:
->> > This patch adds the device tree bindings for the Western Digital's
->> > MyBook Live memory-mapped GPIO controllers.
->> >
->> > The gpios will be supported by gpio-mmio code of the
->> > GPIO generic library.
->> >
->> > +++ b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
->> > @@ -0,0 +1,38 @@
->> > +Bindings for the Western Digital's MyBook Live memory-mapped GPIO controllers.
->>
->> Are these really product level GPIOs rather than some SOC's GPIOs
->> (APM?)?
->>
-> Ah, that's a good point.
->
-> In a nutshell: The APM82181 SoC has two proper/normal GPIO controllers
-> which have a dt-binding and a kernel driver ready to go.
-> However Western Digital went with their own GPIO controller for
-> the MyBook Live [7].
 
-Okay, just making sure. It's a little strange to have external (to an
-SOC) memory mapped GPIOs is why I asked.
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help read/write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-Rob
+These patches have a build dependency on top of v4.6-rc1.
 
-P.S. By v6, you should drop RFC.
+Changes since v4:
+ - fix bug of kmem_cache usage
+ - print more meaningful log in suspend/resume flow
+ - cascade all tasks into one vsync for display
+ - merge cmdq_handle_done() and cmdq_handle_done_internal()
+ - remove TASK_STATE_START_ERROR and its related flow
+ - merge cmdq_rec_append_write() into cmdq_rec_append_command()
+ - simplify some functions, such as cmdq_task_insert_into_thread(),
+   cmdq_remove(), cmdq_task_acquire(), and cmdq_rec_append_command()
+ - refine in program comments
+
+Best regards,
+HS Liao
+
+HS Liao (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  CMDQ: Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  CMDQ: suspend/resume protection
+
+ .../devicetree/bindings/soc/mediatek/gce.txt       |   34 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |    8 +
+ drivers/soc/mediatek/Kconfig                       |   10 +
+ drivers/soc/mediatek/Makefile                      |    1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 1708 ++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        |  197 +++
+ 6 files changed, 1958 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
+
+-- 
+1.9.1
