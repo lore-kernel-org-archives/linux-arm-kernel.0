@@ -1,140 +1,42 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed, 4 May 2016 03:24:02 +0000
-Subject: [v8, 6/7] MAINTAINERS: add entry for Freescale SoC specific driver
-In-Reply-To: <CADRPPNQaLVHp_HnEcHvZE7ebcmhYKf4K8CeWHErRk-0Xv8cU3A@mail.gmail.com>
-References: <1461306464-19521-1-git-send-email-yangbo.lu@nxp.com>
- <1461306464-19521-7-git-send-email-yangbo.lu@nxp.com>
- <1461367352.32510.218.camel@buserror.net>
- <HE1PR04MB088907CD90586FC83D058003F8630@HE1PR04MB0889.eurprd04.prod.outlook.com>
- <CADRPPNQaLVHp_HnEcHvZE7ebcmhYKf4K8CeWHErRk-0Xv8cU3A@mail.gmail.com>
-Message-ID: <HE1PR04MB0889087BDB60357796424CAAF87B0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+Date: Wed, 4 May 2016 11:24:28 +0800
+Subject: [v9, 1/7] Documentation: DT: update Freescale DCFG compatible
+In-Reply-To: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
+References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1462332274-13744-2-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo and Scott,
+Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead
+of 'fsl,ls1021a-dcfg' to include more chips such as ls1021a,
+ls1043a, and ls2080a.
 
-> -----Original Message-----
-> From: Leo Li [mailto:pku.leo at gmail.com]
-> Sent: Wednesday, May 04, 2016 4:06 AM
-> To: Yangbo Lu
-> Cc: Scott Wood; Yang-Leo Li; linux-mmc at vger.kernel.org; linuxppc-
-> dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; ulf.hansson at linaro.org; Zhao Qiang; Russell King;
-> Bhupesh Sharma; Xiaobo Xie; Scott Wood; Claudiu Manoil; Kumar Gala
-> Subject: Re: [v8, 6/7] MAINTAINERS: add entry for Freescale SoC specific
-> driver
-> 
-> On Mon, Apr 25, 2016 at 10:12 PM, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> > Hi Scott and Leo,
-> >
-> >
-> >> -----Original Message-----
-> >> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
-> >> owner at vger.kernel.org] On Behalf Of Scott Wood
-> >> Sent: Saturday, April 23, 2016 7:23 AM
-> >> To: Yangbo Lu; linux-mmc at vger.kernel.org;
-> >> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
-> >> linux-kernel at vger.kernel.org
-> >> Cc: ulf.hansson at linaro.org; Zhao Qiang; Russell King; Bhupesh Sharma;
-> >> Scott Wood; Claudiu Manoil; Kumar Gala; Yang-Leo Li; Xiaobo Xie;
-> >> Michael Ellerman
-> >> Subject: Re: [v8, 6/7] MAINTAINERS: add entry for Freescale SoC
-> >> specific driver
-> >>
-> >> On Fri, 2016-04-22 at 14:27 +0800, Yangbo Lu wrote:
-> >> > Add maintainer entry for Freescale SoC specific driver including
-> >> > the QE library and the GUTS driver. Also add entry for GUTS driver
-> >> > and add maintainer for QE library.
-> >> >
-> >> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> >> > ---
-> >> > Changes for v8:
-> >> >     - Added this patch
-> >> > ---
-> >> >  MAINTAINERS | 16 +++++++++++++++-
-> >> >  1 file changed, 15 insertions(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/MAINTAINERS b/MAINTAINERS index 1d5b4be..d20aeb6
-> >> > 100644
-> >> > --- a/MAINTAINERS
-> >> > +++ b/MAINTAINERS
-> >> > @@ -4622,13 +4622,27 @@ F:
-> >> > drivers/net/ethernet/freescale/fec_ptp.c
-> >> >  F: drivers/net/ethernet/freescale/fec.h
-> >> >  F: Documentation/devicetree/bindings/net/fsl-fec.txt
-> >> >
-> >> > +FREESCALE SOC SPECIFIC DRIVER
-> >>
-> >> FREESCALE SOC DRIVERS
-> >
-> > [Lu Yangbo-B47093] Ok, will change it to 'FREESCALE SOC DRIVERS'.
-> >
-> >>
-> >> > +M: Scott Wood <oss@buserror.net>
-> >>
-> >> Please CC me at this address, not the NXP address that you sent this
-> to...
-> >
-> > [Lu Yangbo-B47093] Sorry for mistaking your email. Will send the one
-> you said.
-> >
-> >>
-> >> > +L: linuxppc-dev at lists.ozlabs.org
-> >> > +S: Maintained
-> >> > +F: drivers/soc/fsl/
-> >> > +F: include/linux/fsl/
-> >>
-> >> This directory will contain drivers that work on PPC and ARM... I'm
-> >> not sure what to put here in terms of mailing lists (we could put
-> >> both, but people probably shouldn't spam both lists if only one arch
-> >> is relevant to the patch), and whom to make pull requests to.
-> >
-> > [Lu Yangbo-B47093] But sooner or later we need to do this for files in
-> fsl/ ...
-> > :)
-> >
-> > Hi Leo, do you have any idea?
-> 
-> I think it would be ok to put both linuxppc and linux-arm mailing lists
-> here.  Driver doesn't fall into any of the functional based sub-systems
-> would very likely be platform stuff.  And if patch author has the
-> knowledge that a patch only impacts one arch, he can remove the other
-> list to reduce the spam.
-> 
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+---
+Changes for v8:
+	- Added this patch
+Changes for v9:
+	- Added a list for the possible compatibles
+---
+ Documentation/devicetree/bindings/arm/fsl.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-[Lu Yangbo-B47093] Thanks a lot. I will update the patchset later adding the two mailing lists.
-
-> >
-> >
-> >>
-> >> > +FREESCALE GUTS DRIVER
-> >> > +M: Yangbo Lu <yangbo.lu@nxp.com>
-> >> > +L: linuxppc-dev at lists.ozlabs.org
-> >> > +S: Maintained
-> >> > +F: drivers/soc/fsl/guts.c
-> >>
-> >> What about the header?
-> >>
-> >> Does guts really need a separate maintainer from drivers/soc/fsl?
-> >
-> > [Lu Yangbo-B47093] I was hesitating to add the maintainer...
-> > And I was not so familiar with it. Let me leave it to the fsl/
-> directory and remove this...
-> >
-> >>
-> >> -Scott
-> >>
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-mmc"
-> >> in the body of a message to majordomo at vger.kernel.org More majordomo
-> >> info at http://vger.kernel.org/majordomo-info.html
-> > _______________________________________________
-> > Linuxppc-dev mailing list
-> > Linuxppc-dev at lists.ozlabs.org
-> > https://lists.ozlabs.org/listinfo/linuxppc-dev
-> 
-> 
-> 
-> --
-> - Leo
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 752a685..465cba1 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -119,7 +119,11 @@ Freescale DCFG
+ configuration and status for the device. Such as setting the secondary
+ core start address and release the secondary core from holdoff and startup.
+   Required properties:
+-  - compatible: should be "fsl,ls1021a-dcfg"
++  - compatible: should be "fsl,<chip>-dcfg"
++    Possible compatibles:
++	"fsl,ls1021a-dcfg"
++	"fsl,ls1043a-dcfg"
++	"fsl,ls2080a-dcfg"
+   - reg : should contain base address and length of DCFG memory-mapped registers
+ 
+ Example:
+-- 
+2.1.0.27.g96db324
