@@ -1,121 +1,134 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed, 4 May 2016 11:24:34 +0800
-Subject: [v9, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
-References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1462332274-13744-8-git-send-email-yangbo.lu@nxp.com>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Wed, 04 May 2016 06:53:50 +0200
+Subject: [RFC v6 1/3] gpio: dt-bindings: add wd,mbl-gpio bindings
+In-Reply-To: <20160504022210.GA9913@rob-hp-laptop>
+References: <cover.1462104492.git.chunkeey@googlemail.com>
+ <103bf8fceb426a9c3b09641ea989955e3ec1c7d4.1462104492.git.chunkeey@googlemail.com>
+ <20160504022210.GA9913@rob-hp-laptop>
+Message-ID: <4330813.s9mxBLCsXA@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eSDHC of T4240-R1.0-R2.0 has incorrect vender version and spec version.
-Acturally the right version numbers should be VVN=0x13 and SVN = 0x1.
-This patch adds the GUTS driver support for eSDHC driver to get SVR(System
-version register). And fix host version to avoid that incorrect version
-numbers break down the ADMA data transfer.
+On Tuesday, May 03, 2016 09:22:10 PM Rob Herring wrote:
+> On Sun, May 01, 2016 at 02:18:37PM +0200, Christian Lamparter wrote:
+> > This patch adds the device tree bindings for the Western Digital's
+> > MyBook Live memory-mapped GPIO controllers.
+> > 
+> > The gpios will be supported by gpio-mmio code of the
+> > GPIO generic library.
+> > 
+> > +++ b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+> > @@ -0,0 +1,38 @@
+> > +Bindings for the Western Digital's MyBook Live memory-mapped GPIO controllers.
+> 
+> Are these really product level GPIOs rather than some SOC's GPIOs 
+> (APM?)?
+> 
+Ah, that's a good point. 
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Scott Wood <oss@buserror.net>
----
-Changes for v2:
-	- Got SVR through iomap instead of dts
-Changes for v3:
-	- Managed GUTS through syscon instead of iomap in eSDHC driver
-Changes for v4:
-	- Got SVR by GUTS driver instead of SYSCON
-Changes for v5:
-	- Changed to get SVR through API fsl_guts_get_svr()
-	- Combined patch 4, patch 5 and patch 6 into one
-Changes for v6:
-	- Added 'Acked-by: Ulf Hansson'
-Changes for v7:
-	- None
-Changes for v8:
-	- Added 'Acked-by: Scott Wood'
-Changes for v9:
-	- None
----
- drivers/mmc/host/Kconfig          |  1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+In a nutshell: The APM82181 SoC has two proper/normal GPIO controllers
+which have a dt-binding and a kernel driver ready to go.
+However Western Digital went with their own GPIO controller for
+the MyBook Live [7].
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 0aa484c..e15e836 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -143,6 +143,7 @@ config MMC_SDHCI_OF_ESDHC
- 	depends on MMC_SDHCI_PLTFM
- 	depends on PPC || ARCH_MXC || ARCH_LAYERSCAPE
- 	select MMC_SDHCI_IO_ACCESSORS
-+	select FSL_GUTS
- 	help
- 	  This selects the Freescale eSDHC controller support.
- 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index 3f34d35..68cc020 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -18,6 +18,8 @@
- #include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-+#include <linux/fsl/svr.h>
-+#include <linux/fsl/guts.h>
- #include <linux/mmc/host.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -28,6 +30,8 @@
- struct sdhci_esdhc {
- 	u8 vendor_ver;
- 	u8 spec_ver;
-+	u32 soc_ver;
-+	u8 soc_rev;
- };
- 
- /**
-@@ -73,6 +77,8 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
- static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 				     int spec_reg, u32 value)
- {
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	u16 ret;
- 	int shift = (spec_reg & 0x2) * 8;
- 
-@@ -80,6 +86,13 @@ static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 		ret = value & 0xffff;
- 	else
- 		ret = (value >> shift) & 0xffff;
-+
-+	/* Workaround for T4240-R1.0-R2.0 eSDHC which has incorrect
-+	 * vendor version and spec version information.
-+	 */
-+	if ((spec_reg == SDHCI_HOST_VERSION) &&
-+	    (esdhc->soc_ver == SVR_T4240) && (esdhc->soc_rev <= 0x20))
-+		ret = (VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) | SDHCI_SPEC_200;
- 	return ret;
- }
- 
-@@ -567,10 +580,20 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_esdhc *esdhc;
- 	u16 host_ver;
-+	u32 svr;
- 
- 	pltfm_host = sdhci_priv(host);
- 	esdhc = sdhci_pltfm_priv(pltfm_host);
- 
-+	fsl_guts_init();
-+	svr = fsl_guts_get_svr();
-+	if (svr) {
-+		esdhc->soc_ver = SVR_SOC_VER(svr);
-+		esdhc->soc_rev = SVR_REV(svr);
-+	} else {
-+		dev_err(&pdev->dev, "Failed to get SVR value!\n");
-+	}
-+
- 	host_ver = sdhci_readw(host, SDHCI_HOST_VERSION);
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
--- 
-2.1.0.27.g96db324
+Long version:
+I know this SoC does have proper GPIO controllers [0].
+For reference: I've helped making a OpenWRT port for the Cisco Meraki MR24
+which uses it/them [1], [2]. Here's the GPIO extract from the MR24 DTS [3]:
+
+--- MR24 DTS ---
+	GPIO0: gpio at ef600b00 {
+   		compatible = "ibm,ppc4xx-gpio";
+       reg = <0xef600b00 0x00000048>; 
+       #gpio-cells = <2>;
+       gpio-controller;
+    };
+--- snap ---
+
+The driver for the "ibm,ppc4xx-gpio" is located under: 
+arch/powerpc/sysdev/ppc4xx_gpio.c [4].
+I can't find a dt binding text for it, if you want I can write one >later<.
+The "ppc4xx" moniker is a strong indication that these GPIO controllers 
+were carried over from the ppc46x/44x/40x series. 
+The address (but not the range): 0x00000004 ef600b00 does match with the
+System Memory Map of the PPC460EX (See GPIO0 Controller on page 8 [5]).
+
+Now for the MyBook Live: The GPIO situation is completely different.
+Unlike the MR24, there are two GPIOs. The first one is on address
+0x4e0000000. It drives the 3-color LED, Ethernet PHY Reset, USB-Core Power,
+SATA Port0 and Port1 Power, NOR Flash Switch and the reset button driver.
+
+The second GPIO only has one input connected. It BIT2 represents the state
+of the reset button. It is located at 0x4e0100000. (The 0x4e0xxxxx address
+puts the GPIO devices on the EBC (aka External Peripheral Bus Controller).
+The EBC is normally used for "direct attachment of memory devices such as
+ROM, SRAM, ...")
+
+Western Digital did release their version of the GPIO driver: apollo3g-gpio.c
+as part of their GPL sources [6]. (I found a mostly untouched version of the
+apollo3g-gpio.c driver on github [7] (AFAICT he added the "porting to kernel 
+3.2.64 by night_ghost@..."  string, other than that it should be pretty much
+identical to what's inside the GPL.tar.gz).
+
+So, I think the MyBook Live's GPIO controller is definitively something WD
+cooked up by themselves in their labs. But I have no idea why they didn't
+use the SoC's GPIO like Cisco... But sadly they really didn't...
+
+Note:
+If someone wants to look and play with this curiosity. I have a small
+stack of DIY "MyBook Live kits", so I can sent one or two away easily.
+For assembling a kit: one need a working 3.5" SATA HDD and a 12v 1.25A
+PSU with a standard 5.5mm x 2.1mm power jack. I made a Debian image for 
+development (download). So, if someone is interested: PM me.
+
+Regards,
+Christian
+
+[0] <https://c1170156.ssl.cf3.rackcdn.com/UK_AMC_APM82181-SKE1000T_DS.pdf>
+[1] <https://wikidevi.com/wiki/Cisco_Meraki_MR24>
+[2] <https://forum.openwrt.org/viewtopic.php?pid=316793#p316793>
+[3] <https://github.com/riptidewave93/Openwrt-MR24/blob/master/overlay/target/linux/apm821xx/dts/MR24.dts#L251>
+[4] <https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/powerpc/sysdev/ppc4xx_gpio.c>
+[5] <http://datasheet.octopart.com/PPC460EX-NUB800T-AMCC-datasheet-11553412.pdf>
+[6] <http://support.wdc.com/downloads.aspx?p=132&lang=en>
+[7] <https://github.com/MyBookLive/kernel-4.0.x/blob/master/03_enable_leds.patch>
+
+> +The Western Digital MyBook Live has two memory-mapped GPIO controllers.
+> +Both GPIO controller only have a single 8-bit data register, where GPIO
+> +state can be read and/or written.
+> +
+> +Required properties:
+> +     - compatible: should be "wd,mbl-gpio"
+> +     - reg-names: must contain
+> +             "dat" - data register
+> +     - reg: address + size pairs describing the GPIO register sets;
+> +             order must correspond with the order of entries in reg-names
+> +     - #gpio-cells: must be set to 2. The first cell is the pin number and
+> +                     the second cell is used to specify the gpio polarity:
+> +                     0 = active high
+> +                     1 = active low
+> +     - gpio-controller: Marks the device node as a gpio controller.
+> +
+> +Optional properties:
+> +     - no-output: GPIOs are read-only.
+> +
+> +Examples:
+> +     gpio0: gpio0 at e0000000 {
+> +             compatible = "wd,mbl-gpio";
+> +             reg-names = "dat";
+> +             reg = <0xe0000000 0x1>;
+> +             #gpio-cells = <2>;
+> +             gpio-controller;
+> +     };
+> +
+> +     gpio1: gpio1 at e0100000 {
+> +             compatible = "wd,mbl-gpio";
+> +             reg-names = "dat";
+> +             reg = <0xe0100000 0x1>;
+> +             #gpio-cells = <2>;
+> +             gpio-controller;
+> +             no-output;
+> +     };
+> -- 
+> 2.8.1
+> 
