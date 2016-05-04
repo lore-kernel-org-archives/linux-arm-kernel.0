@@ -1,75 +1,61 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 4 May 2016 10:40:08 +0100
-Subject: [PATCH V3 0/3] iio: mxs-lradc: simplify TS handling
-In-Reply-To: <CAL7P5jJF9EL4Zk-AC9csyadfrmUp4R+6ceVAN_kNm7dKgo+ZgQ@mail.gmail.com>
-References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
- <500c5874-4ef8-b37b-e12f-80fd5205c172@kernel.org>
- <CAL7P5jJF9EL4Zk-AC9csyadfrmUp4R+6ceVAN_kNm7dKgo+ZgQ@mail.gmail.com>
-Message-ID: <e0989150-8f22-4f36-fea7-65a86973833d@kernel.org>
+From: john@metanate.com (John Keeping)
+Date: Wed,  4 May 2016 15:54:45 +0100
+Subject: [PATCH 1/2] Revert "ASoC: rockchip: i2s: remove unused variables"
+Message-ID: <1462373686-21794-1-git-send-email-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/16 07:06, Ksenija Stanojevi? wrote:
-> Hi Jonathan,
-> 
-> On Sun, May 1, 2016 at 10:08 PM, Jonathan Cameron <jic23@kernel.org> wrote:
->> Ksenija,
->>
->> How would you prefer we handle this interaction of this set and your series.
->> Options are:
->>
->> 1. I apply these now and you rebase on top of the result.
->> 2. You pull these into your series, probably after the driver split making sure these
->>    improvements end up in the new drivers.
->> 3. We ask Stephan to re roll them at a later date (least preferred option as that adds
->> another person we need to chase down to get to the end of this process!)
->>
->> No immediate rush on any of the above as we've probably missed this cycle now anyway.
->> I've been cut off today so not sure what Linus has said today.
-> 
-> My understanding was that you will take this patch series so I already included
-> changes made by this patch set in touchscreen part, I will check if I missed
-> something.
-> I think the best is to apply these now.
-Cool - that's even easier ;)
+This reverts commit 5938448b99275cba95167c3f9d39ca9225fdad38.
 
-Jonathan
-> 
-> Thanks,
-> Ksenija
-> 
->> Jonathan
->> On 23/04/16 20:57, Stefan Wahren wrote:
->>> This patch series simplifies TS handling of mxs-lradc.
->>>
->>> These patches has been tested with i.MX23 and i.MX28 but without
->>> a touchscreen. I added only a bogus touchscreen in devicetree.
->>>
->>> It would be nice if someone with a real touchscreen could test it.
->>>
->>> Changes in V3:
->>> - remove dev.parent assignment as suggested by Dimitry
->>> - add new patch to remove mxs_lradc_ts_unregister
->>> - remove PM implementation from series in order to wait until
->>>   Ksenija has split the driver
->>>
->>> Changes in V2:
->>> - rebase on iio/testing since patch 2 and 3 from V1 has been applied
->>> - also remove input_unregister_device in patch 1
->>> - use mask of virtual channels for IRQ disabling in patch 2
->>>
->>> Stefan Wahren (3):
->>>   iio: mxs-lradc: simplify TS registration
->>>   iio: mxs-lradc: remove mxs_lradc_ts_unregister
->>>   iio: mxs-lradc: disable only masked channels in
->>>     mxs_lradc_hw_stop
->>>
->>>  drivers/iio/adc/mxs-lradc.c |   34 ++++++----------------------------
->>>  1 file changed, 6 insertions(+), 28 deletions(-)
->>>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+It turns out that the commit that made these variables unused is wrong
+so we're about to revert it.  Bring back the variables in prepration.
+
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 2f8e20416bd3..34743ec61c49 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -34,6 +34,13 @@ struct rk_i2s_dev {
+ 
+ 	struct regmap *regmap;
+ 
++/*
++ * Used to indicate the tx/rx status.
++ * I2S controller hopes to start the tx and rx together,
++ * also to stop them when they are both try to stop.
++*/
++	bool tx_start;
++	bool rx_start;
+ 	bool is_master_mode;
+ };
+ 
+@@ -77,7 +84,11 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
+ 		regmap_update_bits(i2s->regmap, I2S_XFER,
+ 				   I2S_XFER_TXS_START,
+ 				   I2S_XFER_TXS_START);
++
++		i2s->tx_start = true;
+ 	} else {
++		i2s->tx_start = false;
++
+ 		regmap_update_bits(i2s->regmap, I2S_DMACR,
+ 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
+ 
+@@ -115,7 +126,11 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
+ 		regmap_update_bits(i2s->regmap, I2S_XFER,
+ 				   I2S_XFER_RXS_START,
+ 				   I2S_XFER_RXS_START);
++
++		i2s->rx_start = true;
+ 	} else {
++		i2s->rx_start = false;
++
+ 		regmap_update_bits(i2s->regmap, I2S_DMACR,
+ 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
+ 
+-- 
+2.8.0.rc4.238.g874082a
