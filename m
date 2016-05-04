@@ -1,204 +1,152 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 4 May 2016 15:35:47 +0200
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <CAL_Jsq+4aL5znA3zOKdcJb+pEXhVOQthkFF6DN2+P6U37t2o6g@mail.gmail.com>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop>
- <20160503185153.5cfddc32@bbrezillon>
- <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
- <20160504113852.10a2dd84@bbrezillon>
- <CAL_Jsq+4aL5znA3zOKdcJb+pEXhVOQthkFF6DN2+P6U37t2o6g@mail.gmail.com>
-Message-ID: <20160504153547.60d736bb@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 May 2016 14:44:20 +0100
+Subject: [PATCH] perf/core / arm_pmu: special-case hetereogeneous CPUs
+In-Reply-To: <20160426103346.GA20836@leverpostej>
+References: <20160425175837.GB3141@leverpostej>
+ <20160425190334.GK3448@twins.programming.kicks-ass.net>
+ <20160426103346.GA20836@leverpostej>
+Message-ID: <20160504134419.GA15849@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 May 2016 08:06:10 -0500
-Rob Herring <robh@kernel.org> wrote:
+Hi,
 
-> On Wed, May 4, 2016 at 4:38 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > Hi Rob,
-> >
-> > On Tue, 3 May 2016 14:11:04 -0500
-> > Rob Herring <robh@kernel.org> wrote:
-> >  
-> >> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
-> >> <boris.brezillon@free-electrons.com> wrote:  
-> >> > Hi Rob,
-> >> >
-> >> > On Tue, 3 May 2016 11:40:19 -0500
-> >> > Rob Herring <robh@kernel.org> wrote:
-> >> >  
-> >> >> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:  
-> >> >> > The EBI (External Bus Interface) is used to access external peripherals
-> >> >> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> >> >> > Each device is assigned a CS line and an address range and can have its
-> >> >> > own configuration (timings, access mode, bus width, ...).
-> >> >> > This driver provides a generic DT binding to configure a device according
-> >> >> > to its requirements.
-> >> >> > For specific device controllers (like the NAND one) the SMC timings
-> >> >> > should be configured by the controller driver through the matrix and smc
-> >> >> > syscon regmaps.  
+On Tue, Apr 26, 2016 at 11:33:46AM +0100, Mark Rutland wrote:
+> On Mon, Apr 25, 2016 at 09:03:34PM +0200, Peter Zijlstra wrote:
+> > On Mon, Apr 25, 2016 at 06:58:37PM +0100, Mark Rutland wrote:
+> > > Hi,
+> > > 
+> > > When booting an arm64 defconfig linux-next (next-20160422) on an ARM
+> > > Juno system, I hit a WARN_ON_ONCE in perf_pmu_register (see backtrace at
+> > > the end of this email).
+> > > 
+> > > This was introduced by commit 26657848502b7847 ("perf/core: Verify we
+> > > have a single perf_hw_context PMU") where we forcefully prevent multiple
+> > > PMUs from sharing perf_hw_context (with a warning), and force additional
+> > > PMUs to use perf_invalid_context.
 > 
-> [...]
+> > > Are you happy to revert 26657848502b787 for the timebeing? Or to somehow
+> > > predicate the check such that it doesn't adversely affect those HW PMUs?
+> > 
+> > I'm happy with a chicken bit for now, its already found two real issues,
+> > so I'd like to keep it.
 > 
-> >> >> > +EBI bus configuration associated with specific chip-select will be defined in
-> >> >> > +the configs subnode. This configs node will in turn contain several subnodes
-> >> >> > +named config-<cs-id>, each of them containing the following properties.  
-> >> >>
-> >> >> This is a bit unusual. Why not just part of the child device nodes?  
-> >> >
-> >> > Oh, come on! I reworked the binding because Mark complained about the
-> >> > previous binding which was doing exactly what you're suggesting. Can
-> >> > you please be consistent in your reviews...  
-> >>
-> >> No, Mark and I both have our opinions. Which part of this patch
-> >> explains the history?  
-> >
-> > Hm, it's in patch 1/2 (just dropped the cover letter, which might not
-> > be such a good idea).
-> >  
-> >> If the revision history is not in the patch, I'm
-> >> not looking at it.
-> >>
-> >> My issue with it this way is that it has invented yet another way to
-> >> describe timings. I would like to be consistent across external bus
-> >> descriptions, but we're not very consistent to begin with though. The
-> >> most common seems to be the way you first did it. But I agree that it
-> >> is kind of screwy to have an intermediate node unless the controller
-> >> itself has sub-blocks within it and is not the established way to
-> >> describe a bus with chip selects. I would either put the properties
-> >> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
-> >> in the device node. I'd call it timings instead of config, but that's
-> >> just bikeshedding.  
-> >
-> > Well, it's not only describing timings (see atmel,bus-width,
-> > atmel,byte-access-type, ...), but I'm fine with either names :).
-> >  
-> >>
-> >> memory-controller at 1000 {
-> >>   ...
-> >>   flash at 0,0 {
-> >>     timings {
-> >>       ...
-> >>     };
-> >>   };
-> >> };  
-> >
-> > Okay. Mark, what do you think of this approach?
-> >
-> > Note that one of my previous version was defining timings directly in
-> > the EBI device node, and Arnd noted that doing so may cause problems
-> > if one of the EBI property (or the config/timing node name) conflict
-> > with the sub-device binding, which is why I decided to put the EBI
-> > config definitions in a separate subnode.  
+> Ok, how about the below? (based on next-20160422).
+
+Peter, any thoughts?
+
+This is still an issue for us in next-20160504 (to which the patch still
+applies).
+
+Will, I assume that you're ok with the change to drivers/perf/arm_pmu.c.
+
+Thanks,
+Mark.
+
+> It looks like 26657848502b7847 was on a stable branch, so I guess we
+> can't fold this in. It probably makes sense for this to go the same path
+> as 26657848502b7847, assuming people are happy with that and there are
+> no conflicts.
 > 
-> You have vendor prefixes on all the properties so I don't think a
-> collision is really a problem. It's also an established pattern in
-> i.MX WEIM and OMAP GPMC (which are hiding in bindings/bus/) and I
-> prefer consistency.
-
-So let's summarize that.
-
-memory-controller at 1000 {
-	...
-	flash at 0,0 {
-		atmel,<ebi-prop-name> = <value>;
-		...
-		<flash-device-prop> = <value>;
-	};
-};
-
-Would everyone agree on this representation?
-
-With this approach, it's a bit more complicated to detect the case
-where we want to keep bootloader/firmware config, but it should be
-doable (it's much more easier to test for the presence of a
-config/timing node than verifying that either all or none of the
-mandatory properties are here).
-
-Still remains the problem mentioned by Jean-Jacques: what if the
-sub-device takes 2 CS lines. Should we apply the same setting to those
-slots?
-
+> Mark.
 > 
-> >> >> > +
-> >> >> > +Optional config-<cs-id> node properties:
-> >> >> > +
-> >> >> > +- atmel,bus-width:         width of the asynchronous device's data bus
-> >> >> > +                           8, 16 or 32.
-> >> >> > +                           Default to 8 when undefined.
-> >> >> > +
-> >> >> > +- atmel,byte-access-type   "write" or "select" (see Atmel datasheet).
-> >> >> > +                           Default to "select" when undefined.
-> >> >> > +
-> >> >> > +- atmel,read-mode          "nrd" or "ncs".
-> >> >> > +                           Default to "ncs" when undefined.
-> >> >> > +
-> >> >> > +- atmel,write-mode         "nwe" or "ncs".
-> >> >> > +                           Default to "ncs" when undefined.
-> >> >> > +
-> >> >> > +- atmel,exnw-mode          "disabled", "frozen" or "ready".
-> >> >> > +                           Default to "disabled" when undefined.
-> >> >> > +
-> >> >> > +- atmel,page-mode          enable page mode if present. The provided value
-> >> >> > +                           defines the page size (supported values: 4, 8,
-> >> >> > +                           16 and 32).
-> >> >> > +
-> >> >> > +- atmel,tdf-mode:          "normal" or "optimized". When set to  
-> >> >>
-> >> >> This should be boolean.  
-> >> >
-> >> > It was a formerly defined as a boolean, and when it's done like that we
-> >> > have no way to identify whether the property was forgotten or
-> >> > intentionally set to normal mode. What's the problem with this approach?  
-> >>
-> >> Only preference to use boolean when that is sufficient. With your
-> >> argument, then we should never have booleans. You state that missing
-> >> means "normal", not forgotten, so all these properties should be
-> >> required with no default.
-> >>
-> >> BTW, I debated the same thing on the other properties, but I could see
-> >> them being expanded to a 3rd mode. I don't see that here though.  
-> >
-> > Well, another reason I switched to a string property is because I
-> > implemented hardware readout in v4, and decided to retrieve the current
-> > state from the hardware and only overload the config with what was
-> > defined in the DT. In this case, if we move to a boolean property we
-> > can't know whether the property is missing because we want to put the
-> > bus in "normal" mode or because we want to keep this config unchanged
-> > (keep the bootloader/bootstrap config).  
+> ---->8----
+> From 7b1007f86d30bfed1dde21218224f119b6ad547f Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Tue, 26 Apr 2016 11:17:51 +0100
+> Subject: [PATCH] perf/core / arm_pmu: special-case hetereogeneous CPUs
 > 
-> Now you are giving yet another definition of what missing means.
-> Please pick and document one:
-> - Error, property missing
-> - Normal mode
-> - Retain firmware/bootloader settings (this should probably apply to
-> all or none)
-
-As I said, this has changed in v5. In v4 we were first retrieving the
-config from the hardware and then overloading this config with the
-properties defined in the DT.
-This ambiguity has gone along with the approach of putting the timings
-directly in the sub-device node. In this version, EBI configs are
-defined directly in configs/config-X nodes, which means that
-- if configs/config-X exists, then all mandatory properties should be
-  defined (otherwise -EINVAL is returned), and we can fallback to
-  default values for optional properties.
-- if configs/config-X does not exist, we retrieve the config directly
-  from the hardware
-
-So, with this assumption, we could definitely switch to a boolean
-property. The only reason I did not change that is because I find it
-clearer to have both modes clearly named than having a property called
-atmel,tdf-optimized.
-
-Anyway that's not something I'm particularly attached to, so let's
-switch back to a boolean property.
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Commit 26657848502b7847 ("perf/core: Verify we have a single
+> perf_hw_context PMU") forcefully prevents multiple PMUs from sharing
+> perf_hw_context, as this generally doesn't make sense. It is a common
+> bug for uncore PMUs to use perf_hw_context rather than
+> perf_invalid_context, which this detects.
+> 
+> However, systems exist with heterogeneous CPUs (and hence heterogeneous
+> HW PMUs), for which sharing perf_hw_context is necessary, and possible
+> in some limited cases. To make this work we have to perform some
+> gymnastics, as we did in commit 66eb579e66ecfea5 ("perf: allow for
+> PMU-specific event filtering") and c904e32a69b7c779 ("arm: perf: filter
+> unschedulable events").
+> 
+> To allow those systems to work, we must allow PMUs for heterogeneous
+> CPUs to share perf_hw_context, though we must still disallow sharing
+> otherwise to detect the common misuse of perf_hw_context.
+> 
+> This patch adds a new PERF_PMU_CAP_HETEROGENEOUS_CPUS for this, updates
+> the core logic to account for this, and makes use of it in the arm_pmu
+> code that is used for systems with heterogeneous CPUs. Comments are
+> added to make the rationale clear and hopefully avoid accidental abuse.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/perf/arm_pmu.c     | 8 ++++++++
+>  include/linux/perf_event.h | 1 +
+>  kernel/events/core.c       | 8 +++++++-
+>  3 files changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 32346b5..bbf827a 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -836,6 +836,14 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>  	if (!platform_get_irq(cpu_pmu->plat_device, 0))
+>  		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+>  
+> +	/*
+> +	 * This is a CPU PMU potentially in a heterogeneous configuration (e.g.
+> +	 * big.LITTLE). This is not an uncore PMU, and we have taken ctx
+> +	 * sharing into account (e.g. with our pmu::filter_match callback and
+> +	 * pmu::event_init group validation).
+> +	 */
+> +	cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_HETEROGENEOUS_CPUS;
+> +
+>  	return 0;
+>  
+>  out_unregister:
+> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+> index 342cb92..18d19d6 100644
+> --- a/include/linux/perf_event.h
+> +++ b/include/linux/perf_event.h
+> @@ -216,6 +216,7 @@ struct perf_event;
+>  #define PERF_PMU_CAP_AUX_SW_DOUBLEBUF		0x08
+>  #define PERF_PMU_CAP_EXCLUSIVE			0x10
+>  #define PERF_PMU_CAP_ITRACE			0x20
+> +#define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
+>  
+>  /**
+>   * struct pmu - generic performance monitoring unit
+> diff --git a/kernel/events/core.c b/kernel/events/core.c
+> index 1e0f117..796ee56 100644
+> --- a/kernel/events/core.c
+> +++ b/kernel/events/core.c
+> @@ -7855,7 +7855,13 @@ skip_type:
+>  	if (pmu->task_ctx_nr == perf_hw_context) {
+>  		static int hw_context_taken = 0;
+>  
+> -		if (WARN_ON_ONCE(hw_context_taken))
+> +		/*
+> +		 * Other than systems with heterogeneous CPUs, it never makes
+> +		 * sense for two PMUs to share perf_hw_context. PMUs which are
+> +		 * uncore must use perf_invalid_context.
+> +		 */
+> +		if (WARN_ON_ONCE(hw_context_taken &&
+> +		    !(pmu->capabilities & PERF_PMU_CAP_HETEROGENEOUS_CPUS)))
+>  			pmu->task_ctx_nr = perf_invalid_context;
+>  
+>  		hw_context_taken = 1;
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
