@@ -1,63 +1,111 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Wed,  4 May 2016 07:53:05 +0000
-Subject: [PATCH V5] clk: bcm2835: mark enabled clocks and pll with
- CLK_ENABLE_HAND_OFF
-Message-ID: <1462348385-16167-1-git-send-email-kernel@martin.sperl.org>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 04 May 2016 11:03:03 +0300
+Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
+ suspend
+In-Reply-To: <1462324873.11651.57.camel@mhfsdcap03>
+References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
+ <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
+ <1462324873.11651.57.camel@mhfsdcap03>
+Message-ID: <871t5ifdxk.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
 
-The bcm2835 firmware enables several clocks and plls before
-booting the linux kernel.
+Hi,
 
-These plls should never get disabled as it may result in a
-stopped system clock and more.
+chunfeng yun <chunfeng.yun@mediatek.com> writes:
+> On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
+>> Hi,
+>> 
+>> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+>> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+>> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
+>> >> >> Click mouse after xhci suspend completion but before system suspend
+>> >> >> completion, system will not be waken up by mouse if the duration of
+>> >> >> them is larger than 20ms which is the device UFP's resume signaling
+>> >> 
+>> >> what is "them" here ? The duration of what is longer than 20ms ?
+>> > They are "xhci suspend completion" and "system suspend completion";
+>> >
+>> > It's time duration
+>> 
+>> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
+>> wakeup ?
+> It is not the time of xhci suspend consumed, but is the time of duration
+> from xhci suspend completion to system suspend completion(after BOOT-CPU
+> is turned off, SPM will be enabled to receive wakeup event)
 
-So during probing we check if the clock and plls are enabled
-and if it is then mark that clock/pll with CLK_ENABLE_HAND_OFF.
+Okay, so SPM will be the entity actually handling wakeups, right ? I'm
+assuming something like this happens:
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- drivers/clk/bcm/clk-bcm2835.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+echo mem > /sys/power/state
+ /* start suspending devices */
+  xhci_suspend()
+ /* all devices suspended */
+ enable_spm()
 
-Note: This requires the CLK_ENABLE_HAND_OFF patch to be applied.
+so, if a mouse button is pressed after xhci_suspend() returns but before
+enable_spm() runs, then we're gonna miss that event, am I right ?
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 0fc71cb..0663b6c 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1211,6 +1211,15 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
- 	divider->cprman = cprman;
- 	divider->data = data;
- 
-+	/* if the pll-divider is running, then enable CLK_ENABLE_HAND_OFF */
-+	if ((cprman_read(cprman, data->a2w_reg) &
-+	     A2W_PLL_CHANNEL_DISABLE) == 0) {
-+		dev_dbg(cprman->dev,
-+			"found firmware enabled pll_div %s - enabling hand off\n",
-+			data->name);
-+		init.flags |= CLK_ENABLE_HAND_OFF;
-+	}
-+
- 	clk = devm_clk_register(cprman->dev, &divider->div.hw);
- 	if (IS_ERR(clk))
- 		return clk;
-@@ -1262,6 +1271,14 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
- 	}
- 
-+	/* if the clock is running, then enable CLK_ENABLE_HAND_OFF */
-+	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
-+		dev_dbg(cprman->dev,
-+			"found firmware enabled clock %s - enabling hand off\n",
-+			data->name);
-+		init.flags |= CLK_ENABLE_HAND_OFF;
-+	}
-+
- 	clock = devm_kzalloc(cprman->dev, sizeof(*clock), GFP_KERNEL);
- 	if (!clock)
- 		return NULL;
+I can't think of any way to sort this out. Let's ask on linux-pm (I've
+added linux-pm to Cc list)
+
+>> >> >> lasted. Another reason is that the SPM is not enabled before system
+>> >> 
+>> >> what's SPM ?
+>> > It is System Power Management which is powered off when system is
+>> > running in normal mode, and is powered on when system enters suspend
+>> > mode. It is used to wakeup system when some wakeup sources, such as
+>> > bluetooth or powerkey etc, tigger wakeup event.
+>> 
+>> okay, thanks
+>> 
+>> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
+>> >>            ^^^^^^^^^^
+>> >>            completion
+>> >> 
+>> >> >> So in order to reduce the duration less than 20ms, make use of
+>> >> >> syscore's suspend/resume interface.
+>> >> 
+>> >> no, this is the wrong approach
+>> > But it seems only one workable approach from software side
+>> 
+>> I wouldn't say that. It seems to me SPM should be enabled earlier.
+> Yes, but normally SPM should be enabled after all CPUS are turned off,
+> so it's difficult to do that, I mean enable SPM before turning off CPUS
+
+is it a requirement that SPM should be enabled only after all CPUs are
+turned off ? If that's the case, then any device in the system might
+have missed wakeups. This doesn't seem like a good design to me; unless
+I'm missing something...
+
+>> >> >> Because the syscore runs on irq disabled context, and xhci's
+>> >> >> suspend/resume calls some sleeping functions, enable local irq
+>> >> >> and then disable it during suspend/resume. This may be not a problem,
+>> >> >> since only boot CPU is runing.
+>> >> 
+>> >> another problem :) calling local_irq_{enable,disable}() is an indication
+>> >> that something's wrong.
+>> > Oh!
+>> >
+>> > BTW: There will be warning logs if they are not called.
+>> 
+>> yeah, I got that :-) But it's still wrong to use
+>> local_irq_{enable,disable}() the way you're using them :-)
+> Yes
+>
+> Thank you very much.
+>> 
+>
+>
+
 -- 
-2.1.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/43c16e2f/attachment-0001.sig>
