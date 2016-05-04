@@ -1,56 +1,39 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 4 May 2016 09:11:58 -0700
-Subject: [PATCH 1/2] dt-bindings: arm,gic: Indtroduce optional property
- 'arm,msi-offset-spi' for gicv2m
-In-Reply-To: <CAMsMSK_jwd6OMMJ8DfAckVJgav9U6p-oz9YcinUinaqj2xdwAA@mail.gmail.com>
-References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
- <1462319245-32532-2-git-send-email-ray.jui@broadcom.com>
- <CAMsMSK_jwd6OMMJ8DfAckVJgav9U6p-oz9YcinUinaqj2xdwAA@mail.gmail.com>
-Message-ID: <3997ed69-760a-9bc1-a451-d07323a6e163@broadcom.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 4 May 2016 11:17:29 -0500
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <20160504155932.GH13045@dhcppc6.redhat.com>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net> <20160503143856.GE13045@dhcppc6.redhat.com>
+ <5728BEC4.6050603@codeaurora.org> <20160503155141.GF13045@dhcppc6.redhat.com>
+ <20160503171602.GA2518@roeck-us.net>
+ <20160504141449.GG13045@dhcppc6.redhat.com> <572A0577.1070000@codeaurora.org>
+ <20160504155932.GH13045@dhcppc6.redhat.com>
+Message-ID: <572A2099.4070901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Pratyush Anand wrote:
+> Its unique to SBSA because you have very little timeout here. kexec-tools
+> upstream does not have any mechanism to handle watchdog timeout. Lets say even
+> if we implement a framework there, the best it can do is to ping the watchdog
+> again.
 
+Ok, so it's more accurate to say that kexec has a minimum watchdog 
+timeout requirement.  What happens if the system admin sets the timeout 
+to 5 seconds arbitrarily?  The system will reset during kexec, no matter 
+which hardware is used.
 
-On 5/4/2016 8:57 AM, Chris Brand wrote:
-> You have a typo in the subject line - "Indtroduce".
+This still sounds like a band-aid to me.  We're just assuming that we 
+need a timeout of at least 20 seconds to support kexec.  Frankly, this 
+still sounds like a problem the kexec developers needs to acknowledge 
+and deal with.
 
-Thanks, but now this patch will be gone based on review comments from 
-Marc on PATCH 2/2.
+Still I'm okay with a patch that extends the timeout by programming WCV, 
+but it has to be commented as a hack specifically to support kexec 
+because the timeout might be too short.  Then Wim can decide whether he 
+supports such changes.
 
->
-> Chris
->
-> On Tue, May 3, 2016 at 4:47 PM, Ray Jui <ray.jui@broadcom.com> wrote:
->> Update the GICv2m binding document by adding an optional property
->> 'arm,msi-offset-spi'.
->>
->> Some implementations of gicv2m have an erratum where the MSI data is
->> the SPI number subtracted by an offset. This is required for the
->> correct MSI interrupt to be triggered.
->>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> ---
->>  Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
->> index 793c20f..550960f 100644
->> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
->> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
->> @@ -140,6 +140,12 @@ Optional properties:
->>                       value, this property should contain the number of
->>                       SPIs assigned to the frame, overriding the HW value.
->>
->> +- arm,msi-offset-spi: Some implementations of gicv2m have an erratum where
->> +                     the MSI data is the SPI number subtracted by an offset.
->> +                     This is required for the correct MSI interrupt to be
->> +                     triggered. This property should contain the required
->> +                     offset.
->> +
->>  Example:
->>
->>         interrupt-controller at e1101000 {
->> --
->> 2.1.4
->>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation collaborative project.
