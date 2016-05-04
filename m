@@ -1,107 +1,84 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Wed, 4 May 2016 17:21:22 +0800
-Subject: [PATCH v10 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-In-Reply-To: <5729B20B.6090006@xs4all.nl>
-References: <1462270287-11374-1-git-send-email-tiffany.lin@mediatek.com>
- <5729A57E.1080505@xs4all.nl> <1462349987.1891.5.camel@mtksdaap41>
- <5729B20B.6090006@xs4all.nl>
-Message-ID: <1462353682.1891.7.camel@mtksdaap41>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 4 May 2016 10:37:16 +0100
+Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
+In-Reply-To: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
+References: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <5729C2CC.7030806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 28/04/16 16:05, Suzuki K Poulose wrote:
+> arm-ccn driver uses irq_set_affinity, which is not exported and
+> hence cannot be built as a module, eventhough we have all the
+> bits ready. This patch makes use of the exported helper
+> irq_set_affinity_hint() instead. Also, the __free_irq expects
+> the affinity_hint to be NULL when we free the irq. So set the
+> affinity_hint to NULL at clean up.
+>
+> Now that we can build it as a module, update the Kconfig to
+> reflect the change.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-On Wed, 2016-05-04 at 10:25 +0200, Hans Verkuil wrote:
-> 
-> On 05/04/2016 10:19 AM, tiffany lin wrote:
-> > Hi Hans,
-> > 
-> > On Wed, 2016-05-04 at 09:32 +0200, Hans Verkuil wrote:
-> >> Hi Tiffany,
-> >>
-> >> On 05/03/2016 12:11 PM, Tiffany Lin wrote:
-> >>> ==============
-> >>>  Introduction
-> >>> ==============
-> >>>
-> >>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
-> >>> Mediatek Video Codec is able to handle video encoding of in a range of formats.
-> >>>
-> >>> This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
-> >>> communicate with VPU.
-> >>>
-> >>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
-> >>> This patch series need [PATCH v15 8/8] memory: mtk-smi: export mtk_smi_larb_get/put[1] to build as module
-> >>>
-> >>> [1]http://lists.infradead.org/pipermail/linux-mediatek/2016-April/005173.html
-> >>>
-> >>> ==================
-> >>>  Device interface
-> >>> ==================
-> >>>
-> >>> In principle the driver bases on v4l2 memory-to-memory framework:
-> >>> it provides a single video node and each opened file handle gets its own private context with separate
-> >>> buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. raw video
-> >>> frames) and CAPTURE (for destination buffers, i.e. encoded video frames).
-> >>>
-> >>> ==============================
-> >>>  VPU (Video Processor Unit)
-> >>> ==============================
-> >>> The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
-> >>> It is able to handle video decoding/encoding in a range of formats.
-> >>> The driver provides with VPU firmware download, memory management and the communication interface between CPU and VPU.
-> >>> For VPU initialization, it will create virtual memory for CPU access and physical address for VPU hw device access. 
-> >>> When a decode/encode instance opens a device node, vpu driver will download vpu firmware to the device.
-> >>> A decode/encode instant will decode/encode a frame using VPU interface to interrupt vpu to handle decoding/encoding jobs.
-> >>>
-> >>> Please have a look at the code and comments will be very much appreciated.
-> >>>
-> >>> Change in v10:
-> >>> 1. Fix smatch/sparse error message
-> >>> 2. Add depends on ARM || ARM64 and MTK_IOMMU in Kconfig
-> >>
-> >> I don't like the ARM or ARM64 dependency since that makes COMPILE_TEST harder.
-> >>
-> >> I removed it here and for the VPU and everything still compiles fine with
-> >> sparse and smatch. So I'll drop those dependencies.
-> >>
-> >> Why is the MTK_IOMMU dependency needed? Just curious.
-> >>
-> > This is because we need MTK_IOMMU module to get dma continuous memory
-> > for HW.
-> > 
-> >> Note that sparse still complains about this:
-> >>
-> >> media-git/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:261:24: warning: incorrect type in assignment (different base types)
-> >>
-> >> I think this code should be rewritten. Something like this would work
-> >> (if I understand the code correctly):
-> >>
-> >> u32 tag = (bs_hdr_len << 5) | 0x10 | not_key;
-> >>
-> >> ac_tag[0] = tag & 0xff;
-> >> ac_tag[1] = (tag >> 8) & 0xff;
-> >> ac_tag[2] = (tag >> 16) & 0xff;
-> >>
-> >> It's perhaps a bit more verbose, but a lot easier to understand.
-> >>
-> > 
-> >> I'm accepting this driver but I'll remove the ARM || ARM64 dependency. Can
-> >> you post a follow-up patch for this sparse warning?
-> >>
-> > 
-> > Got it. We will provide a patch to fix this.
-> > I was curious why my sparse do not show this warning.
-> > Is there any parameter I need to set except C=1?
-> 
-> I'm running it with these parameters: C=2 CF="-D__CHECK_ENDIAN__"
-> 
-> I suspect it is the CHECK_ENDIAN flag that does it.
-> 
-Got it, thanks for the information.
+Hi,
 
-best regards,
-Tiffany
-> Regards,
-> 
-> 	Hans
+Could you please pull this for 4.7 ?
+
+Thanks
+Suzuki
+
+> ---
+>   drivers/bus/Kconfig   |    2 +-
+>   drivers/bus/arm-ccn.c |    7 ++++---
+>   2 files changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index d4a3a31..3efc996 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -48,7 +48,7 @@ config ARM_CCI5xx_PMU
+>   	  If unsure, say Y
+>
+>   config ARM_CCN
+> -	bool "ARM CCN driver support"
+> +	tristate "ARM CCN driver support"
+>   	depends on ARM || ARM64
+>   	depends on PERF_EVENTS
+>   	help
+> diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+> index 7082c72..acc3eb5 100644
+> --- a/drivers/bus/arm-ccn.c
+> +++ b/drivers/bus/arm-ccn.c
+> @@ -1189,7 +1189,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
+>   		perf_pmu_migrate_context(&dt->pmu, cpu, target);
+>   		cpumask_set_cpu(target, &dt->cpu);
+>   		if (ccn->irq)
+> -			WARN_ON(irq_set_affinity(ccn->irq, &dt->cpu) != 0);
+> +			WARN_ON(irq_set_affinity_hint(ccn->irq, &dt->cpu) != 0);
+>   	default:
+>   		break;
+>   	}
+> @@ -1278,7 +1278,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
+>
+>   	/* Also make sure that the overflow interrupt is handled by this CPU */
+>   	if (ccn->irq) {
+> -		err = irq_set_affinity(ccn->irq, &ccn->dt.cpu);
+> +		err = irq_set_affinity_hint(ccn->irq, &ccn->dt.cpu);
+>   		if (err) {
+>   			dev_err(ccn->dev, "Failed to set interrupt affinity!\n");
+>   			goto error_set_affinity;
+> @@ -1306,7 +1306,8 @@ static void arm_ccn_pmu_cleanup(struct arm_ccn *ccn)
+>   {
+>   	int i;
+>
+> -	irq_set_affinity(ccn->irq, cpu_possible_mask);
+> +	if (ccn->irq)
+> +		irq_set_affinity_hint(ccn->irq, NULL);
+>   	unregister_cpu_notifier(&ccn->dt.cpu_nb);
+>   	for (i = 0; i < ccn->num_xps; i++)
+>   		writel(0, ccn->xp[i].base + CCN_XP_DT_CONTROL);
+>
