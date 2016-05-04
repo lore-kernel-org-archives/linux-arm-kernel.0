@@ -1,298 +1,148 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 4 May 2016 14:54:32 +0800
-Subject: [PATCH] mmc: mmc: do not use CMD13 to get status after speed mode
- switch
-Message-ID: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 4 May 2016 08:15:30 +0100
+Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
+In-Reply-To: <6cdd4f858dacf72e192a292f29c12feb@ccbib.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <1461333147-11873-2-git-send-email-harald@ccbib.org>
+ <57288674.9050601@i2se.com> <6cdd4f858dacf72e192a292f29c12feb@ccbib.org>
+Message-ID: <1e7d5f3a-22c1-94d4-9620-7aa112602e39@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Per JEDEC spec, it is not recommended to use CMD13 to get card status
-after speed mode switch. below are two reason about this:
-1. CMD13 cannot be guaranteed due to the asynchronous operation.
-Therefore it is not recommended to use CMD13 to check busy completion
-of the timing change indication.
-2. After switch to HS200, CMD13 will get response of 0x800, and even the
-busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+On 03/05/16 12:22, Harald Geyer wrote:
+> Hi Stefan!
+> 
+> On 03.05.2016 13:07, Stefan Wahren wrote:
+>> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
+>>> The hardware has two current sources ISRC0 and ISRC1 to allow measuring
+>>> resistors without additional circuitry. This commit makes them available
+>>> as regulators.
+>>>
+>>> Tested on an imx233-olinuxino board.
+>>>
+>>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+>>> ---
+>>> The current regulator API doesn't fit this type of device very well: Typically
+>>> consumers will want to set a defined current, ie. min_uA == max_uA, but they
+>>> can't without help from configuration data, because the valid values aren't
+>>> reported by the API for current regulators. I have been thinking about
+>>> extending the API, but currently AFAIK no such consumers exist and most
+>>> users, like myself, will force the regulator to a defined value in
+>>> devicetree anyway.
+>>>
+>>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>>>  drivers/iio/adc/Kconfig                            |   1 +
+>>>  drivers/iio/adc/mxs-lradc.c                        | 152 +++++++++++++++++++++
+>>>  3 files changed, 182 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>> index 555fb11..983952c 100644
+>>> --- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>> +++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>> @@ -19,6 +19,15 @@ Optional properties:
+>>>  - fsl,settling: delay between plate switch to next sample. Allowed value is
+>>>                  1 ... 2047. It counts at 2 kHz and its default is
+>>>                  10 (= 5 ms)
+>>> +- ISRC0: A node describing the regulator of internal current source 0
+>>> +- ISRC1: A node describing the regulator of internal current source 1
+>>> +
+>>> +Required properties for the ISRCx sub-nodes:
+>>> +- regulator-max-microamp: See standard regulator binding documentation.
+>>> +                          Valid values are from 0 to 300 in steps of 20.
+>>> +
+>>> +Optional properties for the ISRCx sub-nodes:
+>>> +Any standard regulator properties that apply to current regulators.
+>>>
+>>>  Example for i.MX23 SoC:
+>>>
+>>> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
+>>>          fsl,ave-ctrl = <4>;
+>>>          fsl,ave-delay = <2>;
+>>>          fsl,settling = <10>;
+>>> +
+>>> +        isrc_lradc0: ISRC0 {
+>>> +            regulator-max-microamp = <300>;
+>>> +        };
+>>> +
+>>> +        isrc_lradc1: ISRC1 {
+>>> +            regulator-max-microamp = <120>;
+>>> +            regulator-min-microamp = <120>;
+>>> +            regulator-always-on;
+>>> +        };
+>>
+>> IMHO the binding should represent the direct connection between the
+>> current source and the physical channel. I think a node label isn't
+>> enough. Unfortunately i don't have an idea to do it the "right way".
+> 
+> I strictly followed the names of the data sheet here: imx23 and imx28
+> reference manuals both call the current sources ISRC0 and ISRC1 even
+> if they are attached to different channels of the ADC. I think
+> inventing some ISRC6 for imx28 would do more harm then good.
+So just to check... These two current sources are effectively
+pushing current out of the ADC input pin?  Assumption being that
+this causes an appropriate voltage across a component between there
+and 0V?
 
-this patch drops CMD13 when doing speed mode switch, if host do not
-support MMC_CAP_WAIT_WHILE_BUSY and there is no ops->card_busy(),
-then the only way is to wait a fixed timeout.
+I wonder if we are better off not treating these as regulators at
+all - whilst you could in theory use them for general purposes, it
+would be a bit nuts and sometimes the 'it is nuts argument' is
+enough to mean we don't support something :)
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/core/mmc.c     |   82 ++++++++++++++++----------------------------
- drivers/mmc/core/mmc_ops.c |   25 +++++++++-----
- 2 files changed, 45 insertions(+), 62 deletions(-)
+I wouldn't have any problem with an additional attribute for the
+adc channels - maybe something like...
 
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 4dbe3df..03ee7a4 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -962,7 +962,7 @@ static int mmc_select_hs(struct mmc_card *card)
- 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
- 			   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS,
- 			   card->ext_csd.generic_cmd6_time,
--			   true, true, true);
-+			   true, false, true);
- 	if (!err)
- 		mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
- 
-@@ -1056,7 +1056,6 @@ static int mmc_switch_status(struct mmc_card *card)
- static int mmc_select_hs400(struct mmc_card *card)
- {
- 	struct mmc_host *host = card->host;
--	bool send_status = true;
- 	unsigned int max_dtr;
- 	int err = 0;
- 	u8 val;
-@@ -1068,9 +1067,6 @@ static int mmc_select_hs400(struct mmc_card *card)
- 	      host->ios.bus_width == MMC_BUS_WIDTH_8))
- 		return 0;
- 
--	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
--		send_status = false;
--
- 	/* Reduce frequency to HS frequency */
- 	max_dtr = card->ext_csd.hs_max_dtr;
- 	mmc_set_clock(host, max_dtr);
-@@ -1080,7 +1076,7 @@ static int mmc_select_hs400(struct mmc_card *card)
- 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
- 			   EXT_CSD_HS_TIMING, val,
- 			   card->ext_csd.generic_cmd6_time,
--			   true, send_status, true);
-+			   true, false, true);
- 	if (err) {
- 		pr_err("%s: switch to high-speed from hs200 failed, err:%d\n",
- 			mmc_hostname(host), err);
-@@ -1090,11 +1086,9 @@ static int mmc_select_hs400(struct mmc_card *card)
- 	/* Set host controller to HS timing */
- 	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
- 
--	if (!send_status) {
--		err = mmc_switch_status(card);
--		if (err)
--			goto out_err;
--	}
-+	err = mmc_switch_status(card);
-+	if (err)
-+		goto out_err;
- 
- 	/* Switch card to DDR */
- 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-@@ -1113,7 +1107,7 @@ static int mmc_select_hs400(struct mmc_card *card)
- 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
- 			   EXT_CSD_HS_TIMING, val,
- 			   card->ext_csd.generic_cmd6_time,
--			   true, send_status, true);
-+			   true, false, true);
- 	if (err) {
- 		pr_err("%s: switch to hs400 failed, err:%d\n",
- 			 mmc_hostname(host), err);
-@@ -1124,11 +1118,9 @@ static int mmc_select_hs400(struct mmc_card *card)
- 	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
- 	mmc_set_bus_speed(card);
- 
--	if (!send_status) {
--		err = mmc_switch_status(card);
--		if (err)
--			goto out_err;
--	}
-+	err = mmc_switch_status(card);
-+	if (err)
-+		goto out_err;
- 
- 	return 0;
- 
-@@ -1146,14 +1138,10 @@ int mmc_hs200_to_hs400(struct mmc_card *card)
- int mmc_hs400_to_hs200(struct mmc_card *card)
- {
- 	struct mmc_host *host = card->host;
--	bool send_status = true;
- 	unsigned int max_dtr;
- 	int err;
- 	u8 val;
- 
--	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
--		send_status = false;
--
- 	/* Reduce frequency to HS */
- 	max_dtr = card->ext_csd.hs_max_dtr;
- 	mmc_set_clock(host, max_dtr);
-@@ -1162,49 +1150,43 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
- 	val = EXT_CSD_TIMING_HS;
- 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
- 			   val, card->ext_csd.generic_cmd6_time,
--			   true, send_status, true);
-+			   true, false, true);
- 	if (err)
- 		goto out_err;
- 
- 	mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
- 
--	if (!send_status) {
--		err = mmc_switch_status(card);
--		if (err)
--			goto out_err;
--	}
-+	err = mmc_switch_status(card);
-+	if (err)
-+		goto out_err;
- 
- 	/* Switch HS DDR to HS */
- 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
- 			   EXT_CSD_BUS_WIDTH_8, card->ext_csd.generic_cmd6_time,
--			   true, send_status, true);
-+			   true, false, true);
- 	if (err)
- 		goto out_err;
- 
- 	mmc_set_timing(host, MMC_TIMING_MMC_HS);
- 
--	if (!send_status) {
--		err = mmc_switch_status(card);
--		if (err)
--			goto out_err;
--	}
-+	err = mmc_switch_status(card);
-+	if (err)
-+		goto out_err;
- 
- 	/* Switch HS to HS200 */
- 	val = EXT_CSD_TIMING_HS200 |
- 	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
- 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
- 			   val, card->ext_csd.generic_cmd6_time, true,
--			   send_status, true);
-+			   false, true);
- 	if (err)
- 		goto out_err;
- 
- 	mmc_set_timing(host, MMC_TIMING_MMC_HS200);
- 
--	if (!send_status) {
--		err = mmc_switch_status(card);
--		if (err)
--			goto out_err;
--	}
-+	err = mmc_switch_status(card);
-+	if (err)
-+		goto out_err;
- 
- 	mmc_set_bus_speed(card);
- 
-@@ -1243,7 +1225,6 @@ static void mmc_select_driver_type(struct mmc_card *card)
- static int mmc_select_hs200(struct mmc_card *card)
- {
- 	struct mmc_host *host = card->host;
--	bool send_status = true;
- 	unsigned int old_timing;
- 	int err = -EINVAL;
- 	u8 val;
-@@ -1260,9 +1241,6 @@ static int mmc_select_hs200(struct mmc_card *card)
- 
- 	mmc_select_driver_type(card);
- 
--	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
--		send_status = false;
--
- 	/*
- 	 * Set the bus width(4 or 8) with host's support and
- 	 * switch to HS200 mode if bus width is set successfully.
-@@ -1274,20 +1252,18 @@ static int mmc_select_hs200(struct mmc_card *card)
- 		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
- 				   EXT_CSD_HS_TIMING, val,
- 				   card->ext_csd.generic_cmd6_time,
--				   true, send_status, true);
-+				   true, false, true);
- 		if (err)
- 			goto err;
- 		old_timing = host->ios.timing;
- 		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
--		if (!send_status) {
--			err = mmc_switch_status(card);
--			/*
--			 * mmc_select_timing() assumes timing has not changed if
--			 * it is a switch error.
--			 */
--			if (err == -EBADMSG)
--				mmc_set_timing(host, old_timing);
--		}
-+		err = mmc_switch_status(card);
-+		/*
-+		 * mmc_select_timing() assumes timing has not changed if
-+		 * it is a switch error.
-+		 */
-+		if (err == -EBADMSG)
-+			mmc_set_timing(host, old_timing);
- 	}
- err:
- 	if (err)
-diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-index 62355bd..32de144 100644
---- a/drivers/mmc/core/mmc_ops.c
-+++ b/drivers/mmc/core/mmc_ops.c
-@@ -480,6 +480,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- 	u32 status = 0;
- 	bool use_r1b_resp = use_busy_signal;
- 	bool expired = false;
-+	bool busy = false;
- 
- 	mmc_retune_hold(host);
- 
-@@ -535,19 +536,24 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- 	/* Must check status to be sure of no errors. */
- 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
- 	do {
-+		/*
-+		 * Due to the possibility of being preempted after
-+		 * sending the status command, check the expiration
-+		 * time first.
-+		 */
-+		expired = time_after(jiffies, timeout);
- 		if (send_status) {
--			/*
--			 * Due to the possibility of being preempted after
--			 * sending the status command, check the expiration
--			 * time first.
--			 */
--			expired = time_after(jiffies, timeout);
- 			err = __mmc_send_status(card, &status, ignore_crc);
- 			if (err)
- 				goto out;
- 		}
- 		if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
- 			break;
-+		if (host->ops->card_busy) {
-+			if (!host->ops->card_busy(host))
-+				break;
-+			busy = true;
-+		}
- 		if (mmc_host_is_spi(host))
- 			break;
- 
-@@ -556,19 +562,20 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- 		 * does'nt support MMC_CAP_WAIT_WHILE_BUSY, then we can only
- 		 * rely on waiting for the stated timeout to be sufficient.
- 		 */
--		if (!send_status) {
-+		if (!send_status && !host->ops->card_busy) {
- 			mmc_delay(timeout_ms);
- 			goto out;
- 		}
- 
- 		/* Timeout if the device never leaves the program state. */
--		if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
-+		if (expired &&
-+		    (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy)) {
- 			pr_err("%s: Card stuck in programming state! %s\n",
- 				mmc_hostname(host), __func__);
- 			err = -ETIMEDOUT;
- 			goto out;
- 		}
--	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
-+	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy);
- 
- 	err = mmc_switch_status_error(host, status);
- out:
--- 
-1.7.9.5
+in_voltage6_sourcecurrent?  Then the control could be pushed to
+userspace. 
+
+Or if it only makes sense to do it as a fixed value in DT then
+define optional child nodes for the individual channels, with
+the relevant ones have current-source-microamp or
+something like that as an parameter.
+
+What do you think?
+
+Jonathan
+
+> 
+>>>      };
+>>>
+>>>  Example for i.MX28 SoC:
+>>> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
+>>>          fsl,ave-ctrl = <4>;
+>>>          fsl,ave-delay = <2>;
+>>>          fsl,settling = <10>;
+>>> +
+>>> +        isrc_lradc0: ISRC0 {
+>>> +            regulator-max-microamp = <300>;
+>>> +        };
+>>> +
+>>> +        isrc_lradc6: ISRC1 {
+>>> +            regulator-max-microamp = <120>;
+>>> +            regulator-min-microamp = <120>;
+>>> +            regulator-always-on;
+>>> +        };
+>>>      };
+>>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>>> index 5937030..1968d1c 100644
+>>> --- a/drivers/iio/adc/Kconfig
+>>> +++ b/drivers/iio/adc/Kconfig
+>>> @@ -319,6 +319,7 @@ config MXS_LRADC
+>>>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>>>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+>>>          depends on INPUT
+>>> +        depends on REGULATOR
+>>
+>> Any chance to avoid this dependency for an optional feature?
+> 
+> I haven't looked into it yet, but I expect that that the mfd
+> conversion will avoid this neatly.
+> 
+> Thanks,
+> Harald
+> 
+>> Stefan
+>>
+>>>          select STMP_DEVICE
+>>>          select IIO_BUFFER
+>>>          select IIO_TRIGGERED_BUFFER
+> 
