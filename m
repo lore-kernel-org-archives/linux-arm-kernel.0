@@ -1,38 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  4 May 2016 18:43:48 -0300
-Subject: [PATCH v2 2/2] ARM: dts: imx6ul-14x14-evk: Pass "fsl,
- sai-mclk-direction-output"
-In-Reply-To: <1462398228-24447-1-git-send-email-festevam@gmail.com>
-References: <1462398228-24447-1-git-send-email-festevam@gmail.com>
-Message-ID: <1462398228-24447-2-git-send-email-festevam@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 5 May 2016 00:49:49 +0300
+Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <57289C75.50904@huawei.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1554541.oDP7Ro5zB2@wuerfel>
+ <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
+ <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
+ <57289C75.50904@huawei.com>
+Message-ID: <20160504214949.GA28217@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, May 03, 2016 at 08:41:25PM +0800, Zhangjian (Bamvor) wrote:
+> Hi, all
+> 
+> After apply this patch with my small testcase, the vsyscall of gettimeofday in
+> ilp32 works in both big endian and small endian. In this patch, I use the
+> different register and offset for ilp32 and lp64. Actually, the
+> COMPAT_TVAL_TV_SEC is same as TVAL_TV_SEC(so as to COMPAT_TSPEC_TV_SEC and
+> TSPEC_TV_SEC). I add it to keep the logic clear. I also change the version
+> of vdso to 4.6. It should change to 2.6.39 if glibc is not update.
+> 
 
-Pass "fsl,sai-mclk-direction-output" to the sai2 node, so that the
-SAI2_MCLK can be an output.
+[...]
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Drop gpr node
-- Use "fsl,sai-mclk-direction-output"
+Hi Bamvor,
 
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 1 +
- 1 file changed, 1 insertion(+)
+It works for me as well. Thank you.
+I'll incorporate it in next submission.
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index 668a729..918c7c8 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -146,6 +146,7 @@
- 			  <&clks IMX6UL_CLK_SAI2>;
- 	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
- 	assigned-clock-rates = <0>, <12288000>;
-+	fsl,sai-mclk-direction-output;
- 	status = "okay";
- };
- 
--- 
-1.9.1
+Yury.
