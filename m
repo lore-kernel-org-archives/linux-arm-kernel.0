@@ -1,199 +1,226 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 4 May 2016 13:29:25 +0200
-Subject: [PATCH v8 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 3/3: vfio changes
-In-Reply-To: <43c26d74c99f40d4b85347c71aa37b1d@IL-EXCH02.marvell.com>
-References: <1461832118-5668-1-git-send-email-eric.auger@linaro.org>
- <43c26d74c99f40d4b85347c71aa37b1d@IL-EXCH02.marvell.com>
-Message-ID: <5729DD15.1010509@linaro.org>
+From: harald@ccbib.org (Harald Geyer)
+Date: Wed, 04 May 2016 13:38:25 +0200
+Subject: [PATCH 1/3] iio: mxs-lradc: Add regulators for current sources
+In-Reply-To: <1e7d5f3a-22c1-94d4-9620-7aa112602e39@kernel.org>
+References: <1461333147-11873-1-git-send-email-harald@ccbib.org>
+ <1461333147-11873-2-git-send-email-harald@ccbib.org>
+ <57288674.9050601@i2se.com> <6cdd4f858dacf72e192a292f29c12feb@ccbib.org>
+ <1e7d5f3a-22c1-94d4-9620-7aa112602e39@kernel.org>
+Message-ID: <0e2b0d54b37d5c780b7b81b64b4e9743@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yehuda,
-On 05/04/2016 01:17 PM, Yehuda Yitschak wrote:
-> 
-> Tested-by: Yehuda Yitschak <yehuday@marvell.com>
-Many thanks for the T-b!
+On 04.05.2016 09:15, Jonathan Cameron wrote:
+> On 03/05/16 12:22, Harald Geyer wrote:
+>> On 03.05.2016 13:07, Stefan Wahren wrote:
+>>> Am 22.04.2016 um 15:52 schrieb Harald Geyer:
+>>>> The hardware has two current sources ISRC0 and ISRC1 to allow 
+>>>> measuring
+>>>> resistors without additional circuitry. This commit makes them 
+>>>> available
+>>>> as regulators.
+>>>>
+>>>> Tested on an imx233-olinuxino board.
+>>>>
+>>>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+>>>> ---
+>>>> The current regulator API doesn't fit this type of device very 
+>>>> well: Typically
+>>>> consumers will want to set a defined current, ie. min_uA == 
+>>>> max_uA, but they
+>>>> can't without help from configuration data, because the valid 
+>>>> values aren't
+>>>> reported by the API for current regulators. I have been thinking 
+>>>> about
+>>>> extending the API, but currently AFAIK no such consumers exist and 
+>>>> most
+>>>> users, like myself, will force the regulator to a defined value in
+>>>> devicetree anyway.
+>>>>
+>>>>  .../bindings/staging/iio/adc/mxs-lradc.txt         |  29 ++++
+>>>>  drivers/iio/adc/Kconfig                            |   1 +
+>>>>  drivers/iio/adc/mxs-lradc.c                        | 152 
+>>>> +++++++++++++++++++++
+>>>>  3 files changed, 182 insertions(+)
+>>>>
+>>>> diff --git 
+>>>> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt 
+>>>> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>>> index 555fb11..983952c 100644
+>>>> --- 
+>>>> a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>>> +++ 
+>>>> b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+>>>> @@ -19,6 +19,15 @@ Optional properties:
+>>>>  - fsl,settling: delay between plate switch to next sample. 
+>>>> Allowed value is
+>>>>                  1 ... 2047. It counts at 2 kHz and its default is
+>>>>                  10 (= 5 ms)
+>>>> +- ISRC0: A node describing the regulator of internal current 
+>>>> source 0
+>>>> +- ISRC1: A node describing the regulator of internal current 
+>>>> source 1
+>>>> +
+>>>> +Required properties for the ISRCx sub-nodes:
+>>>> +- regulator-max-microamp: See standard regulator binding 
+>>>> documentation.
+>>>> +                          Valid values are from 0 to 300 in steps 
+>>>> of 20.
+>>>> +
+>>>> +Optional properties for the ISRCx sub-nodes:
+>>>> +Any standard regulator properties that apply to current 
+>>>> regulators.
+>>>>
+>>>>  Example for i.MX23 SoC:
+>>>>
+>>>> @@ -31,6 +40,16 @@ Example for i.MX23 SoC:
+>>>>          fsl,ave-ctrl = <4>;
+>>>>          fsl,ave-delay = <2>;
+>>>>          fsl,settling = <10>;
+>>>> +
+>>>> +        isrc_lradc0: ISRC0 {
+>>>> +            regulator-max-microamp = <300>;
+>>>> +        };
+>>>> +
+>>>> +        isrc_lradc1: ISRC1 {
+>>>> +            regulator-max-microamp = <120>;
+>>>> +            regulator-min-microamp = <120>;
+>>>> +            regulator-always-on;
+>>>> +        };
+>>>
+>>> IMHO the binding should represent the direct connection between the
+>>> current source and the physical channel. I think a node label isn't
+>>> enough. Unfortunately i don't have an idea to do it the "right 
+>>> way".
+>>
+>> I strictly followed the names of the data sheet here: imx23 and 
+>> imx28
+>> reference manuals both call the current sources ISRC0 and ISRC1 even
+>> if they are attached to different channels of the ADC. I think
+>> inventing some ISRC6 for imx28 would do more harm then good.
+> So just to check... These two current sources are effectively
+> pushing current out of the ADC input pin?  Assumption being that
+> this causes an appropriate voltage across a component between there
+> and 0V?
 
-I'am about to submit a small update on part I & III today (v9), taking
-into account Alex' last comments. MSI layer part (II) is left unchanged
-(v8).
+Exactly.
 
-The way I am going to report the need for MSI mapping on user-side
-changes and I will respin the QEMU part accordingly. Besides, this info
-was not yet used in the QEMU integration.
+> I wonder if we are better off not treating these as regulators at
+> all - whilst you could in theory use them for general purposes, it
+> would be a bit nuts and sometimes the 'it is nuts argument' is
+> enough to mean we don't support something :)
 
-Best Regards
+Yeah, it would be some funny 4-bit DAC ...
 
-Eric
-> 
-> Tested on Armada-7040 using an intel IXGBE (82599ES). 
-> 
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Eric Auger
->> Sent: Thursday, April 28, 2016 11:29
->> To: eric.auger at st.com; eric.auger at linaro.org; robin.murphy at arm.com;
->> alex.williamson at redhat.com; will.deacon at arm.com; joro at 8bytes.org;
->> tglx at linutronix.de; jason at lakedaemon.net; marc.zyngier at arm.com;
->> christoffer.dall at linaro.org; linux-arm-kernel at lists.infradead.org
->> Cc: julien.grall at arm.com; patches at linaro.org; Jean-
->> Philippe.Brucker at arm.com; p.fedin at samsung.com; linux-
->> kernel at vger.kernel.org; Bharat.Bhushan at freescale.com;
->> iommu at lists.linux-foundation.org; pranav.sawargaonkar at gmail.com
->> Subject: [PATCH v8 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
->> part 3/3: vfio changes
+> I wouldn't have any problem with an additional attribute for the
+> adc channels - maybe something like...
+>
+> in_voltage6_sourcecurrent?  Then the control could be pushed to
+> userspace.
+
+I'm very open to that idea. Not having yet an other subsystem
+involved would simplify some things a lot.
+
+> Or if it only makes sense to do it as a fixed value in DT then
+> define optional child nodes for the individual channels, with
+> the relevant ones have current-source-microamp or
+> something like that as an parameter.
+
+My research in thermistors is still ongoing (so I don't have
+a kernel driver yet) but I think for thermistors with
+exponential temperature dependence dynamic setting of the
+current source will be necessary to get high resolution across
+the whole temperature range.
+
+Of course many applications wont need this. For checks like
+"Is my battery over-heating?" a simple fixed current from DT
+will to well, so I guess we should support both.
+
+> What do you think?
+
+As I already stated in an other subthread, I'm not entirely
+happy with the regulator approach. Having everything inside
+iio would make supporting complex use cases easier in the
+future, I guess.
+
+Also IIO devices are much easier to control from user space
+then regulators, which might be desired for this type of
+device.
+
+OTOH I'm not sure how many other devices out there have a
+similar feature. I'd rather not invent a new API for just
+very few devices. IMO iio already suffers from the
+complexity of the sysfs API. Maybe somebody with a good
+overview of ADCs available on the market can provide some
+input here.
+
+Also of course there are lots of ADCs out there without
+internal current source and those could be used with
+thermistors too but would need a regulator anyway.
+So maybe eventually we would end up with both solutions
+supported, which I'd avoid if at all possible. (I guess
+we could work around the last issue by providing some
+generic driver to pull an iio channel and a regulator
+together - do we like that level of abstraction?)
+
+If we start our own API to control current sources we
+might end up pretty much reimplementing the regulator
+API for the single consumer case.
+
+I'd like to have input from more people on the above
+points before going one way or the other.
+
+Thanks,
+Harald
+
+> Jonathan
+>
 >>
->> This series allows the user-space to register a reserved IOVA domain.
->> This completes the kernel integration of the whole functionality on top of
->> part 1 & 2.
+>>>>      };
+>>>>
+>>>>  Example for i.MX28 SoC:
+>>>> @@ -44,4 +63,14 @@ Example for i.MX28 SoC:
+>>>>          fsl,ave-ctrl = <4>;
+>>>>          fsl,ave-delay = <2>;
+>>>>          fsl,settling = <10>;
+>>>> +
+>>>> +        isrc_lradc0: ISRC0 {
+>>>> +            regulator-max-microamp = <300>;
+>>>> +        };
+>>>> +
+>>>> +        isrc_lradc6: ISRC1 {
+>>>> +            regulator-max-microamp = <120>;
+>>>> +            regulator-min-microamp = <120>;
+>>>> +            regulator-always-on;
+>>>> +        };
+>>>>      };
+>>>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>>>> index 5937030..1968d1c 100644
+>>>> --- a/drivers/iio/adc/Kconfig
+>>>> +++ b/drivers/iio/adc/Kconfig
+>>>> @@ -319,6 +319,7 @@ config MXS_LRADC
+>>>>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>>>>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+>>>>          depends on INPUT
+>>>> +        depends on REGULATOR
+>>>
+>>> Any chance to avoid this dependency for an optional feature?
 >>
->> It also depends on [PATCH 1/3] iommu: Add MMIO mapping type series,
->> http://comments.gmane.org/gmane.linux.kernel.iommu/12869
+>> I haven't looked into it yet, but I expect that that the mfd
+>> conversion will avoid this neatly.
 >>
->> We reuse the VFIO DMA MAP ioctl with a new flag to bridge to the msi-
->> iommu API. The need for provisioning such MSI IOVA range is reported
->> through the VFIO_IOMMU_GET_INFO iotcl.
+>> Thanks,
+>> Harald
 >>
->> vfio_iommu_type1 checks if the MSI mapping is safe when attaching the vfio
->> group to the container (allow_unsafe_interrupts modality).
+>>> Stefan
+>>>
+>>>>          select STMP_DEVICE
+>>>>          select IIO_BUFFER
+>>>>          select IIO_TRIGGERED_BUFFER
 >>
->> On ARM/ARM64, the IOMMU does not astract IRQ remapping. the modality
->> is abstracted on MSI controller side. The GICv3 ITS is the first controller
->> advertising the modality.
->>
->> More details & context can be found at:
->> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-
->> armarm64/
->>
->> Best Regards
->>
->> Eric
->>
->> Testing:
->> - functional on ARM64 AMD Overdrive HW (single GICv2m frame) with
->>   Intel X540-T2 (SR-IOV capable)
->> - Not tested: ARM GICv3 ITS
->>
->> References:
->> [1] [RFC 0/2] VFIO: Add virtual MSI doorbell support
->>     (https://lkml.org/lkml/2015/7/24/135)
->> [2] [RFC PATCH 0/6] vfio: Add interface to map MSI pages
->>     (https://lists.cs.columbia.edu/pipermail/kvmarm/2015-
->> September/016607.html)
->> [3] [PATCH v2 0/3] Introduce MSI hardware mapping for VFIO
->>
->> (http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/3858)
->>
->> Git: complete series available at
->> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-
->> rc5-pcie-passthrough-v8
->>
->> previous version at
->> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-
->> rc4-pcie-passthrough-v7
->>
->> QEMU Integration:
->> [RFC v2 0/8] KVM PCI/MSI passthrough with mach-virt
->> (http://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00444.html)
->> https://git.linaro.org/people/eric.auger/qemu.git/shortlog/refs/heads/v2.5.
->> 0-pci-passthrough-rfc-v2
->>
->> History:
->> v7 -> v8:
->> - use renamed msi-iommu API
->> - VFIO only responsible for setting the IOVA aperture
->> - use new DOMAIN_ATTR_MSI_GEOMETRY iommu domain attribute
->>
->> v6 -> v7:
->> - vfio_find_dma now accepts a dma_type argument.
->> - should have recovered the capability to unmap the whole user IOVA range
->> - remove computation of nb IOVA pages -> will post a separate RFC for that
->>   while respinning the QEMU part
->>
->> RFC v5 -> patch v6:
->> - split to ease the review process
->>
->> RFC v4 -> RFC v5:
->> - take into account Thomas' comments on MSI related patches
->>   - split "msi: IOMMU map the doorbell address when needed"
->>   - increase readability and add comments
->>   - fix style issues
->>  - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
->>  - platform ITS now advertises IOMMU_CAP_INTR_REMAP
->>  - fix compilation issue with CONFIG_IOMMU API unset
->>  - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
->>
->> RFC v3 -> v4:
->> - Move doorbell mapping/unmapping in msi.c
->> - fix ref count issue on set_affinity: in case of a change in the address
->>   the previous address is decremented
->> - doorbell map/unmap now is done on msi composition. Should allow the use
->>   case for platform MSI controllers
->> - create dma-reserved-iommu.h/c exposing/implementing a new API
->> dedicated
->>   to reserved IOVA management (looking like dma-iommu glue)
->> - series reordering to ease the review:
->>   - first part is related to IOMMU
->>   - second related to MSI sub-system
->>   - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP
->> removal)
->> - expose the number of requested IOVA pages through
->> VFIO_IOMMU_GET_INFO
->>   [this partially addresses Marc's comments on
->> iommu_get/put_single_reserved
->>    size/alignment problematic - which I did not ignore - but I don't know
->>    how much I can do at the moment]
->>
->> RFC v2 -> RFC v3:
->> - should fix wrong handling of some CONFIG combinations:
->>   CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
->> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
->>
->> PATCH v1 -> RFC v2:
->> - reverted to RFC since it looks more reasonable ;-) the code is split
->>   between VFIO, IOMMU, MSI controller and I am not sure I did the right
->>   choices. Also API need to be further discussed.
->> - iova API usage in arm-smmu.c.
->> - MSI controller natively programs the MSI addr with either the PA or IOVA.
->>   This is not done anymore in vfio-pci driver as suggested by Alex.
->> - check irq remapping capability of the group
->>
->> RFC v1 [2] -> PATCH v1:
->> - use the existing dma map/unmap ioctl interface with a flag to register a
->>   reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
->> - a single reserved IOVA contiguous region now is allowed
->> - use of an RB tree indexed by PA to store allocated reserved slots
->> - use of a vfio_domain iova_domain to manage iova allocation within the
->>   window provided by the userspace
->> - vfio alloc_map/unmap_free take a vfio_group handle
->> - vfio_group handle is cached in vfio_pci_device
->> - add ref counting to bindings
->> - user modality enabled at the end of the series
->>
->>
->> Eric Auger (7):
->>   vfio: introduce a vfio_dma type field
->>   vfio/type1: vfio_find_dma accepting a type argument
->>   vfio/type1: bypass unmap/unpin and replay for VFIO_IOVA_RESERVED slots
->>   vfio: allow reserved msi iova registration
->>   vfio/type1: also check IRQ remapping capability at msi domain
->>   iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
->>   vfio/type1: return MSI mapping requirements with
->> VFIO_IOMMU_GET_INFO
->>
->>  drivers/iommu/arm-smmu-v3.c     |   3 +-
->>  drivers/iommu/arm-smmu.c        |   3 +-
->>  drivers/vfio/vfio_iommu_type1.c | 227
->> +++++++++++++++++++++++++++++++++++++---
->>  include/uapi/linux/vfio.h       |  14 ++-
->>  4 files changed, 230 insertions(+), 17 deletions(-)
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+If you want to support my work:
+see http://friends.ccbib.org/harald/supporting/
+or donate via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
+or bitcoin 1FUtd8T9jRN1rFz63vZz7s2fDtB6d6A7aS
