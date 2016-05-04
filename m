@@ -1,47 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 May 2016 14:46:42 +0100
-Subject: [PATCH] perf/core / arm_pmu: special-case hetereogeneous CPUs
-In-Reply-To: <20160504134419.GA15849@leverpostej>
-References: <20160425175837.GB3141@leverpostej>
- <20160425190334.GK3448@twins.programming.kicks-ass.net>
- <20160426103346.GA20836@leverpostej>
- <20160504134419.GA15849@leverpostej>
-Message-ID: <20160504134641.GB31744@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 May 2016 08:47:03 -0500
+Subject: [PATCH v8 4/9] pwm: pwm-tiecap: Update dt binding document to
+ use proper unit address
+In-Reply-To: <1462291015-1919-5-git-send-email-fcooper@ti.com>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+ <1462291015-1919-5-git-send-email-fcooper@ti.com>
+Message-ID: <20160504134703.GA4194@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2016 at 02:44:20PM +0100, Mark Rutland wrote:
-> Hi,
+On Tue, May 03, 2016 at 10:56:50AM -0500, Franklin S Cooper Jr wrote:
+> Replace unit address from 0 to the proper physical address. Also insure
+> that the unit address matches the reg property address.
 > 
-> On Tue, Apr 26, 2016 at 11:33:46AM +0100, Mark Rutland wrote:
-> > On Mon, Apr 25, 2016 at 09:03:34PM +0200, Peter Zijlstra wrote:
-> > > On Mon, Apr 25, 2016 at 06:58:37PM +0100, Mark Rutland wrote:
-> > > > Hi,
-> > > > 
-> > > > When booting an arm64 defconfig linux-next (next-20160422) on an ARM
-> > > > Juno system, I hit a WARN_ON_ONCE in perf_pmu_register (see backtrace at
-> > > > the end of this email).
-> > > > 
-> > > > This was introduced by commit 26657848502b7847 ("perf/core: Verify we
-> > > > have a single perf_hw_context PMU") where we forcefully prevent multiple
-> > > > PMUs from sharing perf_hw_context (with a warning), and force additional
-> > > > PMUs to use perf_invalid_context.
-> > 
-> > > > Are you happy to revert 26657848502b787 for the timebeing? Or to somehow
-> > > > predicate the check such that it doesn't adversely affect those HW PMUs?
-> > > 
-> > > I'm happy with a chicken bit for now, its already found two real issues,
-> > > so I'd like to keep it.
-> > 
-> > Ok, how about the below? (based on next-20160422).
-> 
-> Peter, any thoughts?
-> 
-> This is still an issue for us in next-20160504 (to which the patch still
-> applies).
-> 
-> Will, I assume that you're ok with the change to drivers/perf/arm_pmu.c.
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Yes, they're pretty straighforward.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Will
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> index 788da6c..0d47354 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> @@ -16,22 +16,22 @@ Optional properties:
+>  
+>  Example:
+>  
+> -ecap0: ecap at 0 { /* ECAP on am33xx */
+> +ecap0: ecap at 48300100 { /* ECAP on am33xx */
+>  	compatible = "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+>  	reg = <0x48300100 0x80>;
+>  	ti,hwmods = "ecap0";
+>  };
+>  
+> -ecap0: ecap at 0 { /* ECAP on am4372 */
+> +ecap0: ecap at 48300100 { /* ECAP on am4372 */
+>  	compatible = "ti,am4372-ecap", "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+>  	reg = <0x48300100 0x80>;
+>  	ti,hwmods = "ecap0";
+>  };
+>  
+> -ecap0: ecap at 0 { /* ECAP on da850 */
+> +ecap0: ecap at 1f06000 { /* ECAP on da850 */
+>  	compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+>  	#pwm-cells = <3>;
+> -	reg = <0x306000 0x80>;
+> +	reg = <0x1f06000 0x80>;
+>  };
+> -- 
+> 2.7.0
+> 
