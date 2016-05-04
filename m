@@ -1,62 +1,32 @@
-From: pinskia@gmail.com (Andrew Pinski)
-Date: Wed, 4 May 2016 16:23:13 -0700
-Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <20160504214949.GA28217@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1554541.oDP7Ro5zB2@wuerfel>
- <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
- <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
- <57289C75.50904@huawei.com> <20160504214949.GA28217@yury-N73SV>
-Message-ID: <CA+=Sn1ngpaJWHpGDmU+kXBkz56SO+XDW2qzMMLAbbBWnaB0eqw@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed,  4 May 2016 16:36:25 -0700
+Subject: [PATCH] clk: rockchip: fix the rk3399 sdmmc sample / drv name
+Message-ID: <1462404985-27957-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 4, 2016 at 2:49 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> On Tue, May 03, 2016 at 08:41:25PM +0800, Zhangjian (Bamvor) wrote:
->> Hi, all
->>
->> After apply this patch with my small testcase, the vsyscall of gettimeofday in
->> ilp32 works in both big endian and small endian. In this patch, I use the
->> different register and offset for ilp32 and lp64. Actually, the
->> COMPAT_TVAL_TV_SEC is same as TVAL_TV_SEC(so as to COMPAT_TSPEC_TV_SEC and
->> TSPEC_TV_SEC). I add it to keep the logic clear. I also change the version
->> of vdso to 4.6. It should change to 2.6.39 if glibc is not update.
->>
->
-> [...]
->
-> Hi Bamvor,
->
-> It works for me as well. Thank you.
-> I'll incorporate it in next submission.
+The rk3399 clock table had a simple typo in it, calling the SDMMC sample
+and drive clocks by the wrong name.  Fix this minor typo.
 
-We should add the following so we are complaint to the ILP32 ABI
-dealing with pointers don't have to be zero extended for arguments,
-Note ZERO should most likely be ZERO_PTR or something to do that
-effect, I am not so good with names.
-#ifdef __LP64__
-#define ZERO(n)
-#else
-#define ZERO(n)         mov     w##n, w##n
-#endif
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-...
-ENTRY(__kernel_gettimeofday)
-        .cfi_startproc
-        ZERO(0)
-        ZERO(1)
-...
-ENTRY(__kernel_clock_gettime)
-        .cfi_startproc
-        ZERO(1)
-...
-ENTRY(__kernel_clock_getres)
-        .cfi_startproc
-        ZERO(1)
-
-Thanks,
-Andrew Pinski
-
->
-> Yury.
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 5248726af86d..291543f52caa 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -894,8 +894,8 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKSEL_CON(16), 8, 3, MFLAGS, 0, 7, DFLAGS,
+ 			RK3399_CLKGATE_CON(6), 1, GFLAGS),
+ 
+-	MMC(SCLK_SDMMC_DRV,     "emmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
+-	MMC(SCLK_SDMMC_SAMPLE,  "emmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
++	MMC(SCLK_SDMMC_DRV,     "sdmmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
++	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
+ 
+ 	MMC(SCLK_SDIO_DRV,      "sdio_drv",    "clk_sdio",  RK3399_SDIO_CON0,  1),
+ 	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  1),
+-- 
+2.8.0.rc3.226.g39d4020
