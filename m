@@ -1,92 +1,183 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Sun, 8 May 2016 15:16:29 +0100
-Subject: NFSroot hangs with bad unlock balance in Linux next
-In-Reply-To: <20160505220344.GE5995@atomide.com>
-References: <20160505220344.GE5995@atomide.com>
-Message-ID: <20160508141629.GF2694@ZenIV.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 4 May 2016 11:35:55 +0200
+Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
+References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20160503164019.GA1604@rob-hp-laptop>
+ <20160503185153.5cfddc32@bbrezillon>
+ <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
+Message-ID: <20160504113555.20f0c622@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 03:03:44PM -0700, Tony Lindgren wrote:
-> Hi,
+Hi Rob,
+
+On Tue, 3 May 2016 14:11:04 -0500
+Rob Herring <robh@kernel.org> wrote:
+
+> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > Hi Rob,
+> >
+> > On Tue, 3 May 2016 11:40:19 -0500
+> > Rob Herring <robh@kernel.org> wrote:
+> >
+> >> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
+> >> > The EBI (External Bus Interface) is used to access external peripherals
+> >> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> >> > Each device is assigned a CS line and an address range and can have its
+> >> > own configuration (timings, access mode, bus width, ...).
+> >> > This driver provides a generic DT binding to configure a device according
+> >> > to its requirements.
+> >> > For specific device controllers (like the NAND one) the SMC timings
+> >> > should be configured by the controller driver through the matrix and smc
+> >> > syscon regmaps.
+> >> >
+> >> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> >> > ---
+> >> >  .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
+> >> >  1 file changed, 136 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> >> > new file mode 100644
+> >> > index 0000000..a6dca5c
+> >> > --- /dev/null
+> >> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+> >> > @@ -0,0 +1,136 @@
+> >> > +* Device tree bindings for Atmel EBI
+> >> > +
+> >> > +The External Bus Interface (EBI) controller is a bus where you can connect
+> >> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+> >> > +The EBI provides a glue-less interface to asynchronous memories through the SMC
+> >> > +(Static Memory Controller).
+> >> > +
+> >> > +Required properties:
+> >> > +
+> >> > +- compatible:              "atmel,at91sam9260-ebi"
+> >> > +                   "atmel,at91sam9261-ebi"
+> >> > +                   "atmel,at91sam9263-ebi0"
+> >> > +                   "atmel,at91sam9263-ebi1"
+> >>
+> >> What are the differences between 0 and 1?
+> >
+> > Because this SoC has 2 EBI busses with different capabilities.
 > 
-> Looks like Linux next with NFSroot hangs for me at some point booting
-> into init. Then after a while it produces "BUG: bad unlock balance
-> detected!".
+> Okay, correct answer. :)
 > 
-> This happens at least with omap5-uevm and igepv5. Not sure yet if it
-> also happens on other boards, the ones I'm seeing it happen both have
-> USB Ethernet controller. They usually hang after the system starts
-> being idle some tens of seconds into booting.
+> [...]
 > 
-> I tried to bisect it down with no luck. I do have the following
-> trace, does that provide any clues?
+> >>
+> >> > +                   of the memory region requested by the device.
+> >> > +
+> >> > +EBI bus configuration associated with specific chip-select will be defined in
+> >> > +the configs subnode. This configs node will in turn contain several subnodes
+> >> > +named config-<cs-id>, each of them containing the following properties.
+> >>
+> >> This is a bit unusual. Why not just part of the child device nodes?
+> >
+> > Oh, come on! I reworked the binding because Mark complained about the
+> > previous binding which was doing exactly what you're suggesting. Can
+> > you please be consistent in your reviews...
+> 
+> No, Mark and I both have our opinions. Which part of this patch
+> explains the history?
 
-> kworker/0:2/112 is trying to release lock (&nfsi->rmdir_sem) at:
-> [<c03a7f98>] nfs_async_unlink_release+0x20/0x68
-> but there are no more locks to release!
+Hm, it's in patch 1/2 (just dropped the cover letter, which might not
+be such a good idea).
 
-Very strange.  We grab that rwsem at the entry into nfs_call_unlink()
-and then either release it there and return or call nfs_do_call_unlink().
-Which arranges for eventual call of nfs_async_unlink_release() (via
-->rpc_release); nfs_async_unlink_release() releases the rwsem.  Nobody else
-releases it (on the read side, that is).
+> If the revision history is not in the patch, I'm
+> not looking at it.
+> 
+> My issue with it this way is that it has invented yet another way to
+> describe timings. I would like to be consistent across external bus
+> descriptions, but we're not very consistent to begin with though. The
+> most common seems to be the way you first did it. But I agree that it
+> is kind of screwy to have an intermediate node unless the controller
+> itself has sub-blocks within it and is not the established way to
+> describe a bus with chip selects. I would either put the properties
+> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
+> in the device node. I'd call it timings instead of config, but that's
+> just bikeshedding.
 
-The only kinda-sorta possibility I see here is that the inode we are
-unlocking in that nfs_async_unlink_release() is not the one we'd locked
-in nfs_call_unlink() that has lead to it.  That really shouldn't happen,
-though...  Just to verify whether that's what we are hitting, could you
-try to reproduce that thing with the patch below on top of -next and see
-if it triggers any of those WARN_ON?
+Well, it's not only describing timings (see atmel,bus-width,
+atmel,byte-access-type, ...), but I'm fine with either names :).
 
-diff --git a/fs/nfs/unlink.c b/fs/nfs/unlink.c
-index d367b06..dbbb4c9 100644
---- a/fs/nfs/unlink.c
-+++ b/fs/nfs/unlink.c
-@@ -64,6 +64,10 @@ static void nfs_async_unlink_release(void *calldata)
- 	struct dentry *dentry = data->dentry;
- 	struct super_block *sb = dentry->d_sb;
- 
-+	if (WARN_ON(data->parent != dentry->d_parent) ||
-+	    WARN_ON(data->parent_inode != dentry->d_parent->d_inode)) {
-+		printk(KERN_ERR "WTF2[%pd4]", dentry);
-+	}
- 	up_read(&NFS_I(d_inode(dentry->d_parent))->rmdir_sem);
- 	d_lookup_done(dentry);
- 	nfs_free_unlinkdata(data);
-@@ -114,7 +118,8 @@ static void nfs_do_call_unlink(struct nfs_unlinkdata *data)
- 
- static int nfs_call_unlink(struct dentry *dentry, struct nfs_unlinkdata *data)
- {
--	struct inode *dir = d_inode(dentry->d_parent);
-+	struct dentry *parent = dentry->d_parent;
-+	struct inode *dir = d_inode(parent);
- 	struct dentry *alias;
- 
- 	down_read(&NFS_I(dir)->rmdir_sem);
-@@ -152,6 +157,12 @@ static int nfs_call_unlink(struct dentry *dentry, struct nfs_unlinkdata *data)
- 		return ret;
- 	}
- 	data->dentry = alias;
-+	data->parent = parent;
-+	data->parent_inode = dir;
-+	if (WARN_ON(parent != alias->d_parent) ||
-+	    WARN_ON(dir != parent->d_inode)) {
-+		printk(KERN_ERR "WTF1[%pd4]", alias);
-+	}
- 	nfs_do_call_unlink(data);
- 	return 1;
- }
-diff --git a/include/linux/nfs_xdr.h b/include/linux/nfs_xdr.h
-index ee8491d..b01a7f1 100644
---- a/include/linux/nfs_xdr.h
-+++ b/include/linux/nfs_xdr.h
-@@ -1471,6 +1471,8 @@ struct nfs_unlinkdata {
- 	struct nfs_removeargs args;
- 	struct nfs_removeres res;
- 	struct dentry *dentry;
-+	struct dentry *parent;
-+	struct inode *parent_inode;
- 	wait_queue_head_t wq;
- 	struct rpc_cred	*cred;
- 	struct nfs_fattr dir_attr;
+> 
+> memory-controller at 1000 {
+>   ...
+>   flash at 0,0 {
+>     timings {
+>       ...
+>     };
+>   };
+> };
+
+Okay. Mark, what do you think of this approach?
+
+Note that one of my previous version was defining timings directly in
+the EBI device node, and Arnd noted that doing so may cause problems
+if one of the EBI property (or the config/timing node name) conflict
+with the sub-device binding, which is why I decided to put the EBI
+config definitions in a separate subnode.
+
+> 
+> >> > +
+> >> > +Optional config-<cs-id> node properties:
+> >> > +
+> >> > +- atmel,bus-width:         width of the asynchronous device's data bus
+> >> > +                           8, 16 or 32.
+> >> > +                           Default to 8 when undefined.
+> >> > +
+> >> > +- atmel,byte-access-type   "write" or "select" (see Atmel datasheet).
+> >> > +                           Default to "select" when undefined.
+> >> > +
+> >> > +- atmel,read-mode          "nrd" or "ncs".
+> >> > +                           Default to "ncs" when undefined.
+> >> > +
+> >> > +- atmel,write-mode         "nwe" or "ncs".
+> >> > +                           Default to "ncs" when undefined.
+> >> > +
+> >> > +- atmel,exnw-mode          "disabled", "frozen" or "ready".
+> >> > +                           Default to "disabled" when undefined.
+> >> > +
+> >> > +- atmel,page-mode          enable page mode if present. The provided value
+> >> > +                           defines the page size (supported values: 4, 8,
+> >> > +                           16 and 32).
+> >> > +
+> >> > +- atmel,tdf-mode:          "normal" or "optimized". When set to
+> >>
+> >> This should be boolean.
+> >
+> > It was a formerly defined as a boolean, and when it's done like that we
+> > have no way to identify whether the property was forgotten or
+> > intentionally set to normal mode. What's the problem with this approach?
+> 
+> Only preference to use boolean when that is sufficient. With your
+> argument, then we should never have booleans. You state that missing
+> means "normal", not forgotten, so all these properties should be
+> required with no default.
+> 
+> BTW, I debated the same thing on the other properties, but I could see
+> them being expanded to a 3rd mode. I don't see that here though.
+
+Well, another reason I switched to a string property is because I
+implemented hardware readout in v4, and decided to retrieve the current
+state from the hardware and only overload the config with what was
+defined in the DT. In this case, if we move to a boolean property we
+can't know whether the property is missing because we want to put the
+bus in "normal" mode or because we want to keep this config unchanged
+(keep the bootloader/bootstrap config).
+
+This is not true in v5, so maybe we should go back to the boolean
+atmel,tdf-optimized property.
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
