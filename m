@@ -1,29 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 May 2016 20:34:17 +0200
-Subject: [PATCH] drm: sun4i: print DMA address correctly
-In-Reply-To: <1462289020-774976-1-git-send-email-arnd@arndb.de>
-References: <1462289020-774976-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160504183417.GF17159@lukather>
+Date: Wed, 4 May 2016 20:35:50 +0200
+Subject: [PATCHv3] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <1462367853-29912-1-git-send-email-oliver@schinagl.nl>
+References: <1462367853-29912-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160504183550.GG17159@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 05:23:28PM +0200, Arnd Bergmann wrote:
-> The newly added sun4i drm driver prints a dma address using the %x
-> format string, which cannot work when dma_addr_t is 64 bit,
-> and gcc warns about this configuration:
+On Wed, May 04, 2016 at 03:17:33PM +0200, Olliver Schinagl wrote:
+> There are 3 kinds of OLinuXino Lime2 boards.
+> One without any on board storage, one with NAND storage and one with
+> eMMC storage. This patch adds the eMMC variant of boards.
 > 
-> drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_update_layer_buffer':
-> drm/sun4i/sun4i_backend.c:193:84: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
->   DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
-> drm/sun4i/sun4i_backend.c:201:84: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
->   DRM_DEBUG_DRIVER("Setting buffer address to 0x%x\n", paddr);
+> eMMC storage is different from a regular SD card in that it is soldered
+> on the board and cannot be changed. Additionally, it shares pins with
+> the NAND module and with the second SPI port.
 > 
-> This changes the code to use the explicit %pad format string, which
-> always prints the right length.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 
-Applied, thanks!
+As a general comment, having a log of the changes helps a lot,
+especially when you roll new versions quiclky.
+
+> ---
+>  .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    | 81 ++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+> new file mode 100644
+> index 0000000..9680fcb
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+> @@ -0,0 +1,81 @@
+> + /*
+> + * Copyright 2015 - Ultimaker B.V.
+> + * Author Olliver Schinagl <oliver@schinagl.nl>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "sun7i-a20-olinuxino-lime2.dts"
+> +
+> +/ {
+> +	model = "Olimex A20-OLinuXino-LIME2-eMMC";
+
+You should have a compatible here too.
+
+Thanks!
 Maxime
 
 -- 
@@ -36,4 +95,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/459377c2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/d5f52f03/attachment.sig>
