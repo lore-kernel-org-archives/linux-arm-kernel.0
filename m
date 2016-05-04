@@ -1,100 +1,57 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 4 May 2016 10:25:47 +0200
-Subject: [PATCH v10 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-In-Reply-To: <1462349987.1891.5.camel@mtksdaap41>
-References: <1462270287-11374-1-git-send-email-tiffany.lin@mediatek.com>
- <5729A57E.1080505@xs4all.nl> <1462349987.1891.5.camel@mtksdaap41>
-Message-ID: <5729B20B.6090006@xs4all.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 May 2016 11:05:03 +0200
+Subject: [PATCH 09/18] ASoC: sti: Update DT example to match the driver
+ code
+In-Reply-To: <5729AA33.6020305@st.com>
+References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
+ <5608365.uloflbeuqO@wuerfel> <5729AA33.6020305@st.com>
+Message-ID: <7856280.FvxMcUZr6e@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/04/2016 10:19 AM, tiffany lin wrote:
-> Hi Hans,
+On Wednesday 04 May 2016 09:52:19 Arnaud Pouliquen wrote:
+> hello Arnd, peter,
 > 
-> On Wed, 2016-05-04 at 09:32 +0200, Hans Verkuil wrote:
->> Hi Tiffany,
->>
->> On 05/03/2016 12:11 PM, Tiffany Lin wrote:
->>> ==============
->>>  Introduction
->>> ==============
->>>
->>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
->>> Mediatek Video Codec is able to handle video encoding of in a range of formats.
->>>
->>> This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
->>> communicate with VPU.
->>>
->>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
->>> This patch series need [PATCH v15 8/8] memory: mtk-smi: export mtk_smi_larb_get/put[1] to build as module
->>>
->>> [1]http://lists.infradead.org/pipermail/linux-mediatek/2016-April/005173.html
->>>
->>> ==================
->>>  Device interface
->>> ==================
->>>
->>> In principle the driver bases on v4l2 memory-to-memory framework:
->>> it provides a single video node and each opened file handle gets its own private context with separate
->>> buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. raw video
->>> frames) and CAPTURE (for destination buffers, i.e. encoded video frames).
->>>
->>> ==============================
->>>  VPU (Video Processor Unit)
->>> ==============================
->>> The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
->>> It is able to handle video decoding/encoding in a range of formats.
->>> The driver provides with VPU firmware download, memory management and the communication interface between CPU and VPU.
->>> For VPU initialization, it will create virtual memory for CPU access and physical address for VPU hw device access. 
->>> When a decode/encode instance opens a device node, vpu driver will download vpu firmware to the device.
->>> A decode/encode instant will decode/encode a frame using VPU interface to interrupt vpu to handle decoding/encoding jobs.
->>>
->>> Please have a look at the code and comments will be very much appreciated.
->>>
->>> Change in v10:
->>> 1. Fix smatch/sparse error message
->>> 2. Add depends on ARM || ARM64 and MTK_IOMMU in Kconfig
->>
->> I don't like the ARM or ARM64 dependency since that makes COMPILE_TEST harder.
->>
->> I removed it here and for the VPU and everything still compiles fine with
->> sparse and smatch. So I'll drop those dependencies.
->>
->> Why is the MTK_IOMMU dependency needed? Just curious.
->>
-> This is because we need MTK_IOMMU module to get dma continuous memory
-> for HW.
-> 
->> Note that sparse still complains about this:
->>
->> media-git/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:261:24: warning: incorrect type in assignment (different base types)
->>
->> I think this code should be rewritten. Something like this would work
->> (if I understand the code correctly):
->>
->> u32 tag = (bs_hdr_len << 5) | 0x10 | not_key;
->>
->> ac_tag[0] = tag & 0xff;
->> ac_tag[1] = (tag >> 8) & 0xff;
->> ac_tag[2] = (tag >> 16) & 0xff;
->>
->> It's perhaps a bit more verbose, but a lot easier to understand.
->>
-> 
->> I'm accepting this driver but I'll remove the ARM || ARM64 dependency. Can
->> you post a follow-up patch for this sparse warning?
->>
-> 
-> Got it. We will provide a patch to fix this.
-> I was curious why my sparse do not show this warning.
-> Is there any parameter I need to set except C=1?
+> On 04/26/2016 01:44 PM, Arnd Bergmann wrote:
+> > On Tuesday 26 April 2016 12:15:32 Peter Griffin wrote:
+> >>>
+> >>>> If not what would you recommend instead? 
+> >>>
+> >>> It's still not clear to me what that bit in the syscfg register
+> >>> is for. Given the error message about "sti-audio-clk-glue",
+> >>> I suspect that this is actually a clock controller and that
+> >>> it should be using the clock binding with a separate driver
+> >>> instead of manipulating the regmap directly from the audio driver.
+> >>
+> >> Luckily I do have the datasheet for the audio-glue sysconf register.
+> >>
+> >> It says: -
+> >>
+> >> [11:8] PCM_CLK_SEL: Selects the frequency synthesizer clock or the external
+> >> PCM clock for each channel.
+> >>
+> >> The driver only ever sets this to 1 which selects the frequency synthesizer
+> >> clock. So the bitfield of the register which the driver is using (PCM_CLK_SEL)
+> >> is a clock mux.
+> > 
+> > Ok, that sounds like it could be either a really simple clock driver
+> > with just a few lines, or integrated into an existing clock driver
+> > if you already have one for this syscon node.
+> > 
+> >       Arnd
+> > 
+> FYI, Name of this glue is related to the register name. But it does not
+> concern only clock...
+>  This glue register is used to :
+> - select clock source ( clock framework or external clock from GPIO)
+> => one bit field per IP instance (player->clk_sel)
+> - select uniperiph player IP instance for PCM out.
+> (http://www.spinics.net/lists/alsa-devel/msg49034.html)
 
-I'm running it with these parameters: C=2 CF="-D__CHECK_ENDIAN__"
+Ok, I see. This is of course again the STi platform being a bit different
+from everyone else, and whatever we do to hide it won't give us a nice
+abstraction. Having just a clock driver for the register won't do the
+job here as you say, so I guess the original patch was already the
+least awkward way to handle it.
 
-I suspect it is the CHECK_ENDIAN flag that does it.
-
-Regards,
-
-	Hans
+	Arnd
