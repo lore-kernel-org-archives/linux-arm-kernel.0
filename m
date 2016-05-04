@@ -1,72 +1,46 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  4 May 2016 15:21:29 +0100
-Subject: [PATCH] KVM: arm/arm64: move GICv2 emulation defines into arm-gic-v3.h
-In-Reply-To: <5729FF19.3030205@arm.com>
-References: <5729FF19.3030205@arm.com>
-Message-ID: <1462371689-26046-1-git-send-email-andre.przywara@arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 4 May 2016 09:21:43 -0500
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <20160504141449.GG13045@dhcppc6.redhat.com>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net> <20160503143856.GE13045@dhcppc6.redhat.com>
+ <5728BEC4.6050603@codeaurora.org> <20160503155141.GF13045@dhcppc6.redhat.com>
+ <20160503171602.GA2518@roeck-us.net>
+ <20160504141449.GG13045@dhcppc6.redhat.com>
+Message-ID: <572A0577.1070000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
-for the list register definition also apply to GICv3 LRs.
-At the moment we have those definitions in the KVM VGICv3
-implementation, so let's move them into the GICv3 header file to
-have them automatically defined.
+Pratyush Anand wrote:
+> static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
+> {
+> +    struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
+> +    struct watchdog_device *wdd = &gwdt->wdd;
+> +    u64 timeout = (u64)gwdt->clk * wdd->timeout;
+> +
+> +    writeq(timeout + arch_counter_get_cntvct(),
+> +                    gwdt->control_base + SBSA_GWDT_WCV);
+> +
+>       panic(WATCHDOG_NAME " timeout");
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-... and then just remove the #include <arm-gic.h> from vgic/vgic-v3.c.
+I'm on the fence about this.
 
-Does that make sense?
+On one hand, I have always opposed the idea that the interrupt handler 
+needs to function properly in order for the timeout to be correct.  Fu's 
+original patch required this for every timeout.
 
-Cheers,
-Andre.
+The current code, however, only uses the interrupt when action=1.  In 
+this case, WCV is only reprogrammed in order to prevent the system from 
+resetting during the kexec.  Technically, the watchdog timeout has 
+already been handled.
 
- include/linux/irqchip/arm-gic-v3.h | 5 +++++
- virt/kvm/arm/vgic-v3.c             | 8 +-------
- 2 files changed, 6 insertions(+), 7 deletions(-)
+However, this should be unnecessary, because it can't be a problem 
+that's unique to the SBSA watchdog.  Every system that kexecs another 
+kernel needs to be able to handle a watchdog timeout.  Shouldn't the 
+kexec code already ping or disable the watchdog?  We need a 
+cross-platform solution.  Drivers should not need to do this.
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 56fd2c5..35e93cf 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -277,6 +277,11 @@
- #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
- #define ICH_LR_PRIORITY_SHIFT		48
- 
-+/* These are for GICv2 emulation only */
-+#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
-+#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
-+#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
-+
- #define ICH_MISR_EOI			(1 << 0)
- #define ICH_MISR_U			(1 << 1)
- 
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 999bdc6..9c5cfc2 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -31,12 +31,6 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
- 
--/* These are for GICv2 emulation only */
--#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
--#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
--#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
--#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
--
- static u32 ich_vtr_el2;
- 
- static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -45,7 +39,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
- 
- 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
--		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
-+		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
- 	else
- 		lr_desc.irq = val & GICH_LR_VIRTUALID;
- 
 -- 
-2.7.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
