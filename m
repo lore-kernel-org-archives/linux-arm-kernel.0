@@ -1,59 +1,63 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 4 May 2016 10:39:52 +0100
-Subject: [PATCH V3 3/3] iio: mxs-lradc: disable only masked channels in
- mxs_lradc_hw_stop
-In-Reply-To: <1461441479-23218-4-git-send-email-stefan.wahren@i2se.com>
-References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
- <1461441479-23218-4-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <240d09cb-8df3-01dd-ee84-6f5dd8cad64a@kernel.org>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  4 May 2016 22:37:48 +0800
+Subject: [PATCH v7 9/9] i2c: rk3x: support fast-mode plus for rk3399
+In-Reply-To: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1462372668-6583-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/16 20:57, Stefan Wahren wrote:
-> Disabling of the touchscreen IRQs should be done in
-> mxs_lradc_disable_ts. So disable only the masked virtual channels
-> in mxs_lradc_hw_stop and finally remove the unused function
-> mxs_lradc_irq_en_mask.
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Reviewed-by: Marek Vasut <marex@denx.de>
-> Tested-by: Marek Vasut <marex@denx.de>
-Applied to the togreg branch of iio.git
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
 
-Thanks,
-
-Jonathan
-> ---
->  drivers/iio/adc/mxs-lradc.c |   11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-> index 90242ba..b84d37c 100644
-> --- a/drivers/iio/adc/mxs-lradc.c
-> +++ b/drivers/iio/adc/mxs-lradc.c
-> @@ -373,13 +373,6 @@ static u32 mxs_lradc_plate_mask(struct mxs_lradc *lradc)
->  	return LRADC_CTRL0_MX28_PLATE_MASK;
->  }
->  
-> -static u32 mxs_lradc_irq_en_mask(struct mxs_lradc *lradc)
-> -{
-> -	if (lradc->soc == IMX23_LRADC)
-> -		return LRADC_CTRL1_MX23_LRADC_IRQ_EN_MASK;
-> -	return LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK;
-> -}
-> -
->  static u32 mxs_lradc_irq_mask(struct mxs_lradc *lradc)
->  {
->  	if (lradc->soc == IMX23_LRADC)
-> @@ -1496,7 +1489,9 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
->  {
->  	int i;
->  
-> -	mxs_lradc_reg_clear(lradc, mxs_lradc_irq_en_mask(lradc), LRADC_CTRL1);
-> +	mxs_lradc_reg_clear(lradc,
-> +		lradc->buffer_vchans << LRADC_CTRL1_LRADC_IRQ_EN_OFFSET,
-> +		LRADC_CTRL1);
->  
->  	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
->  		mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(i));
-> 
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 47368c4..c66cc39 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -124,6 +124,17 @@ static const struct i2c_spec_values fast_mode_spec = {
+ 	.min_hold_buffer_ns = 1300,
+ };
+ 
++static const struct i2c_spec_values fast_mode_plus_spec = {
++	.min_hold_start_ns = 260,
++	.min_low_ns = 500,
++	.min_high_ns = 260,
++	.min_setup_start_ns = 260,
++	.max_data_hold_ns = 400,
++	.min_data_setup_ns = 50,
++	.min_setup_stop_ns = 260,
++	.min_hold_buffer_ns = 500,
++};
++
+ /**
+  * struct rk3x_i2c_calced_timings:
+  * @div_low: Divider output for low
+@@ -534,8 +545,10 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
+ {
+ 	if (speed <= 100000)
+ 		return &standard_mode_spec;
+-	else
++	else if (speed <= 400000)
+ 		return &fast_mode_spec;
++	else
++		return &fast_mode_plus_spec;
+ }
+ 
+ /**
+@@ -746,9 +759,9 @@ static int rk3x_i2c_v1_calc_timings(unsigned long clk_rate,
+ 	const struct i2c_spec_values *spec;
+ 	int ret = 0;
+ 
+-	/* Support standard-mode and fast-mode */
+-	if (WARN_ON(t->bus_freq_hz > 400000))
+-		t->bus_freq_hz = 400000;
++	/* Support standard-mode, fast-mode and fast-mode plus */
++	if (WARN_ON(t->bus_freq_hz > 1000000))
++		t->bus_freq_hz = 1000000;
+ 
+ 	/* prevent scl_rate_khz from becoming 0 */
+ 	if (WARN_ON(t->bus_freq_hz < 1000))
+-- 
+1.9.1
