@@ -1,71 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 May 2016 14:23:00 +0100
-Subject: [PATCH v8 8/8] genirq/msi: use the MSI doorbell's IOVA when
- requested
-In-Reply-To: <1461831730-5575-9-git-send-email-eric.auger@linaro.org>
-References: <1461831730-5575-1-git-send-email-eric.auger@linaro.org>
- <1461831730-5575-9-git-send-email-eric.auger@linaro.org>
-Message-ID: <5729F7B4.7020401@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 4 May 2016 14:30:34 +0100
+Subject: [PATCH v2 18/54] KVM: arm/arm64: vgic-new: Add GICv3 world switch
+ backend
+In-Reply-To: <5728CEDC.9080308@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-19-git-send-email-andre.przywara@arm.com>
+ <5728CEDC.9080308@arm.com>
+Message-ID: <5729F97A.1090909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/16 09:22, Eric Auger wrote:
-> On MSI message composition we now use the MSI doorbell's IOVA in
-> place of the doorbell's PA in case the device is upstream to an
-> IOMMU that requires MSI addresses to be mapped. The doorbell's
-> allocation and mapping happened on an early stage (pci_enable_msi).
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> v7 -> v8:
-> - use iommu_msi_msg_pa_to_va
-> - add WARN_ON
-> 
-> v6 -> v7:
-> - allocation/mapping is done at an earlier stage. We now just perform
->   the iova lookup. So it is safe now to be called in a code that cannot
->   sleep. iommu_msi_set_doorbell_iova is moved in the dma-reserved-iommu
->   API: I think it cleans things up with respect to various #ifdef CONFIGS.
-> 
-> v5:
-> - use macros to increase the readability
-> - add comments
-> - fix a typo that caused a compilation error if CONFIG_IOMMU_API
->   is not set
-> ---
->  kernel/irq/msi.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index d5f95e6..835938b 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -64,8 +64,16 @@ static int msi_compose(struct irq_data *irq_data,
->  
->  	if (erase)
->  		memset(msg, 0, sizeof(*msg));
-> -	else
+Hi,
 
-Nit: Braces on both sides of the 'else'.
-
-> +	else {
-> +		struct device *dev;
+On 03/05/16 17:16, Marc Zyngier wrote:
+> On 28/04/16 17:45, Andre Przywara wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> As the GICv3 virtual interface registers differ from their GICv2
+>> siblings, we need different handlers for processing maintenance
+>> interrupts and reading/writing to the LRs.
+>> Implement the respective handler functions and connect them to
+>> existing code to be called if the host is using a GICv3.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog RFC..v1:
+>> - remove outdated comment about the dist_lock
+>> - add WARN_ON about LR_STATE not being 0 in maintenance interrupts
+>>
+>> Changelog v1 .. v2:
+>> - inject the IRQ priority into the list register
+>>
+>>  include/linux/irqchip/arm-gic-v3.h |   1 +
+>>  virt/kvm/arm/vgic/vgic-v3.c        | 169 +++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic.c           |  25 ++++--
+>>  virt/kvm/arm/vgic/vgic.h           |  29 +++++++
+>>  4 files changed, 219 insertions(+), 5 deletions(-)
+>>  create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index d5d798b..56fd2c5 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -275,6 +275,7 @@
+>>  #define ICH_LR_ACTIVE_BIT		(1ULL << 63)
+>>  #define ICH_LR_PHYS_ID_SHIFT		32
+>>  #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+>> +#define ICH_LR_PRIORITY_SHIFT		48
+>>  
+>>  #define ICH_MISR_EOI			(1 << 0)
+>>  #define ICH_MISR_U			(1 << 1)
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> new file mode 100644
+>> index 0000000..461229b
+>> --- /dev/null
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -0,0 +1,169 @@
+>> +/*
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +#include <linux/irqchip/arm-gic.h>
+> 
+> This last line is definitely a (copy-paste) bug. We should never include
+> both GIC headers in the same file. Can you please drop that line and
+> have the following hunk instead?
+> 
+> +/* These are for GICv2 emulation only */
+> +#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+> +#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+> +#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
 > +
->  		ret = irq_chip_compose_msi_msg(irq_data, msg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
-> +		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
-> +	}
->  
->  	return ret;
->  }
+
+What about including those lines (except the last one) in arm-gic-v3.h
+then? In fact they describe a property of an _GICv3_ LR, even if it is
+only a compatibility feature.
+That would be cleaner IMHO than repeating the definitions here in a .c
+file and we would automatically get the right definitions by just
+including arm-gic-v3.h.
+
+This just compiled fine for me for both the old and new VGIC.
+I can send the patch (needs to be a separate patch because it touches
+the old VGIC as well) if you agree on that idea.
+
+Cheers,
+Andre.
+
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> which is similar to what we have in the old implementation, for the
+> exact same reason.
+> 
+> Thanks,
+> 
+> 	M.
+> 
