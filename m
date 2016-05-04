@@ -1,36 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 May 2016 15:28:25 +0100
-Subject: [PATCH] KVM: arm/arm64: move GICv2 emulation defines into
- arm-gic-v3.h
-In-Reply-To: <1462371689-26046-1-git-send-email-andre.przywara@arm.com>
-References: <5729FF19.3030205@arm.com>
- <1462371689-26046-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <572A0709.9070000@arm.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  4 May 2016 22:33:38 +0800
+Subject: [PATCH v7 5/9] i2c: rk3x: Change SoC data to not use array
+In-Reply-To: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1462372418-6349-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/16 15:21, Andre Przywara wrote:
-> As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
-> for the list register definition also apply to GICv3 LRs.
-> At the moment we have those definitions in the KVM VGICv3
-> implementation, so let's move them into the GICv3 header file to
-> have them automatically defined.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 38 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 30 insertions(+), 8 deletions(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
-
-> ---
-> ... and then just remove the #include <arm-gic.h> from vgic/vgic-v3.c.
-> 
-> Does that make sense?
-
-Definitely.
-
-Thanks,
-
-	M.
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 0838fcf..9686c81 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -867,17 +867,39 @@ static const struct i2c_algorithm rk3x_i2c_algorithm = {
+ 	.functionality		= rk3x_i2c_func,
+ };
+ 
+-static struct rk3x_i2c_soc_data soc_data[3] = {
+-	{ .grf_offset = 0x154 }, /* rk3066 */
+-	{ .grf_offset = 0x0a4 }, /* rk3188 */
+-	{ .grf_offset = -1 },    /* no I2C switching needed */
++static const struct rk3x_i2c_soc_data rk3066_soc_data = {
++	.grf_offset = 0x154,
++};
++
++static const struct rk3x_i2c_soc_data rk3188_soc_data = {
++	.grf_offset = 0x0a4,
++};
++
++static const struct rk3x_i2c_soc_data rk3228_soc_data = {
++	.grf_offset = -1,
++};
++
++static const struct rk3x_i2c_soc_data rk3288_soc_data = {
++	.grf_offset = -1,
+ };
+ 
+ static const struct of_device_id rk3x_i2c_match[] = {
+-	{ .compatible = "rockchip,rk3066-i2c", .data = (void *)&soc_data[0] },
+-	{ .compatible = "rockchip,rk3188-i2c", .data = (void *)&soc_data[1] },
+-	{ .compatible = "rockchip,rk3228-i2c", .data = (void *)&soc_data[2] },
+-	{ .compatible = "rockchip,rk3288-i2c", .data = (void *)&soc_data[2] },
++	{
++		.compatible = "rockchip,rk3066-i2c",
++		.data = (void *)&rk3066_soc_data
++	},
++	{
++		.compatible = "rockchip,rk3188-i2c",
++		.data = (void *)&rk3188_soc_data
++	},
++	{
++		.compatible = "rockchip,rk3228-i2c",
++		.data = (void *)&rk3228_soc_data
++	},
++	{
++		.compatible = "rockchip,rk3288-i2c",
++		.data = (void *)&rk3288_soc_data
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, rk3x_i2c_match);
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
