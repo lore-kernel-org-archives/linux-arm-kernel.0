@@ -1,20 +1,21 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 4 May 2016 13:03:04 +0200
-Subject: [PATCH v3 2/2] nvmem: mxs-ocotp: remove nvmem regmap dependency
-In-Reply-To: <1462214174-469-3-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1462214174-469-3-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5729D6E8.8060808@i2se.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 04 May 2016 13:13:23 +0200
+Subject: [PATCH v2 1/3] video: fbdev: imxfb: fix semantic of .get_power
+ and .set_power
+In-Reply-To: <1462354998-5792-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1462354998-5792-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1462354998-5792-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1462360403.3536.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.05.2016 um 20:36 schrieb Srinivas Kandagatla:
-> Regmap raw accessors are bus specific implementations, using regmap raw
-> apis in nvmem breaks nvmem providers based on regmap mmio.
-> This patch moves to nvmem support in the driver to use callback
-> instead of regmap, which is what the nvmem core supports now.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
+Am Mittwoch, den 04.05.2016, 11:43 +0200 schrieb Uwe Kleine-K?nig:
+> .set_power gets passed an FB_BLANK_XXX value, not a bool. So 0 signals
+> on; and >1 means off. The same applies for return values of .get_power.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
