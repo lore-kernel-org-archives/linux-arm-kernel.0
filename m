@@ -1,77 +1,72 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 4 May 2016 10:38:31 +0100
-Subject: [PATCH V3 1/3] iio: mxs-lradc: simplify TS registration
-In-Reply-To: <20160425210006.GA26059@dtor-ws>
+Date: Wed, 4 May 2016 10:39:19 +0100
+Subject: [PATCH V3 2/3] iio: mxs-lradc: remove mxs_lradc_ts_unregister
+In-Reply-To: <20160425210041.GB26059@dtor-ws>
 References: <1461441479-23218-1-git-send-email-stefan.wahren@i2se.com>
- <1461441479-23218-2-git-send-email-stefan.wahren@i2se.com>
- <20160425210006.GA26059@dtor-ws>
-Message-ID: <7cb1766c-a3c2-891a-9bb8-df8f7b7c3407@kernel.org>
+ <1461441479-23218-3-git-send-email-stefan.wahren@i2se.com>
+ <20160425210041.GB26059@dtor-ws>
+Message-ID: <e1309837-633e-60db-3368-eaad6373dc35@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 25/04/16 22:00, Dmitry Torokhov wrote:
-> On Sat, Apr 23, 2016 at 07:57:57PM +0000, Stefan Wahren wrote:
->> This patch simplifies the TS registration of mxs-lradc by
->> using devm_input_allocate_device.
+> On Sat, Apr 23, 2016 at 07:57:58PM +0000, Stefan Wahren wrote:
+>> After using devm_input_allocate_device for registration
+>> the function mxs_lradc_ts_unregister isn't necessary anymore
+>> since mxs_lradc_ts_close already does the job.
 >>
 >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> Reviewed-by: Marek Vasut <marex@denx.de>
+>> Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > 
 > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Applied to the togreg branch of iio.git - initially going
-to be pushed out as testing though may not be until the weekend.
-
-Jonathan
+Applied.
 > 
 >> ---
->>  drivers/iio/adc/mxs-lradc.c |   10 ++--------
->>  1 file changed, 2 insertions(+), 8 deletions(-)
+>>  drivers/iio/adc/mxs-lradc.c |   13 +------------
+>>  1 file changed, 1 insertion(+), 12 deletions(-)
 >>
 >> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->> index ad26da1..3d1d370 100644
+>> index 3d1d370..90242ba 100644
 >> --- a/drivers/iio/adc/mxs-lradc.c
 >> +++ b/drivers/iio/adc/mxs-lradc.c
->> @@ -1120,18 +1120,16 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>  {
->>  	struct input_dev *input;
->>  	struct device *dev = lradc->dev;
->> -	int ret;
->>  
->>  	if (!lradc->use_touchscreen)
->>  		return 0;
->>  
->> -	input = input_allocate_device();
->> +	input = devm_input_allocate_device(dev);
->>  	if (!input)
->>  		return -ENOMEM;
->>  
->>  	input->name = DRIVER_NAME;
->>  	input->id.bustype = BUS_HOST;
->> -	input->dev.parent = dev;
->>  	input->open = mxs_lradc_ts_open;
->>  	input->close = mxs_lradc_ts_close;
->>  
->> @@ -1146,11 +1144,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>  
->>  	lradc->ts_input = input;
->>  	input_set_drvdata(input, lradc);
->> -	ret = input_register_device(input);
->> -	if (ret)
->> -		input_free_device(lradc->ts_input);
->>  
->> -	return ret;
->> +	return input_register_device(input);
+>> @@ -1148,14 +1148,6 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>  	return input_register_device(input);
 >>  }
 >>  
->>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
->> @@ -1159,7 +1154,6 @@ static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
->>  		return;
->>  
->>  	mxs_lradc_disable_ts(lradc);
->> -	input_unregister_device(lradc->ts_input);
->>  }
->>  
+>> -static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+>> -{
+>> -	if (!lradc->use_touchscreen)
+>> -		return;
+>> -
+>> -	mxs_lradc_disable_ts(lradc);
+>> -}
+>> -
 >>  /*
+>>   * IRQ Handling
+>>   */
+>> @@ -1715,13 +1707,11 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>>  	ret = iio_device_register(iio);
+>>  	if (ret) {
+>>  		dev_err(dev, "Failed to register IIO device\n");
+>> -		goto err_ts;
+>> +		return ret;
+>>  	}
+>>  
+>>  	return 0;
+>>  
+>> -err_ts:
+>> -	mxs_lradc_ts_unregister(lradc);
+>>  err_ts_register:
+>>  	mxs_lradc_hw_stop(lradc);
+>>  err_dev:
+>> @@ -1739,7 +1729,6 @@ static int mxs_lradc_remove(struct platform_device *pdev)
+>>  	struct mxs_lradc *lradc = iio_priv(iio);
+>>  
+>>  	iio_device_unregister(iio);
+>> -	mxs_lradc_ts_unregister(lradc);
+>>  	mxs_lradc_hw_stop(lradc);
+>>  	mxs_lradc_trigger_remove(iio);
+>>  	iio_triggered_buffer_cleanup(iio);
 >> -- 
 >> 1.7.9.5
 >>
