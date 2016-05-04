@@ -1,96 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 May 2016 22:56:34 +0200
-Subject: [PATCH 2/2] pci: host: Add Broadcom STB PCIE RC controller
-In-Reply-To: <572A5678.7020603@gmail.com>
-References: <1462238749-19715-1-git-send-email-f.fainelli@gmail.com>
- <4199321.vpfzMt0zhT@wuerfel> <572A5678.7020603@gmail.com>
-Message-ID: <246366157.3SALjN7m5a@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 May 2016 23:20:28 +0200
+Subject: [PATCH] ARM: cpuidle: Pass on arm_cpuidle_suspend()'s return value
+In-Reply-To: <20160428082023.GA10216@linaro.org>
+References: <1461669301-30834-1-git-send-email-james.morse@arm.com>
+ <20160427091434.GA4303@red-moon> <20160428082023.GA10216@linaro.org>
+Message-ID: <13315467.gEDWYxNU10@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 May 2016 13:07:20 Florian Fainelli wrote:
-> On 04/05/16 12:56, Arnd Bergmann wrote:
-> > On Wednesday 04 May 2016 12:36:17 Florian Fainelli wrote:
-> >> On 03/05/16 02:57, Arnd Bergmann wrote:
-> >> How about introducing helper functions but keeping the same set of
-> >> read/write pci_ops instead, would that seem more acceptable? I agree
-> >> that the macros are not the friendliest thing.
+On Thursday, April 28, 2016 10:20:23 AM Daniel Lezcano wrote:
+> On Wed, Apr 27, 2016 at 10:14:34AM +0100, Lorenzo Pieralisi wrote:
+> > [+ Lina]
 > > 
-> > I can't think of how that would look right now. My impression was that
-> > the macros here are mainly used to implement pci_ops, so I suggested
-> > having two copies of those. Of course the two copies could call the
-> > same implementation and just pass in some constant that the compiler
-> > can then optimize again in any possible way.
+> > On Tue, Apr 26, 2016 at 09:05:57PM +0200, Rafael J. Wysocki wrote:
+> > > On Tue, Apr 26, 2016 at 1:31 PM, Lorenzo Pieralisi
+> > > <lorenzo.pieralisi@arm.com> wrote:
+> > > > On Tue, Apr 26, 2016 at 12:15:01PM +0100, James Morse wrote:
+> > > >> arm_cpuidle_suspend() may return -EOPNOTSUPP, or any value returned
+> > > >> by the cpu_ops/cpuidle_ops suspend call. arm_enter_idle_state() doesn't
+> > > >> update 'ret' with this value, meaning we always signal success to
+> > > >> cpuidle_enter_state(), causing it to update the usage counters as if we
+> > > >> succeeded.
+> > > >>
+> > > >> Fixes: 191de17aa3c1 ("ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function")
+> > > >> Signed-off-by: James Morse <james.morse@arm.com>
+> > > >> ---
+> > > >>  drivers/cpuidle/cpuidle-arm.c | 2 +-
+> > > >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > >
+> > > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> Providing separate copies for read_config and write_config makes sense,
-> what I wanted to avoid was 3 sets of brcm_pcie_read_config and
-> brcm_pcie_write_config, because that would be duplicating quite some
-> code, working on that now.
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Ok, good.
+OK, applied, tagged for -stable (4.1+).
 
-
-> >>> Don't parse the regulator properties yourself here, use the proper APIs.
-> >>
-> >> I will probably drop this for now, and  add it later, there are only a
-> >> handful of boards which requires this, and ultimately, I think we should
-> >> be seaking for a more generic solutions, we can't be the only ones doing
-> >> that.
-> > 
-> > So is this the supply for the slots attached to the PCI host rather than
-> > the host bridge itself?
-> 
-> Technically yes, there are for the attached PCI slots, not the hsost
-> bridge, so their are misplaced, we need to rework that, and I would
-> prefer if there was a way to make it pre-scan type of operation offered
-> by the core PCI code itself, but then there is a chicken and egg
-> problem: you cannot get regulators for device_nodes that have not been
-> created yet, and you can't create pci_device and their corresponding
-> device_nodes until you have turned them on...
-
-Ah, I can see how that is doable but rather tricky to get done right.
-
-Are there actually any legacy PCI slots that need this, or are they PCIe
-ports? If we are lucky, they are all PCIe ports that have a standard
-port device, so we can could add support for a regulator supply
-in drivers/pci/pcie/portdrv_pci.c: The port device will should always be
-present as a child of the root node, but the actual device connected
-to the port is what needs the regulator.
-
-> > You didn't complete this sentence, but I think I've gotten a better
-> > idea of what is going on from the code now. It looks like this
-> > is used to program a set of default DMA ranges into the host
-> > bridge, so there are now three ways of finding out what it
-> > should be:
-> > 
-> > a) count the memory controllers, assume that each one has 1GB of
-> >    address space
-> > b) read the "brcm,log2-scb-sizes" property to find out the
-> >    actual sizes
-> > c) interpret the dma-ranges property
-> > 
-> > The first two seem to things in a rather nonstandard way (the binding
-> > mentions neither of them), while the third is not implemented yet.
-> > I think we have to improve this.
-> 
-> What I meant to say is that we want to avoid programming a SCB window
-> (SCB equals memory controller for the sake of making things simple here)
-> which does not have a baking memory controller, because, well, guess
-> what happens, the PCIe RC could be trying to access non existent memory,
-> and just stall doing so because no error reporting, I can't remember
-> which chips had this problem exactly, but there were definitively some,
-> so the concern is real.
-> 
-> The "brcm,log2-scb-sizes" should be correctly populated all the time in
-> our Device Tree blobs, but we are not quite making a use of them here.
-> 
-> "dma-ranges" seems like an appropriate solution, but sorts of forces us
-> to reinforce the same information that is available somewhere in the
-> Device Tree within the memory controllers nodes themselves.
-> 
-> Let me think about this some more.
-
-Maybe a property that contains a tuple of <&mc-phandle start-addr size>
-instead of "brcm,log2-scb-sizes" would be better here?
-
-	Arnd
+Thanks everybody!
