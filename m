@@ -1,206 +1,129 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed,  4 May 2016 11:54:18 +0000
-Subject: [PATCH v9 7/7] vfio/type1: return MSI geometry through
- VFIO_IOMMU_GET_INFO capability chains
-In-Reply-To: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1462362858-2925-8-git-send-email-eric.auger@linaro.org>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Wed, 04 May 2016 14:56:34 +0300
+Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
+ suspend
+In-Reply-To: <1462359261.11651.69.camel@mhfsdcap03>
+References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
+ <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
+ <1462324873.11651.57.camel@mhfsdcap03> <871t5ifdxk.fsf@intel.com>
+ <1462359261.11651.69.camel@mhfsdcap03>
+Message-ID: <87mvo6dojx.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the user-space to retrieve the MSI geometry. The
-implementation is based on capability chains, now also added to
-VFIO_IOMMU_GET_INFO.
 
-The returned info comprise:
-- whether the MSI IOVA are constrained to a reserved range (x86 case) and
-  in the positive, the start/end of the aperture,
-- or whether the IOVA aperture need to be set by the userspace. In that
-  case, the size and alignment of the IOVA region to be provided are
-  returned.
+Hi,
 
-In case the userspace must provide the IOVA range, we currently return
-an arbitrary number of IOVA pages (16), supposed to fulfill the needs of
-current ARM platforms. This may be deprecated by a more sophisticated
-computation later on.
+chunfeng yun <chunfeng.yun@mediatek.com> writes:
+>> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+>> > On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
+>> >> Hi,
+>> >> 
+>> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+>> >> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
+>> >> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
+>> >> >> >> Click mouse after xhci suspend completion but before system suspend
+>> >> >> >> completion, system will not be waken up by mouse if the duration of
+>> >> >> >> them is larger than 20ms which is the device UFP's resume signaling
+>> >> >> 
+>> >> >> what is "them" here ? The duration of what is longer than 20ms ?
+>> >> > They are "xhci suspend completion" and "system suspend completion";
+>> >> >
+>> >> > It's time duration
+>> >> 
+>> >> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
+>> >> wakeup ?
+>> > It is not the time of xhci suspend consumed, but is the time of duration
+>> > from xhci suspend completion to system suspend completion(after BOOT-CPU
+>> > is turned off, SPM will be enabled to receive wakeup event)
+>> 
+>> Okay, so SPM will be the entity actually handling wakeups, right ? I'm
+>> assuming something like this happens:
+>> 
+>> echo mem > /sys/power/state
+>>  /* start suspending devices */
+>>   xhci_suspend()
+>>  /* all devices suspended */
+>>  enable_spm()
+>> 
+>> so, if a mouse button is pressed after xhci_suspend() returns but before
+>> enable_spm() runs, then we're gonna miss that event, am I right ?
+> Yes, you are right.
+>> 
+>> I can't think of any way to sort this out. Let's ask on linux-pm (I've
+>> added linux-pm to Cc list)
+> Thanks
+>> 
+>> >> >> >> lasted. Another reason is that the SPM is not enabled before system
+>> >> >> 
+>> >> >> what's SPM ?
+>> >> > It is System Power Management which is powered off when system is
+>> >> > running in normal mode, and is powered on when system enters suspend
+>> >> > mode. It is used to wakeup system when some wakeup sources, such as
+>> >> > bluetooth or powerkey etc, tigger wakeup event.
+>> >> 
+>> >> okay, thanks
+>> >> 
+>> >> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
+>> >> >>            ^^^^^^^^^^
+>> >> >>            completion
+>> >> >> 
+>> >> >> >> So in order to reduce the duration less than 20ms, make use of
+>> >> >> >> syscore's suspend/resume interface.
+>> >> >> 
+>> >> >> no, this is the wrong approach
+>> >> > But it seems only one workable approach from software side
+>> >> 
+>> >> I wouldn't say that. It seems to me SPM should be enabled earlier.
+>> > Yes, but normally SPM should be enabled after all CPUS are turned off,
+>> > so it's difficult to do that, I mean enable SPM before turning off CPUS
+>> 
+>> is it a requirement that SPM should be enabled only after all CPUs are
+>> turned off ? If that's the case, then any device in the system might
+>> have missed wakeups. This doesn't seem like a good design to me; unless
+>> I'm missing something...
+> Yes, it's a requirement.
+>
+> If the wakeup source is level trigger, and will keep it until SPM notice
+> it. Although USB wakeup is level trigger, but it just last at most 20ms
+> and clear itself automatically.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+who's clearing USB wakeup after 20ms ? Sure, it's a requirement by the
+USB spec that host should drive reset for *at least* 20ms, but I don't
+remember the exact wordings WRT remote wakeup
 
----
-v8 -> v9:
-- use iommu_msi_supported flag instead of programmable
-- replace IOMMU_INFO_REQUIRE_MSI_MAP flag by a more sophisticated
-  capability chain, reporting the MSI geometry
+/me reads
 
-v7 -> v8:
-- use iommu_domain_msi_geometry
+Okay, here it is, section 7.1.7.7 of USB 2.0 Spec states:
 
-v6 -> v7:
-- remove the computation of the number of IOVA pages to be provisionned.
-  This number depends on the domain/group/device topology which can
-  dynamically change. Let's rely instead rely on an arbitrary max depending
-  on the system
+	"The remote wakeup device must hold the resume signaling for at
+        least 1 ms but for no more than 15 ms (TDRSMUP). At the end of
+        this period, the device stops driving the bus (puts its drivers
+        into the high-impedance state and does not drive the bus to the
+        J state)."
 
-v4 -> v5:
-- move msi_info and ret declaration within the conditional code
+IOW, the mouse is not at fault here. Remote wakeup can last anywhere
+between 1ms and 15ms. If your system can't cope with it, then I'd say
+it's a problem with your system and you shouldn't allow XHCI to go to
+such deep power states until SPM is enabled.
 
-v3 -> v4:
-- replace former vfio_domains_require_msi_mapping by
-  more complex computation of MSI mapping requirements, especially the
-  number of pages to be provided by the user-space.
-- reword patch title
+I really tried finding the correct piece of code which does this for PCI
+devices, but basically it's treated as an IRQ and as long as
+enable_irq_wake() or the sysfs file is set to true, then PME gets
+enabled (hopefully PCI folks can confirm this statement).
 
-RFC v1 -> v1:
-- derived from
-  [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
-- renamed allow_msi_reconfig into require_msi_mapping
-- fixed VFIO_IOMMU_GET_INFO
----
- drivers/vfio/vfio_iommu_type1.c | 69 +++++++++++++++++++++++++++++++++++++++++
- include/uapi/linux/vfio.h       | 30 +++++++++++++++++-
- 2 files changed, 98 insertions(+), 1 deletion(-)
+Very recently Tony Lindgren added proper handling of wakeup signals as
+IRQs for non-PCI systems too (see 4990d4fe327b PM / Wakeirq: Add
+automated device wake IRQ handling), wonder if you could treat SPM
+similarly.
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 2fc8197..841360b 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -1134,6 +1134,50 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
- 	return ret;
- }
- 
-+static int compute_msi_geometry_caps(struct vfio_iommu *iommu,
-+				     struct vfio_info_cap *caps)
-+{
-+	struct vfio_iommu_type1_info_cap_msi_geometry *vfio_msi_geometry;
-+	struct iommu_domain_msi_geometry msi_geometry;
-+	struct vfio_info_cap_header *header;
-+	struct vfio_domain *d;
-+	bool mapping_required;
-+	size_t size;
-+
-+	mutex_lock(&iommu->lock);
-+	/* All domains have same require_msi_map property, pick first */
-+	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
-+	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
-+			      &msi_geometry);
-+	mapping_required = msi_geometry.iommu_msi_supported;
-+
-+	mutex_unlock(&iommu->lock);
-+
-+	size = sizeof(*vfio_msi_geometry);
-+	header = vfio_info_cap_add(caps, size,
-+				   VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY, 1);
-+
-+	if (IS_ERR(header))
-+		return PTR_ERR(header);
-+
-+	vfio_msi_geometry = container_of(header,
-+				struct vfio_iommu_type1_info_cap_msi_geometry,
-+				header);
-+
-+	vfio_msi_geometry->reserved = !mapping_required;
-+	if (vfio_msi_geometry->reserved) {
-+		vfio_msi_geometry->aperture_start = msi_geometry.aperture_start;
-+		vfio_msi_geometry->aperture_end = msi_geometry.aperture_end;
-+		return 0;
-+	}
-+
-+	vfio_msi_geometry->alignment = 1 << __ffs(vfio_pgsize_bitmap(iommu));
-+	/* we currently report the need for an arbitray number of 16 pages */
-+	vfio_msi_geometry->size = 16 * vfio_msi_geometry->alignment;
-+
-+	return 0;
-+}
-+
- static long vfio_iommu_type1_ioctl(void *iommu_data,
- 				   unsigned int cmd, unsigned long arg)
- {
-@@ -1155,6 +1199,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		}
- 	} else if (cmd == VFIO_IOMMU_GET_INFO) {
- 		struct vfio_iommu_type1_info info;
-+		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
-+		int ret;
- 
- 		minsz = offsetofend(struct vfio_iommu_type1_info, iova_pgsizes);
- 
-@@ -1168,6 +1214,29 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 
- 		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
- 
-+		ret = compute_msi_geometry_caps(iommu, &caps);
-+		if (ret)
-+			return ret;
-+
-+		if (caps.size) {
-+			info.flags |= VFIO_IOMMU_INFO_CAPS;
-+			if (info.argsz < sizeof(info) + caps.size) {
-+				info.argsz = sizeof(info) + caps.size;
-+				info.cap_offset = 0;
-+			} else {
-+				vfio_info_cap_shift(&caps, sizeof(info));
-+				if (copy_to_user((void __user *)arg +
-+						sizeof(info), caps.buf,
-+						caps.size)) {
-+					kfree(caps.buf);
-+					return -EFAULT;
-+				}
-+				info.cap_offset = sizeof(info);
-+			}
-+
-+			kfree(caps.buf);
-+		}
-+
- 		return copy_to_user((void __user *)arg, &info, minsz) ?
- 			-EFAULT : 0;
- 
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 4a9dbc2..0ff6a8d 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -488,7 +488,33 @@ struct vfio_iommu_type1_info {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
--	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
-+#define VFIO_IOMMU_INFO_CAPS	(1 << 1)	/* Info supports caps */
-+	__u32   cap_offset;	/* Offset within info struct of first cap */
-+	__u64	iova_pgsizes;	/* Bitmap of supported page sizes */
-+};
-+
-+#define VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY	1
-+
-+/*
-+ * The MSI geometry capability allows to report the MSI IOVA geometry:
-+ * - either the MSI IOVAs are constrained within a reserved IOVA aperture
-+ *   whose boundaries are given by [@aperture_start, @aperture_end].
-+ *   this is typically the case on x86 host. The userspace is not allowed
-+ *   to map userspace memory@IOVAs intersecting this range using
-+ *   VFIO_IOMMU_MAP_DMA.
-+ * - or the MSI IOVAs are not requested to belong to any reserved range;
-+ *   in that case the userspace must provide an IOVA window characterized by
-+ *   @size and @alignment using VFIO_IOMMU_MAP_DMA with RESERVED_MSI_IOVA flag.
-+ */
-+struct vfio_iommu_type1_info_cap_msi_geometry {
-+	struct vfio_info_cap_header header;
-+	bool reserved; /* Are MSI IOVAs within a reserved aperture? */
-+	/* reserved */
-+	__u64 aperture_start;
-+	__u64 aperture_end;
-+	/* not reserved */
-+	__u64 size; /* IOVA aperture size in bytes the userspace must provide */
-+	__u64 alignment; /* alignment of the window, in bytes */
- };
- 
- #define VFIO_IOMMU_GET_INFO _IO(VFIO_TYPE, VFIO_BASE + 12)
-@@ -503,6 +529,8 @@ struct vfio_iommu_type1_info {
-  * IOVA region that will be used on some platforms to map the host MSI frames.
-  * In that specific case, vaddr is ignored. Once registered, an MSI reserved
-  * IOVA region stays until the container is closed.
-+ * The requirement for provisioning such reserved IOVA range can be checked by
-+ * checking the VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY capability.
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/bec02f4f/attachment.sig>
