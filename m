@@ -1,86 +1,60 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 May 2016 03:32:12 +0200
-Subject: [PATCH 02/12] eeprom: at24: remove nvmem regmap dependency
-In-Reply-To: <20160502073254.GA2015@tetsubishi>
-References: <1461526096-29584-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1461526096-29584-3-git-send-email-srinivas.kandagatla@linaro.org>
- <20160502073254.GA2015@tetsubishi>
-Message-ID: <20160504013212.GA7972@lunn.ch>
+From: Nitin.Saxena@caviumnetworks.com (Saxena, Nitin)
+Date: Wed, 4 May 2016 02:12:30 +0000
+Subject: VFIO MSIX Query
+In-Reply-To: <20160503140249.4edaf3cc@t450s.home>
+References: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>,
+ <20160503140249.4edaf3cc@t450s.home>
+Message-ID: <53EA6B5E-2D73-47C1-A912-1D05AB5D9E02@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 09:32:54AM +0200, Wolfram Sang wrote:
-> On Sun, Apr 24, 2016 at 08:28:06PM +0100, Srinivas Kandagatla wrote:
-> > This patch moves to nvmem support in the driver to use callback instead
-> > of regmap.
-> > 
-> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> 
-> Andrew, since you did the NVMEM implementation, could you have a look at
-> this? That would be awesome. Thanks!
-> 
-> > ---
-> >  drivers/misc/eeprom/Kconfig |   1 -
-> >  drivers/misc/eeprom/at24.c  | 103 ++++++++++----------------------------------
-> >  2 files changed, 22 insertions(+), 82 deletions(-)
-> > 
-> > diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
-> > index cfc493c..2d70464 100644
-> > --- a/drivers/misc/eeprom/Kconfig
-> > +++ b/drivers/misc/eeprom/Kconfig
-> > @@ -3,7 +3,6 @@ menu "EEPROM support"
-> >  config EEPROM_AT24
-> >  	tristate "I2C EEPROMs / RAMs / ROMs from most vendors"
-> >  	depends on I2C && SYSFS
-> > -	select REGMAP
-> >  	select NVMEM
-> >  	help
-> >  	  Enable this driver to get read/write support to most I2C EEPROMs
-> > diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
-> > index 089d694..de550a6 100644
-> > --- a/drivers/misc/eeprom/at24.c
-> > +++ b/drivers/misc/eeprom/at24.c
-> > @@ -23,7 +23,6 @@
-> >  #include <linux/acpi.h>
-> >  #include <linux/i2c.h>
-> >  #include <linux/nvmem-provider.h>
-> > -#include <linux/regmap.h>
-> >  #include <linux/platform_data/at24.h>
-> >  
-> >  /*
-> > @@ -69,7 +68,6 @@ struct at24_data {
-> >  	unsigned write_max;
-> >  	unsigned num_addresses;
-> >  
-> > -	struct regmap_config regmap_config;
-> >  	struct nvmem_config nvmem_config;
-> >  	struct nvmem_device *nvmem;
-> >  
-> > @@ -252,10 +250,10 @@ static ssize_t at24_eeprom_read(struct at24_data *at24, char *buf,
-> >  	return -ETIMEDOUT;
-> >  }
-> >  
-> > -static ssize_t at24_read(struct at24_data *at24,
-> > -		char *buf, loff_t off, size_t count)
-> > +static int at24_read(void *priv, unsigned int off, void *val, size_t count)
-> >  {
-> > -	ssize_t retval = 0;
-> > +	struct at24_data *at24 = priv;
-> > +	char *buf = val;
-> >  
-> >  	if (unlikely(!count))
-> >  		return count;
-> > @@ -267,23 +265,21 @@ static ssize_t at24_read(struct at24_data *at24,
-> >  	mutex_lock(&at24->lock);
-> >  
-> >  	while (count) {
-> > -		ssize_t	status;
-> > +		int	status;
-> >  
-> >  		status = at24_eeprom_read(at24, buf, off, count);
+Got it. Thanks Alex. I may have future queries as well on this. Will get back to you.
 
-Since the patch replaces ssize_t with int here, it would also make
-sense to do the same to at24_eeprom_read and at24_eeprom_write. Either
-use ssize_t everywhere or nowhere.
+Thanks,
+Nitin
 
-      Andrew
+> On 04-May-2016, at 01:33, Alex Williamson <alex.williamson@redhat.com> wrote:
+> 
+> Hi,
+> 
+> On Tue, 3 May 2016 23:56:38 +0530
+> Nitin Saxena <nitin.lnx@gmail.com> wrote:
+> 
+>> Hi,
+>> 
+>> I am a newbie to VFIO framework and trying to use it for MSIX interrupt
+>> handling in my userspace application. My userspace application is like
+>> intel's dpdk.
+>> 
+>> My query is why vfio kernel code does not support msix masking/ unmasking
+>> i.e VFIO_SET_ACTION_TRIGGER is not implemented in kernel vfio code for MSIX
+>> but its present for legacy INTX?
+> 
+> I think you mean VFIO_IRQ_SET_ACTION_MASK and
+> VFIO_IRQ_SET_ACTION_UNMASK are not implemented for MSI/X,
+> VFIO_IRQ_SET_ACTION_TRIGGER is the only one that is implemented.  It
+> mostly comes down to it hasn't been needed.  We would just need to
+> verify that disable_irq() and enable_irq() do the right thing and
+> enable the features through the existing VFIO API.  The reason we have
+> these for INTx is that INTx is level triggered and we must mask the
+> interrupt on the host while it's serviced by the user because the
+> interrupt will continue to assert and we have no service guarantees
+> from the user.  MSI/X is of course edge triggered, so doesn't have this
+> problem.  The device would need to continue to re-assert the
+> interrupt.  In cases like a QEMU user, we might want to continue to
+> receive guest masked interrupts to QEMU for emulating the pending bits
+> array, so even if we had VFIO masking support for these interrupts, QEMU
+> probably would not use it.  If MSI/X masking is useful for you vs simply
+> ignoring the eventfd, patches welcome.
+> 
+>> Another question since MSIX interrupt masking is absent in kernel who is
+>> supposed to mask/unmask msix interrupt? does userspace needs to mask/unmask
+>> interrupt after getting notified by eventfd. Is there any usecase where
+>> MSIX handling is done via VFIO framework?
+> 
+> MSI/X is edge triggered and VFIO does not set the AUTOMASKED flag on
+> them, so there is simply no masking of them at all aside from fully
+> disabling them.  QEMU has full support for MSI/X through VFIO that you
+> can use for reference.  Thanks,
+> 
+> Alex
