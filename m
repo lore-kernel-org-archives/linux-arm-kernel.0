@@ -1,38 +1,110 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 May 2016 15:06:45 +0200
-Subject: [PATCH v3 3/3] ARM: dts: exynos: Lower SD card interface voltage
- to 2.8 V on Odroid X/X2/U3
-In-Reply-To: <764fb4d7-873f-0e59-446b-e9652151512d@osg.samsung.com>
-References: <1462365840-27406-1-git-send-email-k.kozlowski@samsung.com>
- <1462365840-27406-3-git-send-email-k.kozlowski@samsung.com>
- <764fb4d7-873f-0e59-446b-e9652151512d@osg.samsung.com>
-Message-ID: <5729F3E5.4010702@samsung.com>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Wed,  4 May 2016 15:17:33 +0200
+Subject: [PATCHv3] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+Message-ID: <1462367853-29912-1-git-send-email-oliver@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2016 02:51 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 05/04/2016 08:44 AM, Krzysztof Kozlowski wrote:
->> Odroid X/X2/U3 schematics say that SD card vmmc regulator
->> (LDO21/TFLASH) operates on 2.8 V. Mainline U-Boot uses that value as
->> well and 2.8 V is common on Exynos-based boards. Additionally use some
->> descriptive name for this regulator.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> ---
->> Changes since v2:
->> 1. Add Javier's tag.
->>
-> 
-> It's missing though :)
-> 
-> Adding the tag again so it can be picked by patchwork:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+There are 3 kinds of OLinuXino Lime2 boards.
+One without any on board storage, one with NAND storage and one with
+eMMC storage. This patch adds the eMMC variant of boards.
 
-D'oh!
+eMMC storage is different from a regular SD card in that it is soldered
+on the board and cannot be changed. Additionally, it shares pins with
+the NAND module and with the second SPI port.
 
-Thanks for spotting,
-Krzysztof
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+---
+ .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    | 81 ++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+new file mode 100644
+index 0000000..9680fcb
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+@@ -0,0 +1,81 @@
++ /*
++ * Copyright 2015 - Ultimaker B.V.
++ * Author Olliver Schinagl <oliver@schinagl.nl>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sun7i-a20-olinuxino-lime2.dts"
++
++/ {
++	model = "Olimex A20-OLinuXino-LIME2-eMMC";
++
++	mmc2_pwrseq: pwrseq {
++		pinctrl-0 = <&mmc2_pins_nrst>;
++		pinctrl-names = "default";
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
++	};
++};
++
++&pio {
++	mmc2_pins_nrst: mmc2 at 0 {
++		allwinner,pins = "PC16";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	mmc-pwrseq = <&mmc2_pwrseq>;
++	status = "okay";
++
++	emmc: emmc at 0 {
++		reg = <0>;
++		compatible = "mmc-card";
++		broken-hpi;
++	};
++};
+-- 
+2.8.1
