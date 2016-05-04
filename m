@@ -1,18 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 4 May 2016 10:10:47 -0700
-Subject: [PATCH 1/1] arm64: dts: Enable GPIO for Broadcom NS2 SoC
-In-Reply-To: <1457087010-26306-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1457087010-26306-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <572A2D17.8000802@gmail.com>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Wed, 4 May 2016 20:16:30 +0300
+Subject: [PATCH 2/7] arm64: add io{read,write}64be accessors
+Message-ID: <1462382190-11937-1-git-send-email-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/16 02:23, Yendapally Reddy Dhananjaya Reddy wrote:
-> This enables the GPIO support for Broadcom NS2 SoC
-> 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+This will allow device drivers to consistently use io{read,write}XXbe
+also for 64-bit accesses.
 
-Applied to devicetree-arm64/next, thanks and sorry about the lag, this
-one fell through the cracks.
+Signed-off-by: Alex Porosanu <alexandru.porosanu@nxp.com>
+Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+---
+ arch/arm64/include/asm/io.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 44be1e03ed65..9b6e408cfa51 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
+ 
+ /*
+- * io{read,write}{16,32}be() macros
++ * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+ #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
++#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
+ 
+ #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
++#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
+ /*
+  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
 -- 
-Florian
+2.4.4
