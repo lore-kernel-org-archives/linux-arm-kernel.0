@@ -1,37 +1,40 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 4 May 2016 08:51:25 -0400
-Subject: [PATCH v3 3/3] ARM: dts: exynos: Lower SD card interface voltage
- to 2.8 V on Odroid X/X2/U3
-In-Reply-To: <1462365840-27406-3-git-send-email-k.kozlowski@samsung.com>
-References: <1462365840-27406-1-git-send-email-k.kozlowski@samsung.com>
- <1462365840-27406-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <764fb4d7-873f-0e59-446b-e9652151512d@osg.samsung.com>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Wed, 4 May 2016 14:52:12 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <CANCTEQgjiuQXcaw=3Dr5kUsTPc3nsDQf2odwzs4nHvrkREAqrg@mail.gmail.com>
+References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+ <CAGb2v66E2TuN3+tYaAbniV3q67waDZOfqKAW14VJz6xZFomZ=Q@mail.gmail.com>
+ <57285162.2000704@schinagl.nl>
+ <CAGb2v66r9m7qVW6BszeT2wqs0KyEr4x5ivTJYqu2Fes=R9-Ltw@mail.gmail.com>
+ <CANCTEQgjiuQXcaw=3Dr5kUsTPc3nsDQf2odwzs4nHvrkREAqrg@mail.gmail.com>
+Message-ID: <5729F07C.3080308@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hey Radoslav,
 
-On 05/04/2016 08:44 AM, Krzysztof Kozlowski wrote:
-> Odroid X/X2/U3 schematics say that SD card vmmc regulator
-> (LDO21/TFLASH) operates on 2.8 V. Mainline U-Boot uses that value as
-> well and 2.8 V is common on Exynos-based boards. Additionally use some
-> descriptive name for this regulator.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> Changes since v2:
-> 1. Add Javier's tag.
-> 
+On 04-05-16 14:30, Radoslav Kolev wrote:
+> 2016-05-03 10:25 GMT+03:00 Chen-Yu Tsai <wens@csie.org>:
+>> On Tue, May 3, 2016 at 3:21 PM, Olliver Schinagl <oliver@schinagl.nl> wrote:
+>>>>> +       bus-width = <4>;
+>>>> Only 4 bits? We normally see eMMC with 8 bits. 4 bits are some kind of
+>>>> embedded SD card.
+>>> On A20 as well? Our investigations so far have concluded that the A10 and
+>>> A20 have those pins not mapped out to pads. The IP does support it however
+>>> we assume.
+>> You're right. My bad. First time A10/A20 sees eMMC support.
+> I can't say anything about A10/A20, but I have a board with A13 and
+> the same eMMC chip and it works fine in 8 bit mode.
+Yep, sun5i actually brings them all out to pads, the A20 however does 
+not :( We first thought that the A20 would also be an 8bitter, because 
+the mmc IP appears to be the same as sun5i, but initial tests show it is 
+not. As for A10, it has older IP and it might not even support 8 bit 
+mode, let alone bring out the pins.
 
-It's missing though :)
+But with A20's + eMMC being available via the lime2, others may repeat 
+my experiments! The lime2 is 8 bit connected.
 
-Adding the tag again so it can be picked by patchwork:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Olliver
+>
+> Regards,
+> Radoslav
