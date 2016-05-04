@@ -1,47 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 May 2016 10:31:53 -0700
-Subject: [GIT PULL] omap legacy boot vs dt boot fixes for v4.7 merge window
-Message-ID: <20160504173153.GT5995@atomide.com>
+From: oss@buserror.net (Scott Wood)
+Date: Wed, 04 May 2016 12:35:08 -0500
+Subject: [v9, 6/7] MAINTAINERS: add entry for Freescale SoC driver
+In-Reply-To: <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
+References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
+ <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1462383308.16584.43.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+On Wed, 2016-05-04 at 11:24 +0800, Yangbo Lu wrote:
+> Add maintainer entry for Freescale SoC driver including
+> the QE library and the GUTS driver now. Also add maintainer
+> for QE library.
+> 
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> ---
+> Changes for v8:
+> 	- Added this patch
+> Changes for v9:
+> 	- Added linux-arm mail list
+> 	- Removed GUTS driver entry
+> ---
+>  MAINTAINERS | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 42e65d1..ce91db7 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4622,9 +4622,18 @@ F:	drivers/net/ethernet/freescale/fec_ptp.c
+>  F:	drivers/net/ethernet/freescale/fec.h
+>  F:	Documentation/devicetree/bindings/net/fsl-fec.txt
+>  
+> +FREESCALE SOC DRIVER
+> +M:	Scott Wood <oss@buserror.net>
+> +L:	linuxppc-dev at lists.ozlabs.org
+> +L:	linux-arm-kernel at lists.infradead.org
+> +S:	Maintained
+> +F:	drivers/soc/fsl/
+> +F:	include/linux/fsl/
+> +
+>  FREESCALE QUICC ENGINE LIBRARY
+> +M:	Qiang Zhao <qiang.zhao@nxp.com>
+>  L:	linuxppc-dev at lists.ozlabs.org
+> -S:	Orphan
+> +S:	Maintained
+>  F:	drivers/soc/fsl/qe/
+>  F:	include/soc/fsl/*qe*.h
+>  F:	include/soc/fsl/*ucc*.h
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+s/DRIVER/DRIVERS/
 
-are available in the git repository at:
+There's more than one.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/legacy-signed
+Otherwise:
+Acked-by: Scott Wood <oss@buserror.net>
 
-for you to fetch changes up to 10c1f7d32bf451d4309850c15ab1fdadccf92620:
+-Scott
 
-  ARM: OMAP2+: n900 needs MMC slot names for legacy user space (2016-04-28 14:26:33 -0700)
-
-----------------------------------------------------------------
-Legacy booting vs device tree booting fixes for omaps for
-v4.7 merge window. These are not considered urgent fixes enough
-for the v4.6-rc cycle, but we need them in v4.7 in order to drop
-the last remaining board-*.c files for omap3 for v4.8 merge window.
-
-On Nokia N900, we need to pass the MMC slot names for the legacy
-user space to work. Let's do that using auxdata as the driver is
-setting up things already with the pdata for legacy booting. Then
-we can later on discuss if we may want to have some generic binding
-describing where the MMC slots are on the device.
-
-N900 also has had the ir-rx51 device driver unusable with multiarch
-for a long time. Let's pass the dmtimer data in pdata for the driver
-to get it going again. Then once things are working, we can eventually
-change the driver to use just hrtimer and PWM framework. The driver
-changes will be queued separately.
-
-----------------------------------------------------------------
-Tony Lindgren (2):
-      ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51
-      ARM: OMAP2+: n900 needs MMC slot names for legacy user space
-
- arch/arm/mach-omap2/board-rx51-peripherals.c   | 35 ++++++++++++++++++++--
- arch/arm/mach-omap2/pdata-quirks.c             | 40 +++++++++++++++++++++++++-
- include/linux/platform_data/media/ir-rx51.h    |  1 +
- include/linux/platform_data/pwm_omap_dmtimer.h | 21 ++++++++++++++
- 4 files changed, 94 insertions(+), 3 deletions(-)
+> 
