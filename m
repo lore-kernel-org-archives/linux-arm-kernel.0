@@ -1,61 +1,33 @@
-From: oss@buserror.net (Scott Wood)
-Date: Wed, 04 May 2016 12:35:08 -0500
-Subject: [v9, 6/7] MAINTAINERS: add entry for Freescale SoC driver
-In-Reply-To: <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
-References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
- <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1462383308.16584.43.camel@buserror.net>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed,  4 May 2016 12:43:55 -0500
+Subject: [PATCH] ARM: dts: dra7: Add gpmc dma channel
+Message-ID: <1462383835-10839-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-05-04 at 11:24 +0800, Yangbo Lu wrote:
-> Add maintainer entry for Freescale SoC driver including
-> the QE library and the GUTS driver now. Also add maintainer
-> for QE library.
-> 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> ---
-> Changes for v8:
-> 	- Added this patch
-> Changes for v9:
-> 	- Added linux-arm mail list
-> 	- Removed GUTS driver entry
-> ---
->  MAINTAINERS | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 42e65d1..ce91db7 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4622,9 +4622,18 @@ F:	drivers/net/ethernet/freescale/fec_ptp.c
->  F:	drivers/net/ethernet/freescale/fec.h
->  F:	Documentation/devicetree/bindings/net/fsl-fec.txt
->  
-> +FREESCALE SOC DRIVER
-> +M:	Scott Wood <oss@buserror.net>
-> +L:	linuxppc-dev at lists.ozlabs.org
-> +L:	linux-arm-kernel at lists.infradead.org
-> +S:	Maintained
-> +F:	drivers/soc/fsl/
-> +F:	include/linux/fsl/
-> +
->  FREESCALE QUICC ENGINE LIBRARY
-> +M:	Qiang Zhao <qiang.zhao@nxp.com>
->  L:	linuxppc-dev at lists.ozlabs.org
-> -S:	Orphan
-> +S:	Maintained
->  F:	drivers/soc/fsl/qe/
->  F:	include/soc/fsl/*qe*.h
->  F:	include/soc/fsl/*ucc*.h
+Add dma channel information to the gpmc.
 
-s/DRIVER/DRIVERS/
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+This patch is based on top of linux-next where EDMA support for DRA7 has
+been added.
 
-There's more than one.
+ arch/arm/boot/dts/dra7.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Otherwise:
-Acked-by: Scott Wood <oss@buserror.net>
-
--Scott
-
-> 
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index e007401..3a8f397 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1451,6 +1451,8 @@
+ 			ti,hwmods = "gpmc";
+ 			reg = <0x50000000 0x37c>;      /* device IO registers */
+ 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			dmas = <&edma_xbar 4 0>;
++			dma-names = "rxtx";
+ 			gpmc,num-cs = <8>;
+ 			gpmc,num-waitpins = <2>;
+ 			#address-cells = <2>;
+-- 
+2.7.0
