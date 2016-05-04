@@ -1,53 +1,38 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  4 May 2016 18:43:47 -0300
-Subject: [PATCH v2 1/2] ARM: dts: imx6ul: Specify the SAI index
-Message-ID: <1462398228-24447-1-git-send-email-festevam@gmail.com>
+Date: Wed,  4 May 2016 18:43:48 -0300
+Subject: [PATCH v2 2/2] ARM: dts: imx6ul-14x14-evk: Pass "fsl,
+ sai-mclk-direction-output"
+In-Reply-To: <1462398228-24447-1-git-send-email-festevam@gmail.com>
+References: <1462398228-24447-1-git-send-email-festevam@gmail.com>
+Message-ID: <1462398228-24447-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Introduce the "sai-index" property to indicate the index of the SAI port.
-
-This is useful for configuring the SAI_MCLK output as we need to write
-to bits 19, 20 and 21 of register GPR1 for SAI1, SAI2 and SAI3,
-respectively.
+Pass "fsl,sai-mclk-direction-output" to the sai2 node, so that the
+SAI2_MCLK can be an output.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-Change since v1:
-- None
+Changes since v1:
+- Drop gpr node
+- Use "fsl,sai-mclk-direction-output"
 
- arch/arm/boot/dts/imx6ul.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 4356b65..b11d5a8 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -281,6 +281,7 @@
- 					dmas = <&sdma 35 24 0>,
- 					       <&sdma 36 24 0>;
- 					dma-names = "rx", "tx";
-+					sai-index = <1>;
- 					status = "disabled";
- 				};
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 668a729..918c7c8 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -146,6 +146,7 @@
+ 			  <&clks IMX6UL_CLK_SAI2>;
+ 	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
+ 	assigned-clock-rates = <0>, <12288000>;
++	fsl,sai-mclk-direction-output;
+ 	status = "okay";
+ };
  
-@@ -296,6 +297,7 @@
- 					dmas = <&sdma 37 24 0>,
- 					       <&sdma 38 24 0>;
- 					dma-names = "rx", "tx";
-+					sai-index = <2>;
- 					status = "disabled";
- 				};
- 
-@@ -311,6 +313,7 @@
- 					dmas = <&sdma 39 24 0>,
- 					       <&sdma 40 24 0>;
- 					dma-names = "rx", "tx";
-+					sai-index = <3>;
- 					status = "disabled";
- 				};
- 			};
 -- 
 1.9.1
