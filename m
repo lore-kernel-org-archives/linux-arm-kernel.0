@@ -1,60 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 4 May 2016 09:43:38 +0200
-Subject: [v9, 6/7] MAINTAINERS: add entry for Freescale SoC driver
-In-Reply-To: <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
-References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
- <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <CAPDyKFoh7mfmMYxVxjG6jrRr6CuGKkuxdeON4yxX3yXFEamikg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 May 2016 08:49:55 +0100
+Subject: [PATCH 2/2] irqchip/gic-v2m: Add workaround for Broadcom NS2
+ GICv2m erratum
+In-Reply-To: <1462319245-32532-3-git-send-email-ray.jui@broadcom.com>
+References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
+ <1462319245-32532-3-git-send-email-ray.jui@broadcom.com>
+Message-ID: <5729A9A3.6070207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 May 2016 at 05:24, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> Add maintainer entry for Freescale SoC driver including
-> the QE library and the GUTS driver now. Also add maintainer
-> for QE library.
->
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+On 04/05/16 00:47, Ray Jui wrote:
+> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
+> implementation has an erratum where the MSI data needs to be the SPI
+> number subtracted by an offset of 32, for the correct MSI interrupt to
+> be triggered.
+> 
+> We are aware that APM X-Gene GICv2m has a similar erratum where the
+> MSI data needs to be the offset from the spi_start. While APM's workaround
+> is triggered based on readings from the MSI_IIDR register, this patch
+> contains a more general solution by allowing this offset to be
+> specified with an optional DT property 'arm,msi-offset-spi'. This patch
+> also maintains compatibility with existing APM platforms
 
-So I need an ack from Scott and Qiang for this one, then I intend to
-queue up the series.
+It may be more generic, but it also fails to deal with less capable
+firmware implementations. In contrast, reading MSI_IIDR is always
+possible (assuming you have a unique ID for this v2m implementation).
 
-Kind regards
-Uffe
+If you cannot uniquely identify it using an ID register, the usual
+alternative is to have a new "compatible" string identifying the
+defective part, and set the offset based on this string. This still
+fails the ACPI test, but is the least invasive DT-wise.
 
-> ---
-> Changes for v8:
->         - Added this patch
-> Changes for v9:
->         - Added linux-arm mail list
->         - Removed GUTS driver entry
-> ---
->  MAINTAINERS | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 42e65d1..ce91db7 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4622,9 +4622,18 @@ F:       drivers/net/ethernet/freescale/fec_ptp.c
->  F:     drivers/net/ethernet/freescale/fec.h
->  F:     Documentation/devicetree/bindings/net/fsl-fec.txt
->
-> +FREESCALE SOC DRIVER
-> +M:     Scott Wood <oss@buserror.net>
-> +L:     linuxppc-dev at lists.ozlabs.org
-> +L:     linux-arm-kernel at lists.infradead.org
-> +S:     Maintained
-> +F:     drivers/soc/fsl/
-> +F:     include/linux/fsl/
-> +
->  FREESCALE QUICC ENGINE LIBRARY
-> +M:     Qiang Zhao <qiang.zhao@nxp.com>
->  L:     linuxppc-dev at lists.ozlabs.org
-> -S:     Orphan
-> +S:     Maintained
->  F:     drivers/soc/fsl/qe/
->  F:     include/soc/fsl/*qe*.h
->  F:     include/soc/fsl/*ucc*.h
-> --
-> 2.1.0.27.g96db324
->
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
