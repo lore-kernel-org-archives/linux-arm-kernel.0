@@ -1,35 +1,66 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed,  4 May 2016 22:13:08 +0800
-Subject: [PATCH v7 3/9] i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
-In-Reply-To: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
-References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1462371194-5809-4-git-send-email-david.wu@rock-chips.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 4 May 2016 19:44:49 +0530
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <20160503171602.GA2518@roeck-us.net>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net>
+ <20160503143856.GE13045@dhcppc6.redhat.com>
+ <5728BEC4.6050603@codeaurora.org>
+ <20160503155141.GF13045@dhcppc6.redhat.com>
+ <20160503171602.GA2518@roeck-us.net>
+Message-ID: <20160504141449.GG13045@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call rk3x_i2c_setup() before rk3x_i2c_start()
-and the last thing in setup was to clean the IPD,
-so no reason to do it at the beginning of start.
+Hi Guenter,
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
----
-Change in v7:
-- none
+On 03/05/2016:10:16:02 AM, Guenter Roeck wrote:
+> On Tue, May 03, 2016 at 09:21:41PM +0530, Pratyush Anand wrote:
+> > On 03/05/2016:10:07:48 AM, Timur Tabi wrote:
+> > > Pratyush Anand wrote:
+> > > >In fact after supporting max_hw_heartbeat_ms, there should be no change for
+> > > >action=0 functionally. However, we would still need some changes for action=1.
+> > > 
+> > > IMHO, action=1 is more of a debugging option, and not something that would
+> > > be used normally.  I would need to see some evidence that real users want to
+> > > have action=1 and a longer timeout.
+> > > 
+> > If action=1 need to be used effectively, then we should have something which
+> > would help to increase timeout values.
+> > 
+> > Currently you have only 10 second to execute secondary kernel, which might not
+> > be sufficient.
+> > 
+> Previously the argument was that the 10 seconds (assuming the clock runs at
+> maximum speed) would not be sufficient to load the watchdog application. Now it
 
- drivers/i2c/busses/i2c-rk3x.c | 1 -
- 1 file changed, 1 deletion(-)
+May be you meant "would be sufficient". OK..let me clarify on it.
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 1e2677a..9eeb4e5 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -174,7 +174,6 @@ static void rk3x_i2c_start(struct rk3x_i2c *i2c)
- {
- 	u32 val;
+Currently it takes 7-8 second from the point 1st kernel panics to the point
+second kernel boots. (Given, we have D-cache enabled in kexec-tools, for which
+community is not yet agreed), anyway..so, it is safe for me as of now. But,
+there is only 2-3 second margin. So, I am not sure if all sort of secondary
+kernel will be able to make it in that time.
+
+Following minimal code will be able to extend timeout for secondary kernel, and
+I do not see anything wrong in it. We are anyway, panicking in ISR, so what
+could be disadvantage if we write a wdt register just before panicking?
+
+--- a/drivers/watchdog/sbsa_gwdt.c
++++ b/drivers/watchdog/sbsa_gwdt.c
+@@ -221,6 +221,13 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
  
--	rk3x_i2c_clean_ipd(i2c);
- 	i2c_writel(i2c, REG_INT_START, REG_IEN);
- 
- 	/* enable adapter with correct mode, send START condition */
--- 
-1.9.1
+static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
+{
++    struct sbsa_gwdt *gwdt = (struct sbsa_gwdt *)dev_id;
++    struct watchdog_device *wdd = &gwdt->wdd;
++    u64 timeout = (u64)gwdt->clk * wdd->timeout;
++
++    writeq(timeout + arch_counter_get_cntvct(),
++                    gwdt->control_base + SBSA_GWDT_WCV);
++
+     panic(WATCHDOG_NAME " timeout");
+      
+             return IRQ_HANDLED;
+
+~Pratyush
