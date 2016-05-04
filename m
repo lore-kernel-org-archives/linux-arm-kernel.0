@@ -1,60 +1,74 @@
-From: Nitin.Saxena@caviumnetworks.com (Saxena, Nitin)
-Date: Wed, 4 May 2016 02:12:30 +0000
-Subject: VFIO MSIX Query
-In-Reply-To: <20160503140249.4edaf3cc@t450s.home>
-References: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>,
- <20160503140249.4edaf3cc@t450s.home>
-Message-ID: <53EA6B5E-2D73-47C1-A912-1D05AB5D9E02@caviumnetworks.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 May 2016 21:22:10 -0500
+Subject: [RFC v6 1/3] gpio: dt-bindings: add wd,mbl-gpio bindings
+In-Reply-To: <103bf8fceb426a9c3b09641ea989955e3ec1c7d4.1462104492.git.chunkeey@googlemail.com>
+References: <cover.1462104492.git.chunkeey@googlemail.com>
+ <103bf8fceb426a9c3b09641ea989955e3ec1c7d4.1462104492.git.chunkeey@googlemail.com>
+Message-ID: <20160504022210.GA9913@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Got it. Thanks Alex. I may have future queries as well on this. Will get back to you.
+On Sun, May 01, 2016 at 02:18:37PM +0200, Christian Lamparter wrote:
+> This patch adds the device tree bindings for the Western Digital's
+> MyBook Live memory-mapped GPIO controllers.
+> 
+> The gpios will be supported by gpio-mmio code of the
+> GPIO generic library.
+> 
+> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+> ---
+>  .../devicetree/bindings/gpio/wd,mbl-gpio.txt       | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+> new file mode 100644
+> index 0000000..038c3a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+> @@ -0,0 +1,38 @@
+> +Bindings for the Western Digital's MyBook Live memory-mapped GPIO controllers.
 
-Thanks,
-Nitin
+Are these really product level GPIOs rather than some SOC's GPIOs 
+(APM?)?
 
-> On 04-May-2016, at 01:33, Alex Williamson <alex.williamson@redhat.com> wrote:
+> +
+> +The Western Digital MyBook Live has two memory-mapped GPIO controllers.
+> +Both GPIO controller only have a single 8-bit data register, where GPIO
+> +state can be read and/or written.
+> +
+> +Required properties:
+> +	- compatible: should be "wd,mbl-gpio"
+> +	- reg-names: must contain
+> +		"dat" - data register
+> +	- reg: address + size pairs describing the GPIO register sets;
+> +		order must correspond with the order of entries in reg-names
+> +	- #gpio-cells: must be set to 2. The first cell is the pin number and
+> +			the second cell is used to specify the gpio polarity:
+> +			0 = active high
+> +			1 = active low
+> +	- gpio-controller: Marks the device node as a gpio controller.
+> +
+> +Optional properties:
+> +	- no-output: GPIOs are read-only.
+> +
+> +Examples:
+> +	gpio0: gpio0 at e0000000 {
+> +		compatible = "wd,mbl-gpio";
+> +		reg-names = "dat";
+> +		reg = <0xe0000000 0x1>;
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	gpio1: gpio1 at e0100000 {
+> +		compatible = "wd,mbl-gpio";
+> +		reg-names = "dat";
+> +		reg = <0xe0100000 0x1>;
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +		no-output;
+> +	};
+> -- 
+> 2.8.1
 > 
-> Hi,
-> 
-> On Tue, 3 May 2016 23:56:38 +0530
-> Nitin Saxena <nitin.lnx@gmail.com> wrote:
-> 
->> Hi,
->> 
->> I am a newbie to VFIO framework and trying to use it for MSIX interrupt
->> handling in my userspace application. My userspace application is like
->> intel's dpdk.
->> 
->> My query is why vfio kernel code does not support msix masking/ unmasking
->> i.e VFIO_SET_ACTION_TRIGGER is not implemented in kernel vfio code for MSIX
->> but its present for legacy INTX?
-> 
-> I think you mean VFIO_IRQ_SET_ACTION_MASK and
-> VFIO_IRQ_SET_ACTION_UNMASK are not implemented for MSI/X,
-> VFIO_IRQ_SET_ACTION_TRIGGER is the only one that is implemented.  It
-> mostly comes down to it hasn't been needed.  We would just need to
-> verify that disable_irq() and enable_irq() do the right thing and
-> enable the features through the existing VFIO API.  The reason we have
-> these for INTx is that INTx is level triggered and we must mask the
-> interrupt on the host while it's serviced by the user because the
-> interrupt will continue to assert and we have no service guarantees
-> from the user.  MSI/X is of course edge triggered, so doesn't have this
-> problem.  The device would need to continue to re-assert the
-> interrupt.  In cases like a QEMU user, we might want to continue to
-> receive guest masked interrupts to QEMU for emulating the pending bits
-> array, so even if we had VFIO masking support for these interrupts, QEMU
-> probably would not use it.  If MSI/X masking is useful for you vs simply
-> ignoring the eventfd, patches welcome.
-> 
->> Another question since MSIX interrupt masking is absent in kernel who is
->> supposed to mask/unmask msix interrupt? does userspace needs to mask/unmask
->> interrupt after getting notified by eventfd. Is there any usecase where
->> MSIX handling is done via VFIO framework?
-> 
-> MSI/X is edge triggered and VFIO does not set the AUTOMASKED flag on
-> them, so there is simply no masking of them at all aside from fully
-> disabling them.  QEMU has full support for MSI/X through VFIO that you
-> can use for reference.  Thanks,
-> 
-> Alex
