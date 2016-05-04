@@ -1,106 +1,120 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 May 2016 14:54:33 +0100
-Subject: [PATCH v2 18/54] KVM: arm/arm64: vgic-new: Add GICv3 world switch
- backend
-In-Reply-To: <5729F97A.1090909@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-19-git-send-email-andre.przywara@arm.com>
- <5728CEDC.9080308@arm.com> <5729F97A.1090909@arm.com>
-Message-ID: <5729FF19.3030205@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 04 May 2016 15:09:54 +0100
+Subject: [PATCH] arm64: Make arch_randomize_brk avoid stack area
+In-Reply-To: <1461848638.2848.19.camel@linaro.org>
+References: <1461848638.2848.19.camel@linaro.org>
+Message-ID: <1462370994.2895.11.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/16 14:30, Andre Przywara wrote:
-> Hi,
-> 
-> On 03/05/16 17:16, Marc Zyngier wrote:
->> On 28/04/16 17:45, Andre Przywara wrote:
->>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>> As the GICv3 virtual interface registers differ from their GICv2
->>> siblings, we need different handlers for processing maintenance
->>> interrupts and reading/writing to the LRs.
->>> Implement the respective handler functions and connect them to
->>> existing code to be called if the host is using a GICv3.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> Changelog RFC..v1:
->>> - remove outdated comment about the dist_lock
->>> - add WARN_ON about LR_STATE not being 0 in maintenance interrupts
->>>
->>> Changelog v1 .. v2:
->>> - inject the IRQ priority into the list register
->>>
->>>  include/linux/irqchip/arm-gic-v3.h |   1 +
->>>  virt/kvm/arm/vgic/vgic-v3.c        | 169 +++++++++++++++++++++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic.c           |  25 ++++--
->>>  virt/kvm/arm/vgic/vgic.h           |  29 +++++++
->>>  4 files changed, 219 insertions(+), 5 deletions(-)
->>>  create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
->>>
->>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->>> index d5d798b..56fd2c5 100644
->>> --- a/include/linux/irqchip/arm-gic-v3.h
->>> +++ b/include/linux/irqchip/arm-gic-v3.h
->>> @@ -275,6 +275,7 @@
->>>  #define ICH_LR_ACTIVE_BIT		(1ULL << 63)
->>>  #define ICH_LR_PHYS_ID_SHIFT		32
->>>  #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
->>> +#define ICH_LR_PRIORITY_SHIFT		48
->>>  
->>>  #define ICH_MISR_EOI			(1 << 0)
->>>  #define ICH_MISR_U			(1 << 1)
->>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>> new file mode 100644
->>> index 0000000..461229b
->>> --- /dev/null
->>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>> @@ -0,0 +1,169 @@
->>> +/*
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/irqchip/arm-gic-v3.h>
->>> +#include <linux/kvm.h>
->>> +#include <linux/kvm_host.h>
->>> +#include <linux/irqchip/arm-gic.h>
->>
->> This last line is definitely a (copy-paste) bug. We should never include
->> both GIC headers in the same file. Can you please drop that line and
->> have the following hunk instead?
->>
->> +/* These are for GICv2 emulation only */
->> +#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
->> +#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->> +#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
->> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
->> +
-> 
-> What about including those lines (except the last one) in arm-gic-v3.h
-> then? In fact they describe a property of an _GICv3_ LR, even if it is
-> only a compatibility feature.
-> That would be cleaner IMHO than repeating the definitions here in a .c
-> file and we would automatically get the right definitions by just
-> including arm-gic-v3.h.
-> 
-> This just compiled fine for me for both the old and new VGIC.
-> I can send the patch (needs to be a separate patch because it touches
-> the old VGIC as well) if you agree on that idea.
+When a process is created, various address randomisations could end up
+colluding to place the address of brk in the stack memory. This would
+mean processes making small heap based memory allocations are in danger
+of having them overwriting, or overwritten by, the stack.
 
-Sure, send the patch.
+Another consequence, is that even for processes that make no use of
+brk, the output of /proc/*/maps may show the stack area listed as
+'[heap]' rather than '[stack]'. Apart from being misleading this causes
+fatal errors with the Android run-time like:
+"No [stack] line found in /proc/self/task/*/maps"
 
-	M.
+To prevent this problem pick a limit for brk that allows for the stack's
+memory. At the same time we remove randomize_base() as that was only
+used by arch_randomize_brk().
+
+Note, in practice, since commit d1fd836dcf00 ("mm: split ET_DYN ASLR
+from mmap ASLR") this problem shouldn't occur because the address chosen
+for loading binaries is well clear of the stack, however, prior to that
+the problem does occur because of the following...
+
+The memory layout of a task is determined by arch_pick_mmap_layout. If
+address randomisation is enabled (task has flag PF_RANDOMIZE) this sets
+mmap_base to a random address at the top of task memory just below a
+region calculated to allow for a stack which itself may have a random
+base address. Any mmap operations that then happen which require an
+address allocating will use the topdown allocation method, i.e. the
+first allocated memory will be at the top of memory, just below the
+area set aside for the stack.
+
+When a relocatable binary is loaded into a new process by
+load_elf_binary and randomised address are enabled, it uses a
+'load_bias' of zero, so that when mmap is called to create a memory
+region for it, a new address is picked (address zero not being
+available). As this is the first memory region in the task, it gets the
+region just below the stack, as described previously.
+
+The loader then set's brk to the end of the elf data section, which will
+be near the end of the loaded binary and then it calls
+arch_randomize_brk. As this currently stands, this adds a random amount
+to brk, which unfortunately may take it into the address range where the
+stack lies.
+
+Testing:
+
+These changes have been tested on Linux v4.6-rc4 using 100000
+invocations of a program [1] that can display the offset of a process's
+brk...
+
+$for i in $(seq 100000); do ./aslr --report brk ; done
+
+This shows values of brk are evenly distributed over a 1GB range, both
+before and after this change.
+
+With Linux version 3.18 (where the collision of brk and stack can happen
+and this change limits brk to avoid that) the distribution of brk values
+after the change shows a slope where lower values for brk are more
+common and upper values have about half the frequency of those.
+
+[1] http://bazaar.launchpad.net/~ubuntu-bugcontrol/qa-regression-testing/master/files/2499/scripts/kernel-security/aslr/
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Cc: <stable@vger.kernel.org> # 4.0 and earlier
+
+---
+
+Changes since RFC.
+- Fixed compilation errors (finger trouble preparing original email)
+- Updated commit message to included notes on testing
+- Added CC stable for Linux '4.0 and earlier'
+
+ arch/arm64/kernel/process.c | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 8062482..26429a0 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -382,13 +382,25 @@ unsigned long arch_align_stack(unsigned long sp)
+ 	return sp & ~0xf;
+ }
+ 
+-static unsigned long randomize_base(unsigned long base)
++unsigned long arch_randomize_brk(struct mm_struct *mm)
+ {
++	unsigned long base = mm->brk;
+ 	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
+-	return randomize_range(base, range_end, 0) ? : base;
+-}
++	unsigned long max_stack, range_limit;
+ 
+-unsigned long arch_randomize_brk(struct mm_struct *mm)
+-{
+-	return randomize_base(mm->brk);
++	/*
++	 * Determine how much room we need to leave available for the stack.
++	 * We limit this to a reasonable value, because extremely large or
++	 * unlimited stacks are always going to bump up against brk at some
++	 * point and we don't want to fail to randomise brk in those cases.
++	 */
++	max_stack = rlimit(RLIMIT_STACK);
++	if (max_stack > SZ_128M)
++		max_stack = SZ_128M;
++
++	range_limit = mm->start_stack - max_stack - 1;
++	if (range_end > range_limit)
++		range_end = range_limit;
++
++	return randomize_range(base, range_end, 0) ? : base;
+ }
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
