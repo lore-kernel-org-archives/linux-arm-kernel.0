@@ -1,54 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 4 May 2016 09:38:50 +0200
-Subject: [GIT PULL] Device Tree updated for Ux500 for v4.7
-Message-ID: <CACRpkdbjdM=L4DEUZ5fuDPRumXdiztqht1h+zu+UZoJKk1dXoA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 4 May 2016 09:43:38 +0200
+Subject: [v9, 6/7] MAINTAINERS: add entry for Freescale SoC driver
+In-Reply-To: <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
+References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
+ <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <CAPDyKFoh7mfmMYxVxjG6jrRr6CuGKkuxdeON4yxX3yXFEamikg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On 4 May 2016 at 05:24, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> Add maintainer entry for Freescale SoC driver including
+> the QE library and the GUTS driver now. Also add maintainer
+> for QE library.
+>
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 
-I guess I should have gotten this out the door earlier, especially
-since the patches were around since forever.
+So I need an ack from Scott and Qiang for this one, then I intend to
+queue up the series.
 
-Anyways this is a few cleanups of DTS files (use proper includes)
-and the assignment of the accelerometers as open drain so they
-actually work.
+Kind regards
+Uffe
 
-Please pull it in!
-
-Yours,
-Linus Walleij
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-armsoc-v4.7
-
-for you to fetch changes up to 7ba5dd530072d383f713a0fe1e4ffcdc5523ae37:
-
-  ARM: dts: ux500: configure the accelerometers open drain (2016-05-04
-09:33:25 +0200)
-
-----------------------------------------------------------------
-Devicetree updates for v4.7:
-- Use generic include files
-- Make accelerometers open drain on the TVK board
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: ux500: use the GPIO DT header
-      ARM: dts: ux500: use the GIC include header
-      ARM: dts: ux500: configure the accelerometers open drain
-
- arch/arm/boot/dts/ste-ccu9540.dts          |  2 +-
- arch/arm/boot/dts/ste-dbx5x0.dtsi          | 92 +++++++++++++++---------------
- arch/arm/boot/dts/ste-href-stuib.dtsi      |  4 +-
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 16 +++---
- arch/arm/boot/dts/ste-hrefprev60.dtsi      |  8 +--
- arch/arm/boot/dts/ste-hrefv60plus.dtsi     |  6 +-
- arch/arm/boot/dts/ste-snowball.dts         | 19 +++---
- 7 files changed, 75 insertions(+), 72 deletions(-)
+> ---
+> Changes for v8:
+>         - Added this patch
+> Changes for v9:
+>         - Added linux-arm mail list
+>         - Removed GUTS driver entry
+> ---
+>  MAINTAINERS | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 42e65d1..ce91db7 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4622,9 +4622,18 @@ F:       drivers/net/ethernet/freescale/fec_ptp.c
+>  F:     drivers/net/ethernet/freescale/fec.h
+>  F:     Documentation/devicetree/bindings/net/fsl-fec.txt
+>
+> +FREESCALE SOC DRIVER
+> +M:     Scott Wood <oss@buserror.net>
+> +L:     linuxppc-dev at lists.ozlabs.org
+> +L:     linux-arm-kernel at lists.infradead.org
+> +S:     Maintained
+> +F:     drivers/soc/fsl/
+> +F:     include/linux/fsl/
+> +
+>  FREESCALE QUICC ENGINE LIBRARY
+> +M:     Qiang Zhao <qiang.zhao@nxp.com>
+>  L:     linuxppc-dev at lists.ozlabs.org
+> -S:     Orphan
+> +S:     Maintained
+>  F:     drivers/soc/fsl/qe/
+>  F:     include/soc/fsl/*qe*.h
+>  F:     include/soc/fsl/*ucc*.h
+> --
+> 2.1.0.27.g96db324
+>
