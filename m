@@ -1,59 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 May 2016 14:43:58 +0200
-Subject: [PATCH v3 1/3] ARM: dts: exynos: Define vqmmc for SD card and allow
- disabling regulators on Odroid X/X2/U3
-Message-ID: <1462365840-27406-1-git-send-email-k.kozlowski@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 4 May 2016 14:46:53 +0200
+Subject: [PATCH v2 0/4] Patches to allow consistent mmc / mmcblk
+ numbering w/ device tree
+In-Reply-To: <CAL_JsqJ4Pzuip9VUpwryy_xK6XSZ6E+kus3wD=T4wcTHav=9iA@mail.gmail.com>
+References: <1461951139-6109-1-git-send-email-dianders@chromium.org>
+ <20160429181248.GW19428@n2100.arm.linux.org.uk>
+ <20160504071801.GA17045@amd>
+ <CAL_JsqJ4Pzuip9VUpwryy_xK6XSZ6E+kus3wD=T4wcTHav=9iA@mail.gmail.com>
+Message-ID: <20160504124653.GA23838@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SD-card vmmc-supply contained incorrectly two regulators. The second
-one is ignored. Fix this by defining proper vmmc and vqmmc supplies.
-Additionally these regulators do not have to be always on, so allow
-disabling them to reduce energy consumption.
+On Wed 2016-05-04 07:25:42, Rob Herring wrote:
+> On Wed, May 4, 2016 at 2:18 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Fri 2016-04-29 19:12:48, Russell King - ARM Linux wrote:
+> >> On Fri, Apr 29, 2016 at 10:32:15AM -0700, Douglas Anderson wrote:
+> >> > This series picks patches from various different places to produce what
+> >> > I consider the best solution to getting consistent mmc and mmcblk
+> >> > ordering.
+> >> >
+> >> > Why consistent ordering and why not just use UUIDs?  IMHO consistent
+> >> > ordering solves a few different problems:
+> >>
+> >> NAK.  Really.  Use UUIDs, that's the proper solution here.
+> >
+> > Except that UUIDs do not solve the problem.
+> >
+> > You have just booted of nfsroot, and you want to format u-SD card in
+> > the external slot. How do you do that?
+> 
+> The same way you format a USB stick when you insert it.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Well, and that actually brings related question "how do you format the
+right USB stick if you have 5 of them connected". PCs don't have good
+solution, but that does not mean it can't be solved.
 
----
+And no, its not really the same. At least in N900 case, I'm not really
+sure if you are expected to manipulate the u-SD card while the system
+is on. It is under battery cover.
 
-Changes since v2:
-1. Add Javier's tag.
+> If you have built-in versus removable, then we should expose that
+> information to userspace rather than some arbitrary encoding in DT
+> that 0 means built-in and 1 means removable. Or if you have multiple
+> slots, then use "label" to provide meaningful slot names.
 
-Changes since v1:
-1. None
----
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index cab0f07d7d28..3d0d44581fbd 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -249,7 +249,6 @@
- 				regulator-name = "VDDQ_MMC2_2.8V";
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
--				regulator-always-on;
- 				regulator-boot-on;
- 			};
- 
-@@ -345,7 +344,6 @@
- 				regulator-name = "LDO21_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
--				regulator-always-on;
- 				regulator-boot-on;
- 			};
- 
-@@ -482,7 +480,8 @@
- 	bus-width = <4>;
- 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
- 	pinctrl-names = "default";
--	vmmc-supply = <&ldo4_reg &ldo21_reg>;
-+	vmmc-supply = <&ldo21_reg>;
-+	vqmmc-supply = <&ldo4_reg>;
- 	cd-gpios = <&gpk2 2 GPIO_ACTIVE_HIGH>;
- 	cd-inverted;
- 	status = "okay";
+Yes, labels would be nice. Plus the slot numbers should be stable, so
+that booting does not randomly break.
+									Pavel
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
