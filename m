@@ -1,40 +1,28 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Wed, 4 May 2016 16:09:40 +0200
-Subject: [PATCH v2 2/3] ARM: DRA7x: dts: Update the OSC_32K_CLK frequency
-In-Reply-To: <5728E0BC.3080509@ti.com>
-References: <20160427171658.GA5995@atomide.com>
- <1462209123-7332-1-git-send-email-Linux.HWI@garmin.com>
- <1462209123-7332-3-git-send-email-Linux.HWI@garmin.com>
- <57285E66.2000708@ti.com>
- <5728A81F.4050906@garmin.com> <20160503164323.GN5995@atomide.com>
- <5728E0BC.3080509@ti.com>
-Message-ID: <CAALWOA_4bqWo-izirjQUKb-YjiyBJwAdek_z60kjnEnj74Er7w@mail.gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  4 May 2016 22:13:05 +0800
+Subject: [PATCH v7 0/9] add i2c driver supported for rk3399
+Message-ID: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2016 at 18:43, Tony Lindgren <tony@atomide.com> wrote:
-> Does a fixed divider calculation of input * (32768 / 27e6) make sense
-> here too as pointed out earlier by Matthijs for the ti81xx?
+There are two points differert from others:
+ - new method to caculate i2c timings for rk3399
+ - pclk and function clk are separated at rk3399
 
-That was an actual fractional divider, i.e. the output clock would be
-exactly that ratio of the input clock, which would therefore yield
-32768 Hz if the default crystal is used for the main osc.
+David Wu (9):
+  i2c: rk3x: add documentation to fields in "struct rk3x_i2c"
+  i2c: rk3x: use struct "rk3x_i2c_calced_timings"
+  i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
+  i2c: rk3x: Move setting STATE_START and add STATE_SETUP
+  i2c: rk3x: Change SoC data to not use array
+  i2c: rk3x: Move spec timing data to "static const" structs
+  dt-bindings: i2c: rk3x: add support for rk3399
+  i2c: rk3x: add i2c support for rk3399 soc
+  i2c: rk3x: support fast-mode plus for rk3399
 
-It makes no sense to use it to describe a wobbly RC osc.
+ Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  16 +-
+ drivers/i2c/busses/i2c-rk3x.c                      | 482 +++++++++++++++++----
+ 2 files changed, 419 insertions(+), 79 deletions(-)
 
-
-On 3 May 2016 at 19:32, Tero Kristo <t-kristo@ti.com> wrote:
-> Also, as it is security related, this is kind of sensitive area to discuss publicly.
-
-Don't be silly. The only sense in which this clock is "security
-related" is because it's used for the secure watchdog, and the reason
-to use it despite its inaccuracy is completely obvious: an internal rc
-osc can't be easily manipulated by an external attacker. I see no
-reason to act all cloak-and-dagger about this.
-
-(This seems to be a general theme to conceal "security related" things
-from public documentation. If I were an HS customer I'd actually be
-concerned about such behaviour since it would seem to indicate a lack
-of confidence in one's security architecture.)
-
-Matthijs
+-- 
+1.9.1
