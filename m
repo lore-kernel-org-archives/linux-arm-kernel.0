@@ -1,57 +1,136 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 4 May 2016 09:20:51 -0700
-Subject: [PATCH 2/2] irqchip/gic-v2m: Add workaround for Broadcom NS2
- GICv2m erratum
-In-Reply-To: <5729A9A3.6070207@arm.com>
-References: <1462319245-32532-1-git-send-email-ray.jui@broadcom.com>
- <1462319245-32532-3-git-send-email-ray.jui@broadcom.com>
- <5729A9A3.6070207@arm.com>
-Message-ID: <964ae899-2fd1-baa4-521d-a31326281aa0@broadcom.com>
+From: john@metanate.com (John Keeping)
+Date: Wed,  4 May 2016 17:21:57 +0100
+Subject: [PATCH v2 2/2] ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate
+ capture and playback"
+In-Reply-To: <1462378917-24135-1-git-send-email-john@metanate.com>
+References: <1462378917-24135-1-git-send-email-john@metanate.com>
+Message-ID: <1462378917-24135-2-git-send-email-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+This reverts commit eba65d179c1149cf79e68608d452631f33d7f017.
 
-On 5/4/2016 12:49 AM, Marc Zyngier wrote:
-> On 04/05/16 00:47, Ray Jui wrote:
->> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
->> implementation has an erratum where the MSI data needs to be the SPI
->> number subtracted by an offset of 32, for the correct MSI interrupt to
->> be triggered.
->>
->> We are aware that APM X-Gene GICv2m has a similar erratum where the
->> MSI data needs to be the offset from the spi_start. While APM's workaround
->> is triggered based on readings from the MSI_IIDR register, this patch
->> contains a more general solution by allowing this offset to be
->> specified with an optional DT property 'arm,msi-offset-spi'. This patch
->> also maintains compatibility with existing APM platforms
->
-> It may be more generic, but it also fails to deal with less capable
-> firmware implementations. In contrast, reading MSI_IIDR is always
-> possible (assuming you have a unique ID for this v2m implementation).
->
-> If you cannot uniquely identify it using an ID register, the usual
-> alternative is to have a new "compatible" string identifying the
-> defective part, and set the offset based on this string. This still
-> fails the ACPI test, but is the least invasive DT-wise.
+This broke audio on Veyron Jerry Chromebooks and I now cannot reproduce
+the problem I was trying to fix even with this commit reverted, so it
+seems that this was completely the wrong thing to do.
 
-Okay. We do seem to have an ID. The JEP code looks a bit weird as the 
-IIDR register reads 0x13f. We were just a bit concerned that there's 
-another chip from Broadcom that may happen to have the same ID but may 
-already have this offset issue fixed (or made worse with a different 
-offset, :) ). Since that chip has not even taped out yet, we can wait 
-till later to confirm. If a compatible string is needed in the future, 
-we'll add that.
+Reported-by: Enric Balletbo Serra <eballetbo@gmail.com>
+Signed-off-by: John Keeping <john@metanate.com>
+---
+v2: Add "ASoC: rockchip: " prefix to subject
 
-For now, I'm going to submit another patch to deal with this offset 
-based on IIDR reading 0x13f.
+ sound/soc/rockchip/rockchip_i2s.c | 72 ++++++++++++++++++++++-----------------
+ 1 file changed, 40 insertions(+), 32 deletions(-)
 
->
-> Thanks,
->
-> 	M.
->
-
-Thanks,
-
-Ray
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 34743ec61c49..574c6af28c06 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -82,8 +82,8 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
+ 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_ENABLE);
+ 
+ 		regmap_update_bits(i2s->regmap, I2S_XFER,
+-				   I2S_XFER_TXS_START,
+-				   I2S_XFER_TXS_START);
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
+ 
+ 		i2s->tx_start = true;
+ 	} else {
+@@ -92,23 +92,27 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
+ 		regmap_update_bits(i2s->regmap, I2S_DMACR,
+ 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
+ 
+-		regmap_update_bits(i2s->regmap, I2S_XFER,
+-				   I2S_XFER_TXS_START,
+-				   I2S_XFER_TXS_STOP);
+-
+-		regmap_update_bits(i2s->regmap, I2S_CLR,
+-				   I2S_CLR_TXC,
+-				   I2S_CLR_TXC);
++		if (!i2s->rx_start) {
++			regmap_update_bits(i2s->regmap, I2S_XFER,
++					   I2S_XFER_TXS_START |
++					   I2S_XFER_RXS_START,
++					   I2S_XFER_TXS_STOP |
++					   I2S_XFER_RXS_STOP);
+ 
+-		regmap_read(i2s->regmap, I2S_CLR, &val);
++			regmap_update_bits(i2s->regmap, I2S_CLR,
++					   I2S_CLR_TXC | I2S_CLR_RXC,
++					   I2S_CLR_TXC | I2S_CLR_RXC);
+ 
+-		/* Should wait for clear operation to finish */
+-		while (val & I2S_CLR_TXC) {
+ 			regmap_read(i2s->regmap, I2S_CLR, &val);
+-			retry--;
+-			if (!retry) {
+-				dev_warn(i2s->dev, "fail to clear\n");
+-				break;
++
++			/* Should wait for clear operation to finish */
++			while (val) {
++				regmap_read(i2s->regmap, I2S_CLR, &val);
++				retry--;
++				if (!retry) {
++					dev_warn(i2s->dev, "fail to clear\n");
++					break;
++				}
+ 			}
+ 		}
+ 	}
+@@ -124,8 +128,8 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
+ 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_ENABLE);
+ 
+ 		regmap_update_bits(i2s->regmap, I2S_XFER,
+-				   I2S_XFER_RXS_START,
+-				   I2S_XFER_RXS_START);
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
+ 
+ 		i2s->rx_start = true;
+ 	} else {
+@@ -134,23 +138,27 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
+ 		regmap_update_bits(i2s->regmap, I2S_DMACR,
+ 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
+ 
+-		regmap_update_bits(i2s->regmap, I2S_XFER,
+-				   I2S_XFER_RXS_START,
+-				   I2S_XFER_RXS_STOP);
+-
+-		regmap_update_bits(i2s->regmap, I2S_CLR,
+-				   I2S_CLR_RXC,
+-				   I2S_CLR_RXC);
++		if (!i2s->tx_start) {
++			regmap_update_bits(i2s->regmap, I2S_XFER,
++					   I2S_XFER_TXS_START |
++					   I2S_XFER_RXS_START,
++					   I2S_XFER_TXS_STOP |
++					   I2S_XFER_RXS_STOP);
+ 
+-		regmap_read(i2s->regmap, I2S_CLR, &val);
++			regmap_update_bits(i2s->regmap, I2S_CLR,
++					   I2S_CLR_TXC | I2S_CLR_RXC,
++					   I2S_CLR_TXC | I2S_CLR_RXC);
+ 
+-		/* Should wait for clear operation to finish */
+-		while (val & I2S_CLR_RXC) {
+ 			regmap_read(i2s->regmap, I2S_CLR, &val);
+-			retry--;
+-			if (!retry) {
+-				dev_warn(i2s->dev, "fail to clear\n");
+-				break;
++
++			/* Should wait for clear operation to finish */
++			while (val) {
++				regmap_read(i2s->regmap, I2S_CLR, &val);
++				retry--;
++				if (!retry) {
++					dev_warn(i2s->dev, "fail to clear\n");
++					break;
++				}
+ 			}
+ 		}
+ 	}
+-- 
+2.8.0.rc4.238.g874082a
