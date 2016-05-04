@@ -1,111 +1,225 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Wed, 04 May 2016 11:03:03 +0300
-Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
- suspend
-In-Reply-To: <1462324873.11651.57.camel@mhfsdcap03>
-References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
- <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
- <1462324873.11651.57.camel@mhfsdcap03>
-Message-ID: <871t5ifdxk.fsf@intel.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 4 May 2016 10:10:58 +0200
+Subject: [PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge
+ device companion assignment to core code.
+In-Reply-To: <20160427024537.GH6789@localhost>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-2-git-send-email-tn@semihalf.com>
+ <20160427024537.GH6789@localhost>
+Message-ID: <5729AE92.2090106@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
->> Hi,
->> 
->> chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
->> >> >> Click mouse after xhci suspend completion but before system suspend
->> >> >> completion, system will not be waken up by mouse if the duration of
->> >> >> them is larger than 20ms which is the device UFP's resume signaling
->> >> 
->> >> what is "them" here ? The duration of what is longer than 20ms ?
->> > They are "xhci suspend completion" and "system suspend completion";
->> >
->> > It's time duration
->> 
->> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
->> wakeup ?
-> It is not the time of xhci suspend consumed, but is the time of duration
-> from xhci suspend completion to system suspend completion(after BOOT-CPU
-> is turned off, SPM will be enabled to receive wakeup event)
-
-Okay, so SPM will be the entity actually handling wakeups, right ? I'm
-assuming something like this happens:
-
-echo mem > /sys/power/state
- /* start suspending devices */
-  xhci_suspend()
- /* all devices suspended */
- enable_spm()
-
-so, if a mouse button is pressed after xhci_suspend() returns but before
-enable_spm() runs, then we're gonna miss that event, am I right ?
-
-I can't think of any way to sort this out. Let's ask on linux-pm (I've
-added linux-pm to Cc list)
-
->> >> >> lasted. Another reason is that the SPM is not enabled before system
->> >> 
->> >> what's SPM ?
->> > It is System Power Management which is powered off when system is
->> > running in normal mode, and is powered on when system enters suspend
->> > mode. It is used to wakeup system when some wakeup sources, such as
->> > bluetooth or powerkey etc, tigger wakeup event.
->> 
->> okay, thanks
->> 
->> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
->> >>            ^^^^^^^^^^
->> >>            completion
->> >> 
->> >> >> So in order to reduce the duration less than 20ms, make use of
->> >> >> syscore's suspend/resume interface.
->> >> 
->> >> no, this is the wrong approach
->> > But it seems only one workable approach from software side
->> 
->> I wouldn't say that. It seems to me SPM should be enabled earlier.
-> Yes, but normally SPM should be enabled after all CPUS are turned off,
-> so it's difficult to do that, I mean enable SPM before turning off CPUS
-
-is it a requirement that SPM should be enabled only after all CPUs are
-turned off ? If that's the case, then any device in the system might
-have missed wakeups. This doesn't seem like a good design to me; unless
-I'm missing something...
-
->> >> >> Because the syscore runs on irq disabled context, and xhci's
->> >> >> suspend/resume calls some sleeping functions, enable local irq
->> >> >> and then disable it during suspend/resume. This may be not a problem,
->> >> >> since only boot CPU is runing.
->> >> 
->> >> another problem :) calling local_irq_{enable,disable}() is an indication
->> >> that something's wrong.
->> > Oh!
->> >
->> > BTW: There will be warning logs if they are not called.
->> 
->> yeah, I got that :-) But it's still wrong to use
->> local_irq_{enable,disable}() the way you're using them :-)
-> Yes
+On 27.04.2016 04:45, Bjorn Helgaas wrote:
+> [question for Rafael below]
 >
-> Thank you very much.
->> 
+> On Fri, Apr 15, 2016 at 07:06:36PM +0200, Tomasz Nowicki wrote:
+>> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+>> bridge initialization. They both use arch-specific sysdata to pass down
+>> parent device reference and both rely on NULL parent in pci_create_root_bus()
+>> to validate sysdata content.
+>>
+>> It looks hacky and prevents us from getting some firmware specific
+>> info for PCI host controller based on its acpi_device structure
+>> in generic pci_create_root_bus() function. However, we overcome that
+>> blocker by passing down parent device via pci_create_root_bus parameter
+>> (as the ACPI device type). Then we use ACPI_COMPANION_SET in core code
+>> for ACPI boot method only. ACPI_COMPANION_SET is safe to run for all
+>> cases DT, ACPI and DT&ACPI.
+>>
+>> Since now PCI core code is setting ACPI companion device for us,
+>> x86 & ia64 specific ACPI companion device setting turns out to be dead now.
+>> We can get rid of it, including related companion reference from
+>> PCI sysdata structure. Aslo, PCI_CONTROLLER macro cannot return valid
+>> companion device anymore. Therefore we need to convert its usage to
+>> ACPI_COMPANION.
+>>
+>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Tested-by: Duc Dang <dhdang@apm.com>
+>> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>   arch/ia64/hp/common/sba_iommu.c    |  2 +-
+>>   arch/ia64/include/asm/pci.h        |  1 -
+>>   arch/ia64/pci/pci.c                | 16 ----------------
+>>   arch/ia64/sn/kernel/io_acpi_init.c |  4 ++--
+>>   arch/x86/include/asm/pci.h         |  3 ---
+>>   arch/x86/pci/acpi.c                | 17 -----------------
+>>   drivers/acpi/pci_root.c            |  7 ++++++-
+>>   drivers/pci/probe.c                |  2 ++
+>>   8 files changed, 11 insertions(+), 41 deletions(-)
+>>
+>> diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
+>> index a6d6190..78e4444 100644
+>> --- a/arch/ia64/hp/common/sba_iommu.c
+>> +++ b/arch/ia64/hp/common/sba_iommu.c
+>> @@ -1981,7 +1981,7 @@ sba_connect_bus(struct pci_bus *bus)
+>>   	if (PCI_CONTROLLER(bus)->iommu)
+>>   		return;
+>>
+>> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
+>> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+>>   	if (!handle)
+>>   		return;
+>>
+>> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+>> index c0835b0..12423f4 100644
+>> --- a/arch/ia64/include/asm/pci.h
+>> +++ b/arch/ia64/include/asm/pci.h
+>> @@ -63,7 +63,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+>>   #define pci_legacy_write platform_pci_legacy_write
+>>
+>>   struct pci_controller {
+>> -	struct acpi_device *companion;
+>>   	void *iommu;
+>>   	int segment;
+>>   	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+>> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+>> index 8f6ac2f..978d6af 100644
+>> --- a/arch/ia64/pci/pci.c
+>> +++ b/arch/ia64/pci/pci.c
+>> @@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>   	}
+>>
+>>   	info->controller.segment = root->segment;
+>> -	info->controller.companion = device;
+>>   	info->controller.node = acpi_get_node(device->handle);
+>>   	INIT_LIST_HEAD(&info->io_resources);
+>>   	return acpi_pci_root_create(root, &pci_acpi_root_ops,
+>>   				    &info->common, &info->controller);
+>>   }
+>>
+>> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+>> -{
+>> -	/*
+>> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+>> -	 * here, pci_create_root_bus() has been called by someone else and
+>> -	 * sysdata is likely to be different from what we expect.  Let it go in
+>> -	 * that case.
+>> -	 */
+>> -	if (!bridge->dev.parent) {
+>> -		struct pci_controller *controller = bridge->bus->sysdata;
+>> -		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+>> -	}
+>> -	return 0;
+>> -}
+>> -
+>>   void pcibios_fixup_device_resources(struct pci_dev *dev)
+>>   {
+>>   	int idx;
+>> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+>> index 231234c..e454492 100644
+>> --- a/arch/ia64/sn/kernel/io_acpi_init.c
+>> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
+>> @@ -132,7 +132,7 @@ sn_get_bussoft_ptr(struct pci_bus *bus)
+>>   	struct acpi_resource_vendor_typed *vendor;
+>>
+>>
+>> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
+>> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+>>   	status = acpi_get_vendor_resource(handle, METHOD_NAME__CRS,
+>>   					  &sn_uuid, &buffer);
+>>   	if (ACPI_FAILURE(status)) {
+>> @@ -360,7 +360,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+>>   	acpi_status status;
+>>   	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>>
+>> -	rootbus_handle = acpi_device_handle(PCI_CONTROLLER(dev)->companion);
+>> +	rootbus_handle = acpi_device_handle(ACPI_COMPANION(dev->bus->bridge));
+>>           status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+>>                                          &segment);
+>>           if (ACPI_SUCCESS(status)) {
+>> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+>> index 9ab7507..24de07d 100644
+>> --- a/arch/x86/include/asm/pci.h
+>> +++ b/arch/x86/include/asm/pci.h
+>> @@ -14,9 +14,6 @@
+>>   struct pci_sysdata {
+>>   	int		domain;		/* PCI domain */
+>>   	int		node;		/* NUMA node */
+>> -#ifdef CONFIG_ACPI
+>> -	struct acpi_device *companion;	/* ACPI companion device */
+>> -#endif
+>>   #ifdef CONFIG_X86_64
+>>   	void		*iommu;		/* IOMMU private data */
+>>   #endif
+>> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+>> index 3cd6983..f4ca17a 100644
+>> --- a/arch/x86/pci/acpi.c
+>> +++ b/arch/x86/pci/acpi.c
+>> @@ -340,7 +340,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>   		struct pci_sysdata sd = {
+>>   			.domain = domain,
+>>   			.node = node,
+>> -			.companion = root->device
+>>   		};
+>>
+>>   		memcpy(bus->sysdata, &sd, sizeof(sd));
+>> @@ -355,7 +354,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>   		else {
+>>   			info->sd.domain = domain;
+>>   			info->sd.node = node;
+>> -			info->sd.companion = root->device;
+>>   			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
+>>   						   &info->common, &info->sd);
+>>   		}
+>> @@ -373,21 +371,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>   	return bus;
+>>   }
+>>
+>> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+>> -{
+>> -	/*
+>> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+>> -	 * here, pci_create_root_bus() has been called by someone else and
+>> -	 * sysdata is likely to be different from what we expect.  Let it go in
+>> -	 * that case.
+>> -	 */
+>> -	if (!bridge->dev.parent) {
+>> -		struct pci_sysdata *sd = bridge->bus->sysdata;
+>> -		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+>> -	}
+>> -	return 0;
+>> -}
+>> -
+>>   int __init pci_acpi_init(void)
+>>   {
+>>   	struct pci_dev *dev = NULL;
+>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+>> index ae3fe4e..4581e0e 100644
+>> --- a/drivers/acpi/pci_root.c
+>> +++ b/drivers/acpi/pci_root.c
+>> @@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device *device,
+>>   		}
+>>   	}
+>>
+>> +	/*
+>> +	 * pci_create_root_bus() needs to detect the parent device type,
+>> +	 * so initialize its companion data accordingly.
+>> +	 */
+>> +	ACPI_COMPANION_SET(&device->dev, device);
+>>   	root->device = device;
+>>   	root->segment = segment & 0xFFFF;
+>>   	strcpy(acpi_device_name(device), ACPI_PCI_ROOT_DEVICE_NAME);
+>> @@ -846,7 +851,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>>
+>>   	pci_acpi_root_add_resources(info);
+>>   	pci_add_resource(&info->resources, &root->secondary);
+>> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+>> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+>>   				  sysdata, &info->resources);
 >
+> "device" here is a struct acpi_device *.  Rafael, is that the right
+> thing to do?  I dimly recall proposing something similar long ago and
+> that it turned out to be a bad idea.
 >
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160504/43c16e2f/attachment-0001.sig>
+Joining Bjorn's question. Rafael, do you recall what was the issue here 
+from the past?
+
+Thanks,
+Tomasz
