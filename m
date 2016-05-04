@@ -1,104 +1,74 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 May 2016 21:24:37 -0500
-Subject: [PATCH V3 2/7] documentation: iommu: Add bindings for
- msm,iommu-v0 ip
-In-Reply-To: <1462128875-20988-3-git-send-email-sricharan@codeaurora.org>
-References: <1462128875-20988-1-git-send-email-sricharan@codeaurora.org>
- <1462128875-20988-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20160504022437.GA4110@rob-hp-laptop>
+Date: Tue, 3 May 2016 21:30:26 -0500
+Subject: [PATCH v2 5/5] vf610-soc: Add Vybrid SoC device tree binding
+ documentation
+In-Reply-To: <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
+References: <cover.1462171989.git.maitysanchayan@gmail.com>
+ <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
+Message-ID: <20160504023026.GB5382@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 12:24:30AM +0530, Sricharan R wrote:
-> The MSM IOMMU is an implementation compatible with the ARM VMSA short
-> descriptor page tables. It provides address translation for bus masters outside
-> of the CPU, each connected to the IOMMU through a port called micro-TLB.
-> Adding the DT bindings for the same.
+On Mon, May 02, 2016 at 12:35:04PM +0530, Sanchayan Maity wrote:
+> Add device tree binding documentation for Vybrid SoC.
 > 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 > ---
->  .../devicetree/bindings/iommu/msm,iommu-v0.txt     | 62 ++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+>  .../bindings/arm/freescale/fsl,vf610-soc.txt       | 35 ++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
 > new file mode 100644
-> index 0000000..63b4f96
+> index 0000000..bdd95e8
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
-> @@ -0,0 +1,62 @@
-> +* MSM IOMMU
+> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+> @@ -0,0 +1,35 @@
+> +Vybrid System-on-Chip
+> +---------------------
 > +
-> +The MSM IOMMU is an implementation compatible with the ARM VMSA short
-> +descriptor page tables. It provides address translation for bus masters outside
-> +of the CPU, each connected to the IOMMU through a port called micro-TLB.
+> +Required properties:
 > +
-> +Required Properties:
-> +
-> +  - compatible: Must contain "msm,iommu-v0".
+> +- #address-cells: must be 1
+> +- #size-cells: must be 1
+> +- compatible: "fsl,vf610-soc-bus", "simple-bus"
 
-SOC specific compatible strings please.
+If this is a bus, put the file in bindings/bus/...
 
-> +  - reg: Base address and size of the IOMMU registers.
-> +  - interrupts: Specifiers for the MMU fault interrupts. For instances that
-> +    support secure mode two interrupts must be specified, for non-secure and
-> +    secure mode, in that order. For instances that don't support secure mode a
-> +    single interrupt must be specified.
-> +  - #iommu-cells: The number of cells needed to specify the stream id. This
-> +		  is always 1.
-> +  - qcom,ncb:	  The total number of context banks in the IOMMU.
-> +  - clocks	: List of clocks to be used during SMMU register access. See
-> +		  Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +		  for information about the format. For each clock specified
-> +		  here, there must be a corresponding entry in clock-names
-> +		  (see below).
-> +
-> +  - clock-names	: List of clock names corresponding to the clocks specified in
-> +		  the "clocks" property (above). See
-> +		  Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +		  for more info.
+> +- interrupt-parent: phandle to the MSCM interrupt router node
+> +- ranges
+> +- fsl,rom-revision: phandle to the on-chip ROM node and address of rom
+> +  revision register
 
-You must define how many clocks, their order and their names.
+Why is this needed here? Can't you search the tree for the ROM node and 
+get this info.
+
+> +- fsl,cpu-count: phandle to the MSCM CPU configuration node and address of
+> +  CPU count register
+> +- fsl,l2-size: phandle to the MSCM CPU configuration node and address of
+> +  L2 cache size register
+> +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+
+How are all these properties used?
 
 > +
-> +Each bus master connected to an IOMMU must reference the IOMMU in its device
-> +node with the following property:
+> +Example:
 > +
-> +  - iommus: A reference to the IOMMU in multiple cells. The first cell is a
-> +	    phandle to the IOMMU and the second cell is the stream id.
-> +	    A single master device can be connected to more than one iommu
-> +	    and multiple contexts in each of the iommu. So multiple entries
-> +	    are required to list all the iommus and the stream ids that the
-> +	    master is connected to.
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "fsl,vf610-soc-bus", "simple-bus";
+> +		interrupt-parent = <&mscm_ir>;
+> +		ranges;
+> +		fsl,rom-revision = <&ocrom 0x80>;
+> +		fsl,cpu-count = <&mscm_cpucfg 0x2C>;
+> +		fsl,l2-size = <&mscm_cpucfg 0x14>;
+> +		nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
+> +		nvmem-cell-names = "cfg0", "cfg1";
 > +
-> +Example: mdp iommu and its bus master
-> +
-> +                mdp_port0: iommu at 7500000 {
-> +			compatible = "msm,iommu-v0";
-> +			#iommu-cells = <1>;
-> +			clock-names =
-> +			    "smmu_pclk",
-> +			    "iommu_clk";
-> +			clocks =
-> +			    <&mmcc SMMU_AHB_CLK>,
-> +			    <&mmcc MDP_AXI_CLK>;
-> +			reg = <0x07500000 0x100000>;
-> +			interrupts =
-> +			    <GIC_SPI 63 0>,
-> +			    <GIC_SPI 64 0>;
-> +			qcom,ncb = <2>;
-> +		};
-> +
-> +		mdp: qcom,mdp at 5100000 {
-> +			compatible = "qcom,mdp";
-> +			...
-> +			iommus = <&mdp_port0 0
-> +				  &mdp_port0 2>;
-> +		};
+> +		...
+> +	};
 > -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 2.8.2
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
