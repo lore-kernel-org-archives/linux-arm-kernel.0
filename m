@@ -1,84 +1,55 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 4 May 2016 10:37:16 +0100
-Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
-In-Reply-To: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
-References: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <5729C2CC.7030806@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 4 May 2016 10:40:48 +0100
+Subject: [PATCH v2 0/3] ARM: nommu: R-class fixes
+In-Reply-To: <20160503204419.GP19428@n2100.arm.linux.org.uk>
+References: <1461862316-9877-1-git-send-email-vladimir.murzin@arm.com>
+ <57287BD9.6090907@arm.com> <20160503103237.GN19428@n2100.arm.linux.org.uk>
+ <5728806F.7000208@arm.com> <20160503204419.GP19428@n2100.arm.linux.org.uk>
+Message-ID: <5729C3A0.2080506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/16 16:05, Suzuki K Poulose wrote:
-> arm-ccn driver uses irq_set_affinity, which is not exported and
-> hence cannot be built as a module, eventhough we have all the
-> bits ready. This patch makes use of the exported helper
-> irq_set_affinity_hint() instead. Also, the __free_irq expects
-> the affinity_hint to be NULL when we free the irq. So set the
-> affinity_hint to NULL at clean up.
->
-> Now that we can build it as a module, update the Kconfig to
-> reflect the change.
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+On 03/05/16 21:44, Russell King - ARM Linux wrote:
+> On Tue, May 03, 2016 at 11:41:51AM +0100, Vladimir Murzin wrote:
+>> On 03/05/16 11:32, Russell King - ARM Linux wrote:
+>>> On Tue, May 03, 2016 at 11:22:17AM +0100, Vladimir Murzin wrote:
+>>>> On 28/04/16 17:51, Vladimir Murzin wrote:
+>>>>> Small set of fixes discovered with R-class cores.
+>>>>>
+>>>>> Jean-Philippe Brucker (2):
+>>>>>   ARM: nommu: fix PMSAv7 setup
+>>>>>   ARM: nommu: change memory reserve for the vectors
+>>>>>
+>>>>> Vladimir Murzin (1):
+>>>>>   ARM: domain: move {set,get}_domain under config guard
+>>>>>
+>>>>>  arch/arm/include/asm/domain.h |   11 +++++++++++
+>>>>>  arch/arm/kernel/head-nommu.S  |    2 +-
+>>>>>  arch/arm/mm/nommu.c           |   15 ++++++++-------
+>>>>>  3 files changed, 20 insertions(+), 8 deletions(-)
+>>>>>
+>>>>
+>>>> Russell, any objection to get it into patch tracker?
+>>>
+>>> I've not had any chance to look at them yet - last weekend, I was away
+>>> from Thursday through until late Tuesday, then I spent most of Wednesday
+>>> and Thursday catching up.  Friday I was able to look at some stuff, and
+>>> then I've spent the bank holiday weekend digging out laurels in the front
+>>> garden.  I've only just today got back to looking at some kernel stuff.
+>>>
+>>> So really, I've only had two days in the last week and a half to look at
+>>> anything.
+>>>
+>>> Please wait a little while longer.  Thanks.
+>>
+>> Thanks for prompt reply! I wasn't aware you've been off, patches can wait.
+> 
+> Thanks for waiting, I've now looked through them and they look fine to me.
+> 
+> Please put them in the patch system, thanks.
+> 
 
-Hi,
+Thanks for your time! Patches in the patch system now.
 
-Could you please pull this for 4.7 ?
-
-Thanks
-Suzuki
-
-> ---
->   drivers/bus/Kconfig   |    2 +-
->   drivers/bus/arm-ccn.c |    7 ++++---
->   2 files changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index d4a3a31..3efc996 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -48,7 +48,7 @@ config ARM_CCI5xx_PMU
->   	  If unsure, say Y
->
->   config ARM_CCN
-> -	bool "ARM CCN driver support"
-> +	tristate "ARM CCN driver support"
->   	depends on ARM || ARM64
->   	depends on PERF_EVENTS
->   	help
-> diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-> index 7082c72..acc3eb5 100644
-> --- a/drivers/bus/arm-ccn.c
-> +++ b/drivers/bus/arm-ccn.c
-> @@ -1189,7 +1189,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
->   		perf_pmu_migrate_context(&dt->pmu, cpu, target);
->   		cpumask_set_cpu(target, &dt->cpu);
->   		if (ccn->irq)
-> -			WARN_ON(irq_set_affinity(ccn->irq, &dt->cpu) != 0);
-> +			WARN_ON(irq_set_affinity_hint(ccn->irq, &dt->cpu) != 0);
->   	default:
->   		break;
->   	}
-> @@ -1278,7 +1278,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
->
->   	/* Also make sure that the overflow interrupt is handled by this CPU */
->   	if (ccn->irq) {
-> -		err = irq_set_affinity(ccn->irq, &ccn->dt.cpu);
-> +		err = irq_set_affinity_hint(ccn->irq, &ccn->dt.cpu);
->   		if (err) {
->   			dev_err(ccn->dev, "Failed to set interrupt affinity!\n");
->   			goto error_set_affinity;
-> @@ -1306,7 +1306,8 @@ static void arm_ccn_pmu_cleanup(struct arm_ccn *ccn)
->   {
->   	int i;
->
-> -	irq_set_affinity(ccn->irq, cpu_possible_mask);
-> +	if (ccn->irq)
-> +		irq_set_affinity_hint(ccn->irq, NULL);
->   	unregister_cpu_notifier(&ccn->dt.cpu_nb);
->   	for (i = 0; i < ccn->num_xps; i++)
->   		writel(0, ccn->xp[i].base + CCN_XP_DT_CONTROL);
->
+Cheers
+Vladimir
