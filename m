@@ -1,28 +1,50 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 May 2016 17:25:21 -0500
-Subject: [v10, 1/7] Documentation: DT: update Freescale DCFG compatible
-In-Reply-To: <1462417950-46796-2-git-send-email-yangbo.lu@nxp.com>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <1462417950-46796-2-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <20160505222521.GA18377@rob-hp-laptop>
+Date: Thu, 5 May 2016 17:42:40 -0500
+Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
+In-Reply-To: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160505224240.GA31429@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 11:12:24AM +0800, Yangbo Lu wrote:
-> Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead
-> of 'fsl,ls1021a-dcfg' to include more chips such as ls1021a,
-> ls1043a, and ls2080a.
+On Thu, May 05, 2016 at 02:34:13PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> ---
-> Changes for v8:
-> 	- Added this patch
-> Changes for v9:
-> 	- Added a list for the possible compatibles
-> Changes for v10:
-> 	- None
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> This is a different, second try to fix usb3503+lan on Odroid U3 board
+> if it was initialized by bootloader (e.g. for TFTP boot).
+> 
+> First version:
+> http://www.spinics.net/lists/linux-usb/msg140042.html
+> 
+> 
+> Problem
+> =======
+> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+> is required, e.g. by suspend to RAM. The actual TFTP boot does
+> not have to happen. Just "usb start" from U-Boot is sufficient.
+> 
+> From the schematics, the regulator is a supply only to LAN, however
+> without toggling it off/on, the usb3503 hub won appear neither.
+> 
+> 
+> Solution
+> ========
+> This is very similar to the MMC pwrseq behavior so the idea is to:
+> 1. Move MMC pwrseq drivers to generic place,
 
-Acked-by: Rob Herring <robh@kernel.org>
+You can do that, but I'm going to NAK any use of pwrseq bindings outside 
+of MMC. I think it is the wrong way to do things. The DT should describe 
+the devices. If they happen to be "simple" then the core can walk the 
+tree and do any setup. For example, look for "reset-gpios" and toggle 
+that GPIO. There is no need for a special node.
+
+> 2. Extend the pwrseq-simple with regulator toggling,
+> 3. Add support to USB hub and port core for pwrseq,
+
+We discussed this for USB already[1] and is why we defined how to add 
+USB child devices. The idea is not to add pwrseq to that.
+
+Rob
+
+[1] http://www.spinics.net/lists/linux-usb/msg134082.html
