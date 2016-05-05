@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 05 May 2016 16:56:23 +0100
-Subject: Applied "ASoC: rockchip: Revert "ASoC: rockchip: i2s: remove unused
- variables"" to the asoc tree
-In-Reply-To: <1462373686-21794-1-git-send-email-john@metanate.com>
-Message-ID: <E1ayLdX-0004kH-IJ@debutante>
+Date: Thu, 05 May 2016 16:56:20 +0100
+Subject: Applied "ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate
+ capture and playback"" to the asoc tree
+In-Reply-To: <1462373686-21794-2-git-send-email-john@metanate.com>
+Message-ID: <E1ayLdU-0004jH-K0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: Revert "ASoC: rockchip: i2s: remove unused variables"
+   ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate capture and playback"
 
 has been applied to the asoc tree at
 
@@ -34,64 +34,134 @@ to this mail.
 Thanks,
 Mark
 
->From a6e806c49e3265494ac6fe6ec88ed5c010652e0d Mon Sep 17 00:00:00 2001
+>From 7e885d211f023dfd201fad8246bbf3c3bd126c61 Mon Sep 17 00:00:00 2001
 From: John Keeping <john@metanate.com>
-Date: Wed, 4 May 2016 17:21:56 +0100
-Subject: [PATCH] ASoC: rockchip: Revert "ASoC: rockchip: i2s: remove unused
- variables"
+Date: Wed, 4 May 2016 17:21:57 +0100
+Subject: [PATCH] ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate capture
+ and playback"
 
-This reverts commit 5938448b99275cba95167c3f9d39ca9225fdad38.
+This reverts commit eba65d179c1149cf79e68608d452631f33d7f017.
 
-It turns out that the commit that made these variables unused is wrong
-so we're about to revert it.  Bring back the variables in prepration.
+This broke audio on Veyron Jerry Chromebooks and I now cannot reproduce
+the problem I was trying to fix even with this commit reverted, so it
+seems that this was completely the wrong thing to do.
 
+Reported-by: Enric Balletbo Serra <eballetbo@gmail.com>
 Signed-off-by: John Keeping <john@metanate.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rockchip_i2s.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ sound/soc/rockchip/rockchip_i2s.c | 72 ++++++++++++++++++++++-----------------
+ 1 file changed, 40 insertions(+), 32 deletions(-)
 
 diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 2f8e20416bd3..34743ec61c49 100644
+index 34743ec61c49..574c6af28c06 100644
 --- a/sound/soc/rockchip/rockchip_i2s.c
 +++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -34,6 +34,13 @@ struct rk_i2s_dev {
+@@ -82,8 +82,8 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
+ 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_ENABLE);
  
- 	struct regmap *regmap;
- 
-+/*
-+ * Used to indicate the tx/rx status.
-+ * I2S controller hopes to start the tx and rx together,
-+ * also to stop them when they are both try to stop.
-+*/
-+	bool tx_start;
-+	bool rx_start;
- 	bool is_master_mode;
- };
- 
-@@ -77,7 +84,11 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
  		regmap_update_bits(i2s->regmap, I2S_XFER,
- 				   I2S_XFER_TXS_START,
- 				   I2S_XFER_TXS_START);
-+
-+		i2s->tx_start = true;
+-				   I2S_XFER_TXS_START,
+-				   I2S_XFER_TXS_START);
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
+ 
+ 		i2s->tx_start = true;
  	} else {
-+		i2s->tx_start = false;
-+
+@@ -92,23 +92,27 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
  		regmap_update_bits(i2s->regmap, I2S_DMACR,
  				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
  
-@@ -115,7 +126,11 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
+-		regmap_update_bits(i2s->regmap, I2S_XFER,
+-				   I2S_XFER_TXS_START,
+-				   I2S_XFER_TXS_STOP);
+-
+-		regmap_update_bits(i2s->regmap, I2S_CLR,
+-				   I2S_CLR_TXC,
+-				   I2S_CLR_TXC);
++		if (!i2s->rx_start) {
++			regmap_update_bits(i2s->regmap, I2S_XFER,
++					   I2S_XFER_TXS_START |
++					   I2S_XFER_RXS_START,
++					   I2S_XFER_TXS_STOP |
++					   I2S_XFER_RXS_STOP);
+ 
+-		regmap_read(i2s->regmap, I2S_CLR, &val);
++			regmap_update_bits(i2s->regmap, I2S_CLR,
++					   I2S_CLR_TXC | I2S_CLR_RXC,
++					   I2S_CLR_TXC | I2S_CLR_RXC);
+ 
+-		/* Should wait for clear operation to finish */
+-		while (val & I2S_CLR_TXC) {
+ 			regmap_read(i2s->regmap, I2S_CLR, &val);
+-			retry--;
+-			if (!retry) {
+-				dev_warn(i2s->dev, "fail to clear\n");
+-				break;
++
++			/* Should wait for clear operation to finish */
++			while (val) {
++				regmap_read(i2s->regmap, I2S_CLR, &val);
++				retry--;
++				if (!retry) {
++					dev_warn(i2s->dev, "fail to clear\n");
++					break;
++				}
+ 			}
+ 		}
+ 	}
+@@ -124,8 +128,8 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
+ 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_ENABLE);
+ 
  		regmap_update_bits(i2s->regmap, I2S_XFER,
- 				   I2S_XFER_RXS_START,
- 				   I2S_XFER_RXS_START);
-+
-+		i2s->rx_start = true;
+-				   I2S_XFER_RXS_START,
+-				   I2S_XFER_RXS_START);
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
++				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
+ 
+ 		i2s->rx_start = true;
  	} else {
-+		i2s->rx_start = false;
-+
+@@ -134,23 +138,27 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
  		regmap_update_bits(i2s->regmap, I2S_DMACR,
  				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
  
+-		regmap_update_bits(i2s->regmap, I2S_XFER,
+-				   I2S_XFER_RXS_START,
+-				   I2S_XFER_RXS_STOP);
+-
+-		regmap_update_bits(i2s->regmap, I2S_CLR,
+-				   I2S_CLR_RXC,
+-				   I2S_CLR_RXC);
++		if (!i2s->tx_start) {
++			regmap_update_bits(i2s->regmap, I2S_XFER,
++					   I2S_XFER_TXS_START |
++					   I2S_XFER_RXS_START,
++					   I2S_XFER_TXS_STOP |
++					   I2S_XFER_RXS_STOP);
+ 
+-		regmap_read(i2s->regmap, I2S_CLR, &val);
++			regmap_update_bits(i2s->regmap, I2S_CLR,
++					   I2S_CLR_TXC | I2S_CLR_RXC,
++					   I2S_CLR_TXC | I2S_CLR_RXC);
+ 
+-		/* Should wait for clear operation to finish */
+-		while (val & I2S_CLR_RXC) {
+ 			regmap_read(i2s->regmap, I2S_CLR, &val);
+-			retry--;
+-			if (!retry) {
+-				dev_warn(i2s->dev, "fail to clear\n");
+-				break;
++
++			/* Should wait for clear operation to finish */
++			while (val) {
++				regmap_read(i2s->regmap, I2S_CLR, &val);
++				retry--;
++				if (!retry) {
++					dev_warn(i2s->dev, "fail to clear\n");
++					break;
++				}
+ 			}
+ 		}
+ 	}
 -- 
 2.8.1
