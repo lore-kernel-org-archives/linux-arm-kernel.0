@@ -1,32 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 May 2016 17:39:37 +0100
-Subject: [PATCH v3] irqchip/gic-v2m: Add workaround for Broadcom NS2
- GICv2m erratum
-In-Reply-To: <1462465921-3220-2-git-send-email-ray.jui@broadcom.com>
-References: <1462465921-3220-1-git-send-email-ray.jui@broadcom.com>
- <1462465921-3220-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <572B7749.3070708@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 5 May 2016 09:43:00 -0700
+Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
+In-Reply-To: <572A2099.4070901@codeaurora.org>
+References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
+ <5728A7C3.4010001@roeck-us.net>
+ <20160503143856.GE13045@dhcppc6.redhat.com>
+ <5728BEC4.6050603@codeaurora.org>
+ <20160503155141.GF13045@dhcppc6.redhat.com>
+ <20160503171602.GA2518@roeck-us.net>
+ <20160504141449.GG13045@dhcppc6.redhat.com>
+ <572A0577.1070000@codeaurora.org>
+ <20160504155932.GH13045@dhcppc6.redhat.com>
+ <572A2099.4070901@codeaurora.org>
+Message-ID: <20160505164300.GA16914@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/16 17:32, Ray Jui wrote:
-> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
-> implementation has an erratum where the MSI data needs to be the SPI
-> number subtracted by an offset of 32, for the correct MSI interrupt
-> to be triggered.
+On Wed, May 04, 2016 at 11:17:29AM -0500, Timur Tabi wrote:
+> Pratyush Anand wrote:
+> >Its unique to SBSA because you have very little timeout here. kexec-tools
+> >upstream does not have any mechanism to handle watchdog timeout. Lets say even
+> >if we implement a framework there, the best it can do is to ping the watchdog
+> >again.
 > 
-> Here we are adding the workaround based on readings from the MSI_IIDR
-> register, which contains a value unique to Broadcom NS2 GICv2m
+> Ok, so it's more accurate to say that kexec has a minimum watchdog timeout
+> requirement.  What happens if the system admin sets the timeout to 5 seconds
+> arbitrarily?  The system will reset during kexec, no matter which hardware
+> is used.
 > 
-> Reported-by: Alex Barba <alex.barba@broadcom.com>
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> This still sounds like a band-aid to me.  We're just assuming that we need a
+> timeout of at least 20 seconds to support kexec.  Frankly, this still sounds
+> like a problem the kexec developers needs to acknowledge and deal with.
+> 
+> Still I'm okay with a patch that extends the timeout by programming WCV, but
+> it has to be commented as a hack specifically to support kexec because the
+> timeout might be too short.  Then Wim can decide whether he supports such
+> changes.
+> 
+I don't even understand how kexec-tools is involved in the first place.
+kexec-tools sounds like user space, which should execute _after_ the kernel
+and its modules are loaded (assuming modules are loaded from initramfs).
+If kexec-tools can somehow ping the watchdog (presumably by writing into
+the HW directly), I don't understand why it doesn't simply load the watchdog
+driver instead and let the watchdog core handle the heartbeats.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I am really missing something here. How can kexec-tools do anything before
+the kernel is loaded ?
 
-I'll queue that for 4.7.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Guenter
