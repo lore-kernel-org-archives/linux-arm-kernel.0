@@ -1,103 +1,105 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Thu, 5 May 2016 13:57:58 +0530
-Subject: [PATCH v2 5/5] vf610-soc: Add Vybrid SoC device tree binding
- documentation
-In-Reply-To: <20160504023026.GB5382@rob-hp-laptop>
-References: <cover.1462171989.git.maitysanchayan@gmail.com>
- <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
- <20160504023026.GB5382@rob-hp-laptop>
-Message-ID: <20160505082758.GB18151@Sanchayan-Arch.localdomain>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu,  5 May 2016 14:21:38 +0530
+Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
+Message-ID: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+Current set of patches apply on 4.6-rc6. Fixes for the nvmem apis
+are now posted [1] and queued in -next [2]
+Patches [1-6] will need to be merged via thermal tree/Eduardo.
+Patches [7-11] will need to go via qcom-msm tree/Andy.
 
-On 16-05-03 21:30:26, Rob Herring wrote:
-> On Mon, May 02, 2016 at 12:35:04PM +0530, Sanchayan Maity wrote:
-> > Add device tree binding documentation for Vybrid SoC.
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       | 35 ++++++++++++++++++++++
-> >  1 file changed, 35 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-> > new file mode 100644
-> > index 0000000..bdd95e8
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-> > @@ -0,0 +1,35 @@
-> > +Vybrid System-on-Chip
-> > +---------------------
-> > +
-> > +Required properties:
-> > +
-> > +- #address-cells: must be 1
-> > +- #size-cells: must be 1
-> > +- compatible: "fsl,vf610-soc-bus", "simple-bus"
-> 
-> If this is a bus, put the file in bindings/bus/...
+Changes since v5:
+* Minor review fixes from Eduardo
 
-The fsl,vf610-soc-bus binding is used to bind the driver in question with
-an appropriate compatible node.
+Changes since v4:
+* dropped qcom,tsens-slopes binding, used coefficients instead
+* dropped qcom,sensor-id binding
+* Added support for msm8996 family
+* Other minor review fixes from v4
 
-Basically being a standalone platform driver, there was need of a compatible
-property to bind on. Introducing a separate device tree node for it's sake
-didn't seem appropriate so the alteration to SoC node's compatible.
+Changes since v3:
+* Dropped 'clk: qcom: create virtual child device for TSENS' which
+is picked up by Stephen
+* Updated GCC bindings with optional TSENS properties
 
-> 
-> > +- interrupt-parent: phandle to the MSCM interrupt router node
-> > +- ranges
-> > +- fsl,rom-revision: phandle to the on-chip ROM node and address of rom
-> > +  revision register
-> 
-> Why is this needed here? Can't you search the tree for the ROM node and 
-> get this info.
+Changes since v2:
+* Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
 
-Strictly per say this and next two can be specified in their respective nodes
-of ocrom and mscm cpucfg, however they would then require the use of syscon_
-regmap_lookup_by_compatible and this seems clean along with the introduction
-of new syscon_regmap_read_from_offset function used with SoC node.
+Changes since v1:
+* Created virtual tsens device from gcc driver for 8960,
+with DT having a single node for gcc and tsens
+* Minor fixes with rebasing on 4.3-rc1
 
-> 
-> > +- fsl,cpu-count: phandle to the MSCM CPU configuration node and address of
-> > +  CPU count register
-> > +- fsl,l2-size: phandle to the MSCM CPU configuration node and address of
-> > +  L2 cache size register
-> > +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
-> > +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
-> 
-> How are all these properties used?
+Changes since RFC:
+* Added support for 8916 and 8084
+* Based off the latest nvmem framework patches [1]
+* Minor review fixes for comments mostly from Lina
 
-All the above five are used to get the relevant values from the registers and
-expose the information for SoC sysfs device.
-https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+This is an attempt to have a single TSENS driver for
+the different versions of the TSENS IP that exist, on
+different qcom msm/apq SoCs'
+Support is added for msm8916, msm8960, msm8974 and msm8996 families.
 
-nvmem are consumer nodes which are accessed using the NVMEM consumer API's
-leveraging the NVMEM framework and NVMEM vf610 ocotp driver.
+A lot of the work is based of original code from Stephen Boyd
+and Siddartha Mohanadoss. I have also picked some of what
+Narendran Rajan did in his attempt to upstream the support
+for 8960 family. I could not keep the original authorship on
+any of the patches because I ended up moving the code around
+quite a bit in an effort to have a single driver for the
+various devices. I would be glad to change the authorship
+for any of the patches if needed.
 
-Regards,
-Sanchayan.
+[1] https://lkml.org/lkml/2016/4/24/103
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git char-misc-next
 
-> 
-> > +
-> > +Example:
-> > +
-> > +	soc {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		compatible = "fsl,vf610-soc-bus", "simple-bus";
-> > +		interrupt-parent = <&mscm_ir>;
-> > +		ranges;
-> > +		fsl,rom-revision = <&ocrom 0x80>;
-> > +		fsl,cpu-count = <&mscm_cpucfg 0x2C>;
-> > +		fsl,l2-size = <&mscm_cpucfg 0x14>;
-> > +		nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
-> > +		nvmem-cell-names = "cfg0", "cfg1";
-> > +
-> > +		...
-> > +	};
-> > -- 
-> > 2.8.2
-> > 
+Rajendra Nayak (11):
+  thermal: qcom: tsens: Add a skeletal TSENS drivers
+  thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+  thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+  thermal: core: export apis to get slope and offset
+  thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+  thermal: qcom: tsens-8996: Add support for 8996 family of SoCs
+  arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8996: Add thermal zones, tsens and qfprom nodes
+
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  18 ++
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  21 ++
+ Documentation/thermal/sysfs-api.txt                |  12 +
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 103 ++++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                | 103 ++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                | 103 ++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  64 +++++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              |  92 +++++++
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/qcom/Kconfig                       |  11 +
+ drivers/thermal/qcom/Makefile                      |   2 +
+ drivers/thermal/qcom/tsens-8916.c                  | 113 ++++++++
+ drivers/thermal/qcom/tsens-8960.c                  | 292 +++++++++++++++++++++
+ drivers/thermal/qcom/tsens-8974.c                  | 244 +++++++++++++++++
+ drivers/thermal/qcom/tsens-8996.c                  |  84 ++++++
+ drivers/thermal/qcom/tsens-common.c                | 141 ++++++++++
+ drivers/thermal/qcom/tsens.c                       | 200 ++++++++++++++
+ drivers/thermal/qcom/tsens.h                       |  92 +++++++
+ drivers/thermal/thermal_core.c                     |  30 +++
+ include/linux/thermal.h                            |   8 +
+ 21 files changed, 1739 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+ create mode 100644 drivers/thermal/qcom/Kconfig
+ create mode 100644 drivers/thermal/qcom/Makefile
+ create mode 100644 drivers/thermal/qcom/tsens-8916.c
+ create mode 100644 drivers/thermal/qcom/tsens-8960.c
+ create mode 100644 drivers/thermal/qcom/tsens-8974.c
+ create mode 100644 drivers/thermal/qcom/tsens-8996.c
+ create mode 100644 drivers/thermal/qcom/tsens-common.c
+ create mode 100644 drivers/thermal/qcom/tsens.c
+ create mode 100644 drivers/thermal/qcom/tsens.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
