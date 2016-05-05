@@ -1,31 +1,22 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  5 May 2016 10:44:18 +0100
-Subject: [PATCH] arm64: defconfig: Add Juno SATA controller
-Message-ID: <1462441458-24387-1-git-send-email-andre.przywara@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu,  5 May 2016 10:43:58 +0100
+Subject: [PATCH 0/4] arm64: pmd accessor fixes
+Message-ID: <1462441442-6996-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Juno (r1 and r2) boards feature a SATA controller soldered
-on the board and connected to the PCI bus.
-Add the respective driver to defconfig to get hard disks supported out
-of the box on the Junos.
+The first two patches are follow-ups on the hardware AF/DBM support, so
+they should go in as fixes (on top of current arm64 for-next/core
+branch). The third patch is a minor clean-up while the last one
+implements pmd_present() following recent discussions around
+pmd_mknotpresent() (and it's also a cc stable).
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Catalin Marinas (4):
+  arm64: Fix typo in the pmdp_huge_get_and_clear() definition
+  arm64: Implement pmdp_set_access_flags() for hardware AF/DBM
+  arm64: Replace hard-coded values in the pmd/pud_bad() macros
+  arm64: Ensure pmd_present() returns false after pmd_mknotpresent()
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index a44ef99..c7f4202 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -103,6 +103,7 @@ CONFIG_AHCI_CEVA=y
- CONFIG_AHCI_MVEBU=y
- CONFIG_AHCI_XGENE=y
- CONFIG_SATA_RCAR=y
-+CONFIG_SATA_SIL24=y
- CONFIG_PATA_PLATFORM=y
- CONFIG_PATA_OF_PLATFORM=y
- CONFIG_NETDEVICES=y
--- 
-2.7.3
+ arch/arm64/include/asm/pgtable-hwdef.h |  1 -
+ arch/arm64/include/asm/pgtable.h       | 26 ++++++++++++++++++--------
+ 2 files changed, 18 insertions(+), 9 deletions(-)
