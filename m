@@ -1,52 +1,78 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 5 May 2016 12:33:37 -0500
-Subject: [PATCH 1/2] drivers: i2c: qup: Fix broken dma when
- CONFIG_DEBUG_SG is enabled
-In-Reply-To: <1462166637-16778-2-git-send-email-sricharan@codeaurora.org>
-References: <1462166637-16778-1-git-send-email-sricharan@codeaurora.org>
- <1462166637-16778-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20160505173337.GC6533@hector.attlocal.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 5 May 2016 19:37:03 +0200
+Subject: [RFC v2 10/13] usb: hub: Power sequence the ports on activation
+In-Reply-To: <Pine.LNX.4.44L0.1605051007040.2008-100000@iolanthe.rowland.org>
+References: <1462451666-17945-11-git-send-email-k.kozlowski@samsung.com>
+ <Pine.LNX.4.44L0.1605051007040.2008-100000@iolanthe.rowland.org>
+Message-ID: <20160505173703.GA3034@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2016 at 10:53:56AM +0530, Sricharan R wrote:
-> With CONFIG_DEBUG_SG is enabled and when dma mode is used, below dump is seen,
+On Thu, May 05, 2016 at 10:09:47AM -0400, Alan Stern wrote:
+> On Thu, 5 May 2016, Krzysztof Kozlowski wrote:
 > 
-> ------------[ cut here ]------------
-> kernel BUG at include/linux/scatterlist.h:140!
-> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.0-00459-g9f087b9-dirty #7
-> Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
-> task: ffffffc036868000 ti: ffffffc036870000 task.ti: ffffffc036870000
-> PC is at qup_sg_set_buf.isra.13+0x138/0x154
-> LR is at qup_sg_set_buf.isra.13+0x50/0x154
-> pc : [<ffffffc0005a0ed8>] lr : [<ffffffc0005a0df0>] pstate: 60000145
-> sp : ffffffc0368735c0
-> x29: ffffffc0368735c0 x28: ffffffc036873752
-> x27: ffffffc035233018 x26: ffffffc000c4e000
-> x25: 0000000000000000 x24: 0000000000000004
-> x23: 0000000000000000 x22: ffffffc035233668
-> x21: ffffff80004e3000 x20: ffffffc0352e0018
-> x19: 0000004000000000 x18: 0000000000000028
-> x17: 0000000000000004 x16: ffffffc0017a39c8
-> x15: 0000000000001cdf x14: ffffffc0019929d8
-> x13: ffffffc0352e0018 x12: 0000000000000000
-> x11: 0000000000000001 x10: 0000000000000001
-> x9 : ffffffc0012b2d70 x8 : ffffff80004e3000
-> x7 : 0000000000000018 x6 : 0000000030000000
-> x5 : ffffffc00199f018 x4 : ffffffc035233018
-> x3 : 0000000000000004 x2 : 00000000c0000000
-> x1 : 0000000000000003 x0 : 0000000000000000
+> > The autodetection of attached USB device might not work on certain
+> > boards where the power is delivered externally. These devices also might
+> > require a hard reset. Use pwrseq for that in USB hub.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  drivers/usb/core/hub.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+> > index 1c82fcc448f5..0fddaacc62bf 100644
+> > --- a/drivers/usb/core/hub.c
+> > +++ b/drivers/usb/core/hub.c
+> > @@ -26,6 +26,7 @@
+> >  #include <linux/mutex.h>
+> >  #include <linux/random.h>
+> >  #include <linux/pm_qos.h>
+> > +#include <linux/pwrseq.h>
+> >  
+> >  #include <asm/uaccess.h>
+> >  #include <asm/byteorder.h>
+> > @@ -1661,7 +1662,17 @@ static int hub_configure(struct usb_hub *hub,
+> >  
+> >  	usb_hub_adjust_deviceremovable(hdev, hub->descriptor);
+> >  
+> > +	/* FIXME: When do the pre-power-on? */
 > 
-> Process swapper/0 (pid: 1, stack limit = 0xffffffc036870020)
-> Stack: (0xffffffc0368735c0 to 0xffffffc036874000)
-> 
-> Change allocation of sg buffers from dma_coherent memory to kzalloc
-> to fix the issue.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> It's hard to answer this without knowing what pre-power-on involves.
 
-Looks fine.
+In my particular case, I want to achieve a full reset through regulator (off
+and on) because the bootloader left it in initialized state. I assume
+that if bootloader did not configure the device, the reset won't be
+harmful.
 
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
+In a MMC case, this pre-power-on on is setting the 'reset' GPIO (thus
+triggering the reset) and post-power-on is clearing the 'reset'.
+
+> Why not create a pwrseq_power_on() routine that does pre_power_on 
+> followed by post_power_on?
+
+For my purpose it seems sensible.
+
+> 
+> > +	/*
+> > +	for (i = 0; i < maxchild; i++)
+> > +		pwrseq_pre_power_on(hub->ports[i]->pwrseq);
+> > +	*/
+> > +
+> > +	for (i = 0; i < maxchild; i++)
+> > +		pwrseq_post_power_on(hub->ports[i]->pwrseq);
+> 
+> This is patch 10/13.  hub->ports[i]->pwrseq doesn't get added until 
+> 11/13.  Obviously you never tried compiling each patch in the series.
+
+Ahh yes, I forgot to reorder them. Thanks for spotting this.
+
+> 
+> > +
+> >  	hub_activate(hub, HUB_INIT);
+> > +
+> 
+> Unnecessary blank line added.
+
+Thanks for feedback,
+Krzysztof
