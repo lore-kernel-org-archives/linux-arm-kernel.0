@@ -1,131 +1,125 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu,  5 May 2016 14:21:49 +0530
-Subject: [PATCH v6 11/11] arm64: dts: msm8996: Add thermal zones,
- tsens and qfprom nodes
-In-Reply-To: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
-References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1462438309-11196-12-git-send-email-rnayak@codeaurora.org>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Thu,  5 May 2016 11:08:52 +0200
+Subject: [PATCHv4] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+Message-ID: <1462439332-26215-1-git-send-email-oliver@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal zones, tsens and qfprom nodes
+There are 3 kinds of OLinuXino Lime2 boards.
+One without any on board storage, one with NAND storage and one with
+eMMC storage. This patch adds the eMMC variant of boards.
 
-Cc: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+eMMC storage is different from a regular SD card in that it is soldered
+on the board and cannot be changed. Additionally, it shares pins with
+the NAND module and with the second SPI port.
+
+Changeslog:
+
+v4:
+  Add board compatibles
+
+v3:
+  Add pwr-seq-emmc with the reset gpio
+
+v2:
+  Remove unsupported no-1.8-v property, add vqmmc property
+
+v1:
+  Initial bare bone version
+
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 ---
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 92 +++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    | 82 ++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 0506fb8..4b36929 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -97,6 +97,92 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal0 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+new file mode 100644
+index 0000000..5ea4915
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+@@ -0,0 +1,82 @@
++ /*
++ * Copyright 2015 - Ultimaker B.V.
++ * Author Olliver Schinagl <oliver@schinagl.nl>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+			thermal-sensors = <&tsens0 3>;
++#include "sun7i-a20-olinuxino-lime2.dts"
 +
-+			trips {
-+				cpu_alert0: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
++/ {
++	model = "Olimex A20-OLinuXino-LIME2-eMMC";
++	compatible = "olimex,a20-olinuxino-lime2-emmc", "allwinner,sun7i-a20";
 +
-+				cpu_crit0: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal1 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 5>;
-+
-+			trips {
-+				cpu_alert1: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit1: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal2 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 8>;
-+
-+			trips {
-+				cpu_alert2: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit2: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal3 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 10>;
-+
-+			trips {
-+				cpu_alert3: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit3: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
++	mmc2_pwrseq: pwrseq {
++		pinctrl-0 = <&mmc2_pins_nrst>;
++		pinctrl-names = "default";
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
 +	};
++};
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -151,6 +237,12 @@
- 			reg = <0x300000 0x90000>;
- 		};
- 
-+		tsens0: thermal-sensor at 4a8000 {
-+			compatible = "qcom,msm8996-tsens";
-+			reg = <0x4a8000 0x2000>;
-+			#thermal-sensor-cells = <1>;
-+		};
++&pio {
++	mmc2_pins_nrst: mmc2 at 0 {
++		allwinner,pins = "PC16";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
 +
- 		blsp2_uart1: serial at 75b0000 {
- 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
- 			reg = <0x75b0000 0x1000>;
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	mmc-pwrseq = <&mmc2_pwrseq>;
++	status = "okay";
++
++	emmc: emmc at 0 {
++		reg = <0>;
++		compatible = "mmc-card";
++		broken-hpi;
++	};
++};
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.8.1
