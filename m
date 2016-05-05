@@ -1,45 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 May 2016 20:17:28 +0100
-Subject: [RFC PATCH 1/7] ALSA: ac97: split out the generic ac97 registers
-In-Reply-To: <87pot0pbnf.fsf@belgarion.home>
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-2-git-send-email-robert.jarzmik@free.fr>
- <20160503115159.GP6292@sirena.org.uk>
- <87y47roski.fsf@belgarion.home>
- <20160504090702.GV6292@sirena.org.uk>
- <87pot0pbnf.fsf@belgarion.home>
-Message-ID: <20160505191728.GK6292@sirena.org.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 05 May 2016 12:17:51 -0700
+Subject: [PATCH V5] clk: bcm2835: mark enabled clocks and pll with
+ CLK_ENABLE_HAND_OFF
+In-Reply-To: <1462348385-16167-1-git-send-email-kernel@martin.sperl.org>
+References: <1462348385-16167-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87oa8ks49s.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 09:06:44PM +0200, Robert Jarzmik wrote:
-> Mark Brown <broonie@kernel.org> writes:
+kernel at martin.sperl.org writes:
 
-> > I see that, I just don't know why that helps.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The bcm2835 firmware enables several clocks and plls before
+> booting the linux kernel.
+>
+> These plls should never get disabled as it may result in a
+> stopped system clock and more.
+>
+> So during probing we check if the clock and plls are enabled
+> and if it is then mark that clock/pll with CLK_ENABLE_HAND_OFF.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> ---
+>  drivers/clk/bcm/clk-bcm2835.c | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>
+> Note: This requires the CLK_ENABLE_HAND_OFF patch to be applied.
+>
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index 0fc71cb..0663b6c 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> @@ -1211,6 +1211,15 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
+>  	divider->cprman = cprman;
+>  	divider->data = data;
+>  
+> +	/* if the pll-divider is running, then enable CLK_ENABLE_HAND_OFF */
+> +	if ((cprman_read(cprman, data->a2w_reg) &
+> +	     A2W_PLL_CHANNEL_DISABLE) == 0) {
+> +		dev_dbg(cprman->dev,
+> +			"found firmware enabled pll_div %s - enabling hand off\n",
+> +			data->name);
+> +		init.flags |= CLK_ENABLE_HAND_OFF;
+> +	}
 
-> Ok, so let me explain.
-
-> As you already understood, AC97_VENDOR* is needed in bus.c for the
-> autoscanning. The remaining is the reason why I don't want to include
-> ac97_codec.h in bus.c, which follows.
-
-> In order to have a clean split between former ac97 bus implementation and this
-> new one, I didn't want to include any former ac97 includes, excepting in
-> sound/ac97/compat.c.
-
-It's probably a good idea to articulate some of this in the commit log
-then!
-
-> This transition will be easier if the new ac97 code is isolated as much as
-> possible from the former code while providing backward compatibility ... hence
-> this patch.
-
-It'd probably have been clearer to me if it were splitting out all the
-register definitions rather than just some of them.
+I don't think we want this on dividers.  There are very few cases where
+a divider will be grabbed and prepare/enabled on its own, rather than as
+a side effect of a downstream clock being needed.  So, I think the
+dividers need to stay as being enabled/disabled automatically by the
+downstream clocks, like in the v3 patch you had sent.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160505/2dd6048c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160505/063e7354/attachment.sig>
