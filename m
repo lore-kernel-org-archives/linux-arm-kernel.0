@@ -1,35 +1,49 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Thu,  5 May 2016 23:33:10 +0900
-Subject: [PATCH] ARM: iop: Fix indentation
-Message-ID: <1462458790-5927-1-git-send-email-js07.lee@gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 5 May 2016 10:42:12 -0400
+Subject: [PATCH v1] builddeb: fix missing headers in linux-headers package
+In-Reply-To: <1459445479-10948-1-git-send-email-asamson@codeaurora.org>
+References: <1459445479-10948-1-git-send-email-asamson@codeaurora.org>
+Message-ID: <572B5BC4.7080402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix indentation in iop_3xx_std_desc
+On 03/31/2016 01:31 PM, Azriel Samson wrote:
+> The kernel headers package (linux-headers) doesn't include
+> header files from other architectures required to build
+> out-of-tree modules.
+> 
+> For e.g. on ARM64, opcodes.h includes the same file from ARM
+> which causes the following error:
+> ./arch/arm64/include/asm/opcodes.h:1:43: fatal error:
+> ../../arm/include/asm/opcodes.h: No such file or directory
+> compilation terminated.
+> 
+> Signed-off-by: Azriel Samson <asamson@codeaurora.org>
+> ---
+>  scripts/package/builddeb | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/scripts/package/builddeb b/scripts/package/builddeb
+> index 6c3b038..06ba0d9 100755
+> --- a/scripts/package/builddeb
+> +++ b/scripts/package/builddeb
+> @@ -322,7 +322,7 @@ fi
+>  
+>  # Build kernel header package
+>  (cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/debian/hdrsrcfiles"
+> -(cd $srctree; find arch/$SRCARCH/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
+> +(cd $srctree; find arch/*/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
+>  (cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/debian/hdrsrcfiles"
+>  (cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/debian/hdrsrcfiles"
+>  (cd $objtree; find arch/$SRCARCH/include Module.symvers include scripts -type f) >> "$objtree/debian/hdrobjfiles"
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
- arch/arm/plat-iop/setup.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Any feedback on this? Michal, do you think this would be appropriate to
+include in 4.7?
 
-diff --git a/arch/arm/plat-iop/setup.c b/arch/arm/plat-iop/setup.c
-index 5b217f4..8151bde 100644
---- a/arch/arm/plat-iop/setup.c
-+++ b/arch/arm/plat-iop/setup.c
-@@ -20,12 +20,12 @@
-  * the IOP3xx OCCDR must be mapped uncached and unbuffered.
-  */
- static struct map_desc iop3xx_std_desc[] __initdata = {
--	 {	/* mem mapped registers */
-+	{	/* mem mapped registers */
- 		.virtual	= IOP3XX_PERIPHERAL_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(IOP3XX_PERIPHERAL_PHYS_BASE),
- 		.length		= IOP3XX_PERIPHERAL_SIZE,
- 		.type		= MT_UNCACHED,
--	 },
-+	},
- };
- 
- void __init iop3xx_map_io(void)
+Thanks,
+Christopher Covington
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
