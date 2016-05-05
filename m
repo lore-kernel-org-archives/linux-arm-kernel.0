@@ -1,50 +1,49 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu,  5 May 2016 22:33:14 +0200
-Subject: [PATCH] ARM: socfpga: Update socfpga_defconfig
-Message-ID: <1462480394-8084-1-git-send-email-marex@denx.de>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Thu,  5 May 2016 13:48:48 -0700
+Subject: [PATCH 0/6] Support BCM23550 SoC
+Message-ID: <1462481334-8943-1-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the following bits:
+This patchset introduces support for the BCM23550 SoC and the Broadcom
+Sparrow development board.
 
-CONFIG_TOUCHSCREEN_STMPE
- - STMPE touchscreen support, needed on MCVEVK as it contains the
-   chip. This also enables the STMPE MFD device and touchscreen
-   input support.
+It modifies the BCM21664 support slightly to share code between the two.
 
-CONFIG_USB_STORAGE
- - USB storage support is often used, so enable it.
+With this patchset, a multi-v7 kernel brings up all 4 CPUs on a Sparrow
+board, and gets to a shell prompt. Many of the IP blocks that are shared
+with BCM28155 and BCM21664 are also functional, although not all have
+been thoroughly tested.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/configs/socfpga_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Chris Brand (6):
+  power: Introduce Broadcom kona reset driver
+  arm: bcm21664: Remove reset code
+  docs: Document BCM23550 bindings
+  arm: Add support for Broadcom BCM23550 SoC
+  arm: BCM23550 SMP support
+  arm: dt: bcm23550: Add device tree files
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index e277dc6..9e1e096 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -59,6 +59,8 @@ CONFIG_NETDEVICES=y
- CONFIG_STMMAC_ETH=y
- CONFIG_MICREL_PHY=y
- CONFIG_INPUT_EVDEV=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_STMPE=y
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
-@@ -78,9 +80,11 @@ CONFIG_SENSORS_LTC2978=y
- CONFIG_SENSORS_LTC2978_REGULATOR=y
- CONFIG_WATCHDOG=y
- CONFIG_DW_WATCHDOG=y
-+CONFIG_MFD_STMPE=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_USB=y
-+CONFIG_USB_STORAGE=y
- CONFIG_USB_DWC2=y
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_GADGET=y
+ .../bindings/arm/bcm/brcm,bcm23550-cpu-method.txt  |  36 ++
+ .../devicetree/bindings/arm/bcm/brcm,bcm23550.txt  |  15 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/bcm23550-sparrow.dts             |  75 ++++
+ arch/arm/boot/dts/bcm23550.dtsi                    | 419 +++++++++++++++++++++
+ arch/arm/mach-bcm/Kconfig                          |  12 +-
+ arch/arm/mach-bcm/Makefile                         |   5 +-
+ arch/arm/mach-bcm/board_bcm21664.c                 |  42 ---
+ arch/arm/mach-bcm/board_bcm23550.c                 |  25 ++
+ arch/arm/mach-bcm/platsmp.c                        |  58 +++
+ drivers/power/reset/Kconfig                        |  10 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/brcm-kona-reset.c              |  75 ++++
+ 14 files changed, 731 insertions(+), 46 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
+ create mode 100644 arch/arm/boot/dts/bcm23550-sparrow.dts
+ create mode 100644 arch/arm/boot/dts/bcm23550.dtsi
+ create mode 100644 arch/arm/mach-bcm/board_bcm23550.c
+ create mode 100644 drivers/power/reset/brcm-kona-reset.c
+
 -- 
-2.7.0
+1.9.1
