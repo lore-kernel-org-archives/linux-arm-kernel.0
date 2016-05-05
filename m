@@ -1,54 +1,26 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 5 May 2016 15:52:11 -0400
-Subject: [RFC v2 09/13] power: pwrseq: Add support for USB hubs with
- external power
-In-Reply-To: <1462451666-17945-10-git-send-email-k.kozlowski@samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <1462451666-17945-10-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <3bdf7888-5ed1-2a55-6607-ee8be70e25e7@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 May 2016 21:55:26 +0200
+Subject: ARM: SoC fixes for 4.6
+In-Reply-To: <7856724.NgjOiORdJx@wuerfel>
+References: <7856724.NgjOiORdJx@wuerfel>
+Message-ID: <4480155.1AKdzJLtY3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
-> Some USB devices on embedded boards have external power supply which has
-> to be reset in certain conditions. Add pwrseq interface for this.
+On Thursday 05 May 2016 21:36:43 Arnd Bergmann wrote:
+> Here are a couple last-minute fixes for ARM SoCs. Most of them
+> are for the OMAP platforms, quoting Tony Lindgren:
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/power/pwrseq/pwrseq.c | 44 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pwrseq.h        |  8 ++++++++
->  2 files changed, 52 insertions(+)
+>     Fixes for omaps for v4.6-rc cycle. All dts fixes, mostly
+>     affecting voltages and pinctrl for various device drivers:
 > 
-> diff --git a/drivers/power/pwrseq/pwrseq.c b/drivers/power/pwrseq/pwrseq.c
-> index 495a19d3c30b..306265f55a10 100644
-> --- a/drivers/power/pwrseq/pwrseq.c
-> +++ b/drivers/power/pwrseq/pwrseq.c
-> @@ -52,6 +52,43 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
->  }
->  EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
->  
-> +struct pwrseq *pwrseq_alloc(struct device *dev)
-> +{
+>     - Regulator minimum voltage fixes for omap5
+>     - ISP syscon register offset fix for omap3
+>     - Fix regulator initial modes for n900
+>     - Fix omap5 pinctrl wkup instance size
+> 
 
-This function is USB specific so better to call it usb_pwrseq_alloc() instead.
+Sorry for forgetting the [GIT PULL] again on both my pull requests, I'll
+send you identical copies with a correct subject line right away.
 
-Although, this function has a lot of duplicated code from mmc_pwrseq_alloc()
-so I think is better to keep the name generic and factorize the common code.
-
-I expect other devices are also needing some kind of power seq in the future
-so having a single alloc function instead of each for device type makes sense.
-
-> +	struct device_node *np;
-> +	struct pwrseq *p, *ret = NULL;
-> +
-> +	np = of_parse_phandle(dev->of_node, "usb-pwrseq", 0);
-
-I know this is just an RFC but you should really add DT bindings for this.
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+	Arnd
