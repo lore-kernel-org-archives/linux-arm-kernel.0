@@ -1,127 +1,97 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu,  5 May 2016 15:53:28 +0000
-Subject: [PATCH 5/5] clk: bcm2835: add support for
- BCM2835_CLOCK_FLAG_USE_MASH/INTEGER
-In-Reply-To: <1462463608-22940-1-git-send-email-kernel@martin.sperl.org>
-References: <1462463608-22940-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1462463608-22940-6-git-send-email-kernel@martin.sperl.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 05 May 2016 16:56:23 +0100
+Subject: Applied "ASoC: rockchip: Revert "ASoC: rockchip: i2s: remove unused
+ variables"" to the asoc tree
+In-Reply-To: <1462373686-21794-1-git-send-email-john@metanate.com>
+Message-ID: <E1ayLdX-0004kH-IJ@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+The patch
 
-Allow the use of higher order mash fractional divider modes
-and also allow to force the use of integer dividers.
+   ASoC: rockchip: Revert "ASoC: rockchip: i2s: remove unused variables"
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From a6e806c49e3265494ac6fe6ec88ed5c010652e0d Mon Sep 17 00:00:00 2001
+From: John Keeping <john@metanate.com>
+Date: Wed, 4 May 2016 17:21:56 +0100
+Subject: [PATCH] ASoC: rockchip: Revert "ASoC: rockchip: i2s: remove unused
+ variables"
+
+This reverts commit 5938448b99275cba95167c3f9d39ca9225fdad38.
+
+It turns out that the commit that made these variables unused is wrong
+so we're about to revert it.  Bring back the variables in prepration.
+
+Signed-off-by: John Keeping <john@metanate.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c       | 57 +++++++++++++++++++++++++++++++++++--
- include/dt-bindings/clock/bcm2835.h |  7 +++++
- 2 files changed, 62 insertions(+), 2 deletions(-)
+ sound/soc/rockchip/rockchip_i2s.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index c80487e..08140ad 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -130,6 +130,7 @@
- # define CM_BUSY			BIT(7)
- # define CM_BUSYD			BIT(8)
- # define CM_FRAC			BIT(9)
-+# define CM_MASH			BIT(10)
- # define CM_SRC_SHIFT			0
- # define CM_SRC_BITS			4
- # define CM_SRC_MASK			0xf
-@@ -888,6 +889,24 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
- 				 CM_DIV_FRAC_BITS - data->frac_bits);
- 	}
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 2f8e20416bd3..34743ec61c49 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -34,6 +34,13 @@ struct rk_i2s_dev {
  
-+	/* based on flags modify settings */
-+	switch (clock->flags & BCM2835_CLOCK_FLAG_USE_MASK) {
-+	case BCM2835_CLOCK_FLAG_USE_FRAC:
-+			break;
-+	case BCM2835_CLOCK_FLAG_USE_INTEGER:
-+		div &= GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
-+			       CM_DIV_FRAC_BITS);
-+		break;
-+	case BCM2835_CLOCK_FLAG_USE_MASH2:
-+		mindiv += 2 << CM_DIV_FRAC_BITS;
-+		maxdiv -= 1 << CM_DIV_FRAC_BITS;
-+		break;
-+	case BCM2835_CLOCK_FLAG_USE_MASH3:
-+		mindiv += 4 << CM_DIV_FRAC_BITS;
-+		maxdiv -= 3 << CM_DIV_FRAC_BITS;
-+		break;
-+	}
+ 	struct regmap *regmap;
+ 
++/*
++ * Used to indicate the tx/rx status.
++ * I2S controller hopes to start the tx and rx together,
++ * also to stop them when they are both try to stop.
++*/
++	bool tx_start;
++	bool rx_start;
+ 	bool is_master_mode;
+ };
+ 
+@@ -77,7 +84,11 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
+ 		regmap_update_bits(i2s->regmap, I2S_XFER,
+ 				   I2S_XFER_TXS_START,
+ 				   I2S_XFER_TXS_START);
 +
- 	/* apply the clamping  limits */
- 	div = max_t(u32, div, mindiv);
- 	div = min_t(u32, div, maxdiv);
-@@ -996,8 +1015,26 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
- 	 * clock this requirement should be take care of by the
- 	 * clk-framework.
- 	 */
--	ctl = cprman_read(cprman, data->ctl_reg) & ~CM_FRAC;
--	ctl |= (div & CM_DIV_FRAC_MASK) ? CM_FRAC : 0;
-+	ctl = cprman_read(cprman, data->ctl_reg) & ~(CM_FRAC | CM_MASH);
-+	if (div & CM_DIV_FRAC_MASK) {
-+		/*
-+		 * we never get to *MASH* for non-mash clock,
-+		 * as it is filtered in bcm2835_register_clock
-+		 * USE_INTEGER forces already choose_clock_div
-+		 * to apply the mask so that we do not get here
-+		 */
-+		switch (clock->flags & BCM2835_CLOCK_FLAG_USE_MASK) {
-+		case BCM2835_CLOCK_FLAG_USE_FRAC:
-+			ctl |= CM_FRAC;
-+			break;
-+		case BCM2835_CLOCK_FLAG_USE_MASH2:
-+			ctl |= CM_MASH;
-+			break;
-+		case BCM2835_CLOCK_FLAG_USE_MASH3:
-+			ctl |= CM_MASH | CM_FRAC;
-+			break;
-+		}
-+	}
- 	cprman_write(cprman, data->ctl_reg, ctl);
- 
- 	cprman_write(cprman, data->div_reg, div);
-@@ -1280,6 +1317,22 @@ bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 		clock->flags |= bcm2835_register_clock_default_parents(
- 			cprman->dev, data);
- 
-+	/* check for MASH flags when the clock is not a mash clock */
-+	if (!data->is_mash_clock) {
-+		switch (clock->flags & BCM2835_CLOCK_FLAG_USE_MASK) {
-+		case BCM2835_CLOCK_FLAG_USE_MASH2:
-+		case BCM2835_CLOCK_FLAG_USE_MASH3:
-+			dev_warn(cprman->dev,
-+				 "found mash2/mash3 flag for clock %s, which does not support mash\n",
-+				 data->name);
-+			clock->flags &= BCM2835_CLOCK_FLAG_USE_MASK;
-+			clock->flags |= BCM2835_CLOCK_FLAG_USE_FRAC;
-+			break;
-+		default:
-+			break;
-+		}
-+	}
++		i2s->tx_start = true;
+ 	} else {
++		i2s->tx_start = false;
 +
- 	return devm_clk_register(cprman->dev, &clock->hw);
- }
+ 		regmap_update_bits(i2s->regmap, I2S_DMACR,
+ 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
  
-diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-index e5396fe..5591bd1 100644
---- a/include/dt-bindings/clock/bcm2835.h
-+++ b/include/dt-bindings/clock/bcm2835.h
-@@ -90,3 +90,10 @@
- #define BCM2835_VPU_PARENT_PLLH_AUX	7
- #define BCM2835_VPU_PARENT_PLLC_CORE1	8
- #define BCM2835_VPU_PARENT_PLLC_CORE2	9
+@@ -115,7 +126,11 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
+ 		regmap_update_bits(i2s->regmap, I2S_XFER,
+ 				   I2S_XFER_RXS_START,
+ 				   I2S_XFER_RXS_START);
 +
-+/* additional clock flags */
-+#define BCM2835_CLOCK_FLAG_USE_FRAC	((0 << 31) | (0 << 30))
-+#define BCM2835_CLOCK_FLAG_USE_INTEGER	((0 << 31) | (1 << 30))
-+#define BCM2835_CLOCK_FLAG_USE_MASH2	((1 << 31) | (0 << 30))
-+#define BCM2835_CLOCK_FLAG_USE_MASH3	((1 << 31) | (1 << 30))
-+#define BCM2835_CLOCK_FLAG_USE_MASK	((1 << 31) | (1 << 30))
++		i2s->rx_start = true;
+ 	} else {
++		i2s->rx_start = false;
++
+ 		regmap_update_bits(i2s->regmap, I2S_DMACR,
+ 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
+ 
 -- 
-2.1.4
+2.8.1
