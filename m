@@ -1,65 +1,53 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 5 May 2016 14:48:57 -0700
-Subject: [PATCH] ARM: BCM5301X: Add DT for Luxul XAP-1510
-In-Reply-To: <572BBF6B.8030207@hauke-m.de>
-References: <1462296501-5209-1-git-send-email-dhaab@luxul.com>
- <572A453E.6010000@gmail.com>
- <CACna6ryWGsOwBhhauJTROi2BPbmgGn_4oYnKc-L8-3Joy+5M7g@mail.gmail.com>
- <572BBF6B.8030207@hauke-m.de>
-Message-ID: <572BBFC9.1030800@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 May 2016 15:03:44 -0700
+Subject: NFSroot hangs with bad unlock balance in Linux next
+Message-ID: <20160505220344.GE5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/16 14:47, Hauke Mehrtens wrote:
-> On 05/05/2016 12:36 AM, Rafa? Mi?ecki wrote:
->> On 4 May 2016 at 20:53, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> On 03/05/16 10:28, Dan Haab wrote:
->>>> Luxul XAP-1510 is an AP device based on BCM4708 SoC. It uses flash
->>>> memory connected to the SPI controller.
->>>
->>> Looks fine, except one nit:
->>>
->>>> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
->>>> new file mode 100644
->>>> index 0000000..f4460b5
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
->>>> @@ -0,0 +1,67 @@
->>>> +/*
->>>> + * Broadcom BCM470X / BCM5301X ARM platform code.
->>>> + * DTS for Luxul XAP-1510
->>>> + *
->>>> + * Copyright 2015 Luxul Inc.
->>>> + *
->>>> + * Licensed under the GNU/GPL. See COPYING for details.
->>>
->>> The ARM SoC maintainer have been asking to utilize a license which is
->>> also BSD compatible, so something along the lines of this one:
->>>
->>> arch/arm/boot/dts/bcm911360k.dts
->>>
->>> Do you mind respining the patch to include that kind of license header?
->>
->> I wasn't aware of this neither. Shall we re-license existing DTS files
->> as well? I'm fine with changing them to BSD compatible.
->>
->> I'm a bit confused by using BSD license only. Kernel is licensed under
->> GNU GPL version 2 and if there are some BSD compatible modules, they
->> use dual licensing model (BSD/GPL). Shouldn't we use BSD/GPL in DTS
->> files as well then?
->>
-> 
-> As far as I understand the License part you can take code which is
-> licensed under BSD license and use it in GPL code because you can comply
-> with the BSD license and also handle it in a way to be GPL compliant at
-> the same time. You can also make a change to BSD code and license this
-> change under the GPL, then the complete code (the old one + your change)
-> is now GPL.
-> 
-> Are the device tree files licensed under BSD license to make it easier
-> to integrate them into a proprietary boot loader or what is the purpose?
+Hi,
 
-Yes, there could be that, or just making the license compatible with
-other OSes like FreeBSD for instace.
--- 
-Florian
+Looks like Linux next with NFSroot hangs for me at some point booting
+into init. Then after a while it produces "BUG: bad unlock balance
+detected!".
+
+This happens at least with omap5-uevm and igepv5. Not sure yet if it
+also happens on other boards, the ones I'm seeing it happen both have
+USB Ethernet controller. They usually hang after the system starts
+being idle some tens of seconds into booting.
+
+I tried to bisect it down with no luck. I do have the following
+trace, does that provide any clues?
+
+Regards,
+
+Tony
+
+8< --------------------------
+[ BUG: bad unlock balance detected! ]
+4.6.0-rc6-next-20160505+ #1252 Not tainted
+-------------------------------------
+kworker/0:2/112 is trying to release lock (&nfsi->rmdir_sem) at:
+[<c03a7f98>] nfs_async_unlink_release+0x20/0x68
+but there are no more locks to release!
+
+other info that might help us debug this:
+2 locks held by kworker/0:2/112:
+ #0:  ("nfsiod"){.+.+..}, at: [<c0154774>] process_one_work+0x120/0x6bc
+  #1:  ((&task->u.tk_work)#2){+.+...}, at: [<c0154774>] process_one_work+0x120/0x6bc
+
+stack backtrace:
+CPU: 0 PID: 112 Comm: kworker/0:2 Not tainted 4.6.0-rc6-next-20160505+ #1252
+Hardware name: Generic OMAP5 (Flattened Device Tree)
+Workqueue: nfsiod rpc_async_release
+[<c0110328>] (unwind_backtrace) from [<c010c3cc>] (show_stack+0x10/0x14)
+[<c010c3cc>] (show_stack) from [<c0481348>] (dump_stack+0xb0/0xe4)
+[<c0481348>] (dump_stack) from [<c018d638>] (print_unlock_imbalance_bug+0xb0/0xe0)
+[<c018d638>] (print_unlock_imbalance_bug) from [<c0191444>] (lock_release+0x2ec/0x4c4)
+[<c0191444>] (lock_release) from [<c018abf0>] (up_read+0x18/0x58)
+[<c018abf0>] (up_read) from [<c03a7f98>] (nfs_async_unlink_release+0x20/0x68)
+[<c03a7f98>] (nfs_async_unlink_release) from [<c0785320>] (rpc_free_task+0x24/0x44)
+[<c0785320>] (rpc_free_task) from [<c015483c>] (process_one_work+0x1e8/0x6bc)
+[<c015483c>] (process_one_work) from [<c0154e54>] (worker_thread+0x144/0x4e8)
+[<c0154e54>] (worker_thread) from [<c015ad0c>] (kthread+0xdc/0xf8)
+[<c015ad0c>] (kthread) from [<c01078f0>] (ret_from_fork+0x14/0x24)
