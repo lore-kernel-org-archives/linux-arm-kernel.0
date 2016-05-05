@@ -1,33 +1,70 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 4 May 2016 18:16:21 -0700
-Subject: [PATCH] ARM: dts: rockchip: move rk3288 edp phy under the GRF
-In-Reply-To: <20160505011112.GA131923@google.com>
-References: <1640976.sZtsTTlDpl@diego> <4275673.EbRsbqkhH8@diego>
- <20160505011112.GA131923@google.com>
-Message-ID: <20160505011621.GA44327@google.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Thu, 5 May 2016 10:24:18 +0800
+Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <CA+=Sn1ngpaJWHpGDmU+kXBkz56SO+XDW2qzMMLAbbBWnaB0eqw@mail.gmail.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1554541.oDP7Ro5zB2@wuerfel>
+ <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
+ <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
+ <57289C75.50904@huawei.com> <20160504214949.GA28217@yury-N73SV>
+ <CA+=Sn1ngpaJWHpGDmU+kXBkz56SO+XDW2qzMMLAbbBWnaB0eqw@mail.gmail.com>
+Message-ID: <572AAED2.7050604@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2016 at 06:11:12PM -0700, Brian Norris wrote:
-> On Fri, Apr 22, 2016 at 03:56:27PM +0200, Heiko Stuebner wrote:
-> > Am Samstag, 16. April 2016, 02:49:14 schrieb Heiko St?bner:
-> > > The edp-phy control is a part of the General Register Files and
-> > > with a recent patch in 4.6 the phy driver can now also handle this
-> > > correctly, so move the dts node under the GRF as well.
-> > > 
-> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > 
-> > the change in the phy-driver has made it into Greg's usb tree as fix for 4.6, 
-> > so I've picked this patch for 4.7 now.
-> 
-> Not sure if it's intentional, but the phy binding change (which is in
-> 4.6) broke the DP support in 4.6/rk3288.dtsi, and this patch is
-> necessary to bring it back. Shouldn't this DTS change have gone to 4.7
-> too? Or (when convincing ourselves we're not breaking the DT ABI here),
-> could we just claim that eDP wasn't supported in 4.6, and 4.7 will just
-> be bug-fixing the rk3288 DTS?
+Hi,
 
-Oops, my bad. The eDP PHY didn't show up at all in the v4.6/rk3288.dtsi.
-So no breakage. Sorry for the false alarm.
+On 2016/5/5 7:23, Andrew Pinski wrote:
+> On Wed, May 4, 2016 at 2:49 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>> On Tue, May 03, 2016 at 08:41:25PM +0800, Zhangjian (Bamvor) wrote:
+>>> Hi, all
+>>>
+>>> After apply this patch with my small testcase, the vsyscall of gettimeofday in
+>>> ilp32 works in both big endian and small endian. In this patch, I use the
+>>> different register and offset for ilp32 and lp64. Actually, the
+>>> COMPAT_TVAL_TV_SEC is same as TVAL_TV_SEC(so as to COMPAT_TSPEC_TV_SEC and
+>>> TSPEC_TV_SEC). I add it to keep the logic clear. I also change the version
+>>> of vdso to 4.6. It should change to 2.6.39 if glibc is not update.
+>>>
+>>
+>> [...]
+>>
+>> Hi Bamvor,
+>>
+>> It works for me as well. Thank you.
+>> I'll incorporate it in next submission.
+>
+> We should add the following so we are complaint to the ILP32 ABI
+> dealing with pointers don't have to be zero extended for arguments,
+> Note ZERO should most likely be ZERO_PTR or something to do that
+> effect, I am not so good with names.
+> #ifdef __LP64__
+> #define ZERO(n)
+> #else
+> #define ZERO(n)         mov     w##n, w##n
+> #endif
+>
+> ...
+> ENTRY(__kernel_gettimeofday)
+>          .cfi_startproc
+>          ZERO(0)
+>          ZERO(1)
+> ...
+> ENTRY(__kernel_clock_gettime)
+>          .cfi_startproc
+>          ZERO(1)
+> ...
+> ENTRY(__kernel_clock_getres)
+>          .cfi_startproc
+>          ZERO(1)
+Thanks. I will test and send a new version.
 
-Brian
+Thanks.
+
+Bamvor
+> Thanks,
+> Andrew Pinski
+>
+>>
+>> Yury.
