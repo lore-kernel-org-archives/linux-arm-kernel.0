@@ -1,65 +1,41 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 05 May 2016 21:06:44 +0200
-Subject: [RFC PATCH 1/7] ALSA: ac97: split out the generic ac97 registers
-In-Reply-To: <20160504090702.GV6292@sirena.org.uk> (Mark Brown's message of
- "Wed, 4 May 2016 10:07:02 +0100")
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-2-git-send-email-robert.jarzmik@free.fr>
- <20160503115159.GP6292@sirena.org.uk> <87y47roski.fsf@belgarion.home>
- <20160504090702.GV6292@sirena.org.uk>
-Message-ID: <87pot0pbnf.fsf@belgarion.home>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 5 May 2016 15:09:52 -0400
+Subject: [RFC v2 05/13] power: pwrseq: Remove mmc prefix from mmc_pwrseq
+In-Reply-To: <1462451666-17945-6-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <1462451666-17945-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <48539995-2966-0df0-51db-e0c549a92880@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+Hello Krzysztof,
 
-> On Tue, May 03, 2016 at 09:22:05PM +0200, Robert Jarzmik wrote:
->> Mark Brown <broonie@kernel.org> writes:
->
->> > On Sat, Apr 30, 2016 at 11:15:33PM +0200, Robert Jarzmik wrote:
->
->> >> Split out from the ac97_codec.h the ac97 generic registers, which can be
->> >> used by a codec, typically a generic ac97 codec, and by the ac97 bus, to
->> >> scan an ac97 AC-Link.
->
->> > I don't entirely see the value in this one but equally it does no harm.
->
->> Oh that's to have the defines AC97_VENDOR_ID1 and AC97_VENDOR_ID2, but without
->> including ac97_codec.h in sound/ac97/bus.c.
->
-> I see that, I just don't know why that helps.
-Ok, so let me explain.
+On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
+> The "mmc" prefix is no longer needed after moving the pwrseq core code
+> from mmc/ to power/.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-As you already understood, AC97_VENDOR* is needed in bus.c for the
-autoscanning. The remaining is the reason why I don't want to include
-ac97_codec.h in bus.c, which follows.
+[snip]
 
-In order to have a clean split between former ac97 bus implementation and this
-new one, I didn't want to include any former ac97 includes, excepting in
-sound/ac97/compat.c.
+> diff --git a/drivers/power/pwrseq/pwrseq_emmc.c b/drivers/power/pwrseq/pwrseq_emmc.c
+> index a0583ed46d7f..a68ac9a68e04 100644
+> --- a/drivers/power/pwrseq/pwrseq_emmc.c
+> +++ b/drivers/power/pwrseq/pwrseq_emmc.c
+> @@ -22,7 +22,7 @@
+>  #include <linux/mmc/host.h>
+> 
 
-Amongst the thing I wanted to isolate :
- - didn't want the struct snd_ac97 in sound/ac97/* (except compat.c) to see not
-   be "fooled" by a definition which would come with ac97_codec.h by "chance".
- - didn't want to have snd_a97_*() functions, as they rely on struct snd_ac97.
- - didn't want the struct snd_ac97_bus_ops, there is a new one
-   => the main grudge I have is the void (*write)() and unsigned short (*read)()
-   prototype which prevent from returning error codes such as -EIO, etc ...
+I don't think this header inclusion is needed. At least I didn't see anything
+defined there that's used in this driver. This also applies to pwrseq_simple.
 
-Moreover, to have a smooth transition, my plan is :
- - have this new ac97 bus
- - provide any needed function in compat.c so that previous codecs, regmap,
-   ... continue to work
- - port the ac97 "pci" codec to have a generic ac97 codec so that codecs can be
-   shrinked from common ac97 code.
- - port the codecs ... several monthes of work, etc ...
- - once the port is done, remove compat.c
+I think you could remove those in another preparatory patches before the move.
 
-This transition will be easier if the new ac97 code is isolated as much as
-possible from the former code while providing backward compatibility ... hence
-this patch.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Cheers.
-
+Best regards,
 -- 
-Robert
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
