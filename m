@@ -1,50 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 May 2016 17:42:40 -0500
-Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
-In-Reply-To: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160505224240.GA31429@rob-hp-laptop>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 5 May 2016 15:55:19 -0700
+Subject: [PATCH v7 2/9] i2c: rk3x: use struct "rk3x_i2c_calced_timings"
+In-Reply-To: <1462371194-5809-3-git-send-email-david.wu@rock-chips.com>
+References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+ <1462371194-5809-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <CAD=FV=WAbedAB78shifxwjmZ-od8rhOiNz80rpdqfwzRsdX6WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 02:34:13PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> This is a different, second try to fix usb3503+lan on Odroid U3 board
-> if it was initialized by bootloader (e.g. for TFTP boot).
-> 
-> First version:
-> http://www.spinics.net/lists/linux-usb/msg140042.html
-> 
-> 
-> Problem
-> =======
-> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
-> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
-> is required, e.g. by suspend to RAM. The actual TFTP boot does
-> not have to happen. Just "usb start" from U-Boot is sufficient.
-> 
-> From the schematics, the regulator is a supply only to LAN, however
-> without toggling it off/on, the usb3503 hub won appear neither.
-> 
-> 
-> Solution
-> ========
-> This is very similar to the MMC pwrseq behavior so the idea is to:
-> 1. Move MMC pwrseq drivers to generic place,
+David,
 
-You can do that, but I'm going to NAK any use of pwrseq bindings outside 
-of MMC. I think it is the wrong way to do things. The DT should describe 
-the devices. If they happen to be "simple" then the core can walk the 
-tree and do any setup. For example, look for "reset-gpios" and toggle 
-that GPIO. There is no need for a special node.
+On Wed, May 4, 2016 at 7:13 AM, David Wu <david.wu@rock-chips.com> wrote:
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-> 2. Extend the pwrseq-simple with regulator toggling,
-> 3. Add support to USB hub and port core for pwrseq,
+Usually folks like a description and not just a subject line.  I'd add
+a description like:
 
-We discussed this for USB already[1] and is why we defined how to add 
-USB child devices. The idea is not to add pwrseq to that.
+The "div_high" and "div_low" values are always used together.  Group them
+into a structure to make it easier to pass them both around.  This
+structure also provides a place for future calculated timings.
 
-Rob
+> ---
+> Change in v7:
+> - none
+>
+>  drivers/i2c/busses/i2c-rk3x.c | 55 +++++++++++++++++++++++++------------------
+>  1 file changed, 32 insertions(+), 23 deletions(-)
 
-[1] http://www.spinics.net/lists/linux-usb/msg134082.html
+Other than the description, I think this looks fine.
+
+IMHO this can be applied any time independent of any earlier patches.
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
