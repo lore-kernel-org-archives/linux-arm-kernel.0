@@ -1,63 +1,43 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 May 2016 17:12:12 -0500
-Subject: [PATCH v7 7/9] dt-bindings: i2c: rk3x: add support for rk3399
-In-Reply-To: <1462372523-6444-1-git-send-email-david.wu@rock-chips.com>
-References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
- <1462372523-6444-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20160505221212.GA26820@rob-hp-laptop>
+Date: Thu, 5 May 2016 17:17:13 -0500
+Subject: [Patch v3 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <1462402245-18295-2-git-send-email-andy.gross@linaro.org>
+References: <1462402245-18295-1-git-send-email-andy.gross@linaro.org>
+ <1462402245-18295-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160505221713.GA12273@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2016 at 10:35:23PM +0800, David Wu wrote:
-> The bus clock and function clock are separated at rk3399,
-> and others use one clock as the bus clock and function clock.
+On Wed, May 04, 2016 at 05:50:38PM -0500, Andy Gross wrote:
+> This patch adds the device tree support for the Qualcomm SCM firmware.
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
 > ---
->  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+>  .../devicetree/bindings/firmware/qcom,scm.txt      | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> index 0b4a85f..82b6f6b 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> @@ -6,10 +6,20 @@ RK3xxx SoCs.
->  Required properties :
->  
->   - reg : Offset and length of the register set for the device
-> - - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
-> -		"rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
-> + - compatible: should be one of the followings
+> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> new file mode 100644
+> index 0000000..ee7cd12
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+> @@ -0,0 +1,26 @@
+> +QCOM Secure Channel Manager (SCM)
+> +
+> +Qualcomm processors include an interface to communicate to the secure firmware.
+> +This interface allows for clients to request different types of actions.  These
+> +can include CPU power up/down, HDCP requests, loading of firmware, and other
+> +assorted actions.
+> +
+> +Required properties:
+> +- compatible: must contain one of the following:
+> + * "qcom,scm-a-family" for A family Qualcomm processors (APQ8064, MSM8960, etc)
+> + * "qcom,scm" for B family and later processors (MSM8916, APQ8084, MSM8974, etc)
+> +- clocks: One to three clocks may be required based on compatible.
+> + * Only core clock required for "qcom,scm-apq8064"
 
-s/followings/following:/
+This is not a compatible string. What happened to the chip ones. I 
+thought we decided on chip specific plus one of the above ones.
 
-> +   - "rockchip,rk3066-i2c": for rk3066
-> +   - "rockchip,rk3188-i2c": for rk3188
-> +   - "rockchip,rk3228-i2c": for rk3228
-> +   - "rockchip,rk3288-i2c": for rk3288
-> +   - "rockchip,rk3399-i2c": for rk3399
->   - interrupts : interrupt number
-> - - clocks : parent clock
-> + - clocks: See ../clock/clock-bindings.txt
-> +   - For older hardware (rk3066, rk3188, rk3228, rk3288):
-> +     - There is one clock that's used both to derive the functional clock
-> +       for the device and as the bus clock.  REQUIRED.
-
-This is the required section, so REQUIRED is redundant.
-
-> +   - For newer hardware (rk3399): specify by name
-> +     - "i2c": REQUIRED. This is used to derive the functional clock.
-> +     - "pclk": REQUIRED. This is the bus clock.equired on RK3066, RK3188 :
-
-This doesn't make sense. The first line says this applies to rk3399, but 
-then here it is talking about other parts.
-
-And there's a typo.
-
->  
->  Required on RK3066, RK3188 :
->  
-> -- 
-> 1.9.1
-> 
-> 
+Rob
