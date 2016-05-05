@@ -1,37 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 May 2016 10:31:36 +0200
-Subject: [v10,
- 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <1462417950-46796-8-git-send-email-yangbo.lu@nxp.com>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <1462417950-46796-8-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <4448030.Zs8fVnr3nm@wuerfel>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 5 May 2016 10:32:17 +0200
+Subject: [alsa-devel] [PATCH 1/7] ASoC: mediatek: Refine mt8173 driver and
+ change config option
+In-Reply-To: <1462416342.25179.36.camel@mtksdaap41>
+References: <1461934848-60011-1-git-send-email-garlic.tseng@mediatek.com>
+ <1461934848-60011-2-git-send-email-garlic.tseng@mediatek.com>
+ <20160504164306.GA6292@sirena.org.uk> <1462416342.25179.36.camel@mtksdaap41>
+Message-ID: <572B0511.80701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 May 2016 11:12:30 Yangbo Lu wrote:
-> 
-> +       fsl_guts_init();
-> +       svr = fsl_guts_get_svr();
-> +       if (svr) {
-> +               esdhc->soc_ver = SVR_SOC_VER(svr);
-> +               esdhc->soc_rev = SVR_REV(svr);
-> +       } else {
-> +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
-> +       }
-> +
-> 
 
 
-Sorry for jumping in again after not participating in the discussion for the
-past few versions.
+On 05/05/16 04:45, Garlic Tseng wrote:
+> On Wed, 2016-05-04 at 17:43 +0100, Mark Brown wrote:
+>> On Fri, Apr 29, 2016 at 09:00:42PM +0800, Garlic Tseng wrote:
+>>
+>>>   .../{mtk-afe-pcm.c => mt8173/mt8173-afe-pcm.c}     | 488 ++++++++++-----------
+>>
+>> So there's going to be no code sharing at all between this and any other
+>> Mediatek chips?  That seems very surprising, it'd suggest that the
+>> hardware designers were creating a new design completely from scratch
+>> each time which doesn't seem all that likely.  This is an unusual way of
+>> organizing things and we need a much clearer explanation of what's going
+>> on here.
+>
+> MT8173 and MT2701 are from different product lines so the register
+> control sequences are very different. If another driver for 8173-like
+> (or 2701-like) chip go upstream it shall share some common code with the
+> relatively driver indeed. However I think MT8173 and MT2701 can't share
+> the platform driver or a lot of "if MT8173 else MT2701" will mess up the
+> code.
+>
 
-What happened to my suggestion of making this a platform-independent interface
-to avoid the link time dependency?
+What about the other SoCs we have some minimal support for: mt6589, 
+mt8135, mt6592, mt6580, mt7323, mt8127?
 
-Specifically, why not add an exported function to drivers/base/soc.c that
-uses glob_match() for comparing a string in the device driver to the ID
-of the SoC that is set by whatever SoC identifying driver the platform
-has?
+A quick glance at the datasheets showed me, that mt6589 and at least 
+mt8127 have quite similar register offsets. So I suppose there is some 
+common code actually.
 
-	Arnd
+Regards,
+Matthias
