@@ -1,115 +1,79 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 May 2016 14:34:22 +0200
-Subject: [RFC v2 09/13] power: pwrseq: Add support for USB hubs with external
- power
+Date: Thu, 05 May 2016 14:34:14 +0200
+Subject: [RFC v2 01/13] usb: misc: usb3503: Clean up on driver unbind
 In-Reply-To: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
 References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1462451666-17945-10-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1462451666-17945-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some USB devices on embedded boards have external power supply which has
-to be reset in certain conditions. Add pwrseq interface for this.
+The driver should clean up after itself by unpreparing the clock when it
+is unbound.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/power/pwrseq/pwrseq.c | 44 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/pwrseq.h        |  8 ++++++++
- 2 files changed, 52 insertions(+)
+ drivers/usb/misc/usb3503.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/power/pwrseq/pwrseq.c b/drivers/power/pwrseq/pwrseq.c
-index 495a19d3c30b..306265f55a10 100644
---- a/drivers/power/pwrseq/pwrseq.c
-+++ b/drivers/power/pwrseq/pwrseq.c
-@@ -52,6 +52,43 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+diff --git a/drivers/usb/misc/usb3503.c b/drivers/usb/misc/usb3503.c
+index b45cb77c0744..a464636675a6 100644
+--- a/drivers/usb/misc/usb3503.c
++++ b/drivers/usb/misc/usb3503.c
+@@ -330,6 +330,19 @@ static int usb3503_i2c_probe(struct i2c_client *i2c,
+ 	return usb3503_probe(hub);
  }
- EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
  
-+struct pwrseq *pwrseq_alloc(struct device *dev)
++static int usb3503_i2c_remove(struct i2c_client *i2c)
 +{
-+	struct device_node *np;
-+	struct pwrseq *p, *ret = NULL;
++	struct usb3503 *hub;
 +
-+	np = of_parse_phandle(dev->of_node, "usb-pwrseq", 0);
-+	if (!np)
-+		return NULL;
-+
-+	mutex_lock(&pwrseq_list_mutex);
-+	list_for_each_entry(p, &pwrseq_list, pwrseq_node) {
-+		if (p->dev->of_node == np) {
-+			if (!try_module_get(p->owner))
-+				dev_err(dev,
-+					"increasing module refcount failed\n");
-+			else
-+				ret = p;
-+
-+			break;
-+		}
++	hub = i2c_get_clientdata(i2c);
++	if (hub) {
++		if (hub->clk)
++			clk_disable_unprepare(hub->clk);
 +	}
 +
-+	of_node_put(np);
-+	mutex_unlock(&pwrseq_list_mutex);
++	return 0;
++}
 +
-+	/* FIXME: this path can be simplified... */
-+	if (!ret) {
-+		dev_info(dev, "usb-pwrseq defer\n");
-+		return ERR_PTR(-EPROBE_DEFER);
+ static int usb3503_platform_probe(struct platform_device *pdev)
+ {
+ 	struct usb3503 *hub;
+@@ -342,6 +355,19 @@ static int usb3503_platform_probe(struct platform_device *pdev)
+ 	return usb3503_probe(hub);
+ }
+ 
++static int usb3503_platform_remove(struct platform_device *pdev)
++{
++	struct usb3503 *hub;
++
++	hub = platform_get_drvdata(pdev);
++	if (hub) {
++		if (hub->clk)
++			clk_disable_unprepare(hub->clk);
 +	}
 +
-+	dev_info(dev, "allocated usb-pwrseq\n");
-+
-+	return ret;
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(pwrseq_alloc);
 +
- void pwrseq_pre_power_on(struct pwrseq *pwrseq)
+ #ifdef CONFIG_PM_SLEEP
+ static int usb3503_i2c_suspend(struct device *dev)
  {
- 	if (pwrseq && pwrseq->ops->pre_power_on)
-@@ -84,6 +121,13 @@ void mmc_pwrseq_free(struct mmc_host *host)
- }
- EXPORT_SYMBOL_GPL(mmc_pwrseq_free);
+@@ -395,6 +421,7 @@ static struct i2c_driver usb3503_i2c_driver = {
+ 		.of_match_table = of_match_ptr(usb3503_of_match),
+ 	},
+ 	.probe		= usb3503_i2c_probe,
++	.remove		= usb3503_i2c_remove,
+ 	.id_table	= usb3503_id,
+ };
  
-+void pwrseq_free(const struct pwrseq *pwrseq)
-+{
-+	if (pwrseq)
-+		module_put(pwrseq->owner);
-+}
-+EXPORT_SYMBOL_GPL(pwrseq_free);
-+
- int pwrseq_register(struct pwrseq *pwrseq)
- {
- 	if (!pwrseq || !pwrseq->ops || !pwrseq->dev)
-diff --git a/include/linux/pwrseq.h b/include/linux/pwrseq.h
-index fcc8fd855d4c..c3c91f50e4cb 100644
---- a/include/linux/pwrseq.h
-+++ b/include/linux/pwrseq.h
-@@ -31,9 +31,13 @@ void pwrseq_unregister(struct pwrseq *pwrseq);
- void pwrseq_pre_power_on(struct pwrseq *pwrseq);
- void pwrseq_post_power_on(struct pwrseq *pwrseq);
- void pwrseq_power_off(struct pwrseq *pwrseq);
-+
- int mmc_pwrseq_alloc(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
+@@ -404,6 +431,7 @@ static struct platform_driver usb3503_platform_driver = {
+ 		.of_match_table = of_match_ptr(usb3503_of_match),
+ 	},
+ 	.probe		= usb3503_platform_probe,
++	.remove		= usb3503_platform_remove,
+ };
  
-+struct pwrseq *pwrseq_alloc(struct device *dev);
-+void pwrseq_free(const struct pwrseq *pwrseq);
-+
- #else /* CONFIG_POWER_SEQ */
- 
- static inline int pwrseq_register(struct pwrseq *pwrseq)
-@@ -44,9 +48,13 @@ static inline void pwrseq_unregister(struct pwrseq *pwrseq) {}
- static inline void pwrseq_pre_power_on(struct pwrseq *pwrseq) {}
- static inline void pwrseq_post_power_on(struct pwrseq *pwrseq) {}
- static inline void pwrseq_power_off(struct pwrseq *pwrseq) {}
-+
- static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
- static inline void mmc_pwrseq_free(struct mmc_host *host) {}
- 
-+static inline struct pwrseq *pwrseq_alloc(struct device *dev) { return NULL; }
-+static inline void pwrseq_free(const struct pwrseq *pwrseq) {}
-+
- #endif /* CONFIG_POWER_SEQ */
- 
- #endif /* _LINUX_PWRSEQ_H */
+ static int __init usb3503_init(void)
 -- 
 1.9.1
