@@ -1,50 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 5 May 2016 09:43:00 -0700
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <572A2099.4070901@codeaurora.org>
-References: <20da73bb9bdf27993514c1da80fead13dc92932d.1462262900.git.panand@redhat.com>
- <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com>
- <5728BEC4.6050603@codeaurora.org>
- <20160503155141.GF13045@dhcppc6.redhat.com>
- <20160503171602.GA2518@roeck-us.net>
- <20160504141449.GG13045@dhcppc6.redhat.com>
- <572A0577.1070000@codeaurora.org>
- <20160504155932.GH13045@dhcppc6.redhat.com>
- <572A2099.4070901@codeaurora.org>
-Message-ID: <20160505164300.GA16914@roeck-us.net>
+From: thomas.hanson@linaro.org (Tom Hanson)
+Date: Thu, 5 May 2016 10:44:26 -0600
+Subject: [PATCH v2 16/54] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
+ framework
+In-Reply-To: <572B7384.2050405@linaro.org>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-17-git-send-email-andre.przywara@arm.com>
+ <572B7384.2050405@linaro.org>
+Message-ID: <572B786A.7040705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2016 at 11:17:29AM -0500, Timur Tabi wrote:
-> Pratyush Anand wrote:
-> >Its unique to SBSA because you have very little timeout here. kexec-tools
-> >upstream does not have any mechanism to handle watchdog timeout. Lets say even
-> >if we implement a framework there, the best it can do is to ping the watchdog
-> >again.
-> 
-> Ok, so it's more accurate to say that kexec has a minimum watchdog timeout
-> requirement.  What happens if the system admin sets the timeout to 5 seconds
-> arbitrarily?  The system will reset during kexec, no matter which hardware
-> is used.
-> 
-> This still sounds like a band-aid to me.  We're just assuming that we need a
-> timeout of at least 20 seconds to support kexec.  Frankly, this still sounds
-> like a problem the kexec developers needs to acknowledge and deal with.
-> 
-> Still I'm okay with a patch that extends the timeout by programming WCV, but
-> it has to be commented as a hack specifically to support kexec because the
-> timeout might be too short.  Then Wim can decide whether he supports such
-> changes.
-> 
-I don't even understand how kexec-tools is involved in the first place.
-kexec-tools sounds like user space, which should execute _after_ the kernel
-and its modules are loaded (assuming modules are loaded from initramfs).
-If kexec-tools can somehow ping the watchdog (presumably by writing into
-the HW directly), I don't understand why it doesn't simply load the watchdog
-driver instead and let the watchdog core handle the heartbeats.
+On 05/05/2016 10:23 AM, Tom Hanson wrote:
+> On 04/28/2016 10:45 AM, Andre Przywara wrote:
+>
+> ...
+>
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index 4fb20fd..a656a12e5 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>
+> ...
+>> +static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>> +{
+>
+> ...
+>
+>> +        /* This interrupt looks like it has to be migrated. */
+>> +
+>> +        spin_unlock(&irq->irq_lock);
+>> +        spin_unlock(&vgic_cpu->ap_list_lock);
+>
+> If using the suggested (but not provided) higher level function from patch 14 this could be:
+>                  vgic_unlock_aplist_irq(, spinlock_t irq);
 
-I am really missing something here. How can kexec-tools do anything before
-the kernel is loaded ?
-
-Guenter
+Oh, bother.  That should be:
+             vgic_unlock_aplist_irq(vgic_cpu->ap_list_lock, irq->irq_lock);
