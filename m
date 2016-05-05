@@ -1,93 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 May 2016 08:38:18 +0100
-Subject: [PATCH v2] irqchip/gic-v2m: Add workaround for Broadcom NS2
- GICv2m erratum
-In-Reply-To: <1462405635-27864-2-git-send-email-ray.jui@broadcom.com>
-References: <1462405635-27864-1-git-send-email-ray.jui@broadcom.com>
- <1462405635-27864-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <572AF86A.1090000@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 5 May 2016 11:22:37 +0300
+Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <57289C75.50904@huawei.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1554541.oDP7Ro5zB2@wuerfel>
+ <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
+ <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
+ <57289C75.50904@huawei.com>
+Message-ID: <20160505082237.GA32190@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/16 00:47, Ray Jui wrote:
-> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
-> implementation has an erratum where the MSI data needs to be the SPI
-> number subtracted by an offset of 32, for the correct MSI interrupt
-> to be triggered.
+On Tue, May 03, 2016 at 08:41:25PM +0800, Zhangjian (Bamvor) wrote:
+[...]
+
+> After apply this patch with my small testcase, the vsyscall of gettimeofday in
+> ilp32 works in both big endian and small endian. In this patch, I use the
+> different register and offset for ilp32 and lp64. Actually, the
+> COMPAT_TVAL_TV_SEC is same as TVAL_TV_SEC(so as to COMPAT_TSPEC_TV_SEC and
+> TSPEC_TV_SEC). I add it to keep the logic clear. I also change the version
+> of vdso to 4.6. It should change to 2.6.39 if glibc is not update.
 > 
-> Here we are adding the workaround based on readings from the MSI_IIDR
-> register, which contains a value unique to Broadcom NS2 GICv2m
-> 
-> Reported-by: Alex Barba <alex.barba@broadcom.com>
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> ---
->  drivers/irqchip/irq-gic-v2m.c | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index 28f047c..4c89e27 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -49,6 +49,9 @@
->  /* APM X-Gene with GICv2m MSI_IIDR register value */
->  #define XGENE_GICV2M_MSI_IIDR		0x06000170
->  
-> +/* Broadcom NS2 GICv2m MSI_IIDR register value */
-> +#define BCM_NS2_GICV2M_MSI_IIDR		0x0000013f
-> +
->  /* List of flags for specific v2m implementation */
->  #define GICV2M_NEEDS_SPI_OFFSET		0x00000001
->  
-> @@ -62,6 +65,7 @@ struct v2m_data {
->  	void __iomem *base;	/* GICv2m virt address */
->  	u32 spi_start;		/* The SPI number that MSIs start */
->  	u32 nr_spis;		/* The number of SPIs for MSIs */
-> +	u32 spi_offset;		/* offset to be subtracted from SPI number */
->  	unsigned long *bm;	/* MSI vector bitmap */
->  	u32 flags;		/* v2m flags for specific implementation */
->  };
-> @@ -102,7 +106,7 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  	msg->data = data->hwirq;
->  
->  	if (v2m->flags & GICV2M_NEEDS_SPI_OFFSET)
-> -		msg->data -= v2m->spi_start;
-> +		msg->data -= v2m->spi_offset;
->  }
->  
->  static struct irq_chip gicv2m_irq_chip = {
-> @@ -340,9 +344,18 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->  	 * different from the standard GICv2m implementation where
->  	 * the MSI data is the absolute value within the range from
->  	 * spi_start to (spi_start + num_spis).
-> +	 *
-> +	 * Broadom NS2 GICv2m implementation has an erratum where the MSI data
-> +	 * is 'spi_number - 32'
->  	 */
-> -	if (readl_relaxed(v2m->base + V2M_MSI_IIDR) == XGENE_GICV2M_MSI_IIDR)
-> +	if (readl_relaxed(v2m->base + V2M_MSI_IIDR) == XGENE_GICV2M_MSI_IIDR) {
-> +		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
-> +		v2m->spi_offset = v2m->spi_start;
-> +	} else if (readl_relaxed(v2m->base + V2M_MSI_IIDR) ==
-> +		   BCM_NS2_GICV2M_MSI_IIDR) {
->  		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
-> +		v2m->spi_offset = 32;
-> +	}
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 574081f..c8e32eb 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -101,6 +101,11 @@ int main(void)
+>    DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
+>    DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
+>    BLANK();
+> +  DEFINE(COMPAT_TVAL_TV_SEC,	offsetof(struct compat_timeval, tv_sec));
+> +  DEFINE(COMPAT_TVAL_TV_USEC,	offsetof(struct compat_timeval, tv_usec));
+> +  DEFINE(COMPAT_TSPEC_TV_SEC,	offsetof(struct compat_timespec, tv_sec));
+> +  DEFINE(COMPAT_TSPEC_TV_NSEC,	offsetof(struct compat_timespec, tv_nsec));
+> +  BLANK();
 
-Can we make this a bit less ugly?
+Hi Bamvor,
 
-	switch (readl_relaxed(v2m->base + V2M_MSI_IIDR)) {
-	case XGENE_GICV2M_MSI_IIDR:
-		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
-		v2m->spi_offset = v2m->spi_start;
-		break;
-	case BCM_NS2_GICV2M_MSI_IIDR:
-		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
-		v2m->spi_offset = 32;
-		break;
-	}
+We just found this lines break build if ILP32 is disabled. I think we
+need to wrap them with #ifdef CONFIG_ARM64_ILP32
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yury
