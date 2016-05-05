@@ -1,26 +1,101 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 5 May 2016 13:22:10 -0500
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <20160505182031.GB12434@dhcppc6.redhat.com>
-References: <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com> <5728BEC4.6050603@codeaurora.org>
- <20160503155141.GF13045@dhcppc6.redhat.com>
- <20160503171602.GA2518@roeck-us.net>
- <20160504141449.GG13045@dhcppc6.redhat.com> <572A0577.1070000@codeaurora.org>
- <20160504155932.GH13045@dhcppc6.redhat.com> <572A2099.4070901@codeaurora.org>
- <20160505164300.GA16914@roeck-us.net>
- <20160505182031.GB12434@dhcppc6.redhat.com>
-Message-ID: <572B8F52.2000709@codeaurora.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 5 May 2016 14:32:16 -0400
+Subject: [RFC v2 01/13] usb: misc: usb3503: Clean up on driver unbind
+In-Reply-To: <1462451666-17945-2-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <1462451666-17945-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <d78e8151-ee37-a003-2f8f-bc5431906512@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pratyush Anand wrote:
-> I think, in the long run we must have SBSA
-> watchdog specification improvement to keep WOR as 64 bit.
+Hello Krzysztof
 
-I agree with this 100%.  IMHO, using a 32-bit WOR was just a bad decision.
+Patch looks good to me, I just have a trivial comment below.
 
+On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
+> The driver should clean up after itself by unpreparing the clock when it
+> is unbound.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/usb/misc/usb3503.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/usb/misc/usb3503.c b/drivers/usb/misc/usb3503.c
+> index b45cb77c0744..a464636675a6 100644
+> --- a/drivers/usb/misc/usb3503.c
+> +++ b/drivers/usb/misc/usb3503.c
+> @@ -330,6 +330,19 @@ static int usb3503_i2c_probe(struct i2c_client *i2c,
+>  	return usb3503_probe(hub);
+>  }
+>  
+> +static int usb3503_i2c_remove(struct i2c_client *i2c)
+> +{
+> +	struct usb3503 *hub;
+> +
+> +	hub = i2c_get_clientdata(i2c);
+> +	if (hub) {
+> +		if (hub->clk)
+> +			clk_disable_unprepare(hub->clk);
+> +	}
+
+I think the following is simpler and easier to read:
+
+if (hub && hub->clk)
+	clk_disable_unprepare(hub->clk);
+
+> +
+> +	return 0;
+> +}
+> +
+>  static int usb3503_platform_probe(struct platform_device *pdev)
+>  {
+>  	struct usb3503 *hub;
+> @@ -342,6 +355,19 @@ static int usb3503_platform_probe(struct platform_device *pdev)
+>  	return usb3503_probe(hub);
+>  }
+>  
+> +static int usb3503_platform_remove(struct platform_device *pdev)
+> +{
+> +	struct usb3503 *hub;
+> +
+> +	hub = platform_get_drvdata(pdev);
+> +	if (hub) {
+> +		if (hub->clk)
+> +			clk_disable_unprepare(hub->clk);
+> +	}
+> +
+
+Ditto.
+
+> +	return 0;
+> +}
+> +
+>  #ifdef CONFIG_PM_SLEEP
+>  static int usb3503_i2c_suspend(struct device *dev)
+>  {
+> @@ -395,6 +421,7 @@ static struct i2c_driver usb3503_i2c_driver = {
+>  		.of_match_table = of_match_ptr(usb3503_of_match),
+>  	},
+>  	.probe		= usb3503_i2c_probe,
+> +	.remove		= usb3503_i2c_remove,
+>  	.id_table	= usb3503_id,
+>  };
+>  
+> @@ -404,6 +431,7 @@ static struct platform_driver usb3503_platform_driver = {
+>  		.of_match_table = of_match_ptr(usb3503_of_match),
+>  	},
+>  	.probe		= usb3503_platform_probe,
+> +	.remove		= usb3503_platform_remove,
+>  };
+>  
+>  static int __init usb3503_init(void)
+> 
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation collaborative project.
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
