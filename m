@@ -1,36 +1,49 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  5 May 2016 13:12:24 -0700
-Subject: [PATCH] ARM: dts: imx7d-pinfunc: add input mux for UART2 RX DTE mode
-Message-ID: <1462479144-2481-1-git-send-email-stefan@agner.ch>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 5 May 2016 16:16:20 -0400
+Subject: [RFC v2 13/13] ARM: dts: exynos: Fix LAN and HUB after bootloader
+ initialization on Odroid U3
+In-Reply-To: <1462451666-17945-14-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <1462451666-17945-14-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <9dff13ae-5863-2b45-0e6a-00b345a19019@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add input mux for UART2 RX in DTE mode. This allows to use the pad
-UART2_TX_DATA_ALT0 as UART2 RX. This particular input select seems
-to be missing in current reference manuals (Rev. B), but when looking
-at the tables and other UART input select registers (e.g. UART3) it
-seems naturally that this input mux register also has a fourth pad
-option for UART2_TX_DATA_ALT0. It has also been proven to be required
-to use UART2 in DTE mode and the particular pads on the Colibri iMX7
-platform.
+Hello Krzysztof,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/imx7d-pinfunc.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
+> On Odroid U3 (Exynos4412-based) board if USB was initialized by
+> bootloader (in U-Boot "usb start" before tftpboot), the HUB (usb3503)
+> and LAN (smsc95xx) after after successful probing were not visible in the
+> system ("lsusb").
+> 
+> In such case the devices had to be fully reset before configuring.
+> Reset by GPIO (called RESET_N pin) and by RESET field in STCD register
+> in usb3503 HUB are not sufficient. Instead full reset has to be done by
+> disabling and enabling regulator.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-diff --git a/arch/arm/boot/dts/imx7d-pinfunc.h b/arch/arm/boot/dts/imx7d-pinfunc.h
-index eeda783..3f9f0d9 100644
---- a/arch/arm/boot/dts/imx7d-pinfunc.h
-+++ b/arch/arm/boot/dts/imx7d-pinfunc.h
-@@ -594,7 +594,7 @@
- #define MX7D_PAD_UART2_RX_DATA__GPIO4_IO2                         0x0130 0x03A0 0x0000 0x5 0x0
- #define MX7D_PAD_UART2_RX_DATA__ENET2_MDIO                        0x0130 0x03A0 0x0000 0x6 0x0
- #define MX7D_PAD_UART2_TX_DATA__UART2_DCE_TX                      0x0134 0x03A4 0x0000 0x0 0x0
--#define MX7D_PAD_UART2_TX_DATA__UART2_DTE_RX                      0x0134 0x03A4 0x0000 0x0 0x0
-+#define MX7D_PAD_UART2_TX_DATA__UART2_DTE_RX                      0x0134 0x03A4 0x06FC 0x0 0x3
- #define MX7D_PAD_UART2_TX_DATA__I2C2_SDA                          0x0134 0x03A4 0x05E0 0x1 0x0
- #define MX7D_PAD_UART2_TX_DATA__SAI3_RX_DATA0                     0x0134 0x03A4 0x06C8 0x2 0x0
- #define MX7D_PAD_UART2_TX_DATA__ECSPI1_RDY                        0x0134 0x03A4 0x0000 0x3 0x0
+[snip]
+
+>  
+> +	lan_pwrseq: pwrseq2 {
+> +		compatible = "mmc-pwrseq-simple";
+
+It feels strange to have a "mmc-pwrseq-simple" compatible for a USB power
+sequence provider. As I mentioned in the other patch, I think there should
+either be a DT binding for the USB pwrseq-simple with a "usb-pwrseq-simple"
+compatible that binds to the same pwrseq-simple driver or maybe having a
+generic DT binding for any device with a new "pwrseq-simple" compatible.
+
+Patch looks good to me though, so after having a DT binding and changing
+the compatible string:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-2.8.2
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
