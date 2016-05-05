@@ -1,85 +1,49 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu, 5 May 2016 03:21:04 +0000
-Subject: [v9, 6/7] MAINTAINERS: add entry for Freescale SoC driver
-In-Reply-To: <1462383308.16584.43.camel@buserror.net>
-References: <1462332274-13744-1-git-send-email-yangbo.lu@nxp.com>
- <1462332274-13744-7-git-send-email-yangbo.lu@nxp.com>
- <1462383308.16584.43.camel@buserror.net>
-Message-ID: <HE1PR04MB0889AA66ABC718111D7EF41FF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+Date: Thu, 5 May 2016 11:12:23 +0800
+Subject: [v10, 0/7] Fix eSDHC host version register bug
+Message-ID: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks a lot, Scott and Qiang.
-Will change 'DRIVER' to 'DRIVERS' and update the patchset with your acts.
+This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+eSDHC controller. To get the SoC version and revision, it's needed to add the
+GUTS driver to access the global utilities registers.
 
+So, the first four patches are to add the GUTS driver.
+The following patches except the updating MAINTAINERS patch are to enable
+GUTS driver support to get SVR in eSDHC driver and fix host version for T4240.
 
-Best regards,
-Yangbo Lu
+Yangbo Lu (7):
+  Documentation: DT: update Freescale DCFG compatible
+  ARM64: dts: ls2080a: add device configuration node
+  soc: fsl: add GUTS driver for QorIQ platforms
+  dt: move guts devicetree doc out of powerpc directory
+  powerpc/fsl: move mpc85xx.h to include/linux/fsl
+  MAINTAINERS: add entry for Freescale SoC drivers
+  mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
 
-> -----Original Message-----
-> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
-> owner at vger.kernel.org] On Behalf Of Scott Wood
-> Sent: Thursday, May 05, 2016 1:35 AM
-> To: Yangbo Lu; linux-mmc at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; linux-clk at vger.kernel.org; linux-
-> i2c at vger.kernel.org; iommu at lists.linux-foundation.org;
-> netdev at vger.kernel.org
-> Cc: ulf.hansson at linaro.org; Mark Rutland; Rob Herring; Russell King;
-> Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh Sharma; Qiang
-> Zhao; Kumar Gala; Santosh Shilimkar; Yang-Leo Li; Xiaobo Xie
-> Subject: Re: [v9, 6/7] MAINTAINERS: add entry for Freescale SoC driver
-> 
-> On Wed, 2016-05-04 at 11:24 +0800, Yangbo Lu wrote:
-> > Add maintainer entry for Freescale SoC driver including the QE library
-> > and the GUTS driver now. Also add maintainer for QE library.
-> >
-> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> > ---
-> > Changes for v8:
-> > 	- Added this patch
-> > Changes for v9:
-> > 	- Added linux-arm mail list
-> > 	- Removed GUTS driver entry
-> > ---
-> >  MAINTAINERS | 11 ++++++++++-
-> >  1 file changed, 10 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/MAINTAINERS b/MAINTAINERS index 42e65d1..ce91db7 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -4622,9 +4622,18 @@ F:	drivers/net/ethernet/freescale/fec_ptp.c
-> >  F:	drivers/net/ethernet/freescale/fec.h
-> >  F:	Documentation/devicetree/bindings/net/fsl-fec.txt
-> >
-> > +FREESCALE SOC DRIVER
-> > +M:	Scott Wood <oss@buserror.net>
-> > +L:	linuxppc-dev at lists.ozlabs.org
-> > +L:	linux-arm-kernel at lists.infradead.org
-> > +S:	Maintained
-> > +F:	drivers/soc/fsl/
-> > +F:	include/linux/fsl/
-> > +
-> >  FREESCALE QUICC ENGINE LIBRARY
-> > +M:	Qiang Zhao <qiang.zhao@nxp.com>
-> >  L:	linuxppc-dev at lists.ozlabs.org
-> > -S:	Orphan
-> > +S:	Maintained
-> >  F:	drivers/soc/fsl/qe/
-> >  F:	include/soc/fsl/*qe*.h
-> >  F:	include/soc/fsl/*ucc*.h
-> 
-> s/DRIVER/DRIVERS/
-> 
-> There's more than one.
-> 
-> Otherwise:
-> Acked-by: Scott Wood <oss@buserror.net>
-> 
-> -Scott
-> 
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+ Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
+ .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+ MAINTAINERS                                        |  11 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+ arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+ drivers/clk/clk-qoriq.c                            |   3 +-
+ drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+ drivers/iommu/fsl_pamu.c                           |   3 +-
+ drivers/mmc/host/Kconfig                           |   1 +
+ drivers/mmc/host/sdhci-of-esdhc.c                  |  23 ++++
+ drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+ drivers/soc/Kconfig                                |   2 +-
+ drivers/soc/fsl/Kconfig                            |   8 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/guts.c                             | 119 +++++++++++++++++++
+ include/linux/fsl/guts.h                           | 126 +++++++++++++--------
+ .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+ 17 files changed, 262 insertions(+), 60 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/guts.c
+ rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
+
+-- 
+2.1.0.27.g96db324
