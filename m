@@ -1,167 +1,191 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 05 May 2016 16:56:20 +0100
-Subject: Applied "ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate
- capture and playback"" to the asoc tree
-In-Reply-To: <1462373686-21794-2-git-send-email-john@metanate.com>
-Message-ID: <E1ayLdU-0004jH-K0@debutante>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 5 May 2016 17:12:54 +0100
+Subject: [PATCH] maintainers: update my email address(es)
+Message-ID: <20160505161254.GY19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Update my email and web addresses in the kernel maintainers file.
 
-   ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate capture and playback"
-
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 7e885d211f023dfd201fad8246bbf3c3bd126c61 Mon Sep 17 00:00:00 2001
-From: John Keeping <john@metanate.com>
-Date: Wed, 4 May 2016 17:21:57 +0100
-Subject: [PATCH] ASoC: rockchip: Revert "ASoC: rockchip: i2s: separate capture
- and playback"
-
-This reverts commit eba65d179c1149cf79e68608d452631f33d7f017.
-
-This broke audio on Veyron Jerry Chromebooks and I now cannot reproduce
-the problem I was trying to fix even with this commit reverted, so it
-seems that this was completely the wrong thing to do.
-
-Reported-by: Enric Balletbo Serra <eballetbo@gmail.com>
-Signed-off-by: John Keeping <john@metanate.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- sound/soc/rockchip/rockchip_i2s.c | 72 ++++++++++++++++++++++-----------------
- 1 file changed, 40 insertions(+), 32 deletions(-)
+ MAINTAINERS | 48 ++++++++++++++++++++++++------------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 34743ec61c49..574c6af28c06 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -82,8 +82,8 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
- 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_ENABLE);
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ecbb2f6a3ba0..73141b4f46a9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -872,9 +872,9 @@ F:	drivers/perf/arm_pmu.c
+ F:	include/linux/perf/arm_pmu.h
  
- 		regmap_update_bits(i2s->regmap, I2S_XFER,
--				   I2S_XFER_TXS_START,
--				   I2S_XFER_TXS_START);
-+				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
-+				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
+ ARM PORT
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ F:	arch/arm/
  
- 		i2s->tx_start = true;
- 	} else {
-@@ -92,23 +92,27 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
- 		regmap_update_bits(i2s->regmap, I2S_DMACR,
- 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
+@@ -886,35 +886,35 @@ F:	arch/arm/plat-*/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
  
--		regmap_update_bits(i2s->regmap, I2S_XFER,
--				   I2S_XFER_TXS_START,
--				   I2S_XFER_TXS_STOP);
--
--		regmap_update_bits(i2s->regmap, I2S_CLR,
--				   I2S_CLR_TXC,
--				   I2S_CLR_TXC);
-+		if (!i2s->rx_start) {
-+			regmap_update_bits(i2s->regmap, I2S_XFER,
-+					   I2S_XFER_TXS_START |
-+					   I2S_XFER_RXS_START,
-+					   I2S_XFER_TXS_STOP |
-+					   I2S_XFER_RXS_STOP);
+ ARM PRIMECELL AACI PL041 DRIVER
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ S:	Maintained
+ F:	sound/arm/aaci.*
  
--		regmap_read(i2s->regmap, I2S_CLR, &val);
-+			regmap_update_bits(i2s->regmap, I2S_CLR,
-+					   I2S_CLR_TXC | I2S_CLR_RXC,
-+					   I2S_CLR_TXC | I2S_CLR_RXC);
+ ARM PRIMECELL CLCD PL110 DRIVER
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ S:	Maintained
+ F:	drivers/video/fbdev/amba-clcd.*
  
--		/* Should wait for clear operation to finish */
--		while (val & I2S_CLR_TXC) {
- 			regmap_read(i2s->regmap, I2S_CLR, &val);
--			retry--;
--			if (!retry) {
--				dev_warn(i2s->dev, "fail to clear\n");
--				break;
-+
-+			/* Should wait for clear operation to finish */
-+			while (val) {
-+				regmap_read(i2s->regmap, I2S_CLR, &val);
-+				retry--;
-+				if (!retry) {
-+					dev_warn(i2s->dev, "fail to clear\n");
-+					break;
-+				}
- 			}
- 		}
- 	}
-@@ -124,8 +128,8 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
- 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_ENABLE);
+ ARM PRIMECELL KMI PL050 DRIVER
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ S:	Maintained
+ F:	drivers/input/serio/ambakmi.*
+ F:	include/linux/amba/kmi.h
  
- 		regmap_update_bits(i2s->regmap, I2S_XFER,
--				   I2S_XFER_RXS_START,
--				   I2S_XFER_RXS_START);
-+				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
-+				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
+ ARM PRIMECELL MMCI PL180/1 DRIVER
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ S:	Maintained
+ F:	drivers/mmc/host/mmci.*
+ F:	include/linux/amba/mmci.h
  
- 		i2s->rx_start = true;
- 	} else {
-@@ -134,23 +138,27 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
- 		regmap_update_bits(i2s->regmap, I2S_DMACR,
- 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
+ ARM PRIMECELL UART PL010 AND PL011 DRIVERS
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ S:	Maintained
+ F:	drivers/tty/serial/amba-pl01*.c
+ F:	include/linux/amba/serial.h
  
--		regmap_update_bits(i2s->regmap, I2S_XFER,
--				   I2S_XFER_RXS_START,
--				   I2S_XFER_RXS_STOP);
--
--		regmap_update_bits(i2s->regmap, I2S_CLR,
--				   I2S_CLR_RXC,
--				   I2S_CLR_RXC);
-+		if (!i2s->tx_start) {
-+			regmap_update_bits(i2s->regmap, I2S_XFER,
-+					   I2S_XFER_TXS_START |
-+					   I2S_XFER_RXS_START,
-+					   I2S_XFER_TXS_STOP |
-+					   I2S_XFER_RXS_STOP);
+ ARM PRIMECELL BUS SUPPORT
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ S:	Maintained
+ F:	drivers/amba/
+ F:	include/linux/amba/bus.h
+@@ -1036,7 +1036,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
  
--		regmap_read(i2s->regmap, I2S_CLR, &val);
-+			regmap_update_bits(i2s->regmap, I2S_CLR,
-+					   I2S_CLR_TXC | I2S_CLR_RXC,
-+					   I2S_CLR_TXC | I2S_CLR_RXC);
+ ARM/CLKDEV SUPPORT
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/include/asm/clkdev.h
+@@ -1093,9 +1093,9 @@ F:	arch/arm/boot/dts/cx92755*
+ N:	digicolor
  
--		/* Should wait for clear operation to finish */
--		while (val & I2S_CLR_RXC) {
- 			regmap_read(i2s->regmap, I2S_CLR, &val);
--			retry--;
--			if (!retry) {
--				dev_warn(i2s->dev, "fail to clear\n");
--				break;
-+
-+			/* Should wait for clear operation to finish */
-+			while (val) {
-+				regmap_read(i2s->regmap, I2S_CLR, &val);
-+				retry--;
-+				if (!retry) {
-+					dev_warn(i2s->dev, "fail to clear\n");
-+					break;
-+				}
- 			}
- 		}
- 	}
+ ARM/EBSA110 MACHINE SUPPORT
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ F:	arch/arm/mach-ebsa110/
+ F:	drivers/net/ethernet/amd/am79c961a.*
+@@ -1124,9 +1124,9 @@ T:	git git://git.berlios.de/gemini-board
+ F:	arch/arm/mm/*-fa*
+ 
+ ARM/FOOTBRIDGE ARCHITECTURE
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ F:	arch/arm/include/asm/hardware/dec21285.h
+ F:	arch/arm/mach-footbridge/
+@@ -1457,7 +1457,7 @@ S:	Maintained
+ ARM/PT DIGITAL BOARD PORT
+ M:	Stefan Eletzhofer <stefan.eletzhofer@eletztrick.de>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ 
+ ARM/QUALCOMM SUPPORT
+@@ -1493,9 +1493,9 @@ S:	Supported
+ F:	arch/arm64/boot/dts/renesas/
+ 
+ ARM/RISCPC ARCHITECTURE
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ F:	arch/arm/include/asm/hardware/entry-macro-iomd.S
+ F:	arch/arm/include/asm/hardware/ioc.h
+@@ -1773,9 +1773,9 @@ F:	drivers/clk/versatile/clk-vexpress-osc.c
+ F:	drivers/clocksource/versatile.c
+ 
+ ARM/VFP SUPPORT
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ F:	arch/arm/vfp/
+ 
+@@ -2921,7 +2921,7 @@ F:	mm/cleancache.c
+ F:	include/linux/cleancache.h
+ 
+ CLK API
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-clk at vger.kernel.org
+ S:	Maintained
+ F:	include/linux/clk.h
+@@ -3354,9 +3354,9 @@ S:	Supported
+ F:	drivers/net/ethernet/stmicro/stmmac/
+ 
+ CYBERPRO FB DRIVER
+-M:	Russell King <linux@arm.linux.org.uk>
++M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.arm.linux.org.uk/
++W:	http://www.armlinux.org.uk/
+ S:	Maintained
+ F:	drivers/video/fbdev/cyber2000fb.*
+ 
+@@ -3881,7 +3881,7 @@ F:	Documentation/devicetree/bindings/display/st,stih4xx.txt
+ 
+ DRM DRIVERS FOR VIVANTE GPU IP
+ M:	Lucas Stach <l.stach@pengutronix.de>
+-R:	Russell King <linux+etnaviv@arm.linux.org.uk>
++R:	Russell King <linux+etnaviv@armlinux.org.uk>
+ R:	Christian Gmeiner <christian.gmeiner@gmail.com>
+ L:	dri-devel at lists.freedesktop.org
+ S:	Maintained
+@@ -6905,7 +6905,7 @@ L:	linux-man at vger.kernel.org
+ S:	Maintained
+ 
+ MARVELL ARMADA DRM SUPPORT
+-M:	Russell King <rmk+kernel@arm.linux.org.uk>
++M:	Russell King <rmk+kernel@armlinux.org.uk>
+ S:	Maintained
+ F:	drivers/gpu/drm/armada/
+ 
+@@ -7905,7 +7905,7 @@ S:	Supported
+ F:	drivers/nfc/nxp-nci
+ 
+ NXP TDA998X DRM DRIVER
+-M:	Russell King <rmk+kernel@arm.linux.org.uk>
++M:	Russell King <rmk+kernel@armlinux.org.uk>
+ S:	Supported
+ F:	drivers/gpu/drm/i2c/tda998x_drv.c
+ F:	include/drm/i2c/tda998x.h
+
 -- 
-2.8.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
