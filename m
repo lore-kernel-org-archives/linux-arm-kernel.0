@@ -1,123 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 May 2016 12:27:32 -0700
-Subject: [PATCH] ARM: dts: omap5-board-common: Describe the voltage
- supply mapping accurately
-In-Reply-To: <572B984D.10203@ti.com>
-References: <1462389618-28860-1-git-send-email-nm@ti.com>
- <572A528C.4090302@ti.com> <20160505183611.GA5995@atomide.com>
- <572B984D.10203@ti.com>
-Message-ID: <20160505192732.GC5995@atomide.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 5 May 2016 15:31:03 -0400
+Subject: [RFC v2 07/13] power: pwrseq: simple: Add support for toggling
+ regulator
+In-Reply-To: <1462451666-17945-8-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <1462451666-17945-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <d27c30c1-f205-973e-71f1-f5b410418d04@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [160505 12:02]:
-> On 05/05/2016 01:36 PM, Tony Lindgren wrote:
-> > Now I'm wondering if the x15 related vin-supply changes are actually all
-> > ignored? It seems that "vin" is only automatically configured for the
-> > fixed-regulator? Maybe regulator-palmas should be updated to use the
+Hello Krzysztof,
+
+On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
+> Some devices need real hard-reset by cutting the power.  During power
+> sequence turn off and on the regulator, if it is provided.
 > 
-> ok /me goes duh!!!! ofcourse! Sorry about not catching it..
-> hmm.. maybe we messed up am572x-idk as well.. I can quickly fix that
-> up as well
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-OK yeah sounds like they won't do anything currently.
+[snip]
 
-> ldoln is vsys_cobra as well.. I missed that.
-> 
-> Others look good. we should probably get this merged to fix the
-> regression.
+>  
+>  #define to_pwrseq_simple(p) container_of(p, struct mmc_pwrseq_simple, pwrseq)
+> @@ -62,6 +65,13 @@ static void mmc_pwrseq_simple_post_power_on(struct pwrseq *_pwrseq)
+>  {
+>  	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
+>  
+> +	if (pwrseq->ext_reg) {
+> +		int err;
+> +
+> +		err = regulator_enable(pwrseq->ext_reg);
+> +		WARN_ON_ONCE(err);
+> +	}
+> +
 
-OK I'll apply the following updated version of your patch later today.
-I left out the links from the description and the timestamps too.
+Shouldn't this be in mmc_pwrseq_simple_pre_power_on() instead?
 
-Regards,
+For example, a chip may need to be powered on before attempting to
+toggle its reset or power pins using some GPIO lines.
 
-Tony
-
-8< -------------------------
-From: Nishanth Menon <nm@ti.com>
-Date: Thu, 5 May 2016 11:12:28 -0700
-Subject: [PATCH] ARM: dts: omap5-board-common: Describe the voltage supply
- mapping accurately
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-OMAP5uEVM based platforms share a similar voltage rail map. This
-should be properly described in device tree, without this regulator core
-will be unable to determine the source voltage of LDOs such as LDO9 and
-SMPS10 which could be configured for bypass depending on the voltage
-requested of them. This results in conditions such as:
-
-ldo9: bypassed regulator has no supply!
-ldo9: failed to get the current voltage(-517)
-palmas-pmic 48070000.i2c:palmas at 48:palmas_pmic: failed to register
-48070000.i2c:palmas at 48:palmas_pmic regulator
-
-Cc: Agust? Fontquerni <af@iseebcn.com>
-Cc: Eduard Gavin <egavin@iseebcn.com>
-Cc: Enric Balletbo i Serra <eballetbo@iseebcn.com>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[tony at atomide.com: fixed to use palmas style in-supply]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/boot/dts/omap5-board-common.dtsi
-+++ b/arch/arm/boot/dts/omap5-board-common.dtsi
-@@ -14,6 +14,29 @@
- 		display0 = &hdmi0;
- 	};
- 
-+	vmain: fixedregulator-vmain {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmain";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
-+	vsys_cobra: fixedregulator-vsys_cobra {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vsys_cobra";
-+		vin-supply = <&vmain>;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
-+	vdds_1v8_main: fixedregulator-vdds_1v8_main {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vdds_1v8_main";
-+		vin-supply = <&smps7_reg>;
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
- 	vmmcsd_fixed: fixedregulator-mmcsd {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vmmcsd_fixed";
-@@ -409,6 +432,26 @@
- 
- 			ti,ldo6-vibrator;
- 
-+			smps123-in-supply = <&vsys_cobra>;
-+			smps45-in-supply = <&vsys_cobra>;
-+			smps6-in-supply = <&vsys_cobra>;
-+			smps7-in-supply = <&vsys_cobra>;
-+			smps8-in-supply = <&vsys_cobra>;
-+			smps9-in-supply = <&vsys_cobra>;
-+			smps10_out2-in-supply = <&vsys_cobra>;
-+			smps10_out1-in-supply = <&vsys_cobra>;
-+			ldo1-in-supply = <&vsys_cobra>;
-+			ldo2-in-supply = <&vsys_cobra>;
-+			ldo3-in-supply = <&vdds_1v8_main>;
-+			ldo4-in-supply = <&vdds_1v8_main>;
-+			ldo5-in-supply = <&vsys_cobra>;
-+			ldo6-in-supply = <&vdds_1v8_main>;
-+			ldo7-in-supply = <&vsys_cobra>;
-+			ldo8-in-supply = <&vsys_cobra>;
-+			ldo9-in-supply = <&vmmcsd_fixed>;
-+			ldoln-in-supply = <&vsys_cobra>;
-+			ldousb-in-supply = <&vsys_cobra>;
-+
- 			regulators {
- 				smps123_reg: smps123 {
- 					/* VDD_OPP_MPU */
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
