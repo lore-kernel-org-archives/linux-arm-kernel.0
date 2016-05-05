@@ -1,101 +1,119 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 5 May 2016 14:32:16 -0400
-Subject: [RFC v2 01/13] usb: misc: usb3503: Clean up on driver unbind
-In-Reply-To: <1462451666-17945-2-git-send-email-k.kozlowski@samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <1462451666-17945-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <d78e8151-ee37-a003-2f8f-bc5431906512@osg.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 May 2016 11:36:11 -0700
+Subject: [PATCH] ARM: dts: omap5-board-common: Describe the voltage
+ supply mapping accurately
+In-Reply-To: <572A528C.4090302@ti.com>
+References: <1462389618-28860-1-git-send-email-nm@ti.com>
+ <572A528C.4090302@ti.com>
+Message-ID: <20160505183611.GA5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof
-
-Patch looks good to me, I just have a trivial comment below.
-
-On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
-> The driver should clean up after itself by unpreparing the clock when it
-> is unbound.
+* Nishanth Menon <nm@ti.com> [160504 12:52]:
+> On 05/04/2016 02:20 PM, Nishanth Menon wrote:
+> [...]
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/usb/misc/usb3503.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
+> > @@ -551,6 +590,8 @@
+> >  
+> >  				ldo9_reg: ldo9 {
+> >  					/* VCC_DV_SDIO: vdds_sdcard */
+> > +					vin-supply = <&vmmcsdio_fixed>;
+> > +
 > 
-> diff --git a/drivers/usb/misc/usb3503.c b/drivers/usb/misc/usb3503.c
-> index b45cb77c0744..a464636675a6 100644
-> --- a/drivers/usb/misc/usb3503.c
-> +++ b/drivers/usb/misc/usb3503.c
-> @@ -330,6 +330,19 @@ static int usb3503_i2c_probe(struct i2c_client *i2c,
->  	return usb3503_probe(hub);
->  }
->  
-> +static int usb3503_i2c_remove(struct i2c_client *i2c)
-> +{
-> +	struct usb3503 *hub;
-> +
-> +	hub = i2c_get_clientdata(i2c);
-> +	if (hub) {
-> +		if (hub->clk)
-> +			clk_disable_unprepare(hub->clk);
-> +	}
-
-I think the following is simpler and easier to read:
-
-if (hub && hub->clk)
-	clk_disable_unprepare(hub->clk);
-
-> +
-> +	return 0;
-> +}
-> +
->  static int usb3503_platform_probe(struct platform_device *pdev)
->  {
->  	struct usb3503 *hub;
-> @@ -342,6 +355,19 @@ static int usb3503_platform_probe(struct platform_device *pdev)
->  	return usb3503_probe(hub);
->  }
->  
-> +static int usb3503_platform_remove(struct platform_device *pdev)
-> +{
-> +	struct usb3503 *hub;
-> +
-> +	hub = platform_get_drvdata(pdev);
-> +	if (hub) {
-> +		if (hub->clk)
-> +			clk_disable_unprepare(hub->clk);
-> +	}
-> +
-
-Ditto.
-
-> +	return 0;
-> +}
-> +
->  #ifdef CONFIG_PM_SLEEP
->  static int usb3503_i2c_suspend(struct device *dev)
->  {
-> @@ -395,6 +421,7 @@ static struct i2c_driver usb3503_i2c_driver = {
->  		.of_match_table = of_match_ptr(usb3503_of_match),
->  	},
->  	.probe		= usb3503_i2c_probe,
-> +	.remove		= usb3503_i2c_remove,
->  	.id_table	= usb3503_id,
->  };
->  
-> @@ -404,6 +431,7 @@ static struct platform_driver usb3503_platform_driver = {
->  		.of_match_table = of_match_ptr(usb3503_of_match),
->  	},
->  	.probe		= usb3503_platform_probe,
-> +	.remove		= usb3503_platform_remove,
->  };
->  
->  static int __init usb3503_init(void)
+> There is an extra white space here, and vmmcsd_fixed is the regulator
+> to be used, looks like vmmcsdio_fixed should ideally been vwlan_fixed
+> or something.. the actual rail to LDO9_IN was called vmmc_3v3_SDIO..
 > 
+> Sorry for the confusion. Unfortunately, I can not recreate the fail on
+> my board, but this sounded like the closest fix I can think of.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Looks like arch/arm/boot/dts/tegra114-dalmore.dts has entries like
+this instead for the PMIC:
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+ldo9-in-supply = <&palmas_smps9_reg>:
+...
+
+Doing simlar changes for omap5-board-common.dtsi seems to fix the
+issues for me:
+
+LDO3: supplied by vdds_1v8_main
+LDO4: supplied by vdds_1v8_main
+ldo4: Bringing 0uV into 1800000-1800000uV
+LDO5: supplied by vsys_cobra
+LDO6: supplied by vdds_1v8_main
+LDO7: supplied by vsys_cobra
+ldo7: Bringing 0uV into 2000000-2000000uV
+LDO8: supplied by vsys_cobra
+LDO9: supplied by vmmcsd_fixed
+
+See also the patch below too, and please check I got things right
+based on your earlier patch :)
+
+Now I'm wondering if the x15 related vin-supply changes are actually all
+ignored? It seems that "vin" is only automatically configured for the
+fixed-regulator? Maybe regulator-palmas should be updated to use the
+"vin-supply" if configured to avoid confusion?
+
+Regards,
+
+Tony
+
+8< -----------------
+--- a/arch/arm/boot/dts/omap5-board-common.dtsi
++++ b/arch/arm/boot/dts/omap5-board-common.dtsi
+@@ -14,6 +14,29 @@
+ 		display0 = &hdmi0;
+ 	};
+ 
++	vmain: fixedregulator-vmain {
++		compatible = "regulator-fixed";
++		regulator-name = "vmain";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	vsys_cobra: fixedregulator-vsys_cobra {
++		compatible = "regulator-fixed";
++		regulator-name = "vsys_cobra";
++		vin-supply = <&vmain>;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	vdds_1v8_main: fixedregulator-vdds_1v8_main {
++		compatible = "regulator-fixed";
++		regulator-name = "vdds_1v8_main";
++		vin-supply = <&smps7_reg>;
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
+ 	vmmcsd_fixed: fixedregulator-mmcsd {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vmmcsd_fixed";
+@@ -409,6 +432,25 @@
+ 
+ 			ti,ldo6-vibrator;
+ 
++			smps123-in-supply = <&vsys_cobra>;
++			smps45-in-supply = <&vsys_cobra>;
++			smps6-in-supply = <&vsys_cobra>;
++			smps7-in-supply = <&vsys_cobra>;
++			smps8-in-supply = <&vsys_cobra>;
++			smps9-in-supply = <&vsys_cobra>;
++			smps10_out2-in-supply = <&vsys_cobra>;
++			smps10_out1-in-supply = <&vsys_cobra>;
++			ldo1-in-supply = <&vsys_cobra>;
++			ldo2-in-supply = <&vsys_cobra>;
++			ldo3-in-supply = <&vdds_1v8_main>;
++			ldo4-in-supply = <&vdds_1v8_main>;
++			ldo5-in-supply = <&vsys_cobra>;
++			ldo6-in-supply = <&vdds_1v8_main>;
++			ldo7-in-supply = <&vsys_cobra>;
++			ldo8-in-supply = <&vsys_cobra>;
++			ldo9-in-supply = <&vmmcsd_fixed>;
++			ldousb-in-supply = <&vsys_cobra>;
++
+ 			regulators {
+ 				smps123_reg: smps123 {
+ 					/* VDD_OPP_MPU */
