@@ -1,61 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 May 2016 18:33:05 +0100
-Subject: [PATCH] kvm: arm64: Enable hardware updates of the Access Flag
- for Stage 2 page tables
-In-Reply-To: <1460566657-30221-1-git-send-email-catalin.marinas@arm.com>
-References: <1460566657-30221-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <572B83D1.10600@arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 5 May 2016 12:33:37 -0500
+Subject: [PATCH 1/2] drivers: i2c: qup: Fix broken dma when
+ CONFIG_DEBUG_SG is enabled
+In-Reply-To: <1462166637-16778-2-git-send-email-sricharan@codeaurora.org>
+References: <1462166637-16778-1-git-send-email-sricharan@codeaurora.org>
+ <1462166637-16778-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160505173337.GC6533@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/16 17:57, Catalin Marinas wrote:
-> The ARMv8.1 architecture extensions introduce support for hardware
-> updates of the access and dirty information in page table entries. With
-> VTCR_EL2.HA enabled (bit 21), when the CPU accesses an IPA with the
-> PTE_AF bit cleared in the stage 2 page table, instead of raising an
-> Access Flag fault to EL2 the CPU sets the actual page table entry bit
-> (10). To ensure that kernel modifications to the page table do not
-> inadvertently revert a bit set by hardware updates, certain Stage 2
-> software pte/pmd operations must be performed atomically.
+On Mon, May 02, 2016 at 10:53:56AM +0530, Sricharan R wrote:
+> With CONFIG_DEBUG_SG is enabled and when dma mode is used, below dump is seen,
 > 
-> The main user of the AF bit is the kvm_age_hva() mechanism. The
-> kvm_age_hva_handler() function performs a "test and clear young" action
-> on the pte/pmd. This needs to be atomic in respect of automatic hardware
-> updates of the AF bit. Since the AF bit is in the same position for both
-> Stage 1 and Stage 2, the patch reuses the existing
-> ptep_test_and_clear_young() functionality if
-> __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG is defined. Otherwise, the
-> existing pte_young/pte_mkold mechanism is preserved.
+> ------------[ cut here ]------------
+> kernel BUG at include/linux/scatterlist.h:140!
+> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.0-00459-g9f087b9-dirty #7
+> Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
+> task: ffffffc036868000 ti: ffffffc036870000 task.ti: ffffffc036870000
+> PC is at qup_sg_set_buf.isra.13+0x138/0x154
+> LR is at qup_sg_set_buf.isra.13+0x50/0x154
+> pc : [<ffffffc0005a0ed8>] lr : [<ffffffc0005a0df0>] pstate: 60000145
+> sp : ffffffc0368735c0
+> x29: ffffffc0368735c0 x28: ffffffc036873752
+> x27: ffffffc035233018 x26: ffffffc000c4e000
+> x25: 0000000000000000 x24: 0000000000000004
+> x23: 0000000000000000 x22: ffffffc035233668
+> x21: ffffff80004e3000 x20: ffffffc0352e0018
+> x19: 0000004000000000 x18: 0000000000000028
+> x17: 0000000000000004 x16: ffffffc0017a39c8
+> x15: 0000000000001cdf x14: ffffffc0019929d8
+> x13: ffffffc0352e0018 x12: 0000000000000000
+> x11: 0000000000000001 x10: 0000000000000001
+> x9 : ffffffc0012b2d70 x8 : ffffff80004e3000
+> x7 : 0000000000000018 x6 : 0000000030000000
+> x5 : ffffffc00199f018 x4 : ffffffc035233018
+> x3 : 0000000000000004 x2 : 00000000c0000000
+> x1 : 0000000000000003 x0 : 0000000000000000
 > 
-> The kvm_set_s2pte_readonly() (and the corresponding pmd equivalent) have
-> to perform atomic modifications in order to avoid a race with updates of
-> the AF bit. The arm64 implementation has been re-written using
-> exclusives.
+> Process swapper/0 (pid: 1, stack limit = 0xffffffc036870020)
+> Stack: (0xffffffc0368735c0 to 0xffffffc036874000)
 > 
-> Currently, kvm_set_s2pte_writable() (and pmd equivalent) take a pointer
-> argument and modify the pte/pmd in place. However, these functions are
-> only used on local variables rather than actual page table entries, so
-> it makes more sense to follow the pte_mkwrite() approach for stage 1
-> attributes. The change to kvm_s2pte_mkwrite() makes it clear that these
-> functions do not modify the actual page table entries.
+> Change allocation of sg buffers from dma_coherent memory to kzalloc
+> to fix the issue.
 > 
-> The (pte|pmd)_mkyoung() uses on Stage 2 entries (setting the AF bit
-> explicitly) do not need to be modified since hardware updates of the
-> dirty status are not supported by KVM, so there is no possibility of
-> losing such information.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Looks fine.
 
-Christoffer: assuming you're happy with that patch, could you queue it
-for 4.7?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Reviewed-by: Andy Gross <andy.gross@linaro.org>
