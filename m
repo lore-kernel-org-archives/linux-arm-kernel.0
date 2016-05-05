@@ -1,22 +1,41 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu,  5 May 2016 10:43:58 +0100
-Subject: [PATCH 0/4] arm64: pmd accessor fixes
-Message-ID: <1462441442-6996-1-git-send-email-catalin.marinas@arm.com>
+Date: Thu,  5 May 2016 10:43:59 +0100
+Subject: [PATCH 1/4] arm64: Fix typo in the pmdp_huge_get_and_clear()
+ definition
+In-Reply-To: <1462441442-6996-1-git-send-email-catalin.marinas@arm.com>
+References: <1462441442-6996-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1462441442-6996-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first two patches are follow-ups on the hardware AF/DBM support, so
-they should go in as fixes (on top of current arm64 for-next/core
-branch). The third patch is a minor clean-up while the last one
-implements pmd_present() following recent discussions around
-pmd_mknotpresent() (and it's also a cc stable).
+With hardware AF/DBM support, pmd modifications (transparent huge pages)
+should be performed atomically using load/store exclusive. The initial
+patches defined the get-and-clear function and __HAVE_ARCH_* macro
+without the "huge" word, leaving the pmdp_huge_get_and_clear() to the
+default, non-atomic implementation.
 
-Catalin Marinas (4):
-  arm64: Fix typo in the pmdp_huge_get_and_clear() definition
-  arm64: Implement pmdp_set_access_flags() for hardware AF/DBM
-  arm64: Replace hard-coded values in the pmd/pud_bad() macros
-  arm64: Ensure pmd_present() returns false after pmd_mknotpresent()
+Fixes: 2f4b829c625e ("arm64: Add support for hardware updates of the access and dirty pte bits")
+Cc: <stable@vger.kernel.org> # 4.3+
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/pgtable.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- arch/arm64/include/asm/pgtable-hwdef.h |  1 -
- arch/arm64/include/asm/pgtable.h       | 26 ++++++++++++++++++--------
- 2 files changed, 18 insertions(+), 9 deletions(-)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index e021cbf11043..5237331e97f4 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -605,9 +605,9 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
+ }
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+-#define __HAVE_ARCH_PMDP_GET_AND_CLEAR
+-static inline pmd_t pmdp_get_and_clear(struct mm_struct *mm,
+-				       unsigned long address, pmd_t *pmdp)
++#define __HAVE_ARCH_PMDP_HUGE_GET_AND_CLEAR
++static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
++					    unsigned long address, pmd_t *pmdp)
+ {
+ 	return pte_pmd(ptep_get_and_clear(mm, address, (pte_t *)pmdp));
+ }
