@@ -1,68 +1,85 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 5 May 2016 19:06:02 +0200
-Subject: [PATCH 2/2] drm: hdlcd: Suspend/resume only active crtcs
-In-Reply-To: <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
-References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
- <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
-Message-ID: <20160505170601.GP1286@phenom.ffwll.local>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 5 May 2016 10:07:52 -0700
+Subject: usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+References: <1461612094-30939-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20160505170752.GA118697@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 05:13:38PM +0100, Robin Murphy wrote:
-> The current PM ops simply unconditionally enable/disable the HDLCD,
-> which proves problematic when there is no display plugged in - since
-> without a crtc the hardware itself is still in an uninitialised state,
-> coming out of suspend results in it being enabled without a valid
-> framebuffer address, which typically results in it trying to scan out
-> from bus address 0 and flooding the system with error interrupts.
+On Mon, Apr 25, 2016 at 10:21:34PM +0300, Strashko, Grygorii wrote:
+> Now not all DMA paremters configured properly for "xhci-hcd" platform
+> device which is created manually. For example: dma_pfn_offset, dam_ops
+> and iommu configuration will not corresponds "dwc3" devices
+> configuration. As result, this will cause problems like wrong DMA
+> addresses translation on platforms with LPAE enabled like Keystone 2.
 > 
-> Fix this by checking the crtc state on resume, and only enabling the
-> hardware if it's actually supposed to be. For the sake of consistency,
-> do the same on the suspend path as well, although there it's merely a
-> case of skipping unnecessary work.
+> When platform is using DT boot mode the DMA configuration will be
+> parsed and applied from DT, so, to fix this issue, reuse
+> of_dma_configure() API and retrieve DMA configuartion for "xhci-hcd"
+> from DWC3 device node.
 > 
-> CC: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Cc: David Fisher <david.fisher1@synopsys.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: "Thang Q. Nguyen" <tqnguyen@apm.com>
+> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+Tested-by: Brian Norris <briannorris@chromium.org>
+
+What's the status of this? I see that there was some divergent
+discussion about the merits of a dma_inherit() API...
+
+FWIW, I'll reiterate Grygorii's note that Felipe's alternative patch
+does NOT resolve the problem with the creation of the xhci-hcd platform
+device:
+
+https://patchwork.kernel.org/patch/8952721/
+
+Brian
+
 > ---
->  drivers/gpu/drm/arm/hdlcd_crtc.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> drivers/usb/dwc3/host.c | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> index fef1b04c2aab..bf6ff5e48adc 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> @@ -296,12 +296,14 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
+> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+> index c679f63..93c8ef9 100644
+> --- a/drivers/usb/dwc3/host.c
+> +++ b/drivers/usb/dwc3/host.c
+> @@ -17,6 +17,7 @@
 >  
->  void hdlcd_crtc_suspend(struct drm_crtc *crtc)
->  {
-> -	hdlcd_crtc_disable(crtc);
-> +	if (crtc->state->active)
-> +		hdlcd_crtc_disable(crtc);
->  }
+>  #include <linux/platform_device.h>
+>  #include <linux/usb/xhci_pdriver.h>
+> +#include <linux/of_device.h>
 >  
->  void hdlcd_crtc_resume(struct drm_crtc *crtc)
->  {
-> -	hdlcd_crtc_enable(crtc);
-> +	if (crtc->state->active)
-> +		hdlcd_crtc_enable(crtc);
->  }
-
-If you use the atomic helpers to suspend/resume your entire display
-pipeline these callbacks shouldn't even be needed at all. Tried just
-removing them?
--Daniel
-
+>  #include "core.h"
 >  
->  int hdlcd_setup_crtc(struct drm_device *drm)
-> -- 
-> 2.8.1.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> @@ -32,12 +33,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+>  		return -ENOMEM;
+>  	}
+>  
+> -	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+> -
+>  	xhci->dev.parent	= dwc->dev;
+> -	xhci->dev.dma_mask	= dwc->dev->dma_mask;
+> -	xhci->dev.dma_parms	= dwc->dev->dma_parms;
+> -
+>  	dwc->xhci = xhci;
+>  
+>  	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
+> @@ -62,6 +58,15 @@ int dwc3_host_init(struct dwc3 *dwc)
+>  	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+>  			  dev_name(&xhci->dev));
+>  
+> +	if (IS_ENABLED(CONFIG_OF) && dwc->dev->of_node) {
+> +		of_dma_configure(&xhci->dev, dwc->dev->of_node);
+> +	} else {
+> +		dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+> +
+> +		xhci->dev.dma_mask	= dwc->dev->dma_mask;
+> +		xhci->dev.dma_parms	= dwc->dev->dma_parms;
+> +	}
+> +
+>  	ret = platform_device_add(xhci);
+>  	if (ret) {
+>  		dev_err(dwc->dev, "failed to register xHCI device\n");
