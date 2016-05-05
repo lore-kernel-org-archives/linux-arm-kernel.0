@@ -1,55 +1,72 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 5 May 2016 14:44:50 -0400
-Subject: [RFC v2 02/13] power/mmc: Move pwrseq drivers to power/pwrseq
-In-Reply-To: <1462451666-17945-3-git-send-email-k.kozlowski@samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <1462451666-17945-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <4532bfb4-38f9-a61d-1d80-e5af18cd3d98@osg.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 May 2016 11:46:09 -0700
+Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
+In-Reply-To: <572A38FD.9050801@ti.com>
+References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
+ <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
+ <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
+Message-ID: <20160505184609.GB5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+* Nishanth Menon <nm@ti.com> [160504 11:03]:
+> On 05/04/2016 12:26 PM, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > Adding Nishanth to Cc.
+> > 
+> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [160429 05:15]:
+> >> ldo7_reg, obviously ;)
+> >>
+> >>> 	status = "okay";
+> >>> 	regulator-min-microvolt = <1800000>;
+> >>> 	regulator-max-microvolt = <1800000>;
+> >>> };
+> > 
+> > It really seems to be ldo7, otherwise there's no HDMI output. I don't
+> > have the schematics either.
+> > 
+> > But it seems we have at least two other regressions in Linux next that
+> > prevent me from testing this properly:
+> > 
+> > 1. On igepv5, I get this for the MMC regulator
+> > 
+> > ldo9: bypassed regulator has no supply!
+> > ldo9: failed to get the current voltage(-517)
+> > palmas-pmic 48070000.i2c:palmas at 48:palmas_pmic: failed to register 48070000.i2c:palmar
 
-On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
-> The MMC power sequence drivers are useful also outside of MMC world: for
-> USB devices needed a hard-reset before probing. Before extending and
-> re-using pwrseq drivers, move them to a new place.
-> 
-> The commit does not introduce significant changes in the pwrseq drivers
-> code so still all the functions are prefixed with "mmc_pwrseq". However
-> the MMC-specific pwrseq functions has to be now exported and everything
-> is hidden not by CONFIG_OF but by new CONFIG_POWER_SEQ option.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+The patch I posted fixes this. Then for the HDMI see below.
+I've kept it at 2V like we have in omap5-board-common.dtsi,
+I wonder if it really should be 1.8V though for ldo7 in this
+case?
 
-[snip]
+Regards,
 
-> --- a/drivers/mmc/core/Kconfig
-> +++ b/drivers/power/pwrseq/Kconfig
-> @@ -1,7 +1,12 @@
-> -#
-> -# MMC core configuration
-> -#
-> -config PWRSEQ_EMMC
-> +menuconfig POWER_SEQ
-> +	default y if OF
-> +	bool "Hardware reset support for specific devices"
-> +	help
-> +	  Provides drivers which reset the specific device before...
-> +
+Tony
+8< -----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 5 May 2016 11:29:23 -0700
+Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
 
-I think this text could be improved a little bit, maybe something like:
+Fix ldo7 source for HDMI on igepv5.
 
-"Provides drivers that implements specific power sequences for chips,
-using the generic power sequence management interface".
+Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-The rest looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
+index 46ecb1d..72ff6a4 100644
+--- a/arch/arm/boot/dts/omap5-igep0050.dts
++++ b/arch/arm/boot/dts/omap5-igep0050.dts
+@@ -35,6 +35,12 @@
+ 	};
+ };
+ 
++&ldo7_reg {
++	status = "okay";
++	regulator-min-microvolt = <2000000>;
++	regulator-max-microvolt = <2000000>;
++};
++
+ &omap5_pmx_core {
+ 	i2c4_pins: pinmux_i2c4_pins {
+ 		pinctrl-single,pins = <
