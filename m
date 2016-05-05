@@ -1,164 +1,298 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 5 May 2016 17:44:24 +0000
-Subject: [PATCH v9 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 2/3: msi changes
-In-Reply-To: <1462375094-2390-1-git-send-email-eric.auger@linaro.org>
-References: <1462375094-2390-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <9C17BA6B-7304-47CA-A287-77FB41D96AD3@caviumnetworks.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Thu, 5 May 2016 13:48:53 -0400
+Subject: [PATCH 2/2] pci: host: Add Broadcom STB PCIE RC controller
+In-Reply-To: <572A4F31.8010802@gmail.com>
+References: <1462238749-19715-1-git-send-email-f.fainelli@gmail.com>
+ <1462238749-19715-3-git-send-email-f.fainelli@gmail.com>
+ <2339405.90vXV1p6zU@wuerfel> <572A4F31.8010802@gmail.com>
+Message-ID: <CANCKTBuNFQFLsab2WS+BRGUOuUOTLYuoaWNuM5T9HPGihvwYCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Wed, May 4, 2016 at 3:36 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 03/05/16 02:57, Arnd Bergmann wrote:
+>>> +static const struct pcie_cfg_data generic_cfg = {
+>>> +    .offsets        = pcie_offsets,
+>>> +    .type           = GENERIC,
+>>> +};
+>>
+>> The way you access the config space here seems very indirect. I'd
+>> suggest instead writing two sets of pci_ops, with hardcoded registers
+>> offsets in them, and a function pointer to access the RGR1_SW_INIT_1
+>> register.
+>
+> How about introducing helper functions but keeping the same set of
+> read/write pci_ops instead, would that seem more acceptable? I agree
+> that the macros are not the friendliest thing.
+>
+>>
+>>> +struct brcm_msi {
+>>> +    struct irq_domain *domain;
+>>> +    struct irq_chip irq_chip;
+>>> +    struct msi_controller chip;
+>>> +    struct mutex lock;
+>>> +    int irq;
+>>> +    /* intr_base is the base pointer for interrupt status/set/clr regs */
+>>> +    void __iomem *intr_base;
+>>> +    /* intr_legacy_mask indicates how many bits are MSI interrupts */
+>>> +    u32 intr_legacy_mask;
+>>> +    /* intr_legacy_offset indicates bit position of MSI_01 */
+>>> +    u32 intr_legacy_offset;
+>>> +    /* used indicates which MSI interrupts have been alloc'd */
+>>> +    unsigned long used;
+>>> +    /* working indicates that on boot we have brought up MSI */
+>>> +    bool working;
+>>> +};
+>>
+>> I'd move the MSI controller stuff into a separate file, and add a way to
+>> override it. It's likely that at some point the same PCIe implementation
+>> will be used with a modern GICv3 or GICv2m, so you should be able to
+>> look up the msi controller from a property.
+>
+> Good point, let's do that, though all controllers actually do support
+> MSI, so I wonder.
+>
+>>
+>>> +struct brcm_window {
+>>> +    u64 size;
+>>> +    u64 cpu_addr;
+>>> +    struct resource pcie_iomem_res;
+>>> +};
+>>
+>> This appears to duplicate things we already have. Try to get rid of
+>> the structure and use what is already there.
+>
+> OK, the resource is probably good enough here.
+>
+>>
+>>> +struct brcm_dev_pwr_supply {
+>>> +    struct list_head node;
+>>> +    char name[32];
+>>> +    struct regulator *regulator;
+>>> +};
+>>
+>> Same here: Just get all the regulators you know about by name
+>> and put them into the main structure.
+>
+> OK, I will drop the regulator support for now, see below for a more
+> elaborate answer.
+>
+>>
+>>> +/* Internal Bus Controller Information.*/
+>>> +struct brcm_pcie {
+>>> +    struct list_head        list;
+>>> +    void __iomem            *base;
+>>> +    char                    name[8];
+>>> +    bool                    suspended;
+>>> +    struct clk              *clk;
+>>> +    struct device_node      *dn;
+>>> +    int                     pcie_irq[4];
+>>> +    int                     irq;
+>>> +    int                     num_out_wins;
+>>> +    bool                    ssc;
+>>> +    int                     gen;
+>>> +    int                     scb_size_vals[BRCM_MAX_SCB];
+>>> +    struct brcm_window      out_wins[BRCM_NUM_PCI_OUT_WINS];
+>>> +    struct pci_bus          *bus;
+>>> +    struct device           *dev;
+>>> +    struct list_head        resource;
+>>> +    struct list_head        pwr_supplies;
+>>> +    struct brcm_msi         msi;
+>>> +    unsigned int            rev;
+>>> +    unsigned int            num;
+>>> +    bool                    bridge_setup_done;
+>>> +    const int               *reg_offsets;
+>>> +    enum pcie_type          type;
+>>> +};
+>>> +
+>>> +static int brcm_num_pci_controllers;
+>>> +static int num_memc;
+>>
+>> Remove the globals.
+>
+> OK.
+>
+>>
+>>> +
+>>> +/*
+>>> + * MIPS endianness is configured by boot strap, which also reverses all
+>>> + * bus endianness (i.e., big-endian CPU + big endian bus ==> native
+>>> + * endian I/O).
+>>> + *
+>>> + * Other architectures (e.g., ARM) either do not support big endian, or
+>>> + * else leave I/O in little endian mode.
+>>> + */
+>>> +static inline u32 bpcie_readl(void __iomem *base)
+>>> +{
+>>> +    if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+>>> +            return __raw_readl(base);
+>>> +    else
+>>> +            return readl_relaxed(base);
+>>> +}
+>>
+>> I think it would make more sense to only make this depend on the
+>> architecture, not on endianess: If the __raw_ version works on MIPS
+>> in big-endian mode, you should be able to also use it in little-endian
+>> mode.
+>>
+>> For the default (ARM) version, please use the non-relaxed accessor
+>> by default, unless you can show a difference in performance and prove
+>> that you don't need the implied barriers.
+>
+> Our busing makes it so that the __raw_readl() (or _relaxed) I/O access
+> is going to have the same guarantees as if we were adding a barrier,
+> that is, writes are not going to be re-ordered with each other by the
+> bus, nor the CPU (since it maps the space as device memory), and on
+> MIPS, well, it's all through unmapped, uncached space, but I can
+> definitively switch that for readl(), should not make a huge performance
+> difference, if noticeable.
+>
+>>
+>>> +/* negative return value indicates error */
+>>> +static int mdio_read(void __iomem *base, u8 phyad, u8 regad)
+>>> +{
+>>> +    u32 data = ((phyad & 0xf) << 16)
+>>> +            | (regad & 0x1f)
+>>> +            | 0x100000;
+>>> +
+>>> +    bpcie_writel(data, base + PCIE_RC_DL_MDIO_ADDR);
+>>> +    bpcie_readl(base + PCIE_RC_DL_MDIO_ADDR);
+>>> +
+>>> +    data = bpcie_readl(base + PCIE_RC_DL_MDIO_RD_DATA);
+>>> +    if (!(data & 0x80000000)) {
+>>> +            mdelay(1);
+>>
+>> Try to restructure the code so this is never called with spinlocks
+>> held and then replace the mdelay() with an msleep().
+>
+> I cannot really think of a reason why we did not use msleep() all along,
+> so thanks for spotting that.
 
-Does this series supports gicv3-its emulation?
-Do we have a tree with all the dependent patches
+This is an artifact of when we used to do our PCIe suspend/resume via
+syscore calls and we could not sleep.
 
+>
+>>> +
+>>> +    /* set up 4GB PCIE->SCB memory window on BAR2 */
+>>> +    bpcie_writel(0x00000011, base + PCIE_MISC_RC_BAR2_CONFIG_LO);
+>>> +    bpcie_writel(0x00000000, base + PCIE_MISC_RC_BAR2_CONFIG_HI);
+>>
+>> Where does this window come from? It's not in the DT as far as I can see.
+>
+> This is an architectural maximum value which is baked into the PCIE Root
+> Complex hardware, on all generations that this driver supports. We
+> configure the largest address match rang size here, just to be safe,
+> AFAICT there is no point in looking at the inbound or outbound window
+> sizes to re-program that differently.
 
+Florian, I have a subsequent commit that passes the inbound
+information in the device tree; it's designed for when we have to map
+the multiple inbound regions differently using dma-ranges.  I will
+make it available to you offline.
 
+>
+>
+>>> +    INIT_LIST_HEAD(&pcie->pwr_supplies);
+>>> +    INIT_LIST_HEAD(&pcie->resource);
+>>> +
+>>> +    supplies = of_property_count_strings(dn, "supply-names");
+>>> +    if (supplies <= 0)
+>>> +            supplies = 0;
+>>> +
+>>> +    for (i = 0; i < supplies; i++) {
+>>> +            if (of_property_read_string_index(dn, "supply-names", i,
+>>> +                                              &name))
+>>> +                    continue;
+>>> +            supply = devm_kzalloc(&pdev->dev, sizeof(*supply), GFP_KERNEL);
+>>> +            if (!supply)
+>>> +                    return -ENOMEM;
+>>> +
+>>> +            strncpy(supply->name, name, sizeof(supply->name));
+>>> +            supply->name[sizeof(supply->name) - 1] = '\0';
+>>> +            supply->regulator = devm_regulator_get(&pdev->dev, name);
+>>> +            if (IS_ERR(supply->regulator)) {
+>>> +                    dev_err(&pdev->dev, "Unable to get %s supply, err=%d\n",
+>>> +                            name, (int)PTR_ERR(supply->regulator));
+>>> +                    continue;
+>>> +            }
+>>> +
+>>> +            if (regulator_enable(supply->regulator))
+>>> +                    dev_err(&pdev->dev, "Unable to enable %s supply.\n",
+>>> +                            name);
+>>> +            list_add_tail(&supply->node, &pcie->pwr_supplies);
+>>> +    }
+>>
+>> Don't parse the regulator properties yourself here, use the proper APIs.
+>
+> I will probably drop this for now, and  add it later, there are only a
+> handful of boards which requires this, and ultimately, I think we should
+> be seaking for a more generic solutions, we can't be the only ones doing
+> that.
+>
+>>
+>>> +    /* 'num_memc' will be set only by the first controller, and all
+>>> +     * other controllers will use the value set by the first.
+>>> +     */
+>>> +    if (num_memc == 0)
+>>> +            for_each_compatible_node(mdn, NULL, "brcm,brcmstb-memc")
+>>> +                    if (of_device_is_available(mdn))
+>>> +                            num_memc++;
+>>
+>> Why is this?
+>
+> This is so we do not end-up programming the PCIe RC which is agnostic of
+> the number of
 
+I believe this code is still around for folks passing us a device tree
+with lacking information.  It should be removed.
+
+>
+>>
+>>> +    resource_list_for_each_entry(win, &res) {
+>>> +            struct brcm_window *w = &pcie->out_wins[i];
+>>> +
+>>> +            r = win->res;
+>>> +
+>>> +            if (!r->flags)
+>>> +                    continue;
+>>> +
+>>> +            switch (resource_type(r)) {
+>>> +            case IORESOURCE_MEM:
+>>> +                    w->cpu_addr = r->start;
+>>> +                    w->size = resource_size(r);
+>>> +                    w->pcie_iomem_res.name  = "External PCIe MEM";
+>>> +                    w->pcie_iomem_res.flags = r->flags;
+>>> +                    w->pcie_iomem_res.start = r->start;
+>>> +                    w->pcie_iomem_res.end   = r->end;
+>>> +                    pcie->num_out_wins++;
+>>> +                    i++;
+>>> +                    /* Request memory region resources. */
+>>> +                    ret = devm_request_resource(&pdev->dev,
+>>> +                                                &iomem_resource,
+>>> +                                                &w->pcie_iomem_res);
+>>> +                    if (ret) {
+>>> +                            dev_err(&pdev->dev,
+>>> +                                    "request PCIe memory resource failed\n");
+>>> +                            goto out_err_clk;
+>>> +                    }
+>>> +                    break;
+>>> +
+>>> +            default:
+>>> +                    continue;
+>>> +            }
+>>> +    }
+>>
+>> What about IORESOURCE_IO?
+>
+> We do not support I/O space on this controller AFAIR. Our downstream
+> driver does insert a fake bogus I/O range, but I cannot really remember
+> why that was needed now, Jim do you remember?
+> --
+> Florian
+
+We added a bogus IO region because there was no other way to proceed
+w/o getting an error.  Or should I say, I knew of no other way to
+proceed...
 
 Thanks,
-Tirumalesh. 
-On 5/4/16, 8:18 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
-
->This series implements the MSI address mapping/unmapping in the MSI layer.
->IOMMU binding happens on pci_enable_msi since this function can sleep and
->return errors. On msi_domain_set_affinity, msi_domain_(de)activate, which
->are not allowed to sleep, we simply look for the already existing binding.
->
->A new MSI domain info flag value is introduced to report whether the msi
->domain implements IRQ remapping. GIC v3 ITS is the first MSI controller
->advertising it. This flag value will be used by VFIO subsystem to
->determine whether MSI forwarding is safe.
->
->More details & context can be found at:
->http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
->
->Best Regards
->
->Eric
->
->Applies on top of PART 1/3. Also depends on
->[PATCH 1/3] iommu: Add MMIO mapping type,
->http://comments.gmane.org/gmane.linux.kernel.iommu/12869
->
->Git: complete series available at
->https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc6-pcie-passthrough-v9-msi-v9
->
->This branch contains all parts in v9.
->
->History:
->
->v8 -> v9:
->- use a union in irq_chip_msi_doorbell_info + boolean telling whether the
->  doorbell is percpu
->- decouple irq_data parsing from the actual mapping/unmapping in
->  msi_handle_doorbell_mappings
->- fix misc style issues
->
->v7 -> v8:
->take into account Marc's comments:
->- use iommu_msi_msg_pa_to_va with new proto
->- change in irq_chip_msi_doorbell_info struct definition:
->  prot and size became shared between all doorbells and phys_addr_t __percpu
->- cleanups in v2m irqchip
->- eventually did not touch MSI_FLAG_IRQ_REMAPPING naming
->- On msi_handle_doorbell_mappings, stop on the first irqchip where doorbells
->  can be found
->- fix resource deallocation on mapping failure in msi_domain_alloc_irqs
->
->v6 -> v7:
->- do alloc/map handling on pci_enable_msi and search on msi_(de)domain_activate
->- add msi_doorbell_info callback in irq-chip to retrieve the characteristics
->  of doorbells
->
->RFC v5 -> patch v6:
->- split to ease the review process
->- rebase on default iommu domain code (irq_data_to_msi_mapping_domain
->  checks IOMMU_DOMAIN_DMA type)
->- fix unmap sequence on msi_domain_set_affinity (reported by Marc):
->  unmap the previous doorbell when the new one has been mapped & written to
->  the device, ie. irq_chip_write_msi_msg.
->- "msi: msi_compose wrapper removed" following change above
->- add size parameter to iommu_get_reserved_iova API following Marc's request
->
->RFC v4 -> RFC v5:
->- take into account Thomas' comments on MSI related patches
->  - split "msi: IOMMU map the doorbell address when needed"
->  - increase readability and add comments
->  - fix style issues
-> - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
-> - platform ITS now advertises IOMMU_CAP_INTR_REMAP
-> - fix compilation issue with CONFIG_IOMMU API unset
-> - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
->
->RFC v3 -> v4:
->- Move doorbell mapping/unmapping in msi.c
->- fix ref count issue on set_affinity: in case of a change in the address
->  the previous address is decremented
->- doorbell map/unmap now is done on msi composition. Should allow the use
->  case for platform MSI controllers
->- create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
->  to reserved IOVA management (looking like dma-iommu glue)
->- series reordering to ease the review:
->  - first part is related to IOMMU
->  - second related to MSI sub-system
->  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
->- expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
->  [this partially addresses Marc's comments on iommu_get/put_single_reserved
->   size/alignment problematic - which I did not ignore - but I don't know
->   how much I can do at the moment]
->
->RFC v2 -> RFC v3:
->- should fix wrong handling of some CONFIG combinations:
->  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
->- fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
->
->PATCH v1 -> RFC v2:
->- reverted to RFC since it looks more reasonable ;-) the code is split
->  between VFIO, IOMMU, MSI controller and I am not sure I did the right
->  choices. Also API need to be further discussed.
->- iova API usage in arm-smmu.c.
->- MSI controller natively programs the MSI addr with either the PA or IOVA.
->  This is not done anymore in vfio-pci driver as suggested by Alex.
->- check irq remapping capability of the group
->
->RFC v1 [2] -> PATCH v1:
->- use the existing dma map/unmap ioctl interface with a flag to register a
->  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
->- a single reserved IOVA contiguous region now is allowed
->- use of an RB tree indexed by PA to store allocated reserved slots
->- use of a vfio_domain iova_domain to manage iova allocation within the
->  window provided by the userspace
->- vfio alloc_map/unmap_free take a vfio_group handle
->- vfio_group handle is cached in vfio_pci_device
->- add ref counting to bindings
->- user modality enabled at the end of the series
->
->
->Eric Auger (8):
->  genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
->  irqchip/gic-v3-its: ITS advertises MSI_FLAG_IRQ_REMAPPING
->  genirq/msi: export msi_get_domain_info
->  genirq/msi: msi_compose wrapper
->  genirq/irq: introduce msi_doorbell_info
->  irqchip/gicv2m: implement msi_doorbell_info callback
->  genirq/msi: map/unmap the MSI doorbells on msi_domain_alloc/free_irqs
->  genirq/msi: use the MSI doorbell's IOVA when requested
->
-> drivers/irqchip/irq-gic-v2m.c                 |  16 +++
-> drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   3 +-
-> drivers/irqchip/irq-gic-v3-its-platform-msi.c |   3 +-
-> include/linux/irq.h                           |  15 ++-
-> include/linux/msi.h                           |   2 +
-> kernel/irq/msi.c                              | 136 +++++++++++++++++++++++---
-> 6 files changed, 161 insertions(+), 14 deletions(-)
->
->-- 
->1.9.1
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jim Quinlan
