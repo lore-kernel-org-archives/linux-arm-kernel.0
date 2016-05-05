@@ -1,95 +1,76 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 5 May 2016 18:00:48 +0000
-Subject: [PATCH v4 02/12] KVM: arm/arm64: extend arch CAP checks to allow
- per-VM capabilities
-In-Reply-To: <1458958450-19662-3-git-send-email-andre.przywara@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <33EF8FD5-9769-4FBA-8F70-7CF737CE732A@caviumnetworks.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 5 May 2016 19:01:17 +0100
+Subject: [PATCH 2/2] drm: hdlcd: Suspend/resume only active crtcs
+In-Reply-To: <20160505170601.GP1286@phenom.ffwll.local>
+References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
+ <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
+ <20160505170601.GP1286@phenom.ffwll.local>
+Message-ID: <572B8A6D.40405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Daniel,
 
-
-
-
-
-On 3/25/16, 7:14 PM, "kvmarm-bounces at lists.cs.columbia.edu on behalf of Andre Przywara" <kvmarm-bounces at lists.cs.columbia.edu on behalf of andre.przywara@arm.com> wrote:
-
->KVM capabilities can be a per-VM property, though ARM/ARM64 currently
->does not pass on the VM pointer to the architecture specific
->capability handlers.
->Add a "struct kvm*" parameter to those function to later allow proper
->per-VM capability reporting.
-
-This looks good
-Reviewed-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com> 
-
+On 05/05/16 18:06, Daniel Vetter wrote:
+> On Thu, May 05, 2016 at 05:13:38PM +0100, Robin Murphy wrote:
+>> The current PM ops simply unconditionally enable/disable the HDLCD,
+>> which proves problematic when there is no display plugged in - since
+>> without a crtc the hardware itself is still in an uninitialised state,
+>> coming out of suspend results in it being enabled without a valid
+>> framebuffer address, which typically results in it trying to scan out
+>> from bus address 0 and flooding the system with error interrupts.
+>>
+>> Fix this by checking the crtc state on resume, and only enabling the
+>> hardware if it's actually supposed to be. For the sake of consistency,
+>> do the same on the suspend path as well, although there it's merely a
+>> case of skipping unnecessary work.
+>>
+>> CC: Liviu Dudau <liviu.dudau@arm.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/gpu/drm/arm/hdlcd_crtc.c | 6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+>> index fef1b04c2aab..bf6ff5e48adc 100644
+>> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+>> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+>> @@ -296,12 +296,14 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
+>>
+>>   void hdlcd_crtc_suspend(struct drm_crtc *crtc)
+>>   {
+>> -	hdlcd_crtc_disable(crtc);
+>> +	if (crtc->state->active)
+>> +		hdlcd_crtc_disable(crtc);
+>>   }
+>>
+>>   void hdlcd_crtc_resume(struct drm_crtc *crtc)
+>>   {
+>> -	hdlcd_crtc_enable(crtc);
+>> +	if (crtc->state->active)
+>> +		hdlcd_crtc_enable(crtc);
+>>   }
 >
->Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->---
-> arch/arm/include/asm/kvm_host.h   | 2 +-
-> arch/arm/kvm/arm.c                | 2 +-
-> arch/arm64/include/asm/kvm_host.h | 2 +-
-> arch/arm64/kvm/reset.c            | 2 +-
-> 4 files changed, 4 insertions(+), 4 deletions(-)
+> If you use the atomic helpers to suspend/resume your entire display
+> pipeline these callbacks shouldn't even be needed at all. Tried just
+> removing them?
+
+I'll have to leave that in Liviu's hands as I know literally nothing 
+about the relationship between platform PM ops and DRM helpers ;)
+My only motivation is for the arm64 hibernate support currently sat in 
+-next for 4.7 to stop being broken on my Juno board by this.
+
+Robin.
+
+> -Daniel
 >
->diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->index 3850701..494b004 100644
->--- a/arch/arm/include/asm/kvm_host.h
->+++ b/arch/arm/include/asm/kvm_host.h
->@@ -265,7 +265,7 @@ static inline void __cpu_init_stage2(void)
-> 	kvm_call_hyp(__init_stage2_translation);
-> }
-> 
->-static inline int kvm_arch_dev_ioctl_check_extension(long ext)
->+static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-> {
-> 	return 0;
-> }
->diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->index 5b9d9e3..e2e9be2 100644
->--- a/arch/arm/kvm/arm.c
->+++ b/arch/arm/kvm/arm.c
->@@ -205,7 +205,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
-> 		r = KVM_MAX_VCPUS;
-> 		break;
-> 	default:
->-		r = kvm_arch_dev_ioctl_check_extension(ext);
->+		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
-> 		break;
-> 	}
-> 	return r;
->diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->index 71fa6fe..2cdd7ae 100644
->--- a/arch/arm64/include/asm/kvm_host.h
->+++ b/arch/arm64/include/asm/kvm_host.h
->@@ -46,7 +46,7 @@
-> 
-> int __attribute_const__ kvm_target_cpu(void);
-> int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
->-int kvm_arch_dev_ioctl_check_extension(long ext);
->+int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
-> 
-> struct kvm_arch {
-> 	/* The VMID generation used for the virt. memory system */
->diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->index 9677bf0..2ba7c8d 100644
->--- a/arch/arm64/kvm/reset.c
->+++ b/arch/arm64/kvm/reset.c
->@@ -63,7 +63,7 @@ static bool cpu_has_32bit_el1(void)
->  * We currently assume that the number of HW registers is uniform
->  * across all CPUs (see cpuinfo_sanity_check).
->  */
->-int kvm_arch_dev_ioctl_check_extension(long ext)
->+int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-> {
-> 	int r;
-> 
->-- 
->2.7.3
+>>
+>>   int hdlcd_setup_crtc(struct drm_device *drm)
+>> --
+>> 2.8.1.dirty
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 >
->_______________________________________________
->kvmarm mailing list
->kvmarm at lists.cs.columbia.edu
->https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
