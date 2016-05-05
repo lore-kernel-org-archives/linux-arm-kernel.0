@@ -1,47 +1,33 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 May 2016 14:34:21 +0200
-Subject: [RFC v2 08/13] usb: hub: Handle deferred probe
+Date: Thu, 05 May 2016 14:34:25 +0200
+Subject: [RFC v2 12/13] ARM: dts: exynos: Switch the buck8 to GPIO mode on
+ Odroid U3
 In-Reply-To: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
 References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1462451666-17945-9-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1462451666-17945-13-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for deferred probing to the usb hub. Currently EPROBE_DEFER
-does not exist in usb hub path but future patches will add it on the
-port level.
+Switch the control of buck8 to GPIO mode. It is faster than I2C/register
+mode and it is the easiest way to disable it (regulator state is a
+logical OR state of GPIO and register value).
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/usb/core/hub.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos4412-odroidu3.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index 38cc4bae0a82..1c82fcc448f5 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -1731,6 +1731,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	struct usb_endpoint_descriptor *endpoint;
- 	struct usb_device *hdev;
- 	struct usb_hub *hub;
-+	int ret;
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index d73aa6c58fe3..31cdc036fda4 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -74,6 +74,7 @@
+ 	regulator-name = "BUCK8_P3V3";
+ 	regulator-min-microvolt = <3300000>;
+ 	regulator-max-microvolt = <3300000>;
++	maxim,ena-gpios = <&gpa1 1 GPIO_ACTIVE_HIGH>;
+ };
  
- 	desc = intf->cur_altsetting;
- 	hdev = interface_to_usbdev(intf);
-@@ -1850,11 +1851,12 @@ descriptor_error:
- 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
- 		hub->quirk_check_port_auto_suspend = 1;
- 
--	if (hub_configure(hub, endpoint) >= 0)
-+	ret = hub_configure(hub, endpoint);
-+	if (ret >= 0)
- 		return 0;
- 
- 	hub_disconnect(intf);
--	return -ENODEV;
-+	return ret;
- }
- 
- static int
+ /* VDDQ for MSHC (eMMC card) */
 -- 
 1.9.1
