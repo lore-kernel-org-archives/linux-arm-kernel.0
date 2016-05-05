@@ -1,98 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 May 2016 23:15:16 +0200
-Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB PCIe
- bindings
-In-Reply-To: <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
-References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
- <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <4513390.VWu0VVAxOl@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 05 May 2016 23:36:49 +0200
+Subject: [PATCH v7 5/9] i2c: rk3x: Change SoC data to not use array
+In-Reply-To: <1462372418-6349-1-git-send-email-david.wu@rock-chips.com>
+References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+ <1462372418-6349-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <2061861.OMNZ1I2HYA@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 May 2016 12:14:59 Florian Fainelli wrote:
-> From: Jim Quinlan <jim2101024@gmail.com>
-> 
-> This patchs adds the Device Tree bindings for the Broadcom STB PCIe root
-> complex hardware.
-> 
-> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Am Mittwoch, 4. Mai 2016, 22:33:38 schrieb David Wu:
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+
+that makes the code look nicer (and of course prepares for you further 
+changes), so
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
 > ---
-> Changes in v2:
+>  drivers/i2c/busses/i2c-rk3x.c | 38 ++++++++++++++++++++++++++++++--------
+>  1 file changed, 30 insertions(+), 8 deletions(-)
 > 
-> - rewrite the binding document almost from scratch to include many more
->   references to existing documents
-> - describe missing properties
-> - give better examples
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 0838fcf..9686c81 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -867,17 +867,39 @@ static const struct i2c_algorithm rk3x_i2c_algorithm =
+> { .functionality		= rk3x_i2c_func,
+>  };
 > 
->  .../devicetree/bindings/pci/brcm,brcmstb-pcie.txt  | 98 ++++++++++++++++++++++
->  1 file changed, 98 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
+> -static struct rk3x_i2c_soc_data soc_data[3] = {
+> -	{ .grf_offset = 0x154 }, /* rk3066 */
+> -	{ .grf_offset = 0x0a4 }, /* rk3188 */
+> -	{ .grf_offset = -1 },    /* no I2C switching needed */
+> +static const struct rk3x_i2c_soc_data rk3066_soc_data = {
+> +	.grf_offset = 0x154,
+> +};
+> +
+> +static const struct rk3x_i2c_soc_data rk3188_soc_data = {
+> +	.grf_offset = 0x0a4,
+> +};
+> +
+> +static const struct rk3x_i2c_soc_data rk3228_soc_data = {
+> +	.grf_offset = -1,
+> +};
+> +
+> +static const struct rk3x_i2c_soc_data rk3288_soc_data = {
+> +	.grf_offset = -1,
+>  };
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
-> new file mode 100644
-> index 000000000000..3682b0f0bc26
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
-> @@ -0,0 +1,98 @@
-> +Broadcom STB PCIe Host Controller Device Tree Bindings
-> +
-> +This document describes the binding of the PCIe Root Complex hardware found in
-> +Broadcom Set Top Box System-on-Chips such as BCM7425 (MIPS), BCM7435 (MIPS) and
-> +BCM7445 (ARMv7).
-> +
-> +Required properties:
-> +- compatible: must be one of: "brcm,bcm7425-pcie"
-> +			      "brcm,bcm7435-pcie"
-> +			      "brcm,bcm7445-pcie"
-> +
-> +- reg: specifies the physical base address of the controller registers and
-> +  its length
-> +
-> +- interrupt-parent: must be a reference (phandle) to the parent interrupt
-> +  controller in the system (7038-l1-intc on MIPS, GIC on ARM/ARM64)
-> +
-> +- interrrupts: first interrupt must be the Level 1 interrupt number corresponding
-> +  to the main PCIe RC interrupt, second interrupt must be the MSI interrupt
-> +  See the interrupt-parent documentation for the number of cells and their meaning:
-> +  MIPS: Documentation/devicetree/bindings/interrupt-controller/brcm,bcm7038-l1-intc.txt
-> +  ARM/ARM64: Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-> +
-> +- interrupt-names: must be "pcie", and if present "msi"
-
-When I suggested splitting out the MSI support, I was thinking (but not writing)
-that you'd use an msi-parent property to refer to the node that holds the
-msi-controller as well.
-
-> +- ranges: ranges for the PCI outbound windows, no I/O or prefetchable windows
-> +  must be specified here, only non-prefetchable. 32-bits windows or 64-bits
-> +  windows are allowed based on the host processor's capabilities (ARM w/ LPAE,
-> +  ARM64).
-
-So this supports 64-bit non-prefetchable windows? Usually 64-bit windows
-are prefetchable.
-
-> +- brcm,log2-scb-sizes: log2 size of the SCB window that is mapped to PCIe space
-> +  there must be exactly one value per memory controller present in the system
-> +  (ranges from 1 to 3)
-
-I'm still not too happy with this property. I see no reason for the log2
-format (rather than length in bytes, or offset/length tuples, or dma-ranges,
-or phandles pointing to the memory controllers). I think we need to discuss
-this some more.
-
-> +- brcm,gen: integer that indicates desired forced generation of link: 1 => 2.5
-> +  Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps. Will override the auto-negotation if
-> +  specified.
-
-to repeat my earlier comment from v1:
-
-Shouldn't the link generation be probed automatically?
-
-> +- <*>-supply: see Documentation/devicetree/bindings/regulator/regulator.txt
-> +
-> +- <*>-supply-names: see Documentation/devicetree/bindings/regulator/regulator.txt
-
-I don't see supply-names documented there.
-
-	Arnd
+>  static const struct of_device_id rk3x_i2c_match[] = {
+> -	{ .compatible = "rockchip,rk3066-i2c", .data = (void *)&soc_data[0] },
+> -	{ .compatible = "rockchip,rk3188-i2c", .data = (void *)&soc_data[1] },
+> -	{ .compatible = "rockchip,rk3228-i2c", .data = (void *)&soc_data[2] },
+> -	{ .compatible = "rockchip,rk3288-i2c", .data = (void *)&soc_data[2] },
+> +	{
+> +		.compatible = "rockchip,rk3066-i2c",
+> +		.data = (void *)&rk3066_soc_data
+> +	},
+> +	{
+> +		.compatible = "rockchip,rk3188-i2c",
+> +		.data = (void *)&rk3188_soc_data
+> +	},
+> +	{
+> +		.compatible = "rockchip,rk3228-i2c",
+> +		.data = (void *)&rk3228_soc_data
+> +	},
+> +	{
+> +		.compatible = "rockchip,rk3288-i2c",
+> +		.data = (void *)&rk3288_soc_data
+> +	},
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, rk3x_i2c_match);
