@@ -1,191 +1,93 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 5 May 2016 17:12:54 +0100
-Subject: [PATCH] maintainers: update my email address(es)
-Message-ID: <20160505161254.GY19428@n2100.arm.linux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu,  5 May 2016 17:13:37 +0100
+Subject: [PATCH 1/2] drm: hdlcd: Skip PM callbacks if unbound
+Message-ID: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update my email and web addresses in the kernel maintainers file.
+Until an encoder component is available to trigger the HDLCD's component
+master bind callback, the drm_device we keep in drvdata isn't allocated.
+Since it is quite possible to, say, hibernate the system without having
+loaded the encoder driver, the PM callbacks need to check for a valid
+drm_device before trying to take the lock and suspend/resume the crtcs,
+otherwise this happens:
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+[   51.779092] Unable to handle kernel NULL pointer dereference at virtual address 00000200
+[   51.787143] pgd = ffff800974462000
+[   51.790514] [00000200] *pgd=0000000000000000
+[   51.794768] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+[   51.800291] Modules linked in:
+[   51.803325] CPU: 4 PID: 2098 Comm: systemd-sleep Not tainted 4.6.0-rc6+ #4
+[   51.810140] Hardware name: ARM Juno development board (r1) (DT)
+[   51.816008] task: ffff800974430000 ti: ffff80097380c000 task.ti: ffff80097380c000
+[   51.823433] PC is at mutex_lock+0x14/0x60
+[   51.827411] LR is at drm_modeset_lock_all+0x3c/0xe0
+[   51.832246] pc : [<ffff0000087d55c4>] lr : [<ffff0000084839fc>] pstate: 40000145
+[   51.839577] sp : ffff80097380faf0
+[   51.842859] x29: ffff80097380faf0 x28: 0000000000000000
+[   51.848132] x27: 0000000000000002 x26: ffff000008e01000
+[   51.853405] x25: ffff0000084cc000 x24: ffff000008dcb408
+[   51.858678] x23: ffff000008e7c000 x22: ffff8009760e8870
+[   51.863962] x21: 0000000000000200 x20: 0000000000000000
+[   51.869244] x19: 0000000000000200 x18: ffff800079357dd0
+[   51.874527] x17: 0000ffff8a00ab88 x16: 0000000000000018
+[   51.879809] x15: 0000000000000018 x14: 0000000000000000
+[   51.885091] x13: 0000000000000002 x12: 0000000000000000
+[   51.890374] x11: ffff0000087ff904 x10: 0000000000000840
+[   51.895656] x9 : 0000000000000000 x8 : ffff800973821680
+[   51.900938] x7 : 0000000000000000 x6 : 000000000000003f
+[   51.906220] x5 : 0000000000000040 x4 : 0000000000000000
+[   51.911502] x3 : 0000000000000004 x2 : 0000000000000000
+[   51.916784] x1 : 0000000000000001 x0 : 0000000000000200
+...
+[   52.339406] [<ffff0000087d55c4>] mutex_lock+0x14/0x60
+[   52.344425] [<ffff0000084839fc>] drm_modeset_lock_all+0x3c/0xe0
+[   52.350305] [<ffff00000848a034>] hdlcd_pm_suspend+0x2c/0x90
+[   52.355842] [<ffff0000084c0d14>] platform_pm_suspend+0x24/0x58
+[   52.361638] [<ffff0000084cc190>] dpm_run_callback.isra.4+0x20/0x68
+[   52.367778] [<ffff0000084ccad4>] __device_suspend+0xe4/0x238
+[   52.373400] [<ffff0000084cdcac>] dpm_suspend+0x10c/0x240
+[   52.378679] [<ffff0000084ce0b8>] dpm_suspend_start+0x70/0x80
+[   52.384302] [<ffff0000080f80e4>] suspend_devices_and_enter+0x9c/0x480
+[   52.390699] [<ffff0000080f8698>] pm_suspend+0x1d0/0x240
+[   52.395890] [<ffff0000080f7280>] state_store+0x80/0x100
+[   52.401084] [<ffff0000083503f4>] kobj_attr_store+0x14/0x28
+[   52.406535] [<ffff000008238580>] sysfs_kf_write+0x48/0x58
+[   52.411899] [<ffff00000823798c>] kernfs_fop_write+0xbc/0x188
+[   52.417521] [<ffff0000081c71f4>] __vfs_write+0x1c/0xe0
+[   52.422626] [<ffff0000081c8144>] vfs_write+0x8c/0x1a8
+[   52.427644] [<ffff0000081c953c>] SyS_write+0x44/0xa0
+[   52.432578] [<ffff000008084ecc>] __sys_trace_return+0x0/0x4
+[   52.438114] Code: 910003fd f9000bf3 aa0003f3 f9800011 (885ffc01)
+[   52.444229] ---[ end trace 34b87a5fb9453f65 ]---
+
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- MAINTAINERS | 48 ++++++++++++++++++++++++------------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+ drivers/gpu/drm/arm/hdlcd_drv.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ecbb2f6a3ba0..73141b4f46a9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -872,9 +872,9 @@ F:	drivers/perf/arm_pmu.c
- F:	include/linux/perf/arm_pmu.h
+diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
+index 734899c4e4bb..86a5eea4cf53 100644
+--- a/drivers/gpu/drm/arm/hdlcd_drv.c
++++ b/drivers/gpu/drm/arm/hdlcd_drv.c
+@@ -498,7 +498,7 @@ static int __maybe_unused hdlcd_pm_suspend(struct device *dev)
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 	struct drm_crtc *crtc;
  
- ARM PORT
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- F:	arch/arm/
+-	if (pm_runtime_suspended(dev))
++	if (pm_runtime_suspended(dev) || !drm)
+ 		return 0;
  
-@@ -886,35 +886,35 @@ F:	arch/arm/plat-*/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+ 	drm_modeset_lock_all(drm);
+@@ -513,7 +513,7 @@ static int __maybe_unused hdlcd_pm_resume(struct device *dev)
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 	struct drm_crtc *crtc;
  
- ARM PRIMECELL AACI PL041 DRIVER
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- S:	Maintained
- F:	sound/arm/aaci.*
+-	if (!pm_runtime_suspended(dev))
++	if (!pm_runtime_suspended(dev) || !drm)
+ 		return 0;
  
- ARM PRIMECELL CLCD PL110 DRIVER
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- S:	Maintained
- F:	drivers/video/fbdev/amba-clcd.*
- 
- ARM PRIMECELL KMI PL050 DRIVER
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- S:	Maintained
- F:	drivers/input/serio/ambakmi.*
- F:	include/linux/amba/kmi.h
- 
- ARM PRIMECELL MMCI PL180/1 DRIVER
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- S:	Maintained
- F:	drivers/mmc/host/mmci.*
- F:	include/linux/amba/mmci.h
- 
- ARM PRIMECELL UART PL010 AND PL011 DRIVERS
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- S:	Maintained
- F:	drivers/tty/serial/amba-pl01*.c
- F:	include/linux/amba/serial.h
- 
- ARM PRIMECELL BUS SUPPORT
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- S:	Maintained
- F:	drivers/amba/
- F:	include/linux/amba/bus.h
-@@ -1036,7 +1036,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/CLKDEV SUPPORT
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/include/asm/clkdev.h
-@@ -1093,9 +1093,9 @@ F:	arch/arm/boot/dts/cx92755*
- N:	digicolor
- 
- ARM/EBSA110 MACHINE SUPPORT
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- F:	arch/arm/mach-ebsa110/
- F:	drivers/net/ethernet/amd/am79c961a.*
-@@ -1124,9 +1124,9 @@ T:	git git://git.berlios.de/gemini-board
- F:	arch/arm/mm/*-fa*
- 
- ARM/FOOTBRIDGE ARCHITECTURE
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- F:	arch/arm/include/asm/hardware/dec21285.h
- F:	arch/arm/mach-footbridge/
-@@ -1457,7 +1457,7 @@ S:	Maintained
- ARM/PT DIGITAL BOARD PORT
- M:	Stefan Eletzhofer <stefan.eletzhofer@eletztrick.de>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- 
- ARM/QUALCOMM SUPPORT
-@@ -1493,9 +1493,9 @@ S:	Supported
- F:	arch/arm64/boot/dts/renesas/
- 
- ARM/RISCPC ARCHITECTURE
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- F:	arch/arm/include/asm/hardware/entry-macro-iomd.S
- F:	arch/arm/include/asm/hardware/ioc.h
-@@ -1773,9 +1773,9 @@ F:	drivers/clk/versatile/clk-vexpress-osc.c
- F:	drivers/clocksource/versatile.c
- 
- ARM/VFP SUPPORT
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- F:	arch/arm/vfp/
- 
-@@ -2921,7 +2921,7 @@ F:	mm/cleancache.c
- F:	include/linux/cleancache.h
- 
- CLK API
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-clk at vger.kernel.org
- S:	Maintained
- F:	include/linux/clk.h
-@@ -3354,9 +3354,9 @@ S:	Supported
- F:	drivers/net/ethernet/stmicro/stmmac/
- 
- CYBERPRO FB DRIVER
--M:	Russell King <linux@arm.linux.org.uk>
-+M:	Russell King <linux@armlinux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.arm.linux.org.uk/
-+W:	http://www.armlinux.org.uk/
- S:	Maintained
- F:	drivers/video/fbdev/cyber2000fb.*
- 
-@@ -3881,7 +3881,7 @@ F:	Documentation/devicetree/bindings/display/st,stih4xx.txt
- 
- DRM DRIVERS FOR VIVANTE GPU IP
- M:	Lucas Stach <l.stach@pengutronix.de>
--R:	Russell King <linux+etnaviv@arm.linux.org.uk>
-+R:	Russell King <linux+etnaviv@armlinux.org.uk>
- R:	Christian Gmeiner <christian.gmeiner@gmail.com>
- L:	dri-devel at lists.freedesktop.org
- S:	Maintained
-@@ -6905,7 +6905,7 @@ L:	linux-man at vger.kernel.org
- S:	Maintained
- 
- MARVELL ARMADA DRM SUPPORT
--M:	Russell King <rmk+kernel@arm.linux.org.uk>
-+M:	Russell King <rmk+kernel@armlinux.org.uk>
- S:	Maintained
- F:	drivers/gpu/drm/armada/
- 
-@@ -7905,7 +7905,7 @@ S:	Supported
- F:	drivers/nfc/nxp-nci
- 
- NXP TDA998X DRM DRIVER
--M:	Russell King <rmk+kernel@arm.linux.org.uk>
-+M:	Russell King <rmk+kernel@armlinux.org.uk>
- S:	Supported
- F:	drivers/gpu/drm/i2c/tda998x_drv.c
- F:	include/drm/i2c/tda998x.h
-
+ 	drm_modeset_lock_all(drm);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.8.1.dirty
