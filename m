@@ -1,101 +1,101 @@
 From: chris.brand@broadcom.com (Chris Brand)
-Date: Thu,  5 May 2016 13:48:51 -0700
-Subject: [PATCH 3/6] docs: Document BCM23550 bindings
+Date: Thu,  5 May 2016 13:48:52 -0700
+Subject: [PATCH 4/6] arm: Add support for Broadcom BCM23550 SoC
 In-Reply-To: <1462481334-8943-1-git-send-email-chris.brand@broadcom.com>
 References: <1462481334-8943-1-git-send-email-chris.brand@broadcom.com>
-Message-ID: <1462481334-8943-4-git-send-email-chris.brand@broadcom.com>
+Message-ID: <1462481334-8943-5-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding document for Broadcom BCM23550 SoC.
-
-BCM23550 has a Cluster Dormant Control IP block that holds cores
-in an idle state. Introduce a new CPU enable method in which the CDC is
-accessed to bring the core online.
+BCM23550 is a quad-A7 SoC used on the Broadcom "Sparrow" board.
+It shares many IP blocks with other Broadcom Kona chips.
 
 Signed-off-by: Chris Brand <chris.brand@broadcom.com>
 ---
- .../bindings/arm/bcm/brcm,bcm23550-cpu-method.txt  | 36 ++++++++++++++++++++++
- .../devicetree/bindings/arm/bcm/brcm,bcm23550.txt  | 15 +++++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
- 3 files changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
+ arch/arm/mach-bcm/Kconfig          | 12 ++++++++++--
+ arch/arm/mach-bcm/Makefile         |  5 ++++-
+ arch/arm/mach-bcm/board_bcm23550.c | 25 +++++++++++++++++++++++++
+ 3 files changed, 39 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-bcm/board_bcm23550.c
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 7ef121472cdd..cb1281f115a9 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -111,9 +111,17 @@ config ARCH_BCM_21664
+ 	  Enable support for the BCM21664 family, which includes
+ 	  BCM21663 and BCM21664 variants.
+ 
++config ARCH_BCM_23550
++	bool "Broadcom BCM23550 SoC"
++	depends on ARCH_MULTI_V7
++	select ARCH_BCM_MOBILE
++	select HAVE_SMP
++	help
++	  Enable support for the BCM23550.
++
+ config ARCH_BCM_MOBILE_L2_CACHE
+ 	bool "Broadcom mobile SoC level 2 cache support"
+-	depends on ARCH_BCM_MOBILE
++	depends on ARCH_BCM_281XX || ARCH_BCM_21664
+ 	default y
+ 	select CACHE_L2X0
+ 	select ARCH_BCM_MOBILE_SMC
+@@ -128,7 +136,7 @@ config ARCH_BCM_MOBILE_SMP
+ 	select HAVE_ARM_SCU
+ 	select ARM_ERRATA_764369
+ 	help
+-	  SMP support for the BCM281XX and BCM21664 SoC families.
++	  SMP support for the BCM281XX, BCM21664 and BCM23550 SoC families.
+ 	  Provided as an option so SMP support for SoCs of this type
+ 	  can be disabled for an SMP-enabled kernel.
+ 
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 7d665151c772..980f5850097c 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -26,7 +26,10 @@ obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
+ # BCM21664
+ obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
+ 
+-# BCM281XX and BCM21664 SMP support
++# BCM23550
++obj-$(CONFIG_ARCH_BCM_23550)	+= board_bcm23550.o
++
++# BCM281XX, BCM21664 and BCM23550 SMP support
+ obj-$(CONFIG_ARCH_BCM_MOBILE_SMP) += platsmp.o
+ 
+ # BCM281XX and BCM21664 L2 cache control
+diff --git a/arch/arm/mach-bcm/board_bcm23550.c b/arch/arm/mach-bcm/board_bcm23550.c
 new file mode 100644
-index 000000000000..b1b16872bbca
+index 000000000000..0ac01debd077
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
-@@ -0,0 +1,36 @@
-+Broadcom Kona Family CPU Enable Method
-+--------------------------------------
-+This binding defines the enable method used for starting secondary
-+CPUs in the following Broadcom SoCs:
-+  BCM23550
++++ b/arch/arm/mach-bcm/board_bcm23550.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+The enable method is specified by defining the following required
-+properties in the "cpu" device tree node:
-+  - enable-method = "brcm,bcm23550-cpu-method";
-+  - secondary-boot-reg = <...>;
++#include <linux/of_platform.h>
 +
-+The secondary-boot-reg property is a u32 value that specifies the
-+physical address of the register used to request the ROM holding pen
-+code release a secondary CPU.  The value written to the register is
-+formed by encoding the target CPU id into the low bits of the
-+physical start address it should jump to.
++#include <asm/mach/arch.h>
 +
-+Example:
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++static const char * const bcm23550_dt_compat[] = {
++	"brcm,bcm23550",
++	NULL,
++};
 +
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+			enable-method = "brcm,bcm23550-cpu-method";
-+			secondary-boot-reg = <0x3500417c>;
-+		};
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
-new file mode 100644
-index 000000000000..080baad923d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
-@@ -0,0 +1,15 @@
-+Broadcom BCM23550 device tree bindings
-+--------------------------------------
-+
-+This document describes the device tree bindings for boards with the BCM23550
-+SoC.
-+
-+Required root node property:
-+  - compatible: brcm,bcm23550
-+
-+Example:
-+	/ {
-+		model = "BCM23550 SoC";
-+		compatible = "brcm,bcm23550";
-+		[...]
-+	}
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index ccc62f145306..8d63711139bd 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -194,6 +194,7 @@ nodes to be present and contain the properties described below.
- 			    "allwinner,sun8i-a23"
- 			    "arm,psci"
- 			    "arm,realview-smp"
-+			    "brcm,bcm23550-cpu-method"
- 			    "brcm,bcm-nsp-smp"
- 			    "brcm,brahma-b15"
- 			    "marvell,armada-375-smp"
++DT_MACHINE_START(BCM23550_DT, "BCM23550 Broadcom Application Processor")
++	.dt_compat = bcm23550_dt_compat,
++MACHINE_END
 -- 
 1.9.1
