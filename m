@@ -1,172 +1,118 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 May 2016 14:29:40 +0100
-Subject: [PATCH 2/5] remoteproc: core: Add rproc OF look-up functions
+Date: Thu,  5 May 2016 14:29:39 +0100
+Subject: [PATCH 1/5] remoteproc: core: Task sync during rproc_fw_boot()
 In-Reply-To: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
 References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1462454983-13168-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1462454983-13168-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- of_rproc_byindex(): look-up and obtain a reference to a rproc
-  		      using the DT phandle "rprocs" and a index.
+By default, rproc_fw_boot() needs to wait for rproc to be configured,
+but a race may occur when using rpmsg/virtio.  In this case, it can
+be called locally in a safe manor.
 
-- of_rproc_byname():  lookup and obtain a reference to a rproc
-  		      using the DT phandle "rprocs" and "rproc-names".
+This patch represents two usecases:
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+ - External call (via exported rproc_boot()), which waits
+ - Internal call can use 'nowait' version of rproc_boot()
+
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_core.c | 96 +++++++++++++++++++++++++++++++++++-
- include/linux/remoteproc.h           |  3 ++
- 2 files changed, 98 insertions(+), 1 deletion(-)
+ drivers/remoteproc/remoteproc_core.c     | 29 +++++++++++++++++++++++++++--
+ drivers/remoteproc/remoteproc_internal.h |  1 +
+ drivers/remoteproc/remoteproc_virtio.c   |  2 +-
+ 3 files changed, 29 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 7db2818..85e5fd8 100644
+index ee44df5..7db2818 100644
 --- a/drivers/remoteproc/remoteproc_core.c
 +++ b/drivers/remoteproc/remoteproc_core.c
-@@ -41,12 +41,19 @@
- #include <linux/virtio_ids.h>
- #include <linux/virtio_ring.h>
- #include <asm/byteorder.h>
-+#include <linux/klist.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
- 
- #include "remoteproc_internal.h"
- 
- static DEFINE_MUTEX(rproc_list_mutex);
- static LIST_HEAD(rproc_list);
- 
-+static void klist_rproc_get(struct klist_node *n);
-+static void klist_rproc_put(struct klist_node *n);
-+static DEFINE_KLIST(rprocs, klist_rproc_get, klist_rproc_put);
-+
- typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
- 				struct resource_table *table, int len);
- typedef int (*rproc_handle_resource_t)(struct rproc *rproc,
-@@ -1196,6 +1203,87 @@ out:
+@@ -1033,8 +1033,9 @@ static void rproc_crash_handler_work(struct work_struct *work)
  }
- EXPORT_SYMBOL(rproc_shutdown);
  
-+/* will be called when an rproc is added to the rprocs klist */
-+static void klist_rproc_get(struct klist_node *n)
-+{
-+	struct rproc *rproc = container_of(n, struct rproc, klist);
-+
-+	get_device(&rproc->dev);
-+}
-+
-+/* will be called when an rproc is removed from the rprocs klist */
-+static void klist_rproc_put(struct klist_node *n)
-+{
-+	struct rproc *rproc = container_of(n, struct rproc, klist);
-+
-+	put_device(&rproc->dev);
-+}
-+
-+static struct rproc *next_rproc(struct klist_iter *i)
-+{
-+	struct klist_node *n;
-+
-+	n = klist_next(i);
-+	if (!n)
-+		return NULL;
-+
-+	return container_of(n, struct rproc, klist);
-+}
-+
-+/**
-+ * of_rproc_by_index() - lookup and obtain a reference to an rproc
-+ * @np: node to search for rproc
-+ * @index: index into the phandle list
-+ *
-+ * Returns the rproc driver on success and an appropriate error code otherwise.
-+ */
-+struct rproc *of_rproc_byindex(struct device_node *np, int index)
-+{
-+	struct rproc *rproc;
-+	struct device_node *rproc_node;
-+	struct platform_device *pdev;
-+	struct klist_iter i;
-+
-+	if (index < 0)
-+		return ERR_PTR(-EINVAL);
-+
-+	rproc_node = of_parse_phandle(np, "rprocs", index);
-+	if (!rproc_node)
-+		return ERR_PTR(-ENODEV);
-+
-+	pdev = of_find_device_by_node(rproc_node);
-+	if (!pdev)
-+		return ERR_PTR(-ENODEV);
-+
-+	klist_iter_init(&rprocs, &i);
-+	while ((rproc = next_rproc(&i)) != NULL)
-+		if (rproc->dev.parent == &pdev->dev)
-+			break;
-+	klist_iter_exit(&i);
-+
-+	return rproc;
-+}
-+EXPORT_SYMBOL(of_rproc_byindex);
-+
-+/**
-+ * of_rproc_byname() - lookup and obtain a reference to an rproc
-+ * @np: node to search for rproc
-+ * @name: name of the remoteproc from device's point of view
-+ *
-+ * Returns the rproc driver on success and an appropriate error code otherwise.
-+ */
-+struct rproc *of_rproc_byname(struct device_node *np, const char *name)
-+{
-+	int index;
-+
-+	if (unlikely(!name))
-+		return ERR_PTR(-EINVAL);
-+
-+	index = of_property_match_string(np, "rproc-names", name);
-+	return of_rproc_byindex(np, index);
-+}
-+EXPORT_SYMBOL(of_rproc_byname);
-+
  /**
-  * rproc_get_by_phandle() - find a remote processor by phandle
-  * @phandle: phandle to the rproc
-@@ -1282,7 +1370,13 @@ int rproc_add(struct rproc *rproc)
- 	/* create debugfs entries */
- 	rproc_create_debug_dir(rproc);
- 
--	return rproc_add_virtio_devices(rproc);
-+	ret = rproc_add_virtio_devices(rproc);
-+	if (ret < 0)
-+		klist_remove(&rproc->klist);
-+	else
-+		klist_add_tail(&rproc->klist, &rprocs);
-+
-+	return ret;
- }
- EXPORT_SYMBOL(rproc_add);
- 
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 9c4e138..4c96e78 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -410,6 +410,7 @@ enum rproc_crash_type {
+- * rproc_boot() - boot a remote processor
++ * __rproc_boot() - boot a remote processor
+  * @rproc: handle of a remote processor
++ * @wait: wait for rproc registration completion
+  *
+  * Boot a remote processor (i.e. load its firmware, power it on, ...).
+  *
+@@ -1043,7 +1044,7 @@ static void rproc_crash_handler_work(struct work_struct *work)
+  *
+  * Returns 0 on success, and an appropriate error value otherwise.
   */
- struct rproc {
- 	struct list_head node;
-+	struct klist_node klist;
- 	struct iommu_domain *domain;
- 	const char *name;
- 	const char *firmware;
-@@ -494,6 +495,8 @@ int rproc_del(struct rproc *rproc);
- int rproc_boot(struct rproc *rproc);
- void rproc_shutdown(struct rproc *rproc);
- void rproc_report_crash(struct rproc *rproc, enum rproc_crash_type type);
-+struct rproc *of_rproc_byindex(struct device_node *np, int index);
-+struct rproc *of_rproc_byname(struct device_node *np, const char *name);
- 
- static inline struct rproc_vdev *vdev_to_rvdev(struct virtio_device *vdev)
+-int rproc_boot(struct rproc *rproc)
++static int __rproc_boot(struct rproc *rproc, bool wait)
  {
+ 	const struct firmware *firmware_p;
+ 	struct device *dev;
+@@ -1091,6 +1092,10 @@ int rproc_boot(struct rproc *rproc)
+ 		goto downref_rproc;
+ 	}
+ 
++	/* if rproc virtio is not yet configured, wait */
++	if (wait)
++		wait_for_completion(&rproc->firmware_loading_complete);
++
+ 	ret = rproc_fw_boot(rproc, firmware_p);
+ 
+ 	release_firmware(firmware_p);
+@@ -1104,9 +1109,29 @@ unlock_mutex:
+ 	mutex_unlock(&rproc->lock);
+ 	return ret;
+ }
++
++/**
++ * rproc_boot() - boot a remote processor
++ * @rproc: handle of a remote processor
++ */
++int rproc_boot(struct rproc *rproc)
++{
++	return __rproc_boot(rproc, true);
++}
+ EXPORT_SYMBOL(rproc_boot);
+ 
+ /**
++ * rproc_boot_nowait() - boot a remote processor
++ * @rproc: handle of a remote processor
++ *
++ * Same as rproc_boot() but don't wait for rproc registration completion
++ */
++int rproc_boot_nowait(struct rproc *rproc)
++{
++	return __rproc_boot(rproc, false);
++}
++
++/**
+  * rproc_shutdown() - power off the remote processor
+  * @rproc: the remote processor
+  *
+diff --git a/drivers/remoteproc/remoteproc_internal.h b/drivers/remoteproc/remoteproc_internal.h
+index 8041b95..57e1de5 100644
+--- a/drivers/remoteproc/remoteproc_internal.h
++++ b/drivers/remoteproc/remoteproc_internal.h
+@@ -48,6 +48,7 @@ struct rproc_fw_ops {
+ /* from remoteproc_core.c */
+ void rproc_release(struct kref *kref);
+ irqreturn_t rproc_vq_interrupt(struct rproc *rproc, int vq_id);
++int rproc_boot_nowait(struct rproc *rproc);
+ 
+ /* from remoteproc_virtio.c */
+ int rproc_add_virtio_dev(struct rproc_vdev *rvdev, int id);
+diff --git a/drivers/remoteproc/remoteproc_virtio.c b/drivers/remoteproc/remoteproc_virtio.c
+index ff30684..106d9e4 100644
+--- a/drivers/remoteproc/remoteproc_virtio.c
++++ b/drivers/remoteproc/remoteproc_virtio.c
+@@ -175,7 +175,7 @@ static int rproc_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
+ 	}
+ 
+ 	/* now that the vqs are all set, boot the remote processor */
+-	ret = rproc_boot(rproc);
++	ret = rproc_boot_nowait(rproc);
+ 	if (ret) {
+ 		dev_err(&rproc->dev, "rproc_boot() failed %d\n", ret);
+ 		goto error;
 -- 
 2.8.0
