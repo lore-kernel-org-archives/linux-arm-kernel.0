@@ -1,41 +1,63 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu,  5 May 2016 22:26:09 +0200
-Subject: [PATCH 2/4] ARM: mxs: dts: Add AUART2 pinmux
-In-Reply-To: <1462479971-7891-1-git-send-email-marex@denx.de>
-References: <1462479971-7891-1-git-send-email-marex@denx.de>
-Message-ID: <1462479971-7891-2-git-send-email-marex@denx.de>
+Date: Thu,  5 May 2016 22:26:08 +0200
+Subject: [PATCH 1/4] ARM: mxs: dts: Add SSP2 SD mux
+Message-ID: <1462479971-7891-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 2-pin pinmux settings for AUART2.
+Add pinmux configuration for SSP2 port in SD mode, both for
+the 4-bit and 8-bit case.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
 ---
- arch/arm/boot/dts/imx23.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/imx23.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index c70ebef..0c9a357e 100644
+index 302d116..c70ebef 100644
 --- a/arch/arm/boot/dts/imx23.dtsi
 +++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -171,6 +171,17 @@
+@@ -249,6 +249,40 @@
  					fsl,pull-up = <MXS_PULL_DISABLE>;
  				};
  
-+				auart1_2pins_a: auart1-2pins at 0 {
++				mmc1_4bit_pins_a: mmc1-4bit at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						MX23_PAD_GPMI_D14__AUART2_RX
-+						MX23_PAD_GPMI_D15__AUART2_TX
++						MX23_PAD_GPMI_D00__SSP2_DATA0
++						MX23_PAD_GPMI_D01__SSP2_DATA1
++						MX23_PAD_GPMI_D02__SSP2_DATA2
++						MX23_PAD_GPMI_D03__SSP2_DATA3
++						MX23_PAD_GPMI_RDY1__SSP2_CMD
++						MX23_PAD_GPMI_WRN__SSP2_SCK
 +					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,drive-strength = <MXS_DRIVE_8mA>;
 +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
++					fsl,pull-up = <MXS_PULL_ENABLE>;
 +				};
 +
- 				gpmi_pins_a: gpmi-nand at 0 {
++				mmc1_8bit_pins_a: mmc1-8bit at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX23_PAD_GPMI_D00__SSP2_DATA0
++						MX23_PAD_GPMI_D01__SSP2_DATA1
++						MX23_PAD_GPMI_D02__SSP2_DATA2
++						MX23_PAD_GPMI_D03__SSP2_DATA3
++						MX23_PAD_GPMI_D04__SSP2_DATA4
++						MX23_PAD_GPMI_D05__SSP2_DATA5
++						MX23_PAD_GPMI_D06__SSP2_DATA6
++						MX23_PAD_GPMI_D07__SSP2_DATA7
++						MX23_PAD_GPMI_RDY1__SSP2_CMD
++						MX23_PAD_GPMI_WRN__SSP2_SCK
++					>;
++					fsl,drive-strength = <MXS_DRIVE_8mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_ENABLE>;
++				};
++
+ 				pwm2_pins_a: pwm2 at 0 {
  					reg = <0>;
  					fsl,pinmux-ids = <
 -- 
