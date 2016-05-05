@@ -1,30 +1,41 @@
-From: thomas.hanson@linaro.org (Tom Hanson)
-Date: Thu, 5 May 2016 10:34:48 -0600
-Subject: [PATCH v2 14/54] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
-In-Reply-To: <572B2D88.3050504@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-15-git-send-email-andre.przywara@arm.com>
- <57293844.1060802@linaro.org> <572B2D88.3050504@arm.com>
-Message-ID: <572B7628.4020608@linaro.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 5 May 2016 09:37:48 -0700
+Subject: [PATCH] clk: rockchip: fix the rk3399 sdmmc sample / drv name
+In-Reply-To: <1462404985-27957-1-git-send-email-dianders@chromium.org>
+References: <1462404985-27957-1-git-send-email-dianders@chromium.org>
+Message-ID: <20160505163748.GA97052@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2016 05:24 AM, Andre Przywara wrote:
-> Hi Tom,
->
-> thanks for looking at the patches!
->
+On Wed, May 04, 2016 at 04:36:25PM -0700, Douglas Anderson wrote:
+> The rk3399 clock table had a simple typo in it, calling the SDMMC sample
+> and drive clocks by the wrong name.  Fix this minor typo.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-You're quite welcome.  It's a great way to spin-up.
+LGTM.
 
-> The idea isn't too bad indeed.
-> I see that we could use that in vgic_queue_irq_unlock() and
-> vgic_mmio_write_sactive().
-> But as Marc mentioned in a conversation yesterday we will have a mixture
-> of wrapped locks and open coded lock sequences. See for instance
-> vgic_prune_ap_list(), where we have the sequence, but we can't use
-> vgic_lock_aplist_irq() because the IRQ lock is taken inside the loop
-> while the ap_list_lock is taken once outside of it.
+Tested-by: Brian Norris <briannorris@chromium.org>
+Acked-by: Brian Norris <briannorris@chromium.org>
 
-Agreed.  I looked at a few places where it wouldn't work. Definitely not a blanket solution but every little bit helps, especially if it helps avoid a bug such as a deadlock that may take hours to track down.  Been there, done that. :-)
+> ---
+>  drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> index 5248726af86d..291543f52caa 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -894,8 +894,8 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>  			RK3399_CLKSEL_CON(16), 8, 3, MFLAGS, 0, 7, DFLAGS,
+>  			RK3399_CLKGATE_CON(6), 1, GFLAGS),
+>  
+> -	MMC(SCLK_SDMMC_DRV,     "emmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
+> -	MMC(SCLK_SDMMC_SAMPLE,  "emmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
+> +	MMC(SCLK_SDMMC_DRV,     "sdmmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
+> +	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
+>  
+>  	MMC(SCLK_SDIO_DRV,      "sdio_drv",    "clk_sdio",  RK3399_SDIO_CON0,  1),
+>  	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  1),
+> -- 
+> 2.8.0.rc3.226.g39d4020
