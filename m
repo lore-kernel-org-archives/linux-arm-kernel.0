@@ -1,136 +1,98 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 May 2016 14:34:20 +0200
-Subject: [RFC v2 07/13] power: pwrseq: simple: Add support for toggling
- regulator
-In-Reply-To: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1462451666-17945-8-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 05 May 2016 14:34:13 +0200
+Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
+Message-ID: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices need real hard-reset by cutting the power.  During power
-sequence turn off and on the regulator, if it is provided.
+Hi,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
+This is a different, second try to fix usb3503+lan on Odroid U3 board
+if it was initialized by bootloader (e.g. for TFTP boot).
+
+First version:
+http://www.spinics.net/lists/linux-usb/msg140042.html
+
+
+Problem
+=======
+When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+is required, e.g. by suspend to RAM. The actual TFTP boot does
+not have to happen. Just "usb start" from U-Boot is sufficient.
+
+>From the schematics, the regulator is a supply only to LAN, however
+without toggling it off/on, the usb3503 hub won appear neither.
+
+
+Solution
+========
+This is very similar to the MMC pwrseq behavior so the idea is to:
+1. Move MMC pwrseq drivers to generic place,
+2. Extend the pwrseq-simple with regulator toggling,
+3. Add support to USB hub and port core for pwrseq,
+4. Toggle the regulator when needed.
+
+
+Issues
+======
+I am not familiar with USB subsystem, so please kindly guide me
+where USB related code should be placed.
+
+In the code there are still some issues to solve (FIXME/TODO notes).
+If the approach is okay, I will improve the patchset. However at this
+point - IT WORKS, which is nice. :)
+
+
+Best regards,
+Krzysztof
+
+Krzysztof Kozlowski (13):
+  usb: misc: usb3503: Clean up on driver unbind
+  power/mmc: Move pwrseq drivers to power/pwrseq
+  MAINTAINERS: Retain Ulf Hansson as the same maintainer of pwrseq
+  power: pwrseq: Enable COMPILE_TEST for drivers
+  power: pwrseq: Remove mmc prefix from mmc_pwrseq
+  power: pwrseq: Generalize mmc_pwrseq operations by removing mmc prefix
+  power: pwrseq: simple: Add support for toggling regulator
+  usb: hub: Handle deferred probe
+  power: pwrseq: Add support for USB hubs with external power
+  usb: hub: Power sequence the ports on activation
+  usb: port: Parse pwrseq phandle from Device Tree
+  ARM: dts: exynos: Switch the buck8 to GPIO mode on Odroid U3
+  ARM: dts: exynos: Fix LAN and HUB after bootloader initialization on
+    Odroid U3
+
  .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt  |  2 +
- drivers/power/pwrseq/pwrseq_simple.c               | 50 ++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
+ MAINTAINERS                                        |  8 +++
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  2 +-
+ arch/arm/boot/dts/exynos4412-odroidu3.dts          |  7 ++
+ drivers/mmc/Kconfig                                |  2 -
+ drivers/mmc/core/Makefile                          |  3 -
+ drivers/mmc/core/core.c                            |  8 +--
+ drivers/mmc/core/host.c                            |  2 +-
+ drivers/mmc/core/pwrseq.h                          | 52 --------------
+ drivers/power/Kconfig                              |  1 +
+ drivers/power/Makefile                             |  1 +
+ drivers/{mmc/core => power/pwrseq}/Kconfig         | 21 ++++--
+ drivers/power/pwrseq/Makefile                      |  3 +
+ drivers/{mmc/core => power/pwrseq}/pwrseq.c        | 80 +++++++++++++++++-----
+ drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c   | 15 ++--
+ drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c | 73 ++++++++++++++++----
+ drivers/usb/core/hub.c                             | 17 ++++-
+ drivers/usb/core/hub.h                             |  3 +
+ drivers/usb/core/port.c                            | 15 ++++
+ drivers/usb/misc/usb3503.c                         | 28 ++++++++
+ include/linux/mmc/host.h                           |  4 +-
+ include/linux/pwrseq.h                             | 60 ++++++++++++++++
+ 22 files changed, 294 insertions(+), 113 deletions(-)
+ delete mode 100644 drivers/mmc/core/pwrseq.h
+ rename drivers/{mmc/core => power/pwrseq}/Kconfig (65%)
+ create mode 100644 drivers/power/pwrseq/Makefile
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq.c (50%)
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c (89%)
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c (64%)
+ create mode 100644 include/linux/pwrseq.h
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-index ce0e76749671..176ff831e7f1 100644
---- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-@@ -16,6 +16,7 @@ Optional properties:
-   See ../clocks/clock-bindings.txt for details.
- - clock-names : Must include the following entry:
-   "ext_clock" (External clock provided to the card).
-+- ext-supply : External regulator supply
- 
- Example:
- 
-@@ -24,4 +25,5 @@ Example:
- 		reset-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
- 		clocks = <&clk_32768_ck>;
- 		clock-names = "ext_clock";
-+		ext-supply = <&buck8>;
- 	}
-diff --git a/drivers/power/pwrseq/pwrseq_simple.c b/drivers/power/pwrseq/pwrseq_simple.c
-index ab0098412690..4d5ea53d3ead 100644
---- a/drivers/power/pwrseq/pwrseq_simple.c
-+++ b/drivers/power/pwrseq/pwrseq_simple.c
-@@ -16,7 +16,9 @@
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/pwrseq.h>
-+#include <linux/delay.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -25,6 +27,7 @@ struct mmc_pwrseq_simple {
- 	bool clk_enabled;
- 	struct clk *ext_clk;
- 	struct gpio_descs *reset_gpios;
-+	struct regulator *ext_reg;
- };
- 
- #define to_pwrseq_simple(p) container_of(p, struct mmc_pwrseq_simple, pwrseq)
-@@ -62,6 +65,13 @@ static void mmc_pwrseq_simple_post_power_on(struct pwrseq *_pwrseq)
- {
- 	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
- 
-+	if (pwrseq->ext_reg) {
-+		int err;
-+
-+		err = regulator_enable(pwrseq->ext_reg);
-+		WARN_ON_ONCE(err);
-+	}
-+
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
- }
- 
-@@ -75,6 +85,13 @@ static void mmc_pwrseq_simple_power_off(struct pwrseq *_pwrseq)
- 		clk_disable_unprepare(pwrseq->ext_clk);
- 		pwrseq->clk_enabled = false;
- 	}
-+
-+	if (pwrseq->ext_reg) {
-+		int err;
-+
-+		err = regulator_disable(pwrseq->ext_reg);
-+		WARN_ON_ONCE(err);
-+	}
- }
- 
- static const struct pwrseq_ops mmc_pwrseq_simple_ops = {
-@@ -102,6 +119,32 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
- 	if (IS_ERR(pwrseq->ext_clk) && PTR_ERR(pwrseq->ext_clk) != -ENOENT)
- 		return PTR_ERR(pwrseq->ext_clk);
- 
-+	/* FIXME: regulator_get_exclusive? */
-+	pwrseq->ext_reg = devm_regulator_get_optional(dev, "ext");
-+	if (IS_ERR(pwrseq->ext_reg)) {
-+		if (PTR_ERR(pwrseq->ext_reg) == -ENODEV)
-+			pwrseq->ext_reg = NULL;
-+		else
-+			return PTR_ERR(pwrseq->ext_reg);
-+	} else {
-+		int err;
-+		/*
-+		 * Be sure that regulator is off, before the driver will start
-+		 * power sequence. It is likely that regulator is on by default
-+		 * and it without toggling it here, it would be disabled much
-+		 * later by the core.
-+		 */
-+
-+		err = regulator_enable(pwrseq->ext_reg);
-+		WARN_ON_ONCE(err);
-+
-+		/* FIXME: handle this in a more sensible way */
-+		mdelay(10);
-+
-+		err = regulator_disable(pwrseq->ext_reg);
-+		WARN_ON_ONCE(err);
-+	}
-+
- 	pwrseq->reset_gpios = devm_gpiod_get_array(dev, "reset",
- 							GPIOD_OUT_HIGH);
- 	if (IS_ERR(pwrseq->reset_gpios) &&
-@@ -124,6 +167,13 @@ static int mmc_pwrseq_simple_remove(struct platform_device *pdev)
- 
- 	pwrseq_unregister(&pwrseq->pwrseq);
- 
-+	if (pwrseq->ext_reg) {
-+		int err;
-+
-+		err = regulator_disable(pwrseq->ext_reg);
-+		WARN_ON_ONCE(err);
-+	}
-+
- 	return 0;
- }
- 
 -- 
 1.9.1
