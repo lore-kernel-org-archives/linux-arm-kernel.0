@@ -1,50 +1,103 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  5 May 2016 17:13:38 +0100
-Subject: [PATCH 2/2] drm: hdlcd: Suspend/resume only active crtcs
-In-Reply-To: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
-References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
-Message-ID: <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 5 May 2016 09:14:07 -0700
+Subject: [PATCH v2] irqchip/gic-v2m: Add workaround for Broadcom NS2
+ GICv2m erratum
+In-Reply-To: <572AF86A.1090000@arm.com>
+References: <1462405635-27864-1-git-send-email-ray.jui@broadcom.com>
+ <1462405635-27864-2-git-send-email-ray.jui@broadcom.com>
+ <572AF86A.1090000@arm.com>
+Message-ID: <7724bb0f-9b0e-ea4c-ea87-c462adac1fe9@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current PM ops simply unconditionally enable/disable the HDLCD,
-which proves problematic when there is no display plugged in - since
-without a crtc the hardware itself is still in an uninitialised state,
-coming out of suspend results in it being enabled without a valid
-framebuffer address, which typically results in it trying to scan out
-from bus address 0 and flooding the system with error interrupts.
 
-Fix this by checking the crtc state on resume, and only enabling the
-hardware if it's actually supposed to be. For the sake of consistency,
-do the same on the suspend path as well, although there it's merely a
-case of skipping unnecessary work.
 
-CC: Liviu Dudau <liviu.dudau@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/gpu/drm/arm/hdlcd_crtc.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+On 5/5/2016 12:38 AM, Marc Zyngier wrote:
+> On 05/05/16 00:47, Ray Jui wrote:
+>> Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
+>> implementation has an erratum where the MSI data needs to be the SPI
+>> number subtracted by an offset of 32, for the correct MSI interrupt
+>> to be triggered.
+>>
+>> Here we are adding the workaround based on readings from the MSI_IIDR
+>> register, which contains a value unique to Broadcom NS2 GICv2m
+>>
+>> Reported-by: Alex Barba <alex.barba@broadcom.com>
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v2m.c | 17 +++++++++++++++--
+>>  1 file changed, 15 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+>> index 28f047c..4c89e27 100644
+>> --- a/drivers/irqchip/irq-gic-v2m.c
+>> +++ b/drivers/irqchip/irq-gic-v2m.c
+>> @@ -49,6 +49,9 @@
+>>  /* APM X-Gene with GICv2m MSI_IIDR register value */
+>>  #define XGENE_GICV2M_MSI_IIDR		0x06000170
+>>
+>> +/* Broadcom NS2 GICv2m MSI_IIDR register value */
+>> +#define BCM_NS2_GICV2M_MSI_IIDR		0x0000013f
+>> +
+>>  /* List of flags for specific v2m implementation */
+>>  #define GICV2M_NEEDS_SPI_OFFSET		0x00000001
+>>
+>> @@ -62,6 +65,7 @@ struct v2m_data {
+>>  	void __iomem *base;	/* GICv2m virt address */
+>>  	u32 spi_start;		/* The SPI number that MSIs start */
+>>  	u32 nr_spis;		/* The number of SPIs for MSIs */
+>> +	u32 spi_offset;		/* offset to be subtracted from SPI number */
+>>  	unsigned long *bm;	/* MSI vector bitmap */
+>>  	u32 flags;		/* v2m flags for specific implementation */
+>>  };
+>> @@ -102,7 +106,7 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>>  	msg->data = data->hwirq;
+>>
+>>  	if (v2m->flags & GICV2M_NEEDS_SPI_OFFSET)
+>> -		msg->data -= v2m->spi_start;
+>> +		msg->data -= v2m->spi_offset;
+>>  }
+>>
+>>  static struct irq_chip gicv2m_irq_chip = {
+>> @@ -340,9 +344,18 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+>>  	 * different from the standard GICv2m implementation where
+>>  	 * the MSI data is the absolute value within the range from
+>>  	 * spi_start to (spi_start + num_spis).
+>> +	 *
+>> +	 * Broadom NS2 GICv2m implementation has an erratum where the MSI data
+>> +	 * is 'spi_number - 32'
+>>  	 */
+>> -	if (readl_relaxed(v2m->base + V2M_MSI_IIDR) == XGENE_GICV2M_MSI_IIDR)
+>> +	if (readl_relaxed(v2m->base + V2M_MSI_IIDR) == XGENE_GICV2M_MSI_IIDR) {
+>> +		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
+>> +		v2m->spi_offset = v2m->spi_start;
+>> +	} else if (readl_relaxed(v2m->base + V2M_MSI_IIDR) ==
+>> +		   BCM_NS2_GICV2M_MSI_IIDR) {
+>>  		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
+>> +		v2m->spi_offset = 32;
+>> +	}
+>
+> Can we make this a bit less ugly?
+>
+> 	switch (readl_relaxed(v2m->base + V2M_MSI_IIDR)) {
+> 	case XGENE_GICV2M_MSI_IIDR:
+> 		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
+> 		v2m->spi_offset = v2m->spi_start;
+> 		break;
+> 	case BCM_NS2_GICV2M_MSI_IIDR:
+> 		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
+> 		v2m->spi_offset = 32;
+> 		break;
+> 	}
 
-diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-index fef1b04c2aab..bf6ff5e48adc 100644
---- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-+++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-@@ -296,12 +296,14 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
- 
- void hdlcd_crtc_suspend(struct drm_crtc *crtc)
- {
--	hdlcd_crtc_disable(crtc);
-+	if (crtc->state->active)
-+		hdlcd_crtc_disable(crtc);
- }
- 
- void hdlcd_crtc_resume(struct drm_crtc *crtc)
- {
--	hdlcd_crtc_enable(crtc);
-+	if (crtc->state->active)
-+		hdlcd_crtc_enable(crtc);
- }
- 
- int hdlcd_setup_crtc(struct drm_device *drm)
--- 
-2.8.1.dirty
+Okay will do that!
+
+>
+> Thanks,
+>
+> 	M.
+>
+
+Thanks,
+
+Ray
