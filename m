@@ -1,67 +1,33 @@
-From: thomas.hanson@linaro.org (Tom Hanson)
-Date: Thu, 5 May 2016 10:23:32 -0600
-Subject: [PATCH v2 16/54] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
- framework
-In-Reply-To: <1461861973-26464-17-git-send-email-andre.przywara@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-17-git-send-email-andre.przywara@arm.com>
-Message-ID: <572B7384.2050405@linaro.org>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu,  5 May 2016 09:32:00 -0700
+Subject: [PATCH v3] Workaround for Broadcom NS2 gicv2m implementation
+Message-ID: <1462465921-3220-1-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2016 10:45 AM, Andre Przywara wrote:
+Alex Barba <alex.barba@broadcom.com> discovered Broadcom NS2 GICv2m
+implementation has an erratum where the MSI data needs to be the SPI number
+subtracted by an offset of 32, for the correct MSI interrupt to be triggered.
 
-...
+We are now implementating the workaround based on readings from the MSI_IIDR
+register.
 
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 4fb20fd..a656a12e5 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
+Patch series is developed based on Linux v4.6-rc1 and available at:
+https://github.com/Broadcom/arm64-linux/tree/gicv2m-iproc-v3
 
-...
-> +static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
-> +{
+Changes from v2:
+ - Improved the logic of dealing with MSI_IIDR readings by using a switch
+statement suggested by Marc Zyngier
 
-...
+Changes from v1:
+ - Changed from DT based approach to the approch similar to APM that is based
+on readings from the MSI_IIDR register
 
-> +		/* This interrupt looks like it has to be migrated. */
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vgic_cpu->ap_list_lock);
+Ray Jui (1):
+  irqchip/gic-v2m: Add workaround for Broadcom NS2 GICv2m erratum
 
-If using the suggested (but not provided) higher level function from patch 14 this could be:
-                 vgic_unlock_aplist_irq(, spinlock_t irq);
-> +
-> +		/*
-> +		 * Ensure locking order by always locking the smallest
-> +		 * ID first.
-> +		 */
-> +		if (vcpu->vcpu_id < target_vcpu->vcpu_id) {
-> +			vcpuA = vcpu;
-> +			vcpuB = target_vcpu;
-> +		} else {
-> +			vcpuA = target_vcpu;
-> +			vcpuB = vcpu;
-> +		}
-> +
-> +		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-> +		spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+ drivers/irqchip/irq-gic-v2m.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-And this whole block could be replaced by:
-                 vgic_lock_cpu_aplist_pair(vcpuA, vcpuB)
-
-> +             spin_lock(&irq->irq_lock);
-
-...
-
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
-> +		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-And this could be:
-                 vgic_unlock_cpu_aplist_pair(vcpuA, vcpuB)
-
-> +		goto retry;
-> +	}
-> +
-> +	spin_unlock(&vgic_cpu->ap_list_lock);
-> +}
+-- 
+2.1.4
