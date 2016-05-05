@@ -1,44 +1,37 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 5 May 2016 11:22:37 +0300
-Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <57289C75.50904@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1554541.oDP7Ro5zB2@wuerfel>
- <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
- <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
- <57289C75.50904@huawei.com>
-Message-ID: <20160505082237.GA32190@yury-N73SV>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 May 2016 10:31:36 +0200
+Subject: [v10,
+ 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+In-Reply-To: <1462417950-46796-8-git-send-email-yangbo.lu@nxp.com>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <1462417950-46796-8-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <4448030.Zs8fVnr3nm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 08:41:25PM +0800, Zhangjian (Bamvor) wrote:
-[...]
-
-> After apply this patch with my small testcase, the vsyscall of gettimeofday in
-> ilp32 works in both big endian and small endian. In this patch, I use the
-> different register and offset for ilp32 and lp64. Actually, the
-> COMPAT_TVAL_TV_SEC is same as TVAL_TV_SEC(so as to COMPAT_TSPEC_TV_SEC and
-> TSPEC_TV_SEC). I add it to keep the logic clear. I also change the version
-> of vdso to 4.6. It should change to 2.6.39 if glibc is not update.
+On Thursday 05 May 2016 11:12:30 Yangbo Lu wrote:
 > 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 574081f..c8e32eb 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -101,6 +101,11 @@ int main(void)
->    DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
->    DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
->    BLANK();
-> +  DEFINE(COMPAT_TVAL_TV_SEC,	offsetof(struct compat_timeval, tv_sec));
-> +  DEFINE(COMPAT_TVAL_TV_USEC,	offsetof(struct compat_timeval, tv_usec));
-> +  DEFINE(COMPAT_TSPEC_TV_SEC,	offsetof(struct compat_timespec, tv_sec));
-> +  DEFINE(COMPAT_TSPEC_TV_NSEC,	offsetof(struct compat_timespec, tv_nsec));
-> +  BLANK();
+> +       fsl_guts_init();
+> +       svr = fsl_guts_get_svr();
+> +       if (svr) {
+> +               esdhc->soc_ver = SVR_SOC_VER(svr);
+> +               esdhc->soc_rev = SVR_REV(svr);
+> +       } else {
+> +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
+> +       }
+> +
+> 
 
-Hi Bamvor,
 
-We just found this lines break build if ILP32 is disabled. I think we
-need to wrap them with #ifdef CONFIG_ARM64_ILP32
+Sorry for jumping in again after not participating in the discussion for the
+past few versions.
 
-Yury
+What happened to my suggestion of making this a platform-independent interface
+to avoid the link time dependency?
+
+Specifically, why not add an exported function to drivers/base/soc.c that
+uses glob_match() for comparing a string in the device driver to the ID
+of the SoC that is set by whatever SoC identifying driver the platform
+has?
+
+	Arnd
