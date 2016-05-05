@@ -1,53 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 May 2016 15:03:44 -0700
-Subject: NFSroot hangs with bad unlock balance in Linux next
-Message-ID: <20160505220344.GE5995@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 May 2016 17:12:12 -0500
+Subject: [PATCH v7 7/9] dt-bindings: i2c: rk3x: add support for rk3399
+In-Reply-To: <1462372523-6444-1-git-send-email-david.wu@rock-chips.com>
+References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+ <1462372523-6444-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20160505221212.GA26820@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 04, 2016 at 10:35:23PM +0800, David Wu wrote:
+> The bus clock and function clock are separated at rk3399,
+> and others use one clock as the bus clock and function clock.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> index 0b4a85f..82b6f6b 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> @@ -6,10 +6,20 @@ RK3xxx SoCs.
+>  Required properties :
+>  
+>   - reg : Offset and length of the register set for the device
+> - - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
+> -		"rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
+> + - compatible: should be one of the followings
 
-Looks like Linux next with NFSroot hangs for me at some point booting
-into init. Then after a while it produces "BUG: bad unlock balance
-detected!".
+s/followings/following:/
 
-This happens at least with omap5-uevm and igepv5. Not sure yet if it
-also happens on other boards, the ones I'm seeing it happen both have
-USB Ethernet controller. They usually hang after the system starts
-being idle some tens of seconds into booting.
+> +   - "rockchip,rk3066-i2c": for rk3066
+> +   - "rockchip,rk3188-i2c": for rk3188
+> +   - "rockchip,rk3228-i2c": for rk3228
+> +   - "rockchip,rk3288-i2c": for rk3288
+> +   - "rockchip,rk3399-i2c": for rk3399
+>   - interrupts : interrupt number
+> - - clocks : parent clock
+> + - clocks: See ../clock/clock-bindings.txt
+> +   - For older hardware (rk3066, rk3188, rk3228, rk3288):
+> +     - There is one clock that's used both to derive the functional clock
+> +       for the device and as the bus clock.  REQUIRED.
 
-I tried to bisect it down with no luck. I do have the following
-trace, does that provide any clues?
+This is the required section, so REQUIRED is redundant.
 
-Regards,
+> +   - For newer hardware (rk3399): specify by name
+> +     - "i2c": REQUIRED. This is used to derive the functional clock.
+> +     - "pclk": REQUIRED. This is the bus clock.equired on RK3066, RK3188 :
 
-Tony
+This doesn't make sense. The first line says this applies to rk3399, but 
+then here it is talking about other parts.
 
-8< --------------------------
-[ BUG: bad unlock balance detected! ]
-4.6.0-rc6-next-20160505+ #1252 Not tainted
--------------------------------------
-kworker/0:2/112 is trying to release lock (&nfsi->rmdir_sem) at:
-[<c03a7f98>] nfs_async_unlink_release+0x20/0x68
-but there are no more locks to release!
+And there's a typo.
 
-other info that might help us debug this:
-2 locks held by kworker/0:2/112:
- #0:  ("nfsiod"){.+.+..}, at: [<c0154774>] process_one_work+0x120/0x6bc
-  #1:  ((&task->u.tk_work)#2){+.+...}, at: [<c0154774>] process_one_work+0x120/0x6bc
-
-stack backtrace:
-CPU: 0 PID: 112 Comm: kworker/0:2 Not tainted 4.6.0-rc6-next-20160505+ #1252
-Hardware name: Generic OMAP5 (Flattened Device Tree)
-Workqueue: nfsiod rpc_async_release
-[<c0110328>] (unwind_backtrace) from [<c010c3cc>] (show_stack+0x10/0x14)
-[<c010c3cc>] (show_stack) from [<c0481348>] (dump_stack+0xb0/0xe4)
-[<c0481348>] (dump_stack) from [<c018d638>] (print_unlock_imbalance_bug+0xb0/0xe0)
-[<c018d638>] (print_unlock_imbalance_bug) from [<c0191444>] (lock_release+0x2ec/0x4c4)
-[<c0191444>] (lock_release) from [<c018abf0>] (up_read+0x18/0x58)
-[<c018abf0>] (up_read) from [<c03a7f98>] (nfs_async_unlink_release+0x20/0x68)
-[<c03a7f98>] (nfs_async_unlink_release) from [<c0785320>] (rpc_free_task+0x24/0x44)
-[<c0785320>] (rpc_free_task) from [<c015483c>] (process_one_work+0x1e8/0x6bc)
-[<c015483c>] (process_one_work) from [<c0154e54>] (worker_thread+0x144/0x4e8)
-[<c0154e54>] (worker_thread) from [<c015ad0c>] (kthread+0xdc/0xf8)
-[<c015ad0c>] (kthread) from [<c01078f0>] (ret_from_fork+0x14/0x24)
+>  
+>  Required on RK3066, RK3188 :
+>  
+> -- 
+> 1.9.1
+> 
+> 
