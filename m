@@ -1,50 +1,41 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 May 2016 16:02:16 -0700
-Subject: [PATCH v7 9/9] i2c: rk3x: support fast-mode plus for rk3399
-In-Reply-To: <1462372668-6583-1-git-send-email-david.wu@rock-chips.com>
-References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
- <1462372668-6583-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAD=FV=UtHPDtB7LTbUpwcjOcoYwNma59-TRDU3hrt6c_2TWxxA@mail.gmail.com>
+From: xow@google.com (Xo Wang)
+Date: Thu, 5 May 2016 23:11:53 +0000 (UTC)
+Subject: [PATCH v2 09/11] arm/dst: Add Aspeed ast2500 device tree
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-10-git-send-email-joel@jms.id.au>
+Message-ID: <loom.20160506T005831-472@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+Joel Stanley <joel <at> jms.id.au> writes:
+> +/ {
+> +	model = "AST2500 EVB";
+> +	compatible = "aspeed,ast2500";
+> +
+> +	chosen {
+> +		stdout-path = &uart5;
+> +		bootargs = "console=ttyS4,115200";
+> +	};
+> +
+> +	memory {
+> +		reg = < 0x80000000 0x10000000 >;
 
-On Wed, May 4, 2016 at 7:37 AM, David Wu <david.wu@rock-chips.com> wrote:
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
->  drivers/i2c/busses/i2c-rk3x.c | 21 +++++++++++++++++----
->  1 file changed, 17 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index 47368c4..c66cc39 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -124,6 +124,17 @@ static const struct i2c_spec_values fast_mode_spec = {
->         .min_hold_buffer_ns = 1300,
->  };
->
-> +static const struct i2c_spec_values fast_mode_plus_spec = {
-> +       .min_hold_start_ns = 260,
-> +       .min_low_ns = 500,
-> +       .min_high_ns = 260,
-> +       .min_setup_start_ns = 260,
-> +       .max_data_hold_ns = 400,
+The AST2500 EVB has an SK Hynix H5AN4G6NMFR 4Gb part, so this should be 
+0x20000000 for size.
 
-I'm curious where you got the data_hold_ns.  I can't quite remember
-what this parameter does / how the timing function works anymore, but
-the doc I have (search for UM10204 and click the first link) shows
-values for Standard-mode and Fast-mode but not Fast-mode Plus.  It
-seems to imply that this is a bit of a bogus number anyway because it
-only matters if we don't stretch the tLOW to go along with the longer
-data hold.
+> +			uart1: serial <at> 1e783000 {
+> +				compatible = "ns16550a";
+> +				reg = <0x1e783000 0x1000>;
+> +				reg-shift = <2>;
+> +				interrupts = <9>;
+> +				clock-frequency = <1843200>;
 
-As I have said in the previous patch, how all this stuff works has
-totally left my brain, so if you understand it that's probably good
-enough.  If you feel like I should try to re-understand this again so
-I can review it more deeply, let me know.
+The AST2500 datasheet 39.3.1 states the input clock to their 16550 IP is 
+24 MHz. Their u-boot code also has #define CONFIG_SYS_NS16550_CLK 
+24000000. I suspect we hit a path in the serial/8250 driver that doesn't 
+change the divisor from what u-boot set, which is why this has worked.
 
+Thanks for the porting work!
 
-Since I assume that you had some sane reason to include max_data_hold_ns:
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+cheers
+//xo
