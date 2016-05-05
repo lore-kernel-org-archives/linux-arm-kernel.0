@@ -1,138 +1,123 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 5 May 2016 19:23:55 +0000
-Subject: [PATCH v9 5/7] vfio/type1: also check IRQ remapping capability at
- msi domain
-In-Reply-To: <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
-Message-ID: <FFD9D7C5-B6EF-4E16-A209-BED31DAB26AA@caviumnetworks.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 May 2016 12:27:32 -0700
+Subject: [PATCH] ARM: dts: omap5-board-common: Describe the voltage
+ supply mapping accurately
+In-Reply-To: <572B984D.10203@ti.com>
+References: <1462389618-28860-1-git-send-email-nm@ti.com>
+ <572A528C.4090302@ti.com> <20160505183611.GA5995@atomide.com>
+ <572B984D.10203@ti.com>
+Message-ID: <20160505192732.GC5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-
-
-On 5/4/16, 4:54 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
-
->On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
->by the msi controller. vfio_safe_irq_domain allows to check whether
->interrupts are "safe" for a given device. They are if the device does
->not use MSI or if the device uses MSI and the msi-parent controller
->supports IRQ remapping.
->
->Then we check at group level if all devices have safe interrupts: if not,
->we only allow the group to be attached if allow_unsafe_interrupts is set.
->
->At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
->changed in next patch.
-
-Will this work in systems with multiple ITS?
->
->Signed-off-by: Eric Auger <eric.auger@linaro.org>
->
->---
->v3 -> v4:
->- rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
->  and irq_remapping into safe_irq_domains
->
->v2 -> v3:
->- protect vfio_msi_parent_irq_remapping_capable with
->  CONFIG_GENERIC_MSI_IRQ_DOMAIN
->---
-> drivers/vfio/vfio_iommu_type1.c | 44 +++++++++++++++++++++++++++++++++++++++--
-> 1 file changed, 42 insertions(+), 2 deletions(-)
->
->diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->index 4d3a6f1..2fc8197 100644
->--- a/drivers/vfio/vfio_iommu_type1.c
->+++ b/drivers/vfio/vfio_iommu_type1.c
->@@ -37,6 +37,8 @@
-> #include <linux/vfio.h>
-> #include <linux/workqueue.h>
-> #include <linux/msi-iommu.h>
->+#include <linux/irqdomain.h>
->+#include <linux/msi.h>
+* Nishanth Menon <nm@ti.com> [160505 12:02]:
+> On 05/05/2016 01:36 PM, Tony Lindgren wrote:
+> > Now I'm wondering if the x15 related vin-supply changes are actually all
+> > ignored? It seems that "vin" is only automatically configured for the
+> > fixed-regulator? Maybe regulator-palmas should be updated to use the
 > 
-> #define DRIVER_VERSION  "0.2"
-> #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
->@@ -777,6 +779,33 @@ static int vfio_bus_type(struct device *dev, void *data)
-> 	return 0;
-> }
+> ok /me goes duh!!!! ofcourse! Sorry about not catching it..
+> hmm.. maybe we messed up am572x-idk as well.. I can quickly fix that
+> up as well
+
+OK yeah sounds like they won't do anything currently.
+
+> ldoln is vsys_cobra as well.. I missed that.
 > 
->+/**
->+ * vfio_safe_irq_domain: returns whether the irq domain
->+ * the device is attached to is safe with respect to MSI isolation.
->+ * If the irq domain is not an MSI domain, we return it is safe.
->+ *
->+ * @dev: device handle
->+ * @data: unused
->+ * returns 0 if the irq domain is safe, -1 if not.
->+ */
->+static int vfio_safe_irq_domain(struct device *dev, void *data)
->+{
->+#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->+	struct irq_domain *domain;
->+	struct msi_domain_info *info;
->+
->+	domain = dev_get_msi_domain(dev);
->+	if (!domain)
->+		return 0;
->+
->+	info = msi_get_domain_info(domain);
->+
->+	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
->+		return -1;
->+#endif
->+	return 0;
->+}
->+
-> static int vfio_iommu_replay(struct vfio_iommu *iommu,
-> 			     struct vfio_domain *domain)
-> {
->@@ -870,7 +899,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
-> 	struct vfio_group *group, *g;
-> 	struct vfio_domain *domain, *d;
-> 	struct bus_type *bus = NULL;
->-	int ret;
->+	int ret, safe_irq_domains;
-> 
-> 	mutex_lock(&iommu->lock);
-> 
->@@ -893,6 +922,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
-> 
-> 	group->iommu_group = iommu_group;
-> 
->+	/*
->+	 * Determine if all the devices of the group have a safe irq domain
->+	 * with respect to MSI isolation
->+	 */
->+	safe_irq_domains = !iommu_group_for_each_dev(iommu_group, &bus,
->+				       vfio_safe_irq_domain);
->+
-> 	/* Determine bus_type in order to allocate a domain */
-> 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
-> 	if (ret)
->@@ -920,8 +956,12 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
-> 	INIT_LIST_HEAD(&domain->group_list);
-> 	list_add(&group->next, &domain->group_list);
-> 
->+	/*
->+	 * to advertise safe interrupts either the IOMMU or the MSI controllers
->+	 * must support IRQ remapping/interrupt translation
->+	 */
-> 	if (!allow_unsafe_interrupts &&
->-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->+	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !safe_irq_domains)) {
-> 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
-> 		       __func__);
-> 		ret = -EPERM;
->-- 
->1.9.1
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Others look good. we should probably get this merged to fix the
+> regression.
+
+OK I'll apply the following updated version of your patch later today.
+I left out the links from the description and the timestamps too.
+
+Regards,
+
+Tony
+
+8< -------------------------
+From: Nishanth Menon <nm@ti.com>
+Date: Thu, 5 May 2016 11:12:28 -0700
+Subject: [PATCH] ARM: dts: omap5-board-common: Describe the voltage supply
+ mapping accurately
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+OMAP5uEVM based platforms share a similar voltage rail map. This
+should be properly described in device tree, without this regulator core
+will be unable to determine the source voltage of LDOs such as LDO9 and
+SMPS10 which could be configured for bypass depending on the voltage
+requested of them. This results in conditions such as:
+
+ldo9: bypassed regulator has no supply!
+ldo9: failed to get the current voltage(-517)
+palmas-pmic 48070000.i2c:palmas at 48:palmas_pmic: failed to register
+48070000.i2c:palmas at 48:palmas_pmic regulator
+
+Cc: Agust? Fontquerni <af@iseebcn.com>
+Cc: Eduard Gavin <egavin@iseebcn.com>
+Cc: Enric Balletbo i Serra <eballetbo@iseebcn.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+[tony at atomide.com: fixed to use palmas style in-supply]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/dts/omap5-board-common.dtsi
++++ b/arch/arm/boot/dts/omap5-board-common.dtsi
+@@ -14,6 +14,29 @@
+ 		display0 = &hdmi0;
+ 	};
+ 
++	vmain: fixedregulator-vmain {
++		compatible = "regulator-fixed";
++		regulator-name = "vmain";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	vsys_cobra: fixedregulator-vsys_cobra {
++		compatible = "regulator-fixed";
++		regulator-name = "vsys_cobra";
++		vin-supply = <&vmain>;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	vdds_1v8_main: fixedregulator-vdds_1v8_main {
++		compatible = "regulator-fixed";
++		regulator-name = "vdds_1v8_main";
++		vin-supply = <&smps7_reg>;
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
+ 	vmmcsd_fixed: fixedregulator-mmcsd {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vmmcsd_fixed";
+@@ -409,6 +432,26 @@
+ 
+ 			ti,ldo6-vibrator;
+ 
++			smps123-in-supply = <&vsys_cobra>;
++			smps45-in-supply = <&vsys_cobra>;
++			smps6-in-supply = <&vsys_cobra>;
++			smps7-in-supply = <&vsys_cobra>;
++			smps8-in-supply = <&vsys_cobra>;
++			smps9-in-supply = <&vsys_cobra>;
++			smps10_out2-in-supply = <&vsys_cobra>;
++			smps10_out1-in-supply = <&vsys_cobra>;
++			ldo1-in-supply = <&vsys_cobra>;
++			ldo2-in-supply = <&vsys_cobra>;
++			ldo3-in-supply = <&vdds_1v8_main>;
++			ldo4-in-supply = <&vdds_1v8_main>;
++			ldo5-in-supply = <&vsys_cobra>;
++			ldo6-in-supply = <&vdds_1v8_main>;
++			ldo7-in-supply = <&vsys_cobra>;
++			ldo8-in-supply = <&vsys_cobra>;
++			ldo9-in-supply = <&vmmcsd_fixed>;
++			ldoln-in-supply = <&vsys_cobra>;
++			ldousb-in-supply = <&vsys_cobra>;
++
+ 			regulators {
+ 				smps123_reg: smps123 {
+ 					/* VDD_OPP_MPU */
