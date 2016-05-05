@@ -1,70 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 May 2016 15:43:28 +0100
-Subject: [PATCH v2 14/54] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
-In-Reply-To: <572B2D88.3050504@arm.com>
-References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
- <1461861973-26464-15-git-send-email-andre.przywara@arm.com>
- <57293844.1060802@linaro.org> <572B2D88.3050504@arm.com>
-Message-ID: <572B5C10.4040900@arm.com>
+Date: Thu, 5 May 2016 15:49:59 +0100
+Subject: [PATCH v3 0/2] irqchip/mbigen: fix the IO remap problem in mbigen
+ driver.
+In-Reply-To: <56F0B7C3.8070001@huawei.com>
+References: <1458203641-17172-1-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1603211124450.3978@nanos> <56F0B7C3.8070001@huawei.com>
+Message-ID: <572B5D97.4090004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/16 12:24, Andre Przywara wrote:
-> Hi Tom,
+On 22/03/16 03:10, majun (F) wrote:
 > 
-> thanks for looking at the patches!
 > 
-> On 04/05/16 00:46, Tom Hanson wrote:
->> On 04/28/2016 10:45 AM, Andre Przywara wrote:
->> ...
->>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->>> index fb45537..92b78a0 100644
->>> --- a/virt/kvm/arm/vgic/vgic.c
->>> +++ b/virt/kvm/arm/vgic/vgic.c
->>> @@ -19,8 +19,31 @@
->> ... 
->>> +/*
->>> + * Locking order is always:
->>> + *   vgic_cpu->ap_list_lock
->>> + *     vgic_irq->irq_lock
->>> + *
->>> + * (that is, always take the ap_list_lock before the struct vgic_irq
->>> lock).
->>> + *
->>> + * When taking more than one ap_list_lock at the same time, always
->>> take the
->>> + * lowest numbered VCPU's ap_list_lock first, so:
->>> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
->>> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
->>> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
->>> + */
+> ? 2016/3/21 18:29, Thomas Gleixner ??:
+>> On Thu, 17 Mar 2016, MaJun wrote:
+>>> This patch set is used to fix the problem of remap a set of registers
+>>> repeatedly in current mbigen driver.
+>>>
+>>>   irqchip/mbigen:Change the mbigen node definition in dt binding file
+>>>   irqchip/mbigen:Change the mbigen driver based on the new mbigen node definition
 >>
->> The code would be safer and easier to maintain in the long run if there
->> were functions provided which implement these 2 rules.  Something along
->> the line of:
+>> These subject lines are still horrible as they tell nothing about the nature
+>> of the change. I fixed them up along with the changelogs and applied them to
+>> irq/urgent. Can you spot the difference?
+> 
+> Yes, after you changing, the subject and change log clearly show why we need to
+> do this change.
+> I have learned a lot from you :)
+> 
 >>
->>   void vgic_lock_aplist_irq(spinlock_t ap_list_lock, spinlock_t irq_lock){
->>       spin_lock(ap_list_lock);
->>       spin_lock(irq_lock);
->>   }
-> 
-> The idea isn't too bad indeed.
-> I see that we could use that in vgic_queue_irq_unlock() and
-> vgic_mmio_write_sactive().
-> But as Marc mentioned in a conversation yesterday we will have a mixture
-> of wrapped locks and open coded lock sequences. See for instance
-> vgic_prune_ap_list(), where we have the sequence, but we can't use
-> vgic_lock_aplist_irq() because the IRQ lock is taken inside the loop
-> while the ap_list_lock is taken once outside of it.
-> 
-> Marc, Christoffer, what is your opinion here?
+>> While at it. The config switch for this driver is horrible. It's just in the
+>> middle of the device driver configs. Why is this configurable by the user at
+>> all? It simply should be selected by arm64 or some subarch configuration
+>> there. Please clean that up.
+>>
+> will do.
 
-I don't mind switching to these more "high level" primitives, but I'm
-slightly worried that whoever starts using them will not consider that
-they are quite heavy and not always required.
-
-But maybe it is worth a try.
+So what's the status of this? Do you still plan to respin it?
 
 Thanks,
 
