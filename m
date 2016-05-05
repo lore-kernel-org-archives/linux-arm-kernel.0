@@ -1,43 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 May 2016 17:17:13 -0500
-Subject: [Patch v3 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
-In-Reply-To: <1462402245-18295-2-git-send-email-andy.gross@linaro.org>
-References: <1462402245-18295-1-git-send-email-andy.gross@linaro.org>
- <1462402245-18295-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160505221713.GA12273@rob-hp-laptop>
+Date: Thu, 5 May 2016 17:25:21 -0500
+Subject: [v10, 1/7] Documentation: DT: update Freescale DCFG compatible
+In-Reply-To: <1462417950-46796-2-git-send-email-yangbo.lu@nxp.com>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <1462417950-46796-2-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <20160505222521.GA18377@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2016 at 05:50:38PM -0500, Andy Gross wrote:
-> This patch adds the device tree support for the Qualcomm SCM firmware.
+On Thu, May 05, 2016 at 11:12:24AM +0800, Yangbo Lu wrote:
+> Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead
+> of 'fsl,ls1021a-dcfg' to include more chips such as ls1021a,
+> ls1043a, and ls2080a.
 > 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 > ---
->  .../devicetree/bindings/firmware/qcom,scm.txt      | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> new file mode 100644
-> index 0000000..ee7cd12
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> @@ -0,0 +1,26 @@
-> +QCOM Secure Channel Manager (SCM)
-> +
-> +Qualcomm processors include an interface to communicate to the secure firmware.
-> +This interface allows for clients to request different types of actions.  These
-> +can include CPU power up/down, HDCP requests, loading of firmware, and other
-> +assorted actions.
-> +
-> +Required properties:
-> +- compatible: must contain one of the following:
-> + * "qcom,scm-a-family" for A family Qualcomm processors (APQ8064, MSM8960, etc)
-> + * "qcom,scm" for B family and later processors (MSM8916, APQ8084, MSM8974, etc)
-> +- clocks: One to three clocks may be required based on compatible.
-> + * Only core clock required for "qcom,scm-apq8064"
+> Changes for v8:
+> 	- Added this patch
+> Changes for v9:
+> 	- Added a list for the possible compatibles
+> Changes for v10:
+> 	- None
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-This is not a compatible string. What happened to the chip ones. I 
-thought we decided on chip specific plus one of the above ones.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
