@@ -1,49 +1,42 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 5 May 2016 16:16:20 -0400
-Subject: [RFC v2 13/13] ARM: dts: exynos: Fix LAN and HUB after bootloader
- initialization on Odroid U3
-In-Reply-To: <1462451666-17945-14-git-send-email-k.kozlowski@samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <1462451666-17945-14-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <9dff13ae-5863-2b45-0e6a-00b345a19019@osg.samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu,  5 May 2016 22:26:09 +0200
+Subject: [PATCH 2/4] ARM: mxs: dts: Add AUART2 pinmux
+In-Reply-To: <1462479971-7891-1-git-send-email-marex@denx.de>
+References: <1462479971-7891-1-git-send-email-marex@denx.de>
+Message-ID: <1462479971-7891-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Add 2-pin pinmux settings for AUART2.
 
-On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
-> On Odroid U3 (Exynos4412-based) board if USB was initialized by
-> bootloader (in U-Boot "usb start" before tftpboot), the HUB (usb3503)
-> and LAN (smsc95xx) after after successful probing were not visible in the
-> system ("lsusb").
-> 
-> In such case the devices had to be fully reset before configuring.
-> Reset by GPIO (called RESET_N pin) and by RESET field in STCD register
-> in usb3503 HUB are not sufficient. Instead full reset has to be done by
-> disabling and enabling regulator.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+---
+ arch/arm/boot/dts/imx23.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-[snip]
-
->  
-> +	lan_pwrseq: pwrseq2 {
-> +		compatible = "mmc-pwrseq-simple";
-
-It feels strange to have a "mmc-pwrseq-simple" compatible for a USB power
-sequence provider. As I mentioned in the other patch, I think there should
-either be a DT binding for the USB pwrseq-simple with a "usb-pwrseq-simple"
-compatible that binds to the same pwrseq-simple driver or maybe having a
-generic DT binding for any device with a new "pwrseq-simple" compatible.
-
-Patch looks good to me though, so after having a DT binding and changing
-the compatible string:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index c70ebef..0c9a357e 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -171,6 +171,17 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
++				auart1_2pins_a: auart1-2pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX23_PAD_GPMI_D14__AUART2_RX
++						MX23_PAD_GPMI_D15__AUART2_TX
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
+ 				gpmi_pins_a: gpmi-nand at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.7.0
