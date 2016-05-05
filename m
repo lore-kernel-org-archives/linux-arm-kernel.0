@@ -1,41 +1,56 @@
-From: xow@google.com (Xo Wang)
-Date: Thu, 5 May 2016 23:11:53 +0000 (UTC)
-Subject: [PATCH v2 09/11] arm/dst: Add Aspeed ast2500 device tree
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-10-git-send-email-joel@jms.id.au>
-Message-ID: <loom.20160506T005831-472@post.gmane.org>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 5 May 2016 18:16:11 -0500
+Subject: [Patch v3 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <20160505221713.GA12273@rob-hp-laptop>
+References: <1462402245-18295-1-git-send-email-andy.gross@linaro.org>
+ <1462402245-18295-2-git-send-email-andy.gross@linaro.org>
+ <20160505221713.GA12273@rob-hp-laptop>
+Message-ID: <CAPBZ5QfYOiGniV6PGRRRgAb2sy=J2TjVSxM-+42GR+4mU-Ht9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joel Stanley <joel <at> jms.id.au> writes:
-> +/ {
-> +	model = "AST2500 EVB";
-> +	compatible = "aspeed,ast2500";
-> +
-> +	chosen {
-> +		stdout-path = &uart5;
-> +		bootargs = "console=ttyS4,115200";
-> +	};
-> +
-> +	memory {
-> +		reg = < 0x80000000 0x10000000 >;
+On 5 May 2016 at 17:17, Rob Herring <robh@kernel.org> wrote:
+> On Wed, May 04, 2016 at 05:50:38PM -0500, Andy Gross wrote:
+>> This patch adds the device tree support for the Qualcomm SCM firmware.
+>>
+>> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+>> ---
+>>  .../devicetree/bindings/firmware/qcom,scm.txt      | 26 ++++++++++++++++++++++
+>>  1 file changed, 26 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+>> new file mode 100644
+>> index 0000000..ee7cd12
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+>> @@ -0,0 +1,26 @@
+>> +QCOM Secure Channel Manager (SCM)
+>> +
+>> +Qualcomm processors include an interface to communicate to the secure firmware.
+>> +This interface allows for clients to request different types of actions.  These
+>> +can include CPU power up/down, HDCP requests, loading of firmware, and other
+>> +assorted actions.
+>> +
+>> +Required properties:
+>> +- compatible: must contain one of the following:
+>> + * "qcom,scm-a-family" for A family Qualcomm processors (APQ8064, MSM8960, etc)
+>> + * "qcom,scm" for B family and later processors (MSM8916, APQ8084, MSM8974, etc)
+>> +- clocks: One to three clocks may be required based on compatible.
+>> + * Only core clock required for "qcom,scm-apq8064"
+>
+> This is not a compatible string. What happened to the chip ones. I
+> thought we decided on chip specific plus one of the above ones.
 
-The AST2500 EVB has an SK Hynix H5AN4G6NMFR 4Gb part, so this should be 
-0x20000000 for size.
+Stephen specifically didn't like the chip ones due to churn.  We'd
+have to add compat tags every time we got a new chip.... which is kind
+of frequent.  So I opted for defining one compat for older A family
+chips that require only 1 clock.  The qcom,scm would cover the newer
+chips.
 
-> +			uart1: serial <at> 1e783000 {
-> +				compatible = "ns16550a";
-> +				reg = <0x1e783000 0x1000>;
-> +				reg-shift = <2>;
-> +				interrupts = <9>;
-> +				clock-frequency = <1843200>;
+And it looks like i left a reference to apq8064.  That needs to be
+replaced with a-family.  Sorry for that confusion.
 
-The AST2500 datasheet 39.3.1 states the input clock to their 16550 IP is 
-24 MHz. Their u-boot code also has #define CONFIG_SYS_NS16550_CLK 
-24000000. I suspect we hit a path in the serial/8250 driver that doesn't 
-change the divisor from what u-boot set, which is why this has worked.
+Regards,
 
-Thanks for the porting work!
-
-cheers
-//xo
+Andy
