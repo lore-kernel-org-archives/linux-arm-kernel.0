@@ -1,42 +1,54 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 05 May 2016 21:46:10 +0200
-Subject: [RFC PATCH 1/7] ALSA: ac97: split out the generic ac97 registers
-In-Reply-To: <20160505191728.GK6292@sirena.org.uk> (Mark Brown's message of
- "Thu, 5 May 2016 20:17:28 +0100")
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-2-git-send-email-robert.jarzmik@free.fr>
- <20160503115159.GP6292@sirena.org.uk> <87y47roski.fsf@belgarion.home>
- <20160504090702.GV6292@sirena.org.uk> <87pot0pbnf.fsf@belgarion.home>
- <20160505191728.GK6292@sirena.org.uk>
-Message-ID: <87h9ecp9tp.fsf@belgarion.home>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 5 May 2016 15:52:11 -0400
+Subject: [RFC v2 09/13] power: pwrseq: Add support for USB hubs with
+ external power
+In-Reply-To: <1462451666-17945-10-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <1462451666-17945-10-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <3bdf7888-5ed1-2a55-6607-ee8be70e25e7@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+Hello Krzysztof,
 
-> On Thu, May 05, 2016 at 09:06:44PM +0200, Robert Jarzmik wrote:
->> Mark Brown <broonie@kernel.org> writes:
->
->> > I see that, I just don't know why that helps.
->> In order to have a clean split between former ac97 bus implementation and this
->> new one, I didn't want to include any former ac97 includes, excepting in
->> sound/ac97/compat.c.
->
-> It's probably a good idea to articulate some of this in the commit log
-> then!
-Fair point, I'll improve that.
+On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
+> Some USB devices on embedded boards have external power supply which has
+> to be reset in certain conditions. Add pwrseq interface for this.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/power/pwrseq/pwrseq.c | 44 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pwrseq.h        |  8 ++++++++
+>  2 files changed, 52 insertions(+)
+> 
+> diff --git a/drivers/power/pwrseq/pwrseq.c b/drivers/power/pwrseq/pwrseq.c
+> index 495a19d3c30b..306265f55a10 100644
+> --- a/drivers/power/pwrseq/pwrseq.c
+> +++ b/drivers/power/pwrseq/pwrseq.c
+> @@ -52,6 +52,43 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+>  }
+>  EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
+>  
+> +struct pwrseq *pwrseq_alloc(struct device *dev)
+> +{
 
->> This transition will be easier if the new ac97 code is isolated as much as
->> possible from the former code while providing backward compatibility ... hence
->> this patch.
->
-> It'd probably have been clearer to me if it were splitting out all the
-> register definitions rather than just some of them.
-Euh unless I'm missing something I have splitted out all the ac97 generic
-registers AFAIK. The only remaining ones are chip specific which I didn't take
-as they should be in codec specific code and not ac97 generic one.
+This function is USB specific so better to call it usb_pwrseq_alloc() instead.
 
-Cheers.
+Although, this function has a lot of duplicated code from mmc_pwrseq_alloc()
+so I think is better to keep the name generic and factorize the common code.
 
+I expect other devices are also needing some kind of power seq in the future
+so having a single alloc function instead of each for device type makes sense.
+
+> +	struct device_node *np;
+> +	struct pwrseq *p, *ret = NULL;
+> +
+> +	np = of_parse_phandle(dev->of_node, "usb-pwrseq", 0);
+
+I know this is just an RFC but you should really add DT bindings for this.
+
+Best regards,
 -- 
-Robert
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
