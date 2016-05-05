@@ -1,167 +1,61 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 5 May 2016 11:34:26 +0200
-Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
- during disable
-In-Reply-To: <CAAObsKCmPZBaSudVJy8BPThhoZw8VVqxicqsmc8diApajD57nA@mail.gmail.com>
-References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
- <5707043D.6060706@rock-chips.com>
- <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
- <570AFAC2.8080907@rock-chips.com>
- <CAAObsKCmPZBaSudVJy8BPThhoZw8VVqxicqsmc8diApajD57nA@mail.gmail.com>
-Message-ID: <CAAObsKBXxb8ZS3CqLy4qsDRWLvT=w2ACANCcDLE5B47nRKtvBw@mail.gmail.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Thu, 5 May 2016 09:41:32 +0000
+Subject: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for
+ T4240-R1.0-R2.0
+In-Reply-To: <4448030.Zs8fVnr3nm@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <1462417950-46796-8-git-send-email-yangbo.lu@nxp.com>
+ <4448030.Zs8fVnr3nm@wuerfel>
+Message-ID: <HE1PR04MB0889B52134A43C0E7A452B7BF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2016 at 16:23, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> On 11 April 2016 at 03:15, Mark yao <mark.yao@rock-chips.com> wrote:
->> On 2016?04?08? 18:54, Tomeu Vizoso wrote:
->>>
->>> On 8 April 2016 at 03:07, Mark yao <mark.yao@rock-chips.com> wrote:
->>>>
->>>> On 2016?04?06? 18:14, Tomeu Vizoso wrote:
->>>>
->>>> When a plane is being disabled but it's still enabled, do check if the
->>>> previous update has been completed by reading yrgb_mst back.
->>>>
->>>> Otherwise, pending pageflips would remain pending after a CRTC is
->>>> disabled.
->>>>
->>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>> ---
->>>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++--
->>>>   1 file changed, 3 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> index a9b1e8b5ac85..f46b1fd1887b 100644
->>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> @@ -1064,8 +1064,9 @@ static bool vop_win_pending_is_complete(struct
->>>> vop_win
->>>> *vop_win)
->>>>    struct vop_plane_state *state = to_vop_plane_state(plane->state);
->>>>    dma_addr_t yrgb_mst;
->>>>
->>>> - if (!state->enable)
->>>> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
->>>> + if (!state->enable &&
->>>> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
->>>> + return true;
->>>>
->>>>
->>>> It is wrong, the patch would cause a bug.
->>>>
->>>> when state->enable is 0, check yrgb_mst == state->yrgb_mst always be
->>>> true,
->>>> because state->yrgb_mst not update on plane disabled funtion, that would
->>>> cause iommu crash.
->>>
->>> Sorry, but I don't understand where's the bug and what could cause
->>> that crash. What the existing code was doing is saying that a pageflip
->>> event is still pending if we have told the plane to disable but for
->>> some reason it hasn't yet.
->>>
->>> With this modification, if we read back that it's already disabled, we
->>> return true as before. But if we read back that it isn't disabled yet,
->>> then we still check the fb pointers and compare them.
->>>
->>> The iommu mapping is removed when the _CRTC_ is disabled, and what
->>> this series does is to wait for the pending pageflip to finish before
->>> conitnuing with CRTC disablement.
->>
->>
->> the iommu mapping will unmap after plane disabled, we need sure that the
->> plane really disabled before unmap, if not, the unmap may call before plane
->> really disable, vop may access unmap address, then would get iommu page
->> fault.
->
-> Sorry, but I still don't see the error condition that you are
-> describing. AFAICS, the unmap will happen after the last pageflip has
-> completed.
->
->>>> About pending pageflips would remain pending, can you  describe more info
->>>> about it? I think those pending pageflips should be ignore when CRTC is
->>>> disabled.
->>>
->>> Well, right now in rockchip-drm pending pageflips won't be ignored
->>> when a CRTC is disabled, but will be delivered when it's re-enabled.
->>>
->>> If they would be to be ignored (understanding that as dropped), that
->>> would require modifications to clients so they keep track of which fbs
->>> were used in a particular crtc and destroy them when the crtc is
->>> disabled, but that would be incorrect when using the i915 DRM driver
->>> (I also assume others do the same). Given that the pageflip ioctl
->>> isn't driver-specific, I think there cannot be such a difference in
->>> behavior between drivers.
->>>
->>> With the current behavior (pending pageflip events being delayed until
->>> the CRTC is enabled again), compositors and other clients will be
->>> holding on to the fb in the pending pageflip until an arbitrary point
->>> in the future that may not ever come. To me that sounds like a serious
->>> modification of the assumptions on fb lifecycle that might not be
->>> warranted.
->>>
->>> So in summary, even if I haven't found any explicit documentation on
->>> this, I think the ABI is that any pending pageflips are to be
->>> delivered when that CRTC is being disabled and not later.
->>
->>
->> on drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>
->> drm_atomic_helper_commit_planes(dev, state, true);
->> rockchip_atomic_wait_for_complete(dev, state);
->>
->> We set active_only = true, I think planes can only update when crtc is
->> active. and rockchip_atomic_wait_for_complete only wait when crtc is active.
->
-> That's fine, but if a pageflip is pending when the client requests the
-> CRTC to be disabled, we need to wait for the event to be emitted
-> before we actually disable the HW.
+Hi Arnd,
 
-Hi Mark,
 
-could you tell me if you agree that there's a bug that needs to be
-solved, and if so, what do you think we should do about it?
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, May 05, 2016 4:32 PM
+> To: linuxppc-dev at lists.ozlabs.org
+> Cc: Yangbo Lu; linux-mmc at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> linux-clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; Mark Rutland;
+> ulf.hansson at linaro.org; Russell King; Bhupesh Sharma; Joerg Roedel;
+> Santosh Shilimkar; Yang-Leo Li; Scott Wood; Rob Herring; Claudiu Manoil;
+> Kumar Gala; Xiaobo Xie; Qiang Zhao
+> Subject: Re: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-
+> R1.0-R2.0
+> 
+> On Thursday 05 May 2016 11:12:30 Yangbo Lu wrote:
+> >
+> > +       fsl_guts_init();
+> > +       svr = fsl_guts_get_svr();
+> > +       if (svr) {
+> > +               esdhc->soc_ver = SVR_SOC_VER(svr);
+> > +               esdhc->soc_rev = SVR_REV(svr);
+> > +       } else {
+> > +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
+> > +       }
+> > +
+> >
+> 
+> 
+> Sorry for jumping in again after not participating in the discussion for
+> the past few versions.
+> 
+> What happened to my suggestion of making this a platform-independent
+> interface to avoid the link time dependency?
+> 
+> Specifically, why not add an exported function to drivers/base/soc.c that
+> uses glob_match() for comparing a string in the device driver to the ID
+> of the SoC that is set by whatever SoC identifying driver the platform
+> has?
+> 
+> 	Arnd
 
-Thanks,
+[Lu Yangbo-B47093] I think this has been discussed in v6.
+You can find Scott's comments about this in below link.
+https://patchwork.kernel.org/patch/8544501/
 
-Tomeu
-
-> Regards,
->
-> Tomeu
->
->> Thanks.
->>
->>> Thanks,
->>>
->>> Tomeu
->>>
->>>> Thanks.
->>>>
->>>>
->>>>    yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
->>>>
->>>>
->>>>
->>>> --
->>>> ?ark Yao
->>>>
->>>>
->>>> _______________________________________________
->>>> dri-devel mailing list
->>>> dri-devel at lists.freedesktop.org
->>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>>>
->>>
->>>
->>
->>
->> --
->> ?ark Yao
->>
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Thanks.
