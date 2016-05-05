@@ -1,64 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 May 2016 10:11:19 -0700
-Subject: [PATCH 0/2] Fix ir-rx51 by using PWM pdata
-In-Reply-To: <5724F0CB.6060807@gmail.com>
-References: <1461714709-10455-1-git-send-email-tony@atomide.com>
- <57227E63.4040907@gmail.com> <20160428212748.GI5995@atomide.com>
- <5724F0CB.6060807@gmail.com>
-Message-ID: <20160505171119.GZ5995@atomide.com>
+From: liviu.dudau@arm.com (liviu.dudau at arm.com)
+Date: Thu, 5 May 2016 18:11:23 +0100
+Subject: [PATCH 2/2] drm: hdlcd: Suspend/resume only active crtcs
+In-Reply-To: <20160505170601.GP1286@phenom.ffwll.local>
+References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
+ <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
+ <20160505170601.GP1286@phenom.ffwll.local>
+Message-ID: <20160505171123.GK28464@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160430 10:53]:
-> Hi,
+On Thu, May 05, 2016 at 07:06:02PM +0200, Daniel Vetter wrote:
+> On Thu, May 05, 2016 at 05:13:38PM +0100, Robin Murphy wrote:
+> > The current PM ops simply unconditionally enable/disable the HDLCD,
+> > which proves problematic when there is no display plugged in - since
+> > without a crtc the hardware itself is still in an uninitialised state,
+> > coming out of suspend results in it being enabled without a valid
+> > framebuffer address, which typically results in it trying to scan out
+> > from bus address 0 and flooding the system with error interrupts.
+> > 
+> > Fix this by checking the crtc state on resume, and only enabling the
+> > hardware if it's actually supposed to be. For the sake of consistency,
+> > do the same on the suspend path as well, although there it's merely a
+> > case of skipping unnecessary work.
+> > 
+> > CC: Liviu Dudau <liviu.dudau@arm.com>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  drivers/gpu/drm/arm/hdlcd_crtc.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > index fef1b04c2aab..bf6ff5e48adc 100644
+> > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > @@ -296,12 +296,14 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
+> >  
+> >  void hdlcd_crtc_suspend(struct drm_crtc *crtc)
+> >  {
+> > -	hdlcd_crtc_disable(crtc);
+> > +	if (crtc->state->active)
+> > +		hdlcd_crtc_disable(crtc);
+> >  }
+> >  
+> >  void hdlcd_crtc_resume(struct drm_crtc *crtc)
+> >  {
+> > -	hdlcd_crtc_enable(crtc);
+> > +	if (crtc->state->active)
+> > +		hdlcd_crtc_enable(crtc);
+> >  }
 > 
-> On 29.04.2016 00:27, Tony Lindgren wrote:
-> >* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160428 14:21]:
-> >>
-> >>I didn't test legacy boot, as I don't really see any value of doing it now
-> >>the end of the legacy boot is near, the driver does not function correctly,
-> >>however the patchset at least allows for the driver to be build and we have
-> >>something to improve on. And I am going to send a patch that fixes the
-> >>problem with omap_dm_timer_request_specific(). So, for both patches, you may
-> >>add:
-> >>
-> >>Tested-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-> >
-> >OK thanks.
-> >
-> >Mauro, do the driver changes look OK to you?
-> >
-> >If so, I could queue the driver too for v4.7 because of the
-> >dependency with your ack. Or I can provide you an immutable
-> >branch with just the pdata changes against v4.6-rc1 if you
-> >prefer that.
-> >
+> If you use the atomic helpers to suspend/resume your entire display
+> pipeline these callbacks shouldn't even be needed at all. Tried just
+> removing them?
 
-Mauro, I've applied the pdata patch only into my omap-for-v4.7/legacy branch.
-Feel free to merge immutable commit against v4.6-rc1 which is 8453c5cafd32
-("ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51") to your tree
-also for v4.7 if you decide to apply the ir-rx51 driver changes. Else we need
-to wait for v4.7-rc1 :)
+Yes, I need to cleanup the PM code in HDLCD.
 
-> In the meanwhile I was able to make the driver functional (on top of the
-> $subject series) - for that purpose I had to fix dmtimer.c - it turns out
-> that PM runtime get()/put() is called in almost every function exported by
-> dmtimer, which in turn slows down IR transmission to 4-5s instead of 0.5s. I
-> also replaced GPT9 dmtimer with PWM framework API (pwm-omap-dmtimer needs a
-> patch) and implemented some DT support.
+Thanks,
+Liviu
+
+
+> -Daniel
 > 
-> Now, how shall I proceed with those - wait for the $subject series to be
-> accepted or post the patches now?
+> >  
+> >  int hdlcd_setup_crtc(struct drm_device *drm)
+> > -- 
+> > 2.8.1.dirty
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> -- 
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
+> 
 
-Best to do incremental patches on what was posted to avoid confusion.
-
-> Tony, I was unable to find the tree on kernel.org your patches are in. Which
-> tree to use to base my patches on?
-
-The pdata changes are in Linux next with omap-for-v4.7/legacy, the driver
-changes I have not committed into any upstream going tree. Seems like
-Mauro can take it after merging in commit 8453c5cafd32.
-
-Regards,
-
-Tony
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
