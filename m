@@ -1,114 +1,60 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Thu, 5 May 2016 14:46:22 -0700
-Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB PCIe
- bindings
-In-Reply-To: <4513390.VWu0VVAxOl@wuerfel>
-References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
- <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
- <4513390.VWu0VVAxOl@wuerfel>
-Message-ID: <572BBF2E.5010606@broadcom.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 5 May 2016 23:47:23 +0200
+Subject: [PATCH] ARM: BCM5301X: Add DT for Luxul XAP-1510
+In-Reply-To: <CACna6ryWGsOwBhhauJTROi2BPbmgGn_4oYnKc-L8-3Joy+5M7g@mail.gmail.com>
+References: <1462296501-5209-1-git-send-email-dhaab@luxul.com>
+ <572A453E.6010000@gmail.com>
+ <CACna6ryWGsOwBhhauJTROi2BPbmgGn_4oYnKc-L8-3Joy+5M7g@mail.gmail.com>
+Message-ID: <572BBF6B.8030207@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/16 14:15, Arnd Bergmann wrote:
-> On Thursday 05 May 2016 12:14:59 Florian Fainelli wrote:
->> From: Jim Quinlan <jim2101024@gmail.com>
+On 05/05/2016 12:36 AM, Rafa? Mi?ecki wrote:
+> On 4 May 2016 at 20:53, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 03/05/16 10:28, Dan Haab wrote:
+>>> Luxul XAP-1510 is an AP device based on BCM4708 SoC. It uses flash
+>>> memory connected to the SPI controller.
 >>
->> This patchs adds the Device Tree bindings for the Broadcom STB PCIe root
->> complex hardware.
+>> Looks fine, except one nit:
 >>
->> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->> Changes in v2:
+>>> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+>>> new file mode 100644
+>>> index 0000000..f4460b5
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+>>> @@ -0,0 +1,67 @@
+>>> +/*
+>>> + * Broadcom BCM470X / BCM5301X ARM platform code.
+>>> + * DTS for Luxul XAP-1510
+>>> + *
+>>> + * Copyright 2015 Luxul Inc.
+>>> + *
+>>> + * Licensed under the GNU/GPL. See COPYING for details.
 >>
->> - rewrite the binding document almost from scratch to include many more
->>   references to existing documents
->> - describe missing properties
->> - give better examples
+>> The ARM SoC maintainer have been asking to utilize a license which is
+>> also BSD compatible, so something along the lines of this one:
 >>
->>  .../devicetree/bindings/pci/brcm,brcmstb-pcie.txt  | 98 ++++++++++++++++++++++
->>  1 file changed, 98 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
+>> arch/arm/boot/dts/bcm911360k.dts
 >>
->> diff --git a/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
->> new file mode 100644
->> index 000000000000..3682b0f0bc26
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
->> @@ -0,0 +1,98 @@
->> +Broadcom STB PCIe Host Controller Device Tree Bindings
->> +
->> +This document describes the binding of the PCIe Root Complex hardware found in
->> +Broadcom Set Top Box System-on-Chips such as BCM7425 (MIPS), BCM7435 (MIPS) and
->> +BCM7445 (ARMv7).
->> +
->> +Required properties:
->> +- compatible: must be one of: "brcm,bcm7425-pcie"
->> +			      "brcm,bcm7435-pcie"
->> +			      "brcm,bcm7445-pcie"
->> +
->> +- reg: specifies the physical base address of the controller registers and
->> +  its length
->> +
->> +- interrupt-parent: must be a reference (phandle) to the parent interrupt
->> +  controller in the system (7038-l1-intc on MIPS, GIC on ARM/ARM64)
->> +
->> +- interrrupts: first interrupt must be the Level 1 interrupt number corresponding
->> +  to the main PCIe RC interrupt, second interrupt must be the MSI interrupt
->> +  See the interrupt-parent documentation for the number of cells and their meaning:
->> +  MIPS: Documentation/devicetree/bindings/interrupt-controller/brcm,bcm7038-l1-intc.txt
->> +  ARM/ARM64: Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
->> +
->> +- interrupt-names: must be "pcie", and if present "msi"
+>> Do you mind respining the patch to include that kind of license header?
 > 
-> When I suggested splitting out the MSI support, I was thinking (but not writing)
-> that you'd use an msi-parent property to refer to the node that holds the
-> msi-controller as well.
+> I wasn't aware of this neither. Shall we re-license existing DTS files
+> as well? I'm fine with changing them to BSD compatible.
+> 
+> I'm a bit confused by using BSD license only. Kernel is licensed under
+> GNU GPL version 2 and if there are some BSD compatible modules, they
+> use dual licensing model (BSD/GPL). Shouldn't we use BSD/GPL in DTS
+> files as well then?
+> 
 
-Humm fair enough.
+As far as I understand the License part you can take code which is
+licensed under BSD license and use it in GPL code because you can comply
+with the BSD license and also handle it in a way to be GPL compliant at
+the same time. You can also make a change to BSD code and license this
+change under the GPL, then the complete code (the old one + your change)
+is now GPL.
 
-> 
->> +- ranges: ranges for the PCI outbound windows, no I/O or prefetchable windows
->> +  must be specified here, only non-prefetchable. 32-bits windows or 64-bits
->> +  windows are allowed based on the host processor's capabilities (ARM w/ LPAE,
->> +  ARM64).
-> 
-> So this supports 64-bit non-prefetchable windows? Usually 64-bit windows
-> are prefetchable.
-> 
->> +- brcm,log2-scb-sizes: log2 size of the SCB window that is mapped to PCIe space
->> +  there must be exactly one value per memory controller present in the system
->> +  (ranges from 1 to 3)
-> 
-> I'm still not too happy with this property. I see no reason for the log2
-> format (rather than length in bytes, or offset/length tuples, or dma-ranges,
-> or phandles pointing to the memory controllers). I think we need to discuss
-> this some more.
+Are the device tree files licensed under BSD license to make it easier
+to integrate them into a proprietary boot loader or what is the purpose?
 
-Sure, works for me.
-
-> 
->> +- brcm,gen: integer that indicates desired forced generation of link: 1 => 2.5
->> +  Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps. Will override the auto-negotation if
->> +  specified.
-> 
-> to repeat my earlier comment from v1:
-> 
-> Shouldn't the link generation be probed automatically?
-
-It is, but if the property is present, we can foce the link negotiation,
-We have had cases where this was desired and helpful.
-
-> 
->> +- <*>-supply: see Documentation/devicetree/bindings/regulator/regulator.txt
->> +
->> +- <*>-supply-names: see Documentation/devicetree/bindings/regulator/regulator.txt
-> 
-> I don't see supply-names documented there.
-
-Meh, I read that wrong, will fix that.
-
-Thanks!
--- 
-Florian
+Hauke
