@@ -1,45 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 May 2016 15:49:59 +0100
-Subject: [PATCH v3 0/2] irqchip/mbigen: fix the IO remap problem in mbigen
- driver.
-In-Reply-To: <56F0B7C3.8070001@huawei.com>
-References: <1458203641-17172-1-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1603211124450.3978@nanos> <56F0B7C3.8070001@huawei.com>
-Message-ID: <572B5D97.4090004@arm.com>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Thu, 5 May 2016 18:36:04 +0300
+Subject: [PATCH v2 3/8] arm64: add io{read,write}64be accessors
+In-Reply-To: <1462462435-27403-1-git-send-email-horia.geanta@nxp.com>
+References: <1462462435-27403-1-git-send-email-horia.geanta@nxp.com>
+Message-ID: <1462462564-27731-1-git-send-email-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/16 03:10, majun (F) wrote:
-> 
-> 
-> ? 2016/3/21 18:29, Thomas Gleixner ??:
->> On Thu, 17 Mar 2016, MaJun wrote:
->>> This patch set is used to fix the problem of remap a set of registers
->>> repeatedly in current mbigen driver.
->>>
->>>   irqchip/mbigen:Change the mbigen node definition in dt binding file
->>>   irqchip/mbigen:Change the mbigen driver based on the new mbigen node definition
->>
->> These subject lines are still horrible as they tell nothing about the nature
->> of the change. I fixed them up along with the changelogs and applied them to
->> irq/urgent. Can you spot the difference?
-> 
-> Yes, after you changing, the subject and change log clearly show why we need to
-> do this change.
-> I have learned a lot from you :)
-> 
->>
->> While at it. The config switch for this driver is horrible. It's just in the
->> middle of the device driver configs. Why is this configurable by the user at
->> all? It simply should be selected by arm64 or some subarch configuration
->> there. Please clean that up.
->>
-> will do.
+This will allow device drivers to consistently use io{read,write}XXbe
+also for 64-bit accesses.
 
-So what's the status of this? Do you still plan to respin it?
+Signed-off-by: Alex Porosanu <alexandru.porosanu@nxp.com>
+Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+---
+ arch/arm64/include/asm/io.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 44be1e03ed65..9b6e408cfa51 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
+ 
+ /*
+- * io{read,write}{16,32}be() macros
++ * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+ #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
++#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
+ 
+ #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
++#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
+ /*
+  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
 -- 
-Jazz is not dead. It just smells funny...
+2.4.4
