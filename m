@@ -1,121 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 May 2016 13:10:31 +0200
-Subject: [v10,
- 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <HE1PR04MB0889B52134A43C0E7A452B7BF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <4448030.Zs8fVnr3nm@wuerfel>
- <HE1PR04MB0889B52134A43C0E7A452B7BF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
-Message-ID: <5159406.HOFrj7pRfW@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 5 May 2016 12:24:56 +0100
+Subject: [PATCH v2 14/54] KVM: arm/arm64: vgic-new: Implement virtual IRQ
+ injection
+In-Reply-To: <57293844.1060802@linaro.org>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-15-git-send-email-andre.przywara@arm.com>
+ <57293844.1060802@linaro.org>
+Message-ID: <572B2D88.3050504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 May 2016 09:41:32 Yangbo Lu wrote:
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Thursday, May 05, 2016 4:32 PM
-> > To: linuxppc-dev at lists.ozlabs.org
-> > Cc: Yangbo Lu; linux-mmc at vger.kernel.org; devicetree at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > linux-clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
-> > foundation.org; netdev at vger.kernel.org; Mark Rutland;
-> > ulf.hansson at linaro.org; Russell King; Bhupesh Sharma; Joerg Roedel;
-> > Santosh Shilimkar; Yang-Leo Li; Scott Wood; Rob Herring; Claudiu Manoil;
-> > Kumar Gala; Xiaobo Xie; Qiang Zhao
-> > Subject: Re: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-
-> > R1.0-R2.0
-> > 
-> > On Thursday 05 May 2016 11:12:30 Yangbo Lu wrote:
-> > >
-> > > +       fsl_guts_init();
-> > > +       svr = fsl_guts_get_svr();
-> > > +       if (svr) {
-> > > +               esdhc->soc_ver = SVR_SOC_VER(svr);
-> > > +               esdhc->soc_rev = SVR_REV(svr);
-> > > +       } else {
-> > > +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
-> > > +       }
-> > > +
-> > >
-> > 
-> > 
-> > Sorry for jumping in again after not participating in the discussion for
-> > the past few versions.
-> > 
-> > What happened to my suggestion of making this a platform-independent
-> > interface to avoid the link time dependency?
-> > 
-> > Specifically, why not add an exported function to drivers/base/soc.c that
-> > uses glob_match() for comparing a string in the device driver to the ID
-> > of the SoC that is set by whatever SoC identifying driver the platform
-> > has?
+Hi Tom,
+
+thanks for looking at the patches!
+
+On 04/05/16 00:46, Tom Hanson wrote:
+> On 04/28/2016 10:45 AM, Andre Przywara wrote:
+> ...
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index fb45537..92b78a0 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>> @@ -19,8 +19,31 @@
+> ... 
+>> +/*
+>> + * Locking order is always:
+>> + *   vgic_cpu->ap_list_lock
+>> + *     vgic_irq->irq_lock
+>> + *
+>> + * (that is, always take the ap_list_lock before the struct vgic_irq
+>> lock).
+>> + *
+>> + * When taking more than one ap_list_lock at the same time, always
+>> take the
+>> + * lowest numbered VCPU's ap_list_lock first, so:
+>> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
+>> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
+>> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
+>> + */
 > 
-> [Lu Yangbo-B47093] I think this has been discussed in v6.
-> You can find Scott's comments about this in below link.
-> https://patchwork.kernel.org/patch/8544501/
-
-Ah, thanks for bearing with me and digging this out again. Let me follow
-up on Scott's older replies here then:
-
-> >> IIRC, it is the same IP block as i.MX and Arnd's point is this won't
-> >> even compile on !PPC. It is things like this that prevent sharing the
-> >> driver.
+> The code would be safer and easier to maintain in the long run if there
+> were functions provided which implement these 2 rules.  Something along
+> the line of:
 > 
-> The whole point of using the MMIO SVR instead of the PPC SPR is so that
-> it will work on ARM...  The guts driver should build on any platform as
-> long as OF is enabled, and if it doesn't find a node to bind to it will
-> return 0 for SVR, and the eSDHC driver will continue (after printing an
-> error that should be removed) without the ability to test for errata
-> based on SVR.
+>   void vgic_lock_aplist_irq(spinlock_t ap_list_lock, spinlock_t irq_lock){
+>       spin_lock(ap_list_lock);
+>       spin_lock(irq_lock);
+>   }
 
-It feels like a bad design to have to come up with a different
-method for each SoC type here when they all do the same thing
-and want to identify some variant of the chip to do device
-specific quirks.
+The idea isn't too bad indeed.
+I see that we could use that in vgic_queue_irq_unlock() and
+vgic_mmio_write_sactive().
+But as Marc mentioned in a conversation yesterday we will have a mixture
+of wrapped locks and open coded lock sequences. See for instance
+vgic_prune_ap_list(), where we have the sequence, but we can't use
+vgic_lock_aplist_irq() because the IRQ lock is taken inside the loop
+while the ap_list_lock is taken once outside of it.
 
-As far as I'm concerned, every driver in drivers/soc that needs to
-export a symbol to be used by a device driver is an indication that
-we don't have the right set of abstractions yet. There are cases
-that are not worth abstracting because the functionality is rather
-obscure and only a couple of drivers for one particular chip
-ever need it.
+Marc, Christoffer, what is your opinion here?
 
-Finding out the version of the SoC does not look like this case.
-
-> > I think the first four patches take care of building for ARM,
-> > but the problem remains if you want to enable COMPILE_TEST as
-> > we need for certain automated checking.
+> and  (borrowing from patch 16/54):
 > 
-> What specific problem is there with COMPILE_TEST?
-
-COMPILE_TEST is solvable here and the way it is implemented in this
-case (selecting FSL_GUTS from the driver) indeed looks like it works
-correctly, but it's still awkward that this means building the
-SoC specific ID stuff into the vmlinux binary for any driver that
-uses something like that for a particular SoC.
-
-> >> Dealing with Si revs is a common problem. We should have a
-> >> common solution. There is soc_device for this purpose.
-> > 
-> > Exactly. The last time this came up, I think we agreed to implement a
-> > helper using glob_match() on the soc_device strings. Unfortunately
-> > this hasn't happened then, but I'd still prefer that over yet another
-> > vendor-specific way of dealing with the generic issue.
+>   void vgic_lock_cpu_aplist_pair(struct kvm_vcpu *vcpu1, struct kvm_vcpu
+> *vcpu2){
+>       struct kvm_vcpu *vcpuA, *vcpuB;
+>       /*
+>        * Ensure locking order by always locking the smallest
+>        * ID first.
+>        */
+>      if (vcpu1->vcpu_id < vcpu2->vcpu_id) {
+>           vcpuA = vcpu1;
+>           vcpuB = vcpu2;
+>       } else {
+>           vcpuA = vcpu2;
+>           vcpuB = vcpu1;
+>       }
 > 
-> soc_device would require encoding the SVR as a string and then decoding
-> the string, which is more complicated and error prone than having
-> platform-specific code test a platform-specific number. 
+>       spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+>       spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+>   }
 
-You already need to encode it as a string to register the soc_device,
-and the driver just needs to pass a glob string, so the only part that
-is missing is the generic function that takes the string from the
-driver and passes that to glob_match for the soc_device.
+I am not sure this is worth it. We have exactly one user of this
+sequence, so I'd rather keep it and the comments there.
+Also the use case is probably confined to the core VGIC code.
 
-> And when would it get registered on arm64, which doesn't have
-> platform code?
+Cheers,
+Andre.
 
-Whenever the soc driver is loaded, as is the case now. The match
-function can return -EPROBE_DEFER if no SoC device is registered
-yet.
-
-	Arnd
+> 
+> With, of course the matching unlock functions.
+> 
+> Then, as long as new code calls the correct function, the order is
+> always correct.  Easy to write, easy to review.  And beats the heck out
+> of chasing a deadlock at some point in the future.
+> 
