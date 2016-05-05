@@ -1,88 +1,41 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Thu, 5 May 2016 18:11:23 +0100
-Subject: [PATCH 2/2] drm: hdlcd: Suspend/resume only active crtcs
-In-Reply-To: <20160505170601.GP1286@phenom.ffwll.local>
-References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
- <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
- <20160505170601.GP1286@phenom.ffwll.local>
-Message-ID: <20160505171123.GK28464@e106497-lin.cambridge.arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 5 May 2016 12:22:19 -0500
+Subject: [PATCH 2/2] drivers: i2c: qup: Fix error handling
+In-Reply-To: <1462166637-16778-3-git-send-email-sricharan@codeaurora.org>
+References: <1462166637-16778-1-git-send-email-sricharan@codeaurora.org>
+ <1462166637-16778-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160505172219.GB6533@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 07:06:02PM +0200, Daniel Vetter wrote:
-> On Thu, May 05, 2016 at 05:13:38PM +0100, Robin Murphy wrote:
-> > The current PM ops simply unconditionally enable/disable the HDLCD,
-> > which proves problematic when there is no display plugged in - since
-> > without a crtc the hardware itself is still in an uninitialised state,
-> > coming out of suspend results in it being enabled without a valid
-> > framebuffer address, which typically results in it trying to scan out
-> > from bus address 0 and flooding the system with error interrupts.
-> > 
-> > Fix this by checking the crtc state on resume, and only enabling the
-> > hardware if it's actually supposed to be. For the sake of consistency,
-> > do the same on the suspend path as well, although there it's merely a
-> > case of skipping unnecessary work.
-> > 
-> > CC: Liviu Dudau <liviu.dudau@arm.com>
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> >  drivers/gpu/drm/arm/hdlcd_crtc.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > index fef1b04c2aab..bf6ff5e48adc 100644
-> > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > @@ -296,12 +296,14 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
-> >  
-> >  void hdlcd_crtc_suspend(struct drm_crtc *crtc)
-> >  {
-> > -	hdlcd_crtc_disable(crtc);
-> > +	if (crtc->state->active)
-> > +		hdlcd_crtc_disable(crtc);
-> >  }
-> >  
-> >  void hdlcd_crtc_resume(struct drm_crtc *crtc)
-> >  {
-> > -	hdlcd_crtc_enable(crtc);
-> > +	if (crtc->state->active)
-> > +		hdlcd_crtc_enable(crtc);
-> >  }
+On Mon, May 02, 2016 at 10:53:57AM +0530, Sricharan R wrote:
+> Among the bus errors reported from the QUP_MASTER_STATUS register
+> only NACK is considered and transfer gets suspended, while
+> other errors are ignored. Correct this and suspend the transfer
+> for other errors as well. This avoids unnessecary 'timeouts' which
+> happens when waiting for events that would never happen when there
+> is already an error condition on the bus.
 > 
-> If you use the atomic helpers to suspend/resume your entire display
-> pipeline these callbacks shouldn't even be needed at all. Tried just
-> removing them?
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/i2c/busses/i2c-qup.c | 34 +++++++++++++++++++++++++---------
+>  1 file changed, 25 insertions(+), 9 deletions(-)
 
-Yes, I need to cleanup the PM code in HDLCD.
+Reviewed-by: Andy Gross <andy.gross@linaro.org>
 
-Thanks,
-Liviu
+<snip>
 
+> @@ -1227,6 +1240,9 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
+>  	struct qup_i2c_dev *qup = i2c_get_adapdata(adap);
+>  	int ret, len, idx = 0, use_dma = 0;
+>  
+> +	qup->bus_err = 0;
+> +	qup->qup_err = 0;
+> +
 
-> -Daniel
-> 
-> >  
-> >  int hdlcd_setup_crtc(struct drm_device *drm)
-> > -- 
-> > 2.8.1.dirty
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
-> 
+What about the initial setting of these?  Does this need to be removed from the
+main xfer function?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+>  	ret = pm_runtime_get_sync(qup->dev);
+>  	if (ret < 0)
+>  		goto out;
