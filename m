@@ -1,70 +1,47 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Thu, 5 May 2016 17:52:33 +0100
-Subject: [PATCH 2/2] drm: hdlcd: Suspend/resume only active crtcs
-In-Reply-To: <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
-References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
- <759fe8d3dde95091a9df83018051cba00f494e1e.1462464611.git.robin.murphy@arm.com>
-Message-ID: <20160505165233.GI28464@e106497-lin.cambridge.arm.com>
+From: thomas.hanson@linaro.org (Tom Hanson)
+Date: Thu, 5 May 2016 11:04:01 -0600
+Subject: [PATCH v2 18/54] KVM: arm/arm64: vgic-new: Add GICv3 world switch
+ backend
+In-Reply-To: <1461861973-26464-19-git-send-email-andre.przywara@arm.com>
+References: <1461861973-26464-1-git-send-email-andre.przywara@arm.com>
+ <1461861973-26464-19-git-send-email-andre.przywara@arm.com>
+Message-ID: <572B7D01.50202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 05:13:38PM +0100, Robin Murphy wrote:
-> The current PM ops simply unconditionally enable/disable the HDLCD,
-> which proves problematic when there is no display plugged in - since
-> without a crtc the hardware itself is still in an uninitialised state,
-> coming out of suspend results in it being enabled without a valid
-> framebuffer address, which typically results in it trying to scan out
-> from bus address 0 and flooding the system with error interrupts.
-> 
-> Fix this by checking the crtc state on resume, and only enabling the
-> hardware if it's actually supposed to be. For the sake of consistency,
-> do the same on the suspend path as well, although there it's merely a
-> case of skipping unnecessary work.
-> 
-> CC: Liviu Dudau <liviu.dudau@arm.com>
+On 04/28/2016 10:45 AM, Andre Przywara wrote:
 
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+...
 
-Thanks for the patch, Robin!
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> new file mode 100644
+> index 0000000..461229b
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
 
-Liviu
+...
 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/gpu/drm/arm/hdlcd_crtc.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> index fef1b04c2aab..bf6ff5e48adc 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> @@ -296,12 +296,14 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
->  
->  void hdlcd_crtc_suspend(struct drm_crtc *crtc)
->  {
-> -	hdlcd_crtc_disable(crtc);
-> +	if (crtc->state->active)
-> +		hdlcd_crtc_disable(crtc);
->  }
->  
->  void hdlcd_crtc_resume(struct drm_crtc *crtc)
->  {
-> -	hdlcd_crtc_enable(crtc);
-> +	if (crtc->state->active)
-> +		hdlcd_crtc_enable(crtc);
->  }
->  
->  int hdlcd_setup_crtc(struct drm_device *drm)
-> -- 
-> 2.8.1.dirty
-> 
+> +void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+> +{
+> + struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
+> + u32 model = vcpu->kvm->arch.vgic.vgic_model;
+> + int lr;
+> +
+> + /* Assumes ap_list_lock held */
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+If truly required that ap_list_lock already be locked, then the code should enforce it. At least in dev mode. Maybe:
+         DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->ap_list_lock));
+
+...
+
+> +/* Requires the irq to be locked already */
+> +void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+> +{
+> +	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+> +	u64 val = irq->intid;
+> +
+
+Similarly, if required then the code should enforce it.
+         DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+
+...
