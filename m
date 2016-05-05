@@ -1,128 +1,107 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu,  5 May 2016 15:53:25 +0000
-Subject: [PATCH 2/5] clk: bcm2835: expose the parent clocks via
- include/dt-bindings
+Date: Thu,  5 May 2016 15:53:26 +0000
+Subject: [PATCH 3/5] clk: bcm2835: enable default filtering for parent clocks
 In-Reply-To: <1462463608-22940-1-git-send-email-kernel@martin.sperl.org>
 References: <1462463608-22940-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1462463608-22940-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1462463608-22940-4-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Expose the parent clocks via include/dt-bindings,
-so that they can easily get referred to in the device tree.
+Depending on the type of clock define a default set of
+parent clocks that are uses during parent clock selection.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c       | 45 ++++++++++++++++++-------------------
- include/dt-bindings/clock/bcm2835.h | 26 +++++++++++++++++++++
- 2 files changed, 48 insertions(+), 23 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c | 47 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index c19b99c9..1b1657d 100644
+index 1b1657d..8a44ebf 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1303,10 +1303,10 @@ struct bcm2835_clk_desc {
- 
- /* main oscillator parent mux */
- static const char *const bcm2835_clock_osc_parents[] = {
--	"gnd",
--	"xosc",
--	"testdebug0",
--	"testdebug1"
-+	[BCM2835_OSC_PARENT_GND]	= "gnd",
-+	[BCM2835_OSC_PARENT_OSC]	= "xosc",
-+	[BCM2835_OSC_PARENT_TESTDEBUG0]	= "testdebug0",
-+	[BCM2835_OSC_PARENT_TESTDEBUG1]	= "testdebug1",
+@@ -836,6 +836,7 @@ struct bcm2835_clock {
+ 	struct clk_hw hw;
+ 	struct bcm2835_cprman *cprman;
+ 	const struct bcm2835_clock_data *data;
++	u32 flags;
  };
  
- #define REGISTER_OSC_CLK(...)	REGISTER_CLK(				\
-@@ -1316,14 +1316,14 @@ static const char *const bcm2835_clock_osc_parents[] = {
+ static struct bcm2835_clock *bcm2835_clock_from_hw(struct clk_hw *hw)
+@@ -1023,6 +1024,8 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+ 		parent = clk_hw_get_parent_by_index(hw, i);
+ 		if (!parent)
+ 			continue;
++		if (!(clock->flags & BIT(i)))
++			continue;
+ 		prate = clk_hw_get_rate(parent);
+ 		div = bcm2835_clock_choose_div(hw, req->rate, prate, true);
+ 		rate = bcm2835_clock_rate_from_divisor(clock, prate, div);
+@@ -1216,6 +1219,10 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
+ 	return clk;
+ }
  
- /* main peripherial parent mux */
- static const char *const bcm2835_clock_per_parents[] = {
--	"gnd",
--	"xosc",
--	"testdebug0",
--	"testdebug1",
--	"plla_per",
--	"pllc_per",
--	"plld_per",
--	"pllh_aux",
-+	[BCM2835_PER_PARENT_GND]	= "gnd",
-+	[BCM2835_PER_PARENT_OSC]	= "xosc",
-+	[BCM2835_PER_PARENT_TESTDEBUG0]	= "testdebug0",
-+	[BCM2835_PER_PARENT_TESTDEBUG1]	= "testdebug1",
-+	[BCM2835_PER_PARENT_PLLA_PER]	= "plla_per",
-+	[BCM2835_PER_PARENT_PLLC_PER]	= "pllc_per",
-+	[BCM2835_PER_PARENT_PLLD_PER]	= "plld_per",
-+	[BCM2835_PER_PARENT_PLLH_AUX]	= "pllh_aux",
- };
++static u32 bcm2835_register_clock_default_parents(
++	struct device *dev,
++	const struct bcm2835_clock_data *data);
++
+ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 					  const struct bcm2835_clock_data *data)
+ {
+@@ -1263,6 +1270,8 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	clock->cprman = cprman;
+ 	clock->data = data;
+ 	clock->hw.init = &init;
++	clock->flags = bcm2835_register_clock_default_parents(
++		cprman->dev, data);
  
- #define REGISTER_PER_CLK(...)	REGISTER_CLK(				\
-@@ -1333,18 +1333,17 @@ static const char *const bcm2835_clock_per_parents[] = {
- 
- /* main vpu parent mux */
- static const char *const bcm2835_clock_vpu_parents[] = {
--	"gnd",
--	"xosc",
--	"testdebug0",
--	"testdebug1",
--	"plla_core",
--	"pllc_core0",
--	"plld_core",
--	"pllh_aux",
--	"pllc_core1",
--	"pllc_core2",
-+	[BCM2835_VPU_PARENT_GND]	= "gnd",
-+	[BCM2835_VPU_PARENT_OSC]	= "xosc",
-+	[BCM2835_VPU_PARENT_TESTDEBUG0]	= "testdebug0",
-+	[BCM2835_VPU_PARENT_TESTDEBUG1]	= "testdebug1",
-+	[BCM2835_VPU_PARENT_PLLA_CORE]	= "plla_core",
-+	[BCM2835_VPU_PARENT_PLLC_CORE0]	= "pllc_core0",
-+	[BCM2835_VPU_PARENT_PLLD_CORE]	= "plld_core",
-+	[BCM2835_VPU_PARENT_PLLH_AUX]	= "pllh_aux",
-+	[BCM2835_VPU_PARENT_PLLC_CORE1]	= "pllc_core1",
-+	[BCM2835_VPU_PARENT_PLLC_CORE2]	= "pllc_core2",
- };
--
- #define REGISTER_VPU_CLK(...)	REGISTER_CLK(				\
- 	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_vpu_parents),	\
+ 	return devm_clk_register(cprman->dev, &clock->hw);
+ }
+@@ -1349,6 +1358,44 @@ static const char *const bcm2835_clock_vpu_parents[] = {
  	.parents = bcm2835_clock_vpu_parents,				\
-diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-index 360e00c..e5396fe 100644
---- a/include/dt-bindings/clock/bcm2835.h
-+++ b/include/dt-bindings/clock/bcm2835.h
-@@ -64,3 +64,29 @@
- #define BCM2835_CLOCK_CAM1		46
- #define BCM2835_CLOCK_DSI0E		47
- #define BCM2835_CLOCK_DSI1E		48
+ 	__VA_ARGS__)
+ 
++/* calc the default flags for different clocks based on the parent array */
++static u32 bcm2835_register_clock_default_parents(
++	struct device *dev,
++	const struct bcm2835_clock_data *data)
++{
++	/* by default we disable the testdebug clocks for all known types */
++	if (data->parents == bcm2835_clock_osc_parents)
++		return
++			BIT(BCM2835_OSC_PARENT_GND) |
++			BIT(BCM2835_OSC_PARENT_OSC);
++	if (data->parents == bcm2835_clock_vpu_parents)
++		return
++			BIT(BCM2835_VPU_PARENT_GND) |
++			BIT(BCM2835_VPU_PARENT_OSC) |
++			BIT(BCM2835_VPU_PARENT_PLLA_CORE) |
++			BIT(BCM2835_VPU_PARENT_PLLC_CORE0) |
++			BIT(BCM2835_VPU_PARENT_PLLD_CORE) |
++			BIT(BCM2835_VPU_PARENT_PLLH_AUX) |
++			BIT(BCM2835_VPU_PARENT_PLLC_CORE1) |
++			BIT(BCM2835_VPU_PARENT_PLLC_CORE2);
++	if (data->parents == bcm2835_clock_per_parents)
++		return
++			BIT(BCM2835_PER_PARENT_GND) |
++			BIT(BCM2835_PER_PARENT_OSC) |
++			BIT(BCM2835_PER_PARENT_PLLA_PER) |
++			/* by default do not use PLLC_PER */
++			BIT(BCM2835_PER_PARENT_PLLD_PER) |
++			BIT(BCM2835_PER_PARENT_PLLH_AUX);
 +
-+/* the parent clock for different clock types */
-+#define BCM2835_OSC_PARENT_GND		0
-+#define BCM2835_OSC_PARENT_OSC		1
-+#define BCM2835_OSC_PARENT_TESTDEBUG0	2
-+#define BCM2835_OSC_PARENT_TESTDEBUG1	3
++	/* warn about unknown parents */
++	dev_warn(dev,
++		 "unknown clock parents for clock %s - enabling all %d parents\n",
++		 data->name, data->num_mux_parents);
 +
-+#define BCM2835_PER_PARENT_GND		0
-+#define BCM2835_PER_PARENT_OSC		1
-+#define BCM2835_PER_PARENT_TESTDEBUG0	2
-+#define BCM2835_PER_PARENT_TESTDEBUG1	3
-+#define BCM2835_PER_PARENT_PLLA_PER	4
-+#define BCM2835_PER_PARENT_PLLC_PER	5
-+#define BCM2835_PER_PARENT_PLLD_PER	6
-+#define BCM2835_PER_PARENT_PLLH_AUX	7
++	/* return enable all clocks */
++	return BIT(data->num_mux_parents) - 1;
++}
 +
-+#define BCM2835_VPU_PARENT_GND		0
-+#define BCM2835_VPU_PARENT_OSC		1
-+#define BCM2835_VPU_PARENT_TESTDEBUG0	2
-+#define BCM2835_VPU_PARENT_TESTDEBUG1	3
-+#define BCM2835_VPU_PARENT_PLLA_CORE	4
-+#define BCM2835_VPU_PARENT_PLLC_CORE0	5
-+#define BCM2835_VPU_PARENT_PLLD_CORE	6
-+#define BCM2835_VPU_PARENT_PLLH_AUX	7
-+#define BCM2835_VPU_PARENT_PLLC_CORE1	8
-+#define BCM2835_VPU_PARENT_PLLC_CORE2	9
+ /*
+  * the real definition of all the pll, pll_dividers and clocks
+  * these make use of the above REGISTER_* macros
 -- 
 2.1.4
