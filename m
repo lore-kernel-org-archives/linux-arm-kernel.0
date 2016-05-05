@@ -1,43 +1,43 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu,  5 May 2016 22:26:10 +0200
-Subject: [PATCH 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
+Date: Thu,  5 May 2016 22:26:11 +0200
+Subject: [PATCH 4/4] ARM: mxs: dts: Add SanDisk Sansa Fuze+ support
 In-Reply-To: <1462479971-7891-1-git-send-email-marex@denx.de>
 References: <1462479971-7891-1-git-send-email-marex@denx.de>
-Message-ID: <1462479971-7891-3-git-send-email-marex@denx.de>
+Message-ID: <1462479971-7891-4-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for this small MP3 player based on STMP3780 (rev.4).
-Currently supported is both external microSD and internal SD-NAND
+Add support for this small MP3 player based on STMP3780 (rev.3).
+Currently supported are both external microSD and internal SD-NAND
 bridge, PWM and USB gadget.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
 ---
- arch/arm/boot/dts/Makefile       |   1 +
- arch/arm/boot/dts/imx23-xfi3.dts | 190 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 191 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx23-xfi3.dts
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/imx23-sansa.dts | 216 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 217 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx23-sansa.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8f9f1c2..7a79d37 100644
+index 7a79d37..eaa8048 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -417,6 +417,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
+@@ -416,6 +416,7 @@ dtb-$(CONFIG_SOC_VF610) += \
+ dtb-$(CONFIG_ARCH_MXS) += \
  	imx23-evk.dtb \
  	imx23-olinuxino.dtb \
++	imx23-sansa.dtb \
  	imx23-stmp378x_devb.dtb \
-+	imx23-xfi3.dtb \
+ 	imx23-xfi3.dtb \
  	imx28-apf28.dtb \
- 	imx28-apf28dev.dtb \
- 	imx28-apx4devkit.dtb \
-diff --git a/arch/arm/boot/dts/imx23-xfi3.dts b/arch/arm/boot/dts/imx23-xfi3.dts
+diff --git a/arch/arm/boot/dts/imx23-sansa.dts b/arch/arm/boot/dts/imx23-sansa.dts
 new file mode 100644
-index 0000000..d7e7cf5
+index 0000000..60a578c
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx23-xfi3.dts
-@@ -0,0 +1,190 @@
++++ b/arch/arm/boot/dts/imx23-sansa.dts
+@@ -0,0 +1,216 @@
 +/*
 + * Copyright (C) 2013-2016 Marek Vasut <marex@denx.de>
 + *
@@ -90,8 +90,8 @@ index 0000000..d7e7cf5
 +#include "imx23.dtsi"
 +
 +/ {
-+	model = "Creative ZEN X-Fi3";
-+	compatible = "creative,x-fi3", "fsl,imx23";
++	model = "SanDisk Sansa Fuze+";
++	compatible = "sandisk,sansa_fuze_plus", "fsl,imx23";
 +
 +	memory {
 +		reg = <0x40000000 0x04000000>;
@@ -112,8 +112,9 @@ index 0000000..d7e7cf5
 +			ssp1: ssp at 80034000 {
 +				compatible = "fsl,imx23-mmc";
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc1_4bit_pins_a>;
-+				bus-width = <4>;
++				pinctrl-0 = <&mmc1_8bit_pins_a>;
++				bus-width = <8>;
++				vmmc-supply = <&reg_vddio_sd1>;
 +				non-removable;
 +				status = "okay";
 +			};
@@ -125,33 +126,24 @@ index 0000000..d7e7cf5
 +				hog_pins_a: hog at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						MX23_PAD_GPMI_D07__GPIO_0_7
++						MX23_PAD_GPMI_D08__GPIO_0_8
++						MX23_PAD_PWM3__GPIO_1_29
++						MX23_PAD_AUART1_RTS__GPIO_0_27
++						MX23_PAD_AUART1_CTS__GPIO_0_26
++						MX23_PAD_I2C_SCL__I2C_SCL
++						MX23_PAD_I2C_SDA__I2C_SDA
++						MX23_PAD_LCD_DOTCK__GPIO_1_22
++						MX23_PAD_LCD_HSYNC__GPIO_1_24
++						MX23_PAD_PWM3__GPIO_1_29
 +					>;
 +					fsl,drive-strength = <0>;
 +					fsl,voltage = <1>;
 +					fsl,pull-up = <0>;
 +				};
-+
-+				key_pins_a: keys at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX23_PAD_ROTARYA__GPIO_2_7
-+						MX23_PAD_ROTARYB__GPIO_2_8
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
 +			};
 +		};
 +
 +		apbx at 80040000 {
-+			i2c: i2c at 80058000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2c_pins_a>;
-+				status = "okay";
-+			};
-+
 +			pwm: pwm at 80064000 {
 +				pinctrl-names = "default";
 +				pinctrl-0 = <&pwm2_pins_a>;
@@ -161,12 +153,6 @@ index 0000000..d7e7cf5
 +			duart: serial at 80070000 {
 +				pinctrl-names = "default";
 +				pinctrl-0 = <&duart_pins_a>;
-+				status = "okay";
-+			};
-+
-+			auart1: serial at 8006e000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&auart1_2pins_a>;
 +				status = "okay";
 +			};
 +
@@ -195,7 +181,35 @@ index 0000000..d7e7cf5
 +			regulator-name = "vddio-sd0";
 +			regulator-min-microvolt = <3300000>;
 +			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio0 7 0>;
++			gpio = <&gpio0 8 0>;
++		};
++
++		reg_vddio_sd1: vddio-sd1 {
++			compatible = "regulator-fixed";
++			regulator-name = "vddio-sd1";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio1 29 0>;
++		};
++
++		reg_vdd_touchpad: vdd-touchpad0 {
++			compatible = "regulator-fixed";
++			regulator-name = "vdd-touchpad0";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio0 26 0>;
++			regulator-always-on;
++			enable-active-low;
++		};
++
++		reg_vdd_tuner: vdd-tuner0 {
++			compatible = "regulator-fixed";
++			regulator-name = "vdd-tuner0";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio0 29 0>;
++			regulator-always-on;
++			enable-active-low;
 +		};
 +	};
 +
@@ -206,27 +220,39 @@ index 0000000..d7e7cf5
 +		default-brightness-level = <6>;
 +	};
 +
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&key_pins_a>;
++	i2c at 0 {
 +		#address-cells = <1>;
 +		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		gpios = <
++			&gpio1 24 0		/* SDA */
++			&gpio1 22 0		/* SCL */
++		>;
++		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
++	};
 +
-+		button at 0 {
-+			label = "volume-down";
-+			linux,code = <114>;
-+			gpios = <&gpio2 7 0>;
-+			debounce-interval = <20>;
++	i2c at 1 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		gpios = <
++			&gpio0 31 0		/* SDA */
++			&gpio0 30 0		/* SCL */
++		>;
++		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
++
++		touch: touch at 20 {
++			compatible = "synaptics,synaptics_i2c";
++			reg = <0x20>;
 +		};
 +
-+		button at 1 {
-+			label = "volume-up";
-+			linux,code = <115>;
-+			gpios = <&gpio2 8 0>;
-+			debounce-interval = <20>;
++		eeprom: eeprom at 50 {
++			compatible = "atmel,24c64";
++			reg = <0x50>;
++			pagesize = <32>;
 +		};
 +	};
++
 +};
 -- 
 2.7.0
