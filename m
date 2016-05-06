@@ -1,144 +1,82 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 6 May 2016 11:59:14 -0700
-Subject: [PATCH 3/5] remoteproc: core: Add ability to select a firmware
- from the client
-In-Reply-To: <1462454983-13168-4-git-send-email-lee.jones@linaro.org>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160506185914.GF1256@tuxbot>
+From: thomas.hanson@linaro.org (Tom Hanson)
+Date: Fri, 6 May 2016 13:07:21 -0600
+Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world switch
+ backend
+In-Reply-To: <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
+Message-ID: <572CEB69.8040009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
-
-> ST Co-Processors can be loaded with different firmwares to execute
-> specific tasks without the need for unloading the rproc module.
-> 
-
-I'm very much interested in ideas related to this and who "owns" the
-life cycle of remoteprocs, do you have any code I can take a look at
-that's using this interface?
-
-> This patch provides a function which can update the firmware name.
-> 
-> NB: This can only happen if the rproc is offline.
-> 
-
-How is this working in the case when the remoteproc provides vdevs that
-is holding references towards the rproc?
-
-Do you unload rpmsg et al before doing this?
-
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 05/06/2016 04:45 AM, Andre Przywara wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+>
+> As the GICv3 virtual interface registers differ from their GICv2
+> siblings, we need different handlers for processing maintenance
+> interrupts and reading/writing to the LRs.
+> Implement the respective handler functions and connect them to
+> existing code to be called if the host is using a GICv3.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  drivers/remoteproc/remoteproc_core.c | 63 ++++++++++++++++++++++++++++++++++++
->  include/linux/remoteproc.h           | 13 ++++++++
->  2 files changed, 76 insertions(+)
-> 
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> index 85e5fd8..03720c0 100644
-> --- a/drivers/remoteproc/remoteproc_core.c
-> +++ b/drivers/remoteproc/remoteproc_core.c
-> @@ -1004,6 +1004,7 @@ int rproc_trigger_recovery(struct rproc *rproc)
->  
->  	/* Free the copy of the resource table */
->  	kfree(rproc->cached_table);
-> +	rproc->cached_table = NULL;
->  
+> Changelog RFC..v1:
+> - remove outdated comment about the dist_lock
+> - add WARN_ON about LR_STATE not being 0 in maintenance interrupts
+>
+> Changelog v1 .. v2:
+> - inject the IRQ priority into the list register
+>
+> Changelog v2 .. v3:
+> - remove no longer needed irqchip/arm-gic.h inclusion
+>
+>   include/linux/irqchip/arm-gic-v3.h |   1 +
+>   virt/kvm/arm/vgic/vgic-v3.c        | 168 +++++++++++++++++++++++++++++++++++++
+>   virt/kvm/arm/vgic/vgic.c           |  25 ++++--
+>   virt/kvm/arm/vgic/vgic.h           |  29 +++++++
+>   4 files changed, 218 insertions(+), 5 deletions(-)
+>   create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
+>
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index ec938d1..35e93cf 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -275,6 +275,7 @@
+>   #define ICH_LR_ACTIVE_BIT		(1ULL << 63)
+>   #define ICH_LR_PHYS_ID_SHIFT		32
+>   #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+> +#define ICH_LR_PRIORITY_SHIFT		48
+>
+>   /* These are for GICv2 emulation only */
+>   #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> new file mode 100644
+> index 0000000..43d1dd7
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
 
-Somewhat unrelated, but should be fixed, so let's go with it.
+...
 
->  	return rproc_add_virtio_devices(rproc);
->  }
-> @@ -1329,6 +1330,66 @@ struct rproc *rproc_get_by_phandle(phandle phandle)
->  EXPORT_SYMBOL(rproc_get_by_phandle);
->  
->  /**
-> + * rproc_set_fw_name() - change rproc fw name
-> + * @rproc: rproc handle
-> + * @firmware: name of firmware file to load
-> + *
-> + * set a new firmware name for rproc handle
-> + * firmware name can be updated only if the rproc is offline
-> + * if firmware name is NULL the fw name is set on default name
-> + *
-> + * this function can wait, if the old fw config virtio is not yet finish
-> + * (fw config request is asynchronous)
-> + *
-> + * Returns 0 on success and an appropriate error code otherwise.
-> + */
-> +int rproc_set_fw_name(struct rproc *rproc, const char *firmware)
+> +void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
 > +{
-> +	struct rproc_vdev *rvdev, *rvtmp;
+> +	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
+> +	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+> +	int lr;
 > +
-> +	if (!rproc)
-> +		return -EINVAL;
-> +
-> +	/* if rproc is just being registered, wait */
-> +	wait_for_completion(&rproc->firmware_loading_complete);
-> +
-> +	mutex_lock(&rproc->lock);
-> +
-> +	if (rproc->state != RPROC_OFFLINE) {
-> +		mutex_unlock(&rproc->lock);
-> +		return -EBUSY;
-> +	}
-> +
-> +	if (rproc->firmware && rproc->firmware != rproc->orig_firmware)
-> +		kfree(rproc->firmware);
+> +	/* Assumes ap_list_lock held */
 
-kfree(NULL) is fine, so you can drop the first part of the expression.
 
-> +
-> +	/* restore original fw name */
-> +	if (!firmware) {
-> +		rproc->firmware = rproc->orig_firmware;
-> +	} else {
-> +		rproc->firmware = kstrdup(firmware, GFP_KERNEL);
-> +		if (!rproc->firmware)
-> +			rproc->firmware = rproc->orig_firmware;
+If truly required that ap_list_lock already be locked, then the code should enforce it. At least in dev mode. Maybe:
+          DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->ap_list_lock));
 
-In the unlikely event that kstrdup fails I we should leave
-rproc->firmware unchanged and return an error here.
+...
 
-As this is written we will silently (with a blarg in the log if anyone
-checks) switch back to the default firmware and boot that.
+> +/* Requires the irq to be locked already */
+> +void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
 
-> +	}
-> +
-> +	dev_info(&rproc->dev, "%s, fw name updated with:%s\n",
-> +		 rproc->name, rproc->firmware);
-> +
-> +	mutex_unlock(&rproc->lock);
-> +
-> +	/* clean up remote vdev entries */
-> +	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node)
-> +		rproc_remove_virtio_dev(rvdev);
-> +
-> +	/* Free the copy of the resource table */
-> +	kfree(rproc->cached_table);
-> +	rproc->cached_table = NULL;
-> +
-> +	return rproc_add_virtio_devices(rproc);
-> +}
-> +EXPORT_SYMBOL(rproc_set_fw_name);
-[..]
->  
-> +struct rproc_subdev {
-> +	struct device dev;
-> +	struct rproc *rproc;
-> +	struct resource *res;
-> +};
-> +
-> +#define to_subdevice(d) container_of(d, struct rproc_subdev, dev)
-> +struct rproc_subdev *rproc_subdev_add(struct rproc *rproc,
-> +				      struct resource *res);
-> +void rproc_subdev_del(struct rproc_subdev *subdev);
-> +struct device *rproc_subdev_lookup(struct rproc *rproc, const char *name);
-> +int rproc_set_fw_name(struct rproc *rproc, const char *firmware);
 
-These belongs to the next patch.
+Similarly, if required then the code should enforce it.
+          DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
 
-Regards,
-Bjorn
+  ...
