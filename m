@@ -1,50 +1,78 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 06 May 2016 08:28:48 +0200
-Subject: [RFC v2 13/13] ARM: dts: exynos: Fix LAN and HUB after bootloader
- initialization on Odroid U3
-In-Reply-To: <9dff13ae-5863-2b45-0e6a-00b345a19019@osg.samsung.com>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <1462451666-17945-14-git-send-email-k.kozlowski@samsung.com>
- <9dff13ae-5863-2b45-0e6a-00b345a19019@osg.samsung.com>
-Message-ID: <572C39A0.8030701@samsung.com>
+Date: Fri, 06 May 2016 09:21:20 +0200
+Subject: [PATCH v6 0/9] mfd: max8997: Add regmap support
+Message-ID: <1462519289-2356-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2016 10:16 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
->> On Odroid U3 (Exynos4412-based) board if USB was initialized by
->> bootloader (in U-Boot "usb start" before tftpboot), the HUB (usb3503)
->> and LAN (smsc95xx) after after successful probing were not visible in the
->> system ("lsusb").
->>
->> In such case the devices had to be fully reset before configuring.
->> Reset by GPIO (called RESET_N pin) and by RESET field in STCD register
->> in usb3503 HUB are not sufficient. Instead full reset has to be done by
->> disabling and enabling regulator.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
-> 
-> [snip]
-> 
->>  
->> +	lan_pwrseq: pwrseq2 {
->> +		compatible = "mmc-pwrseq-simple";
-> 
-> It feels strange to have a "mmc-pwrseq-simple" compatible for a USB power
-> sequence provider. As I mentioned in the other patch, I think there should
-> either be a DT binding for the USB pwrseq-simple with a "usb-pwrseq-simple"
-> compatible that binds to the same pwrseq-simple driver or maybe having a
-> generic DT binding for any device with a new "pwrseq-simple" compatible.
-> 
-> Patch looks good to me though, so after having a DT binding and changing
-> the compatible string:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Hi,
 
-Probably this will change after Rob's feedback. :)
+
+This is a rebase and extension of old Robert Baldyga's work. [0]
+
+Robert no longer works in Samsung.
+
+>From the original cover letter:
+"This patchset modifies max8997 driver and associated function drivers to use
+register maps instead of operating directly on i2c bus. This change allowed
+to simplify irq handling, and to move some initializations to individual
+function drivers. Hence now when some functions are not enabled, their i2c
+clients, regmaps and irqs are not registered."
+
+
+My changes (since Robert's v5)
+==============================
+1. Rebase on v4.6-rc6.
+2. Collect more acks.
+3. Add few fixes:
+   a. Haptic fix from Marek,
+   b. Extcon and RTC fix from me,
+   c. DTS fixes from Marek.
+
+DTS changes are independent but rest of them (extcon/input/MFD) rely
+on each other.
+
+One way of merging would be to pick everything (except DTS) through
+one tree. Or use tags.
+
 
 Best regards,
 Krzysztof
+
+[0] http://lkml.iu.edu/hypermail//linux/kernel/1411.1/03152.html
+
+
+Krzysztof Kozlowski (3):
+  extcon: max8997: Fix handling error code of regmap_irq_get_virq()
+  rtc: max8997: Check for ERRNO of regmap_irq_get_virq()
+  extcon: max8997: Fix inconsistent indenting
+
+Marek Szyprowski (3):
+  input: max8997-haptic: Fix NULL pointer dereference
+  ARM: dts: exynos: Fix regulator name to avoid forbidden character on
+    exynos4210-trats
+  ARM: dts: exynos: Add interrupt line to MAX8997 PMIC on
+    exynos4210-trats
+
+Robert Baldyga (3):
+  mfd: max8997: Use regmap to access registers
+  mfd: max8997: handle IRQs using regmap
+  mfd: max8997: Change irq names to upper case
+
+ arch/arm/boot/dts/exynos4210-trats.dts |   4 +-
+ drivers/extcon/extcon-max8997.c        |  72 ++++---
+ drivers/input/misc/max8997_haptic.c    |  40 ++--
+ drivers/leds/leds-max8997.c            |  13 +-
+ drivers/mfd/Kconfig                    |   3 +-
+ drivers/mfd/Makefile                   |   2 +-
+ drivers/mfd/max8997-irq.c              | 383 ---------------------------------
+ drivers/mfd/max8997.c                  | 245 ++++++++++++++-------
+ drivers/power/max8997_charger.c        |  33 +--
+ drivers/regulator/max8997.c            |  87 ++++----
+ drivers/rtc/rtc-max8997.c              |  60 +++---
+ include/linux/mfd/max8997-private.h    |  82 +++++--
+ 12 files changed, 392 insertions(+), 632 deletions(-)
+ delete mode 100644 drivers/mfd/max8997-irq.c
+
+-- 
+1.9.1
