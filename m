@@ -1,84 +1,63 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 6 May 2016 08:26:38 -0600
-Subject: [PATCH] coresight: Handle build path error
-In-Reply-To: <1462358484-9342-1-git-send-email-suzuki.poulose@arm.com>
-References: <1462358484-9342-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkwEG-4U+hvdVNHQxoH_WuZvD_pYwDC6NSBOok9o5swNoA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 6 May 2016 16:30:10 +0200
+Subject: [PATCH] ARM: at91: sama5: Update defconfig
+In-Reply-To: <1462480295-8034-1-git-send-email-marex@denx.de>
+References: <1462480295-8034-1-git-send-email-marex@denx.de>
+Message-ID: <572CAA72.4000107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 May 2016 at 04:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> Enabling a component via sysfs (echo 1 > enable_source), would
-> trigger building a path from the enabled sources to the sink.
-> If there is an error in the process (e.g, sink not enabled or
-> the device (CPU corresponding to ETM) is not online), we never report
-> failure, except for leaving a message in the dmesg.
->
-> Do proper error checking for the build path and return the error.
->
-> Before:
->  $ echo 0 > /sys/devices/system/cpu/cpu2/online
->  $ echo 1 > /sys/devices/cs_etm/cpu2/enable_source
->  $ echo $?
->  0
->
-> After:
->  $ echo 0 > /sys/devices/system/cpu/cpu2/online
->  $ echo 1 > /sys/devices/cs_etm/cpu2/enable_source
->  -bash: echo: write error: No such device or address
->
-> Cc: Mathie Porier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Le 05/05/2016 22:31, Marek Vasut a ?crit :
+> Enable CGROUPS support, so we can boot userspace that uses systemd on
+> top of kernel configured using this defconfig. The systemd userspace
+> depends on cgroups and without them, it dies in mysterious ways.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-This patch looks good - thanks for the fix.  Due to how late we are in
-the cycle I'd ask Greg to pick it up right away but there is a
-(couple) of typos in my name on the CC line.  Either resend another
-patch with the correct spelling or remove the CC line altogether.
+Hi Marek,
 
-Thanks,
-Mathieu
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
+BTW, isn't it something else required to run a systemd enabled image?
+I've seen that some of the option may be missing as well:
+
+CONFIG_FHANDLE (libudev, mount and bind mount handling)
+from: https://github.com/systemd/systemd/blob/master/README#L51
+
+In the " Optional but strongly recommended:" I see interest in:
+ CONFIG_AUTOFS4_FS
+ CONFIG_TMPFS_XATTR
+ CONFIG_{TMPFS,EXT4,XFS,BTRFS_FS,...}_POSIX_ACL
+
+But it's maybe not so interesting for our little embedded systems.
+
+I'm also puzzled about the need for more options about cgroups...
+
+I add a couple of other people in Cc so we can figure out the proper
+configuration set...
+
+Thanks Marek for having started the discussion, bye,
 
 > ---
->  drivers/hwtracing/coresight/coresight.c |    9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index 2ea5961..e0c5166 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -393,6 +393,7 @@ out:
->  struct list_head *coresight_build_path(struct coresight_device *csdev)
->  {
->         struct list_head *path;
-> +       int rc;
->
->         path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
->         if (!path)
-> @@ -400,9 +401,10 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
->
->         INIT_LIST_HEAD(path);
->
-> -       if (_coresight_build_path(csdev, path)) {
-> +       rc = _coresight_build_path(csdev, path);
-> +       if (rc) {
->                 kfree(path);
-> -               path = NULL;
-> +               return ERR_PTR(rc);
->         }
->
->         return path;
-> @@ -448,8 +450,9 @@ int coresight_enable(struct coresight_device *csdev)
->                 goto out;
->
->         path = coresight_build_path(csdev);
-> -       if (!path) {
-> +       if (IS_ERR(path)) {
->                 pr_err("building path(s) failed\n");
-> +               ret = PTR_ERR(path);
->                 goto out;
->         }
->
-> --
-> 1.7.9.5
->
+>  arch/arm/configs/sama5_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+> index afbda41..1b60be2 100644
+> --- a/arch/arm/configs/sama5_defconfig
+> +++ b/arch/arm/configs/sama5_defconfig
+> @@ -3,6 +3,7 @@
+>  CONFIG_SYSVIPC=y
+>  CONFIG_IRQ_DOMAIN_DEBUG=y
+>  CONFIG_LOG_BUF_SHIFT=14
+> +CONFIG_CGROUPS=y
+>  CONFIG_BLK_DEV_INITRD=y
+>  CONFIG_EMBEDDED=y
+>  CONFIG_SLAB=y
+> 
+
+
+-- 
+Nicolas Ferre
