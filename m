@@ -1,39 +1,33 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 06 May 2016 09:27:16 +0200
-Subject: [PATCH v6 9/9] ARM: dts: exynos: Add interrupt line to MAX8997 PMIC on
- exynos4210-trats
+Date: Fri, 06 May 2016 09:27:13 +0200
+Subject: [PATCH v6 6/9] rtc: max8997: Check for ERRNO of regmap_irq_get_virq()
 In-Reply-To: <1462519636-3250-1-git-send-email-k.kozlowski@samsung.com>
 References: <1462519289-2356-2-git-send-email-k.kozlowski@samsung.com>
  <1462519636-3250-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1462519636-3250-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1462519636-3250-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Szyprowski <m.szyprowski@samsung.com>
+The regmap_irq_get_virq() can return zero or negative ERRNO, so it is
+insufficient to check only for non-zero value.
 
-MAX8997 PMIC requires interrupt and fails probing without it.
-
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Fixes: d105f0b1215d ("ARM: dts: Add basic dts file for Samsung Trats board")
-Cc: <stable@vger.kernel.org>
-[k.kozlowski: Write commit message, add CC-stable]
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210-trats.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/rtc/rtc-max8997.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index fed5847410d3..79d983036560 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -298,6 +298,8 @@
- 		compatible = "maxim,max8997-pmic";
+diff --git a/drivers/rtc/rtc-max8997.c b/drivers/rtc/rtc-max8997.c
+index 4998aee0f07f..1a06e17ebe9b 100644
+--- a/drivers/rtc/rtc-max8997.c
++++ b/drivers/rtc/rtc-max8997.c
+@@ -497,7 +497,7 @@ static int max8997_rtc_probe(struct platform_device *pdev)
+ 	}
  
- 		reg = <0x66>;
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <7 0>;
- 
- 		max8997,pmic-buck1-uses-gpio-dvs;
- 		max8997,pmic-buck2-uses-gpio-dvs;
+ 	virq = regmap_irq_get_virq(max8997->irq_data, MAX8997_PMICIRQ_RTCA1);
+-	if (!virq) {
++	if (virq <= 0) {
+ 		dev_err(&pdev->dev, "Failed to create mapping alarm IRQ\n");
+ 		ret = -ENXIO;
+ 		goto err_out;
 -- 
 1.9.1
