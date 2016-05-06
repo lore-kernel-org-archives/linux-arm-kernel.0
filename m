@@ -1,354 +1,177 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 6 May 2016 16:32:06 +0800
-Subject: [PATCH] Xen: EFI: Parse DT parameters for Xen specific UEFI
-Message-ID: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Fri, 06 May 2016 11:03:42 +0200
+Subject: [PATCH v3 1/3] leds: triggers: Allow to switch the trigger to
+ "panic" on a kernel panic
+In-Reply-To: <57230B26.9010300@samsung.com>
+References: <1461881020-13964-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1461881020-13964-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <57230B26.9010300@samsung.com>
+Message-ID: <572C5DEE.3070307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On 04/29/2016 09:20 AM, Jacek Anaszewski wrote:
+> Hi Ezequiel,
+>
+> Thanks for the update. It's indeed reasonable to have all the
+> switching infrastructure in ledtrig-panic.c.
+>
+> I've noticed two minor issues below.
 
-Add a new function to parse DT parameters for Xen specific UEFI just
-like the way for normal UEFI. Then it could reuse the existing codes.
+Since the merge window is imminent, I've addressed those issues by
+myself and applied the patch set to the for-next branch
+of linux-leds.git.
 
-If Xen supports EFI, initialize runtime services.
+Thanks,
+Jacek Anaszewski
 
-CC: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
-Drop using of EFI_PARAVIRT. Discussion can be found from [1].
-[1] https://lkml.org/lkml/2016/4/29/8
----
- arch/arm/include/asm/efi.h         |  2 +
- arch/arm/xen/enlighten.c           | 16 ++++++++
- arch/arm64/include/asm/efi.h       |  2 +
- drivers/firmware/efi/arm-runtime.c | 70 +++++++++++++++++++++++---------
- drivers/firmware/efi/efi.c         | 81 ++++++++++++++++++++++++++++++--------
- 5 files changed, 137 insertions(+), 34 deletions(-)
-
-diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-index e0eea72..5ba4343 100644
---- a/arch/arm/include/asm/efi.h
-+++ b/arch/arm/include/asm/efi.h
-@@ -52,9 +52,11 @@ static inline void efi_set_pgd(struct mm_struct *mm)
- 
- void efi_virtmap_load(void);
- void efi_virtmap_unload(void);
-+int xen_arm_enable_runtime_services(void);
- 
- #else
- #define efi_init()
-+#define xen_arm_enable_runtime_services() (0)
- #endif /* CONFIG_EFI */
- 
- /* arch specific definitions used by the stub code */
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 13e3e9f..3362870 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -16,6 +16,7 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include <asm/system_misc.h>
-+#include <asm/efi.h>
- #include <linux/interrupt.h>
- #include <linux/irqreturn.h>
- #include <linux/module.h>
-@@ -261,6 +262,13 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
- 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
- 		hyper_node.version = s + strlen(hyper_node.prefix);
- 
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		/* Check if Xen supports EFI */
-+		if ((of_get_flat_dt_subnode_by_name(node, "uefi") > 0) &&
-+		    !efi_runtime_disabled())
-+			set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-+	}
-+
- 	return 0;
- }
- 
-@@ -338,6 +346,7 @@ static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
- 	struct shared_info *shared_info_page = NULL;
-+	int ret;
- 
- 	if (!xen_domain())
- 		return 0;
-@@ -352,6 +361,13 @@ static int __init xen_guest_init(void)
- 		return -ENODEV;
- 	}
- 
-+	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_BOOT) &&
-+	    efi_enabled(EFI_RUNTIME_SERVICES)) {
-+		ret = xen_arm_enable_runtime_services();
-+		if (ret)
-+			return ret;
-+	}
-+
- 	shared_info_page = (struct shared_info *)get_zeroed_page(GFP_KERNEL);
- 
- 	if (!shared_info_page) {
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 8e88a69..574bee5 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -8,8 +8,10 @@
- 
- #ifdef CONFIG_EFI
- extern void efi_init(void);
-+int xen_arm_enable_runtime_services(void);
- #else
- #define efi_init()
-+#define xen_arm_enable_runtime_services() (0)
- #endif
- 
- int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 6ae21e4..211ec10 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -27,6 +27,7 @@
- #include <asm/mmu.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
-+#include <asm/xen/xen-ops.h>
- 
- extern u64 efi_system_table;
- 
-@@ -39,6 +40,33 @@ static struct mm_struct efi_mm = {
- 	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
- };
- 
-+static int __init efi_remap_init(void)
-+{
-+	u64 mapsize;
-+
-+	pr_info("Remapping and enabling EFI services.\n");
-+
-+	mapsize = memmap.map_end - memmap.map;
-+	memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
-+						   mapsize);
-+	if (!memmap.map) {
-+		pr_err("Failed to remap EFI memory map\n");
-+		return -ENOMEM;
-+	}
-+	memmap.map_end = memmap.map + mapsize;
-+	efi.memmap = &memmap;
-+
-+	efi.systab = (__force void *)ioremap_cache(efi_system_table,
-+						   sizeof(efi_system_table_t));
-+	if (!efi.systab) {
-+		pr_err("Failed to remap EFI System Table\n");
-+		return -ENOMEM;
-+	}
-+	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-+
-+	return 0;
-+}
-+
- static bool __init efi_virtmap_init(void)
- {
- 	efi_memory_desc_t *md;
-@@ -75,7 +103,7 @@ static bool __init efi_virtmap_init(void)
-  */
- static int __init arm_enable_runtime_services(void)
- {
--	u64 mapsize;
-+	int ret;
- 
- 	if (!efi_enabled(EFI_BOOT)) {
- 		pr_info("EFI services will not be available.\n");
-@@ -87,25 +115,14 @@ static int __init arm_enable_runtime_services(void)
- 		return 0;
- 	}
- 
--	pr_info("Remapping and enabling EFI services.\n");
--
--	mapsize = memmap.map_end - memmap.map;
--	memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
--						   mapsize);
--	if (!memmap.map) {
--		pr_err("Failed to remap EFI memory map\n");
--		return -ENOMEM;
-+	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-+		pr_info("EFI runtime services access via paravirt.\n");
-+		return 0;
- 	}
--	memmap.map_end = memmap.map + mapsize;
--	efi.memmap = &memmap;
- 
--	efi.systab = (__force void *)ioremap_cache(efi_system_table,
--						   sizeof(efi_system_table_t));
--	if (!efi.systab) {
--		pr_err("Failed to remap EFI System Table\n");
--		return -ENOMEM;
--	}
--	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-+	ret = efi_remap_init();
-+	if (ret)
-+		return ret;
- 
- 	if (!efi_virtmap_init()) {
- 		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
-@@ -122,6 +139,23 @@ static int __init arm_enable_runtime_services(void)
- }
- early_initcall(arm_enable_runtime_services);
- 
-+int __init xen_arm_enable_runtime_services(void)
-+{
-+	int ret;
-+
-+	ret = efi_remap_init();
-+	if (ret)
-+		return ret;
-+
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		/* Set up runtime services function pointers for Xen Dom0 */
-+		xen_efi_runtime_setup();
-+		efi.runtime_version = efi.systab->hdr.revision;
-+	}
-+
-+	return 0;
-+}
-+
- void efi_virtmap_load(void)
- {
- 	preempt_disable();
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 3a69ed5..f586e1e 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -469,12 +469,14 @@ device_initcall(efi_load_efivars);
- 		FIELD_SIZEOF(struct efi_fdt_params, field) \
- 	}
- 
--static __initdata struct {
-+struct params {
- 	const char name[32];
- 	const char propname[32];
- 	int offset;
- 	int size;
--} dt_params[] = {
-+};
-+
-+static __initdata struct params fdt_params[] = {
- 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
- 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
- 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-@@ -482,44 +484,91 @@ static __initdata struct {
- 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
- };
- 
-+static __initdata struct params xen_fdt_params[] = {
-+	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
-+};
-+
-+#define EFI_FDT_PARAMS_SIZE	ARRAY_SIZE(fdt_params)
-+
-+static __initdata struct {
-+	const char *uname;
-+	const char *subnode;
-+	struct params *params;
-+} dt_params[] = {
-+	{ "hypervisor", "uefi", xen_fdt_params },
-+	{ "chosen", NULL, fdt_params },
-+};
-+
- struct param_info {
- 	int found;
- 	void *params;
-+	const char *missing;
- };
- 
--static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
--				       int depth, void *data)
-+static int __init __find_uefi_params(unsigned long node,
-+				     struct param_info *info,
-+				     struct params *params)
- {
--	struct param_info *info = data;
- 	const void *prop;
- 	void *dest;
- 	u64 val;
- 	int i, len;
- 
--	if (depth != 1 || strcmp(uname, "chosen") != 0)
--		return 0;
--
--	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
--		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
--		if (!prop)
-+	for (i = 0; i < EFI_FDT_PARAMS_SIZE; i++) {
-+		prop = of_get_flat_dt_prop(node, params[i].propname, &len);
-+		if (!prop) {
-+			info->missing = params[i].name;
- 			return 0;
--		dest = info->params + dt_params[i].offset;
-+		}
-+
-+		dest = info->params + params[i].offset;
- 		info->found++;
- 
- 		val = of_read_number(prop, len / sizeof(u32));
- 
--		if (dt_params[i].size == sizeof(u32))
-+		if (params[i].size == sizeof(u32))
- 			*(u32 *)dest = val;
- 		else
- 			*(u64 *)dest = val;
- 
- 		if (efi_enabled(EFI_DBG))
--			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
--				dt_params[i].size * 2, val);
-+			pr_info("  %s: 0x%0*llx\n", params[i].name,
-+				params[i].size * 2, val);
- 	}
-+
- 	return 1;
- }
- 
-+static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
-+				       int depth, void *data)
-+{
-+	struct param_info *info = data;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		const char *subnode = dt_params[i].subnode;
-+
-+		if (depth != 1 || strcmp(uname, dt_params[i].uname) != 0) {
-+			info->missing = dt_params[i].params[0].name;
-+			continue;
-+		}
-+
-+		if (subnode) {
-+			node = of_get_flat_dt_subnode_by_name(node, subnode);
-+			if (node < 0)
-+				return 0;
-+		}
-+
-+		return __find_uefi_params(node, info, dt_params[i].params);
-+	}
-+
-+	return 0;
-+}
-+
- int __init efi_get_fdt_params(struct efi_fdt_params *params)
- {
- 	struct param_info info;
-@@ -535,7 +584,7 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
- 		pr_info("UEFI not found.\n");
- 	else if (!ret)
- 		pr_err("Can't find '%s' in device tree!\n",
--		       dt_params[info.found].name);
-+		       info.missing);
- 
- 	return ret;
- }
--- 
-2.0.4
+> On 04/29/2016 12:03 AM, Ezequiel Garcia wrote:
+>> This commit adds a new led_cdev flag LED_PANIC_INDICATOR, which
+>> allows to mark a specific LED to be switched to the "panic"
+>> trigger, on a kernel panic.
+>>
+>> This is useful to allow the user to assign a regular trigger
+>> to a given LED, and still blink that LED on a kernel panic.
+>>
+>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+>> ---
+>>   drivers/leds/led-triggers.c          |  2 +-
+>>   drivers/leds/leds.h                  |  1 +
+>>   drivers/leds/trigger/Kconfig         |  3 +++
+>>   drivers/leds/trigger/ledtrig-panic.c | 47
+>> ++++++++++++++++++++++++++++++++++++
+>>   include/linux/leds.h                 |  1 +
+>>   5 files changed, 53 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+>> index 2181581795d3..55fa65e1ae03 100644
+>> --- a/drivers/leds/led-triggers.c
+>> +++ b/drivers/leds/led-triggers.c
+>> @@ -26,7 +26,7 @@
+>>    * Nests outside led_cdev->trigger_lock
+>>    */
+>>   static DECLARE_RWSEM(triggers_list_lock);
+>> -static LIST_HEAD(trigger_list);
+>> +LIST_HEAD(trigger_list);
+>>
+>>    /* Used by LED Class */
+>>
+>> diff --git a/drivers/leds/leds.h b/drivers/leds/leds.h
+>> index db3f20da7221..7d38e6b9a740 100644
+>> --- a/drivers/leds/leds.h
+>> +++ b/drivers/leds/leds.h
+>> @@ -30,5 +30,6 @@ void led_set_brightness_nosleep(struct led_classdev
+>> *led_cdev,
+>>
+>>   extern struct rw_semaphore leds_list_lock;
+>>   extern struct list_head leds_list;
+>> +extern struct list_head trigger_list;
+>>
+>>   #endif    /* __LEDS_H_INCLUDED */
+>> diff --git a/drivers/leds/trigger/Kconfig b/drivers/leds/trigger/Kconfig
+>> index beac8c31c51b..4e4521c9072a 100644
+>> --- a/drivers/leds/trigger/Kconfig
+>> +++ b/drivers/leds/trigger/Kconfig
+>> @@ -121,6 +121,9 @@ config LEDS_TRIGGER_PANIC
+>>       depends on LEDS_TRIGGERS
+>>       help
+>>         This allows LEDs to be configured to blink on a kernel panic.
+>> +      Enabling this option will allow to mark certain LEDs as
+>> 'panic-indicators',
+>
+> s/"panic-indicators"/panic indicators/
+>
+> I understand that you referred here to the DT property name, but this
+> is not obvious at first glance, and it is an implementation detail.
+>
+>> +      allowing to blink them on a kernel panic, even if they are set to
+>> +      a different trigger.
+>>         If unsure, say Y.
+>>
+>>   endif # LEDS_TRIGGERS
+>> diff --git a/drivers/leds/trigger/ b/drivers/leds/trigger/ledtrig-panic.c
+>> index 627b350c5ec3..3e447bd2064a 100644
+>> --- a/drivers/leds/trigger/ledtrig-panic.c
+>> +++ b/drivers/leds/trigger/ledtrig-panic.c
+>> @@ -11,10 +11,54 @@
+>>
+>>   #include <linux/kernel.h>
+>>   #include <linux/init.h>
+>> +#include <linux/notifier.h>
+>>   #include <linux/leds.h>
+>> +#include "../leds.h"
+>>
+>>   static struct led_trigger *trigger;
+>>
+>> +/*
+>> + * This is a called in a special context by the atomic panic
+>
+> s/is a/is/
+>
+>> + * notifier. This means the trigger can be changed without
+>> + * worrying about locking.
+>> + */
+>> +static void led_trigger_set_panic(struct led_classdev *led_cdev)
+>> +{
+>> +    struct led_trigger *trig;
+>> +
+>> +    list_for_each_entry(trig, &trigger_list, next_trig) {
+>> +        if (strcmp("panic", trig->name))
+>> +            continue;
+>> +        if (led_cdev->trigger)
+>> +            list_del(&led_cdev->trig_list);
+>> +        list_add_tail(&led_cdev->trig_list, &trig->led_cdevs);
+>> +
+>> +        /* Avoid the delayed blink path */
+>> +        led_cdev->blink_delay_on = 0;
+>> +        led_cdev->blink_delay_off = 0;
+>> +
+>> +        led_cdev->trigger = trig;
+>> +        if (trig->activate)
+>> +            trig->activate(led_cdev);
+>> +        break;
+>> +    }
+>> +}
+>> +
+>> +static int led_trigger_panic_notifier(struct notifier_block *nb,
+>> +                      unsigned long code, void *unused)
+>> +{
+>> +    struct led_classdev *led_cdev;
+>> +
+>> +    list_for_each_entry(led_cdev, &leds_list, node)
+>> +        if (led_cdev->flags & LED_PANIC_INDICATOR)
+>> +            led_trigger_set_panic(led_cdev);
+>> +    return NOTIFY_DONE;
+>> +}
+>> +
+>> +static struct notifier_block led_trigger_panic_nb = {
+>> +    .notifier_call = led_trigger_panic_notifier,
+>> +};
+>> +
+>>   static long led_panic_blink(int state)
+>>   {
+>>       led_trigger_event(trigger, state ? LED_FULL : LED_OFF);
+>> @@ -23,6 +67,9 @@ static long led_panic_blink(int state)
+>>
+>>   static int __init ledtrig_panic_init(void)
+>>   {
+>> +    atomic_notifier_chain_register(&panic_notifier_list,
+>> +                       &led_trigger_panic_nb);
+>> +
+>>       led_trigger_register_simple("panic", &trigger);
+>>       panic_blink = led_panic_blink;
+>>       return 0;
+>> diff --git a/include/linux/leds.h b/include/linux/leds.h
+>> index 19eb10278bea..7e9fb00e15e8 100644
+>> --- a/include/linux/leds.h
+>> +++ b/include/linux/leds.h
+>> @@ -50,6 +50,7 @@ struct led_classdev {
+>>   #define LED_SYSFS_DISABLE    (1 << 22)
+>>   #define LED_DEV_CAP_FLASH    (1 << 23)
+>>   #define LED_HW_PLUGGABLE    (1 << 24)
+>> +#define LED_PANIC_INDICATOR    (1 << 25)
+>>
+>>       /* Set LED brightness level
+>>        * Must not sleep. Use brightness_set_blocking for drivers
+>>
+>
