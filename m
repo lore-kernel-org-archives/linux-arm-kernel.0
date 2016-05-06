@@ -1,103 +1,48 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 May 2016 11:45:27 +0100
-Subject: [PATCH v3 14/55] KVM: arm/arm64: vgic-new: Add acccessor to new
- struct vgic_irq instance
+Date: Fri,  6 May 2016 11:45:24 +0100
+Subject: [PATCH v3 11/55] KVM: arm/arm64: pmu: abstract access to number of
+ SPIs
 In-Reply-To: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
 References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462531568-9799-15-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462531568-9799-12-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Currently the PMU uses a member of the struct vgic_dist directly,
+which not only breaks abstraction, but will fail with the new VGIC.
+Abstract this access in the VGIC header file.
 
-The new VGIC implementation centers around a struct vgic_irq instance
-per virtual IRQ.
-Provide a function to retrieve the right instance for a given IRQ
-number and (in case of private interrupts) the right VCPU.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic.c
- create mode 100644 virt/kvm/arm/vgic/vgic.h
+ include/kvm/arm_vgic.h | 2 ++
+ virt/kvm/arm/pmu.c     | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-new file mode 100644
-index 0000000..fb45537
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include "vgic.h"
-+
-+struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid)
-+{
-+	/* SGIs and PPIs */
-+	if (intid <= VGIC_MAX_PRIVATE)
-+		return &vcpu->arch.vgic_cpu.private_irqs[intid];
-+
-+	/* SPIs */
-+	if (intid <= VGIC_MAX_SPI)
-+		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
-+
-+	/* LPIs are not yet covered */
-+	if (intid >= VGIC_MIN_LPI)
-+		return NULL;
-+
-+	WARN(1, "Looking up struct vgic_irq for reserved INTID");
-+	return NULL;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-new file mode 100644
-index 0000000..61b8d22
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __KVM_ARM_VGIC_NEW_H__
-+#define __KVM_ARM_VGIC_NEW_H__
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid);
-+
-+#endif
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 452bb85..c14ff77 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -347,6 +347,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
++#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
++				 ((i) < (k)->arch.vgic.nr_irqs))
+ 
+ int vgic_v2_probe(struct device_node *vgic_node,
+ 		  const struct vgic_ops **ops,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 575c7aa..bd2e872 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -477,7 +477,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		 * the interrupt number is the same for all vcpus, while as an
+ 		 * SPI it must be a separate number per vcpu.
+ 		 */
+-		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
++		if (irq < VGIC_NR_SGIS || !vgic_valid_spi(vcpu->kvm, irq) ||
+ 		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+ 			return -EINVAL;
+ 
 -- 
 2.7.3
