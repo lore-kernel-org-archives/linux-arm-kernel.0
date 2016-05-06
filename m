@@ -1,32 +1,34 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 6 May 2016 11:02:17 -0700
-Subject: [GIT PULL] i.MX clock fixes for 4.6, take 2
-In-Reply-To: <20160503133605.GN5874@tiger>
-References: <20160503133605.GN5874@tiger>
-Message-ID: <20160506180217.GW3492@codeaurora.org>
+Date: Fri, 6 May 2016 11:04:03 -0700
+Subject: [GIT PULL] i.MX clock updates for 4.7, take 2
+In-Reply-To: <20160503134356.GO5874@tiger>
+References: <20160503134356.GO5874@tiger>
+Message-ID: <20160506180403.GX3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/03, Shawn Guo wrote:
-> The following changes since commit 7196c52c9377df0175b510ff5896bda524f7345e:
+> The following changes since commit 69c542e8022ca53c5fee664548163809eb1777c3:
 > 
->   clk: imx6q: fix typo in CAN clock definition (2016-04-13 15:27:15 +0800)
+>   clk: imx: vf610: fix whitespace in vf610-clock.h (2016-04-12 09:31:08 +0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-fixes-4.6-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.7-2
 > 
-> for you to fetch changes up to 3397c2c45b1b6f54834dfeae30a73046f33ca943:
+> for you to fetch changes up to 92a847e3609a8d00bcbe8bdfacbcbbca03135410:
 > 
->   ARM: dts: imx35: restore existing used clock enumeration (2016-04-18 12:37:21 +0800)
+>   clk: imx7d: fix ahb clock mux 1 (2016-05-03 20:35:38 +0800)
 > 
 > ----------------------------------------------------------------
-> The i.MX clock fixes for 4.6, take 2:
->  - Fix the commit 3713e3f5e927 ("clk: imx35: define two clocks for rtc")
->    which messed up the clock enumeration when adding new clock.
+> The i.MX clock updates for 4.7, take 2:
+>  - Update clk-pllv3 driver to get it return correct frequency for
+>    Ethernet PLL on i.MX7D.
+>  - Correct ahb clock mux settings for i.MX7D per latest hardware
+>    document.
+> 
 
-This commit wasn't introduced in this merge window, so I'm going
-to pull this into clk-next unless you have some justification.
+Thanks. Pulled into clk-next.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
