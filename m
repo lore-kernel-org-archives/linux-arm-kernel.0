@@ -1,55 +1,60 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 06 May 2016 08:24:32 +0200
-Subject: [RFC v2 07/13] power: pwrseq: simple: Add support for toggling
- regulator
-In-Reply-To: <d27c30c1-f205-973e-71f1-f5b410418d04@osg.samsung.com>
+Date: Fri, 06 May 2016 08:26:28 +0200
+Subject: [RFC v2 09/13] power: pwrseq: Add support for USB hubs with
+ external power
+In-Reply-To: <3bdf7888-5ed1-2a55-6607-ee8be70e25e7@osg.samsung.com>
 References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <1462451666-17945-8-git-send-email-k.kozlowski@samsung.com>
- <d27c30c1-f205-973e-71f1-f5b410418d04@osg.samsung.com>
-Message-ID: <572C38A0.7060707@samsung.com>
+ <1462451666-17945-10-git-send-email-k.kozlowski@samsung.com>
+ <3bdf7888-5ed1-2a55-6607-ee8be70e25e7@osg.samsung.com>
+Message-ID: <572C3914.4040708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2016 09:31 PM, Javier Martinez Canillas wrote:
+On 05/05/2016 09:52 PM, Javier Martinez Canillas wrote:
 > Hello Krzysztof,
 > 
 > On 05/05/2016 08:34 AM, Krzysztof Kozlowski wrote:
->> Some devices need real hard-reset by cutting the power.  During power
->> sequence turn off and on the regulator, if it is provided.
+>> Some USB devices on embedded boards have external power supply which has
+>> to be reset in certain conditions. Add pwrseq interface for this.
 >>
 >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >> ---
-> 
-> [snip]
-> 
+>>  drivers/power/pwrseq/pwrseq.c | 44 +++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pwrseq.h        |  8 ++++++++
+>>  2 files changed, 52 insertions(+)
+>>
+>> diff --git a/drivers/power/pwrseq/pwrseq.c b/drivers/power/pwrseq/pwrseq.c
+>> index 495a19d3c30b..306265f55a10 100644
+>> --- a/drivers/power/pwrseq/pwrseq.c
+>> +++ b/drivers/power/pwrseq/pwrseq.c
+>> @@ -52,6 +52,43 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+>>  }
+>>  EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
 >>  
->>  #define to_pwrseq_simple(p) container_of(p, struct mmc_pwrseq_simple, pwrseq)
->> @@ -62,6 +65,13 @@ static void mmc_pwrseq_simple_post_power_on(struct pwrseq *_pwrseq)
->>  {
->>  	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(_pwrseq);
->>  
->> +	if (pwrseq->ext_reg) {
->> +		int err;
->> +
->> +		err = regulator_enable(pwrseq->ext_reg);
->> +		WARN_ON_ONCE(err);
->> +	}
->> +
+>> +struct pwrseq *pwrseq_alloc(struct device *dev)
+>> +{
 > 
-> Shouldn't this be in mmc_pwrseq_simple_pre_power_on() instead?
+> This function is USB specific so better to call it usb_pwrseq_alloc() instead.
+
+Indeed it is parsing USB specific bindings so such prefix is needed.
+
+> Although, this function has a lot of duplicated code from mmc_pwrseq_alloc()
+> so I think is better to keep the name generic and factorize the common code.
 > 
-> For example, a chip may need to be powered on before attempting to
-> toggle its reset or power pins using some GPIO lines.
+> I expect other devices are also needing some kind of power seq in the future
+> so having a single alloc function instead of each for device type makes sense.
 
-Indeed this should be still sorted out but here the assumption is that
-regulator is disabled (by probe()) so it should be turned on with
-GPIO-reset set.
+Yes, this can be cleaned up and unified.
 
-This can be done at the end of pre-power-on or here (beginning of
-post-power-on). On the other hand I understand these pre/post callbacks
-as one starting the reset sequence (pre) and second as finishing it
-(post). In case of regulators, finishing power sequence is to turn the
-regulator on.
+> 
+>> +	struct device_node *np;
+>> +	struct pwrseq *p, *ret = NULL;
+>> +
+>> +	np = of_parse_phandle(dev->of_node, "usb-pwrseq", 0);
+> 
+> I know this is just an RFC but you should really add DT bindings for this.
+
+Yep, next step.
 
 Best regards,
 Krzysztof
