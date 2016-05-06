@@ -1,114 +1,94 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 May 2016 11:45:41 +0100
-Subject: [PATCH v3 28/55] KVM: arm/arm64: vgic-new: Add CONFIG registers
- handlers
-In-Reply-To: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462531568-9799-29-git-send-email-andre.przywara@arm.com>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Fri,  6 May 2016 13:10:18 +0200
+Subject: [PATCH v7 0/3] gpio: add DT support for memory-mapped GPIOs
+Message-ID: <cover.1462372360.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be
-easily referenced from the v3 emulation as well later.
+This patch series adds device tree support for generic memory-mapped GPIOs.
+The GPIO library already allows drivers and architecture support code to
+reuse generic code for managing a GPIO chip. Currently, a developer has
+to create a platform device "basic-mmio-gpio" and attach a bgpio_pdata
+platform data structure to make use of it. However, for architectures
+which rely on the device tree to enumerate devices, creating custom
+platform devices is another extra step that can be avoided by having
+direct support via a device tree binding.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Changelog v1 .. v2:
-- adapt to new MMIO framework
+I initially came across this patch [0] from ?lvaro Fern?ndez Rojas,
+while looking for an easy way to add support for the GPIO of my
+WD MyBook Live [1] (APM82181). His generic approach patch allowed
+me to easily get the GPIO (and the connected LEDs, buttons, gpiohogs)
+up and running. Even thought, Mr. Fernandez initially developed it
+for his work on the brcm63xx [2].
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
- 3 files changed, 54 insertions(+), 1 deletion(-)
+The drivers for gpio-clps711x, gpio-ge, gpio-moxart and gpio-ts4800
+are now part of the gpio-mmio.c driver. The old driver files have
+been removed and the Kconfig, Makefile entries have been updated
+accordingly.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 2e17250..2a953ec 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -88,7 +88,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 2),
-+		vgic_mmio_read_config, vgic_mmio_write_config, 2),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index d7fe9e6..19fed56 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -321,6 +321,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
-+				    gpa_t addr, unsigned int len)
-+{
-+	u32 intid = (addr & 0xff) * 4;
-+	u32 value = 0;
-+	int i;
-+
-+	for (i = 0; i < len * 4; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		if (irq->config == VGIC_CONFIG_EDGE)
-+			value |= (2U << (i * 2));
-+	}
-+
-+	return extract_bytes(value, addr & 3, len);
-+}
-+
-+void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-+			    gpa_t addr, unsigned int len,
-+			    unsigned long val)
-+{
-+	u32 intid = (addr & 0xff) * 4;
-+	int i;
-+
-+	for (i = 0; i < len * 4; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		if (intid + i < 16)
-+			continue;
-+
-+		/*
-+		 * The spec says that interrupts must be disabled before
-+		 * changing the configuration to avoid UNDEFINED behaviour.
-+		 */
-+
-+		spin_lock(&irq->irq_lock);
-+		if (test_bit(i * 2 + 1, &val)) {
-+			irq->config = VGIC_CONFIG_EDGE;
-+		} else {
-+			irq->config = VGIC_CONFIG_LEVEL;
-+			irq->pending = irq->line_level | irq->soft_pending;
-+		}
-+		spin_unlock(&irq->irq_lock);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index cd04ac5..884eb71 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -114,6 +114,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
- 			      gpa_t addr, unsigned int len,
- 			      unsigned long val);
- 
-+unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
-+				    gpa_t addr, unsigned int len);
-+
-+void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-+			    gpa_t addr, unsigned int len,
-+			    unsigned long val);
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- #endif
+And finally, the most important stat about the series:
+	>>> 333 insertions(+), 411 deletions(-) <<<
+	It still removes more lines than it adds!
+
+Thanks!
+
+[0] <https://patchwork.ozlabs.org/patch/422121/>
+[1] <https://github.com/chunkeey/MBL-openwrt>
+[2] <https://wiki.openwrt.org/doc/hardware/soc/soc.broadcom.bcm63xx>
+
+changelog:
+
+v6 -> v7:
+	- finally made a PATCH series (based on linux-gpio devel branch)
+	- added Rob Herring's ACK to the dt bindings
+	- cc'd clps711x, gpio-ge, moxart and ts4800 authors for driver
+	  changes.
+
+v5 -> v6:
+	- rewrote bindings and driver patch to fit the wd,mbl-gpio
+	- unified parser code for gpio-ge, gpio-moxart and gpio-ts4800
+	- fixed gpio chip's base being overwritten with bogus "0"
+	- fixed compat driver crash when reload gpio-generic.ko module
+	- dropped already applied patches from the series
+	- rebased code on linus' devel tree
+	- moved dt bindings patch to the top of the series
+
+v4 -> v5:
+	- reverted rename of gpio-mmio.c back to gpio-generic.c
+	- fixed Andy Shevchenko's comments
+	- consolidated changes from clps711x, gpio-ge, gpio-moxart and
+	  gpio-ts4800 into one patch.
+
+v3 -> v4:
+	- renamed gpio-generic.c to gpio-mmio.c
+	- changed compat. string to "linux,gpio-mmio"
+	- integrated Cirrus clps711x driver
+	- integrated GE FGPA gpio-ge driver
+	- integrated MOXA ART GPIO driver
+	- integrated TS4800 gpio driver
+	- reshuffled patches, reworded commits, fixed spelling errors, etc.
+
+Christian Lamparter (2):
+  gpio: dt-bindings: add wd,mbl-gpio bindings
+  gpio: move clps711x, moxart, ts4800 and gpio-ge into gpio-mmio
+
+?lvaro Fern?ndez Rojas (1):
+  gpio: mmio: add DT support for memory-mapped GPIOs
+
+ .../devicetree/bindings/gpio/wd,mbl-gpio.txt       |  38 +++
+ drivers/gpio/Kconfig                               |  43 +--
+ drivers/gpio/Makefile                              |   4 -
+ drivers/gpio/gpio-clps711x.c                       |  91 -------
+ drivers/gpio/gpio-ge.c                             | 114 --------
+ drivers/gpio/gpio-mmio.c                           | 289 ++++++++++++++++++++-
+ drivers/gpio/gpio-moxart.c                         |  84 ------
+ drivers/gpio/gpio-ts4800.c                         |  81 ------
+ 8 files changed, 333 insertions(+), 411 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+ delete mode 100644 drivers/gpio/gpio-clps711x.c
+ delete mode 100644 drivers/gpio/gpio-ge.c
+ delete mode 100644 drivers/gpio/gpio-moxart.c
+ delete mode 100644 drivers/gpio/gpio-ts4800.c
+
 -- 
-2.7.3
+2.8.1
