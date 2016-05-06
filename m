@@ -1,64 +1,26 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 6 May 2016 15:43:24 +0100
-Subject: [PATCH 0/3] Support MPS2 UART controller
-In-Reply-To: <CAP=VYLopd8erCP9J9cTyZ+YubafKjWi3bHQp-swmyfyn2eZ_Ww@mail.gmail.com>
-References: <1461574068-14641-1-git-send-email-vladimir.murzin@arm.com>
- <CAP=VYLopd8erCP9J9cTyZ+YubafKjWi3bHQp-swmyfyn2eZ_Ww@mail.gmail.com>
-Message-ID: <572CAD8C.5000102@arm.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 6 May 2016 16:50:11 +0200
+Subject: [PATCH v2 04/11] clocksource/moxart: Generalise timer for use on
+ other socs
+In-Reply-To: <20160503133603.GA19298@linaro.org>
+References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
+ <1461225849-28074-5-git-send-email-joel@jms.id.au>
+ <571A5FBA.9010204@linaro.org>
+ <CACPK8XfgDPPYG=ON-Z+gEKSg1fe4PuqRWoMz8P-9oCMvgQKmhw@mail.gmail.com>
+ <20160503133603.GA19298@linaro.org>
+Message-ID: <CACmBeS2U62DTbGPDgcnPSRNSD180Jw8NWbV0A+6LF3QMBnczzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/16 15:31, Paul Gortmaker wrote:
-> On Mon, Apr 25, 2016 at 4:47 AM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
->> Hi,
->>
->> These patches allow to use UART controller found on MPS2 platform.
-> 
-> Did you intend this driver to support being modular?  It has a bool Kconfig
-> (not tristate) which makes the module_exit dead code.
-> 
-> If it will always be builtin (with console as primary use case) then you can
-> see commit 89ebc27427695bfc1e769f1dd99bd243d332ac7a as a possible
-> update suggestion.
+On 3 May 2016 at 15:36, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> Apparently, it could be the fttmr010 [2].
+>
+> May be Jonas Jensen can confirm that.
 
-Thanks for the pointer, Paul! I'll see how to update the driver and send
-a patch after next merge window closed.
+The best I can do is infer (if that helps).
 
-Cheers
-Vladimir
+Also I can test on UC-7112-LX Plus hardware (the patch I got from Ben
+back in May 2015 was verified OK).
 
-> 
-> P.
-> --
-> 
->>
->> Following [1], please, consider to merge them into tty/serial tree.
->>
->> [1] https://lkml.org/lkml/2016/4/23/190
->>
->> Thanks!
->>
->> Vladimir Murzin (3):
->>   dt-bindings: document the MPS2 UART bindings
->>   serial: mps2-uart: add MPS2 UART driver
->>   serial: mps2-uart: add support for early console
->>
->>  .../devicetree/bindings/serial/arm,mps2-uart.txt   |   19 +
->>  drivers/tty/serial/Kconfig                         |   13 +
->>  drivers/tty/serial/Makefile                        |    1 +
->>  drivers/tty/serial/mps2-uart.c                     |  625 ++++++++++++++++++++
->>  include/uapi/linux/serial_core.h                   |    3 +
->>  5 files changed, 661 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
->>  create mode 100644 drivers/tty/serial/mps2-uart.c
->>
->> --
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+
+   Jonas
