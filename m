@@ -1,56 +1,30 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 6 May 2016 14:35:45 -0400
-Subject: [PATCH V4 0/2] vfio, platform: add ACPI support
-In-Reply-To: <57290E25.7010501@codeaurora.org>
-References: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
- <3322250.xDEDujoeAM@wuerfel> <57290E25.7010501@codeaurora.org>
-Message-ID: <572CE401.4080102@codeaurora.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 6 May 2016 11:44:06 -0700
+Subject: [PATCH 1/5] remoteproc: core: Task sync during rproc_fw_boot()
+In-Reply-To: <1462454983-13168-2-git-send-email-lee.jones@linaro.org>
+References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
+ <1462454983-13168-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160506184406.GD1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/3/2016 4:46 PM, Sinan Kaya wrote:
-> On 5/3/2016 4:12 PM, Arnd Bergmann wrote:
->> On Sunday 01 May 2016 17:07:50 Sinan Kaya wrote:
->>> The patchset makes three different changes.
->>> 1. Add support for probing ACPI platform devices.
->>> 2. Add support for ACPI _RST method support during reset
->>> 3. Make reset driver a requirement by default with an optional
->>>    kernel command line override
->>
->> Looks nice, thanks for rewriting this!
->>
->> For future submissions, it would help to have a list of changes
->> compared to the previous versions a the patch set in the cover
->> letter to help reviewers, but this time my memory was still fresh
->> enough.
->>
->> 	Arnd
->>
-> 
-> Sure, will do. I asked Rafael to review the ACPI code. 
-> 
-> +		ret = vfio_platform_call_reset(vdev);
-> 
-> This is the only problem I'm seeing in the code. I tested the ACPI path only. 
-> I'm wondering if Eric could test the device tree version.
-> 
-> +		if (ret)
-> +			goto err_irq;
->  
-> I'll get rid of this line on the first patch and move it to second
-> patch along with reset_required check.
-> 
+On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
 
-Before I post my next patch, I wanted to see if there is any other 
-feedback. Rafael mentioned to me that this code should go through
-his branch as it is ACPI specific.
+> By default, rproc_fw_boot() needs to wait for rproc to be configured,
+> but a race may occur when using rpmsg/virtio.  In this case, it can
+> be called locally in a safe manor.
+> 
+> This patch represents two usecases:
+> 
+>  - External call (via exported rproc_boot()), which waits
+>  - Internal call can use 'nowait' version of rproc_boot()
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Are we OK with this? Alex?
+Looks good
 
-I'm hoping that Eric Auger will be able to test DT in parallel.
-I haven't heart from him though.
+Applied to rproc-next.
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Regards,
+Bjorn
