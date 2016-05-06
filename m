@@ -1,139 +1,71 @@
-From: nkaje@codeaurora.org (Naveen Kaje)
-Date: Fri, 6 May 2016 11:53:07 -0600
-Subject: [V2,2/2] drivers: i2c: qup: Fix error handling
-In-Reply-To: <1462534274-28925-3-git-send-email-sricharan@codeaurora.org>
-References: <1462534274-28925-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <b2353f0e-3516-6bce-688a-2eeee2244ec8@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 6 May 2016 11:00:02 -0700
+Subject: [PATCH v7 8/9] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <572C64B5.6080607@rock-chips.com>
+References: <1462371194-5809-1-git-send-email-david.wu@rock-chips.com>
+ <1462372609-6535-1-git-send-email-david.wu@rock-chips.com>
+ <CAD=FV=VhMJiowNWm+0=jzzK0vajg1=3PutaWbzhGPN_BU2+19w@mail.gmail.com>
+ <572C64B5.6080607@rock-chips.com>
+Message-ID: <CAD=FV=XOOAbKxqJsxGU4pXbNJtbq_Q4Pj2=9P48NCze5NTJyrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
-On 5/6/2016 5:31 AM, Sricharan R wrote:
-> Among the bus errors reported from the QUP_MASTER_STATUS register
-> only NACK is considered and transfer gets suspended, while
-> other errors are ignored. Correct this and suspend the transfer
-> for other errors as well. This avoids unnessecary 'timeouts' which
-> happens when waiting for events that would never happen when there
-> is already an error condition on the bus.
+On Fri, May 6, 2016 at 2:32 AM, David.Wu <david.wu@rock-chips.com> wrote:
+>> Also (optional): once you do that, there becomes much less of a reason
+>> to store "t_calc" in "struct rk3x_i2c".  Already you're never using
+>> the "div_low" and "div_high" that you store in the "struct rk3x_i2c".
+>> Of course, to do that you've got to change other places not to clobber
+>> these bits in REG_CON.
+>>
 >
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> Reviewed-by: Andy Gross <andy.gross@linaro.org>
-Hi Sricharan,
-Looks good to me. Tested on QDF2432 platform.
+> So, I only just need to store tuning value in the "struct rk3x_i2c", but not
+> to store the "div_low" and "div_high"?
 
-Reviewed-by: Naveen Kaje <nkaje@codeaurora.org>
-Tested-by: Naveen Kaje <nkaje@codeaurora.org>
+I was suggesting not adding anything to what's stored in "struct
+rk3x_i2c" (AKA don't add t_calc there).  Just set the value directly
+in the register here then change all other bits of code to respect it.
 
-> ---
->   drivers/i2c/busses/i2c-qup.c | 42 +++++++++++++++++++++++++++++-------------
->   1 file changed, 29 insertions(+), 13 deletions(-)
+That is:
+
+In rk3x_i2c_start(), write:
+
+  u32 val = i2c_readl(i2c, REG_CON) & REG_CON_TUNING_MASK;
+
+In rk3x_i2c_xfer(), write:
+  val = i2c_readl(i2c, REG_CON) & REG_CON_TUNING_MASK
+  val |= REG_CON_EN | REG_CON_STOP, REG_CON;
+  i2c_writel(i2c, val);
+
+
+You could get fancy and add a new "i2c_update_bits", but that might be overkill.
+
+
+> The patches we have already used in our projects, they are verified by the
+> basic tests. I would ask them to do more tests. Because we didn't change the
+> clock rate now, it was a fixed value when clk inited, so we could not find
+> the bug here.
+
+OK.  Presumably a rk3066 w/ DVS enabled would be a good test?  Reading
+the description of commit 249051f49907 ("i2c: rk3x: handle dynamic
+clock rate changes correctly"), I see:
+
+    The i2c input clock can change dynamically, e.g. on the RK3066 where
+    pclk_i2c0 and pclk_i2c1 are connected to the armclk, which changes
+    rate on cpu frequency scaling.
+
+
+>> If you take that advice, you can get rid of all of the "if
+>> (i2c->pclk)" statements in your code.
+>>
 >
-> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-> index 8620e99..af52a47 100644
-> --- a/drivers/i2c/busses/i2c-qup.c
-> +++ b/drivers/i2c/busses/i2c-qup.c
-> @@ -310,6 +310,7 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
->   	u32 opflags;
->   	u32 status;
->   	u32 shift = __ffs(op);
-> +	int ret = 0;
->   
->   	len *= qup->one_byte_t;
->   	/* timeout after a wait of twice the max time */
-> @@ -321,18 +322,31 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
->   
->   		if (((opflags & op) >> shift) == val) {
->   			if ((op == QUP_OUT_NOT_EMPTY) && qup->is_last) {
-> -				if (!(status & I2C_STATUS_BUS_ACTIVE))
-> -					return 0;
-> +				if (!(status & I2C_STATUS_BUS_ACTIVE)) {
-> +					ret = 0;
-> +					goto done;
-> +				}
->   			} else {
-> -				return 0;
-> +				ret = 0;
-> +				goto done;
->   			}
->   		}
->   
-> -		if (time_after(jiffies, timeout))
-> -			return -ETIMEDOUT;
-> -
-> +		if (time_after(jiffies, timeout)) {
-> +			ret = -ETIMEDOUT;
-> +			goto done;
-> +		}
->   		usleep_range(len, len * 2);
->   	}
-> +
-> +done:
-> +	if (qup->bus_err || qup->qup_err) {
-> +		if (qup->bus_err & QUP_I2C_NACK_FLAG)
-> +			dev_err(qup->dev, "NACK from %x\n", qup->msg->addr);
-> +		ret = -EIO;
-> +	}
-> +
-> +	return ret;
->   }
->   
->   static void qup_i2c_set_write_mode_v2(struct qup_i2c_dev *qup,
-> @@ -796,7 +810,6 @@ static int qup_i2c_bam_do_xfer(struct qup_i2c_dev *qup, struct i2c_msg *msg,
->   		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
->   			msg--;
->   			dev_err(qup->dev, "NACK from %x\n", msg->addr);
-> -			ret = -EIO;
->   
->   			if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
->   				dev_err(qup->dev, "change to run state timed out");
-> @@ -818,6 +831,7 @@ static int qup_i2c_bam_do_xfer(struct qup_i2c_dev *qup, struct i2c_msg *msg,
->   
->   			qup_i2c_rel_dma(qup);
->   		}
-> +		ret = -EIO;
->   	}
->   
->   	dma_unmap_sg(qup->dev, qup->btx.sg, tx_nents, DMA_TO_DEVICE);
-> @@ -841,9 +855,6 @@ static int qup_i2c_bam_xfer(struct i2c_adapter *adap, struct i2c_msg *msg,
->   	if (ret)
->   		goto out;
->   
-> -	qup->bus_err = 0;
-> -	qup->qup_err = 0;
-> -
->   	writel(0, qup->base + QUP_MX_INPUT_CNT);
->   	writel(0, qup->base + QUP_MX_OUTPUT_CNT);
->   
-> @@ -882,10 +893,9 @@ static int qup_i2c_wait_for_complete(struct qup_i2c_dev *qup,
->   	}
->   
->   	if (qup->bus_err || qup->qup_err) {
-> -		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
-> +		if (qup->bus_err & QUP_I2C_NACK_FLAG)
->   			dev_err(qup->dev, "NACK from %x\n", msg->addr);
-> -			ret = -EIO;
-> -		}
-> +		ret = -EIO;
->   	}
->   
->   	return ret;
-> @@ -1178,6 +1188,9 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
->   	if (ret < 0)
->   		goto out;
->   
-> +	qup->bus_err = 0;
-> +	qup->qup_err = 0;
-> +
->   	writel(1, qup->base + QUP_SW_RESET);
->   	ret = qup_i2c_poll_state(qup, QUP_RESET_STATE);
->   	if (ret)
-> @@ -1227,6 +1240,9 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
->   	struct qup_i2c_dev *qup = i2c_get_adapdata(adap);
->   	int ret, len, idx = 0, use_dma = 0;
->   
-> +	qup->bus_err = 0;
-> +	qup->qup_err = 0;
-> +
->   	ret = pm_runtime_get_sync(qup->dev);
->   	if (ret < 0)
->   		goto out;
+> It would make i2c->clk to be enabled and prepared twice when uses
+> rk3x_i2c_v0_calc_timings for old hardware. But if do the opposite
+> disabled and unprepated twice, that is okay.
+
+Right.  The same clock will get an enable / prepare count of "2"
+(instead of two different clocks getting a count of "1).  ...but
+nothing should be hurt by that.
+
+-Doug
