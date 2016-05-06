@@ -1,61 +1,60 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 6 May 2016 12:19:11 -0700
-Subject: [PATCH] ARM: dts: imx: Remove unneeded unit-addresses
-In-Reply-To: <CAOMZO5BXFL47p=WTPDDRFGq38yktmB1FnbOTWJ37mrWsKkeUSQ@mail.gmail.com>
-References: <1462283851-10820-1-git-send-email-fabio.estevam@nxp.com>
- <CAL_JsqKv_7ufFG7DSkxqp9QOEjLEDVofyYMoudtJjqBA78ahcA@mail.gmail.com>
- <CAOMZO5AO15UmNJARS9aL-U=CjYnUq0D9S38NYHC8w2DLwOeR_A@mail.gmail.com>
- <CAOMZO5BXFL47p=WTPDDRFGq38yktmB1FnbOTWJ37mrWsKkeUSQ@mail.gmail.com>
-Message-ID: <20160506121911.04a7aa6e@jclayton-pc>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 06 May 2016 21:54:26 +0200
+Subject: [PATCH V4 0/2] vfio, platform: add ACPI support
+In-Reply-To: <572CE401.4080102@codeaurora.org>
+References: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
+ <57290E25.7010501@codeaurora.org> <572CE401.4080102@codeaurora.org>
+Message-ID: <2869312.Xk2efht43x@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 May 2016 12:45:07 -0300
-Fabio Estevam <festevam@gmail.com> wrote:
-
-> On Tue, May 3, 2016 at 12:42 PM, Fabio Estevam <festevam@gmail.com>
-> wrote:
-> > On Tue, May 3, 2016 at 12:37 PM, Rob Herring <robh@kernel.org>
-> > wrote: 
-> >> Presumably these are register offsets which could be useful to have
-> >> even if the Linux driver doesn't use them. But either way is fine
-> >> with me.  
-> >
-> > Yes, these are register offsets.
-> >
-> >                 reg_3p0: regulator-3p0 {
-> >                     compatible = "fsl,anatop-regulator";
-> >                     regulator-name = "vdd3p0";
-> >                     regulator-min-microvolt = <2625000>;
-> >                     regulator-max-microvolt = <3400000>;
-> >                     anatop-reg-offset = <0x120>;  
+On Friday, May 06, 2016 02:35:45 PM Sinan Kaya wrote:
+> On 5/3/2016 4:46 PM, Sinan Kaya wrote:
+> > On 5/3/2016 4:12 PM, Arnd Bergmann wrote:
+> >> On Sunday 01 May 2016 17:07:50 Sinan Kaya wrote:
+> >>> The patchset makes three different changes.
+> >>> 1. Add support for probing ACPI platform devices.
+> >>> 2. Add support for ACPI _RST method support during reset
+> >>> 3. Make reset driver a requirement by default with an optional
+> >>>    kernel command line override
+> >>
+> >> Looks nice, thanks for rewriting this!
+> >>
+> >> For future submissions, it would help to have a list of changes
+> >> compared to the previous versions a the patch set in the cover
+> >> letter to help reviewers, but this time my memory was still fresh
+> >> enough.
+> >>
+> >> 	Arnd
+> >>
+> > 
+> > Sure, will do. I asked Rafael to review the ACPI code. 
+> > 
+> > +		ret = vfio_platform_call_reset(vdev);
+> > 
+> > This is the only problem I'm seeing in the code. I tested the ACPI path only. 
+> > I'm wondering if Eric could test the device tree version.
+> > 
+> > +		if (ret)
+> > +			goto err_irq;
+> >  
+> > I'll get rid of this line on the first patch and move it to second
+> > patch along with reset_required check.
+> > 
 > 
-> Sorry, pressed the 'send' button too quickly.
-> 
-> There is a "anatop-reg-offset = <0x120>;" property that is used to
-> pass the offset to the anatop regulator driver, so that's why I
-> preferred to remove the unneeded unit-address.
-> 
-> Thanks
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Before I post my next patch, I wanted to see if there is any other 
+> feedback. Rafael mentioned to me that this code should go through
+> his branch as it is ACPI specific.
 
-There are actually 2 registers (on some of them),
-anatop-reg-offset, and anatop-delay-reg-offset...
-Converting those to use reg and deprecating the anatop specific
-items would seem like a Good Thing (tm) to me.
+It doesn't have to, but it should be posted to linux-acpi at vger.kernel.org at
+least for a review in there.
 
-...wandering into less safe territory:
-I know reg is usually a memory offset in bytes, but
-each of the anatop memory offsets also include a bit-shift
-and a bit-width item, which really narrowly defines the 
-register bits that pertain to each regulator.
+> Are we OK with this? Alex?
+> 
+> I'm hoping that Eric Auger will be able to test DT in parallel.
+> I haven't heart from him though.
 
-would it be totally inappropriate to use
-#address-cells = 2 and
-#size-cells =1 
-where address cells would contain the byte offset and the bit shift, and
-the size cell would contain the bit offset?
+Surely heard?
+
+Thanks,
+Rafael
