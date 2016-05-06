@@ -1,125 +1,116 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 10 May 2016 10:30:35 +0800
-Subject: [PATCH v7 4/9] clk: mediatek: Add MT2701 clock support
-In-Reply-To: <20160509222950.GV3492@codeaurora.org>
-References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
- <1460621514-65191-5-git-send-email-jamesjj.liao@mediatek.com>
- <20160506231151.GI3492@codeaurora.org>
- <1462775888.5344.20.camel@mtksdaap41>
- <20160509222950.GV3492@codeaurora.org>
-Message-ID: <1462847435.23126.10.camel@mtksdaap41>
+From: liviu.dudau@arm.com (liviu.dudau at arm.com)
+Date: Fri, 6 May 2016 17:26:13 +0100
+Subject: [PATCH 1/2] drm: hdlcd: Skip PM callbacks if unbound
+In-Reply-To: <20160506145417.GB15076@ulmo.ba.sec>
+References: <eeb2a5540f50f5a3dd7f87861be1e9117bc4ed65.1462464611.git.robin.murphy@arm.com>
+ <20160506145417.GB15076@ulmo.ba.sec>
+Message-ID: <20160506162613.GL28464@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Mon, 2016-05-09 at 15:29 -0700, Stephen Boyd wrote:
-> On 05/09, James Liao wrote:
-> > On Fri, 2016-05-06 at 16:11 -0700, Stephen Boyd wrote:
-> > > On 04/14, James Liao wrote:
-> > > > diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
-> > > > new file mode 100644
-> > > > index 0000000..b4db141
-> > > > --- /dev/null
-> > > > +++ b/drivers/clk/mediatek/clk-mt2701.c
-> > > > +static void __init mtk_infrasys_init(struct device_node *node)
-> > > > +{
-> > > > +	struct clk_onecell_data *clk_data;
-> > > > +	int r;
-> > > > +
-> > > > +	clk_data = mtk_alloc_clk_data(CLK_INFRA_NR);
-> > > > +
-> > > > +	mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
-> > > > +						clk_data);
-> > > > +	mtk_clk_register_factors(infra_fixed_divs, ARRAY_SIZE(infra_fixed_divs),
-> > > > +						clk_data);
-> > > > +
-> > > > +	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> > > > +	if (r)
-> > > > +		pr_err("%s(): could not register clock provider: %d\n",
-> > > > +			__func__, r);
-> > > > +}
-> > > > +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
-> > > 
-> > > I'm still lost on the usage of CLK_OF_DECLARE here. What part of
-> > > these clk controllers needs to be registered to make the timer
-> > > work?
+On Fri, May 06, 2016 at 04:54:17PM +0200, Thierry Reding wrote:
+> On Thu, May 05, 2016 at 05:13:37PM +0100, Robin Murphy wrote:
+> > Until an encoder component is available to trigger the HDLCD's component
+> > master bind callback, the drm_device we keep in drvdata isn't allocated.
+> > Since it is quite possible to, say, hibernate the system without having
+> > loaded the encoder driver, the PM callbacks need to check for a valid
+> > drm_device before trying to take the lock and suspend/resume the crtcs,
+> > otherwise this happens:
 > > 
-> > GPT (mtk-timer.c) may need infracfg and topckgen clocks. MT8173 for
-> > example:
+> > [   51.779092] Unable to handle kernel NULL pointer dereference at virtual address 00000200
+> > [   51.787143] pgd = ffff800974462000
+> > [   51.790514] [00000200] *pgd=0000000000000000
+> > [   51.794768] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+> > [   51.800291] Modules linked in:
+> > [   51.803325] CPU: 4 PID: 2098 Comm: systemd-sleep Not tainted 4.6.0-rc6+ #4
+> > [   51.810140] Hardware name: ARM Juno development board (r1) (DT)
+> > [   51.816008] task: ffff800974430000 ti: ffff80097380c000 task.ti: ffff80097380c000
+> > [   51.823433] PC is at mutex_lock+0x14/0x60
+> > [   51.827411] LR is at drm_modeset_lock_all+0x3c/0xe0
+> > [   51.832246] pc : [<ffff0000087d55c4>] lr : [<ffff0000084839fc>] pstate: 40000145
+> > [   51.839577] sp : ffff80097380faf0
+> > [   51.842859] x29: ffff80097380faf0 x28: 0000000000000000
+> > [   51.848132] x27: 0000000000000002 x26: ffff000008e01000
+> > [   51.853405] x25: ffff0000084cc000 x24: ffff000008dcb408
+> > [   51.858678] x23: ffff000008e7c000 x22: ffff8009760e8870
+> > [   51.863962] x21: 0000000000000200 x20: 0000000000000000
+> > [   51.869244] x19: 0000000000000200 x18: ffff800079357dd0
+> > [   51.874527] x17: 0000ffff8a00ab88 x16: 0000000000000018
+> > [   51.879809] x15: 0000000000000018 x14: 0000000000000000
+> > [   51.885091] x13: 0000000000000002 x12: 0000000000000000
+> > [   51.890374] x11: ffff0000087ff904 x10: 0000000000000840
+> > [   51.895656] x9 : 0000000000000000 x8 : ffff800973821680
+> > [   51.900938] x7 : 0000000000000000 x6 : 000000000000003f
+> > [   51.906220] x5 : 0000000000000040 x4 : 0000000000000000
+> > [   51.911502] x3 : 0000000000000004 x2 : 0000000000000000
+> > [   51.916784] x1 : 0000000000000001 x0 : 0000000000000200
+> > ...
+> > [   52.339406] [<ffff0000087d55c4>] mutex_lock+0x14/0x60
+> > [   52.344425] [<ffff0000084839fc>] drm_modeset_lock_all+0x3c/0xe0
+> > [   52.350305] [<ffff00000848a034>] hdlcd_pm_suspend+0x2c/0x90
+> > [   52.355842] [<ffff0000084c0d14>] platform_pm_suspend+0x24/0x58
+> > [   52.361638] [<ffff0000084cc190>] dpm_run_callback.isra.4+0x20/0x68
+> > [   52.367778] [<ffff0000084ccad4>] __device_suspend+0xe4/0x238
+> > [   52.373400] [<ffff0000084cdcac>] dpm_suspend+0x10c/0x240
+> > [   52.378679] [<ffff0000084ce0b8>] dpm_suspend_start+0x70/0x80
+> > [   52.384302] [<ffff0000080f80e4>] suspend_devices_and_enter+0x9c/0x480
+> > [   52.390699] [<ffff0000080f8698>] pm_suspend+0x1d0/0x240
+> > [   52.395890] [<ffff0000080f7280>] state_store+0x80/0x100
+> > [   52.401084] [<ffff0000083503f4>] kobj_attr_store+0x14/0x28
+> > [   52.406535] [<ffff000008238580>] sysfs_kf_write+0x48/0x58
+> > [   52.411899] [<ffff00000823798c>] kernfs_fop_write+0xbc/0x188
+> > [   52.417521] [<ffff0000081c71f4>] __vfs_write+0x1c/0xe0
+> > [   52.422626] [<ffff0000081c8144>] vfs_write+0x8c/0x1a8
+> > [   52.427644] [<ffff0000081c953c>] SyS_write+0x44/0xa0
+> > [   52.432578] [<ffff000008084ecc>] __sys_trace_return+0x0/0x4
+> > [   52.438114] Code: 910003fd f9000bf3 aa0003f3 f9800011 (885ffc01)
+> > [   52.444229] ---[ end trace 34b87a5fb9453f65 ]---
 > > 
-> > 	timer: timer at 10008000 {
-> > 	[...]
-> > 		clocks = <&infracfg CLK_INFRA_CLK_13M>,
-> > 			 <&topckgen CLK_TOP_RTC_SEL>;
-> > 	};
+> > Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  drivers/gpu/drm/arm/hdlcd_drv.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
+> > index 734899c4e4bb..86a5eea4cf53 100644
+> > --- a/drivers/gpu/drm/arm/hdlcd_drv.c
+> > +++ b/drivers/gpu/drm/arm/hdlcd_drv.c
+> > @@ -498,7 +498,7 @@ static int __maybe_unused hdlcd_pm_suspend(struct device *dev)
+> >  	struct drm_device *drm = dev_get_drvdata(dev);
+> >  	struct drm_crtc *crtc;
+> >  
+> > -	if (pm_runtime_suspended(dev))
+> > +	if (pm_runtime_suspended(dev) || !drm)
+> >  		return 0;
+> >  
+> >  	drm_modeset_lock_all(drm);
+> > @@ -513,7 +513,7 @@ static int __maybe_unused hdlcd_pm_resume(struct device *dev)
+> >  	struct drm_device *drm = dev_get_drvdata(dev);
+> >  	struct drm_crtc *crtc;
+> >  
+> > -	if (!pm_runtime_suspended(dev))
+> > +	if (!pm_runtime_suspended(dev) || !drm)
+> >  		return 0;
 > 
-> Ok. It should be possible to only register the clk tree for these
-> clks in CLK_OF_DECLARE() and then register the other clks that
-> the clk provider provides with a regular driver probe routine.
-> That way we can get the advantage of the device framework, etc.
-> but still register the clks we need to make the timer work early
-> on.
+> Perhaps rather than this workaround you should only enable runtime PM on
+> this after the master has been bound?
 
-I'll study a new way to separate clock registration of a subsystem into
-CLK_OF_DECLARE() and device probe().
-
-> > 
-> > > > +	GATE_DISP1(CLK_MM_DPI_DIGL, "mm_dpi_digl", "dpi0_sel", 2),
-> > > > +	GATE_DISP1(CLK_MM_DPI_ENGINE, "mm_dpi_eng", "mm_sel", 3),
-> > > > +	GATE_DISP1(CLK_MM_DPI1_DIGL, "mm_dpi1_digl", "dpi1_sel", 4),
-> > > > +	GATE_DISP1(CLK_MM_DPI1_ENGINE, "mm_dpi1_eng", "mm_sel", 5),
-> > > > +	GATE_DISP1(CLK_MM_TVE_OUTPUT, "mm_tve_output", "tve_sel", 6),
-> > > > +	GATE_DISP1(CLK_MM_TVE_INPUT, "mm_tve_input", "dpi0_sel", 7),
-> > > > +	GATE_DISP1(CLK_MM_HDMI_PIXEL, "mm_hdmi_pixel", "dpi1_sel", 8),
-> > > > +	GATE_DISP1(CLK_MM_HDMI_PLL, "mm_hdmi_pll", "hdmi_sel", 9),
-> > > > +	GATE_DISP1(CLK_MM_HDMI_AUDIO, "mm_hdmi_audio", "apll_sel", 10),
-> > > > +	GATE_DISP1(CLK_MM_HDMI_SPDIF, "mm_hdmi_spdif", "apll_sel", 11),
-> > > > +	GATE_DISP1(CLK_MM_TVE_FMM, "mm_tve_fmm", "mm_sel", 14),
-> > > > +};
-> > > 
-> > > I also don't understand why we don't have different files and
-> > > drivers for all these different clock controllers? They all have
-> > > a similar probe structure, sure, but otherwise these are
-> > > different devices with different clks for them. The whole #ifdef
-> > > thing in the later patch would go away too.
-> > 
-> > Yes, you are right. So you prefer to support subsystem clocks in
-> > separated files such as clk-mt2701-mm.c, clk-mt2701-bdp.c and so on,
-> > right?
-> > 
-> > But even if we implement subsystem clock in separated files, we still
-> > need a way to make them optional. So the config options and #ifdef may
-> > not be removed.
-> 
-> Presumably different files could just not be compiled if the
-> config is disabled, thus removing any need for #ifdef.
-
-OK. I'll try to implement these subsystem clocks into separated files in
-next patch.
-
-> > 
-> > > > +	GATE_BDP1(CLK_BDP_BRG_RT_B, "brg_rt_bclk", "mm_sel", 12),
-> > > > +	GATE_BDP1(CLK_BDP_BRG_RT_DRAM, "brg_rt_dram", "mm_sel", 13),
-> > > > +	GATE_BDP1(CLK_BDP_LARBRT_DRAM, "larbrt_dram", "mm_sel", 14),
-> > > > +	GATE_BDP1(CLK_BDP_TMDS_SYN, "tmds_syn", "hdmi_0_pll340m", 15),
-> > > > +	GATE_BDP1(CLK_BDP_HDMI_MON, "hdmi_mon", "hdmi_0_pll340m", 16),
-> > > > +};
-> > > > +
-> > > > +static void __init mtk_bdpsys_init(struct device_node *node)
-> > > 
-> > > Shouldn't be __init because it's driver probe path.
-> > 
-> > I use builtin_platform_driver_probe(clk_drv, clk_probe) to register this
-> > driver, and it looks can be __init.
-> 
-> Ok, but that doesn't work with deferred probe right? It may be
-> better to avoid it then.
-
-It may be a concern. I'll investigate a proper way to implement the init
-functions.
-
+Yes, that is probably a better solution, even if the patch is going to be much bigger.
 
 Best regards,
+Liviu
 
-James 
+> 
+> Thierry
+
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
