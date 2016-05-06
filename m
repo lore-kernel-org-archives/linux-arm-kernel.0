@@ -1,168 +1,245 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 6 May 2016 08:37:57 -0500
-Subject: [PATCH V2] ARM: dts: am57xx-idk-common: Fix input supply names
-Message-ID: <1462541877-20032-1-git-send-email-nm@ti.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Fri,  6 May 2016 08:43:36 -0500
+Subject: [PATCH] irqchip/gicv3-its: Implement two-level(indirect) device table
+ support
+Message-ID: <1462542216-20952-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Palmas Regulator is an exception and does not follow the standard
-"vin-supply" common definitions for all regulators, as a result of this,
-the input supplies are not reported to regulator framework, with the
-obvious result of not being appropriately mapped. Fix the same.
+Since device IDs are extremely sparse, the single, a.k.a flat table is
+not sufficient for the following two reasons.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+1) According to ARM-GIC spec, ITS hw can access maximum of 256(pages)*
+   64K(pageszie) bytes. In the best case, it supports upto DEVid=21
+   sparse with minimum device table entry size 8bytes.
+
+2) The maximum memory size that is possible without memblock depends on
+   MAX_ORDER. 4MB on 4K page size kernel with default MAX_ORDER, so it
+   supports DEVid range 19bits.
+
+The two-level device table feature brings us two advantages, the first
+is a very high possibility of supporting upto 32bit sparse, and the
+second one is the best utilization of memory allocation.
+
+The feature is enabled automatically during driver probe if the flat
+table is not adequate and the hardware is capable of two-level table
+walk.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
-Changes since V1:
-	- fix up fat fingered deletion of regulator name of ldortc
-V1: https://patchwork.kernel.org/patch/9028201/
-Based on: next-20160506
 
-bootlog: http://pastebin.ubuntu.com/16258763/
+This patch is based on Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7
 
- arch/arm/boot/dts/am57xx-idk-common.dtsi | 32 +++++++++++++++++---------------
- 1 file changed, 17 insertions(+), 15 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c   | 109 ++++++++++++++++++++++++++++++++-----
+ include/linux/irqchip/arm-gic-v3.h |   2 +
+ 2 files changed, 97 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-index b01a5948cdd0..0e63b9dff6e7 100644
---- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-@@ -60,10 +60,26 @@
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 6bd881b..caeb105 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -55,13 +55,14 @@ struct its_collection {
+ };
  
- 		tps659038_pmic {
- 			compatible = "ti,tps659038-pmic";
+ /*
+- * The ITS_BASER structure - contains memory information and cached
+- * value of BASER register configuration.
++ * The ITS_BASER structure - contains memory information, cached value
++ * of BASER register configuration and ITS page size in bytes.
+  */
+ struct its_baser {
+ 	void		*base;
+ 	u64		val;
+ 	u32		order;
++	u32		psz;
+ };
+ 
+ /*
+@@ -853,6 +854,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		u64 type = GITS_BASER_TYPE(val);
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+ 		int order = get_order(psz);
++		bool tried_indirect = false;
++		u64 indirect = 0;
+ 		int alloc_pages;
+ 		u64 tmp;
+ 		void *base;
+@@ -877,11 +880,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 			 */
+ 			order = max(get_order((1UL << ids) * entry_size),
+ 				    order);
+-			if (order >= MAX_ORDER) {
++			if (order >= MAX_ORDER)
+ 				order = MAX_ORDER - 1;
+-				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+-					node_name, order);
+-			}
+ 		}
+ 
+ retry_alloc_baser:
+@@ -889,8 +889,6 @@ retry_alloc_baser:
+ 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+ 			alloc_pages = GITS_BASER_PAGES_MAX;
+ 			order = get_order(GITS_BASER_PAGES_MAX * psz);
+-			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
+-				node_name, order, alloc_pages);
+ 		}
+ 
+ 		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+@@ -924,6 +922,7 @@ retry_baser:
+ 
+ 		val |= alloc_pages - 1;
+ 		its->tables[i].val = val;
++		its->tables[i].psz = psz;
+ 
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+ 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+@@ -963,6 +962,49 @@ retry_baser:
+ 			}
+ 		}
+ 
++		/*
++		 * Attempt enabling Indirection table walk since we were unable
++		 * to allocate enough memory for flat device table to cover
++		 * whole DevID sparse that hw reporting, and ITS hardware has
++		 * capablity of supporting two-level table.
++		 */
++		if ((type == GITS_BASER_TYPE_DEVICE) &&
++		    (!tried_indirect) &&
++		    (PAGE_ORDER_TO_SIZE(order) < (entry_size << ids))) {
 +
-+			smps12-in-supply = <&vmain>;
-+			smps3-in-supply = <&vmain>;
-+			smps45-in-supply = <&vmain>;
-+			smps6-in-supply = <&vmain>;
-+			smps7-in-supply = <&vmain>;
-+			smps8-in-supply = <&vmain>;
-+			smps9-in-supply = <&vmain>;
-+			ldo1-in-supply = <&vmain>;
-+			ldo2-in-supply = <&vmain>;
-+			ldo3-in-supply = <&vmain>;
-+			ldo4-in-supply = <&vmain>;
-+			ldo9-in-supply = <&vmain>;
-+			ldoln-in-supply = <&vmain>;
-+			ldousb-in-supply = <&vmain>;
-+			ldortc-in-supply = <&vmain>;
++			val |= GITS_BASER_INDIRECT;
++			writeq_relaxed(val, its->base + GITS_BASER + i * 8);
++			tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
++			tried_indirect = true;
 +
- 			regulators {
- 				smps12_reg: smps12 {
- 					/* VDD_MPU */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps12";
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1250000>;
-@@ -73,7 +89,6 @@
++			/* Does ITS HW supports Indirect table walk? */
++			if (!(tmp & GITS_BASER_INDIRECT)) {
++				pr_warn("%s: Device Table too large, reduce order to %u\n",
++					node_name, order);
++				goto retry_baser;
++			}
++
++			/*
++			 * According to GIC spec, the size of the Level2 table
++			 * is equal to ITS page size which is 'psz'. For
++			 * computing Level1 table1 size, subtract DevID bits
++			 * that covers Level2 table from 'ids' which is reported
++			 * by ITS hardware times Level1 table entry size 8bytes.
++			 *
++			 *   L2-DevIDs = ilog2(psz / entry_size)
++			 *      L1-DevIDs = ids (reported by HW) - L2-DevIDs
++			 * Table1 size = L1-DevIDs * 8Bytes
++			 */
++			ids -= ilog2(psz / entry_size);
++			order = get_order(GITS_LEVEL1_ENTRY_SIZE << ids);
++
++			/* Limit Level1 table size to MAX_ORDER-1 */
++			order = min(order, MAX_ORDER - 1);
++			indirect = GITS_BASER_INDIRECT;
++			its->tables[type].base = NULL;
++			goto retry_alloc_baser;
++		}
++
+ 		if (val != tmp) {
+ 			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
+ 			       node_name, i,
+@@ -971,10 +1013,12 @@ retry_baser:
+ 			goto out_free;
+ 		}
  
- 				smps3_reg: smps3 {
- 					/* VDD_DDR EMIF1 EMIF2 */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps3";
- 					regulator-min-microvolt = <1350000>;
- 					regulator-max-microvolt = <1350000>;
-@@ -84,7 +99,6 @@
- 				smps45_reg: smps45 {
- 					/* VDD_DSPEVE on AM572 */
- 					/* VDD_IVA + VDD_DSP on AM571 */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps45";
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1250000>;
-@@ -94,7 +108,6 @@
+-		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+-			(int)(PAGE_ORDER_TO_SIZE(order) / entry_size),
++		pr_info("ITS: allocated %d %s @%lx (%s, psz %dK, shr %d)\n",
++			(int)(PAGE_ORDER_TO_SIZE(order) /
++			(indirect ? GITS_LEVEL1_ENTRY_SIZE : entry_size)),
+ 			its_base_type_string[type],
+ 			(unsigned long)virt_to_phys(base),
++			indirect ? "indirect" : "flat",
+ 			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+ 	}
  
- 				smps6_reg: smps6 {
- 					/* VDD_GPU */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps6";
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1250000>;
-@@ -104,7 +117,6 @@
+@@ -1149,6 +1193,46 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
+ 	return its_dev;
+ }
  
- 				smps7_reg: smps7 {
- 					/* VDD_CORE */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps7";
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1150000>;
-@@ -115,13 +127,11 @@
- 				smps8_reg: smps8 {
- 					/* 5728 - VDD_IVAHD */
- 					/* 5718 - N.C. test point */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps8";
- 				};
++static bool its_alloc_device_table(struct its_baser *baser, u32 dev_id)
++{
++	u32 entry_size = GITS_BASER_ENTRY_SIZE(baser->val);
++	u64 *table = baser->base;
++	struct page *page;
++	u32 psz = SZ_64K;
++	u32 idx;
++
++	/* Don't allow 'dev_id' that exceeds single, flat table limit */
++	if (!(baser->val & GITS_BASER_INDIRECT)) {
++		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) / entry_size))
++			return false;
++		return true;
++	}
++
++	/* Compute Level1 table index & check if that exceeds table range */
++	idx = dev_id >> ilog2(baser->psz / entry_size);
++	if (idx >= (PAGE_ORDER_TO_SIZE(baser->order) / GITS_LEVEL1_ENTRY_SIZE))
++		return false;
++
++	/* Allocate memory for Level2 table */
++	if (!table[idx]) {
++		page = alloc_pages_exact(psz, GFP_KERNEL | __GFP_ZERO);
++		if (!page)
++			return false;
++
++		table[idx] = page_to_phys(page) | GITS_BASER_VALID;
++
++		/* Flush memory to PoC if hardware dosn't support coherency */
++		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK)) {
++			__flush_dcache_area(table + idx, GITS_LEVEL1_ENTRY_SIZE);
++			__flush_dcache_area(page_address(page), psz);
++		}
++		/* Ensure updated table contents are visible to ITS hardware */
++		dsb(sy);
++	}
++
++	return true;
++}
++
+ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+ {
+ 	int i;
+@@ -1176,11 +1260,8 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	int sz;
  
- 				smps9_reg: smps9 {
- 					/* VDD_3_3D */
--					vin-supply = <&vmain>;
- 					regulator-name = "smps9";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-@@ -132,7 +142,6 @@
- 				ldo1_reg: ldo1 {
- 					/* VDDSHV8 - VSDMMC  */
- 					/* NOTE: on rev 1.3a, data supply */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldo1";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <3300000>;
-@@ -142,7 +151,6 @@
+ 	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+-
+-	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+ 	if (baser) {
+-		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) /
+-			      GITS_BASER_ENTRY_SIZE(baser->val)))
++		if (!its_alloc_device_table(baser, dev_id))
+ 			return NULL;
+ 	} else if (ilog2(dev_id) >= its->device_ids)
+ 		return NULL;
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 9e6fdd3..df404ea 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -187,6 +187,7 @@
+ #define GITS_TYPER_PTA			(1UL << 19)
  
- 				ldo2_reg: ldo2 {
- 					/* VDDSH18V */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldo2";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
-@@ -152,7 +160,6 @@
+ #define GITS_CBASER_VALID		(1UL << 63)
++#define GITS_BASER_INDIRECT		(1UL << 62)
+ #define GITS_CBASER_nCnB		(0UL << 59)
+ #define GITS_CBASER_nC			(1UL << 59)
+ #define GITS_CBASER_RaWt		(2UL << 59)
+@@ -238,6 +239,7 @@
+ #define GITS_BASER_TYPE_RESERVED6	6
+ #define GITS_BASER_TYPE_RESERVED7	7
  
- 				ldo3_reg: ldo3 {
- 					/* R1.3a 572x V1_8PHY_LDO3: USB, SATA */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldo3";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
-@@ -162,7 +169,6 @@
- 
- 				ldo4_reg: ldo4 {
- 					/* R1.3a 572x V1_8PHY_LDO4: PCIE, HDMI*/
--					vin-supply = <&vmain>;
- 					regulator-name = "ldo4";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
-@@ -174,7 +180,6 @@
- 
- 				ldo9_reg: ldo9 {
- 					/* VDD_RTC  */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldo9";
- 					regulator-min-microvolt = <840000>;
- 					regulator-max-microvolt = <1160000>;
-@@ -184,7 +189,6 @@
- 
- 				ldoln_reg: ldoln {
- 					/* VDDA_1V8_PLL */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldoln";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
-@@ -194,7 +198,6 @@
- 
- 				ldousb_reg: ldousb {
- 					/* VDDA_3V_USB: VDDA_USBHS33 */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldousb";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-@@ -204,7 +207,6 @@
- 
- 				ldortc_reg: ldortc {
- 					/* VDDA_RTC  */
--					vin-supply = <&vmain>;
- 					regulator-name = "ldortc";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
++#define GITS_LEVEL1_ENTRY_SIZE		(8UL)
+ /*
+  * ITS commands
+  */
 -- 
-2.8.0
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
+a Linux Foundation Collaborative Project
