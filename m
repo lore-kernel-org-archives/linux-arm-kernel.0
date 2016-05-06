@@ -1,82 +1,61 @@
-From: thomas.hanson@linaro.org (Tom Hanson)
-Date: Fri, 6 May 2016 13:07:21 -0600
-Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world switch
- backend
-In-Reply-To: <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
-Message-ID: <572CEB69.8040009@linaro.org>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri, 6 May 2016 12:19:11 -0700
+Subject: [PATCH] ARM: dts: imx: Remove unneeded unit-addresses
+In-Reply-To: <CAOMZO5BXFL47p=WTPDDRFGq38yktmB1FnbOTWJ37mrWsKkeUSQ@mail.gmail.com>
+References: <1462283851-10820-1-git-send-email-fabio.estevam@nxp.com>
+ <CAL_JsqKv_7ufFG7DSkxqp9QOEjLEDVofyYMoudtJjqBA78ahcA@mail.gmail.com>
+ <CAOMZO5AO15UmNJARS9aL-U=CjYnUq0D9S38NYHC8w2DLwOeR_A@mail.gmail.com>
+ <CAOMZO5BXFL47p=WTPDDRFGq38yktmB1FnbOTWJ37mrWsKkeUSQ@mail.gmail.com>
+Message-ID: <20160506121911.04a7aa6e@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2016 04:45 AM, Andre Przywara wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
->
-> As the GICv3 virtual interface registers differ from their GICv2
-> siblings, we need different handlers for processing maintenance
-> interrupts and reading/writing to the LRs.
-> Implement the respective handler functions and connect them to
-> existing code to be called if the host is using a GICv3.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - remove outdated comment about the dist_lock
-> - add WARN_ON about LR_STATE not being 0 in maintenance interrupts
->
-> Changelog v1 .. v2:
-> - inject the IRQ priority into the list register
->
-> Changelog v2 .. v3:
-> - remove no longer needed irqchip/arm-gic.h inclusion
->
->   include/linux/irqchip/arm-gic-v3.h |   1 +
->   virt/kvm/arm/vgic/vgic-v3.c        | 168 +++++++++++++++++++++++++++++++++++++
->   virt/kvm/arm/vgic/vgic.c           |  25 ++++--
->   virt/kvm/arm/vgic/vgic.h           |  29 +++++++
->   4 files changed, 218 insertions(+), 5 deletions(-)
->   create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
->
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index ec938d1..35e93cf 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -275,6 +275,7 @@
->   #define ICH_LR_ACTIVE_BIT		(1ULL << 63)
->   #define ICH_LR_PHYS_ID_SHIFT		32
->   #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
-> +#define ICH_LR_PRIORITY_SHIFT		48
->
->   /* These are for GICv2 emulation only */
->   #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> new file mode 100644
-> index 0000000..43d1dd7
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+On Tue, 3 May 2016 12:45:07 -0300
+Fabio Estevam <festevam@gmail.com> wrote:
 
-...
+> On Tue, May 3, 2016 at 12:42 PM, Fabio Estevam <festevam@gmail.com>
+> wrote:
+> > On Tue, May 3, 2016 at 12:37 PM, Rob Herring <robh@kernel.org>
+> > wrote: 
+> >> Presumably these are register offsets which could be useful to have
+> >> even if the Linux driver doesn't use them. But either way is fine
+> >> with me.  
+> >
+> > Yes, these are register offsets.
+> >
+> >                 reg_3p0: regulator-3p0 {
+> >                     compatible = "fsl,anatop-regulator";
+> >                     regulator-name = "vdd3p0";
+> >                     regulator-min-microvolt = <2625000>;
+> >                     regulator-max-microvolt = <3400000>;
+> >                     anatop-reg-offset = <0x120>;  
+> 
+> Sorry, pressed the 'send' button too quickly.
+> 
+> There is a "anatop-reg-offset = <0x120>;" property that is used to
+> pass the offset to the anatop regulator driver, so that's why I
+> preferred to remove the unneeded unit-address.
+> 
+> Thanks
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> +void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-> +	u32 model = vcpu->kvm->arch.vgic.vgic_model;
-> +	int lr;
-> +
-> +	/* Assumes ap_list_lock held */
+There are actually 2 registers (on some of them),
+anatop-reg-offset, and anatop-delay-reg-offset...
+Converting those to use reg and deprecating the anatop specific
+items would seem like a Good Thing (tm) to me.
 
+...wandering into less safe territory:
+I know reg is usually a memory offset in bytes, but
+each of the anatop memory offsets also include a bit-shift
+and a bit-width item, which really narrowly defines the 
+register bits that pertain to each regulator.
 
-If truly required that ap_list_lock already be locked, then the code should enforce it. At least in dev mode. Maybe:
-          DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->ap_list_lock));
-
-...
-
-> +/* Requires the irq to be locked already */
-> +void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
-
-
-Similarly, if required then the code should enforce it.
-          DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-
-  ...
+would it be totally inappropriate to use
+#address-cells = 2 and
+#size-cells =1 
+where address cells would contain the byte offset and the bit shift, and
+the size cell would contain the bit offset?
