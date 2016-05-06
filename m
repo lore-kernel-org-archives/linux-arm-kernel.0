@@ -1,63 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 6 May 2016 16:30:10 +0200
-Subject: [PATCH] ARM: at91: sama5: Update defconfig
-In-Reply-To: <1462480295-8034-1-git-send-email-marex@denx.de>
-References: <1462480295-8034-1-git-send-email-marex@denx.de>
-Message-ID: <572CAA72.4000107@atmel.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Fri, 6 May 2016 10:31:49 -0400
+Subject: [PATCH 0/3] Support MPS2 UART controller
+In-Reply-To: <1461574068-14641-1-git-send-email-vladimir.murzin@arm.com>
+References: <1461574068-14641-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <CAP=VYLopd8erCP9J9cTyZ+YubafKjWi3bHQp-swmyfyn2eZ_Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/05/2016 22:31, Marek Vasut a ?crit :
-> Enable CGROUPS support, so we can boot userspace that uses systemd on
-> top of kernel configured using this defconfig. The systemd userspace
-> depends on cgroups and without them, it dies in mysterious ways.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Mon, Apr 25, 2016 at 4:47 AM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> Hi,
+>
+> These patches allow to use UART controller found on MPS2 platform.
 
-Hi Marek,
+Did you intend this driver to support being modular?  It has a bool Kconfig
+(not tristate) which makes the module_exit dead code.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+If it will always be builtin (with console as primary use case) then you can
+see commit 89ebc27427695bfc1e769f1dd99bd243d332ac7a as a possible
+update suggestion.
 
-BTW, isn't it something else required to run a systemd enabled image?
-I've seen that some of the option may be missing as well:
+P.
+--
 
-CONFIG_FHANDLE (libudev, mount and bind mount handling)
-from: https://github.com/systemd/systemd/blob/master/README#L51
-
-In the " Optional but strongly recommended:" I see interest in:
- CONFIG_AUTOFS4_FS
- CONFIG_TMPFS_XATTR
- CONFIG_{TMPFS,EXT4,XFS,BTRFS_FS,...}_POSIX_ACL
-
-But it's maybe not so interesting for our little embedded systems.
-
-I'm also puzzled about the need for more options about cgroups...
-
-I add a couple of other people in Cc so we can figure out the proper
-configuration set...
-
-Thanks Marek for having started the discussion, bye,
-
-> ---
->  arch/arm/configs/sama5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index afbda41..1b60be2 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -3,6 +3,7 @@
->  CONFIG_SYSVIPC=y
->  CONFIG_IRQ_DOMAIN_DEBUG=y
->  CONFIG_LOG_BUF_SHIFT=14
-> +CONFIG_CGROUPS=y
->  CONFIG_BLK_DEV_INITRD=y
->  CONFIG_EMBEDDED=y
->  CONFIG_SLAB=y
-> 
-
-
--- 
-Nicolas Ferre
+>
+> Following [1], please, consider to merge them into tty/serial tree.
+>
+> [1] https://lkml.org/lkml/2016/4/23/190
+>
+> Thanks!
+>
+> Vladimir Murzin (3):
+>   dt-bindings: document the MPS2 UART bindings
+>   serial: mps2-uart: add MPS2 UART driver
+>   serial: mps2-uart: add support for early console
+>
+>  .../devicetree/bindings/serial/arm,mps2-uart.txt   |   19 +
+>  drivers/tty/serial/Kconfig                         |   13 +
+>  drivers/tty/serial/Makefile                        |    1 +
+>  drivers/tty/serial/mps2-uart.c                     |  625 ++++++++++++++++++++
+>  include/uapi/linux/serial_core.h                   |    3 +
+>  5 files changed, 661 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
+>  create mode 100644 drivers/tty/serial/mps2-uart.c
+>
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
