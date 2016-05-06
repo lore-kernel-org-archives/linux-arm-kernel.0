@@ -1,99 +1,50 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 6 May 2016 16:25:49 +0300
-Subject: [PATCH v7 3/3] gpio: move clps711x, moxart, ts4800 and gpio-ge
- into gpio-mmio
-In-Reply-To: <4995974.1A7SuhXPf2@debian64>
-References: <cover.1462372360.git.chunkeey@googlemail.com>
- <e936c3c38deee5cd954862c5ed11f9cffa2ba6a9.1462372360.git.chunkeey@googlemail.com>
- <CAHp75VeFjcPX+f3j+h+OL2jEpfGP+aqL78ymcsj4JwUfO0RvtA@mail.gmail.com>
- <4995974.1A7SuhXPf2@debian64>
-Message-ID: <CAHp75Vf5AP88TMFqVHOD5197vj40QpKRaW0jkOQ9kwz2rzYdWw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 6 May 2016 15:29:56 +0200
+Subject: [PATCH 1/3] ARM: at91/dt: sama5d2: add trng node
+In-Reply-To: <1462293864-32551-2-git-send-email-mike@mikebwilliams.com>
+References: <1462293864-32551-1-git-send-email-mike@mikebwilliams.com>
+ <1462293864-32551-2-git-send-email-mike@mikebwilliams.com>
+Message-ID: <572C9C54.5030706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 6, 2016 at 4:06 PM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
-> On Friday, May 06, 2016 02:53:24 PM Andy Shevchenko wrote:
->> On Fri, May 6, 2016 at 2:10 PM, Christian Lamparter
->> <chunkeey@googlemail.com> wrote:
+Le 03/05/2016 18:44, Mike Williams a ?crit :
+> Add node to support SAMA5D2 hardware random number generator.
 
->> Just a nit: possible to use switch case?
-> I think so. I've integrated the id < 0 || id > 4 check as well.
-> I don't know, I liked the old version more, it was shorter
->
-> diff --git a/drivers/gpio/gpio-mmio.c b/drivers/gpio/gpio-mmio.c
-> index f116786..f71021c 100644
-> --- a/drivers/gpio/gpio-mmio.c
-> +++ b/drivers/gpio/gpio-mmio.c
-> @@ -619,14 +619,25 @@ static int clps711x_parse_dt(struct platform_device *pdev,
->         const char *dir_reg_name;
->         int id = np ? of_alias_get_id(np, "gpio") : pdev->id;
->
-> -       if ((id < 0) || (id > 4))
-> +       switch (id) {
-> +       case 0:
-> +       case 1:
-> +       case 2:
-> +               pdata->ngpio = 0; /* determined by register width */
-> +               dir_reg_name = "dirout";
-> +               break;
-> +       case 3:
-> +               pdata->ngpio = 0; /* determined by register width */
-> +               /* PORTD is inverted logic for direction register */
-> +               dir_reg_name = "dirin";
-> +               break;
-> +       case 4:
-> +               pdata->ngpio = 3; /* PORTE is 3 lines only */
-> +               dir_reg_name = "dirout";
-> +               break;
-> +       default:
->                 return -ENODEV;
-> -
-> -       /* PORTE is 3 lines only */
-> -       pdata->ngpio = (id == 4) ? 3 : /* determined by register width */ 0;
-> -
-> -       /* PORTD is inverted logic for direction register */
-> -       dir_reg_name = (id == 3) ? "dirin" : "dirout",
-> +       }
+Oh, Mike, something is missing here: you Singed-off-by tag.
 
-For my personal taste the switch case more understandable / readable.
-But i'm not totally objecting the old model, just a subject to discuss.
+http://lxr.free-electrons.com/source/Documentation/SubmittingPatches#L409
 
->> > +struct compat_gpio_device_data {
->> > +       unsigned int expected_resource_size;
->> > +       unsigned int ngpio;
->> > +       resource_size_t register_width;
->> > +       unsigned long flags;
->> > +       int (*call_back)(struct platform_device *pdev,
->> > +                        struct bgpio_pdata *pdata,
->> > +                        unsigned long *flags);
->> > +       struct resource_replacement {
->> > +               resource_size_t start_offset;
->> > +               const char *name;
->> > +       } resources[5];
->>
->> I would define magic number with a description what are those 5.
->
-> Difficult, these are 5 placeholders for the named resources.
-> There's particular order so a enum like
-> {
->         DAT,
->         SET,
->         CLR,
->         DIRIN,
->         DIROUT,
->         __NUM_RES
-> }
->
-> might look nice but it has no purpose other than maybe confusing people
-> why the entries aren't used.
+Please read this and send me an email telling me if you add it to your
+patches (this way you don't have to re-send them, if it's easier for you).
 
-OK, might be just
+Bye,
 
-#define ?_SUPPORTED_RES_MAX 5
-?
-} resources[_SUPPORTED_RES_MAX];
+
+> ---
+>  arch/arm/boot/dts/sama5d2.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index 78996bd..af9a5f8 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -1127,6 +1127,13 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			trng at fc01c000 {
+> +				compatible = "atmel,at91sam9g45-trng";
+> +				reg = <0xfc01c000 0x4000>;
+> +				interrupts = <47 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				clocks = <&trng_clk>;
+> +			};
+> +
+>  			aic: interrupt-controller at fc020000 {
+>  				#interrupt-cells = <3>;
+>  				compatible = "atmel,sama5d2-aic";
+> 
+
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Nicolas Ferre
