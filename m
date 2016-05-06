@@ -1,134 +1,114 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 May 2016 11:46:08 +0100
-Subject: [PATCH v3 55/55] KVM: arm/arm64: vgic-new: enable build
+Date: Fri,  6 May 2016 11:45:41 +0100
+Subject: [PATCH v3 28/55] KVM: arm/arm64: vgic-new: Add CONFIG registers
+ handlers
 In-Reply-To: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
 References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462531568-9799-56-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462531568-9799-29-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the new VGIC implementation has reached feature parity with
-the old one, add the new files to the build system and add a Kconfig
-option to switch between the two versions.
-We set the default to the new version to get maximum test coverage,
-in case people experience problems they can switch back to the old
-behaviour if needed.
+The config register handlers are shared between the v2 and v3
+emulation, so their implementation goes into vgic-mmio.c, to be
+easily referenced from the v3 emulation as well later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
 Changelog v1 .. v2:
-- adjust the changed filenames in the Makefiles
-- add vgic-mmio-v2.c and vgic-mmio-v3.c to the Makefiles
+- adapt to new MMIO framework
 
- arch/arm/kvm/Kconfig          |  7 +++++++
- arch/arm/kvm/Makefile         | 11 +++++++++++
- arch/arm64/kvm/Kconfig        |  7 +++++++
- arch/arm64/kvm/Makefile       | 12 ++++++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c |  5 +++++
- 5 files changed, 42 insertions(+)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
+ 3 files changed, 54 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 95a0005..02abfff 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -46,6 +46,13 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 2e17250..2a953ec 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -88,7 +88,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 2),
++		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index d7fe9e6..19fed56 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -321,6 +321,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+ 	}
+ }
  
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+	---help---
-+	  uses the new VGIC implementation
++unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len)
++{
++	u32 intid = (addr & 0xff) * 4;
++	u32 value = 0;
++	int i;
 +
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index eb1bf43..a596b58 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -21,7 +21,18 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++	for (i = 0; i < len * 4; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+obj-y += $(KVM)/arm/vgic/vgic.o
-+obj-y += $(KVM)/arm/vgic/vgic-init.o
-+obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
-+obj-y += $(KVM)/arm/vgic/vgic-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic-mmio.o
-+obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
-+else
- obj-y += $(KVM)/arm/vgic.o
- obj-y += $(KVM)/arm/vgic-v2.o
- obj-y += $(KVM)/arm/vgic-v2-emul.o
-+endif
- obj-y += $(KVM)/arm/arch_timer.o
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index de7450d..3f0e1ce 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -55,6 +55,13 @@ config KVM_ARM_PMU
- 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
- 	  virtual machines.
- 
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+        ---help---
-+          uses the new VGIC implementation
++		if (irq->config == VGIC_CONFIG_EDGE)
++			value |= (2U << (i * 2));
++	}
 +
- source drivers/vhost/Kconfig
++	return extract_bytes(value, addr & 3, len);
++}
++
++void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
++			    gpa_t addr, unsigned int len,
++			    unsigned long val)
++{
++	u32 intid = (addr & 0xff) * 4;
++	int i;
++
++	for (i = 0; i < len * 4; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		if (intid + i < 16)
++			continue;
++
++		/*
++		 * The spec says that interrupts must be disabled before
++		 * changing the configuration to avoid UNDEFINED behaviour.
++		 */
++
++		spin_lock(&irq->irq_lock);
++		if (test_bit(i * 2 + 1, &val)) {
++			irq->config = VGIC_CONFIG_EDGE;
++		} else {
++			irq->config = VGIC_CONFIG_LEVEL;
++			irq->pending = irq->line_level | irq->soft_pending;
++		}
++		spin_unlock(&irq->irq_lock);
++	}
++}
++
+ static int match_region(const void *key, const void *elt)
+ {
+ 	const unsigned int offset = (unsigned long)key;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index cd04ac5..884eb71 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -114,6 +114,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+ 			      gpa_t addr, unsigned int len,
+ 			      unsigned long val);
  
- endif # VIRTUALIZATION
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 122cff4..a7a958c 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -20,10 +20,22 @@ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
++unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len);
++
++void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
++			    gpa_t addr, unsigned int len,
++			    unsigned long val);
++
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
  
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
-+else
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
-+endif
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index caac41f..a3f12b3 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -21,7 +21,12 @@
- 
- #include <asm/kvm_hyp.h>
- 
-+#ifdef CONFIG_KVM_NEW_VGIC
-+extern struct vgic_global kvm_vgic_global_state;
-+#define vgic_v2_params kvm_vgic_global_state
-+#else
- extern struct vgic_params vgic_v2_params;
-+#endif
- 
- static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 					    void __iomem *base)
+ #endif
 -- 
 2.7.3
