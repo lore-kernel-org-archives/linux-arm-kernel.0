@@ -1,104 +1,159 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 May 2016 11:45:22 +0100
-Subject: [PATCH v3 09/55] KVM: arm/arm64: Fix MMIO emulation data handling
+Date: Fri,  6 May 2016 11:45:21 +0100
+Subject: [PATCH v3 08/55] KVM: arm/arm64: Get rid of vgic_cpu->nr_lr
 In-Reply-To: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
 References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462531568-9799-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462531568-9799-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-When the kernel was handling a guest MMIO read access internally, we
-need to copy the emulation result into the run->mmio structure in order
-for the kvm_handle_mmio_return() function to pick it up and inject the
-	result back into the guest.
+The number of list registers is a property of the underlying system, not
+of emulated VGIC CPU interface.
 
-Currently the only user of kvm_io_bus for ARM is the VGIC, which did
-this copying itself, so this was not causing issues so far.
+As we are about to move this variable to global state in the new vgic
+for clarity, move it from the legacy implementation as well to make the
+merge of the new code easier.
 
-But with the upcoming new vgic implementation we need this done
-properly.
-
-Update the kvm_handle_mmio_return description and cleanup the code to
-only perform a single copying when needed.
-
-Code and commit message inspired by Andre Przywara.
-
-Reported-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/kvm/mmio.c | 14 +++++++-------
- virt/kvm/arm/vgic.c |  7 -------
- 2 files changed, 7 insertions(+), 14 deletions(-)
+ include/kvm/arm_vgic.h        |  3 ---
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 12 +++++++-----
+ virt/kvm/arm/vgic-v2.c        |  4 +++-
+ virt/kvm/arm/vgic.c           | 12 ++----------
+ 4 files changed, 12 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 0f6600f..0158e9e 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -87,11 +87,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index f842d7d..452bb85 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -303,9 +303,6 @@ struct vgic_cpu {
+ 	unsigned long   *active_shared;
+ 	unsigned long   *pend_act_shared;
  
- /**
-  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
-+ *			     or in-kernel IO emulation
-+ *
-  * @vcpu: The VCPU pointer
-  * @run:  The VCPU run struct containing the mmio data
-- *
-- * This should only be called after returning from userspace for MMIO load
-- * emulation.
-  */
- int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+-	/* Number of list registers on this CPU */
+-	int		nr_lr;
+-
+ 	/* CPU vif control registers for world switch */
+ 	union {
+ 		struct vgic_v2_cpu_if	vgic_v2;
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 674bdf8..caac41f 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -21,11 +21,13 @@
+ 
+ #include <asm/kvm_hyp.h>
+ 
++extern struct vgic_params vgic_v2_params;
++
+ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+ 					    void __iomem *base)
  {
-@@ -206,18 +205,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	run->mmio.is_write	= is_write;
- 	run->mmio.phys_addr	= fault_ipa;
- 	run->mmio.len		= len;
--	if (is_write)
--		memcpy(run->mmio.data, data_buf, len);
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
++	int nr_lr = (kern_hyp_va(&vgic_v2_params))->nr_lr;
+ 	u32 eisr0, eisr1;
+ 	int i;
+ 	bool expect_mi;
+@@ -67,7 +69,7 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ {
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
++	int nr_lr = (kern_hyp_va(&vgic_v2_params))->nr_lr;
+ 	u32 elrsr0, elrsr1;
  
- 	if (!ret) {
- 		/* We handled the access successfully in the kernel. */
-+		if (!is_write)
-+			memcpy(run->mmio.data, data_buf, len);
- 		vcpu->stat.mmio_exit_kernel++;
- 		kvm_handle_mmio_return(vcpu, run);
- 		return 1;
--	} else {
--		vcpu->stat.mmio_exit_user++;
- 	}
+ 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+@@ -86,7 +88,7 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ {
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
++	int nr_lr = (kern_hyp_va(&vgic_v2_params))->nr_lr;
+ 	int i;
  
-+	if (is_write)
-+		memcpy(run->mmio.data, data_buf, len);
-+	vcpu->stat.mmio_exit_user++;
- 	run->exit_reason	= KVM_EXIT_MMIO;
- 	return 0;
- }
+ 	for (i = 0; i < nr_lr; i++) {
+@@ -141,13 +143,13 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+-	int i, nr_lr;
++	int nr_lr = (kern_hyp_va(&vgic_v2_params))->nr_lr;
++	int i;
+ 	u64 live_lrs = 0;
+ 
+ 	if (!base)
+ 		return;
+ 
+-	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+ 
+ 	for (i = 0; i < nr_lr; i++)
+ 		if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index 67ec334..6aaf5f7 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -174,7 +174,7 @@ static const struct vgic_ops vgic_v2_ops = {
+ 	.enable			= vgic_v2_enable,
+ };
+ 
+-static struct vgic_params vgic_v2_params;
++struct vgic_params __section(.hyp.text) vgic_v2_params;
+ 
+ static void vgic_cpu_init_lrs(void *params)
+ {
+@@ -204,6 +204,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
+ 	struct resource vcpu_res;
+ 	struct vgic_params *vgic = &vgic_v2_params;
+ 
++	memset(vgic, 0, sizeof(*vgic));
++
+ 	vgic->maint_irq = irq_of_parse_and_map(vgic_node, 0);
+ 	if (!vgic->maint_irq) {
+ 		kvm_err("error getting vgic maintenance irq from DT\n");
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5efc298..e70cee4 100644
+index 00386df..5efc298 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -820,7 +820,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_io_device *iodev = container_of(this,
- 						    struct vgic_io_device, dev);
--	struct kvm_run *run = vcpu->run;
- 	const struct vgic_io_range *range;
- 	struct kvm_exit_mmio mmio;
- 	bool updated_state;
-@@ -849,12 +848,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 		updated_state = false;
- 	}
- 	spin_unlock(&dist->lock);
--	run->mmio.is_write	= is_write;
--	run->mmio.len		= len;
--	run->mmio.phys_addr	= addr;
--	memcpy(run->mmio.data, val, len);
--
--	kvm_handle_mmio_return(vcpu, run);
+@@ -691,12 +691,11 @@ bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
+  */
+ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ {
+-	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	u64 elrsr = vgic_get_elrsr(vcpu);
+ 	unsigned long *elrsr_ptr = u64_to_bitmask(&elrsr);
+ 	int i;
  
- 	if (updated_state)
- 		vgic_kick_vcpus(vcpu->kvm);
+-	for_each_clear_bit(i, elrsr_ptr, vgic_cpu->nr_lr) {
++	for_each_clear_bit(i, elrsr_ptr, vgic->nr_lr) {
+ 		struct vgic_lr lr = vgic_get_lr(vcpu, i);
+ 
+ 		/*
+@@ -1107,7 +1106,7 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < vcpu->arch.vgic_cpu.nr_lr; i++) {
++	for (i = 0; i < vgic->nr_lr; i++) {
+ 		struct vgic_lr vlr = vgic_get_lr(vcpu, i);
+ 
+ 		if (vlr.irq == virt_irq && vlr.state & LR_STATE_ACTIVE)
+@@ -1867,13 +1866,6 @@ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+ 		return -ENOMEM;
+ 	}
+ 
+-	/*
+-	 * Store the number of LRs per vcpu, so we don't have to go
+-	 * all the way to the distributor structure to find out. Only
+-	 * assembly code should use this one.
+-	 */
+-	vgic_cpu->nr_lr = vgic->nr_lr;
+-
+ 	return 0;
+ }
+ 
 -- 
 2.7.3
