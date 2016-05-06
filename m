@@ -1,53 +1,40 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Fri, 6 May 2016 10:31:49 -0400
-Subject: [PATCH 0/3] Support MPS2 UART controller
-In-Reply-To: <1461574068-14641-1-git-send-email-vladimir.murzin@arm.com>
-References: <1461574068-14641-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAP=VYLopd8erCP9J9cTyZ+YubafKjWi3bHQp-swmyfyn2eZ_Ww@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 6 May 2016 15:32:48 +0100
+Subject: [PATCH] coresight: Handle build path error
+In-Reply-To: <CANLsYkwEG-4U+hvdVNHQxoH_WuZvD_pYwDC6NSBOok9o5swNoA@mail.gmail.com>
+References: <1462358484-9342-1-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwEG-4U+hvdVNHQxoH_WuZvD_pYwDC6NSBOok9o5swNoA@mail.gmail.com>
+Message-ID: <572CAB10.7060103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2016 at 4:47 AM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> Hi,
+On 06/05/16 15:26, Mathieu Poirier wrote:
+> On 4 May 2016 at 04:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> Enabling a component via sysfs (echo 1 > enable_source), would
+>> trigger building a path from the enabled sources to the sink.
+>> If there is an error in the process (e.g, sink not enabled or
+>> the device (CPU corresponding to ETM) is not online), we never report
+>> failure, except for leaving a message in the dmesg.
+>>
+>> Do proper error checking for the build path and return the error.
+>>
+>> Before:
+>>   $ echo 0 > /sys/devices/system/cpu/cpu2/online
+>>   $ echo 1 > /sys/devices/cs_etm/cpu2/enable_source
+>>   $ echo $?
+>>   0
+>>
+>> After:
+>>   $ echo 0 > /sys/devices/system/cpu/cpu2/online
+>>   $ echo 1 > /sys/devices/cs_etm/cpu2/enable_source
+>>   -bash: echo: write error: No such device or address
+>>
+>> Cc: Mathie Porier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >
-> These patches allow to use UART controller found on MPS2 platform.
+> This patch looks good - thanks for the fix.  Due to how late we are in
+> the cycle I'd ask Greg to pick it up right away but there is a
+> (couple) of typos in my name on the CC line.  Either resend another
+> patch with the correct spelling or remove the CC line altogether.
 
-Did you intend this driver to support being modular?  It has a bool Kconfig
-(not tristate) which makes the module_exit dead code.
-
-If it will always be builtin (with console as primary use case) then you can
-see commit 89ebc27427695bfc1e769f1dd99bd243d332ac7a as a possible
-update suggestion.
-
-P.
---
-
->
-> Following [1], please, consider to merge them into tty/serial tree.
->
-> [1] https://lkml.org/lkml/2016/4/23/190
->
-> Thanks!
->
-> Vladimir Murzin (3):
->   dt-bindings: document the MPS2 UART bindings
->   serial: mps2-uart: add MPS2 UART driver
->   serial: mps2-uart: add support for early console
->
->  .../devicetree/bindings/serial/arm,mps2-uart.txt   |   19 +
->  drivers/tty/serial/Kconfig                         |   13 +
->  drivers/tty/serial/Makefile                        |    1 +
->  drivers/tty/serial/mps2-uart.c                     |  625 ++++++++++++++++++++
->  include/uapi/linux/serial_core.h                   |    3 +
->  5 files changed, 661 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
->  create mode 100644 drivers/tty/serial/mps2-uart.c
->
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Sorry about that. will resend it fixed.
