@@ -1,113 +1,134 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 May 2016 11:46:07 +0100
-Subject: [PATCH v3 54/55] KVM: arm/arm64: vgic-new: implement mapped IRQ
- handling
+Date: Fri,  6 May 2016 11:46:08 +0100
+Subject: [PATCH v3 55/55] KVM: arm/arm64: vgic-new: enable build
 In-Reply-To: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
 References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462531568-9799-55-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462531568-9799-56-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now store the mapped hardware IRQ number in our struct, so we
-don't need the irq_phys_map for the new VGIC.
-Implement the hardware IRQ mapping on top of the reworked arch
-timer interface.
+Now that the new VGIC implementation has reached feature parity with
+the old one, add the new files to the build system and add a Kconfig
+option to switch between the two versions.
+We set the default to the new version to get maximum test coverage,
+in case people experience problems they can switch back to the old
+behaviour if needed.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog RFC..v1:
-- adapt to new arch_timer mapped IRQ interface
-- implement inject_mapped_irq() as a macro (since it is identical to
-  the "un-mapped" IRQ implementation)
-
 Changelog v1 .. v2:
-- replace inject_mapped_irq() macro with a separate implementation,
-  which only allows mapped IRQs to be injected via this interface
+- adjust the changed filenames in the Makefiles
+- add vgic-mmio-v2.c and vgic-mmio-v3.c to the Makefiles
 
- include/kvm/vgic/vgic.h  |  5 +++++
- virt/kvm/arm/vgic/vgic.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+ arch/arm/kvm/Kconfig          |  7 +++++++
+ arch/arm/kvm/Makefile         | 11 +++++++++++
+ arch/arm64/kvm/Kconfig        |  7 +++++++
+ arch/arm64/kvm/Makefile       | 12 ++++++++++++
+ virt/kvm/arm/hyp/vgic-v2-sr.c |  5 +++++
+ 5 files changed, 42 insertions(+)
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 07c3011..64aca0c 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -213,6 +213,11 @@ int kvm_vgic_hyp_init(void);
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 95a0005..02abfff 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -46,6 +46,13 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
  
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
-+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			       bool level);
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
++config KVM_NEW_VGIC
++	bool "New VGIC implementation"
++	depends on KVM
++	default y
++	---help---
++	  uses the new VGIC implementation
++
+ source drivers/vhost/Kconfig
  
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ endif # VIRTUALIZATION
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index eb1bf43..a596b58 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -21,7 +21,18 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+ obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++
++ifeq ($(CONFIG_KVM_NEW_VGIC),y)
++obj-y += $(KVM)/arm/vgic/vgic.o
++obj-y += $(KVM)/arm/vgic/vgic-init.o
++obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
++obj-y += $(KVM)/arm/vgic/vgic-v2.o
++obj-y += $(KVM)/arm/vgic/vgic-mmio.o
++obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
++obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
++else
+ obj-y += $(KVM)/arm/vgic.o
+ obj-y += $(KVM)/arm/vgic-v2.o
+ obj-y += $(KVM)/arm/vgic-v2-emul.o
++endif
+ obj-y += $(KVM)/arm/arch_timer.o
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index de7450d..3f0e1ce 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -55,6 +55,13 @@ config KVM_ARM_PMU
+ 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+ 	  virtual machines.
  
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 068389a..3f854c5 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -310,6 +310,44 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
- }
++config KVM_NEW_VGIC
++	bool "New VGIC implementation"
++	depends on KVM
++	default y
++        ---help---
++          uses the new VGIC implementation
++
+ source drivers/vhost/Kconfig
  
-+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			       bool level)
-+{
-+	return vgic_update_irq_pending(kvm, cpuid, intid, level, true);
-+}
-+
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+
-+	BUG_ON(!irq);
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	irq->hw = true;
-+	irq->hwintid = phys_irq;
-+
-+	spin_unlock(&irq->irq_lock);
-+
-+	return 0;
-+}
-+
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+
-+	BUG_ON(!irq);
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	irq->hw = false;
-+	irq->hwintid = 0;
-+
-+	spin_unlock(&irq->irq_lock);
-+
-+	return 0;
-+}
-+
- /**
-  * vgic_prune_ap_list - Remove non-relevant interrupts from the list
-  *
-@@ -563,3 +601,15 @@ void vgic_kick_vcpus(struct kvm *kvm)
- 			kvm_vcpu_kick(vcpu);
- 	}
- }
-+
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	bool map_is_active;
-+
-+	spin_lock(&irq->irq_lock);
-+	map_is_active = irq->hw && irq->active;
-+	spin_unlock(&irq->irq_lock);
-+
-+	return map_is_active;
-+}
+ endif # VIRTUALIZATION
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 122cff4..a7a958c 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -20,10 +20,22 @@ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+ 
++ifeq ($(CONFIG_KVM_NEW_VGIC),y)
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
++else
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
++endif
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+ kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index caac41f..a3f12b3 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -21,7 +21,12 @@
+ 
+ #include <asm/kvm_hyp.h>
+ 
++#ifdef CONFIG_KVM_NEW_VGIC
++extern struct vgic_global kvm_vgic_global_state;
++#define vgic_v2_params kvm_vgic_global_state
++#else
+ extern struct vgic_params vgic_v2_params;
++#endif
+ 
+ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+ 					    void __iomem *base)
 -- 
 2.7.3
