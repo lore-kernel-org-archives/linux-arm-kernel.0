@@ -1,36 +1,19 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 May 2016 12:19:37 +0100
-Subject: [PATCH] arm64: Make arch_randomize_brk avoid stack area
-In-Reply-To: <1462370994.2895.11.camel@linaro.org>
-References: <1461848638.2848.19.camel@linaro.org>
- <1462370994.2895.11.camel@linaro.org>
-Message-ID: <20160506111937.GK20671@e104818-lin.cambridge.arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri,  6 May 2016 17:01:12 +0530
+Subject: [PATCH V2 0/2] drivers: i2c: qup: Some misc fixes
+Message-ID: <1462534274-28925-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tixy,
+One for fixing the bug with CONFIG_DEBUG_SG enabled and another
+to suspend the transfer for all errors instead of just for nack.
 
-On Wed, May 04, 2016 at 03:09:54PM +0100, Jon Medhurst (Tixy) wrote:
-> Note, in practice, since commit d1fd836dcf00 ("mm: split ET_DYN ASLR
-> from mmap ASLR") this problem shouldn't occur because the address chosen
-> for loading binaries is well clear of the stack, however, prior to that
-> the problem does occur because of the following...
+Sricharan R (2):
+  drivers: i2c: qup: Fix broken dma when CONFIG_DEBUG_SG is enabled.
+  drivers: i2c: qup: Fix error handling
 
-[...]
-
-> These changes have been tested on Linux v4.6-rc4 using 100000
-> invocations of a program [1] that can display the offset of a process's
-> brk...
-
-[...]
-
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> Cc: <stable@vger.kernel.org> # 4.0 and earlier
-
-I don't fully understand what we are supposed to do with this patch.
-Should it only be applied to stable kernels prior to 4.0? Do we need it
-in mainline? As you stated above, this problem does not exist in recent
-kernels.
+ drivers/i2c/busses/i2c-qup.c | 87 +++++++++++++++++++++-----------------------
+ 1 file changed, 42 insertions(+), 45 deletions(-)
 
 -- 
-Catalin
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
