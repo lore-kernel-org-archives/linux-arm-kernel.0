@@ -1,94 +1,68 @@
 From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Fri,  6 May 2016 13:10:18 +0200
-Subject: [PATCH v7 0/3] gpio: add DT support for memory-mapped GPIOs
-Message-ID: <cover.1462372360.git.chunkeey@googlemail.com>
+Date: Fri,  6 May 2016 13:10:19 +0200
+Subject: [PATCH v7 1/3] gpio: dt-bindings: add wd,mbl-gpio bindings
+In-Reply-To: <cover.1462372360.git.chunkeey@googlemail.com>
+References: <cover.1462372360.git.chunkeey@googlemail.com>
+Message-ID: <9bc9349d6e13d81c6200b0cd8fa20c76263043f6.1462372360.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds device tree support for generic memory-mapped GPIOs.
-The GPIO library already allows drivers and architecture support code to
-reuse generic code for managing a GPIO chip. Currently, a developer has
-to create a platform device "basic-mmio-gpio" and attach a bgpio_pdata
-platform data structure to make use of it. However, for architectures
-which rely on the device tree to enumerate devices, creating custom
-platform devices is another extra step that can be avoided by having
-direct support via a device tree binding.
+This patch adds the device tree bindings for the Western Digital's
+MyBook Live memory-mapped GPIO controllers.
 
-I initially came across this patch [0] from ?lvaro Fern?ndez Rojas,
-while looking for an easy way to add support for the GPIO of my
-WD MyBook Live [1] (APM82181). His generic approach patch allowed
-me to easily get the GPIO (and the connected LEDs, buttons, gpiohogs)
-up and running. Even thought, Mr. Fernandez initially developed it
-for his work on the brcm63xx [2].
+The gpios will be supported by gpio-mmio code of the
+GPIO generic library.
 
-The drivers for gpio-clps711x, gpio-ge, gpio-moxart and gpio-ts4800
-are now part of the gpio-mmio.c driver. The old driver files have
-been removed and the Kconfig, Makefile entries have been updated
-accordingly.
-
-And finally, the most important stat about the series:
-	>>> 333 insertions(+), 411 deletions(-) <<<
-	It still removes more lines than it adds!
-
-Thanks!
-
-[0] <https://patchwork.ozlabs.org/patch/422121/>
-[1] <https://github.com/chunkeey/MBL-openwrt>
-[2] <https://wiki.openwrt.org/doc/hardware/soc/soc.broadcom.bcm63xx>
-
-changelog:
-
-v6 -> v7:
-	- finally made a PATCH series (based on linux-gpio devel branch)
-	- added Rob Herring's ACK to the dt bindings
-	- cc'd clps711x, gpio-ge, moxart and ts4800 authors for driver
-	  changes.
-
-v5 -> v6:
-	- rewrote bindings and driver patch to fit the wd,mbl-gpio
-	- unified parser code for gpio-ge, gpio-moxart and gpio-ts4800
-	- fixed gpio chip's base being overwritten with bogus "0"
-	- fixed compat driver crash when reload gpio-generic.ko module
-	- dropped already applied patches from the series
-	- rebased code on linus' devel tree
-	- moved dt bindings patch to the top of the series
-
-v4 -> v5:
-	- reverted rename of gpio-mmio.c back to gpio-generic.c
-	- fixed Andy Shevchenko's comments
-	- consolidated changes from clps711x, gpio-ge, gpio-moxart and
-	  gpio-ts4800 into one patch.
-
-v3 -> v4:
-	- renamed gpio-generic.c to gpio-mmio.c
-	- changed compat. string to "linux,gpio-mmio"
-	- integrated Cirrus clps711x driver
-	- integrated GE FGPA gpio-ge driver
-	- integrated MOXA ART GPIO driver
-	- integrated TS4800 gpio driver
-	- reshuffled patches, reworded commits, fixed spelling errors, etc.
-
-Christian Lamparter (2):
-  gpio: dt-bindings: add wd,mbl-gpio bindings
-  gpio: move clps711x, moxart, ts4800 and gpio-ge into gpio-mmio
-
-?lvaro Fern?ndez Rojas (1):
-  gpio: mmio: add DT support for memory-mapped GPIOs
-
- .../devicetree/bindings/gpio/wd,mbl-gpio.txt       |  38 +++
- drivers/gpio/Kconfig                               |  43 +--
- drivers/gpio/Makefile                              |   4 -
- drivers/gpio/gpio-clps711x.c                       |  91 -------
- drivers/gpio/gpio-ge.c                             | 114 --------
- drivers/gpio/gpio-mmio.c                           | 289 ++++++++++++++++++++-
- drivers/gpio/gpio-moxart.c                         |  84 ------
- drivers/gpio/gpio-ts4800.c                         |  81 ------
- 8 files changed, 333 insertions(+), 411 deletions(-)
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+---
+ .../devicetree/bindings/gpio/wd,mbl-gpio.txt       | 38 ++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
- delete mode 100644 drivers/gpio/gpio-clps711x.c
- delete mode 100644 drivers/gpio/gpio-ge.c
- delete mode 100644 drivers/gpio/gpio-moxart.c
- delete mode 100644 drivers/gpio/gpio-ts4800.c
 
+diff --git a/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+new file mode 100644
+index 0000000..038c3a6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+@@ -0,0 +1,38 @@
++Bindings for the Western Digital's MyBook Live memory-mapped GPIO controllers.
++
++The Western Digital MyBook Live has two memory-mapped GPIO controllers.
++Both GPIO controller only have a single 8-bit data register, where GPIO
++state can be read and/or written.
++
++Required properties:
++	- compatible: should be "wd,mbl-gpio"
++	- reg-names: must contain
++		"dat" - data register
++	- reg: address + size pairs describing the GPIO register sets;
++		order must correspond with the order of entries in reg-names
++	- #gpio-cells: must be set to 2. The first cell is the pin number and
++			the second cell is used to specify the GPIO polarity:
++			0 = active high
++			1 = active low
++	- gpio-controller: marks the device node as a GPIO controller.
++
++Optional properties:
++	- no-output: GPIOs are read-only.
++
++Examples:
++	GPIO0: gpio0 at e0000000 {
++		compatible = "wd,mbl-gpio";
++		reg-names = "dat";
++		reg = <0xe0000000 0x1>;
++		#gpio-cells = <2>;
++		gpio-controller;
++	};
++
++	GPIO1: gpio1 at e0100000 {
++		compatible = "wd,mbl-gpio";
++		reg-names = "dat";
++		reg = <0xe0100000 0x1>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		no-output;
++	};
 -- 
 2.8.1
