@@ -1,143 +1,99 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 6 May 2016 17:00:22 +0300
-Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <CA+=Sn1mNdd+Xy5QL5ScRyZOCWwKkG6o1Pb50sFPuiKX=0Z2B1w@mail.gmail.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1554541.oDP7Ro5zB2@wuerfel>
- <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
- <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
- <57289C75.50904@huawei.com> <20160504214949.GA28217@yury-N73SV>
- <CA+=Sn1ngpaJWHpGDmU+kXBkz56SO+XDW2qzMMLAbbBWnaB0eqw@mail.gmail.com>
- <572AAED2.7050604@huawei.com>
- <CA+=Sn1mNdd+Xy5QL5ScRyZOCWwKkG6o1Pb50sFPuiKX=0Z2B1w@mail.gmail.com>
-Message-ID: <20160506140022.GA18587@yury-N73SV>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 6 May 2016 10:12:08 -0400
+Subject: [PATCH] ARM: dts: exynos: Add MFC memory banks for Peach boards
+In-Reply-To: <572CA2F3.4050407@samsung.com>
+References: <1461871311-18344-1-git-send-email-javier@osg.samsung.com>
+ <cef99c21-3886-c055-05bf-cd04e3b588b3@osg.samsung.com>
+ <572CA2F3.4050407@samsung.com>
+Message-ID: <23883a5f-bfed-9474-51a7-14271b6c391f@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello colleagues,
+Hello Krzysztof,
 
-After all comments, VDSO fix looks like this for me.
+On 05/06/2016 09:58 AM, Krzysztof Kozlowski wrote:
+> On 05/06/2016 03:44 PM, Javier Martinez Canillas wrote:
+>> Hello Krzysztof,
+>>
+>> On 04/28/2016 03:21 PM, Javier Martinez Canillas wrote:
+>>> The MFC nodes with the memory regions reserved for memory allocations
+>>> are missing in the Exynos5420 Peach Pit and Exynos5800 Peach Pi DTS.
+>>>
+>>> This causes the s5p-mfc driver probe to fail with the following error:
+>>>
+>>> [    4.140647] s5p_mfc_alloc_memdevs:1072: Failed to declare coherent memory for MFC device
+>>> [    4.216163] s5p-mfc: probe of 11000000.codec failed with error -12
+>>>
+>>> Add the missing nodes so the driver probes and the {en,de}coder video
+>>> nodes are registered correctly:
+>>>
+>>> [    4.096277] s5p-mfc 11000000.codec: decoder registered as /dev/video4
+>>> [    4.102282] s5p-mfc 11000000.codec: encoder registered as /dev/video5
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
+>>> ---
+>>>
+>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 +++++
+>>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 +++++
+>>>  2 files changed, 10 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> index b644858231b6..f9d2e4f1a0e0 100644
+>>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> @@ -694,6 +694,11 @@
+>>>  	status = "okay";
+>>>  };
+>>>  
+>>> +&mfc {
+>>> +	samsung,mfc-r = <0x43000000 0x800000>;
+>>> +	samsung,mfc-l = <0x51000000 0x800000>;
+>>> +};
+>>> +
+>>>  &mmc_0 {
+>>>  	status = "okay";
+>>>  	num-slots = <1>;
+>>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> index 6ba9aec15485..62ceb89e073f 100644
+>>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> @@ -669,6 +669,11 @@
+>>>  	status = "okay";
+>>>  };
+>>>  
+>>> +&mfc {
+>>> +	samsung,mfc-r = <0x43000000 0x800000>;
+>>> +	samsung,mfc-l = <0x51000000 0x800000>;
+>>> +};
+>>> +
+>>>  &mmc_0 {
+>>>  	status = "okay";
+>>>  	num-slots = <1>;
+>>>
+>>
+>> Any comments about this patch?
+> 
+> What is up with the rush now (a week for ping)? As I understand, this
 
-Note I renamed Andrew's ZERO macro to DELOUSE, as
-there already is __SC_DELOUSE which does the same,
-but in C, not asm.
+Sorry about that... I should had waited for more time for the ping indeed.
+I just thought the patch was trivial and you usually answer within days.
 
-Like Bamvor, I'm not sure how we'd apply this patch - 
-standalone or meld to VDSO. I think, VDSO patch is too
-big and bad-structurized, and if I find how to refactor
-it, I'll incorporate this fix.
+> was broken for very long time on these boards (since adding DT support
+> in 2012?).
+> 
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/kernel/asm-offsets.c               |  7 +++++++
- arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  2 +-
- arch/arm64/kernel/vdso/gettimeofday.S         | 20 +++++++++++++++++---
- 3 files changed, 25 insertions(+), 4 deletions(-)
+Yes, that's correct. And in fact even the s5p-mfc driver is currently
+not working in mainline. But I posted some fixes and will post more
+patches from other people today to get it working. So I thought that
+would be nice to have this in since one of my test machines is a Peach.
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index e229525..fcfd087 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -101,6 +101,13 @@ int main(void)
-   DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
-   DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
-   BLANK();
-+#ifdef CONFIG_ARM64_ILP32
-+  DEFINE(COMPAT_TVAL_TV_SEC,	offsetof(struct compat_timeval, tv_sec));
-+  DEFINE(COMPAT_TVAL_TV_USEC,	offsetof(struct compat_timeval, tv_usec));
-+  DEFINE(COMPAT_TSPEC_TV_SEC,	offsetof(struct compat_timespec, tv_sec));
-+  DEFINE(COMPAT_TSPEC_TV_NSEC,	offsetof(struct compat_timespec, tv_nsec));
-+  BLANK();
-+#endif
-   DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
-   DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
-   BLANK();
-diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-index ddc63fd..d182a8d 100644
---- a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-+++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-@@ -79,7 +79,7 @@ PHDRS
-  */
- VERSION
- {
--	LINUX_2.6 {
-+	LINUX_2.6.39 {
- 	global:
- 		__kernel_rt_sigreturn;
- 		__kernel_gettimeofday;
-diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-index efa79e8..a2d8a70 100644
---- a/arch/arm64/kernel/vdso/gettimeofday.S
-+++ b/arch/arm64/kernel/vdso/gettimeofday.S
-@@ -25,6 +25,16 @@
- #define NSEC_PER_SEC_LO16	0xca00
- #define NSEC_PER_SEC_HI16	0x3b9a
- 
-+#ifdef __LP64__
-+#define PTR_REG(n)	x##n
-+#define OFFSET(n)	n
-+#define DELOUSE(n)
-+#else
-+#define PTR_REG(n)	w##n
-+#define OFFSET(n)	COMPAT_##n
-+#define DELOUSE(n)	mov     w##n, w##n
-+#endif
-+
- vdso_data	.req	x6
- use_syscall	.req	w7
- seqcnt		.req	w8
-@@ -51,6 +61,8 @@ seqcnt		.req	w8
- /* int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz); */
- ENTRY(__kernel_gettimeofday)
- 	.cfi_startproc
-+	DELOUSE(0)
-+	DELOUSE(1)
- 	mov	x2, x30
- 	.cfi_register x30, x2
- 
-@@ -68,7 +80,7 @@ ENTRY(__kernel_gettimeofday)
- 	mov	x13, #1000
- 	lsl	x13, x13, x12
- 	udiv	x11, x11, x13
--	stp	x10, x11, [x0, #TVAL_TV_SEC]
-+	stp	PTR_REG(10), PTR_REG(11), [x0, #OFFSET(TVAL_TV_SEC)]
- 2:
- 	/* If tz is NULL, return 0. */
- 	cbz	x1, 3f
-@@ -88,6 +100,7 @@ ENDPROC(__kernel_gettimeofday)
- /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
- ENTRY(__kernel_clock_gettime)
- 	.cfi_startproc
-+	DELOUSE(1)
- 	cmp	w0, #CLOCK_REALTIME
- 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
- 	b.ne	2f
-@@ -159,7 +172,7 @@ ENTRY(__kernel_clock_gettime)
- 
- 6:	/* Store to the user timespec. */
- 	lsr	x11, x11, x12
--	stp	x10, x11, [x1, #TSPEC_TV_SEC]
-+	stp	PTR_REG(10), PTR_REG(11), [x1, #OFFSET(TSPEC_TV_SEC)]
- 	mov	x0, xzr
- 	ret
- 7:
-@@ -174,6 +187,7 @@ ENDPROC(__kernel_clock_gettime)
- /* int __kernel_clock_getres(clockid_t clock_id, struct timespec *res); */
- ENTRY(__kernel_clock_getres)
- 	.cfi_startproc
-+	DELOUSE(1)
- 	cmp	w0, #CLOCK_REALTIME
- 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
- 	b.ne	1f
-@@ -187,7 +201,7 @@ ENTRY(__kernel_clock_getres)
- 	ldr	x2, 6f
- 2:
- 	cbz	w1, 3f
--	stp	xzr, x2, [x1]
-+	stp	PTR_REG(zr), PTR_REG(2), [x1]
- 
- 3:	/* res == NULL. */
- 	mov	w0, wzr
+> Best regards,
+> Krzysztof
+>
+
+Best regards,
 -- 
-2.5.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
