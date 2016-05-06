@@ -1,48 +1,66 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 5 May 2016 17:18:20 -0700
-Subject: [PATCH RFC] Watchdog: sbsa_gwdt: Enhance timeout range
-In-Reply-To: <572BDB30.9060602@codeaurora.org>
-References: <5728A7C3.4010001@roeck-us.net>
- <20160503143856.GE13045@dhcppc6.redhat.com> <5728BEC4.6050603@codeaurora.org>
- <20160503155141.GF13045@dhcppc6.redhat.com>
- <20160503171602.GA2518@roeck-us.net>
- <20160504141449.GG13045@dhcppc6.redhat.com> <572A0577.1070000@codeaurora.org>
- <20160504155932.GH13045@dhcppc6.redhat.com> <572A2099.4070901@codeaurora.org>
- <20160505164300.GA16914@roeck-us.net>
- <20160505182031.GB12434@dhcppc6.redhat.com> <572B8F52.2000709@codeaurora.org>
- <572BD8E3.4070707@roeck-us.net> <572BD959.3090507@codeaurora.org>
- <572BDB30.9060602@codeaurora.org>
-Message-ID: <572BE2CC.4020606@roeck-us.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 6 May 2016 09:21:25 +0900
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT PM Domain Updates for v4.7
+In-Reply-To: <cover.1461730364.git.horms+renesas@verge.net.au>
+References: <cover.1461730364.git.horms+renesas@verge.net.au>
+Message-ID: <20160506002125.GE24999@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2016 04:45 PM, Timur Tabi wrote:
-> Timur Tabi wrote:
->>
->>> A 32-bit counter is absolutely fine. Letting it run with a 400MHz clock
->>> (or was it 200 MHz ?) is the problem. A resolution of 2.5ns for a
->>> watchdog
->>> timer does not really make any sense.
->>
->> The 10 second limit is based on a 20MHz clock.
->
-> No, that's not true.  I misread the code.  I knew something was wrong, but it didn't click until just now.
->
-> The default timeout is 10 seconds.  The max timeout on a 20MHz system (which is what we're running) is over 200 seconds.
->
-> The problem is that Pratyush's system is running at a clock that's way too fast:
->
->   [  131.187562] sbsa-gwdt sbsa-gwdt.0: Initialized with 40s timeout @ 250000000 Hz, action=1.
->
-> 250MHz is unreasonable.  Pratyush, why is your system counter so high? On our ARM64 system, it's set to 20MHz.
->
+Hi,
 
-Guess that answers my earlier question. Problem is that the specification
-_permits_ those unreasonable frequencies, and quite obviously they are
-being used, no matter if it makes sense or not.
+On Wed, Apr 27, 2016 at 02:20:10PM +1000, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM64 based SoC DT PM Domain updates for v4.7.
+> 
+> This pull requests is based on a merge of:
+> 
+> * "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
+>   v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
+>   pulled
+> * "[GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for v4.7",
+>   tagged as renesas-arm64-dt2-for-v4.7, which I have sent a pull request
+>   for.
+> 
+> The reason for the somewhat tedious base on
+> renesas-rcar-sysc2-for-v4.7, which provides driver changes,
+> is a hard run-time dependency.
+> 
+> I also have a similar set of changes for ARM (32-bit) which I will send
+> separately.
 
-With a (still unreasonable) maximum frequency of 100 MHz, the problem
-would not exist. So, if anything, someone with influence on the standard
-might suggest to reduce the maximum permitted frequency.
+I am wondering if this pull-request might have slipped through the cracks.
 
-Guenter
+FWIW, all other pull requests I have submitted for v4.7 have been pulled
+(thanks!) including a similar pull-request for ARM (32-bit) which is
+present in the next/late branch of the arm-soc tree.
+
+I do not plan to send any more non-fix pull requests for v4.7.
+And at this stage I am not aware of any fixes for v4.7.
+
+> The following changes since commit 3238ec7c0a821915f38095752de97a424fd1d6ce:
+> 
+>   Merge tag 'renesas-rcar-sysc2-for-v4.7' into arm64-dt-pm-domain-for-v4.7 (2016-04-27 11:49:19 +1000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-pm-domain-for-v4.7
+> 
+> for you to fetch changes up to 38dbb45ee4bc7dda4aabba2178eebff2f93380d1:
+> 
+>   arm64: dts: r8a7795: Use SYSC "always-on" PM Domain (2016-04-27 14:10:41 +1000)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM64 Based SoC DT PM Domain Updates for v4.7
+> 
+> * Add SYSC PM Domains to DT of r8a7795 SoC
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (2):
+>       arm64: dts: r8a7795: Add SYSC PM Domains
+>       arm64: dts: r8a7795: Use SYSC "always-on" PM Domain
+> 
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 123 +++++++++++++++++--------------
+>  1 file changed, 68 insertions(+), 55 deletions(-)
+> 
