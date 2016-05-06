@@ -1,14 +1,96 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Fri, 6 May 2016 07:59:37 -0700
-Subject: [PATCH] maintainers: update my email address(es)
-In-Reply-To: <20160505161254.GY19428@n2100.arm.linux.org.uk>
-References: <20160505161254.GY19428@n2100.arm.linux.org.uk>
-Message-ID: <20160506145937.GA24095@infradead.org>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Fri,  6 May 2016 17:27:34 +0200
+Subject: [PATCH 1/1] ASoC: pxa: Fix module autoload for platform drivers
+Message-ID: <1462548454-28597-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 05:12:54PM +0100, Russell King wrote:
-> Update my email and web addresses in the kernel maintainers file.
+These platform drivers are lacking MODULE_ALIAS so module autoloading
+doesn't work. Tested on corgi and poodle with kernel 4.4.
 
-What's up with linux.org.uk?  It also seems like Al's address at
-zeniv.linux.org.uk has been bouncing for a while..
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+---
+ sound/soc/pxa/brownstone.c     | 1 +
+ sound/soc/pxa/mioa701_wm9713.c | 1 +
+ sound/soc/pxa/mmp-pcm.c        | 1 +
+ sound/soc/pxa/mmp-sspa.c       | 1 +
+ sound/soc/pxa/palm27x.c        | 1 +
+ sound/soc/pxa/pxa-ssp.c        | 1 +
+ sound/soc/pxa/pxa2xx-ac97.c    | 1 +
+ sound/soc/pxa/pxa2xx-pcm.c     | 1 +
+ 8 files changed, 8 insertions(+)
+
+diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
+index ec522e9..b6cb995 100644
+--- a/sound/soc/pxa/brownstone.c
++++ b/sound/soc/pxa/brownstone.c
+@@ -133,3 +133,4 @@ module_platform_driver(mmp_driver);
+ MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
+ MODULE_DESCRIPTION("ALSA SoC Brownstone");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:brownstone-audio");
+diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
+index 5c8f9db..d1661fa 100644
+--- a/sound/soc/pxa/mioa701_wm9713.c
++++ b/sound/soc/pxa/mioa701_wm9713.c
+@@ -207,3 +207,4 @@ module_platform_driver(mioa701_wm9713_driver);
+ MODULE_AUTHOR("Robert Jarzmik (rjarzmik at free.fr)");
+ MODULE_DESCRIPTION("ALSA SoC WM9713 MIO A701");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:mioa701-wm9713");
+diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
+index 51e790d..96df9b2 100644
+--- a/sound/soc/pxa/mmp-pcm.c
++++ b/sound/soc/pxa/mmp-pcm.c
+@@ -248,3 +248,4 @@ module_platform_driver(mmp_pcm_driver);
+ MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
+ MODULE_DESCRIPTION("MMP Soc Audio DMA module");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:mmp-pcm-audio");
+diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
+index eca60c2..ca8b23f 100644
+--- a/sound/soc/pxa/mmp-sspa.c
++++ b/sound/soc/pxa/mmp-sspa.c
+@@ -482,3 +482,4 @@ module_platform_driver(asoc_mmp_sspa_driver);
+ MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
+ MODULE_DESCRIPTION("MMP SSPA SoC Interface");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:mmp-sspa-dai");
+diff --git a/sound/soc/pxa/palm27x.c b/sound/soc/pxa/palm27x.c
+index 4e74d95..bcc81e9 100644
+--- a/sound/soc/pxa/palm27x.c
++++ b/sound/soc/pxa/palm27x.c
+@@ -161,3 +161,4 @@ module_platform_driver(palm27x_wm9712_driver);
+ MODULE_AUTHOR("Marek Vasut <marek.vasut@gmail.com>");
+ MODULE_DESCRIPTION("ALSA SoC Palm T|X, T5 and LifeDrive");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:palm27x-asoc");
+diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
+index da03fad..3cad990 100644
+--- a/sound/soc/pxa/pxa-ssp.c
++++ b/sound/soc/pxa/pxa-ssp.c
+@@ -833,3 +833,4 @@ module_platform_driver(asoc_ssp_driver);
+ MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
+ MODULE_DESCRIPTION("PXA SSP/PCM SoC Interface");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:pxa-ssp-dai");
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index f3de615..9615e6d 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -287,3 +287,4 @@ module_platform_driver(pxa2xx_ac97_driver);
+ MODULE_AUTHOR("Nicolas Pitre");
+ MODULE_DESCRIPTION("AC97 driver for the Intel PXA2xx chip");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:pxa2xx-ac97");
+diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
+index 9f39039..410d48b 100644
+--- a/sound/soc/pxa/pxa2xx-pcm.c
++++ b/sound/soc/pxa/pxa2xx-pcm.c
+@@ -117,3 +117,4 @@ module_platform_driver(pxa_pcm_driver);
+ MODULE_AUTHOR("Nicolas Pitre");
+ MODULE_DESCRIPTION("Intel PXA2xx PCM DMA module");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:pxa-pcm-audio");
+-- 
+1.9.1
