@@ -1,85 +1,64 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 6 May 2016 08:43:23 -0600
-Subject: [PATCH] coresight: Handle build path error
-In-Reply-To: <1462545350-15970-1-git-send-email-suzuki.poulose@arm.com>
-References: <CANLsYkwEG-4U+hvdVNHQxoH_WuZvD_pYwDC6NSBOok9o5swNoA@mail.gmail.com>
- <1462545350-15970-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkwtSTwRD9kjqU0v60wNHoRLoXW1hTwRq3tZemO=RqnhQw@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 6 May 2016 15:43:24 +0100
+Subject: [PATCH 0/3] Support MPS2 UART controller
+In-Reply-To: <CAP=VYLopd8erCP9J9cTyZ+YubafKjWi3bHQp-swmyfyn2eZ_Ww@mail.gmail.com>
+References: <1461574068-14641-1-git-send-email-vladimir.murzin@arm.com>
+ <CAP=VYLopd8erCP9J9cTyZ+YubafKjWi3bHQp-swmyfyn2eZ_Ww@mail.gmail.com>
+Message-ID: <572CAD8C.5000102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2016 at 08:35, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> Enabling a component via sysfs (echo 1 > enable_source), would
-> trigger building a path from the enabled sources to the sink.
-> If there is an error in the process (e.g, sink not enabled or
-> the device (CPU corresponding to ETM) is not online), we never report
-> failure, except for leaving a message in the dmesg.
->
-> Do proper error checking for the build path and return the error.
->
-> Before:
->  $ echo 0 > /sys/devices/system/cpu/cpu2/online
->  $ echo 1 > /sys/devices/cs_etm/cpu2/enable_source
->  $ echo $?
->  0
->
-> After:
->  $ echo 0 > /sys/devices/system/cpu/cpu2/online
->  $ echo 1 > /sys/devices/cs_etm/cpu2/enable_source
->  -bash: echo: write error: No such device or address
->
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight.c |    9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index 2ea5961..e0c5166 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -393,6 +393,7 @@ out:
->  struct list_head *coresight_build_path(struct coresight_device *csdev)
->  {
->         struct list_head *path;
-> +       int rc;
->
->         path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
->         if (!path)
-> @@ -400,9 +401,10 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
->
->         INIT_LIST_HEAD(path);
->
-> -       if (_coresight_build_path(csdev, path)) {
-> +       rc = _coresight_build_path(csdev, path);
-> +       if (rc) {
->                 kfree(path);
-> -               path = NULL;
-> +               return ERR_PTR(rc);
->         }
->
->         return path;
-> @@ -448,8 +450,9 @@ int coresight_enable(struct coresight_device *csdev)
->                 goto out;
->
->         path = coresight_build_path(csdev);
-> -       if (!path) {
-> +       if (IS_ERR(path)) {
->                 pr_err("building path(s) failed\n");
-> +               ret = PTR_ERR(path);
->                 goto out;
->         }
->
+On 06/05/16 15:31, Paul Gortmaker wrote:
+> On Mon, Apr 25, 2016 at 4:47 AM, Vladimir Murzin
+> <vladimir.murzin@arm.com> wrote:
+>> Hi,
+>>
+>> These patches allow to use UART controller found on MPS2 platform.
+> 
+> Did you intend this driver to support being modular?  It has a bool Kconfig
+> (not tristate) which makes the module_exit dead code.
+> 
+> If it will always be builtin (with console as primary use case) then you can
+> see commit 89ebc27427695bfc1e769f1dd99bd243d332ac7a as a possible
+> update suggestion.
+
+Thanks for the pointer, Paul! I'll see how to update the driver and send
+a patch after next merge window closed.
+
+Cheers
+Vladimir
+
+> 
+> P.
 > --
-> 1.7.9.5
->
-
-Thanks for the correction:
-
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
-Greg, given how small the changes are can you pick this up?  Otherwise
-I'll simply keep it in my tree.
-
-Thanks,
-Mathieu
+> 
+>>
+>> Following [1], please, consider to merge them into tty/serial tree.
+>>
+>> [1] https://lkml.org/lkml/2016/4/23/190
+>>
+>> Thanks!
+>>
+>> Vladimir Murzin (3):
+>>   dt-bindings: document the MPS2 UART bindings
+>>   serial: mps2-uart: add MPS2 UART driver
+>>   serial: mps2-uart: add support for early console
+>>
+>>  .../devicetree/bindings/serial/arm,mps2-uart.txt   |   19 +
+>>  drivers/tty/serial/Kconfig                         |   13 +
+>>  drivers/tty/serial/Makefile                        |    1 +
+>>  drivers/tty/serial/mps2-uart.c                     |  625 ++++++++++++++++++++
+>>  include/uapi/linux/serial_core.h                   |    3 +
+>>  5 files changed, 661 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
+>>  create mode 100644 drivers/tty/serial/mps2-uart.c
+>>
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
