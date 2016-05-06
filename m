@@ -1,58 +1,56 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 6 May 2016 16:58:06 +0930
-Subject: [PATCH v2 09/11] arm/dst: Add Aspeed ast2500 device tree
-In-Reply-To: <loom.20160506T005831-472@post.gmane.org>
-References: <1461225849-28074-1-git-send-email-joel@jms.id.au>
- <1461225849-28074-10-git-send-email-joel@jms.id.au>
- <loom.20160506T005831-472@post.gmane.org>
-Message-ID: <CACPK8Xe2jjTuMeE2kPacFcGjGFkKFSJHwxHMRgrd93G1T+FX7g@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 May 2016 08:32:19 +0100
+Subject: [PATCH v3 0/2] irqchip/mbigen: fix the IO remap problem in mbigen
+ driver.
+In-Reply-To: <572BEF97.5020003@huawei.com>
+References: <1458203641-17172-1-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1603211124450.3978@nanos> <56F0B7C3.8070001@huawei.com>
+ <572B5D97.4090004@arm.com> <572BEF97.5020003@huawei.com>
+Message-ID: <572C4883.20106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 6, 2016 at 8:41 AM, Xo Wang <xow@google.com> wrote:
-> Joel Stanley <joel <at> jms.id.au> writes:
->> +/ {
->> +     model = "AST2500 EVB";
->> +     compatible = "aspeed,ast2500";
->> +
->> +     chosen {
->> +             stdout-path = &uart5;
->> +             bootargs = "console=ttyS4,115200";
->> +     };
->> +
->> +     memory {
->> +             reg = < 0x80000000 0x10000000 >;
->
-> The AST2500 EVB has an SK Hynix H5AN4G6NMFR 4Gb part, so this should be
-> 0x20000000 for size.
+On 06/05/16 02:12, majun (F) wrote:
+> Hi Marc:
+> 
+> ? 2016/5/5 22:49, Marc Zyngier ??:
+>> On 22/03/16 03:10, majun (F) wrote:
+>>>
+>>>
+>>> ? 2016/3/21 18:29, Thomas Gleixner ??:
+>>>> On Thu, 17 Mar 2016, MaJun wrote:
+>>>>> This patch set is used to fix the problem of remap a set of registers
+>>>>> repeatedly in current mbigen driver.
+>>>>>
+>>>>>   irqchip/mbigen:Change the mbigen node definition in dt binding file
+>>>>>   irqchip/mbigen:Change the mbigen driver based on the new mbigen node definition
+>>>>
+>>>> These subject lines are still horrible as they tell nothing about the nature
+>>>> of the change. I fixed them up along with the changelogs and applied them to
+>>>> irq/urgent. Can you spot the difference?
+>>>
+>>> Yes, after you changing, the subject and change log clearly show why we need to
+>>> do this change.
+>>> I have learned a lot from you :)
+>>>
+>>>>
+>>>> While at it. The config switch for this driver is horrible. It's just in the
+>>>> middle of the device driver configs. Why is this configurable by the user at
+>>>> all? It simply should be selected by arm64 or some subarch configuration
+>>>> there. Please clean that up.
+>>>>
+>>> will do.
+>>
+>> So what's the status of this? Do you still plan to respin it?
+>>
+> 
+> This patch set had been ACK by Thomas.
 
-Well caught. I've got a different part on my v1.1 board, but it is also 4Gbit.
+Interesting. Somehow, the ARM email server has decided not to deliver
+the tip-bot messages, so I didn't see it was already in.
 
->
->> +                     uart1: serial <at> 1e783000 {
->> +                             compatible = "ns16550a";
->> +                             reg = <0x1e783000 0x1000>;
->> +                             reg-shift = <2>;
->> +                             interrupts = <9>;
->> +                             clock-frequency = <1843200>;
->
-> The AST2500 datasheet 39.3.1 states the input clock to their 16550 IP is
-> 24 MHz. Their u-boot code also has #define CONFIG_SYS_NS16550_CLK
-> 24000000. I suspect we hit a path in the serial/8250 driver that doesn't
-> change the divisor from what u-boot set, which is why this has worked.
+Sorry for the noise.
 
-You're correct, we are relying on uboot. There's also a tricky 'div13'
-register in the SCU that we are setting in our board file for these
-numbers to work out.
-
-In V3 I've added a clk driver to take are of these details.
-
->
-> Thanks for the porting work!
-
-Thanks for the review. Did you manage to get these patches booting on
-your board?
-
-Cheers,
-
-Joel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
