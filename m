@@ -1,143 +1,92 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 May 2016 11:45:38 +0100
-Subject: [PATCH v3 25/55] KVM: arm/arm64: vgic-new: Add PENDING registers
+Date: Fri,  6 May 2016 11:45:42 +0100
+Subject: [PATCH v3 29/55] KVM: arm/arm64: vgic-new: Add TARGET registers
  handlers
 In-Reply-To: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
 References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462531568-9799-26-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462531568-9799-30-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pending register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be easily
-referenced from the v3 emulation as well later.
-For level triggered interrupts the real line level is unaffected by
-this write, so we keep this state separate and combine it with the
-device's level to get the actual pending state.
+The target register handlers are v2 emulation specific, so their
+implementation lives entirely in vgic-mmio-v2.c.
+We copy the old VGIC behaviour of assigning an IRQ to the first VCPU
+set in the target mask instead of making it possibly pending on
+multiple VCPUs.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
 Changelog RFC..v1:
-- remove IRQ lock from read handler
-- remove TODO from clear pending handler
+- remove runtime VCPU determination from this v2-only register
+- fold in implementation of vgic_v2_irq_change_affinity()
+- replace ffs() with __ffs()
 
 Changelog v1 .. v2:
 - adapt to new MMIO framework
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
- virt/kvm/arm/vgic/vgic-mmio.c    | 60 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    | 12 ++++++++
- 3 files changed, 74 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 448d1da..4b87e0a 100644
+index 2a953ec..888529e 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -76,9 +76,9 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
- 		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
-+		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
-+		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 077ae86..4df1af7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -102,6 +102,66 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
+@@ -66,6 +66,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
  	}
  }
  
-+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len)
++static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len)
 +{
-+	u32 intid = (addr & 0x7f) * 8;
-+	u32 value = 0;
++	u32 intid = addr & 0x3ff;
 +	int i;
++	u64 val = 0;
 +
-+	/* Loop over all IRQs affected by this read */
-+	for (i = 0; i < len * 8; i++) {
++	for (i = 0; i < len; i++) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		if (irq->pending)
-+			value |= (1U << i);
++		val |= (u64)irq->targets << (i * 8);
 +	}
 +
-+	return extract_bytes(value, addr & 3, len);
++	return val;
 +}
 +
-+void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
++static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
++				   gpa_t addr, unsigned int len,
++				   unsigned long val)
 +{
-+	u32 intid = (addr & 0x7f) * 8;
++	u32 intid = addr & 0x3ff;
 +	int i;
 +
-+	for_each_set_bit(i, &val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	/* GICD_ITARGETSR[0-7] are read-only */
++	if (intid < VGIC_NR_PRIVATE_IRQS)
++		return;
 +
-+		spin_lock(&irq->irq_lock);
-+		irq->pending = true;
-+		if (irq->config == VGIC_CONFIG_LEVEL)
-+			irq->soft_pending = true;
-+
-+		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+	}
-+}
-+
-+void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
-+{
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
-+
-+	for_each_set_bit(i, &val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
++		int target;
 +
 +		spin_lock(&irq->irq_lock);
 +
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			irq->soft_pending = false;
-+			irq->pending = irq->line_level;
-+		} else {
-+			irq->pending = false;
-+		}
++		irq->targets = (val >> (i * 8)) & 0xff;
++		target = irq->targets ? __ffs(irq->targets) : 0;
++		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
 +
 +		spin_unlock(&irq->irq_lock);
 +	}
 +}
 +
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 188909a..d4fc029 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -85,6 +85,18 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
- 
-+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len);
-+
-+void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
-+void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- #endif
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+@@ -86,7 +127,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+ 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
++		vgic_mmio_read_target, vgic_mmio_write_target, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+ 		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
 -- 
 2.7.3
