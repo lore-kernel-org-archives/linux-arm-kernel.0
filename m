@@ -1,209 +1,22 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 6 May 2016 15:37:31 +0300
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <572C8B30.7000005@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
- <572C8B30.7000005@huawei.com>
-Message-ID: <20160506123731.GA11959@yury-N73SV>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 6 May 2016 07:48:12 -0500
+Subject: [PATCH] ARM: dts: am57xx-idk-common: Fix input supply names
+In-Reply-To: <1462493125-27832-1-git-send-email-nm@ti.com>
+References: <1462493125-27832-1-git-send-email-nm@ti.com>
+Message-ID: <572C928C.3080308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 08:16:48PM +0800, Zhangjian (Bamvor) wrote:
-> Hi,
-> 
-> On 2016/4/6 6:08, Yury Norov wrote:
-> >From: Andrew Pinski <apinski@cavium.com>
-> >
-> >Add a separate syscall-table for ILP32, which dispatches either to native
-> >LP64 system call implementation or to compat-syscalls, as appropriate.
-> >
-> >Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-> >Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> >---
-> >  arch/arm64/include/asm/unistd.h | 11 ++++++-
-> >  arch/arm64/kernel/Makefile      |  2 +-
-> >  arch/arm64/kernel/entry.S       | 12 +++++++-
-> >  arch/arm64/kernel/sys_ilp32.c   | 65 +++++++++++++++++++++++++++++++++++++++++
-> >  4 files changed, 87 insertions(+), 3 deletions(-)
-> >  create mode 100644 arch/arm64/kernel/sys_ilp32.c
-> >
-> >diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> >index 2971dea..5ea18ef 100644
-> >--- a/arch/arm64/include/asm/unistd.h
-> >+++ b/arch/arm64/include/asm/unistd.h
-> >@@ -13,9 +13,18 @@
-> >   * You should have received a copy of the GNU General Public License
-> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> >+
-> >+#ifdef CONFIG_COMPAT
-> >+#define __ARCH_WANT_COMPAT_STAT64
-> >+#endif
-> >+
-> >+#ifdef CONFIG_ARM64_ILP32
-> >+#define __ARCH_WANT_COMPAT_SYS_PREADV64
-> >+#define __ARCH_WANT_COMPAT_SYS_PWRITEV64
-> >+#endif
-> >+
-> >  #ifdef CONFIG_AARCH32_EL0
-> >  #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
-> >-#define __ARCH_WANT_COMPAT_STAT64
-> >  #define __ARCH_WANT_SYS_GETHOSTNAME
-> >  #define __ARCH_WANT_SYS_PAUSE
-> >  #define __ARCH_WANT_SYS_GETPGRP
-> >diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> >index 9dfdf86..7aa65ea 100644
-> >--- a/arch/arm64/kernel/Makefile
-> >+++ b/arch/arm64/kernel/Makefile
-> >@@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
-> >  arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
-> >  					   sys_compat.o entry32.o		\
-> >  					   ../../arm/kernel/opcodes.o binfmt_elf32.o
-> >-arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
-> >+arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
-> >  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
-> >  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
-> >  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-> >diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> >index cf4d1ae..1f7a145 100644
-> >--- a/arch/arm64/kernel/entry.S
-> >+++ b/arch/arm64/kernel/entry.S
-> >@@ -715,9 +715,13 @@ ENDPROC(ret_from_fork)
-> >   */
-> >  	.align	6
-> >  el0_svc:
-> >-	adrp	stbl, sys_call_table		// load syscall table pointer
-> >  	uxtw	scno, w8			// syscall number in w8
-> >  	mov	sc_nr, #__NR_syscalls
-> >+#ifdef CONFIG_ARM64_ILP32
-> >+	ldr	x16, [tsk, #TI_FLAGS]
-> >+	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> >+#endif
-> >+	adrp	stbl, sys_call_table		// load syscall table pointer
-> >  el0_svc_naked:					// compat entry point
-> >  	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-> >  	enable_dbg_and_irq
-> >@@ -737,6 +741,12 @@ ni_sys:
-> >  	b	ret_fast_syscall
-> >  ENDPROC(el0_svc)
-> >
-> >+#ifdef CONFIG_ARM64_ILP32
-> >+el0_ilp32_svc:
-> >+	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
-> >+	b el0_svc_naked
-> >+#endif
-> >+
-> >  	/*
-> >  	 * This is the really slow path.  We're going to be doing context
-> >  	 * switches, and waiting for our parent to respond.
-> >diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-> >new file mode 100644
-> >index 0000000..0996d8e
-> >--- /dev/null
-> >+++ b/arch/arm64/kernel/sys_ilp32.c
-> >@@ -0,0 +1,65 @@
-> >+/*
-> >+ * AArch64- ILP32 specific system calls implementation
-> >+ *
-> >+ * Copyright (C) 2016 Cavium Inc.
-> >+ * Author: Andrew Pinski <apinski@cavium.com>
-> >+ *
-> >+ * This program is free software; you can redistribute it and/or modify
-> >+ * it under the terms of the GNU General Public License version 2 as
-> >+ * published by the Free Software Foundation.
-> >+ *
-> >+ * This program is distributed in the hope that it will be useful,
-> >+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >+ * GNU General Public License for more details.
-> >+ *
-> >+ * You should have received a copy of the GNU General Public License
-> >+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >+ */
-> >+
-> >+#include <linux/compiler.h>
-> >+#include <linux/errno.h>
-> >+#include <linux/fs.h>
-> >+#include <linux/mm.h>
-> >+#include <linux/msg.h>
-> >+#include <linux/export.h>
-> >+#include <linux/sched.h>
-> >+#include <linux/slab.h>
-> >+#include <linux/syscalls.h>
-> >+#include <linux/compat.h>
-> >+#include <asm-generic/syscalls.h>
-> >+
-> >+/* Using non-compat syscalls where necessary */
-> >+#define compat_sys_fadvise64_64        sys_fadvise64_64
-> >+#define compat_sys_fallocate           sys_fallocate
-> >+#define compat_sys_ftruncate64         sys_ftruncate
-> >+#define compat_sys_lookup_dcookie      sys_lookup_dcookie
-> >+#define compat_sys_pread64             sys_pread64
-> >+#define compat_sys_pwrite64            sys_pwrite64
-> >+#define compat_sys_readahead           sys_readahead
-> >+#define compat_sys_shmat               sys_shmat
-> >+#define compat_sys_sync_file_range     sys_sync_file_range
-> >+#define compat_sys_truncate64          sys_truncate
-> >+#define sys_llseek                     sys_lseek
-> >+#define sys_mmap2		       sys_mmap
-> I am a little bit confused here. We wrap the mmap to mmap2 in glibc
-> without shift the 4096 and We map mmap2 to mmap in kernel which
-> means we shift with the real page size. It works unless the
-> application want to mmap the offset bigger then 2G. In ILP32 app,
-> if the offset is bigger than 2G(e.g. 0xfb000000), it is a negative
-> number and extend to 64bit nagetive number in kernel
-> (0xfffffff fb000000). I add the "COMPAT_SYSCALL_WRAP6(mmap, ...)" in
-> kernel/compat_wrapper.c. But it is not works. I am not sure if it is
-> already sign extended in userspace.
-> 
-> On the other hand, I read the code of mmap in arm and other
-> architecture. Usually, they will shift 4096 in userspace and shift
-> others in kernel if needed. Should we follow the similar ways or we
-> could call mmap_pgoff in glibc and do the shift according the real
-> page shift(getpages())?
-> 
-> Thanks
-> 
-> Bamvor
-> 
-> 
+On 05/05/2016 07:05 PM, Nishanth Menon wrote:
+[...]
+>  				ldortc_reg: ldortc {
+>  					/* VDDA_RTC  */
+>  					vin-supply = <&vmain>;
+> -					regulator-name = "ldortc";
+I deleted the wrong line here!
 
-Hi,
+Will repost. Sorry for the noise.
 
-AFAIR, here we don't shift offset, as it's 64-bit both in user-
-and kernel-space, and just pass it from user to kernel thru glibc
-with no changes.
-
-It definitely works, as there are many mappings made by linker and
-libc in 2G+ area, and there are no problems with them. This is a
-typical ILP32 application map:
-
-00400000-00401000 r-xp 00000000 08:00 130400     /root/mykill
-00410000-00411000 rwxp 00000000 08:00 130400     /root/mykill
-00527000-00549000 rwxp 00000000 00:00 0          [heap]
-c6278000-c6298000 rwxp 00000000 00:00 0 
-c6298000-c63d0000 r-xp 00000000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
-c63d0000-c63e0000 ---p 00138000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
-c63e0000-c63e2000 r-xp 00138000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
-c63e2000-c63e3000 rwxp 0013a000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
-c63e3000-c63e6000 rwxp 00000000 00:00 0 
-c63e6000-c63fc000 r-xp 00000000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
-c63fc000-c640b000 ---p 00016000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
-c640b000-c640c000 r-xp 00015000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
-c640c000-c640d000 rwxp 00016000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
-c640d000-c640f000 rwxp 00000000 00:00 0 
-c640f000-c642c000 r-xp 00000000 08:00 135288     /root/sys-root/libilp32/ld-2.22.so
-c6437000-c6439000 rwxp 00000000 00:00 0 
-c6439000-c643a000 r--p 00000000 00:00 0          [vvar]
-c643a000-c643b000 r-xp 00000000 00:00 0          [vdso]
-c643b000-c643c000 r-xp 0001c000 08:00 135288     /root/sys-root/libilp32/ld-2.22.so
-c643c000-c643d000 rwxp 0001d000 08:00 135288     /root/sys-root/libilp32/ld-2.22.so
-ffe2d000-ffe4e000 rw-p 00000000 00:00 0          [stack]
-
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Regards,
+Nishanth Menon
