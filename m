@@ -1,322 +1,108 @@
-From: linux@horizon.com (George Spelvin)
-Date: 7 May 2016 04:41:29 -0400
-Subject: [patch V4] lib: GCD: Use binary GCD algorithm instead of Euclidean
-In-Reply-To: <1462527763-15301-1-git-send-email-zengzhaoxiu@163.com>
-Message-ID: <20160507084129.7284.qmail@ns.horizon.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 7 May 2016 11:49:14 +0200
+Subject: [RFC PATCH 05/12] ARM: dts: exynos: Configure Exynos5410 pinctrl
+ for eMMC and SD card
+In-Reply-To: <CAGOxZ52sH9vcN0MXxhX1ee7wr9Ao6Na=5X1bXxQo+6uvvWCbJA@mail.gmail.com>
+References: <1462297949-13824-1-git-send-email-krzk@kernel.org>
+ <1462297949-13824-6-git-send-email-krzk@kernel.org>
+ <CAGOxZ52sH9vcN0MXxhX1ee7wr9Ao6Na=5X1bXxQo+6uvvWCbJA@mail.gmail.com>
+Message-ID: <20160507094914.GA3731@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing critical, but a bit of kibitzing.
-(That is slang in the Yiddish language for a person
-who offers annoying and unwanted advice.)
+On Sat, May 07, 2016 at 10:23:52AM +0530, Alim Akhtar wrote:
+> Hi Krzysztof,
+> 
+> On Tue, May 3, 2016 at 11:22 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > Configure the pinctrl for MMC0 (eMMC) and MMC2 (microSD card).
+> >
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> >
+> > ---
+> >
+> > I am not sure about sd0_rclk. Also I wonder whether this should go to
+> > board DTS...
+> > ---
+> >  arch/arm/boot/dts/exynos5410-pinctrl.dtsi | 87 +++++++++++++++++++++++++++++++
+> >  1 file changed, 87 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+> > index f9aa6bb55464..dc12a79b8b32 100644
+> > --- a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+> > @@ -277,6 +277,93 @@
+> >                 interrupt-controller;
+> >                 #interrupt-cells = <2>;
+> >         };
+> > +
+> > +       sd0_clk: sd0-clk {
+> > +               samsung,pins = "gpc0-0";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <0>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +
+> > +       sd0_cmd: sd0-cmd {
+> > +               samsung,pins = "gpc0-1";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <0>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +
+> > +       sd0_cd: sd0-cd {
+> > +               samsung,pins = "gpc0-2";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <3>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +
+> > +       sd0_bus1: sd0-bus-width1 {
+> > +               samsung,pins = "gpc0-3";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <3>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +
+> > +       sd0_bus4: sd0-bus-width4 {
+> > +               samsung,pins = "gpc0-4", "gpc0-5", "gpc0-6";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <3>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +
+> > +       sd0_bus8: sd0-bus-width8 {
+> > +               samsung,pins = "gpc3-0", "gpc3-1", "gpc3-2", "gpc3-3";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <3>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +
+> > +       /* TODO: What's up with with rclk? On Odroid XU this is missing... */
+> > +       /*
+> > +       sd0_rclk: sd0-rclk {
+> > +               samsung,pins = "gpc0-7";
+> > +               samsung,pin-function = <2>;
+> > +               samsung,pin-pud = <1>;
+> > +               samsung,pin-drv = <3>;
+> > +       };
+> > +       */
+> > +
+> IF Odroid XU is populated with an eMMC5.0+ device && RCLK (Data
+> Strobe) is connected from AP to emmc device, THEN you should configure
+> this dedicated PIN.
+> Otherwise you can remove this TODO and uncomment the node and put a
+> comment saying that this feature (emmc5.0+) is not supported on this
+> SoC.
 
-> The binary GCD algorithm is based on the following facts:
-> 	1. If a and b are all evens, then gcd(a,b) = 2 * gcd(a/2, b/2)
->	2. If a is even and b is odd, then gcd(a,b) = gcd(a/2, b)
->	3. If a and b are all odds, then gcd(a,b) = gcd((a-b)/2, b) = gcd((a+b)/2, b)
+I double checked and:
+1. Schematics say this pin is not connected,
+2. Hardkernel forum confirms that altough XU could support eMMC5.0 (SoC
+   supports it) but it was not tested and the pin (RCLK) should be wired
+   by consumer.
 
-1) "even" and "odd" are adjectives.  In English, adjectives to not have
-   plural suffixes.  Thus, "they are even" or "they are odd".
-2) Although "all" is not exactly wrong, it sounds odd.  Since there are
-   exactly two of them it's clearer to say "both".
+With your help it seems solved. I'll remove the TODO and add a comment
+about not supported emmc5.
 
-If I also rephrase the last line to fit into 80 columns, you get:
 
-  The binary GCD algorithm is based on the following facts:
-- 	1. If a and b are all evens, then gcd(a,b) = 2 * gcd(a/2, b/2)
-+ 	1. If a and b are both even, then gcd(a,b) = 2 * gcd(a/2, b/2)
- 	2. If a is even and b is odd, then gcd(a,b) = gcd(a/2, b)
--	3. If a and b are all odds, then gcd(a,b) = gcd((a-b)/2, b) = gcd((a+b)/2, b)
-+	3. If both are odd, then gcd(a,b) = gcd((a-b)/2, b) = gcd((a+b)/2, b)
-
-3) Negative config options are always confusing.
-
-Would it be better to call it CONFIG_INEFFICIEBNT_FFS, or even simpler
-CONFIG_SLOW_FFS?
-
-Also, you're allowed to add "help" to a non-interactive config option,
-and some documentation might be useful.
-E.g.
-
-+config CPU_SLOW_FFS
-+	def_bool n
-+	help
-+	  If n, the CPU supports a fast __ffs (__builtin_ctz) operation,
-+	  either directly or via a short code sequence using a count
-+	  leading zeros or population count instruction.  If y, the
-+	  operation is emulated by slower software, such as an unrolled
-+	  binary search.
-+
-+	  This is purely an optimization option; the kernel
-+	  will function correctly regardless of how it is set.
-+
-
-Your benchmark code doesn't have to have a separate code path if
-__x86_64__; rdtsc works on 32-bit code just as well.  paths.  And the
-way you subtract the end and start times is unnecessarily complicated.
-The C language guarantees that unsigned arithmetic simply wraps modulo
-2^bits as expected.
-
-Here's a simplified version:
-
-	#include <stdio.h>
-	#include <stdlib.h>
-	#include <stdint.h>
-	#include <string.h>
-	#include <time.h>
-	#include <unistd.h>
-
-	#define swap(a, b) \
-		do { \
-			a ^= b; \
-			b ^= a; \
-			a ^= b; \
-		} while (0)
-
-	/* The Euclidean GCD algorithm */
-	unsigned long gcd0(unsigned long a, unsigned long b)
-	{
-		if (a < b)
-			swap(a, b);
-
-		while (b != 0) {
-			unsigned long r = a % b;
-			a = b;
-			b = r;
-		}
-		return a;
-	}
-
-	/* The binary GCD algorithm, using __builtin_ctzl */
-	unsigned long gcd1(unsigned long a, unsigned long b)
-	{
-		unsigned long r = a | b;
-
-		if (!a || !b)
-			return r;
-
-		b >>= __builtin_ctzl(b);
-
-		do {
-			a >>= __builtin_ctzl(a);
-
-			if (a < b)
-				swap(a, b);
-			a -= b;
-		} while (a);
-		return b << __builtin_ctzl(r);
-	}
-
-	/* Binary GCD algorithm, even/odd variant, without __builtin_ctzl */
-	unsigned long gcd2(unsigned long a, unsigned long b)
-	{
-		unsigned long r = a | b;
-
-		if (!a || !b)
-			return r;
-
-		r &= -r;
-
-		while (!(b & r))
-			b >>= 1;
-
-		for (;;) {
-			while (!(a & r))
-				a >>= 1;
-			if (a < b)
-				swap(a, b);
-			else if (a == b)
-				return a;
-			a -= b;
-			a >>= 1;
-			if (a & r)
-				a += b;
-			a >>= 1;
-		}
-	}
-
-	/* A variant of gcd1, with early out for gcd = 1 */
-	unsigned long gcd3(unsigned long a, unsigned long b)
-	{
-		unsigned long r = a | b;
-
-		if (!a || !b)
-			return r;
-
-		b >>= __builtin_ctzl(b);
-		if (b == 1)
-			return r & -r;
-
-		for (;;) {
-			a >>= __builtin_ctzl(a);
-			if (a == b || a == 1)
-				return a << __builtin_ctzl(r);
-
-			if (a < b)
-				swap(a, b);
-			a -= b;
-		}
-	}
-
-	unsigned long gcd4(unsigned long a, unsigned long b)
-	{
-		unsigned long r = a | b;
-
-		if (!a || !b)
-			return r;
-
-		r &= -r;
-
-		while (!(b & r))
-			b >>= 1;
-		if (b == r)
-			return r;
-
-		for (;;) {
-			while (!(a & r))
-				a >>= 1;
-			if (a == b || a == r)
-				return a;
-
-			if (a < b)
-				swap(a, b);
-			a -= b;
-			a >>= 1;
-			if (a & r)
-				a += b;
-			a >>= 1;
-		}
-	}
-
-	static unsigned long (*gcd_func[])(unsigned long a, unsigned long b) = {
-		gcd0, gcd1, gcd2, gcd3, gcd4,
-	};
-
-	#define TEST_ENTRIES (int)(sizeof(gcd_func) / sizeof(gcd_func[0]))
-
-	#define rdtscll(val) do { \
-		unsigned __a,__d; \
-		__asm__ __volatile__("rdtsc" : "=a" (__a), "=d" (__d)); \
-		(val) = __a | (unsigned long long)__d << 32; \
-	} while(0)
-
-	static unsigned long long
-	benchmark_gcd_func(unsigned long (*gcd)(unsigned long, unsigned long),
-			   unsigned long a, unsigned long b, unsigned long *res)
-	{
-		unsigned long long start, end;
-		unsigned long gcd_res;
-
-		rdtscll(start);
-		gcd_res = gcd(a, b);
-		rdtscll(end);
-
-		*res = gcd_res;
-		return end - start;
-	}
-
-	static inline unsigned long get_rand()
-	{
-		if (sizeof(long) == 8)
-			return (unsigned long)rand() << 32 | rand();
-		else
-			return rand();
-	}
-
-	int main(int argc, char **argv)
-	{
-		unsigned int seed = time(0);
-		int loops = 100;
-		int repeats = 1000;
-		unsigned long (*res)[TEST_ENTRIES];
-		unsigned long long elapsed[TEST_ENTRIES];
-		int i, j, k;
-
-		for (;;) {
-			int opt = getopt(argc, argv, "n:r:s:");
-			/* End condition always first */
-			if (opt == -1)
-				break;
-
-			switch (opt) {
-			case 'n':
-				loops = atoi(optarg);
-				break;
-			case 'r':
-				repeats = atoi(optarg);
-				break;
-			case 's':
-				seed = strtoul(optarg, NULL, 10);
-				break;
-			default:
-				/* You won't actually get here. */
-				break;
-			}
-		}
-
-		res = malloc(sizeof(unsigned long) * TEST_ENTRIES * loops);
-		memset(elapsed, 0, sizeof(elapsed));
-
-		srand(seed);
-		for (j = 0; j < loops; j++) {
-			unsigned long a = get_rand();
-			/* Do we have args? */
-			unsigned long b = argc > optind ? strtoul(argv[optind], NULL, 10) : get_rand();
-			unsigned long long min_elapsed[TEST_ENTRIES];
-			for (k = 0; k < repeats; k++) {
-				for (i = 0; i < TEST_ENTRIES; i++) {
-					unsigned long long tmp = benchmark_gcd_func(gcd_func[i], a, b, &res[j][i]);
-					if (k == 0 || min_elapsed[i] > tmp)
-						min_elapsed[i] = tmp;
-				}
-			}
-			for (i = 0; i < TEST_ENTRIES; i++)
-				elapsed[i] += min_elapsed[i];
-		}
-
-		for (i = 0; i < TEST_ENTRIES; i++)
-			printf("gcd%d: elapsed %llu\n", i, elapsed[i]);
-
-		k = 0;
-		srand(seed);
-		for (j = 0; j < loops; j++) {
-			unsigned long a = get_rand();
-			unsigned long b = argc > optind ? strtoul(argv[optind], NULL, 10) : get_rand();
-			for (i = 1; i < TEST_ENTRIES; i++) {
-				if (res[j][i] != res[j][0])
-					break;
-			}
-			if (i < TEST_ENTRIES) {
-				if (k == 0) {
-					k = 1;
-					fprintf(stderr, "Error:\n");
-				}
-				fprintf(stderr, "gcd(%lu, %lu): ", a, b);
-				for (i = 0; i < TEST_ENTRIES; i++)
-					fprintf(stderr, "%ld%s", res[j][i], i < TEST_ENTRIES - 1 ? ", " : "\n");
-			}
-		}
-
-		if (k == 0)
-			fprintf(stderr, "PASS\n");
-
-		free(res);
-
-		return 0;
-	}
-
-Here are some more timings, with the same flags as your tests:
-
-First, 32 bit code:
-		gcd0	gcd1	gcd2	gcd3	gcd4
-Ivy Bridge	3156	1192	1740	1160	1640	PASS
-AMD Phenom	7150	2564	2348	2975	2843	PASS
-Core 2		4176	2592	4164	2604	3900	PASS
-Pentium 4	11492	4784	7632	4852	6452	PASS
-
-And 64-bit (longer times becuase the inputs are larger):
-Ivy Bridge	10636	2496	3500	2432	3360	PASS
-AMD Phenom	19482	4058	6030	5001	6845	PASS
-
-Looking@those, I'm not sure how much better the gcd3/4 versions are
-than gcd1/2.  The difference seems pretty minor and sometimes negative.
+Best regards,
+Krzysztof
