@@ -1,87 +1,119 @@
-From: ayaka@soulik.info (ayaka)
-Date: Sat, 7 May 2016 13:09:01 +0800
-Subject: [RESEND PATCH] [media] s5p-mfc: don't close instance after free
- OUTPUT buffers
-In-Reply-To: <1462572682-5195-1-git-send-email-javier@osg.samsung.com>
-References: <1462572682-5195-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <572D786D.2040105@soulik.info>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 7 May 2016 13:30:14 +0800
+Subject: [PATCH RFC 1/5] net: phy: sun8i-h3-ephy: Add bindings for
+ Allwinner H3 Ethernet PHY
+In-Reply-To: <CAGb2v662vHfYox2Ff9Mm=sXq4UHg92SQe2ihnKY9Aa4X9yss4Q@mail.gmail.com>
+References: <1459786954-12649-1-git-send-email-wens@csie.org>
+ <1459786954-12649-2-git-send-email-wens@csie.org> <570BF9B0.2090602@gmail.com>
+ <CAGb2v662vHfYox2Ff9Mm=sXq4UHg92SQe2ihnKY9Aa4X9yss4Q@mail.gmail.com>
+Message-ID: <CAGb2v65qPMieWU-1CRJYL_zZ3JpUm83+AN477jGdrWYnjjJ66g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please also notice those patches (A few patches make s5p-mfc work with 
-Gstreamer)
-  I resent to mail recently.
-Without them, the encoder won't work with Gstreamer either. I hope it 
-will be
-merged as soon as possible.
+Hi,
 
-? 2016?05?07? 06:11, Javier Martinez Canillas ??:
-> From: ayaka <ayaka@soulik.info>
+On Tue, Apr 12, 2016 at 9:38 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Tue, Apr 12, 2016 at 3:23 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 04/04/16 09:22, Chen-Yu Tsai wrote:
+>>> The Allwinner H3 SoC incorporates an Ethernet PHY. This is enabled and
+>>> configured through a memory mapped hardware register.
+>>>
+>>> This same register also configures the MAC interface mode and TX clock
+>>> source. Also covered by the register, but not supported in these bindings,
+>>> are TX/RX clock delay chains and inverters, and an RMII module.
+>>>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>  .../bindings/net/allwinner,sun8i-h3-ephy.txt       | 44 ++++++++++++++++++++++
+>>>  1 file changed, 44 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+>>> new file mode 100644
+>>> index 000000000000..146f227e6d88
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+>>> @@ -0,0 +1,44 @@
+>>> +* Allwinner H3 E(thernet) PHY
+>>> +
+>>> +The Allwinner H3 integrates an MII ethernet PHY. As with external PHYs,
+>>> +before it can be configured over the MDIO bus and used, certain hardware
+>>> +features must be configured, such as the PHY address and LED polarity.
+>>
+>> Is the internal PHY address really configurable? Not that there is
+>> anything wrong with it, this is good.
 >
-> User-space applications can use the VIDIOC_REQBUFS ioctl to determine if a
-> memory mapped, user pointer or DMABUF based I/O is supported by the driver.
+> It is. Things that are configured or provided to a discrete PHY are routed
+> to registers in the SoC, things such as PHY address, clocks, resets.
 >
-> So a set of VIDIOC_REQBUFS ioctl calls will be made with count 0 and then
-> the real VIDIOC_REQBUFS call with count == n. But for count 0, the driver
-> not only frees the buffer but also closes the MFC instance and s5p_mfc_ctx
-> state is set to MFCINST_FREE.
+>>> +The PHY must also be powered on and brought out of reset.
+>>> +
+>>> +This is accomplished with regulators and pull-up/downs for external PHYs.
+>>> +For this internal PHY, a hardware register is programmed.
+>>> +
+>>> +The same hardware register also contains clock and interface controls
+>>> +for the MAC. This is also present in earlier SoCs, and is covered by
+>>> +"allwinner,sun7i-a20-gmac-clk". The controls in the H3 are slightly
+>>> +different due to the inclusion of what appears to be an RMII-MII
+>>> +bridge.
+>>> +
+>>> +Required properties:
+>>> +- compatible: should be "allwinner,sun8i-h3-ephy"
+>>> +- reg: address and length of the register set for the device
+>>> +- clocks: A phandle to the reference clock for this device
+>>> +- resets: A phandle to the reset control for this device
+>>> +
+>>> +Ethernet PHY related properties:
+>>> +- allwinner,ephy-addr: the MDIO bus address the PHY should respond to.
+>>> +                    If this is not set, the external PHY is used, and
+>>> +                    everything else in this section is ignored.
+>>
+>> So we are going to put the same value here, and in the actual Ethernet
+>> PHY device tree node that should be hanging off the EMAC/MDIO bus
+>> controller, this is confusing and error prone.
 >
-> The VIDIOC_REQBUFS handler for the output device checks if the s5p_mfc_ctx
-> state is set to MFCINST_INIT (which happens on an VIDIOC_S_FMT) and fails
-> otherwise. So after a VIDIOC_REQBUFS(n), future VIDIOC_REQBUFS(n) calls
-> will fails unless a VIDIOC_S_FMT ioctl calls happens before the reqbufs.
+> Yes, that would be an issue when writing the DTS.
+>>
+>>> +- allwinner,leds-active-low: LEDs are active low. Without this, LEDs are
+>>> +                          active high.
+>>> +
+>>> +Ethernet MAC clock related properties:
+>>> +- #clock-cells: should be 0
+>>> +- clock-output-names: "mac_tx"
+>>> +
+>>> +Example:
+>>> +
+>>> +ethernet-phy at 01c00030 {
+>>> +     compatible = "allwinner,sun8i-h3-ephy";
+>>> +     reg = <0x01c00030 0x4>;
+>>
+>> Looking at this register space this looks more like an internal PHY SHIM
+>> that is needed to be configured before the internal PHY can be access,
+>> not a proper Ethernet PHY per-se, see replies in aptch 2.
+>>
+>> Should not this block be a second cell associated with the Ethernet MAC
+>> block? One or the other are not going to be very useful without
+>> knowledge of each other.
 >
-> But applications may first set the format and then attempt to determine
-> the I/O methods supported by the driver (for example Gstramer does it) so
-> the state won't be set to MFCINST_INIT again and VIDIOC_REQBUFS will fail.
->
-> To avoid this issue, only free the buffers on VIDIOC_REQBUFS(0) but don't
-> close the MFC instance to allow future VIDIOC_REQBUFS(n) calls to succeed.
->
-> Signed-off-by: ayaka <ayaka@soulik.info>
-> [javier: Rewrote changelog to explain the problem more detailed]
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-> ---
-> Hello,
->
-> This is a resend of a patch posted by Ayaka some time ago [0].
-> Without $SUBJECT, trying to decode a video using Gstramer fails
-> on an Exynos5422 Odroid XU4 board with following error message:
->
-> $ gst-launch-1.0 filesrc location=test.mov ! qtdemux ! h264parse ! v4l2video0dec ! videoconvert ! autovideosink
->
-> Setting pipeline to PAUSED ...
-> Pipeline is PREROLLING ...
-> [ 3947.114756] vidioc_reqbufs:576: Only V4L2_MEMORY_MAP is supported
-> [ 3947.114771] vidioc_reqbufs:576: Only V4L2_MEMORY_MAP is supported
-> [ 3947.114903] reqbufs_output:484: Reqbufs called in an invalid state
-> [ 3947.114913] reqbufs_output:510: Failed allocating buffers for OUTPUT queue
-> ERROR: from element /GstPipeline:pipeline0/v4l2video0dec:v4l2video0dec0: Failed to allocate required memory.
-> Additional debug info:
-> gstv4l2videodec.c(575): gst_v4l2_video_dec_handle_frame (): /GstPipeline:pipeline0/v4l2video0dec:v4l2video0dec0:
-> Buffer pool activation failed
-> ERROR: pipeline doesn't want to preroll.
-> Setting pipeline to NULL ...
-> Freeing pipeline ...
->
-> [0]: https://patchwork.linuxtv.org/patch/32794/
->
-> Best regards,
-> Javier
->
->   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index f2d6376ce618..8b9467de2d6a 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -474,7 +474,6 @@ static int reqbufs_output(struct s5p_mfc_dev *dev, struct s5p_mfc_ctx *ctx,
->   		ret = vb2_reqbufs(&ctx->vq_src, reqbufs);
->   		if (ret)
->   			goto out;
-> -		s5p_mfc_close_mfc_inst(dev, ctx);
->   		ctx->src_bufs_cnt = 0;
->   		ctx->output_state = QUEUE_FREE;
->   	} else if (ctx->output_state == QUEUE_FREE) {
+> True. However the lower half of the same register also controls the
+> MAC interface mode and TX clock source and delays. This we had a clock
+> driver that was used in conjuction with stmmac on earlier SoCs. I was
+> hoping to keep that model with the newer EMAC. At the time it was
+> argued that what seemed like a clock should be handled by a clock
+> driver, instead of just a "syscon". If this is reaching too far to
+> handle this new use case, I will happily just provide patches to merge
+> this into the MAC.
+
+Maxime, Hans, any thoughts?
+
+It seems like it'd be easier to just fold this into the EMAC driver.
+The register is not part of the clock controller in these new SoCs,
+so it's nicer than what we had in A20/A31. It's also not just a clock
+control, but a bunch of various controls.
+
+ChenYu
+
+> I would like to know how to deal with things like a PHY requiring
+> some sort of shim driver, be it an internal one, or an external mfd
+> chip that happens to have an Ethernet PHY included? How do we tie
+> this into the PHY node under the MDIO bus?
