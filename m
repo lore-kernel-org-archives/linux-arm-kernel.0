@@ -1,54 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat,  7 May 2016 13:10:28 +0200
-Subject: [GIT PULL] ARM: dts: exynos: Non-critical fixes for v4.7
-Message-ID: <1462619428-13798-1-git-send-email-k.kozlowski@samsung.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Sat, 7 May 2016 13:23:56 +0200
+Subject: [patch V4] lib: GCD: Use binary GCD algorithm instead of Euclidean
+In-Reply-To: <1462527763-15301-1-git-send-email-zengzhaoxiu@163.com>
+References: <1462527763-15301-1-git-send-email-zengzhaoxiu@163.com>
+Message-ID: <20160507112308.GA2612@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+> index 57ffaf2..ca675ed 100644
+> --- a/arch/sparc/Kconfig
+> +++ b/arch/sparc/Kconfig
+> @@ -42,6 +42,7 @@ config SPARC
+>  	select ODD_RT_SIGACTION
+>  	select OLD_SIGSUSPEND
+>  	select ARCH_HAS_SG_CHAIN
+> +	select CPU_NO_EFFICIENT_FFS
+>  
+>  config SPARC32
+>  	def_bool !64BIT
 
-A bunch of fixes for things probably broken for long time (MFC, regulator
-debugfs) or for stuff which will be broken in next releases (conversion
-of max8997 to regmap).
+sparc64 have an efficient ffs implementation.
+We use run-time patching to use the proper version
+depending on the actual sparc cpu.
 
+As this is determinded at config time, then let the
+sparc cpu that has the efficient ffs benefit from this.
 
-Best regards,
-Krzysztof
+In other words - select CPU_NO_EFFICIENT_FFS only for SPARC32.
 
-
-The following changes since commit a0a966b83873f33778710a4fc59240244b0734a5:
-
-  ARM: EXYNOS: Properly skip unitialized parent clock in power domain on (2016-04-25 11:35:37 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-non-critical-4.7
-
-for you to fetch changes up to 330d12764e15f6e3e94ff34cda29db96d2589c24:
-
-  ARM: dts: exynos: Add interrupt line to MAX8997 PMIC on exynos4210-trats (2016-05-06 16:01:32 +0200)
-
-----------------------------------------------------------------
-Samsung DTS non-critical fixes for v4.7:
-1. Fix s5p-mfc driver probe on Exynos542x Peach boards (need to provide MFC
-   memory banks). On these boards this was broken for long time but
-   apparently no one enabled this driver till now.
-2. Fix creation of debugfs entries for one regulator on Exynos4210
-   Trats board.
-3. Fix probing of max8997 MFD driver (and its children) because
-   of missing interrupt. Actually the current version of the driver probes
-   (just without interrupts) but after switching to regmap and regmap-irq,
-   the interrupt will be mandatory.
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: exynos: Add MFC memory banks for Peach boards
-
-Marek Szyprowski (2):
-      ARM: dts: exynos: Fix regulator name to avoid forbidden character on exynos4210-trats
-      ARM: dts: exynos: Add interrupt line to MAX8997 PMIC on exynos4210-trats
-
- arch/arm/boot/dts/exynos4210-trats.dts     | 4 +++-
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 +++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 +++++
- 3 files changed, 13 insertions(+), 1 deletion(-)
+	Sam
