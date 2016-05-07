@@ -1,36 +1,46 @@
 From: ayaka@soulik.info (ayaka)
-Date: Sat,  7 May 2016 13:05:24 +0800
-Subject: [PATCH 1/3] [media] s5p-mfc: Add handling of buffer freeing reqbufs
- request
+Date: Sat,  7 May 2016 13:05:25 +0800
+Subject: [PATCH 2/3] [media] s5p-mfc: remove unnecessary check in try_fmt
 In-Reply-To: <1462597526-31559-1-git-send-email-ayaka@soulik.info>
 References: <1462597526-31559-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1462597526-31559-2-git-send-email-ayaka@soulik.info>
+Message-ID: <1462597526-31559-3-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder forget the work to call hardware to release its buffers.
-This patch came from chromium project. I just change its code
-style and make the API match with new kernel.
+We don't need to request the sizeimage or num_planes
+in try_fmt.
 
 Signed-off-by: ayaka <ayaka@soulik.info>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
 diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index 034b5c1..a66a9f9 100644
+index a66a9f9..2f76aba 100644
 --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
 +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -1144,7 +1144,10 @@ static int vidioc_reqbufs(struct file *file, void *priv,
- 		return -EINVAL;
- 	if (reqbufs->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
- 		if (reqbufs->count == 0) {
-+			mfc_debug(2, "Freeing buffers\n");
- 			ret = vb2_reqbufs(&ctx->vq_dst, reqbufs);
-+			s5p_mfc_hw_call(dev->mfc_ops, release_codec_buffers,
-+					ctx);
- 			ctx->capture_state = QUEUE_FREE;
- 			return ret;
+@@ -1043,10 +1043,6 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 			mfc_err("failed to try output format\n");
+ 			return -EINVAL;
  		}
+-		if (pix_fmt_mp->plane_fmt[0].sizeimage == 0) {
+-			mfc_err("must be set encoding output size\n");
+-			return -EINVAL;
+-		}
+ 		if ((dev->variant->version_bit & fmt->versions) == 0) {
+ 			mfc_err("Unsupported format by this MFC version.\n");
+ 			return -EINVAL;
+@@ -1060,11 +1056,6 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 			mfc_err("failed to try output format\n");
+ 			return -EINVAL;
+ 		}
+-
+-		if (fmt->num_planes != pix_fmt_mp->num_planes) {
+-			mfc_err("failed to try output format\n");
+-			return -EINVAL;
+-		}
+ 		if ((dev->variant->version_bit & fmt->versions) == 0) {
+ 			mfc_err("Unsupported format by this MFC version.\n");
+ 			return -EINVAL;
 -- 
 2.5.5
