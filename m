@@ -1,68 +1,116 @@
 From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sat,  7 May 2016 18:21:46 +0300
-Subject: [PATCH 5/7] ARM: OMAP: dmtimer: Do not call PM runtime functions when
- not needed.
+Date: Sat,  7 May 2016 18:21:45 +0300
+Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
 In-Reply-To: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <1462634508-24961-6-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-once omap_dm_timer_start() is called, which calls omap_dm_timer_enable()
-and thus pm_runtime_get_sync(), it doesn't make sense to call PM runtime
-functions again before omap_dm_timer_stop is called(). Otherwise PM runtime
-functions called in omap_dm_timer_enable/disable lead to long and unneeded
-delays.
-
-Fix that by implementing an "enabled" counter, so the PM runtime functions
-get called only when really needed.
-
-Without that patch Nokia N900 IR TX driver (ir-rx51) does not function.
+With the upcoming removal of legacy boot, lets add support to one of the
+last N900 drivers remaining without it. As the driver still uses omap
+dmtimer, add auxdata as well.
 
 Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
 ---
- arch/arm/plat-omap/dmtimer.c              | 9 ++++++++-
- arch/arm/plat-omap/include/plat/dmtimer.h | 1 +
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/media/nokia,lirc-rx51         | 19 +++++++++++++++++++
+ arch/arm/mach-omap2/pdata-quirks.c                    |  6 +-----
+ drivers/media/rc/ir-rx51.c                            | 11 ++++++++++-
+ 3 files changed, 30 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/nokia,lirc-rx51
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 7a327bd..f35a78c 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -365,6 +365,9 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
- {
- 	int c;
- 
-+	if (timer->enabled++)
-+		return;
+diff --git a/Documentation/devicetree/bindings/media/nokia,lirc-rx51 b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
+new file mode 100644
+index 0000000..5b3081e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
+@@ -0,0 +1,19 @@
++Device-Tree bindings for LIRC TX driver for Nokia N900(RX51)
 +
- 	pm_runtime_get_sync(&timer->pdev->dev);
- 
- 	if (!(timer->capability & OMAP_TIMER_ALWON)) {
-@@ -383,7 +386,11 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
- 
- void omap_dm_timer_disable(struct omap_dm_timer *timer)
- {
--	pm_runtime_put_sync(&timer->pdev->dev);
-+	if (timer->enabled == 1)
-+		pm_runtime_put_sync(&timer->pdev->dev);
++Required properties:
++	- compatible: should be "nokia,lirc-rx51".
++	- pwms: specifies PWM used for IR signal transmission.
 +
-+	if (timer->enabled)
-+		timer->enabled--;
++Example node:
++
++	pwm9: dmtimer-pwm at 9 {
++		compatible = "ti,omap-dmtimer-pwm";
++		ti,timers = <&timer9>;
++		#pwm-cells = <3>;
++	};
++
++	ir: lirc-rx51 {
++		compatible = "nokia,lirc-rx51";
++
++		pwms = <&pwm9 0 26316 0>; /* 38000 Hz */
++	};
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index af65781..c15ccac 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -273,8 +273,6 @@ static struct platform_device omap3_rom_rng_device = {
+ 	},
+ };
+ 
+-static struct platform_device rx51_lirc_device;
+-
+ static void __init nokia_n900_legacy_init(void)
+ {
+ 	hsmmc2_internal_input_clk();
+@@ -293,10 +291,7 @@ static void __init nokia_n900_legacy_init(void)
+ 
+ 		pr_info("RX-51: Registering OMAP3 HWRNG device\n");
+ 		platform_device_register(&omap3_rom_rng_device);
+-
+ 	}
+-
+-	platform_device_register(&rx51_lirc_device);
  }
- EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
  
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index dd79f30..fc984e1 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -114,6 +114,7 @@ struct omap_dm_timer {
- 	unsigned long rate;
- 	unsigned reserved:1;
- 	unsigned posted:1;
-+	u32 enabled;
- 	struct timer_regs context;
- 	int (*get_context_loss_count)(struct device *);
- 	int ctx_loss_count;
+ static void __init omap3_tao3530_legacy_init(void)
+@@ -534,6 +529,7 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 		       &omap3_iommu_pdata),
+ 	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x4809c000, "4809c000.mmc", &mmc_pdata[0]),
+ 	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x480b4000, "480b4000.mmc", &mmc_pdata[1]),
++	OF_DEV_AUXDATA("nokia,lirc-rx51", 0, "lirc-rx51", &rx51_lirc_data),
+ 	/* Only on am3517 */
+ 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
+ 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
+index 5096ef3..7a329d8 100644
+--- a/drivers/media/rc/ir-rx51.c
++++ b/drivers/media/rc/ir-rx51.c
+@@ -21,6 +21,7 @@
+ #include <linux/sched.h>
+ #include <linux/wait.h>
+ #include <linux/pwm.h>
++#include <linux/of.h>
+ 
+ #include <media/lirc.h>
+ #include <media/lirc_dev.h>
+@@ -478,6 +479,14 @@ static int lirc_rx51_remove(struct platform_device *dev)
+ 	return lirc_unregister_driver(lirc_rx51_driver.minor);
+ }
+ 
++static const struct of_device_id lirc_rx51_match[] = {
++	{
++		.compatible = "nokia,lirc-rx51",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, lirc_rx51_match);
++
+ struct platform_driver lirc_rx51_platform_driver = {
+ 	.probe		= lirc_rx51_probe,
+ 	.remove		= lirc_rx51_remove,
+@@ -485,7 +494,7 @@ struct platform_driver lirc_rx51_platform_driver = {
+ 	.resume		= lirc_rx51_resume,
+ 	.driver		= {
+ 		.name	= DRIVER_NAME,
+-		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(lirc_rx51_match),
+ 	},
+ };
+ module_platform_driver(lirc_rx51_platform_driver);
 -- 
 1.9.1
