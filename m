@@ -1,34 +1,97 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 6 May 2016 17:21:11 -0600
-Subject: [PATCH 05/11] pwm: tegra-dfll: Add driver for Tegra DFLL PWM
- controller
-In-Reply-To: <20160506231532.GK3492@codeaurora.org>
-References: <1461321071-6431-1-git-send-email-pchiu@nvidia.com>
- <1461321071-6431-6-git-send-email-pchiu@nvidia.com>
- <20160422125513.GJ9047@ulmo.ba.sec> <20160506231532.GK3492@codeaurora.org>
-Message-ID: <572D26E7.2060406@wwwdotorg.org>
+From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
+Date: Fri, 06 May 2016 21:25:01 -0400
+Subject: [RESEND PATCH] [media] s5p-mfc: don't close instance after free
+ OUTPUT buffers
+In-Reply-To: <1462572682-5195-1-git-send-email-javier@osg.samsung.com>
+References: <1462572682-5195-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1462584301.25248.40.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2016 05:15 PM, Stephen Boyd wrote:
-> On 04/22, Thierry Reding wrote:
->> On Fri, Apr 22, 2016 at 06:31:05PM +0800, Penny Chiu wrote:
->>> diff --git a/Documentation/devicetree/bindings/pwm/nvidia,tegra-dfll-pwm.txt b/Documentation/devicetree/bindings/pwm/nvidia,tegra-dfll-pwm.txt
->>> new file mode 100644
->>> index 0000000..bd0d247
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/pwm/nvidia,tegra-dfll-pwm.txt
->>> @@ -0,0 +1,48 @@
->>> +Tegra SoC DFLL PWM controller
->>
->> Stephen, we have in the past used tegra124 in names, even if the IP was
->> already included in tegra114, but we never supported it on Tegra114 and
->> hence couldn't even verify that the binding was valid. Any preference as
->> to the name in this particular case?
->
-> You meant Stephen Warren right? I don't care either way.
+Thanks for re-submitting. See inline two typos to fix in teh comment.
 
-Sorry, I wasn't really paying attention to patches.
+cheers,
+Nicolas
 
-Yes, using "124" seems to make sense; we can always expand the binding 
-to cover "114" later if there's any demand.
+Le vendredi 06 mai 2016 ? 18:11 -0400, Javier Martinez Canillas a ?crit?:
+> From: ayaka <ayaka@soulik.info>
+> 
+> User-space applications can use the VIDIOC_REQBUFS ioctl to determine if a
+> memory mapped, user pointer or DMABUF based I/O is supported by the driver.
+> 
+> So a set of VIDIOC_REQBUFS ioctl calls will be made with count 0 and then
+> the real VIDIOC_REQBUFS call with count == n. But for count 0, the driver
+> not only frees the buffer but also closes the MFC instance and s5p_mfc_ctx
+> state is set to MFCINST_FREE.
+> 
+> The VIDIOC_REQBUFS handler for the output device checks if the s5p_mfc_ctx
+> state is set to MFCINST_INIT (which happens on an VIDIOC_S_FMT) and fails
+> otherwise. So after a VIDIOC_REQBUFS(n), future VIDIOC_REQBUFS(n) calls
+> will fails unless a VIDIOC_S_FMT ioctl calls happens before the reqbufs.
+> 
+> But applications may first set the format and then attempt to determine
+> the I/O methods supported by the driver (for example Gstramer does it) so
+?* GStreamer
+
+> the state won't be set to MFCINST_INIT again and VIDIOC_REQBUFS will fail.
+> 
+> To avoid this issue, only free the buffers on VIDIOC_REQBUFS(0) but don't
+> close the MFC instance to allow future VIDIOC_REQBUFS(n) calls to succeed.
+> 
+> Signed-off-by: ayaka <ayaka@soulik.info>
+> [javier: Rewrote changelog to explain the problem more detailed]
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> Hello,
+> 
+> This is a resend of a patch posted by Ayaka some time ago [0].
+> Without $SUBJECT, trying to decode a video using Gstramer fails
+
+* GStreamer again?
+
+> on an Exynos5422 Odroid XU4 board with following error message:
+> 
+> $ gst-launch-1.0 filesrc location=test.mov ! qtdemux ! h264parse ! v4l2video0dec ! videoconvert ! autovideosink
+> 
+> Setting pipeline to PAUSED ...
+> Pipeline is PREROLLING ...
+> [ 3947.114756] vidioc_reqbufs:576: Only V4L2_MEMORY_MAP is supported
+> [ 3947.114771] vidioc_reqbufs:576: Only V4L2_MEMORY_MAP is supported
+> [ 3947.114903] reqbufs_output:484: Reqbufs called in an invalid state
+> [ 3947.114913] reqbufs_output:510: Failed allocating buffers for OUTPUT queue
+> ERROR: from element /GstPipeline:pipeline0/v4l2video0dec:v4l2video0dec0: Failed to allocate required memory.
+> Additional debug info:
+> gstv4l2videodec.c(575): gst_v4l2_video_dec_handle_frame (): /GstPipeline:pipeline0/v4l2video0dec:v4l2video0dec0:
+> Buffer pool activation failed
+> ERROR: pipeline doesn't want to preroll.
+> Setting pipeline to NULL ...
+> Freeing pipeline ...
+> 
+> [0]: https://patchwork.linuxtv.org/patch/32794/
+> 
+> Best regards,
+> Javier
+> 
+> ?drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
+> ?1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index f2d6376ce618..8b9467de2d6a 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -474,7 +474,6 @@ static int reqbufs_output(struct s5p_mfc_dev *dev, struct s5p_mfc_ctx *ctx,
+> ?		ret = vb2_reqbufs(&ctx->vq_src, reqbufs);
+> ?		if (ret)
+> ?			goto out;
+> -		s5p_mfc_close_mfc_inst(dev, ctx);
+> ?		ctx->src_bufs_cnt = 0;
+> ?		ctx->output_state = QUEUE_FREE;
+> ?	} else if (ctx->output_state == QUEUE_FREE) {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160506/c27b9a43/attachment-0001.sig>
