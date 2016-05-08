@@ -1,31 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun,  8 May 2016 11:24:56 +0200
-Subject: [PATCH] clk: samsung: exynos5420: Remove useless check for return
- value of samsung_clk_init
-Message-ID: <1462699496-16646-1-git-send-email-krzk@kernel.org>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Sun,  8 May 2016 12:59:55 +0200
+Subject: [PATCH 1/2] dma-mapping: add __dma_sync_single_for_device()
+In-Reply-To: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1462705196-10857-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung_clk_init() cannot return NULL. Either it returns allocated
-memory or it panics.
+Some users of the DMA mapping API calls dma_sync_single_for_device()
+from the dma_map_single() call path. This will cause false warning
+printouts if CONFIG_DMA_API_DEBUG are enabled.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+The reason for the warning are that debug_dma_sync_single_for_device()
+will be called before debug_dma_map_page() so the new mapping can't be
+found and are believed to be invalid. Add __dma_sync_single_for_device()
+that don't call into debug_dma_sync_single_for_device() and can be used
+in these situations.
+
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- drivers/clk/samsung/clk-exynos5420.c | 2 --
- 1 file changed, 2 deletions(-)
+ include/linux/dma-mapping.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 92382cef9f90..770c0f007c6b 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -1356,8 +1356,6 @@ static void __init exynos5x_clk_init(struct device_node *np,
- 	exynos5x_soc = soc;
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 9ea9aba..0e4d3a6 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -224,7 +224,7 @@ static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
+ 	debug_dma_sync_single_for_cpu(dev, addr, size, dir);
+ }
  
- 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
+-static inline void dma_sync_single_for_device(struct device *dev,
++static inline void __dma_sync_single_for_device(struct device *dev,
+ 					      dma_addr_t addr, size_t size,
+ 					      enum dma_data_direction dir)
+ {
+@@ -233,6 +233,13 @@ static inline void dma_sync_single_for_device(struct device *dev,
+ 	BUG_ON(!valid_dma_direction(dir));
+ 	if (ops->sync_single_for_device)
+ 		ops->sync_single_for_device(dev, addr, size, dir);
++}
++
++static inline void dma_sync_single_for_device(struct device *dev,
++					      dma_addr_t addr, size_t size,
++					      enum dma_data_direction dir)
++{
++	__dma_sync_single_for_device(dev, addr, size, dir);
+ 	debug_dma_sync_single_for_device(dev, addr, size, dir);
+ }
  
- 	samsung_clk_of_register_fixed_ext(ctx, exynos5x_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos5x_fixed_rate_ext_clks),
 -- 
-2.5.0
+2.8.2
