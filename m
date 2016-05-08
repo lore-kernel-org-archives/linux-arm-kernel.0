@@ -1,68 +1,158 @@
 From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Sun,  8 May 2016 15:08:22 +0200
-Subject: [PATCH v8 1/3] gpio: dt-bindings: add wd,mbl-gpio bindings
+Date: Sun,  8 May 2016 15:08:23 +0200
+Subject: [PATCH v8 2/3] gpio: mmio: add DT support for memory-mapped GPIOs
 In-Reply-To: <cover.1462543457.git.chunkeey@googlemail.com>
 References: <cover.1462543457.git.chunkeey@googlemail.com>
-Message-ID: <9bc9349d6e13d81c6200b0cd8fa20c76263043f6.1462543458.git.chunkeey@googlemail.com>
+Message-ID: <535f785bf6116c0fb6f46afbb77e6d4bd3ef5f60.1462543458.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree bindings for the Western Digital's
-MyBook Live memory-mapped GPIO controllers.
+From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
 
-The gpios will be supported by gpio-mmio code of the
-GPIO generic library.
+This patch adds support for defining memory-mapped GPIOs which
+are compatible with the existing gpio-mmio interface. The generic
+library provides support for many memory-mapped GPIO controllers
+that are found in various on-board FPGA and ASIC solutions that
+are used to control board's switches, LEDs, chip-selects,
+Ethernet/USB PHY power, etc.
 
-Acked-by: Rob Herring <robh@kernel.org>
+For setting GPIO's there are three configurations:
+	1. single input/output register resource (named "dat"),
+	2. set/clear pair (named "set" and "clr"),
+	3. single output register resource and single input resource
+	   ("set" and dat").
+
+The configuration is detected by which resources are present.
+For the single output register, this drives a 1 by setting a bit
+and a zero by clearing a bit.  For the set clr pair, this drives
+a 1 by setting a bit in the set register and clears it by setting
+a bit in the clear register. The configuration is detected by
+which resources are present.
+
+For setting the GPIO direction, there are three configurations:
+	a. simple bidirectional GPIOs that requires no configuration.
+	b. an output direction register (named "dirout")
+	   where a 1 bit indicates the GPIO is an output.
+	c. an input direction register (named "dirin")
+	   where a 1 bit indicates the GPIO is an input.
+
+The first user for this binding is "wd,mbl-gpio".
+
+Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
 Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
 ---
- .../devicetree/bindings/gpio/wd,mbl-gpio.txt       | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
+ drivers/gpio/gpio-mmio.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 74 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
-new file mode 100644
-index 0000000..038c3a6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
-@@ -0,0 +1,38 @@
-+Bindings for the Western Digital's MyBook Live memory-mapped GPIO controllers.
+diff --git a/drivers/gpio/gpio-mmio.c b/drivers/gpio/gpio-mmio.c
+index 6c1cb3b..4b7b74c 100644
+--- a/drivers/gpio/gpio-mmio.c
++++ b/drivers/gpio/gpio-mmio.c
+@@ -61,6 +61,8 @@ o        `                     ~~~~\___/~~~~    ` controller in FPGA is ,.`
+ #include <linux/bitops.h>
+ #include <linux/platform_device.h>
+ #include <linux/mod_devicetable.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ static void bgpio_write8(void __iomem *reg, unsigned long data)
+ {
+@@ -569,6 +571,66 @@ static void __iomem *bgpio_map(struct platform_device *pdev,
+ 	return devm_ioremap_resource(&pdev->dev, r);
+ }
+ 
++#ifdef CONFIG_OF
++static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
++				     struct bgpio_pdata *pdata,
++				     unsigned long *flags)
++{
++	struct device *dev = &pdev->dev;
++	int err;
 +
-+The Western Digital MyBook Live has two memory-mapped GPIO controllers.
-+Both GPIO controller only have a single 8-bit data register, where GPIO
-+state can be read and/or written.
++	pdata->base = -1;
 +
-+Required properties:
-+	- compatible: should be "wd,mbl-gpio"
-+	- reg-names: must contain
-+		"dat" - data register
-+	- reg: address + size pairs describing the GPIO register sets;
-+		order must correspond with the order of entries in reg-names
-+	- #gpio-cells: must be set to 2. The first cell is the pin number and
-+			the second cell is used to specify the gpio polarity:
-+			0 = active high
-+			1 = active low
-+	- gpio-controller: Marks the device node as a gpio controller.
++	if (of_property_read_bool(dev->of_node, "no-output"))
++		*flags |= BGPIOF_NO_OUTPUT;
 +
-+Optional properties:
-+	- no-output: GPIOs are read-only.
++	return 0;
++}
 +
-+Examples:
-+	gpio0: gpio0 at e0000000 {
-+		compatible = "wd,mbl-gpio";
-+		reg-names = "dat";
-+		reg = <0xe0000000 0x1>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
++#define ADD(_name, _func) { .compatible = _name, .data = _func }
 +
-+	gpio1: gpio1 at e0100000 {
-+		compatible = "wd,mbl-gpio";
-+		reg-names = "dat";
-+		reg = <0xe0100000 0x1>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		no-output;
-+	};
++static const struct of_device_id bgpio_of_match[] = {
++	ADD("wd,mbl-gpio", bgpio_basic_mmio_parse_dt),
++	{ }
++};
++#undef ADD
++MODULE_DEVICE_TABLE(of, bgpio_of_match);
++
++static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
++					  unsigned long *flags)
++{
++	const int (*parse_dt)(struct platform_device *,
++			      struct bgpio_pdata *, unsigned long *);
++	const struct device_node *node = pdev->dev.of_node;
++	const struct of_device_id *of_id;
++	struct bgpio_pdata *pdata;
++	int err = -ENODEV;
++
++	of_id = of_match_node(bgpio_of_match, node);
++	if (!of_id)
++		return NULL;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(struct bgpio_pdata),
++			     GFP_KERNEL);
++	if (!pdata)
++		return ERR_PTR(-ENOMEM);
++
++	parse_dt = (const void *)of_id->data;
++	if (parse_dt)
++		err = parse_dt(pdev, pdata, flags);
++	if (err)
++		return ERR_PTR(err);
++
++	return pdata;
++}
++#else
++static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
++					  unsigned long *flags)
++{
++	return NULL;
++}
++#endif /* CONFIG_OF */
++
+ static int bgpio_pdev_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -579,10 +641,19 @@ static int bgpio_pdev_probe(struct platform_device *pdev)
+ 	void __iomem *dirout;
+ 	void __iomem *dirin;
+ 	unsigned long sz;
+-	unsigned long flags = pdev->id_entry->driver_data;
++	unsigned long flags = 0;
+ 	int err;
+ 	struct gpio_chip *gc;
+-	struct bgpio_pdata *pdata = dev_get_platdata(dev);
++	struct bgpio_pdata *pdata;
++
++	pdata = bgpio_parse_dt(pdev, &flags);
++	if (IS_ERR(pdata))
++		return PTR_ERR(pdata);
++
++	if (!pdata) {
++		pdata = dev_get_platdata(dev);
++		flags = pdev->id_entry->driver_data;
++	}
+ 
+ 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");
+ 	if (!r)
+@@ -646,6 +717,7 @@ MODULE_DEVICE_TABLE(platform, bgpio_id_table);
+ static struct platform_driver bgpio_driver = {
+ 	.driver = {
+ 		.name = "basic-mmio-gpio",
++		.of_match_table = of_match_ptr(bgpio_of_match),
+ 	},
+ 	.id_table = bgpio_id_table,
+ 	.probe = bgpio_pdev_probe,
 -- 
 2.8.1
