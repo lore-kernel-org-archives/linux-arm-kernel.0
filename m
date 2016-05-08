@@ -1,57 +1,38 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun,  8 May 2016 21:05:47 +0200
-Subject: [PATCH v2 02/22] dt-bindings: clock: Add PWM and USB clock IDs to
- Exynos5410
+Date: Sun,  8 May 2016 21:05:48 +0200
+Subject: [PATCH v2 03/22] ARM: dts: exynos: Add fin_pll node for clock driver
 In-Reply-To: <1462734367-5619-1-git-send-email-krzk@kernel.org>
 References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462734367-5619-3-git-send-email-krzk@kernel.org>
+Message-ID: <1462734367-5619-4-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add IDs for PWM and USB clocks to Exynos5410. Use the same number as for
-Exynos5420 just in case in future these drivers were merged.
+For consistency between Exynos5410 and Exynos542x/5800 switch to similar
+way of defining fin_pll/oscclk. Add a node early, before implementing
+this in driver to preserve bisectability.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- include/dt-bindings/clock/exynos5410.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/exynos5410-smdk5410.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
-index 213f19e02870..34c8e96987a1 100644
---- a/include/dt-bindings/clock/exynos5410.h
-+++ b/include/dt-bindings/clock/exynos5410.h
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ * Copyright (c) 2016 Krzysztof Kozlowski
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -27,16 +28,25 @@
- #define CLK_SCLK_MMC0		132
- #define CLK_SCLK_MMC1		133
- #define CLK_SCLK_MMC2		134
-+#define CLK_SCLK_USBD300	150
-+#define CLK_SCLK_USBD301	151
-+#define CLK_SCLK_USBPHY300	152
-+#define CLK_SCLK_USBPHY301	153
-+#define CLK_SCLK_PWM		155
+diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+index 0f6429e1b75c..d7d658deeff4 100644
+--- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
++++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+@@ -31,6 +31,13 @@
+ 		#clock-cells = <0>;
+ 	};
  
- /* gate clocks */
- #define CLK_UART0		257
- #define CLK_UART1		258
- #define CLK_UART2		259
- #define CLK_UART3		260
-+#define CLK_PWM			279
- #define CLK_MCT			315
- #define CLK_MMC0		351
- #define CLK_MMC1		352
- #define CLK_MMC2		353
-+#define CLK_USBH20		365
-+#define CLK_USBD300		366
-+#define CLK_USBD301		367
- 
- #define CLK_NR_CLKS		512
- 
++	fixed-rate-clocks {
++		oscclk {
++			compatible = "samsung,exynos5420-oscclk";
++			clock-frequency = <24000000>;
++		};
++	};
++
+ 	firmware at 02037000 {
+ 		compatible = "samsung,secure-firmware";
+ 		reg = <0x02037000 0x1000>;
 -- 
 2.5.0
