@@ -1,33 +1,35 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun,  8 May 2016 21:05:59 +0200
-Subject: [PATCH v2 14/22] ARM: dts: exynos: Prepare for inclusion of
- exynos5.dtsi in exynos5410.dtsi
+Date: Sun,  8 May 2016 21:06:00 +0200
+Subject: [PATCH v2 15/22] ARM: dts: exynos: Use phandle to get parent node in
+ exynos5250-snow
 In-Reply-To: <1462734367-5619-1-git-send-email-krzk@kernel.org>
 References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462734367-5619-15-git-send-email-krzk@kernel.org>
+Message-ID: <1462734367-5619-16-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'sromc' label to SROM memory controller in common exynos5.dtsi so it
-can be referenced by inheriting DTSI.
+The i2c-arbitrator node in exynos5250-snow-common used absolute path to
+reference other node (the i2c parent). Use phandle instead, because the
+depth of the other node may be changed (like moving it under 'soc'
+node).
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos5.dtsi | 2 +-
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index fe901152f3ea..7c83dc6ef972 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -31,7 +31,7 @@
- 		reg = <0x10000000 0x100>;
- 	};
+diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+index ddfe1f558c10..419d59da1751 100644
+--- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
++++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+@@ -61,7 +61,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
--	memory-controller at 12250000 {
-+	sromc: memory-controller at 12250000 {
- 		compatible = "samsung,exynos4210-srom";
- 		reg = <0x12250000 0x14>;
- 	};
+-		i2c-parent = <&{/i2c@12CA0000}>;
++		i2c-parent = <&i2c_4>;
+ 
+ 		our-claim-gpio = <&gpf0 3 GPIO_ACTIVE_LOW>;
+ 		their-claim-gpios = <&gpe0 4 GPIO_ACTIVE_LOW>;
 -- 
 2.5.0
