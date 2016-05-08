@@ -1,31 +1,43 @@
-From: serveralex@gmail.com (=?UTF-8?q?Alexander=20M=C3=BCller?=)
-Date: Sun,  8 May 2016 19:59:49 +0200
-Subject: [PATCH] pinctrl: meson: Fix eth_tx_en bit index
-In-Reply-To: <1462730389-10961-1-git-send-email-serveralex@gmail.com>
-References: <1462730389-10961-1-git-send-email-serveralex@gmail.com>
-Message-ID: <1462730389-10961-2-git-send-email-serveralex@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 8 May 2016 20:05:50 +0200
+Subject: [PATCH] drm: sun4i: fix probe error handling
+In-Reply-To: <1462479061-893414-1-git-send-email-arnd@arndb.de>
+References: <1462479061-893414-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160508180550.GB6167@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix pinctrl eth_tx_en bit index according to Hardkernel ODROID-C1 datasheet.
+On Thu, May 05, 2016 at 10:10:52PM +0200, Arnd Bergmann wrote:
+> gcc points out a possible uninitialized variable use in
+> sun4i_dclk_create():
+> 
+> drivers/gpu/drm/sun4i/sun4i_dotclock.c: In function 'sun4i_dclk_create':
+> drivers/gpu/drm/sun4i/sun4i_dotclock.c:139:12: error: 'clk_name' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   init.name = clk_name;
+> 
+> The warning only shows up when CONFIG_OF is disabled, and the
+> property is never filled, but the same bug can show up even
+> when CONFIG_OF is enabled but of_property_read_string_index
+> returns another error.
+> 
+> To fix it, this ensures that sun4i_dclk_create propagates
+> any error from of_property_read_string_index.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 
-Signed-off-by: Alexander M?ller <serveralex@gmail.com>
----
- drivers/pinctrl/meson/pinctrl-meson8b.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Applied, thanks
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
-index a100bcf..874f2ed 100644
---- a/drivers/pinctrl/meson/pinctrl-meson8b.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
-@@ -564,7 +564,7 @@ static struct meson_pmx_group meson8b_cbus_groups[] = {
- 	GROUP(eth_rx_clk,	6,	3),
- 	GROUP(eth_txd0_1,	6,	4),
- 	GROUP(eth_txd1_1,	6,	5),
--	GROUP(eth_tx_en,	6,	0),
-+	GROUP(eth_tx_en,	6,	6),
- 	GROUP(eth_ref_clk,	6,	8),
- 	GROUP(eth_mdc,		6,	9),
- 	GROUP(eth_mdio_en,	6,	10),
+Maxime
+
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160508/7d6efac6/attachment.sig>
