@@ -1,183 +1,294 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 4 May 2016 11:35:55 +0200
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop>
- <20160503185153.5cfddc32@bbrezillon>
- <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
-Message-ID: <20160504113555.20f0c622@bbrezillon>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 8 May 2016 12:10:01 -0500
+Subject: [PATCH] irqchip/gicv3-its: Implement two-level(indirect) device
+ table support
+In-Reply-To: <20160506152247.67d0881a@arm.com>
+References: <1462542216-20952-1-git-send-email-shankerd@codeaurora.org>
+ <20160506152247.67d0881a@arm.com>
+Message-ID: <572F72E9.3060608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Marc,
 
-On Tue, 3 May 2016 14:11:04 -0500
-Rob Herring <robh@kernel.org> wrote:
 
-> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > Hi Rob,
-> >
-> > On Tue, 3 May 2016 11:40:19 -0500
-> > Rob Herring <robh@kernel.org> wrote:
-> >
-> >> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
-> >> > The EBI (External Bus Interface) is used to access external peripherals
-> >> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> >> > Each device is assigned a CS line and an address range and can have its
-> >> > own configuration (timings, access mode, bus width, ...).
-> >> > This driver provides a generic DT binding to configure a device according
-> >> > to its requirements.
-> >> > For specific device controllers (like the NAND one) the SMC timings
-> >> > should be configured by the controller driver through the matrix and smc
-> >> > syscon regmaps.
-> >> >
-> >> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> >> > ---
-> >> >  .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
-> >> >  1 file changed, 136 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> >> > new file mode 100644
-> >> > index 0000000..a6dca5c
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-> >> > @@ -0,0 +1,136 @@
-> >> > +* Device tree bindings for Atmel EBI
-> >> > +
-> >> > +The External Bus Interface (EBI) controller is a bus where you can connect
-> >> > +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> >> > +The EBI provides a glue-less interface to asynchronous memories through the SMC
-> >> > +(Static Memory Controller).
-> >> > +
-> >> > +Required properties:
-> >> > +
-> >> > +- compatible:              "atmel,at91sam9260-ebi"
-> >> > +                   "atmel,at91sam9261-ebi"
-> >> > +                   "atmel,at91sam9263-ebi0"
-> >> > +                   "atmel,at91sam9263-ebi1"
-> >>
-> >> What are the differences between 0 and 1?
-> >
-> > Because this SoC has 2 EBI busses with different capabilities.
-> 
-> Okay, correct answer. :)
-> 
-> [...]
-> 
-> >>
-> >> > +                   of the memory region requested by the device.
-> >> > +
-> >> > +EBI bus configuration associated with specific chip-select will be defined in
-> >> > +the configs subnode. This configs node will in turn contain several subnodes
-> >> > +named config-<cs-id>, each of them containing the following properties.
-> >>
-> >> This is a bit unusual. Why not just part of the child device nodes?
-> >
-> > Oh, come on! I reworked the binding because Mark complained about the
-> > previous binding which was doing exactly what you're suggesting. Can
-> > you please be consistent in your reviews...
-> 
-> No, Mark and I both have our opinions. Which part of this patch
-> explains the history?
+On 05/06/2016 09:22 AM, Marc Zyngier wrote:
+> Hi Shanker,
+>
+> Thanks for putting this together. Comments below:
+>
+> On Fri, 6 May 2016 08:43:36 -0500
+> Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>
+>> Since device IDs are extremely sparse, the single, a.k.a flat table is
+>> not sufficient for the following two reasons.
+>>
+>> 1) According to ARM-GIC spec, ITS hw can access maximum of 256(pages)*
+>>    64K(pageszie) bytes. In the best case, it supports upto DEVid=21
+>>    sparse with minimum device table entry size 8bytes.
+>>
+>> 2) The maximum memory size that is possible without memblock depends on
+>>    MAX_ORDER. 4MB on 4K page size kernel with default MAX_ORDER, so it
+>>    supports DEVid range 19bits.
+>>
+>> The two-level device table feature brings us two advantages, the first
+>> is a very high possibility of supporting upto 32bit sparse, and the
+>> second one is the best utilization of memory allocation.
+>>
+>> The feature is enabled automatically during driver probe if the flat
+>> table is not adequate and the hardware is capable of two-level table
+>> walk.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>>
+>> This patch is based on Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7
+>>
+>>  drivers/irqchip/irq-gic-v3-its.c   | 109 ++++++++++++++++++++++++++++++++-----
+>>  include/linux/irqchip/arm-gic-v3.h |   2 +
+>>  2 files changed, 97 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 6bd881b..caeb105 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -55,13 +55,14 @@ struct its_collection {
+>>  };
+>>  
+>>  /*
+>> - * The ITS_BASER structure - contains memory information and cached
+>> - * value of BASER register configuration.
+>> + * The ITS_BASER structure - contains memory information, cached value
+>> + * of BASER register configuration and ITS page size in bytes.
+>>   */
+>>  struct its_baser {
+>>  	void		*base;
+>>  	u64		val;
+>>  	u32		order;
+>> +	u32		psz;
+>>  };
+>>  
+>>  /*
+>> @@ -853,6 +854,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>  		u64 type = GITS_BASER_TYPE(val);
+>>  		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+>>  		int order = get_order(psz);
+>> +		bool tried_indirect = false;
+>> +		u64 indirect = 0;
+>>  		int alloc_pages;
+>>  		u64 tmp;
+>>  		void *base;
+>> @@ -877,11 +880,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>  			 */
+>>  			order = max(get_order((1UL << ids) * entry_size),
+>>  				    order);
+>> -			if (order >= MAX_ORDER) {
+>> +			if (order >= MAX_ORDER)
+>>  				order = MAX_ORDER - 1;
+>> -				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+>> -					node_name, order);
+>> -			}
+>>  		}
+>>  
+>>  retry_alloc_baser:
+>> @@ -889,8 +889,6 @@ retry_alloc_baser:
+>>  		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+>>  			alloc_pages = GITS_BASER_PAGES_MAX;
+>>  			order = get_order(GITS_BASER_PAGES_MAX * psz);
+>> -			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
+>> -				node_name, order, alloc_pages);
+>>  		}
+>>  
+>>  		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>> @@ -924,6 +922,7 @@ retry_baser:
+>>  
+>>  		val |= alloc_pages - 1;
+>>  		its->tables[i].val = val;
+>> +		its->tables[i].psz = psz;
+>>  
+>>  		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+>>  		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+>> @@ -963,6 +962,49 @@ retry_baser:
+>>  			}
+>>  		}
+>>  
+>> +		/*
+>> +		 * Attempt enabling Indirection table walk since we were unable
+>> +		 * to allocate enough memory for flat device table to cover
+>> +		 * whole DevID sparse that hw reporting, and ITS hardware has
+>> +		 * capablity of supporting two-level table.
+>> +		 */
+>> +		if ((type == GITS_BASER_TYPE_DEVICE) &&
+>> +		    (!tried_indirect) &&
+>> +		    (PAGE_ORDER_TO_SIZE(order) < (entry_size << ids))) {
+> Why not try to use indirect tables if they are available, irrespective
+> of the size of the required allocation? From a memory usage point of
+> view, it is likely to always be a gain, unless your id space is so
+> small that it fits in a single page. And with PCIe, you know for sure
+> that the ID space is extremely sparse, hence indirect tables are an
+> immediate win.
+>
+> Do you see any value in using the indirect table as a last resort?
+As such there is no strong reason other than saving one read
+cycle penalty for accessing the second level table.
 
-Hm, it's in patch 1/2 (just dropped the cover letter, which might not
-be such a good idea).
+I need your advice, should I enable this feature always or
+if the memory (ids * entry_size) requirement is more than
+some threshold?
 
-> If the revision history is not in the patch, I'm
-> not looking at it.
-> 
-> My issue with it this way is that it has invented yet another way to
-> describe timings. I would like to be consistent across external bus
-> descriptions, but we're not very consistent to begin with though. The
-> most common seems to be the way you first did it. But I agree that it
-> is kind of screwy to have an intermediate node unless the controller
-> itself has sub-blocks within it and is not the established way to
-> describe a bus with chip selects. I would either put the properties
-> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
-> in the device node. I'd call it timings instead of config, but that's
-> just bikeshedding.
 
-Well, it's not only describing timings (see atmel,bus-width,
-atmel,byte-access-type, ...), but I'm fine with either names :).
+>> +
+>> +			val |= GITS_BASER_INDIRECT;
+>> +			writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+>> +			tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+>> +			tried_indirect = true;
+>> +
+>> +			/* Does ITS HW supports Indirect table walk? */
+>> +			if (!(tmp & GITS_BASER_INDIRECT)) {
+>> +				pr_warn("%s: Device Table too large, reduce order to %u\n",
+>> +					node_name, order);
+>> +				goto retry_baser;
+>> +			}
+>> +
+>> +			/*
+>> +			 * According to GIC spec, the size of the Level2 table
+>> +			 * is equal to ITS page size which is 'psz'. For
+>> +			 * computing Level1 table1 size, subtract DevID bits
+>> +			 * that covers Level2 table from 'ids' which is reported
+>> +			 * by ITS hardware times Level1 table entry size 8bytes.
+>> +			 *
+>> +			 *   L2-DevIDs = ilog2(psz / entry_size)
+>> +			 *      L1-DevIDs = ids (reported by HW) - L2-DevIDs
+>> +			 * Table1 size = L1-DevIDs * 8Bytes
+>> +			 */
+>> +			ids -= ilog2(psz / entry_size);
+>> +			order = get_order(GITS_LEVEL1_ENTRY_SIZE << ids);
+>> +
+>> +			/* Limit Level1 table size to MAX_ORDER-1 */
+>> +			order = min(order, MAX_ORDER - 1);
+>> +			indirect = GITS_BASER_INDIRECT;
+>> +			its->tables[type].base = NULL;
+>> +			goto retry_alloc_baser;
+>> +		}
+>> +
+> Please take this opportunity to split this function into something
+> manageable. It is really getting out of control. Something to directly
+> deal with the device table seems in order.
 
-> 
-> memory-controller at 1000 {
->   ...
->   flash at 0,0 {
->     timings {
->       ...
->     };
->   };
-> };
+Sure, I'll post a separate patch for this change.
+>>  		if (val != tmp) {
+>>  			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
+>>  			       node_name, i,
+>> @@ -971,10 +1013,12 @@ retry_baser:
+>>  			goto out_free;
+>>  		}
+>>  
+>> -		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+>> -			(int)(PAGE_ORDER_TO_SIZE(order) / entry_size),
+>> +		pr_info("ITS: allocated %d %s @%lx (%s, psz %dK, shr %d)\n",
+>> +			(int)(PAGE_ORDER_TO_SIZE(order) /
+>> +			(indirect ? GITS_LEVEL1_ENTRY_SIZE : entry_size)),
+>>  			its_base_type_string[type],
+>>  			(unsigned long)virt_to_phys(base),
+>> +			indirect ? "indirect" : "flat",
+>>  			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+>>  	}
+>>  
+>> @@ -1149,6 +1193,46 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
+>>  	return its_dev;
+>>  }
+>>  
+>> +static bool its_alloc_device_table(struct its_baser *baser, u32 dev_id)
+>> +{
+>> +	u32 entry_size = GITS_BASER_ENTRY_SIZE(baser->val);
+>> +	u64 *table = baser->base;
+>> +	struct page *page;
+>> +	u32 psz = SZ_64K;
+>> +	u32 idx;
+>> +
+>> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+>> +	if (!(baser->val & GITS_BASER_INDIRECT)) {
+>> +		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) / entry_size))
+>> +			return false;
+>> +		return true;
+>> +	}
+>> +
+>> +	/* Compute Level1 table index & check if that exceeds table range */
+>> +	idx = dev_id >> ilog2(baser->psz / entry_size);
+>> +	if (idx >= (PAGE_ORDER_TO_SIZE(baser->order) / GITS_LEVEL1_ENTRY_SIZE))
+>> +		return false;
+>> +
+>> +	/* Allocate memory for Level2 table */
+>> +	if (!table[idx]) {
+>> +		page = alloc_pages_exact(psz, GFP_KERNEL | __GFP_ZERO);
+>> +		if (!page)
+>> +			return false;
+>> +
+>> +		table[idx] = page_to_phys(page) | GITS_BASER_VALID;
+> Be careful, this must be written in LE format. If you're running a BE
+> kernel, you're in for a nasty surprise...
 
-Okay. Mark, what do you think of this approach?
+Sorry, I didn't think about breaking BE machines. I'll fix it.
+>> +
+>> +		/* Flush memory to PoC if hardware dosn't support coherency */
+>> +		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK)) {
+>> +			__flush_dcache_area(table + idx, GITS_LEVEL1_ENTRY_SIZE);
+>> +			__flush_dcache_area(page_address(page), psz);
+>> +		}
+>> +		/* Ensure updated table contents are visible to ITS hardware */
+>> +		dsb(sy);
+>> +	}
+>> +
+>> +	return true;
+>> +}
+>> +
+>>  static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+>>  {
+>>  	int i;
+>> @@ -1176,11 +1260,8 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>  	int sz;
+>>  
+>>  	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+>> -
+>> -	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+>>  	if (baser) {
+>> -		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) /
+>> -			      GITS_BASER_ENTRY_SIZE(baser->val)))
+>> +		if (!its_alloc_device_table(baser, dev_id))
+>>  			return NULL;
+>>  	} else if (ilog2(dev_id) >= its->device_ids)
+>>  		return NULL;
+> Please fold these checks into its_alloc_device_table so that it takes
+> an its_node as a first parameter instead of an its_baser. That will make
+> the code a bit more readable.
 
-Note that one of my previous version was defining timings directly in
-the EBI device node, and Arnd noted that doing so may cause problems
-if one of the EBI property (or the config/timing node name) conflict
-with the sub-device binding, which is why I decided to put the EBI
-config definitions in a separate subnode.
-
-> 
-> >> > +
-> >> > +Optional config-<cs-id> node properties:
-> >> > +
-> >> > +- atmel,bus-width:         width of the asynchronous device's data bus
-> >> > +                           8, 16 or 32.
-> >> > +                           Default to 8 when undefined.
-> >> > +
-> >> > +- atmel,byte-access-type   "write" or "select" (see Atmel datasheet).
-> >> > +                           Default to "select" when undefined.
-> >> > +
-> >> > +- atmel,read-mode          "nrd" or "ncs".
-> >> > +                           Default to "ncs" when undefined.
-> >> > +
-> >> > +- atmel,write-mode         "nwe" or "ncs".
-> >> > +                           Default to "ncs" when undefined.
-> >> > +
-> >> > +- atmel,exnw-mode          "disabled", "frozen" or "ready".
-> >> > +                           Default to "disabled" when undefined.
-> >> > +
-> >> > +- atmel,page-mode          enable page mode if present. The provided value
-> >> > +                           defines the page size (supported values: 4, 8,
-> >> > +                           16 and 32).
-> >> > +
-> >> > +- atmel,tdf-mode:          "normal" or "optimized". When set to
-> >>
-> >> This should be boolean.
-> >
-> > It was a formerly defined as a boolean, and when it's done like that we
-> > have no way to identify whether the property was forgotten or
-> > intentionally set to normal mode. What's the problem with this approach?
-> 
-> Only preference to use boolean when that is sufficient. With your
-> argument, then we should never have booleans. You state that missing
-> means "normal", not forgotten, so all these properties should be
-> required with no default.
-> 
-> BTW, I debated the same thing on the other properties, but I could see
-> them being expanded to a 3rd mode. I don't see that here though.
-
-Well, another reason I switched to a string property is because I
-implemented hardware readout in v4, and decided to retrieve the current
-state from the hardware and only overload the config with what was
-defined in the DT. In this case, if we move to a boolean property we
-can't know whether the property is missing because we want to put the
-bus in "normal" mode or because we want to keep this config unchanged
-(keep the bootloader/bootstrap config).
-
-This is not true in v5, so maybe we should go back to the boolean
-atmel,tdf-optimized property.
-
-Thanks,
-
-Boris
+I'll fix it in the next patch.
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 9e6fdd3..df404ea 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -187,6 +187,7 @@
+>>  #define GITS_TYPER_PTA			(1UL << 19)
+>>  
+>>  #define GITS_CBASER_VALID		(1UL << 63)
+>> +#define GITS_BASER_INDIRECT		(1UL << 62)
+>>  #define GITS_CBASER_nCnB		(0UL << 59)
+>>  #define GITS_CBASER_nC			(1UL << 59)
+>>  #define GITS_CBASER_RaWt		(2UL << 59)
+>> @@ -238,6 +239,7 @@
+>>  #define GITS_BASER_TYPE_RESERVED6	6
+>>  #define GITS_BASER_TYPE_RESERVED7	7
+>>  
+>> +#define GITS_LEVEL1_ENTRY_SIZE		(8UL)
+>>  /*
+>>   * ITS commands
+>>   */
+>
+> Thanks,
+>
+> 	M.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
