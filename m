@@ -1,33 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 May 2016 20:05:50 +0200
-Subject: [PATCH] drm: sun4i: fix probe error handling
-In-Reply-To: <1462479061-893414-1-git-send-email-arnd@arndb.de>
-References: <1462479061-893414-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160508180550.GB6167@lukather>
+Date: Sun, 8 May 2016 20:09:41 +0200
+Subject: [PATCHv4] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <1462439332-26215-1-git-send-email-oliver@schinagl.nl>
+References: <1462439332-26215-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160508180941.GC6167@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 10:10:52PM +0200, Arnd Bergmann wrote:
-> gcc points out a possible uninitialized variable use in
-> sun4i_dclk_create():
+On Thu, May 05, 2016 at 11:08:52AM +0200, Olliver Schinagl wrote:
+> There are 3 kinds of OLinuXino Lime2 boards.
+> One without any on board storage, one with NAND storage and one with
+> eMMC storage. This patch adds the eMMC variant of boards.
 > 
-> drivers/gpu/drm/sun4i/sun4i_dotclock.c: In function 'sun4i_dclk_create':
-> drivers/gpu/drm/sun4i/sun4i_dotclock.c:139:12: error: 'clk_name' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->   init.name = clk_name;
+> eMMC storage is different from a regular SD card in that it is soldered
+> on the board and cannot be changed. Additionally, it shares pins with
+> the NAND module and with the second SPI port.
 > 
-> The warning only shows up when CONFIG_OF is disabled, and the
-> property is never filled, but the same bug can show up even
-> when CONFIG_OF is enabled but of_property_read_string_index
-> returns another error.
+> Changeslog:
 > 
-> To fix it, this ensures that sun4i_dclk_create propagates
-> any error from of_property_read_string_index.
+> v4:
+>   Add board compatibles
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
+> v3:
+>   Add pwr-seq-emmc with the reset gpio
+> 
+> v2:
+>   Remove unsupported no-1.8-v property, add vqmmc property
+> 
+> v1:
+>   Initial bare bone version
 
-Applied, thanks
+This is not something we want in the commit log. This should go below
+the --- so that it's dropped when applied.
 
+Removed and applied.
+
+Thanks,
 Maxime
 
 -- 
@@ -40,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160508/7d6efac6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160508/9683f589/attachment.sig>
