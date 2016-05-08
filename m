@@ -1,41 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  8 May 2016 22:01:46 +0200
-Subject: [PATCH 11/16] clk: sunxi-ng: Add N-K-factor clock support
+Date: Sun,  8 May 2016 22:01:43 +0200
+Subject: [PATCH 08/16] clk: sunxi-ng: Add M-factor clock support
 In-Reply-To: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1462737711-10017-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1462737711-10017-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce support for clocks that use a combination of two linear
-multipliers.
+Introduce support for clocks that divide by a linear factor.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
  drivers/clk/sunxi-ng/Makefile |   1 +
- drivers/clk/sunxi-ng/ccu_nk.c | 147 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_nk.h |  44 +++++++++++++
- 3 files changed, 192 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_nk.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_nk.h
+ drivers/clk/sunxi-ng/ccu_m.c  | 135 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_m.h  | 101 +++++++++++++++++++++++++++++++
+ 3 files changed, 237 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_m.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_m.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 09fce7467784..e29ddae99653 100644
+index a47a3bbdf285..f41de901c607 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -7,5 +7,6 @@ obj-y += ccu_gate.o
- obj-y += ccu_m.o
- obj-y += ccu_mp.o
+@@ -4,5 +4,6 @@ obj-y += ccu_reset.o
+ obj-y += ccu_div_table.o
+ obj-y += ccu_fixed_factor.o
+ obj-y += ccu_gate.o
++obj-y += ccu_m.o
  obj-y += ccu_mux.o
-+obj-y += ccu_nk.o
- obj-y += ccu_p.o
  obj-y += ccu_phase.o
-diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
+diff --git a/drivers/clk/sunxi-ng/ccu_m.c b/drivers/clk/sunxi-ng/ccu_m.c
 new file mode 100644
-index 000000000000..46eede3e986e
+index 000000000000..424eb6da0d5b
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_nk.c
-@@ -0,0 +1,147 @@
++++ b/drivers/clk/sunxi-ng/ccu_m.c
+@@ -0,0 +1,135 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -47,148 +46,136 @@ index 000000000000..46eede3e986e
 + */
 +
 +#include <linux/clk-provider.h>
-+#include <linux/rational.h>
 +
 +#include "ccu_gate.h"
-+#include "ccu_nk.h"
++#include "ccu_m.h"
++#include "ccu_mux.h"
 +
-+void ccu_nk_find_best(unsigned long parent, unsigned long rate,
-+		      unsigned int max_n, unsigned int max_k,
-+		      unsigned int *n, unsigned int *k)
++static void ccu_m_find_best(unsigned long parent, unsigned long rate,
++			    unsigned int max_m, unsigned int *m)
 +{
-+	unsigned long best_rate = 0;
-+	unsigned int best_k = 0, best_n =0;
-+	unsigned int _k, _n;
++	unsigned int _m = parent / rate;
 +
-+	for (_k = 0; _k <= max_k; _k++) {
-+		for (_n = 0; _n <= max_n; _n++) {
-+			unsigned long tmp_rate = parent * _n * _k;
++	if (_m > max_m)
++		_m = max_m;
 +
-+			if (tmp_rate > rate)
-+				continue;
-+
-+			if ((rate - tmp_rate) < (rate - best_rate)) {
-+				best_rate = tmp_rate;
-+				best_k = _k;
-+				best_n = _n;
-+			}
-+		}
-+	}
-+
-+	*k = best_k;
-+	*n = best_n;
++	*m = _m;
 +}
 +
-+static void ccu_nk_disable(struct clk_hw *hw)
++static unsigned long ccu_m_round_rate(struct ccu_mux_internal *mux,
++				       unsigned long parent_rate,
++				       unsigned long rate,
++				       void *data)
 +{
-+	struct ccu_nk *nk = hw_to_ccu_nk(hw);
++	struct ccu_m *cm = data;
++	unsigned int m;
 +
-+	return ccu_gate_helper_disable(&nk->common, nk->enable);
++	ccu_m_find_best(parent_rate, rate, 1 << cm->m.width, &m);
++
++	return parent_rate / m;
 +}
 +
-+static int ccu_nk_enable(struct clk_hw *hw)
-+{
-+	struct ccu_nk *nk = hw_to_ccu_nk(hw);
 +
-+	return ccu_gate_helper_enable(&nk->common, nk->enable);
++static void ccu_m_disable(struct clk_hw *hw)
++{
++	struct ccu_m *cm = hw_to_ccu_m(hw);
++
++	return ccu_gate_helper_disable(&cm->common, cm->enable);
 +}
 +
-+static int ccu_nk_is_enabled(struct clk_hw *hw)
++static int ccu_m_enable(struct clk_hw *hw)
 +{
-+	struct ccu_nk *nk = hw_to_ccu_nk(hw);
++	struct ccu_m *cm = hw_to_ccu_m(hw);
 +
-+	return ccu_gate_helper_is_enabled(&nk->common, nk->enable);
++	return ccu_gate_helper_enable(&cm->common, cm->enable);
 +}
 +
-+static unsigned long ccu_nk_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
++static int ccu_m_is_enabled(struct clk_hw *hw)
 +{
-+	struct ccu_nk *nk = hw_to_ccu_nk(hw);
-+	unsigned long rate, n, k;
++	struct ccu_m *cm = hw_to_ccu_m(hw);
++
++	return ccu_gate_helper_is_enabled(&cm->common, cm->enable);
++}
++
++static unsigned long ccu_m_recalc_rate(struct clk_hw *hw,
++				       unsigned long parent_rate)
++{
++	struct ccu_m *cm = hw_to_ccu_m(hw);
++	unsigned long m;
 +	u32 reg;
 +
-+	reg = readl(nk->common.base + nk->common.reg);
++	reg = readl(cm->common.base + cm->common.reg);
 +
-+	n = reg >> nk->n.shift;
-+	n &= (1 << nk->n.width) - 1;
++	m = reg >> cm->m.shift;
++	m &= (1 << cm->m.width) - 1;
 +
-+	k = reg >> nk->k.shift;
-+	k &= (1 << nk->k.width) - 1;
-+
-+	rate = parent_rate * (n + 1) * (k + 1);
-+
-+	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate / nk->fixed_post_div;
-+
-+	return rate;
++	return parent_rate / (m + 1);
 +}
 +
-+static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *parent_rate)
++static int ccu_m_determine_rate(struct clk_hw *hw,
++				struct clk_rate_request *req)
 +{
-+	struct ccu_nk *nk = hw_to_ccu_nk(hw);
-+	unsigned int n, k;
++	struct ccu_m *cm = hw_to_ccu_m(hw);
 +
-+	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate * nk->fixed_post_div;
-+
-+	ccu_nk_find_best(*parent_rate, rate,
-+			 1 << nk->n.width, 1 << nk->k.width,
-+			 &n, &k);
-+
-+	rate = *parent_rate * n * k;
-+	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate / nk->fixed_post_div;
-+
-+	return rate;
++	return ccu_mux_helper_determine_rate(&cm->common, &cm->mux,
++					     req, ccu_m_round_rate, cm);
 +}
 +
-+static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
-+			   unsigned long parent_rate)
++static int ccu_m_set_rate(struct clk_hw *hw, unsigned long rate,
++			  unsigned long parent_rate)
 +{
-+	struct ccu_nk *nk = hw_to_ccu_nk(hw);
++	struct ccu_m *cm = hw_to_ccu_m(hw);
 +	unsigned long flags;
-+	unsigned int n, k;
++	unsigned int m;
 +	u32 reg;
 +
-+	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate * nk->fixed_post_div;
++	ccu_m_find_best(parent_rate, rate, 1 << cm->m.width, &m);
 +
-+	ccu_nk_find_best(parent_rate, rate,
-+			 1 << nk->n.width, 1 << nk->k.width,
-+			 &n, &k);
++	spin_lock_irqsave(cm->common.lock, flags);
 +
-+	spin_lock_irqsave(nk->common.lock, flags);
++	reg = readl(cm->common.base + cm->common.reg);
++	reg &= ((1 << cm->m.width) - 1) << cm->m.shift;
 +
-+	reg = readl(nk->common.base + nk->common.reg);
-+	reg &= ~GENMASK(nk->n.width + nk->n.shift, nk->n.shift);
-+	reg &= ~GENMASK(nk->k.width + nk->k.shift, nk->k.shift);
++	writel(reg | ((m - 1) << cm->m.shift),
++	       cm->common.base + cm->common.reg);
 +
-+	writel(reg | ((k - 1) << nk->k.shift) | ((n - 1) << nk->n.shift),
-+	       nk->common.base + nk->common.reg);
-+
-+	spin_unlock_irqrestore(nk->common.lock, flags);
-+
-+	ccu_helper_wait_for_lock(&nk->common, nk->lock);
++	spin_unlock_irqrestore(cm->common.lock, flags);
 +
 +	return 0;
 +}
 +
-+const struct clk_ops ccu_nk_ops = {
-+	.disable	= ccu_nk_disable,
-+	.enable		= ccu_nk_enable,
-+	.is_enabled	= ccu_nk_is_enabled,
++static u8 ccu_m_get_parent(struct clk_hw *hw)
++{
++	struct ccu_m *cm = hw_to_ccu_m(hw);
 +
-+	.recalc_rate	= ccu_nk_recalc_rate,
-+	.round_rate	= ccu_nk_round_rate,
-+	.set_rate	= ccu_nk_set_rate,
++	return ccu_mux_helper_get_parent(&cm->common, &cm->mux);
++}
++
++static int ccu_m_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct ccu_m *cm = hw_to_ccu_m(hw);
++
++	return ccu_mux_helper_set_parent(&cm->common, &cm->mux, index);
++}
++
++const struct clk_ops ccu_m_ops = {
++	.disable	= ccu_m_disable,
++	.enable		= ccu_m_enable,
++	.is_enabled	= ccu_m_is_enabled,
++
++	.get_parent	= ccu_m_get_parent,
++	.set_parent	= ccu_m_set_parent,
++
++	.determine_rate	= ccu_m_determine_rate,
++	.recalc_rate	= ccu_m_recalc_rate,
++	.set_rate	= ccu_m_set_rate,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_nk.h b/drivers/clk/sunxi-ng/ccu_nk.h
+diff --git a/drivers/clk/sunxi-ng/ccu_m.h b/drivers/clk/sunxi-ng/ccu_m.h
 new file mode 100644
-index 000000000000..cdbbd45815c6
+index 000000000000..625c0a7cef43
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_nk.h
-@@ -0,0 +1,44 @@
++++ b/drivers/clk/sunxi-ng/ccu_m.h
+@@ -0,0 +1,101 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -202,36 +189,93 @@ index 000000000000..cdbbd45815c6
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _CCU_NK_H_
-+#define _CCU_NK_H_
++#ifndef _CCU_M_H_
++#define _CCU_M_H_
 +
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_common.h"
 +#include "ccu_factor.h"
++#include "ccu_mux.h"
 +
-+struct ccu_nk {
-+	u16			reg;
++struct ccu_m {
 +	u32			enable;
-+	u32			lock;
 +
-+	struct ccu_factor	n;
-+	struct ccu_factor	k;
-+
-+	unsigned int		fixed_post_div;
-+
++	struct ccu_factor	m;
++	struct ccu_mux_internal	mux;
 +	struct ccu_common	common;
 +};
 +
-+static inline struct ccu_nk *hw_to_ccu_nk(struct clk_hw *hw)
++#define SUNXI_CCU_M(_struct, _name, _parent, _reg, _mshift, _mwidth,	\
++		    _flags)						\
++	struct ccu_m _struct = {					\
++		.m	= SUNXI_CLK_FACTOR(_mshift, _mwidth),		\
++		.common	= {						\
++			.reg		= _reg,				\
++			.hw.init	= SUNXI_HW_INIT(_name,		\
++							_parent,	\
++							&ccu_m_ops,	\
++							_flags),	\
++		},							\
++	}
++
++#define SUNXI_CCU_M_WITH_GATE(_struct, _name, _parent, _reg,		\
++			      _mshift, _mwidth,	_gate,			\
++			      _flags)					\
++	struct ccu_m _struct = {					\
++		.enable	= _gate,					\
++		.m	= SUNXI_CLK_FACTOR(_mshift, _mwidth),		\
++		.common	= {						\
++			.reg		= _reg,				\
++			.features	= CCU_FEATURE_GATE,		\
++			.hw.init	= SUNXI_HW_INIT(_name,		\
++							_parent,	\
++							&ccu_m_ops,	\
++							_flags),	\
++		},							\
++	}
++
++#define SUNXI_CCU_M_WITH_MUX(_struct, _name, _parents, _reg,		\
++			     _mshift, _mwidth, _muxshift, _muxwidth,	\
++			     _flags)					\
++	struct ccu_m _struct = {					\
++		.m	= SUNXI_CLK_FACTOR(_mshift, _mwidth),		\
++		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
++		.common	= {						\
++			.reg		= _reg,				\
++			.hw.init	= SUNXI_HW_INIT_PARENTS(_name,	\
++								_parents, \
++								&ccu_m_ops, \
++								_flags), \
++		},							\
++	}
++
++#define SUNXI_CCU_M_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
++				  _mshift, _mwidth, _muxshift, _muxwidth, \
++				  _gate, _flags)			\
++	struct ccu_m _struct = {					\
++		.enable	= _gate,					\
++		.m	= SUNXI_CLK_FACTOR(_mshift, _mwidth),		\
++		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
++		.common	= {						\
++			.reg		= _reg,				\
++			.features	= CCU_FEATURE_GATE,		\
++			.hw.init	= SUNXI_HW_INIT_PARENTS(_name,	\
++								_parents, \
++								&ccu_m_ops, \
++								_flags), \
++		},							\
++	}
++
++static inline struct ccu_m *hw_to_ccu_m(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_nk, common);
++	return container_of(common, struct ccu_m, common);
 +}
 +
-+extern const struct clk_ops ccu_nk_ops;
++extern const struct clk_ops ccu_m_ops;
 +
-+#endif /* _CCU_NK_H_ */
++#endif /* _CCU_M_H_ */
 -- 
 2.8.2
