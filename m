@@ -1,115 +1,92 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 8 May 2016 16:19:34 +0300
-Subject: [PATCH v8 0/3] gpio: add DT support for memory-mapped GPIOs
-In-Reply-To: <cover.1462543457.git.chunkeey@googlemail.com>
-References: <cover.1462543457.git.chunkeey@googlemail.com>
-Message-ID: <CAHp75VdrbagU496qLjoUWMb7pWS3VyM4PDYwmyZFw52RgPs9=g@mail.gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Sun, 8 May 2016 15:16:29 +0100
+Subject: NFSroot hangs with bad unlock balance in Linux next
+In-Reply-To: <20160505220344.GE5995@atomide.com>
+References: <20160505220344.GE5995@atomide.com>
+Message-ID: <20160508141629.GF2694@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2016 at 4:08 PM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
-> This patch series adds device tree support for generic memory-mapped GPIOs.
-> The GPIO library already allows drivers and architecture support code to
-> reuse generic code for managing a GPIO chip. Currently, a developer has
-> to create a platform device "basic-mmio-gpio" and attach a bgpio_pdata
-> platform data structure to make use of it. However, for architectures
-> which rely on the device tree to enumerate devices, creating custom
-> platform devices is another extra step that can be avoided by having
-> direct support via a device tree binding.
->
-> I initially came across this patch [0] from ?lvaro Fern?ndez Rojas,
-> while looking for an easy way to add support for the GPIO of my
-> WD MyBook Live [1] (APM82181). His generic approach patch allowed
-> me to easily get the GPIO (and the connected LEDs, buttons, gpiohogs)
-> up and running. Even thought, Mr. Fernandez initially developed it
-> for his work on the brcm63xx [2].
->
-> The third patch (which can be applied at a later time) moves gpio-clps711x,
-> gpio-ge, gpio-moxart and gpio-ts4800 into gpio-mmio.c. The old driver files
-> and makefile entries have been removed. The Kconfig entries for these
-> drivers are kept for compatibility reasons.
->
-> And finally, the most important stat about the series:
->         >>> 336 insertions(+), 380 deletions(-) <<<
->         It still removes more lines than it adds!
->
-> Thanks!
->
-> [0] <https://patchwork.ozlabs.org/patch/422121/>
-> [1] <https://github.com/chunkeey/MBL-openwrt>
-> [2] <https://wiki.openwrt.org/doc/hardware/soc/soc.broadcom.bcm63xx>
->
+On Thu, May 05, 2016 at 03:03:44PM -0700, Tony Lindgren wrote:
+> Hi,
+> 
+> Looks like Linux next with NFSroot hangs for me at some point booting
+> into init. Then after a while it produces "BUG: bad unlock balance
+> detected!".
+> 
+> This happens at least with omap5-uevm and igepv5. Not sure yet if it
+> also happens on other boards, the ones I'm seeing it happen both have
+> USB Ethernet controller. They usually hang after the system starts
+> being idle some tens of seconds into booting.
+> 
+> I tried to bisect it down with no luck. I do have the following
+> trace, does that provide any clues?
 
-FWIW:
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> kworker/0:2/112 is trying to release lock (&nfsi->rmdir_sem) at:
+> [<c03a7f98>] nfs_async_unlink_release+0x20/0x68
+> but there are no more locks to release!
 
+Very strange.  We grab that rwsem at the entry into nfs_call_unlink()
+and then either release it there and return or call nfs_do_call_unlink().
+Which arranges for eventual call of nfs_async_unlink_release() (via
+->rpc_release); nfs_async_unlink_release() releases the rwsem.  Nobody else
+releases it (on the read side, that is).
 
-> changelog:
->
-> v7 -> v8:
->         - removed ngpio property parser and most flags parsers
->         - converted clps711x to switch case for GPIO
->         - retained original Kconfig syms which now select GPIO_GENERIC_PLATFORM
->
-> v6 -> v7:
->         - finally made a PATCH series (based on linux-gpio devel branch)
->         - added Rob Herring's ACK to the dt bindings
->         - cc'd clps711x, gpio-ge, moxart and ts4800 authors for driver
->           changes.
->
-> v5 -> v6:
->         - rewrote bindings and driver patch to fit the wd,mbl-gpio
->         - unified parser code for gpio-ge, gpio-moxart and gpio-ts4800
->         - fixed gpio chip's base being overwritten with bogus "0"
->         - fixed compat driver crash when reload gpio-generic.ko module
->         - dropped already applied patches from the series
->         - rebased code on linus' devel tree
->         - moved dt bindings patch to the top of the series
->
-> v4 -> v5:
->         - reverted rename of gpio-mmio.c back to gpio-generic.c
->         - fixed Andy Shevchenko's comments
->         - consolidated changes from clps711x, gpio-ge, gpio-moxart and
->           gpio-ts4800 into one patch.
->
-> v3 -> v4:
->         - renamed gpio-generic.c to gpio-mmio.c
->         - changed compat. string to "linux,gpio-mmio"
->         - integrated Cirrus clps711x driver
->         - integrated GE FGPA gpio-ge driver
->         - integrated MOXA ART GPIO driver
->         - integrated TS4800 gpio driver
->         - reshuffled patches, reworded commits, fixed spelling errors, etc.
->
-> Christian Lamparter (2):
->   gpio: dt-bindings: add wd,mbl-gpio bindings
->   gpio: move clps711x, moxart, ts4800 and gpio-ge into gpio-mmio
->
-> ?lvaro Fern?ndez Rojas (1):
->   gpio: mmio: add DT support for memory-mapped GPIOs
->
->  .../devicetree/bindings/gpio/wd,mbl-gpio.txt       |  38 +++
->  drivers/gpio/Kconfig                               |  16 +-
->  drivers/gpio/Makefile                              |   4 -
->  drivers/gpio/gpio-clps711x.c                       |  91 -------
->  drivers/gpio/gpio-ge.c                             | 114 --------
->  drivers/gpio/gpio-mmio.c                           | 288 ++++++++++++++++++++-
->  drivers/gpio/gpio-moxart.c                         |  84 ------
->  drivers/gpio/gpio-ts4800.c                         |  81 ------
->  8 files changed, 336 insertions(+), 380 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/wd,mbl-gpio.txt
->  delete mode 100644 drivers/gpio/gpio-clps711x.c
->  delete mode 100644 drivers/gpio/gpio-ge.c
->  delete mode 100644 drivers/gpio/gpio-moxart.c
->  delete mode 100644 drivers/gpio/gpio-ts4800.c
->
-> --
-> 2.8.1
->
+The only kinda-sorta possibility I see here is that the inode we are
+unlocking in that nfs_async_unlink_release() is not the one we'd locked
+in nfs_call_unlink() that has lead to it.  That really shouldn't happen,
+though...  Just to verify whether that's what we are hitting, could you
+try to reproduce that thing with the patch below on top of -next and see
+if it triggers any of those WARN_ON?
 
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+diff --git a/fs/nfs/unlink.c b/fs/nfs/unlink.c
+index d367b06..dbbb4c9 100644
+--- a/fs/nfs/unlink.c
++++ b/fs/nfs/unlink.c
+@@ -64,6 +64,10 @@ static void nfs_async_unlink_release(void *calldata)
+ 	struct dentry *dentry = data->dentry;
+ 	struct super_block *sb = dentry->d_sb;
+ 
++	if (WARN_ON(data->parent != dentry->d_parent) ||
++	    WARN_ON(data->parent_inode != dentry->d_parent->d_inode)) {
++		printk(KERN_ERR "WTF2[%pd4]", dentry);
++	}
+ 	up_read(&NFS_I(d_inode(dentry->d_parent))->rmdir_sem);
+ 	d_lookup_done(dentry);
+ 	nfs_free_unlinkdata(data);
+@@ -114,7 +118,8 @@ static void nfs_do_call_unlink(struct nfs_unlinkdata *data)
+ 
+ static int nfs_call_unlink(struct dentry *dentry, struct nfs_unlinkdata *data)
+ {
+-	struct inode *dir = d_inode(dentry->d_parent);
++	struct dentry *parent = dentry->d_parent;
++	struct inode *dir = d_inode(parent);
+ 	struct dentry *alias;
+ 
+ 	down_read(&NFS_I(dir)->rmdir_sem);
+@@ -152,6 +157,12 @@ static int nfs_call_unlink(struct dentry *dentry, struct nfs_unlinkdata *data)
+ 		return ret;
+ 	}
+ 	data->dentry = alias;
++	data->parent = parent;
++	data->parent_inode = dir;
++	if (WARN_ON(parent != alias->d_parent) ||
++	    WARN_ON(dir != parent->d_inode)) {
++		printk(KERN_ERR "WTF1[%pd4]", alias);
++	}
+ 	nfs_do_call_unlink(data);
+ 	return 1;
+ }
+diff --git a/include/linux/nfs_xdr.h b/include/linux/nfs_xdr.h
+index ee8491d..b01a7f1 100644
+--- a/include/linux/nfs_xdr.h
++++ b/include/linux/nfs_xdr.h
+@@ -1471,6 +1471,8 @@ struct nfs_unlinkdata {
+ 	struct nfs_removeargs args;
+ 	struct nfs_removeres res;
+ 	struct dentry *dentry;
++	struct dentry *parent;
++	struct inode *parent_inode;
+ 	wait_queue_head_t wq;
+ 	struct rpc_cred	*cred;
+ 	struct nfs_fattr dir_attr;
