@@ -1,41 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  8 May 2016 22:01:41 +0200
-Subject: [PATCH 06/16] clk: sunxi-ng: Add divider table clock
+Date: Sun,  8 May 2016 22:01:45 +0200
+Subject: [PATCH 10/16] clk: sunxi-ng: Add M-P factor clock support
 In-Reply-To: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1462737711-10017-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1462737711-10017-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for clocks based on a divider tables.
+Introduce support for the clocks that combine a linear divider and a
+power-of-two based one.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/Makefile        |   1 +
- drivers/clk/sunxi-ng/ccu_div_table.c | 117 +++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_div_table.h |  75 ++++++++++++++++++++++
- 3 files changed, 193 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_div_table.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_div_table.h
+ drivers/clk/sunxi-ng/Makefile |   1 +
+ drivers/clk/sunxi-ng/ccu_mp.c | 158 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_mp.h |  79 +++++++++++++++++++++
+ 3 files changed, 238 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_mp.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_mp.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index aa5c411ff8ea..f20c6c8f217c 100644
+index 063c50f35ad4..09fce7467784 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -1,6 +1,7 @@
- obj-y += ccu_common.o
- obj-y += ccu_reset.o
- 
-+obj-y += ccu_div_table.o
+@@ -5,6 +5,7 @@ obj-y += ccu_div_table.o
  obj-y += ccu_fixed_factor.o
  obj-y += ccu_gate.o
+ obj-y += ccu_m.o
++obj-y += ccu_mp.o
  obj-y += ccu_mux.o
-diff --git a/drivers/clk/sunxi-ng/ccu_div_table.c b/drivers/clk/sunxi-ng/ccu_div_table.c
+ obj-y += ccu_p.o
+ obj-y += ccu_phase.o
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
 new file mode 100644
-index 000000000000..cbfff0bd47e3
+index 000000000000..7181188deba7
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_div_table.c
-@@ -0,0 +1,117 @@
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -0,0 +1,158 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -48,117 +49,158 @@ index 000000000000..cbfff0bd47e3
 +
 +#include <linux/clk-provider.h>
 +
-+#include "ccu_div_table.h"
 +#include "ccu_gate.h"
++#include "ccu_mp.h"
 +
-+static void ccu_div_table_find_best(unsigned long parent, unsigned long rate,
-+				    struct ccu_div_table *ct,
-+				    unsigned int *index)
++static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
++			     unsigned int max_m, unsigned int max_p,
++			     unsigned int *m, unsigned int *p)
 +{
 +	unsigned long best_rate = 0;
-+	unsigned int best_index = 0;
-+	unsigned int _index;
++	unsigned int best_m = 0, best_p = 0;
++	unsigned int _m, _p;
 +
-+	for (_index = 0; _index <= ct->num_divs; _index++) {
-+		unsigned long tmp_rate = parent / ct->table[_index];
++	for (_p = 0; _p <= max_p; _p++) {
++		for (_m = 1; _m <= max_m; _m++) {
++			unsigned long tmp_rate = (parent >> _p) / _m;
 +
-+		if (tmp_rate > rate)
-+			continue;
++			if (tmp_rate > rate)
++				continue;
 +
-+		if ((rate - tmp_rate) < (rate - best_rate)) {
-+			best_rate = tmp_rate;
-+			best_index = _index;
++			if ((rate - tmp_rate) < (rate - best_rate)) {
++				best_rate = tmp_rate;
++				best_m = _m;
++				best_p = _p;
++			}
 +		}
 +	}
 +
-+	*index = best_index;
++	*m = best_m;
++	*p = best_p;
 +}
 +
-+static void ccu_div_table_disable(struct clk_hw *hw)
++static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
++				       unsigned long parent_rate,
++				       unsigned long rate,
++				       void *data)
 +{
-+	struct ccu_div_table *ct = hw_to_ccu_div_table(hw);
++	struct ccu_mp *cmp = data;
++	unsigned int m, p;
 +
-+	return ccu_gate_helper_disable(&ct->common, ct->enable);
++	ccu_mp_find_best(parent_rate, rate,
++			 1 << cmp->m.width, (1 << cmp->p.width) - 1,
++			 &m, &p);
++
++	return (parent_rate >> p) / m;
 +}
 +
-+static int ccu_div_table_enable(struct clk_hw *hw)
++static void ccu_mp_disable(struct clk_hw *hw)
 +{
-+	struct ccu_div_table *ct = hw_to_ccu_div_table(hw);
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
 +
-+	return ccu_gate_helper_enable(&ct->common, ct->enable);
++	return ccu_gate_helper_disable(&cmp->common, cmp->enable);
 +}
 +
-+static int ccu_div_table_is_enabled(struct clk_hw *hw)
++static int ccu_mp_enable(struct clk_hw *hw)
 +{
-+	struct ccu_div_table *ct = hw_to_ccu_div_table(hw);
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
 +
-+	return ccu_gate_helper_is_enabled(&ct->common, ct->enable);
++	return ccu_gate_helper_enable(&cmp->common, cmp->enable);
 +}
 +
-+static unsigned long ccu_div_table_recalc_rate(struct clk_hw *hw,
-+					       unsigned long parent_rate)
++static int ccu_mp_is_enabled(struct clk_hw *hw)
 +{
-+	struct ccu_div_table *ct = hw_to_ccu_div_table(hw);
-+	unsigned long div;
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
++
++	return ccu_gate_helper_is_enabled(&cmp->common, cmp->enable);
++}
++
++static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
++					unsigned long parent_rate)
++{
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
++	unsigned int m, p;
 +	u32 reg;
 +
-+	reg = readl(ct->common.base + ct->common.reg);
++	reg = readl(cmp->common.base + cmp->common.reg);
 +
-+	div = reg >> ct->div.shift;
-+	div &= (1 << ct->div.width) - 1;
++	m = reg >> cmp->m.shift;
++	m &= (1 << cmp->m.width) - 1;
 +
-+	return parent_rate / ct->table[div];
++	p = reg >> cmp->p.shift;
++	p &= (1 << cmp->p.width) - 1;
++
++	return (parent_rate >> p) / (m + 1);
 +}
 +
-+static long ccu_div_table_round_rate(struct clk_hw *hw, unsigned long rate,
-+				     unsigned long *parent_rate)
++static int ccu_mp_determine_rate(struct clk_hw *hw,
++				 struct clk_rate_request *req)
 +{
-+	struct ccu_div_table *ct = hw_to_ccu_div_table(hw);
-+	unsigned int index;
-+	
-+	ccu_div_table_find_best(*parent_rate, rate,
-+				ct, &index);
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
 +
-+	return *parent_rate / ct->table[index];
++	return ccu_mux_helper_determine_rate(&cmp->common, &cmp->mux,
++					     req, ccu_mp_round_rate, cmp);
 +}
 +
-+static int ccu_div_table_set_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long parent_rate)
++static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
++			   unsigned long parent_rate)
 +{
-+	struct ccu_div_table *ct = hw_to_ccu_div_table(hw);
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
 +	unsigned long flags;
-+	unsigned int index;
++	unsigned int m, p;
 +	u32 reg;
 +
-+	ccu_div_table_find_best(parent_rate, rate, ct, &index);
++	ccu_mp_find_best(parent_rate, rate,
++			 1 << cmp->m.width, (1 << cmp->p.width) - 1,
++			 &m, &p);
 +
-+	spin_lock_irqsave(ct->common.lock, flags);
 +
-+	reg = readl(ct->common.base + ct->common.reg);
-+	reg &= ~GENMASK(ct->div.width + ct->div.shift, ct->div.shift);
-+	writel(reg | ((ct->table[index]) << ct->div.shift),
-+	       ct->common.base + ct->common.reg);
++	spin_lock_irqsave(cmp->common.lock, flags);
 +
-+	spin_unlock_irqrestore(ct->common.lock, flags);
++	reg = readl(cmp->common.base + cmp->common.reg);
++	reg &= ~GENMASK(cmp->m.width + cmp->m.shift, cmp->m.shift);
++	reg &= ~GENMASK(cmp->p.width + cmp->p.shift, cmp->p.shift);
++
++	writel(reg | (p << cmp->p.shift) | ((m - 1) << cmp->m.shift),
++	       cmp->common.base + cmp->common.reg);
++
++	spin_unlock_irqrestore(cmp->common.lock, flags);
 +
 +	return 0;
 +}
 +
-+const struct clk_ops ccu_div_table_ops = {
-+	.disable	= ccu_div_table_disable,
-+	.enable		= ccu_div_table_enable,
-+	.is_enabled	= ccu_div_table_is_enabled,
++static u8 ccu_mp_get_parent(struct clk_hw *hw)
++{
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
 +
-+	.recalc_rate	= ccu_div_table_recalc_rate,
-+	.round_rate	= ccu_div_table_round_rate,
-+	.set_rate	= ccu_div_table_set_rate,
++	return ccu_mux_helper_get_parent(&cmp->common, &cmp->mux);
++}
++
++static int ccu_mp_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
++
++	return ccu_mux_helper_set_parent(&cmp->common, &cmp->mux, index);
++}
++
++const struct clk_ops ccu_mp_ops = {
++	.disable	= ccu_mp_disable,
++	.enable		= ccu_mp_enable,
++	.is_enabled	= ccu_mp_is_enabled,
++
++	.get_parent	= ccu_mp_get_parent,
++	.set_parent	= ccu_mp_set_parent,
++
++	.determine_rate	= ccu_mp_determine_rate,
++	.recalc_rate	= ccu_mp_recalc_rate,
++	.set_rate	= ccu_mp_set_rate,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_div_table.h b/drivers/clk/sunxi-ng/ccu_div_table.h
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
 new file mode 100644
-index 000000000000..bd7da49087ed
+index 000000000000..95da9c46cd4f
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_div_table.h
-@@ -0,0 +1,75 @@
++++ b/drivers/clk/sunxi-ng/ccu_mp.h
+@@ -0,0 +1,79 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -172,67 +214,71 @@ index 000000000000..bd7da49087ed
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _CCU_DIV_TABLE_H_
-+#define _CCU_DIV_TABLE_H_
++#ifndef _CCU_MP_H_
++#define _CCU_MP_H_
 +
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_common.h"
 +#include "ccu_factor.h"
++#include "ccu_mux.h"
 +
-+struct ccu_div_table {
++struct ccu_mp {
 +	u32			enable;
 +
-+	u8			*table;
-+	int			num_divs;
-+
-+	struct ccu_factor	div;
++	struct ccu_factor	m;
++	struct ccu_factor	p;
++	struct ccu_mux_internal	mux;
 +	struct ccu_common	common;
 +};
 +
-+#define SUNXI_CCU_DIV_TABLE(_struct, _name, _parent, _reg,		\
-+			    _shift, _width,				\
-+			    _table, _flags)				\
-+	struct ccu_div_table _struct = {				\
-+		.table		= _table,				\
-+		.num_divs	= ARRAY_SIZE(_table),			\
-+		.div		= SUNXI_CLK_FACTOR(_shift, _width),	\
++#define SUNXI_CCU_MP_WITH_MUX(_struct, _name, _parents, _reg,		\
++			      _mshift, _mwidth,				\
++			      _pshift, _pwidth,				\
++			      _muxshift, _muxwidth,			\
++			      _flags)					\
++	struct ccu_mp _struct = {					\
++		.m	= SUNXI_CLK_FACTOR(_mshift, _mwidth),		\
++		.p	= SUNXI_CLK_FACTOR(_pshift, _pwidth),		\
++		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
 +		.common	= {						\
 +			.reg		= _reg,				\
-+			.hw.init	= SUNXI_HW_INIT(_name,		\
-+							_parent,	\
-+							&ccu_div_table_ops, \
-+							_flags),	\
++			.hw.init	= SUNXI_HW_INIT_PARENTS(_name,	\
++								_parents, \
++								&ccu_mp_ops, \
++								_flags), \
 +		}							\
 +	}
 +
-+#define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
-+				      _shift, _width,			\
-+				      _table, _gate, _flags)		\
-+	struct ccu_div_table _struct = {				\
-+		.enable		= _gate,				\
-+		.table		= _table,				\
-+		.num_divs	= ARRAY_SIZE(_table),			\
-+		.div		= SUNXI_CLK_FACTOR(_shift, _width),	\
++#define SUNXI_CCU_MP_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
++				   _mshift, _mwidth,			\
++				   _pshift, _pwidth,			\
++				   _muxshift, _muxwidth,		\
++				   _gate, _flags)			\
++	struct ccu_mp _struct = {					\
++		.enable	= _gate,					\
++		.m	= SUNXI_CLK_FACTOR(_mshift, _mwidth),		\
++		.p	= SUNXI_CLK_FACTOR(_pshift, _pwidth),		\
++		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
 +		.common	= {						\
 +			.reg		= _reg,				\
 +			.features	= CCU_FEATURE_GATE,		\
-+			.hw.init	= SUNXI_HW_INIT(_name,		\
-+							_parent,	\
-+							&ccu_div_table_ops, \
-+							_flags),	\
++			.hw.init	= SUNXI_HW_INIT_PARENTS(_name,	\
++								_parents, \
++								&ccu_mp_ops, \
++								_flags), \
 +		}							\
 +	}
 +
-+static inline struct ccu_div_table *hw_to_ccu_div_table(struct clk_hw *hw)
++static inline struct ccu_mp *hw_to_ccu_mp(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_div_table, common);
++	return container_of(common, struct ccu_mp, common);
 +}
 +
-+extern const struct clk_ops ccu_div_table_ops;
++extern const struct clk_ops ccu_mp_ops;
 +
-+#endif /* _CCU_DIV_H_ */
++#endif /* _CCU_MP_H_ */
 -- 
 2.8.2
