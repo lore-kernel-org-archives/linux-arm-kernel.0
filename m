@@ -1,38 +1,85 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun,  8 May 2016 13:55:39 +0200
-Subject: [PATCH] ARM: configs: lpc18xx: enable adc and dac iio drivers
-Message-ID: <1462708539-9222-1-git-send-email-manabian@gmail.com>
+From: zengzhaoxiu@163.com (Zhaoxiu Zeng)
+Date: Sun, 8 May 2016 20:52:52 +0800
+Subject: [patch V4] lib: GCD: Use binary GCD algorithm instead of Euclidean
+In-Reply-To: <20160507084129.7284.qmail@ns.horizon.com>
+References: <20160507084129.7284.qmail@ns.horizon.com>
+Message-ID: <042bae7f-51d6-93e8-549d-a38bcb4c9cf5@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ADC and DAC IIO drivers for LPC18xx/43xx SoCs.
+? 2016/5/7 16:41, George Spelvin ??:
+> Nothing critical, but a bit of kibitzing.
+> (That is slang in the Yiddish language for a person
+> who offers annoying and unwanted advice.)
+>
+>> The binary GCD algorithm is based on the following facts:
+>> 	1. If a and b are all evens, then gcd(a,b) = 2 * gcd(a/2, b/2)
+>> 	2. If a is even and b is odd, then gcd(a,b) = gcd(a/2, b)
+>> 	3. If a and b are all odds, then gcd(a,b) = gcd((a-b)/2, b) = gcd((a+b)/2, b)
+> 1) "even" and "odd" are adjectives.  In English, adjectives to not have
+>    plural suffixes.  Thus, "they are even" or "they are odd".
+> 2) Although "all" is not exactly wrong, it sounds odd.  Since there are
+>    exactly two of them it's clearer to say "both".
+>
+> If I also rephrase the last line to fit into 80 columns, you get:
+>
+>   The binary GCD algorithm is based on the following facts:
+> - 	1. If a and b are all evens, then gcd(a,b) = 2 * gcd(a/2, b/2)
+> + 	1. If a and b are both even, then gcd(a,b) = 2 * gcd(a/2, b/2)
+>  	2. If a is even and b is odd, then gcd(a,b) = gcd(a/2, b)
+> -	3. If a and b are all odds, then gcd(a,b) = gcd((a-b)/2, b) = gcd((a+b)/2, b)
+> +	3. If both are odd, then gcd(a,b) = gcd((a-b)/2, b) = gcd((a+b)/2, b)
+>
+> 3) Negative config options are always confusing.
+>
+> Would it be better to call it CONFIG_INEFFICIEBNT_FFS, or even simpler
+> CONFIG_SLOW_FFS?
+>
+> Also, you're allowed to add "help" to a non-interactive config option,
+> and some documentation might be useful.
+> E.g.
+>
+> +config CPU_SLOW_FFS
+> +	def_bool n
+> +	help
+> +	  If n, the CPU supports a fast __ffs (__builtin_ctz) operation,
+> +	  either directly or via a short code sequence using a count
+> +	  leading zeros or population count instruction.  If y, the
+> +	  operation is emulated by slower software, such as an unrolled
+> +	  binary search.
+> +
+> +	  This is purely an optimization option; the kernel
+> +	  will function correctly regardless of how it is set.
+> +
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
-Hi arm-soc team,
+Thanks a lot.
 
-Only one simple defconfig update for lpc18xx this cycle. So please
-apply this one directly. Thanks!
+> Your benchmark code doesn't have to have a separate code path if
+> __x86_64__; rdtsc works on 32-bit code just as well.  paths.  And the
+> way you subtract the end and start times is unnecessarily complicated.
+> The C language guarantees that unsigned arithmetic simply wraps modulo
+> 2^bits as expected.
 
+rdsc works on x86, the other path is prepared for other architectures.
 
-regards,
-Joachim Eastwood
+> Here are some more timings, with the same flags as your tests:
+>
+> First, 32 bit code:
+> 		gcd0	gcd1	gcd2	gcd3	gcd4
+> Ivy Bridge	3156	1192	1740	1160	1640	PASS
+> AMD Phenom	7150	2564	2348	2975	2843	PASS
+> Core 2		4176	2592	4164	2604	3900	PASS
+> Pentium 4	11492	4784	7632	4852	6452	PASS
+>
+> And 64-bit (longer times becuase the inputs are larger):
+> Ivy Bridge	10636	2496	3500	2432	3360	PASS
+> AMD Phenom	19482	4058	6030	5001	6845	PASS
+>
+> Looking at those, I'm not sure how much better the gcd3/4 versions are
+> than gcd1/2.  The difference seems pretty minor and sometimes negative.
+>
 
- arch/arm/configs/lpc18xx_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+The worst case of binary GCD is that one number is power of 2,
+for example a is 0xffffffff (0xcccccccc for the "even/odd" variant) and b is 1.
 
-diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
-index 2ae00b0..2de1bf0 100644
---- a/arch/arm/configs/lpc18xx_defconfig
-+++ b/arch/arm/configs/lpc18xx_defconfig
-@@ -149,6 +149,8 @@ CONFIG_PWM=y
- CONFIG_PWM_LPC18XX_SCT=y
- CONFIG_IIO=y
- CONFIG_MMA7455_I2C=y
-+CONFIG_LPC18XX_ADC=y
-+CONFIG_LPC18XX_DAC=y
- CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_PHY_LPC18XX_USB_OTG=y
- CONFIG_NVMEM=y
--- 
-2.8.2
+The gcd3/4 versions can handle this properly.
