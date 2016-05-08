@@ -1,39 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  8 May 2016 22:01:44 +0200
-Subject: [PATCH 09/16] clk: sunxi-ng: Add P-factor clock support
+Date: Sun,  8 May 2016 22:01:42 +0200
+Subject: [PATCH 07/16] clk: sunxi-ng: Add phase clock support
 In-Reply-To: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1462737711-10017-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1462737711-10017-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce support for clocks that divide using a power of two factor.
+Add support for the clocks in the CCU that introduce a phase shift from
+their parent clock.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/Makefile |   1 +
- drivers/clk/sunxi-ng/ccu_p.c  | 141 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_p.h  |  40 ++++++++++++
- 3 files changed, 182 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_p.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_p.h
+ drivers/clk/sunxi-ng/Makefile    |   1 +
+ drivers/clk/sunxi-ng/ccu_phase.c | 126 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_phase.h |  50 ++++++++++++++++
+ 3 files changed, 177 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_phase.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_phase.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index f41de901c607..063c50f35ad4 100644
+index f20c6c8f217c..a47a3bbdf285 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -6,4 +6,5 @@ obj-y += ccu_fixed_factor.o
+@@ -5,3 +5,4 @@ obj-y += ccu_div_table.o
+ obj-y += ccu_fixed_factor.o
  obj-y += ccu_gate.o
- obj-y += ccu_m.o
  obj-y += ccu_mux.o
-+obj-y += ccu_p.o
- obj-y += ccu_phase.o
-diff --git a/drivers/clk/sunxi-ng/ccu_p.c b/drivers/clk/sunxi-ng/ccu_p.c
++obj-y += ccu_phase.o
+diff --git a/drivers/clk/sunxi-ng/ccu_phase.c b/drivers/clk/sunxi-ng/ccu_phase.c
 new file mode 100644
-index 000000000000..4d4dbd35cead
+index 000000000000..cf0f0b20115c
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_p.c
-@@ -0,0 +1,141 @@
++++ b/drivers/clk/sunxi-ng/ccu_phase.c
+@@ -0,0 +1,126 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -45,142 +45,127 @@ index 000000000000..4d4dbd35cead
 + */
 +
 +#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
 +
-+#include "ccu_gate.h"
-+#include "ccu_p.h"
++#include "ccu_phase.h"
 +
-+static void ccu_p_find_best(unsigned long parent, unsigned long rate,
-+			    unsigned int max_p, unsigned int *p)
++static int ccu_phase_get_phase(struct clk_hw *hw)
 +{
-+	unsigned int div, _p;
-+
-+	div = DIV_ROUND_UP(parent, rate);
-+	_p = __roundup_pow_of_two(div);
-+
-+	if (_p > max_p)
-+		_p = max_p;
-+
-+	*p = _p;
-+}
-+
-+static unsigned long ccu_p_round_rate(struct ccu_mux_internal *mux,
-+				       unsigned long parent_rate,
-+				       unsigned long rate,
-+				       void *data)
-+{
-+	struct ccu_p *cp = data;
-+	unsigned int p;
-+
-+	ccu_p_find_best(parent_rate, rate, (1 << cp->p.width) - 1, &p);
-+
-+	return parent_rate >> p;
-+}
-+
-+static void ccu_p_disable(struct clk_hw *hw)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+
-+	return ccu_gate_helper_disable(&cp->common, cp->enable);
-+}
-+
-+static int ccu_p_enable(struct clk_hw *hw)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+
-+	return ccu_gate_helper_enable(&cp->common, cp->enable);
-+}
-+
-+static int ccu_p_is_enabled(struct clk_hw *hw)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+
-+	return ccu_gate_helper_is_enabled(&cp->common, cp->enable);
-+}
-+
-+static unsigned long ccu_p_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+	unsigned long p;
++	struct ccu_phase *phase = hw_to_ccu_phase(hw);
++	struct clk_hw *parent, *pparent;
++	unsigned int parent_rate, pparent_rate;
++	u16 step, parent_div;
 +	u32 reg;
++	u8 delay;
 +
-+	reg = readl(cp->common.base + cp->common.reg);
-+	p = reg >> cp->p.shift;
-+	p &= (1 << cp->p.width) - 1;
++	reg = readl(phase->common.base + phase->common.reg);
++	delay = (reg >> phase->shift);
++	delay &= (1 << phase->width) - 1;
 +
-+	ccu_mux_helper_adjust_parent_for_prediv(&cp->common, &cp->mux, -1,
-+						&parent_rate);
++	if (!delay)
++		return 180;
 +
-+	return parent_rate >> p;
++	/* Get our parent clock, it's the one that can adjust its rate */
++	parent = clk_hw_get_parent(hw);
++	if (!parent)
++		return -EINVAL;
++
++	/* And its rate */
++	parent_rate = clk_hw_get_rate(parent);
++	if (!parent_rate)
++		return -EINVAL;
++
++	/* Now, get our parent's parent (most likely some PLL) */
++	pparent = clk_hw_get_parent(parent);
++	if (!pparent)
++		return -EINVAL;
++
++	/* And its rate */
++	pparent_rate = clk_hw_get_rate(pparent);
++	if (!pparent_rate)
++		return -EINVAL;
++
++	/* Get our parent clock divider */
++	parent_div = pparent_rate / parent_rate;
++
++	step = DIV_ROUND_CLOSEST(360, parent_div);
++	return delay * step;
 +}
 +
-+static int ccu_p_determine_rate(struct clk_hw *hw,
-+				struct clk_rate_request *req)
++static int ccu_phase_set_phase(struct clk_hw *hw, int degrees)
 +{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+
-+	return ccu_mux_helper_determine_rate(&cp->common, &cp->mux,
-+					     req, ccu_p_round_rate, cp);
-+}
-+
-+static int ccu_p_set_rate(struct clk_hw *hw, unsigned long rate,
-+			   unsigned long parent_rate)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
++	struct ccu_phase *phase = hw_to_ccu_phase(hw);
++	struct clk_hw *parent, *pparent;
++	unsigned int parent_rate, pparent_rate;
 +	unsigned long flags;
-+	unsigned int p;
 +	u32 reg;
++	u8 delay;
 +
-+	ccu_mux_helper_adjust_parent_for_prediv(&cp->common, &cp->mux, -1,
-+						&parent_rate);
++	/* Get our parent clock, it's the one that can adjust its rate */
++	parent = clk_hw_get_parent(hw);
++	if (!parent)
++		return -EINVAL;
 +
-+	ccu_p_find_best(parent_rate, rate, (1 << cp->p.width) - 1, &p);
++	/* And its rate */
++	parent_rate = clk_hw_get_rate(parent);
++	if (!parent_rate)
++		return -EINVAL;
 +
-+	spin_lock_irqsave(cp->common.lock, flags);
++	/* Now, get our parent's parent (most likely some PLL) */
++	pparent = clk_hw_get_parent(parent);
++	if (!pparent)
++		return -EINVAL;
 +
-+	reg = readl(cp->common.base + cp->common.reg);
-+	reg &= ~GENMASK(cp->p.width + cp->p.shift, cp->p.shift);
++	/* And its rate */
++	pparent_rate = clk_hw_get_rate(pparent);
++	if (!pparent_rate)
++		return -EINVAL;
 +
-+	writel(reg | (p << cp->p.shift),
-+	       cp->common.base + cp->common.reg);
++	if (degrees != 180) {
++		u16 step, parent_div;
 +
-+	spin_unlock_irqrestore(cp->common.lock, flags);
++		/* Get our parent divider */
++		parent_div = pparent_rate / parent_rate;
++
++		/*
++		 * We can only outphase the clocks by multiple of the
++		 * PLL's period.
++		 *
++		 * Since our parent clock is only a divider, and the
++		 * formula to get the outphasing in degrees is deg =
++		 * 360 * delta / period
++		 *
++		 * If we simplify this formula, we can see that the
++		 * only thing that we're concerned about is the number
++		 * of period we want to outphase our clock from, and
++		 * the divider set by our parent clock.
++		 */
++		step = DIV_ROUND_CLOSEST(360, parent_div);
++		delay = DIV_ROUND_CLOSEST(degrees, step);
++	} else {
++		delay = 0;
++	}
++
++	spin_lock_irqsave(phase->common.lock, flags);
++	reg = readl(phase->common.base + phase->common.reg);
++	reg &= ~GENMASK(phase->width + phase->shift, phase->shift);
++	writel(reg | (delay << phase->shift),
++	       phase->common.base + phase->common.reg);
++	spin_unlock_irqrestore(phase->common.lock, flags);
 +
 +	return 0;
 +}
 +
-+static u8 ccu_p_get_parent(struct clk_hw *hw)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+
-+	return ccu_mux_helper_get_parent(&cp->common, &cp->mux);
-+}
-+
-+static int ccu_p_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct ccu_p *cp = hw_to_ccu_p(hw);
-+
-+	return ccu_mux_helper_set_parent(&cp->common, &cp->mux, index);
-+}
-+
-+const struct clk_ops ccu_p_ops = {
-+	.disable	= ccu_p_disable,
-+	.enable		= ccu_p_enable,
-+	.is_enabled	= ccu_p_is_enabled,
-+
-+	.get_parent	= ccu_p_get_parent,
-+	.set_parent	= ccu_p_set_parent,
-+
-+	.determine_rate	= ccu_p_determine_rate,
-+	.recalc_rate	= ccu_p_recalc_rate,
-+	.set_rate	= ccu_p_set_rate,
++const struct clk_ops ccu_phase_ops = {
++	.get_phase	= ccu_phase_get_phase,
++	.set_phase	= ccu_phase_set_phase,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_p.h b/drivers/clk/sunxi-ng/ccu_p.h
+diff --git a/drivers/clk/sunxi-ng/ccu_phase.h b/drivers/clk/sunxi-ng/ccu_phase.h
 new file mode 100644
-index 000000000000..3cbda4ae6e72
+index 000000000000..e28b4e58a819
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_p.h
-@@ -0,0 +1,40 @@
++++ b/drivers/clk/sunxi-ng/ccu_phase.h
+@@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -194,32 +179,42 @@ index 000000000000..3cbda4ae6e72
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _CCU_P_H_
-+#define _CCU_P_H_
++#ifndef _CCU_PHASE_H_
++#define _CCU_PHASE_H_
 +
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_common.h"
-+#include "ccu_factor.h"
-+#include "ccu_mux.h"
 +
-+struct ccu_p {
-+	u32			enable;
++struct ccu_phase {
++	u8			shift;
++	u8			width;
 +
-+	struct ccu_factor	p;
-+	struct ccu_mux_internal	mux;
 +	struct ccu_common	common;
 +};
 +
-+static inline struct ccu_p *hw_to_ccu_p(struct clk_hw *hw)
++#define SUNXI_CCU_PHASE(_struct, _name, _parent, _reg, _shift, _width, _flags) \
++	struct ccu_phase _struct = {					\
++		.shift	= _shift,					\
++		.width	= _width,					\
++		.common	= {						\
++			.reg		= _reg,				\
++			.hw.init	= SUNXI_HW_INIT(_name,		\
++							_parent,	\
++							&ccu_phase_ops,	\
++							_flags),	\
++		}							\
++	}
++
++static inline struct ccu_phase *hw_to_ccu_phase(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_p, common);
++	return container_of(common, struct ccu_phase, common);
 +}
 +
-+extern const struct clk_ops ccu_p_ops;
++extern const struct clk_ops ccu_phase_ops;
 +
-+#endif /* _CCU_P_H_ */
++#endif /* _CCU_PHASE_H_ */
 -- 
 2.8.2
