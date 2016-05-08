@@ -1,20 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 08 May 2016 22:51:14 +0200
-Subject: [PATCH] clk: rockchip: fix the rk3399 sdmmc sample / drv name
-In-Reply-To: <1462404985-27957-1-git-send-email-dianders@chromium.org>
-References: <1462404985-27957-1-git-send-email-dianders@chromium.org>
-Message-ID: <4645491.pfFL9jxaO2@phil>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Mon,  9 May 2016 00:46:18 +0200
+Subject: [PATCH 1/1] net: thunderx: avoid exposing kernel stack
+Message-ID: <1462747578-6147-1-git-send-email-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 4. Mai 2016, 16:36:25 schrieb Douglas Anderson:
-> The rk3399 clock table had a simple typo in it, calling the SDMMC sample
-> and drive clocks by the wrong name.  Fix this minor typo.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Reserved fields should be set to zero to avoid exposing
+bits from the kernel stack.
 
-applied to my clk-branch
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+---
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-
-Thanks for catching this
-Heiko
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 8acd7c0..0ff8e60 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -533,6 +533,7 @@ static void nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
+ 		nicvf_config_vlan_stripping(nic, nic->netdev->features);
+ 
+ 	/* Enable Receive queue */
++	memset(&rq_cfg, 0, sizeof(struct rq_cfg));
+ 	rq_cfg.ena = 1;
+ 	rq_cfg.tcp_ena = 0;
+ 	nicvf_queue_reg_write(nic, NIC_QSET_RQ_0_7_CFG, qidx, *(u64 *)&rq_cfg);
+@@ -565,6 +566,7 @@ void nicvf_cmp_queue_config(struct nicvf *nic, struct queue_set *qs,
+ 			      qidx, (u64)(cq->dmem.phys_base));
+ 
+ 	/* Enable Completion queue */
++	memset(&cq_cfg, 0, sizeof(struct cq_cfg));
+ 	cq_cfg.ena = 1;
+ 	cq_cfg.reset = 0;
+ 	cq_cfg.caching = 0;
+@@ -613,6 +615,7 @@ static void nicvf_snd_queue_config(struct nicvf *nic, struct queue_set *qs,
+ 			      qidx, (u64)(sq->dmem.phys_base));
+ 
+ 	/* Enable send queue  & set queue size */
++	memset(&sq_cfg, 0, sizeof(struct sq_cfg));
+ 	sq_cfg.ena = 1;
+ 	sq_cfg.reset = 0;
+ 	sq_cfg.ldwb = 0;
+@@ -649,6 +652,7 @@ static void nicvf_rbdr_config(struct nicvf *nic, struct queue_set *qs,
+ 
+ 	/* Enable RBDR  & set queue size */
+ 	/* Buffer size should be in multiples of 128 bytes */
++	memset(&rbdr_cfg, 0, sizeof(struct rbdr_cfg));
+ 	rbdr_cfg.ena = 1;
+ 	rbdr_cfg.reset = 0;
+ 	rbdr_cfg.ldwb = 0;
+-- 
+2.1.4
