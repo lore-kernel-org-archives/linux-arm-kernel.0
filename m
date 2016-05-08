@@ -1,53 +1,37 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Sun,  8 May 2016 12:59:55 +0200
-Subject: [PATCH 1/2] dma-mapping: add __dma_sync_single_for_device()
+Date: Sun,  8 May 2016 12:59:56 +0200
+Subject: [PATCH 2/2] iommu/io-pgtable-arm: use __dma_sync_single_for_device()
 In-Reply-To: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1462705196-10857-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1462705196-10857-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some users of the DMA mapping API calls dma_sync_single_for_device()
-from the dma_map_single() call path. This will cause false warning
-printouts if CONFIG_DMA_API_DEBUG are enabled.
-
-The reason for the warning are that debug_dma_sync_single_for_device()
-will be called before debug_dma_map_page() so the new mapping can't be
-found and are believed to be invalid. Add __dma_sync_single_for_device()
-that don't call into debug_dma_sync_single_for_device() and can be used
-in these situations.
+The call to dma_sync_single_for_device() can be reached from
+dma_map_single(). If CONFIG_DMA_API_DEBUG is enabled this would result
+in a check that the mapping being synced is valid. Since the call to
+dma_map_single is not yet completed the mapping is not recorded in
+dma-debug and the check fails and a warning is printed. Avoid this
+warning by calling __dma_sync_single_for_device() which don't preform
+this check.
 
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- include/linux/dma-mapping.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/iommu/io-pgtable-arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 9ea9aba..0e4d3a6 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -224,7 +224,7 @@ static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
- 	debug_dma_sync_single_for_cpu(dev, addr, size, dir);
- }
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index f433b51..3da8102 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -255,7 +255,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+ 	*ptep = pte;
  
--static inline void dma_sync_single_for_device(struct device *dev,
-+static inline void __dma_sync_single_for_device(struct device *dev,
- 					      dma_addr_t addr, size_t size,
- 					      enum dma_data_direction dir)
- {
-@@ -233,6 +233,13 @@ static inline void dma_sync_single_for_device(struct device *dev,
- 	BUG_ON(!valid_dma_direction(dir));
- 	if (ops->sync_single_for_device)
- 		ops->sync_single_for_device(dev, addr, size, dir);
-+}
-+
-+static inline void dma_sync_single_for_device(struct device *dev,
-+					      dma_addr_t addr, size_t size,
-+					      enum dma_data_direction dir)
-+{
-+	__dma_sync_single_for_device(dev, addr, size, dir);
- 	debug_dma_sync_single_for_device(dev, addr, size, dir);
+ 	if (!selftest_running)
+-		dma_sync_single_for_device(cfg->iommu_dev,
++		__dma_sync_single_for_device(cfg->iommu_dev,
+ 					   __arm_lpae_dma_addr(ptep),
+ 					   sizeof(pte), DMA_TO_DEVICE);
  }
- 
 -- 
 2.8.2
