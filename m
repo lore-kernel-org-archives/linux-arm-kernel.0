@@ -1,40 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  8 May 2016 22:01:47 +0200
-Subject: [PATCH 12/16] clk: sunxi-ng: Add N-M-factor clock support
+Date: Sun,  8 May 2016 22:01:44 +0200
+Subject: [PATCH 09/16] clk: sunxi-ng: Add P-factor clock support
 In-Reply-To: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1462737711-10017-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1462737711-10017-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce support for clocks that multiply and divide using linear factors.
+Introduce support for clocks that divide using a power of two factor.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
  drivers/clk/sunxi-ng/Makefile |   1 +
- drivers/clk/sunxi-ng/ccu_nm.c | 103 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_nm.h |  41 +++++++++++++++++
- 3 files changed, 145 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_nm.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_nm.h
+ drivers/clk/sunxi-ng/ccu_p.c  | 141 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_p.h  |  40 ++++++++++++
+ 3 files changed, 182 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_p.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_p.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index e29ddae99653..fba64c7f4fcd 100644
+index f41de901c607..063c50f35ad4 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -8,5 +8,6 @@ obj-y += ccu_m.o
- obj-y += ccu_mp.o
+@@ -6,4 +6,5 @@ obj-y += ccu_fixed_factor.o
+ obj-y += ccu_gate.o
+ obj-y += ccu_m.o
  obj-y += ccu_mux.o
- obj-y += ccu_nk.o
-+obj-y += ccu_nm.o
- obj-y += ccu_p.o
++obj-y += ccu_p.o
  obj-y += ccu_phase.o
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+diff --git a/drivers/clk/sunxi-ng/ccu_p.c b/drivers/clk/sunxi-ng/ccu_p.c
 new file mode 100644
-index 000000000000..268637db137b
+index 000000000000..4d4dbd35cead
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_nm.c
-@@ -0,0 +1,103 @@
++++ b/drivers/clk/sunxi-ng/ccu_p.c
+@@ -0,0 +1,141 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -46,104 +45,142 @@ index 000000000000..268637db137b
 + */
 +
 +#include <linux/clk-provider.h>
-+#include <linux/rational.h>
 +
 +#include "ccu_gate.h"
-+#include "ccu_nm.h"
++#include "ccu_p.h"
 +
-+static void ccu_nm_disable(struct clk_hw *hw)
++static void ccu_p_find_best(unsigned long parent, unsigned long rate,
++			    unsigned int max_p, unsigned int *p)
 +{
-+	struct ccu_nm *nm = hw_to_ccu_nm(hw);
++	unsigned int div, _p;
 +
-+	return ccu_gate_helper_disable(&nm->common, nm->enable);
++	div = DIV_ROUND_UP(parent, rate);
++	_p = __roundup_pow_of_two(div);
++
++	if (_p > max_p)
++		_p = max_p;
++
++	*p = _p;
 +}
 +
-+static int ccu_nm_enable(struct clk_hw *hw)
++static unsigned long ccu_p_round_rate(struct ccu_mux_internal *mux,
++				       unsigned long parent_rate,
++				       unsigned long rate,
++				       void *data)
 +{
-+	struct ccu_nm *nm = hw_to_ccu_nm(hw);
++	struct ccu_p *cp = data;
++	unsigned int p;
 +
-+	return ccu_gate_helper_enable(&nm->common, nm->enable);
++	ccu_p_find_best(parent_rate, rate, (1 << cp->p.width) - 1, &p);
++
++	return parent_rate >> p;
 +}
 +
-+static int ccu_nm_is_enabled(struct clk_hw *hw)
++static void ccu_p_disable(struct clk_hw *hw)
 +{
-+	struct ccu_nm *nm = hw_to_ccu_nm(hw);
++	struct ccu_p *cp = hw_to_ccu_p(hw);
 +
-+	return ccu_gate_helper_is_enabled(&nm->common, nm->enable);
++	return ccu_gate_helper_disable(&cp->common, cp->enable);
 +}
 +
-+static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
++static int ccu_p_enable(struct clk_hw *hw)
++{
++	struct ccu_p *cp = hw_to_ccu_p(hw);
++
++	return ccu_gate_helper_enable(&cp->common, cp->enable);
++}
++
++static int ccu_p_is_enabled(struct clk_hw *hw)
++{
++	struct ccu_p *cp = hw_to_ccu_p(hw);
++
++	return ccu_gate_helper_is_enabled(&cp->common, cp->enable);
++}
++
++static unsigned long ccu_p_recalc_rate(struct clk_hw *hw,
 +					unsigned long parent_rate)
 +{
-+	struct ccu_nm *nm = hw_to_ccu_nm(hw);
-+	unsigned long n, m;
++	struct ccu_p *cp = hw_to_ccu_p(hw);
++	unsigned long p;
 +	u32 reg;
 +
-+	reg = readl(nm->common.base + nm->common.reg);
++	reg = readl(cp->common.base + cp->common.reg);
++	p = reg >> cp->p.shift;
++	p &= (1 << cp->p.width) - 1;
 +
-+	n = reg >> nm->n.shift;
-+	n &= (1 << nm->n.width) - 1;
++	ccu_mux_helper_adjust_parent_for_prediv(&cp->common, &cp->mux, -1,
++						&parent_rate);
 +
-+	m = reg >> nm->m.shift;
-+	m &= (1 << nm->m.width) - 1;
-+
-+	return parent_rate * (n + 1) / (m + 1);
++	return parent_rate >> p;
 +}
 +
-+static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *parent_rate)
++static int ccu_p_determine_rate(struct clk_hw *hw,
++				struct clk_rate_request *req)
 +{
-+	struct ccu_nm *nm = hw_to_ccu_nm(hw);
-+	unsigned long n, m;
++	struct ccu_p *cp = hw_to_ccu_p(hw);
 +
-+	rational_best_approximation(rate, *parent_rate,
-+				    nm->n.width, nm->m.width, &n, &m);
-+
-+	return *parent_rate * n / m;
++	return ccu_mux_helper_determine_rate(&cp->common, &cp->mux,
++					     req, ccu_p_round_rate, cp);
 +}
 +
-+static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
++static int ccu_p_set_rate(struct clk_hw *hw, unsigned long rate,
 +			   unsigned long parent_rate)
 +{
-+	struct ccu_nm *nm = hw_to_ccu_nm(hw);
++	struct ccu_p *cp = hw_to_ccu_p(hw);
 +	unsigned long flags;
-+	unsigned long n, m;
++	unsigned int p;
 +	u32 reg;
 +
-+	rational_best_approximation(rate, parent_rate,
-+				    nm->n.width, nm->m.width, &n, &m);
++	ccu_mux_helper_adjust_parent_for_prediv(&cp->common, &cp->mux, -1,
++						&parent_rate);
 +
-+	spin_lock_irqsave(nm->common.lock, flags);
++	ccu_p_find_best(parent_rate, rate, (1 << cp->p.width) - 1, &p);
 +
-+	reg = readl(nm->common.base + nm->common.reg);
-+	reg &= ~GENMASK(nm->n.width + nm->n.shift, nm->n.shift);
-+	reg &= ~GENMASK(nm->m.width + nm->m.shift, nm->m.shift);
++	spin_lock_irqsave(cp->common.lock, flags);
 +
-+	writel(reg | ((m - 1) << nm->m.shift) | ((n - 1) << nm->n.shift),
-+	       nm->common.base + nm->common.reg);
++	reg = readl(cp->common.base + cp->common.reg);
++	reg &= ~GENMASK(cp->p.width + cp->p.shift, cp->p.shift);
 +
-+	spin_unlock_irqrestore(nm->common.lock, flags);
++	writel(reg | (p << cp->p.shift),
++	       cp->common.base + cp->common.reg);
 +
-+	ccu_helper_wait_for_lock(&nm->common, nm->lock);
++	spin_unlock_irqrestore(cp->common.lock, flags);
 +
 +	return 0;
 +}
 +
-+const struct clk_ops ccu_nm_ops = {
-+	.disable	= ccu_nm_disable,
-+	.enable		= ccu_nm_enable,
-+	.is_enabled	= ccu_nm_is_enabled,
++static u8 ccu_p_get_parent(struct clk_hw *hw)
++{
++	struct ccu_p *cp = hw_to_ccu_p(hw);
 +
-+	.recalc_rate	= ccu_nm_recalc_rate,
-+	.round_rate	= ccu_nm_round_rate,
-+	.set_rate	= ccu_nm_set_rate,
++	return ccu_mux_helper_get_parent(&cp->common, &cp->mux);
++}
++
++static int ccu_p_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct ccu_p *cp = hw_to_ccu_p(hw);
++
++	return ccu_mux_helper_set_parent(&cp->common, &cp->mux, index);
++}
++
++const struct clk_ops ccu_p_ops = {
++	.disable	= ccu_p_disable,
++	.enable		= ccu_p_enable,
++	.is_enabled	= ccu_p_is_enabled,
++
++	.get_parent	= ccu_p_get_parent,
++	.set_parent	= ccu_p_set_parent,
++
++	.determine_rate	= ccu_p_determine_rate,
++	.recalc_rate	= ccu_p_recalc_rate,
++	.set_rate	= ccu_p_set_rate,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.h b/drivers/clk/sunxi-ng/ccu_nm.h
+diff --git a/drivers/clk/sunxi-ng/ccu_p.h b/drivers/clk/sunxi-ng/ccu_p.h
 new file mode 100644
-index 000000000000..6fda3ed05cd8
+index 000000000000..3cbda4ae6e72
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_nm.h
-@@ -0,0 +1,41 @@
++++ b/drivers/clk/sunxi-ng/ccu_p.h
+@@ -0,0 +1,40 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -157,33 +194,32 @@ index 000000000000..6fda3ed05cd8
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _CCU_NM_H_
-+#define _CCU_NM_H_
++#ifndef _CCU_P_H_
++#define _CCU_P_H_
 +
 +#include <linux/clk-provider.h>
 +
-+#include "ccu_factor.h"
 +#include "ccu_common.h"
++#include "ccu_factor.h"
++#include "ccu_mux.h"
 +
-+struct ccu_nm {
++struct ccu_p {
 +	u32			enable;
-+	u32			lock;
 +
-+	struct ccu_factor	n;
-+	struct ccu_factor	m;
-+
++	struct ccu_factor	p;
++	struct ccu_mux_internal	mux;
 +	struct ccu_common	common;
 +};
 +
-+static inline struct ccu_nm *hw_to_ccu_nm(struct clk_hw *hw)
++static inline struct ccu_p *hw_to_ccu_p(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_nm, common);
++	return container_of(common, struct ccu_p, common);
 +}
 +
-+extern const struct clk_ops ccu_nm_ops;
++extern const struct clk_ops ccu_p_ops;
 +
-+#endif /* _CCU_NM_H_ */
++#endif /* _CCU_P_H_ */
 -- 
 2.8.2
