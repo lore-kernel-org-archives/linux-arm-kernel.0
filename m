@@ -1,51 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 May 2016 20:09:41 +0200
-Subject: [PATCHv4] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
-In-Reply-To: <1462439332-26215-1-git-send-email-oliver@schinagl.nl>
-References: <1462439332-26215-1-git-send-email-oliver@schinagl.nl>
-Message-ID: <20160508180941.GC6167@lukather>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Sun, 08 May 2016 20:27:24 +0200
+Subject: [PATCH v8 2/3] gpio: mmio: add DT support for memory-mapped GPIOs
+In-Reply-To: <CAGhQ9VyG6yX+g=FjfB6VP0pUNYGYXo60CHkWmSiiOisjeX20cg@mail.gmail.com>
+References: <cover.1462543457.git.chunkeey@googlemail.com>
+ <535f785bf6116c0fb6f46afbb77e6d4bd3ef5f60.1462543458.git.chunkeey@googlemail.com>
+ <CAGhQ9VyG6yX+g=FjfB6VP0pUNYGYXo60CHkWmSiiOisjeX20cg@mail.gmail.com>
+Message-ID: <1946866.9Xyiz0Lzsg@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 11:08:52AM +0200, Olliver Schinagl wrote:
-> There are 3 kinds of OLinuXino Lime2 boards.
-> One without any on board storage, one with NAND storage and one with
-> eMMC storage. This patch adds the eMMC variant of boards.
+On Sunday, May 08, 2016 07:17:13 PM Joachim Eastwood wrote:
+> > +#define ADD(_name, _func) { .compatible = _name, .data = _func }
 > 
-> eMMC storage is different from a regular SD card in that it is soldered
-> on the board and cannot be changed. Additionally, it shares pins with
-> the NAND module and with the second SPI port.
-> 
-> Changeslog:
-> 
-> v4:
->   Add board compatibles
-> 
-> v3:
->   Add pwr-seq-emmc with the reset gpio
-> 
-> v2:
->   Remove unsupported no-1.8-v property, add vqmmc property
-> 
-> v1:
->   Initial bare bone version
+> I don't see the point in having a macro for such a simple data
+> structure, but since this v8 and Linus hasn't complained I guess it's
+> fine.
+>
+> Using a macro here makes it impossible to grep for 'compatible'. Doing
+> 'git grep compatible drivers/gpio/' is sometimes very useful to see
+> which hardware the driver actually supports.
 
-This is not something we want in the commit log. This should go below
-the --- so that it's dropped when applied.
+Ok. I'll definitely picking it up. I'll wait until Tuesday/Wednesday
+for more comments and then release a new series.
+ 
+> > +static const struct of_device_id bgpio_of_match[] = {
+> > +       ADD("wd,mbl-gpio", bgpio_basic_mmio_parse_dt),
+> > +       { }
+> > +};
+> > +#undef ADD
+> > +MODULE_DEVICE_TABLE(of, bgpio_of_match);
+> > +
+> > +static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
+> > +                                         unsigned long *flags)
+> > +{
+[...]
+> > +       of_id = of_match_node(bgpio_of_match, node);
+> > +       if (!of_id)
+> > +               return NULL;
+[...]
+> You can retrieve OF match data using of_device_get_match_data().
+> Saves you a couple of lines and better explains what your doing.
+Yes thanks that's useful too since I don't need the of_id variable
+anymore.
 
-Removed and applied.
+Both improvements save a total of 8 lines. so it's 328 insertions(+)
+vs 380 deletions(-).
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160508/9683f589/attachment.sig>
+Regards,
+Christian
