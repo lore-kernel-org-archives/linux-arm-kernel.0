@@ -1,179 +1,140 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun,  8 May 2016 21:05:57 +0200
-Subject: [PATCH v2 12/22] ARM: dts: exynos: Split Odroid XU3 LEDs to separate
- DTSI
+Date: Sun,  8 May 2016 21:05:58 +0200
+Subject: [PATCH v2 13/22] ARM: dts: exynos: Move common nodes to exynos5.dtsi
 In-Reply-To: <1462734367-5619-1-git-send-email-krzk@kernel.org>
 References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462734367-5619-13-git-send-email-krzk@kernel.org>
+Message-ID: <1462734367-5619-14-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LED nodes can be shared between Odroid XU3, XU3-Lite and XU (not yet
-added) thus removing duplication.
+Exynos5420 and Exynos5250 share some nodes: the PWM and syscon
+(sysreg_system_controller). Move them to parent DTSI to avoid
+duplication.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts | 35 +----------------
- arch/arm/boot/dts/exynos5422-odroidxu3.dts      | 35 +----------------
- arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi | 50 +++++++++++++++++++++++++
- 3 files changed, 52 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi
+ arch/arm/boot/dts/exynos5.dtsi    | 12 ++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi | 19 +++++--------------
+ arch/arm/boot/dts/exynos5420.dtsi | 19 +++++--------------
+ 3 files changed, 22 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-index 2ae1cf41dcb6..03fa88c45426 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-@@ -14,44 +14,11 @@
- /dts-v1/;
- #include "exynos5422-odroidxu3-common.dtsi"
- #include "exynos5422-odroidxu3-audio.dtsi"
-+#include "exynos54xx-odroidxu-leds.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index d5c0f18a4223..fe901152f3ea 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -63,6 +63,11 @@
+ 		interrupts = <1 9 0xf04>;
+ 	};
  
- / {
- 	model = "Hardkernel Odroid XU3 Lite";
- 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
--
--	pwmleds {
--		compatible = "pwm-leds";
--
--		greenled {
--			label = "green:mmc0";
--			pwms = <&pwm 1 2000000 0>;
--			pwm-names = "pwm1";
--			/*
--			 * Green LED is much brighter than the others
--			 * so limit its max brightness
--			 */
--			max_brightness = <127>;
--			linux,default-trigger = "mmc0";
--		};
--
--		blueled {
--			label = "blue:heartbeat";
--			pwms = <&pwm 2 2000000 0>;
--			pwm-names = "pwm2";
--			max_brightness = <255>;
--			linux,default-trigger = "heartbeat";
--		};
--	};
--
--	gpioleds {
--		compatible = "gpio-leds";
--		redled {
--			label = "red:microSD";
--			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
--			default-state = "off";
--			linux,default-trigger = "mmc1";
--		};
--	};
- };
- 
- &pwm {
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index 432406db85de..9ed6564acfb0 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -13,44 +13,11 @@
- /dts-v1/;
- #include "exynos5422-odroidxu3-common.dtsi"
- #include "exynos5422-odroidxu3-audio.dtsi"
-+#include "exynos54xx-odroidxu-leds.dtsi"
- 
- / {
- 	model = "Hardkernel Odroid XU3";
- 	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
--
--	pwmleds {
--		compatible = "pwm-leds";
--
--		greenled {
--			label = "green:mmc0";
--			pwms = <&pwm 1 2000000 0>;
--			pwm-names = "pwm1";
--			/*
--			 * Green LED is much brighter than the others
--			 * so limit its max brightness
--			 */
--			max_brightness = <127>;
--			linux,default-trigger = "mmc0";
--		};
--
--		blueled {
--			label = "blue:heartbeat";
--			pwms = <&pwm 2 2000000 0>;
--			pwm-names = "pwm2";
--			max_brightness = <255>;
--			linux,default-trigger = "heartbeat";
--		};
--	};
--
--	gpioleds {
--		compatible = "gpio-leds";
--		redled {
--			label = "red:microSD";
--			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
--			default-state = "off";
--			linux,default-trigger = "mmc1";
--		};
--	};
- };
- 
- &i2c_0 {
-diff --git a/arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi b/arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi
-new file mode 100644
-index 000000000000..0ed30206625c
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi
-@@ -0,0 +1,50 @@
-+/*
-+ * Hardkernel Odroid XU/XU3 LED device tree source
-+ *
-+ * Copyright (c) 2015,2016 Krzysztof Kozlowski
-+ * Copyright (c) 2014 Collabora Ltd.
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		greenled {
-+			label = "green:mmc0";
-+			pwms = <&pwm 1 2000000 0>;
-+			pwm-names = "pwm1";
-+			/*
-+			 * Green LED is much brighter than the others
-+			 * so limit its max brightness
-+			 */
-+			max_brightness = <127>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		blueled {
-+			label = "blue:heartbeat";
-+			pwms = <&pwm 2 2000000 0>;
-+			pwm-names = "pwm2";
-+			max_brightness = <255>;
-+			linux,default-trigger = "heartbeat";
-+		};
++	sysreg_system_controller: syscon at 10050000 {
++		compatible = "samsung,exynos5-sysreg", "syscon";
++		reg = <0x10050000 0x5000>;
 +	};
 +
-+	gpioleds {
-+		compatible = "gpio-leds";
-+		redled {
-+			label = "red:microSD";
-+			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc1";
-+		};
+ 	serial_0: serial at 12C00000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x12C00000 0x100>;
+@@ -87,6 +92,13 @@
+ 		interrupts = <0 54 0>;
+ 	};
+ 
++	pwm: pwm at 12DD0000 {
++		compatible = "samsung,exynos4210-pwm";
++		reg = <0x12DD0000 0x100>;
++		samsung,pwm-outputs = <0>, <1>, <2>, <3>;
++		#pwm-cells = <3>;
 +	};
++
+ 	rtc: rtc at 101E0000 {
+ 		compatible = "samsung,s3c6410-rtc";
+ 		reg = <0x101E0000 0x100>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index c7158b2fb213..6762faaf12a8 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -235,11 +235,6 @@
+ 		interrupt-parent = <&gic>;
+ 	};
+ 
+-	sysreg_system_controller: syscon at 10050000 {
+-		compatible = "samsung,exynos5-sysreg", "syscon";
+-		reg = <0x10050000 0x5000>;
+-	};
+-
+ 	watchdog at 101D0000 {
+ 		compatible = "samsung,exynos5250-wdt";
+ 		reg = <0x101D0000 0x100>;
+@@ -662,15 +657,6 @@
+ 		samsung,pmureg-phandle = <&pmu_system_controller>;
+ 	};
+ 
+-	pwm: pwm at 12dd0000 {
+-		compatible = "samsung,exynos4210-pwm";
+-		reg = <0x12dd0000 0x100>;
+-		samsung,pwm-outputs = <0>, <1>, <2>, <3>;
+-		#pwm-cells = <3>;
+-		clocks = <&clock CLK_PWM>;
+-		clock-names = "timers";
+-	};
+-
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -1070,6 +1056,11 @@
+ 	iommus = <&sysmmu_fimd1>;
+ };
+ 
++&pwm {
++	clocks = <&clock CLK_PWM>;
++	clock-names = "timers";
 +};
++
+ &rtc {
+ 	clocks = <&clock CLK_RTC>;
+ 	clock-names = "rtc";
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 4c8523471c65..f7322d87095f 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -542,15 +542,6 @@
+ 		status = "disabled";
+ 	};
+ 
+-	pwm: pwm at 12dd0000 {
+-		compatible = "samsung,exynos4210-pwm";
+-		reg = <0x12dd0000 0x100>;
+-		samsung,pwm-outputs = <0>, <1>, <2>, <3>;
+-		#pwm-cells = <3>;
+-		clocks = <&clock CLK_PWM>;
+-		clock-names = "timers";
+-	};
+-
+ 	dp_phy: dp-video-phy {
+ 		compatible = "samsung,exynos5420-dp-video-phy";
+ 		samsung,pmu-syscon = <&pmu_system_controller>;
+@@ -823,11 +814,6 @@
+ 		interrupt-parent = <&gic>;
+ 	};
+ 
+-	sysreg_system_controller: syscon at 10050000 {
+-		compatible = "samsung,exynos5-sysreg", "syscon";
+-		reg = <0x10050000 0x5000>;
+-	};
+-
+ 	tmu_cpu0: tmu at 10060000 {
+ 		compatible = "samsung,exynos5420-tmu";
+ 		reg = <0x10060000 0x100>;
+@@ -1207,6 +1193,11 @@
+ 	iommu-names = "m0", "m1";
+ };
+ 
++&pwm {
++	clocks = <&clock CLK_PWM>;
++	clock-names = "timers";
++};
++
+ &rtc {
+ 	clocks = <&clock CLK_RTC>;
+ 	clock-names = "rtc";
 -- 
 2.5.0
