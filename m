@@ -1,42 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  8 May 2016 22:01:39 +0200
-Subject: [PATCH 04/16] clk: sunxi-ng: Add gate clock support
+Date: Sun,  8 May 2016 22:01:38 +0200
+Subject: [PATCH 03/16] clk: sunxi-ng: Add fixed factor clock support
 In-Reply-To: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1462737711-10017-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1462737711-10017-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks in the Allwinner SoCs clocks unit are just simple gates. Add
-support for those clocks.
+Some clocks in the Allwinner SoCs clock units are direct, fixed,
+multipliers or dividers from their parent.
 
-Since it's a feature that can also be found in more complex clocks, provide
-a bunch of helpers that can be reused later on.
+Add support for such clocks.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/Makefile   |  1 +
- drivers/clk/sunxi-ng/ccu_gate.c | 82 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_gate.h | 53 ++++++++++++++++++++++++++
- 3 files changed, 136 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_gate.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_gate.h
+ drivers/clk/sunxi-ng/Makefile           |  2 ++
+ drivers/clk/sunxi-ng/ccu_fixed_factor.c | 42 +++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_fixed_factor.h | 50 +++++++++++++++++++++++++++++++++
+ 3 files changed, 94 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_fixed_factor.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_fixed_factor.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index d76276736765..fc01127b3b45 100644
+index bd3461b0f38c..d76276736765 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -2,3 +2,4 @@ obj-y += ccu_common.o
+@@ -1,2 +1,4 @@
+ obj-y += ccu_common.o
  obj-y += ccu_reset.o
- 
- obj-y += ccu_fixed_factor.o
-+obj-y += ccu_gate.o
-diff --git a/drivers/clk/sunxi-ng/ccu_gate.c b/drivers/clk/sunxi-ng/ccu_gate.c
++
++obj-y += ccu_fixed_factor.o
+diff --git a/drivers/clk/sunxi-ng/ccu_fixed_factor.c b/drivers/clk/sunxi-ng/ccu_fixed_factor.c
 new file mode 100644
-index 000000000000..1e98f8a33ac3
+index 000000000000..75df8a854db5
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_gate.c
-@@ -0,0 +1,82 @@
++++ b/drivers/clk/sunxi-ng/ccu_fixed_factor.c
+@@ -0,0 +1,42 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -49,82 +48,42 @@ index 000000000000..1e98f8a33ac3
 +
 +#include <linux/clk-provider.h>
 +
-+#include "ccu_gate.h"
++#include "ccu_fixed_factor.h"
 +
-+void ccu_gate_helper_disable(struct ccu_common *common, u32 gate)
++static unsigned long ccu_fixed_factor_recalc_rate(struct clk_hw *hw,
++						  unsigned long parent_rate)
 +{
-+	unsigned long flags;
-+	u32 reg;
++	struct ccu_fixed_factor *fix = hw_to_ccu_fixed_factor(hw);
 +
-+	if (!(common->features & CCU_FEATURE_GATE))
-+		return;
-+
-+	spin_lock_irqsave(common->lock, flags);
-+
-+	reg = readl(common->base + common->reg);
-+	writel(reg & ~gate, common->base + common->reg);
-+
-+	spin_unlock_irqrestore(common->lock, flags);
++	return parent_rate * fix->mult / fix->div;
 +}
 +
-+static void ccu_gate_disable(struct clk_hw *hw)
++static long ccu_fixed_factor_round_rate(struct clk_hw *hw,
++					unsigned long rate,
++					unsigned long *parent_rate)
 +{
-+	struct ccu_gate *cg = hw_to_ccu_gate(hw);
++	struct ccu_fixed_factor *fix = hw_to_ccu_fixed_factor(hw);
 +
-+	return ccu_gate_helper_disable(&cg->common, cg->enable);
++	return *parent_rate / fix->div * fix->mult;
 +}
 +
-+int ccu_gate_helper_enable(struct ccu_common *common, u32 gate)
++static int ccu_fixed_factor_set_rate(struct clk_hw *hw, unsigned long rate,
++				     unsigned long parent_rate)
 +{
-+	unsigned long flags;
-+	u32 reg;
-+
-+	if (!(common->features & CCU_FEATURE_GATE))
-+		return 0;
-+
-+	spin_lock_irqsave(common->lock, flags);
-+
-+	reg = readl(common->base + common->reg);
-+	writel(reg | gate, common->base + common->reg);
-+
-+	spin_unlock_irqrestore(common->lock, flags);
-+
 +	return 0;
 +}
 +
-+static int ccu_gate_enable(struct clk_hw *hw)
-+{
-+	struct ccu_gate *cg = hw_to_ccu_gate(hw);
-+
-+	return ccu_gate_helper_enable(&cg->common, cg->enable);
-+}
-+
-+int ccu_gate_helper_is_enabled(struct ccu_common *common, u32 gate)
-+{
-+	if (!(common->features & CCU_FEATURE_GATE))
-+		return 1;
-+
-+	return readl(common->base + common->reg) & gate;
-+}
-+
-+static int ccu_gate_is_enabled(struct clk_hw *hw)
-+{
-+	struct ccu_gate *cg = hw_to_ccu_gate(hw);
-+
-+	return ccu_gate_helper_is_enabled(&cg->common, cg->enable);
-+}
-+
-+const struct clk_ops ccu_gate_ops = {
-+	.disable	= ccu_gate_disable,
-+	.enable		= ccu_gate_enable,
-+	.is_enabled	= ccu_gate_is_enabled,
++const struct clk_ops ccu_fixed_factor_ops = {
++	.recalc_rate	= ccu_fixed_factor_recalc_rate,
++	.round_rate	= ccu_fixed_factor_round_rate,
++	.set_rate	= ccu_fixed_factor_set_rate,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_gate.h b/drivers/clk/sunxi-ng/ccu_gate.h
+diff --git a/drivers/clk/sunxi-ng/ccu_fixed_factor.h b/drivers/clk/sunxi-ng/ccu_fixed_factor.h
 new file mode 100644
-index 000000000000..8e15fa17bcc1
+index 000000000000..4e53dbc9d10b
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_gate.h
-@@ -0,0 +1,53 @@
++++ b/drivers/clk/sunxi-ng/ccu_fixed_factor.h
+@@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -138,45 +97,42 @@ index 000000000000..8e15fa17bcc1
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _CCU_GATE_H_
-+#define _CCU_GATE_H_
++#ifndef _CCU_FIXED_FACTOR_H_
++#define _CCU_FIXED_FACTOR_H_
 +
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_common.h"
 +
-+struct ccu_gate {
-+	u32			enable;
++struct ccu_fixed_factor {
++	u16			div;
++	u16			mult;
 +
 +	struct ccu_common	common;
 +};
 +
-+#define SUNXI_CCU_GATE(_struct, _name, _parent, _reg, _gate, _flags)	\
-+	struct ccu_gate _struct = {					\
-+		.enable	= _gate,					\
++#define SUNXI_CCU_FIXED_FACTOR(_struct, _name, _parent,			\
++			       _div, _mult, _flags)			\
++	struct ccu_fixed_factor _struct = {				\
++		.div	= _div,						\
++		.mult	= _mult,					\
 +		.common	= {						\
-+			.reg		= _reg,				\
-+			.features	= CCU_FEATURE_GATE,		\
 +			.hw.init	= SUNXI_HW_INIT(_name,		\
 +							_parent,	\
-+							&ccu_gate_ops,	\
++							&ccu_fixed_factor_ops, \
 +							_flags),	\
-+		}							\
++		},							\
 +	}
 +
-+static inline struct ccu_gate *hw_to_ccu_gate(struct clk_hw *hw)
++static inline struct ccu_fixed_factor *hw_to_ccu_fixed_factor(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_gate, common);
++	return container_of(common, struct ccu_fixed_factor, common);
 +}
 +
-+void ccu_gate_helper_disable(struct ccu_common *common, u32 gate);
-+int ccu_gate_helper_enable(struct ccu_common *common, u32 gate);
-+int ccu_gate_helper_is_enabled(struct ccu_common *common, u32 gate);
++extern const struct clk_ops ccu_fixed_factor_ops;
 +
-+extern const struct clk_ops ccu_gate_ops;
-+
-+#endif /* _CCU_GATE_H_ */
++#endif /* _CCU_FIXED_FACTOR_H_ */
 -- 
 2.8.2
