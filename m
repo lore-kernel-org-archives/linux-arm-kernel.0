@@ -1,26 +1,27 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 9 May 2016 16:58:00 -0400
-Subject: [PATCH v2 11/22] ARM: dts: exynos: Configure Exynos5410 pinctrl
- for eMMC and SD card
-In-Reply-To: <1462734367-5619-12-git-send-email-krzk@kernel.org>
-References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
- <1462734367-5619-12-git-send-email-krzk@kernel.org>
-Message-ID: <ec696ee3-9a35-7a25-21f7-b0b635d7c2c4@osg.samsung.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon,  9 May 2016 15:58:24 -0500
+Subject: [PATCH V3 0/2] Add two-level support to ITS device table
+Message-ID: <1462827506-23570-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+This patchset contains necessary code changes to support two-level
+(Indirection) table walk feature for device table.
 
-On 05/08/2016 03:05 PM, Krzysztof Kozlowski wrote:
-> Configure the pinctrl for MMC0 (eMMC) and MMC2 (microSD card).
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
+Shanker Donthineni (2):
+  irqchip/gicv3-its: split its_alloc_tables() into two functions
+  irqchip/gicv3-its: Implement two-level(indirect) device table support
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+ drivers/irqchip/irq-gic-v3-its.c   | 351 +++++++++++++++++++++++--------------
+ include/linux/irqchip/arm-gic-v3.h |   3 +
+ 2 files changed, 223 insertions(+), 131 deletions(-)
 
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+
+This patch is based on Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7
+
+I have tested the Indirection feature on Qualcomm Technologies QDF2XXX server platform.
+
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
+a Linux Foundation Collaborative Project
