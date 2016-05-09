@@ -1,21 +1,31 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 9 May 2016 15:40:13 +0100
-Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
-In-Reply-To: <17116806.BYbaJP9QyN@wuerfel>
-References: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
- <5729C2CC.7030806@arm.com> <573098E1.5050007@arm.com>
- <17116806.BYbaJP9QyN@wuerfel>
-Message-ID: <5730A14D.2010705@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 May 2016 16:41:46 +0200
+Subject: [GIT PULL] omap legacy boot vs dt boot fixes for v4.7 merge window
+In-Reply-To: <20160504173153.GT5995@atomide.com>
+References: <20160504173153.GT5995@atomide.com>
+Message-ID: <4944500.vQ12ELNkJC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/16 15:36, Arnd Bergmann wrote:
->
-> Applied now, sorry for the delay and thanks for the reminders.
->
-> It was in my todo list the whole time, I just didn't get around to
-> do any merges last week.
+On Wednesday 04 May 2016 10:31:53 Tony Lindgren wrote:
+> Legacy booting vs device tree booting fixes for omaps for
+> v4.7 merge window. These are not considered urgent fixes enough
+> for the v4.6-rc cycle, but we need them in v4.7 in order to drop
+> the last remaining board-*.c files for omap3 for v4.8 merge window.
+> 
+> On Nokia N900, we need to pass the MMC slot names for the legacy
+> user space to work. Let's do that using auxdata as the driver is
+> setting up things already with the pdata for legacy booting. Then
+> we can later on discuss if we may want to have some generic binding
+> describing where the MMC slots are on the device.
+> 
+> N900 also has had the ir-rx51 device driver unusable with multiarch
+> for a long time. Let's pass the dmtimer data in pdata for the driver
+> to get it going again. Then once things are working, we can eventually
+> change the driver to use just hrtimer and PWM framework. The driver
+> changes will be queued separately.
+> 
 
-No problems, Thanks Arnd.
+Good plan, merged it into next/fixes-non-critical, thanks!
 
-Suzuki
+	Arnd
