@@ -1,157 +1,73 @@
-From: Tirumalesh.Chalamarla@cavium.com (Chalamarla, Tirumalesh)
-Date: Mon, 9 May 2016 16:53:01 +0000
-Subject: [PATCH v4 03/12] KVM: arm64: Introduce new MMIO region for the
- ITS base address
-In-Reply-To: <5730B108.5010009@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-4-git-send-email-andre.przywara@arm.com>
- <651B7BE4-D1C9-44B2-84BE-19103C1D8CE0@caviumnetworks.com>
- <5730B108.5010009@arm.com>
-Message-ID: <692F5470-73B2-467D-A5D4-58439446AC93@caviumnetworks.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 May 2016 12:00:43 -0500
+Subject: [PATCH] ARM: dts: imx: Remove unneeded unit-addresses
+In-Reply-To: <20160506121911.04a7aa6e@jclayton-pc>
+References: <1462283851-10820-1-git-send-email-fabio.estevam@nxp.com>
+ <CAL_JsqKv_7ufFG7DSkxqp9QOEjLEDVofyYMoudtJjqBA78ahcA@mail.gmail.com>
+ <CAOMZO5AO15UmNJARS9aL-U=CjYnUq0D9S38NYHC8w2DLwOeR_A@mail.gmail.com>
+ <CAOMZO5BXFL47p=WTPDDRFGq38yktmB1FnbOTWJ37mrWsKkeUSQ@mail.gmail.com>
+ <20160506121911.04a7aa6e@jclayton-pc>
+Message-ID: <CAL_JsqKp5q5oL=s6haOU8ggtst_ejL5wZx2NeqFi=izF64z6cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-
-
-On 5/9/16, 8:47 AM, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
-
->On 05/05/16 19:08, Chalamarla, Tirumalesh wrote:
->> 
->> 
->> 
->> 
->> 
->> On 3/25/16, 7:14 PM, "kvmarm-bounces at lists.cs.columbia.edu on behalf of Andre Przywara" <kvmarm-bounces at lists.cs.columbia.edu on behalf of andre.przywara@arm.com> wrote:
->> 
->>> The ARM GICv3 ITS controller requires a separate register frame to
->>> cover ITS specific registers. Add a new VGIC address type and store
->>> the address in a field in the vgic_dist structure.
->>> Provide a function to check whether userland has provided the address,
->>> so ITS functionality can be guarded by that check.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
->>> arch/arm64/include/uapi/asm/kvm.h              |  2 ++
->>> include/kvm/vgic/vgic.h                        |  5 +++++
->>> virt/kvm/arm/vgic/vgic.c                       | 10 ++++++++++
->>> virt/kvm/arm/vgic/vgic_init.c                  |  1 +
->>> virt/kvm/arm/vgic/vgic_kvm_device.c            |  7 +++++++
->>> 6 files changed, 34 insertions(+)
->>>
->>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
->>> index 59541d4..087e2d9 100644
->>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
->>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
->>> @@ -39,6 +39,15 @@ Groups:
->>>       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->>>       This address needs to be 64K aligned.
->>>
->>> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
->>> +      Base address in the guest physical address space of the GICv3 ITS
->>> +      control register frame. The ITS allows MSI(-X) interrupts to be
->>> +      injected into guests. This extension is optional, if the kernel
->>> +      does not support the ITS, the call returns -ENODEV.
->>> +      This memory is solely for the guest to access the ITS control
->>> +      registers and does not cover the ITS translation register.
->>> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->>> +      This address needs to be 64K aligned and the region covers 64 KByte.
->>>
->>>   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
->>>   Attributes:
->>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->>> index f209ea1..c2b257d 100644
->>> --- a/arch/arm64/include/uapi/asm/kvm.h
->>> +++ b/arch/arm64/include/uapi/asm/kvm.h
->>> @@ -87,9 +87,11 @@ struct kvm_regs {
->>> /* Supported VGICv3 address types  */
->>> #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
->>> #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
->>> +#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
->>>
->>> #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
->>> #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
->>> +#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
->>>
->>> #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
->>> #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
->>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->>> index 7c1d145..11344e6 100644
->>> --- a/include/kvm/vgic/vgic.h
->>> +++ b/include/kvm/vgic/vgic.h
->>> @@ -135,6 +135,9 @@ struct vgic_dist {
->>> 		gpa_t			vgic_redist_base;
->>> 	};
->>>
->>> +	/* The base address of the ITS control register frame */
->>> +	gpa_t			vgic_its_base;
->>> +
->>> 	/* distributor enabled */
->>> 	u32			enabled;
->>>
->>> @@ -253,4 +256,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
->>> 	return kvm_vgic_global_state.max_gic_vcpus;
->>> }
->>>
->>> +bool vgic_has_its(struct kvm *kvm);
->>> +
->>> #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
->>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->>> index 65395af..1de2478 100644
->>> --- a/virt/kvm/arm/vgic/vgic.c
->>> +++ b/virt/kvm/arm/vgic/vgic.c
->>> @@ -612,3 +612,13 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
->>>
->>> 	return map_is_active;
->>> }
->>> +
->>> +bool vgic_has_its(struct kvm *kvm)
->>> +{
->>> +	struct vgic_dist *dist = &kvm->arch.vgic;
->>> +
->>> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
->>> +		return false;
->>> +
->>> +	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
->>> +}
->>> diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
->>> index ac655b5..2301e03 100644
->>> --- a/virt/kvm/arm/vgic/vgic_init.c
->>> +++ b/virt/kvm/arm/vgic/vgic_init.c
->>> @@ -132,6 +132,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
->>> 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->>> 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
->>> 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
->>> +	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
->>>
->>> out_unlock:
->>> 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
->>> diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
->>> index 7f78a16..3ec2ac3 100644
->>> --- a/virt/kvm/arm/vgic/vgic_kvm_device.c
->>> +++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
->>> @@ -109,6 +109,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
->>> 		block_size = KVM_VGIC_V3_REDIST_SIZE;
->>> 		alignment = SZ_64K;
->>> 		break;
->>> +	case KVM_VGIC_V3_ADDR_TYPE_ITS:
->>> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
->>> +		addr_ptr = &vgic->vgic_its_base;
->>> +		block_size = KVM_VGIC_V3_ITS_SIZE;
->>> +		alignment = SZ_64K;
->>> +		break;
->> 
->> Should there be a check based on number of vcpus? 
+On Fri, May 6, 2016 at 2:19 PM, Joshua Clayton <stillcompiling@gmail.com> wrote:
+> On Tue, 3 May 2016 12:45:07 -0300
+> Fabio Estevam <festevam@gmail.com> wrote:
 >
->Why would the number of vcpus influence the size of the ITS?
+>> On Tue, May 3, 2016 at 12:42 PM, Fabio Estevam <festevam@gmail.com>
+>> wrote:
+>> > On Tue, May 3, 2016 at 12:37 PM, Rob Herring <robh@kernel.org>
+>> > wrote:
+>> >> Presumably these are register offsets which could be useful to have
+>> >> even if the Linux driver doesn't use them. But either way is fine
+>> >> with me.
+>> >
+>> > Yes, these are register offsets.
+>> >
+>> >                 reg_3p0: regulator-3p0 {
+>> >                     compatible = "fsl,anatop-regulator";
+>> >                     regulator-name = "vdd3p0";
+>> >                     regulator-min-microvolt = <2625000>;
+>> >                     regulator-max-microvolt = <3400000>;
+>> >                     anatop-reg-offset = <0x120>;
+>>
+>> Sorry, pressed the 'send' button too quickly.
+>>
+>> There is a "anatop-reg-offset = <0x120>;" property that is used to
+>> pass the offset to the anatop regulator driver, so that's why I
+>> preferred to remove the unneeded unit-address.
+>>
+>> Thanks
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> There are actually 2 registers (on some of them),
+> anatop-reg-offset, and anatop-delay-reg-offset...
+> Converting those to use reg and deprecating the anatop specific
+> items would seem like a Good Thing (tm) to me.
+>
+> ...wandering into less safe territory:
+> I know reg is usually a memory offset in bytes, but
+> each of the anatop memory offsets also include a bit-shift
+> and a bit-width item, which really narrowly defines the
+> register bits that pertain to each regulator.
+>
+> would it be totally inappropriate to use
+> #address-cells = 2 and
+> #size-cells =1
+> where address cells would contain the byte offset and the bit shift, and
+> the size cell would contain the bit offset?
 
-does the re-distributor per VCPU thing? I think its worth to add a check for re distributor size. 
->
->Thanks,
->
->	M.
->-- 
->Jazz is not dead. It just smells funny...
+Technically that is fine. However, then the standard address
+translation functions will not work.
+
+Given it is also encoding bit offsets, I'd just keep this patch as is.
+We could also debate just not putting this in the DT at all.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
