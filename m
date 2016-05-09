@@ -1,174 +1,440 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 9 May 2016 11:00:56 +0100
-Subject: [PATCH 0/2] Fix incorrect warning from dma-debug
-In-Reply-To: <57305A4B.70401@arm.com>
-References: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <57305A4B.70401@arm.com>
-Message-ID: <57305FD8.7070006@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 9 May 2016 18:01:45 +0800
+Subject: [PATCH 02/16] clk: sunxi-ng: Add common infrastructure
+In-Reply-To: <1462737711-10017-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67XWt6tjG_xXWgGatTaiN5uYQb2_Q6bgixMDUkHfVHLHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/16 10:37, Robin Murphy wrote:
-> Hi Niklas,
+On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Start our new clock infrastructure by adding the registration code, common
+> structure and common code.
 >
-> On 08/05/16 11:59, Niklas S?derlund wrote:
->> Hi,
->>
->> While using CONFIG_DMA_API_DEBUG i came across this warning which I
->> think is a false positive. As shown dma_sync_single_for_device() are
->> called from the dma_map_single() call path. This triggers the warning
->> since the dma-debug code have not yet been made aware of the mapping.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/Makefile              |   1 +
+>  drivers/clk/sunxi-ng/Makefile     |   2 +
+>  drivers/clk/sunxi-ng/ccu_common.c | 108 ++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_common.h |  74 ++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_factor.h |  15 ++++++
+>  drivers/clk/sunxi-ng/ccu_mux.h    |  20 +++++++
+>  drivers/clk/sunxi-ng/ccu_reset.c  |  55 +++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_reset.h  |  40 ++++++++++++++
+>  8 files changed, 315 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/Makefile
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_common.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_common.h
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_factor.h
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_mux.h
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_reset.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_reset.h
 >
-> Almost right ;) The thing being mapped (the SPI device's buffer) and the
-> thing being synced (the IOMMU's PTE) are entirely unrelated. Due to the
-> current of_iommu_init() setup, the IOMMU is probed long before
-> dma_debug_init() gets called, therefore DMA debug is missing entries for
-> some of the initial page table mappings and gets confused when we update
-> them later.
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 4ef71a13ab37..83a93cd9e21d 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -78,6 +78,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)            += socfpga/
+>  obj-$(CONFIG_PLAT_SPEAR)               += spear/
+>  obj-$(CONFIG_ARCH_STI)                 += st/
+>  obj-$(CONFIG_ARCH_SUNXI)               += sunxi/
+> +obj-$(CONFIG_ARCH_SUNXI)               += sunxi-ng/
+>  obj-$(CONFIG_ARCH_TEGRA)               += tegra/
+>  obj-y                                  += ti/
+>  obj-$(CONFIG_ARCH_U8500)               += ux500/
+> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> new file mode 100644
+> index 000000000000..bd3461b0f38c
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -0,0 +1,2 @@
+> +obj-y += ccu_common.o
+> +obj-y += ccu_reset.o
+> diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
+> new file mode 100644
+> index 000000000000..1d9242566fbd
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_common.c
+> @@ -0,0 +1,108 @@
+> +/*
+> + * Copyright 2016 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +
+> +#include "ccu_common.h"
+> +#include "ccu_reset.h"
+> +
+> +static DEFINE_SPINLOCK(ccu_lock);
+> +
+> +void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
+> +{
+> +       u32 reg;
+> +
+> +       if (!(common->features & CCU_FEATURE_LOCK))
+> +               return;
+> +
+> +       WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
+> +                                          !(reg & lock), 0, 500));
+
+                                    no delay between reads? ^
+
+> +}
+> +
+> +int sunxi_ccu_probe(struct device_node *node,
+> +                   const struct sunxi_ccu_desc *desc)
+> +{
+> +       struct ccu_common **cclks = desc->clks;
+> +       size_t num_clks = desc->num_clks;
+> +       struct clk_onecell_data *data;
+> +       struct ccu_reset *reset;
+> +       struct clk **clks;
+> +       void __iomem *reg;
+> +       int i, ret;
+> +
+> +       reg = of_iomap(node, 0);
+
+Why not of_io_request_and_map?
+
+> +       if (IS_ERR(reg)) {
+
+And of_iomap returns NULL on error. This is for of_io_request_and_map.
+
+> +               pr_err("%s: Could not map the clock registers\n",
+> +                      of_node_full_name(node));
+> +               return PTR_ERR(reg);
+> +       }
+> +
+> +       data = kzalloc(sizeof(*data), GFP_KERNEL);
+> +       if (!data)
+> +               return -ENOMEM;
+> +
+> +       clks = kcalloc(num_clks, sizeof(struct clk *), GFP_KERNEL);
+> +       if (!clks)
+> +               return -ENOMEM;
+> +
+> +       data->clks = clks;
+> +       data->clk_num = num_clks;
+> +
+> +       for (i = 0; i < num_clks; i++) {
+> +               struct ccu_common *cclk = cclks[i];
+> +               struct clk *clk;
+> +
+> +               if (!cclk) {
+> +                       cclk = ERR_PTR(-ENOENT);
+
+This seems redundant, unless you intended to use it elsewhere?
+
+> +                       continue;
+> +               }
+> +
+> +               cclk->base = reg;
+> +               cclk->lock = &ccu_lock;
+> +
+> +               clk = clk_register(NULL, &cclk->hw);
+> +               if (IS_ERR(clk))
+> +                       continue;
+> +
+> +               clks[i] = clk;
+> +       }
+> +
+> +       ret = of_clk_add_provider(node, of_clk_src_onecell_get, data);
+> +       if (ret)
+> +               goto err_clk_unreg;
+> +
+> +       reset = kzalloc(sizeof(*reset), GFP_KERNEL);
+> +       reset->rcdev.of_node = node;
+> +       reset->rcdev.ops = &ccu_reset_ops;
+> +       reset->rcdev.owner = THIS_MODULE;
+> +       reset->rcdev.nr_resets = desc->num_resets;
+> +       reset->base = reg;
+> +       reset->lock = &ccu_lock;
+> +       reset->reset_map = desc->resets;
+> +
+> +       ret = reset_controller_register(&reset->rcdev);
+> +       if (ret)
+> +               goto err_of_clk_unreg;
+> +
+> +       return 0;
+> +
+> +err_of_clk_unreg:
+> +err_clk_unreg:
+> +       return ret;
+> +}
+> diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+> new file mode 100644
+> index 000000000000..e8b477fcd320
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_common.h
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _COMMON_H_
+> +#define _COMMON_H_
+> +
+> +#include <linux/compiler.h>
+> +#include <linux/clk-provider.h>
+> +
+> +#define CCU_FEATURE_GATE               BIT(0)
+> +#define CCU_FEATURE_LOCK               BIT(1)
+
+*_PLL_LOCK would be clearer that this implements a PLL lock indicator.
+Or maybe a comment.
+
+> +#define CCU_FEATURE_FRACTIONAL         BIT(2)
+> +#define CCU_FEATURE_VARIABLE_PREDIV    BIT(3)
+> +#define CCU_FEATURE_FIXED_PREDIV       BIT(4)
+> +#define CCU_FEATURE_FIXED_POSTDIV      BIT(5)
+> +
+> +struct device_node;
+> +
+> +#define SUNXI_HW_INIT(_name, _parent, _ops, _flags)                    \
+> +       &(struct clk_init_data) {                                       \
+> +               .flags          = _flags,                               \
+> +               .name           = _name,                                \
+> +               .parent_names   = (const char *[]) { _parent },         \
+> +               .num_parents    = 1,                                    \
+> +               .ops            = _ops,                                 \
+> +       }
+> +
+> +#define SUNXI_HW_INIT_PARENTS(_name, _parents, _ops, _flags)           \
+> +       &(struct clk_init_data) {                                       \
+> +               .flags          = _flags,                               \
+> +               .name           = _name,                                \
+> +               .parent_names   = _parents,                             \
+> +               .num_parents    = ARRAY_SIZE(_parents),                 \
+> +               .ops            = _ops,                                 \
+> +       }
+> +
+> +struct ccu_common {
+> +       void __iomem    *base;
+> +       unsigned long   reg;
+
+This seems quite large, considering the address space of the CCU,
+and you using u16 or u32 for the same thing on the reset control side.
+
+> +
+> +       unsigned long   features;
+> +       spinlock_t      *lock;
+> +       struct clk_hw   hw;
+> +};
+> +
+> +static inline struct ccu_common *hw_to_ccu_common(struct clk_hw *hw)
+> +{
+> +       return container_of(hw, struct ccu_common, hw);
+> +}
+> +
+> +struct sunxi_ccu_desc {
+> +       struct ccu_common       **clks;
+> +       unsigned long           num_clks;
+> +
+> +       struct ccu_reset_map    *resets;
+> +       unsigned long           num_resets;
+> +};
+> +
+> +void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock);
+> +
+> +int sunxi_ccu_probe(struct device_node *node,
+> +                   const struct sunxi_ccu_desc *desc);
+> +
+> +#endif /* _COMMON_H_ */
+> diff --git a/drivers/clk/sunxi-ng/ccu_factor.h b/drivers/clk/sunxi-ng/ccu_factor.h
+> new file mode 100644
+> index 000000000000..e7cc564aaea0
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_factor.h
+> @@ -0,0 +1,15 @@
+> +#ifndef _CLK_FACTOR_H_
+> +#define _CLK_FACTOR_H_
+> +
+> +struct ccu_factor {
+> +       u8      shift;
+> +       u8      width;
+> +};
+> +
+> +#define SUNXI_CLK_FACTOR(_shift, _width)       \
+> +       {                                       \
+> +               .shift  = _shift,               \
+> +               .width  = _width,               \
+> +       }
+> +
+> +#endif /* _CLK_FACTOR_H_ */
+> diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
+> new file mode 100644
+> index 000000000000..17cedad4e433
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_mux.h
+
+As far as I can tell there are no users of this file within this patch or the
+following patches before the mux clock support one. It'd be easier to understand
+if this part was moved to the mux clock patch.
+
+> @@ -0,0 +1,20 @@
+> +#ifndef _CCU_MUX_H_
+> +#define _CCU_MUX_H_
+> +
+> +#include "common.h"
+> +
+> +struct ccu_mux_internal {
+> +       u8      shift;
+> +       u8      width;
+> +
+> +       u8      *map;
+
+I assume map is a table?
+
+> +};
+> +
+> +#define SUNXI_CLK_MUX(_shift, _width, _map)    \
+> +       {                                       \
+> +               .map    = _map,                 \
+> +               .shift  = _shift,               \
+> +               .width  = _width,               \
+> +       }
+> +
+> +#endif /* _CCU_MUX_H_ */
+> diff --git a/drivers/clk/sunxi-ng/ccu_reset.c b/drivers/clk/sunxi-ng/ccu_reset.c
+> new file mode 100644
+> index 000000000000..6c31d48783a7
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_reset.c
+> @@ -0,0 +1,55 @@
+> +/*
+> + * Copyright (C) 2016 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/reset-controller.h>
+> +
+> +#include "ccu_reset.h"
+> +
+> +static int ccu_reset_assert(struct reset_controller_dev *rcdev,
+> +                           unsigned long id)
+> +{
+> +       struct ccu_reset *ccu = rcdev_to_ccu_reset(rcdev);
+> +       const struct ccu_reset_map *map = &ccu->reset_map[id];
+> +       unsigned long flags;
+> +       u32 reg;
+> +
+> +       spin_lock_irqsave(ccu->lock, flags);
+> +
+> +       reg = readl(ccu->base + map->reg);
+> +       writel(reg & ~map->bit, ccu->base + map->reg);
+> +
+> +       spin_unlock_irqrestore(ccu->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static int ccu_reset_deassert(struct reset_controller_dev *rcdev,
+> +                             unsigned long id)
+> +{
+> +       struct ccu_reset *ccu = rcdev_to_ccu_reset(rcdev);
+> +       const struct ccu_reset_map *map = &ccu->reset_map[id];
+> +       unsigned long flags;
+> +       u32 reg;
+> +
+> +       spin_lock_irqsave(ccu->lock, flags);
+> +
+> +       reg = readl(ccu->base + map->reg);
+> +       writel(reg | map->bit, ccu->base + map->reg);
+> +
+> +       spin_unlock_irqrestore(ccu->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +const struct reset_control_ops ccu_reset_ops = {
+> +       .assert         = ccu_reset_assert,
+> +       .deassert       = ccu_reset_deassert,
+> +};
+> diff --git a/drivers/clk/sunxi-ng/ccu_reset.h b/drivers/clk/sunxi-ng/ccu_reset.h
+> new file mode 100644
+> index 000000000000..36a4679210bd
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_reset.h
+> @@ -0,0 +1,40 @@
+> +/*
+> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _CCU_RESET_H_
+> +#define _CCU_RESET_H_
+> +
+> +#include <linux/reset-controller.h>
+> +
+> +struct ccu_reset_map {
+> +       u16     reg;
+> +       u32     bit;
+> +};
+> +
+> +
+> +struct ccu_reset {
+> +       void __iomem                    *base;
+> +       struct ccu_reset_map            *reset_map;
+> +       spinlock_t                      *lock;
+> +
+> +       struct reset_controller_dev     rcdev;
+> +};
+> +
+> +static inline struct ccu_reset *rcdev_to_ccu_reset(struct reset_controller_dev *rcdev)
+> +{
+> +       return container_of(rcdev, struct ccu_reset, rcdev);
+> +}
+> +
+> +extern const struct reset_control_ops ccu_reset_ops;
+> +
+> +#endif /* _CCU_RESET_H_ */
+
+The reset control code looks good.
+
+
+Regards
+ChenYu
+
+> --
+> 2.8.2
 >
->> I try to solve this by introducing __dma_sync_single_for_device() which
->> do not call into the dma-debug code. I'm no expert and this might be a
->> bad way of solving the problem but it allowed me to keep working.
->
-> The simple fix should be to just call dma_debug_init() from a
-> sufficiently earlier initcall level. The best would be to sort out a
-> proper device dependency order to avoid the whole early-IOMMU-creation
-> thing entirely.
-
-A tangential idea, as Will just suggested to me, would be to make this 
-false-positive situation more explicit, something like (untested):
----8<---
-diff --git a/lib/dma-debug.c b/lib/dma-debug.c
-index 4a1515f4b452..e16684a4ce86 100644
---- a/lib/dma-debug.c
-+++ b/lib/dma-debug.c
-@@ -107,7 +107,8 @@ static bool dma_debug_initialized __read_mostly;
-
-  static inline bool dma_debug_disabled(void)
-  {
--	return global_disable || !dma_debug_initialized;
-+	return global_disable || WARN_ONCE(!dma_debug_initialized,
-+					   "early DMA-API call not tracked");
-  }
-
-  /* Global error count */
---->8---
-
-but it seems like this a sufficiently rare case that it's probably not 
-worth cluttering up the code for.
-
-Robin.
-
->> ------------[ cut here ]------------
->> WARNING: CPU: 0 PID: 1 at lib/dma-debug.c:1209 check_sync+0x154/0x5e4
->> ipmmu-vmsa e6740000.mmu: DMA-API: device driver tries to sync DMA
->> memory it has not allocated [device address=0x000000006e89b008]
->> [size=8 bytes]
->> CPU: 0 PID: 1 Comm: swapper/0 Not tainted
->> 4.6.0-rc5-00012-g52e78c1-dirty #1
->> Hardware name: Generic R8A7791 (Flattened Device Tree)
->> Backtrace:
->> [<c020a0a4>] (dump_backtrace) from [<c020a250>] (show_stack+0x18/0x1c)
->>   r7:c03ebad0 r6:00000009 r5:60000093 r4:00000000
->> [<c020a238>] (show_stack) from [<c03cb7e4>] (dump_stack+0x84/0xa4)
->> [<c03cb760>] (dump_stack) from [<c021e3ac>] (__warn+0xd0/0x100)
->>   r5:00000000 r4:ef05dac8
->> [<c021e2dc>] (__warn) from [<c021e41c>] (warn_slowpath_fmt+0x40/0x48)
->>   r9:00010000 r8:00000000 r7:c0c69c40 r6:c0c02754 r5:ef05db78 r4:ef222810
->> [<c021e3e0>] (warn_slowpath_fmt) from [<c03ebad0>]
->> (check_sync+0x154/0x5e4)
->>   r3:c0945b6f r2:c0936e85
->> [<c03eb97c>] (check_sync) from [<c03ed594>]
->> (debug_dma_sync_single_for_device+0x64/0x70)
->>   r10:00000009 r9:0000000c r8:ee89b008 r7:00000000 r6:6e89b008
->> r5:00000000
->>   r4:6e89b008
->> [<c03ed530>] (debug_dma_sync_single_for_device) from [<c0465298>]
->> (__arm_lpae_set_pte.part.0+0x80/0x8c)
->>   r5:00000001 r4:ef222810
->> [<c0465218>] (__arm_lpae_set_pte.part.0) from [<c046553c>]
->> (__arm_lpae_map+0x298/0x2f0)
->>   r7:00000008 r6:ef25e000 r4:ee898500
->> [<c04652a4>] (__arm_lpae_map) from [<c0465b18>] (arm_lpae_map+0xcc/0xe4)
->>   r10:c0465f40 r9:00001000 r8:40000000 r7:00000000 r6:6f25c000
->> r5:00000000
->>   r4:000008c0
->> [<c0465a4c>] (arm_lpae_map) from [<c0465f78>] (ipmmu_map+0x38/0x40)
->>   r7:40000000 r6:00000000 r5:00001000 r4:c0465a4c
->> [<c0465f40>] (ipmmu_map) from [<c0463d90>] (iommu_map+0xf8/0x15c)
->>   r4:ee895608
->> [<c0463c98>] (iommu_map) from [<c0213524>]
->> (arm_coherent_iommu_map_page+0x1d4/0x2d4)
->>   r10:ef386940 r9:00001000 r8:00000000 r7:00000000 r6:40000000
->> r5:00000000
->>   r4:00000000
->> [<c0213350>] (arm_coherent_iommu_map_page) from [<c0213690>]
->> (arm_iommu_map_page+0x6c/0x74)
->>   r10:c0c61f44 r9:ef19d210 r8:00000001 r7:00001000 r6:00000000
->> r5:ec5ddb80
->>   r4:00000000
->> [<c0213624>] (arm_iommu_map_page) from [<c04f7d64>]
->> (sh_msiof_spi_probe+0x430/0x7b0)
->>   r9:00000000 r8:c0213624 r7:ef19d210 r6:ef242800 r5:ef1b4010 r4:ef242af0
->> [<c04f7934>] (sh_msiof_spi_probe) from [<c049fd3c>]
->> (platform_drv_probe+0x58/0xa8)
->>   r10:00000000 r9:00000000 r8:c0c1f8d4 r7:c0c7e910 r6:c0c1f8d4
->> r5:ef1b4010
->>   r4:c04f7934
->> [<c049fce4>] (platform_drv_probe) from [<c049e788>]
->> (driver_probe_device+0x13c/0x2a4)
->>   r7:c0c7e910 r6:00000000 r5:c0c7e900 r4:ef1b4010
->> [<c049e64c>] (driver_probe_device) from [<c049e978>]
->> (__driver_attach+0x88/0xac)
->>   r9:c0c34000 r8:c0a3c010 r7:c0c1cf08 r6:c0c1f8d4 r5:ef1b4044 r4:ef1b4010
->> [<c049e8f0>] (__driver_attach) from [<c049ce44>]
->> (bus_for_each_dev+0x74/0x98)
->>   r7:c0c1cf08 r6:c049e8f0 r5:c0c1f8d4 r4:00000000
->> [<c049cdd0>] (bus_for_each_dev) from [<c049ebd0>]
->> (driver_attach+0x20/0x28)
->>   r6:ef1cc200 r5:00000000 r4:c0c1f8d4
->> [<c049ebb0>] (driver_attach) from [<c049d5d8>]
->> (bus_add_driver+0xd4/0x1e4)
->> [<c049d504>] (bus_add_driver) from [<c049f2dc>]
->> (driver_register+0xa4/0xe8)
->>   r7:c0a3c010 r6:00000000 r5:c0a1e400 r4:c0c1f8d4
->> [<c049f238>] (driver_register) from [<c04a0778>]
->> (__platform_driver_register+0x38/0x4c)
->>   r5:c0a1e400 r4:ee958fc0
->> [<c04a0740>] (__platform_driver_register) from [<c0a1e418>]
->> (sh_msiof_spi_drv_init+0x18/0x20)
->> [<c0a1e400>] (sh_msiof_spi_drv_init) from [<c0a00e1c>]
->> (do_one_initcall+0x10c/0x1c0)
->> [<c0a00d10>] (do_one_initcall) from [<c0a00ff8>]
->> (kernel_init_freeable+0x128/0x1f4)
->>   r9:c0c34000 r8:c0c34000 r7:c0a47e60 r6:c0a3c83c r5:000000bd r4:00000006
->> [<c0a00ed0>] (kernel_init_freeable) from [<c071067c>]
->> (kernel_init+0x10/0x118)
->>   r9:00000000[    1.879529] ata1: link resume succeeded after 1 retries
->>   r8:00000000 r7:00000000 r6:00000000 r5:c071066c r4:00000000
->> [<c071066c>] (kernel_init) from [<c0206e08>] (ret_from_fork+0x14/0x2c)
->>   r5:c071066c r4:00000000
->> ---[ end trace 6eb9a3df3009d491 ]---
->>
->> Niklas S?derlund (2):
->>    dma-mapping: add __dma_sync_single_for_device()
->>    iommu/io-pgtable-arm: use __dma_sync_single_for_device()
->>
->>   drivers/iommu/io-pgtable-arm.c | 2 +-
->>   include/linux/dma-mapping.h    | 9 ++++++++-
->>   2 files changed, 9 insertions(+), 2 deletions(-)
->>
->> --
->> 2.8.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
