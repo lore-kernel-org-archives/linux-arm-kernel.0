@@ -1,25 +1,21 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 9 May 2016 17:35:03 -0400
-Subject: [PATCH v2 16/22] ARM: dts: exynos: Move Exynos5250 and Exynos5420
- nodes under soc
-In-Reply-To: <1462734367-5619-17-git-send-email-krzk@kernel.org>
+Date: Mon, 9 May 2016 17:39:51 -0400
+Subject: [PATCH v2 17/22] ARM: dts: exynos: Include common exynos5 in
+ exynos5410.dtsi
+In-Reply-To: <1462734367-5619-18-git-send-email-krzk@kernel.org>
 References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
- <1462734367-5619-17-git-send-email-krzk@kernel.org>
-Message-ID: <4d0516dc-bed4-8017-374b-bd197a64026f@osg.samsung.com>
+ <1462734367-5619-18-git-send-email-krzk@kernel.org>
+Message-ID: <89bcdacc-e404-ad55-c087-92ba87901ee4@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Krzysztof,
 
 On 05/08/2016 03:06 PM, Krzysztof Kozlowski wrote:
-> The conventions it to put SoC devices under 'soc' node. In fact other
-
-s/it/is
-
-> our DTSes (like exynos3250.dtsi or exynos5410.dtsi) already follows it.
-> Adjust exynos5250 and exynos5420 DTSI to follow this convention. This is
-> also necessary for the upcoming change in exynos5410.dtsi to inherit
-> from common exynos5.dtsi.
+> The exynos5.dtsi is used for common nodes shared between Exynos5250 and
+> Exynos542x. Since Exynos5410 is very similar to Exynos5420 it can
+> include the common file as well to remove duplication and make
+> everything more consistent.
 > 
 > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
