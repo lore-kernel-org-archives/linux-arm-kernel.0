@@ -1,24 +1,16 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon,  9 May 2016 21:59:06 +0930
-Subject: [PULL REQUEST] aspeed arch changes for 4.7
-Message-ID: <1462796946-13579-1-git-send-email-joel@jms.id.au>
+Date: Mon,  9 May 2016 21:59:40 +0930
+Subject: [PULL REQUEST] aspeed devicetree changes for 4.7
+Message-ID: <1462796980-13703-1-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-This is the initial pull request for the Aspeed BMC SoCs.
-
-I put 4.7 in the subject for this and the subsequent requests but if it's a bit
-late in the cycle then I understand.
-
-Following review I got rid of the board file by pushing the functionality out
-to a watchdog and clock driver, so it's just the Kconfig bits. I've also added
-myself to maintainers for the Aspeed arch and drivers as I intend on looking
-after them.
+This device trees for a pair of Aspeed BMC SoCs and the boards that they sit
+in.
 
 Please pull if it looks okay.
-
 
 The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
 
@@ -26,21 +18,29 @@ The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
 
 are available in the git repository at:
 
-  https://github.com/shenki/linux.git tags/aspeed-for-4.7-arch
+  https://github.com/shenki/linux.git tags/aspeed-for-4.7-dts
 
-for you to fetch changes up to 8c2ed9bcfbeb7f313b567b25e87effd75e7dc3d6:
+for you to fetch changes up to 02440622656d26a0d68308db9e4ce1d2510f6530:
 
-  arm: Add Aspeed machine (2016-05-09 17:41:14 +0930)
-
-----------------------------------------------------------------
-aspeed arch tag for 4.7
+  arm/dst: Add Aspeed ast2500 device tree (2016-05-09 17:41:58 +0930)
 
 ----------------------------------------------------------------
-Joel Stanley (1):
-      arm: Add Aspeed machine
+aspeed devicetree for 4.7
 
- MAINTAINERS                  |  7 +++++++
- arch/arm/Kconfig             |  2 ++
- arch/arm/mach-aspeed/Kconfig | 30 ++++++++++++++++++++++++++++++
- 3 files changed, 39 insertions(+)
- create mode 100644 arch/arm/mach-aspeed/Kconfig
+----------------------------------------------------------------
+Joel Stanley (3):
+      doc/devicetree: Add Aspeed and Tyan to vendor-prefixes
+      arm/dts: Add Aspeed ast2400 device tree
+      arm/dst: Add Aspeed ast2500 device tree
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/aspeed-ast2500-evb.dts           |  25 +++
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts      |  25 +++
+ arch/arm/boot/dts/aspeed-g4.dtsi                   | 161 +++++++++++++++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi                   | 170 +++++++++++++++++++++
+ 6 files changed, 385 insertions(+)
+ create mode 100644 arch/arm/boot/dts/aspeed-ast2500-evb.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-g4.dtsi
+ create mode 100644 arch/arm/boot/dts/aspeed-g5.dtsi
