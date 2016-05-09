@@ -1,78 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 9 May 2016 09:32:41 -0700
-Subject: [PATCH v6 1/9] input: max8997-haptic: Fix NULL pointer dereference
-In-Reply-To: <1462519289-2356-2-git-send-email-k.kozlowski@samsung.com>
-References: <1462519289-2356-1-git-send-email-k.kozlowski@samsung.com>
- <1462519289-2356-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160509163241.GB15535@dtor-ws>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 9 May 2016 18:34:29 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2: use "atmel,
+ sama5d3-nfc" compatible for nfc
+In-Reply-To: <1462776680-5284-3-git-send-email-wenyou.yang@atmel.com>
+References: <1462776680-5284-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1462811669-10107-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 09:21:21AM +0200, Krzysztof Kozlowski wrote:
-> From: Marek Szyprowski <m.szyprowski@samsung.com>
-> 
-> NULL pointer derefence happens when booting with DTB because the
-> platform data for haptic device is not set in supplied data from parent
-> MFD device.
-> 
-> The MFD device creates only platform data (from Device Tree) for itself,
-> not for haptic child.
-> 
-> Unable to handle kernel NULL pointer dereference at virtual address 0000009c
-> pgd = c0004000
-> 	[0000009c] *pgd=00000000
-> 	Internal error: Oops: 5 [#1] PREEMPT SMP ARM
-> 	(max8997_haptic_probe) from [<c03f9cec>] (platform_drv_probe+0x4c/0xb0)
-> 	(platform_drv_probe) from [<c03f8440>] (driver_probe_device+0x214/0x2c0)
-> 	(driver_probe_device) from [<c03f8598>] (__driver_attach+0xac/0xb0)
-> 	(__driver_attach) from [<c03f67ac>] (bus_for_each_dev+0x68/0x9c)
-> 	(bus_for_each_dev) from [<c03f7a38>] (bus_add_driver+0x1a0/0x218)
-> 	(bus_add_driver) from [<c03f8db0>] (driver_register+0x78/0xf8)
-> 	(driver_register) from [<c0101774>] (do_one_initcall+0x90/0x1d8)
-> 	(do_one_initcall) from [<c0a00dbc>] (kernel_init_freeable+0x15c/0x1fc)
-> 	(kernel_init_freeable) from [<c06bb5b4>] (kernel_init+0x8/0x114)
-> 	(kernel_init) from [<c0107938>] (ret_from_fork+0x14/0x3c)
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: <stable@vger.kernel.org>
-> Fixes: 104594b01ce7 ("Input: add driver support for MAX8997-haptic")
-> [k.kozlowski: Write commit message, add CC-stable]
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+From: Wenyou Yang <wenyou.yang@atmel.com>
 
-Applied, thank you.
+An error in documentation of the NAND Flash Controller (NFC) led to choose
+another compatibility string for sama5d2 with an impact on the NAND flash
+ready/busy information. It was producing the error message:
 
-> ---
->  drivers/input/misc/max8997_haptic.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/misc/max8997_haptic.c b/drivers/input/misc/max8997_haptic.c
-> index a806ba3818f7..8d6326d7e7be 100644
-> --- a/drivers/input/misc/max8997_haptic.c
-> +++ b/drivers/input/misc/max8997_haptic.c
-> @@ -255,12 +255,14 @@ static int max8997_haptic_probe(struct platform_device *pdev)
->  	struct max8997_dev *iodev = dev_get_drvdata(pdev->dev.parent);
->  	const struct max8997_platform_data *pdata =
->  					dev_get_platdata(iodev->dev);
-> -	const struct max8997_haptic_platform_data *haptic_pdata =
-> -					pdata->haptic_pdata;
-> +	const struct max8997_haptic_platform_data *haptic_pdata = NULL;
->  	struct max8997_haptic *chip;
->  	struct input_dev *input_dev;
->  	int error;
->  
-> +	if (pdata)
-> +		haptic_pdata = pdata->haptic_pdata;
-> +
->  	if (!haptic_pdata) {
->  		dev_err(&pdev->dev, "no haptic platform data\n");
->  		return -EINVAL;
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-input" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+atmel_nand 80000000.nand: Time out to wait for interrupt: 0x08000000
 
+and had an impact on performance.
+
+So, switch back to the classical "atmel,sama5d3-nfc" compatibility string for
+this SoC which gives the proper ready/busy bit information. The NAND flash
+driver will be updated to remove the support for this different
+implementation.
+
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+[nicolas.ferre at atmel.com: change commit message]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Wenyou, Romain,
+
+I plan to send this patch for 4.6-rc as a fix tomorrow (my time). Can you
+please tell me if it's okay on your side.
+I revised the commit message just to justify the very late "fix" sending of
+this patch...
+
+Thanks for your help, bye.
+  Nicolas.
+
+
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 78996bdbd3df..9817090c1b73 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -280,7 +280,7 @@
+ 			status = "disabled";
+ 
+ 			nfc at c0000000 {
+-				compatible = "atmel,sama5d4-nfc";
++				compatible = "atmel,sama5d3-nfc";
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				reg = < /* NFC Command Registers */
 -- 
-Dmitry
+2.1.3
