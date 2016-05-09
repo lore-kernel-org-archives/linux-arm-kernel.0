@@ -1,59 +1,51 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  9 May 2016 23:37:35 +0100
-Subject: [PATCH] arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
-Message-ID: <1462833455-27720-1-git-send-email-andre.przywara@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 May 2016 15:39:24 -0700
+Subject: [PATCH v4 01/11] clk: sunxi: Add display and TCON0 clocks driver
+In-Reply-To: <20160509223238.GW3492@codeaurora.org>
+References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160506223002.GE3492@codeaurora.org>
+ <20160508200308.GF6167@lukather>
+ <20160509223238.GW3492@codeaurora.org>
+Message-ID: <20160509223924.GX3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+On 05/09, Stephen Boyd wrote:
+> 
+> Ok I applied this one to clk-next.
+> 
 
-Commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option"),
-added support for ARCH_SUNXI on arm64, but failed to select
-GENERIC_IRQ_CHIP, which is required for drivers/irqchip/irq-sunxi-nmi.c
-and causes build failures like :
+And I squashed this in to silence the following checker warning.
 
-  UPD     include/generated/compile.h
-  CC      init/version.o
-  LD      init/built-in.o
-drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
-drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
-drivers/built-in.o: In function `irq_domain_add_linear':
-include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
-drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
-drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
-drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
-drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
-drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
-drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
+drivers/clk/sunxi/clk-sun4i-display.c:110:33: warning: Variable
+length array is used.
 
-Fixes: commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option")
-Cc: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Hi Olof, Arnd,
-
-as agreed upon in that other mail, can you take this patch for 4.6?
-
-Cheers,
-Andre.
-
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index efa77c1..521b1ec 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,6 +2,7 @@ menu "Platform selection"
+---8<---
+diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+index f02e250e64ed..f8ff6c4a5633 100644
+--- a/drivers/clk/sunxi/clk-sun4i-display.c
++++ b/drivers/clk/sunxi/clk-sun4i-display.c
+@@ -107,7 +107,7 @@ static int sun4i_a10_display_reset_xlate(struct reset_controller_dev *rcdev,
+ static void __init sun4i_a10_display_init(struct device_node *node,
+ 					  const struct sun4i_a10_display_clk_data *data)
+ {
+-	const char *parents[data->parents];
++	const char *parents[4];
+ 	const char *clk_name = node->name;
+ 	struct reset_data *reset_data;
+ 	struct clk_divider *div = NULL;
+@@ -126,8 +126,8 @@ static void __init sun4i_a10_display_init(struct device_node *node,
+ 		return;
+ 	}
  
- config ARCH_SUNXI
- 	bool "Allwinner sunxi 64-bit SoC Family"
-+	select GENERIC_IRQ_CHIP
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
- 
+-	ret = of_clk_parent_fill(node, parents, data->parents);
+-	if (ret != data->parents) {
++	ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
++	if (ret != ARRAY_SIZE(parents)) {
+ 		pr_err("%s: Could not retrieve the parents\n", clk_name);
+ 		goto unmap;
+ 	}
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
