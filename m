@@ -1,91 +1,47 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 9 May 2016 09:24:21 +0200
-Subject: [PATCH 12/16] clk: sunxi-ng: Add N-M-factor clock support
-In-Reply-To: <1462737711-10017-13-git-send-email-maxime.ripard@free-electrons.com>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-13-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160509092421.a36252139fd6b00b2cd32f24@free.fr>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Mon, 9 May 2016 08:32:35 +0100
+Subject: NFSroot hangs with bad unlock balance in Linux next
+In-Reply-To: <20160508141629.GF2694@ZenIV.linux.org.uk>
+References: <20160505220344.GE5995@atomide.com>
+ <20160508141629.GF2694@ZenIV.linux.org.uk>
+Message-ID: <20160509073235.GI2694@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  8 May 2016 22:01:47 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Sun, May 08, 2016 at 03:16:29PM +0100, Al Viro wrote:
 
-> Introduce support for clocks that multiply and divide using linear factors.
+> Very strange.  We grab that rwsem at the entry into nfs_call_unlink()
+> and then either release it there and return or call nfs_do_call_unlink().
+> Which arranges for eventual call of nfs_async_unlink_release() (via
+> ->rpc_release); nfs_async_unlink_release() releases the rwsem.  Nobody else
+> releases it (on the read side, that is).
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi-ng/Makefile |   1 +
->  drivers/clk/sunxi-ng/ccu_nm.c | 103 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu_nm.h |  41 +++++++++++++++++
->  3 files changed, 145 insertions(+)
->  create mode 100644 drivers/clk/sunxi-ng/ccu_nm.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu_nm.h
-	[snip]
-> diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-> new file mode 100644
-> index 000000000000..268637db137b
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu_nm.c
-> @@ -0,0 +1,103 @@
-	[snip]
-> +static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
-> +			      unsigned long *parent_rate)
-> +{
-> +	struct ccu_nm *nm = hw_to_ccu_nm(hw);
-> +	unsigned long n, m;
-> +
-> +	rational_best_approximation(rate, *parent_rate,
-> +				    nm->n.width, nm->m.width, &n, &m);
+> The only kinda-sorta possibility I see here is that the inode we are
+> unlocking in that nfs_async_unlink_release() is not the one we'd locked
+> in nfs_call_unlink() that has lead to it.  That really shouldn't happen,
+> though...  Just to verify whether that's what we are hitting, could you
+> try to reproduce that thing with the patch below on top of -next and see
+> if it triggers any of those WARN_ON?
 
-Should be
-			1 << nm->n.width, 1 << nm->m.width, &n, &m);
+D'oh...  Lockdep warnings are easy to trigger (and, AFAICS, bogus).
+up_read/down_read in fs/nfs/unlink.c should be replaced with
+up_read_non_owner/down_read_non_owner, lest the lockdep gets confused.
+Hangs are different - I've no idea what's triggering those.  I've seen
+something similar on that -next, but not on work.lookups.
 
-> +
-> +	return *parent_rate * n / m;
-> +}
-> +
-> +static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			   unsigned long parent_rate)
-> +{
-> +	struct ccu_nm *nm = hw_to_ccu_nm(hw);
-> +	unsigned long flags;
-> +	unsigned long n, m;
-> +	u32 reg;
-> +
-> +	rational_best_approximation(rate, parent_rate,
-> +				    nm->n.width, nm->m.width, &n, &m);
+The joy of bisecting -next...  <a couple of hours later>
+9317bb69824ec8d078b0b786b6971aedb0af3d4f is the first bad commit
+commit 9317bb69824ec8d078b0b786b6971aedb0af3d4f
+Author: Eric Dumazet <edumazet@google.com>
+Date:   Mon Apr 25 10:39:32 2016 -0700
 
-Idem
+    net: SOCKWQ_ASYNC_NOSPACE optimizations
 
-> +
-> +	spin_lock_irqsave(nm->common.lock, flags);
-> +
-> +	reg = readl(nm->common.base + nm->common.reg);
-> +	reg &= ~GENMASK(nm->n.width + nm->n.shift, nm->n.shift);
-> +	reg &= ~GENMASK(nm->m.width + nm->m.shift, nm->m.shift);
-> +
-> +	writel(reg | ((m - 1) << nm->m.shift) | ((n - 1) << nm->n.shift),
-> +	       nm->common.base + nm->common.reg);
-> +
-> +	spin_unlock_irqrestore(nm->common.lock, flags);
-> +
-> +	ccu_helper_wait_for_lock(&nm->common, nm->lock);
-> +
-> +	return 0;
-> +}
-> +
-> +const struct clk_ops ccu_nm_ops = {
-> +	.disable	= ccu_nm_disable,
-> +	.enable		= ccu_nm_enable,
-> +	.is_enabled	= ccu_nm_is_enabled,
-> +
-> +	.recalc_rate	= ccu_nm_recalc_rate,
-> +	.round_rate	= ccu_nm_round_rate,
-> +	.set_rate	= ccu_nm_set_rate,
-> +};
-	[snip]
+Reverting changes to sk_set_bit/sk_clear_bit gets rid of the hangs.  Plain
+revert gives a conflict, since there had been additional change in
+"net: SOCKWQ_ASYNC_WAITDATA optimizations"; removing both fixed the hangs.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Note that hangs appear without any fs/nfs/unlink.c modifications being
+there.  When the hang happens it affects NFS traffic; ssh session still
+works fine until it steps on a filesystem operation on NFS (i.e. you
+can use builtins, access procfs, etc.)
