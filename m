@@ -1,51 +1,44 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon,  9 May 2016 22:01:49 +0930
-Subject: [PATCH 2/4] drvers/clk: Support fourth generation Aspeed SoCs
+Date: Mon,  9 May 2016 22:01:50 +0930
+Subject: [PATCH 3/4] drvers/clk: Support fifth generation Aspeed SoCs
 In-Reply-To: <1462797111-14271-1-git-send-email-joel@jms.id.au>
 References: <1462797111-14271-1-git-send-email-joel@jms.id.au>
-Message-ID: <1462797111-14271-3-git-send-email-joel@jms.id.au>
+Message-ID: <1462797111-14271-4-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 A basic driver to create fixed rate clock devices from strapping
 registers.
 
-The clocks on the ast2400 are derived from an external oscillator and
-the frequency of this can be derived from the strapping of the
-processor. The frequency of internal clocks can be derived from other
-registers in the SCU (System Control Unit).
+Like the ast2400, the ast2500 clocks are derived from an external
+oscillator and the frequency of this can be determined from the
+strapping of the processor.
+
+The frequency of internal clocks can be derived from other registers in
+the SCU (System Control Unit). The layout of the internal clocks is a
+bit different to the ast2400, as are the divisor reigisters, so it has
+it's own driver.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/clk/Makefile        |   1 +
  drivers/clk/aspeed/Makefile |   1 +
- drivers/clk/aspeed/clk-g4.c | 109 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 111 insertions(+)
- create mode 100644 drivers/clk/aspeed/Makefile
- create mode 100644 drivers/clk/aspeed/clk-g4.c
+ drivers/clk/aspeed/clk-g5.c | 189 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 190 insertions(+)
+ create mode 100644 drivers/clk/aspeed/clk-g5.c
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 46869d696e4d..8eaaef013a28 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -84,3 +84,4 @@ obj-$(CONFIG_X86)			+= x86/
- obj-$(CONFIG_ARCH_ZX)			+= zte/
- obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
- obj-$(CONFIG_H8300)		+= h8300/
-+obj-$(CONFIG_ARCH_ASPEED)		+= aspeed/
 diff --git a/drivers/clk/aspeed/Makefile b/drivers/clk/aspeed/Makefile
-new file mode 100644
-index 000000000000..d3457fbe3019
---- /dev/null
+index d3457fbe3019..9ddb0f8f4356 100644
+--- a/drivers/clk/aspeed/Makefile
 +++ b/drivers/clk/aspeed/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_MACH_ASPEED_G4) += clk-g4.o
-diff --git a/drivers/clk/aspeed/clk-g4.c b/drivers/clk/aspeed/clk-g4.c
+@@ -1 +1,2 @@
+ obj-$(CONFIG_MACH_ASPEED_G4) += clk-g4.o
++obj-$(CONFIG_MACH_ASPEED_G5) += clk-g5.o
+diff --git a/drivers/clk/aspeed/clk-g5.c b/drivers/clk/aspeed/clk-g5.c
 new file mode 100644
-index 000000000000..91677e9177f5
+index 000000000000..812fd9accf30
 --- /dev/null
-+++ b/drivers/clk/aspeed/clk-g4.c
-@@ -0,0 +1,109 @@
++++ b/drivers/clk/aspeed/clk-g5.c
+@@ -0,0 +1,189 @@
 +/*
 + * Copyright 2016 IBM Corporation
 + *
@@ -61,6 +54,42 @@ index 000000000000..91677e9177f5
 +#include <linux/of_address.h>
 +#include <linux/clkdev.h>
 +
++static void __init aspeed_of_clkin_clk_init(struct device_node *node)
++{
++	struct clk *clk;
++	void __iomem *base;
++	int reg, rate;
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++	/* Strap register SCU70 */
++	reg = readl(base) & BIT(23);
++	iounmap(base);
++
++	if (reg)
++		rate = 25 * 1000 * 1000;
++	else
++		rate = 24 * 1000 * 1000;
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, 0, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(aspeed_clkin_clock, "aspeed,g5-clkin-clock",
++	       aspeed_of_clkin_clk_init);
++
++
 +static void __init aspeed_of_hpll_clk_init(struct device_node *node)
 +{
 +	struct clk *clk, *clkin_clk;
@@ -68,10 +97,6 @@ index 000000000000..91677e9177f5
 +	int reg, rate, clkin;
 +	const char *name = node->name;
 +	const char *parent_name;
-+	const int rates[][4] = {
-+		{384, 360, 336, 408},
-+		{400, 375, 350, 425},
-+	};
 +
 +	of_property_read_string(node, "clock-output-names", &name);
 +	parent_name = of_clk_get_parent_name(node, 0);
@@ -81,6 +106,7 @@ index 000000000000..91677e9177f5
 +		pr_err("%s: of_iomap failed\n", node->full_name);
 +		return;
 +	}
++	/* H-PLL parameter register SCU24 */
 +	reg = readl(base);
 +	iounmap(base);
 +
@@ -92,16 +118,16 @@ index 000000000000..91677e9177f5
 +
 +	clkin = clk_get_rate(clkin_clk);
 +
-+	reg = (reg >> 8) & 0x2;
++	if (reg & BIT(21)) {
++		rate = 0;
++	} else if (reg & BIT(20)) {
++		rate = clkin;
++	} else {
++		int p = (reg >> 13) & 0x3f;
++		int m = (reg >> 5) & 0xff;
++		int n = reg & 0x1f;
 +
-+	if (clkin == 48000000 || clkin == 24000000)
-+		rate = rates[0][reg] * 1000000;
-+	else if (clkin == 25000000)
-+		rate = rates[1][reg] * 1000000;
-+	else {
-+		pr_err("%s: unknown clkin frequency %dHz\n",
-+				node->full_name, clkin);
-+		WARN_ON(1);
++		rate = clkin * ((m + 1) / (n + 1)) / (p + 1);
 +	}
 +
 +	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
@@ -113,8 +139,55 @@ index 000000000000..91677e9177f5
 +	clk_register_clkdev(clk, NULL, name);
 +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
 +}
-+CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g4-hpll-clock",
++CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g5-hpll-clock",
 +	       aspeed_of_hpll_clk_init);
++
++
++static void __init aspeed_of_ahb_clk_init(struct device_node *node)
++{
++	struct clk *clk, *hpll_clk;
++	void __iomem *base;
++	int reg, rate, hpll;
++	const char *name = node->name;
++	const char *parent_name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	/* Strap register SCU70 */
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++	reg = (readl(base) >> 9) & 0x03;
++	iounmap(base);
++
++	/* A value of zero is undefined */
++	WARN_ON(reg == 0);
++
++	hpll_clk = of_clk_get(node, 0);
++	if (IS_ERR(hpll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	hpll = clk_get_rate(hpll_clk);
++
++	rate = hpll / 2 / (reg + 1);
++
++	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(aspeed_ahb_clock, "aspeed,g5-ahb-clock",
++	       aspeed_of_ahb_clk_init);
++
 +
 +static void __init aspeed_of_apb_clk_init(struct device_node *node)
 +{
@@ -127,12 +200,13 @@ index 000000000000..91677e9177f5
 +	of_property_read_string(node, "clock-output-names", &name);
 +	parent_name = of_clk_get_parent_name(node, 0);
 +
++	/* Clock selection register SCU08 */
 +	base = of_iomap(node, 0);
 +	if (!base) {
 +		pr_err("%s: of_iomap failed\n", node->full_name);
 +		return;
 +	}
-+	reg = readl(base);
++	reg = readl(base) >> 23 & 0x3;
 +	iounmap(base);
 +
 +	hpll_clk = of_clk_get(node, 0);
@@ -141,8 +215,7 @@ index 000000000000..91677e9177f5
 +		return;
 +	}
 +
-+	reg = (reg >> 23) & 0x3;
-+	rate = clk_get_rate(hpll_clk) / (2 + 2 * reg);
++	rate = clk_get_rate(hpll_clk) / (4 * (reg + 1));
 +
 +	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
 +	if (IS_ERR(clk)) {
@@ -153,7 +226,7 @@ index 000000000000..91677e9177f5
 +	clk_register_clkdev(clk, NULL, name);
 +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
 +}
-+CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g4-apb-clock",
++CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g5-apb-clock",
 +	       aspeed_of_apb_clk_init);
 -- 
 2.8.1
