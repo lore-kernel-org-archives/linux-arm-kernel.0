@@ -1,240 +1,61 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 9 May 2016 09:55:24 +0200
-Subject: [PATCH v9 4/7] vfio: allow reserved msi iova registration
-In-Reply-To: <F50F9BB4-1D62-4CAF-BC0E-BE97D222E5A0@caviumnetworks.com>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-5-git-send-email-eric.auger@linaro.org>
- <F50F9BB4-1D62-4CAF-BC0E-BE97D222E5A0@caviumnetworks.com>
-Message-ID: <5730426C.4070306@linaro.org>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Mon, 9 May 2016 16:00:11 +0800
+Subject: [PATCH 0/5] MT2701 iommu support
+Message-ID: <1462780816-5288-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chalamarla,
-On 05/05/2016 09:22 PM, Chalamarla, Tirumalesh wrote:
-> 
-> 
-> 
-> 
-> 
-> On 5/4/16, 4:54 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
-> 
->> The user is allowed to register a reserved MSI IOVA range by using the
->> DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
->> This region is stored in the vfio_dma rb tree. At that point the iova
->> range is not mapped to any target address yet. The host kernel will use
->> those iova when needed, typically when MSIs are allocated.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
->>
->> ---
->> v7 -> v8:
->> - use iommu_msi_set_aperture function. There is no notion of
->>  unregistration anymore since the reserved msi slot remains
->>  until the container gets closed.
->>
->> v6 -> v7:
->> - use iommu_free_reserved_iova_domain
->> - convey prot attributes downto dma-reserved-iommu iova domain creation
->> - reserved bindings teardown now performed on iommu domain destruction
->> - rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
->>         VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
->> - change title
->> - pass the protection attribute to dma-reserved-iommu API
->>
->> v3 -> v4:
->> - use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
->> - protect vfio_register_reserved_iova_range implementation with
->>  CONFIG_IOMMU_DMA_RESERVED
->> - handle unregistration by user-space and on vfio_iommu_type1 release
->>
->> v1 -> v2:
->> - set returned value according to alloc_reserved_iova_domain result
->> - free the iova domains in case any error occurs
->>
->> RFC v1 -> v1:
->> - takes into account Alex comments, based on
->>  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
->> - use the existing dma map/unmap ioctl interface with a flag to register
->>  a reserved IOVA range. A single reserved iova region is allowed.
->> ---
->> drivers/vfio/vfio_iommu_type1.c | 78 ++++++++++++++++++++++++++++++++++++++++-
->> include/uapi/linux/vfio.h       | 10 +++++-
->> 2 files changed, 86 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->> index 94a9916..4d3a6f1 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -36,6 +36,7 @@
->> #include <linux/uaccess.h>
->> #include <linux/vfio.h>
->> #include <linux/workqueue.h>
->> +#include <linux/msi-iommu.h>
->>
->> #define DRIVER_VERSION  "0.2"
->> #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
->> @@ -445,6 +446,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
->> 	vfio_lock_acct(-unlocked);
->> }
->>
->> +static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
->> +				dma_addr_t iova, size_t size)
->> +{
->> +	struct vfio_domain *d;
->> +	int ret = 0;
->> +
->> +	list_for_each_entry(d, &iommu->domain_list, next) {
->> +		ret = iommu_msi_set_aperture(d->domain, iova, iova + size - 1);
->> +		if (ret)
->> +			break;
->> +	}
->> +	return ret;
->> +}
->> +
->> static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
->> {
->> 	vfio_unmap_unpin(iommu, dma);
->> @@ -693,6 +708,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
->> 	return ret;
->> }
->>
->> +static int vfio_register_msi_range(struct vfio_iommu *iommu,
->> +				   struct vfio_iommu_type1_dma_map *map)
->> +{
->> +	dma_addr_t iova = map->iova;
->> +	size_t size = map->size;
->> +	int ret = 0;
->> +	struct vfio_dma *dma;
->> +	unsigned long order;
->> +	uint64_t mask;
->> +
->> +	/* Verify that none of our __u64 fields overflow */
->> +	if (map->size != size || map->iova != iova)
->> +		return -EINVAL;
->> +
->> +	order =  __ffs(vfio_pgsize_bitmap(iommu));
->> +	mask = ((uint64_t)1 << order) - 1;
->> +
->> +	WARN_ON(mask & PAGE_MASK);
->> +
->> +	if (!size || (size | iova) & mask)
->> +		return -EINVAL;
->> +
->> +	/* Don't allow IOVA address wrap */
->> +	if (iova + size - 1 < iova)
->> +		return -EINVAL;
->> +
->> +	mutex_lock(&iommu->lock);
->> +
->> +	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
->> +		ret =  -EEXIST;
->> +		goto unlock;
->> +	}
->> +
->> +	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
->> +	if (!dma) {
->> +		ret = -ENOMEM;
->> +		goto unlock;
->> +	}
->> +
->> +	dma->iova = iova;
->> +	dma->size = size;
->> +	dma->type = VFIO_IOVA_RESERVED;
->> +
->> +	ret = vfio_set_msi_aperture(iommu, iova, size);
->> +	if (ret)
->> +		goto free_unlock;
->> +
->> +	vfio_link_dma(iommu, dma);
->> +	goto unlock;
->> +
->> +free_unlock:
->> +	kfree(dma);
->> +unlock:
->> +	mutex_unlock(&iommu->lock);
->> +	return ret;
->> +}
->> +
->> static int vfio_bus_type(struct device *dev, void *data)
->> {
->> 	struct bus_type **bus = data;
->> @@ -1062,7 +1134,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->> 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
->> 		struct vfio_iommu_type1_dma_map map;
->> 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
->> -				VFIO_DMA_MAP_FLAG_WRITE;
->> +				VFIO_DMA_MAP_FLAG_WRITE |
->> +				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
->>
->> 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
->>
->> @@ -1072,6 +1145,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->> 		if (map.argsz < minsz || map.flags & ~mask)
->> 			return -EINVAL;
->>
->> +		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
->> +			return vfio_register_msi_range(iommu, &map);
->> +
-> 
-> How are we getting the PA and any validation needed?
-Sorry I am not sure I get your question? The principle is the userspace
-registers a spare Guest PA range that can be safely used by the kernel
-to map host MSI frames. In QEMU integration we use platform bus unmapped
-GPA to make things transparent for the virt machine.
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Any validation: we currently make sure the registered GPA was not
-already registered as RAM regions. The kernel also checks it is properly
-aligned according to the IOMMU page size.
+  Mediatek's m4u(Multimedia Memory Management Unit) and SMI(Smart
+Multimedia Interface)have two generations HW. They basically sharing the
+same hardware block diagram, but have some difference as below:
 
-Please let me know if I answered your question.
+  Generation one m4u only support one layer, flat pagetable addressing, and
+only support 4K size page mapping. While generation two m4u support 2
+levels of pagetable which use the ARM short-descriptor translation table
+format for address translation.
+They have slight different register base and register offset.
+They have very different HW ports defines.
 
-Best Regards
+  Generaion one SMI have additional "async" clock which transform the smi
+clock into emi clock domain, this clock should be prepare and enabled for
+cMI generation one HW.
+The register which control the iommu need to translation the address or not
+for a particular port is located at smi ao base(smi always on register
+base) for generation one SMI HW, but located at each larb's register base
+for generation two HW.
 
-Eric
+This patch set add mt2701 iommu support, it's based on 4.6-rc1 and James
+Liao's "Add clock support for Mediatek MT2701 v7[1]" and "Mediatek MT2701
+SCPSYS power domain support v6[2]" patch.
 
->> 		return vfio_dma_do_map(iommu, &map);
->>
->> 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
->> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
->> index 255a211..4a9dbc2 100644
->> --- a/include/uapi/linux/vfio.h
->> +++ b/include/uapi/linux/vfio.h
->> @@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
->>  *
->>  * Map process virtual addresses to IO virtual addresses using the
->>  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
->> + *
->> + * In case RESERVED_MSI_IOVA flag is set, the API only aims at registering an
->> + * IOVA region that will be used on some platforms to map the host MSI frames.
->> + * In that specific case, vaddr is ignored. Once registered, an MSI reserved
->> + * IOVA region stays until the container is closed.
->>  */
->> struct vfio_iommu_type1_dma_map {
->> 	__u32	argsz;
->> 	__u32	flags;
->> #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
->> #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
->> +/* reserved iova for MSI vectors*/
->> +#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
->> 	__u64	vaddr;				/* Process virtual address */
->> 	__u64	iova;				/* IO virtual address */
->> 	__u64	size;				/* Size of mapping (bytes) */
->> @@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
->>  * Caller sets argsz.  The actual unmapped size is returned in the size
->>  * field.  No guarantee is made to the user that arbitrary unmaps of iova
->>  * or size different from those used in the original mapping call will
->> - * succeed.
->> + * succeed. Once registered, an MSI region cannot be unmapped and stays
->> + * until the container is closed.
->>  */
->> struct vfio_iommu_type1_dma_unmap {
->> 	__u32	argsz;
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-February/004030.html
+[2] http://www.spinics.net/lists/arm-kernel/msg497028.html
+
+Honghui Zhang (5):
+  dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and
+    smi
+  iommu/mediatek: move the common struct into header file
+  memory/mediatek: add support for mt2701
+  iommu/mediatek: add support for mtk iommu generation one HW
+  ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  13 +-
+ .../memory-controllers/mediatek,smi-common.txt     |  21 +-
+ .../memory-controllers/mediatek,smi-larb.txt       |   4 +-
+ arch/arm/boot/dts/mt2701.dtsi                      |  51 ++
+ drivers/iommu/Kconfig                              |  19 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/mtk_iommu.c                          |  62 +-
+ drivers/iommu/mtk_iommu.h                          |  94 +++
+ drivers/iommu/mtk_iommu_v1.c                       | 767 +++++++++++++++++++++
+ drivers/memory/mtk-smi.c                           | 168 ++++-
+ include/dt-bindings/memory/mt2701-larb-port.h      |  85 +++
+ 11 files changed, 1197 insertions(+), 88 deletions(-)
+ create mode 100644 drivers/iommu/mtk_iommu.h
+ create mode 100644 drivers/iommu/mtk_iommu_v1.c
+ create mode 100644 include/dt-bindings/memory/mt2701-larb-port.h
+
+-- 
+1.8.1.1.dirty
