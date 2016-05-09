@@ -1,98 +1,157 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 09 May 2016 12:13:21 +0200
-Subject: [PATCH 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
-In-Reply-To: <57304AAE.20103@i2se.com>
-References: <1462479971-7891-1-git-send-email-marex@denx.de>
- <1462479971-7891-3-git-send-email-marex@denx.de>
- <977436072.210446.e7eef450-2262-47df-8e8e-6a44da10083c.open-xchange@email.1und1.de>
- <572FA04B.1020005@denx.de> <57304AAE.20103@i2se.com>
-Message-ID: <573062C1.1050000@denx.de>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Mon, 9 May 2016 18:07:06 +0800
+Subject: [PATCH 24/25] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <20160506140022.GA18587@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1554541.oDP7Ro5zB2@wuerfel>
+ <20160503090045.GB10733@e104818-lin.cambridge.arm.com>
+ <3846428.6xx69KGEja@wuerfel> <57288660.9030607@huawei.com>
+ <57289C75.50904@huawei.com> <20160504214949.GA28217@yury-N73SV>
+ <CA+=Sn1ngpaJWHpGDmU+kXBkz56SO+XDW2qzMMLAbbBWnaB0eqw@mail.gmail.com>
+ <572AAED2.7050604@huawei.com>
+ <CA+=Sn1mNdd+Xy5QL5ScRyZOCWwKkG6o1Pb50sFPuiKX=0Z2B1w@mail.gmail.com>
+ <20160506140022.GA18587@yury-N73SV>
+Message-ID: <5730614A.2000601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2016 10:30 AM, Stefan Wahren wrote:
-> Hi,
-> 
-> Am 08.05.2016 um 22:23 schrieb Marek Vasut:
->> On 05/06/2016 09:40 AM, Stefan Wahren wrote:
->>> Hi Marek,
->> Hi!
->>
->>> sorry for the reply format.
->> replying from a phone ? :)
-> 
-> no an ugly webmailer :(
-> 
->>
->>>> Marek Vasut <marex@denx.de> hat am 5. Mai 2016 um 22:26 geschrieben:
->>>>
->>>> Add support for this small MP3 player based on STMP3780 (rev.4).
->>>> Currently supported is both external microSD and internal SD-NAND
->>>> bridge, PWM and USB gadget.
->>>>
->>>> Signed-off-by: Marek Vasut <marex@denx.de>
->>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->>>> Cc: Shawn Guo <shawnguo@kernel.org>
->>>> ---
->>>>  arch/arm/boot/dts/Makefile | 1 +
->>>>  arch/arm/boot/dts/imx23-xfi3.dts | 190
->>>> +++++++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 191 insertions(+)
->>>>  create mode 100644 arch/arm/boot/dts/imx23-xfi3.dts
->>>>
->>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>> index 8f9f1c2..7a79d37 100644
->>>> --- a/arch/arm/boot/dts/Makefile
->>>> +++ b/arch/arm/boot/dts/Makefile
->>>> @@ -417,6 +417,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
->>>>  imx23-evk.dtb \
->>>>  imx23-olinuxino.dtb \
->>>>  imx23-stmp378x_devb.dtb \
->>>> + imx23-xfi3.dtb \
->>>>  imx28-apf28.dtb \
->>>>  imx28-apf28dev.dtb \
->>>>  imx28-apx4devkit.dtb \
->>>> diff --git a/arch/arm/boot/dts/imx23-xfi3.dts
->>>> b/arch/arm/boot/dts/imx23-xfi3.dts
->>>> new file mode 100644
->>>> index 0000000..d7e7cf5
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/imx23-xfi3.dts
->>>> @@ -0,0 +1,190 @@
->>>> +/*
->>>> + * Copyright (C) 2013-2016 Marek Vasut <marex@denx.de>
->>>> + *
->>>> + * This file is dual-licensed: you can use it either under the terms
->>>> + * of the GPL or the X11 license, at your option. Note that this dual
->>>> + * licensing only applies to this file, and not this project as a
->>>> + * whole.
->>>> + *
->>>> + * a) This file is free software; you can redistribute it and/or
->>>> + * modify it under the terms of the GNU General Public License as
->>>> + * published by the Free Software Foundation; either version 2 of
->>>> + * the License, or (at your option) any later version.
->>>> + *
->>>> + * This file is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->>>> + * GNU General Public License for more details.
->>>> + *
->>>> + * You should have received a copy of the GNU General Public
->>>> + * License along with this file; if not, write to the Free
->>>> + * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->>>> + * MA 02110-1301 USA
->>> AFAIK this address shouldn't be included.
->> Hmmm, some boards do include it. I'll remove it from this submission and
->> also for the xfi.
->>
->> Shall I send patch(es) removing the address from the other boards too ?
-> 
-> i'm not sure. Maybe Shawn has an opinion about it.
+Hi, yury
 
-I am hoping for that.
+I tested successful in both little endian and big endian.
+Just two comments below:
 
-btw V2 of patches is out, feel free to review :)
+On 2016/5/6 22:00, Yury Norov wrote:
+> Hello colleagues,
+>
+> After all comments, VDSO fix looks like this for me.
+>
+> Note I renamed Andrew's ZERO macro to DELOUSE, as
+> there already is __SC_DELOUSE which does the same,
+> but in C, not asm.
+>
+> Like Bamvor, I'm not sure how we'd apply this patch -
+> standalone or meld to VDSO. I think, VDSO patch is too
+> big and bad-structurized, and if I find how to refactor
+> it, I'll incorporate this fix.
+>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>   arch/arm64/kernel/asm-offsets.c               |  7 +++++++
+>   arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  2 +-
+>   arch/arm64/kernel/vdso/gettimeofday.S         | 20 +++++++++++++++++---
+>   3 files changed, 25 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index e229525..fcfd087 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -101,6 +101,13 @@ int main(void)
+>     DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
+>     DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
+>     BLANK();
+> +#ifdef CONFIG_ARM64_ILP32
+The following structs exist in both aarch32 el0 and ilp32. How about change it to
+"#ifdef CONFIG_COMPAT"?
+> +  DEFINE(COMPAT_TVAL_TV_SEC,	offsetof(struct compat_timeval, tv_sec));
+> +  DEFINE(COMPAT_TVAL_TV_USEC,	offsetof(struct compat_timeval, tv_usec));
+> +  DEFINE(COMPAT_TSPEC_TV_SEC,	offsetof(struct compat_timespec, tv_sec));
+> +  DEFINE(COMPAT_TSPEC_TV_NSEC,	offsetof(struct compat_timespec, tv_nsec));
+> +  BLANK();
+> +#endif
+>     DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
+>     DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
+>     BLANK();
+> diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> index ddc63fd..d182a8d 100644
+> --- a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> +++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> @@ -79,7 +79,7 @@ PHDRS
+>    */
+>   VERSION
+>   {
+> -	LINUX_2.6 {
+> +	LINUX_2.6.39 {
+Do we really want to this version? Maybe 4.x is better?
 
--- 
-Best regards,
-Marek Vasut
+Regards
+
+Bamvor
+
+>   	global:
+>   		__kernel_rt_sigreturn;
+>   		__kernel_gettimeofday;
+> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+> index efa79e8..a2d8a70 100644
+> --- a/arch/arm64/kernel/vdso/gettimeofday.S
+> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
+> @@ -25,6 +25,16 @@
+>   #define NSEC_PER_SEC_LO16	0xca00
+>   #define NSEC_PER_SEC_HI16	0x3b9a
+>
+> +#ifdef __LP64__
+> +#define PTR_REG(n)	x##n
+> +#define OFFSET(n)	n
+> +#define DELOUSE(n)
+> +#else
+> +#define PTR_REG(n)	w##n
+> +#define OFFSET(n)	COMPAT_##n
+> +#define DELOUSE(n)	mov     w##n, w##n
+> +#endif
+> +
+>   vdso_data	.req	x6
+>   use_syscall	.req	w7
+>   seqcnt		.req	w8
+> @@ -51,6 +61,8 @@ seqcnt		.req	w8
+>   /* int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz); */
+>   ENTRY(__kernel_gettimeofday)
+>   	.cfi_startproc
+> +	DELOUSE(0)
+> +	DELOUSE(1)
+>   	mov	x2, x30
+>   	.cfi_register x30, x2
+>
+> @@ -68,7 +80,7 @@ ENTRY(__kernel_gettimeofday)
+>   	mov	x13, #1000
+>   	lsl	x13, x13, x12
+>   	udiv	x11, x11, x13
+> -	stp	x10, x11, [x0, #TVAL_TV_SEC]
+> +	stp	PTR_REG(10), PTR_REG(11), [x0, #OFFSET(TVAL_TV_SEC)]
+>   2:
+>   	/* If tz is NULL, return 0. */
+>   	cbz	x1, 3f
+> @@ -88,6 +100,7 @@ ENDPROC(__kernel_gettimeofday)
+>   /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
+>   ENTRY(__kernel_clock_gettime)
+>   	.cfi_startproc
+> +	DELOUSE(1)
+>   	cmp	w0, #CLOCK_REALTIME
+>   	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
+>   	b.ne	2f
+> @@ -159,7 +172,7 @@ ENTRY(__kernel_clock_gettime)
+>
+>   6:	/* Store to the user timespec. */
+>   	lsr	x11, x11, x12
+> -	stp	x10, x11, [x1, #TSPEC_TV_SEC]
+> +	stp	PTR_REG(10), PTR_REG(11), [x1, #OFFSET(TSPEC_TV_SEC)]
+>   	mov	x0, xzr
+>   	ret
+>   7:
+> @@ -174,6 +187,7 @@ ENDPROC(__kernel_clock_gettime)
+>   /* int __kernel_clock_getres(clockid_t clock_id, struct timespec *res); */
+>   ENTRY(__kernel_clock_getres)
+>   	.cfi_startproc
+> +	DELOUSE(1)
+>   	cmp	w0, #CLOCK_REALTIME
+>   	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
+>   	b.ne	1f
+> @@ -187,7 +201,7 @@ ENTRY(__kernel_clock_getres)
+>   	ldr	x2, 6f
+>   2:
+>   	cbz	w1, 3f
+> -	stp	xzr, x2, [x1]
+> +	stp	PTR_REG(zr), PTR_REG(2), [x1]
+>
+>   3:	/* res == NULL. */
+>   	mov	w0, wzr
+>
