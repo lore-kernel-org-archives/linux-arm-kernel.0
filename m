@@ -1,38 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 9 May 2016 16:18:39 +0100
-Subject: [PATCH 0/5] Introduce per-domain page sizes
-In-Reply-To: <20160509145157.GD13971@8bytes.org>
-References: <cover.1460048991.git.robin.murphy@arm.com>
- <20160509112138.GB13275@8bytes.org> <57307863.1070706@arm.com>
- <20160509145157.GD13971@8bytes.org>
-Message-ID: <5730AA4F.4040303@arm.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 9 May 2016 09:20:15 -0600
+Subject: VFIO MSIX Query
+In-Reply-To: <CAB995MvxU+mN9uxr_20nLkoezyhedUAHdFWawk-GG_bj0YjSYw@mail.gmail.com>
+References: <CAB995Mu0==PJ0iU4h_3oAMGo-VYDFrjOg_BO757M=PDWgMWtCw@mail.gmail.com>
+ <20160503140249.4edaf3cc@t450s.home>
+ <CAB995MsFjv=GvHSmo029fmuTWhGiYev3-2A358orFz_dq724Fw@mail.gmail.com>
+ <20160507195058.5b00f176@ul30vt.home>
+ <CAB995MvxU+mN9uxr_20nLkoezyhedUAHdFWawk-GG_bj0YjSYw@mail.gmail.com>
+Message-ID: <20160509092015.39129d56@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/16 15:51, Joerg Roedel wrote:
-> On Mon, May 09, 2016 at 12:45:39PM +0100, Robin Murphy wrote:
->> Thanks a lot! I was expecting to pick this up again after the merge
->> window and post an updated version then; as you may already have
->> found, patch 5 conflicts somewhat with the SMMUv2 context format
->> changes in Will's updates branch. The correct resolution requires a
->> bit of rewriting, so below is what that patch looks like when
->> rebased on top of Will's branch. If you'd prefer it in actual merge
->> resolution format, shout and I'll give that a go.
->
-> Okay, hmm, but the patch does not apply here, even after fixing the line
-> breaks. I'll push my tree soon, can you rebase this patch on-top the
-> core branch then? It should already contain patches 1-4.
+On Sun, 8 May 2016 20:45:10 +0530
+Nitin Saxena <nitin.lnx@gmail.com> wrote:
 
-Bah, I saw last week's "Merge remote-tracking branch 
-'will/for-joerg/arm-smmu/updates' into HEAD" commit on that branch 
-without spotting it was no longer up to date, sorry. Yes, it's probably 
-safest if I rebase on top of your merge of everything else - I'll keep 
-an eye out.
+> Hi Alex,
+> 
+> Thanks for your answer. I got the point that all access to device must be
+> VFIO.
+> I have few more questions.
+> 
+> >> When the device is initially opened via the VFIO_GET_DEVICE_FD ioctl, we  
+> go through an initialization sequence on the device, including a device
+> reset
+> Does this mean only one process (primary in multiprocess app) can only
+> perform VFIO_GROUP_GET_DEVICE_FD ioctl ? which I doubt as I saw in dpdk
+> that each process (regardless primary or not) does VFIO_GROUP_GET_DEVICE_FD
+> ioctl. Kindly confirm.
 
-Thanks,
-Robin.
+Users can call GET_DEVICE_FD multiple times, but note that the group
+file descriptor can only be opened once, so you'd need to pass
+device file descriptors off to other threads.
 
->
->
-> 	Joerg
->
+> >> Use VFIO for all access to the device or don't use VFIO at all.  
+> I will map PCI BARS via VFIO but what about hugepages for each process.
+> Since I am using VFIO_NOIOMMU do I need to call VFIO_IOMMU_MAP_DMA ioctl
+> for each hugepage of each process? I think this is not needed in my case.
+> Please confirm.
+
+No-IOMMU mode does not have MAP_DMA or UNMAP_DMA ioctls.  If you want
+to support a safe operating mode, with an IOMMU providing DMA
+isolation, then yes, you would need to map DMA targets for the device
+using those ioctls for the type1 IOMMU backend.
+
+> Can you please also confirm about the patch I attached. Is there any thing
+> missing in the patch that I needed to incorporate from kernel 4.5 to make
+> VFO NOIOMMU work? Patch
+
+I can't confirm or deny whether the backport is accurate.  Thanks,
+
+Alex
