@@ -1,40 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 9 May 2016 15:32:38 -0700
-Subject: [PATCH v4 01/11] clk: sunxi: Add display and TCON0 clocks driver
-In-Reply-To: <20160508200308.GF6167@lukather>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
- <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160506223002.GE3492@codeaurora.org>
- <20160508200308.GF6167@lukather>
-Message-ID: <20160509223238.GW3492@codeaurora.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  9 May 2016 23:37:35 +0100
+Subject: [PATCH] arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
+Message-ID: <1462833455-27720-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08, Maxime Ripard wrote:
-> Hi Stephen,
-> 
-> On Fri, May 06, 2016 at 03:30:02PM -0700, Stephen Boyd wrote:
-> > On 04/25, Maxime Ripard wrote:
-> > > The A10 SoCs and its relatives has a special clock controller to drive the
-> > > display engines (both frontend and backend), that have a lot in common with
-> > > the clock to drive the first TCON channel.
-> > > 
-> > > Add a driver to support both.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > 
-> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
-> > Unless I can merge this into clk-next? Wasn't clear to me.
-> 
-> Yes, please do, I already sent you the bunch of patches I gathered for
-> 4.7, and I don't have any others but this one.
-> 
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Ok I applied this one to clk-next.
+Commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option"),
+added support for ARCH_SUNXI on arm64, but failed to select
+GENERIC_IRQ_CHIP, which is required for drivers/irqchip/irq-sunxi-nmi.c
+and causes build failures like :
 
+  UPD     include/generated/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
+drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
+drivers/built-in.o: In function `irq_domain_add_linear':
+include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
+include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
+drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
+drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
+drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
+drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
+drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
+drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
+drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
+
+Fixes: commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option")
+Cc: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi Olof, Arnd,
+
+as agreed upon in that other mail, can you take this patch for 4.6?
+
+Cheers,
+Andre.
+
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index efa77c1..521b1ec 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -2,6 +2,7 @@ menu "Platform selection"
+ 
+ config ARCH_SUNXI
+ 	bool "Allwinner sunxi 64-bit SoC Family"
++	select GENERIC_IRQ_CHIP
+ 	help
+ 	  This enables support for Allwinner sunxi based SoCs like the A64.
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
