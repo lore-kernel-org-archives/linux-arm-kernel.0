@@ -1,12 +1,12 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Mon, 9 May 2016 16:15:05 -0700
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 9 May 2016 16:15:11 -0700
 Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB PCIe
  bindings
 In-Reply-To: <20160509192641.GA4936@rob-hp-laptop>
 References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
  <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
  <20160509192641.GA4936@rob-hp-laptop>
-Message-ID: <573119F9.3040509@broadcom.com>
+Message-ID: <573119FF.9000306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
