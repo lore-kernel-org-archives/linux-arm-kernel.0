@@ -1,26 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 May 2016 16:38:48 +0200
-Subject: [GIT PULL] ARM: dts: exynos: Non-critical fixes for v4.7
-In-Reply-To: <1462619428-13798-1-git-send-email-k.kozlowski@samsung.com>
-References: <1462619428-13798-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <7398428.rrnfaS9ayc@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 9 May 2016 15:40:13 +0100
+Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
+In-Reply-To: <17116806.BYbaJP9QyN@wuerfel>
+References: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
+ <5729C2CC.7030806@arm.com> <573098E1.5050007@arm.com>
+ <17116806.BYbaJP9QyN@wuerfel>
+Message-ID: <5730A14D.2010705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 07 May 2016 13:10:28 Krzysztof Kozlowski wrote:
-> Samsung DTS non-critical fixes for v4.7:
-> 1. Fix s5p-mfc driver probe on Exynos542x Peach boards (need to provide MFC
->    memory banks). On these boards this was broken for long time but
->    apparently no one enabled this driver till now.
-> 2. Fix creation of debugfs entries for one regulator on Exynos4210
->    Trats board.
-> 3. Fix probing of max8997 MFD driver (and its children) because
->    of missing interrupt. Actually the current version of the driver probes
->    (just without interrupts) but after switching to regmap and regmap-irq,
->    the interrupt will be mandatory.
-> 
-> 
+On 09/05/16 15:36, Arnd Bergmann wrote:
+>
+> Applied now, sorry for the delay and thanks for the reminders.
+>
+> It was in my todo list the whole time, I just didn't get around to
+> do any merges last week.
 
-Merged into next/fixes-non-critical, thanks!
+No problems, Thanks Arnd.
 
-	Arnd
+Suzuki
