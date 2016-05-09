@@ -1,71 +1,202 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Mon, 9 May 2016 02:02:46 +0000
-Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-In-Reply-To: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1461290434-18462-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB1855159EE178BE4806E3E3B3FF700@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun,  8 May 2016 21:14:42 -0500
+Subject: [PATCH V2 2/2] irqchip/gicv3-its: Implement two-level(indirect)
+ device table support
+In-Reply-To: <1462760082-21943-1-git-send-email-shankerd@codeaurora.org>
+References: <1462760082-21943-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <1462760082-21943-2-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Friday, April 22, 2016 10:01 AM
-> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
-> <fugang.duan@nxp.com>; lznuaa at gmail.com
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> arnd at arndb.de; holgerschurig at gmail.com; Troy Kisky
-> <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net 1/1] net: fec: update dirty_tx even if no skb
-> 
-> If dirty_tx isn't updated, then dma_unmap_single will be called twice.
-> 
-> This fixes a
-> [   58.420980] ------------[ cut here ]------------
-> [   58.425667] WARNING: CPU: 0 PID: 377 at /home/schurig/d/mkarm/linux-
-> 4.5/lib/dma-debug.c:1096 check_unmap+0x9d0/0xab8()
-> [   58.436405] fec 2188000.ethernet: DMA-API: device driver tries to free DMA
-> memory it has not allocated [device address=0x0000000000000000] [size=66
-> bytes]
-> 
-> encountered by Holger
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> Tested-by: <holgerschurig@gmail.com>
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index 08243c2..b71654c 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1197,10 +1197,8 @@ fec_enet_tx_queue(struct net_device *ndev, u16
-> queue_id)
->  					 fec16_to_cpu(bdp->cbd_datlen),
->  					 DMA_TO_DEVICE);
->  		bdp->cbd_bufaddr = cpu_to_fec32(0);
-> -		if (!skb) {
-> -			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
-> -			continue;
-> -		}
-> +		if (!skb)
-> +			goto skb_done;
-> 
->  		/* Check for errors. */
->  		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC | @@ -1239,7
-> +1237,7 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
-> 
->  		/* Free the sk buffer associated with this last transmit */
->  		dev_kfree_skb_any(skb);
-> -
-> +skb_done:
->  		/* Make sure the update to bdp and tx_skbuff are performed
->  		 * before dirty_tx
->  		 */
-> --
-> 2.5.0
+Since device IDs are extremely sparse, the single, a.k.a flat table is
+not sufficient for the following two reasons.
 
-Thanks. 
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
+1) According to ARM-GIC spec, ITS hw can access maximum of 256(pages)*
+   64K(pageszie) bytes. In the best case, it supports upto DEVid=21
+   sparse with minimum device table entry size 8bytes.
+
+2) The maximum memory size that is possible without memblock depends on
+   MAX_ORDER. 4MB on 4K page size kernel with default MAX_ORDER, so it
+   supports DEVid range 19bits.
+
+The two-level device table feature brings us two advantages, the first
+is a very high possibility of supporting upto 32bit sparse, and the
+second one is the best utilization of memory allocation.
+
+The feature is enabled automatically during driver probe if a single
+ITS page is not adequate for flat table and the hardware is capable
+of two-level table walk.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+
+This patch is based on Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7
+
+I have tested the Indirection feature on Qualcomm Technologies QDF2XXX server platform.
+
+Changes since v1:
+  Most of this patch has been rewritten after refactoring its_alloc_tables().
+  Always enable device two-level if the memory requirement is more than PAGE_SIZE.
+  Fixed the coding bug that breaks on the BE machine.
+  Edited the commit text.
+
+ drivers/irqchip/irq-gic-v3-its.c | 100 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 83 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index b23e00c..27be792 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -938,6 +938,18 @@ retry_baser:
+ 	return 0;
+ }
+ 
++/**
++ * Find out whether an implemented baser register supports a single, flat table
++ * or a two-level table by reading bit offset at '62' after writing '1' to it.
++ */
++static u64 its_baser_check_indirect(struct its_baser *baser)
++{
++	u64 val = GITS_BASER_InnerShareable | GITS_BASER_WaWb;
++
++	writeq_relaxed(val | GITS_BASER_INDIRECT, baser->hwreg);
++	return (readq_relaxed(baser->hwreg) & GITS_BASER_INDIRECT);
++}
++
+ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ {
+ 	u64 typer = readq_relaxed(its->base + GITS_TYPER);
+@@ -964,6 +976,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+ 		int order = get_order(psz);
+ 		struct its_baser *baser = its->tables + i;
++		u64 indirect = 0;
+ 
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
+@@ -977,17 +990,27 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		 * Allocate as many entries as required to fit the
+ 		 * range of device IDs that the ITS can grok... The ID
+ 		 * space being incredibly sparse, this results in a
+-		 * massive waste of memory.
++		 * massive waste of memory if two-level device table
++		 * feature is not supported by hardware.
+ 		 *
+ 		 * For other tables, only allocate a single page.
+ 		 */
+ 		if (type == GITS_BASER_TYPE_DEVICE) {
+-			/*
+-			 * 'order' was initialized earlier to the default page
+-			 * granule of the the ITS.  We can't have an allocation
+-			 * smaller than that.  If the requested allocation
+-			 * is smaller, round up to the default page granule.
+-			 */
++			if ((entry_size << ids) > psz)
++				indirect = its_baser_check_indirect(baser);
++
++			if (indirect) {
++				/*
++				 * The size of the lvl2 table is equal to ITS
++				 * page size which is 'psz'. For computing lvl1
++				 * table size, subtract ID bits that sparse
++				 * lvl2 table from 'ids' which is reported by
++				 * ITS hardware times lvl1 table entry size.
++				 */
++				ids -= ilog2(psz / entry_size);
++				entry_size = GITS_LVL1_ENTRY_SIZE;
++			}
++
+ 			order = max(get_order(entry_size << ids), order);
+ 			if (order >= MAX_ORDER) {
+ 				order = MAX_ORDER - 1;
+@@ -997,7 +1020,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 			}
+ 		}
+ 
+-		err = its_baser_setup(its, baser, order, 0);
++		err = its_baser_setup(its, baser, order, indirect);
+ 		if (err < 0) {
+ 			its_free_tables(its);
+ 			return err;
+@@ -1187,10 +1210,60 @@ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+ 	return NULL;
+ }
+ 
++static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
++{
++	struct its_baser *baser;
++	struct page *page;
++	u32 entry_size, idx;
++	u64 *table;
++
++	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
++
++	/* Don't allow 'dev_id' that exceeds ITS hardware limit */
++	if (!baser && (ilog2(dev_id) >= its->device_ids))
++		return false;
++
++	/* Don't allow 'dev_id' that exceeds single, flat table limit */
++	entry_size = GITS_BASER_ENTRY_SIZE(baser->val);
++	if (!(baser->val & GITS_BASER_INDIRECT)) {
++		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) / entry_size))
++			return false;
++		return true;
++	}
++
++	/* Compute Level1 table index & check if that exceeds table range */
++	idx = dev_id >> ilog2(baser->psz / entry_size);
++	if (idx >= (PAGE_ORDER_TO_SIZE(baser->order) / GITS_LVL1_ENTRY_SIZE))
++		return false;
++
++	table = baser->base;
++
++	/* Allocate memory for Level2 table */
++	if (!table[idx]) {
++		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
++		if (!page)
++			return false;
++
++		/* Flush memory to PoC if hardware doesn't support coherency */
++		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
++			__flush_dcache_area(page_address(page), baser->psz);
++
++		table[idx] = cpu_to_le64(page_to_phys(page) | GITS_BASER_VALID);
++
++		/* Flush memory to PoC if hardware doesn't support coherency */
++		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
++			__flush_dcache_area(table + idx, GITS_LVL1_ENTRY_SIZE);
++
++		/* Ensure updated table contents are visible to ITS hardware */
++		dsb(sy);
++	}
++
++	return true;
++}
++
+ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 					    int nvecs)
+ {
+-	struct its_baser *baser;
+ 	struct its_device *dev;
+ 	unsigned long *lpi_map;
+ 	unsigned long flags;
+@@ -1201,14 +1274,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	int nr_ites;
+ 	int sz;
+ 
+-	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+-
+-	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+-	if (baser) {
+-		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) /
+-			      GITS_BASER_ENTRY_SIZE(baser->val)))
+-			return NULL;
+-	} else if (ilog2(dev_id) >= its->device_ids)
++	if (!its_alloc_device_table(its, dev_id))
+ 		return NULL;
+ 
+ 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+-- 
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
+a Linux Foundation Collaborative Project
