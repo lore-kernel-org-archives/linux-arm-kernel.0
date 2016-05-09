@@ -1,219 +1,94 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 10 May 2016 00:56:37 +0200
-Subject: [PATCH V6 01/13] pci, acpi, x86,
- ia64: Move ACPI host bridge device companion assignment to core code.
-In-Reply-To: <1460740008-19489-2-git-send-email-tn@semihalf.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <1460740008-19489-2-git-send-email-tn@semihalf.com>
-Message-ID: <292578579.uIxhMjkdfG@vostro.rjw.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 May 2016 17:58:42 -0500
+Subject: [PATCH v2 5/5] vf610-soc: Add Vybrid SoC device tree binding
+ documentation
+In-Reply-To: <4ca82be6c1d434c612868b441e9f6e1f@agner.ch>
+References: <cover.1462171989.git.maitysanchayan@gmail.com>
+ <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
+ <20160504023026.GB5382@rob-hp-laptop>
+ <20160505082758.GB18151@Sanchayan-Arch.localdomain>
+ <CAL_JsqL1qQu_u=6xosP8UmR3oXLawbVz=Hap0wDm7aN4mjK2GA@mail.gmail.com>
+ <4ca82be6c1d434c612868b441e9f6e1f@agner.ch>
+Message-ID: <CAL_JsqL7sjdONYad6sXM1KXFCjooANuN7WYg-paV9LnKnuMTnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 15, 2016 07:06:36 PM Tomasz Nowicki wrote:
-> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
-> bridge initialization. They both use arch-specific sysdata to pass down
-> parent device reference and both rely on NULL parent in pci_create_root_bus()
-> to validate sysdata content.
+On Mon, May 9, 2016 at 1:25 PM, Stefan Agner <stefan@agner.ch> wrote:
+> On 2016-05-09 10:14, Rob Herring wrote:
+>> On Thu, May 5, 2016 at 3:27 AM,  <maitysanchayan@gmail.com> wrote:
+>>> Hello Rob,
+>>>
+>>> On 16-05-03 21:30:26, Rob Herring wrote:
+>>>> On Mon, May 02, 2016 at 12:35:04PM +0530, Sanchayan Maity wrote:
+>>>> > Add device tree binding documentation for Vybrid SoC.
+>>>> >
+>>>> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>>> > ---
+>>>> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       | 35 ++++++++++++++++++++++
+>>>> >  1 file changed, 35 insertions(+)
+>>>> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>>>> >
+>>>> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>>>> > new file mode 100644
+>>>> > index 0000000..bdd95e8
+>>>> > --- /dev/null
+>>>> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>>>> > @@ -0,0 +1,35 @@
+>>>> > +Vybrid System-on-Chip
+>>>> > +---------------------
+>>>> > +
+>>>> > +Required properties:
+>>>> > +
+>>>> > +- #address-cells: must be 1
+>>>> > +- #size-cells: must be 1
+>>>> > +- compatible: "fsl,vf610-soc-bus", "simple-bus"
+>>>>
+>>>> If this is a bus, put the file in bindings/bus/...
+>>>
+>>> The fsl,vf610-soc-bus binding is used to bind the driver in question with
+>>> an appropriate compatible node.
+>>>
+>>> Basically being a standalone platform driver, there was need of a compatible
+>>> property to bind on. Introducing a separate device tree node for it's sake
+>>> didn't seem appropriate so the alteration to SoC node's compatible.
+>>
+>> Ah, so you are designing a node around the needs of a Linux specific
+>> driver. Don't do that. DT describes the h/w and this node is not a h/w
+>> block.
+>>
+>> Create a platform device based on a matching SOC compatible string
+>> instead and make your driver find the information it needs directly
+>> from the relevant nodes like the ROM node.
+>
+> That reads like my words a year ago:
+> https://lkml.org/lkml/2015/5/22/408
+>
+> Initially pretty much everything was hard-coded in the driver.
+>
+> Arnd then pushed to use more descriptive in the device tree.
+>
+> Of course, we should not end up making up relations which are not there
+> in hardware. We need to find the right balance.
+>
+> Here is my suggestion:
+> 1. Add "fsl,vf610-soc-bus" as compatible string to the soc node, use it
+> to bind the "soc bus driver" as a platform driver located in driver/soc/
 
-No, this is not relied on for that.  It is just NULL, because we don't
-have a physical parent device representation for the PCI host bridge.
+I'm not convinced this is a h/w block. This keeps coming up and I
+think this is a kernel problem, not a DT problem. Let's face it that
+there are drivers at the SOC level which don't fit into a DT node.
+They may be the exception, but they are a common exception. My
+proposal for how to deal with these cases is here[1].
 
-> It looks hacky and prevents us from getting some firmware specific
-> info for PCI host controller based on its acpi_device structure
-> in generic pci_create_root_bus() function.
+I also think drivers/soc is a mess because it is randomly used or not.
+IMO, using it should not be at the whim of whomever does SOC support.
 
-You can't get that info without adding ACPI-specific code to that function
-anyway.
+> 2. Add ROM as syscon device (it is not erasable ROM memory, hence eeprom
+> seems not to be appropriate)
 
-> However, we overcome that blocker by passing down parent device via
-> pci_create_root_bus parameter (as the ACPI device type).
+It is not a syscon. It is just memory. nvmem covers read-only memory,
+so I have no issue using that.
 
-Which is completely wrong.
+Rob
 
-> Then we use ACPI_COMPANION_SET in core code
-> for ACPI boot method only. ACPI_COMPANION_SET is safe to run for all
-> cases DT, ACPI and DT&ACPI.
-> 
-> Since now PCI core code is setting ACPI companion device for us,
-> x86 & ia64 specific ACPI companion device setting turns out to be dead now.
-> We can get rid of it, including related companion reference from
-> PCI sysdata structure. Aslo, PCI_CONTROLLER macro cannot return valid
-> companion device anymore. Therefore we need to convert its usage to
-> ACPI_COMPANION.
-> 
-> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  arch/ia64/hp/common/sba_iommu.c    |  2 +-
->  arch/ia64/include/asm/pci.h        |  1 -
->  arch/ia64/pci/pci.c                | 16 ----------------
->  arch/ia64/sn/kernel/io_acpi_init.c |  4 ++--
->  arch/x86/include/asm/pci.h         |  3 ---
->  arch/x86/pci/acpi.c                | 17 -----------------
->  drivers/acpi/pci_root.c            |  7 ++++++-
->  drivers/pci/probe.c                |  2 ++
->  8 files changed, 11 insertions(+), 41 deletions(-)
-> 
-> diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
-> index a6d6190..78e4444 100644
-> --- a/arch/ia64/hp/common/sba_iommu.c
-> +++ b/arch/ia64/hp/common/sba_iommu.c
-> @@ -1981,7 +1981,7 @@ sba_connect_bus(struct pci_bus *bus)
->  	if (PCI_CONTROLLER(bus)->iommu)
->  		return;
->  
-> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
-> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
->  	if (!handle)
->  		return;
->  
-> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-> index c0835b0..12423f4 100644
-> --- a/arch/ia64/include/asm/pci.h
-> +++ b/arch/ia64/include/asm/pci.h
-> @@ -63,7 +63,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
->  #define pci_legacy_write platform_pci_legacy_write
->  
->  struct pci_controller {
-> -	struct acpi_device *companion;
->  	void *iommu;
->  	int segment;
->  	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
-> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-> index 8f6ac2f..978d6af 100644
-> --- a/arch/ia64/pci/pci.c
-> +++ b/arch/ia64/pci/pci.c
-> @@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	}
->  
->  	info->controller.segment = root->segment;
-> -	info->controller.companion = device;
->  	info->controller.node = acpi_get_node(device->handle);
->  	INIT_LIST_HEAD(&info->io_resources);
->  	return acpi_pci_root_create(root, &pci_acpi_root_ops,
->  				    &info->common, &info->controller);
->  }
->  
-> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> -{
-> -	/*
-> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
-> -	 * here, pci_create_root_bus() has been called by someone else and
-> -	 * sysdata is likely to be different from what we expect.  Let it go in
-> -	 * that case.
-> -	 */
-> -	if (!bridge->dev.parent) {
-> -		struct pci_controller *controller = bridge->bus->sysdata;
-> -		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
-> -	}
-> -	return 0;
-> -}
-> -
->  void pcibios_fixup_device_resources(struct pci_dev *dev)
->  {
->  	int idx;
-> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
-> index 231234c..e454492 100644
-> --- a/arch/ia64/sn/kernel/io_acpi_init.c
-> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
-> @@ -132,7 +132,7 @@ sn_get_bussoft_ptr(struct pci_bus *bus)
->  	struct acpi_resource_vendor_typed *vendor;
->  
->  
-> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
-> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
->  	status = acpi_get_vendor_resource(handle, METHOD_NAME__CRS,
->  					  &sn_uuid, &buffer);
->  	if (ACPI_FAILURE(status)) {
-> @@ -360,7 +360,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
->  	acpi_status status;
->  	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
->  
-> -	rootbus_handle = acpi_device_handle(PCI_CONTROLLER(dev)->companion);
-> +	rootbus_handle = acpi_device_handle(ACPI_COMPANION(dev->bus->bridge));
->          status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
->                                         &segment);
->          if (ACPI_SUCCESS(status)) {
-> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-> index 9ab7507..24de07d 100644
-> --- a/arch/x86/include/asm/pci.h
-> +++ b/arch/x86/include/asm/pci.h
-> @@ -14,9 +14,6 @@
->  struct pci_sysdata {
->  	int		domain;		/* PCI domain */
->  	int		node;		/* NUMA node */
-> -#ifdef CONFIG_ACPI
-> -	struct acpi_device *companion;	/* ACPI companion device */
-> -#endif
->  #ifdef CONFIG_X86_64
->  	void		*iommu;		/* IOMMU private data */
->  #endif
-> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-> index 3cd6983..f4ca17a 100644
-> --- a/arch/x86/pci/acpi.c
-> +++ b/arch/x86/pci/acpi.c
-> @@ -340,7 +340,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  		struct pci_sysdata sd = {
->  			.domain = domain,
->  			.node = node,
-> -			.companion = root->device
->  		};
->  
->  		memcpy(bus->sysdata, &sd, sizeof(sd));
-> @@ -355,7 +354,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  		else {
->  			info->sd.domain = domain;
->  			info->sd.node = node;
-> -			info->sd.companion = root->device;
->  			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
->  						   &info->common, &info->sd);
->  		}
-> @@ -373,21 +371,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	return bus;
->  }
->  
-> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> -{
-> -	/*
-> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
-> -	 * here, pci_create_root_bus() has been called by someone else and
-> -	 * sysdata is likely to be different from what we expect.  Let it go in
-> -	 * that case.
-> -	 */
-> -	if (!bridge->dev.parent) {
-> -		struct pci_sysdata *sd = bridge->bus->sysdata;
-> -		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
-> -	}
-> -	return 0;
-> -}
-> -
->  int __init pci_acpi_init(void)
->  {
->  	struct pci_dev *dev = NULL;
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index ae3fe4e..4581e0e 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device *device,
->  		}
->  	}
->  
-> +	/*
-> +	 * pci_create_root_bus() needs to detect the parent device type,
-> +	 * so initialize its companion data accordingly.
-> +	 */
-> +	ACPI_COMPANION_SET(&device->dev, device);
-
-This is a complete nonsense, sorry.
-
-This just means that the ACPI firmware object will now be an ACPI companion of
-itself.
-
-Thanks,
-Rafael
+[1] https://lkml.org/lkml/2013/10/30/27
