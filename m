@@ -1,64 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 May 2016 14:03:22 -0700
-Subject: Reverting ARCH_SUNXI arm64 support(?)
-In-Reply-To: <20160509205716.GG3733@lukather>
-References: <57304FF7.3080909@arm.com> <20160509090951.GC19763@arm.com>
- <5730714C.7010608@arm.com> <20160509205716.GG3733@lukather>
-Message-ID: <CAOesGMiAeG1Sy1efAMVQxkRu-Wh7UY-awUcPPQPQ3BKswsYN5Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 May 2016 16:07:35 -0500
+Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
+In-Reply-To: <5730F8BA.5000402@gmail.com>
+References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160509200657.GA3379@rob-hp-laptop> <5730F8BA.5000402@gmail.com>
+Message-ID: <CAL_JsqJPZS1ne_xAuBFtCc5L1HKFJf0LDUJ7CRSFXhc3adkTfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 9, 2016 at 1:57 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, May 09, 2016 at 12:15:24PM +0100, Andre Przywara wrote:
->> Hi,
->>
->> On 09/05/16 10:09, Will Deacon wrote:
->> > On Mon, May 09, 2016 at 09:53:11AM +0100, Andre Przywara wrote:
->> >> Hi Will, Catalin,
->> >
->> > Hi Andre,
->> >
->> >> Suzuki reported a build failure with certain (non-defconfig) .configs
->> >> due to the new ARCH_SUNXI support in 4.6-rc [1].
->> >> As unfortunately we couldn't agree on a solution and also the support
->> >> for the A64/Pine64 is partial in 4.6 anyway, can you please revert:
->> >> ce3dd55b99b151a90ac1701c6825f2ae2d49b54e ("arm64: Introduce Allwinner
->> >> SoC config option")
->> >
->> > Given that we (Catalin and I) didn't commit that patch, it seems weird
->> > that we should be reverting it. Shouldn't this be handled in arm-soc or
->> > via the sunxi subtree?
->> >
->> > We're also a week from the merge window, so it doesn't seem like a good
->> > time to be hacking at .config/kconfig-related issues.
->>
->> I agree, that's why I was proposing taking Suzuki's first patch:
->>
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index efa77c1..521b1ec 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -2,6 +2,7 @@ menu "Platform selection"
->>
->>  config ARCH_SUNXI
->>       bool "Allwinner sunxi 64-bit SoC Family"
->> +     select GENERIC_IRQ_CHIP
->>       help
->>         This enables support for Allwinner sunxi based SoCs like the A64.
->>
->>
->> This is what defconfig selects anyway and also the change would be
->> confined to this (new) config option.
->>
->> Olof, Arnd: would it be an option to take this patch still?
+On Mon, May 9, 2016 at 3:53 PM, Ivaylo Dimitrov
+<ivo.g.dimitrov.75@gmail.com> wrote:
+> Hi,
 >
-> FWIW, I'd be in favour for such patch as a late patch for 4.6.
+> On  9.05.2016 23:06, Rob Herring wrote:
+>>
+>> On Sat, May 07, 2016 at 06:21:45PM +0300, Ivaylo Dimitrov wrote:
+>>>
+>>> With the upcoming removal of legacy boot, lets add support to one of the
+>>> last N900 drivers remaining without it. As the driver still uses omap
+>>> dmtimer, add auxdata as well.
+>>>
+>>> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+>>> ---
+>>>   .../devicetree/bindings/media/nokia,lirc-rx51         | 19
+>>> +++++++++++++++++++
+>>>   arch/arm/mach-omap2/pdata-quirks.c                    |  6 +-----
+>>>   drivers/media/rc/ir-rx51.c                            | 11 ++++++++++-
+>>>   3 files changed, 30 insertions(+), 6 deletions(-)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/media/nokia,lirc-rx51
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/media/nokia,lirc-rx51
+>>> b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
+>>> new file mode 100644
+>>> index 0000000..5b3081e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
+>>> @@ -0,0 +1,19 @@
+>>> +Device-Tree bindings for LIRC TX driver for Nokia N900(RX51)
+>>> +
+>>> +Required properties:
+>>> +       - compatible: should be "nokia,lirc-rx51".
+>>
+>>
+>> lirc is a Linux term. Also, nokia,rx51-... would be conventional
+>> ordering.
+>>
 >
-> We can always fix things up properly in a later patch for 4.7 or 4.8.
+> I used the driver name ("lirc_rx51") to not bring confusion. Also, it
+> registers itself through lirc_register_driver() call, so having lirc in its
+> name somehow makes sense.
+>
+> I am not very good in inventing names, the best compatible I can think of is
+> "nokia,rx51-ir". Is that ok?
 
-+1. Please send said patch to arm at kernel.org and we can apply it (cc
-Maxime so he can cc) and send up.
+Sure, but...
 
+>> Is this anything more than a PWM LED?
+>>
+>
+> It is an IR LED connected through a driver to McSPI2_SIMO pin of OMAP3,
+> which pin can be configured as PWM or GPIO(there are other configurations,
+> but they don't make sense). In theory it could be used for various things
+> (like uni-directional serial TX, or stuff like that), but in practice it
+> allows N900 to be act as an IR remote controller. I guess that fits in
+> "nothing more than a PWM LED", more or less.
 
--Olof
+There's already a pwm-led binding that can be used. Though there may
+be missing consumer IR to LED subsystem support in the kernel. You
+could list both compatibles, use the rx51 IR driver now, and then move
+to pwm-led driver in the future.
+
+Rob
