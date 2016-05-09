@@ -1,75 +1,97 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 9 May 2016 08:48:16 -0400
-Subject: [RESEND PATCH] [media] s5p-mfc: don't close instance after free
- OUTPUT buffers
-In-Reply-To: <1462584301.25248.40.camel@collabora.com>
-References: <1462572682-5195-1-git-send-email-javier@osg.samsung.com>
- <1462584301.25248.40.camel@collabora.com>
-Message-ID: <ef0eb150-450b-96db-5f04-45271643f5c6@osg.samsung.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon,  9 May 2016 22:02:49 +0930
+Subject: [PATCH 4/4] drivers/clocksource/moxart: Add Aspeed support
+In-Reply-To: <1462797169-14512-1-git-send-email-joel@jms.id.au>
+References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
+Message-ID: <1462797169-14512-5-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+The Aspeed SoC has timer IP with a very similar register layout to the
+moxart timer. This patch adds support for the fourth and fifth gen
+aspeed SoCs, and has been tested on the ast2400 and ast2500.
 
-Thanks for your feedback.
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ .../bindings/timer/moxa,moxart-timer.txt           |  4 ++-
+ drivers/clocksource/moxart_timer.c                 | 32 ++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
 
-On 05/06/2016 09:25 PM, Nicolas Dufresne wrote:
-> Thanks for re-submitting. See inline two typos to fix in teh comment.
->
-
-You are welcome, as we talked in IRC you needed this to make video decoding
-in your Exynos4412 Odroid X2 board, so it would be great if you can provide
-your Reviewed or Acked by tags.
+diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+index da2d510cae47..e207c11630af 100644
+--- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
++++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+@@ -2,7 +2,9 @@ MOXA ART timer
  
-> cheers,
-> Nicolas
-> 
-> Le vendredi 06 mai 2016 ? 18:11 -0400, Javier Martinez Canillas a ?crit :
->> From: ayaka <ayaka@soulik.info>
->>
->> User-space applications can use the VIDIOC_REQBUFS ioctl to determine if a
->> memory mapped, user pointer or DMABUF based I/O is supported by the driver.
->>
->> So a set of VIDIOC_REQBUFS ioctl calls will be made with count 0 and then
->> the real VIDIOC_REQBUFS call with count == n. But for count 0, the driver
->> not only frees the buffer but also closes the MFC instance and s5p_mfc_ctx
->> state is set to MFCINST_FREE.
->>
->> The VIDIOC_REQBUFS handler for the output device checks if the s5p_mfc_ctx
->> state is set to MFCINST_INIT (which happens on an VIDIOC_S_FMT) and fails
->> otherwise. So after a VIDIOC_REQBUFS(n), future VIDIOC_REQBUFS(n) calls
->> will fails unless a VIDIOC_S_FMT ioctl calls happens before the reqbufs.
->>
->> But applications may first set the format and then attempt to determine
->> the I/O methods supported by the driver (for example Gstramer does it) so
->  * GStreamer
->
-
-Right, sorry about that. I'll wait for other people feedback and fix in v2.
-
->> the state won't be set to MFCINST_INIT again and VIDIOC_REQBUFS will fail.
->>
->> To avoid this issue, only free the buffers on VIDIOC_REQBUFS(0) but don't
->> close the MFC instance to allow future VIDIOC_REQBUFS(n) calls to succeed.
->>
->> Signed-off-by: ayaka <ayaka@soulik.info>
->> [javier: Rewrote changelog to explain the problem more detailed]
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->> Hello,
->>
->> This is a resend of a patch posted by Ayaka some time ago [0].
->> Without $SUBJECT, trying to decode a video using Gstramer fails
-> 
-> * GStreamer again 
->
-
-Yes, this is not that important since the comments between the --- separator
-and the actual diff is stripped and doesn't end in the commit message.
-
-Best regards,
+ Required properties:
+ 
+-- compatible : Must be "moxa,moxart-timer"
++- compatible : Must be one of:
++ 	- "moxa,moxart-timer"
++ 	- "aspeed,ast2400-timer"
+ - reg : Should contain registers location and length
+ - interrupts : Should contain the timer interrupt number
+ - clocks : Should contain phandle for the clock that drives the counter
+diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+index d17e3eface87..83ffa2727699 100644
+--- a/drivers/clocksource/moxart_timer.c
++++ b/drivers/clocksource/moxart_timer.c
+@@ -56,6 +56,23 @@
+ #define MOXART_TIMER1_ENABLE	(MOXART_CR_2_ENABLE | MOXART_CR_1_ENABLE)
+ #define MOXART_TIMER1_DISABLE	(MOXART_CR_2_ENABLE)
+ 
++/*
++ * The ASpeed variant of the IP block has a different layout
++ * for the control register
++ */
++#define ASPEED_CR_1_ENABLE	BIT(0)
++#define ASPEED_CR_1_CLOCK	BIT(1)
++#define ASPEED_CR_1_INT		BIT(2)
++#define ASPEED_CR_2_ENABLE	BIT(4)
++#define ASPEED_CR_2_CLOCK	BIT(5)
++#define ASPEED_CR_2_INT		BIT(6)
++#define ASPEED_CR_3_ENABLE	BIT(8)
++#define ASPEED_CR_3_CLOCK	BIT(9)
++#define ASPEED_CR_3_INT		BIT(10)
++
++#define ASPEED_TIMER1_ENABLE   (ASPEED_CR_2_ENABLE | ASPEED_CR_1_ENABLE)
++#define ASPEED_TIMER1_DISABLE  (ASPEED_CR_2_ENABLE)
++
+ struct moxart_timer {
+ 	void __iomem *base;
+ 	unsigned int t1_disable_val;
+@@ -159,6 +176,9 @@ static void __init moxart_timer_init(struct device_node *node)
+ 	if (of_device_is_compatible(node, "moxa,moxart-timer")) {
+ 		timer->t1_enable_val = MOXART_TIMER1_ENABLE;
+ 		timer->t1_disable_val = MOXART_TIMER1_DISABLE;
++	} else if (of_device_is_compatible(node, "aspeed,ast2400-timer")) {
++		timer->t1_enable_val = ASPEED_TIMER1_ENABLE;
++		timer->t1_disable_val = ASPEED_TIMER1_DISABLE;
+ 	} else
+ 		panic("%s: unknown platform\n", node->full_name);
+ 
+@@ -189,6 +209,17 @@ static void __init moxart_timer_init(struct device_node *node)
+ 	if (ret)
+ 		panic("%s: setup_irq failed\n", node->full_name);
+ 
++	/* Clear match registers */
++	writel(0, timer->base + TIMER1_BASE + REG_MATCH1);
++	writel(0, timer->base + TIMER1_BASE + REG_MATCH2);
++	writel(0, timer->base + TIMER2_BASE + REG_MATCH1);
++	writel(0, timer->base + TIMER2_BASE + REG_MATCH2);
++
++	/*
++	 * Start timer 2 rolling as our main wall clock source, keep timer 1
++	 * disabled
++	 */
++	writel(0, timer->base + TIMER_CR);
+ 	writel(~0, timer->base + TIMER2_BASE + REG_LOAD);
+ 	writel(timer->t1_disable_val, timer->base + TIMER_CR);
+ 
+@@ -201,3 +232,4 @@ static void __init moxart_timer_init(struct device_node *node)
+ 	clockevents_config_and_register(&timer->clkevt, pclk, 0x4, 0xfffffffe);
+ }
+ CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
++CLOCKSOURCE_OF_DECLARE(aspeed, "aspeed,ast2400-timer", moxart_timer_init);
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.8.1
