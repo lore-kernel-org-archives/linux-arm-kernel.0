@@ -1,29 +1,39 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 10 May 2016 08:04:40 +1000
-Subject: [PATCH 1/2] doc/devicetree: Add Aspeed VIC bindings
-In-Reply-To: <20160509152003.GA13842@leverpostej>
-References: <1462797239-14765-1-git-send-email-joel@jms.id.au>
- <1462797239-14765-2-git-send-email-joel@jms.id.au>
- <20160509152003.GA13842@leverpostej>
-Message-ID: <1462831480.20290.120.camel@kernel.crashing.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 May 2016 15:42:19 -0700
+Subject: [GIT PULL] clk: tegra: Changes for v4.7-rc1
+In-Reply-To: <20160509051946.GA18753@ulmo.ba.sec>
+References: <1461945596-24090-1-git-send-email-thierry.reding@gmail.com>
+ <20160503000248.GB3492@codeaurora.org>
+ <20160509051946.GA18753@ulmo.ba.sec>
+Message-ID: <20160509224219.GY3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-05-09 at 16:20 +0100, Mark Rutland wrote:
->?
-> Generally we steer clear of this kind of bitmap encoding in DT.
+On 05/09, Thierry Reding wrote:
+>
+> I'm not aware of any API that would fit in this case. Power domains
+> would be misleading because power management isn't involved. One other
+> alternative that I had thought about is to make it a "virtual" reset,
+> but that is equally misleading because nothing is really being reset
+> here.
 > 
-> Is this actually necessary? What does htis gain us?
+> Yet another option might be to make it a "virtual" clock, though it'd
+> have to be somewhat hacky because we need two steps (one to enable HW
+> control and another to start the HW sequencer). That could be
+> implemented using ->prepare() and ->enable(), respectively, but it's
+> really not a clock either.
 > 
-> Why can we not just register with the full set of possible
-> interrupts?
+> I welcome any ideas on how to turn this into something generic, though.
+> 
 
-Trying to remember why I did that ... I think it has to do with
-supporting multiple SoCs that have different possible sources...
+I suggested power domains because it looks like SoC glue code
+that we need to do when the device is powered on and off? Unless
+I totally misread how it was used. And I suppose I should have
+said generic power domains (genpd) instead of power domains,
+because I agree it's not actual power management, just some SoC
+runtime PM stuff it seems. But who knows, I probably misread it
+all.
 
-There might also be a case of some sources routed to the internal
-coldfire microcontroller or the LPC bus instead of the ARM but I'm not
-100% certain.
-
-Cheers,
-Ben.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
