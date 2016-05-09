@@ -1,88 +1,54 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  9 May 2016 17:49:45 +0100
-Subject: [PATCH 1/6] arm64: alternatives: drop enable parameter from _else and
- _endif macro
+Date: Mon,  9 May 2016 17:49:46 +0100
+Subject: [PATCH 2/6] arm64: fix "dc cvau" cache operation on errata-affected
+ core
 In-Reply-To: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
 References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462812590-4494-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462812590-4494-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 77ee306c0aea9 ("arm64: alternatives: add enable parameter to
-conditional asm macros") extended the alternative assembly macros.
-Unfortunately this does not really work as one would expect, as the
-enable parameter in fact correctly protects the alternative section
-magic, but not the actual code sequences.
-So if enable is false, we will have the original instruction(s) _and_
-the alternative ones in the file, which is just wrong.
-To make this work one would need to additionally protect the
-alternative sequence with extra .if directives, which makes
-the intention of the enable parameter rather pointless.
-Instead users should directly guard the whole "_else; insn; _endif"
-sequence with .if directives.
-Add a comment describing this usage and drop the enable parameter from
-the alternative_else and alternative_endif macros.
-
-This reverts parts of commit 77ee306c0aea ("arm64: alternatives: add
-enable parameter to conditional asm macros").
+The ARM errata 819472, 826319, 827319 and 824069 for affected
+Cortex-A53 cores demand to promote "dc cvau" instructions to
+"dc civac" as well.
+Attribute the usage of the instruction in __flush_cache_user_range
+to also be covered by our alternative patching efforts.
+For that we introduce an assembly macro which both deals with
+alternatives while still tagging the instructions as USER.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/include/asm/alternative.h | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/alternative.h | 4 ++++
+ arch/arm64/mm/cache.S                | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index beccbde..502c9ef 100644
+index 502c9ef..d4a69a9 100644
 --- a/arch/arm64/include/asm/alternative.h
 +++ b/arch/arm64/include/asm/alternative.h
-@@ -94,6 +94,8 @@ void apply_alternatives(void *start, size_t length);
-  *
-  * The code that follows this macro will be assembled and linked as
-  * normal. There are no restrictions on this code.
-+ * If you use the enable parameter, see the comments below for _else
-+ * and _endif.
-  */
- .macro alternative_if_not cap, enable = 1
- 	.if \enable
-@@ -117,23 +119,33 @@ void apply_alternatives(void *start, size_t length);
-  * 2. Not contain a branch target that is used outside of the
-  *    alternative sequence it is defined in (branches into an
-  *    alternative sequence are not fixed up).
-+ *
-+ * If you used the optional enable parameter in the opening
-+ * alternative_if_not macro above, please protect the whole _else
-+ * branch with an .if directive:
-+ *	alternative_if_not CAP_SOMETHING, condition
-+ *		orig_insn
-+ *	.if condition
-+ *	alternative_else
-+ *		repl_insn
-+ *	alternative_endif
-+ *	.endif
-  */
--.macro alternative_else, enable = 1
--	.if \enable
-+.macro alternative_else
- 662:	.pushsection .altinstr_replacement, "ax"
- 663:
--	.endif
- .endm
+@@ -151,6 +151,10 @@ void apply_alternatives(void *start, size_t length);
+ #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
+ 	alternative_insn insn1, insn2, cap, IS_ENABLED(cfg)
+ 
++.macro user_alt, label, oldinstr, newinstr, cond
++9999:	alternative_insn "\oldinstr", "\newinstr", \cond
++	_ASM_EXTABLE 9999b, \label
++.endm
  
  /*
-  * Complete an alternative code sequence.
-+ *
-+ * Please mind the comment at alternative_else above if you used the
-+ * optional enable parameter with the opening alternative_if_not macro.
-  */
--.macro alternative_endif, enable = 1
--	.if \enable
-+.macro alternative_endif
- 664:	.popsection
- 	.org	. - (664b-663b) + (662b-661b)
- 	.org	. - (662b-661b) + (664b-663b)
--	.endif
- .endm
- 
- #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
+  * Generate the assembly for UAO alternatives with exception table entries.
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 6df0706..82f40bd 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -54,7 +54,7 @@ ENTRY(__flush_cache_user_range)
+ 	sub	x3, x2, #1
+ 	bic	x4, x0, x3
+ 1:
+-USER(9f, dc	cvau, x4	)		// clean D line to PoU
++user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+ 	add	x4, x4, x2
+ 	cmp	x4, x1
+ 	b.lo	1b
 -- 
 2.7.3
