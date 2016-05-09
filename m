@@ -1,304 +1,91 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 9 May 2016 07:48:25 -0700
-Subject: [PATCH 2/2] watchdog: Add Aspeed watchdog driver
-In-Reply-To: <1462797277-14969-3-git-send-email-joel@jms.id.au>
-References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
- <1462797277-14969-3-git-send-email-joel@jms.id.au>
-Message-ID: <5730A339.80006@roeck-us.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  9 May 2016 15:51:28 +0100
+Subject: [PATCH v2] clocksource/arm_arch_timer: Force per-CPU interrupt to be
+ level-triggered
+Message-ID: <1462805488-21535-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+The ARM architected timer produces level-triggered interrupts (this
+is mandated by the architecture). Unfortunately, most device-trees
+get this wrong, and expose an edge-triggered interrupt.
 
-On 05/09/2016 05:34 AM, Joel Stanley wrote:
-> Provides generic watchdog features as well as reboot support for the
-> Apeed SoC.
->
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->   drivers/watchdog/Kconfig      |  13 +++
->   drivers/watchdog/Makefile     |   1 +
->   drivers/watchdog/aspeed_wdt.c | 199 ++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 213 insertions(+)
->   create mode 100644 drivers/watchdog/aspeed_wdt.c
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index fb947655badd..4f0e2ded4785 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -661,6 +661,19 @@ config ATLAS7_WATCHDOG
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called atlas7_wdt.
->
-> +config ASPEED_WATCHDOG
-> +	tristate "Aspeed 2400 watchdog support"
-> +	depends on ARCH_ASPEED || COMPILE_TEST
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in Apseed BMC SoCs.
-> +
-> +	  This driver is required to reboot the SoC.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called aspeed_wdt.
-> +
->   # AVR32 Architecture
->
->   config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index feb6270fdbde..36855375e0ce 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -73,6 +73,7 @@ obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->   obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
->   obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
->   obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
-> +obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
->
->   # AVR32 Architecture
->   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/aspeed_wdt.c b/drivers/watchdog/aspeed_wdt.c
-> new file mode 100644
-> index 000000000000..46cc71963c62
-> --- /dev/null
-> +++ b/drivers/watchdog/aspeed_wdt.c
-> @@ -0,0 +1,199 @@
-> +/*
-> + * Copyright 2016 IBM Corporation
-> + *
-> + * Joel Stanley <joel@jms.id.au>
-> + *
-> + * Based on the qcom-watchdog driver
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/watchdog.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +
-> +struct aspeed_wdt {
-> +	struct watchdog_device	wdd;
-> +	unsigned long		rate;
-> +	void __iomem		*base;
-> +	u32			ctrl;
-> +};
-> +
-> +static const struct of_device_id aspeed_wdt_of_table[] = {
-> +	{ .compatible = "aspeed,wdt" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, aspeed_wdt_of_table);
-> +
-> +#define WDT_STATUS		0x00
-> +#define WDT_RELOAD_VALUE	0x04
-> +#define WDT_RESTART		0x08
-> +#define WDT_CTRL		0x0C
-> +#define   WDT_CTRL_RESET_MODE_SOC	(0x00 << 5)
-> +#define   WDT_CTRL_RESET_MODE_FULL_CHIP	(0x01 << 5)
-> +#define	  WDT_CTRL_1MHZ_CLK		BIT(4)
-> +#define	  WDT_CTRL_WDT_EXT		BIT(3)
-> +#define	  WDT_CTRL_WDT_INTR		BIT(2)
-> +#define   WDT_CTRL_RESET_SYSTEM		BIT(1)
-> +#define   WDT_CTRL_ENABLE		BIT(0)
-> +
-> +#define	WDT_RESTART_MAGIC	0x4755
+Until now, this wasn't too much an issue, as the programming of the
+trigger would fail (the corresponding PPI cannot be reconfigured),
+and the kernel would be happy with this. But we're about to change
+this, and trust DT a lot if the driver doesn't provide its own
+trigger information. In that context, the timer breaks badly.
 
-Please don't use tabs after #define.
+While we do need to fix the DTs, there is also some userspace out
+there (kvmtool) that generates the same kind of broken DT on the
+fly, and that will completely break with newer kernels.
 
-> +
-> +static struct aspeed_wdt *to_aspeed_wdt(struct watchdog_device *wdd)
-> +{
-> +	return container_of(wdd, struct aspeed_wdt, wdd);
-> +}
-> +
-> +
-Please no double empty lines.
+As a safety measure, and to keep buggy software alive as well as
+buying us some time to fix DTs all over the place, let's check
+what trigger configuration has been given us by the firmware.
+If this is not a level configuration, then we know that the
+DT/ACPI configuration is bust, and we pick some defaults which
+won't be worse than the existing setup.
 
-> +static void aspeed_wdt_enable(struct aspeed_wdt *wdt, int count)
-> +{
-> +	wdt->ctrl |= WDT_CTRL_ENABLE;
-> +
-> +	writel(0, wdt->base + WDT_CTRL);
-> +	writel(count, wdt->base + WDT_RELOAD_VALUE);
-> +	writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
-> +	writel(wdt->ctrl, wdt->base + WDT_CTRL);
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+- from v1: realised that there is no sane default, as we already have
+  diverging configurations. Instead, test for a level interrupt, and
+  force it to level low if current setting was edge. Also scream at the
+  unfortunate user.
 
-Is it really necessary to write 0 into the ctrl register when enabling
-the watchdog ? Problem with it is two-fold: It changes the clock rate
-for a brief period of time, and it disables the watchdog while updating
-the timeout. Both is undesirable unless really needed.
+ drivers/clocksource/arm_arch_timer.c | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
 
-> +}
-> +
-> +static int aspeed_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	dev_dbg(wdd->parent, "starting with timeout of %d (rate %lu)\n",
-> +			wdd->timeout, wdt->rate);
-
-Are those dev_dbg() really useful ?
-
-> +	aspeed_wdt_enable(wdt, wdd->timeout * wdt->rate);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	wdt->ctrl &= ~WDT_CTRL_ENABLE;
-> +	writel(wdt->ctrl, wdt->base + WDT_CTRL);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_ping(struct watchdog_device *wdd)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	dev_dbg(wdd->parent, "ping\n");
-> +	writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	dev_dbg(wdd->parent, "timeout set to %u\n", timeout);
-> +	wdd->timeout = timeout;
-> +
-> +	return aspeed_wdt_start(wdd);
-> +}
-> +
-> +static int aspeed_wdt_restart(struct watchdog_device *wdd,
-> +			      unsigned long action, void *data)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	aspeed_wdt_enable(wdt, 128 * wdt->rate / 1000);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_ops aspeed_wdt_ops = {
-> +	.start		= aspeed_wdt_start,
-> +	.stop		= aspeed_wdt_stop,
-> +	.ping		= aspeed_wdt_ping,
-> +	.set_timeout	= aspeed_wdt_set_timeout,
-> +	.restart	= aspeed_wdt_restart,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static const struct watchdog_info aspeed_wdt_info = {
-> +	.options	= WDIOF_KEEPALIVEPING
-> +			| WDIOF_MAGICCLOSE
-> +			| WDIOF_SETTIMEOUT,
-> +	.identity	= KBUILD_MODNAME,
-> +};
-> +
-> +static int aspeed_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct aspeed_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	watchdog_unregister_device(&wdt->wdd);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct aspeed_wdt *wdt;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(wdt->base))
-> +		return PTR_ERR(wdt->base);
-> +
-> +	/*
-> +	 * The ast2400 wdt can run at PCLK, or 1MHz. The ast2500 only
-> +	 * runs at 1MHz. We chose to always run at 1MHz, as there's no
-> +	 * good reason to have a faster watchdog counter.
-> +	 */
-> +	wdt->rate = 1000000;
-
-Why not just use a define ?
-
-> +	wdt->wdd.info = &aspeed_wdt_info;
-> +	wdt->wdd.ops = &aspeed_wdt_ops;
-> +	wdt->wdd.min_timeout = 1;
-> +	wdt->wdd.max_timeout = 0x10000000U / wdt->rate;
-> +	wdt->wdd.parent = &pdev->dev;
-> +
-> +	wdt->wdd.timeout = min(wdt->wdd.max_timeout, 30U);
-
-Pretty much the same here. Since max_timeout is a constant,
-it is well known that it is larger than 30 seconds.
-Might as well use defines for max_timeout and timeout.
-
-> +	watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev);
-> +
-> +	wdt->ctrl = WDT_CTRL_RESET_MODE_SOC |
-
-Only reset tha SoC ? Are you sure this is what you want ?
-
-> +		WDT_CTRL_1MHZ_CLK |
-> +		WDT_CTRL_RESET_SYSTEM;
-> +
-> +	/* Ensure hardware is in consistent state */
-> +	aspeed_wdt_stop(&wdt->wdd);
-> +
-An alternative might be to check if the watchdog is running, and inform
-the watchdog core about it so it can generate heartbeats as required
-until user space opens the watchdog device. This would ensure that the
-system is protected during boot.
-
-ctrl is really static except for the enable flag. Not really sure
-if having a variable for it has any real benefits - you might as well
-just read the register and update the enable flag instead as needed when
-starting or stopping the watchdog. Is there a reason for not doing that ?
-
-> +	ret = watchdog_register_device(&wdt->wdd);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to register\n");
-> +		goto err;
-
-Unnecessary goto. Just return.
-
-> +	}
-> +
-> +	dev_info(&pdev->dev, "rate %lu, max timeout %u, timeout %d\n",
-> +		 wdt->rate, wdt->wdd.max_timeout, wdt->wdd.timeout);
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +err:
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver aspeed_watchdog_driver = {
-> +	.probe = aspeed_wdt_probe,
-> +	.remove = aspeed_wdt_remove,
-> +	.driver = {
-> +		.name = KBUILD_MODNAME,
-> +		.of_match_table = of_match_ptr(aspeed_wdt_of_table),
-> +	},
-> +};
-> +module_platform_driver(aspeed_watchdog_driver);
-> +
-> +MODULE_DESCRIPTION("Aspeed Watchdog Driver");
-> +MODULE_LICENSE("GPL");
->
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5152b38..be8cc6d 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -8,6 +8,9 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++
++#define pr_fmt(fmt)	"arm_arch_timer: " fmt
++
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/device.h>
+@@ -362,14 +365,32 @@ static bool arch_timer_has_nonsecure_ppi(void)
+ 		arch_timer_ppi[PHYS_NONSECURE_PPI]);
+ }
+ 
++static u32 check_ppi_trigger(int irq)
++{
++	u32 flags = irq_get_trigger_type(irq);
++
++	if (flags != IRQF_TRIGGER_HIGH && flags != IRQF_TRIGGER_LOW) {
++		pr_warn("WARNING: Invalid trigger for IRQ%d, assuming level low\n", irq);
++		pr_warn("WARNING: Please fix your firmware\n");
++		flags = IRQF_TRIGGER_LOW;
++	}
++
++	return flags;
++}
++
+ static int arch_timer_setup(struct clock_event_device *clk)
+ {
++	u32 flags;
++
+ 	__arch_timer_setup(ARCH_CP15_TIMER, clk);
+ 
+-	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
++	flags = check_ppi_trigger(arch_timer_ppi[arch_timer_uses_ppi]);
++	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], flags);
+ 
+-	if (arch_timer_has_nonsecure_ppi())
+-		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
++	if (arch_timer_has_nonsecure_ppi()) {
++		flags = check_ppi_trigger(arch_timer_ppi[PHYS_NONSECURE_PPI]);
++		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], flags);
++	}
+ 
+ 	arch_counter_set_user_access();
+ 	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
+-- 
+2.1.4
