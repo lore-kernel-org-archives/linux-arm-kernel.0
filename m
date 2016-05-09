@@ -1,109 +1,258 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon,  9 May 2016 18:39:26 +0100
-Subject: [PATCH] arm64: kgdb: Match pstate size with gdbserver protocol
-Message-ID: <1462815566-15086-1-git-send-email-daniel.thompson@linaro.org>
+From: Tirumalesh.Chalamarla@cavium.com (Chalamarla, Tirumalesh)
+Date: Mon, 9 May 2016 17:51:04 +0000
+Subject: [PATCH v3 32/55] KVM: arm/arm64: vgic-new: Add GICv3 MMIO
+ handling framework
+In-Reply-To: <5730C65D.5000609@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-33-git-send-email-andre.przywara@arm.com>
+ <5730C65D.5000609@arm.com>
+Message-ID: <9CD2D565-5046-4366-9CB5-A08C5D7B1909@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current versions of gdb do not interoperate cleanly with kgdb on arm64
-systems because gdb and kgdb do not use the same register description.
-This patch modifies kgdb to work with recent releases of gdb (>= 7.8.1).
 
-Compatibility with gdb (after the patch is applied) is as follows:
 
-  gdb-7.6 and earlier  Ok
-  gdb-7.7 series       Works if user provides custom target description
-  gdb-7.8(.0)          Works if user provides custom target description
-  gdb-7.8.1 and later  Ok
 
-When commit 44679a4f142b ("arm64: KGDB: Add step debugging support") was
-introduced it was paired with a gdb patch that made an incompatible
-change to the gdbserver protocol. This patch was eventually merged into
-the gdb sources:
-https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=a4d9ba85ec5597a6a556afe26b712e878374b9dd
 
-The change to the protocol was mostly made to simplify big-endian support
-inside the kernel gdb stub. Unfortunately the gdb project released
-gdb-7.7.x and gdb-7.8.0 before the protocol incompatibility was identified
-and reversed:
-https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bdc144174bcb11e808b4e73089b850cf9620a7ee
 
-This leaves us in a position where kgdb still uses the no-longer-used
-protocol; gdb-7.8.1, which restored the original behaviour,If was
-released on 2014-10-29.
+On 5/9/16, 10:18 AM, "kvmarm-bounces at lists.cs.columbia.edu on behalf of Marc Zyngier" <kvmarm-bounces at lists.cs.columbia.edu on behalf of marc.zyngier@arm.com> wrote:
 
-I don't believe it is possible to detect/correct the protocol
-incompatiblity which means the kernel must take a view about which
-version of the gdb remote protocol is "correct". This patch takes the
-view that the original/current version of the protocol is correct
-and that version found in gdb-7.7.x and gdb-7.8.0 is anomalous.
+>On 06/05/16 11:45, Andre Przywara wrote:
+>> Create a new file called vgic-mmio-v3.c and describe the GICv3
+>> distributor and redistributor registers there.
+>> This adds a special macro to deal with the split of SGI/PPI in the
+>> redistributor and SPIs in the distributor, which allows us to reuse
+>> the existing GICv2 handlers for those registers which are compatible.
+>> Also we provide a function to deal with the registration of the two
+>> separate redistributor frames per VCPU.
+>> 
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>> Changelog RFC..v1:
+>> - adapt to new MMIO registration approach:
+>>   register one device for the distributor and two for each VCPU
+>> - implement special handling for private interrupts
+>> - remove empty stub functions
+>> - make IGROUPR return RAO
+>> 
+>> Changelog v1 .. v2:
+>> - adapt to new framework, introduce vgic-mmio-v3.c
+>> - remove userland register access functions (for now)
+>> - precompute .len when describing a VGIC register
+>> - add missed pointer incrementation on registering redist regions
+>> - replace _nyi stub functions with raz/wi versions
+>> 
+>> Changelog v2 .. v3:
+>> - replace inclusion of kvm/vgic/vgic.h with kvm/arm_vgic.h
+>> - add prototype and stub code for vgic_register_redist_iodevs
+>> - rename register struct variables _rdbase_ and _sgibase_
+>> 
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 191 +++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic-mmio.c    |   5 +
+>>  virt/kvm/arm/vgic/vgic-mmio.h    |   2 +
+>>  virt/kvm/arm/vgic/vgic.h         |   7 ++
+>>  4 files changed, 205 insertions(+)
+>>  create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> 
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> new file mode 100644
+>> index 0000000..06c7ec5
+>> --- /dev/null
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -0,0 +1,191 @@
+>> +/*
+>> + * VGICv3 MMIO handling functions
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +#include <kvm/iodev.h>
+>> +#include <kvm/arm_vgic.h>
+>> +
+>> +#include <asm/kvm_emulate.h>
+>> +
+>> +#include "vgic.h"
+>> +#include "vgic-mmio.h"
+>> +
+>> +/*
+>> + * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+>> + * redistributors, while SPIs are covered by registers in the distributor
+>> + * block. Trying to set private IRQs in this block gets ignored.
+>> + * We take some special care here to fix the calculation of the register
+>> + * offset.
+>> + */
+>> +#define REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(off, read_ops, write_ops, bpi) \
+>> +	{								\
+>> +		.reg_offset = off,					\
+>> +		.bits_per_irq = bpi,					\
+>> +		.len = (bpi * VGIC_NR_PRIVATE_IRQS) / 8,		\
+>> +		.read = vgic_mmio_read_raz,				\
+>> +		.write = vgic_mmio_write_wi,				\
+>> +	}, {								\
+>> +		.reg_offset = off + (bpi * VGIC_NR_PRIVATE_IRQS) / 8,	\
+>> +		.bits_per_irq = bpi,					\
+>> +		.len = (bpi * (1024 - VGIC_NR_PRIVATE_IRQS)) / 8,	\
+>> +		.read = read_ops,					\
+>> +		.write = write_ops,					\
+>> +	}
+>> +
+>> +static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>> +	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 16),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+>> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+>> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICENABLER,
+>> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISPENDR,
+>> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
+>> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+>> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICACTIVER,
+>> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IPRIORITYR,
+>> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ITARGETSR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICFGR,
+>> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGRPMODR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+>> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 64),
+>> +	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
+>> +};
+>> +
+>> +static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
+>> +};
+>> +
+>> +static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
+>> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
+>> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ICENABLER0,
+>> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ISPENDR0,
+>> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ICPENDR0,
+>> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
+>> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ICACTIVER0,
+>> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_IPRIORITYR0,
+>> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 32),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_ICFGR0,
+>> +		vgic_mmio_read_config, vgic_mmio_write_config, 8),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_IGRPMODR0,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_NSACR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>> +};
+>> +
+>> +unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+>> +{
+>> +	dev->regions = vgic_v3_dist_registers;
+>> +	dev->nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
+>> +
+>> +	kvm_iodevice_init(&dev->dev, &kvm_io_gic_ops);
+>> +
+>> +	return SZ_64K;
+>> +}
+>> +
+>> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>> +{
+>> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+>> +	struct kvm_vcpu *vcpu;
+>> +	struct vgic_io_device *devices, *device;
+>> +	int c, ret = 0;
+>> +
+>> +	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+>> +			  GFP_KERNEL);
+>> +	if (!devices)
+>> +		return -ENOMEM;
+>> +
+>> +	device = devices;
+>> +	kvm_for_each_vcpu(c, vcpu, kvm) {
+>> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
+>> +		device->base_addr = redist_base_address;
+>> +		device->regions = vgic_v3_rdbase_registers;
+>> +		device->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+>> +		device->redist_vcpu = vcpu;
+>> +
+>> +		mutex_lock(&kvm->slots_lock);
+>> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+>> +					      redist_base_address,
+>> +					      SZ_64K, &device->dev);
+>> +		mutex_unlock(&kvm->slots_lock);
+>> +
+>> +		if (ret)
+>> +			break;
+>> +
+>> +		device++;
+>> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
+>> +		device->base_addr = redist_base_address + SZ_64K;
+>> +		device->regions = vgic_v3_sgibase_registers;
+>> +		device->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
+>> +		device->redist_vcpu = vcpu;
+>> +
+>> +		mutex_lock(&kvm->slots_lock);
+>> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+>> +					      redist_base_address + SZ_64K,
+>> +					      SZ_64K, &device->dev);
+>> +		mutex_unlock(&kvm->slots_lock);
+>> +		if (ret) {
+>> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+>> +						  &devices[c * 2].dev);
+>> +			break;
+>> +		}
+>> +		device++;
+>> +		redist_base_address += 2 * SZ_64K;
+>> +	}
+>
+>What I fail to see here is what prevents the redistributor range from
+>overlapping with the distributor (or any other device). The kvm IO bus
+>is happy with overlapping addresses, but I'm not sure at all that this
+>is safe.
+>
+>Care to shed some light on it?
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
-
-Notes:
-    Vijaya: I really hope I have the history lesson in the commit
-            message correct! I've done a fair bit of archeology to
-    	unpick things.
-
- arch/arm64/include/asm/kgdb.h | 13 +++++--------
- arch/arm64/kernel/kgdb.c      |  7 ++++++-
- 2 files changed, 11 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kgdb.h b/arch/arm64/include/asm/kgdb.h
-index f69f69c8120c..326fa8f44da5 100644
---- a/arch/arm64/include/asm/kgdb.h
-+++ b/arch/arm64/include/asm/kgdb.h
-@@ -43,20 +43,17 @@ extern int kgdb_fault_expected;
-  * General purpose regs:
-  *     r0-r30: 64 bit
-  *     sp,pc : 64 bit
-- *     pstate  : 64 bit
-- *     Total: 34
-+ *     pstate  : 32 bit
-+ *     Total: 33 + 1
-  * FPU regs:
-  *     f0-f31: 128 bit
-- *     Total: 32
-- * Extra regs
-  *     fpsr & fpcr: 32 bit
-- *     Total: 2
-- *
-+ *     Total: 32 + 2
-  */
-
--#define _GP_REGS		34
-+#define _GP_REGS		33
- #define _FP_REGS		32
--#define _EXTRA_REGS		2
-+#define _EXTRA_REGS		3
- /*
-  * general purpose registers size in bytes.
-  * pstate is only 4 bytes. subtract 4 bytes
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index b67531a13136..ec62a4e3c190 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -58,7 +58,11 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
- 	{ "x30", 8, offsetof(struct pt_regs, regs[30])},
- 	{ "sp", 8, offsetof(struct pt_regs, sp)},
- 	{ "pc", 8, offsetof(struct pt_regs, pc)},
--	{ "pstate", 8, offsetof(struct pt_regs, pstate)},
-+	{ "pstate", 4, offsetof(struct pt_regs, pstate)
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+							+ 4
-+#endif
-+	},
- 	{ "v0", 16, -1 },
- 	{ "v1", 16, -1 },
- 	{ "v2", 16, -1 },
-@@ -128,6 +132,7 @@ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
- 	memset((char *)gdb_regs, 0, NUMREGBYTES);
- 	thread_regs = task_pt_regs(task);
- 	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
-+	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
- }
-
- void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
---
-2.5.5
+Added the same question on wrong patch last week, thanks Marc. 
+>
+>Thanks,
+>
+>	M.
+>-- 
+>Jazz is not dead. It just smells funny...
+>_______________________________________________
+>kvmarm mailing list
+>kvmarm at lists.cs.columbia.edu
+>https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
