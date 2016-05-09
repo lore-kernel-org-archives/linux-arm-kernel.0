@@ -1,72 +1,180 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 9 May 2016 09:46:40 +0200
-Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
-In-Reply-To: <20160505224240.GA31429@rob-hp-laptop>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <20160505224240.GA31429@rob-hp-laptop>
-Message-ID: <CAPDyKFqpoi03Egfuvd8qJXnn_+FBgPXAb7S4UvkxVs8BA+zwnA@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 9 May 2016 09:48:38 +0200
+Subject: [PATCH v9 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
+ 2/3: msi changes
+In-Reply-To: <9C17BA6B-7304-47CA-A287-77FB41D96AD3@caviumnetworks.com>
+References: <1462375094-2390-1-git-send-email-eric.auger@linaro.org>
+ <9C17BA6B-7304-47CA-A287-77FB41D96AD3@caviumnetworks.com>
+Message-ID: <573040D6.9050803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2016 at 00:42, Rob Herring <robh@kernel.org> wrote:
-> On Thu, May 05, 2016 at 02:34:13PM +0200, Krzysztof Kozlowski wrote:
->> Hi,
->>
->> This is a different, second try to fix usb3503+lan on Odroid U3 board
->> if it was initialized by bootloader (e.g. for TFTP boot).
->>
->> First version:
->> http://www.spinics.net/lists/linux-usb/msg140042.html
->>
->>
->> Problem
->> =======
->> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
->> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
->> is required, e.g. by suspend to RAM. The actual TFTP boot does
->> not have to happen. Just "usb start" from U-Boot is sufficient.
->>
->> From the schematics, the regulator is a supply only to LAN, however
->> without toggling it off/on, the usb3503 hub won appear neither.
->>
->>
->> Solution
->> ========
->> This is very similar to the MMC pwrseq behavior so the idea is to:
->> 1. Move MMC pwrseq drivers to generic place,
->
-> You can do that, but I'm going to NAK any use of pwrseq bindings outside
-> of MMC. I think it is the wrong way to do things. The DT should describe
+Hi Chalarmala,
+On 05/05/2016 07:44 PM, Chalamarla, Tirumalesh wrote:
+> Hi Eric,
+> 
+> Does this series supports gicv3-its emulation?
+> Do we have a tree with all the dependent patches
+GICv3 ITS emulation support comes with:
+[PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/5738
 
-Huh, I didn't know that was your view of the mmc pwrseq bindings. Why
-didn't you NAK them before?
+My series just allows PCI device MSI transactions to reach the host MSI
+frame through the SMMU. Only host GICv2m has been tested at the moment
+with a guest exposed with a GICv2m too.
 
-> the devices. If they happen to be "simple" then the core can walk the
-> tree and do any setup. For example, look for "reset-gpios" and toggle
-> that GPIO. There is no need for a special node.
->
->> 2. Extend the pwrseq-simple with regulator toggling,
->> 3. Add support to USB hub and port core for pwrseq,
->
-> We discussed this for USB already[1] and is why we defined how to add
-> USB child devices. The idea is not to add pwrseq to that.
+Best Regards
 
-I am not familiar with the USB discussion.
+Eric
 
-Still, let me give you some more background to the mmc pwrseq. The
-idea from the mmc pwrseq bindings comes from the power-domain DT
-bindings, as I thought these things were a bit related.
-In both cases they are not directly a property of the device, but more
-describing a HW dependency to allow the device to work.
 
-One could probably use a child node instead of a phandle, but that
-wasn't chosen back then. Of course you are the DT expert, but could
-you perhaps tell me why a child node is better for cases like this?
-
->
-> Rob
->
-> [1] http://www.spinics.net/lists/linux-usb/msg134082.html
-
-Kind regards
-Uffe
+> 
+> 
+> 
+> 
+> 
+> Thanks,
+> Tirumalesh. 
+> On 5/4/16, 8:18 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
+> 
+>> This series implements the MSI address mapping/unmapping in the MSI layer.
+>> IOMMU binding happens on pci_enable_msi since this function can sleep and
+>> return errors. On msi_domain_set_affinity, msi_domain_(de)activate, which
+>> are not allowed to sleep, we simply look for the already existing binding.
+>>
+>> A new MSI domain info flag value is introduced to report whether the msi
+>> domain implements IRQ remapping. GIC v3 ITS is the first MSI controller
+>> advertising it. This flag value will be used by VFIO subsystem to
+>> determine whether MSI forwarding is safe.
+>>
+>> More details & context can be found at:
+>> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
+>>
+>> Best Regards
+>>
+>> Eric
+>>
+>> Applies on top of PART 1/3. Also depends on
+>> [PATCH 1/3] iommu: Add MMIO mapping type,
+>> http://comments.gmane.org/gmane.linux.kernel.iommu/12869
+>>
+>> Git: complete series available at
+>> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc6-pcie-passthrough-v9-msi-v9
+>>
+>> This branch contains all parts in v9.
+>>
+>> History:
+>>
+>> v8 -> v9:
+>> - use a union in irq_chip_msi_doorbell_info + boolean telling whether the
+>>  doorbell is percpu
+>> - decouple irq_data parsing from the actual mapping/unmapping in
+>>  msi_handle_doorbell_mappings
+>> - fix misc style issues
+>>
+>> v7 -> v8:
+>> take into account Marc's comments:
+>> - use iommu_msi_msg_pa_to_va with new proto
+>> - change in irq_chip_msi_doorbell_info struct definition:
+>>  prot and size became shared between all doorbells and phys_addr_t __percpu
+>> - cleanups in v2m irqchip
+>> - eventually did not touch MSI_FLAG_IRQ_REMAPPING naming
+>> - On msi_handle_doorbell_mappings, stop on the first irqchip where doorbells
+>>  can be found
+>> - fix resource deallocation on mapping failure in msi_domain_alloc_irqs
+>>
+>> v6 -> v7:
+>> - do alloc/map handling on pci_enable_msi and search on msi_(de)domain_activate
+>> - add msi_doorbell_info callback in irq-chip to retrieve the characteristics
+>>  of doorbells
+>>
+>> RFC v5 -> patch v6:
+>> - split to ease the review process
+>> - rebase on default iommu domain code (irq_data_to_msi_mapping_domain
+>>  checks IOMMU_DOMAIN_DMA type)
+>> - fix unmap sequence on msi_domain_set_affinity (reported by Marc):
+>>  unmap the previous doorbell when the new one has been mapped & written to
+>>  the device, ie. irq_chip_write_msi_msg.
+>> - "msi: msi_compose wrapper removed" following change above
+>> - add size parameter to iommu_get_reserved_iova API following Marc's request
+>>
+>> RFC v4 -> RFC v5:
+>> - take into account Thomas' comments on MSI related patches
+>>  - split "msi: IOMMU map the doorbell address when needed"
+>>  - increase readability and add comments
+>>  - fix style issues
+>> - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+>> - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+>> - fix compilation issue with CONFIG_IOMMU API unset
+>> - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+>>
+>> RFC v3 -> v4:
+>> - Move doorbell mapping/unmapping in msi.c
+>> - fix ref count issue on set_affinity: in case of a change in the address
+>>  the previous address is decremented
+>> - doorbell map/unmap now is done on msi composition. Should allow the use
+>>  case for platform MSI controllers
+>> - create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+>>  to reserved IOVA management (looking like dma-iommu glue)
+>> - series reordering to ease the review:
+>>  - first part is related to IOMMU
+>>  - second related to MSI sub-system
+>>  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+>> - expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+>>  [this partially addresses Marc's comments on iommu_get/put_single_reserved
+>>   size/alignment problematic - which I did not ignore - but I don't know
+>>   how much I can do at the moment]
+>>
+>> RFC v2 -> RFC v3:
+>> - should fix wrong handling of some CONFIG combinations:
+>>  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+>> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+>>
+>> PATCH v1 -> RFC v2:
+>> - reverted to RFC since it looks more reasonable ;-) the code is split
+>>  between VFIO, IOMMU, MSI controller and I am not sure I did the right
+>>  choices. Also API need to be further discussed.
+>> - iova API usage in arm-smmu.c.
+>> - MSI controller natively programs the MSI addr with either the PA or IOVA.
+>>  This is not done anymore in vfio-pci driver as suggested by Alex.
+>> - check irq remapping capability of the group
+>>
+>> RFC v1 [2] -> PATCH v1:
+>> - use the existing dma map/unmap ioctl interface with a flag to register a
+>>  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+>> - a single reserved IOVA contiguous region now is allowed
+>> - use of an RB tree indexed by PA to store allocated reserved slots
+>> - use of a vfio_domain iova_domain to manage iova allocation within the
+>>  window provided by the userspace
+>> - vfio alloc_map/unmap_free take a vfio_group handle
+>> - vfio_group handle is cached in vfio_pci_device
+>> - add ref counting to bindings
+>> - user modality enabled at the end of the series
+>>
+>>
+>> Eric Auger (8):
+>>  genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
+>>  irqchip/gic-v3-its: ITS advertises MSI_FLAG_IRQ_REMAPPING
+>>  genirq/msi: export msi_get_domain_info
+>>  genirq/msi: msi_compose wrapper
+>>  genirq/irq: introduce msi_doorbell_info
+>>  irqchip/gicv2m: implement msi_doorbell_info callback
+>>  genirq/msi: map/unmap the MSI doorbells on msi_domain_alloc/free_irqs
+>>  genirq/msi: use the MSI doorbell's IOVA when requested
+>>
+>> drivers/irqchip/irq-gic-v2m.c                 |  16 +++
+>> drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   3 +-
+>> drivers/irqchip/irq-gic-v3-its-platform-msi.c |   3 +-
+>> include/linux/irq.h                           |  15 ++-
+>> include/linux/msi.h                           |   2 +
+>> kernel/irq/msi.c                              | 136 +++++++++++++++++++++++---
+>> 6 files changed, 161 insertions(+), 14 deletions(-)
+>>
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
