@@ -1,92 +1,93 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 9 May 2016 10:30:38 +0200
-Subject: [PATCH 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
-In-Reply-To: <572FA04B.1020005@denx.de>
-References: <1462479971-7891-1-git-send-email-marex@denx.de>
- <1462479971-7891-3-git-send-email-marex@denx.de>
- <977436072.210446.e7eef450-2262-47df-8e8e-6a44da10083c.open-xchange@email.1und1.de>
- <572FA04B.1020005@denx.de>
-Message-ID: <57304AAE.20103@i2se.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 9 May 2016 11:31:58 +0300
+Subject: [PATCH] ARM: dts: Fix igepv5 audiopwon-gpio
+In-Reply-To: <1462474581-13865-1-git-send-email-tony@atomide.com>
+References: <1462474581-13865-1-git-send-email-tony@atomide.com>
+Message-ID: <ab6e5775-949b-f83a-fc13-1c643181ec2b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/05/16 21:56, Tony Lindgren wrote:
+> Playing audio works on omap5-uevm, but produces an "Unhandled fault:
+> imprecise external abort (0x1406) at 0x00000000" error on igepv5.
 
-Am 08.05.2016 um 22:23 schrieb Marek Vasut:
-> On 05/06/2016 09:40 AM, Stefan Wahren wrote:
->> Hi Marek,
-> Hi!
->
->> sorry for the reply format.
-> replying from a phone ? :)
+I assume this is coming from the McPDM driver... If the clock is missing from
+the twl6040 the IP is not accessible.
+I do have a driver upstream to represent the twl6040 clock to be used by the
+McPDM, but did not had time to do the work for integrating that into the clock
+tree. Since it is external clock and we need i2c commands to configure things
+in twl6040, I'm still not sure how pm_runtime would like this...
 
-no an ugly webmailer :(
+> Looks like the twl6040 audpwron GPIO pin is different for these
+> boards. Let's fix the issue by configuring the audpwron in the
+> board specific dts file.
 
->
->>> Marek Vasut <marex@denx.de> hat am 5. Mai 2016 um 22:26 geschrieben:
->>>
->>> Add support for this small MP3 player based on STMP3780 (rev.4).
->>> Currently supported is both external microSD and internal SD-NAND
->>> bridge, PWM and USB gadget.
->>>
->>> Signed-off-by: Marek Vasut <marex@denx.de>
->>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->>> Cc: Shawn Guo <shawnguo@kernel.org>
->>> ---
->>>  arch/arm/boot/dts/Makefile | 1 +
->>>  arch/arm/boot/dts/imx23-xfi3.dts | 190
->>> +++++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 191 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/imx23-xfi3.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 8f9f1c2..7a79d37 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -417,6 +417,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
->>>  imx23-evk.dtb \
->>>  imx23-olinuxino.dtb \
->>>  imx23-stmp378x_devb.dtb \
->>> + imx23-xfi3.dtb \
->>>  imx28-apf28.dtb \
->>>  imx28-apf28dev.dtb \
->>>  imx28-apx4devkit.dtb \
->>> diff --git a/arch/arm/boot/dts/imx23-xfi3.dts
->>> b/arch/arm/boot/dts/imx23-xfi3.dts
->>> new file mode 100644
->>> index 0000000..d7e7cf5
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/imx23-xfi3.dts
->>> @@ -0,0 +1,190 @@
->>> +/*
->>> + * Copyright (C) 2013-2016 Marek Vasut <marex@denx.de>
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + * a) This file is free software; you can redistribute it and/or
->>> + * modify it under the terms of the GNU General Public License as
->>> + * published by the Free Software Foundation; either version 2 of
->>> + * the License, or (at your option) any later version.
->>> + *
->>> + * This file is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public
->>> + * License along with this file; if not, write to the Free
->>> + * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->>> + * MA 02110-1301 USA
->> AFAIK this address shouldn't be included.
-> Hmmm, some boards do include it. I'll remove it from this submission and
-> also for the xfi.
->
-> Shall I send patch(es) removing the address from the other boards too ?
+Acked-by: Peter Ujfalusi <peter.ujflausi@ti com>
 
-i'm not sure. Maybe Shawn has an opinion about it.
 
-Thanks
-Stefan
+> Cc: Agust? Fontquerni <af@iseebcn.com>
+> Cc: Eduard Gavin <egavin@iseebcn.com>
+> Cc: Enric Balletbo i Serra <eballetbo@iseebcn.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/boot/dts/omap5-board-common.dtsi |  3 ++-
+>  arch/arm/boot/dts/omap5-igep0050.dts      | 10 ++++++++++
+>  arch/arm/boot/dts/omap5-uevm.dts          | 10 ++++++++++
+>  3 files changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5-board-common.dtsi b/arch/arm/boot/dts/omap5-board-common.dtsi
+> index 2eea26c..23b1d7c 100644
+> --- a/arch/arm/boot/dts/omap5-board-common.dtsi
+> +++ b/arch/arm/boot/dts/omap5-board-common.dtsi
+> @@ -642,7 +642,8 @@
+>  		pinctrl-0 = <&twl6040_pins>;
+>  
+>  		interrupts = <GIC_SPI 119 IRQ_TYPE_NONE>; /* IRQ_SYS_2N cascaded to gic */
+> -		ti,audpwron-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;  /* gpio line 141 */
+> +
+> +		/* audpwron gpio defined in the board specific dts */
+>  
+>  		vio-supply = <&smps7_reg>;
+>  		v2v1-supply = <&smps9_reg>;
+> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
+> index 72ff6a4..673cdfa 100644
+> --- a/arch/arm/boot/dts/omap5-igep0050.dts
+> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
+> @@ -58,3 +58,13 @@
+>  		<&gpio7 3 0>;		/* 195, SDA */
+>  };
+>  
+> +&twl6040 {
+> +	ti,audpwron-gpio = <&gpio5 16 GPIO_ACTIVE_HIGH>;  /* gpio line 144 */
+> +};
+> +
+> +&twl6040_pins {
+> +	pinctrl-single,pins = <
+> +		OMAP5_IOPAD(0x1c4, PIN_OUTPUT | MUX_MODE6)	/* mcspi1_somi.gpio5_144 */
+> +		OMAP5_IOPAD(0x1ca, PIN_OUTPUT | MUX_MODE6)	/* perslimbus2_clock.gpio5_145 */
+> +	>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index 60b3fbb..a51e605 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -51,3 +51,13 @@
+>  		<&gpio9 1 GPIO_ACTIVE_HIGH>,	/* TCA6424A P00, LS OE */
+>  		<&gpio7 1 GPIO_ACTIVE_HIGH>;	/* GPIO 193, HPD */
+>  };
+> +
+> +&twl6040 {
+> +	ti,audpwron-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;  /* gpio line 141 */
+> +};
+> +
+> +&twl6040_pins {
+> +	pinctrl-single,pins = <
+> +		OMAP5_IOPAD(0x1be, PIN_OUTPUT | MUX_MODE6)	/* mcspi1_somi.gpio5_141 */
+> +	>;
+> +};
+> 
+
+
+-- 
+P?ter
