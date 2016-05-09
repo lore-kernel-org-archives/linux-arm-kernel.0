@@ -1,328 +1,215 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 9 May 2016 11:00:33 +0800
-Subject: [PATCH] mmc: mmc: do not use CMD13 to get status after speed mode
- switch
-In-Reply-To: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <5fa01153-6724-5426-1f71-b7caf31bf796@rock-chips.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 8 May 2016 23:02:46 -0500
+Subject: [PATCH V2 2/2] irqchip/gicv3-its: Implement two-level(indirect)
+ device table support
+In-Reply-To: <1462760082-21943-2-git-send-email-shankerd@codeaurora.org>
+References: <1462760082-21943-1-git-send-email-shankerd@codeaurora.org>
+ <1462760082-21943-2-git-send-email-shankerd@codeaurora.org>
+Message-ID: <57300BE6.20804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-rockchip
 
 
-I just hacked my local branch to fix the issues found on rockchip
-platform. The reaseon is that mmc core fail to get status
-after switching from hs200 to hs. So I disabled sending status for it
-just like what Chaotian does here. But I didn't deeply dig out the root
-cause but I agree with Chaotian's opinion.
-
-FYI:
-My emmc deivce is KLMA62WEPD-B031.
-
-[    1.526008] sdhci: Secure Digital Host Controller Interface driver
-[    1.526558] sdhci: Copyright(c) Pierre Ossman
-[    1.527899] sdhci-pltfm: SDHCI platform and OF driver helper
-[    1.529967] sdhci-arasan fe330000.sdhci: No vmmc regulator found
-[    1.530501] sdhci-arasan fe330000.sdhci: No vqmmc regulator found
-[    1.568710] mmc0: SDHCI controller on fe330000.sdhci [fe330000.sdhci] 
-using ADMA
-[    1.627552] mmc0: switch to high-speed from hs200 failed, err:-84
-[    1.628108] mmc0: error -84 whilst initialising MMC card
-
-
-? 2016/5/4 14:54, Chaotian Jing ??:
-> Per JEDEC spec, it is not recommended to use CMD13 to get card status
-> after speed mode switch. below are two reason about this:
-> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
-> Therefore it is not recommended to use CMD13 to check busy completion
-> of the timing change indication.
-> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
-> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+On 05/08/2016 09:14 PM, Shanker Donthineni wrote:
+> Since device IDs are extremely sparse, the single, a.k.a flat table is
+> not sufficient for the following two reasons.
 >
-> this patch drops CMD13 when doing speed mode switch, if host do not
-> support MMC_CAP_WAIT_WHILE_BUSY and there is no ops->card_busy(),
-> then the only way is to wait a fixed timeout.
+> 1) According to ARM-GIC spec, ITS hw can access maximum of 256(pages)*
+>    64K(pageszie) bytes. In the best case, it supports upto DEVid=21
+>    sparse with minimum device table entry size 8bytes.
 >
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> 2) The maximum memory size that is possible without memblock depends on
+>    MAX_ORDER. 4MB on 4K page size kernel with default MAX_ORDER, so it
+>    supports DEVid range 19bits.
+>
+> The two-level device table feature brings us two advantages, the first
+> is a very high possibility of supporting upto 32bit sparse, and the
+> second one is the best utilization of memory allocation.
+>
+> The feature is enabled automatically during driver probe if a single
+> ITS page is not adequate for flat table and the hardware is capable
+> of two-level table walk.
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 > ---
->  drivers/mmc/core/mmc.c     |   82 ++++++++++++++++----------------------------
->  drivers/mmc/core/mmc_ops.c |   25 +++++++++-----
->  2 files changed, 45 insertions(+), 62 deletions(-)
 >
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 4dbe3df..03ee7a4 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -962,7 +962,7 @@ static int mmc_select_hs(struct mmc_card *card)
->  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->  			   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS,
->  			   card->ext_csd.generic_cmd6_time,
-> -			   true, true, true);
-> +			   true, false, true);
->  	if (!err)
->  		mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
+> This patch is based on Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7
 >
-> @@ -1056,7 +1056,6 @@ static int mmc_switch_status(struct mmc_card *card)
->  static int mmc_select_hs400(struct mmc_card *card)
->  {
->  	struct mmc_host *host = card->host;
-> -	bool send_status = true;
->  	unsigned int max_dtr;
->  	int err = 0;
->  	u8 val;
-> @@ -1068,9 +1067,6 @@ static int mmc_select_hs400(struct mmc_card *card)
->  	      host->ios.bus_width == MMC_BUS_WIDTH_8))
->  		return 0;
+> I have tested the Indirection feature on Qualcomm Technologies QDF2XXX server platform.
 >
-> -	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
-> -		send_status = false;
-> -
->  	/* Reduce frequency to HS frequency */
->  	max_dtr = card->ext_csd.hs_max_dtr;
->  	mmc_set_clock(host, max_dtr);
-> @@ -1080,7 +1076,7 @@ static int mmc_select_hs400(struct mmc_card *card)
->  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->  			   EXT_CSD_HS_TIMING, val,
->  			   card->ext_csd.generic_cmd6_time,
-> -			   true, send_status, true);
-> +			   true, false, true);
->  	if (err) {
->  		pr_err("%s: switch to high-speed from hs200 failed, err:%d\n",
->  			mmc_hostname(host), err);
-> @@ -1090,11 +1086,9 @@ static int mmc_select_hs400(struct mmc_card *card)
->  	/* Set host controller to HS timing */
->  	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
+> Changes since v1:
+>   Most of this patch has been rewritten after refactoring its_alloc_tables().
+>   Always enable device two-level if the memory requirement is more than PAGE_SIZE.
+>   Fixed the coding bug that breaks on the BE machine.
+>   Edited the commit text.
 >
-> -	if (!send_status) {
-> -		err = mmc_switch_status(card);
-> -		if (err)
-> -			goto out_err;
-> -	}
-> +	err = mmc_switch_status(card);
-> +	if (err)
-> +		goto out_err;
+>  drivers/irqchip/irq-gic-v3-its.c | 100 ++++++++++++++++++++++++++++++++-------
+>  1 file changed, 83 insertions(+), 17 deletions(-)
 >
->  	/* Switch card to DDR */
->  	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-> @@ -1113,7 +1107,7 @@ static int mmc_select_hs400(struct mmc_card *card)
->  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->  			   EXT_CSD_HS_TIMING, val,
->  			   card->ext_csd.generic_cmd6_time,
-> -			   true, send_status, true);
-> +			   true, false, true);
->  	if (err) {
->  		pr_err("%s: switch to hs400 failed, err:%d\n",
->  			 mmc_hostname(host), err);
-> @@ -1124,11 +1118,9 @@ static int mmc_select_hs400(struct mmc_card *card)
->  	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
->  	mmc_set_bus_speed(card);
->
-> -	if (!send_status) {
-> -		err = mmc_switch_status(card);
-> -		if (err)
-> -			goto out_err;
-> -	}
-> +	err = mmc_switch_status(card);
-> +	if (err)
-> +		goto out_err;
->
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index b23e00c..27be792 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -938,6 +938,18 @@ retry_baser:
 >  	return 0;
->
-> @@ -1146,14 +1138,10 @@ int mmc_hs200_to_hs400(struct mmc_card *card)
->  int mmc_hs400_to_hs200(struct mmc_card *card)
+>  }
+>  
+> +/**
+> + * Find out whether an implemented baser register supports a single, flat table
+> + * or a two-level table by reading bit offset at '62' after writing '1' to it.
+> + */
+> +static u64 its_baser_check_indirect(struct its_baser *baser)
+> +{
+> +	u64 val = GITS_BASER_InnerShareable | GITS_BASER_WaWb;
+> +
+> +	writeq_relaxed(val | GITS_BASER_INDIRECT, baser->hwreg);
+> +	return (readq_relaxed(baser->hwreg) & GITS_BASER_INDIRECT);
+> +}
+> +
+>  static int its_alloc_tables(const char *node_name, struct its_node *its)
 >  {
->  	struct mmc_host *host = card->host;
-> -	bool send_status = true;
->  	unsigned int max_dtr;
->  	int err;
->  	u8 val;
->
-> -	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
-> -		send_status = false;
-> -
->  	/* Reduce frequency to HS */
->  	max_dtr = card->ext_csd.hs_max_dtr;
->  	mmc_set_clock(host, max_dtr);
-> @@ -1162,49 +1150,43 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
->  	val = EXT_CSD_TIMING_HS;
->  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
->  			   val, card->ext_csd.generic_cmd6_time,
-> -			   true, send_status, true);
-> +			   true, false, true);
->  	if (err)
->  		goto out_err;
->
->  	mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
->
-> -	if (!send_status) {
-> -		err = mmc_switch_status(card);
-> -		if (err)
-> -			goto out_err;
-> -	}
-> +	err = mmc_switch_status(card);
-> +	if (err)
-> +		goto out_err;
->
->  	/* Switch HS DDR to HS */
->  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
->  			   EXT_CSD_BUS_WIDTH_8, card->ext_csd.generic_cmd6_time,
-> -			   true, send_status, true);
-> +			   true, false, true);
->  	if (err)
->  		goto out_err;
->
->  	mmc_set_timing(host, MMC_TIMING_MMC_HS);
->
-> -	if (!send_status) {
-> -		err = mmc_switch_status(card);
-> -		if (err)
-> -			goto out_err;
-> -	}
-> +	err = mmc_switch_status(card);
-> +	if (err)
-> +		goto out_err;
->
->  	/* Switch HS to HS200 */
->  	val = EXT_CSD_TIMING_HS200 |
->  	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
->  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
->  			   val, card->ext_csd.generic_cmd6_time, true,
-> -			   send_status, true);
-> +			   false, true);
->  	if (err)
->  		goto out_err;
->
->  	mmc_set_timing(host, MMC_TIMING_MMC_HS200);
->
-> -	if (!send_status) {
-> -		err = mmc_switch_status(card);
-> -		if (err)
-> -			goto out_err;
-> -	}
-> +	err = mmc_switch_status(card);
-> +	if (err)
-> +		goto out_err;
->
->  	mmc_set_bus_speed(card);
->
-> @@ -1243,7 +1225,6 @@ static void mmc_select_driver_type(struct mmc_card *card)
->  static int mmc_select_hs200(struct mmc_card *card)
->  {
->  	struct mmc_host *host = card->host;
-> -	bool send_status = true;
->  	unsigned int old_timing;
->  	int err = -EINVAL;
->  	u8 val;
-> @@ -1260,9 +1241,6 @@ static int mmc_select_hs200(struct mmc_card *card)
->
->  	mmc_select_driver_type(card);
->
-> -	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
-> -		send_status = false;
-> -
->  	/*
->  	 * Set the bus width(4 or 8) with host's support and
->  	 * switch to HS200 mode if bus width is set successfully.
-> @@ -1274,20 +1252,18 @@ static int mmc_select_hs200(struct mmc_card *card)
->  		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->  				   EXT_CSD_HS_TIMING, val,
->  				   card->ext_csd.generic_cmd6_time,
-> -				   true, send_status, true);
-> +				   true, false, true);
->  		if (err)
->  			goto err;
->  		old_timing = host->ios.timing;
->  		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
-> -		if (!send_status) {
-> -			err = mmc_switch_status(card);
-> -			/*
-> -			 * mmc_select_timing() assumes timing has not changed if
-> -			 * it is a switch error.
-> -			 */
-> -			if (err == -EBADMSG)
-> -				mmc_set_timing(host, old_timing);
-> -		}
-> +		err = mmc_switch_status(card);
-> +		/*
-> +		 * mmc_select_timing() assumes timing has not changed if
-> +		 * it is a switch error.
-> +		 */
-> +		if (err == -EBADMSG)
-> +			mmc_set_timing(host, old_timing);
->  	}
->  err:
->  	if (err)
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 62355bd..32de144 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -480,6 +480,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->  	u32 status = 0;
->  	bool use_r1b_resp = use_busy_signal;
->  	bool expired = false;
-> +	bool busy = false;
->
->  	mmc_retune_hold(host);
->
-> @@ -535,19 +536,24 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->  	/* Must check status to be sure of no errors. */
->  	timeout = jiffies + msecs_to_jiffies(timeout_ms);
->  	do {
-> +		/*
-> +		 * Due to the possibility of being preempted after
-> +		 * sending the status command, check the expiration
-> +		 * time first.
-> +		 */
-> +		expired = time_after(jiffies, timeout);
->  		if (send_status) {
-> -			/*
-> -			 * Due to the possibility of being preempted after
-> -			 * sending the status command, check the expiration
-> -			 * time first.
-> -			 */
-> -			expired = time_after(jiffies, timeout);
->  			err = __mmc_send_status(card, &status, ignore_crc);
->  			if (err)
->  				goto out;
->  		}
->  		if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
->  			break;
-> +		if (host->ops->card_busy) {
-> +			if (!host->ops->card_busy(host))
-> +				break;
-> +			busy = true;
-> +		}
->  		if (mmc_host_is_spi(host))
->  			break;
->
-> @@ -556,19 +562,20 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->  		 * does'nt support MMC_CAP_WAIT_WHILE_BUSY, then we can only
->  		 * rely on waiting for the stated timeout to be sufficient.
+>  	u64 typer = readq_relaxed(its->base + GITS_TYPER);
+> @@ -964,6 +976,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+>  		int order = get_order(psz);
+>  		struct its_baser *baser = its->tables + i;
+> +		u64 indirect = 0;
+>  
+>  		if (type == GITS_BASER_TYPE_NONE)
+>  			continue;
+> @@ -977,17 +990,27 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  		 * Allocate as many entries as required to fit the
+>  		 * range of device IDs that the ITS can grok... The ID
+>  		 * space being incredibly sparse, this results in a
+> -		 * massive waste of memory.
+> +		 * massive waste of memory if two-level device table
+> +		 * feature is not supported by hardware.
+>  		 *
+>  		 * For other tables, only allocate a single page.
 >  		 */
-> -		if (!send_status) {
-> +		if (!send_status && !host->ops->card_busy) {
->  			mmc_delay(timeout_ms);
->  			goto out;
+>  		if (type == GITS_BASER_TYPE_DEVICE) {
+> -			/*
+> -			 * 'order' was initialized earlier to the default page
+> -			 * granule of the the ITS.  We can't have an allocation
+> -			 * smaller than that.  If the requested allocation
+> -			 * is smaller, round up to the default page granule.
+> -			 */
+> +			if ((entry_size << ids) > psz)
+> +				indirect = its_baser_check_indirect(baser);
+> +
+> +			if (indirect) {
+> +				/*
+> +				 * The size of the lvl2 table is equal to ITS
+> +				 * page size which is 'psz'. For computing lvl1
+> +				 * table size, subtract ID bits that sparse
+> +				 * lvl2 table from 'ids' which is reported by
+> +				 * ITS hardware times lvl1 table entry size.
+> +				 */
+> +				ids -= ilog2(psz / entry_size);
+> +				entry_size = GITS_LVL1_ENTRY_SIZE;
+> +			}
+> +
+>  			order = max(get_order(entry_size << ids), order);
+>  			if (order >= MAX_ORDER) {
+>  				order = MAX_ORDER - 1;
+> @@ -997,7 +1020,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  			}
 >  		}
->
->  		/* Timeout if the device never leaves the program state. */
-> -		if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
-> +		if (expired &&
-> +		    (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy)) {
->  			pr_err("%s: Card stuck in programming state! %s\n",
->  				mmc_hostname(host), __func__);
->  			err = -ETIMEDOUT;
->  			goto out;
->  		}
-> -	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
-> +	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy);
->
->  	err = mmc_switch_status_error(host, status);
->  out:
->
+>  
+> -		err = its_baser_setup(its, baser, order, 0);
+> +		err = its_baser_setup(its, baser, order, indirect);
+>  		if (err < 0) {
+>  			its_free_tables(its);
+>  			return err;
+> @@ -1187,10 +1210,60 @@ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+>  	return NULL;
+>  }
+>  
+> +static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+> +{
+> +	struct its_baser *baser;
+> +	struct page *page;
+> +	u32 entry_size, idx;
+> +	u64 *table;
+> +
+> +	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+> +
+> +	/* Don't allow 'dev_id' that exceeds ITS hardware limit */
+> +	if (!baser && (ilog2(dev_id) >= its->device_ids))
+> +		return false;
+> +
+I have missed this change, will be fixed in v3 patchset.
 
+    if (!baser) {
+        if (ilog2(dev_id) >= its->device_ids))
+            return false;
+        return true;
+    }
+
+> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+> +	entry_size = GITS_BASER_ENTRY_SIZE(baser->val);
+> +	if (!(baser->val & GITS_BASER_INDIRECT)) {
+> +		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) / entry_size))
+> +			return false;
+> +		return true;
+> +	}
+> +
+> +	/* Compute Level1 table index & check if that exceeds table range */
+> +	idx = dev_id >> ilog2(baser->psz / entry_size);
+> +	if (idx >= (PAGE_ORDER_TO_SIZE(baser->order) / GITS_LVL1_ENTRY_SIZE))
+> +		return false;
+> +
+> +	table = baser->base;
+> +
+> +	/* Allocate memory for Level2 table */
+> +	if (!table[idx]) {
+> +		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
+> +		if (!page)
+> +			return false;
+> +
+> +		/* Flush memory to PoC if hardware doesn't support coherency */
+> +		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
+> +			__flush_dcache_area(page_address(page), baser->psz);
+> +
+> +		table[idx] = cpu_to_le64(page_to_phys(page) | GITS_BASER_VALID);
+> +
+> +		/* Flush memory to PoC if hardware doesn't support coherency */
+> +		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
+> +			__flush_dcache_area(table + idx, GITS_LVL1_ENTRY_SIZE);
+> +
+> +		/* Ensure updated table contents are visible to ITS hardware */
+> +		dsb(sy);
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>  					    int nvecs)
+>  {
+> -	struct its_baser *baser;
+>  	struct its_device *dev;
+>  	unsigned long *lpi_map;
+>  	unsigned long flags;
+> @@ -1201,14 +1274,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>  	int nr_ites;
+>  	int sz;
+>  
+> -	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+> -
+> -	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+> -	if (baser) {
+> -		if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) /
+> -			      GITS_BASER_ENTRY_SIZE(baser->val)))
+> -			return NULL;
+> -	} else if (ilog2(dev_id) >= its->device_ids)
+> +	if (!its_alloc_device_table(its, dev_id))
+>  		return NULL;
+>  
+>  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 
 -- 
-Best Regards
-Shawn Lin
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
