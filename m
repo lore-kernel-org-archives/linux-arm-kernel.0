@@ -1,53 +1,39 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 9 May 2016 12:15:24 +0100
-Subject: Reverting ARCH_SUNXI arm64 support(?)
-In-Reply-To: <20160509090951.GC19763@arm.com>
-References: <57304FF7.3080909@arm.com> <20160509090951.GC19763@arm.com>
-Message-ID: <5730714C.7010608@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 May 2016 13:17:19 +0200
+Subject: next-20160503 build: 1 failures 12 warnings (next-20160503)
+In-Reply-To: <20160509205315.631e0c68@canb.auug.org.au>
+References: <E1axZpG-000664-AK@optimist> <2280495.M9rYajvqUJ@wuerfel>
+ <20160509205315.631e0c68@canb.auug.org.au>
+Message-ID: <4516208.OQ3mKD6WuY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/05/16 10:09, Will Deacon wrote:
-> On Mon, May 09, 2016 at 09:53:11AM +0100, Andre Przywara wrote:
->> Hi Will, Catalin,
+On Monday 09 May 2016 20:53:15 Stephen Rothwell wrote:
+> Hi Arnd and all,
 > 
-> Hi Andre,
+> On Tue, 03 May 2016 17:02:39 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Tuesday 03 May 2016 15:17:23 Mark Brown wrote:
+> > > On Tue, May 03, 2016 at 01:53:18PM +0100, Build bot for Mark Brown wrote:
+> > > 
+> > > Today's -next fails to build an ARM allmodconfig due to:
+> > >   
+> > > >       arm-allmodconfig
+> > > > ../drivers/pinctrl/bcm/pinctrl-ns2-mux.c:540:17: error: 'pinctrl_utils_dt_free_map' undeclared here (not in a function)  
+> > > 
+> > > caused by b5aa1006e4a93 (pinctrl: ns2: add pinmux driver support for
+> > > Broadcom NS2 SoC) - presumably just a missing dependency.
+> > >   
+> > 
+> > No, the function got renamed in another patch. I already prepared a fix
+> > yesterday, but haven't gotten around to submit the patches for the last
+> > two days, I'll try to send it out today, but it might end up being
+> > tomorrow, or Linus could fix this one himself first.
 > 
->> Suzuki reported a build failure with certain (non-defconfig) .configs
->> due to the new ARCH_SUNXI support in 4.6-rc [1].
->> As unfortunately we couldn't agree on a solution and also the support
->> for the A64/Pine64 is partial in 4.6 anyway, can you please revert:
->> ce3dd55b99b151a90ac1701c6825f2ae2d49b54e ("arm64: Introduce Allwinner
->> SoC config option")
-> 
-> Given that we (Catalin and I) didn't commit that patch, it seems weird
-> that we should be reverting it. Shouldn't this be handled in arm-soc or
-> via the sunxi subtree?
-> 
-> We're also a week from the merge window, so it doesn't seem like a good
-> time to be hacking at .config/kconfig-related issues.
+> Can we, please, get this fixed ... less than a week to the merge window
+> opening ...
 
-I agree, that's why I was proposing taking Suzuki's first patch:
+Linus Walleij just picked up the patch I sent last week into the pinctrl tree,
+so it should be fine in tomorrow's linux-next.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index efa77c1..521b1ec 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,6 +2,7 @@ menu "Platform selection"
-
- config ARCH_SUNXI
- 	bool "Allwinner sunxi 64-bit SoC Family"
-+	select GENERIC_IRQ_CHIP
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
-
-
-This is what defconfig selects anyway and also the change would be
-confined to this (new) config option.
-
-Olof, Arnd: would it be an option to take this patch still?
-
-Cheers,
-Andre.
+	Arnd
