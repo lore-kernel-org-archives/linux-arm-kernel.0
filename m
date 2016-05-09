@@ -1,147 +1,352 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 May 2016 16:47:20 +0100
-Subject: [PATCH v4 03/12] KVM: arm64: Introduce new MMIO region for the
- ITS base address
-In-Reply-To: <651B7BE4-D1C9-44B2-84BE-19103C1D8CE0@caviumnetworks.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-4-git-send-email-andre.przywara@arm.com>
- <651B7BE4-D1C9-44B2-84BE-19103C1D8CE0@caviumnetworks.com>
-Message-ID: <5730B108.5010009@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 9 May 2016 17:47:06 +0200
+Subject: [PATCH V4 1/2] vfio, platform: add support for ACPI during probe
+ and reset
+In-Reply-To: <1462136872-17590-2-git-send-email-okaya@codeaurora.org>
+References: <1462136872-17590-1-git-send-email-okaya@codeaurora.org>
+ <1462136872-17590-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <5730B0FA.1040303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/16 19:08, Chalamarla, Tirumalesh wrote:
+Hi Sinan,
+On 05/01/2016 11:07 PM, Sinan Kaya wrote:
+> The code is using the compatible DT string to associate a reset driver with
+> the actual device itself. The compatible string does not exist on ACPI
+> based systems. HID is the unique identifier for a device driver instead.
 > 
+> When ACPI is enabled, the change will query the presence of _RST method
+> and will call it instead of querying an external reset driver.
 > 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c  | 176 +++++++++++++++++++++-----
+>  drivers/vfio/platform/vfio_platform_private.h |   7 +-
+>  2 files changed, 147 insertions(+), 36 deletions(-)
 > 
-> 
-> 
-> On 3/25/16, 7:14 PM, "kvmarm-bounces at lists.cs.columbia.edu on behalf of Andre Przywara" <kvmarm-bounces at lists.cs.columbia.edu on behalf of andre.przywara@arm.com> wrote:
-> 
->> The ARM GICv3 ITS controller requires a separate register frame to
->> cover ITS specific registers. Add a new VGIC address type and store
->> the address in a field in the vgic_dist structure.
->> Provide a function to check whether userland has provided the address,
->> so ITS functionality can be guarded by that check.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
->> arch/arm64/include/uapi/asm/kvm.h              |  2 ++
->> include/kvm/vgic/vgic.h                        |  5 +++++
->> virt/kvm/arm/vgic/vgic.c                       | 10 ++++++++++
->> virt/kvm/arm/vgic/vgic_init.c                  |  1 +
->> virt/kvm/arm/vgic/vgic_kvm_device.c            |  7 +++++++
->> 6 files changed, 34 insertions(+)
->>
->> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
->> index 59541d4..087e2d9 100644
->> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
->> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
->> @@ -39,6 +39,15 @@ Groups:
->>       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->>       This address needs to be 64K aligned.
->>
->> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
->> +      Base address in the guest physical address space of the GICv3 ITS
->> +      control register frame. The ITS allows MSI(-X) interrupts to be
->> +      injected into guests. This extension is optional, if the kernel
->> +      does not support the ITS, the call returns -ENODEV.
->> +      This memory is solely for the guest to access the ITS control
->> +      registers and does not cover the ITS translation register.
->> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->> +      This address needs to be 64K aligned and the region covers 64 KByte.
->>
->>   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
->>   Attributes:
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index f209ea1..c2b257d 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -87,9 +87,11 @@ struct kvm_regs {
->> /* Supported VGICv3 address types  */
->> #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
->> #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
->> +#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
->>
->> #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
->> #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
->> +#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
->>
->> #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
->> #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
->> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->> index 7c1d145..11344e6 100644
->> --- a/include/kvm/vgic/vgic.h
->> +++ b/include/kvm/vgic/vgic.h
->> @@ -135,6 +135,9 @@ struct vgic_dist {
->> 		gpa_t			vgic_redist_base;
->> 	};
->>
->> +	/* The base address of the ITS control register frame */
->> +	gpa_t			vgic_its_base;
->> +
->> 	/* distributor enabled */
->> 	u32			enabled;
->>
->> @@ -253,4 +256,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
->> 	return kvm_vgic_global_state.max_gic_vcpus;
->> }
->>
->> +bool vgic_has_its(struct kvm *kvm);
->> +
->> #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
->> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->> index 65395af..1de2478 100644
->> --- a/virt/kvm/arm/vgic/vgic.c
->> +++ b/virt/kvm/arm/vgic/vgic.c
->> @@ -612,3 +612,13 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
->>
->> 	return map_is_active;
->> }
->> +
->> +bool vgic_has_its(struct kvm *kvm)
->> +{
->> +	struct vgic_dist *dist = &kvm->arch.vgic;
->> +
->> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
->> +		return false;
->> +
->> +	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
->> +}
->> diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
->> index ac655b5..2301e03 100644
->> --- a/virt/kvm/arm/vgic/vgic_init.c
->> +++ b/virt/kvm/arm/vgic/vgic_init.c
->> @@ -132,6 +132,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
->> 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->> 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
->> 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
->> +	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
->>
->> out_unlock:
->> 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
->> diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
->> index 7f78a16..3ec2ac3 100644
->> --- a/virt/kvm/arm/vgic/vgic_kvm_device.c
->> +++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
->> @@ -109,6 +109,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
->> 		block_size = KVM_VGIC_V3_REDIST_SIZE;
->> 		alignment = SZ_64K;
->> 		break;
->> +	case KVM_VGIC_V3_ADDR_TYPE_ITS:
->> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
->> +		addr_ptr = &vgic->vgic_its_base;
->> +		block_size = KVM_VGIC_V3_ITS_SIZE;
->> +		alignment = SZ_64K;
->> +		break;
-> 
-> Should there be a check based on number of vcpus? 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index e65b142..528ec04 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include <linux/device.h>
+> +#include <linux/acpi.h>
+>  #include <linux/iommu.h>
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+> @@ -41,7 +42,7 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  		if (!strcmp(iter->compat, compat) &&
+>  			try_module_get(iter->owner)) {
+>  			*module = iter->owner;
+> -			reset_fn = iter->reset;
+> +			reset_fn = iter->of_reset;
+>  			break;
+>  		}
+>  	}
+> @@ -49,20 +50,111 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  	return reset_fn;
+>  }
+>  
+> -static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+> +
+> +#ifdef CONFIG_ACPI
+> +int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+> +			     struct device *dev)
+>  {
+> -	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+> -						&vdev->reset_module);
+> -	if (!vdev->reset) {
+> -		request_module("vfio-reset:%s", vdev->compat);
+> -		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+> -							 &vdev->reset_module);
+> +	struct acpi_device *adev = ACPI_COMPANION(dev);
+> +
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	if (!adev)
+> +		return -ENODEV;
+> +
+> +	vdev->acpihid = acpi_device_hid(adev);
+> +	if (!vdev->acpihid) {
+> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
+> +		       vdev->name);
+> +		return -ENODEV;
+>  	}
+> +	return 0;
+> +}
+> +
+> +static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+> +{
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +	acpi_status acpi_ret;
+> +	unsigned long long val;
+> +
+> +	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
+> +	if (ACPI_FAILURE(acpi_ret))
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +static int vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +
+> +	if (acpi_has_method(handle, "_RST"))
+> +		return 0;
+Can't you directly return acpi_has_method(handle, "_RST"), hence return
+a boolean?
+> +
+> +	return -EINVAL;
+> +}
+> +#else
+> +int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+> +			     struct device *dev)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +static int vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
+> +
+> +static int vfio_platform_has_reset(struct vfio_platform_device *vdev)
+> +{
+return a boolean?
+> +	if (vdev->acpihid)
+> +		return vfio_platform_acpi_has_reset(vdev);
+> +
+> +	if (vdev->of_reset)
+> +		return 0;
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
+> +{
+> +	int rc;
+> +
+> +	if (vdev->acpihid)
+> +		return vfio_platform_acpi_has_reset(vdev);
+> +
+> +	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+> +						    &vdev->reset_module);
+> +	if (vdev->of_reset)
+> +		return 0;
+> +
+> +	rc = request_module("vfio-reset:%s", vdev->compat);
+> +	if (rc)
+> +		return rc;
+> +
+> +	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+> +						    &vdev->reset_module);
+> +	if (vdev->of_reset)
+> +		return 0;
+> +
+> +	return -EINVAL;
+>  }
+>  
+>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+>  {
+> -	if (vdev->reset)
+> +	if (vdev->acpihid)
+> +		return;
+> +
+> +	if (vdev->of_reset)
+>  		module_put(vdev->reset_module);
+>  }
+>  
+> @@ -134,6 +226,20 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+>  	kfree(vdev->regions);
+>  }
+>  
+> +static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
+> +{
+> +	if (vdev->of_reset) {
+> +		dev_info(vdev->device, "reset\n");
+> +		vdev->of_reset(vdev);
+return vdev->of_reset(vdev) to align with acpi reset behavior.
+> +		return 0;
+> +	} else if (vdev->acpihid) {
+> +		return vfio_platform_acpi_call_reset(vdev);
+I think it would make sense to have the same dev_info traces for dt and
+acpi.
+> +	}
+> +
+> +	dev_warn(vdev->device, "no reset function found!\n");
+> +	return -EINVAL;
+> +}
+> +
+>  static void vfio_platform_release(void *device_data)
+>  {
+>  	struct vfio_platform_device *vdev = device_data;
+> @@ -141,12 +247,7 @@ static void vfio_platform_release(void *device_data)
+>  	mutex_lock(&driver_lock);
+>  
+>  	if (!(--vdev->refcnt)) {
+> -		if (vdev->reset) {
+> -			dev_info(vdev->device, "reset\n");
+> -			vdev->reset(vdev);
+> -		} else {
+> -			dev_warn(vdev->device, "no reset function found!\n");
+> -		}
+> +		vfio_platform_call_reset(vdev);
+>  		vfio_platform_regions_cleanup(vdev);
+>  		vfio_platform_irq_cleanup(vdev);
+>  	}
+> @@ -175,12 +276,9 @@ static int vfio_platform_open(void *device_data)
+>  		if (ret)
+>  			goto err_irq;
+>  
+> -		if (vdev->reset) {
+> -			dev_info(vdev->device, "reset\n");
+> -			vdev->reset(vdev);
+> -		} else {
+> -			dev_warn(vdev->device, "no reset function found!\n");
+> -		}
+> +		ret = vfio_platform_call_reset(vdev);
+> +		if (ret)
+> +			goto err_irq;
+This change should be in next patch since if you fail finding a reset
+function, you clean things up, mandating a reset function to exist.
 
-Why would the number of vcpus influence the size of the ITS?
+Also in case the reset function fails you change the behavior which is
+not detailed in the commit msg.
+>  	}
+>  
+>  	vdev->refcnt++;
+> @@ -213,7 +311,7 @@ static long vfio_platform_ioctl(void *device_data,
+>  		if (info.argsz < minsz)
+>  			return -EINVAL;
+>  
+> -		if (vdev->reset)
+> +		if (!vfio_platform_has_reset(vdev))
+>  			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
+>  		info.flags = vdev->flags;
+>  		info.num_regions = vdev->num_regions;
+> @@ -312,10 +410,7 @@ static long vfio_platform_ioctl(void *device_data,
+>  		return ret;
+>  
+>  	} else if (cmd == VFIO_DEVICE_RESET) {
+> -		if (vdev->reset)
+> -			return vdev->reset(vdev);
+> -		else
+> -			return -EINVAL;
+> +		return vfio_platform_call_reset(vdev);
+Here you also change the behavior: before, in case the dt reset failed
+we returned an error. Now we return 0.
 
-Thanks,
+To me this patch would deserve to be split into 2 parts: ACPI probing
+without reset and then ACPI reset. In case you change the behavior of
+existing dt reset, please put that in a separate patch.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best Regards
+
+Eric
+>  	}
+>  
+>  	return -ENOTTY;
+> @@ -544,6 +639,21 @@ static const struct vfio_device_ops vfio_platform_ops = {
+>  	.mmap		= vfio_platform_mmap,
+>  };
+>  
+> +int vfio_platform_of_probe(struct vfio_platform_device *vdev,
+> +			   struct device *dev)
+> +{
+> +	int ret;
+> +
+> +	ret = device_property_read_string(dev, "compatible",
+> +					  &vdev->compat);
+> +	if (ret) {
+> +		pr_err("VFIO: cannot retrieve compat for %s\n",
+> +			vdev->name);
+> +		return ret;
+> +	}
+> +	return 0;
+> +}
+> +
+>  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  			       struct device *dev)
+>  {
+> @@ -553,14 +663,14 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  	if (!vdev)
+>  		return -EINVAL;
+>  
+> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
+> -	if (ret) {
+> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
+> -		return -EINVAL;
+> -	}
+> +	ret = vfio_platform_acpi_probe(vdev, dev);
+> +	if (ret)
+> +		ret = vfio_platform_of_probe(vdev, dev);
+>  
+> -	vdev->device = dev;
+> +	if (ret)
+> +		return ret;
+>  
+> +	vdev->device = dev;
+>  	group = iommu_group_get(dev);
+>  	if (!group) {
+>  		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
+> @@ -611,7 +721,7 @@ void vfio_platform_unregister_reset(const char *compat,
+>  
+>  	mutex_lock(&driver_lock);
+>  	list_for_each_entry_safe(iter, temp, &reset_list, link) {
+> -		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
+> +		if (!strcmp(iter->compat, compat) && (iter->of_reset == fn)) {
+>  			list_del(&iter->link);
+>  			break;
+>  		}
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index 42816dd..ba9e4f8 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -58,6 +58,7 @@ struct vfio_platform_device {
+>  	struct mutex			igate;
+>  	struct module			*parent_module;
+>  	const char			*compat;
+> +	const char			*acpihid;
+>  	struct module			*reset_module;
+>  	struct device			*device;
+>  
+> @@ -71,7 +72,7 @@ struct vfio_platform_device {
+>  	struct resource*
+>  		(*get_resource)(struct vfio_platform_device *vdev, int i);
+>  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
+> -	int	(*reset)(struct vfio_platform_device *vdev);
+> +	int	(*of_reset)(struct vfio_platform_device *vdev);
+>  };
+>  
+>  typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
+> @@ -80,7 +81,7 @@ struct vfio_platform_reset_node {
+>  	struct list_head link;
+>  	char *compat;
+>  	struct module *owner;
+> -	vfio_platform_reset_fn_t reset;
+> +	vfio_platform_reset_fn_t of_reset;
+>  };
+>  
+>  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+> @@ -103,7 +104,7 @@ extern void vfio_platform_unregister_reset(const char *compat,
+>  static struct vfio_platform_reset_node __reset ## _node = {	\
+>  	.owner = THIS_MODULE,					\
+>  	.compat = __compat,					\
+> -	.reset = __reset,					\
+> +	.of_reset = __reset,					\
+>  };								\
+>  __vfio_platform_register_reset(&__reset ## _node)
+>  
+> 
