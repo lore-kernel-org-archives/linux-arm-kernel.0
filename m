@@ -1,138 +1,84 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  9 May 2016 17:49:49 +0100
-Subject: [PATCH 5/6] arm64: consolidate signal injection on emulation errors
-In-Reply-To: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
-References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1462812590-4494-6-git-send-email-andre.przywara@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 9 May 2016 17:50:56 +0100
+Subject: [PATCH] kvm: arm64: Enable hardware updates of the Access Flag
+ for Stage 2 page tables
+In-Reply-To: <20160509153310.GA27623@cbox>
+References: <1460566657-30221-1-git-send-email-catalin.marinas@arm.com>
+ <20160509153310.GA27623@cbox>
+Message-ID: <20160509165056.GC20598@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code for injecting a signal into userland if a trapped instruction
-fails emulation due to a _userland_ error (like an illegal address)
-will be used more often with the next patch.
-Factor out the core functionality into a separate function and use
-that both for the existing trap handler and for the deprecated
-instructions emulation.
+On Mon, May 09, 2016 at 05:33:10PM +0200, Christoffer Dall wrote:
+> On Wed, Apr 13, 2016 at 05:57:37PM +0100, Catalin Marinas wrote:
+> > The ARMv8.1 architecture extensions introduce support for hardware
+> > updates of the access and dirty information in page table entries. With
+> > VTCR_EL2.HA enabled (bit 21), when the CPU accesses an IPA with the
+> > PTE_AF bit cleared in the stage 2 page table, instead of raising an
+> > Access Flag fault to EL2 the CPU sets the actual page table entry bit
+> > (10). To ensure that kernel modifications to the page table do not
+> > inadvertently revert a bit set by hardware updates, certain Stage 2
+> > software pte/pmd operations must be performed atomically.
+> > 
+> > The main user of the AF bit is the kvm_age_hva() mechanism. The
+> > kvm_age_hva_handler() function performs a "test and clear young" action
+> > on the pte/pmd. This needs to be atomic in respect of automatic hardware
+> > updates of the AF bit. Since the AF bit is in the same position for both
+> > Stage 1 and Stage 2, the patch reuses the existing
+> > ptep_test_and_clear_young() functionality if
+> > __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG is defined. Otherwise, the
+> > existing pte_young/pte_mkold mechanism is preserved.
+> > 
+> > The kvm_set_s2pte_readonly() (and the corresponding pmd equivalent) have
+> > to perform atomic modifications in order to avoid a race with updates of
+> > the AF bit. The arm64 implementation has been re-written using
+> > exclusives.
+> > 
+> > Currently, kvm_set_s2pte_writable() (and pmd equivalent) take a pointer
+> > argument and modify the pte/pmd in place. However, these functions are
+> > only used on local variables rather than actual page table entries, so
+> > it makes more sense to follow the pte_mkwrite() approach for stage 1
+> > attributes. The change to kvm_s2pte_mkwrite() makes it clear that these
+> > functions do not modify the actual page table entries.
+> 
+> so if one CPU takes a permission fault and is in the process of updating
+> the page table, what prevents another CPU from setting the access flag
+> (on a read, done by HW) on that entry between us reading the old pte and
+> replacing it with the new pte?
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/include/asm/traps.h       |  3 +++
- arch/arm64/kernel/armv8_deprecated.c | 13 ++++------
- arch/arm64/kernel/traps.c            | 46 ++++++++++++++++++++++++++----------
- 3 files changed, 41 insertions(+), 21 deletions(-)
+There isn't anything that would prevent this. However, as in the stage 1
+scenarios, explicitly writing a PTE as a result of a permission fault
+should also mark the entry as accessed (young, either as the default
+protection in PROT_DEFAULT or explicitly via pte_mkyoung).
 
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 0cc2f29..b20ce2f 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -34,6 +34,9 @@ struct undef_hook {
- void register_undef_hook(struct undef_hook *hook);
- void unregister_undef_hook(struct undef_hook *hook);
- 
-+void force_signal_inject(int signal, int code, struct pt_regs *regs,
-+			 unsigned long address);
-+
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- static inline int __in_irqentry_text(unsigned long ptr)
- {
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index c37202c..4003843 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -321,21 +321,18 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
-  */
- static void set_segfault(struct pt_regs *regs, unsigned long addr)
- {
--	siginfo_t info;
-+	int code;
- 
- 	down_read(&current->mm->mmap_sem);
- 	if (find_vma(current->mm, addr) == NULL)
--		info.si_code = SEGV_MAPERR;
-+		code = SEGV_MAPERR;
- 	else
--		info.si_code = SEGV_ACCERR;
-+		code = SEGV_ACCERR;
- 	up_read(&current->mm->mmap_sem);
- 
--	info.si_signo = SIGSEGV;
--	info.si_errno = 0;
--	info.si_addr  = (void *) instruction_pointer(regs);
--
- 	pr_debug("SWP{B} emulation: access caused memory abort!\n");
--	arm64_notify_die("Illegal memory access", regs, &info, 0);
-+
-+	force_signal_inject(SIGSEGV, code, regs, addr);
- }
- 
- static int emulate_swpX(unsigned int address, unsigned int *data,
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c539208..03755a4 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -373,30 +373,50 @@ exit:
- 	return fn ? fn(regs, instr) : 1;
- }
- 
--asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
-+void force_signal_inject(int signal, int code, struct pt_regs *regs,
-+			 unsigned long address)
- {
- 	siginfo_t info;
- 	void __user *pc = (void __user *)instruction_pointer(regs);
-+	const char *desc;
- 
--	/* check for AArch32 breakpoint instructions */
--	if (!aarch32_break_handler(regs))
--		return;
--
--	if (call_undef_hook(regs) == 0)
--		return;
-+	switch (signal) {
-+	case SIGILL:
-+		desc = "undefined instruction";
-+		break;
-+	case SIGSEGV:
-+		desc = "illegal memory access";
-+		break;
-+	default:
-+		desc = "bad mode";
-+		break;
-+	}
- 
--	if (unhandled_signal(current, SIGILL) && show_unhandled_signals_ratelimited()) {
--		pr_info("%s[%d]: undefined instruction: pc=%p\n",
--			current->comm, task_pid_nr(current), pc);
-+	if (unhandled_signal(current, signal) &&
-+	    show_unhandled_signals_ratelimited()) {
-+		pr_info("%s[%d]: %s: pc=%p\n",
-+			current->comm, task_pid_nr(current), desc, pc);
- 		dump_instr(KERN_INFO, regs);
- 	}
- 
--	info.si_signo = SIGILL;
-+	info.si_signo = signal;
- 	info.si_errno = 0;
--	info.si_code  = ILL_ILLOPC;
-+	info.si_code  = code;
- 	info.si_addr  = pc;
- 
--	arm64_notify_die("Oops - undefined instruction", regs, &info, 0);
-+	arm64_notify_die(desc, regs, &info, 0);
-+}
-+
-+asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
-+{
-+	/* check for AArch32 breakpoint instructions */
-+	if (!aarch32_break_handler(regs))
-+		return;
-+
-+	if (call_undef_hook(regs) == 0)
-+		return;
-+
-+	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
- }
- 
- long compat_arm_syscall(struct pt_regs *regs);
+> Don't we loose the AF information in that case too?
+
+Since the hardware never clears the AF bit automatically, there is no
+information to lose in this race as long as the kvm_set_s2pte_writable()
+sets the AF bit. AFAICT, the PAGE_S2 and PAGE_S2_DEVICE definitions
+already use PROT_DEFAULT which has the AF bit set.
+
+> >  static inline void kvm_set_s2pte_readonly(pte_t *pte)
+> >  {
+> > -	pte_val(*pte) = (pte_val(*pte) & ~PTE_S2_RDWR) | PTE_S2_RDONLY;
+> > +	pteval_t pteval;
+> > +	unsigned long tmp;
+> > +
+> > +	asm volatile("//	kvm_set_s2pte_readonly\n"
+> > +	"	prfm	pstl1strm, %2\n"
+> > +	"1:	ldxr	%0, %2\n"
+> > +	"	and	%0, %0, %3		// clear PTE_S2_RDWR\n"
+> > +	"	orr	%0, %0, %4		// set PTE_S2_RDONLY\n"
+> > +	"	stxr	%w1, %0, %2\n"
+> > +	"	cbnz	%w1, 1b\n"
+> > +	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*pte))
+> 
+> so the +Q means "pass the memory address of the value and by the way the
+> content, not the address itself, can be updated by the assembly code" ?
+
+Yes. I think "info gcc" isn't clear enough on this constraint (at least
+to me) but that's something we learnt from the tools guys in the early
+days of the aarch64 kernel port.
+
 -- 
-2.7.3
+Catalin
