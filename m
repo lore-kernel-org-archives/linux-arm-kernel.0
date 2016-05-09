@@ -1,33 +1,33 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 9 May 2016 14:51:19 +0800
-Subject: [PATCH 2/2] ARM: at91/dt: use "atmel,sama5d3-nfc" compatible for nfc
-In-Reply-To: <1462776680-5284-1-git-send-email-wenyou.yang@atmel.com>
-References: <1462776680-5284-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1462776680-5284-3-git-send-email-wenyou.yang@atmel.com>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Mon, 9 May 2016 09:06:15 +0200
+Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
+In-Reply-To: <5723755D.9060108@ti.com>
+References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+ <20160425115758.GA4874@lukather>
+ <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
+ <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
+Message-ID: <20160509090615.6272f8ca@erd979>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the compatible "atmel,sama5d4-nfc" removal, use
-"atmel,sama5d3-nfc" for the sama5d2's nfc node.
+On Fri, 29 Apr 2016 17:53:17 +0300
+Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+[...] 
+> >>
+> >> Small problem for me, but Robin is submitting a brand new
+> >> auxdisplay driver:
+> >> http://marc.info/?l=linux-kernel&m=146001950512999&w=2
+> >> http://marc.info/?l=linux-kernel&m=146001988013230&w=2  
+> > 
+> > My understanding is that Tomi doesn't want any new fbdev drivers, so
+> > I'm not sure this is the right place for those patches.  
+> 
+> Hmm, that one looks like an fbdev driver, not an auxdisplay driver.
+> But, not relevant for this patch, of course.
 
- arch/arm/boot/dts/sama5d2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+If you guys feel like auxdisplay is not the right subsystem for the
+driver, and would like me to move it, please share.
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 78996bd..9817090 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -280,7 +280,7 @@
- 			status = "disabled";
- 
- 			nfc at c0000000 {
--				compatible = "atmel,sama5d4-nfc";
-+				compatible = "atmel,sama5d3-nfc";
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				reg = < /* NFC Command Registers */
--- 
-2.7.4
+Regards,
+Robin van der Gracht
