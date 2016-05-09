@@ -1,151 +1,97 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 9 May 2016 10:05:08 +0200
-Subject: [PATCH v9 5/7] vfio/type1: also check IRQ remapping capability at
- msi domain
-In-Reply-To: <FFD9D7C5-B6EF-4E16-A209-BED31DAB26AA@caviumnetworks.com>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
- <FFD9D7C5-B6EF-4E16-A209-BED31DAB26AA@caviumnetworks.com>
-Message-ID: <573044B4.4000905@linaro.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 9 May 2016 11:25:53 +0300
+Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
+In-Reply-To: <20160505184609.GB5995@atomide.com>
+References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
+ <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
+ <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
+ <20160505184609.GB5995@atomide.com>
+Message-ID: <a6969765-d07d-6d0e-36df-b78b485d9644@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chalamarla,
-On 05/05/2016 09:23 PM, Chalamarla, Tirumalesh wrote:
-> 
-> 
-> 
-> 
-> 
-> On 5/4/16, 4:54 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
-> 
->> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
->> by the msi controller. vfio_safe_irq_domain allows to check whether
->> interrupts are "safe" for a given device. They are if the device does
->> not use MSI or if the device uses MSI and the msi-parent controller
->> supports IRQ remapping.
->>
->> Then we check at group level if all devices have safe interrupts: if not,
->> we only allow the group to be attached if allow_unsafe_interrupts is set.
->>
->> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
->> changed in next patch.
-> 
-> Will this work in systems with multiple ITS?
-Yes it should support multiple ITS.
+Adding Tomi,
 
-Please note however that the series does not yet implement the
-msi_doorbell_info callback in GICv3 ITS PCIe/platform irqchip. Without
-that, the pci_enable is going to fail. I am going to submit a separate
-RFC for that but I can't test it at the moment.
+On 05/05/16 21:46, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [160504 11:03]:
+>> On 05/04/2016 12:26 PM, Tony Lindgren wrote:
+>>> Hi,
+>>>
+>>> Adding Nishanth to Cc.
+>>>
+>>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160429 05:15]:
+>>>> ldo7_reg, obviously ;)
+>>>>
+>>>>> 	status = "okay";
+>>>>> 	regulator-min-microvolt = <1800000>;
+>>>>> 	regulator-max-microvolt = <1800000>;
+>>>>> };
+>>>
+>>> It really seems to be ldo7, otherwise there's no HDMI output. I don't
+>>> have the schematics either.
+>>>
+>>> But it seems we have at least two other regressions in Linux next that
+>>> prevent me from testing this properly:
+>>>
+>>> 1. On igepv5, I get this for the MMC regulator
+>>>
+>>> ldo9: bypassed regulator has no supply!
+>>> ldo9: failed to get the current voltage(-517)
+>>> palmas-pmic 48070000.i2c:palmas at 48:palmas_pmic: failed to register 48070000.i2c:palmar
+> 
+> The patch I posted fixes this. Then for the HDMI see below.
+> I've kept it at 2V like we have in omap5-board-common.dtsi,
+> I wonder if it really should be 1.8V though for ldo7 in this
+> case?
 
-Best Regards
+AFAIK the VDDA for the HDMI needs to be 1.8V along with other VDDAs for DSS
+(vdda_dsiporta, vdda_dsiportc and vdda_hdmi).
 
-Eric
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->> v3 -> v4:
->> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
->>  and irq_remapping into safe_irq_domains
->>
->> v2 -> v3:
->> - protect vfio_msi_parent_irq_remapping_capable with
->>  CONFIG_GENERIC_MSI_IRQ_DOMAIN
->> ---
->> drivers/vfio/vfio_iommu_type1.c | 44 +++++++++++++++++++++++++++++++++++++++--
->> 1 file changed, 42 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->> index 4d3a6f1..2fc8197 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -37,6 +37,8 @@
->> #include <linux/vfio.h>
->> #include <linux/workqueue.h>
->> #include <linux/msi-iommu.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/msi.h>
->>
->> #define DRIVER_VERSION  "0.2"
->> #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
->> @@ -777,6 +779,33 @@ static int vfio_bus_type(struct device *dev, void *data)
->> 	return 0;
->> }
->>
->> +/**
->> + * vfio_safe_irq_domain: returns whether the irq domain
->> + * the device is attached to is safe with respect to MSI isolation.
->> + * If the irq domain is not an MSI domain, we return it is safe.
->> + *
->> + * @dev: device handle
->> + * @data: unused
->> + * returns 0 if the irq domain is safe, -1 if not.
->> + */
->> +static int vfio_safe_irq_domain(struct device *dev, void *data)
->> +{
->> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->> +	struct irq_domain *domain;
->> +	struct msi_domain_info *info;
->> +
->> +	domain = dev_get_msi_domain(dev);
->> +	if (!domain)
->> +		return 0;
->> +
->> +	info = msi_get_domain_info(domain);
->> +
->> +	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
->> +		return -1;
->> +#endif
->> +	return 0;
->> +}
->> +
->> static int vfio_iommu_replay(struct vfio_iommu *iommu,
->> 			     struct vfio_domain *domain)
->> {
->> @@ -870,7 +899,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->> 	struct vfio_group *group, *g;
->> 	struct vfio_domain *domain, *d;
->> 	struct bus_type *bus = NULL;
->> -	int ret;
->> +	int ret, safe_irq_domains;
->>
->> 	mutex_lock(&iommu->lock);
->>
->> @@ -893,6 +922,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>
->> 	group->iommu_group = iommu_group;
->>
->> +	/*
->> +	 * Determine if all the devices of the group have a safe irq domain
->> +	 * with respect to MSI isolation
->> +	 */
->> +	safe_irq_domains = !iommu_group_for_each_dev(iommu_group, &bus,
->> +				       vfio_safe_irq_domain);
->> +
->> 	/* Determine bus_type in order to allocate a domain */
->> 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
->> 	if (ret)
->> @@ -920,8 +956,12 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->> 	INIT_LIST_HEAD(&domain->group_list);
->> 	list_add(&group->next, &domain->group_list);
->>
->> +	/*
->> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
->> +	 * must support IRQ remapping/interrupt translation
->> +	 */
->> 	if (!allow_unsafe_interrupts &&
->> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !safe_irq_domains)) {
->> 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
->> 		       __func__);
->> 		ret = -EPERM;
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tomi: what do you think?
+
+According to the OMAP5 data manual the vdda_hdmi can be in 1.5V or 1.8V mode,
+2V is not mentioned in the recommended operating conditions table.
+
+Just to note: on omap5-uevm the ldo7 is connected to VPP1 of OMAP5 (eFuse
+power supply), which does require 2V.
+
+
+> Regards,
+> 
+> Tony
+> 8< -----------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Thu, 5 May 2016 11:29:23 -0700
+> Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
+> 
+> Fix ldo7 source for HDMI on igepv5.
+> 
+> Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
+> index 46ecb1d..72ff6a4 100644
+> --- a/arch/arm/boot/dts/omap5-igep0050.dts
+> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
+> @@ -35,6 +35,12 @@
+>  	};
+>  };
+>  
+> +&ldo7_reg {
+> +	status = "okay";
+> +	regulator-min-microvolt = <2000000>;
+> +	regulator-max-microvolt = <2000000>;
+
+If we are not changing the default voltage set in the common dtsi file we only
+need to status = "okay"
+
+> +};
+> +
+>  &omap5_pmx_core {
+>  	i2c4_pins: pinmux_i2c4_pins {
+>  		pinctrl-single,pins = <
+> 
+
+
+-- 
+P?ter
