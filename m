@@ -1,87 +1,52 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Tue, 10 May 2016 01:06:18 +0300
-Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
-In-Reply-To: <CAL_JsqJPZS1ne_xAuBFtCc5L1HKFJf0LDUJ7CRSFXhc3adkTfA@mail.gmail.com>
-References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160509200657.GA3379@rob-hp-laptop> <5730F8BA.5000402@gmail.com>
- <CAL_JsqJPZS1ne_xAuBFtCc5L1HKFJf0LDUJ7CRSFXhc3adkTfA@mail.gmail.com>
-Message-ID: <573109DA.9040602@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 May 2016 15:11:46 -0700
+Subject: [PATCH 01/16] clk: fix critical clock locking
+In-Reply-To: <1462737711-10017-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20160509221146.GS3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/08, Maxime Ripard wrote:
+> The critical clock handling in __clk_core_init isn't taking the enable lock
+> before calling clk_core_enable, which in turns triggers the warning in the
+> lockdep_assert_held call in that function when lockep is enabled.
+> 
+> Add the calls to clk_enable_lock/unlock to make sure it doesn't happen.
+> 
+> Fixes: 32b9b1096186 ("clk: Allow clocks to be marked as CRITICAL")
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
 
+Why is this patch hiding in this series?
 
-On 10.05.2016 00:07, Rob Herring wrote:
-> On Mon, May 9, 2016 at 3:53 PM, Ivaylo Dimitrov
-> <ivo.g.dimitrov.75@gmail.com> wrote:
->> Hi,
->>
->> On  9.05.2016 23:06, Rob Herring wrote:
->>>
->>> On Sat, May 07, 2016 at 06:21:45PM +0300, Ivaylo Dimitrov wrote:
->>>>
->>>> With the upcoming removal of legacy boot, lets add support to one of the
->>>> last N900 drivers remaining without it. As the driver still uses omap
->>>> dmtimer, add auxdata as well.
->>>>
->>>> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
->>>> ---
->>>>    .../devicetree/bindings/media/nokia,lirc-rx51         | 19
->>>> +++++++++++++++++++
->>>>    arch/arm/mach-omap2/pdata-quirks.c                    |  6 +-----
->>>>    drivers/media/rc/ir-rx51.c                            | 11 ++++++++++-
->>>>    3 files changed, 30 insertions(+), 6 deletions(-)
->>>>    create mode 100644
->>>> Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>>> b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>>> new file mode 100644
->>>> index 0000000..5b3081e
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>>> @@ -0,0 +1,19 @@
->>>> +Device-Tree bindings for LIRC TX driver for Nokia N900(RX51)
->>>> +
->>>> +Required properties:
->>>> +       - compatible: should be "nokia,lirc-rx51".
->>>
->>>
->>> lirc is a Linux term. Also, nokia,rx51-... would be conventional
->>> ordering.
->>>
->>
->> I used the driver name ("lirc_rx51") to not bring confusion. Also, it
->> registers itself through lirc_register_driver() call, so having lirc in its
->> name somehow makes sense.
->>
->> I am not very good in inventing names, the best compatible I can think of is
->> "nokia,rx51-ir". Is that ok?
->
-> Sure, but...
->
->>> Is this anything more than a PWM LED?
->>>
->>
->> It is an IR LED connected through a driver to McSPI2_SIMO pin of OMAP3,
->> which pin can be configured as PWM or GPIO(there are other configurations,
->> but they don't make sense). In theory it could be used for various things
->> (like uni-directional serial TX, or stuff like that), but in practice it
->> allows N900 to be act as an IR remote controller. I guess that fits in
->> "nothing more than a PWM LED", more or less.
->
-> There's already a pwm-led binding that can be used. Though there may
-> be missing consumer IR to LED subsystem support in the kernel. You
-> could list both compatibles, use the rx51 IR driver now, and then move
-> to pwm-led driver in the future.
->
+>  drivers/clk/clk.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ce39add5a258..16a38df3c688 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2404,8 +2404,15 @@ static int __clk_core_init(struct clk_core *core)
+>  		core->ops->init(core->hw);
+>  
+>  	if (core->flags & CLK_IS_CRITICAL) {
+> +		unsigned long flags;
+> +
+> +		clk_prepare_lock();
+>  		clk_core_prepare(core);
+> +		clk_prepare_unlock();
 
-I looked at the pwm-leds (and related) code and couldn't see how it will 
-do the job of controlling IR TX LED as a remote controller. So yeah, it 
-seems CIR support in LEDS subsystem is non existent.
+It looks like we already hold the prepare lock at this point.
 
-Could you elaborate on "list both compatibles", I don't really 
-understand what I should do.
+> +
+> +		flags = clk_enable_lock();
+>  		clk_core_enable(core);
+> +		clk_enable_unlock(flags);
 
-Ivo
+This seems correct though.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
