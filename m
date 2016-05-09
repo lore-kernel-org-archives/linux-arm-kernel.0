@@ -1,75 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 May 2016 16:07:35 -0500
-Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
-In-Reply-To: <5730F8BA.5000402@gmail.com>
-References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160509200657.GA3379@rob-hp-laptop> <5730F8BA.5000402@gmail.com>
-Message-ID: <CAL_JsqJPZS1ne_xAuBFtCc5L1HKFJf0LDUJ7CRSFXhc3adkTfA@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 9 May 2016 23:21:19 +0200
+Subject: [PATCH 0/3] HSI: omap-ssi: regressions against yesterday's
+ linux-next
+In-Reply-To: <1462288586-584690-1-git-send-email-arnd@arndb.de>
+References: <1462288586-584690-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160509212118.GD1129@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 9, 2016 at 3:53 PM, Ivaylo Dimitrov
-<ivo.g.dimitrov.75@gmail.com> wrote:
-> Hi,
->
-> On  9.05.2016 23:06, Rob Herring wrote:
->>
->> On Sat, May 07, 2016 at 06:21:45PM +0300, Ivaylo Dimitrov wrote:
->>>
->>> With the upcoming removal of legacy boot, lets add support to one of the
->>> last N900 drivers remaining without it. As the driver still uses omap
->>> dmtimer, add auxdata as well.
->>>
->>> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
->>> ---
->>>   .../devicetree/bindings/media/nokia,lirc-rx51         | 19
->>> +++++++++++++++++++
->>>   arch/arm/mach-omap2/pdata-quirks.c                    |  6 +-----
->>>   drivers/media/rc/ir-rx51.c                            | 11 ++++++++++-
->>>   3 files changed, 30 insertions(+), 6 deletions(-)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>>
->>> diff --git a/Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>> b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>> new file mode 100644
->>> index 0000000..5b3081e
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
->>> @@ -0,0 +1,19 @@
->>> +Device-Tree bindings for LIRC TX driver for Nokia N900(RX51)
->>> +
->>> +Required properties:
->>> +       - compatible: should be "nokia,lirc-rx51".
->>
->>
->> lirc is a Linux term. Also, nokia,rx51-... would be conventional
->> ordering.
->>
->
-> I used the driver name ("lirc_rx51") to not bring confusion. Also, it
-> registers itself through lirc_register_driver() call, so having lirc in its
-> name somehow makes sense.
->
-> I am not very good in inventing names, the best compatible I can think of is
-> "nokia,rx51-ir". Is that ok?
+Hi Arnd,
 
-Sure, but...
+On Tue, May 03, 2016 at 05:16:19PM +0200, Arnd Bergmann wrote:
+> One patch you added yesterday unfortunately caused (at least) three
+> separate build problems with 32-bit ARM randconfig builds.
+> 
+> These three patches should make it all work again.
 
->> Is this anything more than a PWM LED?
->>
->
-> It is an IR LED connected through a driver to McSPI2_SIMO pin of OMAP3,
-> which pin can be configured as PWM or GPIO(there are other configurations,
-> but they don't make sense). In theory it could be used for various things
-> (like uni-directional serial TX, or stuff like that), but in practice it
-> allows N900 to be act as an IR remote controller. I guess that fits in
-> "nothing more than a PWM LED", more or less.
+Sorry for the delayed respones, I was on vacation last week and
+asked Stephen to temp. disable the HSI tree. I just applied all
+patches and asked him to reenable it.
 
-There's already a pwm-led binding that can be used. Though there may
-be missing consumer IR to LED subsystem support in the kernel. You
-could list both compatibles, use the rx51 IR driver now, and then move
-to pwm-led driver in the future.
-
-Rob
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160509/b6561e5d/attachment.sig>
