@@ -1,89 +1,38 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 9 May 2016 16:49:26 -0500
-Subject: [PATCH 6/6] ARM: OMAP2+: sram: remove legacy OMAP3 code
-In-Reply-To: <1462830566-28708-1-git-send-email-d-gerlach@ti.com>
-References: <1462830566-28708-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1462830566-28708-7-git-send-email-d-gerlach@ti.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 9 May 2016 17:53:09 -0400
+Subject: [PATCH v2 20/22] ARM: dts: exynos: Move common
+ Exynos5410/542x/5800 nodes to new DTSI
+In-Reply-To: <1462734367-5619-21-git-send-email-krzk@kernel.org>
+References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
+ <1462734367-5619-21-git-send-email-krzk@kernel.org>
+Message-ID: <9e642e0d-87e1-4661-0233-acecf0082f24@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have converted OMAP3 PM code to use generic sram driver we
-no longer need to provide OMAP3 specific SRAM code for the omap SRAM
-API.
+Hello Krzysztof,
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c | 16 ----------------
- arch/arm/mach-omap2/sram.c   | 23 -----------------------
- 2 files changed, 39 deletions(-)
+On 05/08/2016 03:06 PM, Krzysztof Kozlowski wrote:
+> The Exynos5410/542x/5800 are very similar designs. Create new new
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 5ebbf5c30c6e..22d4c8742f99 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -502,22 +502,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
- }
+s/new new/a new
+
+> DTSI with common nodes to remove DTS duplication. Although currently
+> only MCT and SysRAM are shared but in future more nodes will be added to
+> common file.
+> 
+> The patch should not have functional impact.
+> 
+
+A nice way to check this is to diff the disassembled compiled DTBs with
+and without the patch and making sure that the resulted DTS is the same.
+
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
  
--/*
-- * Push functions to SRAM
-- *
-- * The minimum set of functions is pushed to SRAM for execution:
-- * - omap3_do_wfi for erratum i581 WA,
-- * - save_secure_ram_context for security extensions.
-- */
--void omap_push_sram_idle(void)
--{
--	omap3_do_wfi_sram = omap_sram_push(omap3_do_wfi, omap3_do_wfi_sz);
--
--	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
--		_omap_save_secure_sram = omap_sram_push(save_secure_ram_context,
--				save_secure_ram_context_sz);
--}
--
- static void __init pm_errata_configure(void)
- {
- 	if (cpu_is_omap3630()) {
-diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-index 83d0e61f49e6..7881304b5205 100644
---- a/arch/arm/mach-omap2/sram.c
-+++ b/arch/arm/mach-omap2/sram.c
-@@ -209,27 +209,6 @@ static inline int omap243x_sram_init(void)
- }
- #endif
- 
--#ifdef CONFIG_ARCH_OMAP3
--
--void omap3_sram_restore_context(void)
--{
--	omap_sram_reset();
--
--	omap_push_sram_idle();
--}
--
--static inline int omap34xx_sram_init(void)
--{
--	omap3_sram_restore_context();
--	return 0;
--}
--#else
--static inline int omap34xx_sram_init(void)
--{
--	return 0;
--}
--#endif /* CONFIG_ARCH_OMAP3 */
--
- int __init omap_sram_init(void)
- {
- 	omap_detect_sram();
-@@ -239,8 +218,6 @@ int __init omap_sram_init(void)
- 		omap242x_sram_init();
- 	else if (cpu_is_omap2430())
- 		omap243x_sram_init();
--	else if (cpu_is_omap34xx())
--		omap34xx_sram_init();
- 
- 	return 0;
- }
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-2.7.3
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
