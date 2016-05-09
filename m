@@ -1,37 +1,407 @@
 From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Mon,  9 May 2016 13:36:59 +0100
-Subject: [PATCH 0/2] arm64: Add support for CLOCK_MONOTONIC_RAW in
- clock_gettime() vDSO
-Message-ID: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
+Date: Mon,  9 May 2016 13:37:00 +0100
+Subject: [PATCH 1/2] arm64: Refactor vDSO time functions
+In-Reply-To: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
+References: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
+Message-ID: <1462797421-33103-2-git-send-email-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Time functions are directly implemented in assembly in arm64, and it
+is desirable to keep it this way for performance reasons (everything
+fits in registers, so that the stack is not used at all). However, the
+current implementation is quite difficult to read and understand (even
+considering it's assembly).  Additionally, due to the structure of
+__kernel_clock_gettime, which heavily uses conditional branches to
+share code between the different clocks, it is difficult to support a
+new clock without making the branches even harder to follow.
 
-This small series adds support for CLOCK_MONOTONIC_RAW to
-clock_gettime() (and clock_getres()) in the arm64 vDSO. This should make
-calls to clock_gettime() with CLOCK_MONOTONIC_RAW just as fast as
-CLOCK_MONOTONIC and such, instead of falling back to the significantly
-slower syscall.
+This commit completely refactors the structure of clock_gettime (and
+gettimeofday along the way) while keeping exactly the same algorithms.
+We no longer try to share code; instead, macros provide common
+operations. This new approach comes with a number of advantages:
+- In clock_gettime, clock implementations are no longer interspersed,
+  making them much more readable. Additionally, macros only use
+  registers passed as arguments or reserved with .req, this way it is
+  easy to make sure that registers are properly allocated. To avoid a
+  large number of branches in a given execution path, a jump table is
+  used; a normal execution uses 3 unconditional branches.
+- __do_get_tspec has been replaced with 2 macros (get_ts_clock_mono,
+  get_clock_shifted_nsec) and explicit loading of data from the vDSO
+  page. Consequently, clock_gettime and gettimeofday are now leaf
+  functions, and saving x30 (lr) is no longer necessary.
+- Variables protected by tb_seq_count are now loaded all at once,
+  allowing to merge the seqcnt_read macro into seqcnt_check.
+- For CLOCK_REALTIME_COARSE, removed an unused load of the wall to
+  monotonic timespec.
+- For CLOCK_MONOTONIC_COARSE, removed a few shift instructions.
 
-Given that gettimeofday.S is already quite difficult to understand, and
-directly adding MONOTONIC_RAW support makes it even more so, the first
-patch refactors it to make it simpler, and save a few instructions along
-the way. The second patch actually adds support for MONOTONIC_RAW, which
-is made quite easy by the refactoring.
+Obviously, the downside of sharing less code is an increase in code
+size. However since the vDSO has its own code page, this does not
+really matter, as long as the size of the DSO remains below 4 kB. For
+now this should be all right:
+                    Before  After
+  vdso.so size (B)  2776    2936
 
-Thanks,
-Kevin
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+---
+ arch/arm64/kernel/vdso/gettimeofday.S | 282 +++++++++++++++++++---------------
+ 1 file changed, 162 insertions(+), 120 deletions(-)
 
-Kevin Brodsky (2):
-  arm64: Refactor vDSO time functions
-  arm64: Add support for CLOCK_MONOTONIC_RAW in clock_gettime() vDSO
-
- arch/arm64/include/asm/vdso_datapage.h |   8 +-
- arch/arm64/kernel/asm-offsets.c        |   6 +-
- arch/arm64/kernel/vdso.c               |   8 +-
- arch/arm64/kernel/vdso/gettimeofday.S  | 317 ++++++++++++++++++++-------------
- 4 files changed, 215 insertions(+), 124 deletions(-)
-
+diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+index efa79e8d4196..caff9dd6ba78 100644
+--- a/arch/arm64/kernel/vdso/gettimeofday.S
++++ b/arch/arm64/kernel/vdso/gettimeofday.S
+@@ -26,24 +26,91 @@
+ #define NSEC_PER_SEC_HI16	0x3b9a
+ 
+ vdso_data	.req	x6
+-use_syscall	.req	w7
+-seqcnt		.req	w8
++seqcnt		.req	w7
++w_tmp		.req	w8
++x_tmp		.req	x8
++
++/*
++ * Conventions for macro arguments:
++ * - An argument is write-only if its name starts with "res".
++ * - All other arguments are read-only, unless otherwise specified.
++ */
+ 
+ 	.macro	seqcnt_acquire
+ 9999:	ldr	seqcnt, [vdso_data, #VDSO_TB_SEQ_COUNT]
+ 	tbnz	seqcnt, #0, 9999b
+ 	dmb	ishld
+-	ldr	use_syscall, [vdso_data, #VDSO_USE_SYSCALL]
+ 	.endm
+ 
+-	.macro	seqcnt_read, cnt
++	.macro	seqcnt_check fail
+ 	dmb	ishld
+-	ldr	\cnt, [vdso_data, #VDSO_TB_SEQ_COUNT]
++	ldr	w_tmp, [vdso_data, #VDSO_TB_SEQ_COUNT]
++	cmp	w_tmp, seqcnt
++	b.ne	\fail
+ 	.endm
+ 
+-	.macro	seqcnt_check, cnt, fail
+-	cmp	\cnt, seqcnt
+-	b.ne	\fail
++	.macro	syscall_check fail
++	ldr	w_tmp, [vdso_data, #VDSO_USE_SYSCALL]
++	cbnz	w_tmp, \fail
++	.endm
++
++	.macro get_nsec_per_sec res
++	mov	\res, #NSEC_PER_SEC_LO16
++	movk	\res, #NSEC_PER_SEC_HI16, lsl #16
++	.endm
++
++	/*
++	 * Returns the clock delta, in nanoseconds left-shifted by the clock
++	 * shift.
++	 */
++	.macro	get_clock_shifted_nsec res, cycle_last, mult
++	/* Read the virtual counter. */
++	isb
++	mrs	x_tmp, cntvct_el0
++	/* Calculate cycle delta and convert to ns. */
++	sub	\res, x_tmp, \cycle_last
++	/* We can only guarantee 56 bits of precision. */
++	movn	x_tmp, #0xff00, lsl #48
++	and	\res, x_tmp, \res
++	mul	\res, \res, \mult
++	.endm
++
++	/*
++	 * Returns in res_{sec,nsec} the REALTIME timespec, based on the
++	 * "wall time" (xtime) and the clock_mono delta.
++	 */
++	.macro	get_ts_realtime res_sec, res_nsec, \
++			clock_nsec, xtime_sec, xtime_nsec, nsec_to_sec
++	add	\res_nsec, \clock_nsec, \xtime_nsec
++	udiv	x_tmp, \res_nsec, \nsec_to_sec
++	add	\res_sec, \xtime_sec, x_tmp
++	msub	\res_nsec, x_tmp, \nsec_to_sec, \res_nsec
++	.endm
++
++	/* sec and nsec are modified in place. */
++	.macro add_ts sec, nsec, ts_sec, ts_nsec, nsec_to_sec
++	/* Add timespec. */
++	add	\sec, \sec, \ts_sec
++	add	\nsec, \nsec, \ts_nsec
++
++	/* Normalise the new timespec. */
++	cmp	\nsec, \nsec_to_sec
++	b.lt	9999f
++	sub	\nsec, \nsec, \nsec_to_sec
++	add	\sec, \sec, #1
++9999:
++	cmp	\nsec, #0
++	b.ge	9998f
++	add	\nsec, \nsec, \nsec_to_sec
++	sub	\sec, \sec, #1
++9998:
++	.endm
++
++	.macro jump_slot jumptable, index, label
++	.if (. - \jumptable) != 4 * (\index)
++		.error "Jump slot index mismatch"
++	.endif
++	b	\label
+ 	.endm
+ 
+ 	.text
+@@ -51,18 +118,24 @@ seqcnt		.req	w8
+ /* int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz); */
+ ENTRY(__kernel_gettimeofday)
+ 	.cfi_startproc
+-	mov	x2, x30
+-	.cfi_register x30, x2
+-
+-	/* Acquire the sequence counter and get the timespec. */
+ 	adr	vdso_data, _vdso_data
+-1:	seqcnt_acquire
+-	cbnz	use_syscall, 4f
+-
+ 	/* If tv is NULL, skip to the timezone code. */
+ 	cbz	x0, 2f
+-	bl	__do_get_tspec
+-	seqcnt_check w9, 1b
++
++	/* Compute the time of day. */
++1:	seqcnt_acquire
++	syscall_check fail=4f
++	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
++	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
++	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
++	seqcnt_check fail=1b
++
++	get_nsec_per_sec res=x9
++	lsl	x9, x9, x12
++
++	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	get_ts_realtime res_sec=x10, res_nsec=x11, \
++		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+ 
+ 	/* Convert ns to us. */
+ 	mov	x13, #1000
+@@ -76,95 +149,107 @@ ENTRY(__kernel_gettimeofday)
+ 	stp	w4, w5, [x1, #TZ_MINWEST]
+ 3:
+ 	mov	x0, xzr
+-	ret	x2
++	ret
+ 4:
+ 	/* Syscall fallback. */
+ 	mov	x8, #__NR_gettimeofday
+ 	svc	#0
+-	ret	x2
++	ret
+ 	.cfi_endproc
+ ENDPROC(__kernel_gettimeofday)
+ 
++#define JUMPSLOT_MAX CLOCK_MONOTONIC_COARSE
++
+ /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
+ ENTRY(__kernel_clock_gettime)
+ 	.cfi_startproc
+-	cmp	w0, #CLOCK_REALTIME
+-	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
+-	b.ne	2f
++	cmp 	w0, #JUMPSLOT_MAX
++	b.hi 	syscall
++	adr	vdso_data, _vdso_data
++	adr 	x_tmp, jumptable
++	add 	x_tmp, x_tmp, w0, uxtw #2
++	br 	x_tmp
++
++jumptable:
++	jump_slot jumptable, CLOCK_REALTIME, realtime
++	jump_slot jumptable, CLOCK_MONOTONIC, monotonic
++	b 	syscall
++	b 	syscall
++	b 	syscall
++	jump_slot jumptable, CLOCK_REALTIME_COARSE, realtime_coarse
++	jump_slot jumptable, CLOCK_MONOTONIC_COARSE, monotonic_coarse
++
++	.if (. - jumptable) != 4 * (JUMPSLOT_MAX + 1)
++	.error	"Wrong jumptable size"
++	.endif
++
++realtime:
++	seqcnt_acquire
++	syscall_check fail=syscall
++	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
++	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
++	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
++	seqcnt_check fail=realtime
+ 
+-	mov	x2, x30
+-	.cfi_register x30, x2
++	/* All computations are done with left-shifted nsecs. */
++	get_nsec_per_sec res=x9
++	lsl	x9, x9, x12
+ 
+-	/* Get kernel timespec. */
+-	adr	vdso_data, _vdso_data
+-1:	seqcnt_acquire
+-	cbnz	use_syscall, 7f
++	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	get_ts_realtime res_sec=x10, res_nsec=x11, \
++		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+ 
+-	bl	__do_get_tspec
+-	seqcnt_check w9, 1b
++	b shift_store
+ 
+-	mov	x30, x2
++monotonic:
++	seqcnt_acquire
++	syscall_check fail=syscall
++	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
++	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
++	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
++	ldp	x3, x4, [vdso_data, #VDSO_WTM_CLK_SEC]
++	seqcnt_check fail=monotonic
+ 
+-	cmp	w0, #CLOCK_MONOTONIC
+-	b.ne	6f
++	/* All computations are done with left-shifted nsecs. */
++	lsl	x4, x4, x12
++	get_nsec_per_sec res=x9
++	lsl	x9, x9, x12
+ 
+-	/* Get wtm timespec. */
+-	ldp	x13, x14, [vdso_data, #VDSO_WTM_CLK_SEC]
++	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	get_ts_realtime res_sec=x10, res_nsec=x11, \
++		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+ 
+-	/* Check the sequence counter. */
+-	seqcnt_read w9
+-	seqcnt_check w9, 1b
+-	b	4f
+-2:
+-	cmp	w0, #CLOCK_REALTIME_COARSE
+-	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
+-	b.ne	8f
++	add_ts sec=x10, nsec=x11, ts_sec=x3, ts_nsec=x4, nsec_to_sec=x9
+ 
+-	/* xtime_coarse_nsec is already right-shifted */
+-	mov	x12, #0
++	b shift_store
+ 
+-	/* Get coarse timespec. */
+-	adr	vdso_data, _vdso_data
+-3:	seqcnt_acquire
++realtime_coarse:
++	seqcnt_acquire
+ 	ldp	x10, x11, [vdso_data, #VDSO_XTIME_CRS_SEC]
++	seqcnt_check fail=realtime_coarse
+ 
+-	/* Get wtm timespec. */
+-	ldp	x13, x14, [vdso_data, #VDSO_WTM_CLK_SEC]
++	b store
+ 
+-	/* Check the sequence counter. */
+-	seqcnt_read w9
+-	seqcnt_check w9, 3b
++monotonic_coarse:
++	seqcnt_acquire
++	ldp	x10, x11, [vdso_data, #VDSO_XTIME_CRS_SEC]
++	ldp	x13, x14, [vdso_data, #VDSO_WTM_CLK_SEC]
++	seqcnt_check fail=monotonic_coarse
+ 
+-	cmp	w0, #CLOCK_MONOTONIC_COARSE
+-	b.ne	6f
+-4:
+-	/* Add on wtm timespec. */
+-	add	x10, x10, x13
+-	lsl	x14, x14, x12
+-	add	x11, x11, x14
++	/* Computations are done in (non-shifted) nsecs. */
++	get_nsec_per_sec res=x9
++	add_ts sec=x10, nsec=x11, ts_sec=x13, ts_nsec=x14, nsec_to_sec=x9
+ 
+-	/* Normalise the new timespec. */
+-	mov	x15, #NSEC_PER_SEC_LO16
+-	movk	x15, #NSEC_PER_SEC_HI16, lsl #16
+-	lsl	x15, x15, x12
+-	cmp	x11, x15
+-	b.lt	5f
+-	sub	x11, x11, x15
+-	add	x10, x10, #1
+-5:
+-	cmp	x11, #0
+-	b.ge	6f
+-	add	x11, x11, x15
+-	sub	x10, x10, #1
++	b store
+ 
+-6:	/* Store to the user timespec. */
++shift_store:
+ 	lsr	x11, x11, x12
++store:
+ 	stp	x10, x11, [x1, #TSPEC_TV_SEC]
+ 	mov	x0, xzr
+ 	ret
+-7:
+-	mov	x30, x2
+-8:	/* Syscall fallback. */
++
++syscall: /* Syscall fallback. */
+ 	mov	x8, #__NR_clock_gettime
+ 	svc	#0
+ 	ret
+@@ -203,46 +288,3 @@ ENTRY(__kernel_clock_getres)
+ 	.quad	CLOCK_COARSE_RES
+ 	.cfi_endproc
+ ENDPROC(__kernel_clock_getres)
+-
+-/*
+- * Read the current time from the architected counter.
+- * Expects vdso_data to be initialised.
+- * Clobbers the temporary registers (x9 - x15).
+- * Returns:
+- *  - w9		= vDSO sequence counter
+- *  - (x10, x11)	= (ts->tv_sec, shifted ts->tv_nsec)
+- *  - w12		= cs_shift
+- */
+-ENTRY(__do_get_tspec)
+-	.cfi_startproc
+-
+-	/* Read from the vDSO data page. */
+-	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
+-	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
+-	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
+-	seqcnt_read w9
+-
+-	/* Read the virtual counter. */
+-	isb
+-	mrs	x15, cntvct_el0
+-
+-	/* Calculate cycle delta and convert to ns. */
+-	sub	x10, x15, x10
+-	/* We can only guarantee 56 bits of precision. */
+-	movn	x15, #0xff00, lsl #48
+-	and	x10, x15, x10
+-	mul	x10, x10, x11
+-
+-	/* Use the kernel time to calculate the new timespec. */
+-	mov	x11, #NSEC_PER_SEC_LO16
+-	movk	x11, #NSEC_PER_SEC_HI16, lsl #16
+-	lsl	x11, x11, x12
+-	add	x15, x10, x14
+-	udiv	x14, x15, x11
+-	add	x10, x13, x14
+-	mul	x13, x14, x11
+-	sub	x11, x15, x13
+-
+-	ret
+-	.cfi_endproc
+-ENDPROC(__do_get_tspec)
 -- 
 2.8.0
