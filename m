@@ -1,46 +1,28 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Mon, 9 May 2016 11:53:16 +0200
-Subject: [PATCHv4] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
-In-Reply-To: <20160508180941.GC6167@lukather>
-References: <1462439332-26215-1-git-send-email-oliver@schinagl.nl>
- <20160508180941.GC6167@lukather>
-Message-ID: <57305E0C.8040304@schinagl.nl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 May 2016 11:59:32 +0200
+Subject: [PATCH 1/2] pinctrl: nomadik: hide nmk_gpio_get_mode when unused
+In-Reply-To: <1462289221-861102-1-git-send-email-arnd@arndb.de>
+References: <1462289221-861102-1-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdaYkALuRLZ2LU-o-H97rvTLdCmqQf8Zs6sy-tjamuunnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Maxime,
+On Tue, May 3, 2016 at 5:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 08-05-16 20:09, Maxime Ripard wrote:
-> On Thu, May 05, 2016 at 11:08:52AM +0200, Olliver Schinagl wrote:
->> There are 3 kinds of OLinuXino Lime2 boards.
->> One without any on board storage, one with NAND storage and one with
->> eMMC storage. This patch adds the eMMC variant of boards.
->>
->> eMMC storage is different from a regular SD card in that it is soldered
->> on the board and cannot be changed. Additionally, it shares pins with
->> the NAND module and with the second SPI port.
->>
->> Changeslog:
->>
->> v4:
->>    Add board compatibles
->>
->> v3:
->>    Add pwr-seq-emmc with the reset gpio
->>
->> v2:
->>    Remove unsupported no-1.8-v property, add vqmmc property
->>
->> v1:
->>    Initial bare bone version
-> This is not something we want in the commit log. This should go below
-> the --- so that it's dropped when applied.
-Sorry about that, I didn't know the --- trick. ChenYu reminded of it 
-however, so that'll go into my toolblox.
+> nmk_gpio_get_mode is only used in one place, and that is conditionally
+> compiled if DEBUG_FS is enabled. A recent cleanup has marked the
+> definition 'static', which now leads to a warning:
 >
-> Removed and applied.
-Thanks for fixing it, much appreciated :)
+> drivers/pinctrl/nomadik/pinctrl-nomadik.c:614:12: error: 'nmk_gpio_get_mode' defined but not used [-Werror=unused-function]
+>  static int nmk_gpio_get_mode(struct nmk_gpio_chip *nmk_chip, int offset)
+>             ^~~~~~~~~~~~~~~~~
 >
-> Thanks,
-> Maxime
+> Moving the function itself inside the #ifdef shuts it up again.
 >
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 5e81e0a0913c ("pinctrl: nomadik: use BIT() with offsets consequently")
+
+Patch applied!
+
+Yours,
+Linus Walleij
