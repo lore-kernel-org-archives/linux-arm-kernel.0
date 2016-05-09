@@ -1,21 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 May 2016 16:33:59 +0200
-Subject: [GIT PULL] Reset controller changes for v4.7: build fix and OXNAS
- driver
-In-Reply-To: <1462265548.3617.6.camel@pengutronix.de>
-References: <1462265548.3617.6.camel@pengutronix.de>
-Message-ID: <12721898.B3zhW3DZeG@wuerfel>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 10 May 2016 00:04:41 +0930
+Subject: [PULL REQUEST] aspeed arch changes for 4.7
+In-Reply-To: <13157357.VTBDHVBdl8@wuerfel>
+References: <1462796946-13579-1-git-send-email-joel@jms.id.au>
+ <13157357.VTBDHVBdl8@wuerfel>
+Message-ID: <CACPK8Xd2jKwphtF7_qzMEmbzXM=DiFJk2c8Y-Tp6M-G2kkgxmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2016 10:52:28 Philipp Zabel wrote:
-> Reset controller changes for v4.7
-> 
-> - add missing stub for device_reset
-> - add support for OXNAS SoCs
-> 
-> 
+On Mon, May 9, 2016 at 11:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 09 May 2016 21:59:06 Joel Stanley wrote:
+>> This is the initial pull request for the Aspeed BMC SoCs.
+>> aspeed arch tag for 4.7
+>>
+>
+> Pulled into next/soc.
+>
+> Please try to put a little more context into the signed tag next
+> time, it's what ends up in the git history. I've copied the text
+> from your email above for this time.
 
-Merged into next/drivers, thanks!
+I didn't realise that was the case, I'll do so next time. Thanks for
+your help getting these merged!
 
-	Arnd
+Cheers,
+
+Joel
