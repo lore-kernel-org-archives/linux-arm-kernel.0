@@ -1,9 +1,9 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Mon,  9 May 2016 18:44:06 +0200
-Subject: [PATCHv6 7/8] ARM: dts: r8a7790: add iommus to dmac0 and dmac1
+Date: Mon,  9 May 2016 18:44:07 +0200
+Subject: [PATCHv6 8/8] ARM: dts: r8a7791: add iommus to dmac0 and dmac1
 In-Reply-To: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1462812247-3414-8-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1462812247-3414-9-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,14 +14,14 @@ reducing the effective number of channels to 14 per DMAC.
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 30 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7791.dtsi | 30 ++++++++++++++++++++++++++++++
  1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 404ef2b..2912320 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -336,6 +336,21 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 4f01b64..dc81c90 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -313,6 +313,21 @@
  		power-domains = <&cpg_clocks>;
  		#dma-cells = <1>;
  		dma-channels = <15>;
@@ -43,7 +43,7 @@ index 404ef2b..2912320 100644
  	};
  
  	dmac1: dma-controller at e6720000 {
-@@ -367,6 +382,21 @@
+@@ -344,6 +359,21 @@
  		power-domains = <&cpg_clocks>;
  		#dma-cells = <1>;
  		dma-channels = <15>;
