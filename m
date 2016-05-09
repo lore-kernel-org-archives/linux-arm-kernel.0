@@ -1,222 +1,148 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 9 May 2016 16:49:50 -0600
-Subject: [PATCH v9 7/7] vfio/type1: return MSI geometry through
- VFIO_IOMMU_GET_INFO capability chains
-In-Reply-To: <1462362858-2925-8-git-send-email-eric.auger@linaro.org>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-8-git-send-email-eric.auger@linaro.org>
-Message-ID: <20160509164950.0b1cf9c1@t450s.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 May 2016 15:49:53 -0700
+Subject: [PATCH 2/4] drvers/clk: Support fourth generation Aspeed SoCs
+In-Reply-To: <1462797111-14271-3-git-send-email-joel@jms.id.au>
+References: <1462797111-14271-1-git-send-email-joel@jms.id.au>
+ <1462797111-14271-3-git-send-email-joel@jms.id.au>
+Message-ID: <20160509224953.GZ3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  4 May 2016 11:54:18 +0000
-Eric Auger <eric.auger@linaro.org> wrote:
+On 05/09, Joel Stanley wrote:
+> diff --git a/drivers/clk/aspeed/clk-g4.c b/drivers/clk/aspeed/clk-g4.c
+> new file mode 100644
+> index 000000000000..91677e9177f5
+> --- /dev/null
+> +++ b/drivers/clk/aspeed/clk-g4.c
+> @@ -0,0 +1,109 @@
+> +/*
+> + * Copyright 2016 IBM Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/clk.h>
 
-> This patch allows the user-space to retrieve the MSI geometry. The
-> implementation is based on capability chains, now also added to
-> VFIO_IOMMU_GET_INFO.
-> 
-> The returned info comprise:
-> - whether the MSI IOVA are constrained to a reserved range (x86 case) and
->   in the positive, the start/end of the aperture,
-> - or whether the IOVA aperture need to be set by the userspace. In that
->   case, the size and alignment of the IOVA region to be provided are
->   returned.
-> 
-> In case the userspace must provide the IOVA range, we currently return
-> an arbitrary number of IOVA pages (16), supposed to fulfill the needs of
-> current ARM platforms. This may be deprecated by a more sophisticated
-> computation later on.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> v8 -> v9:
-> - use iommu_msi_supported flag instead of programmable
-> - replace IOMMU_INFO_REQUIRE_MSI_MAP flag by a more sophisticated
->   capability chain, reporting the MSI geometry
-> 
-> v7 -> v8:
-> - use iommu_domain_msi_geometry
-> 
-> v6 -> v7:
-> - remove the computation of the number of IOVA pages to be provisionned.
->   This number depends on the domain/group/device topology which can
->   dynamically change. Let's rely instead rely on an arbitrary max depending
->   on the system
-> 
-> v4 -> v5:
-> - move msi_info and ret declaration within the conditional code
-> 
-> v3 -> v4:
-> - replace former vfio_domains_require_msi_mapping by
->   more complex computation of MSI mapping requirements, especially the
->   number of pages to be provided by the user-space.
-> - reword patch title
-> 
-> RFC v1 -> v1:
-> - derived from
->   [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
-> - renamed allow_msi_reconfig into require_msi_mapping
-> - fixed VFIO_IOMMU_GET_INFO
-> ---
->  drivers/vfio/vfio_iommu_type1.c | 69 +++++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/vfio.h       | 30 +++++++++++++++++-
->  2 files changed, 98 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index 2fc8197..841360b 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -1134,6 +1134,50 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
->  	return ret;
->  }
->  
-> +static int compute_msi_geometry_caps(struct vfio_iommu *iommu,
-> +				     struct vfio_info_cap *caps)
+Hopefully this include isn't needed.
+
+> +#include <linux/clk-provider.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clkdev.h>
+> +
+> +static void __init aspeed_of_hpll_clk_init(struct device_node *node)
 > +{
-> +	struct vfio_iommu_type1_info_cap_msi_geometry *vfio_msi_geometry;
-> +	struct iommu_domain_msi_geometry msi_geometry;
-> +	struct vfio_info_cap_header *header;
-> +	struct vfio_domain *d;
-> +	bool mapping_required;
-> +	size_t size;
+> +	struct clk *clk, *clkin_clk;
+> +	void __iomem *base;
+> +	int reg, rate, clkin;
+> +	const char *name = node->name;
+> +	const char *parent_name;
+> +	const int rates[][4] = {
+> +		{384, 360, 336, 408},
+> +		{400, 375, 350, 425},
+> +	};
 > +
-> +	mutex_lock(&iommu->lock);
-> +	/* All domains have same require_msi_map property, pick first */
-> +	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
-> +	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
-> +			      &msi_geometry);
-> +	mapping_required = msi_geometry.iommu_msi_supported;
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +	parent_name = of_clk_get_parent_name(node, 0);
 > +
-> +	mutex_unlock(&iommu->lock);
+> +	base = of_iomap(node, 0);
+> +	if (!base) {
+> +		pr_err("%s: of_iomap failed\n", node->full_name);
+> +		return;
+> +	}
+> +	reg = readl(base);
+> +	iounmap(base);
 > +
-> +	size = sizeof(*vfio_msi_geometry);
-> +	header = vfio_info_cap_add(caps, size,
-> +				   VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY, 1);
-> +
-> +	if (IS_ERR(header))
-> +		return PTR_ERR(header);
-> +
-> +	vfio_msi_geometry = container_of(header,
-> +				struct vfio_iommu_type1_info_cap_msi_geometry,
-> +				header);
-> +
-> +	vfio_msi_geometry->reserved = !mapping_required;
-> +	if (vfio_msi_geometry->reserved) {
-> +		vfio_msi_geometry->aperture_start = msi_geometry.aperture_start;
-> +		vfio_msi_geometry->aperture_end = msi_geometry.aperture_end;
-> +		return 0;
+> +	clkin_clk = of_clk_get(node, 0);
+> +	if (IS_ERR(clkin_clk)) {
+> +		pr_err("%s: of_clk_get failed\n", node->full_name);
+> +		return;
 > +	}
 > +
-> +	vfio_msi_geometry->alignment = 1 << __ffs(vfio_pgsize_bitmap(iommu));
-> +	/* we currently report the need for an arbitray number of 16 pages */
-> +	vfio_msi_geometry->size = 16 * vfio_msi_geometry->alignment;
-
-Hmm, that really is arbitrary.  How could we know a real value here?
-
+> +	clkin = clk_get_rate(clkin_clk);
 > +
-> +	return 0;
+> +	reg = (reg >> 8) & 0x2;
+> +
+> +	if (clkin == 48000000 || clkin == 24000000)
+> +		rate = rates[0][reg] * 1000000;
+> +	else if (clkin == 25000000)
+> +		rate = rates[1][reg] * 1000000;
+> +	else {
+> +		pr_err("%s: unknown clkin frequency %dHz\n",
+> +				node->full_name, clkin);
+> +		WARN_ON(1);
+> +	}
+> +
+> +	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
+
+Please write a proper clk driver that sets clkin to be the parent
+of this clk registered here and then calculates the frequency
+based on the parent clk rate and the strapping registers via the
+recalc rate callback. Also please move this to a platform driver
+instead of using CLK_OF_DECLARE assuming this isn't required for
+any timers in the system.
+
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: failed to register clock\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	clk_register_clkdev(clk, NULL, name);
+
+Do you have clkdev users? If not then please drop this.
+
+> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
 > +}
+> +CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g4-hpll-clock",
+> +	       aspeed_of_hpll_clk_init);
 > +
->  static long vfio_iommu_type1_ioctl(void *iommu_data,
->  				   unsigned int cmd, unsigned long arg)
->  {
-> @@ -1155,6 +1199,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->  		}
->  	} else if (cmd == VFIO_IOMMU_GET_INFO) {
->  		struct vfio_iommu_type1_info info;
-> +		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
-> +		int ret;
->  
->  		minsz = offsetofend(struct vfio_iommu_type1_info, iova_pgsizes);
->  
-> @@ -1168,6 +1214,29 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->  
->  		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
->  
-> +		ret = compute_msi_geometry_caps(iommu, &caps);
-> +		if (ret)
-> +			return ret;
+> +static void __init aspeed_of_apb_clk_init(struct device_node *node)
+> +{
+> +	struct clk *clk, *hpll_clk;
+> +	void __iomem *base;
+> +	int reg, rate;
+> +	const char *name = node->name;
+> +	const char *parent_name;
 > +
-> +		if (caps.size) {
-> +			info.flags |= VFIO_IOMMU_INFO_CAPS;
-> +			if (info.argsz < sizeof(info) + caps.size) {
-> +				info.argsz = sizeof(info) + caps.size;
-> +				info.cap_offset = 0;
-> +			} else {
-> +				vfio_info_cap_shift(&caps, sizeof(info));
-> +				if (copy_to_user((void __user *)arg +
-> +						sizeof(info), caps.buf,
-> +						caps.size)) {
-> +					kfree(caps.buf);
-> +					return -EFAULT;
-> +				}
-> +				info.cap_offset = sizeof(info);
-> +			}
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +	parent_name = of_clk_get_parent_name(node, 0);
 > +
-> +			kfree(caps.buf);
-> +		}
+> +	base = of_iomap(node, 0);
+> +	if (!base) {
+> +		pr_err("%s: of_iomap failed\n", node->full_name);
+> +		return;
+> +	}
+> +	reg = readl(base);
+> +	iounmap(base);
 > +
->  		return copy_to_user((void __user *)arg, &info, minsz) ?
->  			-EFAULT : 0;
->  
-> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-> index 4a9dbc2..0ff6a8d 100644
-> --- a/include/uapi/linux/vfio.h
-> +++ b/include/uapi/linux/vfio.h
-> @@ -488,7 +488,33 @@ struct vfio_iommu_type1_info {
->  	__u32	argsz;
->  	__u32	flags;
->  #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
-> -	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
-> +#define VFIO_IOMMU_INFO_CAPS	(1 << 1)	/* Info supports caps */
-> +	__u32   cap_offset;	/* Offset within info struct of first cap */
-> +	__u64	iova_pgsizes;	/* Bitmap of supported page sizes */
+> +	hpll_clk = of_clk_get(node, 0);
+> +	if (IS_ERR(hpll_clk)) {
+> +		pr_err("%s: of_clk_get failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	reg = (reg >> 23) & 0x3;
+> +	rate = clk_get_rate(hpll_clk) / (2 + 2 * reg);
+> +
+> +	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: failed to register clock\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	clk_register_clkdev(clk, NULL, name);
+> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g4-apb-clock",
+> +	       aspeed_of_apb_clk_init);
 
-This would break existing users, we can't arbitrarily change the offset
-of iova_pgsizes.  We can add cap_offset to the end and I think
-everything would work about above if we do that.
+Following on Rob's comment, please combine this into one driver
+instead of having different DT nodes for different clks that are
+all really part of one clock controller hw block.
 
-> +};
-> +
-> +#define VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY	1
-> +
-> +/*
-> + * The MSI geometry capability allows to report the MSI IOVA geometry:
-> + * - either the MSI IOVAs are constrained within a reserved IOVA aperture
-> + *   whose boundaries are given by [@aperture_start, @aperture_end].
-> + *   this is typically the case on x86 host. The userspace is not allowed
-> + *   to map userspace memory at IOVAs intersecting this range using
-> + *   VFIO_IOMMU_MAP_DMA.
-> + * - or the MSI IOVAs are not requested to belong to any reserved range;
-> + *   in that case the userspace must provide an IOVA window characterized by
-> + *   @size and @alignment using VFIO_IOMMU_MAP_DMA with RESERVED_MSI_IOVA flag.
-> + */
-> +struct vfio_iommu_type1_info_cap_msi_geometry {
-> +	struct vfio_info_cap_header header;
-> +	bool reserved; /* Are MSI IOVAs within a reserved aperture? */
-
-Do bools have a guaranteed user size?  Let's make this a __u32 and call
-it flags with bit 0 defined as reserved.  I'm tempted to suggest we
-could figure out how to make alignment fit in another __u32 so we have a
-properly packed structure, otherwise we should make a reserved __u32.
-
-> +	/* reserved */
-> +	__u64 aperture_start;
-> +	__u64 aperture_end;
-> +	/* not reserved */
-> +	__u64 size; /* IOVA aperture size in bytes the userspace must provide */
-> +	__u64 alignment; /* alignment of the window, in bytes */
->  };
->  
->  #define VFIO_IOMMU_GET_INFO _IO(VFIO_TYPE, VFIO_BASE + 12)
-> @@ -503,6 +529,8 @@ struct vfio_iommu_type1_info {
->   * IOVA region that will be used on some platforms to map the host MSI frames.
->   * In that specific case, vaddr is ignored. Once registered, an MSI reserved
->   * IOVA region stays until the container is closed.
-> + * The requirement for provisioning such reserved IOVA range can be checked by
-> + * checking the VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY capability.
->   */
->  struct vfio_iommu_type1_dma_map {
->  	__u32	argsz;
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
