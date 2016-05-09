@@ -1,58 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 May 2016 14:27:12 +0100
-Subject: [PATCH] clocksource/arm_arch_timer: Force per-CPU interrupt to
- trigger on level-high
-In-Reply-To: <1462799197-31286-1-git-send-email-marc.zyngier@arm.com>
-References: <1462799197-31286-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <57309030.8040907@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 9 May 2016 09:32:47 -0400
+Subject: [PATCH] clk: samsung: exynos5420: Remove useless check for return
+ value of samsung_clk_init
+In-Reply-To: <1462699496-16646-1-git-send-email-krzk@kernel.org>
+References: <1462699496-16646-1-git-send-email-krzk@kernel.org>
+Message-ID: <4033d4d5-558d-898f-cdc9-07a19654ade6@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/16 14:06, Marc Zyngier wrote:
-> The ARM architected timer produces level-triggered interrupts (this
-> is mandated by the architecture). Unfortunately, most device-trees
-> get this wrong, and expose an edge-triggered interrupt.
+Hello Krzysztof,
+
+On 05/08/2016 05:24 AM, Krzysztof Kozlowski wrote:
+> The samsung_clk_init() cannot return NULL. Either it returns allocated
+> memory or it panics.
 > 
-> Until now, this wasn't too much an issue, as the programming of the
-> trigger would fail (the corresponding PPI cannot be reconfigured),
-> and the kernel would be happy with this. But we're about to change
-> this, and trust DT a lot if the driver doesn't provide its own
-> trigger information. In that context, the timer breaks badly.
-> 
-> While we do need to fix the DTs, there is also some userspace out
-> there (kvmtool) that generates the same kind of broken DT on the
-> fly, and that will completely break with newer kernels.
-> 
-> As a safety measure, and to keep buggy software alive as well as
-> buying us some time to fix DTs all over the place, let's enforce
-> the interrupt trigger in the timer driver. This doesn't cost
-> us anything, and ensures that this will work in all situations,
-> broken DT or not.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  drivers/clocksource/arm_arch_timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/clk/samsung/clk-exynos5420.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5152b38..fdf367ae 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -366,7 +366,7 @@ static int arch_timer_setup(struct clock_event_device *clk)
->  {
->  	__arch_timer_setup(ARCH_CP15_TIMER, clk);
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 92382cef9f90..770c0f007c6b 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -1356,8 +1356,6 @@ static void __init exynos5x_clk_init(struct device_node *np,
+>  	exynos5x_soc = soc;
 >  
-> -	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
-> +	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], IRQF_TRIGGER_HIGH);
+>  	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
+> -	if (!ctx)
+> -		panic("%s: unable to allocate context.\n", __func__);
+>
 
-Looking at it a bit more, it looks like it is should be a TRIGGER_LOW
-(the ARM GIC doesn't distinguish between levels, but other
-implementations might be able to). Oh well.
+Indeed, the check is superfluous. I see that most callers [0] currently
+do the same, so probably makes sense to remove those too in this patch.
 
-I'll respin this shortly.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Thanks,
+[0]:
+drivers/clk/samsung/clk-exynos4.c
+drivers/clk/samsung/clk-exynos5250.c
+drivers/clk/samsung/clk-exynos5440.c
+drivers/clk/samsung/clk-s3c2410.c
+drivers/clk/samsung/clk-s3c2412.c
+drivers/clk/samsung/clk-s3c2443.c
+drivers/clk/samsung/clk-s3c64xx.c
+drivers/clk/samsung/clk-s5pv210.c
 
-	M.
+Best regards,
 -- 
-Jazz is not dead. It just smells funny...
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
