@@ -1,36 +1,89 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 9 May 2016 11:34:38 +0300
-Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
-In-Reply-To: <a6969765-d07d-6d0e-36df-b78b485d9644@ti.com>
-References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
- <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
- <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
- <20160505184609.GB5995@atomide.com>
- <a6969765-d07d-6d0e-36df-b78b485d9644@ti.com>
-Message-ID: <57304B9E.50201@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 9 May 2016 11:34:42 +0300
+Subject: [PATCH] ARM: dts: Fix igepv5 audiopwon-gpio
+In-Reply-To: <1462474581-13865-1-git-send-email-tony@atomide.com>
+References: <1462474581-13865-1-git-send-email-tony@atomide.com>
+Message-ID: <1b37fbdd-67f0-e9e3-d442-bdc0bd74397b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/05/16 11:25, Peter Ujfalusi wrote:
-
-> Tomi: what do you think?
+On 05/05/16 21:56, Tony Lindgren wrote:
+> Playing audio works on omap5-uevm, but produces an "Unhandled fault:
+> imprecise external abort (0x1406) at 0x00000000" error on igepv5.
 > 
-> According to the OMAP5 data manual the vdda_hdmi can be in 1.5V or 1.8V mode,
-> 2V is not mentioned in the recommended operating conditions table.
+> Looks like the twl6040 audpwron GPIO pin is different for these
+> boards. Let's fix the issue by configuring the audpwron in the
+> board specific dts file.
+> 
+> Cc: Agust? Fontquerni <af@iseebcn.com>
+> Cc: Eduard Gavin <egavin@iseebcn.com>
+> Cc: Enric Balletbo i Serra <eballetbo@iseebcn.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/boot/dts/omap5-board-common.dtsi |  3 ++-
+>  arch/arm/boot/dts/omap5-igep0050.dts      | 10 ++++++++++
+>  arch/arm/boot/dts/omap5-uevm.dts          | 10 ++++++++++
+>  3 files changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5-board-common.dtsi b/arch/arm/boot/dts/omap5-board-common.dtsi
+> index 2eea26c..23b1d7c 100644
+> --- a/arch/arm/boot/dts/omap5-board-common.dtsi
+> +++ b/arch/arm/boot/dts/omap5-board-common.dtsi
+> @@ -642,7 +642,8 @@
+>  		pinctrl-0 = <&twl6040_pins>;
+>  
+>  		interrupts = <GIC_SPI 119 IRQ_TYPE_NONE>; /* IRQ_SYS_2N cascaded to gic */
+> -		ti,audpwron-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;  /* gpio line 141 */
+> +
+> +		/* audpwron gpio defined in the board specific dts */
+>  
+>  		vio-supply = <&smps7_reg>;
+>  		v2v1-supply = <&smps9_reg>;
+> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
+> index 72ff6a4..673cdfa 100644
+> --- a/arch/arm/boot/dts/omap5-igep0050.dts
+> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
+> @@ -58,3 +58,13 @@
+>  		<&gpio7 3 0>;		/* 195, SDA */
+>  };
+>  
+> +&twl6040 {
+> +	ti,audpwron-gpio = <&gpio5 16 GPIO_ACTIVE_HIGH>;  /* gpio line 144 */
 
-I thought vdda_hdmi should always be 1.8V, but you're right, on omap5
-1.5V is allowed according to DM. On later SoCs it's only 1.8V. I suggest
-we use 1.8V on all boards, as that's what's known to work.
+BTW: how do you know that gpio144 is used as audpwron GPIO on igepv5?
 
-2V is definitely wrong.
+> +};
+> +
+> +&twl6040_pins {
+> +	pinctrl-single,pins = <
+> +		OMAP5_IOPAD(0x1c4, PIN_OUTPUT | MUX_MODE6)	/* mcspi1_somi.gpio5_144 */
+> +		OMAP5_IOPAD(0x1ca, PIN_OUTPUT | MUX_MODE6)	/* perslimbus2_clock.gpio5_145 */
 
- Tomi
+What does the gpio145 is used for?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160509/d962752c/attachment-0001.sig>
+> +	>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index 60b3fbb..a51e605 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -51,3 +51,13 @@
+>  		<&gpio9 1 GPIO_ACTIVE_HIGH>,	/* TCA6424A P00, LS OE */
+>  		<&gpio7 1 GPIO_ACTIVE_HIGH>;	/* GPIO 193, HPD */
+>  };
+> +
+> +&twl6040 {
+> +	ti,audpwron-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;  /* gpio line 141 */
+> +};
+> +
+> +&twl6040_pins {
+> +	pinctrl-single,pins = <
+> +		OMAP5_IOPAD(0x1be, PIN_OUTPUT | MUX_MODE6)	/* mcspi1_somi.gpio5_141 */
+> +	>;
+> +};
+> 
+
+
+-- 
+P?ter
