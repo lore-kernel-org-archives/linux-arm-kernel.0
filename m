@@ -1,58 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 May 2016 18:34:29 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d2: use "atmel,
- sama5d3-nfc" compatible for nfc
-In-Reply-To: <1462776680-5284-3-git-send-email-wenyou.yang@atmel.com>
-References: <1462776680-5284-3-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1462811669-10107-1-git-send-email-nicolas.ferre@atmel.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 9 May 2016 12:44:50 -0400
+Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI
+ with CPU thermal nodes
+In-Reply-To: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <d7e37f87-c794-f0ad-73d1-8e976c37471b@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenyou Yang <wenyou.yang@atmel.com>
+Hello Krzysztof,
 
-An error in documentation of the NAND Flash Controller (NFC) led to choose
-another compatibility string for sama5d2 with an impact on the NAND flash
-ready/busy information. It was producing the error message:
+On 05/09/2016 02:19 AM, Krzysztof Kozlowski wrote:
+> Include the CPU thermal nodes directly in Odroid XU3-family common DTS
+> because it is the only user of it. Keeping it in separate DTSI node does
+> not bring benefits because:
+> 1. It is not re-usable on other non-fan boards (fan is referenced),
+> 2. It won't be re-used on future Odroid XU board because different
+>    CPU cluster behavior.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-atmel_nand 80000000.nand: Time out to wait for interrupt: 0x08000000
+Agreed with both points and the patch looks good to me.
 
-and had an impact on performance.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-So, switch back to the classical "atmel,sama5d3-nfc" compatibility string for
-this SoC which gives the proper ready/busy bit information. The NAND flash
-driver will be updated to remove the support for this different
-implementation.
-
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-[nicolas.ferre at atmel.com: change commit message]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Wenyou, Romain,
-
-I plan to send this patch for 4.6-rc as a fix tomorrow (my time). Can you
-please tell me if it's okay on your side.
-I revised the commit message just to justify the very late "fix" sending of
-this patch...
-
-Thanks for your help, bye.
-  Nicolas.
-
-
- arch/arm/boot/dts/sama5d2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 78996bdbd3df..9817090c1b73 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -280,7 +280,7 @@
- 			status = "disabled";
- 
- 			nfc at c0000000 {
--				compatible = "atmel,sama5d4-nfc";
-+				compatible = "atmel,sama5d3-nfc";
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				reg = < /* NFC Command Registers */
+Best regards,
 -- 
-2.1.3
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
