@@ -1,54 +1,92 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 May 2016 15:06:57 -0500
-Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
-In-Reply-To: <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <20160509200657.GA3379@rob-hp-laptop>
+Date: Mon, 9 May 2016 15:09:36 -0500
+Subject: [PATCH v2 22/22] ARM: dts: exynos: Add initial support for
+ Odroid XU board
+In-Reply-To: <1462734367-5619-23-git-send-email-krzk@kernel.org>
+References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
+ <1462734367-5619-23-git-send-email-krzk@kernel.org>
+Message-ID: <20160509200936.GA24252@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 07, 2016 at 06:21:45PM +0300, Ivaylo Dimitrov wrote:
-> With the upcoming removal of legacy boot, lets add support to one of the
-> last N900 drivers remaining without it. As the driver still uses omap
-> dmtimer, add auxdata as well.
+On Sun, May 08, 2016 at 09:06:07PM +0200, Krzysztof Kozlowski wrote:
+> The Hardkernel's Odroid XU board was first design with big.LITTLE SoC
+> from Samsung: the Exynos5410. Comparing now to more popular Odroid XU3
+> the differences are:
+> 1. Exynos5410 instead of 5422,
+> 2. DisplayPort,
+> 3. Main PMIC: Maxim 77802 instead of S2MPS11,
+> 4. USB3503+LAN9730 instead of integrated LAN9514,
+> 5. eMMC 4.5 instead of eMMC 5.0,
 > 
-> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> This patch adds initial support for the XU board with working basic
+> functions, eMMC/SD and USB (including attached ethernet adapter).
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  .../devicetree/bindings/media/nokia,lirc-rx51         | 19 +++++++++++++++++++
->  arch/arm/mach-omap2/pdata-quirks.c                    |  6 +-----
->  drivers/media/rc/ir-rx51.c                            | 11 ++++++++++-
->  3 files changed, 30 insertions(+), 6 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/media/nokia,lirc-rx51
+>  .../bindings/arm/samsung/samsung-boards.txt        |   1 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/exynos5410-odroidxu.dts          | 166 +++++++++++++++++++++
+>  3 files changed, 168 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos5410-odroidxu.dts
 > 
-> diff --git a/Documentation/devicetree/bindings/media/nokia,lirc-rx51 b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> index f5deace2b380..0ea7f14ef294 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> @@ -47,6 +47,7 @@ Required root node properties:
+>  	- "hardkernel,odroid-u3"  - for Exynos4412-based Hardkernel Odroid U3.
+>  	- "hardkernel,odroid-x"   - for Exynos4412-based Hardkernel Odroid X.
+>  	- "hardkernel,odroid-x2"  - for Exynos4412-based Hardkernel Odroid X2.
+> +	- "hardkernel,odroid-xu"  - for Exynos5410-based Hardkernel Odroid XU.
+>  	- "hardkernel,odroid-xu3" - for Exynos5422-based Hardkernel Odroid XU3.
+>  	- "hardkernel,odroid-xu3-lite" - for Exynos5422-based Hardkernel
+>  					 Odroid XU3 Lite board.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5aeb10674370..9ed1c7abedb1 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -134,6 +134,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+>  	exynos5250-snow-rev5.dtb \
+>  	exynos5250-spring.dtb \
+>  	exynos5260-xyref5260.dtb \
+> +	exynos5410-odroidxu.dtb \
+>  	exynos5410-smdk5410.dtb \
+>  	exynos5420-arndale-octa.dtb \
+>  	exynos5420-peach-pit.dtb \
+> diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
 > new file mode 100644
-> index 0000000..5b3081e
+> index 000000000000..b0cbd53aeea9
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/nokia,lirc-rx51
-> @@ -0,0 +1,19 @@
-> +Device-Tree bindings for LIRC TX driver for Nokia N900(RX51)
+> +++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+> @@ -0,0 +1,166 @@
+> +/*
+> + * Hardkernel Odroid XU3 board device tree source
+> + *
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + * Copyright (c) 2016 Krzysztof Kozlowski
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +Required properties:
-> +	- compatible: should be "nokia,lirc-rx51".
+> +/dts-v1/;
+> +#include "exynos5410.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include "exynos54xx-odroidxu-leds.dtsi"
+> +
+> +/ {
+> +	model = "Hardkernel Odroid XU";
+> +	compatible = "hardkernel,odroid-xu", "samsung,exynos5410", "samsung,exynos5";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x7EA00000>;
 
-lirc is a Linux term. Also, nokia,rx51-... would be conventional 
-ordering.
+lowercase hex please.
 
-Is this anything more than a PWM LED?
+With that,
 
-> +	- pwms: specifies PWM used for IR signal transmission.
-> +
-> +Example node:
-> +
-> +	pwm9: dmtimer-pwm at 9 {
-> +		compatible = "ti,omap-dmtimer-pwm";
-> +		ti,timers = <&timer9>;
-> +		#pwm-cells = <3>;
-> +	};
-> +
-> +	ir: lirc-rx51 {
-> +		compatible = "nokia,lirc-rx51";
-> +
-> +		pwms = <&pwm9 0 26316 0>; /* 38000 Hz */
-> +	};
+Acked-by: Rob Herring <robh@kernel.org>
