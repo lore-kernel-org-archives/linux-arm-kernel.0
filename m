@@ -1,97 +1,47 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon,  9 May 2016 22:02:49 +0930
-Subject: [PATCH 4/4] drivers/clocksource/moxart: Add Aspeed support
-In-Reply-To: <1462797169-14512-1-git-send-email-joel@jms.id.au>
-References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
-Message-ID: <1462797169-14512-5-git-send-email-joel@jms.id.au>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 9 May 2016 15:50:00 +0300
+Subject: [PATCH 1/2] doc/devicetree: Add Aspeed VIC bindings
+In-Reply-To: <1462797239-14765-2-git-send-email-joel@jms.id.au>
+References: <1462797239-14765-1-git-send-email-joel@jms.id.au>
+ <1462797239-14765-2-git-send-email-joel@jms.id.au>
+Message-ID: <20160509124959.GM4414@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aspeed SoC has timer IP with a very similar register layout to the
-moxart timer. This patch adds support for the fourth and fifth gen
-aspeed SoCs, and has been tested on the ast2400 and ast2500.
+Hi Joel,
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- .../bindings/timer/moxa,moxart-timer.txt           |  4 ++-
- drivers/clocksource/moxart_timer.c                 | 32 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 1 deletion(-)
+On Mon, May 09, 2016 at 10:03:58PM +0930, Joel Stanley wrote:
+> +Aspeed Vectored Interrupt Controller
+> +
+> +These bindings are for the Aspeed AST2400 interrupt controller register layout.
+> +The SoC has an legacy register layout, but this driver does not support that
+> +mode of operation.
+> +
+> +Required properties:
+> +
+> +- compatible : should be "aspeed,ast2400-vic".
+> +
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 1.
+> +- valid-sources : bitmask of valid irq sources
+> +
+> +Example:
+> +
+> + vic: interrupt-controller {
+> +      compatible = "aspeed,ast2400-new-vic";
 
-diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-index da2d510cae47..e207c11630af 100644
---- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-@@ -2,7 +2,9 @@ MOXA ART timer
- 
- Required properties:
- 
--- compatible : Must be "moxa,moxart-timer"
-+- compatible : Must be one of:
-+ 	- "moxa,moxart-timer"
-+ 	- "aspeed,ast2400-timer"
- - reg : Should contain registers location and length
- - interrupts : Should contain the timer interrupt number
- - clocks : Should contain phandle for the clock that drives the counter
-diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
-index d17e3eface87..83ffa2727699 100644
---- a/drivers/clocksource/moxart_timer.c
-+++ b/drivers/clocksource/moxart_timer.c
-@@ -56,6 +56,23 @@
- #define MOXART_TIMER1_ENABLE	(MOXART_CR_2_ENABLE | MOXART_CR_1_ENABLE)
- #define MOXART_TIMER1_DISABLE	(MOXART_CR_2_ENABLE)
- 
-+/*
-+ * The ASpeed variant of the IP block has a different layout
-+ * for the control register
-+ */
-+#define ASPEED_CR_1_ENABLE	BIT(0)
-+#define ASPEED_CR_1_CLOCK	BIT(1)
-+#define ASPEED_CR_1_INT		BIT(2)
-+#define ASPEED_CR_2_ENABLE	BIT(4)
-+#define ASPEED_CR_2_CLOCK	BIT(5)
-+#define ASPEED_CR_2_INT		BIT(6)
-+#define ASPEED_CR_3_ENABLE	BIT(8)
-+#define ASPEED_CR_3_CLOCK	BIT(9)
-+#define ASPEED_CR_3_INT		BIT(10)
-+
-+#define ASPEED_TIMER1_ENABLE   (ASPEED_CR_2_ENABLE | ASPEED_CR_1_ENABLE)
-+#define ASPEED_TIMER1_DISABLE  (ASPEED_CR_2_ENABLE)
-+
- struct moxart_timer {
- 	void __iomem *base;
- 	unsigned int t1_disable_val;
-@@ -159,6 +176,9 @@ static void __init moxart_timer_init(struct device_node *node)
- 	if (of_device_is_compatible(node, "moxa,moxart-timer")) {
- 		timer->t1_enable_val = MOXART_TIMER1_ENABLE;
- 		timer->t1_disable_val = MOXART_TIMER1_DISABLE;
-+	} else if (of_device_is_compatible(node, "aspeed,ast2400-timer")) {
-+		timer->t1_enable_val = ASPEED_TIMER1_ENABLE;
-+		timer->t1_disable_val = ASPEED_TIMER1_DISABLE;
- 	} else
- 		panic("%s: unknown platform\n", node->full_name);
- 
-@@ -189,6 +209,17 @@ static void __init moxart_timer_init(struct device_node *node)
- 	if (ret)
- 		panic("%s: setup_irq failed\n", node->full_name);
- 
-+	/* Clear match registers */
-+	writel(0, timer->base + TIMER1_BASE + REG_MATCH1);
-+	writel(0, timer->base + TIMER1_BASE + REG_MATCH2);
-+	writel(0, timer->base + TIMER2_BASE + REG_MATCH1);
-+	writel(0, timer->base + TIMER2_BASE + REG_MATCH2);
-+
-+	/*
-+	 * Start timer 2 rolling as our main wall clock source, keep timer 1
-+	 * disabled
-+	 */
-+	writel(0, timer->base + TIMER_CR);
- 	writel(~0, timer->base + TIMER2_BASE + REG_LOAD);
- 	writel(timer->t1_disable_val, timer->base + TIMER_CR);
- 
-@@ -201,3 +232,4 @@ static void __init moxart_timer_init(struct device_node *node)
- 	clockevents_config_and_register(&timer->clkevt, pclk, 0x4, 0xfffffffe);
- }
- CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
-+CLOCKSOURCE_OF_DECLARE(aspeed, "aspeed,ast2400-timer", moxart_timer_init);
+That doesn't match the compatible string documented above.
+
+> +      interrupt-controller;
+> +      #interrupt-cells = <1>;
+> +      valid-sources = < 0xffffffff 0x0007ffff>;
+> +      reg = <0x1e6c0080 0x80>;
+> + };
+
+baruch
+
 -- 
-2.8.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
