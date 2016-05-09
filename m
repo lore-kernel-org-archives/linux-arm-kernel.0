@@ -1,254 +1,173 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 09 May 2016 08:19:49 +0200
-Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI with
- CPU thermal nodes
-Message-ID: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 9 May 2016 14:38:08 +0800
+Subject: [PATCH v7 4/9] clk: mediatek: Add MT2701 clock support
+In-Reply-To: <20160506231151.GI3492@codeaurora.org>
+References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1460621514-65191-5-git-send-email-jamesjj.liao@mediatek.com>
+ <20160506231151.GI3492@codeaurora.org>
+Message-ID: <1462775888.5344.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include the CPU thermal nodes directly in Odroid XU3-family common DTS
-because it is the only user of it. Keeping it in separate DTSI node does
-not bring benefits because:
-1. It is not re-usable on other non-fan boards (fan is referenced),
-2. It won't be re-used on future Odroid XU board because different
-   CPU cluster behavior.
+Hi Stephen,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi      | 103 ---------------------
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  94 ++++++++++++++++++-
- 2 files changed, 92 insertions(+), 105 deletions(-)
- delete mode 100644 arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+On Fri, 2016-05-06 at 16:11 -0700, Stephen Boyd wrote:
+> On 04/14, James Liao wrote:
+> > diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+> > new file mode 100644
+> > index 0000000..b4db141
+> > --- /dev/null
+> > +++ b/drivers/clk/mediatek/clk-mt2701.c
+> > +static void __init mtk_infrasys_init(struct device_node *node)
+> > +{
+> > +	struct clk_onecell_data *clk_data;
+> > +	int r;
+> > +
+> > +	clk_data = mtk_alloc_clk_data(CLK_INFRA_NR);
+> > +
+> > +	mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
+> > +						clk_data);
+> > +	mtk_clk_register_factors(infra_fixed_divs, ARRAY_SIZE(infra_fixed_divs),
+> > +						clk_data);
+> > +
+> > +	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> > +	if (r)
+> > +		pr_err("%s(): could not register clock provider: %d\n",
+> > +			__func__, r);
+> > +}
+> > +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
+> 
+> I'm still lost on the usage of CLK_OF_DECLARE here. What part of
+> these clk controllers needs to be registered to make the timer
+> work?
 
-diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
-deleted file mode 100644
-index 3e4c4ad96d63..000000000000
---- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
-+++ /dev/null
-@@ -1,103 +0,0 @@
--/*
-- * Device tree sources for Exynos5422 thermal zone
-- *
-- * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
-- *			Anand Moon <linux.amoon@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- */
--
--#include <dt-bindings/thermal/thermal.h>
--
--/ {
--	thermal-zones {
--		cpu0_thermal: cpu0-thermal {
--			thermal-sensors = <&tmu_cpu0 0>;
--			polling-delay-passive = <250>;
--			polling-delay = <0>;
--			trips {
--				cpu_alert0: cpu-alert-0 {
--					temperature = <50000>; /* millicelsius */
--					hysteresis = <5000>; /* millicelsius */
--					type = "active";
--				};
--				cpu_alert1: cpu-alert-1 {
--					temperature = <60000>; /* millicelsius */
--					hysteresis = <5000>; /* millicelsius */
--					type = "active";
--				};
--				cpu_alert2: cpu-alert-2 {
--					temperature = <70000>; /* millicelsius */
--					hysteresis = <5000>; /* millicelsius */
--					type = "active";
--				};
--				cpu_crit0: cpu-crit-0 {
--					temperature = <120000>; /* millicelsius */
--					hysteresis = <0>; /* millicelsius */
--					type = "critical";
--				};
--				/*
--				 * Exyunos542x support only 4 trip-points
--				 * so for these polling mode is required.
--				 * Start polling at temperature level of last
--				 * interrupt-driven trip: cpu_alert2
--				 */
--				cpu_alert3: cpu-alert-3 {
--					temperature = <70000>; /* millicelsius */
--					hysteresis = <10000>; /* millicelsius */
--					type = "passive";
--				};
--				cpu_alert4: cpu-alert-4 {
--					temperature = <85000>; /* millicelsius */
--					hysteresis = <10000>; /* millicelsius */
--					type = "passive";
--				};
--
--			};
--			cooling-maps {
--				map0 {
--				     trip = <&cpu_alert0>;
--				     cooling-device = <&fan0 0 1>;
--				};
--				map1 {
--				     trip = <&cpu_alert1>;
--				     cooling-device = <&fan0 1 2>;
--				};
--				map2 {
--				     trip = <&cpu_alert2>;
--				     cooling-device = <&fan0 2 3>;
--				};
--				/*
--				 * When reaching cpu_alert3, reduce CPU
--				 * by 2 steps. On Exynos5422/5800 that would
--				 * be: 1500 MHz and 1100 MHz.
--				 */
--				map3 {
--				     trip = <&cpu_alert3>;
--				     cooling-device = <&cpu0 0 2>;
--				};
--				map4 {
--				     trip = <&cpu_alert3>;
--				     cooling-device = <&cpu4 0 2>;
--				};
--
--				/*
--				 * When reaching cpu_alert4, reduce CPU
--				 * further, down to 600 MHz (11 steps for big,
--				 * 7 steps for LITTLE).
--				 */
--				map5 {
--				     trip = <&cpu_alert4>;
--				     cooling-device = <&cpu0 3 7>;
--				};
--				map6 {
--				     trip = <&cpu_alert4>;
--				     cooling-device = <&cpu4 3 11>;
--				};
--			};
--		};
--	};
--};
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 2a4e10bc8801..ff05041835e5 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -1,9 +1,11 @@
- /*
-  * Hardkernel Odroid XU3 board device tree source
-  *
-- * Copyright (c) 2014 Collabora Ltd.
-  * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-+ * Copyright (c) 2014 Collabora Ltd.
-+ * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
-+ *                    Anand Moon <linux.amoon@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -16,7 +18,6 @@
- #include <dt-bindings/sound/samsung-i2s.h>
- #include "exynos5800.dtsi"
- #include "exynos5422-cpus.dtsi"
--#include "exynos5422-cpu-thermal.dtsi"
- 
- / {
- 	memory {
-@@ -54,6 +55,95 @@
- 		#cooling-cells = <2>;
- 		cooling-levels = <0 130 170 230>;
- 	};
-+
-+	thermal-zones {
-+		cpu0_thermal: cpu0-thermal {
-+			thermal-sensors = <&tmu_cpu0 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu_alert0: cpu-alert-0 {
-+					temperature = <50000>; /* millicelsius */
-+					hysteresis = <5000>; /* millicelsius */
-+					type = "active";
-+				};
-+				cpu_alert1: cpu-alert-1 {
-+					temperature = <60000>; /* millicelsius */
-+					hysteresis = <5000>; /* millicelsius */
-+					type = "active";
-+				};
-+				cpu_alert2: cpu-alert-2 {
-+					temperature = <70000>; /* millicelsius */
-+					hysteresis = <5000>; /* millicelsius */
-+					type = "active";
-+				};
-+				cpu_crit0: cpu-crit-0 {
-+					temperature = <120000>; /* millicelsius */
-+					hysteresis = <0>; /* millicelsius */
-+					type = "critical";
-+				};
-+				/*
-+				 * Exynos542x supports only 4 trip-points
-+				 * so for these polling mode is required.
-+				 * Start polling at temperature level of last
-+				 * interrupt-driven trip: cpu_alert2
-+				 */
-+				cpu_alert3: cpu-alert-3 {
-+					temperature = <70000>; /* millicelsius */
-+					hysteresis = <10000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_alert4: cpu-alert-4 {
-+					temperature = <85000>; /* millicelsius */
-+					hysteresis = <10000>; /* millicelsius */
-+					type = "passive";
-+				};
-+
-+			};
-+			cooling-maps {
-+				map0 {
-+				     trip = <&cpu_alert0>;
-+				     cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+				     trip = <&cpu_alert1>;
-+				     cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+				     trip = <&cpu_alert2>;
-+				     cooling-device = <&fan0 2 3>;
-+				};
-+				/*
-+				 * When reaching cpu_alert3, reduce CPU
-+				 * by 2 steps. On Exynos5422/5800 that would
-+				 * be: 1500 MHz and 1100 MHz.
-+				 */
-+				map3 {
-+				     trip = <&cpu_alert3>;
-+				     cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+				     trip = <&cpu_alert3>;
-+				     cooling-device = <&cpu4 0 2>;
-+				};
-+
-+				/*
-+				 * When reaching cpu_alert4, reduce CPU
-+				 * further, down to 600 MHz (11 steps for big,
-+				 * 7 steps for LITTLE).
-+				 */
-+				map5 {
-+				     trip = <&cpu_alert4>;
-+				     cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+				     trip = <&cpu_alert4>;
-+				     cooling-device = <&cpu4 3 11>;
-+				};
-+			};
-+		};
-+	};
-+
- };
- 
- &bus_wcore {
--- 
-1.9.1
+GPT (mtk-timer.c) may need infracfg and topckgen clocks. MT8173 for
+example:
+
+	timer: timer at 10008000 {
+	[...]
+		clocks = <&infracfg CLK_INFRA_CLK_13M>,
+			 <&topckgen CLK_TOP_RTC_SEL>;
+	};
+
+> > +	GATE_DISP1(CLK_MM_DPI_DIGL, "mm_dpi_digl", "dpi0_sel", 2),
+> > +	GATE_DISP1(CLK_MM_DPI_ENGINE, "mm_dpi_eng", "mm_sel", 3),
+> > +	GATE_DISP1(CLK_MM_DPI1_DIGL, "mm_dpi1_digl", "dpi1_sel", 4),
+> > +	GATE_DISP1(CLK_MM_DPI1_ENGINE, "mm_dpi1_eng", "mm_sel", 5),
+> > +	GATE_DISP1(CLK_MM_TVE_OUTPUT, "mm_tve_output", "tve_sel", 6),
+> > +	GATE_DISP1(CLK_MM_TVE_INPUT, "mm_tve_input", "dpi0_sel", 7),
+> > +	GATE_DISP1(CLK_MM_HDMI_PIXEL, "mm_hdmi_pixel", "dpi1_sel", 8),
+> > +	GATE_DISP1(CLK_MM_HDMI_PLL, "mm_hdmi_pll", "hdmi_sel", 9),
+> > +	GATE_DISP1(CLK_MM_HDMI_AUDIO, "mm_hdmi_audio", "apll_sel", 10),
+> > +	GATE_DISP1(CLK_MM_HDMI_SPDIF, "mm_hdmi_spdif", "apll_sel", 11),
+> > +	GATE_DISP1(CLK_MM_TVE_FMM, "mm_tve_fmm", "mm_sel", 14),
+> > +};
+> 
+> I also don't understand why we don't have different files and
+> drivers for all these different clock controllers? They all have
+> a similar probe structure, sure, but otherwise these are
+> different devices with different clks for them. The whole #ifdef
+> thing in the later patch would go away too.
+
+Yes, you are right. So you prefer to support subsystem clocks in
+separated files such as clk-mt2701-mm.c, clk-mt2701-bdp.c and so on,
+right?
+
+But even if we implement subsystem clock in separated files, we still
+need a way to make them optional. So the config options and #ifdef may
+not be removed.
+
+> > +	GATE_BDP1(CLK_BDP_BRG_RT_B, "brg_rt_bclk", "mm_sel", 12),
+> > +	GATE_BDP1(CLK_BDP_BRG_RT_DRAM, "brg_rt_dram", "mm_sel", 13),
+> > +	GATE_BDP1(CLK_BDP_LARBRT_DRAM, "larbrt_dram", "mm_sel", 14),
+> > +	GATE_BDP1(CLK_BDP_TMDS_SYN, "tmds_syn", "hdmi_0_pll340m", 15),
+> > +	GATE_BDP1(CLK_BDP_HDMI_MON, "hdmi_mon", "hdmi_0_pll340m", 16),
+> > +};
+> > +
+> > +static void __init mtk_bdpsys_init(struct device_node *node)
+> 
+> Shouldn't be __init because it's driver probe path.
+
+I use builtin_platform_driver_probe(clk_drv, clk_probe) to register this
+driver, and it looks can be __init.
+
+> > +{
+> > +	struct clk_onecell_data *clk_data;
+> > +	int r;
+> > +
+> > +	clk_data = mtk_alloc_clk_data(CLK_BDP_NR);
+> > +
+> > +	mtk_clk_register_gates(node, bdp_clks, ARRAY_SIZE(bdp_clks),
+> > +						clk_data);
+> > +
+> > +	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> > +	if (r)
+> > +		pr_err("%s(): could not register clock provider: %d\n",
+> > +			__func__, r);
+> > +}
+> [...]
+> > +
+> > +static int __init clk_probe(struct platform_device *pdev)
+> > +{
+> > +	void (*clk_init)(struct device_node *);
+> > +	const struct of_device_id *of_id;
+> > +
+> > +	of_id = of_match_node(of_clk_match_tbl, pdev->dev.of_node);
+> > +	if (!of_id || !of_id->data)
+> > +		return -EINVAL;
+> > +
+> > +	clk_init = of_id->data;
+> > +	clk_init(pdev->dev.of_node);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct platform_driver clk_drv = {
+> 
+> Please add some mtk here, 'clk_drv' is too generic.
+
+OK. I'll add it in next patch.
+
+> > +	.driver = {
+> > +		.name = "mtk-clk",
+> > +		.owner = THIS_MODULE,
+> 
+> This is unnecessary.
+
+I'll remove it.
+
+> > +		.of_match_table = of_match_ptr(of_clk_match_tbl),
+> 
+> Just drop of_match_ptr() because it's not helping. Also
+> of_clk_match_tbl is too generic.
+
+I'll change it.
+
+> > +	},
+> > +};
+> > +
+> > +builtin_platform_driver_probe(clk_drv, clk_probe);
+> > +}
+> > diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> > index 32d2e45..8796acc 100644
+> > --- a/drivers/clk/mediatek/clk-mtk.h
+> > +++ b/drivers/clk/mediatek/clk-mtk.h
+> > @@ -145,8 +146,35 @@ struct mtk_gate {
+> [...]
+> > +struct mtk_clk_divider {
+> > +	int id;
+> > +	const char *name;
+> > +	const char *parent_name;
+> > +	unsigned long flags;
+> > +
+> > +	uint32_t div_reg;
+> 
+> u32 is shorter
+
+I'll change it.
+
+> > +	unsigned char div_shift;
+> > +	unsigned char div_width;
+> > +	unsigned char clk_divider_flags;
+> > +	const struct clk_div_table *clk_div_table;
+> > +};
