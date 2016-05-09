@@ -1,69 +1,91 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 9 May 2016 22:28:37 +0200
-Subject: [GIT PULL] Allwinner DT for 4.7, round 2
-Message-ID: <20160509202837.GA19124@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 May 2016 15:30:03 -0500
+Subject: [PATCH 1/4] doc/devicetree: Add Aspeed clock bindings
+In-Reply-To: <1462797111-14271-2-git-send-email-joel@jms.id.au>
+References: <1462797111-14271-1-git-send-email-joel@jms.id.au>
+ <1462797111-14271-2-git-send-email-joel@jms.id.au>
+Message-ID: <20160509203003.GA24945@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On Mon, May 09, 2016 at 10:01:48PM +0930, Joel Stanley wrote:
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> ---
+>  .../devicetree/bindings/clock/aspeed-clock.txt     | 156 +++++++++++++++++++++
+>  1 file changed, 156 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/aspeed-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/aspeed-clock.txt b/Documentation/devicetree/bindings/clock/aspeed-clock.txt
+> new file mode 100644
+> index 000000000000..968329406435
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/aspeed-clock.txt
+> @@ -0,0 +1,156 @@
+> +Device Tree Clock bindings for the Aspeed SoCs
+> +
+> +Aspeed SoCs have a fixed frequency input osciallator is used to create the PLL
+> +and APB clocks. We can determine these frequencies by reading registers that
+> +are set according to strapping bits.
+> +
+> +Forth generation boards
+> +-----------------------
+> +
+> +eg, ast2400.
+> +
+> +CLKIN:
+> + - compatible : Must be "fixed-clock"
+> + - #clock-cells : Should be 0
+> + - clock-frequency: 48e6, 25e6 or 24e6 depending on the input clock
+> +
+> +PLL:
+> +
+> +Required properties:
+> + - compatible : Must be "aspeed,g4-hpll-clock"
+> + - #clock-cells : Should be 0
+> + - reg : Should contain registers location and length
+> + - clocks : Should contain phandle + clock-specifier for the input clock (clkin)
+> +
+> +Optional properties:
+> + - clock-output-names : Should contain clock name
+> +
+> +
+> +APB:
+> +
+> +Required properties:
+> + - compatible : Must be "aspeed,g4-apb-clock"
+> + - #clock-cells : Should be 0
+> + - reg : Should contain registers location and length
+> + - clocks : Should contain phandle + clock-specifier for the h-pll
+> +
+> +Optional properties:
+> + - clock-output-names : Should contain clock name
+> +
+> +
+> +For example:
+> +
+> +	clk_clkin: clk_clkin {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <48000000>;
+> +	};
+> +
+> +	clk_hpll: clk_hpll {
+> +		compatible = "aspeed,g4-hpll-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x1e6e2008 0x4>;
+> +	};
+> +
+> +	clk_apb: clk_apb at 1e6e2008 {
+> +		#clock-cells = <0>;
+> +		compatible = "aspeed,g4-apb-clock";
+> +		reg = <0x1e6e2008 0x4>;
 
-Here's a second bunch of patches for DT, that is on top of the previous PR.
+You have overlapping register regions which we try to avoid (it would 
+through errors, but doesn't because of existing platforms).
 
-Unless something unexpected comes up, I expect it to be our last PR
-for the 4.7 merge window.
+Just define the h/w block controlling these clocks and support multiple 
+clocks.
 
-Thanks!
-Maxime
+Is this really all the clocks the SOC has?
 
-The following changes since commit b52e345d43cfe9214fecfa92375525a086d39581:
-
-  ARM: dts: sun7i: Enable S/PDIF on the Cubietruck (2016-04-25 09:56:34 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.7-2
-
-for you to fetch changes up to 068655dc9b7c71c4bea25c41eeaa5125c6724a91:
-
-  ARM: sun7i: dt: Add pll3 and pll7 clocks (2016-05-08 21:09:29 +0200)
-
-----------------------------------------------------------------
-Allwinner DT changes for 4.7, round 2
-
-Mostly DT patches to enable the new DRM driver on the CHIP, preliminary
-support for the A10 and A20, and a support for a new variant of the Olimex
-A20-Olinuxino-Lime2 featuring an eMMC
-
-----------------------------------------------------------------
-Maxime Ripard (3):
-      ARM: sun5i: a13: Add display and TCON clocks
-      ARM: sun5i: r8: Add display blocks to the DTSI
-      ARM: sun5i: chip: Enable the TV Encoder
-
-Olliver Schinagl (1):
-      ARM: dts: sunxi: Add a olinuxino-lime2-emmc
-
-Priit Laes (2):
-      ARM: sun4i: dt: Add pll3 and pll7 clocks
-      ARM: sun7i: dt: Add pll3 and pll7 clocks
-
- arch/arm/boot/dts/sun4i-a10.dtsi                   |  43 +++++++
- arch/arm/boot/dts/sun5i-a13.dtsi                   |  39 +++++-
- arch/arm/boot/dts/sun5i-r8-chip.dts                |  12 ++
- arch/arm/boot/dts/sun5i-r8.dtsi                    | 142 ++++++++++++++++++++-
- .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    |  82 ++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  41 ++++++
- 6 files changed, 355 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160509/d17318ab/attachment.sig>
+Rob
