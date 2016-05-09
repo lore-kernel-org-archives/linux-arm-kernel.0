@@ -1,23 +1,57 @@
 From: absahu@codeaurora.org (Abhishek Sahu)
-Date: Mon,  9 May 2016 18:14:29 +0530
-Subject: [PATCH 0/2] i2c: qup: Fixed the DMA transfer errors
-Message-ID: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+Date: Mon,  9 May 2016 18:14:30 +0530
+Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
+In-Reply-To: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+Message-ID: <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches contain the I2C QUP (Qualcomm Universal Peripheral) DMA
-related fixes. The first patch cleared the error bits in ISR, which
-resolves the kernel hang for I2C bus errors and DMA transfer. The
-second patch fixed the DMA segments length, which resolves the issue
-for I2C transfer failure over 255 bytes.
+1. Current QCOM I2C driver hangs when sending data to address 0x03-0x07
+in some scenarios. The QUP controller generates invalid write in this
+case, since these addresses are reserved for different bus formats.
 
-Abhishek Sahu (2):
-  drivers: i2c: qup: Cleared the error bits in ISR
-  drivers: i2c: qup: Fixed the DMA segments length
+2. Also, the error handling is done by I2C QUP ISR in the case of DMA
+mode. The state need to be RESET in case of any error for clearing the
+available data in FIFO, which otherwise leaves the BAM DMA controller
+in hang state.
 
- drivers/i2c/busses/i2c-qup.c | 26 +++++++++++++++-----------
- 1 file changed, 15 insertions(+), 11 deletions(-)
+This patch fixes the above two issues by clearing the error bits from
+I2C and QUP status in ISR in case of I2C error, QUP error and resets
+the QUP state to clear the FIFO data.
 
+Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
+---
+ drivers/i2c/busses/i2c-qup.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 23eaabb..8c2f1bc 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -213,14 +213,16 @@ static irqreturn_t qup_i2c_interrupt(int irq, void *dev)
+ 	bus_err &= I2C_STATUS_ERROR_MASK;
+ 	qup_err &= QUP_STATUS_ERROR_FLAGS;
+ 
+-	if (qup_err) {
+-		/* Clear Error interrupt */
++	/* Clear the error bits in QUP_ERROR_FLAGS */
++	if (qup_err)
+ 		writel(qup_err, qup->base + QUP_ERROR_FLAGS);
+-		goto done;
+-	}
+ 
+-	if (bus_err) {
+-		/* Clear Error interrupt */
++	/* Clear the error bits in QUP_I2C_STATUS */
++	if (bus_err)
++		writel(bus_err, qup->base + QUP_I2C_STATUS);
++
++	/* Reset the QUP State in case of error */
++	if (qup_err || bus_err) {
+ 		writel(QUP_RESET_STATE, qup->base + QUP_STATE);
+ 		goto done;
+ 	}
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
