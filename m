@@ -1,151 +1,109 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon,  9 May 2016 19:32:31 +0200
-Subject: [PATCH v2] clk: samsung: Remove useless check for return value of
- samsung_clk_init
-Message-ID: <1462815151-14396-1-git-send-email-krzk@kernel.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon,  9 May 2016 18:39:26 +0100
+Subject: [PATCH] arm64: kgdb: Match pstate size with gdbserver protocol
+Message-ID: <1462815566-15086-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung_clk_init() cannot return NULL. Either it returns allocated
-memory or it panics.
+Current versions of gdb do not interoperate cleanly with kgdb on arm64
+systems because gdb and kgdb do not use the same register description.
+This patch modifies kgdb to work with recent releases of gdb (>= 7.8.1).
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Compatibility with gdb (after the patch is applied) is as follows:
 
+  gdb-7.6 and earlier  Ok
+  gdb-7.7 series       Works if user provides custom target description
+  gdb-7.8(.0)          Works if user provides custom target description
+  gdb-7.8.1 and later  Ok
+
+When commit 44679a4f142b ("arm64: KGDB: Add step debugging support") was
+introduced it was paired with a gdb patch that made an incompatible
+change to the gdbserver protocol. This patch was eventually merged into
+the gdb sources:
+https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=a4d9ba85ec5597a6a556afe26b712e878374b9dd
+
+The change to the protocol was mostly made to simplify big-endian support
+inside the kernel gdb stub. Unfortunately the gdb project released
+gdb-7.7.x and gdb-7.8.0 before the protocol incompatibility was identified
+and reversed:
+https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bdc144174bcb11e808b4e73089b850cf9620a7ee
+
+This leaves us in a position where kgdb still uses the no-longer-used
+protocol; gdb-7.8.1, which restored the original behaviour,If was
+released on 2014-10-29.
+
+I don't believe it is possible to detect/correct the protocol
+incompatiblity which means the kernel must take a view about which
+version of the gdb remote protocol is "correct". This patch takes the
+view that the original/current version of the protocol is correct
+and that version found in gdb-7.7.x and gdb-7.8.0 is anomalous.
+
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
 
-Changes since v1:
-1. Remove the check from most of other Samsung clock drivers (suggested
-   by Javier).
----
- drivers/clk/samsung/clk-exynos4.c    | 2 --
- drivers/clk/samsung/clk-exynos5250.c | 3 +--
- drivers/clk/samsung/clk-exynos5420.c | 2 --
- drivers/clk/samsung/clk-exynos5440.c | 2 --
- drivers/clk/samsung/clk-s3c2410.c    | 2 --
- drivers/clk/samsung/clk-s3c2412.c    | 2 --
- drivers/clk/samsung/clk-s3c2443.c    | 2 --
- drivers/clk/samsung/clk-s3c64xx.c    | 2 --
- drivers/clk/samsung/clk-s5pv210.c    | 2 --
- 9 files changed, 1 insertion(+), 18 deletions(-)
+Notes:
+    Vijaya: I really hope I have the history lesson in the commit
+            message correct! I've done a fair bit of archeology to
+    	unpick things.
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 7b3d0f975987..2f458233908b 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -1450,8 +1450,6 @@ static void __init exynos4_clk_init(struct device_node *np,
- 		panic("%s: failed to map registers\n", __func__);
- 
- 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	samsung_clk_of_register_fixed_ext(ctx, exynos4_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos4_fixed_rate_ext_clks),
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 837197db4ffb..d8621cf31786 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -805,8 +805,7 @@ static void __init exynos5250_clk_init(struct device_node *np)
- 	}
- 
- 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
-+
- 	samsung_clk_of_register_fixed_ext(ctx, exynos5250_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos5250_fixed_rate_ext_clks),
- 			ext_clk_match);
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 92382cef9f90..770c0f007c6b 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -1356,8 +1356,6 @@ static void __init exynos5x_clk_init(struct device_node *np,
- 	exynos5x_soc = soc;
- 
- 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	samsung_clk_of_register_fixed_ext(ctx, exynos5x_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos5x_fixed_rate_ext_clks),
-diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
-index c57cff1e1798..22c73d4a5ee3 100644
---- a/drivers/clk/samsung/clk-exynos5440.c
-+++ b/drivers/clk/samsung/clk-exynos5440.c
-@@ -125,8 +125,6 @@ static void __init exynos5440_clk_init(struct device_node *np)
- 	}
- 
- 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	samsung_clk_of_register_fixed_ext(ctx, exynos5440_fixed_rate_ext_clks,
- 		ARRAY_SIZE(exynos5440_fixed_rate_ext_clks), ext_clk_match);
-diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
-index d7b011c1fcf8..d7a1e772d95a 100644
---- a/drivers/clk/samsung/clk-s3c2410.c
-+++ b/drivers/clk/samsung/clk-s3c2410.c
-@@ -374,8 +374,6 @@ void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
- 	}
- 
- 	ctx = samsung_clk_init(np, reg_base, NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	/* Register external clocks only in non-dt cases */
- 	if (!np)
-diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
-index effe3736ec6b..ec873ee15d37 100644
---- a/drivers/clk/samsung/clk-s3c2412.c
-+++ b/drivers/clk/samsung/clk-s3c2412.c
-@@ -265,8 +265,6 @@ void __init s3c2412_common_clk_init(struct device_node *np, unsigned long xti_f,
- 	}
- 
- 	ctx = samsung_clk_init(np, reg_base, NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	/* Register external clocks only in non-dt cases */
- 	if (!np)
-diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
-index 37562783b25e..5e24a17e10e6 100644
---- a/drivers/clk/samsung/clk-s3c2443.c
-+++ b/drivers/clk/samsung/clk-s3c2443.c
-@@ -400,8 +400,6 @@ void __init s3c2443_common_clk_init(struct device_node *np, unsigned long xti_f,
- 	}
- 
- 	ctx = samsung_clk_init(np, reg_base, NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	/* Register external clocks only in non-dt cases */
- 	if (!np)
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index 60aa775bd374..a48bd5f17330 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -471,8 +471,6 @@ void __init s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
- 	}
- 
- 	ctx = samsung_clk_init(np, reg_base, NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	/* Register external clocks. */
- 	if (!np)
-diff --git a/drivers/clk/samsung/clk-s5pv210.c b/drivers/clk/samsung/clk-s5pv210.c
-index 52302262045d..fd2725710a6f 100644
---- a/drivers/clk/samsung/clk-s5pv210.c
-+++ b/drivers/clk/samsung/clk-s5pv210.c
-@@ -784,8 +784,6 @@ static void __init __s5pv210_clk_init(struct device_node *np,
- 	struct samsung_clk_provider *ctx;
- 
- 	ctx = samsung_clk_init(np, reg_base, NR_CLKS);
--	if (!ctx)
--		panic("%s: unable to allocate context.\n", __func__);
- 
- 	samsung_clk_register_mux(ctx, early_mux_clks,
- 					ARRAY_SIZE(early_mux_clks));
--- 
-2.5.0
+ arch/arm64/include/asm/kgdb.h | 13 +++++--------
+ arch/arm64/kernel/kgdb.c      |  7 ++++++-
+ 2 files changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kgdb.h b/arch/arm64/include/asm/kgdb.h
+index f69f69c8120c..326fa8f44da5 100644
+--- a/arch/arm64/include/asm/kgdb.h
++++ b/arch/arm64/include/asm/kgdb.h
+@@ -43,20 +43,17 @@ extern int kgdb_fault_expected;
+  * General purpose regs:
+  *     r0-r30: 64 bit
+  *     sp,pc : 64 bit
+- *     pstate  : 64 bit
+- *     Total: 34
++ *     pstate  : 32 bit
++ *     Total: 33 + 1
+  * FPU regs:
+  *     f0-f31: 128 bit
+- *     Total: 32
+- * Extra regs
+  *     fpsr & fpcr: 32 bit
+- *     Total: 2
+- *
++ *     Total: 32 + 2
+  */
+
+-#define _GP_REGS		34
++#define _GP_REGS		33
+ #define _FP_REGS		32
+-#define _EXTRA_REGS		2
++#define _EXTRA_REGS		3
+ /*
+  * general purpose registers size in bytes.
+  * pstate is only 4 bytes. subtract 4 bytes
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+index b67531a13136..ec62a4e3c190 100644
+--- a/arch/arm64/kernel/kgdb.c
++++ b/arch/arm64/kernel/kgdb.c
+@@ -58,7 +58,11 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+ 	{ "x30", 8, offsetof(struct pt_regs, regs[30])},
+ 	{ "sp", 8, offsetof(struct pt_regs, sp)},
+ 	{ "pc", 8, offsetof(struct pt_regs, pc)},
+-	{ "pstate", 8, offsetof(struct pt_regs, pstate)},
++	{ "pstate", 4, offsetof(struct pt_regs, pstate)
++#ifdef CONFIG_CPU_BIG_ENDIAN
++							+ 4
++#endif
++	},
+ 	{ "v0", 16, -1 },
+ 	{ "v1", 16, -1 },
+ 	{ "v2", 16, -1 },
+@@ -128,6 +132,7 @@ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
+ 	memset((char *)gdb_regs, 0, NUMREGBYTES);
+ 	thread_regs = task_pt_regs(task);
+ 	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
++	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
+ }
+
+ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
+--
+2.5.5
