@@ -1,148 +1,219 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 9 May 2016 15:49:53 -0700
-Subject: [PATCH 2/4] drvers/clk: Support fourth generation Aspeed SoCs
-In-Reply-To: <1462797111-14271-3-git-send-email-joel@jms.id.au>
-References: <1462797111-14271-1-git-send-email-joel@jms.id.au>
- <1462797111-14271-3-git-send-email-joel@jms.id.au>
-Message-ID: <20160509224953.GZ3492@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 10 May 2016 00:56:37 +0200
+Subject: [PATCH V6 01/13] pci, acpi, x86,
+ ia64: Move ACPI host bridge device companion assignment to core code.
+In-Reply-To: <1460740008-19489-2-git-send-email-tn@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-2-git-send-email-tn@semihalf.com>
+Message-ID: <292578579.uIxhMjkdfG@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09, Joel Stanley wrote:
-> diff --git a/drivers/clk/aspeed/clk-g4.c b/drivers/clk/aspeed/clk-g4.c
-> new file mode 100644
-> index 000000000000..91677e9177f5
-> --- /dev/null
-> +++ b/drivers/clk/aspeed/clk-g4.c
-> @@ -0,0 +1,109 @@
-> +/*
-> + * Copyright 2016 IBM Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/clk.h>
+On Friday, April 15, 2016 07:06:36 PM Tomasz Nowicki wrote:
+> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+> bridge initialization. They both use arch-specific sysdata to pass down
+> parent device reference and both rely on NULL parent in pci_create_root_bus()
+> to validate sysdata content.
 
-Hopefully this include isn't needed.
+No, this is not relied on for that.  It is just NULL, because we don't
+have a physical parent device representation for the PCI host bridge.
 
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clkdev.h>
-> +
-> +static void __init aspeed_of_hpll_clk_init(struct device_node *node)
-> +{
-> +	struct clk *clk, *clkin_clk;
-> +	void __iomem *base;
-> +	int reg, rate, clkin;
-> +	const char *name = node->name;
-> +	const char *parent_name;
-> +	const int rates[][4] = {
-> +		{384, 360, 336, 408},
-> +		{400, 375, 350, 425},
-> +	};
-> +
-> +	of_property_read_string(node, "clock-output-names", &name);
-> +	parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +	base = of_iomap(node, 0);
-> +	if (!base) {
-> +		pr_err("%s: of_iomap failed\n", node->full_name);
-> +		return;
-> +	}
-> +	reg = readl(base);
-> +	iounmap(base);
-> +
-> +	clkin_clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clkin_clk)) {
-> +		pr_err("%s: of_clk_get failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	clkin = clk_get_rate(clkin_clk);
-> +
-> +	reg = (reg >> 8) & 0x2;
-> +
-> +	if (clkin == 48000000 || clkin == 24000000)
-> +		rate = rates[0][reg] * 1000000;
-> +	else if (clkin == 25000000)
-> +		rate = rates[1][reg] * 1000000;
-> +	else {
-> +		pr_err("%s: unknown clkin frequency %dHz\n",
-> +				node->full_name, clkin);
-> +		WARN_ON(1);
-> +	}
-> +
-> +	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
+> It looks hacky and prevents us from getting some firmware specific
+> info for PCI host controller based on its acpi_device structure
+> in generic pci_create_root_bus() function.
 
-Please write a proper clk driver that sets clkin to be the parent
-of this clk registered here and then calculates the frequency
-based on the parent clk rate and the strapping registers via the
-recalc rate callback. Also please move this to a platform driver
-instead of using CLK_OF_DECLARE assuming this isn't required for
-any timers in the system.
+You can't get that info without adding ACPI-specific code to that function
+anyway.
 
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: failed to register clock\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	clk_register_clkdev(clk, NULL, name);
+> However, we overcome that blocker by passing down parent device via
+> pci_create_root_bus parameter (as the ACPI device type).
 
-Do you have clkdev users? If not then please drop this.
+Which is completely wrong.
 
-> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g4-hpll-clock",
-> +	       aspeed_of_hpll_clk_init);
-> +
-> +static void __init aspeed_of_apb_clk_init(struct device_node *node)
-> +{
-> +	struct clk *clk, *hpll_clk;
-> +	void __iomem *base;
-> +	int reg, rate;
-> +	const char *name = node->name;
-> +	const char *parent_name;
-> +
-> +	of_property_read_string(node, "clock-output-names", &name);
-> +	parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +	base = of_iomap(node, 0);
-> +	if (!base) {
-> +		pr_err("%s: of_iomap failed\n", node->full_name);
-> +		return;
-> +	}
-> +	reg = readl(base);
-> +	iounmap(base);
-> +
-> +	hpll_clk = of_clk_get(node, 0);
-> +	if (IS_ERR(hpll_clk)) {
-> +		pr_err("%s: of_clk_get failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	reg = (reg >> 23) & 0x3;
-> +	rate = clk_get_rate(hpll_clk) / (2 + 2 * reg);
-> +
-> +	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: failed to register clock\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	clk_register_clkdev(clk, NULL, name);
-> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g4-apb-clock",
-> +	       aspeed_of_apb_clk_init);
+> Then we use ACPI_COMPANION_SET in core code
+> for ACPI boot method only. ACPI_COMPANION_SET is safe to run for all
+> cases DT, ACPI and DT&ACPI.
+> 
+> Since now PCI core code is setting ACPI companion device for us,
+> x86 & ia64 specific ACPI companion device setting turns out to be dead now.
+> We can get rid of it, including related companion reference from
+> PCI sysdata structure. Aslo, PCI_CONTROLLER macro cannot return valid
+> companion device anymore. Therefore we need to convert its usage to
+> ACPI_COMPANION.
+> 
+> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Tested-by: Duc Dang <dhdang@apm.com>
+> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  arch/ia64/hp/common/sba_iommu.c    |  2 +-
+>  arch/ia64/include/asm/pci.h        |  1 -
+>  arch/ia64/pci/pci.c                | 16 ----------------
+>  arch/ia64/sn/kernel/io_acpi_init.c |  4 ++--
+>  arch/x86/include/asm/pci.h         |  3 ---
+>  arch/x86/pci/acpi.c                | 17 -----------------
+>  drivers/acpi/pci_root.c            |  7 ++++++-
+>  drivers/pci/probe.c                |  2 ++
+>  8 files changed, 11 insertions(+), 41 deletions(-)
+> 
+> diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
+> index a6d6190..78e4444 100644
+> --- a/arch/ia64/hp/common/sba_iommu.c
+> +++ b/arch/ia64/hp/common/sba_iommu.c
+> @@ -1981,7 +1981,7 @@ sba_connect_bus(struct pci_bus *bus)
+>  	if (PCI_CONTROLLER(bus)->iommu)
+>  		return;
+>  
+> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
+> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+>  	if (!handle)
+>  		return;
+>  
+> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+> index c0835b0..12423f4 100644
+> --- a/arch/ia64/include/asm/pci.h
+> +++ b/arch/ia64/include/asm/pci.h
+> @@ -63,7 +63,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+>  #define pci_legacy_write platform_pci_legacy_write
+>  
+>  struct pci_controller {
+> -	struct acpi_device *companion;
+>  	void *iommu;
+>  	int segment;
+>  	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+> index 8f6ac2f..978d6af 100644
+> --- a/arch/ia64/pci/pci.c
+> +++ b/arch/ia64/pci/pci.c
+> @@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	}
+>  
+>  	info->controller.segment = root->segment;
+> -	info->controller.companion = device;
+>  	info->controller.node = acpi_get_node(device->handle);
+>  	INIT_LIST_HEAD(&info->io_resources);
+>  	return acpi_pci_root_create(root, &pci_acpi_root_ops,
+>  				    &info->common, &info->controller);
+>  }
+>  
+> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> -{
+> -	/*
+> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+> -	 * here, pci_create_root_bus() has been called by someone else and
+> -	 * sysdata is likely to be different from what we expect.  Let it go in
+> -	 * that case.
+> -	 */
+> -	if (!bridge->dev.parent) {
+> -		struct pci_controller *controller = bridge->bus->sysdata;
+> -		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+> -	}
+> -	return 0;
+> -}
+> -
+>  void pcibios_fixup_device_resources(struct pci_dev *dev)
+>  {
+>  	int idx;
+> diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
+> index 231234c..e454492 100644
+> --- a/arch/ia64/sn/kernel/io_acpi_init.c
+> +++ b/arch/ia64/sn/kernel/io_acpi_init.c
+> @@ -132,7 +132,7 @@ sn_get_bussoft_ptr(struct pci_bus *bus)
+>  	struct acpi_resource_vendor_typed *vendor;
+>  
+>  
+> -	handle = acpi_device_handle(PCI_CONTROLLER(bus)->companion);
+> +	handle = acpi_device_handle(ACPI_COMPANION(bus->bridge));
+>  	status = acpi_get_vendor_resource(handle, METHOD_NAME__CRS,
+>  					  &sn_uuid, &buffer);
+>  	if (ACPI_FAILURE(status)) {
+> @@ -360,7 +360,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
+>  	acpi_status status;
+>  	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>  
+> -	rootbus_handle = acpi_device_handle(PCI_CONTROLLER(dev)->companion);
+> +	rootbus_handle = acpi_device_handle(ACPI_COMPANION(dev->bus->bridge));
+>          status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
+>                                         &segment);
+>          if (ACPI_SUCCESS(status)) {
+> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+> index 9ab7507..24de07d 100644
+> --- a/arch/x86/include/asm/pci.h
+> +++ b/arch/x86/include/asm/pci.h
+> @@ -14,9 +14,6 @@
+>  struct pci_sysdata {
+>  	int		domain;		/* PCI domain */
+>  	int		node;		/* NUMA node */
+> -#ifdef CONFIG_ACPI
+> -	struct acpi_device *companion;	/* ACPI companion device */
+> -#endif
+>  #ifdef CONFIG_X86_64
+>  	void		*iommu;		/* IOMMU private data */
+>  #endif
+> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+> index 3cd6983..f4ca17a 100644
+> --- a/arch/x86/pci/acpi.c
+> +++ b/arch/x86/pci/acpi.c
+> @@ -340,7 +340,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  		struct pci_sysdata sd = {
+>  			.domain = domain,
+>  			.node = node,
+> -			.companion = root->device
+>  		};
+>  
+>  		memcpy(bus->sysdata, &sd, sizeof(sd));
+> @@ -355,7 +354,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  		else {
+>  			info->sd.domain = domain;
+>  			info->sd.node = node;
+> -			info->sd.companion = root->device;
+>  			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
+>  						   &info->common, &info->sd);
+>  		}
+> @@ -373,21 +371,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	return bus;
+>  }
+>  
+> -int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> -{
+> -	/*
+> -	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+> -	 * here, pci_create_root_bus() has been called by someone else and
+> -	 * sysdata is likely to be different from what we expect.  Let it go in
+> -	 * that case.
+> -	 */
+> -	if (!bridge->dev.parent) {
+> -		struct pci_sysdata *sd = bridge->bus->sysdata;
+> -		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+> -	}
+> -	return 0;
+> -}
+> -
+>  int __init pci_acpi_init(void)
+>  {
+>  	struct pci_dev *dev = NULL;
+> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> index ae3fe4e..4581e0e 100644
+> --- a/drivers/acpi/pci_root.c
+> +++ b/drivers/acpi/pci_root.c
+> @@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device *device,
+>  		}
+>  	}
+>  
+> +	/*
+> +	 * pci_create_root_bus() needs to detect the parent device type,
+> +	 * so initialize its companion data accordingly.
+> +	 */
+> +	ACPI_COMPANION_SET(&device->dev, device);
 
-Following on Rob's comment, please combine this into one driver
-instead of having different DT nodes for different clks that are
-all really part of one clock controller hw block.
+This is a complete nonsense, sorry.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This just means that the ACPI firmware object will now be an ACPI companion of
+itself.
+
+Thanks,
+Rafael
