@@ -1,39 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 May 2016 13:17:19 +0200
-Subject: next-20160503 build: 1 failures 12 warnings (next-20160503)
-In-Reply-To: <20160509205315.631e0c68@canb.auug.org.au>
-References: <E1axZpG-000664-AK@optimist> <2280495.M9rYajvqUJ@wuerfel>
- <20160509205315.631e0c68@canb.auug.org.au>
-Message-ID: <4516208.OQ3mKD6WuY@wuerfel>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 9 May 2016 13:21:38 +0200
+Subject: [PATCH 0/5] Introduce per-domain page sizes
+In-Reply-To: <cover.1460048991.git.robin.murphy@arm.com>
+References: <cover.1460048991.git.robin.murphy@arm.com>
+Message-ID: <20160509112138.GB13275@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 May 2016 20:53:15 Stephen Rothwell wrote:
-> Hi Arnd and all,
+On Thu, Apr 07, 2016 at 06:42:03PM +0100, Robin Murphy wrote:
+> Hi all,
 > 
-> On Tue, 03 May 2016 17:02:39 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > On Tuesday 03 May 2016 15:17:23 Mark Brown wrote:
-> > > On Tue, May 03, 2016 at 01:53:18PM +0100, Build bot for Mark Brown wrote:
-> > > 
-> > > Today's -next fails to build an ARM allmodconfig due to:
-> > >   
-> > > >       arm-allmodconfig
-> > > > ../drivers/pinctrl/bcm/pinctrl-ns2-mux.c:540:17: error: 'pinctrl_utils_dt_free_map' undeclared here (not in a function)  
-> > > 
-> > > caused by b5aa1006e4a93 (pinctrl: ns2: add pinmux driver support for
-> > > Broadcom NS2 SoC) - presumably just a missing dependency.
-> > >   
-> > 
-> > No, the function got renamed in another patch. I already prepared a fix
-> > yesterday, but haven't gotten around to submit the patches for the last
-> > two days, I'll try to send it out today, but it might end up being
-> > tomorrow, or Linus could fix this one himself first.
+> Since this area seems to be in vogue at the moment, here's what I was
+> working on when the related patches[1][2] popped up, which happens to
+> be more or less the intersection of both. As I recycled some of Will's
+> old series as a starting point, I've retained the cleanup patches from
+> that with their original acks - hope that's OK.
 > 
-> Can we, please, get this fixed ... less than a week to the merge window
-> opening ...
+> Fortunately, this already looks rather like parts of Joerg's plan[3],
+> so I hope it's a suitable first step. Below is a quick hacked-up example
+> of the kind of caller-controlled special use-case alluded to, using the
+> SMMU/HDLCD combo on Juno - for a 'real' implementation of this we'd want
+> the group-based domain allocation call so the driver could throw the
+> device at that and get its own non-default DMA ops domain to play with.
+> 
+> Robin.
+> 
+> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12774
+> [2]:http://thread.gmane.org/gmane.linux.kernel.iommu/12901
+> [3]:http://article.gmane.org/gmane.linux.kernel.iommu/12937
+> 
+> Robin Murphy (4):
+>   iommu: of: enforce const-ness of struct iommu_ops
+>   iommu: Allow selecting page sizes per domain
+>   iommu/dma: Finish optimising higher-order allocations
+>   iommu/arm-smmu: Use per-domain page sizes.
+> 
+> Will Deacon (1):
+>   iommu: remove unused priv field from struct iommu_ops
 
-Linus Walleij just picked up the patch I sent last week into the pinctrl tree,
-so it should be fine in tomorrow's linux-next.
+Okay, I am still no happy that this lifts the requirements of the
+iommu-api for the arm-smmu driver. But to get there we need more core
+changes and this code is a step in the right direction, so I applied it.
 
-	Arnd
+Thanks,
+
+	Joerg
