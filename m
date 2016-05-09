@@ -1,103 +1,193 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 May 2016 08:21:38 -0700
-Subject: NFSroot hangs with bad unlock balance in Linux next
-In-Reply-To: <20160509151219.GF5995@atomide.com>
-References: <20160505220344.GE5995@atomide.com>
- <20160508141629.GF2694@ZenIV.linux.org.uk>
- <20160509073235.GI2694@ZenIV.linux.org.uk>
- <CANn89iK5H-SokYE1r+OO3sPmQ1vpGqYGbE4x1QLn44wdyvH0cw@mail.gmail.com>
- <20160509151219.GF5995@atomide.com>
-Message-ID: <20160509152138.GG5995@atomide.com>
+From: Tirumalesh.Chalamarla@cavium.com (Chalamarla, Tirumalesh)
+Date: Mon, 9 May 2016 15:23:43 +0000
+Subject: [PATCH v9 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
+ 2/3: msi changes
+In-Reply-To: <573040D6.9050803@linaro.org>
+References: <1462375094-2390-1-git-send-email-eric.auger@linaro.org>
+ <9C17BA6B-7304-47CA-A287-77FB41D96AD3@caviumnetworks.com>
+ <573040D6.9050803@linaro.org>
+Message-ID: <50F1DA1B-3760-474F-A401-43AA26A5F6B6@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160509 08:15]:
-> * Eric Dumazet <edumazet@google.com> [160509 07:16]:
-> > On Mon, May 9, 2016 at 12:32 AM, Al Viro <viro@zeniv.linux.org.uk> wrote:
-> > > On Sun, May 08, 2016 at 03:16:29PM +0100, Al Viro wrote:
-> > >
-> > >> Very strange.  We grab that rwsem at the entry into nfs_call_unlink()
-> > >> and then either release it there and return or call nfs_do_call_unlink().
-> > >> Which arranges for eventual call of nfs_async_unlink_release() (via
-> > >> ->rpc_release); nfs_async_unlink_release() releases the rwsem.  Nobody else
-> > >> releases it (on the read side, that is).
-> > >>
-> > >> The only kinda-sorta possibility I see here is that the inode we are
-> > >> unlocking in that nfs_async_unlink_release() is not the one we'd locked
-> > >> in nfs_call_unlink() that has lead to it.  That really shouldn't happen,
-> > >> though...  Just to verify whether that's what we are hitting, could you
-> > >> try to reproduce that thing with the patch below on top of -next and see
-> > >> if it triggers any of those WARN_ON?
-> 
-> Thanks no warnings with that patch though.
-> 
-> > > D'oh...  Lockdep warnings are easy to trigger (and, AFAICS, bogus).
-> > > up_read/down_read in fs/nfs/unlink.c should be replaced with
-> > > up_read_non_owner/down_read_non_owner, lest the lockdep gets confused.
-> > > Hangs are different - I've no idea what's triggering those.  I've seen
-> > > something similar on that -next, but not on work.lookups.
-> > >
-> > > The joy of bisecting -next...  <a couple of hours later>
-> > > 9317bb69824ec8d078b0b786b6971aedb0af3d4f is the first bad commit
-> > > commit 9317bb69824ec8d078b0b786b6971aedb0af3d4f
-> > > Author: Eric Dumazet <edumazet@google.com>
-> > > Date:   Mon Apr 25 10:39:32 2016 -0700
-> > >
-> > >     net: SOCKWQ_ASYNC_NOSPACE optimizations
-> > >
-> > > Reverting changes to sk_set_bit/sk_clear_bit gets rid of the hangs.  Plain
-> > > revert gives a conflict, since there had been additional change in
-> > > "net: SOCKWQ_ASYNC_WAITDATA optimizations"; removing both fixed the hangs.
-> > >
-> > > Note that hangs appear without any fs/nfs/unlink.c modifications being
-> > > there.  When the hang happens it affects NFS traffic; ssh session still
-> > > works fine until it steps on a filesystem operation on NFS (i.e. you
-> > > can use builtins, access procfs, etc.)
-> > 
-> > Yeah, the issue was reported last week (
-> > http://www.spinics.net/lists/netdev/msg375777.html ),
-> > and I could not convince myself to add a new sock flag,  like
-> > SOCK_FASYNC_STICKY.
-> > 
-> > (Just in case NFS would ever call sock_fasync() with an empty
-> > fasync_list, and SOCK_FASYNC would be cleared again.
-> 
-> Yeah applying the test patch from the url above makes things work
-> for me again.
 
-Looks like with both patches applied I still also get this eventually:
 
-=====================================
-[ BUG: bad unlock balance detected! ]
-4.6.0-rc7-next-20160509+ #1264 Not tainted
--------------------------------------
-kworker/0:1/18 is trying to release lock (&nfsi->rmdir_sem) at:
-[<c03a894c>] nfs_async_unlink_release+0x3c/0xc0
-but there are no more locks to release!
 
-               other info that might help us debug this:
-2 locks held by kworker/0:1/18:
- #0:  ("nfsiod"){.+.+..}, at: [<c015473c>] process_one_work+0x120/0x6bc
- #1:  ((&task->u.tk_work)#2){+.+...}, at: [<c015473c>] process_one_work+0x120/0x6bc
 
-               stack backtrace:
-CPU: 0 PID: 18 Comm: kworker/0:1 Not tainted 4.6.0-rc7-next-20160509+ #1264
-Hardware name: Generic OMAP5 (Flattened Device Tree)
-Workqueue: nfsiod rpc_async_release
-[<c0110318>] (unwind_backtrace) from [<c010c3bc>] (show_stack+0x10/0x14)
-[<c010c3bc>] (show_stack) from [<c0481da8>] (dump_stack+0xb0/0xe4)
-[<c0481da8>] (dump_stack) from [<c018d090>] (print_unlock_imbalance_bug+0xb0/0xe0)
-[<c018d090>] (print_unlock_imbalance_bug) from [<c0190e9c>] (lock_release+0x2ec/0x4c0)
-[<c0190e9c>] (lock_release) from [<c018a4b8>] (up_read+0x18/0x58)
-[<c018a4b8>] (up_read) from [<c03a894c>] (nfs_async_unlink_release+0x3c/0xc0)
-[<c03a894c>] (nfs_async_unlink_release) from [<c07860e0>] (rpc_free_task+0x24/0x44)
-[<c07860e0>] (rpc_free_task) from [<c0154804>] (process_one_work+0x1e8/0x6bc)
-[<c0154804>] (process_one_work) from [<c0154e1c>] (worker_thread+0x144/0x4e8)
-[<c0154e1c>] (worker_thread) from [<c015acd4>] (kthread+0xdc/0xf8)
-[<c015acd4>] (kthread) from [<c01078f0>] (ret_from_fork+0x14/0x24)
 
-After the warning, NFSroot keeps working with Eric's patch.
+On 5/9/16, 12:48 AM, "Eric Auger" <eric.auger@linaro.org> wrote:
 
-Regards,
+>Hi Chalarmala,
+>On 05/05/2016 07:44 PM, Chalamarla, Tirumalesh wrote:
+>> Hi Eric,
+>> 
+>> Does this series supports gicv3-its emulation?
+>> Do we have a tree with all the dependent patches
+>GICv3 ITS emulation support comes with:
+>[PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+>http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/5738
+>
+>My series just allows PCI device MSI transactions to reach the host MSI
+>frame through the SMMU. Only host GICv2m has been tested at the moment
+>with a guest exposed with a GICv2m too.
 
-Tony
+
+I wanted to test this series on Cavium Thunder, but the only mode supported is Gicv3 with ITS, is there a chance 
+That I get a tree with all the dependencies?
+>
+>Best Regards
+>
+>Eric
+>
+>
+>> 
+>> 
+>> 
+>> 
+>> 
+>> Thanks,
+>> Tirumalesh. 
+>> On 5/4/16, 8:18 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
+>> 
+>>> This series implements the MSI address mapping/unmapping in the MSI layer.
+>>> IOMMU binding happens on pci_enable_msi since this function can sleep and
+>>> return errors. On msi_domain_set_affinity, msi_domain_(de)activate, which
+>>> are not allowed to sleep, we simply look for the already existing binding.
+>>>
+>>> A new MSI domain info flag value is introduced to report whether the msi
+>>> domain implements IRQ remapping. GIC v3 ITS is the first MSI controller
+>>> advertising it. This flag value will be used by VFIO subsystem to
+>>> determine whether MSI forwarding is safe.
+>>>
+>>> More details & context can be found at:
+>>> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
+>>>
+>>> Best Regards
+>>>
+>>> Eric
+>>>
+>>> Applies on top of PART 1/3. Also depends on
+>>> [PATCH 1/3] iommu: Add MMIO mapping type,
+>>> http://comments.gmane.org/gmane.linux.kernel.iommu/12869
+>>>
+>>> Git: complete series available at
+>>> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc6-pcie-passthrough-v9-msi-v9
+>>>
+>>> This branch contains all parts in v9.
+>>>
+>>> History:
+>>>
+>>> v8 -> v9:
+>>> - use a union in irq_chip_msi_doorbell_info + boolean telling whether the
+>>>  doorbell is percpu
+>>> - decouple irq_data parsing from the actual mapping/unmapping in
+>>>  msi_handle_doorbell_mappings
+>>> - fix misc style issues
+>>>
+>>> v7 -> v8:
+>>> take into account Marc's comments:
+>>> - use iommu_msi_msg_pa_to_va with new proto
+>>> - change in irq_chip_msi_doorbell_info struct definition:
+>>>  prot and size became shared between all doorbells and phys_addr_t __percpu
+>>> - cleanups in v2m irqchip
+>>> - eventually did not touch MSI_FLAG_IRQ_REMAPPING naming
+>>> - On msi_handle_doorbell_mappings, stop on the first irqchip where doorbells
+>>>  can be found
+>>> - fix resource deallocation on mapping failure in msi_domain_alloc_irqs
+>>>
+>>> v6 -> v7:
+>>> - do alloc/map handling on pci_enable_msi and search on msi_(de)domain_activate
+>>> - add msi_doorbell_info callback in irq-chip to retrieve the characteristics
+>>>  of doorbells
+>>>
+>>> RFC v5 -> patch v6:
+>>> - split to ease the review process
+>>> - rebase on default iommu domain code (irq_data_to_msi_mapping_domain
+>>>  checks IOMMU_DOMAIN_DMA type)
+>>> - fix unmap sequence on msi_domain_set_affinity (reported by Marc):
+>>>  unmap the previous doorbell when the new one has been mapped & written to
+>>>  the device, ie. irq_chip_write_msi_msg.
+>>> - "msi: msi_compose wrapper removed" following change above
+>>> - add size parameter to iommu_get_reserved_iova API following Marc's request
+>>>
+>>> RFC v4 -> RFC v5:
+>>> - take into account Thomas' comments on MSI related patches
+>>>  - split "msi: IOMMU map the doorbell address when needed"
+>>>  - increase readability and add comments
+>>>  - fix style issues
+>>> - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+>>> - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+>>> - fix compilation issue with CONFIG_IOMMU API unset
+>>> - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+>>>
+>>> RFC v3 -> v4:
+>>> - Move doorbell mapping/unmapping in msi.c
+>>> - fix ref count issue on set_affinity: in case of a change in the address
+>>>  the previous address is decremented
+>>> - doorbell map/unmap now is done on msi composition. Should allow the use
+>>>  case for platform MSI controllers
+>>> - create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+>>>  to reserved IOVA management (looking like dma-iommu glue)
+>>> - series reordering to ease the review:
+>>>  - first part is related to IOMMU
+>>>  - second related to MSI sub-system
+>>>  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+>>> - expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+>>>  [this partially addresses Marc's comments on iommu_get/put_single_reserved
+>>>   size/alignment problematic - which I did not ignore - but I don't know
+>>>   how much I can do at the moment]
+>>>
+>>> RFC v2 -> RFC v3:
+>>> - should fix wrong handling of some CONFIG combinations:
+>>>  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+>>> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+>>>
+>>> PATCH v1 -> RFC v2:
+>>> - reverted to RFC since it looks more reasonable ;-) the code is split
+>>>  between VFIO, IOMMU, MSI controller and I am not sure I did the right
+>>>  choices. Also API need to be further discussed.
+>>> - iova API usage in arm-smmu.c.
+>>> - MSI controller natively programs the MSI addr with either the PA or IOVA.
+>>>  This is not done anymore in vfio-pci driver as suggested by Alex.
+>>> - check irq remapping capability of the group
+>>>
+>>> RFC v1 [2] -> PATCH v1:
+>>> - use the existing dma map/unmap ioctl interface with a flag to register a
+>>>  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+>>> - a single reserved IOVA contiguous region now is allowed
+>>> - use of an RB tree indexed by PA to store allocated reserved slots
+>>> - use of a vfio_domain iova_domain to manage iova allocation within the
+>>>  window provided by the userspace
+>>> - vfio alloc_map/unmap_free take a vfio_group handle
+>>> - vfio_group handle is cached in vfio_pci_device
+>>> - add ref counting to bindings
+>>> - user modality enabled at the end of the series
+>>>
+>>>
+>>> Eric Auger (8):
+>>>  genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
+>>>  irqchip/gic-v3-its: ITS advertises MSI_FLAG_IRQ_REMAPPING
+>>>  genirq/msi: export msi_get_domain_info
+>>>  genirq/msi: msi_compose wrapper
+>>>  genirq/irq: introduce msi_doorbell_info
+>>>  irqchip/gicv2m: implement msi_doorbell_info callback
+>>>  genirq/msi: map/unmap the MSI doorbells on msi_domain_alloc/free_irqs
+>>>  genirq/msi: use the MSI doorbell's IOVA when requested
+>>>
+>>> drivers/irqchip/irq-gic-v2m.c                 |  16 +++
+>>> drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   3 +-
+>>> drivers/irqchip/irq-gic-v3-its-platform-msi.c |   3 +-
+>>> include/linux/irq.h                           |  15 ++-
+>>> include/linux/msi.h                           |   2 +
+>>> kernel/irq/msi.c                              | 136 +++++++++++++++++++++++---
+>>> 6 files changed, 161 insertions(+), 14 deletions(-)
+>>>
+>>> -- 
+>>> 1.9.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
