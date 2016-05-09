@@ -1,44 +1,72 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 9 May 2016 09:39:58 +0200
-Subject: [PATCH 15/16] clk: sunxi-ng: Add H3 clocks
-In-Reply-To: <1462737711-10017-16-git-send-email-maxime.ripard@free-electrons.com>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-16-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160509093958.26e9549f8ce78888c0e9586a@free.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 9 May 2016 09:46:40 +0200
+Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
+In-Reply-To: <20160505224240.GA31429@rob-hp-laptop>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <20160505224240.GA31429@rob-hp-laptop>
+Message-ID: <CAPDyKFqpoi03Egfuvd8qJXnn_+FBgPXAb7S4UvkxVs8BA+zwnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  8 May 2016 22:01:50 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 6 May 2016 at 00:42, Rob Herring <robh@kernel.org> wrote:
+> On Thu, May 05, 2016 at 02:34:13PM +0200, Krzysztof Kozlowski wrote:
+>> Hi,
+>>
+>> This is a different, second try to fix usb3503+lan on Odroid U3 board
+>> if it was initialized by bootloader (e.g. for TFTP boot).
+>>
+>> First version:
+>> http://www.spinics.net/lists/linux-usb/msg140042.html
+>>
+>>
+>> Problem
+>> =======
+>> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+>> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+>> is required, e.g. by suspend to RAM. The actual TFTP boot does
+>> not have to happen. Just "usb start" from U-Boot is sufficient.
+>>
+>> From the schematics, the regulator is a supply only to LAN, however
+>> without toggling it off/on, the usb3503 hub won appear neither.
+>>
+>>
+>> Solution
+>> ========
+>> This is very similar to the MMC pwrseq behavior so the idea is to:
+>> 1. Move MMC pwrseq drivers to generic place,
+>
+> You can do that, but I'm going to NAK any use of pwrseq bindings outside
+> of MMC. I think it is the wrong way to do things. The DT should describe
 
-> Add the list of clocks and resets found in the H3 CCU.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi-ng/Makefile        |   2 +
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.c  | 757 +++++++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/sun8i-h3.h | 162 ++++++++
->  include/dt-bindings/reset/sun8i-h3.h | 103 +++++
->  4 files changed, 1024 insertions(+)
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->  create mode 100644 include/dt-bindings/clock/sun8i-h3.h
->  create mode 100644 include/dt-bindings/reset/sun8i-h3.h
-> 
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index c794f57b6fb1..67ff6a92f124 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -13,3 +13,5 @@ obj-y += ccu_nkmp.o
->  obj-y += ccu_nm.o
->  obj-y += ccu_p.o
->  obj-y += ccu_phase.o
-> +
-> +obj-y += ccu-sun8i-h3.o
+Huh, I didn't know that was your view of the mmc pwrseq bindings. Why
+didn't you NAK them before?
 
-+obj-$(CONFIG_MACH_SUN8I) += ccu-sun8i-h3.o
+> the devices. If they happen to be "simple" then the core can walk the
+> tree and do any setup. For example, look for "reset-gpios" and toggle
+> that GPIO. There is no need for a special node.
+>
+>> 2. Extend the pwrseq-simple with regulator toggling,
+>> 3. Add support to USB hub and port core for pwrseq,
+>
+> We discussed this for USB already[1] and is why we defined how to add
+> USB child devices. The idea is not to add pwrseq to that.
 
-should be better.
+I am not familiar with the USB discussion.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Still, let me give you some more background to the mmc pwrseq. The
+idea from the mmc pwrseq bindings comes from the power-domain DT
+bindings, as I thought these things were a bit related.
+In both cases they are not directly a property of the device, but more
+describing a HW dependency to allow the device to work.
+
+One could probably use a child node instead of a phandle, but that
+wasn't chosen back then. Of course you are the DT expert, but could
+you perhaps tell me why a child node is better for cases like this?
+
+>
+> Rob
+>
+> [1] http://www.spinics.net/lists/linux-usb/msg134082.html
+
+Kind regards
+Uffe
