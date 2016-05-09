@@ -1,20 +1,16 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 May 2016 16:30:36 +0200
-Subject: [GIT PULL] ARM: mediatek soc updates for v4.7
-In-Reply-To: <CABuKBeJV6bA=2Sx_apRp2HMfuyymFCV67zxaoJzBeRbRMzv0AQ@mail.gmail.com>
-References: <CABuKBeJV6bA=2Sx_apRp2HMfuyymFCV67zxaoJzBeRbRMzv0AQ@mail.gmail.com>
-Message-ID: <4344474.MABVc9hllp@wuerfel>
+Date: Mon, 09 May 2016 16:31:56 +0200
+Subject: [GIT PULL] ARM: mediatek: kconfig updates for v4.7
+In-Reply-To: <CABuKBeLwgcZ10pcSoOBnOFhFOMzr9sjoj28Qbi1pqAXGt0h0GQ@mail.gmail.com>
+References: <CABuKBeLwgcZ10pcSoOBnOFhFOMzr9sjoj28Qbi1pqAXGt0h0GQ@mail.gmail.com>
+Message-ID: <4823418.Yj1lKNn5Uv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 May 2016 16:34:11 Matthias Brugger wrote:
-> - re-organize pmic wrapper code for easier and cleaner addiont of new
-> SoCs and pmic wrappers
-> - add support for pmic wrapper mt6323
-> - add support for SoC mt2701
-> - enable gpt6 arch timer on mt7623
+On Monday 02 May 2016 16:35:20 Matthias Brugger wrote:
+> Add mt2701 support
 > 
 
-Pulled into next/drivers, thanks!
+Merged into next/soc, thanks!
 
 	Arnd
