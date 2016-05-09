@@ -1,48 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  9 May 2016 14:06:37 +0100
-Subject: [PATCH] clocksource/arm_arch_timer: Force per-CPU interrupt to
- trigger on level-high
-Message-ID: <1462799197-31286-1-git-send-email-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 May 2016 15:10:40 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT PM Domain Updates for v4.7
+In-Reply-To: <20160506002125.GE24999@verge.net.au>
+References: <cover.1461730364.git.horms+renesas@verge.net.au>
+ <20160506002125.GE24999@verge.net.au>
+Message-ID: <41128314.QPDQXbTtHX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architected timer produces level-triggered interrupts (this
-is mandated by the architecture). Unfortunately, most device-trees
-get this wrong, and expose an edge-triggered interrupt.
+On Friday 06 May 2016 09:21:25 Simon Horman wrote:
+> Hi,
+> 
+> On Wed, Apr 27, 2016 at 02:20:10PM +1000, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM64 based SoC DT PM Domain updates for v4.7.
+> > 
+> > This pull requests is based on a merge of:
+> > 
+> > * "[GIT PULL] Second Round of Renesas ARM Based SoC R-Car SYSC Updates for
+> >   v4.7", tagged as renesas-rcar-sysc2-for-v4.7, which you have already
+> >   pulled
+> > * "[GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for v4.7",
+> >   tagged as renesas-arm64-dt2-for-v4.7, which I have sent a pull request
+> >   for.
+> > 
+> > The reason for the somewhat tedious base on
+> > renesas-rcar-sysc2-for-v4.7, which provides driver changes,
+> > is a hard run-time dependency.
+> > 
+> > I also have a similar set of changes for ARM (32-bit) which I will send
+> > separately.
+> 
+> I am wondering if this pull-request might have slipped through the cracks.
+> 
+> FWIW, all other pull requests I have submitted for v4.7 have been pulled
+> (thanks!) including a similar pull-request for ARM (32-bit) which is
+> present in the next/late branch of the arm-soc tree.
+> 
+> I do not plan to send any more non-fix pull requests for v4.7.
+> And at this stage I am not aware of any fixes for v4.7.
+> 
 
-Until now, this wasn't too much an issue, as the programming of the
-trigger would fail (the corresponding PPI cannot be reconfigured),
-and the kernel would be happy with this. But we're about to change
-this, and trust DT a lot if the driver doesn't provide its own
-trigger information. In that context, the timer breaks badly.
+Indeed it did, thanks for the reminder! I've put it on my stack now
+and should start doing merges later today when I'm through my mail.
 
-While we do need to fix the DTs, there is also some userspace out
-there (kvmtool) that generates the same kind of broken DT on the
-fly, and that will completely break with newer kernels.
-
-As a safety measure, and to keep buggy software alive as well as
-buying us some time to fix DTs all over the place, let's enforce
-the interrupt trigger in the timer driver. This doesn't cost
-us anything, and ensures that this will work in all situations,
-broken DT or not.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/clocksource/arm_arch_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5152b38..fdf367ae 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -366,7 +366,7 @@ static int arch_timer_setup(struct clock_event_device *clk)
- {
- 	__arch_timer_setup(ARCH_CP15_TIMER, clk);
- 
--	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
-+	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], IRQF_TRIGGER_HIGH);
- 
- 	if (arch_timer_has_nonsecure_ppi())
- 		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
--- 
-2.1.4
+	Arnd
