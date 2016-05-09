@@ -1,117 +1,151 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 9 May 2016 16:00:16 +0800
-Subject: [PATCH 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
-In-Reply-To: <1462780816-5288-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1462780816-5288-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1462780816-5288-6-git-send-email-honghui.zhang@mediatek.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 9 May 2016 10:05:08 +0200
+Subject: [PATCH v9 5/7] vfio/type1: also check IRQ remapping capability at
+ msi domain
+In-Reply-To: <FFD9D7C5-B6EF-4E16-A209-BED31DAB26AA@caviumnetworks.com>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
+ <FFD9D7C5-B6EF-4E16-A209-BED31DAB26AA@caviumnetworks.com>
+Message-ID: <573044B4.4000905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi Chalamarla,
+On 05/05/2016 09:23 PM, Chalamarla, Tirumalesh wrote:
+> 
+> 
+> 
+> 
+> 
+> On 5/4/16, 4:54 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
+> 
+>> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+>> by the msi controller. vfio_safe_irq_domain allows to check whether
+>> interrupts are "safe" for a given device. They are if the device does
+>> not use MSI or if the device uses MSI and the msi-parent controller
+>> supports IRQ remapping.
+>>
+>> Then we check at group level if all devices have safe interrupts: if not,
+>> we only allow the group to be attached if allow_unsafe_interrupts is set.
+>>
+>> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+>> changed in next patch.
+> 
+> Will this work in systems with multiple ITS?
+Yes it should support multiple ITS.
 
-Add the dtsi node of iommu and smi for mt2701.
+Please note however that the series does not yet implement the
+msi_doorbell_info callback in GICv3 ITS PCIe/platform irqchip. Without
+that, the pci_enable is going to fail. I am going to submit a separate
+RFC for that but I can't test it at the moment.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+Best Regards
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 42d5a37..363de0d 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -16,6 +16,7 @@
- #include <dt-bindings/power/mt2701-power.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt2701-larb-port.h>
- #include "skeleton64.dtsi"
- #include "mt2701-pinfunc.h"
- 
-@@ -160,6 +161,16 @@
- 		clock-names = "system-clk", "rtc-clk";
- 	};
- 
-+	smi_common: smi at 1000c000 {
-+		compatible = "mediatek,mt2701-smi-common";
-+		reg = <0 0x1000c000 0 0x1000>;
-+		clocks = <&infracfg CLK_INFRA_SMI>,
-+			 <&mmsys CLK_MM_SMI_COMMON>,
-+			 <&infracfg CLK_INFRA_SMI>;
-+		clock-names = "apb", "smi", "async";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -169,6 +180,16 @@
- 		reg = <0 0x10200100 0 0x1c>;
- 	};
- 
-+	iommu: mmsys_iommu at 10205000 {
-+		compatible = "mediatek,mt2701-m4u";
-+		reg = <0 0x10205000 0 0x1000>;
-+		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_M4U>;
-+		clock-names = "bclk";
-+		mediatek,larbs = <&larb0 &larb1 &larb2>;
-+		#iommu-cells = <1>;
-+	};
-+
- 	apmixedsys: syscon at 10209000 {
- 		compatible = "mediatek,mt2701-apmixedsys", "syscon";
- 		reg = <0 0x10209000 0 0x1000>;
-@@ -234,6 +255,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb0: larb at 14010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x14010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+			 <&mmsys CLK_MM_SMI_LARB0>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
-@@ -241,6 +272,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb2: larb at 15001000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x15001000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&imgsys CLK_IMG_SMI_COMM>,
-+			 <&imgsys CLK_IMG_SMI_COMM>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-+	};
-+
- 	vdecsys: syscon at 16000000 {
- 		compatible = "mediatek,mt2701-vdecsys", "syscon";
- 		reg = <0 0x16000000 0 0x1000>;
-@@ -248,6 +289,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb1: larb at 16010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x16010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&vdecsys CLK_VDEC_CKGEN>,
-+			 <&vdecsys CLK_VDEC_LARB>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
-+	};
-+
- 	hifsys: syscon at 1a000000 {
- 		compatible = "mediatek,mt2701-hifsys", "syscon";
- 		reg = <0 0x1a000000 0 0x1000>;
--- 
-1.8.1.1.dirty
+Eric
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>> v3 -> v4:
+>> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
+>>  and irq_remapping into safe_irq_domains
+>>
+>> v2 -> v3:
+>> - protect vfio_msi_parent_irq_remapping_capable with
+>>  CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> ---
+>> drivers/vfio/vfio_iommu_type1.c | 44 +++++++++++++++++++++++++++++++++++++++--
+>> 1 file changed, 42 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+>> index 4d3a6f1..2fc8197 100644
+>> --- a/drivers/vfio/vfio_iommu_type1.c
+>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>> @@ -37,6 +37,8 @@
+>> #include <linux/vfio.h>
+>> #include <linux/workqueue.h>
+>> #include <linux/msi-iommu.h>
+>> +#include <linux/irqdomain.h>
+>> +#include <linux/msi.h>
+>>
+>> #define DRIVER_VERSION  "0.2"
+>> #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+>> @@ -777,6 +779,33 @@ static int vfio_bus_type(struct device *dev, void *data)
+>> 	return 0;
+>> }
+>>
+>> +/**
+>> + * vfio_safe_irq_domain: returns whether the irq domain
+>> + * the device is attached to is safe with respect to MSI isolation.
+>> + * If the irq domain is not an MSI domain, we return it is safe.
+>> + *
+>> + * @dev: device handle
+>> + * @data: unused
+>> + * returns 0 if the irq domain is safe, -1 if not.
+>> + */
+>> +static int vfio_safe_irq_domain(struct device *dev, void *data)
+>> +{
+>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> +	struct irq_domain *domain;
+>> +	struct msi_domain_info *info;
+>> +
+>> +	domain = dev_get_msi_domain(dev);
+>> +	if (!domain)
+>> +		return 0;
+>> +
+>> +	info = msi_get_domain_info(domain);
+>> +
+>> +	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
+>> +		return -1;
+>> +#endif
+>> +	return 0;
+>> +}
+>> +
+>> static int vfio_iommu_replay(struct vfio_iommu *iommu,
+>> 			     struct vfio_domain *domain)
+>> {
+>> @@ -870,7 +899,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>> 	struct vfio_group *group, *g;
+>> 	struct vfio_domain *domain, *d;
+>> 	struct bus_type *bus = NULL;
+>> -	int ret;
+>> +	int ret, safe_irq_domains;
+>>
+>> 	mutex_lock(&iommu->lock);
+>>
+>> @@ -893,6 +922,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>
+>> 	group->iommu_group = iommu_group;
+>>
+>> +	/*
+>> +	 * Determine if all the devices of the group have a safe irq domain
+>> +	 * with respect to MSI isolation
+>> +	 */
+>> +	safe_irq_domains = !iommu_group_for_each_dev(iommu_group, &bus,
+>> +				       vfio_safe_irq_domain);
+>> +
+>> 	/* Determine bus_type in order to allocate a domain */
+>> 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
+>> 	if (ret)
+>> @@ -920,8 +956,12 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>> 	INIT_LIST_HEAD(&domain->group_list);
+>> 	list_add(&group->next, &domain->group_list);
+>>
+>> +	/*
+>> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
+>> +	 * must support IRQ remapping/interrupt translation
+>> +	 */
+>> 	if (!allow_unsafe_interrupts &&
+>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+>> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !safe_irq_domains)) {
+>> 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+>> 		       __func__);
+>> 		ret = -EPERM;
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
