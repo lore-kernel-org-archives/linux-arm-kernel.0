@@ -1,29 +1,145 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 May 2016 10:09:52 +0100
-Subject: Reverting ARCH_SUNXI arm64 support(?)
-In-Reply-To: <57304FF7.3080909@arm.com>
-References: <57304FF7.3080909@arm.com>
-Message-ID: <20160509090951.GC19763@arm.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Mon, 9 May 2016 17:06:15 +0800
+Subject: [PATCH] arm64: dts: Update address-cells and reg properties of cpu
+ nodes
+Message-ID: <1462784775-11684-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 09:53:11AM +0100, Andre Przywara wrote:
-> Hi Will, Catalin,
+MPIDR_EL1[63:32] value is equal to 0 for the CPUs of the LS1043A and
+LS2080A SoCs. The ARM CPU binding allows #address-cells to be set to 1,
+since MPIDR_EL1[63:32] bits are not used for CPUs identification. Update
+the #address-cells and reg properties accordingly.
 
-Hi Andre,
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 10 +++++-----
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 18 +++++++++---------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-> Suzuki reported a build failure with certain (non-defconfig) .configs
-> due to the new ARCH_SUNXI support in 4.6-rc [1].
-> As unfortunately we couldn't agree on a solution and also the support
-> for the A64/Pine64 is partial in 4.6 anyway, can you please revert:
-> ce3dd55b99b151a90ac1701c6825f2ae2d49b54e ("arm64: Introduce Allwinner
-> SoC config option")
-
-Given that we (Catalin and I) didn't commit that patch, it seems weird
-that we should be reverting it. Shouldn't this be handled in arm-soc or
-via the sunxi subtree?
-
-We're also a week from the merge window, so it doesn't seem like a good
-time to be hacking at .config/kconfig-related issues.
-
-Will
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index de0323b..37614b5 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -51,7 +51,7 @@
+ 	#size-cells = <2>;
+ 
+ 	cpus {
+-		#address-cells = <2>;
++		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+ 		/*
+@@ -63,28 +63,28 @@
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
+-			reg = <0x0 0x0>;
++			reg = <0x0>;
+ 			clocks = <&clockgen 1 0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
+-			reg = <0x0 0x1>;
++			reg = <0x1>;
+ 			clocks = <&clockgen 1 0>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
+-			reg = <0x0 0x2>;
++			reg = <0x2>;
+ 			clocks = <&clockgen 1 0>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
+-			reg = <0x0 0x3>;
++			reg = <0x3>;
+ 			clocks = <&clockgen 1 0>;
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 3187c82..25ff4a8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -51,7 +51,7 @@
+ 	#size-cells = <2>;
+ 
+ 	cpus {
+-		#address-cells = <2>;
++		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+ 		/*
+@@ -65,56 +65,56 @@
+ 		cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x0>;
++			reg = <0x0>;
+ 			clocks = <&clockgen 1 0>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x1>;
++			reg = <0x1>;
+ 			clocks = <&clockgen 1 0>;
+ 		};
+ 
+ 		cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x100>;
++			reg = <0x100>;
+ 			clocks = <&clockgen 1 1>;
+ 		};
+ 
+ 		cpu at 101 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x101>;
++			reg = <0x101>;
+ 			clocks = <&clockgen 1 1>;
+ 		};
+ 
+ 		cpu at 200 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x200>;
++			reg = <0x200>;
+ 			clocks = <&clockgen 1 2>;
+ 		};
+ 
+ 		cpu at 201 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x201>;
++			reg = <0x201>;
+ 			clocks = <&clockgen 1 2>;
+ 		};
+ 
+ 		cpu at 300 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x300>;
++			reg = <0x300>;
+ 			clocks = <&clockgen 1 3>;
+ 		};
+ 
+ 		cpu at 301 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+-			reg = <0x0 0x301>;
++			reg = <0x301>;
+ 			clocks = <&clockgen 1 3>;
+ 		};
+ 	};
+-- 
+2.1.0.27.g96db324
