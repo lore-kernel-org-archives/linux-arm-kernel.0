@@ -1,42 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 May 2016 16:36:54 +0200
-Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
-In-Reply-To: <573098E1.5050007@arm.com>
-References: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
- <5729C2CC.7030806@arm.com> <573098E1.5050007@arm.com>
-Message-ID: <17116806.BYbaJP9QyN@wuerfel>
+Date: Mon, 09 May 2016 16:38:48 +0200
+Subject: [GIT PULL] ARM: dts: exynos: Non-critical fixes for v4.7
+In-Reply-To: <1462619428-13798-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462619428-13798-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <7398428.rrnfaS9ayc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 May 2016 15:04:17 Suzuki K Poulose wrote:
-> On 04/05/16 10:37, Suzuki K Poulose wrote:
-> > On 28/04/16 16:05, Suzuki K Poulose wrote:
-> >> arm-ccn driver uses irq_set_affinity, which is not exported and
-> >> hence cannot be built as a module, eventhough we have all the
-> >> bits ready. This patch makes use of the exported helper
-> >> irq_set_affinity_hint() instead. Also, the __free_irq expects
-> >> the affinity_hint to be NULL when we free the irq. So set the
-> >> affinity_hint to NULL at clean up.
-> >>
-> >> Now that we can build it as a module, update the Kconfig to
-> >> reflect the change.
-> >>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-> >> Acked-by: Pawel Moll <pawel.moll@arm.com>
-> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > 
-> > Hi,
-> > 
-> > Could you please pull this for 4.7 ?
+On Saturday 07 May 2016 13:10:28 Krzysztof Kozlowski wrote:
+> Samsung DTS non-critical fixes for v4.7:
+> 1. Fix s5p-mfc driver probe on Exynos542x Peach boards (need to provide MFC
+>    memory banks). On these boards this was broken for long time but
+>    apparently no one enabled this driver till now.
+> 2. Fix creation of debugfs entries for one regulator on Exynos4210
+>    Trats board.
+> 3. Fix probing of max8997 MFD driver (and its children) because
+>    of missing interrupt. Actually the current version of the driver probes
+>    (just without interrupts) but after switching to regmap and regmap-irq,
+>    the interrupt will be mandatory.
 > 
-> Gentle ping...
 > 
 
-Applied now, sorry for the delay and thanks for the reminders.
-
-It was in my todo list the whole time, I just didn't get around to
-do any merges last week.
+Merged into next/fixes-non-critical, thanks!
 
 	Arnd
