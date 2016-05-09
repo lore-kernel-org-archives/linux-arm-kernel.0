@@ -1,99 +1,45 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 09 May 2016 10:39:15 +0200
-Subject: [PATCH] ARM: dts: Fix igepv5 audiopwon-gpio
-In-Reply-To: <1b37fbdd-67f0-e9e3-d442-bdc0bd74397b@ti.com>
-References: <1462474581-13865-1-git-send-email-tony@atomide.com>
- <1b37fbdd-67f0-e9e3-d442-bdc0bd74397b@ti.com>
-Message-ID: <57304CB3.5010601@collabora.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 9 May 2016 09:53:11 +0100
+Subject: Reverting ARCH_SUNXI arm64 support(?)
+Message-ID: <57304FF7.3080909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will, Catalin,
 
+Suzuki reported a build failure with certain (non-defconfig) .configs
+due to the new ARCH_SUNXI support in 4.6-rc [1].
+As unfortunately we couldn't agree on a solution and also the support
+for the A64/Pine64 is partial in 4.6 anyway, can you please revert:
+ce3dd55b99b151a90ac1701c6825f2ae2d49b54e ("arm64: Introduce Allwinner
+SoC config option")
+So with this revert we have the arm64 defconfig now selecting useless
+symbols, it didn't complain, but I was wondering if we should revert the
+defconfig patch as well then? But this looks like pain :-(
 
-On 09/05/16 10:34, Peter Ujfalusi wrote:
-> On 05/05/16 21:56, Tony Lindgren wrote:
->> Playing audio works on omap5-uevm, but produces an "Unhandled fault:
->> imprecise external abort (0x1406) at 0x00000000" error on igepv5.
->>
->> Looks like the twl6040 audpwron GPIO pin is different for these
->> boards. Let's fix the issue by configuring the audpwron in the
->> board specific dts file.
->>
->> Cc: Agust? Fontquerni <af@iseebcn.com>
->> Cc: Eduard Gavin <egavin@iseebcn.com>
->> Cc: Enric Balletbo i Serra <eballetbo@iseebcn.com>
+If all this reverting is too much due to conflicts, we might think about
+going with Suzuki's original one-liner [1], which would be an easy fix -
+though Olof opposed it back then (in favour of a more involved solution,
+which is no option for 4.6 anymore).
 
+Regardless of this the plan for the future would be:
+1) Send a patch to properly express the dependencies for the sunxi IRQ
+controllers - this is independent from the arm64 support. I will do this
+ASAP in hope that it still reaches 4.7.
+2) Investigate whether Maxime's new sunxi clock architecture[2] would be
+a fit for the A64 support.
+3) Use the next weeks to rework the support patches and aim for a 4.8-rc
+merge - depending on the outcome and merge status of 2)
 
-Hey, can you change the email address for this one
+Thoughts?
 
-Cc: Enric Balletbo i Serra <eballetbo@gmail.com>
+Cheers,
+Andre.
 
-Thanks!
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418175.html
+   with the thread continuing here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/420326.html
 
->> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
->> ---
->>  arch/arm/boot/dts/omap5-board-common.dtsi |  3 ++-
->>  arch/arm/boot/dts/omap5-igep0050.dts      | 10 ++++++++++
->>  arch/arm/boot/dts/omap5-uevm.dts          | 10 ++++++++++
->>  3 files changed, 22 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/omap5-board-common.dtsi b/arch/arm/boot/dts/omap5-board-common.dtsi
->> index 2eea26c..23b1d7c 100644
->> --- a/arch/arm/boot/dts/omap5-board-common.dtsi
->> +++ b/arch/arm/boot/dts/omap5-board-common.dtsi
->> @@ -642,7 +642,8 @@
->>  		pinctrl-0 = <&twl6040_pins>;
->>  
->>  		interrupts = <GIC_SPI 119 IRQ_TYPE_NONE>; /* IRQ_SYS_2N cascaded to gic */
->> -		ti,audpwron-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;  /* gpio line 141 */
->> +
->> +		/* audpwron gpio defined in the board specific dts */
->>  
->>  		vio-supply = <&smps7_reg>;
->>  		v2v1-supply = <&smps9_reg>;
->> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
->> index 72ff6a4..673cdfa 100644
->> --- a/arch/arm/boot/dts/omap5-igep0050.dts
->> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
->> @@ -58,3 +58,13 @@
->>  		<&gpio7 3 0>;		/* 195, SDA */
->>  };
->>  
->> +&twl6040 {
->> +	ti,audpwron-gpio = <&gpio5 16 GPIO_ACTIVE_HIGH>;  /* gpio line 144 */
-> 
-> BTW: how do you know that gpio144 is used as audpwron GPIO on igepv5?
-> 
->> +};
->> +
->> +&twl6040_pins {
->> +	pinctrl-single,pins = <
->> +		OMAP5_IOPAD(0x1c4, PIN_OUTPUT | MUX_MODE6)	/* mcspi1_somi.gpio5_144 */
->> +		OMAP5_IOPAD(0x1ca, PIN_OUTPUT | MUX_MODE6)	/* perslimbus2_clock.gpio5_145 */
-> 
-> What does the gpio145 is used for?
-> 
->> +	>;
->> +};
->> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
->> index 60b3fbb..a51e605 100644
->> --- a/arch/arm/boot/dts/omap5-uevm.dts
->> +++ b/arch/arm/boot/dts/omap5-uevm.dts
->> @@ -51,3 +51,13 @@
->>  		<&gpio9 1 GPIO_ACTIVE_HIGH>,	/* TCA6424A P00, LS OE */
->>  		<&gpio7 1 GPIO_ACTIVE_HIGH>;	/* GPIO 193, HPD */
->>  };
->> +
->> +&twl6040 {
->> +	ti,audpwron-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;  /* gpio line 141 */
->> +};
->> +
->> +&twl6040_pins {
->> +	pinctrl-single,pins = <
->> +		OMAP5_IOPAD(0x1be, PIN_OUTPUT | MUX_MODE6)	/* mcspi1_somi.gpio5_141 */
->> +	>;
->> +};
->>
-> 
-> 
+[2]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/427839.html
