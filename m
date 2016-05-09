@@ -1,97 +1,92 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 9 May 2016 11:25:53 +0300
-Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
-In-Reply-To: <20160505184609.GB5995@atomide.com>
-References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
- <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
- <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
- <20160505184609.GB5995@atomide.com>
-Message-ID: <a6969765-d07d-6d0e-36df-b78b485d9644@ti.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 9 May 2016 10:30:38 +0200
+Subject: [PATCH 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
+In-Reply-To: <572FA04B.1020005@denx.de>
+References: <1462479971-7891-1-git-send-email-marex@denx.de>
+ <1462479971-7891-3-git-send-email-marex@denx.de>
+ <977436072.210446.e7eef450-2262-47df-8e8e-6a44da10083c.open-xchange@email.1und1.de>
+ <572FA04B.1020005@denx.de>
+Message-ID: <57304AAE.20103@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Tomi,
+Hi,
 
-On 05/05/16 21:46, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [160504 11:03]:
->> On 05/04/2016 12:26 PM, Tony Lindgren wrote:
->>> Hi,
+Am 08.05.2016 um 22:23 schrieb Marek Vasut:
+> On 05/06/2016 09:40 AM, Stefan Wahren wrote:
+>> Hi Marek,
+> Hi!
+>
+>> sorry for the reply format.
+> replying from a phone ? :)
+
+no an ugly webmailer :(
+
+>
+>>> Marek Vasut <marex@denx.de> hat am 5. Mai 2016 um 22:26 geschrieben:
 >>>
->>> Adding Nishanth to Cc.
+>>> Add support for this small MP3 player based on STMP3780 (rev.4).
+>>> Currently supported is both external microSD and internal SD-NAND
+>>> bridge, PWM and USB gadget.
 >>>
->>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160429 05:15]:
->>>> ldo7_reg, obviously ;)
->>>>
->>>>> 	status = "okay";
->>>>> 	regulator-min-microvolt = <1800000>;
->>>>> 	regulator-max-microvolt = <1800000>;
->>>>> };
+>>> Signed-off-by: Marek Vasut <marex@denx.de>
+>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile | 1 +
+>>>  arch/arm/boot/dts/imx23-xfi3.dts | 190
+>>> +++++++++++++++++++++++++++++++++++++++
+>>>  2 files changed, 191 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/imx23-xfi3.dts
 >>>
->>> It really seems to be ldo7, otherwise there's no HDMI output. I don't
->>> have the schematics either.
->>>
->>> But it seems we have at least two other regressions in Linux next that
->>> prevent me from testing this properly:
->>>
->>> 1. On igepv5, I get this for the MMC regulator
->>>
->>> ldo9: bypassed regulator has no supply!
->>> ldo9: failed to get the current voltage(-517)
->>> palmas-pmic 48070000.i2c:palmas at 48:palmas_pmic: failed to register 48070000.i2c:palmar
-> 
-> The patch I posted fixes this. Then for the HDMI see below.
-> I've kept it at 2V like we have in omap5-board-common.dtsi,
-> I wonder if it really should be 1.8V though for ldo7 in this
-> case?
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 8f9f1c2..7a79d37 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -417,6 +417,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
+>>>  imx23-evk.dtb \
+>>>  imx23-olinuxino.dtb \
+>>>  imx23-stmp378x_devb.dtb \
+>>> + imx23-xfi3.dtb \
+>>>  imx28-apf28.dtb \
+>>>  imx28-apf28dev.dtb \
+>>>  imx28-apx4devkit.dtb \
+>>> diff --git a/arch/arm/boot/dts/imx23-xfi3.dts
+>>> b/arch/arm/boot/dts/imx23-xfi3.dts
+>>> new file mode 100644
+>>> index 0000000..d7e7cf5
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/imx23-xfi3.dts
+>>> @@ -0,0 +1,190 @@
+>>> +/*
+>>> + * Copyright (C) 2013-2016 Marek Vasut <marex@denx.de>
+>>> + *
+>>> + * This file is dual-licensed: you can use it either under the terms
+>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>> + * licensing only applies to this file, and not this project as a
+>>> + * whole.
+>>> + *
+>>> + * a) This file is free software; you can redistribute it and/or
+>>> + * modify it under the terms of the GNU General Public License as
+>>> + * published by the Free Software Foundation; either version 2 of
+>>> + * the License, or (at your option) any later version.
+>>> + *
+>>> + * This file is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public
+>>> + * License along with this file; if not, write to the Free
+>>> + * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>>> + * MA 02110-1301 USA
+>> AFAIK this address shouldn't be included.
+> Hmmm, some boards do include it. I'll remove it from this submission and
+> also for the xfi.
+>
+> Shall I send patch(es) removing the address from the other boards too ?
 
-AFAIK the VDDA for the HDMI needs to be 1.8V along with other VDDAs for DSS
-(vdda_dsiporta, vdda_dsiportc and vdda_hdmi).
+i'm not sure. Maybe Shawn has an opinion about it.
 
-Tomi: what do you think?
-
-According to the OMAP5 data manual the vdda_hdmi can be in 1.5V or 1.8V mode,
-2V is not mentioned in the recommended operating conditions table.
-
-Just to note: on omap5-uevm the ldo7 is connected to VPP1 of OMAP5 (eFuse
-power supply), which does require 2V.
-
-
-> Regards,
-> 
-> Tony
-> 8< -----------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Thu, 5 May 2016 11:29:23 -0700
-> Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
-> 
-> Fix ldo7 source for HDMI on igepv5.
-> 
-> Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
-> index 46ecb1d..72ff6a4 100644
-> --- a/arch/arm/boot/dts/omap5-igep0050.dts
-> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
-> @@ -35,6 +35,12 @@
->  	};
->  };
->  
-> +&ldo7_reg {
-> +	status = "okay";
-> +	regulator-min-microvolt = <2000000>;
-> +	regulator-max-microvolt = <2000000>;
-
-If we are not changing the default voltage set in the common dtsi file we only
-need to status = "okay"
-
-> +};
-> +
->  &omap5_pmx_core {
->  	i2c4_pins: pinmux_i2c4_pins {
->  		pinctrl-single,pins = <
-> 
-
-
--- 
-P?ter
+Thanks
+Stefan
