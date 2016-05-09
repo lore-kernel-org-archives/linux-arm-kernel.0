@@ -1,179 +1,159 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon,  9 May 2016 22:01:48 +0930
-Subject: [PATCH 1/4] doc/devicetree: Add Aspeed clock bindings
+Date: Mon,  9 May 2016 22:01:49 +0930
+Subject: [PATCH 2/4] drvers/clk: Support fourth generation Aspeed SoCs
 In-Reply-To: <1462797111-14271-1-git-send-email-joel@jms.id.au>
 References: <1462797111-14271-1-git-send-email-joel@jms.id.au>
-Message-ID: <1462797111-14271-2-git-send-email-joel@jms.id.au>
+Message-ID: <1462797111-14271-3-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+A basic driver to create fixed rate clock devices from strapping
+registers.
+
+The clocks on the ast2400 are derived from an external oscillator and
+the frequency of this can be derived from the strapping of the
+processor. The frequency of internal clocks can be derived from other
+registers in the SCU (System Control Unit).
+
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- .../devicetree/bindings/clock/aspeed-clock.txt     | 156 +++++++++++++++++++++
- 1 file changed, 156 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/aspeed-clock.txt
+ drivers/clk/Makefile        |   1 +
+ drivers/clk/aspeed/Makefile |   1 +
+ drivers/clk/aspeed/clk-g4.c | 109 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 111 insertions(+)
+ create mode 100644 drivers/clk/aspeed/Makefile
+ create mode 100644 drivers/clk/aspeed/clk-g4.c
 
-diff --git a/Documentation/devicetree/bindings/clock/aspeed-clock.txt b/Documentation/devicetree/bindings/clock/aspeed-clock.txt
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 46869d696e4d..8eaaef013a28 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -84,3 +84,4 @@ obj-$(CONFIG_X86)			+= x86/
+ obj-$(CONFIG_ARCH_ZX)			+= zte/
+ obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
+ obj-$(CONFIG_H8300)		+= h8300/
++obj-$(CONFIG_ARCH_ASPEED)		+= aspeed/
+diff --git a/drivers/clk/aspeed/Makefile b/drivers/clk/aspeed/Makefile
 new file mode 100644
-index 000000000000..968329406435
+index 000000000000..d3457fbe3019
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/aspeed-clock.txt
-@@ -0,0 +1,156 @@
-+Device Tree Clock bindings for the Aspeed SoCs
++++ b/drivers/clk/aspeed/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_MACH_ASPEED_G4) += clk-g4.o
+diff --git a/drivers/clk/aspeed/clk-g4.c b/drivers/clk/aspeed/clk-g4.c
+new file mode 100644
+index 000000000000..91677e9177f5
+--- /dev/null
++++ b/drivers/clk/aspeed/clk-g4.c
+@@ -0,0 +1,109 @@
++/*
++ * Copyright 2016 IBM Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
 +
-+Aspeed SoCs have a fixed frequency input osciallator is used to create the PLL
-+and APB clocks. We can determine these frequencies by reading registers that
-+are set according to strapping bits.
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
 +
-+Forth generation boards
-+-----------------------
-+
-+eg, ast2400.
-+
-+CLKIN:
-+ - compatible : Must be "fixed-clock"
-+ - #clock-cells : Should be 0
-+ - clock-frequency: 48e6, 25e6 or 24e6 depending on the input clock
-+
-+PLL:
-+
-+Required properties:
-+ - compatible : Must be "aspeed,g4-hpll-clock"
-+ - #clock-cells : Should be 0
-+ - reg : Should contain registers location and length
-+ - clocks : Should contain phandle + clock-specifier for the input clock (clkin)
-+
-+Optional properties:
-+ - clock-output-names : Should contain clock name
-+
-+
-+APB:
-+
-+Required properties:
-+ - compatible : Must be "aspeed,g4-apb-clock"
-+ - #clock-cells : Should be 0
-+ - reg : Should contain registers location and length
-+ - clocks : Should contain phandle + clock-specifier for the h-pll
-+
-+Optional properties:
-+ - clock-output-names : Should contain clock name
-+
-+
-+For example:
-+
-+	clk_clkin: clk_clkin {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <48000000>;
++static void __init aspeed_of_hpll_clk_init(struct device_node *node)
++{
++	struct clk *clk, *clkin_clk;
++	void __iomem *base;
++	int reg, rate, clkin;
++	const char *name = node->name;
++	const char *parent_name;
++	const int rates[][4] = {
++		{384, 360, 336, 408},
++		{400, 375, 350, 425},
 +	};
 +
-+	clk_hpll: clk_hpll {
-+		compatible = "aspeed,g4-hpll-clock";
-+		#clock-cells = <0>;
-+		reg = <0x1e6e2008 0x4>;
-+	};
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
 +
-+	clk_apb: clk_apb at 1e6e2008 {
-+		#clock-cells = <0>;
-+		compatible = "aspeed,g4-apb-clock";
-+		reg = <0x1e6e2008 0x4>;
-+		clocks = <&clk_hpll>;
-+	};
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++	reg = readl(base);
++	iounmap(base);
 +
++	clkin_clk = of_clk_get(node, 0);
++	if (IS_ERR(clkin_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
 +
++	clkin = clk_get_rate(clkin_clk);
 +
-+Fifth generation boards
-+-----------------------
++	reg = (reg >> 8) & 0x2;
 +
-+eg, ast2500.
++	if (clkin == 48000000 || clkin == 24000000)
++		rate = rates[0][reg] * 1000000;
++	else if (clkin == 25000000)
++		rate = rates[1][reg] * 1000000;
++	else {
++		pr_err("%s: unknown clkin frequency %dHz\n",
++				node->full_name, clkin);
++		WARN_ON(1);
++	}
 +
-+CLKIN:
-+Required properties:
-+ - compatible : Must be "fixed-clock"
-+ - #clock-cells : Should be 0
-+ - clock-frequency: 25000000 or 24000000 depending on the input clock
++	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
 +
-+H-PLL:
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g4-hpll-clock",
++	       aspeed_of_hpll_clk_init);
 +
-+Required properties:
-+ - compatible : Must be "aspeed,g5-hpll-clock"
-+ - #clock-cells : Should be 0
-+ - reg : Should contain registers location and length
-+ - clocks : Should contain phandle + clock-specifier for the input clock (clkin)
++static void __init aspeed_of_apb_clk_init(struct device_node *node)
++{
++	struct clk *clk, *hpll_clk;
++	void __iomem *base;
++	int reg, rate;
++	const char *name = node->name;
++	const char *parent_name;
 +
-+Optional properties:
-+ - clock-output-names : Should contain clock name
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
 +
-+AHB:
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++	reg = readl(base);
++	iounmap(base);
 +
-+Required properties:
-+ - compatible : Must be "aspeed,g5-ahb-clock"
-+ - #clock-cells : Should be 0
-+ - reg : Should contain registers location and length
-+ - clocks : Should contain phandle + clock-specifier for the the h-pll
++	hpll_clk = of_clk_get(node, 0);
++	if (IS_ERR(hpll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
 +
-+Optional properties:
-+ - clock-output-names : Should contain clock name
++	reg = (reg >> 23) & 0x3;
++	rate = clk_get_rate(hpll_clk) / (2 + 2 * reg);
 +
-+APB:
++	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
 +
-+Required properties:
-+ - compatible : Must be "aspeed,g4-apb-clock"
-+ - #clock-cells : Should be 0
-+ - reg : Should contain registers location and length
-+ - clocks : Should contain phandle + clock-specifier for the the h-pll
-+
-+Optional properties:
-+ - clock-output-names : Should contain clock name
-+
-+For example:
-+	clk_clkin: clk_clkin at 1e6e2070 {
-+		#clock-cells = <0>;
-+		compatible = "aspeed,g5-clkin-clock";
-+		reg = <0x1e6e2070 0x04>;
-+	};
-+
-+	clk_hpll: clk_hpll at 1e6e2024 {
-+		#clock-cells = <0>;
-+		compatible = "aspeed,g5-hpll-clock";
-+		reg = <0x1e6e2024 0x4>;
-+		clocks = <&clk_clkin>;
-+	};
-+
-+	clk_ahb: clk_ahb at 1e6e2070 {
-+		#clock-cells = <0>;
-+		compatible = "aspeed,g5-ahb-clock";
-+		reg = <0x1e6e2070 0x4>;
-+		clocks = <&clk_hpll>;
-+	};
-+
-+	clk_apb: clk_apb at 1e6e2008 {
-+		#clock-cells = <0>;
-+		compatible = "aspeed,g5-apb-clock";
-+		reg = <0x1e6e2008 0x4>;
-+		clocks = <&clk_hpll>;
-+	};
-+
-+Common clocks
-+-------------
-+
-+UART:
-+
-+All supported boards have a uart clock that is derived from a 24MHz reference.
-+We have a clock driver for it as there is a register in the SCU that controls
-+weather it will be divided down by 13 or not.
-+
-+Required properties:
-+ - compatible : Must be "aspeed,uart-clock"
-+ - #clock-cells : Should be 0
-+ - reg : Should contain registers location and length
-+
-+For example:
-+
-+	clk_uart: clk_uart at 1e6e2008 {
-+		#clock-cells = <0>;
-+		compatible = "aspeed,uart-clock";
-+		reg = <0x1e6e202c 0x4>;
-+	};
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g4-apb-clock",
++	       aspeed_of_apb_clk_init);
 -- 
 2.8.1
