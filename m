@@ -1,92 +1,42 @@
-From: petr@barix.com (Petr Kulhavy)
-Date: Mon,  9 May 2016 16:35:22 +0200
-Subject: [PATCH v5 4/4] ARM: DTS: da850: Add McBSP0 and McBSP1
-In-Reply-To: <1462804522-29544-1-git-send-email-petr@barix.com>
-References: <1462804522-29544-1-git-send-email-petr@barix.com>
-Message-ID: <1462804522-29544-5-git-send-email-petr@barix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 May 2016 16:36:54 +0200
+Subject: [PATCH] [for 4.7] arm-ccn: Enable building as module
+In-Reply-To: <573098E1.5050007@arm.com>
+References: <1461855901-23794-1-git-send-email-suzuki.poulose@arm.com>
+ <5729C2CC.7030806@arm.com> <573098E1.5050007@arm.com>
+Message-ID: <17116806.BYbaJP9QyN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SoC nodes for McBSP0 and McBSP1 as well as the corresponding pinmux
-configurations.
+On Monday 09 May 2016 15:04:17 Suzuki K Poulose wrote:
+> On 04/05/16 10:37, Suzuki K Poulose wrote:
+> > On 28/04/16 16:05, Suzuki K Poulose wrote:
+> >> arm-ccn driver uses irq_set_affinity, which is not exported and
+> >> hence cannot be built as a module, eventhough we have all the
+> >> bits ready. This patch makes use of the exported helper
+> >> irq_set_affinity_hint() instead. Also, the __free_irq expects
+> >> the affinity_hint to be NULL when we free the irq. So set the
+> >> affinity_hint to NULL at clean up.
+> >>
+> >> Now that we can build it as a module, update the Kconfig to
+> >> reflect the change.
+> >>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> >> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > 
+> > Hi,
+> > 
+> > Could you please pull this for 4.7 ?
+> 
+> Gentle ping...
+> 
 
-Signed-off-by: Petr Kulhavy <petr@barix.com>
----
-v1: initial
-v2: add missing TC channel in dmas properties (for compatibility with the new EDMA3 binding)
-    remove "-audio" postfix from the compatible string
-v3: no change
-v4: no change
-v5: rebased to current master of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
-    using "sound@" prefix instead of "mcbsp@" prefix
-    address corrected to match the reg value
-    removed leading zeros from the reg values
+Applied now, sorry for the delay and thanks for the reminders.
 
- arch/arm/boot/dts/da850.dtsi | 45 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+), 1 deletion(-)
+It was in my todo list the whole time, I just didn't get around to
+do any merges last week.
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index cf1aad8190f1..3a4450b7ae4a 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -166,7 +166,24 @@
- 					0xc 0x88888888 0xffffffff
- 				>;
- 			};
--
-+			mcbsp0_pins: pinmux_mcbsp0_pins {
-+				pinctrl-single,bits = <
-+					/* PINMUX2:
-+					* CLKS0, DX0, DR0, FSX0
-+					* FSR0, CLKX0, CLKR0
-+					*/
-+					0x8 0x02222220 0xfffffff0
-+				>;
-+			};
-+			mcbsp1_pins: pinmux_mcbsp1_pins {
-+				pinctrl-single,bits = <
-+					/* PINMUX1:
-+					* CLKS1, DX1, DR1, FSX1,
-+					* FSR1, CLKX1, CLKR1
-+					*/
-+					0x4 0x22222220 0xfffffff0
-+				>;
-+			};
- 		};
- 		edma0: edma at 0 {
- 			compatible = "ti,edma3-tpcc";
-@@ -374,6 +391,32 @@
- 				<&edma0 0 1>;
- 			dma-names = "tx", "rx";
- 		};
-+
-+		mcbsp0: sound at 110000 {
-+			compatible = "ti,da850-mcbsp";
-+			reg =	<0x110000 0x1000>,
-+				<0x310000 0x1000>;
-+			reg-names = "mpu", "dat";
-+			interrupts = <97 98>;
-+			interrupts-names = "rx", "tx";
-+			dmas = <&edma0 3 1
-+				&edma0 2 1>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+		mcbsp1: sound at 111000 {
-+			compatible = "ti,da850-mcbsp";
-+			reg =	<0x111000 0x1000>,
-+				<0x311000 0x1000>;
-+			reg-names = "mpu", "dat";
-+			interrupts = <99 100>;
-+			interrupts-names = "rx", "tx";
-+			dmas = <&edma0 5 1
-+				&edma0 4 1>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
--- 
-1.9.1
+	Arnd
