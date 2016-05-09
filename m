@@ -1,67 +1,74 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon,  9 May 2016 22:02:46 +0930
-Subject: [PATCH 1/4] drivers/clocksouree/moxart: Add kbuild symbol
+Date: Mon,  9 May 2016 22:02:47 +0930
+Subject: [PATCH 2/4] drivers/clocksource/moxart: Refactor enable/disable
 In-Reply-To: <1462797169-14512-1-git-send-email-joel@jms.id.au>
 References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
-Message-ID: <1462797169-14512-2-git-send-email-joel@jms.id.au>
+Message-ID: <1462797169-14512-3-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Kconfig entry for this driver so other SoCs can select it. This
-updates the moxart Kconfig in order to select the symbol.
-
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/mach-moxart/Kconfig | 2 +-
- drivers/clocksource/Kconfig  | 9 +++++++++
- drivers/clocksource/Makefile | 2 +-
- 3 files changed, 11 insertions(+), 2 deletions(-)
+ drivers/clocksource/moxart_timer.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
-index 180d9d216719..505fab683b81 100644
---- a/arch/arm/mach-moxart/Kconfig
-+++ b/arch/arm/mach-moxart/Kconfig
-@@ -3,9 +3,9 @@ menuconfig ARCH_MOXART
- 	depends on ARCH_MULTI_V4
- 	select CPU_FA526
- 	select ARM_DMA_MEM_BUFFERABLE
--	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
- 	select ARCH_REQUIRE_GPIOLIB
-+	select MOXART_TIMER
- 	select PHYLIB if NETDEVICES
- 	help
- 	  Say Y here if you want to run your kernel on hardware with a
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index c346be650892..9a54d1ce4ce7 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -411,4 +411,13 @@ config CLKSRC_ST_LPC
- 	  Enable this option to use the Low Power controller timer
- 	  as clocksource.
+diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+index 19857af651c1..b00b2b21e8b3 100644
+--- a/drivers/clocksource/moxart_timer.c
++++ b/drivers/clocksource/moxart_timer.c
+@@ -58,15 +58,25 @@
+ static void __iomem *base;
+ static unsigned int clock_count_per_tick;
  
-+config MOXART_TIMER
-+	bool "Moxart timer" if COMPILE_TEST
-+	depends on GENERIC_CLOCKEVENTS && HAS_IOMEM
-+	select CLKSRC_OF
-+	select CLKSRC_MMIO
-+	help
-+	  Enables the support for the timer used in the Moxart and Aspeed
-+	  system on chips.
+-static int moxart_shutdown(struct clock_event_device *evt)
++static inline void moxart_disable(struct clock_event_device *evt)
+ {
+ 	writel(TIMER1_DISABLE, base + TIMER_CR);
++}
 +
- endmenu
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index dc2b8997f6e6..14fe8172c174 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -22,7 +22,7 @@ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
- obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
--obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
-+obj-$(CONFIG_MOXART_TIMER)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_CLKSRC_PXA)	+= pxa_timer.o
- obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
++static inline void moxart_enable(struct clock_event_device *evt)
++{
++	writel(TIMER1_ENABLE, base + TIMER_CR);
++}
++
++static int moxart_shutdown(struct clock_event_device *evt)
++{
++	moxart_disable(evt);
+ 	return 0;
+ }
+ 
+ static int moxart_set_oneshot(struct clock_event_device *evt)
+ {
+-	writel(TIMER1_DISABLE, base + TIMER_CR);
++	moxart_disable(evt);
+ 	writel(~0, base + TIMER1_BASE + REG_LOAD);
+ 	return 0;
+ }
+@@ -74,21 +84,21 @@ static int moxart_set_oneshot(struct clock_event_device *evt)
+ static int moxart_set_periodic(struct clock_event_device *evt)
+ {
+ 	writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
+-	writel(TIMER1_ENABLE, base + TIMER_CR);
++	moxart_enable(evt);
+ 	return 0;
+ }
+ 
+ static int moxart_clkevt_next_event(unsigned long cycles,
+-				    struct clock_event_device *unused)
++				    struct clock_event_device *evt)
+ {
+ 	u32 u;
+ 
+-	writel(TIMER1_DISABLE, base + TIMER_CR);
++	moxart_disable(evt);
+ 
+ 	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
+ 	writel(u, base + TIMER1_BASE + REG_MATCH1);
+ 
+-	writel(TIMER1_ENABLE, base + TIMER_CR);
++	moxart_enable(evt);
+ 
+ 	return 0;
+ }
 -- 
 2.8.1
