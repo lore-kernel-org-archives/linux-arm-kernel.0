@@ -1,47 +1,83 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Mon, 9 May 2016 08:32:35 +0100
-Subject: NFSroot hangs with bad unlock balance in Linux next
-In-Reply-To: <20160508141629.GF2694@ZenIV.linux.org.uk>
-References: <20160505220344.GE5995@atomide.com>
- <20160508141629.GF2694@ZenIV.linux.org.uk>
-Message-ID: <20160509073235.GI2694@ZenIV.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 9 May 2016 08:35:49 +0100
+Subject: [PATCH v6 0/9] mfd: max8997: Add regmap support
+In-Reply-To: <1462519289-2356-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462519289-2356-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160509073549.GC8324@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 08, 2016 at 03:16:29PM +0100, Al Viro wrote:
-
-> Very strange.  We grab that rwsem at the entry into nfs_call_unlink()
-> and then either release it there and return or call nfs_do_call_unlink().
-> Which arranges for eventual call of nfs_async_unlink_release() (via
-> ->rpc_release); nfs_async_unlink_release() releases the rwsem.  Nobody else
-> releases it (on the read side, that is).
+On Fri, 06 May 2016, Krzysztof Kozlowski wrote:
+> This is a rebase and extension of old Robert Baldyga's work. [0]
 > 
-> The only kinda-sorta possibility I see here is that the inode we are
-> unlocking in that nfs_async_unlink_release() is not the one we'd locked
-> in nfs_call_unlink() that has lead to it.  That really shouldn't happen,
-> though...  Just to verify whether that's what we are hitting, could you
-> try to reproduce that thing with the patch below on top of -next and see
-> if it triggers any of those WARN_ON?
+> Robert no longer works in Samsung.
+> 
+> From the original cover letter:
+> "This patchset modifies max8997 driver and associated function drivers to use
+> register maps instead of operating directly on i2c bus. This change allowed
+> to simplify irq handling, and to move some initializations to individual
+> function drivers. Hence now when some functions are not enabled, their i2c
+> clients, regmaps and irqs are not registered."
+> 
+> 
+> My changes (since Robert's v5)
+> ==============================
+> 1. Rebase on v4.6-rc6.
+> 2. Collect more acks.
+> 3. Add few fixes:
+>    a. Haptic fix from Marek,
+>    b. Extcon and RTC fix from me,
+>    c. DTS fixes from Marek.
+> 
+> DTS changes are independent but rest of them (extcon/input/MFD) rely
+> on each other.
+> 
+> One way of merging would be to pick everything (except DTS) through
+> one tree. Or use tags.
 
-D'oh...  Lockdep warnings are easy to trigger (and, AFAICS, bogus).
-up_read/down_read in fs/nfs/unlink.c should be replaced with
-up_read_non_owner/down_read_non_owner, lest the lockdep gets confused.
-Hangs are different - I've no idea what's triggering those.  I've seen
-something similar on that -next, but not on work.lookups.
+I'd be happy to take the set, once you have collected all Acks.
 
-The joy of bisecting -next...  <a couple of hours later>
-9317bb69824ec8d078b0b786b6971aedb0af3d4f is the first bad commit
-commit 9317bb69824ec8d078b0b786b6971aedb0af3d4f
-Author: Eric Dumazet <edumazet@google.com>
-Date:   Mon Apr 25 10:39:32 2016 -0700
+> Best regards,
+> Krzysztof
+> 
+> [0] http://lkml.iu.edu/hypermail//linux/kernel/1411.1/03152.html
+> 
+> 
+> Krzysztof Kozlowski (3):
+>   extcon: max8997: Fix handling error code of regmap_irq_get_virq()
+>   rtc: max8997: Check for ERRNO of regmap_irq_get_virq()
+>   extcon: max8997: Fix inconsistent indenting
+> 
+> Marek Szyprowski (3):
+>   input: max8997-haptic: Fix NULL pointer dereference
+>   ARM: dts: exynos: Fix regulator name to avoid forbidden character on
+>     exynos4210-trats
+>   ARM: dts: exynos: Add interrupt line to MAX8997 PMIC on
+>     exynos4210-trats
+> 
+> Robert Baldyga (3):
+>   mfd: max8997: Use regmap to access registers
+>   mfd: max8997: handle IRQs using regmap
+>   mfd: max8997: Change irq names to upper case
+> 
+>  arch/arm/boot/dts/exynos4210-trats.dts |   4 +-
+>  drivers/extcon/extcon-max8997.c        |  72 ++++---
+>  drivers/input/misc/max8997_haptic.c    |  40 ++--
+>  drivers/leds/leds-max8997.c            |  13 +-
+>  drivers/mfd/Kconfig                    |   3 +-
+>  drivers/mfd/Makefile                   |   2 +-
+>  drivers/mfd/max8997-irq.c              | 383 ---------------------------------
+>  drivers/mfd/max8997.c                  | 245 ++++++++++++++-------
+>  drivers/power/max8997_charger.c        |  33 +--
+>  drivers/regulator/max8997.c            |  87 ++++----
+>  drivers/rtc/rtc-max8997.c              |  60 +++---
+>  include/linux/mfd/max8997-private.h    |  82 +++++--
+>  12 files changed, 392 insertions(+), 632 deletions(-)
+>  delete mode 100644 drivers/mfd/max8997-irq.c
+> 
 
-    net: SOCKWQ_ASYNC_NOSPACE optimizations
-
-Reverting changes to sk_set_bit/sk_clear_bit gets rid of the hangs.  Plain
-revert gives a conflict, since there had been additional change in
-"net: SOCKWQ_ASYNC_WAITDATA optimizations"; removing both fixed the hangs.
-
-Note that hangs appear without any fs/nfs/unlink.c modifications being
-there.  When the hang happens it affects NFS traffic; ssh session still
-works fine until it steps on a filesystem operation on NFS (i.e. you
-can use builtins, access procfs, etc.)
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
