@@ -1,161 +1,88 @@
-From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Mon,  9 May 2016 18:44:05 +0200
-Subject: [PATCHv6 6/8] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1462812247-3414-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  9 May 2016 17:49:45 +0100
+Subject: [PATCH 1/6] arm64: alternatives: drop enable parameter from _else and
+ _endif macro
+In-Reply-To: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
+References: <1462812590-4494-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1462812590-4494-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable slave transfers to a device behind a IPMMU by mapping the slave
-addresses using the dma-mapping API.
+Commit 77ee306c0aea9 ("arm64: alternatives: add enable parameter to
+conditional asm macros") extended the alternative assembly macros.
+Unfortunately this does not really work as one would expect, as the
+enable parameter in fact correctly protects the alternative section
+magic, but not the actual code sequences.
+So if enable is false, we will have the original instruction(s) _and_
+the alternative ones in the file, which is just wrong.
+To make this work one would need to additionally protect the
+alternative sequence with extra .if directives, which makes
+the intention of the enable parameter rather pointless.
+Instead users should directly guard the whole "_else; insn; _endif"
+sequence with .if directives.
+Add a comment describing this usage and drop the enable parameter from
+the alternative_else and alternative_endif macros.
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+This reverts parts of commit 77ee306c0aea ("arm64: alternatives: add
+enable parameter to conditional asm macros").
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/dma/sh/rcar-dmac.c | 82 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 74 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/alternative.h | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-index b0c3bb2..8592598 100644
---- a/drivers/dma/sh/rcar-dmac.c
-+++ b/drivers/dma/sh/rcar-dmac.c
-@@ -128,6 +128,18 @@ struct rcar_dmac_chan_slave {
- };
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index beccbde..502c9ef 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -94,6 +94,8 @@ void apply_alternatives(void *start, size_t length);
+  *
+  * The code that follows this macro will be assembled and linked as
+  * normal. There are no restrictions on this code.
++ * If you use the enable parameter, see the comments below for _else
++ * and _endif.
+  */
+ .macro alternative_if_not cap, enable = 1
+ 	.if \enable
+@@ -117,23 +119,33 @@ void apply_alternatives(void *start, size_t length);
+  * 2. Not contain a branch target that is used outside of the
+  *    alternative sequence it is defined in (branches into an
+  *    alternative sequence are not fixed up).
++ *
++ * If you used the optional enable parameter in the opening
++ * alternative_if_not macro above, please protect the whole _else
++ * branch with an .if directive:
++ *	alternative_if_not CAP_SOMETHING, condition
++ *		orig_insn
++ *	.if condition
++ *	alternative_else
++ *		repl_insn
++ *	alternative_endif
++ *	.endif
+  */
+-.macro alternative_else, enable = 1
+-	.if \enable
++.macro alternative_else
+ 662:	.pushsection .altinstr_replacement, "ax"
+ 663:
+-	.endif
+ .endm
  
  /*
-+ * struct rcar_dmac_chan_map - Map of slave device phys to dma address
-+ * @addr: slave dma address
-+ * @dir: direction of mapping
-+ * @slave: slave configuration that is mapped
-+ */
-+struct rcar_dmac_chan_map {
-+	dma_addr_t addr;
-+	enum dma_data_direction dir;
-+	struct rcar_dmac_chan_slave slave;
-+};
-+
-+/*
-  * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
-  * @chan: base DMA channel object
-  * @iomem: channel I/O memory base
-@@ -152,6 +164,7 @@ struct rcar_dmac_chan {
+  * Complete an alternative code sequence.
++ *
++ * Please mind the comment at alternative_else above if you used the
++ * optional enable parameter with the opening alternative_if_not macro.
+  */
+-.macro alternative_endif, enable = 1
+-	.if \enable
++.macro alternative_endif
+ 664:	.popsection
+ 	.org	. - (664b-663b) + (662b-661b)
+ 	.org	. - (662b-661b) + (664b-663b)
+-	.endif
+ .endm
  
- 	struct rcar_dmac_chan_slave src;
- 	struct rcar_dmac_chan_slave dst;
-+	struct rcar_dmac_chan_map map;
- 	int mid_rid;
- 
- 	spinlock_t lock;
-@@ -1027,13 +1040,65 @@ rcar_dmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dma_dest,
- 				      DMA_MEM_TO_MEM, flags, false);
- }
- 
-+static int rcar_dmac_map_slave_addr(struct dma_chan *chan,
-+				    enum dma_transfer_direction dir)
-+{
-+	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+	struct rcar_dmac_chan_map *map = &rchan->map;
-+	phys_addr_t dev_addr;
-+	size_t dev_size;
-+	enum dma_data_direction dev_dir;
-+
-+	if (dir == DMA_DEV_TO_MEM) {
-+		dev_addr = rchan->src.slave_addr;
-+		dev_size = rchan->src.xfer_size;
-+		dev_dir = DMA_TO_DEVICE;
-+	} else {
-+		dev_addr = rchan->dst.slave_addr;
-+		dev_size = rchan->dst.xfer_size;
-+		dev_dir = DMA_FROM_DEVICE;
-+	}
-+
-+	/* Reuse current map if possible. */
-+	if (dev_addr == map->slave.slave_addr &&
-+	    dev_size == map->slave.xfer_size &&
-+	    dev_dir == map->dir)
-+		return 0;
-+
-+	/* Remove old mapping if present. */
-+	if (map->slave.xfer_size)
-+		dma_unmap_resource(chan->device->dev, map->addr,
-+				   map->slave.xfer_size, map->dir, NULL);
-+	map->slave.xfer_size = 0;
-+
-+	/* Create new slave address map. */
-+	map->addr = dma_map_resource(chan->device->dev, dev_addr, dev_size,
-+				     dev_dir, NULL);
-+
-+	if (dma_mapping_error(chan->device->dev, map->addr)) {
-+		dev_err(chan->device->dev,
-+			"chan%u: failed to map %zx@%pap", rchan->index,
-+			dev_size, &dev_addr);
-+		return -EIO;
-+	}
-+
-+	dev_dbg(chan->device->dev, "chan%u: map %zx@%pap to %pad dir: %s\n",
-+		rchan->index, dev_size, &dev_addr, &map->addr,
-+		dev_dir == DMA_TO_DEVICE ? "DMA_TO_DEVICE" : "DMA_FROM_DEVICE");
-+
-+	map->slave.slave_addr = dev_addr;
-+	map->slave.xfer_size = dev_size;
-+	map->dir = dev_dir;
-+
-+	return 0;
-+}
-+
- static struct dma_async_tx_descriptor *
- rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			unsigned int sg_len, enum dma_transfer_direction dir,
- 			unsigned long flags, void *context)
- {
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
--	dma_addr_t dev_addr;
- 
- 	/* Someone calling slave DMA on a generic channel? */
- 	if (rchan->mid_rid < 0 || !sg_len) {
-@@ -1043,9 +1108,10 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		return NULL;
- 	}
- 
--	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
--	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
-+	if (rcar_dmac_map_slave_addr(chan, dir))
-+		return NULL;
-+
-+	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
- 				      dir, flags, false);
- }
- 
-@@ -1059,7 +1125,6 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
- 	struct dma_async_tx_descriptor *desc;
- 	struct scatterlist *sgl;
--	dma_addr_t dev_addr;
- 	unsigned int sg_len;
- 	unsigned int i;
- 
-@@ -1071,6 +1136,9 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		return NULL;
- 	}
- 
-+	if (rcar_dmac_map_slave_addr(chan, dir))
-+		return NULL;
-+
- 	sg_len = buf_len / period_len;
- 	if (sg_len > RCAR_DMAC_MAX_SG_LEN) {
- 		dev_err(chan->device->dev,
-@@ -1098,9 +1166,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		sg_dma_len(&sgl[i]) = period_len;
- 	}
- 
--	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
--	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
-+	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
- 				      dir, flags, true);
- 
- 	kfree(sgl);
+ #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
 -- 
-2.8.2
+2.7.3
