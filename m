@@ -1,51 +1,35 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 9 May 2016 15:11:46 -0700
-Subject: [PATCH 01/16] clk: fix critical clock locking
-In-Reply-To: <1462737711-10017-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160509221146.GS3492@codeaurora.org>
+Date: Mon, 9 May 2016 15:13:21 -0700
+Subject: [PATCH v7 7/9] clk: mediatek: Enable critical clocks for MT2701
+In-Reply-To: <1462772426.5344.7.camel@mtksdaap41>
+References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1460621514-65191-8-git-send-email-jamesjj.liao@mediatek.com>
+ <20160506231229.GJ3492@codeaurora.org>
+ <1462772426.5344.7.camel@mtksdaap41>
+Message-ID: <20160509221321.GT3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08, Maxime Ripard wrote:
-> The critical clock handling in __clk_core_init isn't taking the enable lock
-> before calling clk_core_enable, which in turns triggers the warning in the
-> lockdep_assert_held call in that function when lockep is enabled.
+On 05/09, James Liao wrote:
+> Hi Stephen,
 > 
-> Add the calls to clk_enable_lock/unlock to make sure it doesn't happen.
+> On Fri, 2016-05-06 at 16:12 -0700, Stephen Boyd wrote:
+> > On 04/14, James Liao wrote:
+> > > Some system clocks should be turned on by default on MT2701.
+> > > This patch enable these clocks when related clocks have
+> > > been registered.
+> > > 
+> > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > ---
+> > 
+> > critical clks got merged now (sorry I'm slowly getting back to
+> > looking at patches). Please use that flag.
 > 
-> Fixes: 32b9b1096186 ("clk: Allow clocks to be marked as CRITICAL")
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-
-Why is this patch hiding in this series?
-
->  drivers/clk/clk.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+> I don't see critical clock support in v4.6-rc7. Is there a repo/branch
+> that has critical clocks merged?
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index ce39add5a258..16a38df3c688 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2404,8 +2404,15 @@ static int __clk_core_init(struct clk_core *core)
->  		core->ops->init(core->hw);
->  
->  	if (core->flags & CLK_IS_CRITICAL) {
-> +		unsigned long flags;
-> +
-> +		clk_prepare_lock();
->  		clk_core_prepare(core);
-> +		clk_prepare_unlock();
 
-It looks like we already hold the prepare lock at this point.
-
-> +
-> +		flags = clk_enable_lock();
->  		clk_core_enable(core);
-> +		clk_enable_unlock(flags);
-
-This seems correct though.
+Right, it's in clk-next in the clk tree.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
