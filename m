@@ -1,32 +1,38 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 9 May 2016 12:44:50 -0400
-Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI
- with CPU thermal nodes
-In-Reply-To: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
-References: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <d7e37f87-c794-f0ad-73d1-8e976c37471b@osg.samsung.com>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Mon,  9 May 2016 18:44:00 +0200
+Subject: [PATCHv6 1/8] dma-mapping: add {map,unmap}_resource to dma_map_ops
+In-Reply-To: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1462812247-3414-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Add methods to handle mapping of device resources from a physical
+address. This is needed for example to be able to map MMIO FIFO
+registers to a IOMMU.
 
-On 05/09/2016 02:19 AM, Krzysztof Kozlowski wrote:
-> Include the CPU thermal nodes directly in Odroid XU3-family common DTS
-> because it is the only user of it. Keeping it in separate DTSI node does
-> not bring benefits because:
-> 1. It is not re-usable on other non-fan boards (fan is referenced),
-> 2. It won't be re-used on future Odroid XU board because different
->    CPU cluster behavior.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ include/linux/dma-mapping.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Agreed with both points and the patch looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 0e4d3a6..8617fa1 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -49,6 +49,12 @@ struct dma_map_ops {
+ 			 struct scatterlist *sg, int nents,
+ 			 enum dma_data_direction dir,
+ 			 struct dma_attrs *attrs);
++	dma_addr_t (*map_resource)(struct device *dev, phys_addr_t phys_addr,
++			       size_t size, enum dma_data_direction dir,
++			       struct dma_attrs *attrs);
++	void (*unmap_resource)(struct device *dev, dma_addr_t dma_handle,
++			   size_t size, enum dma_data_direction dir,
++			   struct dma_attrs *attrs);
+ 	void (*sync_single_for_cpu)(struct device *dev,
+ 				    dma_addr_t dma_handle, size_t size,
+ 				    enum dma_data_direction dir);
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.8.2
