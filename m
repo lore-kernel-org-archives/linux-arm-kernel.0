@@ -1,372 +1,328 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun,  8 May 2016 21:14:41 -0500
-Subject: [PATCH V2 1/2] irqchip/gicv3-its: split its_alloc_tables() into two
- functions
-Message-ID: <1462760082-21943-1-git-send-email-shankerd@codeaurora.org>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 9 May 2016 11:00:33 +0800
+Subject: [PATCH] mmc: mmc: do not use CMD13 to get status after speed mode
+ switch
+In-Reply-To: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <5fa01153-6724-5426-1f71-b7caf31bf796@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function is getting out of control, it has too many goto
-statements and would be too complicated for adding a feature
-two-level device table. So, it is time for us to cleanup and
-move some of the logic to a separate function without affecting
-the existing functionality.
++ linux-rockchip
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
 
-This patch is based on Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7
+I just hacked my local branch to fix the issues found on rockchip
+platform. The reaseon is that mmc core fail to get status
+after switching from hs200 to hs. So I disabled sending status for it
+just like what Chaotian does here. But I didn't deeply dig out the root
+cause but I agree with Chaotian's opinion.
 
- drivers/irqchip/irq-gic-v3-its.c   | 256 ++++++++++++++++++++-----------------
- include/linux/irqchip/arm-gic-v3.h |   3 +
- 2 files changed, 144 insertions(+), 115 deletions(-)
+FYI:
+My emmc deivce is KLMA62WEPD-B031.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 6bd881b..b23e00c 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -55,13 +55,15 @@ struct its_collection {
- };
- 
- /*
-- * The ITS_BASER structure - contains memory information and cached
-- * value of BASER register configuration.
-+ * The ITS_BASER structure - contains memory information, cached value
-+ * of BASER register configuration, ioremaped address and page size.
-  */
- struct its_baser {
-+	void __iomem	*hwreg;
- 	void		*base;
- 	u64		val;
- 	u32		order;
-+	u32		psz;
- };
- 
- /*
-@@ -823,27 +825,135 @@ static void its_free_tables(struct its_node *its)
- 	}
- }
- 
-+static int its_baser_setup(struct its_node *its, struct its_baser *baser,
-+				  u32 order, u64 indirect)
-+{
-+	u64 val = readq_relaxed(baser->hwreg);
-+	u64 type = GITS_BASER_TYPE(val);
-+	u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
-+	int psz, alloc_pages;
-+	u64 cache, shr, tmp;
-+	void *base;
-+
-+	/* Do first attempt with the requested attributes */
-+	cache = baser->val & GITS_BASER_CACHEABILITY_MASK;
-+	shr = baser->val & GITS_BASER_SHAREABILITY_MASK;
-+	psz = baser->psz;
-+
-+retry_alloc_baser:
-+	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
-+	if (alloc_pages > GITS_BASER_PAGES_MAX) {
-+		pr_warn("ITS@%lx: %s too large, reduce ITS pages %u->%u\n",
-+			its->phys_base, its_base_type_string[type],
-+			alloc_pages, GITS_BASER_PAGES_MAX);
-+		alloc_pages = GITS_BASER_PAGES_MAX;
-+		order = get_order(GITS_BASER_PAGES_MAX * psz);
-+	}
-+
-+	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
-+	if (!base)
-+		return -ENOMEM;
-+
-+retry_baser:
-+	val = (virt_to_phys(base)				 |
-+		(type << GITS_BASER_TYPE_SHIFT)			 |
-+		((entry_size - 1) << GITS_BASER_ENTRY_SIZE_SHIFT) |
-+		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
-+		cache						 |
-+		shr						 |
-+		indirect					 |
-+		GITS_BASER_VALID);
-+
-+	switch (psz) {
-+	case SZ_4K:
-+		val |= GITS_BASER_PAGE_SIZE_4K;
-+		break;
-+	case SZ_16K:
-+		val |= GITS_BASER_PAGE_SIZE_16K;
-+		break;
-+	case SZ_64K:
-+		val |= GITS_BASER_PAGE_SIZE_64K;
-+		break;
-+	}
-+
-+	writeq_relaxed(val, baser->hwreg);
-+	tmp = readq_relaxed(baser->hwreg);
-+
-+	if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
-+		/*
-+		 * Shareability didn't stick. Just use
-+		 * whatever the read reported, which is likely
-+		 * to be the only thing this redistributor
-+		 * supports. If that's zero, make it
-+		 * non-cacheable as well.
-+		 */
-+		shr = tmp & GITS_BASER_SHAREABILITY_MASK;
-+		if (!shr) {
-+			cache = GITS_BASER_nC;
-+			__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
-+		}
-+		goto retry_baser;
-+	}
-+
-+	if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
-+		/*
-+		 * Page size didn't stick. Let's try a smaller
-+		 * size and retry. If we reach 4K, then
-+		 * something is horribly wrong...
-+		 */
-+		free_pages((unsigned long)base, order);
-+		baser->base = NULL;
-+
-+		switch (psz) {
-+		case SZ_16K:
-+			psz = SZ_4K;
-+			goto retry_alloc_baser;
-+		case SZ_64K:
-+			psz = SZ_16K;
-+			goto retry_alloc_baser;
-+		}
-+	}
-+
-+	if (val != tmp) {
-+		pr_err("ITS@%lx: %s doesn't stick: %lx %lx\n",
-+		       its->phys_base, its_base_type_string[type],
-+		       (unsigned long) val, (unsigned long) tmp);
-+		free_pages((unsigned long)base, order);
-+		return -ENXIO;
-+	}
-+
-+	baser->base = base;
-+	baser->order = order;
-+	baser->psz = psz;
-+	baser->val = val;
-+	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : entry_size;
-+
-+	pr_info("ITS@%lx: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
-+		its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / tmp),
-+		its_base_type_string[type],
-+		(unsigned long)virt_to_phys(base),
-+		indirect ? "indirect" : "flat", (int)entry_size,
-+		psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
-+
-+	return 0;
-+}
-+
- static int its_alloc_tables(const char *node_name, struct its_node *its)
- {
--	int err;
--	int i;
--	int psz = SZ_64K;
-+	u64 typer = readq_relaxed(its->base + GITS_TYPER);
-+	u32 ids = GITS_TYPER_DEVBITS(typer);
- 	u64 shr = GITS_BASER_InnerShareable;
--	u64 cache;
--	u64 typer;
--	u32 ids;
-+	u64 cache = GITS_BASER_WaWb;
-+	int psz = SZ_64K;
-+	int err, i;
- 
- 	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375) {
- 		/*
- 		 * erratum 22375: only alloc 8MB table size
- 		 * erratum 24313: ignore memory access type
- 		 */
--		cache	= 0;
-+		cache	= GITS_BASER_nCnB;
- 		ids	= 0x14;			/* 20 bits, 8MB */
--	} else {
--		cache	= GITS_BASER_WaWb;
--		typer	= readq_relaxed(its->base + GITS_TYPER);
--		ids	= GITS_TYPER_DEVBITS(typer);
- 	}
- 
- 	its->device_ids = ids;
-@@ -853,13 +963,16 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 		u64 type = GITS_BASER_TYPE(val);
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
- 		int order = get_order(psz);
--		int alloc_pages;
--		u64 tmp;
--		void *base;
-+		struct its_baser *baser = its->tables + i;
- 
- 		if (type == GITS_BASER_TYPE_NONE)
- 			continue;
- 
-+		/* Set preferred settings for this BASERn */
-+		baser->hwreg = its->base + GITS_BASER + i * 8;
-+		baser->val = cache | shr;
-+		baser->psz = psz;
-+
- 		/*
- 		 * Allocate as many entries as required to fit the
- 		 * range of device IDs that the ITS can grok... The ID
-@@ -875,115 +988,28 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 			 * smaller than that.  If the requested allocation
- 			 * is smaller, round up to the default page granule.
- 			 */
--			order = max(get_order((1UL << ids) * entry_size),
--				    order);
-+			order = max(get_order(entry_size << ids), order);
- 			if (order >= MAX_ORDER) {
- 				order = MAX_ORDER - 1;
--				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
--					node_name, order);
--			}
--		}
--
--retry_alloc_baser:
--		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
--		if (alloc_pages > GITS_BASER_PAGES_MAX) {
--			alloc_pages = GITS_BASER_PAGES_MAX;
--			order = get_order(GITS_BASER_PAGES_MAX * psz);
--			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
--				node_name, order, alloc_pages);
--		}
--
--		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
--		if (!base) {
--			err = -ENOMEM;
--			goto out_free;
--		}
--
--		its->tables[i].base = base;
--		its->tables[i].order = order;
--
--retry_baser:
--		val = (virt_to_phys(base) 				 |
--		       (type << GITS_BASER_TYPE_SHIFT)			 |
--		       ((entry_size - 1) << GITS_BASER_ENTRY_SIZE_SHIFT) |
--		       cache						 |
--		       shr						 |
--		       GITS_BASER_VALID);
--
--		switch (psz) {
--		case SZ_4K:
--			val |= GITS_BASER_PAGE_SIZE_4K;
--			break;
--		case SZ_16K:
--			val |= GITS_BASER_PAGE_SIZE_16K;
--			break;
--		case SZ_64K:
--			val |= GITS_BASER_PAGE_SIZE_64K;
--			break;
--		}
--
--		val |= alloc_pages - 1;
--		its->tables[i].val = val;
--
--		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
--		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
--
--		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
--			/*
--			 * Shareability didn't stick. Just use
--			 * whatever the read reported, which is likely
--			 * to be the only thing this redistributor
--			 * supports. If that's zero, make it
--			 * non-cacheable as well.
--			 */
--			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
--			if (!shr) {
--				cache = GITS_BASER_nC;
--				__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
-+				ids = ilog2(PAGE_ORDER_TO_SIZE(order) / entry_size);
-+				pr_warn("ITS@%lx:: Device Table too large, reduce ids %u->%u\n",
-+					its->phys_base, its->device_ids, ids);
- 			}
--			goto retry_baser;
- 		}
- 
--		if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
--			/*
--			 * Page size didn't stick. Let's try a smaller
--			 * size and retry. If we reach 4K, then
--			 * something is horribly wrong...
--			 */
--			free_pages((unsigned long)base, order);
--			its->tables[i].base = NULL;
--
--			switch (psz) {
--			case SZ_16K:
--				psz = SZ_4K;
--				goto retry_alloc_baser;
--			case SZ_64K:
--				psz = SZ_16K;
--				goto retry_alloc_baser;
--			}
--		}
--
--		if (val != tmp) {
--			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
--			       node_name, i,
--			       (unsigned long) val, (unsigned long) tmp);
--			err = -ENXIO;
--			goto out_free;
-+		err = its_baser_setup(its, baser, order, 0);
-+		if (err < 0) {
-+			its_free_tables(its);
-+			return err;
- 		}
- 
--		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
--			(int)(PAGE_ORDER_TO_SIZE(order) / entry_size),
--			its_base_type_string[type],
--			(unsigned long)virt_to_phys(base),
--			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
-+		/* Update settings which will be used for next BASERn */
-+		psz = baser->psz;
-+		cache = baser->val & GITS_BASER_CACHEABILITY_MASK;
-+		shr = baser->val & GITS_BASER_SHAREABILITY_MASK;
- 	}
- 
- 	return 0;
--
--out_free:
--	its_free_tables(its);
--
--	return err;
- }
- 
- static int its_alloc_collections(struct its_node *its)
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 9e6fdd3..7f917b9 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -204,6 +204,7 @@
- #define GITS_BASER_NR_REGS		8
- 
- #define GITS_BASER_VALID		(1UL << 63)
-+#define GITS_BASER_INDIRECT		(1UL << 62)
- #define GITS_BASER_nCnB			(0UL << 59)
- #define GITS_BASER_nC			(1UL << 59)
- #define GITS_BASER_RaWt			(2UL << 59)
-@@ -228,6 +229,7 @@
- #define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
- #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
- #define GITS_BASER_PAGES_MAX		256
-+#define GITS_BASER_PAGES_SHIFT		(0)
- 
- #define GITS_BASER_TYPE_NONE		0
- #define GITS_BASER_TYPE_DEVICE		1
-@@ -238,6 +240,7 @@
- #define GITS_BASER_TYPE_RESERVED6	6
- #define GITS_BASER_TYPE_RESERVED7	7
- 
-+#define GITS_LVL1_ENTRY_SIZE		(8UL)
- /*
-  * ITS commands
-  */
+[    1.526008] sdhci: Secure Digital Host Controller Interface driver
+[    1.526558] sdhci: Copyright(c) Pierre Ossman
+[    1.527899] sdhci-pltfm: SDHCI platform and OF driver helper
+[    1.529967] sdhci-arasan fe330000.sdhci: No vmmc regulator found
+[    1.530501] sdhci-arasan fe330000.sdhci: No vqmmc regulator found
+[    1.568710] mmc0: SDHCI controller on fe330000.sdhci [fe330000.sdhci] 
+using ADMA
+[    1.627552] mmc0: switch to high-speed from hs200 failed, err:-84
+[    1.628108] mmc0: error -84 whilst initialising MMC card
+
+
+? 2016/5/4 14:54, Chaotian Jing ??:
+> Per JEDEC spec, it is not recommended to use CMD13 to get card status
+> after speed mode switch. below are two reason about this:
+> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
+> Therefore it is not recommended to use CMD13 to check busy completion
+> of the timing change indication.
+> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
+> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+>
+> this patch drops CMD13 when doing speed mode switch, if host do not
+> support MMC_CAP_WAIT_WHILE_BUSY and there is no ops->card_busy(),
+> then the only way is to wait a fixed timeout.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/core/mmc.c     |   82 ++++++++++++++++----------------------------
+>  drivers/mmc/core/mmc_ops.c |   25 +++++++++-----
+>  2 files changed, 45 insertions(+), 62 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 4dbe3df..03ee7a4 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -962,7 +962,7 @@ static int mmc_select_hs(struct mmc_card *card)
+>  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>  			   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS,
+>  			   card->ext_csd.generic_cmd6_time,
+> -			   true, true, true);
+> +			   true, false, true);
+>  	if (!err)
+>  		mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
+>
+> @@ -1056,7 +1056,6 @@ static int mmc_switch_status(struct mmc_card *card)
+>  static int mmc_select_hs400(struct mmc_card *card)
+>  {
+>  	struct mmc_host *host = card->host;
+> -	bool send_status = true;
+>  	unsigned int max_dtr;
+>  	int err = 0;
+>  	u8 val;
+> @@ -1068,9 +1067,6 @@ static int mmc_select_hs400(struct mmc_card *card)
+>  	      host->ios.bus_width == MMC_BUS_WIDTH_8))
+>  		return 0;
+>
+> -	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+> -		send_status = false;
+> -
+>  	/* Reduce frequency to HS frequency */
+>  	max_dtr = card->ext_csd.hs_max_dtr;
+>  	mmc_set_clock(host, max_dtr);
+> @@ -1080,7 +1076,7 @@ static int mmc_select_hs400(struct mmc_card *card)
+>  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>  			   EXT_CSD_HS_TIMING, val,
+>  			   card->ext_csd.generic_cmd6_time,
+> -			   true, send_status, true);
+> +			   true, false, true);
+>  	if (err) {
+>  		pr_err("%s: switch to high-speed from hs200 failed, err:%d\n",
+>  			mmc_hostname(host), err);
+> @@ -1090,11 +1086,9 @@ static int mmc_select_hs400(struct mmc_card *card)
+>  	/* Set host controller to HS timing */
+>  	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
+>
+> -	if (!send_status) {
+> -		err = mmc_switch_status(card);
+> -		if (err)
+> -			goto out_err;
+> -	}
+> +	err = mmc_switch_status(card);
+> +	if (err)
+> +		goto out_err;
+>
+>  	/* Switch card to DDR */
+>  	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+> @@ -1113,7 +1107,7 @@ static int mmc_select_hs400(struct mmc_card *card)
+>  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>  			   EXT_CSD_HS_TIMING, val,
+>  			   card->ext_csd.generic_cmd6_time,
+> -			   true, send_status, true);
+> +			   true, false, true);
+>  	if (err) {
+>  		pr_err("%s: switch to hs400 failed, err:%d\n",
+>  			 mmc_hostname(host), err);
+> @@ -1124,11 +1118,9 @@ static int mmc_select_hs400(struct mmc_card *card)
+>  	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
+>  	mmc_set_bus_speed(card);
+>
+> -	if (!send_status) {
+> -		err = mmc_switch_status(card);
+> -		if (err)
+> -			goto out_err;
+> -	}
+> +	err = mmc_switch_status(card);
+> +	if (err)
+> +		goto out_err;
+>
+>  	return 0;
+>
+> @@ -1146,14 +1138,10 @@ int mmc_hs200_to_hs400(struct mmc_card *card)
+>  int mmc_hs400_to_hs200(struct mmc_card *card)
+>  {
+>  	struct mmc_host *host = card->host;
+> -	bool send_status = true;
+>  	unsigned int max_dtr;
+>  	int err;
+>  	u8 val;
+>
+> -	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+> -		send_status = false;
+> -
+>  	/* Reduce frequency to HS */
+>  	max_dtr = card->ext_csd.hs_max_dtr;
+>  	mmc_set_clock(host, max_dtr);
+> @@ -1162,49 +1150,43 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+>  	val = EXT_CSD_TIMING_HS;
+>  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
+>  			   val, card->ext_csd.generic_cmd6_time,
+> -			   true, send_status, true);
+> +			   true, false, true);
+>  	if (err)
+>  		goto out_err;
+>
+>  	mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
+>
+> -	if (!send_status) {
+> -		err = mmc_switch_status(card);
+> -		if (err)
+> -			goto out_err;
+> -	}
+> +	err = mmc_switch_status(card);
+> +	if (err)
+> +		goto out_err;
+>
+>  	/* Switch HS DDR to HS */
+>  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
+>  			   EXT_CSD_BUS_WIDTH_8, card->ext_csd.generic_cmd6_time,
+> -			   true, send_status, true);
+> +			   true, false, true);
+>  	if (err)
+>  		goto out_err;
+>
+>  	mmc_set_timing(host, MMC_TIMING_MMC_HS);
+>
+> -	if (!send_status) {
+> -		err = mmc_switch_status(card);
+> -		if (err)
+> -			goto out_err;
+> -	}
+> +	err = mmc_switch_status(card);
+> +	if (err)
+> +		goto out_err;
+>
+>  	/* Switch HS to HS200 */
+>  	val = EXT_CSD_TIMING_HS200 |
+>  	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
+>  	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
+>  			   val, card->ext_csd.generic_cmd6_time, true,
+> -			   send_status, true);
+> +			   false, true);
+>  	if (err)
+>  		goto out_err;
+>
+>  	mmc_set_timing(host, MMC_TIMING_MMC_HS200);
+>
+> -	if (!send_status) {
+> -		err = mmc_switch_status(card);
+> -		if (err)
+> -			goto out_err;
+> -	}
+> +	err = mmc_switch_status(card);
+> +	if (err)
+> +		goto out_err;
+>
+>  	mmc_set_bus_speed(card);
+>
+> @@ -1243,7 +1225,6 @@ static void mmc_select_driver_type(struct mmc_card *card)
+>  static int mmc_select_hs200(struct mmc_card *card)
+>  {
+>  	struct mmc_host *host = card->host;
+> -	bool send_status = true;
+>  	unsigned int old_timing;
+>  	int err = -EINVAL;
+>  	u8 val;
+> @@ -1260,9 +1241,6 @@ static int mmc_select_hs200(struct mmc_card *card)
+>
+>  	mmc_select_driver_type(card);
+>
+> -	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+> -		send_status = false;
+> -
+>  	/*
+>  	 * Set the bus width(4 or 8) with host's support and
+>  	 * switch to HS200 mode if bus width is set successfully.
+> @@ -1274,20 +1252,18 @@ static int mmc_select_hs200(struct mmc_card *card)
+>  		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>  				   EXT_CSD_HS_TIMING, val,
+>  				   card->ext_csd.generic_cmd6_time,
+> -				   true, send_status, true);
+> +				   true, false, true);
+>  		if (err)
+>  			goto err;
+>  		old_timing = host->ios.timing;
+>  		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
+> -		if (!send_status) {
+> -			err = mmc_switch_status(card);
+> -			/*
+> -			 * mmc_select_timing() assumes timing has not changed if
+> -			 * it is a switch error.
+> -			 */
+> -			if (err == -EBADMSG)
+> -				mmc_set_timing(host, old_timing);
+> -		}
+> +		err = mmc_switch_status(card);
+> +		/*
+> +		 * mmc_select_timing() assumes timing has not changed if
+> +		 * it is a switch error.
+> +		 */
+> +		if (err == -EBADMSG)
+> +			mmc_set_timing(host, old_timing);
+>  	}
+>  err:
+>  	if (err)
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 62355bd..32de144 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -480,6 +480,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  	u32 status = 0;
+>  	bool use_r1b_resp = use_busy_signal;
+>  	bool expired = false;
+> +	bool busy = false;
+>
+>  	mmc_retune_hold(host);
+>
+> @@ -535,19 +536,24 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  	/* Must check status to be sure of no errors. */
+>  	timeout = jiffies + msecs_to_jiffies(timeout_ms);
+>  	do {
+> +		/*
+> +		 * Due to the possibility of being preempted after
+> +		 * sending the status command, check the expiration
+> +		 * time first.
+> +		 */
+> +		expired = time_after(jiffies, timeout);
+>  		if (send_status) {
+> -			/*
+> -			 * Due to the possibility of being preempted after
+> -			 * sending the status command, check the expiration
+> -			 * time first.
+> -			 */
+> -			expired = time_after(jiffies, timeout);
+>  			err = __mmc_send_status(card, &status, ignore_crc);
+>  			if (err)
+>  				goto out;
+>  		}
+>  		if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
+>  			break;
+> +		if (host->ops->card_busy) {
+> +			if (!host->ops->card_busy(host))
+> +				break;
+> +			busy = true;
+> +		}
+>  		if (mmc_host_is_spi(host))
+>  			break;
+>
+> @@ -556,19 +562,20 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  		 * does'nt support MMC_CAP_WAIT_WHILE_BUSY, then we can only
+>  		 * rely on waiting for the stated timeout to be sufficient.
+>  		 */
+> -		if (!send_status) {
+> +		if (!send_status && !host->ops->card_busy) {
+>  			mmc_delay(timeout_ms);
+>  			goto out;
+>  		}
+>
+>  		/* Timeout if the device never leaves the program state. */
+> -		if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+> +		if (expired &&
+> +		    (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy)) {
+>  			pr_err("%s: Card stuck in programming state! %s\n",
+>  				mmc_hostname(host), __func__);
+>  			err = -ETIMEDOUT;
+>  			goto out;
+>  		}
+> -	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+> +	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG || busy);
+>
+>  	err = mmc_switch_status_error(host, status);
+>  out:
+>
+
+
 -- 
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
-a Linux Foundation Collaborative Project
+Best Regards
+Shawn Lin
