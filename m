@@ -1,45 +1,88 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 9 May 2016 09:53:11 +0100
-Subject: Reverting ARCH_SUNXI arm64 support(?)
-Message-ID: <57304FF7.3080909@arm.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 09 May 2016 11:04:15 +0200
+Subject: [RFC PATCH 0/7] AC97 device/driver model revamp
+In-Reply-To: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
+References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <s5hlh3j8uwg.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Catalin,
+On Sat, 30 Apr 2016 23:15:32 +0200,
+Robert Jarzmik wrote:
+> 
+> It all started in the pxa device-tree submission here :
+>    https://lkml.org/lkml/2016/2/25/965
+> It will be maintained in :
+>    git fetch https://github.com/rjarzmik/linux.git work/ac97
+> 
+> And now it transformed into this RFC, which would bring a ground for AC'97
+> devices closer to the linux device/driver model.
+> 
+> This is just an RFC to see if we understand each other Mark.
+> 
+> Amongst the driving ideas behind this RFC :
+>  - use device/driver model for AC'97
+>    device/driver binding is based on vendor_id{1,2}
+>  - use auto-probe of the AC'97 bus to enumerate codecs and create devices
+>  - be compatible with previous platform_data model for codecs
+>    => this enables a smooth transition, where a codec (here wm9713) can
+>       be used either through platform_device or automatic discovery
+>  - struct snd_ac97 is not used
+>    This structure is really heavy, and doesn't represent an AC97 device, but
+>    rather an AC'97 codec internals IIUC.
+>    I think it's right place would be in include/sound/ac97/codec.h.
+>    This is also a problem for regmap adherence, hence the
+>    include/sound/ac97/compat.h.
+>  - a new AC'97 bus Kconfig is created
+>    This was done for a smooth transition ... let's see if it's a good idea.
+>  - split the AC'97 into :
+>    - the codec
+>    - the digital controller
+>    - the bus
+> 
+> Amongst the things that are not all touched yet :
+>  - ac97_codec.c
+>    The generic AC'97 codec in sound/pci/ac97/ac97_codec.c has really a lot
+>    features, which are not at all PCI related. They could be transfered to
+>    sound/ac97, without the pci specific field.
+>    => this deserves a deep ahead thinking, which I'll do if the current approach
+>    is accepted by the communauty.
+> 
+> The most important patch is 2/7 "ALSA: ac97: add an ac97 bus". This is the main
+> evaluation point for the serie, the others are here so that I can test it all.
+> 
+> Well, this is a long term effort, which might need a complete rewrite according
+> to the comments it'll get. Let's expose it for comments and see how I can
+> progress with it.
 
-Suzuki reported a build failure with certain (non-defconfig) .configs
-due to the new ARCH_SUNXI support in 4.6-rc [1].
-As unfortunately we couldn't agree on a solution and also the support
-for the A64/Pine64 is partial in 4.6 anyway, can you please revert:
-ce3dd55b99b151a90ac1701c6825f2ae2d49b54e ("arm64: Introduce Allwinner
-SoC config option")
-So with this revert we have the arm64 defconfig now selecting useless
-symbols, it didn't complain, but I was wondering if we should revert the
-defconfig patch as well then? But this looks like pain :-(
+I think it's good in general.  The implementation looks fairly simple
+and thin enough.
 
-If all this reverting is too much due to conflicts, we might think about
-going with Suzuki's original one-liner [1], which would be an easy fix -
-though Olof opposed it back then (in favour of a more involved solution,
-which is no option for 4.6 anymore).
+An open question is whether migrating the former AC97 layer into the
+new bus.  I'm not sure about this.  Transition to a new layer always
+brings subtle bugs, especially when the target devices are in wide
+range of legacy ones...   If any, we should start just wrapping via
+the new bus ops.
 
-Regardless of this the plan for the future would be:
-1) Send a patch to properly express the dependencies for the sunxi IRQ
-controllers - this is independent from the arm64 support. I will do this
-ASAP in hope that it still reaches 4.7.
-2) Investigate whether Maxime's new sunxi clock architecture[2] would be
-a fit for the A64 support.
-3) Use the next weeks to rework the support patches and aim for a 4.8-rc
-merge - depending on the outcome and merge status of 2)
+Some other nitpicks:
+- We usually use snd_ prefix for sound stuff.  Better to keep this for
+  exported symbols at least.
 
-Thoughts?
+- I don't see much value in the usefulness of compat_* stuff.
+  For example, it doesn't cover the actual reset procedure or such
+  done as in the old ac97 code.  So it won't work compatibly.  If it's
+  a few lines of changes, the direct call would be likely simpler in
+  the end.
 
-Cheers,
-Andre.
+- The order of patches needs reconsideration.  The current patchset
+  will break the build, as the hook to sound/ac97/* is done in the
+  last patch, while you're already building against to the new stuff
+  beforehand.
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418175.html
-   with the thread continuing here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/420326.html
 
-[2]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/427839.html
+I'll comment more on each patch if any...
+
+
+thanks,
+
+Takashi
