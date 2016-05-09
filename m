@@ -1,30 +1,33 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 9 May 2016 23:21:19 +0200
-Subject: [PATCH 0/3] HSI: omap-ssi: regressions against yesterday's
- linux-next
-In-Reply-To: <1462288586-584690-1-git-send-email-arnd@arndb.de>
-References: <1462288586-584690-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160509212118.GD1129@earth>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 9 May 2016 17:25:14 -0400
+Subject: [PATCH v2 13/22] ARM: dts: exynos: Move common nodes to
+ exynos5.dtsi
+In-Reply-To: <1462734367-5619-14-git-send-email-krzk@kernel.org>
+References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
+ <1462734367-5619-14-git-send-email-krzk@kernel.org>
+Message-ID: <1cee1acf-fb07-9a7f-5d18-b4824a10f5a2@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Krzysztof,
 
-On Tue, May 03, 2016 at 05:16:19PM +0200, Arnd Bergmann wrote:
-> One patch you added yesterday unfortunately caused (at least) three
-> separate build problems with 32-bit ARM randconfig builds.
+On 05/08/2016 03:05 PM, Krzysztof Kozlowski wrote:
+> Exynos5420 and Exynos5250 share some nodes: the PWM and syscon
+> (sysreg_system_controller). Move them to parent DTSI to avoid
+> duplication.
 > 
-> These three patches should make it all work again.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
 
-Sorry for the delayed respones, I was on vacation last week and
-asked Stephen to temp. disable the HSI tree. I just applied all
-patches and asked him to reenable it.
+I see that the i2c_[0-3] nodes are also the same in both DTSI. Do you
+think that makes sense to also move those to exynos5.dtsi as well?
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160509/b6561e5d/attachment.sig>
+In any case that can be made as a follow-up, so:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
