@@ -1,166 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 May 2016 18:09:48 +0100
-Subject: [PATCH v4 03/12] KVM: arm64: Introduce new MMIO region for the
- ITS base address
-In-Reply-To: <692F5470-73B2-467D-A5D4-58439446AC93@caviumnetworks.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-4-git-send-email-andre.przywara@arm.com>
- <651B7BE4-D1C9-44B2-84BE-19103C1D8CE0@caviumnetworks.com>
- <5730B108.5010009@arm.com>
- <692F5470-73B2-467D-A5D4-58439446AC93@caviumnetworks.com>
-Message-ID: <5730C45C.1070808@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 May 2016 12:14:27 -0500
+Subject: [PATCH v2 5/5] vf610-soc: Add Vybrid SoC device tree binding
+ documentation
+In-Reply-To: <20160505082758.GB18151@Sanchayan-Arch.localdomain>
+References: <cover.1462171989.git.maitysanchayan@gmail.com>
+ <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
+ <20160504023026.GB5382@rob-hp-laptop>
+ <20160505082758.GB18151@Sanchayan-Arch.localdomain>
+Message-ID: <CAL_JsqL1qQu_u=6xosP8UmR3oXLawbVz=Hap0wDm7aN4mjK2GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/16 17:53, Chalamarla, Tirumalesh wrote:
-> 
-> 
-> 
-> 
-> 
-> On 5/9/16, 8:47 AM, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
-> 
->> On 05/05/16 19:08, Chalamarla, Tirumalesh wrote:
->>>
->>>
->>>
->>>
->>>
->>> On 3/25/16, 7:14 PM, "kvmarm-bounces at lists.cs.columbia.edu on behalf of Andre Przywara" <kvmarm-bounces at lists.cs.columbia.edu on behalf of andre.przywara@arm.com> wrote:
->>>
->>>> The ARM GICv3 ITS controller requires a separate register frame to
->>>> cover ITS specific registers. Add a new VGIC address type and store
->>>> the address in a field in the vgic_dist structure.
->>>> Provide a function to check whether userland has provided the address,
->>>> so ITS functionality can be guarded by that check.
->>>>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>> Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
->>>> arch/arm64/include/uapi/asm/kvm.h              |  2 ++
->>>> include/kvm/vgic/vgic.h                        |  5 +++++
->>>> virt/kvm/arm/vgic/vgic.c                       | 10 ++++++++++
->>>> virt/kvm/arm/vgic/vgic_init.c                  |  1 +
->>>> virt/kvm/arm/vgic/vgic_kvm_device.c            |  7 +++++++
->>>> 6 files changed, 34 insertions(+)
->>>>
->>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
->>>> index 59541d4..087e2d9 100644
->>>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
->>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
->>>> @@ -39,6 +39,15 @@ Groups:
->>>>       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->>>>       This address needs to be 64K aligned.
->>>>
->>>> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
->>>> +      Base address in the guest physical address space of the GICv3 ITS
->>>> +      control register frame. The ITS allows MSI(-X) interrupts to be
->>>> +      injected into guests. This extension is optional, if the kernel
->>>> +      does not support the ITS, the call returns -ENODEV.
->>>> +      This memory is solely for the guest to access the ITS control
->>>> +      registers and does not cover the ITS translation register.
->>>> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
->>>> +      This address needs to be 64K aligned and the region covers 64 KByte.
->>>>
->>>>   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
->>>>   Attributes:
->>>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->>>> index f209ea1..c2b257d 100644
->>>> --- a/arch/arm64/include/uapi/asm/kvm.h
->>>> +++ b/arch/arm64/include/uapi/asm/kvm.h
->>>> @@ -87,9 +87,11 @@ struct kvm_regs {
->>>> /* Supported VGICv3 address types  */
->>>> #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
->>>> #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
->>>> +#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
->>>>
->>>> #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
->>>> #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
->>>> +#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
->>>>
->>>> #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
->>>> #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
->>>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->>>> index 7c1d145..11344e6 100644
->>>> --- a/include/kvm/vgic/vgic.h
->>>> +++ b/include/kvm/vgic/vgic.h
->>>> @@ -135,6 +135,9 @@ struct vgic_dist {
->>>> 		gpa_t			vgic_redist_base;
->>>> 	};
->>>>
->>>> +	/* The base address of the ITS control register frame */
->>>> +	gpa_t			vgic_its_base;
->>>> +
->>>> 	/* distributor enabled */
->>>> 	u32			enabled;
->>>>
->>>> @@ -253,4 +256,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
->>>> 	return kvm_vgic_global_state.max_gic_vcpus;
->>>> }
->>>>
->>>> +bool vgic_has_its(struct kvm *kvm);
->>>> +
->>>> #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
->>>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->>>> index 65395af..1de2478 100644
->>>> --- a/virt/kvm/arm/vgic/vgic.c
->>>> +++ b/virt/kvm/arm/vgic/vgic.c
->>>> @@ -612,3 +612,13 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
->>>>
->>>> 	return map_is_active;
->>>> }
->>>> +
->>>> +bool vgic_has_its(struct kvm *kvm)
->>>> +{
->>>> +	struct vgic_dist *dist = &kvm->arch.vgic;
->>>> +
->>>> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
->>>> +		return false;
->>>> +
->>>> +	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
->>>> +}
->>>> diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
->>>> index ac655b5..2301e03 100644
->>>> --- a/virt/kvm/arm/vgic/vgic_init.c
->>>> +++ b/virt/kvm/arm/vgic/vgic_init.c
->>>> @@ -132,6 +132,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
->>>> 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->>>> 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
->>>> 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
->>>> +	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
->>>>
->>>> out_unlock:
->>>> 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
->>>> diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
->>>> index 7f78a16..3ec2ac3 100644
->>>> --- a/virt/kvm/arm/vgic/vgic_kvm_device.c
->>>> +++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
->>>> @@ -109,6 +109,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
->>>> 		block_size = KVM_VGIC_V3_REDIST_SIZE;
->>>> 		alignment = SZ_64K;
->>>> 		break;
->>>> +	case KVM_VGIC_V3_ADDR_TYPE_ITS:
->>>> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
->>>> +		addr_ptr = &vgic->vgic_its_base;
->>>> +		block_size = KVM_VGIC_V3_ITS_SIZE;
->>>> +		alignment = SZ_64K;
->>>> +		break;
->>>
->>> Should there be a check based on number of vcpus? 
+On Thu, May 5, 2016 at 3:27 AM,  <maitysanchayan@gmail.com> wrote:
+> Hello Rob,
+>
+> On 16-05-03 21:30:26, Rob Herring wrote:
+>> On Mon, May 02, 2016 at 12:35:04PM +0530, Sanchayan Maity wrote:
+>> > Add device tree binding documentation for Vybrid SoC.
+>> >
+>> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> > ---
+>> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       | 35 ++++++++++++++++++++++
+>> >  1 file changed, 35 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>> > new file mode 100644
+>> > index 0000000..bdd95e8
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>> > @@ -0,0 +1,35 @@
+>> > +Vybrid System-on-Chip
+>> > +---------------------
+>> > +
+>> > +Required properties:
+>> > +
+>> > +- #address-cells: must be 1
+>> > +- #size-cells: must be 1
+>> > +- compatible: "fsl,vf610-soc-bus", "simple-bus"
 >>
->> Why would the number of vcpus influence the size of the ITS?
-> 
-> does the re-distributor per VCPU thing? I think its worth to add a
-> check for re distributor size.
+>> If this is a bus, put the file in bindings/bus/...
+>
+> The fsl,vf610-soc-bus binding is used to bind the driver in question with
+> an appropriate compatible node.
+>
+> Basically being a standalone platform driver, there was need of a compatible
+> property to bind on. Introducing a separate device tree node for it's sake
+> didn't seem appropriate so the alteration to SoC node's compatible.
 
-This patch is implementing the ITS, not the redistributors.
+Ah, so you are designing a node around the needs of a Linux specific
+driver. Don't do that. DT describes the h/w and this node is not a h/w
+block.
 
-If you have any comment on the GICv3 implementation (of which the
-redistributors are part of), please comment on the relevant patch (see
-the 55 patch series that has been posted on Friday).
+Create a platform device based on a matching SOC compatible string
+instead and make your driver find the information it needs directly
+from the relevant nodes like the ROM node.
 
-Thanks,
+>> > +- interrupt-parent: phandle to the MSCM interrupt router node
+>> > +- ranges
+>> > +- fsl,rom-revision: phandle to the on-chip ROM node and address of rom
+>> > +  revision register
+>>
+>> Why is this needed here? Can't you search the tree for the ROM node and
+>> get this info.
+>
+> Strictly per say this and next two can be specified in their respective nodes
+> of ocrom and mscm cpucfg, however they would then require the use of syscon_
+> regmap_lookup_by_compatible and this seems clean along with the introduction
+> of new syscon_regmap_read_from_offset function used with SoC node.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+That does not make sense. You can find the ROM node by compatible
+string, get the address, get an revision offset property, and read the
+address. There's no need for syscon nor regmap here.
+
+>> > +- fsl,cpu-count: phandle to the MSCM CPU configuration node and address of
+>> > +  CPU count register
+>> > +- fsl,l2-size: phandle to the MSCM CPU configuration node and address of
+>> > +  L2 cache size register
+>> > +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+>> > +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+>>
+>> How are all these properties used?
+>
+> All the above five are used to get the relevant values from the registers and
+> expose the information for SoC sysfs device.
+> https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+>
+> nvmem are consumer nodes which are accessed using the NVMEM consumer API's
+> leveraging the NVMEM framework and NVMEM vf610 ocotp driver.
+
+So, please describe in the binding doc what the values contain. cfg0
+and cfg1 is meaningless. But based on the above, this whole binding
+should go.
+
+Rob
