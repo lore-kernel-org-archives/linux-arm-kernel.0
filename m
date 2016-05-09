@@ -1,51 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 9 May 2016 15:39:24 -0700
-Subject: [PATCH v4 01/11] clk: sunxi: Add display and TCON0 clocks driver
-In-Reply-To: <20160509223238.GW3492@codeaurora.org>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
- <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160506223002.GE3492@codeaurora.org>
- <20160508200308.GF6167@lukather>
- <20160509223238.GW3492@codeaurora.org>
-Message-ID: <20160509223924.GX3492@codeaurora.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 10 May 2016 08:04:40 +1000
+Subject: [PATCH 1/2] doc/devicetree: Add Aspeed VIC bindings
+In-Reply-To: <20160509152003.GA13842@leverpostej>
+References: <1462797239-14765-1-git-send-email-joel@jms.id.au>
+ <1462797239-14765-2-git-send-email-joel@jms.id.au>
+ <20160509152003.GA13842@leverpostej>
+Message-ID: <1462831480.20290.120.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09, Stephen Boyd wrote:
+On Mon, 2016-05-09 at 16:20 +0100, Mark Rutland wrote:
+>?
+> Generally we steer clear of this kind of bitmap encoding in DT.
 > 
-> Ok I applied this one to clk-next.
+> Is this actually necessary? What does htis gain us?
 > 
+> Why can we not just register with the full set of possible
+> interrupts?
 
-And I squashed this in to silence the following checker warning.
+Trying to remember why I did that ... I think it has to do with
+supporting multiple SoCs that have different possible sources...
 
-drivers/clk/sunxi/clk-sun4i-display.c:110:33: warning: Variable
-length array is used.
+There might also be a case of some sources routed to the internal
+coldfire microcontroller or the LPC bus instead of the ARM but I'm not
+100% certain.
 
----8<---
-diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
-index f02e250e64ed..f8ff6c4a5633 100644
---- a/drivers/clk/sunxi/clk-sun4i-display.c
-+++ b/drivers/clk/sunxi/clk-sun4i-display.c
-@@ -107,7 +107,7 @@ static int sun4i_a10_display_reset_xlate(struct reset_controller_dev *rcdev,
- static void __init sun4i_a10_display_init(struct device_node *node,
- 					  const struct sun4i_a10_display_clk_data *data)
- {
--	const char *parents[data->parents];
-+	const char *parents[4];
- 	const char *clk_name = node->name;
- 	struct reset_data *reset_data;
- 	struct clk_divider *div = NULL;
-@@ -126,8 +126,8 @@ static void __init sun4i_a10_display_init(struct device_node *node,
- 		return;
- 	}
- 
--	ret = of_clk_parent_fill(node, parents, data->parents);
--	if (ret != data->parents) {
-+	ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
-+	if (ret != ARRAY_SIZE(parents)) {
- 		pr_err("%s: Could not retrieve the parents\n", clk_name);
- 		goto unmap;
- 	}
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Cheers,
+Ben.
