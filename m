@@ -1,47 +1,29 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Tue, 10 May 2016 17:45:17 +0200
-Subject: [PATCH v1] builddeb: fix missing headers in linux-headers package
-In-Reply-To: <572B5BC4.7080402@codeaurora.org>
-References: <1459445479-10948-1-git-send-email-asamson@codeaurora.org>
- <572B5BC4.7080402@codeaurora.org>
-Message-ID: <20160510154516.GF13314@pobox.suse.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 17:45:31 +0200
+Subject: [RESEND PATCH 0/5] gcov fixes and maybe-uninitialized warnings
+In-Reply-To: <20160510151437.GA12889@pobox.suse.cz>
+References: <1461598531-2190169-1-git-send-email-arnd@arndb.de>
+ <20160510151437.GA12889@pobox.suse.cz>
+Message-ID: <5021654.fHHR0eRNyc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2016 at 10:42:12AM -0400, Christopher Covington wrote:
-> On 03/31/2016 01:31 PM, Azriel Samson wrote:
-> > The kernel headers package (linux-headers) doesn't include
-> > header files from other architectures required to build
-> > out-of-tree modules.
+On Tuesday 10 May 2016 17:14:37 Michal Marek wrote:
+> On Mon, Apr 25, 2016 at 05:35:26PM +0200, Arnd Bergmann wrote:
+> > Hi Michal,
 > > 
-> > For e.g. on ARM64, opcodes.h includes the same file from ARM
-> > which causes the following error:
-> > ./arch/arm64/include/asm/opcodes.h:1:43: fatal error:
-> > ../../arm/include/asm/opcodes.h: No such file or directory
-> > compilation terminated.
+> > This is a resend of a series I originally sent back in February, but
+> > unfortunately I never heard back from you. Could you apply these
+> > patches for v4.7?
 > > 
-> > Signed-off-by: Azriel Samson <asamson@codeaurora.org>
-> > ---
-> >  scripts/package/builddeb | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/scripts/package/builddeb b/scripts/package/builddeb
-> > index 6c3b038..06ba0d9 100755
-> > --- a/scripts/package/builddeb
-> > +++ b/scripts/package/builddeb
-> > @@ -322,7 +322,7 @@ fi
-> >  
-> >  # Build kernel header package
-> >  (cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/debian/hdrsrcfiles"
-> > -(cd $srctree; find arch/$SRCARCH/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
-> > +(cd $srctree; find arch/*/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
-> >  (cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/debian/hdrsrcfiles"
-> >  (cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/debian/hdrsrcfiles"
-> >  (cd $objtree; find arch/$SRCARCH/include Module.symvers include scripts -type f) >> "$objtree/debian/hdrobjfiles"
+> > [PATCH 1/5] Kbuild: change CC_OPTIMIZE_FOR_SIZE definition
+> > [PATCH 2/5] Kbuild: disable 'maybe-uninitialized' warning for
+> > [PATCH 3/5] gcov: disable for COMPILE_TEST
+> > [PATCH 4/5] gcov: disable tree-loop-im to reduce stack usage
+> > [PATCH 5/5] gcov: disable -Wmaybe-uninitialized warning
 > 
-> Any feedback on this? Michal, do you think this would be appropriate to
-> include in 4.7?
+> Applied now, sorry for the delay.
 
-Applied to kbuild.git#misc now.
+Great, thanks!
 
-Michal
+	Arnd
