@@ -1,110 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 14:50:43 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <5731D68D.2090109@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <7091358.aJt1stteb5@wuerfel> <5731D68D.2090109@huawei.com>
-Message-ID: <4119683.coHZhzaE6c@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 10 May 2016 08:51:30 -0400
+Subject: [PATCH v2 20/22] ARM: dts: exynos: Move common
+ Exynos5410/542x/5800 nodes to new DTSI
+In-Reply-To: <57317292.2080004@kernel.org>
+References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
+ <1462734367-5619-21-git-send-email-krzk@kernel.org>
+ <9e642e0d-87e1-4661-0233-acecf0082f24@osg.samsung.com>
+ <57317292.2080004@kernel.org>
+Message-ID: <68ebff12-702d-106a-7ce7-5063f62f3bc1@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 May 2016 20:39:41 Zhangjian wrote:
-> Hi,
+Hello Krzysztof,
+
+On 05/10/2016 01:33 AM, Krzysztof Kozlowski wrote:
+> On 05/09/2016 11:53 PM, Javier Martinez Canillas wrote:
+>> Hello Krzysztof,
+>>
+>> On 05/08/2016 03:06 PM, Krzysztof Kozlowski wrote:
+>>> The Exynos5410/542x/5800 are very similar designs. Create new new
+>>
+>> s/new new/a new
+>>
+>>> DTSI with common nodes to remove DTS duplication. Although currently
+>>> only MCT and SysRAM are shared but in future more nodes will be added to
+>>> common file.
+>>>
+>>> The patch should not have functional impact.
+>>>
+>>
+>> A nice way to check this is to diff the disassembled compiled DTBs with
+>> and without the patch and making sure that the resulted DTS is the same.
 > 
-> On 2016/5/10 19:48, Arnd Bergmann wrote:
-> > On Tuesday 10 May 2016 17:47:26 Zhangjian wrote:
-> >> On 2016/5/10 16:36, Arnd Bergmann wrote:
-> >>> On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
-> >>>> On 2016/5/6 20:37, Yury Norov wrote:
-> >>
-> >> "include/uapi/asm-generic/posix_types.h" is uapi, we could not check
-> >> "ARCH_32BIT_OFF_T" here. Besides, the `__kernel_long_t` is long which
-> >> mean it is 32bit in ILP32. should we define something like x32?
-> >>       ```
-> >>       diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
-> >>       index 7985ff6..9baa8d3 100644
-> >>       --- a/arch/arm64/include/uapi/asm/posix_types.h
-> >>       +++ b/arch/arm64/include/uapi/asm/posix_types.h
-> >
-> > glibc does not use the definition of __kernel_off_t, it has its own
-> > copy, so changing the kernel headers would do nothing.
-> Yes, I think so. I am puzzle that how do we ensure that all the new
-> 32bit architecture will define off_t as 64bit after introduce
-> ARCH_32BIT_OFF_T and do not change any other code?
+> Yes, that is what I've done. Recently there is a tool making that even
+> easier: dtx_diff.
+>
 
-This is for historic reasons: we have two sets of system calls passing
-file offsets: the original ones passing a 'long' are named e.g. lseek,
-pread, pwrite, fadvise, ...
+I didn't know we had such a tool in mainline now.
+Very useful, thanks a lot for the information.
+ 
+> Best regards,
+> Krzysztof
+> 
 
-The replacement syscalls that pass a 'long long' __kernel_loff_t are only
-available on 32-bit architectures and have different names, e.g. llseek,
-pread64, pwrite64, fadvise64, ...
-
-On 64-bit architectures, we only provide the first set, because
-__kernel_off_t was already wide enough. On old 32-bit architectures
-we have both, and on new 32-bit architectures we only have the second
-set, which lets us use the same definitions on all 32-bit architectures.
-
-> >>       @@ -5,6 +5,9 @@ typedef unsigned short __kernel_old_uid_t;
-> >>        typedef unsigned short __kernel_old_gid_t;
-> >>         #define __kernel_old_uid_t __kernel_old_uid_t
-> >>
-> >>        +typedef long long __kernel_long_t;
-> >>        +typedef unsigned long long __kernel_ulong_t;
-> >>        +
-> >>         #include <asm-generic/posix_types.h>
-> >>
-> >>         #endif /*  __ASM_POSIX_TYPES_H */u
-> >>       ```
-> >
-> > This would break all sorts of things, because __kernel_long_t/__kernel_ulong_t
-> > are not just used for off_t but also other things.
-> Yes. But if we do not change __kernel_long_t and __kernel_ulong_t, the
-> application of ilp32 will think size of long in kernel is 32bit. Is that
-> correct?
-
-No, __kernel_long_t refers to the definition of 'long' in the kernel/user
-ABI, not in the kernel (except on the x86-64 "x32" ABI, which is weird).
-
-A 32-bit user space application must not care about how 'long' is defined
-in the kernel, it should run on either 32-bit kernels or 64-bit kernels.
-We don't have any plans to do an ilp32-mode kernel, but if we ever want
-one, it must use the exact same ABI as the 64-bit kernel when running
-ilp32 user space.
-
-> >>
-> >> On the other hand, glibc define it own off_t in "bits/types.h":
-> >>       __STD_TYPE __OFF_T_TYPE __off_t;        /* Type of file sizes and offsets.  */
-> >>       __STD_TYPE __OFF64_T_TYPE __off64_t;    /* Type of file sizes and offsets (LFS).  */
-> >>
-> >> in "sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h":
-> >>       #define __OFF_T_TYPE            __SLONGWORD_TYPE
-> >>       #define __OFF64_T_TYPE          __SQUAD_TYPE
-> >>
-> >> If we define off_t as 64bit in glibc:
-> >>       #define __OFF_T_TYPE           __SQUAD_TYPE
-> >>
-> >> Should We need to align all the off_t syscall to 64bit syscall in
-> >> kernel?
-> >>
-> >
-> > Yes, this is the change that I think we need to make, along with
-> > the same change for __INO_T_TYPE and
-> >
-> > #define __OFF_T_MATCHES_OFF64_T        1
-> > #define __INO_T_MATCHES_INO64_T        1
-> >
-> > If I read the rest of the glibc headers right, that should be all we need
-> > to ensure that both off_t and off64_t match the __kernel_loff_t based
-> > syscalls.
-> Ok, I will test the ltp syscall test.
-> With this changes, the issue I mentioned should be fixed. But we still
-> use mmap2 syscall for ILP32 application when we pass the offset instead
-> of page offset. Is it correct?
-
-I don't remember. It's probably not important whether we have the shift
-in there, as long as it's independent of the actual kernel page size and
-user space and kernel agree on the calling conventions.
-
-	Arnd
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
