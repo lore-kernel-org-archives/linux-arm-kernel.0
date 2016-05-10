@@ -1,225 +1,47 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 17:34:28 +0200
-Subject: [PATCH v9 4/7] vfio: allow reserved msi iova registration
-In-Reply-To: <20160510092951.67c2173e@t450s.home>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-5-git-send-email-eric.auger@linaro.org>
- <20160510092951.67c2173e@t450s.home>
-Message-ID: <5731FF84.6040804@linaro.org>
+From: mmarek@suse.com (Michal Marek)
+Date: Tue, 10 May 2016 17:45:17 +0200
+Subject: [PATCH v1] builddeb: fix missing headers in linux-headers package
+In-Reply-To: <572B5BC4.7080402@codeaurora.org>
+References: <1459445479-10948-1-git-send-email-asamson@codeaurora.org>
+ <572B5BC4.7080402@codeaurora.org>
+Message-ID: <20160510154516.GF13314@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 05/10/2016 05:29 PM, Alex Williamson wrote:
-> On Wed,  4 May 2016 11:54:15 +0000
-> Eric Auger <eric.auger@linaro.org> wrote:
+On Thu, May 05, 2016 at 10:42:12AM -0400, Christopher Covington wrote:
+> On 03/31/2016 01:31 PM, Azriel Samson wrote:
+> > The kernel headers package (linux-headers) doesn't include
+> > header files from other architectures required to build
+> > out-of-tree modules.
+> > 
+> > For e.g. on ARM64, opcodes.h includes the same file from ARM
+> > which causes the following error:
+> > ./arch/arm64/include/asm/opcodes.h:1:43: fatal error:
+> > ../../arm/include/asm/opcodes.h: No such file or directory
+> > compilation terminated.
+> > 
+> > Signed-off-by: Azriel Samson <asamson@codeaurora.org>
+> > ---
+> >  scripts/package/builddeb | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/scripts/package/builddeb b/scripts/package/builddeb
+> > index 6c3b038..06ba0d9 100755
+> > --- a/scripts/package/builddeb
+> > +++ b/scripts/package/builddeb
+> > @@ -322,7 +322,7 @@ fi
+> >  
+> >  # Build kernel header package
+> >  (cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/debian/hdrsrcfiles"
+> > -(cd $srctree; find arch/$SRCARCH/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
+> > +(cd $srctree; find arch/*/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
+> >  (cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/debian/hdrsrcfiles"
+> >  (cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/debian/hdrsrcfiles"
+> >  (cd $objtree; find arch/$SRCARCH/include Module.symvers include scripts -type f) >> "$objtree/debian/hdrobjfiles"
 > 
->> The user is allowed to register a reserved MSI IOVA range by using the
->> DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
->> This region is stored in the vfio_dma rb tree. At that point the iova
->> range is not mapped to any target address yet. The host kernel will use
->> those iova when needed, typically when MSIs are allocated.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
->>
->> ---
->> v7 -> v8:
->> - use iommu_msi_set_aperture function. There is no notion of
->>   unregistration anymore since the reserved msi slot remains
->>   until the container gets closed.
->>
->> v6 -> v7:
->> - use iommu_free_reserved_iova_domain
->> - convey prot attributes downto dma-reserved-iommu iova domain creation
->> - reserved bindings teardown now performed on iommu domain destruction
->> - rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
->>          VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
->> - change title
->> - pass the protection attribute to dma-reserved-iommu API
->>
->> v3 -> v4:
->> - use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
->> - protect vfio_register_reserved_iova_range implementation with
->>   CONFIG_IOMMU_DMA_RESERVED
->> - handle unregistration by user-space and on vfio_iommu_type1 release
->>
->> v1 -> v2:
->> - set returned value according to alloc_reserved_iova_domain result
->> - free the iova domains in case any error occurs
->>
->> RFC v1 -> v1:
->> - takes into account Alex comments, based on
->>   [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
->> - use the existing dma map/unmap ioctl interface with a flag to register
->>   a reserved IOVA range. A single reserved iova region is allowed.
->> ---
->>  drivers/vfio/vfio_iommu_type1.c | 78 ++++++++++++++++++++++++++++++++++++++++-
->>  include/uapi/linux/vfio.h       | 10 +++++-
->>  2 files changed, 86 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->> index 94a9916..4d3a6f1 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -36,6 +36,7 @@
->>  #include <linux/uaccess.h>
->>  #include <linux/vfio.h>
->>  #include <linux/workqueue.h>
->> +#include <linux/msi-iommu.h>
->>  
->>  #define DRIVER_VERSION  "0.2"
->>  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
->> @@ -445,6 +446,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
->>  	vfio_lock_acct(-unlocked);
->>  }
->>  
->> +static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
->> +				dma_addr_t iova, size_t size)
->> +{
->> +	struct vfio_domain *d;
->> +	int ret = 0;
->> +
->> +	list_for_each_entry(d, &iommu->domain_list, next) {
->> +		ret = iommu_msi_set_aperture(d->domain, iova, iova + size - 1);
->> +		if (ret)
->> +			break;
->> +	}
->> +	return ret;
->> +}
->> +
->>  static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
->>  {
->>  	vfio_unmap_unpin(iommu, dma);
->> @@ -693,6 +708,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
->>  	return ret;
->>  }
->>  
->> +static int vfio_register_msi_range(struct vfio_iommu *iommu,
->> +				   struct vfio_iommu_type1_dma_map *map)
->> +{
->> +	dma_addr_t iova = map->iova;
->> +	size_t size = map->size;
->> +	int ret = 0;
->> +	struct vfio_dma *dma;
->> +	unsigned long order;
->> +	uint64_t mask;
->> +
->> +	/* Verify that none of our __u64 fields overflow */
->> +	if (map->size != size || map->iova != iova)
->> +		return -EINVAL;
->> +
->> +	order =  __ffs(vfio_pgsize_bitmap(iommu));
->> +	mask = ((uint64_t)1 << order) - 1;
->> +
->> +	WARN_ON(mask & PAGE_MASK);
->> +
->> +	if (!size || (size | iova) & mask)
->> +		return -EINVAL;
->> +
->> +	/* Don't allow IOVA address wrap */
->> +	if (iova + size - 1 < iova)
->> +		return -EINVAL;
->> +
->> +	mutex_lock(&iommu->lock);
->> +
->> +	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
->> +		ret =  -EEXIST;
->> +		goto unlock;
->> +	}
->> +
->> +	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
->> +	if (!dma) {
->> +		ret = -ENOMEM;
->> +		goto unlock;
->> +	}
->> +
->> +	dma->iova = iova;
->> +	dma->size = size;
->> +	dma->type = VFIO_IOVA_RESERVED;
-> 
-> [oops, forgot to send this reply with the others]
-> 
-> I'm tempted to suggest we set type explicitly in the USER case too just
-> to make that abundantly clear rather than taking advantage of the
-> kzalloc struct.
+> Any feedback on this? Michal, do you think this would be appropriate to
+> include in 4.7?
 
-no worries. OK I will set the dma type explicitly in vfio_dma_do_map too.
+Applied to kbuild.git#misc now.
 
-Thanks
-
-Eric
-> 
->> +
->> +	ret = vfio_set_msi_aperture(iommu, iova, size);
->> +	if (ret)
->> +		goto free_unlock;
->> +
->> +	vfio_link_dma(iommu, dma);
->> +	goto unlock;
->> +
->> +free_unlock:
->> +	kfree(dma);
->> +unlock:
->> +	mutex_unlock(&iommu->lock);
->> +	return ret;
->> +}
->> +
->>  static int vfio_bus_type(struct device *dev, void *data)
->>  {
->>  	struct bus_type **bus = data;
->> @@ -1062,7 +1134,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->>  	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
->>  		struct vfio_iommu_type1_dma_map map;
->>  		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
->> -				VFIO_DMA_MAP_FLAG_WRITE;
->> +				VFIO_DMA_MAP_FLAG_WRITE |
->> +				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
->>  
->>  		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
->>  
->> @@ -1072,6 +1145,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->>  		if (map.argsz < minsz || map.flags & ~mask)
->>  			return -EINVAL;
->>  
->> +		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
->> +			return vfio_register_msi_range(iommu, &map);
->> +
->>  		return vfio_dma_do_map(iommu, &map);
->>  
->>  	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
->> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
->> index 255a211..4a9dbc2 100644
->> --- a/include/uapi/linux/vfio.h
->> +++ b/include/uapi/linux/vfio.h
->> @@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
->>   *
->>   * Map process virtual addresses to IO virtual addresses using the
->>   * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
->> + *
->> + * In case RESERVED_MSI_IOVA flag is set, the API only aims at registering an
->> + * IOVA region that will be used on some platforms to map the host MSI frames.
->> + * In that specific case, vaddr is ignored. Once registered, an MSI reserved
->> + * IOVA region stays until the container is closed.
->>   */
->>  struct vfio_iommu_type1_dma_map {
->>  	__u32	argsz;
->>  	__u32	flags;
->>  #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
->>  #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
->> +/* reserved iova for MSI vectors*/
->> +#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
->>  	__u64	vaddr;				/* Process virtual address */
->>  	__u64	iova;				/* IO virtual address */
->>  	__u64	size;				/* Size of mapping (bytes) */
->> @@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
->>   * Caller sets argsz.  The actual unmapped size is returned in the size
->>   * field.  No guarantee is made to the user that arbitrary unmaps of iova
->>   * or size different from those used in the original mapping call will
->> - * succeed.
->> + * succeed. Once registered, an MSI region cannot be unmapped and stays
->> + * until the container is closed.
->>   */
->>  struct vfio_iommu_type1_dma_unmap {
->>  	__u32	argsz;
-> 
+Michal
