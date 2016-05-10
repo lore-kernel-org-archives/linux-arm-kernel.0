@@ -1,52 +1,59 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 10 May 2016 14:49:42 -0500
-Subject: [PATCH 2/2] ARM: dts: dra7: Add ti,secure-ram node to ocmcram1 node
-In-Reply-To: <1462909782-14639-1-git-send-email-d-gerlach@ti.com>
-References: <1462909782-14639-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1462909782-14639-3-git-send-email-d-gerlach@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 21:51:47 +0200
+Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB PCIe
+ bindings
+In-Reply-To: <5732139C.80101@gmail.com>
+References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
+ <4513390.VWu0VVAxOl@wuerfel> <5732139C.80101@gmail.com>
+Message-ID: <2533093.jsjycoq8tW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Secure variants of DRA7xx and AM57xx SoCs may need to reserve a region
-of the SRAM for use by secure software. To account for this, add a child
-node to the ocmcram1 node that will act as a placeholder at the start
-of the SRAM for the reserved region of memory that may be required
-by secure services. The node is added with size 0 so that by default
-parts will have the full space available but the bootloader or board dts
-file is able to resize the node as needed depending on how much reserved
-space is needed, if any, so end users of the ocmcram1 region on HS parts
-must be aware that a smaller amount of SRAM than expected may be available.
+On Tuesday 10 May 2016 10:00:12 Florian Fainelli wrote:
+> 
+> The two critical pieces of information that the PCIe RC needs are:
+> 
+> - number of memory controllers present in the system to avoid
+> configuring a window to a non-existing or non-populated memory controller
+> 
+> - size of the memory populated on the memory controller
+> 
+> You would think that we should somehow be able to derive this
+> information from the "memory" node, but there are a few caveats:
+> 
+> - on MIPS platforms, we have discontiguous physical memory ranges (256MB
+> @ 0x0, then 768MB or 1792MB @ 0x 0x20000000 and 1GB @ 0x90000000), yet
+> the PCIe RC does not know about the hole(s)
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+That sounds like you need a dma-ranges property anyway to describe how
+the DMA addresses are mapped.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index fd6f74856bd3..f46a265ce315 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -292,6 +292,21 @@
- 			ranges = <0x0 0x40300000 0x80000>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			/*
-+			 * This is a placeholder for an optional reserved
-+			 * region for use by secure software. The size
-+			 * of this region is not known until runtime so it
-+			 * is set as zero to either be updated to reserve
-+			 * space or left unchanged to leave all SRAM for use.
-+			 * On HS parts that that require the reserved region
-+			 * either the bootloader can update the size to
-+			 * the required amount or the node can be overridden
-+			 * from the board dts file for the secure platform.
-+			 */
-+			sram-hs at 0 {
-+				compatible = "ti,secure-ram";
-+				reg = <0x0 0x0>;
-+			};
- 		};
- 
- 		/*
--- 
-2.7.3
+> - on ARM platforms, we have an identiy mapping for the PAs below 4GB,
+> but when we cross it, we have additional non-linear memory regions
+> 
+> Both of these memory nodes would imply we know how to identify which
+> physical address belongs to which memory controller, while this is
+> actually possible and known, it creates a dependency on another piece of
+> driver to provide that information.
+> 
+> We do have memory controller nodes populated in the Device Tree, however
+> their binding (out of tree for the moment) does only specify their
+> programmable register interface, and not how how much physical memory
+> and where they provide to the system.
+> 
+> It does seem like we should be able to utilize the "dma-ranges" property
+> to determine both the memory controller number and their respective
+> populated memory sizes.
+> 
+> In the case where we have an identiy mapping though, this seems a little
+> redundant, but less of a stretch than our custom properties and nodes.
+> 
+> Does that sound reasonable to you?
+
+I'd have to look at an example first. Ideally, each line in the
+dma-ranges property would refer to one memory controller, and
+that would be very easy to mandate, but it sounds like in the MIPS
+case you end up with an extra entry for the first 256MB that is
+on the same memory controller as the second 768MB.
+
+	Arnd
