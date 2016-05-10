@@ -1,70 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 13:48:06 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <5731AE2E.2050403@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <9651510.pg5Vmm8vKS@wuerfel> <5731AE2E.2050403@huawei.com>
-Message-ID: <7091358.aJt1stteb5@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 May 2016 13:50:11 +0200
+Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
+In-Reply-To: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
+References: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdZ=KsPL1mBS1bLi=jYsv=Vb1QNBi8XPAJW50doPcwBuZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 May 2016 17:47:26 Zhangjian wrote:
-> On 2016/5/10 16:36, Arnd Bergmann wrote:
-> > On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
-> >> On 2016/5/6 20:37, Yury Norov wrote:
-> 
-> "include/uapi/asm-generic/posix_types.h" is uapi, we could not check
-> "ARCH_32BIT_OFF_T" here. Besides, the `__kernel_long_t` is long which
-> mean it is 32bit in ILP32. should we define something like x32?
->      ```
->      diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
->      index 7985ff6..9baa8d3 100644
->      --- a/arch/arm64/include/uapi/asm/posix_types.h
->      +++ b/arch/arm64/include/uapi/asm/posix_types.h
+On Fri, Apr 29, 2016 at 4:25 PM,  <patrice.chotard@st.com> wrote:
 
-glibc does not use the definition of __kernel_off_t, it has its own
-copy, so changing the kernel headers would do nothing.
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
->      @@ -5,6 +5,9 @@ typedef unsigned short __kernel_old_uid_t;
->       typedef unsigned short __kernel_old_gid_t;
->        #define __kernel_old_uid_t __kernel_old_uid_t
-> 
->       +typedef long long __kernel_long_t;
->       +typedef unsigned long long __kernel_ulong_t;
->       +
->        #include <asm-generic/posix_types.h>
-> 
->        #endif /*  __ASM_POSIX_TYPES_H */u
->      ```
+Patch applied! Because this gives good debuggability.
 
-This would break all sorts of things, because __kernel_long_t/__kernel_ulong_t
-are not just used for off_t but also other things.
+But think about refactorings:
 
-> 
-> On the other hand, glibc define it own off_t in "bits/types.h":
->      __STD_TYPE __OFF_T_TYPE __off_t;        /* Type of file sizes and offsets.  */
->      __STD_TYPE __OFF64_T_TYPE __off64_t;    /* Type of file sizes and offsets (LFS).  */
-> 
-> in "sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h":
->      #define __OFF_T_TYPE            __SLONGWORD_TYPE
->      #define __OFF64_T_TYPE          __SQUAD_TYPE
-> 
-> If we define off_t as 64bit in glibc:
->      #define __OFF_T_TYPE           __SQUAD_TYPE
-> 
-> Should We need to align all the off_t syscall to 64bit syscall in
-> kernel?
-> 
+> +static bool stm32_pconf_input_get(struct stm32_gpio_bank *bank,
+> +       unsigned int offset)
+> +{
+> +       unsigned long flags;
+> +       u32 val;
+> +
+> +       clk_enable(bank->clk);
+> +       spin_lock_irqsave(&bank->lock, flags);
+> +
+> +       val = !!(readl_relaxed(bank->base + STM32_GPIO_IDR) & BIT(offset));
+> +
+> +       spin_unlock_irqrestore(&bank->lock, flags);
+> +       clk_disable(bank->clk);
+> +
+> +       return val;
+> +}
+> +
+> +static bool stm32_pconf_output_get(struct stm32_gpio_bank *bank,
+> +       unsigned int offset)
+> +{
+> +       unsigned long flags;
+> +       u32 val;
+> +
+> +       clk_enable(bank->clk);
+> +       spin_lock_irqsave(&bank->lock, flags);
+> +       val = !!(readl_relaxed(bank->base + STM32_GPIO_ODR) & BIT(offset));
+> +
+> +       spin_unlock_irqrestore(&bank->lock, flags);
+> +       clk_disable(bank->clk);
+> +
+> +       return val;
+> +}
 
-Yes, this is the change that I think we need to make, along with
-the same change for __INO_T_TYPE and 
+Don't you think these two look very similar for example.
 
-#define __OFF_T_MATCHES_OFF64_T        1
-#define __INO_T_MATCHES_INO64_T        1
+But that can be fixed later, debuggability is more important.
 
-If I read the rest of the glibc headers right, that should be all we need
-to ensure that both off_t and off64_t match the __kernel_loff_t based
-syscalls.
-
-	Arnd
+Yours,
+Linus Walleij
