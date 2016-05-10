@@ -1,190 +1,105 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 15:45:20 +0100
-Subject: [PATCH v3 18/55] KVM: arm/arm64: vgic-new: Add GICv2 world switch
- backend
-In-Reply-To: <5731F196.4040906@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-19-git-send-email-andre.przywara@arm.com>
- <20160510133043.GF27623@cbox> <5731E52A.9000402@arm.com>
- <20160510141119.GB20499@cbox> <5731F196.4040906@arm.com>
-Message-ID: <5731F400.4080004@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 10 May 2016 16:47:12 +0200
+Subject: [BISECTED] Regression v4.6-rc1 : nanosleep doesn't return on
+ AT91SAM9
+In-Reply-To: <CACQ1gAipruXcO=xpooYDOdqZbtESD35wxDf7xNrg4zuuRv1wew@mail.gmail.com>
+References: <CACQ1gAg6cKqjaqcV70m2VS5R4_kZEgWTiqzSqDxSjvfrYYxbzg@mail.gmail.com>
+ <CACQ1gAipruXcO=xpooYDOdqZbtESD35wxDf7xNrg4zuuRv1wew@mail.gmail.com>
+Message-ID: <20160510164712.56261bb4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 15:35, Marc Zyngier wrote:
-> On 10/05/16 15:11, Christoffer Dall wrote:
->> On Tue, May 10, 2016 at 02:42:02PM +0100, Marc Zyngier wrote:
->>> On 10/05/16 14:30, Christoffer Dall wrote:
->>>> On Fri, May 06, 2016 at 11:45:31AM +0100, Andre Przywara wrote:
->>>>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>>>
->>>>> Processing maintenance interrupts and accessing the list registers
->>>>> are dependent on the host's GIC version.
->>>>> Introduce vgic-v2.c to contain GICv2 specific functions.
->>>>> Implement the GICv2 specific code for syncing the emulation state
->>>>> into the VGIC registers.
->>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>>> ---
->>>>> Changelog RFC..v1:
->>>>> - remove explicit LR_STATE clearing on maintenance interrupt handling
->>>>> - improve documentation for vgic_v2_populate_lr()
->>>>> - remove WARN_ON on non-edge IRQs in maintenance interrupts
->>>>> - simplify multi-CPU source SGI handling
->>>>>
->>>>> Changelog v1 .. v2:
->>>>> - inject the IRQ priority into the list register
->>>>>
->>>>> Changelog v2 .. v3:
->>>>> - cleanup diff containing rebase artifacts
->>>>>
->>>>>  include/linux/irqchip/arm-gic.h |   1 +
->>>>>  virt/kvm/arm/vgic/vgic-v2.c     | 178 ++++++++++++++++++++++++++++++++++++++++
->>>>>  virt/kvm/arm/vgic/vgic.c        |   6 ++
->>>>>  virt/kvm/arm/vgic/vgic.h        |   6 ++
->>>>>  4 files changed, 191 insertions(+)
->>>>>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
->>>>>
->>>>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
->>>>> index 9c94026..be0d26f 100644
->>>>> --- a/include/linux/irqchip/arm-gic.h
->>>>> +++ b/include/linux/irqchip/arm-gic.h
->>>>> @@ -76,6 +76,7 @@
->>>>>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
->>>>>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->>>>>  #define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
->>>>> +#define GICH_LR_PRIORITY_SHIFT		23
->>>>>  #define GICH_LR_STATE			(3 << 28)
->>>>>  #define GICH_LR_PENDING_BIT		(1 << 28)
->>>>>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
->>>>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->>>>> new file mode 100644
->>>>> index 0000000..4cee616
->>>>> --- /dev/null
->>>>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->>>>> @@ -0,0 +1,178 @@
->>>>> +/*
->>>>> + * Copyright (C) 2015, 2016 ARM Ltd.
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 as
->>>>> + * published by the Free Software Foundation.
->>>>> + *
->>>>> + * This program is distributed in the hope that it will be useful,
->>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>> + * GNU General Public License for more details.
->>>>> + *
->>>>> + * You should have received a copy of the GNU General Public License
->>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>>> + */
->>>>> +
->>>>> +#include <linux/irqchip/arm-gic.h>
->>>>> +#include <linux/kvm.h>
->>>>> +#include <linux/kvm_host.h>
->>>>> +
->>>>> +#include "vgic.h"
->>>>> +
->>>>> +/*
->>>>> + * Call this function to convert a u64 value to an unsigned long * bitmask
->>>>> + * in a way that works on both 32-bit and 64-bit LE and BE platforms.
->>>>> + *
->>>>> + * Warning: Calling this function may modify *val.
->>>>> + */
->>>>> +static unsigned long *u64_to_bitmask(u64 *val)
->>>>> +{
->>>>> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
->>>>> +	*val = (*val >> 32) | (*val << 32);
->>>>> +#endif
->>>>> +	return (unsigned long *)val;
->>>>> +}
->>>>> +
->>>>> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
->>>>> +{
->>>>> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
->>>>> +
->>>>> +	if (cpuif->vgic_misr & GICH_MISR_EOI) {
->>>>> +		u64 eisr = cpuif->vgic_eisr;
->>>>> +		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
->>>>> +		int lr;
->>>>> +
->>>>> +		for_each_set_bit(lr, eisr_bmap, kvm_vgic_global_state.nr_lr) {
->>>>> +			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
->>>>> +
->>>>> +			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
->>>>> +
->>>>> +			kvm_notify_acked_irq(vcpu->kvm, 0,
->>>>> +					     intid - VGIC_NR_PRIVATE_IRQS);
->>>>> +
->>>>
->>>> why do we need to do this?  I cannot find any consumers of this info
->>>> after we've left the hyp code.
->>>
->>> I believe that's for vhost and irqfd. Or am I misreading your question?
->>>
->>
->> I meant the setting of the bits in vgic_elrsr (sorry, badly placed
->> comment)...
->>
->>>> Also, I think I offered a comment about why we would potentially need
->>>> this in the first place.  This is the famous race where hardware doesn't
->>>> guarantee consistency between the MISR and ELRSR right?
->>>
->>> That's the one (except it is between EISR and ELRSR). I don't have your
->>> initial comment at hand, but would something like the following do?
->>>
->>> 			/*
->>> 			 * The maintenance interrupt may not have had a
->>> 			 * chance to update ELRSR, so let's mark the LRs
->>> 			 * presents in EISR as empty.
->>> 			 */
->>>>
->>>>> +			cpuif->vgic_elrsr |= 1ULL << lr;
->>
->> so, why are we doing this?
-> 
-> Ah! I finally see what you mean: we don't reuse LRs at all with the new code
-> base, so knowing which LR is empty is irrelevant. In which case, something
-> like that should be done:
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index e88b5aa..5a8f4d4 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -52,8 +52,6 @@ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
->  
->  			kvm_notify_acked_irq(vcpu->kvm, 0,
->  					     intid - VGIC_NR_PRIVATE_IRQS);
-> -
-> -			cpuif->vgic_elrsr |= 1ULL << lr;
->  		}
->  	}
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 53f7847..4102f0f 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -43,8 +43,6 @@ void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
->  
->  			kvm_notify_acked_irq(vcpu->kvm, 0,
->  					     intid - VGIC_NR_PRIVATE_IRQS);
-> -
-> -			cpuif->vgic_elrsr |= 1ULL << lr;
->  		}
->  
->  		/*
-> 
-> I'll give it a spin, just to be safe.
+Hi Richard,
 
-Seems OK on GICv2, and this of course leads to some more possible
-cleanups or optimizations (I think we can get to a state where we
-completely disregards ELRSR). I'll have a look.
+On Tue, 10 May 2016 16:25:25 +0200
+Richard Genoud <richard.genoud@gmail.com> wrote:
 
-Thanks,
+> 2016-05-10 15:58 GMT+02:00 Richard Genoud <richard.genoud@gmail.com>:
+> > Hi,
+> >
+> > Starting with 4.6-rc1, a sleep 1 doesn't return :
+> >
+> > execve("/bin/sleep", ["sleep", "1"], ["USER=root", "SHLVL=1",
+> > "OLDPWD=/var", "HOME=/", "TERM=vt102",
+> > "PATH=/sbin:/usr/sbin:/bin:/usr/bin", "SHELL=/bin/sh", "PWD=/"]) = 0
+> > uname({sysname="Linux", nodename="LNS",
+> > release="4.5.0-09406-g46e595a17dcf", version="#72 Tue May 10 15:41:34
+> > CEST 2016", machine="armv5tejl", domainname="(none)"}) = 0
+> > brk(0)                                  = 0x153000
+> > brk(0x153d20)                           = 0x153d20
+> > set_tls(0x1534c0, 0x14d1e4, 0, 0x153d20, 0x14e368) = 0
+> > readlink("/proc/self/exe", "/bin/busybox", 4096) = 12
+> > brk(0x174d20)                           = 0x174d20
+> > brk(0x175000)                           = 0x175000
+> > getuid32()                              = 0
+> > rt_sigprocmask(SIG_BLOCK, [CHLD], [], 8) = 0
+> > rt_sigaction(SIGCHLD, NULL, {SIG_DFL, [], 0}, 8) = 0
+> > rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+> > nanosleep({1, 0},
+> >
+> > And the heartbeat led doesn't blink anymore (full on), as if the
+> > timers never fire.
+> >
+> > The platform is an AT91SAM9G35-CM.
+> >
+> > git bisect gives a merge as the 1st bad commit :(
+> > first bad commit: [46e595a17dcf11404f713845ecb5b06b92a94e43] Merge tag
+> > 'armsoc-drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc  
+> 
+> 
+> I went a little further in tracking that down, starting from the merge
+> (1st bad commit) and reverting some commits.
+> It seems that the culprit is :
+> commit 863a81c3be1d931bdae6426e231add9334311f13
+> Author: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Date:   Fri Sep 5 09:54:13 2014 +0200
+>     clk: at91: make use of syscon to share PMC registers in several drivers
+> 
+> Here are the commits I've reverted :
+> 
+> git log --oneline --decorate -20
+> 849cdaa0cf04 (HEAD, tag: good) Revert "clk: at91: make use of syscon
+> to share PMC registers in several drivers"
+> 4bd6dde95321 (tag: last_bad) Revert "clk: at91: make use of
+> syscon/regmap internally"
+> a56dacaa24c4 (tag: always_bad) Revert "clk: at91: remove IRQ handling
+> and use polling"
+> 33edfe7a2de6 Revert "clk: at91: pmc: merge at91_pmc_init in atmel_pmc_probe"
+> 0b22bb649eae Revert "clk: at91: pmc: move pmc structures to C file"
+> 14994fdff366 Revert "ARM: at91: pm: simply call at91_pm_init"
+> 6f0821175327 (tag: still_bad) Revert "ARM: at91: pm: find and remap the pmc"
+> b52bbf7fad1b Revert "ARM: at91: pm: move idle functions to pm.c"
+> dffb1a5f68b9 Revert "ARM: at91: remove useless includes and function prototypes"
+> db352691dcc1 Revert "usb: gadget: atmel: access the PMC using regmap"
+> f7b5433dbbc8 Revert "clk: at91: pmc: drop at91_pmc_base"
+> 6e6dfc0d91c0 Revert "clk: at91: pmc: remove useless capacities handling"
+> ceddd3f88ada Revert "clk: at91: remove useless includes"
+> 46e595a17dcf (tag: bad) Merge tag 'armsoc-drivers' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> e3b1f64e04f5 Merge tag 'armsoc-defconfig' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> 915c56bc01d6 Merge tag 'armsoc-dt64' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> 5a6b7e53d035 Merge tag 'armsoc-dt' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> 8c6d4082fc6a Merge tag 'armsoc-arm64' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> 33b3d2e88c9e Merge tag 'armsoc-soc' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> e88fa1b8b00a Merge tag 'armsoc-cleanup' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
 
-	M.
+Thanks for the detailed report.
+
+Can you try again after applying this patch [1]?
+
+Regards,
+
+Boris
+
+[1]http://code.bulix.org/dx1c0t-98377
+
 -- 
-Jazz is not dead. It just smells funny...
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
