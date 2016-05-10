@@ -1,44 +1,90 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 10 May 2016 14:02:50 +0300
-Subject: [PATCH 14/23] mmc: sdhci-esdhci-imx: disable DLL delay line
- settings explicitly
-In-Reply-To: <1460741387-23815-15-git-send-email-aisheng.dong@nxp.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-15-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <5731BFDA.2000504@intel.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 10 May 2016 20:36:50 +0930
+Subject: [PATCH 2/4] drivers/clocksource/moxart: Refactor enable/disable
+In-Reply-To: <1462797169-14512-3-git-send-email-joel@jms.id.au>
+References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
+ <1462797169-14512-3-git-send-email-joel@jms.id.au>
+Message-ID: <CACPK8XfJ2e1kr-WftidvqsoYew7LqPiNo0sw7opgh8UH=3q_3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/16 20:29, Dong Aisheng wrote:
-> From: Dong Aisheng <aisheng.dong@freescale.com>
-> 
-> Disable DLL delay line settings explicitly during driver initialization
-> in case ROM/uBoot had set an invalid delay.
-> e.g. MX6DL ROM has set the default delay line(DLLCTRL) to 0x1000021,
-> the uSDHC clock timing will become marginal when works on DDR mode
-> due to default delay and will possibly see CRC errors in case the board
-> is not perfectly designed on the eMMC chip layout.
-> 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Hi Daniel,
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Here's a commit message for this patch. If you'd prefer me to resend
+the entire series with this included then I can do that.
 
+This patch abstracts the enable and disable register writes into their
+own functions in preparation for future changes to use SoC specific
+values for the writes.
+
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 4c28fbb..d02db66 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -1186,6 +1186,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		*/
->  		writel(readl(host->ioaddr + 0x6c) | BIT(7),
->  			host->ioaddr + 0x6c);
+>  drivers/clocksource/moxart_timer.c | 22 ++++++++++++++++------
+>  1 file changed, 16 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+> index 19857af651c1..b00b2b21e8b3 100644
+> --- a/drivers/clocksource/moxart_timer.c
+> +++ b/drivers/clocksource/moxart_timer.c
+> @@ -58,15 +58,25 @@
+>  static void __iomem *base;
+>  static unsigned int clock_count_per_tick;
+>
+> -static int moxart_shutdown(struct clock_event_device *evt)
+> +static inline void moxart_disable(struct clock_event_device *evt)
+>  {
+>         writel(TIMER1_DISABLE, base + TIMER_CR);
+> +}
 > +
-> +		/* disable DLL_CTRL delay line settings */
-> +		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
->  	}
->  
->  	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
-> 
+> +static inline void moxart_enable(struct clock_event_device *evt)
+> +{
+> +       writel(TIMER1_ENABLE, base + TIMER_CR);
+> +}
+> +
+> +static int moxart_shutdown(struct clock_event_device *evt)
+> +{
+> +       moxart_disable(evt);
+>         return 0;
+>  }
+>
+>  static int moxart_set_oneshot(struct clock_event_device *evt)
+>  {
+> -       writel(TIMER1_DISABLE, base + TIMER_CR);
+> +       moxart_disable(evt);
+>         writel(~0, base + TIMER1_BASE + REG_LOAD);
+>         return 0;
+>  }
+> @@ -74,21 +84,21 @@ static int moxart_set_oneshot(struct clock_event_device *evt)
+>  static int moxart_set_periodic(struct clock_event_device *evt)
+>  {
+>         writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
+> -       writel(TIMER1_ENABLE, base + TIMER_CR);
+> +       moxart_enable(evt);
+>         return 0;
+>  }
+>
+>  static int moxart_clkevt_next_event(unsigned long cycles,
+> -                                   struct clock_event_device *unused)
+> +                                   struct clock_event_device *evt)
+>  {
+>         u32 u;
+>
+> -       writel(TIMER1_DISABLE, base + TIMER_CR);
+> +       moxart_disable(evt);
+>
+>         u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
+>         writel(u, base + TIMER1_BASE + REG_MATCH1);
+>
+> -       writel(TIMER1_ENABLE, base + TIMER_CR);
+> +       moxart_enable(evt);
+>
+>         return 0;
+>  }
+> --
+> 2.8.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
