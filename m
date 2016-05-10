@@ -1,326 +1,215 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 17:28:09 +0200
-Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world switch
- backend
-In-Reply-To: <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
-Message-ID: <5731FE09.3000007@linaro.org>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 10 May 2016 09:29:51 -0600
+Subject: [PATCH v9 4/7] vfio: allow reserved msi iova registration
+In-Reply-To: <1462362858-2925-5-git-send-email-eric.auger@linaro.org>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <1462362858-2925-5-git-send-email-eric.auger@linaro.org>
+Message-ID: <20160510092951.67c2173e@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2016 12:45 PM, Andre Przywara wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On Wed,  4 May 2016 11:54:15 +0000
+Eric Auger <eric.auger@linaro.org> wrote:
+
+> The user is allowed to register a reserved MSI IOVA range by using the
+> DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
+> This region is stored in the vfio_dma rb tree. At that point the iova
+> range is not mapped to any target address yet. The host kernel will use
+> those iova when needed, typically when MSIs are allocated.
 > 
-> As the GICv3 virtual interface registers differ from their GICv2
-> siblings, we need different handlers for processing maintenance
-> interrupts and reading/writing to the LRs.
-> Implement the respective handler functions and connect them to
-> existing code to be called if the host is using a GICv3.
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
-> Changelog RFC..v1:
-> - remove outdated comment about the dist_lock
-> - add WARN_ON about LR_STATE not being 0 in maintenance interrupts
+> v7 -> v8:
+> - use iommu_msi_set_aperture function. There is no notion of
+>   unregistration anymore since the reserved msi slot remains
+>   until the container gets closed.
 > 
-> Changelog v1 .. v2:
-> - inject the IRQ priority into the list register
+> v6 -> v7:
+> - use iommu_free_reserved_iova_domain
+> - convey prot attributes downto dma-reserved-iommu iova domain creation
+> - reserved bindings teardown now performed on iommu domain destruction
+> - rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
+>          VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
+> - change title
+> - pass the protection attribute to dma-reserved-iommu API
 > 
-> Changelog v2 .. v3:
-> - remove no longer needed irqchip/arm-gic.h inclusion
+> v3 -> v4:
+> - use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
+> - protect vfio_register_reserved_iova_range implementation with
+>   CONFIG_IOMMU_DMA_RESERVED
+> - handle unregistration by user-space and on vfio_iommu_type1 release
 > 
->  include/linux/irqchip/arm-gic-v3.h |   1 +
->  virt/kvm/arm/vgic/vgic-v3.c        | 168 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.c           |  25 ++++--
->  virt/kvm/arm/vgic/vgic.h           |  29 +++++++
->  4 files changed, 218 insertions(+), 5 deletions(-)
->  create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
+> v1 -> v2:
+> - set returned value according to alloc_reserved_iova_domain result
+> - free the iova domains in case any error occurs
 > 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index ec938d1..35e93cf 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -275,6 +275,7 @@
->  #define ICH_LR_ACTIVE_BIT		(1ULL << 63)
->  #define ICH_LR_PHYS_ID_SHIFT		32
->  #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
-> +#define ICH_LR_PRIORITY_SHIFT		48
+> RFC v1 -> v1:
+> - takes into account Alex comments, based on
+>   [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
+> - use the existing dma map/unmap ioctl interface with a flag to register
+>   a reserved IOVA range. A single reserved iova region is allowed.
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 78 ++++++++++++++++++++++++++++++++++++++++-
+>  include/uapi/linux/vfio.h       | 10 +++++-
+>  2 files changed, 86 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 94a9916..4d3a6f1 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -36,6 +36,7 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/vfio.h>
+>  #include <linux/workqueue.h>
+> +#include <linux/msi-iommu.h>
 >  
->  /* These are for GICv2 emulation only */
->  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> new file mode 100644
-> index 0000000..43d1dd7
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -0,0 +1,168 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +
-> +#include "vgic.h"
-> +
-> +void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  #define DRIVER_VERSION  "0.2"
+>  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+> @@ -445,6 +446,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>  	vfio_lock_acct(-unlocked);
+>  }
+>  
+> +static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
+> +				dma_addr_t iova, size_t size)
 > +{
-> +	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-> +	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+> +	struct vfio_domain *d;
+> +	int ret = 0;
 > +
-> +	if (cpuif->vgic_misr & ICH_MISR_EOI) {
-> +		unsigned long eisr_bmap = cpuif->vgic_eisr;
-> +		int lr;
+> +	list_for_each_entry(d, &iommu->domain_list, next) {
+> +		ret = iommu_msi_set_aperture(d->domain, iova, iova + size - 1);
+> +		if (ret)
+> +			break;
+> +	}
+> +	return ret;
+> +}
 > +
-> +		for_each_set_bit(lr, &eisr_bmap, kvm_vgic_global_state.nr_lr) {
-used_lrs?
-> +			u32 intid;
-> +			u64 val = cpuif->vgic_lr[lr];
+>  static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>  {
+>  	vfio_unmap_unpin(iommu, dma);
+> @@ -693,6 +708,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+>  	return ret;
+>  }
+>  
+> +static int vfio_register_msi_range(struct vfio_iommu *iommu,
+> +				   struct vfio_iommu_type1_dma_map *map)
+> +{
+> +	dma_addr_t iova = map->iova;
+> +	size_t size = map->size;
+> +	int ret = 0;
+> +	struct vfio_dma *dma;
+> +	unsigned long order;
+> +	uint64_t mask;
 > +
-> +			if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +				intid = val & ICH_LR_VIRTUAL_ID_MASK;
-> +			else
-> +				intid = val & GICH_LR_VIRTUALID;
+> +	/* Verify that none of our __u64 fields overflow */
+> +	if (map->size != size || map->iova != iova)
+> +		return -EINVAL;
 > +
-> +			WARN_ON(cpuif->vgic_lr[lr] & ICH_LR_STATE);
+> +	order =  __ffs(vfio_pgsize_bitmap(iommu));
+> +	mask = ((uint64_t)1 << order) - 1;
 > +
-> +			kvm_notify_acked_irq(vcpu->kvm, 0,
-> +					     intid - VGIC_NR_PRIVATE_IRQS);
+> +	WARN_ON(mask & PAGE_MASK);
 > +
-> +			cpuif->vgic_elrsr |= 1ULL << lr;
-> +		}
+> +	if (!size || (size | iova) & mask)
+> +		return -EINVAL;
 > +
-> +		/*
-> +		 * In the next iterations of the vcpu loop, if we sync
-> +		 * the vgic state after flushing it, but before
-> +		 * entering the guest (this happens for pending
-> +		 * signals and vmid rollovers), then make sure we
-> +		 * don't pick up any old maintenance interrupts here.
-> +		 */
-> +		cpuif->vgic_eisr = 0;
+> +	/* Don't allow IOVA address wrap */
+> +	if (iova + size - 1 < iova)
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&iommu->lock);
+> +
+> +	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
+> +		ret =  -EEXIST;
+> +		goto unlock;
 > +	}
 > +
-> +	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
-> +}
+> +	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
+> +	if (!dma) {
+> +		ret = -ENOMEM;
+> +		goto unlock;
+> +	}
 > +
-> +void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-> +
-> +	cpuif->vgic_hcr |= ICH_HCR_UIE;
-> +}
-> +
-> +void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-> +	u32 model = vcpu->kvm->arch.vgic.vgic_model;
-> +	int lr;
-> +
-> +	/* Assumes ap_list_lock held */
-I don't think there is such requirement and failed finding the lock held.
+> +	dma->iova = iova;
+> +	dma->size = size;
+> +	dma->type = VFIO_IOVA_RESERVED;
 
-Besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
+[oops, forgot to send this reply with the others]
 
-Eric
+I'm tempted to suggest we set type explicitly in the USER case too just
+to make that abundantly clear rather than taking advantage of the
+kzalloc struct.
+
 > +
-> +	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
-> +		u64 val = cpuif->vgic_lr[lr];
-> +		u32 intid;
-> +		struct vgic_irq *irq;
+> +	ret = vfio_set_msi_aperture(iommu, iova, size);
+> +	if (ret)
+> +		goto free_unlock;
 > +
-> +		if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +			intid = val & ICH_LR_VIRTUAL_ID_MASK;
-> +		else
-> +			intid = val & GICH_LR_VIRTUALID;
-> +		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+> +	vfio_link_dma(iommu, dma);
+> +	goto unlock;
 > +
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		/* Always preserve the active bit */
-> +		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
-> +
-> +		/* Edge is the only case where we preserve the pending bit */
-> +		if (irq->config == VGIC_CONFIG_EDGE &&
-> +		    (val & ICH_LR_PENDING_BIT)) {
-> +			irq->pending = true;
-> +
-> +			if (vgic_irq_is_sgi(intid) &&
-> +			    model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-> +				u32 cpuid = val & GICH_LR_PHYSID_CPUID;
-> +
-> +				cpuid >>= GICH_LR_PHYSID_CPUID_SHIFT;
-> +				irq->source |= (1 << cpuid);
-> +			}
-> +		}
-> +
-> +		/* Clear soft pending state when level irqs have been acked */
-> +		if (irq->config == VGIC_CONFIG_LEVEL &&
-> +		    !(val & ICH_LR_PENDING_BIT)) {
-> +			irq->soft_pending = false;
-> +			irq->pending = irq->line_level;
-> +		}
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +	}
+> +free_unlock:
+> +	kfree(dma);
+> +unlock:
+> +	mutex_unlock(&iommu->lock);
+> +	return ret;
 > +}
 > +
-> +/* Requires the irq to be locked already */
-> +void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
-> +{
-> +	u32 model = vcpu->kvm->arch.vgic.vgic_model;
-> +	u64 val = irq->intid;
-> +
-> +	if (irq->pending) {
-> +		val |= ICH_LR_PENDING_BIT;
-> +
-> +		if (irq->config == VGIC_CONFIG_EDGE)
-> +			irq->pending = false;
-> +
-> +		if (vgic_irq_is_sgi(irq->intid) &&
-> +		    model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-> +			u32 src = ffs(irq->source);
-> +
-> +			BUG_ON(!src);
-> +			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
-> +			irq->source &= ~(1 << (src - 1));
-> +			if (irq->source)
-> +				irq->pending = true;
-> +		}
-> +	}
-> +
-> +	if (irq->active)
-> +		val |= ICH_LR_ACTIVE_BIT;
-> +
-> +	if (irq->hw) {
-> +		val |= ICH_LR_HW;
-> +		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
-> +	} else {
-> +		if (irq->config == VGIC_CONFIG_LEVEL)
-> +			val |= ICH_LR_EOI;
-> +	}
-> +
-> +	/*
-> +	 * Currently all guest IRQs are Group1, as Group0 would result
-> +	 * in a FIQ in the guest, which it wouldn't expect.
-> +	 * Eventually we want to make this configurable, so we may
-> +	 * revisit this in the future.
-> +	 */
-> +	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		val |= ICH_LR_GROUP;
-> +
-> +	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
-> +
-> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = val;
-> +}
-> +
-> +void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
-> +{
-> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = 0;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 68d885c..64d5b45 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -397,12 +397,18 @@ retry:
->  
->  static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
+>  static int vfio_bus_type(struct device *dev, void *data)
 >  {
-> -	vgic_v2_process_maintenance(vcpu);
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_process_maintenance(vcpu);
-> +	else
-> +		vgic_v3_process_maintenance(vcpu);
->  }
+>  	struct bus_type **bus = data;
+> @@ -1062,7 +1134,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>  	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
+>  		struct vfio_iommu_type1_dma_map map;
+>  		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
+> -				VFIO_DMA_MAP_FLAG_WRITE;
+> +				VFIO_DMA_MAP_FLAG_WRITE |
+> +				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
 >  
->  static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
->  {
-> -	vgic_v2_fold_lr_state(vcpu);
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_fold_lr_state(vcpu);
-> +	else
-> +		vgic_v3_fold_lr_state(vcpu);
->  }
+>  		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
 >  
->  /* Requires the ap_list_lock and the irq_lock to be held. */
-> @@ -412,17 +418,26 @@ static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
->  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
->  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> @@ -1072,6 +1145,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>  		if (map.argsz < minsz || map.flags & ~mask)
+>  			return -EINVAL;
 >  
-> -	vgic_v2_populate_lr(vcpu, irq, lr);
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_populate_lr(vcpu, irq, lr);
-> +	else
-> +		vgic_v3_populate_lr(vcpu, irq, lr);
->  }
->  
->  static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
->  {
-> -	vgic_v2_clear_lr(vcpu, lr);
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_clear_lr(vcpu, lr);
-> +	else
-> +		vgic_v3_clear_lr(vcpu, lr);
->  }
->  
->  static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
->  {
-> -	vgic_v2_set_underflow(vcpu);
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_set_underflow(vcpu);
-> +	else
-> +		vgic_v3_set_underflow(vcpu);
->  }
->  
->  static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 0db490e..81b1a20 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -28,4 +28,33 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
->  void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
->  void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
->  
-> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> +void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
-> +void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
-> +void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
-> +void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
-> +void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
-> +#else
-> +static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
-> +{
-> +}
+> +		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
+> +			return vfio_register_msi_range(iommu, &map);
 > +
-> +static inline void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +
-> +static inline void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
-> +				       struct vgic_irq *irq, int lr)
-> +{
-> +}
-> +
-> +static inline void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
-> +{
-> +}
-> +
-> +static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +#endif
-> +
->  #endif
-> 
+>  		return vfio_dma_do_map(iommu, &map);
+>  
+>  	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
+> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+> index 255a211..4a9dbc2 100644
+> --- a/include/uapi/linux/vfio.h
+> +++ b/include/uapi/linux/vfio.h
+> @@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
+>   *
+>   * Map process virtual addresses to IO virtual addresses using the
+>   * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
+> + *
+> + * In case RESERVED_MSI_IOVA flag is set, the API only aims at registering an
+> + * IOVA region that will be used on some platforms to map the host MSI frames.
+> + * In that specific case, vaddr is ignored. Once registered, an MSI reserved
+> + * IOVA region stays until the container is closed.
+>   */
+>  struct vfio_iommu_type1_dma_map {
+>  	__u32	argsz;
+>  	__u32	flags;
+>  #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
+>  #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
+> +/* reserved iova for MSI vectors*/
+> +#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
+>  	__u64	vaddr;				/* Process virtual address */
+>  	__u64	iova;				/* IO virtual address */
+>  	__u64	size;				/* Size of mapping (bytes) */
+> @@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
+>   * Caller sets argsz.  The actual unmapped size is returned in the size
+>   * field.  No guarantee is made to the user that arbitrary unmaps of iova
+>   * or size different from those used in the original mapping call will
+> - * succeed.
+> + * succeed. Once registered, an MSI region cannot be unmapped and stays
+> + * until the container is closed.
+>   */
+>  struct vfio_iommu_type1_dma_unmap {
+>  	__u32	argsz;
