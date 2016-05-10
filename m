@@ -1,100 +1,208 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 10 May 2016 16:07:53 +0300
-Subject: [PATCH 22/23] mmc: sdhci-esdhc-imx: move tuning static
- configuration into hwinit function
-In-Reply-To: <1460741387-23815-23-git-send-email-aisheng.dong@nxp.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-23-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <5731DD29.3020307@intel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 10 May 2016 15:12:59 +0200
+Subject: [PATCH v3 26/55] KVM: arm/arm64: vgic-new: Add ACTIVE registers
+ handlers
+In-Reply-To: <5731DC60.40809@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-27-git-send-email-andre.przywara@arm.com>
+ <5731D0B5.9060605@arm.com> <5731DC60.40809@arm.com>
+Message-ID: <20160510131259.GA20499@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/16 20:29, Dong Aisheng wrote:
-> Move tuning static configuration into hwinit function.
-> Tuning configuration may also be lost in low power mode,
-> so need restore in hwinit().
+On Tue, May 10, 2016 at 02:04:32PM +0100, Andre Przywara wrote:
+> Hi Marc,
 > 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> On 10/05/16 13:14, Marc Zyngier wrote:
+> > On 06/05/16 11:45, Andre Przywara wrote:
+> >> The active register handlers are shared between the v2 and v3
+> >> emulation, so their implementation goes into vgic-mmio.c, to be
+> >> easily referenced from the v3 emulation as well later.
+> >> Since activation/deactivation of an interrupt may happen entirely
+> >> in the guest without it ever exiting, we need some extra logic to
+> >> properly track the active state.
+> >> Putting it on an ap_list on activation is similar to the normal case
+> >> handled by vgic_queue_irq_unlock(), but differs in some details that
+> >> make a separate implementation worthwhile.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >> Changelog RFC..v1:
+> >> - handling queueing in write handler
+> >> - remove IRQ lock from read handler
+> >>
+> >> Changelog v1 .. v2:
+> >> - adapt to new MMIO framework
+> >>
+> >>  virt/kvm/arm/vgic/vgic-mmio-v2.c |   4 +-
+> >>  virt/kvm/arm/vgic/vgic-mmio.c    | 120 +++++++++++++++++++++++++++++++++++++++
+> >>  virt/kvm/arm/vgic/vgic-mmio.h    |  10 ++++
+> >>  3 files changed, 132 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> index 4b87e0a..054b52d 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> @@ -80,9 +80,9 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
+> >>  		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+> >> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> >> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+> >> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> >> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+> >>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> >> index 4df1af7..dbf683e 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> >> @@ -162,6 +162,126 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+> >>  	}
+> >>  }
+> >>  
+> >> +unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+> >> +				    gpa_t addr, unsigned int len)
+> >> +{
+> >> +	u32 intid = (addr & 0x7f) * 8;
+> >> +	u32 value = 0;
+> >> +	int i;
+> >> +
+> >> +	/* Loop over all IRQs affected by this read */
+> >> +	for (i = 0; i < len * 8; i++) {
+> >> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> >> +
+> >> +		if (irq->active)
+> >> +			value |= (1U << i);
+> >> +	}
+> >> +
+> >> +	return extract_bytes(value, addr & 3, len);
+> >> +}
+> >> +
+> >> +void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+> >> +			     gpa_t addr, unsigned int len,
+> >> +			     unsigned long val)
+> >> +{
+> >> +	u32 intid = (addr & 0x7f) * 8;
+> >> +	int i;
+> >> +
+> >> +	for_each_set_bit(i, &val, len * 8) {
+> >> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> >> +
+> >> +		spin_lock(&irq->irq_lock);
+> >> +
+> >> +		irq->active = false;
+> >> +
+> >> +		/*
+> >> +		 * Christoffer wrote:
+> >> +		 * The question is what to do if the vcpu for this irq is
+> >> +		 * running and the LR there has the active bit set, then we'll
+> >> +		 * overwrite this change when we fold the LR state back into
+> >> +		 * the vgic_irq struct.
+> >> +		 *
+> >> +		 * Since I expect this to be extremely rare, one option is to
+> >> +		 * force irq->vcpu to exit (if non-null) and then do you
+> >> +		 * thing here after you've confirm it has exited while holding
+> >> +		 * some lock preventing it from re-entering again.
+> >> +		 * Slightly crazy.
+> >> +		 *
+> >> +		 * The alternative is to put a big fat comment nothing that
+> >> +		 * this is non-supported bad race, and wait until someone
+> >> +		 * submits a bug report relating to this...
+> >> +		 */
+> > 
+> > Don't we have a patch by Christoffer that addresses this exact issue?
+> 
+> Yes, and if I am not mistaken you said last week that we put this patch
+> and the firmware-independent probing on top of the queue, so I didn't
+> merge it.
+> 
+> >> +
+> >> +		spin_unlock(&irq->irq_lock);
+> >> +	}
+> >> +}
+> >> +
+> >> +void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+> >> +			     gpa_t addr, unsigned int len,
+> >> +			     unsigned long val)
+> >> +{
+> >> +	u32 intid = (addr & 0x7f) * 8;
+> >> +	int i;
+> >> +
+> >> +	for_each_set_bit(i, &val, len * 8) {
+> >> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> >> +
+> >> +		spin_lock(&irq->irq_lock);
+> >> +
+> >> +		/* As this is a special case, we can't use the
+> >> +		 * vgic_queue_irq_unlock() function to put this on a VCPU.
+> >> +		 * So deal with this here explicitly unless the IRQs was
+> >> +		 * already active, it was on a VCPU before or there is no
+> >> +		 * target VCPU assigned at the moment.
+> >> +		 */
+> >> +		if (irq->active || irq->vcpu || !irq->target_vcpu) {
+> >> +			irq->active = true;
+> >> +
+> >> +			spin_unlock(&irq->irq_lock);
+> >> +			continue;
+> >> +		}
+> >> +
+> >> +		spin_unlock(&irq->irq_lock);
+> >> +retry:
+> >> +		vcpu = irq->target_vcpu;
+> >> +
+> >> +		spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> >> +		spin_lock(&irq->irq_lock);
+> >> +
+> >> +		/*
+> >> +		 * Recheck after dropping the IRQ lock to see if we should
+> >> +		 * still care about queueing it.
+> >> +		 */
+> >> +		if (irq->active || irq->vcpu) {
+> >> +			irq->active = true;
+> >> +
+> >> +			spin_unlock(&irq->irq_lock);
+> >> +			spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> >> +
+> >> +			continue;
+> >> +		}
+> >> +
+> >> +		/* Did the target VCPU change while we had the lock dropped? */
+> >> +		if (vcpu != irq->target_vcpu) {
+> >> +			spin_unlock(&irq->irq_lock);
+> >> +			spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> >> +
+> >> +			goto retry;
+> >> +		}
+> >> +
+> >> +		/* Now queue the IRQ to the VCPU's ap_list. */
+> >> +		list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
+> >> +		irq->vcpu = vcpu;
+> >> +
+> >> +		irq->active = true;
+> >> +
+> >> +		spin_unlock(&irq->irq_lock);
+> >> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> >> +
+> >> +		kvm_vcpu_kick(vcpu);
+> >> +	}
+> > 
+> > This is annoyingly close to vgic_queue_irq_unlock()... Maybe switching
+> > this to some form of preprocessor template. Or not.
+> 
+> I think we had this discussion with Christoffer before. There are subtle
+> differences and the impression was that unifying the two would make them
+> basically unreadable because of all this special handling.
+> Not sure if the preprocessor would help here.
+> 
+If we changed the queue function slightly as I suggested, I haven't been
+able to come up with a case were we can't do:
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+spin_lock(&irq->irq_lock);
+vgic_queue_irq_unlock(irq);
 
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 36 ++++++++++++++++++------------------
->  1 file changed, 18 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 95f3632..98aa6b5 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -483,7 +483,6 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
->  			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
->  			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> -			u32 tuning_ctrl;
->  			if (val & SDHCI_CTRL_TUNED_CLK) {
->  				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
->  			} else {
-> @@ -496,18 +495,6 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
->  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
->  				m |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
-> -				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
-> -				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT;
-> -				if (imx_data->boarddata.tuning_start_tap) {
-> -					tuning_ctrl &= ~ESDHC_TUNING_START_TAP_MASK;
-> -					tuning_ctrl |= imx_data->boarddata.tuning_start_tap;
-> -				}
-> -
-> -				if (imx_data->boarddata.tuning_step) {
-> -					tuning_ctrl &= ~ESDHC_TUNING_STEP_MASK;
-> -					tuning_ctrl |= imx_data->boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
-> -				}
-> -				writel(tuning_ctrl, host->ioaddr + ESDHC_TUNING_CTRL);
->  			} else {
->  				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
->  			}
-> @@ -982,6 +969,7 @@ static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
-> +	int tmp;
->  
->  	if (esdhc_is_usdhc(imx_data)) {
->  		/*
-> @@ -1013,6 +1001,23 @@ static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
->  
->  		/* disable DLL_CTRL delay line settings */
->  		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
-> +
-> +		if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
-> +			tmp = readl(host->ioaddr + ESDHC_TUNING_CTRL);
-> +			tmp |= ESDHC_STD_TUNING_EN |
-> +				ESDHC_TUNING_START_TAP_DEFAULT;
-> +			if (imx_data->boarddata.tuning_start_tap) {
-> +				tmp &= ~ESDHC_TUNING_START_TAP_MASK;
-> +				tmp |= imx_data->boarddata.tuning_start_tap;
-> +			}
-> +
-> +			if (imx_data->boarddata.tuning_step) {
-> +				tmp &= ~ESDHC_TUNING_STEP_MASK;
-> +				tmp |= imx_data->boarddata.tuning_step
-> +					<< ESDHC_TUNING_STEP_SHIFT;
-> +			}
-> +			writel(tmp, host->ioaddr + ESDHC_TUNING_CTRL);
-> +		}
->  	}
->  }
->  
-> @@ -1226,11 +1231,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		sdhci_esdhc_ops.platform_execute_tuning =
->  					esdhc_executing_tuning;
->  
-> -	if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
-> -		writel(readl(host->ioaddr + ESDHC_TUNING_CTRL) |
-> -			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT,
-> -			host->ioaddr + ESDHC_TUNING_CTRL);
-> -
->  	if (imx_data->socdata->flags & ESDHC_FLAG_ERR004536)
->  		host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
->  
-> 
+but I need to look at it more carefully.
+
+-Christoffer
