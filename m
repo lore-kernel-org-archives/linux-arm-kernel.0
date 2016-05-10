@@ -1,86 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 May 2016 09:22:50 +0100
-Subject: [PATCH] firmware/drivers/psci: Fix unused functions when
- CONFIG_CPU_IDLE=n
-In-Reply-To: <1462864729-11793-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1462864729-11793-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20160510082250.GA14662@red-moon>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 10 May 2016 16:23:29 +0800
+Subject: [PATCH 1/6] dt-bindings: mt8173-xhci: support host side of dual-role
+ mode
+In-Reply-To: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1462868614-20602-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 09:18:49AM +0200, Daniel Lezcano wrote:
-> On the ARM64 architecture, when CPUIDLE is not set in the configuration,
-> the compilation raises a couple of warnings:
-> 
-> drivers/firmware/psci.c:70:12: warning: 'psci_pd_power_off' defined but not used [-Wunused-function]
-> drivers/firmware/psci.c:273:12: warning: 'psci_set_suspend_mode_osi' defined but not used [-Wunused-function]
+Some resources, such as IPPC register etc, shared with device
+driver are moved into common glue layer when xHCI driver is the
+host side of dual-role mode and they should be changed as optional
+properties if they are required ones before. For clarity, add
+a new part of binding to support host side of dual-role mode.
 
-That's not mainline code :)
+Additionally add optional properties of pinctrl for host only mode
 
-Thanks,
-Lorenzo
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-> Fix those warnings by moving the functions inside the #ifdef CONFIG_CPU_IDLE
-> section.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/firmware/psci.c | 21 +++++++++++----------
->  1 file changed, 11 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 9c6a1f9..d7e0632 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -54,7 +54,6 @@
->   */
->  static int resident_cpu = -1;
->  static bool psci_has_osi_pd;
-> -static bool psci_suspend_mode_is_osi;
->  static DEFINE_PER_CPU(u32, cluster_state_id);
->  
->  static inline u32 psci_get_composite_state_id(u32 cpu_state)
-> @@ -67,13 +66,6 @@ static inline void psci_reset_composite_state_id(void)
->  	this_cpu_write(cluster_state_id, 0);
->  }
->  
-> -static int psci_pd_power_off(u32 state_idx, u32 param,
-> -		const struct cpumask *mask)
-> -{
-> -	__this_cpu_add(cluster_state_id, param);
-> -	return 0;
-> -}
-> -
->  bool psci_tos_resident_on(int cpu)
->  {
->  	return cpu == resident_cpu;
-> @@ -270,6 +262,11 @@ static int __init psci_features(u32 psci_func_id)
->  			      psci_func_id, 0, 0);
->  }
->  
-> +#ifdef CONFIG_CPU_IDLE
-> +static bool psci_suspend_mode_is_osi;
-> +
-> +static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-> +
->  static int psci_set_suspend_mode_osi(bool enable)
->  {
->  	int ret;
-> @@ -290,8 +287,12 @@ static int psci_set_suspend_mode_osi(bool enable)
->  	return psci_to_linux_errno(ret);
->  }
->  
-> -#ifdef CONFIG_CPU_IDLE
-> -static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-> +static int psci_pd_power_off(u32 state_idx, u32 param,
-> +		const struct cpumask *mask)
-> +{
-> +	__this_cpu_add(cluster_state_id, param);
-> +	return 0;
-> +}
->  
->  static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
->  {
-> -- 
-> 1.9.1
-> 
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+index b3a7ffa..542e3fa 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -2,6 +2,14 @@ MT8173 xHCI
+ 
+ The device node for Mediatek SOC USB3.0 host controller
+ 
++There are two scenarios: the first one only supports xHCI driver;
++the second one supports dual-role mode, and the host is based on xHCI
++driver. Take account of backward compatibility, we divide bindings
++into two parts.
++
++1st: only supports xHCI driver
++------------------------------------------------------------------------
++
+ Required properties:
+  - compatible : should contain "mediatek,mt8173-xhci"
+  - reg : specifies physical base address and size of the registers,
+@@ -27,6 +35,9 @@ Optional properties:
+ 	control register, it depends on "mediatek,wakeup-src".
+  - vbus-supply : reference to the VBUS regulator;
+  - usb3-lpm-capable : supports USB3.0 LPM
++ - pinctl-names : a pinctrl state named "default" must be defined
++ - pinctrl-0 : pin control group
++	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
+ 
+ Example:
+ usb30: usb at 11270000 {
+@@ -49,3 +60,40 @@ usb30: usb at 11270000 {
+ 	mediatek,syscon-wakeup = <&pericfg>;
+ 	mediatek,wakeup-src = <1>;
+ };
++
++2nd: dual-role mode with xHCI driver
++------------------------------------------------------------------------
++
++In the case, xhci is added as subnode to mtu3. An example and the DT binding
++details of mtu3 can be found in:
++Documentation/devicetree/bindings/usb/mtu3.txt
++
++Required properties:
++ - compatible : should contain "mediatek,mt8173-xhci"
++ - reg : specifies physical base address and size of the registers,
++	should be only for xHCI IP registers
++ - interrupts : interrupt used by the host controller
++ - power-domains : a phandle to USB power domain node to control USB's
++	mtcmos
++ - vusb33-supply : regulator of USB avdd3.3v
++
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must be
++	"sys_ck": for clock of xHCI MAC
++
++Optional properties:
++ - vbus-supply : reference to the VBUS regulator;
++ - usb3-lpm-capable : supports USB3.0 LPM
++
++Example:
++usb30: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x1000>;
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>;
++	clock-names = "sys_ck";
++	vusb33-supply = <&mt6397_vusb_reg>;
++	usb3-lpm-capable;
++};
+-- 
+1.7.9.5
