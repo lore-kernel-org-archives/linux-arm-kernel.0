@@ -1,25 +1,82 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  9 May 2016 18:01:27 -0700
-Subject: [PATCH 0/3] clk: bcm2835: critical clocks and parent selection
-Message-ID: <1462842090-2017-1-git-send-email-eric@anholt.net>
+Date: Mon,  9 May 2016 18:01:30 -0700
+Subject: [PATCH 3/3] clk: bcm2835: Skip PLLC clocks when deciding on a new
+ clock parent
+In-Reply-To: <1462842090-2017-1-git-send-email-eric@anholt.net>
+References: <1462842090-2017-1-git-send-email-eric@anholt.net>
+Message-ID: <1462842090-2017-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new patch 2 inserted between my previous pair, I think this
-should cover Martin's bugs with clock disabling.
+If the firmware had set up a clock to source from PLLC, go along with
+it.  But if we're looking for a new parent, we don't want to switch it
+to PLLC because the firmware will force PLLC (and thus the AXI bus
+clock) to different frequencies during over-temp/under-voltage,
+without notification to Linux.
 
-I tested patch 2 to be important on the downstream kernel: with the
-DPI panel support added there, I was losing ethernet (my only I/O)
-when the HDMI HSM hanging off of PLLD_PER got disabled due to
-EPROBE_DEFER.
+On my system, this moves the Linux-enabled HDMI state machine and DSI1
+escape clock over to plld_per from pllc_per.  EMMC still ends up on
+pllc_per, because the firmware had set it up to use that.
 
-Eric Anholt (3):
-  clk: bcm2835: Mark the VPU clock as critical
-  clk: bcm2835: Mark GPIO clocks enabled at boot as critical.
-  clk: bcm2835: Skip PLLC clocks when deciding on a new clock parent
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+---
 
- drivers/clk/bcm/clk-bcm2835.c | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+No changes, just a resend.
 
+ drivers/clk/bcm/clk-bcm2835.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 1091012ecec6..1d8f29ea9f69 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1008,16 +1008,28 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
+ 	return 0;
+ }
+ 
++static bool
++bcm2835_clk_is_pllc(struct clk_hw *hw)
++{
++	if (!hw)
++		return false;
++
++	return strncmp(clk_hw_get_name(hw), "pllc", 4) == 0;
++}
++
+ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+ 					struct clk_rate_request *req)
+ {
+ 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
+ 	struct clk_hw *parent, *best_parent = NULL;
++	bool current_parent_is_pllc;
+ 	unsigned long rate, best_rate = 0;
+ 	unsigned long prate, best_prate = 0;
+ 	size_t i;
+ 	u32 div;
+ 
++	current_parent_is_pllc = bcm2835_clk_is_pllc(clk_hw_get_parent(hw));
++
+ 	/*
+ 	 * Select parent clock that results in the closest but lower rate
+ 	 */
+@@ -1025,6 +1037,17 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+ 		parent = clk_hw_get_parent_by_index(hw, i);
+ 		if (!parent)
+ 			continue;
++
++		/*
++		 * Don't choose a PLLC-derived clock as our parent
++		 * unless it had been manually set that way.  PLLC's
++		 * frequency gets adjusted by the firmware due to
++		 * over-temp or under-voltage conditions, without
++		 * prior notification to our clock consumer.
++		 */
++		if (bcm2835_clk_is_pllc(parent) && !current_parent_is_pllc)
++			continue;
++
+ 		prate = clk_hw_get_rate(parent);
+ 		div = bcm2835_clock_choose_div(hw, req->rate, prate, true);
+ 		rate = bcm2835_clock_rate_from_divisor(clock, prate, div);
 -- 
 2.8.0.rc3
