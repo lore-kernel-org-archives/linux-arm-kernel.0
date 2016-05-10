@@ -1,81 +1,49 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 10 May 2016 20:43:42 +0200
-Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
-In-Reply-To: <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-8-git-send-email-tn@semihalf.com>
- <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
-Message-ID: <CAJZ5v0jq0NWEYw2Dj6j0pHYrWu-8syYiGP4Nqkm729Uu6hrO7A@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 10 May 2016 11:48:06 -0700
+Subject: [PATCH 2/5] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <20160510141658.GP19473@dell>
+References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
+ <1462454983-13168-3-git-send-email-lee.jones@linaro.org>
+ <20160506184842.GE1256@tuxbot> <20160510141658.GP19473@dell>
+Message-ID: <20160510184806.GK1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 8:37 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->> This patch provides a way to set the ACPI companion in PCI code.
->> We define acpi_pci_set_companion() to set the ACPI companion pointer and
->> call it from PCI core code. The function is stub for now.
->>
->> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>  drivers/pci/probe.c      | 2 ++
->>  include/linux/pci-acpi.h | 4 ++++
->>  2 files changed, 6 insertions(+)
->>
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 8004f67..fb0b752 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -12,6 +12,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/module.h>
->>  #include <linux/cpumask.h>
->> +#include <linux/pci-acpi.h>
->>  #include <linux/pci-aspm.h>
->>  #include <linux/aer.h>
->>  #include <linux/acpi.h>
->> @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->>         bridge->dev.parent = parent;
->>         bridge->dev.release = pci_release_host_bridge_dev;
->>         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
->> +       acpi_pci_set_companion(bridge);
->
-> Yes, we'll probably add something similar here.
->
-> Do I think now is the right time to do that?  No.
->
->>         error = pcibios_root_bridge_prepare(bridge);
->>         if (error) {
->>                 kfree(bridge);
->> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
->> index 09f9f02..1baa515 100644
->> --- a/include/linux/pci-acpi.h
->> +++ b/include/linux/pci-acpi.h
->> @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
->>  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
->>  #endif /* CONFIG_ACPI */
->>
->> +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
->> +{
->> +}
->> +
->>  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
->>  {
->>         return 0;
->> --
->
-> Honestly, to me it looks like this series is trying very hard to avoid
-> doing any PCI host bridge configuration stuff from arch/arm64/
-> although (a) that might be simpler and (b) it would allow us to
-> identify the code that's common between *all* architectures using ACPI
-> support for host bridge configuration and to move *that* to a common
-> place later.  As done here it seems to be following the "ARM64 is
-> generic and the rest of the world is special" line which isn't really
-> helpful.
+On Tue 10 May 07:16 PDT 2016, Lee Jones wrote:
 
-Speaking of which, at least one of the reasons why the ACPI PCI host
-bridge thing on x86 and ia64 went to the arch code was to avoid
-explicit references to ACPI-specific data types and related #ifdeffery
-in the generic PCI code and data structures.  If you are going to add
-those references now anyway, that reason is not relevant any more and
-all of that can just be reworked to refer to ACPI explicitly.
+> On Fri, 06 May 2016, Bjorn Andersson wrote:
+> 
+> > On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
+> > 
+> > > - of_rproc_byindex(): look-up and obtain a reference to a rproc
+> > >   		      using the DT phandle "rprocs" and a index.
+> > > 
+> > > - of_rproc_byname():  lookup and obtain a reference to a rproc
+> > >   		      using the DT phandle "rprocs" and "rproc-names".
+> > > 
+> > > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > 
+> > I like the idea of having these helpers, but we already have
+> > rproc_get_by_phandle() so these helpers should be built upon that rather
+> > than adding the additional list.
+> 
+> Since this is a framework consideration, don't you think it would be
+> better to standardise the phandle name?  This is common practice when
+> coding at a subsystem level.  Some in use examples include; "clocks",
+> "power-domains", "mboxes", "dmas", "phys", "resets", "gpios", etc.
+> 
+> Considering the aforementioned examples, I figured "rprocs" would be
+> suitable.
+> 
+
+To summarize our chat for the record and others.
+
+
+I'm definitely in favour of this and think "rprocs" and "rproc-names"
+sounds good.  My comment was only regarding the duplicated
+implementation.
+
+Regards,
+Bjorn
