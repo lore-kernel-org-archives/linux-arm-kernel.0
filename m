@@ -1,43 +1,62 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 10 May 2016 11:59:29 +0200
-Subject: [PATCH 1/2] Revert "mtd: atmel_nand: Support variable RB_EDGE
- interrupts"
-In-Reply-To: <20160510105549.50b60d8c@bbrezillon>
-References: <1462776680-5284-1-git-send-email-wenyou.yang@atmel.com>
- <1462776680-5284-2-git-send-email-wenyou.yang@atmel.com>
- <20160510105549.50b60d8c@bbrezillon>
-Message-ID: <CAGkQfmPm16sgizhWJEH8onHR+4hC2an9m1k8=AqoNjsK3EeU3Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 May 2016 11:04:12 +0100
+Subject: [PATCH v3 11/55] KVM: arm/arm64: pmu: abstract access to number
+ of SPIs
+In-Reply-To: <5731AF57.2040707@linaro.org>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-12-git-send-email-andre.przywara@arm.com>
+ <5731AF57.2040707@linaro.org>
+Message-ID: <5731B21C.9030205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 10/05/16 10:52, Eric Auger wrote:
+> Hi Andre,
+> On 05/06/2016 12:45 PM, Andre Przywara wrote:
+>> Currently the PMU uses a member of the struct vgic_dist directly,
+>> which not only breaks abstraction, but will fail with the new VGIC.
+>> Abstract this access in the VGIC header file.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h | 2 ++
+>>  virt/kvm/arm/pmu.c     | 2 +-
+>>  2 files changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 452bb85..c14ff77 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -347,6 +347,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>>  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+>>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+>> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+>> +				 ((i) < (k)->arch.vgic.nr_irqs))
+>>  
+>>  int vgic_v2_probe(struct device_node *vgic_node,
+>>  		  const struct vgic_ops **ops,
+>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+>> index 575c7aa..bd2e872 100644
+>> --- a/virt/kvm/arm/pmu.c
+>> +++ b/virt/kvm/arm/pmu.c
+>> @@ -477,7 +477,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>>  		 * the interrupt number is the same for all vcpus, while as an
+>>  		 * SPI it must be a separate number per vcpu.
+>>  		 */
+>> -		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
+>> +		if (irq < VGIC_NR_SGIS || !vgic_valid_spi(vcpu->kvm, irq) ||
+>>  		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+>>  			return -EINVAL;
+>>  
+>>
+> in case this is a PPI it will now return an error, right? I don't think
+> this is what we expect.
 
-2016-05-10 10:55 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
->
-> Romain, I thought you had a real use case on sama5d4 where this patch
-> was needed to make the whole thing work. Not sure why you submitted
-> this patch if you couldn't test it on a real board.
+Ouch. Good catch. I missed the ! too...
 
-My target CPU is SAMA5D2, but I chose the SAMA5D4 for the compatible
-string as it was the earliest design whose datasheet mentioned the
-RB_EDGE3 bit.
+Thanks,
 
-I wrote the SAMA5D2 support in advance, as I was waiting for my board to
-be ready, basing myself on what was found in the datasheet.  The changes
-included both the variable RB_EDGE support, and the PMECC register
-layout changes, which were a prerequisite to use the SAMA5D2 NAND
-controller.
-
-I tested the code against regressions on sama5d3xek, and Wenyou reported
-that he tested it on Atmel's SAMA5D2 PTC, which was the only existing
-board at that time with both a SAMA5D2 SoC and a NAND chip.
-Unfortunately, as the bug is only seen when writing on the flash, and it
-only affects the speed of the device, he did not notice it.
-
-I sent the patches early because I expected the submission process to
-be long, and I wanted to be able to freeze the kernel version to be used
-on my board as soon as possible.
-
-Best regards,
+	M.
 -- 
-Romain Izard
+Jazz is not dead. It just smells funny...
