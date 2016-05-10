@@ -1,59 +1,40 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon,  9 May 2016 17:04:16 -0700
-Subject: [PATCH 6/6] drivers: net: xgene: fix register offset
-In-Reply-To: <1462838656-22043-1-git-send-email-isubramanian@apm.com>
-References: <1462838656-22043-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1462838656-22043-7-git-send-email-isubramanian@apm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 10 May 2016 09:14:24 +0900
+Subject: [PATCH] mmc: sdhci-st: correct name of sd-uhs-sdr50 property
+Message-ID: <1462839264-13300-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes SG_RX_DV_GATE_REG_0_ADDR register offset
-and ring state field lengths.
+Correct what appears to be a typo in the name of the sd-uhs-sdr50.
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Tested-by: Toan Le <toanle@apm.com>
+Also fix mixed tab/space indentation.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    | 6 +++---
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index a3c12dc..a4a1d3e 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -86,7 +86,7 @@ enum xgene_enet_rm {
- #define RINGADDRL_POS		5
- #define RINGADDRL_LEN		27
- #define RINGADDRH_POS		0
--#define RINGADDRH_LEN		6
-+#define RINGADDRH_LEN		7
- #define RINGSIZE_POS		23
- #define RINGSIZE_LEN		3
- #define RINGTYPE_POS		19
-@@ -94,9 +94,9 @@ enum xgene_enet_rm {
- #define RINGMODE_POS		20
- #define RINGMODE_LEN		3
- #define RECOMTIMEOUTL_POS	28
--#define RECOMTIMEOUTL_LEN	3
-+#define RECOMTIMEOUTL_LEN	4
- #define RECOMTIMEOUTH_POS	0
--#define RECOMTIMEOUTH_LEN	2
-+#define RECOMTIMEOUTH_LEN	3
- #define NUMMSGSINQ_POS		1
- #define NUMMSGSINQ_LEN		16
- #define ACCEPTLERR		BIT(19)
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-index 29a71b4..002df5a 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-@@ -33,7 +33,7 @@
- #define LINK_STATUS			BIT(2)
- #define LINK_UP				BIT(15)
- #define MPA_IDLE_WITH_QMI_EMPTY		BIT(12)
--#define SG_RX_DV_GATE_REG_0_ADDR	0x0dfc
-+#define SG_RX_DV_GATE_REG_0_ADDR	0x05fc
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+index 18d950df2749..88faa91125bf 100644
+--- a/Documentation/devicetree/bindings/mmc/sdhci-st.txt
++++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+@@ -38,7 +38,7 @@ Optional properties:
+ - bus-width:		Number of data lines.
+ 			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
  
- extern const struct xgene_mac_ops xgene_sgmac_ops;
- extern const struct xgene_port_ops xgene_sgport_ops;
+-- max-frequency: 	Can be 200MHz, 100Mz or 50MHz (default) and used for
++- max-frequency:	Can be 200MHz, 100Mz or 50MHz (default) and used for
+ 			configuring the CCONFIG3 in the mmcss.
+ 			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
+ 
+@@ -48,7 +48,7 @@ Optional properties:
+ - vqmmc-supply:		Phandle to the regulator dt node, mentioned as the vcc/vdd
+ 			supply in eMMC/SD specs.
+ 
+-- sd-uhs--sdr50:	To enable the SDR50 in the mmcss.
++- sd-uhs-sdr50:	To enable the SDR50 in the mmcss.
+ 			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
+ 
+ - sd-uhs-sdr104:	To enable the SDR104 in the mmcss.
 -- 
-1.9.1
+2.1.4
