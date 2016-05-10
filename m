@@ -1,78 +1,195 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 10 May 2016 10:55:49 -0700
-Subject: [PATCH] arm64: kernel: Fix incorrect brk randomization
-Message-ID: <20160510175549.GA20496@www.outflux.net>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 10 May 2016 19:59:00 +0200
+Subject: [PATCH V7 03/11] pci, of: Move the PCI I/O space management to
+ PCI core code.
+In-Reply-To: <1462893601-8937-4-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-4-git-send-email-tn@semihalf.com>
+Message-ID: <CAJZ5v0ge+LGwp=AkPF50H1ZXFA6J5ByazuY7Opc-aLJwWrBNxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes two issues with the arm64 brk randomziation. First, the
-STACK_RND_MASK was being used incorrectly. The original code was:
+On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> No functional changes in this patch.
+>
+> PCI I/O space mapping code does not depend on OF, therefore it can be
+> moved to PCI core code. This way we will be able to use it
+> e.g. in ACPI PCI code.
+>
+> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  drivers/of/address.c       | 116 +--------------------------------------------
+>  drivers/pci/pci.c          | 115 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_address.h |   9 ----
+>  include/linux/pci.h        |   5 ++
+>  4 files changed, 121 insertions(+), 124 deletions(-)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 91a469d..0a553c0 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -4,6 +4,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/module.h>
+>  #include <linux/of_address.h>
+> +#include <linux/pci.h>
+>  #include <linux/pci_regs.h>
+>  #include <linux/sizes.h>
+>  #include <linux/slab.h>
+> @@ -673,121 +674,6 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+>  }
+>  EXPORT_SYMBOL(of_get_address);
+>
+> -#ifdef PCI_IOBASE
+> -struct io_range {
+> -       struct list_head list;
+> -       phys_addr_t start;
+> -       resource_size_t size;
+> -};
+> -
+> -static LIST_HEAD(io_range_list);
+> -static DEFINE_SPINLOCK(io_range_lock);
+> -#endif
+> -
+> -/*
+> - * Record the PCI IO range (expressed as CPU physical address + size).
+> - * Return a negative value if an error has occured, zero otherwise
+> - */
+> -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> -{
+> -       int err = 0;
+> -
+> -#ifdef PCI_IOBASE
+> -       struct io_range *range;
+> -       resource_size_t allocated_size = 0;
+> -
+> -       /* check if the range hasn't been previously recorded */
+> -       spin_lock(&io_range_lock);
+> -       list_for_each_entry(range, &io_range_list, list) {
+> -               if (addr >= range->start && addr + size <= range->start + size) {
+> -                       /* range already registered, bail out */
+> -                       goto end_register;
+> -               }
+> -               allocated_size += range->size;
+> -       }
+> -
+> -       /* range not registed yet, check for available space */
+> -       if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
+> -               /* if it's too big check if 64K space can be reserved */
+> -               if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
+> -                       err = -E2BIG;
+> -                       goto end_register;
+> -               }
+> -
+> -               size = SZ_64K;
+> -               pr_warn("Requested IO range too big, new size set to 64K\n");
+> -       }
+> -
+> -       /* add the range to the list */
+> -       range = kzalloc(sizeof(*range), GFP_ATOMIC);
+> -       if (!range) {
+> -               err = -ENOMEM;
+> -               goto end_register;
+> -       }
+> -
+> -       range->start = addr;
+> -       range->size = size;
+> -
+> -       list_add_tail(&range->list, &io_range_list);
+> -
+> -end_register:
+> -       spin_unlock(&io_range_lock);
+> -#endif
+> -
+> -       return err;
+> -}
+> -
+> -phys_addr_t pci_pio_to_address(unsigned long pio)
+> -{
+> -       phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
+> -
+> -#ifdef PCI_IOBASE
+> -       struct io_range *range;
+> -       resource_size_t allocated_size = 0;
+> -
+> -       if (pio > IO_SPACE_LIMIT)
+> -               return address;
+> -
+> -       spin_lock(&io_range_lock);
+> -       list_for_each_entry(range, &io_range_list, list) {
+> -               if (pio >= allocated_size && pio < allocated_size + range->size) {
+> -                       address = range->start + pio - allocated_size;
+> -                       break;
+> -               }
+> -               allocated_size += range->size;
+> -       }
+> -       spin_unlock(&io_range_lock);
+> -#endif
+> -
+> -       return address;
+> -}
+> -
+> -unsigned long __weak pci_address_to_pio(phys_addr_t address)
+> -{
+> -#ifdef PCI_IOBASE
+> -       struct io_range *res;
+> -       resource_size_t offset = 0;
+> -       unsigned long addr = -1;
+> -
+> -       spin_lock(&io_range_lock);
+> -       list_for_each_entry(res, &io_range_list, list) {
+> -               if (address >= res->start && address < res->start + res->size) {
+> -                       addr = address - res->start + offset;
+> -                       break;
+> -               }
+> -               offset += res->size;
+> -       }
+> -       spin_unlock(&io_range_lock);
+> -
+> -       return addr;
+> -#else
+> -       if (address > IO_SPACE_LIMIT)
+> -               return (unsigned long)-1;
+> -
+> -       return (unsigned long) address;
+> -#endif
+> -}
+> -
+>  static int __of_address_to_resource(struct device_node *dev,
+>                 const __be32 *addrp, u64 size, unsigned int flags,
+>                 const char *name, struct resource *r)
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 25e0327..bc0c914 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3021,6 +3021,121 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
+>  }
+>  EXPORT_SYMBOL(pci_request_regions_exclusive);
+>
+> +#ifdef PCI_IOBASE
+> +struct io_range {
+> +       struct list_head list;
+> +       phys_addr_t start;
+> +       resource_size_t size;
+> +};
+> +
+> +static LIST_HEAD(io_range_list);
+> +static DEFINE_SPINLOCK(io_range_lock);
+> +#endif
+> +
+> +/*
+> + * Record the PCI IO range (expressed as CPU physical address + size).
+> + * Return a negative value if an error has occured, zero otherwise
+> + */
+> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> +{
+> +       int err = 0;
+> +
+> +#ifdef PCI_IOBASE
 
-	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
-
-STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit), with 4K pages where
-PAGE_SHIFT is 12:
-
-	#define STACK_RND_MASK	(test_thread_flag(TIF_32BIT) ? \
-						0x7ff >> (PAGE_SHIFT - 12) : \
-						0x3ffff >> (PAGE_SHIFT - 12))
-
-This means the resulting offset from base would be 0x7ff0001 or 0x3ffff0001,
-which is wrong since it creates an unaligned end address. It was likely
-intended to be:
-
-	unsigned long range_end = base + ((STACK_RND_MASK + 1) << PAGE_SHIFT)
-
-Which would result in offsets of 0x800000 (32-bit) and 0x40000000 (64-bit).
-
-However, even this corrected 32-bit compat offset (0x00800000) is much
-smaller than native ARM's brk randomization value (0x02000000):
-
-	unsigned long arch_randomize_brk(struct mm_struct *mm)
-	{
-	        unsigned long range_end = mm->brk + 0x02000000;
-	        return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
-	}
-
-So, instead of basing arm64's brk randomization on mistaken STACK_RND_MASK
-calculations, just use specific corrected values for compat (0x2000000)
-and native arm64 (0x40000000).
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm64/kernel/process.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 80624829db61..0d0969bcd76d 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -382,13 +382,14 @@ unsigned long arch_align_stack(unsigned long sp)
- 	return sp & ~0xf;
- }
- 
--static unsigned long randomize_base(unsigned long base)
--{
--	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
--	return randomize_range(base, range_end, 0) ? : base;
--}
--
- unsigned long arch_randomize_brk(struct mm_struct *mm)
- {
--	return randomize_base(mm->brk);
-+	unsigned long range_end = mm->brk;
-+
-+	if (test_thread_flag(TIF_32BIT))
-+		range_end += 0x02000000;
-+	else
-+		range_end += 0x40000000;
-+
-+	return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
- }
--- 
-2.6.3
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+I understand that this moves code around, but those in-function
+#ifdefs aren't nice.  Any chance to get rid of them but putting whole
+functions under the #ifdef?
