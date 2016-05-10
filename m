@@ -1,36 +1,34 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 22:09:18 +0200
-Subject: [PATCH v3 15/27] ARM: dts: exynos: Use phandle to get parent node in
- exynos5250-snow
+Date: Tue, 10 May 2016 22:09:08 +0200
+Subject: [PATCH v3 05/27] ARM: dts: exynos: Switch MCT node to a new fin_pll
+ clock
 In-Reply-To: <1462910970-1812-1-git-send-email-krzk@kernel.org>
 References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462910970-1812-16-git-send-email-krzk@kernel.org>
+Message-ID: <1462910970-1812-6-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c-arbitrator node in exynos5250-snow-common used absolute path to
-reference other node (the i2c parent). Use phandle instead, because the
-depth of the other node may be changed (like moving it under 'soc'
-node).
+The clk-exynos5410 driver now provides the "fin_pll" external fixed
+clock. Switch the Multi-Core Timer to this clock.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/exynos5250-snow-common.dtsi | 2 +-
+ arch/arm/boot/dts/exynos5410.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-index ddfe1f558c10..419d59da1751 100644
---- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-@@ -61,7 +61,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 7a56aec2c5ba..233149abfb62 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -125,7 +125,7 @@
+ 			interrupts = <0>, <1>, <2>, <3>,
+ 				<4>, <5>, <6>, <7>,
+ 				<8>, <9>, <10>, <11>;
+-			clocks = <&fin_pll>, <&clock CLK_MCT>;
++			clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
+ 			clock-names = "fin_pll", "mct";
  
--		i2c-parent = <&{/i2c@12CA0000}>;
-+		i2c-parent = <&i2c_4>;
- 
- 		our-claim-gpio = <&gpf0 3 GPIO_ACTIVE_LOW>;
- 		their-claim-gpios = <&gpe0 4 GPIO_ACTIVE_LOW>;
+ 			interrupt_map: interrupt-map {
 -- 
 2.5.0
