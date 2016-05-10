@@ -1,65 +1,70 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 10 May 2016 14:24:40 +0300
-Subject: [PATCH 19/23] mmc: sdhci-esdhc-imx: enable hw auto retuning for
- MAN_TUNING
-In-Reply-To: <1460741387-23815-20-git-send-email-aisheng.dong@nxp.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-20-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <5731C4F8.4070604@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 13:48:06 +0200
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <5731AE2E.2050403@huawei.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <9651510.pg5Vmm8vKS@wuerfel> <5731AE2E.2050403@huawei.com>
+Message-ID: <7091358.aJt1stteb5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/16 20:29, Dong Aisheng wrote:
-> Indicating hw auto retuning support for mx6qdl in the fake caps_1
-> register and enable auto retuning in post_tuning process after
-> tuning completes.
+On Tuesday 10 May 2016 17:47:26 Zhangjian wrote:
+> On 2016/5/10 16:36, Arnd Bergmann wrote:
+> > On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
+> >> On 2016/5/6 20:37, Yury Norov wrote:
 > 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> "include/uapi/asm-generic/posix_types.h" is uapi, we could not check
+> "ARCH_32BIT_OFF_T" here. Besides, the `__kernel_long_t` is long which
+> mean it is 32bit in ILP32. should we define something like x32?
+>      ```
+>      diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
+>      index 7985ff6..9baa8d3 100644
+>      --- a/arch/arm64/include/uapi/asm/posix_types.h
+>      +++ b/arch/arm64/include/uapi/asm/posix_types.h
 
-I presume this patch should wait for patch 17, but nevertheless:
+glibc does not use the definition of __kernel_off_t, it has its own
+copy, so changing the kernel headers would do nothing.
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+>      @@ -5,6 +5,9 @@ typedef unsigned short __kernel_old_uid_t;
+>       typedef unsigned short __kernel_old_gid_t;
+>        #define __kernel_old_uid_t __kernel_old_uid_t
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index a582a83..07b1144 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -301,7 +301,8 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
->  				/* imx6q/dl does not have cap_1 register, fake one */
->  				val = SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_SDR104
->  					| SDHCI_SUPPORT_SDR50
-> -					| SDHCI_USE_SDR50_TUNING;
-> +					| SDHCI_USE_SDR50_TUNING
-> +					| (SDHCI_TUNING_MODE_3 << SDHCI_RETUNING_MODE_SHIFT);
->  
->  			if (imx_data->socdata->flags & ESDHC_FLAG_HS400)
->  				val |= SDHCI_SUPPORT_HS400;
-> @@ -471,10 +472,13 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  		writel(new_val, host->ioaddr + ESDHC_VENDOR_SPEC);
->  		if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING) {
->  			new_val = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> -			if (val & SDHCI_CTRL_TUNED_CLK)
-> +			if (val & SDHCI_CTRL_TUNED_CLK) {
->  				new_val |= ESDHC_MIX_CTRL_SMPCLK_SEL;
-> -			else
-> +				new_val |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
-> +			} else {
->  				new_val &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-> +				new_val &= ~ESDHC_MIX_CTRL_AUTO_TUNE_EN;
-> +			}
->  			writel(new_val , host->ioaddr + ESDHC_MIX_CTRL);
->  		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
->  			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
-> @@ -760,6 +764,7 @@ static void esdhc_post_tuning(struct sdhci_host *host)
->  
->  	reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
->  	reg &= ~ESDHC_MIX_CTRL_EXE_TUNE;
-> +	reg |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
->  	writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
->  }
->  
+>       +typedef long long __kernel_long_t;
+>       +typedef unsigned long long __kernel_ulong_t;
+>       +
+>        #include <asm-generic/posix_types.h>
 > 
+>        #endif /*  __ASM_POSIX_TYPES_H */u
+>      ```
+
+This would break all sorts of things, because __kernel_long_t/__kernel_ulong_t
+are not just used for off_t but also other things.
+
+> 
+> On the other hand, glibc define it own off_t in "bits/types.h":
+>      __STD_TYPE __OFF_T_TYPE __off_t;        /* Type of file sizes and offsets.  */
+>      __STD_TYPE __OFF64_T_TYPE __off64_t;    /* Type of file sizes and offsets (LFS).  */
+> 
+> in "sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h":
+>      #define __OFF_T_TYPE            __SLONGWORD_TYPE
+>      #define __OFF64_T_TYPE          __SQUAD_TYPE
+> 
+> If we define off_t as 64bit in glibc:
+>      #define __OFF_T_TYPE           __SQUAD_TYPE
+> 
+> Should We need to align all the off_t syscall to 64bit syscall in
+> kernel?
+> 
+
+Yes, this is the change that I think we need to make, along with
+the same change for __INO_T_TYPE and 
+
+#define __OFF_T_MATCHES_OFF64_T        1
+#define __INO_T_MATCHES_INO64_T        1
+
+If I read the rest of the glibc headers right, that should be all we need
+to ensure that both off_t and off64_t match the __kernel_loff_t based
+syscalls.
+
+	Arnd
