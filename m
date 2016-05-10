@@ -1,195 +1,87 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 10 May 2016 19:59:00 +0200
-Subject: [PATCH V7 03/11] pci, of: Move the PCI I/O space management to
- PCI core code.
-In-Reply-To: <1462893601-8937-4-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-4-git-send-email-tn@semihalf.com>
-Message-ID: <CAJZ5v0ge+LGwp=AkPF50H1ZXFA6J5ByazuY7Opc-aLJwWrBNxg@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Tue, 10 May 2016 11:16:35 -0700
+Subject: [PATCH] mmc: dw_mmc: rockchip: Set the drive phase to 180 degrees
+Message-ID: <1462904195-18229-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> No functional changes in this patch.
->
-> PCI I/O space mapping code does not depend on OF, therefore it can be
-> moved to PCI core code. This way we will be able to use it
-> e.g. in ACPI PCI code.
->
-> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  drivers/of/address.c       | 116 +--------------------------------------------
->  drivers/pci/pci.c          | 115 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_address.h |   9 ----
->  include/linux/pci.h        |   5 ++
->  4 files changed, 121 insertions(+), 124 deletions(-)
->
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 91a469d..0a553c0 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -4,6 +4,7 @@
->  #include <linux/ioport.h>
->  #include <linux/module.h>
->  #include <linux/of_address.h>
-> +#include <linux/pci.h>
->  #include <linux/pci_regs.h>
->  #include <linux/sizes.h>
->  #include <linux/slab.h>
-> @@ -673,121 +674,6 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
->  }
->  EXPORT_SYMBOL(of_get_address);
->
-> -#ifdef PCI_IOBASE
-> -struct io_range {
-> -       struct list_head list;
-> -       phys_addr_t start;
-> -       resource_size_t size;
-> -};
-> -
-> -static LIST_HEAD(io_range_list);
-> -static DEFINE_SPINLOCK(io_range_lock);
-> -#endif
-> -
-> -/*
-> - * Record the PCI IO range (expressed as CPU physical address + size).
-> - * Return a negative value if an error has occured, zero otherwise
-> - */
-> -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> -{
-> -       int err = 0;
-> -
-> -#ifdef PCI_IOBASE
-> -       struct io_range *range;
-> -       resource_size_t allocated_size = 0;
-> -
-> -       /* check if the range hasn't been previously recorded */
-> -       spin_lock(&io_range_lock);
-> -       list_for_each_entry(range, &io_range_list, list) {
-> -               if (addr >= range->start && addr + size <= range->start + size) {
-> -                       /* range already registered, bail out */
-> -                       goto end_register;
-> -               }
-> -               allocated_size += range->size;
-> -       }
-> -
-> -       /* range not registed yet, check for available space */
-> -       if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
-> -               /* if it's too big check if 64K space can be reserved */
-> -               if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
-> -                       err = -E2BIG;
-> -                       goto end_register;
-> -               }
-> -
-> -               size = SZ_64K;
-> -               pr_warn("Requested IO range too big, new size set to 64K\n");
-> -       }
-> -
-> -       /* add the range to the list */
-> -       range = kzalloc(sizeof(*range), GFP_ATOMIC);
-> -       if (!range) {
-> -               err = -ENOMEM;
-> -               goto end_register;
-> -       }
-> -
-> -       range->start = addr;
-> -       range->size = size;
-> -
-> -       list_add_tail(&range->list, &io_range_list);
-> -
-> -end_register:
-> -       spin_unlock(&io_range_lock);
-> -#endif
-> -
-> -       return err;
-> -}
-> -
-> -phys_addr_t pci_pio_to_address(unsigned long pio)
-> -{
-> -       phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
-> -
-> -#ifdef PCI_IOBASE
-> -       struct io_range *range;
-> -       resource_size_t allocated_size = 0;
-> -
-> -       if (pio > IO_SPACE_LIMIT)
-> -               return address;
-> -
-> -       spin_lock(&io_range_lock);
-> -       list_for_each_entry(range, &io_range_list, list) {
-> -               if (pio >= allocated_size && pio < allocated_size + range->size) {
-> -                       address = range->start + pio - allocated_size;
-> -                       break;
-> -               }
-> -               allocated_size += range->size;
-> -       }
-> -       spin_unlock(&io_range_lock);
-> -#endif
-> -
-> -       return address;
-> -}
-> -
-> -unsigned long __weak pci_address_to_pio(phys_addr_t address)
-> -{
-> -#ifdef PCI_IOBASE
-> -       struct io_range *res;
-> -       resource_size_t offset = 0;
-> -       unsigned long addr = -1;
-> -
-> -       spin_lock(&io_range_lock);
-> -       list_for_each_entry(res, &io_range_list, list) {
-> -               if (address >= res->start && address < res->start + res->size) {
-> -                       addr = address - res->start + offset;
-> -                       break;
-> -               }
-> -               offset += res->size;
-> -       }
-> -       spin_unlock(&io_range_lock);
-> -
-> -       return addr;
-> -#else
-> -       if (address > IO_SPACE_LIMIT)
-> -               return (unsigned long)-1;
-> -
-> -       return (unsigned long) address;
-> -#endif
-> -}
-> -
->  static int __of_address_to_resource(struct device_node *dev,
->                 const __be32 *addrp, u64 size, unsigned int flags,
->                 const char *name, struct resource *r)
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 25e0327..bc0c914 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3021,6 +3021,121 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
->  }
->  EXPORT_SYMBOL(pci_request_regions_exclusive);
->
-> +#ifdef PCI_IOBASE
-> +struct io_range {
-> +       struct list_head list;
-> +       phys_addr_t start;
-> +       resource_size_t size;
-> +};
-> +
-> +static LIST_HEAD(io_range_list);
-> +static DEFINE_SPINLOCK(io_range_lock);
-> +#endif
-> +
-> +/*
-> + * Record the PCI IO range (expressed as CPU physical address + size).
-> + * Return a negative value if an error has occured, zero otherwise
-> + */
-> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> +{
-> +       int err = 0;
-> +
-> +#ifdef PCI_IOBASE
+Historically for Rockchip devices we've relied on the power-on
+default (or perhaps the firmware setting) to get the correct drive
+phase for dw_mmc devices.  This worked OK for the most part, but:
 
-I understand that this moves code around, but those in-function
-#ifdefs aren't nice.  Any chance to get rid of them but putting whole
-functions under the #ifdef?
+* Relying on the setting just "being right" is a bit fragile.
+
+* As soon as there is an instance where the power on default is wrong or
+  where the firmware didn't configure this properly then we'll get a
+  mysterious failure.
+
+Let's explicitly set this phase in the kernel.
+
+You might notice that this patch is currently very dumb and just always
+sets this phase to 180 degrees.  As far as I can tell this is actually a
+sane thing to do.  From reading through the Designware Databook it
+appears that there are instances where you could still meet hold time
+requirements and set this phase to 90 degrees, but nothing I've read
+indicates that 180 degrees is not OK also.
+
+As indicated above, adding a delay to the drive is used to achieve
+proper hold times.  For a given speed mode hold times are listed in the
+spec in terms of nanoseconds.  The hold times are different for
+different speed modes.  The actual hold time achieved is actually a
+function of Delay_O (an internal delay in dw_mmc, which could vary from
+SoC model to SoC model), pad delays, and the drive delay (which we're
+setting here).  Note also that by setting the drive delay as a phase we
+will get a different number of nanoseconds of delay depending on the
+input clock.
+
+Note that, as far as I can tell, this _does_ change the behavior of
+rk3288 devices.  On devices I tested, which use coreboot/depthcharge as
+BIOS, the SDMMC/SDIO0/SDIO1 drive phase used to be 90 degrees.  Now it
+will be 180 degrees.  With my understanding from the Designware Databook
+the 180 degrees ought to be more correct and should increase
+compatibility.
+
+I have tested this by inserting my collection of uSD cards (mostly UHS,
+though a few not) into a veyron_minnie and confirmed that they still
+seem to enumerate properly.  For a subset of them I tried putting a
+filesystem on them and also tried running mmc_test.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/mmc/host/dw_mmc-rockchip.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index 8c20b81cafd8..62cbd33a07cd 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -66,6 +66,27 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+ 	/* Make sure we use phases which we can enumerate with */
+ 	if (!IS_ERR(priv->sample_clk))
+ 		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
++
++	/*
++	 * Set the drive phase to 180 degrees.  This helps us achieve proper
++	 * hold times.
++	 *
++	 * Note that this is _not_ a value that is tuned and is also _not_ a
++	 * value that will vary from board to board.  It is a value that
++	 * _could_ vary between different SoC models (could be different on
++	 * rk3066 vs. rk3288 for instance).  It is also a value that _could_
++	 * need to be adjusted based on our clock frequency and speed mode
++	 * since different speed modes have different hold time requirements
++	 * and hold time requirements are in "ns" (a phase offset adds a
++	 * different "ns" delay for different input clocks).
++	 *
++	 * Despite these theoretical needs, it has been observed that 180
++	 * degrees gives us good signaling across all tested SoCs and all
++	 * tested speed modes.  If when we find someone that needs 90 degrees
++	 * here we can add a table based on speed mode / SoC compatible ID.
++	 */
++	if (!IS_ERR(priv->drv_clk))
++		clk_set_phase(priv->drv_clk, 180);
+ }
+ 
+ #define NUM_PHASES			360
+-- 
+2.8.0.rc3.226.g39d4020
