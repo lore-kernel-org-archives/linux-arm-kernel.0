@@ -1,31 +1,32 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 10 May 2016 20:59:56 +0200
-Subject: [PATCH -trivial 1/3] Documentation: vm: Spelling s/paltform/platform/g
-Message-ID: <1462906798-27993-1-git-send-email-geert+renesas@glider.be>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Tue, 10 May 2016 21:00:20 +0200
+Subject: [PATCH] devicetree: sunxi: Add OLinuXino Lime2 eMMC to the Makefile
+Message-ID: <1462906820-5203-1-git-send-email-oliver@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- Documentation/vm/hugetlbpage.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ARM: dts: sunxi: Add a olinuxino-lime2-emmc added the new emmc equipped
+lime2 but forgot its Makefile. This patch adds an entry to the Makefile.
 
-diff --git a/Documentation/vm/hugetlbpage.txt b/Documentation/vm/hugetlbpage.txt
-index 54dd9b9c6c31aeed..6f3b3fa35613d900 100644
---- a/Documentation/vm/hugetlbpage.txt
-+++ b/Documentation/vm/hugetlbpage.txt
-@@ -275,10 +275,10 @@ This command mounts a (pseudo) filesystem of type hugetlbfs on the directory
- options sets the owner and group of the root of the file system.  By default
- the uid and gid of the current process are taken.  The mode option sets the
- mode of root of file system to value & 01777.  This value is given in octal.
--By default the value 0755 is picked. If the paltform supports multiple huge
-+By default the value 0755 is picked. If the platform supports multiple huge
- page sizes, the pagesize option can be used to specify the huge page size and
- associated pool.  pagesize is specified in bytes.  If pagesize is not specified
--the paltform's default huge page size and associated pool will be used. The
-+the platform's default huge page size and associated pool will be used. The
- size option sets the maximum value of memory (huge pages) allowed for that
- filesystem (/mnt/huge).  The size option can be specified in bytes, or as a
- percentage of the specified huge page pool (nr_hugepages).  The size is
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+---
+Maxime, I'm sorry for ommitting the Makefile initially, if it is not merged yet,
+maybe just squash it with the previous patch?
+
+ arch/arm/boot/dts/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 95c1923..07f4cf8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -695,6 +695,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-olimex-som-evb.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
+ 	sun7i-a20-olinuxino-lime2.dtb \
++	sun7i-a20-olinuxino-lime2-emmc.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+ 	sun7i-a20-orangepi.dtb \
+ 	sun7i-a20-orangepi-mini.dtb \
 -- 
-1.9.1
+2.8.1
