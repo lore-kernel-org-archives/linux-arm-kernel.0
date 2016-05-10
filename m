@@ -1,134 +1,339 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 10 May 2016 17:19:50 +0200
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host controller
-Message-ID: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+Date: Tue, 10 May 2016 17:19:53 +0200
+Subject: [PATCH V7 03/11] pci,
+ of: Move the PCI I/O space management to PCI core code.
+In-Reply-To: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+Message-ID: <1462893601-8937-4-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the functionality point of view this series may be split into the
-following logic parts:
-1. New ECAM API and update for users of the pci-host-common API
-2. Necessary fixes as the preparation for using driver on ARM64.
-3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
-4. Enable above driver on ARM64
+No functional changes in this patch.
 
-Patches has been built on top of 4.6-rc7 and can be found here:
-git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v7)
+PCI I/O space mapping code does not depend on OF, therefore it can be
+moved to PCI core code. This way we will be able to use it
+e.g. in ACPI PCI code.
 
-This has been tested on Cavium ThunderX server. Any help in reviewing and
-testing is very appreciated.
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/of/address.c       | 116 +--------------------------------------------
+ drivers/pci/pci.c          | 115 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h |   9 ----
+ include/linux/pci.h        |   5 ++
+ 4 files changed, 121 insertions(+), 124 deletions(-)
 
-v6 -> v7
-- drop quirks handling
-- changes for ACPI companion and domain number assignment approach
-- implement arch pcibios_{add|remove}_bus and call acpi_pci_{add|remove}_bus from there
-- cleanups around nomenclature
-- use resources oriented API for ECAM
-- fix for based address calculation before mapping ECAM region
-- remove useless lock for MCFG lookup
-- move MCFG stuff to separated file pci_mcfg.c
-- drop MCFG entries caching
-- rebase against 4.6-rc7
-
-v5 -> v6
-- drop idea of x86 MMCONFIG code refactoring
-- integrate JC's patches which introduce new ECAM API:
-  https://lkml.org/lkml/2016/4/11/907
-  git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
-- integrate Sinan's fix for releasing IO resources, see patch [06/13]
-- added ACPI support for ThunderX ECAM and PEM drivers
-- rebase against 4.6-rc2
-
-v4 -> v5
-- drop MCFG refactoring group patches 1-6 from series v4 and integrate Jayachandran's patch
-  https://patchwork.ozlabs.org/patch/575525/
-- rewrite PCI legacy IRQs allocation
-- squash two patches 11 and 12 from series v4, fixed bisection issue
-- changelog improvements
-- rebase against 4.5-rc3
-
-v3 -> v4
-- drop Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
-- add Lorenzo's fix patch 19/24
-- ACPI PCI bus domain number assigning cleanup
-- change resource management, we now claim and reassign resources
-- improvements for applying quirks
-- drop Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
-- rebase against 4.5-rc1
-
-v2 -> v3
-- fix legacy IRQ assigning and IO ports registration
-- remove reference to arch specific companion device for ia64
-- move ACPI PCI host controller driver to pci_root.c
-- drop generic domain assignment for x86 and ia64 as I am not
-  able to run all necessary test variants
-- drop patch which cleaned legacy IRQ assignment since it belongs to
-  Mathew's series:
-  https://patchwork.ozlabs.org/patch/557504/
-- extend MCFG quirk code
-- rebase against 4.4
-
-v1 -> v2
-- move non-arch specific piece of code to dirver/acpi/ directory
-- fix IO resource handling
-- introduce PCI config accessors quirks matching
-- moved ACPI_COMPANION_SET to generic code
-
-v1 - https://lkml.org/lkml/2015/10/27/504
-v2 - https://lkml.org/lkml/2015/12/16/246
-v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
-v4 - https://lkml.org/lkml/2016/2/4/646
-v5 - https://lkml.org/lkml/2016/2/16/426
-v6 - https://lkml.org/lkml/2016/4/15/594
-
-Jayachandran C (2):
-  PCI: Provide common functions for ECAM mapping
-  PCI: generic, thunder: update to use generic ECAM API
-
-Tomasz Nowicki (9):
-  pci, of: Move the PCI I/O space management to PCI core code.
-  pci: Add new function to unmap IO resources.
-  acpi, pci: Support IO resources when parsing PCI host bridge
-    resources.
-  pci, acpi: Provide a way to assign bus domain number.
-  pci, acpi: Handle ACPI companion assignment.
-  pci, acpi: Support for ACPI based generic PCI host controller
-  arm64, pci, acpi: ACPI support for legacy IRQs parsing and
-    consolidation with DT code.
-  arm64, pci, acpi: Provide ACPI-specific prerequisites for PCI bus
-    enumeration.
-  arm64, pci, acpi: Start using ACPI based PCI host controller driver
-    for ARM64.
-
- arch/arm64/Kconfig                  |   1 +
- arch/arm64/kernel/pci.c             |  34 +++-----
- drivers/acpi/Kconfig                |   8 ++
- drivers/acpi/Makefile               |   1 +
- drivers/acpi/pci_mcfg.c             |  97 ++++++++++++++++++++++
- drivers/acpi/pci_root.c             |  33 ++++++++
- drivers/acpi/pci_root_generic.c     | 149 +++++++++++++++++++++++++++++++++
- drivers/of/address.c                | 116 +-------------------------
- drivers/pci/Kconfig                 |   3 +
- drivers/pci/Makefile                |   2 +
- drivers/pci/ecam.c                  | 161 ++++++++++++++++++++++++++++++++++++
- drivers/pci/ecam.h                  |  72 ++++++++++++++++
- drivers/pci/host/Kconfig            |   1 +
- drivers/pci/host/pci-host-common.c  | 114 +++++++++++--------------
- drivers/pci/host/pci-host-common.h  |  47 -----------
- drivers/pci/host/pci-host-generic.c |  52 +++---------
- drivers/pci/host/pci-thunder-ecam.c |  39 ++-------
- drivers/pci/host/pci-thunder-pem.c  |  92 ++++++++++-----------
- drivers/pci/pci.c                   | 150 ++++++++++++++++++++++++++++++++-
- drivers/pci/probe.c                 |   2 +
- include/linux/of_address.h          |   9 --
- include/linux/pci-acpi.h            |  14 ++++
- include/linux/pci.h                 |  11 ++-
- 23 files changed, 823 insertions(+), 385 deletions(-)
- create mode 100644 drivers/acpi/pci_mcfg.c
- create mode 100644 drivers/acpi/pci_root_generic.c
- create mode 100644 drivers/pci/ecam.c
- create mode 100644 drivers/pci/ecam.h
- delete mode 100644 drivers/pci/host/pci-host-common.h
-
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 91a469d..0a553c0 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -4,6 +4,7 @@
+ #include <linux/ioport.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
++#include <linux/pci.h>
+ #include <linux/pci_regs.h>
+ #include <linux/sizes.h>
+ #include <linux/slab.h>
+@@ -673,121 +674,6 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+ }
+ EXPORT_SYMBOL(of_get_address);
+ 
+-#ifdef PCI_IOBASE
+-struct io_range {
+-	struct list_head list;
+-	phys_addr_t start;
+-	resource_size_t size;
+-};
+-
+-static LIST_HEAD(io_range_list);
+-static DEFINE_SPINLOCK(io_range_lock);
+-#endif
+-
+-/*
+- * Record the PCI IO range (expressed as CPU physical address + size).
+- * Return a negative value if an error has occured, zero otherwise
+- */
+-int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+-{
+-	int err = 0;
+-
+-#ifdef PCI_IOBASE
+-	struct io_range *range;
+-	resource_size_t allocated_size = 0;
+-
+-	/* check if the range hasn't been previously recorded */
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(range, &io_range_list, list) {
+-		if (addr >= range->start && addr + size <= range->start + size) {
+-			/* range already registered, bail out */
+-			goto end_register;
+-		}
+-		allocated_size += range->size;
+-	}
+-
+-	/* range not registed yet, check for available space */
+-	if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
+-		/* if it's too big check if 64K space can be reserved */
+-		if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
+-			err = -E2BIG;
+-			goto end_register;
+-		}
+-
+-		size = SZ_64K;
+-		pr_warn("Requested IO range too big, new size set to 64K\n");
+-	}
+-
+-	/* add the range to the list */
+-	range = kzalloc(sizeof(*range), GFP_ATOMIC);
+-	if (!range) {
+-		err = -ENOMEM;
+-		goto end_register;
+-	}
+-
+-	range->start = addr;
+-	range->size = size;
+-
+-	list_add_tail(&range->list, &io_range_list);
+-
+-end_register:
+-	spin_unlock(&io_range_lock);
+-#endif
+-
+-	return err;
+-}
+-
+-phys_addr_t pci_pio_to_address(unsigned long pio)
+-{
+-	phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
+-
+-#ifdef PCI_IOBASE
+-	struct io_range *range;
+-	resource_size_t allocated_size = 0;
+-
+-	if (pio > IO_SPACE_LIMIT)
+-		return address;
+-
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(range, &io_range_list, list) {
+-		if (pio >= allocated_size && pio < allocated_size + range->size) {
+-			address = range->start + pio - allocated_size;
+-			break;
+-		}
+-		allocated_size += range->size;
+-	}
+-	spin_unlock(&io_range_lock);
+-#endif
+-
+-	return address;
+-}
+-
+-unsigned long __weak pci_address_to_pio(phys_addr_t address)
+-{
+-#ifdef PCI_IOBASE
+-	struct io_range *res;
+-	resource_size_t offset = 0;
+-	unsigned long addr = -1;
+-
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(res, &io_range_list, list) {
+-		if (address >= res->start && address < res->start + res->size) {
+-			addr = address - res->start + offset;
+-			break;
+-		}
+-		offset += res->size;
+-	}
+-	spin_unlock(&io_range_lock);
+-
+-	return addr;
+-#else
+-	if (address > IO_SPACE_LIMIT)
+-		return (unsigned long)-1;
+-
+-	return (unsigned long) address;
+-#endif
+-}
+-
+ static int __of_address_to_resource(struct device_node *dev,
+ 		const __be32 *addrp, u64 size, unsigned int flags,
+ 		const char *name, struct resource *r)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 25e0327..bc0c914 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3021,6 +3021,121 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
+ }
+ EXPORT_SYMBOL(pci_request_regions_exclusive);
+ 
++#ifdef PCI_IOBASE
++struct io_range {
++	struct list_head list;
++	phys_addr_t start;
++	resource_size_t size;
++};
++
++static LIST_HEAD(io_range_list);
++static DEFINE_SPINLOCK(io_range_lock);
++#endif
++
++/*
++ * Record the PCI IO range (expressed as CPU physical address + size).
++ * Return a negative value if an error has occured, zero otherwise
++ */
++int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
++{
++	int err = 0;
++
++#ifdef PCI_IOBASE
++	struct io_range *range;
++	resource_size_t allocated_size = 0;
++
++	/* check if the range hasn't been previously recorded */
++	spin_lock(&io_range_lock);
++	list_for_each_entry(range, &io_range_list, list) {
++		if (addr >= range->start && addr + size <= range->start + size) {
++			/* range already registered, bail out */
++			goto end_register;
++		}
++		allocated_size += range->size;
++	}
++
++	/* range not registed yet, check for available space */
++	if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
++		/* if it's too big check if 64K space can be reserved */
++		if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
++			err = -E2BIG;
++			goto end_register;
++		}
++
++		size = SZ_64K;
++		pr_warn("Requested IO range too big, new size set to 64K\n");
++	}
++
++	/* add the range to the list */
++	range = kzalloc(sizeof(*range), GFP_ATOMIC);
++	if (!range) {
++		err = -ENOMEM;
++		goto end_register;
++	}
++
++	range->start = addr;
++	range->size = size;
++
++	list_add_tail(&range->list, &io_range_list);
++
++end_register:
++	spin_unlock(&io_range_lock);
++#endif
++
++	return err;
++}
++
++phys_addr_t pci_pio_to_address(unsigned long pio)
++{
++	phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
++
++#ifdef PCI_IOBASE
++	struct io_range *range;
++	resource_size_t allocated_size = 0;
++
++	if (pio > IO_SPACE_LIMIT)
++		return address;
++
++	spin_lock(&io_range_lock);
++	list_for_each_entry(range, &io_range_list, list) {
++		if (pio >= allocated_size && pio < allocated_size + range->size) {
++			address = range->start + pio - allocated_size;
++			break;
++		}
++		allocated_size += range->size;
++	}
++	spin_unlock(&io_range_lock);
++#endif
++
++	return address;
++}
++
++unsigned long __weak pci_address_to_pio(phys_addr_t address)
++{
++#ifdef PCI_IOBASE
++	struct io_range *res;
++	resource_size_t offset = 0;
++	unsigned long addr = -1;
++
++	spin_lock(&io_range_lock);
++	list_for_each_entry(res, &io_range_list, list) {
++		if (address >= res->start && address < res->start + res->size) {
++			addr = address - res->start + offset;
++			break;
++		}
++		offset += res->size;
++	}
++	spin_unlock(&io_range_lock);
++
++	return addr;
++#else
++	if (address > IO_SPACE_LIMIT)
++		return (unsigned long)-1;
++
++	return (unsigned long) address;
++#endif
++}
++
+ /**
+  *	pci_remap_iospace - Remap the memory mapped I/O space
+  *	@res: Resource describing the I/O space
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 01c0a55..3786473 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -47,10 +47,6 @@ void __iomem *of_io_request_and_map(struct device_node *device,
+ extern const __be32 *of_get_address(struct device_node *dev, int index,
+ 			   u64 *size, unsigned int *flags);
+ 
+-extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+-extern unsigned long pci_address_to_pio(phys_addr_t addr);
+-extern phys_addr_t pci_pio_to_address(unsigned long pio);
+-
+ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+ 			struct device_node *node);
+ extern struct of_pci_range *of_pci_range_parser_one(
+@@ -86,11 +82,6 @@ static inline const __be32 *of_get_address(struct device_node *dev, int index,
+ 	return NULL;
+ }
+ 
+-static inline phys_addr_t pci_pio_to_address(unsigned long pio)
+-{
+-	return 0;
+-}
+-
+ static inline int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+ 			struct device_node *node)
+ {
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 932ec74..d2a57f3 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1165,6 +1165,9 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
+ 			void *alignf_data);
+ 
+ 
++int pci_register_io_range(phys_addr_t addr, resource_size_t size);
++unsigned long pci_address_to_pio(phys_addr_t addr);
++phys_addr_t pci_pio_to_address(unsigned long pio);
+ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+ 
+ static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+@@ -1481,6 +1484,8 @@ static inline int pci_request_regions(struct pci_dev *dev, const char *res_name)
+ { return -EIO; }
+ static inline void pci_release_regions(struct pci_dev *dev) { }
+ 
++static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
++
+ static inline void pci_block_cfg_access(struct pci_dev *dev) { }
+ static inline int pci_block_cfg_access_in_atomic(struct pci_dev *dev)
+ { return 0; }
 -- 
 1.9.1
