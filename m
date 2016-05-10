@@ -1,79 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 May 2016 15:31:57 +0100
-Subject: [PATCH] arm64: kgdb: Match pstate size with gdbserver protocol
-In-Reply-To: <df946c87-162f-fdda-879b-76b4ad1a1c7a@linaro.org>
-References: <1462815566-15086-1-git-send-email-daniel.thompson@linaro.org>
- <20160510104511.GH687@leverpostej>
- <df946c87-162f-fdda-879b-76b4ad1a1c7a@linaro.org>
-Message-ID: <20160510143156.GB10785@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 10 May 2016 15:35:06 +0100
+Subject: [PATCH v3a] KVM: arm/arm64: pmu: abstract access to number of SPIs
+In-Reply-To: <5731AF57.2040707@linaro.org>
+References: <5731AF57.2040707@linaro.org>
+Message-ID: <1462890906-6134-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 02:41:54PM +0100, Daniel Thompson wrote:
-> On 10/05/16 11:45, Mark Rutland wrote:
-> >>When commit 44679a4f142b ("arm64: KGDB: Add step debugging support") was
-> >>introduced it was paired with a gdb patch that made an incompatible
-> >>change to the gdbserver protocol. This patch was eventually merged into
-> >>the gdb sources:
-> >>https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=a4d9ba85ec5597a6a556afe26b712e878374b9dd
-> >>
-> >>The change to the protocol was mostly made to simplify big-endian support
-> >>inside the kernel gdb stub.
-> >
-> >While that was how we discovered the inconsistency, a major concern is
-> >that SPSR_EL* (i.e. PSTATE), as accessed by MRS/MSR is a 64-bit
-> >quantity, even if the upper 32 bits are RES0 today.
-> >
-> >It is conceivable that the upper 32 bits could be used in future (as
-> >happened with CLIDR_EL1), and for this reason we expose those upper 32
-> >bits from the kernel, and treat system registers as 64-bit quantities
-> >generally.
-> 
-> These cases are not exactly the same.
-> 
-> CLIDR_ELx is (or was) architecturally defined as a 64-bit register
-> and explicitly marks the upper 32-bits as RES0.
-> 
-> That is not the case for SPSR_ELx; this register is architecturally
-> defined to be 32-bit.
+Currently the PMU uses a member of the struct vgic_dist directly,
+which not only breaks abstraction, but will fail with the new VGIC.
+Abstract this access in the VGIC header file.
 
-The below doesn't necessarily change your subsequent argument, but that
-isn't quite true.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi Eric, Marc,
 
-The two cases are in fact identical if you dig into the history a bit
-further. Take a look in an earlier revision of the ARM ARM (e.g. ARM DDI
-0487A.b), where it was explicitly stated:
+as this if-statement was quite confusing (it wasn't even the negation
+that was wrong), I rewrote it a bit to be more readable.
+This one works now with PPIs (after fixing kvmtool).
 
-	Attributes
-		CLIDR_EL1 is a 32-bit register.
+Does that make sense?
 
-This was subsequently upgraded to 64-bit with the addition of ICB.
+Cheers,
+Andre.
 
-Based on this, my PoV is that any register that the ARM ARM describes as
-"a 32-bit register" is a 64-bit register for which the upper 32 bits are
-RES0.
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/pmu.c     | 19 +++++++++++--------
+ 2 files changed, 13 insertions(+), 8 deletions(-)
 
-> I know that doesn't *prevent* SPSR_ELx from being expanded in the
-> future it is not unreasonable for gdb to design its wire protocol
-> based on the description found in the architecture manual.
-> 
-> >So this was also about ensuring the interface was consistent and to some
-> >extent future-proof.
-> 
-> gdb remote protocol is already future proof and has never at any
-> point contradicted the architecture.
-> 
-> However the changes to the protocol in 7.7.x and 7.8.0 were
-> analogous to an unexpected ABI change rather than a carefully
-> controlled introduction of a new feature. Like the kernel, once
-> detected, they were reversed ;-) .
-
-To be clear, I don't disagree with this. The ARM ARM is at best
-amigibious w.r.t. what it means by "a 32-bit register", and that's the
-only point of contention.
-
-However, we should make note of the above as a key point of rationale,
-as it affects other decisions we make in this area.
-
-Thanks,
-Mark.
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 6a98e05..d406f8e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -351,6 +351,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
++#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
++				 ((i) < (k)->arch.vgic.nr_irqs))
+ 
+ int vgic_v2_probe(struct device_node *vgic_node,
+ 		  const struct vgic_ops **ops,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 575c7aa..6ab9d6b 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -436,6 +436,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 	return 0;
+ }
+ 
++/*
++ * For one VM the interrupt type must be same for each vcpu.
++ * As a PPI, the interrupt number is the same for all vcpus,
++ * while as an SPI it must be a separate number per vcpu.
++ */
+ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+ {
+ 	int i;
+@@ -457,6 +462,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+ 	return true;
+ }
+ 
++#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
+ 
+ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ {
+@@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		if (get_user(irq, uaddr))
+ 			return -EFAULT;
+ 
+-		/*
+-		 * The PMU overflow interrupt could be a PPI or SPI, but for one
+-		 * VM the interrupt type must be same for each vcpu. As a PPI,
+-		 * the interrupt number is the same for all vcpus, while as an
+-		 * SPI it must be a separate number per vcpu.
+-		 */
+-		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
+-		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
++		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
++		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
++			return -EINVAL;
++
++		if (!irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+ 			return -EINVAL;
+ 
+ 		if (kvm_arm_pmu_irq_initialized(vcpu))
+-- 
+2.7.3
