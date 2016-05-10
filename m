@@ -1,113 +1,93 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Tue, 10 May 2016 10:32:09 +0200
-Subject: [PATCH 0/5] clk: bcm2835: add flags for mash and parent clocks
-In-Reply-To: <87h9e6yb6i.fsf@eliezer.anholt.net>
-References: <1462463608-22940-1-git-send-email-kernel@martin.sperl.org>
- <87h9e6yb6i.fsf@eliezer.anholt.net>
-Message-ID: <57319C89.7040705@martin.sperl.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 10 May 2016 10:33:40 +0200
+Subject: [PATCH v3 06/55] KVM: arm/arm64: arch_timer: Remove irq_phys_map
+In-Reply-To: <1462531568-9799-7-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <57319CE4.30608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andre,
+On 05/06/2016 12:45 PM, Andre Przywara wrote:
+> Now that the interface between the arch timer and the VGIC does not
+> require passing the irq_phys_map entry pointer anymore, let's remove
+> it from the virtual arch timer and use the virtual IRQ number instead
+> directly.
+> The remaining pointer returned by kvm_vgic_map_phys_irq() will be
+> removed in the following patch.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v1 .. v2:
+> - remove extra virt_irq member from struct, instead use irq.irq directly
+> 
+> Changelog v2 .. v3:
+> - remove bogus validity check from kvm_vgic_unmap_phys_irq()
+> 
+>  include/kvm/arm_arch_timer.h |  3 ---
+>  virt/kvm/arm/arch_timer.c    | 10 ++++------
+>  2 files changed, 4 insertions(+), 9 deletions(-)
+> 
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index b651aed..a47b7de 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -53,9 +53,6 @@ struct arch_timer_cpu {
+>  	/* Timer IRQ */
+>  	struct kvm_irq_level		irq;
+>  
+> -	/* VGIC mapping */
+> -	struct irq_phys_map		*map;
+> -
+>  	/* Active IRQ state caching */
+>  	bool				active_cleared_last;
+>  };
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 29d597d..f2cd188 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -176,10 +176,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+>  
+>  	timer->active_cleared_last = false;
+>  	timer->irq.level = new_level;
+> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
+> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+>  				   timer->irq.level);
+>  	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+> -					 timer->map->virt_irq,
+> +					 timer->irq.irq,
+>  					 timer->irq.level);
+>  	WARN_ON(ret);
+>  }
+> @@ -277,7 +277,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>  	* exit.
+>  	*/
+>  	phys_active = timer->irq.level ||
+> -			kvm_vgic_map_is_active(vcpu, timer->map->virt_irq);
+> +			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
+>  
+>  	/*
+>  	 * We want to avoid hitting the (re)distributor as much as
+> @@ -379,7 +379,6 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  	if (WARN_ON(IS_ERR(map)))
+>  		return PTR_ERR(map);
+>  
+> -	timer->map = map;
+>  	return 0;
+>  }
+>  
+> @@ -522,8 +521,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  
+>  	timer_disarm(timer);
+> -	if (timer->map)
+> -		kvm_vgic_unmap_phys_irq(vcpu, timer->map->virt_irq);
+> +	kvm_vgic_unmap_phys_irq(vcpu, timer->irq.irq);
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-
-On 10.05.2016 03:05, Eric Anholt wrote:
-> kernel at martin.sperl.org writes:
->
->> From: Martin Sperl <kernel@martin.sperl.org>
->>
->> Allow flags to be set on a per clock index basis, which control:
->> * the parent clocks selected when not setting clocks explicitly
->
-> I don't think we need this other than avoiding PLLC.  What else do you
-> want to filter, and why?
-What about potentially disabling PLLA_per or PLLH_aux?
-Under some circumstances it may make sense to avoid those clocks.
-(or testdebug for that matter).
-
-One of the reasons can be to avoid low dividers - see also mash below
-
->
->> * the clock mode with regards to integer only or higher order mash
->
-> Please provide justification in the commit message explaining why there
-> is no obvious mash setting to just implement in clk-bcm2835.c, but that
-> that a better policy can be encoded in the DT.
-
-The normal fractional divider will vary the effective period length
-between int(div)/Fparent and (int(div)+1)/Fparent.
-
-So the device (say DAC or other) connected needs to support in
-principle Fparent/int(div) as a clock.
-
-But for higher order mash the HW will spread the period length between:
-(int(div)-3)/Fparent and (int(div)+4)/Fparent.
-
-This value may be outside of the frequencies supported by the attached
-HW. That is why mash is not enabled by default for mash clocks - only
-div.
-
-That is also why we need to have this configurable.
-
-Also obviously higher parent clock frequencies result in higher dividers
-for the same target-frequency. So the above effect is less dramatic
-when using plld_per (or pllc for that matter) compared to the main
-19.2MHz oscillator, as for 32bit stereo audio at 96kHz (equivalent to
-6144000Hz) in the first case we have a divider of 81.38 while for the
-second (osc) case we have a divider of 3.125.
-
-The use of mash3 is impossible for osc but the use of mash 2 would
-spread the frequencies between 9.6MHz (div=2) and 3.84MHz (div=5).
-
-For plld_per as parent using mash3 instead we get the range:
-6410256.4Hz (div=78) and 5882352.9Hz (div=85), which is a much more
-acceptable range and should not impact the device that much.
-
-So enabling mash 3 by default is not in the best interest hence it is
-not done.
-
-This also shows why with some devices it may be preferable to configure
-that only pllc is used and then with mash 3.
-
-So this patchset tries to accomodate that - even if not in a
-perfect way - I would have preferred to have this in the dt-node that
-is claiming that clock, but I did not want to go that far (yet) adding
-another method to clock_op.
-
-To answer your comments on the patches themselves:
-I had also been investigating the use of "assigned-clock-parents".
-Something like this will not work:
-i2s at ... {
-   clock = <&preman PCM>;
-   assigned-clocks = <&cprman PCM>, <&pcrman PCM>
-   assigned-clock-parents = <&osc>, <&cprman PLLD_PER>;
-}
-because what it does it:
-* call clk_set_parent(pcm, osc);
-* call clk_set_parent(pcm, plld_per);
-
-(if you add "assigned-clock-rates" into the mix then
-clk_set_rate(pcm, rate) is also called separately).
-
-So there is no way to "keep" track of the parent clocks we wanted
-assigned.
-
-As far as I can see the only thing that would work is to implement
-an extension to the dt that would define "assigned-clock-flags"
-and have a set_flags(struct clk_hw *, u32 flags) method in
-clk_ops.
-
-So maybe someone has some better ideas of how to solve this.
-
-Martin
-
-As a side note: selection of parent oscillator and corresponding mash
-may have distinct noise behavior on the same device, where for
-32bit*2 at 48k it is the main oscillator with mash3 while the second best
-match would be pllc with mash2 - not mash3, which has the worsted SN
-from all tested!
-
-This behavior obviously changes with different "target frequencies"
-so it may even be necessary to account for the different target
-frequencies.
-
-But that is for a different discussion.
+Eric
+>  }
+>  
+>  void kvm_timer_enable(struct kvm *kvm)
+> 
