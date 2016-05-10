@@ -1,50 +1,115 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 10 May 2016 11:05:47 +0200
-Subject: [PATCH v2 0/3] video: fbdev: imxfb: make it work again
-In-Reply-To: <5731A02A.2070309@ti.com>
-References: <1462354998-5792-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5731A02A.2070309@ti.com>
-Message-ID: <20160510090547.GQ30822@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 May 2016 10:22:44 +0100
+Subject: [PATCH v3 14/55] KVM: arm/arm64: vgic-new: Add acccessor to new
+ struct vgic_irq instance
+In-Reply-To: <1462531568-9799-15-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-15-git-send-email-andre.przywara@arm.com>
+Message-ID: <5731A864.5000109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomi,
-
-On Tue, May 10, 2016 at 11:47:38AM +0300, Tomi Valkeinen wrote:
-> On 04/05/16 12:43, Uwe Kleine-K?nig wrote:
-> > this is v2 of the series which addresses the review comments I got vor
-> > (implicit) v1.
-> > 
-> > For patch 2 the question is still open if this is the right fix, but
-> > without this the display doesn't stay on. Patches 1 and 3 should be
-> > applicable independant of patch 2.
+On 06/05/16 11:45, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> I picked patches 1 and 3, they look fine.
+> The new VGIC implementation centers around a struct vgic_irq instance
+> per virtual IRQ.
+> Provide a function to retrieve the right instance for a given IRQ
+> number and (in case of private interrupts) the right VCPU.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
+>  2 files changed, 63 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic.h
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> new file mode 100644
+> index 0000000..fb45537
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include "vgic.h"
+> +
+> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
 
-Thanks.
+nit: this structure isn't referenced anywhere yet.
 
-> I still think patch 2 is just broken, it doesn't make sense to me.
+> +
+> +struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+> +			      u32 intid)
+> +{
+> +	/* SGIs and PPIs */
+> +	if (intid <= VGIC_MAX_PRIVATE)
+> +		return &vcpu->arch.vgic_cpu.private_irqs[intid];
+> +
+> +	/* SPIs */
+> +	if (intid <= VGIC_MAX_SPI)
+> +		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
+> +
+> +	/* LPIs are not yet covered */
+> +	if (intid >= VGIC_MIN_LPI)
+> +		return NULL;
+> +
+> +	WARN(1, "Looking up struct vgic_irq for reserved INTID");
+> +	return NULL;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> new file mode 100644
+> index 0000000..61b8d22
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __KVM_ARM_VGIC_NEW_H__
+> +#define __KVM_ARM_VGIC_NEW_H__
+> +
+> +struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+> +			      u32 intid);
+> +
+> +#endif
+> 
 
-What do you think should happen during startup? Something should call
-the set_power callback to enable the device? Or should that only happen
-when something writes to /dev/fb0?
+Otherwise:
 
-> If the regulator is enabled in probe, then it's always on, and
-> imxfb_lcd_set_power() should be removed as it never has any effect. But
-> that doesn't sound correct, as presumably the imxfb_lcd_set_power() has
-> worked at some point.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I think it worked back when unused regulators were not disabled during
-boot.
-
-> And shouldn't the regulator be disabled at least when suspending?
-
-Yeah, but maybe the core should call set_power(off) then? (Don't know,
-maybe that cannot work.)
-
-Best regards
-Uwe
-
+	M.
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
