@@ -1,152 +1,344 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 10 May 2016 10:04:48 +0200
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20160504153547.60d736bb@bbrezillon>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop>
- <20160503185153.5cfddc32@bbrezillon>
- <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
- <20160504113852.10a2dd84@bbrezillon>
- <CAL_Jsq+4aL5znA3zOKdcJb+pEXhVOQthkFF6DN2+P6U37t2o6g@mail.gmail.com>
- <20160504153547.60d736bb@bbrezillon>
-Message-ID: <20160510100448.49834120@bbrezillon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 May 2016 10:15:58 +0200
+Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI
+ with CPU thermal nodes
+In-Reply-To: <CANAwSgT9SY3kj8+beMpc1xGoC=rMBSya+2v2dyZQp6ykH+V0=g@mail.gmail.com>
+References: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
+ <CANAwSgT9SY3kj8+beMpc1xGoC=rMBSya+2v2dyZQp6ykH+V0=g@mail.gmail.com>
+Message-ID: <573198BE.6020900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 May 2016 15:35:47 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> On Wed, 4 May 2016 08:06:10 -0500
-> Rob Herring <robh@kernel.org> wrote:
+On 05/10/2016 08:43 AM, Anand Moon wrote:
+> Hi Krzysztof ,
 > 
-> > On Wed, May 4, 2016 at 4:38 AM, Boris Brezillon
-> > <boris.brezillon@free-electrons.com> wrote:  
-> > > Hi Rob,
-> > >
-> > > On Tue, 3 May 2016 14:11:04 -0500
-> > > Rob Herring <robh@kernel.org> wrote:
-> > >    
-> > >> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
-> > >> <boris.brezillon@free-electrons.com> wrote:    
-> > >> > Hi Rob,
-> > >> >
-> > >> > On Tue, 3 May 2016 11:40:19 -0500
-> > >> > Rob Herring <robh@kernel.org> wrote:
-> > >> >    
-> > >> >> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:    
-> > >> >> > The EBI (External Bus Interface) is used to access external peripherals
-> > >> >> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> > >> >> > Each device is assigned a CS line and an address range and can have its
-> > >> >> > own configuration (timings, access mode, bus width, ...).
-> > >> >> > This driver provides a generic DT binding to configure a device according
-> > >> >> > to its requirements.
-> > >> >> > For specific device controllers (like the NAND one) the SMC timings
-> > >> >> > should be configured by the controller driver through the matrix and smc
-> > >> >> > syscon regmaps.    
-> > 
-> > [...]
-> >   
-> > >> >> > +EBI bus configuration associated with specific chip-select will be defined in
-> > >> >> > +the configs subnode. This configs node will in turn contain several subnodes
-> > >> >> > +named config-<cs-id>, each of them containing the following properties.    
-> > >> >>
-> > >> >> This is a bit unusual. Why not just part of the child device nodes?    
-> > >> >
-> > >> > Oh, come on! I reworked the binding because Mark complained about the
-> > >> > previous binding which was doing exactly what you're suggesting. Can
-> > >> > you please be consistent in your reviews...    
-> > >>
-> > >> No, Mark and I both have our opinions. Which part of this patch
-> > >> explains the history?    
-> > >
-> > > Hm, it's in patch 1/2 (just dropped the cover letter, which might not
-> > > be such a good idea).
-> > >    
-> > >> If the revision history is not in the patch, I'm
-> > >> not looking at it.
-> > >>
-> > >> My issue with it this way is that it has invented yet another way to
-> > >> describe timings. I would like to be consistent across external bus
-> > >> descriptions, but we're not very consistent to begin with though. The
-> > >> most common seems to be the way you first did it. But I agree that it
-> > >> is kind of screwy to have an intermediate node unless the controller
-> > >> itself has sub-blocks within it and is not the established way to
-> > >> describe a bus with chip selects. I would either put the properties
-> > >> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
-> > >> in the device node. I'd call it timings instead of config, but that's
-> > >> just bikeshedding.    
-> > >
-> > > Well, it's not only describing timings (see atmel,bus-width,
-> > > atmel,byte-access-type, ...), but I'm fine with either names :).
-> > >    
-> > >>
-> > >> memory-controller at 1000 {
-> > >>   ...
-> > >>   flash at 0,0 {
-> > >>     timings {
-> > >>       ...
-> > >>     };
-> > >>   };
-> > >> };    
-> > >
-> > > Okay. Mark, what do you think of this approach?
-> > >
-> > > Note that one of my previous version was defining timings directly in
-> > > the EBI device node, and Arnd noted that doing so may cause problems
-> > > if one of the EBI property (or the config/timing node name) conflict
-> > > with the sub-device binding, which is why I decided to put the EBI
-> > > config definitions in a separate subnode.    
-> > 
-> > You have vendor prefixes on all the properties so I don't think a
-> > collision is really a problem. It's also an established pattern in
-> > i.MX WEIM and OMAP GPMC (which are hiding in bindings/bus/) and I
-> > prefer consistency.  
+> On 9 May 2016 at 11:49, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>> Include the CPU thermal nodes directly in Odroid XU3-family common DTS
+>> because it is the only user of it. Keeping it in separate DTSI node does
+>> not bring benefits because:
+>> 1. It is not re-usable on other non-fan boards (fan is referenced),
+>> 2. It won't be re-used on future Odroid XU board because different
+>>    CPU cluster behavior.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi      | 103 ---------------------
+>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  94 ++++++++++++++++++-
+>>  2 files changed, 92 insertions(+), 105 deletions(-)
+>>  delete mode 100644 arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>> deleted file mode 100644
+>> index 3e4c4ad96d63..000000000000
+>> --- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>> +++ /dev/null
+>> @@ -1,103 +0,0 @@
+>> -/*
+>> - * Device tree sources for Exynos5422 thermal zone
+>> - *
+>> - * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
+>> - *                     Anand Moon <linux.amoon@gmail.com>
+>> - *
+>> - * This program is free software; you can redistribute it and/or modify
+>> - * it under the terms of the GNU General Public License version 2 as
+>> - * published by the Free Software Foundation.
+>> - *
+>> - */
+>> -
+>> -#include <dt-bindings/thermal/thermal.h>
+>> -
+>> -/ {
+>> -       thermal-zones {
+>> -               cpu0_thermal: cpu0-thermal {
+>> -                       thermal-sensors = <&tmu_cpu0 0>;
+>> -                       polling-delay-passive = <250>;
+>> -                       polling-delay = <0>;
+>> -                       trips {
+>> -                               cpu_alert0: cpu-alert-0 {
+>> -                                       temperature = <50000>; /* millicelsius */
+>> -                                       hysteresis = <5000>; /* millicelsius */
+>> -                                       type = "active";
+>> -                               };
+>> -                               cpu_alert1: cpu-alert-1 {
+>> -                                       temperature = <60000>; /* millicelsius */
+>> -                                       hysteresis = <5000>; /* millicelsius */
+>> -                                       type = "active";
+>> -                               };
+>> -                               cpu_alert2: cpu-alert-2 {
+>> -                                       temperature = <70000>; /* millicelsius */
+>> -                                       hysteresis = <5000>; /* millicelsius */
+>> -                                       type = "active";
+>> -                               };
+>> -                               cpu_crit0: cpu-crit-0 {
+>> -                                       temperature = <120000>; /* millicelsius */
+>> -                                       hysteresis = <0>; /* millicelsius */
+>> -                                       type = "critical";
+>> -                               };
+>> -                               /*
+>> -                                * Exyunos542x support only 4 trip-points
+>> -                                * so for these polling mode is required.
+>> -                                * Start polling at temperature level of last
+>> -                                * interrupt-driven trip: cpu_alert2
+>> -                                */
+>> -                               cpu_alert3: cpu-alert-3 {
+>> -                                       temperature = <70000>; /* millicelsius */
+>> -                                       hysteresis = <10000>; /* millicelsius */
+>> -                                       type = "passive";
+>> -                               };
+>> -                               cpu_alert4: cpu-alert-4 {
+>> -                                       temperature = <85000>; /* millicelsius */
+>> -                                       hysteresis = <10000>; /* millicelsius */
+>> -                                       type = "passive";
+>> -                               };
+>> -
+>> -                       };
+>> -                       cooling-maps {
+>> -                               map0 {
+>> -                                    trip = <&cpu_alert0>;
+>> -                                    cooling-device = <&fan0 0 1>;
+>> -                               };
+>> -                               map1 {
+>> -                                    trip = <&cpu_alert1>;
+>> -                                    cooling-device = <&fan0 1 2>;
+>> -                               };
+>> -                               map2 {
+>> -                                    trip = <&cpu_alert2>;
+>> -                                    cooling-device = <&fan0 2 3>;
+>> -                               };
+>> -                               /*
+>> -                                * When reaching cpu_alert3, reduce CPU
+>> -                                * by 2 steps. On Exynos5422/5800 that would
+>> -                                * be: 1500 MHz and 1100 MHz.
+>> -                                */
+>> -                               map3 {
+>> -                                    trip = <&cpu_alert3>;
+>> -                                    cooling-device = <&cpu0 0 2>;
+>> -                               };
+>> -                               map4 {
+>> -                                    trip = <&cpu_alert3>;
+>> -                                    cooling-device = <&cpu4 0 2>;
+>> -                               };
+>> -
+>> -                               /*
+>> -                                * When reaching cpu_alert4, reduce CPU
+>> -                                * further, down to 600 MHz (11 steps for big,
+>> -                                * 7 steps for LITTLE).
+>> -                                */
+>> -                               map5 {
+>> -                                    trip = <&cpu_alert4>;
+>> -                                    cooling-device = <&cpu0 3 7>;
+>> -                               };
+>> -                               map6 {
+>> -                                    trip = <&cpu_alert4>;
+>> -                                    cooling-device = <&cpu4 3 11>;
+>> -                               };
+>> -                       };
+>> -               };
+>> -       };
+>> -};
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> index 2a4e10bc8801..ff05041835e5 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> @@ -1,9 +1,11 @@
+>>  /*
+>>   * Hardkernel Odroid XU3 board device tree source
+>>   *
+>> - * Copyright (c) 2014 Collabora Ltd.
+>>   * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>>   *             http://www.samsung.com
+>> + * Copyright (c) 2014 Collabora Ltd.
+>> + * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
+>> + *                    Anand Moon <linux.amoon@gmail.com>
+>>   *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License version 2 as
+>> @@ -16,7 +18,6 @@
+>>  #include <dt-bindings/sound/samsung-i2s.h>
+>>  #include "exynos5800.dtsi"
+>>  #include "exynos5422-cpus.dtsi"
+>> -#include "exynos5422-cpu-thermal.dtsi"
+>>
+>>  / {
+>>         memory {
+>> @@ -54,6 +55,95 @@
+>>                 #cooling-cells = <2>;
+>>                 cooling-levels = <0 130 170 230>;
+>>         };
+>> +
+>> +       thermal-zones {
+>> +               cpu0_thermal: cpu0-thermal {
+>> +                       thermal-sensors = <&tmu_cpu0 0>;
+>> +                       polling-delay-passive = <250>;
+>> +                       polling-delay = <0>;
+>> +                       trips {
+>> +                               cpu_alert0: cpu-alert-0 {
+>> +                                       temperature = <50000>; /* millicelsius */
+>> +                                       hysteresis = <5000>; /* millicelsius */
+>> +                                       type = "active";
+>> +                               };
+>> +                               cpu_alert1: cpu-alert-1 {
+>> +                                       temperature = <60000>; /* millicelsius */
+>> +                                       hysteresis = <5000>; /* millicelsius */
+>> +                                       type = "active";
+>> +                               };
+>> +                               cpu_alert2: cpu-alert-2 {
+>> +                                       temperature = <70000>; /* millicelsius */
+>> +                                       hysteresis = <5000>; /* millicelsius */
+>> +                                       type = "active";
+>> +                               };
+>> +                               cpu_crit0: cpu-crit-0 {
+>> +                                       temperature = <120000>; /* millicelsius */
+>> +                                       hysteresis = <0>; /* millicelsius */
+>> +                                       type = "critical";
+>> +                               };
+>> +                               /*
+>> +                                * Exynos542x supports only 4 trip-points
+>> +                                * so for these polling mode is required.
+>> +                                * Start polling at temperature level of last
+>> +                                * interrupt-driven trip: cpu_alert2
+>> +                                */
+>> +                               cpu_alert3: cpu-alert-3 {
+>> +                                       temperature = <70000>; /* millicelsius */
+>> +                                       hysteresis = <10000>; /* millicelsius */
+>> +                                       type = "passive";
+>> +                               };
+>> +                               cpu_alert4: cpu-alert-4 {
+>> +                                       temperature = <85000>; /* millicelsius */
+>> +                                       hysteresis = <10000>; /* millicelsius */
+>> +                                       type = "passive";
+>> +                               };
+>> +
+>> +                       };
+>> +                       cooling-maps {
+>> +                               map0 {
+>> +                                    trip = <&cpu_alert0>;
+>> +                                    cooling-device = <&fan0 0 1>;
+>> +                               };
+>> +                               map1 {
+>> +                                    trip = <&cpu_alert1>;
+>> +                                    cooling-device = <&fan0 1 2>;
+>> +                               };
+>> +                               map2 {
+>> +                                    trip = <&cpu_alert2>;
+>> +                                    cooling-device = <&fan0 2 3>;
+>> +                               };
+>> +                               /*
+>> +                                * When reaching cpu_alert3, reduce CPU
+>> +                                * by 2 steps. On Exynos5422/5800 that would
+>> +                                * be: 1500 MHz and 1100 MHz.
+>> +                                */
+>> +                               map3 {
+>> +                                    trip = <&cpu_alert3>;
+>> +                                    cooling-device = <&cpu0 0 2>;
+>> +                               };
+>> +                               map4 {
+>> +                                    trip = <&cpu_alert3>;
+>> +                                    cooling-device = <&cpu4 0 2>;
+>> +                               };
+>> +
+>> +                               /*
+>> +                                * When reaching cpu_alert4, reduce CPU
+>> +                                * further, down to 600 MHz (11 steps for big,
+>> +                                * 7 steps for LITTLE).
+>> +                                */
+>> +                               map5 {
+>> +                                    trip = <&cpu_alert4>;
+>> +                                    cooling-device = <&cpu0 3 7>;
+>> +                               };
+>> +                               map6 {
+>> +                                    trip = <&cpu_alert4>;
+>> +                                    cooling-device = <&cpu4 3 11>;
+>> +                               };
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>>  };
+>>
+>>  &bus_wcore {
+>> --
+>> 1.9.1
+>>
 > 
-> So let's summarize that.
+> Could you defer this patch, during my testing with pm-qa from linaro.
 > 
-> memory-controller at 1000 {
-> 	...
-> 	flash at 0,0 {
-> 		atmel,<ebi-prop-name> = <value>;
-> 		...
-> 		<flash-device-prop> = <value>;
-> 	};
-> };
+> git://git.linaro.org/tools/pm-qa.git
 > 
-> Would everyone agree on this representation?
+> When their is running of thermal test case cpu usage reaches around
+> 300+ percentage
+> and some time's the Odroid XU4 hang down.
+> -------------------------------------------------------------------------
+> [ 1028.056619] CPU4: shutdown
+> [ 1148.510372] IRQ54 no longer affine to CPU5
+> [ 1148.511864] CPU5: shutdown
+> [ 1268.921073] IRQ55 no longer affine to CPU6
+> [ 1268.922564] CPU6: shutdown
+> [ 1389.271930] cpu cpu4: Failed to find opp_table: -19
+> [ 1389.301668] IRQ56 no longer affine to CPU7
+> [ 1389.303132] CPU7: shutdown
+> [ 1510.538424] cpu cpu4: opp_list_debug_create_link: Failed to create link
+> [ 1510.543762] cpu cpu4: _add_opp_dev: Failed to register opp debugfs (-12)
+> [ 1510.550625] cpu cpu7: opp_list_debug_create_link: Failed to create link
+> [ 1510.557037] cpu cpu7: _add_opp_dev: Failed to register opp debugfs (-12)
+> [ 1510.664649] cpu cpu5: cpufreq_init: failed to get clk: -2
+> [ 1510.720567] cpu cpu6: cpufreq_init: failed to get clk: -2
+> [ 1510.788280] cpu cpu7: cpufreq_init: failed to get clk: -2
+> root at odroidxu4l:/home/odroid/study/linaro/pm-qa# killall heat_cpu
 > 
-> With this approach, it's a bit more complicated to detect the case
-> where we want to keep bootloader/firmware config, but it should be
-> doable (it's much more easier to test for the presence of a
-> config/timing node than verifying that either all or none of the
-> mandatory properties are here).
+> -------------------------------------------------------------------------
+> And some time I observed that the board will poweroff on reaching
+> temperature 120 degree C.
+> when I am compiling the kernel with or above. make -j8
+> -------------------------------------------------------------------------
+> root at odroidxu4l:~#  * Starting NTP server ntpd                           [ OK ]
+> saned disabled; edit /etc/default/saned
+> [ 4118.924470] thermal thermal_zone3: critical temperature reached(121
+> C),shutting down
+> [ 4119.014327] thermal thermal_zone3: critical temperature reached(121
+> C),shutting down
 > 
-> Still remains the problem mentioned by Jean-Jacques: what if the
-> sub-device takes 2 CS lines. Should we apply the same setting to those
-> slots?
+> Broadcast message from root at odroidxu4l
+>         (unknown) at 20:41 ...
 > 
+> The system is going down for power off NOW!
+> 
+> Broadcast message from root at odroidxu4l
+>         (unknown) at 20:41 ...
+> 
+> The system is going down for power off NOW!
+> [ 4119.431386] thermal thermal_zone3: critical temperature reached(121
+> C),shutting down
+> [ 4120.206709] thermal thermal_zone3: critical temperature reached(120
+> C),shutting down
+> 
+> Broadcast message from root at odroidxu4l
+>         (unknown) at 20:41 ...
+> 
+> The system is going down for power off NOW!
+> wait-for-state stop/waiting
+> [ 4157.574406] reboo
+> 
+> U-Boot 2016.03-00665-g563d8d9-dirty (Apr 04 2016 - 22:27:07 +0930) for
+> ODROID-XU3
+> 
+> CPU:   Exynos5422 @ 800 MHz
+> Model: Odroid XU3 based on EXYNOS5422
+> Board: Odroid XU3 based on EXYNOS5422
+> Type:  xu4
+> DRAM:  2 GiB
+> MMC:   EXYNOS DWMMC: 0, EXYNOS DWMMC: 1
+> *** Warning - bad CRC, using default environment
+> -------------------------------------------------------------------------
+> Once the thermal issue is fixed we can redo this changes.
 
-Rob, Mark, Arnd, can you take a decision regarding this binding? This
-driver is floating around for quite some time, and we were asked to
-rework the binding several times (in time in an opposite direction).
+I am sorry but I do not understand.
+1. Are you saying that my patch causes the issue?
+2. Are you saying that I should not send some patches because of
+conflicting work? (that would be peculiar...)
+3. Are you saying that I should not apply this patch to me tree because
+of conflicting work?
+4. Other?
 
-For the record, here is the thread I mentioned earlier [1]. In his
-answer, Arnd suggests to put timing and bus config description
-outside of the sub-device node. Mark recently complained about this
-representation, which led me to the configs/config-X appraoch, and now
-Rob suggests to go back to the first proposal.
-
-I'm fine doing that, but can you please all confirm that you agree on
-this binding?
-
-Thanks,
-
-Boris
-
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/222438.html
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards.
+Krzysztof
