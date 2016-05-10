@@ -1,67 +1,136 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 May 2016 12:21:29 -0700
-Subject: [PATCH 5/5] remoteproc: core: Clip carveout if it's too big
-In-Reply-To: <1462454983-13168-6-git-send-email-lee.jones@linaro.org>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160510192129.GL1256@tuxbot>
+From: plaes@plaes.org (Priit Laes)
+Date: Tue, 10 May 2016 22:24:07 +0300
+Subject: [PATCH 2/2] ARM: sun7i: A20: Add display and TCON clocks
+In-Reply-To: <1462908247-10474-1-git-send-email-plaes@plaes.org>
+References: <1462908247-10474-1-git-send-email-plaes@plaes.org>
+Message-ID: <1462908247-10474-3-git-send-email-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
+Enable the display and TCON clocks that are needed to drive the display
+engine, tcon and TV encoders.
 
-> Carveout size is primarily extracted from the firmware binary.  However,
-> DT can over-ride this by providing a different (smaller) size.  We're
-> adding protection here to ensure the we only allocate the smaller of the
-> two provided sizes in order to decrease the risk of clashes.
-> 
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 85 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 80 insertions(+), 5 deletions(-)
 
-Is this really the right thing to do?
-
-The firmware is bundled with a resource table stating a certain size of
-this the carveout and this would "silently" give it less space. On some
-systems an IOMMU will save us (killing the firmware) but on others I
-fear the firmware might just access memory outside its expected buffer.
-
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/remoteproc/remoteproc_core.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-[..]
-> @@ -600,6 +601,14 @@ static int rproc_handle_carveout(struct rproc *rproc,
->  		return -ENOMEM;
->  
->  	dma_dev = rproc_subdev_lookup(rproc, "carveout");
-> +	sub = dev_get_drvdata(dma_dev);
-> +
-> +	if (rsc->len > resource_size(sub->res)) {
-> +		dev_warn(dev, "carveout too big (0x%x): clipping to 0x%x\n",
-> +			 rsc->len, resource_size(sub->res));
-> +		rsc->len = resource_size(sub->res);
-> +	}
-
-I would rather expect this to say:
-
-if (resource_size(sub->res) < rsc->len) {
-	dev_err(dev, "defined carveout to small for firmware\n");
-	return -EINVAL;
-}
-
-Unless we trust the remote firmware to dynamically follow what we put in
-the resource table. (And how does it tell us if that limit isn't
-enough?)
-
-> +
->  	va = dma_alloc_coherent(dma_dev, rsc->len, &dma, GFP_KERNEL);
->  	if (!va) {
->  		dev_err(dev->parent, "dma_alloc_coherent err: %d\n", rsc->len);
-
-
-Apart from this concern I'm still need to review the subdev patch; here
-related the part that there's only room for one carveout with only one
-size.
-
-Regards,
-Bjorn
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index febdf4c..82e28c3 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -67,8 +67,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-hdmi";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+-				 <&ahb_gates 44>, <&dram_gates 26>;
++			clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>,
++				 <&de_be0_clk>, <&tcon0_ch0_clk>, <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -76,7 +76,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>,
++			clocks = <&ahb_gates 36>, <&ahb_gates 44>,
++				 <&de_be0_clk>, <&tcon0_ch0_clk>,
+ 				 <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+@@ -85,8 +86,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
+-			clocks = <&pll5 1>,
+-				 <&ahb_gates 34>, <&ahb_gates 36>, <&ahb_gates 44>,
++			clocks = <&ahb_gates 34>, <&ahb_gates 36>, <&ahb_gates 44>,
++				 <&de_be0_clk>, <&tcon0_ch0_clk>,
+ 				 <&dram_gates 5>, <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+@@ -580,6 +581,80 @@
+ 					     "dram_de_mp", "dram_ace";
+ 		};
+ 
++		de_be0_clk: clk at 01c20104 {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c20104 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-be0";
++		};
++
++		de_be1_clk: clk at 01c20108 {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c20108 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-be1";
++		};
++
++		de_fe0_clk: clk at 01c2010c {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c2010c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-fe0";
++		};
++
++		de_fe1_clk: clk at 01c20110 {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c20110 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-fe1";
++		};
++
++		tcon0_ch0_clk: clk at 01c20118 {
++			#clock-cells = <0>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
++			reg = <0x01c20118 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon0-ch0-sclk";
++
++		};
++
++		tcon1_ch0_clk: clk at 01c2011c {
++			#clock-cells = <0>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
++			reg = <0x01c2011c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon1-ch0-sclk";
++
++		};
++
++		tcon0_ch1_clk: clk at 01c2012c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
++			reg = <0x01c2012c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon0-ch1-sclk";
++
++		};
++
++		tcon1_ch1_clk: clk at 01c20130 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
++			reg = <0x01c20130 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon1-ch1-sclk";
++
++		};
++
+ 		ve_clk: clk at 01c2013c {
+ 			#clock-cells = <0>;
+ 			#reset-cells = <0>;
+-- 
+2.8.2
