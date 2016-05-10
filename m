@@ -1,39 +1,44 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 10 May 2016 15:40:31 +0100
-Subject: [PATCH] arm64: cpuinfo: Missing NULL terminator in compat_hwcap_str
-Message-ID: <1462891231-17605-1-git-send-email-julien.grall@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 10 May 2016 16:42:17 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.7 (#2)
+In-Reply-To: <2554522.hzQidgmgjq@wuerfel> (Arnd Bergmann's message of "Tue, 10
+ May 2016 14:13:57 +0200")
+References: <87pot8sct4.fsf@free-electrons.com> <13443700.NUC16SCx6V@wuerfel>
+ <2554522.hzQidgmgjq@wuerfel>
+Message-ID: <87vb2mnfee.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The loop that browses the array compat_hwcap_str will stop when a NULL
-is encountered, however NULL is missing at the end of array. This will
-result to overrun until one NULL is found somewhere in the memory.
-
-Fixes: 44b82b7700d0 "arm64: Fix up /proc/cpuinfo"
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-Cc: stable at vger.kernel.org
-
----
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpuinfo.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 84c8684..f0c3fb7 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -87,7 +87,8 @@ static const char *const compat_hwcap_str[] = {
- 	"idivt",
- 	"vfpd32",
- 	"lpae",
--	"evtstrm"
-+	"evtstrm",
-+	NULL
- };
+Hi Arnd,
  
- static const char *const compat_hwcap2_str[] = {
+ On mar., mai 10 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Tuesday 10 May 2016 14:05:48 Arnd Bergmann wrote:
+>> On Friday 29 April 2016 16:35:19 Gregory CLEMENT wrote:
+>> > mvebu defconfig for 4.7 (part 2)
+>> > 
+>> > - enable AP806 and CP110 syscon driver in arm64 defconfig
+>> > 
+>> > 
+>> 
+>> Merged into next/defconfig, thanks!
+>> 
+>
+> I ended up undoing the merge before I pushed it out to the git server
+> as I noticed you have both arm and arm64 changes in there.
+>
+> Can you still split up the branch in two?
+
+As seen on IRC I am about to send a PR with a new mvebu/defconfig64
+branch as the only change here was related to arm64.
+
+Gregory
+
+>
+> 	Arnd
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
