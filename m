@@ -1,62 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 11:04:12 +0100
-Subject: [PATCH v3 11/55] KVM: arm/arm64: pmu: abstract access to number
- of SPIs
-In-Reply-To: <5731AF57.2040707@linaro.org>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-12-git-send-email-andre.przywara@arm.com>
- <5731AF57.2040707@linaro.org>
-Message-ID: <5731B21C.9030205@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 10 May 2016 13:06:56 +0300
+Subject: [PATCH v2 0/3] video: fbdev: imxfb: make it work again
+In-Reply-To: <20160510090547.GQ30822@pengutronix.de>
+References: <1462354998-5792-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5731A02A.2070309@ti.com> <20160510090547.GQ30822@pengutronix.de>
+Message-ID: <5731B2C0.3040404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 10:52, Eric Auger wrote:
-> Hi Andre,
-> On 05/06/2016 12:45 PM, Andre Przywara wrote:
->> Currently the PMU uses a member of the struct vgic_dist directly,
->> which not only breaks abstraction, but will fail with the new VGIC.
->> Abstract this access in the VGIC header file.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/arm_vgic.h | 2 ++
->>  virt/kvm/arm/pmu.c     | 2 +-
->>  2 files changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 452bb85..c14ff77 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -347,6 +347,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->>  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
->>  #define vgic_ready(k)		((k)->arch.vgic.ready)
->> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
->> +				 ((i) < (k)->arch.vgic.nr_irqs))
->>  
->>  int vgic_v2_probe(struct device_node *vgic_node,
->>  		  const struct vgic_ops **ops,
->> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
->> index 575c7aa..bd2e872 100644
->> --- a/virt/kvm/arm/pmu.c
->> +++ b/virt/kvm/arm/pmu.c
->> @@ -477,7 +477,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
->>  		 * the interrupt number is the same for all vcpus, while as an
->>  		 * SPI it must be a separate number per vcpu.
->>  		 */
->> -		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
->> +		if (irq < VGIC_NR_SGIS || !vgic_valid_spi(vcpu->kvm, irq) ||
->>  		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
->>  			return -EINVAL;
->>  
->>
-> in case this is a PPI it will now return an error, right? I don't think
-> this is what we expect.
 
-Ouch. Good catch. I missed the ! too...
 
-Thanks,
+On 10/05/16 12:05, Uwe Kleine-K?nig wrote:
+> Hello Tomi,
+> 
+> On Tue, May 10, 2016 at 11:47:38AM +0300, Tomi Valkeinen wrote:
+>> On 04/05/16 12:43, Uwe Kleine-K?nig wrote:
+>>> this is v2 of the series which addresses the review comments I got vor
+>>> (implicit) v1.
+>>>
+>>> For patch 2 the question is still open if this is the right fix, but
+>>> without this the display doesn't stay on. Patches 1 and 3 should be
+>>> applicable independant of patch 2.
+>>
+>> I picked patches 1 and 3, they look fine.
+> 
+> Thanks.
+> 
+>> I still think patch 2 is just broken, it doesn't make sense to me.
+> 
+> What do you think should happen during startup? Something should call
+> the set_power callback to enable the device? Or should that only happen
+> when something writes to /dev/fb0?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I think the panel should be enabled at startup, as with fbdev there's no
+specific enable call. So I don't have a problem with enabling the panel
+at startup, but just that the regulator enables/disables don't seem to
+match.
+
+>> If the regulator is enabled in probe, then it's always on, and
+>> imxfb_lcd_set_power() should be removed as it never has any effect. But
+>> that doesn't sound correct, as presumably the imxfb_lcd_set_power() has
+>> worked at some point.
+> 
+> I think it worked back when unused regulators were not disabled during
+> boot.
+
+Is imxfb_lcd_set_power() ever called, or just not at startup? If it is
+called properly later, then perhaps you just need to kick it at startup
+time to enable it. Maybe imxfb_lcd_set_power(lcd, FB_BLANK_UNBLANK);
+
+Did you try unloading the module (both when the LCD is enabled and when
+it's disabled), and seeing that the regulator gets disabled when you
+unload it?
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160510/8144c3b2/attachment.sig>
