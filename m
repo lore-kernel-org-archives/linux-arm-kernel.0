@@ -1,167 +1,184 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 May 2016 18:24:34 +0100
-Subject: [PATCH v9 5/7] vfio/type1: also check IRQ remapping capability at
- msi domain
-In-Reply-To: <57320803.8070506@linaro.org>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
- <20160509164942.5af8b30d@t450s.home> <57320803.8070506@linaro.org>
-Message-ID: <57321952.2020206@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 May 2016 18:32:22 +0100
+Subject: [PATCH v3 17/55] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
+ framework
+In-Reply-To: <5731FC3E.7020700@linaro.org>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
+ <5731FC3E.7020700@linaro.org>
+Message-ID: <57321B26.1030201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 10/05/16 17:10, Eric Auger wrote:
-> Hi Alex,
-> On 05/10/2016 12:49 AM, Alex Williamson wrote:
->> On Wed,  4 May 2016 11:54:16 +0000
->> Eric Auger <eric.auger@linaro.org> wrote:
+On 10/05/16 16:20, Eric Auger wrote:
+> On 05/06/2016 12:45 PM, Andre Przywara wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
 >>
->>> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
->>> by the msi controller. vfio_safe_irq_domain allows to check whether
->>> interrupts are "safe" for a given device. They are if the device does
->>> not use MSI
+>> Implement the framework for syncing IRQs between our emulation and
+>> the list registers, which represent the guest's view of IRQs.
+>> This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
+>> which gets called on guest entry and exit.
+>> The code talking to the actual GICv2/v3 hardware is added in the
+>> following patches.
 >>
->> Are we sure we're not opening a security hole here?  An MSI is simply a
->> DMA write, so really whether or not a device uses MSI is irrelevant.
->> If it can generate a DMA to the MSI doorbell then we need to be
->> protected and I think we pretty much need to assume that devices are
->> DMA capable.  Do the MSI domain checks cover this?
-> Let me try to rephrase: we check the device is not attached to an MSI
-> controller (I think this is the semantic of dev_get_msi_domain(dev)).
->
-> If it is not, we don't have to care about MSI isolation: there will be
-> no IOMMU binding between the device and any MSI doorbell. If it is we
-> check the msi domain is backed by an MSI controller able to perform MSI
-> isolation.
- >
-> So effectively "usage of MSIs" is improper - since it is decided after
-> the group attachment anyway  - and the commit message should rather
-> state "if the device is linked to an MSI controller" (dt msi-parent
-> notion I think).
-
-Hmm, I think Alex has a point here - on a GICv2m I can happily fire 
-arbitrary MSIs from _a shell_ (using /dev/mem), and the CPUs definitely 
-aren't in an MSI domain, so I don't think it's valid to assume that a 
-device using only wired interrupts, therefore with no connection to any 
-MSI controller, isn't still capable of maliciously spewing DMA all over 
-any and every doorbell region in the system.
-
-Robin.
-
-> Does it sound better?
->
-> Regards
->
-> Eric
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog RFC..v1:
+>> - split out vgic_clear_lr() from vgic_populate_lr()
+>> - rename vgic_populate_lrs() to vgic_flush_lr_state()
+>> - clean all LRs when the distributor is disabled
+>> - use list_del() instead of list_del_init()
+>> - add comments to explain the direction of sync/flush_hwstate
+>> - remove unneeded BUG_ON(in_interrupt()
 >>
->>> or if the device uses MSI and the msi-parent controller
->>> supports IRQ remapping.
->>>
->>> Then we check at group level if all devices have safe interrupts: if not,
->>> we only allow the group to be attached if allow_unsafe_interrupts is set.
->>>
->>> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
->>> changed in next patch.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>
->>> ---
->>> v3 -> v4:
->>> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
->>>    and irq_remapping into safe_irq_domains
->>>
->>> v2 -> v3:
->>> - protect vfio_msi_parent_irq_remapping_capable with
->>>    CONFIG_GENERIC_MSI_IRQ_DOMAIN
->>> ---
->>>   drivers/vfio/vfio_iommu_type1.c | 44 +++++++++++++++++++++++++++++++++++++++--
->>>   1 file changed, 42 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->>> index 4d3a6f1..2fc8197 100644
->>> --- a/drivers/vfio/vfio_iommu_type1.c
->>> +++ b/drivers/vfio/vfio_iommu_type1.c
->>> @@ -37,6 +37,8 @@
->>>   #include <linux/vfio.h>
->>>   #include <linux/workqueue.h>
->>>   #include <linux/msi-iommu.h>
->>> +#include <linux/irqdomain.h>
->>> +#include <linux/msi.h>
->>>
->>>   #define DRIVER_VERSION  "0.2"
->>>   #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
->>> @@ -777,6 +779,33 @@ static int vfio_bus_type(struct device *dev, void *data)
->>>   	return 0;
->>>   }
->>>
->>> +/**
->>> + * vfio_safe_irq_domain: returns whether the irq domain
->>> + * the device is attached to is safe with respect to MSI isolation.
->>> + * If the irq domain is not an MSI domain, we return it is safe.
->>> + *
->>> + * @dev: device handle
->>> + * @data: unused
->>> + * returns 0 if the irq domain is safe, -1 if not.
->>> + */
->>> +static int vfio_safe_irq_domain(struct device *dev, void *data)
->>> +{
->>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->>> +	struct irq_domain *domain;
->>> +	struct msi_domain_info *info;
->>> +
->>> +	domain = dev_get_msi_domain(dev);
->>> +	if (!domain)
->>> +		return 0;
->>> +
->>> +	info = msi_get_domain_info(domain);
->>> +
->>> +	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
->>> +		return -1;
->>> +#endif
->>> +	return 0;
->>> +}
->>> +
->>>   static int vfio_iommu_replay(struct vfio_iommu *iommu,
->>>   			     struct vfio_domain *domain)
->>>   {
->>> @@ -870,7 +899,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>>   	struct vfio_group *group, *g;
->>>   	struct vfio_domain *domain, *d;
->>>   	struct bus_type *bus = NULL;
->>> -	int ret;
->>> +	int ret, safe_irq_domains;
->>>
->>>   	mutex_lock(&iommu->lock);
->>>
->>> @@ -893,6 +922,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>>
->>>   	group->iommu_group = iommu_group;
->>>
->>> +	/*
->>> +	 * Determine if all the devices of the group have a safe irq domain
->>> +	 * with respect to MSI isolation
->>> +	 */
->>> +	safe_irq_domains = !iommu_group_for_each_dev(iommu_group, &bus,
->>> +				       vfio_safe_irq_domain);
->>> +
->>>   	/* Determine bus_type in order to allocate a domain */
->>>   	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
->>>   	if (ret)
->>> @@ -920,8 +956,12 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>>   	INIT_LIST_HEAD(&domain->group_list);
->>>   	list_add(&group->next, &domain->group_list);
->>>
->>> +	/*
->>> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
->>> +	 * must support IRQ remapping/interrupt translation
->>> +	 */
->>>   	if (!allow_unsafe_interrupts &&
->>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->>> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !safe_irq_domains)) {
->>>   		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
->>>   		       __func__);
->>>   		ret = -EPERM;
+>> Changelog v2 .. v3:
+>> - remove bogus v2 specific rebase leftovers
 >>
->
+>>  include/kvm/vgic/vgic.h  |   4 +
+>>  virt/kvm/arm/vgic/vgic.c | 193 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic.h |   2 +
+>>  3 files changed, 199 insertions(+)
+>>
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> index 2bfb42c..5fae4a9 100644
+>> --- a/include/kvm/vgic/vgic.h
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -190,6 +190,10 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>>  #define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+>>  			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+>>  
+>> +bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+>> +void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>> +void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>> +
+>>  /**
+>>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+>>   *
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index 4fb20fd..c6f8b9b 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>> @@ -305,3 +305,196 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>>  {
+>>  	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+>>  }
+>> +
+>> +/**
+>> + * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+>> + *
+>> + * @vcpu: The VCPU pointer
+>> + *
+>> + * Go over the list of "interesting" interrupts, and prune those that we
+>> + * won't have to consider in the near future.
+>> + */
+>> +static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +	struct vgic_irq *irq, *tmp;
+>> +
+>> +retry:
+>> +	spin_lock(&vgic_cpu->ap_list_lock);
+>> +
+>> +	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
+>> +		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
+>> +
+>> +		spin_lock(&irq->irq_lock);
+>> +
+>> +		BUG_ON(vcpu != irq->vcpu);
+>> +
+>> +		target_vcpu = vgic_target_oracle(irq);
+>> +
+>> +		if (!target_vcpu) {
+>> +			/*
+>> +			 * We don't need to process this interrupt any
+>> +			 * further, move it off the list.
+>> +			 */
+>> +			list_del(&irq->ap_list);
+>> +			irq->vcpu = NULL;
+>> +			spin_unlock(&irq->irq_lock);
+>> +			continue;
+>> +		}
+>> +
+>> +		if (target_vcpu == vcpu) {
+>> +			/* We're on the right CPU */
+>> +			spin_unlock(&irq->irq_lock);
+>> +			continue;
+>> +		}
+>> +
+>> +		/* This interrupt looks like it has to be migrated. */
+>> +
+>> +		spin_unlock(&irq->irq_lock);
+>> +		spin_unlock(&vgic_cpu->ap_list_lock);
+>> +
+>> +		/*
+>> +		 * Ensure locking order by always locking the smallest
+>> +		 * ID first.
+>> +		 */
+>> +		if (vcpu->vcpu_id < target_vcpu->vcpu_id) {
+>> +			vcpuA = vcpu;
+>> +			vcpuB = target_vcpu;
+>> +		} else {
+>> +			vcpuA = target_vcpu;
+>> +			vcpuB = vcpu;
+>> +		}
+>> +
+>> +		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+>> +		spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+>> +		spin_lock(&irq->irq_lock);
+>> +
+>> +		/*
+>> +		 * If the affinity has been preserved, move the
+>> +		 * interrupt around. Otherwise, it means things have
+>> +		 * changed while the interrupt was unlocked, and we
+>> +		 * need to replay this.
+>> +		 *
+>> +		 * In all cases, we cannot trust the list not to have
+>> +		 * changed, so we restart from the beginning.
+>> +		 */
+>> +		if (target_vcpu == vgic_target_oracle(irq)) {
+>> +			struct vgic_cpu *new_cpu = &target_vcpu->arch.vgic_cpu;
+>> +
+>> +			list_del(&irq->ap_list);
+>> +			irq->vcpu = target_vcpu;
+>> +			list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
+>> +		}
+>> +
+>> +		spin_unlock(&irq->irq_lock);
+>> +		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+>> +		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+>> +		goto retry;
+>> +	}
+>> +
+>> +	spin_unlock(&vgic_cpu->ap_list_lock);
+>> +}
+>> +
+>> +static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
+>> +{
+>> +}
+>> +
+>> +static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+>> +{
+>> +}
+>> +
+>> +/* Requires the ap_list_lock and the irq_lock to be held. */
+> why is it needed to hold the ap_list lock here?
+>> +static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+>> +				    struct vgic_irq *irq, int lr)
+>> +{
+>> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
+> ?
+
+Only the irq lock needs to be held for this particular function. It is
+vgic_flush_lr_state that requires the ap_list lock to be held, as it is
+iterating over all the interrupts for that particular vcpu.
+
+Andre, can you please amend the comment and drop that assertion?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
