@@ -1,45 +1,25 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 May 2016 12:22:06 +0200
-Subject: [PATCH 0/4] clocksource: Add support for Aspeed timer
-In-Reply-To: <1462797169-14512-1-git-send-email-joel@jms.id.au>
-References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
-Message-ID: <20160510102206.GD14952@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 May 2016 11:22:24 +0100
+Subject: [PATCH v3 20/55] KVM: arm/arm64: vgic-new: Implement
+ kvm_vgic_vcpu_pending_irq
+In-Reply-To: <1462531568-9799-21-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-21-git-send-email-andre.przywara@arm.com>
+Message-ID: <5731B660.4030400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 10:02:45PM +0930, Joel Stanley wrote:
-> Hello All,
+On 06/05/16 11:45, Andre Przywara wrote:
+> From: Eric Auger <eric.auger@linaro.org>
 > 
-> This adds support for the Aspeed ast2400 and ast2500 families of BMC SoCs to
-> the moxart driver.
+> Tell KVM whether a particular VCPU has an IRQ that needs handling
+> in the guest. This is used to decide whether a VCPU is runnable.
 > 
-> I've addressed the feedback from Daniel and spent a bit of time trying to
-> ensure the series makes sense.
-> 
-> I've not included a patch that renames the driver to fttmr010, from Faraday
-> Tech, as I wasn't sure if we had consensus. If you would prefer I do so then
-> let me know.
-> 
-> Cheers,
-> 
-> Joel
-> 
-> Joel Stanley (4):
->   drivers/clocksouree/moxart: Add kbuild symbol
->   drivers/clocksource/moxart: Refactor enable/disable
->   drivers/clocksource/moxart: Use struct to hold state
->   drivers/clocksource/moxart: Add Aspeed support
-> 
->  .../bindings/timer/moxa,moxart-timer.txt           |   4 +-
->  arch/arm/mach-moxart/Kconfig                       |   2 +-
->  drivers/clocksource/Kconfig                        |   9 +
->  drivers/clocksource/Makefile                       |   2 +-
->  drivers/clocksource/moxart_timer.c                 | 191 ++++++++++++++-------
->  5 files changed, 143 insertions(+), 65 deletions(-)
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-The changes look ok. Could you please reply to patch 2 with a changelog I 
-can add.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks.
-
-  -- Daniel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
