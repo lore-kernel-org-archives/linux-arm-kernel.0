@@ -1,42 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 14:43:16 +0200
-Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI
- with CPU thermal nodes
-In-Reply-To: <CANAwSgTy6p9AVmmOWATpSO1JqVbwE0v+y_y-RLd+32RnNJTA+Q@mail.gmail.com>
-References: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
- <CANAwSgT9SY3kj8+beMpc1xGoC=rMBSya+2v2dyZQp6ykH+V0=g@mail.gmail.com>
- <573198BE.6020900@samsung.com>
- <CANAwSgTy6p9AVmmOWATpSO1JqVbwE0v+y_y-RLd+32RnNJTA+Q@mail.gmail.com>
-Message-ID: <5731D764.8070007@samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 May 2016 14:46:52 +0200
+Subject: [PATCH] ARM: at91/defconfig: sama5: add CONFIG_FHANDLE
+In-Reply-To: <5731D71A.5080500@atmel.com>
+References: <572CC603.4000102@denx.de>
+ <1462867383-31961-1-git-send-email-nicolas.ferre@atmel.com>
+ <5731D49E.3080307@denx.de> <5731D71A.5080500@atmel.com>
+Message-ID: <5731D83C.3030308@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2016 11:29 AM, Anand Moon wrote:
+On 05/10/2016 02:42 PM, Nicolas Ferre wrote:
+> Le 10/05/2016 14:31, Marek Vasut a ?crit :
+>> On 05/10/2016 10:03 AM, Nicolas Ferre wrote:
+>>> CONFIG_FHANDLE is listed as a mandatory kernel option for systemd. So
+>>> explicitly enable it to allow easy use of systemd userspace.
+>>>
+>>> Reported-by: Marek Vasut <marex@denx.de>
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> ---
+>>> Hi Marek,
 >>
->> I am sorry but I do not understand.
->> 1. Are you saying that my patch causes the issue?
->> 2. Are you saying that I should not send some patches because of
->> conflicting work? (that would be peculiar...)
->> 3. Are you saying that I should not apply this patch to me tree because
->> of conflicting work?
->> 4. Other?
+>> Hi!
 >>
->> Best regards.
->> Krzysztof
+>>> It seems that on my side, CONFIG_FHANDLE is not selected automatically...
+>>> So I add this patch: can you tell me your thoughts?
 >>
+>> Uh, weird, I tried this on next just now:
 >>
+>> linux-2.6$ git describe HEAD
+>> next-20160510
+>>
+>> linux-2.6$ export ARCH=arm ; export CROSS_COMPILE=arm-linux-gnueabi-
+>>
+>> linux-2.6$ make sama5_defconfig ; grep FHANDLE .config
+>>   HOSTCC  scripts/basic/fixdep
+>>   HOSTCC  scripts/kconfig/conf.o
+>>   SHIPPED scripts/kconfig/zconf.tab.c
+>>   SHIPPED scripts/kconfig/zconf.lex.c
+>>   SHIPPED scripts/kconfig/zconf.hash.c
+>>   HOSTCC  scripts/kconfig/zconf.tab.o
+>>   HOSTLD  scripts/kconfig/conf
+>> #
+>> # configuration written to .config
+>> #
+>> CONFIG_FHANDLE=y
 > 
-> Sorry for the confusion it's not about you patch.
-> The feature is not working correctly as per my testing with the
-> original source code.
-> It need to be more tuned or some other approach to the issue need to found.
+> Absolutely. The patch f76be61755c5 ("Make CONFIG_FHANDLE default y") has
+> been added in v4.6-rc2... while I was doing my tests on at91-next that
+> is based on v4.6-rc1 :-\
+> 
+> Anyway. It's in now. Thanks,
 
-Known issue. You don't have cpufreq cooling enabled. I sent patches for
-that and they are in the mainline. However cpufreq cooling requires
-cpufreq which cannot work with BL_SWITCHER and on Exynos542x on
-exynos_defconfig BL_SWITCHER is enabled.
+Cool, thanks :)
 
-Just disable the BL_SWITCHER.
-
+-- 
 Best regards,
-Krzysztof
+Marek Vasut
