@@ -1,103 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 16:22:19 +0100
-Subject: [PATCH v3a] KVM: arm/arm64: pmu: abstract access to number of SPIs
-In-Reply-To: <1462890906-6134-1-git-send-email-andre.przywara@arm.com>
-References: <5731AF57.2040707@linaro.org>
- <1462890906-6134-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <5731FCAB.9050109@arm.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 10 May 2016 17:29:08 +0200
+Subject: [PATCH] arm64: dts: r8a7795: Increase the size of GIC-400 mapped
+ registers
+In-Reply-To: <5731ED92.6080804@arm.com>
+References: <1461047395-6532-1-git-send-email-dirk.behme@de.bosch.com>
+ <CAMuHMdV6XOSiSv-mwovnCAMEPsgOc_vEhPPu0aYCgz74EF242g@mail.gmail.com>
+ <5731ED92.6080804@arm.com>
+Message-ID: <5731FE44.8010906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 15:35, Andre Przywara wrote:
-> Currently the PMU uses a member of the struct vgic_dist directly,
-> which not only breaks abstraction, but will fail with the new VGIC.
-> Abstract this access in the VGIC header file.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Hi Eric, Marc,
-> 
-> as this if-statement was quite confusing (it wasn't even the negation
-> that was wrong), I rewrote it a bit to be more readable.
-> This one works now with PPIs (after fixing kvmtool).
-> 
-> Does that make sense?
-> 
-> Cheers,
-> Andre.
-> 
->  include/kvm/arm_vgic.h |  2 ++
->  virt/kvm/arm/pmu.c     | 19 +++++++++++--------
->  2 files changed, 13 insertions(+), 8 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 6a98e05..d406f8e 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -351,6 +351,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
-> +				 ((i) < (k)->arch.vgic.nr_irqs))
->  
->  int vgic_v2_probe(struct device_node *vgic_node,
->  		  const struct vgic_ops **ops,
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 575c7aa..6ab9d6b 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -436,6 +436,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
->  	return 0;
->  }
->  
-> +/*
-> + * For one VM the interrupt type must be same for each vcpu.
-> + * As a PPI, the interrupt number is the same for all vcpus,
-> + * while as an SPI it must be a separate number per vcpu.
-> + */
->  static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
->  {
->  	int i;
-> @@ -457,6 +462,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
->  	return true;
->  }
->  
-> +#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
+On 10.05.2016 16:17, Marc Zyngier wrote:
+> On 10/05/16 14:33, Geert Uytterhoeven wrote:
+>> CC Marc, lakml
+>>
+>> On Tue, Apr 19, 2016 at 8:29 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>>> From: Pooya Keshavarzi <Pooya.Keshavarzi@de.bosch.com>
+>>>
+>>> There are some requirements about the GIC-400 memory layout and its
+>>> mapping if using 64k aligned base addresses like on r8a7795.
+>>>
+>>> See e.g.
+>>>
+>>> http://xenbits.xen.org/gitweb/?p=xen.git;a=commit;h=21550029f709072aacf3b9
+>>>
+>>> Map the whole memory range instead of only 0x2000. This will fix
+>>> the issue that some hypervisors, e.g. Xen, fail to handle the
+>>> interrupts correctly.
+>>>
+>>> Signed-off-by: Pooya Keshavarzi <Pooya.Keshavarzi@de.bosch.com>
+>>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>>
+>> Based on my understanding below
+>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>>> ---
+>>> Note: This patch is against renesas-drivers-2016-04-12-v4.6-rc3
+>>>
+>>>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> index 8be9424..d880fd4 100644
+>>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> @@ -160,9 +160,9 @@
+>>>                          #address-cells = <0>;
+>>>                          interrupt-controller;
+>>>                          reg = <0x0 0xf1010000 0 0x1000>,
+>>> -                             <0x0 0xf1020000 0 0x2000>,
+>>> +                             <0x0 0xf1020000 0 0x20000>,
+>>>                                <0x0 0xf1040000 0 0x20000>,
+>>> -                             <0x0 0xf1060000 0 0x2000>;
+>>> +                             <0x0 0xf1060000 0 0x20000>;
+>>>                          interrupts = <GIC_PPI 9
+>>>                                          (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>>>                  };
+>>
+>> Region 0:
+>>      4 KiB-pages 0xf1011000-0xf101ffff are aliased to 0xf1010000-0xf1010fff,
+>>      but we need the first 4 KiB only.
+>>
+>> Region 1:
+>>      4 KiB-pages 0xf1021000-0xf102ffff are aliased to 0xf1020000-0xf1020fff,
+>>      4 KiB-pages 0xf1030000-0xf103ffff are all zeroes, probably due to
+>>      non-secure mode?
+>
+> No. This 4kB page only contain a single register (GICC_DIR), which is
+> WO/RAZ.
+>
+>>
+>> Region 2:
+>>      4 KiB-pages 0xf1041000-0xf104ffff are aliased to 0xf1040000-0xf1040fff,
+>>      4 KiB-pages 0xf1050000-0xf105ffff are all zeroes, probably due to
+>>      non-secure mode?
+>
+> Neither. The aliases are an unused feature of GIC400 exposing the other
+> CPUs view of the same registers...
+>
+>>
+>> Region 3:
+>>      4 KiB-pages 0xf1061000-0xf106ffff are aliased to 0xf1060000-0xf1060fff,
+>>      4 KiB-pages 0xf1070000-0xf107ffff are all zeroes, probably due to
+>>      non-secure mode?
+>
+> Same as region 1.
+>
+>>
+>> Region 2 already had a 128 KiB size before, which allowed to use 8 KiB at
+>> 0xf104f000.
+>
+> No. This region (GICH) only needs the first 256 bytes or so. The rest is
+> either RAZ/WI or useless stuff.
+>
+>>
+>> An 8 KiB size for regions 1 and 3 indeed didn't make much sense, as this
+>> covered two identical (aliased) 4 KiB pages, instead of two different pages
+>> at offset 0xf000.
+>
+> While we're at it, adding a pointer to the documentation (GIC400 and
+> SBSA) would be tremendously useful, as it'd avoid misinterpreting the
+> various bits.
 
-You might as well move this to the VGIC code.
 
->  
->  int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
->  {
-> @@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
->  		if (get_user(irq, uaddr))
->  			return -EFAULT;
->  
-> -		/*
-> -		 * The PMU overflow interrupt could be a PPI or SPI, but for one
-> -		 * VM the interrupt type must be same for each vcpu. As a PPI,
-> -		 * the interrupt number is the same for all vcpus, while as an
-> -		 * SPI it must be a separate number per vcpu.
-> -		 */
-> -		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
-> -		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
-> +		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
-> +		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
-> +			return -EINVAL;
-> +
-> +		if (!irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+If anybody could give a short description I could copy & paste into 
+the commit message that would be quite helpful :)
 
-Why do we need to pass this boolean as a parameter? You could rewrite
-irq_is_valid() to generate the is_ppi boolean by itself.
 
->  			return -EINVAL;
->  
->  		if (kvm_arm_pmu_irq_initialized(vcpu))
-> 
+Best regards
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Dirk
