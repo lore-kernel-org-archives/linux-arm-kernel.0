@@ -1,33 +1,26 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 10 May 2016 16:23:34 +0800
-Subject: [PATCH 6/6] pinctrl: mt8173: set GPIO16 to usb iddig mode
-In-Reply-To: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1462868614-20602-7-git-send-email-chunfeng.yun@mediatek.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 10 May 2016 10:28:47 +0200
+Subject: [PATCH] firmware/drivers/psci: Fix unused functions when
+ CONFIG_CPU_IDLE=n
+In-Reply-To: <20160510082250.GA14662@red-moon>
+References: <1462864729-11793-1-git-send-email-daniel.lezcano@linaro.org>
+ <20160510082250.GA14662@red-moon>
+Message-ID: <57319BBF.7060306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the default mode of GPIO16 pin is gpio, when set EINT16 to
-IRQ_TYPE_LEVEL_HIGH, no interrupt is triggered, it can be
-fixed when set its default mode as usb iddig.
+On 05/10/2016 10:22 AM, Lorenzo Pieralisi wrote:
+> On Tue, May 10, 2016 at 09:18:49AM +0200, Daniel Lezcano wrote:
+>> On the ARM64 architecture, when CPUIDLE is not set in the configuration,
+>> the compilation raises a couple of warnings:
+>>
+>> drivers/firmware/psci.c:70:12: warning: 'psci_pd_power_off' defined but not used [-Wunused-function]
+>> drivers/firmware/psci.c:273:12: warning: 'psci_set_suspend_mode_osi' defined but not used [-Wunused-function]
+>
+> That's not mainline code :)
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Ha ha ! Sounds like my scripts are not yet ready :)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-index 13e5b68..9b018fd 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-@@ -201,7 +201,7 @@ static const struct mtk_desc_pin mtk_pins_mt8173[] = {
- 	MTK_PIN(
- 		PINCTRL_PIN(16, "IDDIG"),
- 		NULL, "mt8173",
--		MTK_EINT_FUNCTION(0, 16),
-+		MTK_EINT_FUNCTION(1, 16),
- 		MTK_FUNCTION(0, "GPIO16"),
- 		MTK_FUNCTION(1, "IDDIG"),
- 		MTK_FUNCTION(2, "CMFLASH"),
--- 
-1.7.9.5
+Sorry for the noise.
+
+   -- Daniel
