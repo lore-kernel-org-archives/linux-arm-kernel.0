@@ -1,33 +1,43 @@
 From: serveralex@gmail.com (=?UTF-8?q?Alexander=20M=C3=BCller?=)
-Date: Tue, 10 May 2016 22:08:34 +0200
-Subject: [PATCH 0/6] Enable ethernet support on Amlogic meson8b / Hardkernel
- ODROID-C1
-Message-ID: <1462910920-5462-1-git-send-email-serveralex@gmail.com>
+Date: Tue, 10 May 2016 22:08:36 +0200
+Subject: [PATCH 2/6] ARM: DTS: Amlogic: Add ethernet pins
+In-Reply-To: <1462910920-5462-1-git-send-email-serveralex@gmail.com>
+References: <1462910920-5462-1-git-send-email-serveralex@gmail.com>
+Message-ID: <1462910920-5462-3-git-send-email-serveralex@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes a glitch in the pinctrl driver, adds clock gates
-support and configures ethernet support via stmmac.
+Add pins for ethernet interface
 
-The previously sent patch "pinctrl: meson: Fix eth_tx_en bit index" is
-also included in this patch series.
+Signed-off-by: Alexander M?ller <serveralex@gmail.com>
+---
+ arch/arm/boot/dts/meson8b.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Alexander M?ller (6):
-  pinctrl: meson: Fix eth_tx_en bit index
-  ARM: DTS: Amlogic: Add ethernet pins
-  ARM: clk: Amlogic: Add support for clock gates
-  ARM: clk: Amlogic: Add clk81 clock gates
-  ARM: DTS: Amlogic: Enable ethernet on meson8b
-  ARM: DTS: Amlogic: Enable ethernet on ODROID-C1
-
- arch/arm/boot/dts/meson8b-odroidc1.dts   |  10 ++
- arch/arm/boot/dts/meson8b.dtsi           |  25 ++++
- drivers/clk/meson/clkc.c                 |  18 +++
- drivers/clk/meson/clkc.h                 |  18 +++
- drivers/clk/meson/meson8b-clkc.c         | 196 +++++++++++++++++++++++++++++++
- drivers/pinctrl/meson/pinctrl-meson8b.c  |   2 +-
- include/dt-bindings/clock/meson8b-clkc.h |  99 +++++++++++++++-
- 7 files changed, 365 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index 2bfe401..8ef2da8 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -171,6 +171,20 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 			};
++
++			ethernet_pins: ethernet {
++				mux {
++					groups = "eth_tx_clk", "eth_tx_en",
++						"eth_txd1_0", "eth_txd1_1",
++						"eth_txd0_0", "eth_txd0_1",
++						"eth_rx_clk", "eth_rx_dv",
++						"eth_rxd1", "eth_rxd0",
++						"eth_mdio_en", "eth_mdc",
++						"eth_ref_clk", "eth_txd2",
++						"eth_txd3";
++					function = "ethernet";
++				};
++			};
+ 		};
+ 
+ 		pinctrl_aobus: pinctrl at c8100084 {
 -- 
 2.5.0
