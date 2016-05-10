@@ -1,327 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 10 May 2016 14:08:06 +0200
-Subject: [PATCH v3 15/55] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
-In-Reply-To: <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160510120806.GC27623@cbox>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 15:03:48 +0300
+Subject: [PATCH 20/23] mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong
+ clock issue
+In-Reply-To: <1460741387-23815-21-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-21-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5731CE24.2090002@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:45:28AM +0100, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On 15/04/16 20:29, Dong Aisheng wrote:
+> When enable DDR, the clock factor definition is changed.
+> e.g. original 200Mhz will become 100Mhz one MIX_CTRL_DDREN bit is set
+> So we need to update the clock setting then the strobe dll can lock
+> the correct clock rate.
 > 
-> Provide a vgic_queue_irq() function which decides whether a given
-> IRQ needs to be queued to a VCPU's ap_list.
-> This should be called whenever an IRQ becomes pending or enabled,
-> either as a result of userspace injection, from in-kernel emulated
-> devices like the architected timer or from MMIO accesses to the
-> distributor emulation.
-> Also provides the necessary functions to allow userland to inject an
-> IRQ to a guest.
-> Since this is the first code that starts using our locking mechanism, we
-> add some (hopefully) clear documentation of our locking strategy and
-> requirements along with this patch.
+> Additionally we also need disable the clock before locking strobe dll.
 > 
-> [Andre: refactor out vgic_queue_irq_unlock()]
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Apart from redundant parentheses (refer below):
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
 > ---
-> Changelog RFC..v1:
-> - add spinlock checks protected by CONFIG_DEBUG_SPINLOCK
-> - add more comments to vgic_target_oracle
-> - remove BUG_ON() if IRQ is neither edge or level
-> - rename vgic_queue_irq() to vgic_queue_irq_unlock()
-> - simplify initial check in vgic_queue_irq_unlock()
-> - extend retry loop to ask the oracle again
-> - minor comment fixes
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> Changelog v1 .. v2:
-> - move most IRQ injection code into vgic_update_irq_pending()
-> 
->  include/kvm/vgic/vgic.h  |   3 +
->  virt/kvm/arm/vgic/vgic.c | 209 +++++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h |   1 +
->  3 files changed, 213 insertions(+)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 39933ee..2bfb42c 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -181,6 +181,9 @@ struct vgic_cpu {
->  	u64 live_lrs;
->  };
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 07b1144..3ff213f 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -852,6 +852,11 @@ static void esdhc_set_strobe_dll(struct sdhci_host *host)
+>  	u32 v;
 >  
-> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> +			bool level);
-> +
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(false)
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index fb45537..92b78a0 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -19,8 +19,31 @@
->  
->  #include "vgic.h"
->  
-> +#define CREATE_TRACE_POINTS
-> +#include "../trace.h"
-> +
-> +#ifdef CONFIG_DEBUG_SPINLOCK
-> +#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
-> +#else
-> +#define DEBUG_SPINLOCK_BUG_ON(p)
-> +#endif
-> +
->  struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
->  
-> +/*
-> + * Locking order is always:
-> + *   vgic_cpu->ap_list_lock
-> + *     vgic_irq->irq_lock
-> + *
-> + * (that is, always take the ap_list_lock before the struct vgic_irq lock).
-> + *
-> + * When taking more than one ap_list_lock at the same time, always take the
-> + * lowest numbered VCPU's ap_list_lock first, so:
-> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
-> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
-> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
-> + */
-> +
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid)
->  {
-> @@ -39,3 +62,189 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  	WARN(1, "Looking up struct vgic_irq for reserved INTID");
->  	return NULL;
->  }
-> +
-> +/**
-> + * kvm_vgic_target_oracle - compute the target vcpu for an irq
-> + *
-> + * @irq:	The irq to route. Must be already locked.
-> + *
-> + * Based on the current state of the interrupt (enabled, pending,
-> + * active, vcpu and target_vcpu), compute the next vcpu this should be
-> + * given to. Return NULL if this shouldn't be injected at all.
-> + *
-> + * Requires the IRQ lock to be held.
-> + */
-> +static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
-> +{
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-> +
-> +	/* If the interrupt is active, it must stay on the current vcpu */
-> +	if (irq->active)
-> +		return irq->vcpu;
-> +
-> +	/*
-> +	 * If the IRQ is not active but enabled and pending, we should direct
-> +	 * it to its configured target VCPU.
-> +	 */
-> +	if (irq->enabled && irq->pending)
-> +		return irq->target_vcpu;
-> +
-> +	/* If neither active nor pending and enabled, then this IRQ should not
-> +	 * be queued to any VCPU.
-> +	 */
-> +	return NULL;
-> +}
-> +
-> +/*
-> + * Only valid injection if changing level for level-triggered IRQs or for a
-> + * rising edge.
-> + */
-> +static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-> +{
-> +	switch (irq->config) {
-> +	case VGIC_CONFIG_LEVEL:
-> +		return irq->line_level != level;
-> +	case VGIC_CONFIG_EDGE:
-> +		return level;
-> +	}
-> +
-> +	return false;
-> +}
-> +
-> +/*
-> + * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
-> + * Do the queuing if necessary, taking the right locks in the right order.
-> + * Returns true when the IRQ was queued, false otherwise.
-> + *
-> + * Needs to be entered with the IRQ lock already held, but will return
-> + * with all locks dropped.
-> + */
-> +bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-> +
-> +retry:
-> +	vcpu = vgic_target_oracle(irq);
-> +	if (irq->vcpu || !vcpu) {
-> +		/*
-> +		 * If this IRQ is already on a VCPU's ap_list, then it
-> +		 * cannot be moved or modified and there is no more work for
-> +		 * us to do.
-> +		 *
-> +		 * Otherwise, if the irq is not pending and enabled, it does
-> +		 * not need to be inserted into an ap_list and there is also
-> +		 * no more work for us to do.
-> +		 */
-> +		spin_unlock(&irq->irq_lock);
-> +		return false;
-> +	}
-> +
-> +	/*
-> +	 * We must unlock the irq lock to take the ap_list_lock where
-> +	 * we are going to insert this new pending interrupt.
-> +	 */
-> +	spin_unlock(&irq->irq_lock);
-> +
-> +	/* someone can do stuff here, which we re-check below */
-> +
-> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +	spin_lock(&irq->irq_lock);
-> +
-> +	/*
-> +	 * Did something change behind our backs?
-> +	 *
-> +	 * There are two cases:
-> +	 * 1) The irq became pending or active behind our backs and/or
+>  	if (host->mmc->actual_clock > ESDHC_STROBE_DLL_CLK_FREQ) {
+> +		/* disable clock before enabling strobe dll */
+> +		writel(readl(host->ioaddr + ESDHC_VENDOR_SPEC) &
+> +		       (~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON),
 
-but you're not checking the active state below?
+Parentheses look redundant
 
-so did you mean 'became pending and enabled' ?
-
-> +	 *    the irq->vcpu field was set correspondingly when putting
-> +	 *    the irq on an ap_list. Then drop the locks and return.
-> +	 * 2) Someone changed the affinity on this irq behind our
-> +	 *    backs and we are now holding the wrong ap_list_lock.
-> +	 *    Then drop the locks and try the new VCPU.
-> +	 */
-
-I thought we agreed a long time ago to change this to:
-
-        if (unlinkely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
-		spin_unlock(&irq->irq_lock);
-		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-	
-		spin_lock(&irq->irq_lock);
-		goto retry;
-	}
-
-and get rid of two different if statements below ??
-
-At least I don't understand why we are explicitly evaluating
-!(irq->pending && irq->enabled) here, but using the oracle above?
-
-In fact, I think if you did what I suggest above, then you can reuse
-this for the active state, which frankly looks more complicated than we
-had hoped for...
-
-> +	if (irq->vcpu || !(irq->pending && irq->enabled)) {
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +		return false;
-> +	}
+> +		       host->ioaddr + ESDHC_VENDOR_SPEC);
 > +
-> +	if (irq->target_vcpu != vcpu) {
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		goto retry;
-> +	}
-> +
-> +	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
-> +	irq->vcpu = vcpu;
-> +
-> +	spin_unlock(&irq->irq_lock);
-> +	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +
-> +	kvm_vcpu_kick(vcpu);
-> +
-> +	return true;
-> +}
-> +
-> +static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> +				   unsigned int intid, bool level,
-> +				   bool mapped_irq)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +	struct vgic_irq *irq;
-> +	int ret;
-> +
-> +	trace_vgic_update_irq_pending(cpuid, intid, level);
-> +
-> +	vcpu = kvm_get_vcpu(kvm, cpuid);
-> +	if (!vcpu && intid < VGIC_NR_PRIVATE_IRQS)
-> +		return -EINVAL;
-> +
-> +	irq = vgic_get_irq(kvm, vcpu, intid);
-> +	if (!irq)
-> +		return -EINVAL;
-> +
-> +	if (irq->hw != mapped_irq)
-> +		return -EINVAL;
-> +
-> +	spin_lock(&irq->irq_lock);
-> +
-> +	if (!vgic_validate_injection(irq, level)) {
-> +		/* Nothing to see here, move along... */
-> +		spin_unlock(&irq->irq_lock);
-> +		return 0;
-> +	}
-> +
-> +	if (irq->config == VGIC_CONFIG_LEVEL) {
-> +		irq->line_level = level;
-> +		irq->pending = level || irq->soft_pending;
-> +	} else {
-> +		irq->pending = true;
-> +	}
-> +
-> +	vgic_queue_irq_unlock(kvm, irq);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-> + * @kvm:     The VM structure pointer
-> + * @cpuid:   The CPU for PPIs
-> + * @intid:   The INTID to inject a new state to.
-> + * @level:   Edge-triggered:  true:  to trigger the interrupt
-> + *			      false: to ignore the call
-> + *	     Level-sensitive  true:  raise the input signal
-> + *			      false: lower the input signal
-> + *
-> + * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-> + * level-sensitive interrupts.  You can think of the level parameter as 1
-> + * being HIGH and 0 being LOW and all devices being active-HIGH.
-> + */
-> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> +			bool level)
-> +{
-> +	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 61b8d22..c625767 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -18,5 +18,6 @@
->  
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
-> +bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
->  
->  #endif
-> -- 
-> 2.7.3
+>  		/* force a reset on strobe dll */
+>  		writel(ESDHC_STROBE_DLL_CTRL_RESET,
+>  			host->ioaddr + ESDHC_STROBE_DLL_CTRL);
+> @@ -913,6 +918,8 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
+>  		m |= ESDHC_MIX_CTRL_DDREN | ESDHC_MIX_CTRL_HS400_EN;
+>  		writel(m, host->ioaddr + ESDHC_MIX_CTRL);
+>  		imx_data->is_ddr = 1;
+> +		/* update clock after enable DDR for strobe DLL lock */
+> +		host->ops->set_clock(host, host->clock);
+>  		esdhc_set_strobe_dll(host);
+>  		break;
+>  	}
 > 
