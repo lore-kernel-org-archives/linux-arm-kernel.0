@@ -1,40 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 May 2016 14:08:45 +0200
-Subject: [PATCH v8 2/3] gpio: mmio: add DT support for memory-mapped GPIOs
-In-Reply-To: <535f785bf6116c0fb6f46afbb77e6d4bd3ef5f60.1462543458.git.chunkeey@googlemail.com>
-References: <cover.1462543457.git.chunkeey@googlemail.com>
- <535f785bf6116c0fb6f46afbb77e6d4bd3ef5f60.1462543458.git.chunkeey@googlemail.com>
-Message-ID: <CACRpkdaeZ14hfz-gRetRcdj8NzzyqigV1ZtDSWAwveFxwAgt0w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 14:09:04 +0200
+Subject: [GIT PULL 5/6] i.MX defconfig updates for 4.7
+In-Reply-To: <1462291086-19925-5-git-send-email-shawnguo@kernel.org>
+References: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
+ <1462291086-19925-5-git-send-email-shawnguo@kernel.org>
+Message-ID: <19332422.8mBKvEekr1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2016 at 3:08 PM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
+On Tuesday 03 May 2016 23:58:05 Shawn Guo wrote:
+> The i.MX defconfig updates for 4.7:
+>  - Update multi_v5_defconfig for i.MX21/27 and systemd support
+>  - Update imx_v6_v7_defconfig to support devices found on various i.MX6
+>    board: FT5x06 and TSC2004 touch, I2C GPIO, MICREL PHY and M41T80 RTC
+> 
 
-> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
->
-> This patch adds support for defining memory-mapped GPIOs which
-> are compatible with the existing gpio-mmio interface.
+Merged into next/defconfig, thanks!
 
-Overall very nice, just waiting for the next version.
-
-> The first user for this binding is "wd,mbl-gpio".
-
-And that binding defines that we have a register named "dat".
-
-> +       if (of_property_read_bool(dev->of_node, "no-output"))
-
-And then this too.
-
-Do we want these generic MMIO bindings (dat, no-output)
-in a special document like
-Documentation/devicetree/bindings/gpio/gpio-mmio.txt?
-
-Going forward?
-
-This patch set mainly deals with refactorings, but in the
-long run we want to slim things down a bit and use standard
-bindings I think.
-
-Yours,
-Linus Walleij
+	Arnd
