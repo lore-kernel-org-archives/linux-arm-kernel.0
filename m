@@ -1,107 +1,36 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 11:35:53 +0200
-Subject: [PATCH v3 14/55] KVM: arm/arm64: vgic-new: Add acccessor to new
- struct vgic_irq instance
-In-Reply-To: <1462531568-9799-15-git-send-email-andre.przywara@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 May 2016 10:39:28 +0100
+Subject: [PATCH v3 15/55] KVM: arm/arm64: vgic-new: Implement virtual IRQ
+ injection
+In-Reply-To: <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
 References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-15-git-send-email-andre.przywara@arm.com>
-Message-ID: <5731AB79.1000908@linaro.org>
+ <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <5731AC50.5020809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2016 12:45 PM, Andre Przywara wrote:
+On 06/05/16 11:45, Andre Przywara wrote:
 > From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> The new VGIC implementation centers around a struct vgic_irq instance
-> per virtual IRQ.
-> Provide a function to retrieve the right instance for a given IRQ
-> number and (in case of private interrupts) the right VCPU.
+> Provide a vgic_queue_irq() function which decides whether a given
+> IRQ needs to be queued to a VCPU's ap_list.
+> This should be called whenever an IRQ becomes pending or enabled,
+> either as a result of userspace injection, from in-kernel emulated
+> devices like the architected timer or from MMIO accesses to the
+> distributor emulation.
+> Also provides the necessary functions to allow userland to inject an
+> IRQ to a guest.
+> Since this is the first code that starts using our locking mechanism, we
+> add some (hopefully) clear documentation of our locking strategy and
+> requirements along with this patch.
+> 
+> [Andre: refactor out vgic_queue_irq_unlock()]
 > 
 > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
->  2 files changed, 63 insertions(+)
->  create mode 100644 virt/kvm/arm/vgic/vgic.c
->  create mode 100644 virt/kvm/arm/vgic/vgic.h
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> new file mode 100644
-> index 0000000..fb45537
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Copyright (C) 2015, 2016 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +
-> +#include "vgic.h"
-> +
-> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-> +
-> +struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> +			      u32 intid)
-> +{
-> +	/* SGIs and PPIs */
-> +	if (intid <= VGIC_MAX_PRIVATE)
-> +		return &vcpu->arch.vgic_cpu.private_irqs[intid];
-> +
-> +	/* SPIs */
-> +	if (intid <= VGIC_MAX_SPI)
-> +		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
-> +
-> +	/* LPIs are not yet covered */
-> +	if (intid >= VGIC_MIN_LPI)
-> +		return NULL;
-> +
-> +	WARN(1, "Looking up struct vgic_irq for reserved INTID");
-> +	return NULL;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> new file mode 100644
-> index 0000000..61b8d22
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (C) 2015, 2016 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __KVM_ARM_VGIC_NEW_H__
-> +#define __KVM_ARM_VGIC_NEW_H__
-> +
-> +struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> +			      u32 intid);
-> +
-> +#endif
-> 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-Eric
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
