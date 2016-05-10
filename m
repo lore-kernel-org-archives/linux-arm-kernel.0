@@ -1,50 +1,166 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 May 2016 12:28:39 +0200
-Subject: [PATCH] mmc: sdhci-st: correct name of sd-uhs-sdr50 property
-In-Reply-To: <1462839264-13300-1-git-send-email-horms+renesas@verge.net.au>
-References: <1462839264-13300-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAPDyKFovKxGDnnyKAWjpjTN=7XB5sbTe+gyh2OTSRQ=bmnJTFQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 May 2016 11:28:40 +0100
+Subject: [PATCH 4/5] iommu/mediatek: add support for mtk iommu generation
+ one HW
+In-Reply-To: <1462780816-5288-5-git-send-email-honghui.zhang@mediatek.com>
+References: <1462780816-5288-1-git-send-email-honghui.zhang@mediatek.com>
+ <1462780816-5288-5-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <5731B7D8.8040304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 2016 at 02:14, Simon Horman <horms+renesas@verge.net.au> wrote:
-> Correct what appears to be a typo in the name of the sd-uhs-sdr50.
->
-> Also fix mixed tab/space indentation.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 09/05/16 09:00, honghui.zhang at mediatek.com wrote:
+[...]
+> +static void *mtk_iommu_alloc_pgt(struct device *dev, size_t size, gfp_t gfp)
+> +{
+> +	dma_addr_t dma;
+> +	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+> +
+> +	if (!pages)
+> +		return NULL;
+> +
+> +	dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+> +	if (dma_mapping_error(dev, dma))
+> +		goto out_free;
+> +	/*
+> +	 * We depend on the IOMMU being able to work with any physical
+> +	 * address directly, so if the DMA layer suggests otherwise by
+> +	 * translating or truncating them, that bodes very badly...
+> +	 */
+> +	if (dma != virt_to_phys(pages))
+> +		goto out_unmap;
 
-Thanks, applied for next!
+Given that you've only got a single table to allocate, and at 4MB it has 
+a fair chance of failing beyond early boot time, just use 
+dma_alloc_coherent() - you don't need to care about the dma <-> phys 
+relationship because you don't have multi-level tables to walk. That 
+way, you can get rid of all the awkward streaming DMA stuff, and also 
+benefit from CMA to avoid allocation failures.
 
-Kind regards
-Uffe
+> +	kmemleak_ignore(pages);
+> +	return pages;
+> +
+> +out_unmap:
+> +	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
+> +	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
+> +out_free:
+> +	free_pages_exact(pages, size);
+> +	return NULL;
+> +
+> +}
+> +
+> +static void mtk_iommu_free_pgt(struct device *dev, void *pages, size_t size)
+> +{
+> +	dma_unmap_single(dev, (dma_addr_t)virt_to_phys(pages),
+> +			 size, DMA_TO_DEVICE);
+> +	free_pages_exact(pages, size);
+> +}
+> +
+> +static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
+> +{
+> +	struct mtk_iommu_domain *dom = data->m4u_dom;
+> +
+> +	spin_lock_init(&dom->pgtlock);
+> +
+> +	dom->pgt_va = mtk_iommu_alloc_pgt(data->dev,
+> +				dom->pgt_size, GFP_KERNEL);
+> +	if (!dom->pgt_va)
+> +		return -ENOMEM;
+> +
+> +	dom->pgt_pa = virt_to_phys(dom->pgt_va);
+> +
+> +	writel(dom->pgt_pa, data->base + REG_MMU_PT_BASE_ADDR);
+> +
+> +	dom->cookie = (void *)data;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+> +{
+> +	struct mtk_iommu_domain *dom;
+> +
+> +	if (type != IOMMU_DOMAIN_UNMANAGED)
+> +		return NULL;
+> +
+> +	dom = kzalloc(sizeof(*dom), GFP_KERNEL);
+> +	if (!dom)
+> +		return NULL;
+> +
+> +	/*
+> +	 * MTK m4u support 4GB iova address space, and oly support 4K page
+> +	 * mapping. So the pagetable size should be exactly as 4M.
+> +	 */
+> +	dom->pgt_size = SZ_4M;
 
-> ---
->  Documentation/devicetree/bindings/mmc/sdhci-st.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-> index 18d950df2749..88faa91125bf 100644
-> --- a/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-> @@ -38,7 +38,7 @@ Optional properties:
->  - bus-width:           Number of data lines.
->                         See:  Documentation/devicetree/bindings/mmc/mmc.txt.
->
-> -- max-frequency:       Can be 200MHz, 100Mz or 50MHz (default) and used for
-> +- max-frequency:       Can be 200MHz, 100Mz or 50MHz (default) and used for
->                         configuring the CCONFIG3 in the mmcss.
->                         See:  Documentation/devicetree/bindings/mmc/mmc.txt.
->
-> @@ -48,7 +48,7 @@ Optional properties:
->  - vqmmc-supply:                Phandle to the regulator dt node, mentioned as the vcc/vdd
->                         supply in eMMC/SD specs.
->
-> -- sd-uhs--sdr50:       To enable the SDR50 in the mmcss.
-> +- sd-uhs-sdr50:        To enable the SDR50 in the mmcss.
->                         See:  Documentation/devicetree/bindings/mmc/mmc.txt.
->
->  - sd-uhs-sdr104:       To enable the SDR104 in the mmcss.
-> --
-> 2.1.4
->
+If the table size is fixed, then why bother having a variable at all?
+
+> +	return &dom->domain;
+> +}
+> +
+> +static void mtk_iommu_domain_free(struct iommu_domain *domain)
+> +{
+> +	kfree(to_mtk_domain(domain));
+> +}
+> +
+
+[...]
+
+> +static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> +			 phys_addr_t paddr, size_t size, int prot)
+> +{
+> +	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> +	struct mtk_iommu_data *data = dom->cookie;
+> +	unsigned int page_num = size >> MTK_IOMMU_PAGE_SHIFT;
+
+Since you only advertise a single page size, this will always be 1, so 
+you could either get rid of the loop here...
+
+> +	unsigned long flags;
+> +	unsigned int i;
+> +	u32 *pgt_base_iova;
+> +	u32 pabase = (u32)paddr;
+> +	int map_size = 0;
+> +
+> +	spin_lock_irqsave(&dom->pgtlock, flags);
+> +	pgt_base_iova = dom->pgt_va + (iova  >> MTK_IOMMU_PAGE_SHIFT);
+> +	for (i = 0; i < page_num; i++) {
+> +		pgt_base_iova[i] = pabase | F_DESC_VALID | F_DESC_NONSEC;
+> +		pabase += MTK_IOMMU_PAGE_SIZE;
+> +		map_size += MTK_IOMMU_PAGE_SIZE;
+> +	}
+> +	dma_sync_single_for_device(data->dev,
+> +			dom->pgt_pa + (iova >> MTK_IOMMU_PAGE_SHIFT),
+> +			(size >> MTK_IOMMU_PAGE_SHIFT) * sizeof(u32),
+> +			DMA_TO_DEVICE);
+> +	spin_unlock_irqrestore(&dom->pgtlock, flags);
+> +
+> +	mtk_iommu_tlb_flush_range(data, iova, size);
+> +
+> +	return map_size;
+> +}
+
+[...]
+
+> +static struct iommu_ops mtk_iommu_ops = {
+> +	.domain_alloc	= mtk_iommu_domain_alloc,
+> +	.domain_free	= mtk_iommu_domain_free,
+> +	.attach_dev	= mtk_iommu_attach_device,
+> +	.detach_dev	= mtk_iommu_detach_device,
+> +	.map		= mtk_iommu_map,
+> +	.unmap		= mtk_iommu_unmap,
+> +	.map_sg		= default_iommu_map_sg,
+> +	.iova_to_phys	= mtk_iommu_iova_to_phys,
+> +	.add_device	= mtk_iommu_add_device,
+> +	.remove_device	= mtk_iommu_remove_device,
+> +	.device_group	= mtk_iommu_device_group,
+> +	.pgsize_bitmap	= MTK_IOMMU_PAGE_SIZE,
+> +};
+
+...or perhaps advertise .pgsize_bitmap = ~0UL << MTK_IOMMU_PAGE_SHIFT 
+here, so you actually can handle multiple entries@once for larger 
+mappings - given how simple the page table format is that doesn't seem 
+too unreasonable, especially since it should give you a big efficiency 
+win in terms of TLB maintenance.
+
+Robin.
