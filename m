@@ -1,136 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 14:16:44 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic-new: fix overlap check for device
- addresses
-In-Reply-To: <1462877922-8743-1-git-send-email-andre.przywara@arm.com>
-References: <5730C65D.5000609@arm.com>
- <1462877922-8743-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <5731DF3C.6020201@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 10 May 2016 06:25:09 -0700
+Subject: [PATCH 2/2] watchdog: Add Aspeed watchdog driver
+In-Reply-To: <CACPK8XfK4Qt2GaSL7eVoNkCawbtXqFX9bGRcgyAyq7R2yuSZkA@mail.gmail.com>
+References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
+ <1462797277-14969-3-git-send-email-joel@jms.id.au>
+ <5730A339.80006@roeck-us.net>
+ <CACPK8XfK4Qt2GaSL7eVoNkCawbtXqFX9bGRcgyAyq7R2yuSZkA@mail.gmail.com>
+Message-ID: <5731E135.8000100@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 11:58, Andre Przywara wrote:
-> When userland sets the base addresses for the GIC register frames,
-> the kernel tries to make sure that the regions for the distributor and
-> the one for the CPU interface or the redistributors do not overlap.
-> Only that this check currently takes care of a GICv2 model only.
-> Rework the overlap check to take a GICv3 in account also.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Hi Marc,
-> 
-> this one goes on top of the new-vgic-v3 series.
-> Does this address your concerns about the overlap check?
-> I'd be grateful if you could apply some of your C wizardry on the first
-> function ;-)
-> 
-> Cheers,
-> Andre.
-> 
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 59 ++++++++++++++++++++++++++-----------
->  1 file changed, 41 insertions(+), 18 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index 2122ff2..fcf38ef 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -21,41 +21,63 @@
->  
->  /* common helpers */
->  
-> -static int vgic_ioaddr_overlap(struct kvm *kvm)
-> +static phys_addr_t vgic_get_existing_region(struct kvm *kvm, phys_addr_t *addr)
->  {
-> -	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
-> -	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	phys_addr_t cpu_addr;
-> +	bool is_vgicv2 = (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2);
->  
-> -	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
-> -		return 0;
-> -	if ((dist <= cpu && dist + KVM_VGIC_V2_DIST_SIZE > cpu) ||
-> -	    (cpu <= dist && cpu + KVM_VGIC_V2_CPU_SIZE > dist))
-> -		return -EBUSY;
-> -	return 0;
-> +	cpu_addr = is_vgicv2 ? dist->vgic_cpu_base : dist->vgic_redist_base;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base)) {
-> +		if (IS_VGIC_ADDR_UNDEF(cpu_addr))
-> +			return 0;
-> +
-> +		*addr = cpu_addr;
-> +		if (is_vgicv2)
-> +			return KVM_VGIC_V2_CPU_SIZE;
-> +		return atomic_read(&kvm->online_vcpus) * KVM_VGIC_V3_REDIST_SIZE;
-> +	}
-> +
-> +	*addr = dist->vgic_dist_base;
-> +	return is_vgicv2 ? KVM_VGIC_V2_DIST_SIZE : KVM_VGIC_V3_DIST_SIZE;
-> +}
-> +
-> +static bool vgic_ioaddr_overlap(struct kvm *kvm, phys_addr_t addr,
-> +				phys_addr_t size)
-> +{
-> +	phys_addr_t used_addr, used_size;
-> +
-> +	used_size = vgic_get_existing_region(kvm, &used_addr);
-> +	if (!used_size)
-> +		return false;
-> +
-> +	if (addr + size <= used_addr)
-> +		return false;
-> +
-> +	if (used_addr + used_size <= addr)
-> +		return false;
-> +
-> +	return true;
->  }
->  
->  static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
->  			      phys_addr_t addr, phys_addr_t size)
->  {
-> -	int ret;
-> -
->  	if (addr & ~KVM_PHYS_MASK)
->  		return -E2BIG;
->  
-> -	if (addr & (SZ_4K - 1))
-> -		return -EINVAL;
-> -
->  	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
->  		return -EEXIST;
->  	if (addr + size < addr)
->  		return -EINVAL;
->  
-> +	if (vgic_ioaddr_overlap(kvm, addr, size))
-> +		return -EBUSY;
-> +
->  	*ioaddr = addr;
-> -	ret = vgic_ioaddr_overlap(kvm);
-> -	if (ret)
-> -		*ioaddr = VGIC_ADDR_UNDEF;
->  
-> -	return ret;
-> +	return 0;
->  }
->  
->  /**
-> @@ -104,6 +126,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
->  		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
->  		addr_ptr = &vgic->vgic_redist_base;
->  		block_size = KVM_VGIC_V3_REDIST_SIZE;
-> +		block_size *= atomic_read(&kvm->online_vcpus);
+Hi Joel,
 
-What guarantees that the vcpus have been created already? AFAIU, you can
-perfectly create the VM, then the GIC, and then the vcpus. So this would
-be perfectly be allowed to be zero.
+On 05/10/2016 04:10 AM, Joel Stanley wrote:
 
-Or did I miss something?
+[ ... ]
 
-Thanks,
+>>> +
+>>> +       /*
+>>> +        * The ast2400 wdt can run at PCLK, or 1MHz. The ast2500 only
+>>> +        * runs at 1MHz. We chose to always run at 1MHz, as there's no
+>>> +        * good reason to have a faster watchdog counter.
+>>> +        */
+>>> +       wdt->rate = 1000000;
+>>
+>>
+>> Why not just use a define ?
+>
+> I will add one.
+>
+> The comment is informative though for people who read the ast2400
+> datasheet and wonder why we don't provide the option clocking with
+> pclk, I will leave it in.
+>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The comment is ok. I just find it unnecessary to have a variable
+instead of a constant.
+
+[ ... ]
+>
+>> ctrl is really static except for the enable flag. Not really sure
+>> if having a variable for it has any real benefits - you might as well
+>> just read the register and update the enable flag instead as needed when
+>> starting or stopping the watchdog. Is there a reason for not doing that ?
+>
+> Not really. I find it cleaner to keep a copy of the register instead
+> of read-modify-write, but if you feel strongly about it I can change.
+>
+
+No worries. Not worth arguing about.
+
+Guenter
