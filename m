@@ -1,164 +1,110 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 22:09:29 +0200
-Subject: [PATCH v3 26/27] ARM: dts: exynos: Add I2C,
- PWM and UART pinctrl to Exynos5410
+Date: Tue, 10 May 2016 22:09:30 +0200
+Subject: [PATCH v3 27/27] ARM: dts: exynos: Add RTC and I2C to Exynos5410
 In-Reply-To: <1462910970-1812-1-git-send-email-krzk@kernel.org>
 References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462910970-1812-27-git-send-email-krzk@kernel.org>
+Message-ID: <1462910970-1812-28-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pincontrol groups for HSI2C (USI), I2C, PWM and UART to Exynos5410.
-This allows configuring these pins to specific functions.
+Configure Exynos5410-specific properties of RTC, I2C and HSI2C nodes.
+This still does not enable them on the board level though.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos5410-pinctrl.dtsi | 133 ++++++++++++++++++++++++++++++
- 1 file changed, 133 insertions(+)
+ arch/arm/boot/dts/exynos5410.dtsi | 66 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
-index ddacafa1e907..b58a0f29f42c 100644
---- a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
-@@ -278,6 +278,139 @@
- 		#interrupt-cells = <2>;
- 	};
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index dd4d6d752865..ae64cb0a8efd 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -114,6 +114,9 @@
+ 			status = "disabled";
+ 		};
  
-+	uart0_data: uart0-data {
-+		samsung,pins = "gpa0-0", "gpa0-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
++		/* i2c_0-3 are defined in exynos5.dtsi */
++		/* hsi2c_4-7 are defined in exynos5xx.dtsi */
 +
-+	uart0_fctl: uart0-fctl {
-+		samsung,pins = "gpa0-2", "gpa0-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
+ 		pinctrl_0: pinctrl at 13400000 {
+ 			compatible = "samsung,exynos5410-pinctrl";
+ 			reg = <0x13400000 0x1000>;
+@@ -146,6 +149,62 @@
+ 	};
+ };
+ 
++&i2c_0 {
++	clocks = <&clock CLK_I2C0>;
++	clock-names = "i2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_bus>;
++};
 +
-+	uart1_data: uart1-data {
-+		samsung,pins = "gpa0-4", "gpa0-5";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
++&i2c_1 {
++	clocks = <&clock CLK_I2C1>;
++	clock-names = "i2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_bus>;
++};
 +
-+	uart1_fctl: uart1-fctl {
-+		samsung,pins = "gpa0-6", "gpa0-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
++&i2c_2 {
++	clocks = <&clock CLK_I2C2>;
++	clock-names = "i2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_bus>;
++};
 +
-+	i2c2_bus: i2c2-bus {
-+		samsung,pins = "gpa0-6", "gpa0-7";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
++&i2c_3 {
++	clocks = <&clock CLK_I2C3>;
++	clock-names = "i2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_bus>;
++};
 +
-+	uart2_data: uart2-data {
-+		samsung,pins = "gpa1-0", "gpa1-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
++&hsi2c_4 {
++	clocks = <&clock CLK_USI0>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c4_hs_bus>;
++};
 +
-+	uart2_fctl: uart2-fctl {
-+		samsung,pins = "gpa1-2", "gpa1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
++&hsi2c_5 {
++	clocks = <&clock CLK_USI1>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c5_hs_bus>;
++};
 +
-+	i2c3_bus: i2c3-bus {
-+		samsung,pins = "gpa1-2", "gpa1-3";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
++&hsi2c_6 {
++	clocks = <&clock CLK_USI2>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c6_hs_bus>;
++};
 +
-+	uart3_data: uart3-data {
-+		samsung,pins = "gpa1-4", "gpa1-5";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
++&hsi2c_7 {
++	clocks = <&clock CLK_USI3>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c7_hs_bus>;
++};
 +
-+	i2c4_hs_bus: i2c4-hs-bus {
-+		samsung,pins = "gpa2-0", "gpa2-1";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
+ &mct {
+ 	clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
+ 	clock-names = "fin_pll", "mct";
+@@ -156,6 +215,13 @@
+ 	clock-names = "timers";
+ };
+ 
++&rtc {
++	clocks = <&clock CLK_RTC>;
++	clock-names = "rtc";
++	interrupt-parent = <&pmu_system_controller>;
++	status = "disabled";
++};
 +
-+	i2c5_hs_bus: i2c5-hs-bus {
-+		samsung,pins = "gpa2-2", "gpa2-3";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c6_hs_bus: i2c6-hs-bus {
-+		samsung,pins = "gpb1-3", "gpb1-4";
-+		samsung,pin-function = <4>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm0_out: pwm0-out {
-+		samsung,pins = "gpb2-0";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm1_out: pwm1-out {
-+		samsung,pins = "gpb2-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm2_out: pwm2-out {
-+		samsung,pins = "gpb2-2";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm3_out: pwm3-out {
-+		samsung,pins = "gpb2-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c7_hs_bus: i2c7-hs-bus {
-+		samsung,pins = "gpb2-2", "gpb2-3";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c0_bus: i2c0-bus {
-+		samsung,pins = "gpb3-0", "gpb3-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c1_bus: i2c1-bus {
-+		samsung,pins = "gpb3-2", "gpb3-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	sd0_clk: sd0-clk {
- 		samsung,pins = "gpc0-0";
- 		samsung,pin-function = <2>;
+ &serial_0 {
+ 	clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
+ 	clock-names = "uart", "clk_uart_baud0";
 -- 
 2.5.0
