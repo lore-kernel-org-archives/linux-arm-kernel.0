@@ -1,21 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 14:24:48 +0200
-Subject: [GIT PULL] Ux500 defconfig updates for v4.7
-In-Reply-To: <CACRpkdb6t3QEk6PfTLUXTCCNVWPvq+=BVb1DKJY7q-9HU7+Haw@mail.gmail.com>
-References: <CACRpkdaf39+gQzBb5U9gM5n17QwsNd7FxTbd3J+hLcuBNczKWA@mail.gmail.com>
- <24266746.WXjeqcnmtv@wuerfel>
- <CACRpkdb6t3QEk6PfTLUXTCCNVWPvq+=BVb1DKJY7q-9HU7+Haw@mail.gmail.com>
-Message-ID: <13037240.fYhUNtFjsc@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 10 May 2016 14:25:38 +0200
+Subject: [RFC PATCH 13/21] reset: uniphier: add reset driver for
+ UniPhier PH1-LD4 SoC
+In-Reply-To: <1462873862-30940-14-git-send-email-yamada.masahiro@socionext.com>
+References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
+ <1462873862-30940-14-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462883138.9155.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 May 2016 14:14:45 Linus Walleij wrote:
-> Ux500 defconfig update for v4.7:
-> - Remove the unused MACH_UX500_DT option from the multi_v7 defconfig
-> - Remove staging driver from u8500_defconfig
-> - Update sensor support in u8500_defconfig
+Hi Masahiro,
+
+Am Dienstag, den 10.05.2016, 18:50 +0900 schrieb Masahiro Yamada:
+> This series is just for review.
+> Please do not apply this patch.
 > 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Pulled into next/defconfig, thanks for the quick update!
+No need for all these tiny drivers. If you probe from DT as Lee
+requests, you can let of_device_id.data point to a compatible specific
+uniphier_reset_data.
 
-	Arnd
+regards
+Philipp
