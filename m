@@ -1,43 +1,23 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 10 May 2016 15:15:12 +0100
-Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world switch
- backend
-In-Reply-To: <20160510140454.GG27623@cbox>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
- <20160510140454.GG27623@cbox>
-Message-ID: <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 16:16:22 +0200
+Subject: [GIT PULL 2/6] i.MX device tree updates for 4.7, with new clocks
+In-Reply-To: <1462291086-19925-2-git-send-email-shawnguo@kernel.org>
+References: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
+ <1462291086-19925-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <2576615.2k08M5hHXC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 2016 at 15:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Fri, May 06, 2016 at 11:45:32AM +0100, Andre Przywara wrote:
->> +     /*
->> +      * Currently all guest IRQs are Group1, as Group0 would result
->> +      * in a FIQ in the guest, which it wouldn't expect.
->
-> I still don't like or understand this comment.  This should simply say
-> that we're making a gross assumption about all interrupts being group1
-> here.
+On Tuesday 03 May 2016 23:58:02 Shawn Guo wrote:
+> The i.MX device tree updates with new clocks for 4.7:
+>  - Add LCDIF and FlexCAN device support for i.MX7D
+>  - New support i.MX7D based Nitrogen7 board from Boundary Devices
+>  - Add display support for vf610-colibri board
+> 
 
-It's not really an assumption so much as it's a missing feature (aka bug):
-there's no reason the vGIC shouldn't support group 0 interrupts. We
-just get away with only supporting group 1 because Linux guests
-happen to only use group 1 interrupts. If/when the vGIC gains support
-for group0 interrupts, then it should reset with interrupts configured
-in group0 by default.
+I've pulled it into the next/late branch, we'll send that on once the
+drivers/clk changes are merged.
 
->> +      * Eventually we want to make this configurable, so we may
->> +      * revisit this in the future.
->> +      */
+Thanks,
 
-The only reason to make it configurable is to work around a guest
-kernel bug whereby Linux assumes that all interrupts start out
-in Group1. Marc sent out a patch earlier today that fixes that bug:
- https://lkml.org/lkml/2016/5/10/297
-Depending on how long it takes you to fix this missing vgic feature,
-such kernels may all be long-forgotten, in which case you can
-get away without the config option :-)
-
-thanks
--- PMM
+	Arnd
