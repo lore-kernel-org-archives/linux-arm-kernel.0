@@ -1,40 +1,63 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 9 May 2016 20:52:12 -0500
-Subject: linux-next: build failure after merge of the net-next tree
-In-Reply-To: <20160510112905.5bffcad8@canb.auug.org.au>
-References: <20160510112905.5bffcad8@canb.auug.org.au>
-Message-ID: <CAPBZ5QcRiG0w4WsU7rDGSNogH1PSONWSjrZ6fXWb4kdc+BH3JQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 9 May 2016 20:53:36 -0500
+Subject: [PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge
+ device companion assignment to core code.
+In-Reply-To: <292578579.uIxhMjkdfG@vostro.rjw.lan>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-2-git-send-email-tn@semihalf.com>
+ <292578579.uIxhMjkdfG@vostro.rjw.lan>
+Message-ID: <20160510015336.GA29582@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 May 2016 at 20:29, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> After merging the net-next tree, today's linux-next build (x86_64
-> allmodconfig) failed like this:
->
-> net/qrtr/smd.c:106:14: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .callback = qcom_smd_qrtr_callback,
->               ^
-> net/qrtr/smd.c:106:14: note: (near initialization for 'qcom_smd_qrtr_driver.callback')
->
-> Caused by commit
->
->   bdabad3e363d ("net: Add Qualcomm IPC router")
->
-> interacting with commit
->
->   b853cb9628bf ("soc: qcom: smd: Make callback pass channel reference")
->
-> from the arm-soc tree.
->
-> I added the following merge fix patch (and it turned out I needed the
-> new stubs).
+On Tue, May 10, 2016 at 12:56:37AM +0200, Rafael J. Wysocki wrote:
+> On Friday, April 15, 2016 07:06:36 PM Tomasz Nowicki wrote:
+> > Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+> > bridge initialization. They both use arch-specific sysdata to pass down
+> > parent device reference and both rely on NULL parent in pci_create_root_bus()
+> > to validate sysdata content.
+> 
+> No, this is not relied on for that.  It is just NULL, because we don't
+> have a physical parent device representation for the PCI host bridge.
+> 
+> > It looks hacky and prevents us from getting some firmware specific
+> > info for PCI host controller based on its acpi_device structure
+> > in generic pci_create_root_bus() function.
+> 
+> You can't get that info without adding ACPI-specific code to that function
+> anyway.
+> 
+> > However, we overcome that blocker by passing down parent device via
+> > pci_create_root_bus parameter (as the ACPI device type).
+> 
+> Which is completely wrong.
+> 
+> > Then we use ACPI_COMPANION_SET in core code
+> > for ACPI boot method only. ACPI_COMPANION_SET is safe to run for all
+> > cases DT, ACPI and DT&ACPI.
+> > 
+> > Since now PCI core code is setting ACPI companion device for us,
+> > x86 & ia64 specific ACPI companion device setting turns out to be dead now.
+> > We can get rid of it, including related companion reference from
+> > PCI sysdata structure. Aslo, PCI_CONTROLLER macro cannot return valid
+> > companion device anymore. Therefore we need to convert its usage to
+> > ACPI_COMPANION.
 
-Thanks for fixing this up.  I'll work with Bjorn to get this resolved.
-I'll have something up for tomorrow's next pull.
+I think getting rid of arch-specific sysdata is a good goal (at least
+for things like the domain and ACPI companion that are really not
+arch-specific).
 
+But I'm afraid I've been guilty of allowing the perfect to be the
+enemy of the good.  I think it will be more useful in the end if we
+can get as much of this work in v4.7 as possible, even if there's more
+polishing we'd like to do later.
 
-Regards,
+What if we keep the x86 and ia64 handling of ACPI_COMPANION the way it
+is today, and do it the same way for arm64?  Then later, after we
+merge Arnd's work to make a generic pci_register_host() or similar, I
+suspect we might be able to unify the ACPI_COMPANION stuff more
+easily.  If the driver (acpi/pci_root.c) allocates the struct
+pci_host_bridge, then maybe it will be able to fill in the domain and
+set up the ACPI_COMPANION before it calls the scan interface.
 
-Andy Gross
+Bjorn
