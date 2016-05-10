@@ -1,53 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 15:22:20 +0100
-Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world switch
- backend
-In-Reply-To: <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
- <20160510140454.GG27623@cbox>
- <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
-Message-ID: <5731EE9C.5000201@arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 10 May 2016 09:25:21 -0500
+Subject: [GIT PULL] SoCFPGA update for v4.7
+Message-ID: <1462890321-13569-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 15:15, Peter Maydell wrote:
-> On 10 May 2016 at 15:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> On Fri, May 06, 2016 at 11:45:32AM +0100, Andre Przywara wrote:
->>> +     /*
->>> +      * Currently all guest IRQs are Group1, as Group0 would result
->>> +      * in a FIQ in the guest, which it wouldn't expect.
->>
->> I still don't like or understand this comment.  This should simply say
->> that we're making a gross assumption about all interrupts being group1
->> here.
-> 
-> It's not really an assumption so much as it's a missing feature (aka bug):
-> there's no reason the vGIC shouldn't support group 0 interrupts. We
-> just get away with only supporting group 1 because Linux guests
-> happen to only use group 1 interrupts. If/when the vGIC gains support
-> for group0 interrupts, then it should reset with interrupts configured
-> in group0 by default.
-> 
->>> +      * Eventually we want to make this configurable, so we may
->>> +      * revisit this in the future.
->>> +      */
-> 
-> The only reason to make it configurable is to work around a guest
-> kernel bug whereby Linux assumes that all interrupts start out
-> in Group1. Marc sent out a patch earlier today that fixes that bug:
->  https://lkml.org/lkml/2016/5/10/297
-> Depending on how long it takes you to fix this missing vgic feature,
-> such kernels may all be long-forgotten, in which case you can
-> get away without the config option :-)
+Hi Arnd, Kevin, Olof:
 
-I've CC'd stable for this particular patch, so hopefully we won't have
-to make it configurable as people will diligently update their
-kernels... I also have a patch for handling both groups in KVM, but I'll
-hold onto it until we have something we agree on for the bulk of the code.
+Please pull in this update for v4.7. I aplogize for the lateness of this PR,
+but this patch is dependent on a fix that went in on v4.6-rc7.
+
+That fix is "2882f7637075 ARM: SoCFPGA: simplify secondary trampoline".
 
 Thanks,
+Dinh
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The following changes since commit 44549e8f5eea4e0a41b487b63e616cb089922b99:
+
+  Linux 4.6-rc7 (2016-05-08 14:38:32 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_updates_for_v4.7
+
+for you to fetch changes up to 2882f7637075f876342a6378074d2911cac2fee2:
+
+  ARM: SoCFPGA: simplify secondary trampoline (2016-05-09 13:45:20 -0500)
+
+----------------------------------------------------------------
+SoCFPGA updates for v4.7
+- Simplify secondary trampoline SMP code
+
+----------------------------------------------------------------
+Sascha Hauer (1):
+      ARM: SoCFPGA: simplify secondary trampoline
+
+ arch/arm/mach-socfpga/core.h    |  4 ++--
+ arch/arm/mach-socfpga/headsmp.S | 27 +++++++---------------
+ arch/arm/mach-socfpga/platsmp.c | 51 +++++++++++++++++++----------------------
+ arch/arm/mach-socfpga/socfpga.c |  9 --------
+ 4 files changed, 33 insertions(+), 58 deletions(-)
