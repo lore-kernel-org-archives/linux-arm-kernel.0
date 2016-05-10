@@ -1,22 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 22:20:08 +0200
-Subject: [GIT PULL 4/6] Freescale/NXP arm64 device tree updates for 4.7
-In-Reply-To: <1462291086-19925-4-git-send-email-shawnguo@kernel.org>
-References: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
- <1462291086-19925-4-git-send-email-shawnguo@kernel.org>
-Message-ID: <4371195.x8A0fXcrnJ@wuerfel>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 10 May 2016 22:09:09 +0200
+Subject: [PATCH v3 06/27] ARM: dts: exynos: Remove old fixed-clock provider on
+ SMDK5410
+In-Reply-To: <1462910970-1812-1-git-send-email-krzk@kernel.org>
+References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
+Message-ID: <1462910970-1812-7-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2016 23:58:04 Shawn Guo wrote:
-> The Freescale/NXP arm64 device tree updates for 4.7:
->  - New board support of LS1043a-QDS from Freescale/NXP
->  - Add new compatible for LS1043A and LS2080A GPIO devices
->  - Update device tree bindings and sources for LS2080A fsl-mc device
->  - Update QSPI and DSPI support on LS1043A and LS2080A
-> 
-> 
+All "fin_pll" clock users were switched to the new one, provided by
+Exynos5410 clock driver. Remove old DT node.
 
-Pulled into next/dt64, thanks!
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+ arch/arm/boot/dts/exynos5410-smdk5410.dts | 7 -------
+ 1 file changed, 7 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+index d7d658deeff4..377a679b454b 100644
+--- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
++++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+@@ -24,13 +24,6 @@
+ 		bootargs = "console=ttySAC2,115200";
+ 	};
+ 
+-	fin_pll: xxti {
+-		compatible = "fixed-clock";
+-		clock-frequency = <24000000>;
+-		clock-output-names = "fin_pll";
+-		#clock-cells = <0>;
+-	};
+-
+ 	fixed-rate-clocks {
+ 		oscclk {
+ 			compatible = "samsung,exynos5420-oscclk";
+-- 
+2.5.0
