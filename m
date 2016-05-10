@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 10 May 2016 18:50:51 +0900
-Subject: [RFC PATCH 10/21] clk: uniphier: add clock driver for Media I/O block
- on UniPhier SoCs
+Date: Tue, 10 May 2016 18:50:58 +0900
+Subject: [RFC PATCH 17/21] reset: uniphier: add reset driver for UniPhier
+ ProXstream2/PH1-LD6b SoC
 In-Reply-To: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1462873862-30940-11-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462873862-30940-18-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,41 +14,40 @@ Please do not apply this patch.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/clk/uniphier/Kconfig            |   4 +
- drivers/clk/uniphier/Makefile           |   2 +
- drivers/clk/uniphier/clk-uniphier-mio.c | 215 ++++++++++++++++++++++++++++++++
- 3 files changed, 221 insertions(+)
- create mode 100644 drivers/clk/uniphier/clk-uniphier-mio.c
+ drivers/reset/uniphier/Kconfig               |  4 +++
+ drivers/reset/uniphier/Makefile              |  1 +
+ drivers/reset/uniphier/reset-uniphier-pxs2.c | 46 ++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 drivers/reset/uniphier/reset-uniphier-pxs2.c
 
-diff --git a/drivers/clk/uniphier/Kconfig b/drivers/clk/uniphier/Kconfig
-index 6e0a311..895c4a0 100644
---- a/drivers/clk/uniphier/Kconfig
-+++ b/drivers/clk/uniphier/Kconfig
-@@ -34,4 +34,8 @@ config CLK_UNIPHIER_LD20
- 	tristate "Clock driver for UniPhier PH1-LD20 SoC"
- 	default ARM64
+diff --git a/drivers/reset/uniphier/Kconfig b/drivers/reset/uniphier/Kconfig
+index 92d9a5f..022aef4 100644
+--- a/drivers/reset/uniphier/Kconfig
++++ b/drivers/reset/uniphier/Kconfig
+@@ -22,4 +22,8 @@ config RESET_UNIPHIER_PRO5
+ 	tristate "Reset driver for UniPhier PH1-Pro5 SoC"
+ 	default ARM
  
-+config CLK_UNIPHIER_MIO
-+	tristate "Clock driver for UniPhier Media I/O block"
-+	default y
++config RESET_UNIPHIER_PXS2
++	tristate "Reset driver for UniPhier ProXstream2/PH1-LD6b SoC"
++	default ARM
 +
  endif
-diff --git a/drivers/clk/uniphier/Makefile b/drivers/clk/uniphier/Makefile
-index 59272a6..ae71f04 100644
---- a/drivers/clk/uniphier/Makefile
-+++ b/drivers/clk/uniphier/Makefile
-@@ -11,3 +11,5 @@ obj-$(CONFIG_CLK_UNIPHIER_PRO5)	+= clk-uniphier-pro5.o
- obj-$(CONFIG_CLK_UNIPHIER_PXS2)	+= clk-uniphier-pxs2.o
- obj-$(CONFIG_CLK_UNIPHIER_LD11)	+= clk-uniphier-ld11.o
- obj-$(CONFIG_CLK_UNIPHIER_LD20)	+= clk-uniphier-ld20.o
-+
-+obj-$(CONFIG_CLK_UNIPHIER_MIO)	+= clk-uniphier-mio.o
-diff --git a/drivers/clk/uniphier/clk-uniphier-mio.c b/drivers/clk/uniphier/clk-uniphier-mio.c
+diff --git a/drivers/reset/uniphier/Makefile b/drivers/reset/uniphier/Makefile
+index 537e3f8..50847db 100644
+--- a/drivers/reset/uniphier/Makefile
++++ b/drivers/reset/uniphier/Makefile
+@@ -4,3 +4,4 @@ obj-$(CONFIG_RESET_UNIPHIER_LD4)	+= reset-uniphier-ld4.o
+ obj-$(CONFIG_RESET_UNIPHIER_PRO4)	+= reset-uniphier-pro4.o
+ obj-$(CONFIG_RESET_UNIPHIER_SLD8)	+= reset-uniphier-sld8.o
+ obj-$(CONFIG_RESET_UNIPHIER_PRO5)	+= reset-uniphier-pro5.o
++obj-$(CONFIG_RESET_UNIPHIER_PXS2)	+= reset-uniphier-pxs2.o
+diff --git a/drivers/reset/uniphier/reset-uniphier-pxs2.c b/drivers/reset/uniphier/reset-uniphier-pxs2.c
 new file mode 100644
-index 0000000..28691b7
+index 0000000..55d7273
 --- /dev/null
-+++ b/drivers/clk/uniphier/clk-uniphier-mio.c
-@@ -0,0 +1,215 @@
++++ b/drivers/reset/uniphier/reset-uniphier-pxs2.c
+@@ -0,0 +1,46 @@
 +/*
 + * Copyright (C) 2016 Socionext Inc.
 + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
@@ -65,204 +64,35 @@ index 0000000..28691b7
 + */
 +
 +#include <linux/module.h>
-+#include <linux/of.h>
 +#include <linux/platform_device.h>
 +
-+#include "clk-uniphier.h"
++#include "reset-uniphier.h"
 +
-+#define UNIPHIER_MIO_CLK_SD_FIXED					\
-+	{								\
-+		.name = "sd-44m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 44444444,				\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-33m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 33333333,				\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-50m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 50000000,				\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-67m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 66666666,				\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-100m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 100000000,			\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-40m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 40000000,				\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-25m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 25000000,				\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd-22m",					\
-+		.type = UNIPHIER_CLK_TYPE_FIXED_RATE,			\
-+		.output_index = -1,					\
-+		.data.rate = {						\
-+			.fixed_rate = 22222222,				\
-+		},							\
-+	}
-+
-+#define UNIPHIER_MIO_CLK_SD(ch, index)					\
-+	{								\
-+		.name = "sd" #ch "-sel",				\
-+		.type = UNIPHIER_CLK_TYPE_MUX,				\
-+		.output_index = -1,					\
-+		.data.mux = {						\
-+			.parent_names = {				\
-+				"sd-44m",				\
-+				"sd-33m",				\
-+				"sd-50m",				\
-+				"sd-67m",				\
-+				"sd-100m",				\
-+				"sd-40m",				\
-+				"sd-25m",				\
-+				"sd-22m",				\
-+			},						\
-+			.num_parents = 8,				\
-+			.reg = 0x30 + 0x200 * ch,			\
-+			.masks = {					\
-+				0x00031000,				\
-+				0x00031000,				\
-+				0x00031000,				\
-+				0x00031000,				\
-+				0x00001300,				\
-+				0x00001300,				\
-+				0x00001300,				\
-+				0x00001300,				\
-+			},						\
-+			.vals = {					\
-+				0x00000000,				\
-+				0x00010000,				\
-+				0x00020000,				\
-+				0x00030000,				\
-+				0x00001000,				\
-+				0x00001100,				\
-+				0x00001200,				\
-+				0x00001300,				\
-+			},						\
-+		},							\
-+	},								\
-+	{								\
-+		.name = "sd" #ch,					\
-+		.type = UNIPHIER_CLK_TYPE_GATE,				\
-+		.output_index = (index),				\
-+		.data.gate = {						\
-+			.parent_name = "sd" #ch "-sel",			\
-+			.reg = 0x20 + 0x200 * ch,			\
-+			.mask = BIT(8),					\
-+			.enable_val = BIT(8),				\
-+		},							\
-+	}
-+
-+#define UNIPHIER_MIO_CLK_EHCI(ch, index)				\
-+	{								\
-+		.name = "ehci" #ch,					\
-+		.type = UNIPHIER_CLK_TYPE_GATE,				\
-+		.output_index = (index),				\
-+		.data.gate = {						\
-+			.parent_name = "ehci",				\
-+			.reg = 0x20 + 0x200 * ch,			\
-+			.mask = BIT(29) | BIT(28),			\
-+			.enable_val = BIT(29) | BIT(28),		\
-+		},							\
-+	}
-+
-+#define UNIPHIER_MIO_CLK_DMAC(index)					\
-+	{								\
-+		.name = "miodmac",					\
-+		.type = UNIPHIER_CLK_TYPE_GATE,				\
-+		.output_index = (index),				\
-+		.data.gate = {						\
-+			.parent_name = "stdmac",			\
-+			.reg = 0x20,					\
-+			.mask = BIT(25),				\
-+			.enable_val = BIT(25),				\
-+		},							\
-+	}
-+
-+static const struct uniphier_clk_data uniphier_ld4_mio_clk_data[] = {
-+	UNIPHIER_MIO_CLK_SD_FIXED,
-+	UNIPHIER_MIO_CLK_SD(0, 0),
-+	UNIPHIER_MIO_CLK_SD(1, 1),
-+	UNIPHIER_MIO_CLK_SD(2, 2),	/* for Pro4 */
-+	UNIPHIER_MIO_CLK_DMAC(3),
-+	UNIPHIER_MIO_CLK_EHCI(0, 4),
-+	UNIPHIER_MIO_CLK_EHCI(1, 5),
-+	UNIPHIER_MIO_CLK_EHCI(2, 6),	/* for LD4/sLD8 */
-+	{ /* sentinel */ }
++static const struct uniphier_reset_data uniphier_pxs2_reset_data[] = {
++	{
++		.id = 7,
++		.reg = 0x2000,
++		.mask = BIT(10),
++		.deassert_val = BIT(10),
++	},
++	{ .id = UNIPHIER_RESET_ID_END }
 +};
 +
-+static int uniphier_ld4_mio_clk_probe(struct platform_device *pdev)
++static int uniphier_pxs2_reset_probe(struct platform_device *pdev)
 +{
-+	return uniphier_clk_probe(pdev, uniphier_ld4_mio_clk_data);
++	return uniphier_reset_probe(pdev, uniphier_pxs2_reset_data);
 +}
 +
-+static struct platform_driver uniphier_ld4_mio_clk_driver = {
-+	.probe = uniphier_ld4_mio_clk_probe,
-+	.remove = uniphier_clk_remove,
++static struct platform_driver uniphier_pxs2_reset_driver = {
++	.probe = uniphier_pxs2_reset_probe,
 +	.driver = {
-+		.name = "uniphier-ld4-mio-clk",
++		.name = "uniphier-pxs2-reset",
 +	},
 +};
-+module_platform_driver(uniphier_ld4_mio_clk_driver);
-+
-+static const struct uniphier_clk_data uniphier_pro5_mio_clk_data[] = {
-+	UNIPHIER_MIO_CLK_SD_FIXED,
-+	UNIPHIER_MIO_CLK_SD(0, 0),
-+	UNIPHIER_MIO_CLK_SD(1, 1),
-+	{ /* sentinel */ }
-+};
-+
-+static int uniphier_pro5_mio_clk_probe(struct platform_device *pdev)
-+{
-+	return uniphier_clk_probe(pdev, uniphier_pro5_mio_clk_data);
-+}
-+
-+static struct platform_driver uniphier_pro5_mio_clk_driver = {
-+	.probe = uniphier_pro5_mio_clk_probe,
-+	.remove = uniphier_clk_remove,
-+	.driver = {
-+		.name = "uniphier-pro5-mio-clk",
-+	},
-+};
-+module_platform_driver(uniphier_pro5_mio_clk_driver);
++module_platform_driver(uniphier_pxs2_reset_driver);
 +
 +MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier Media I/O Clock Driver");
++MODULE_DESCRIPTION("UniPhier ProXstream2 Reset Controller Driver");
 +MODULE_LICENSE("GPL");
 -- 
 1.9.1
