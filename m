@@ -1,42 +1,21 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 May 2016 15:16:58 +0100
-Subject: [PATCH 2/5] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <20160506184842.GE1256@tuxbot>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-3-git-send-email-lee.jones@linaro.org>
- <20160506184842.GE1256@tuxbot>
-Message-ID: <20160510141658.GP19473@dell>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 10 May 2016 16:18:31 +0200
+Subject: [PATCH v3 20/55] KVM: arm/arm64: vgic-new: Implement
+ kvm_vgic_vcpu_pending_irq
+In-Reply-To: <1462531568-9799-21-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-21-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160510141831.GH27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 06 May 2016, Bjorn Andersson wrote:
-
-> On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
+On Fri, May 06, 2016 at 11:45:33AM +0100, Andre Przywara wrote:
+> From: Eric Auger <eric.auger@linaro.org>
 > 
-> > - of_rproc_byindex(): look-up and obtain a reference to a rproc
-> >   		      using the DT phandle "rprocs" and a index.
-> > 
-> > - of_rproc_byname():  lookup and obtain a reference to a rproc
-> >   		      using the DT phandle "rprocs" and "rproc-names".
-> > 
-> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
+> Tell KVM whether a particular VCPU has an IRQ that needs handling
+> in the guest. This is used to decide whether a VCPU is runnable.
 > 
-> I like the idea of having these helpers, but we already have
-> rproc_get_by_phandle() so these helpers should be built upon that rather
-> than adding the additional list.
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Since this is a framework consideration, don't you think it would be
-better to standardise the phandle name?  This is common practice when
-coding at a subsystem level.  Some in use examples include; "clocks",
-"power-domains", "mboxes", "dmas", "phys", "resets", "gpios", etc.
-
-Considering the aforementioned examples, I figured "rprocs" would be
-suitable.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
