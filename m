@@ -1,7 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 10 May 2016 17:07:27 -0400
-Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable MFC driver as module
-Message-ID: <1462914448-24480-1-git-send-email-javier@osg.samsung.com>
+Date: Tue, 10 May 2016 17:07:28 -0400
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable Exynos MFC driver as
+ module
+In-Reply-To: <1462914448-24480-1-git-send-email-javier@osg.samsung.com>
+References: <1462914448-24480-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1462914448-24480-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,22 +16,22 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 ---
 
-This patch depends on https://patchwork.kernel.org/patch/8970731/
+This patch depends on https://patchwork.kernel.org/patch/8970711/
 
- arch/arm/configs/exynos_defconfig | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 0600818f0f2a..007c8eca407e 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -155,6 +155,7 @@ CONFIG_VIDEO_EXYNOS_FIMC_LITE=m
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2ba3f0cd2261..8086e9e13ff6 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -534,6 +534,7 @@ CONFIG_VIDEO_EXYNOS_FIMC_LITE=m
  CONFIG_VIDEO_EXYNOS4_FIMC_IS=m
  CONFIG_V4L_MEM2MEM_DRIVERS=y
  CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
 +CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
- CONFIG_DRM=y
- CONFIG_DRM_NXP_PTN3460=y
- CONFIG_DRM_PARADE_PS8622=y
+ CONFIG_VIDEO_RENESAS_JPU=m
+ CONFIG_VIDEO_RENESAS_VSP1=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
 -- 
 2.5.5
