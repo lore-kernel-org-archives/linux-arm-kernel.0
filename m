@@ -1,45 +1,359 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 15:52:20 +0200
-Subject: [PATCH 1/2] ARM: EXYNOS: Move pm_domains driver to drivers/soc/samsung
-Message-ID: <1462888341-21963-1-git-send-email-k.kozlowski@samsung.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 10 May 2016 15:58:42 +0200
+Subject: [BISECTED] Regression v4.6-rc1 : nanosleep doesn't return on AT91SAM9
+Message-ID: <CACQ1gAg6cKqjaqcV70m2VS5R4_kZEgWTiqzSqDxSjvfrYYxbzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos PM domains driver does not have mach-specific dependencies so it
-can be safely moved out of arm/mach-exynos to drivers/soc. This in
-future will allow re-using it on ARM64 boards.
+Hi,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/Makefile                              | 1 -
- drivers/soc/samsung/Makefile                               | 1 +
- {arch/arm/mach-exynos => drivers/soc/samsung}/pm_domains.c | 0
- 3 files changed, 1 insertion(+), 1 deletion(-)
- rename {arch/arm/mach-exynos => drivers/soc/samsung}/pm_domains.c (100%)
+Starting with 4.6-rc1, a sleep 1 doesn't return :
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 34d29df3e006..838249d4ff5c 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -13,7 +13,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o exynos-smc.o firmware.o
- 
- obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_PM_SLEEP)		+= suspend.o
--obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
- 
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- 
-diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-index f64ac4d80564..8acba2bbbd78 100644
---- a/drivers/soc/samsung/Makefile
-+++ b/drivers/soc/samsung/Makefile
-@@ -1,2 +1,3 @@
-+obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
- obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
- 					exynos5250-pmu.o exynos5420-pmu.o
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/drivers/soc/samsung/pm_domains.c
-similarity index 100%
-rename from arch/arm/mach-exynos/pm_domains.c
-rename to drivers/soc/samsung/pm_domains.c
--- 
-1.9.1
+execve("/bin/sleep", ["sleep", "1"], ["USER=root", "SHLVL=1",
+"OLDPWD=/var", "HOME=/", "TERM=vt102",
+"PATH=/sbin:/usr/sbin:/bin:/usr/bin", "SHELL=/bin/sh", "PWD=/"]) = 0
+uname({sysname="Linux", nodename="LNS",
+release="4.5.0-09406-g46e595a17dcf", version="#72 Tue May 10 15:41:34
+CEST 2016", machine="armv5tejl", domainname="(none)"}) = 0
+brk(0)                                  = 0x153000
+brk(0x153d20)                           = 0x153d20
+set_tls(0x1534c0, 0x14d1e4, 0, 0x153d20, 0x14e368) = 0
+readlink("/proc/self/exe", "/bin/busybox", 4096) = 12
+brk(0x174d20)                           = 0x174d20
+brk(0x175000)                           = 0x175000
+getuid32()                              = 0
+rt_sigprocmask(SIG_BLOCK, [CHLD], [], 8) = 0
+rt_sigaction(SIGCHLD, NULL, {SIG_DFL, [], 0}, 8) = 0
+rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+nanosleep({1, 0},
+
+And the heartbeat led doesn't blink anymore (full on), as if the
+timers never fire.
+
+The platform is an AT91SAM9G35-CM.
+
+git bisect gives a merge as the 1st bad commit :(
+first bad commit: [46e595a17dcf11404f713845ecb5b06b92a94e43] Merge tag
+'armsoc-drivers' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+
+
+Here is the git bisect log:
+git bisect start
+# good: [b562e44f507e863c6792946e4e1b1449fbbac85d] Linux 4.5
+git bisect good b562e44f507e863c6792946e4e1b1449fbbac85d
+# bad: [f55532a0c0b8bb6148f4e07853b876ef73bc69ca] Linux 4.6-rc1
+git bisect bad f55532a0c0b8bb6148f4e07853b876ef73bc69ca
+# good: [6b5f04b6cf8ebab9a65d9c0026c650bb2538fd0f] Merge branch
+'for-4.6' of git://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup
+git bisect good 6b5f04b6cf8ebab9a65d9c0026c650bb2538fd0f
+# bad: [53d2e6976bd4042672ed7b90dfbf4b31635b7dcf] Merge tag
+'xfs-for-linus-4.6-rc1' of
+git://git.kernel.org/pub/scm/linux/kernel/git/dgc/linux-xfs
+git bisect bad 53d2e6976bd4042672ed7b90dfbf4b31635b7dcf
+# good: [8626c56c8279b88b91b8df55345cdf89542d5e90] bridge: fix
+potential use-after-free when hook returns QUEUE or STOLEN verdict
+git bisect good 8626c56c8279b88b91b8df55345cdf89542d5e90
+# good: [8c6d4082fc6ad2214e945b5b7368b828fb16e9a9] Merge tag
+'armsoc-arm64' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+git bisect good 8c6d4082fc6ad2214e945b5b7368b828fb16e9a9
+# good: [915c56bc01d6eab071e0dd1c6ea3bf73fbe5124f] Merge tag
+'armsoc-dt64' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+git bisect good 915c56bc01d6eab071e0dd1c6ea3bf73fbe5124f
+# bad: [24b5e20f11a75866bbffc46c30a22fa50612a769] Merge branch
+'efi-core-for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+git bisect bad 24b5e20f11a75866bbffc46c30a22fa50612a769
+# bad: [46e595a17dcf11404f713845ecb5b06b92a94e43] Merge tag
+'armsoc-drivers' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+git bisect bad 46e595a17dcf11404f713845ecb5b06b92a94e43
+# good: [4a6f791c359a78535553ccf060615622d27b1ce1] Merge tag
+'omap-for-v4.6/defconfig-signed' of
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into
+next/defconfig
+git bisect good 4a6f791c359a78535553ccf060615622d27b1ce1
+# good: [f628c64fc0ffdcd08f39d74ec23ed7706cb8653b] Merge tag
+'at91-ab-4.6-drivers' of
+git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux into
+next/drivers
+git bisect good f628c64fc0ffdcd08f39d74ec23ed7706cb8653b
+# good: [387eb3f3d574ebf43b3afe83da59a99481866b78] reset: socfpga:
+Make reset_control_ops const
+git bisect good 387eb3f3d574ebf43b3afe83da59a99481866b78
+# good: [87023bc2ed11ea6b0944b34cc0281454c01832bf] Merge tag
+'sunxi-drivers-for-4.6' of
+https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux into
+next/drivers
+git bisect good 87023bc2ed11ea6b0944b34cc0281454c01832bf
+# good: [33b96d2c9579213cf3f36d7b29841b1e464750c4] bus: imx-weim: Take
+the 'status' property value into account
+git bisect good 33b96d2c9579213cf3f36d7b29841b1e464750c4
+# good: [9fe5bf92c30a89631eb1fafe0d9b18e2ba331ebb] ARM: configs: Add
+new config fragment to change RAM start point
+git bisect good 9fe5bf92c30a89631eb1fafe0d9b18e2ba331ebb
+# good: [e3b1f64e04f57198ca0ab1216d824a5547be8446] Merge tag
+'armsoc-defconfig' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+git bisect good e3b1f64e04f57198ca0ab1216d824a5547be8446
+# first bad commit: [46e595a17dcf11404f713845ecb5b06b92a94e43] Merge
+tag 'armsoc-drivers' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+
+
+And the defconfig :
+CONFIG_KERNEL_LZO=y
+CONFIG_DEFAULT_HOSTNAME="lns"
+# CONFIG_SWAP is not set
+CONFIG_SYSVIPC=y
+# CONFIG_CROSS_MEMORY_ATTACH is not set
+CONFIG_FHANDLE=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+CONFIG_RELAY=y
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_KALLSYMS_ALL=y
+CONFIG_EMBEDDED=y
+CONFIG_SLAB=y
+CONFIG_PARTITION_ADVANCED=y
+# CONFIG_IOSCHED_DEADLINE is not set
+# CONFIG_IOSCHED_CFQ is not set
+# CONFIG_ARCH_MULTI_V7 is not set
+CONFIG_ARCH_AT91=y
+CONFIG_SOC_AT91SAM9=y
+CONFIG_AEABI=y
+# CONFIG_COMPACTION is not set
+CONFIG_UACCESS_WITH_MEMCPY=y
+# CONFIG_ATAGS is not set
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+# CONFIG_COREDUMP is not set
+# CONFIG_SUSPEND is not set
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_PACKET_DIAG=y
+CONFIG_UNIX=y
+CONFIG_UNIX_DIAG=y
+CONFIG_XFRM_USER=y
+CONFIG_NET_KEY=y
+CONFIG_INET=y
+CONFIG_IP_ADVANCED_ROUTER=y
+CONFIG_IP_MULTIPLE_TABLES=y
+CONFIG_IP_ROUTE_VERBOSE=y
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+CONFIG_INET_AH=y
+CONFIG_INET_ESP=y
+CONFIG_INET_IPCOMP=y
+CONFIG_INET_UDP_DIAG=y
+CONFIG_INET6_AH=y
+CONFIG_INET6_ESP=y
+CONFIG_INET6_IPCOMP=y
+CONFIG_NETFILTER=y
+# CONFIG_BRIDGE_NETFILTER is not set
+CONFIG_NETFILTER_NETLINK_LOG=y
+CONFIG_NF_CONNTRACK=y
+# CONFIG_NF_CONNTRACK_PROCFS is not set
+CONFIG_NF_CT_NETLINK=y
+CONFIG_NETFILTER_XT_TARGET_CONNMARK=y
+CONFIG_NETFILTER_XT_TARGET_MARK=y
+CONFIG_NF_CONNTRACK_IPV4=y
+CONFIG_NF_NAT_IPV4=y
+CONFIG_IP_NF_IPTABLES=y
+CONFIG_IP_NF_FILTER=y
+CONFIG_IP_NF_TARGET_REJECT=y
+CONFIG_IP_NF_MANGLE=y
+CONFIG_NF_CONNTRACK_IPV6=y
+CONFIG_IP6_NF_IPTABLES=y
+CONFIG_IP6_NF_MATCH_IPV6HEADER=y
+CONFIG_IP6_NF_FILTER=y
+CONFIG_IP6_NF_TARGET_REJECT=y
+CONFIG_IP6_NF_MANGLE=y
+CONFIG_BRIDGE=y
+# CONFIG_BRIDGE_IGMP_SNOOPING is not set
+CONFIG_DNS_RESOLVER=y
+CONFIG_NETLINK_DIAG=y
+CONFIG_CFG80211=y
+CONFIG_CFG80211_WEXT=y
+CONFIG_MAC80211=y
+CONFIG_MAC80211_LEDS=y
+CONFIG_RFKILL=y
+CONFIG_RFKILL_INPUT=y
+CONFIG_RFKILL_GPIO=y
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# CONFIG_STANDALONE is not set
+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
+# CONFIG_FIRMWARE_IN_KERNEL is not set
+CONFIG_MTD=y
+CONFIG_MTD_CMDLINE_PARTS=y
+CONFIG_MTD_NAND=y
+CONFIG_MTD_NAND_ATMEL=y
+CONFIG_MTD_UBI=y
+CONFIG_MTD_UBI_FASTMAP=y
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=4
+CONFIG_BLK_DEV_RAM_SIZE=8192
+CONFIG_ATMEL_TCLIB=y
+CONFIG_ATMEL_SSC=y
+CONFIG_EEPROM_AT24=y
+CONFIG_EEPROM_93CX6=y
+CONFIG_SCSI=y
+CONFIG_BLK_DEV_SD=y
+# CONFIG_SCSI_LOWLEVEL is not set
+CONFIG_NETDEVICES=y
+# CONFIG_NET_VENDOR_ARC is not set
+# CONFIG_NET_CADENCE is not set
+# CONFIG_NET_VENDOR_BROADCOM is not set
+# CONFIG_NET_VENDOR_CIRRUS is not set
+# CONFIG_NET_VENDOR_EZCHIP is not set
+# CONFIG_NET_VENDOR_FARADAY is not set
+# CONFIG_NET_VENDOR_HISILICON is not set
+# CONFIG_NET_VENDOR_INTEL is not set
+# CONFIG_NET_VENDOR_MARVELL is not set
+# CONFIG_NET_VENDOR_MICREL is not set
+# CONFIG_NET_VENDOR_MICROCHIP is not set
+# CONFIG_NET_VENDOR_NATSEMI is not set
+# CONFIG_NET_VENDOR_NETRONOME is not set
+# CONFIG_NET_VENDOR_QUALCOMM is not set
+# CONFIG_NET_VENDOR_RENESAS is not set
+# CONFIG_NET_VENDOR_ROCKER is not set
+# CONFIG_NET_VENDOR_SAMSUNG is not set
+# CONFIG_NET_VENDOR_SEEQ is not set
+# CONFIG_NET_VENDOR_SMSC is not set
+# CONFIG_NET_VENDOR_STMICRO is not set
+# CONFIG_NET_VENDOR_SYNOPSYS is not set
+# CONFIG_NET_VENDOR_VIA is not set
+# CONFIG_NET_VENDOR_WIZNET is not set
+CONFIG_PHYLIB=y
+CONFIG_DAVICOM_PHY=y
+CONFIG_PPP=y
+CONFIG_PPP_DEFLATE=y
+CONFIG_PPP_ASYNC=y
+# CONFIG_USB_NET_DRIVERS is not set
+# CONFIG_WLAN is not set
+# CONFIG_INPUT_MOUSEDEV is not set
+CONFIG_INPUT_EVDEV=y
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+CONFIG_INPUT_MISC=y
+CONFIG_INPUT_UINPUT=y
+# CONFIG_SERIO is not set
+# CONFIG_LEGACY_PTYS is not set
+# CONFIG_DEVKMEM is not set
+CONFIG_SERIAL_ATMEL=y
+CONFIG_SERIAL_ATMEL_CONSOLE=y
+# CONFIG_SERIAL_ATMEL_PDC is not set
+CONFIG_I2C=y
+# CONFIG_I2C_COMPAT is not set
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_MUX=y
+CONFIG_I2C_AT91=y
+CONFIG_I2C_GPIO=y
+CONFIG_SPI=y
+CONFIG_SPI_ATMEL=y
+CONFIG_SPI_SPIDEV=y
+CONFIG_GPIO_SYSFS=y
+# CONFIG_HWMON is not set
+CONFIG_WATCHDOG=y
+CONFIG_AT91SAM9X_WATCHDOG=y
+CONFIG_SSB=y
+CONFIG_BCMA=y
+CONFIG_SOUND=y
+CONFIG_SND=y
+# CONFIG_SND_SUPPORT_OLD_API is not set
+# CONFIG_SND_VERBOSE_PROCFS is not set
+# CONFIG_SND_DRIVERS is not set
+# CONFIG_SND_ARM is not set
+# CONFIG_SND_SPI is not set
+# CONFIG_SND_USB is not set
+CONFIG_SND_SOC=y
+CONFIG_SND_ATMEL_SOC=y
+CONFIG_SND_AT91_SOC_SAM9X5_WM8731=y
+CONFIG_HIDRAW=y
+CONFIG_UHID=y
+CONFIG_USB_HIDDEV=y
+CONFIG_USB=y
+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_EHCI_ROOT_HUB_TT=y
+CONFIG_USB_ACM=y
+CONFIG_USB_WDM=y
+CONFIG_USB_STORAGE=y
+CONFIG_USB_STORAGE_REALTEK=y
+CONFIG_USB_STORAGE_DATAFAB=y
+CONFIG_USB_STORAGE_FREECOM=y
+CONFIG_USB_STORAGE_ISD200=y
+CONFIG_USB_STORAGE_USBAT=y
+CONFIG_USB_STORAGE_SDDR09=y
+CONFIG_USB_STORAGE_SDDR55=y
+CONFIG_USB_STORAGE_JUMPSHOT=y
+CONFIG_USB_STORAGE_ALAUDA=y
+CONFIG_USB_STORAGE_ONETOUCH=y
+CONFIG_USB_STORAGE_KARMA=y
+CONFIG_USB_STORAGE_CYPRESS_ATACB=y
+CONFIG_USB_STORAGE_ENE_UB6250=y
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_IPW=y
+CONFIG_USB_SERIAL_PL2303=y
+CONFIG_USB_SERIAL_QUALCOMM=y
+CONFIG_USB_SERIAL_SIERRAWIRELESS=y
+CONFIG_USB_SERIAL_OPTION=y
+CONFIG_USB_EZUSB_FX2=y
+CONFIG_USB_GADGET=y
+CONFIG_USB_AT91=y
+CONFIG_USB_ATMEL_USBA=y
+CONFIG_USB_ETH=y
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+CONFIG_LEDS_GPIO=y
+CONFIG_LEDS_TRIGGER_TIMER=y
+CONFIG_LEDS_TRIGGER_ONESHOT=y
+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+CONFIG_LEDS_TRIGGER_GPIO=y
+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+CONFIG_DMADEVICES=y
+CONFIG_AT_HDMAC=y
+# CONFIG_IOMMU_SUPPORT is not set
+CONFIG_FANOTIFY=y
+CONFIG_VFAT_FS=y
+CONFIG_FAT_DEFAULT_CODEPAGE=850
+CONFIG_NTFS_FS=y
+CONFIG_TMPFS=y
+CONFIG_UBIFS_FS=y
+CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+# CONFIG_NETWORK_FILESYSTEMS is not set
+CONFIG_NLS_DEFAULT="utf8"
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_CODEPAGE_850=y
+CONFIG_NLS_ISO8859_1=y
+CONFIG_NLS_UTF8=y
+CONFIG_PRINTK_TIME=y
+CONFIG_MESSAGE_LOGLEVEL_DEFAULT=7
+CONFIG_STRIP_ASM_SYMS=y
+CONFIG_DEBUG_SECTION_MISMATCH=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_LOCKUP_DETECTOR=y
+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+# CONFIG_SCHED_DEBUG is not set
+# CONFIG_DEBUG_BUGVERBOSE is not set
+CONFIG_FUNCTION_TRACER=y
+CONFIG_FTRACE_SYSCALLS=y
+CONFIG_TRACER_SNAPSHOT=y
+CONFIG_KEYS=y
+CONFIG_CRYPTO_ECB=y
+CONFIG_CRYPTO_CRC32C=y
+CONFIG_CRYPTO_MICHAEL_MIC=y
+CONFIG_CRYPTO_USER_API_HASH=y
+CONFIG_CRYPTO_USER_API_SKCIPHER=y
+# CONFIG_CRYPTO_HW is not set
+CONFIG_CRC_ITU_T=y
+CONFIG_CRC7=y
+
+Regards,
+Richard.
