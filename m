@@ -1,180 +1,34 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 22:09:15 +0200
-Subject: [PATCH v3 12/27] ARM: dts: exynos: Split Odroid XU3 LEDs to separate
- DTSI
+Date: Tue, 10 May 2016 22:09:17 +0200
+Subject: [PATCH v3 14/27] ARM: dts: exynos: Prepare for inclusion of
+ exynos5.dtsi in exynos5410.dtsi
 In-Reply-To: <1462910970-1812-1-git-send-email-krzk@kernel.org>
 References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462910970-1812-13-git-send-email-krzk@kernel.org>
+Message-ID: <1462910970-1812-15-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LED nodes can be shared between Odroid XU3, XU3-Lite and XU (not yet
-added) thus removing duplication.
+Add 'sromc' label to SROM memory controller in common exynos5.dtsi so it
+can be referenced by inheriting DTSI.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts | 35 +----------------
- arch/arm/boot/dts/exynos5422-odroidxu3.dts      | 35 +----------------
- arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi | 50 +++++++++++++++++++++++++
- 3 files changed, 52 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi
+ arch/arm/boot/dts/exynos5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-index 2ae1cf41dcb6..03fa88c45426 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-@@ -14,44 +14,11 @@
- /dts-v1/;
- #include "exynos5422-odroidxu3-common.dtsi"
- #include "exynos5422-odroidxu3-audio.dtsi"
-+#include "exynos54xx-odroidxu-leds.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index c5d198c70b86..30a0b63b06c9 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -35,7 +35,7 @@
+ 		reg = <0x10000000 0x100>;
+ 	};
  
- / {
- 	model = "Hardkernel Odroid XU3 Lite";
- 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
--
--	pwmleds {
--		compatible = "pwm-leds";
--
--		greenled {
--			label = "green:mmc0";
--			pwms = <&pwm 1 2000000 0>;
--			pwm-names = "pwm1";
--			/*
--			 * Green LED is much brighter than the others
--			 * so limit its max brightness
--			 */
--			max_brightness = <127>;
--			linux,default-trigger = "mmc0";
--		};
--
--		blueled {
--			label = "blue:heartbeat";
--			pwms = <&pwm 2 2000000 0>;
--			pwm-names = "pwm2";
--			max_brightness = <255>;
--			linux,default-trigger = "heartbeat";
--		};
--	};
--
--	gpioleds {
--		compatible = "gpio-leds";
--		redled {
--			label = "red:microSD";
--			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
--			default-state = "off";
--			linux,default-trigger = "mmc1";
--		};
--	};
- };
- 
- &pwm {
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index 432406db85de..9ed6564acfb0 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -13,44 +13,11 @@
- /dts-v1/;
- #include "exynos5422-odroidxu3-common.dtsi"
- #include "exynos5422-odroidxu3-audio.dtsi"
-+#include "exynos54xx-odroidxu-leds.dtsi"
- 
- / {
- 	model = "Hardkernel Odroid XU3";
- 	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
--
--	pwmleds {
--		compatible = "pwm-leds";
--
--		greenled {
--			label = "green:mmc0";
--			pwms = <&pwm 1 2000000 0>;
--			pwm-names = "pwm1";
--			/*
--			 * Green LED is much brighter than the others
--			 * so limit its max brightness
--			 */
--			max_brightness = <127>;
--			linux,default-trigger = "mmc0";
--		};
--
--		blueled {
--			label = "blue:heartbeat";
--			pwms = <&pwm 2 2000000 0>;
--			pwm-names = "pwm2";
--			max_brightness = <255>;
--			linux,default-trigger = "heartbeat";
--		};
--	};
--
--	gpioleds {
--		compatible = "gpio-leds";
--		redled {
--			label = "red:microSD";
--			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
--			default-state = "off";
--			linux,default-trigger = "mmc1";
--		};
--	};
- };
- 
- &i2c_0 {
-diff --git a/arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi b/arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi
-new file mode 100644
-index 000000000000..0ed30206625c
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos54xx-odroidxu-leds.dtsi
-@@ -0,0 +1,50 @@
-+/*
-+ * Hardkernel Odroid XU/XU3 LED device tree source
-+ *
-+ * Copyright (c) 2015,2016 Krzysztof Kozlowski
-+ * Copyright (c) 2014 Collabora Ltd.
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		greenled {
-+			label = "green:mmc0";
-+			pwms = <&pwm 1 2000000 0>;
-+			pwm-names = "pwm1";
-+			/*
-+			 * Green LED is much brighter than the others
-+			 * so limit its max brightness
-+			 */
-+			max_brightness = <127>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		blueled {
-+			label = "blue:heartbeat";
-+			pwms = <&pwm 2 2000000 0>;
-+			pwm-names = "pwm2";
-+			max_brightness = <255>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpioleds {
-+		compatible = "gpio-leds";
-+		redled {
-+			label = "red:microSD";
-+			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc1";
-+		};
-+	};
-+};
+-	memory-controller at 12250000 {
++	sromc: memory-controller at 12250000 {
+ 		compatible = "samsung,exynos4210-srom";
+ 		reg = <0x12250000 0x14>;
+ 	};
 -- 
 2.5.0
