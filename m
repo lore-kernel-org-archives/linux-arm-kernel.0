@@ -1,55 +1,25 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  9 May 2016 18:01:28 -0700
-Subject: [PATCH 1/3 v2] clk: bcm2835: Mark the VPU clock as critical
-In-Reply-To: <1462842090-2017-1-git-send-email-eric@anholt.net>
-References: <1462842090-2017-1-git-send-email-eric@anholt.net>
-Message-ID: <1462842090-2017-2-git-send-email-eric@anholt.net>
+Date: Mon,  9 May 2016 18:01:27 -0700
+Subject: [PATCH 0/3] clk: bcm2835: critical clocks and parent selection
+Message-ID: <1462842090-2017-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VPU clock is also the clock for our AXI bus, so we really can't
-disable it.  This might have happened during boot if, for example,
-uart1 (aux_uart clock) probed and was then disabled before the other
-consumers of the VPU clock had probed.
+With the new patch 2 inserted between my previous pair, I think this
+should cover Martin's bugs with clock disabling.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+I tested patch 2 to be important on the downstream kernel: with the
+DPI panel support added there, I was losing ethernet (my only I/O)
+when the HDMI HSM hanging off of PLLD_PER got disabled due to
+EPROBE_DEFER.
 
-v2: Rewrite to use a .flags in bcm2835_clock_data, since other clocks
-    will need this too.
+Eric Anholt (3):
+  clk: bcm2835: Mark the VPU clock as critical
+  clk: bcm2835: Mark GPIO clocks enabled at boot as critical.
+  clk: bcm2835: Skip PLLC clocks when deciding on a new clock parent
 
- drivers/clk/bcm/clk-bcm2835.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/clk/bcm/clk-bcm2835.c | 32 ++++++++++++++++++++++++++++++--
+ 1 file changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 7a7970865c2d..d9db03cb3fd8 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -443,6 +443,8 @@ struct bcm2835_clock_data {
- 	/* Number of fractional bits in the divider */
- 	u32 frac_bits;
- 
-+	u32 flags;
-+
- 	bool is_vpu_clock;
- 	bool is_mash_clock;
- };
-@@ -1230,7 +1232,7 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 	init.parent_names = parents;
- 	init.num_parents = data->num_mux_parents;
- 	init.name = data->name;
--	init.flags = CLK_IGNORE_UNUSED;
-+	init.flags = data->flags | CLK_IGNORE_UNUSED;
- 
- 	if (data->is_vpu_clock) {
- 		init.ops = &bcm2835_vpu_clock_clk_ops;
-@@ -1649,6 +1651,7 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.div_reg = CM_VPUDIV,
- 		.int_bits = 12,
- 		.frac_bits = 8,
-+		.flags = CLK_IS_CRITICAL,
- 		.is_vpu_clock = true),
- 
- 	/* clocks with per parent mux */
 -- 
 2.8.0.rc3
