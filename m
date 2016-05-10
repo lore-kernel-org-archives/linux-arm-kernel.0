@@ -1,20 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 14:09:04 +0200
-Subject: [GIT PULL 5/6] i.MX defconfig updates for 4.7
-In-Reply-To: <1462291086-19925-5-git-send-email-shawnguo@kernel.org>
-References: <1462291086-19925-1-git-send-email-shawnguo@kernel.org>
- <1462291086-19925-5-git-send-email-shawnguo@kernel.org>
-Message-ID: <19332422.8mBKvEekr1@wuerfel>
+Date: Tue, 10 May 2016 14:13:57 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.7 (#2)
+In-Reply-To: <13443700.NUC16SCx6V@wuerfel>
+References: <87pot8sct4.fsf@free-electrons.com> <13443700.NUC16SCx6V@wuerfel>
+Message-ID: <2554522.hzQidgmgjq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2016 23:58:05 Shawn Guo wrote:
-> The i.MX defconfig updates for 4.7:
->  - Update multi_v5_defconfig for i.MX21/27 and systemd support
->  - Update imx_v6_v7_defconfig to support devices found on various i.MX6
->    board: FT5x06 and TSC2004 touch, I2C GPIO, MICREL PHY and M41T80 RTC
+On Tuesday 10 May 2016 14:05:48 Arnd Bergmann wrote:
+> On Friday 29 April 2016 16:35:19 Gregory CLEMENT wrote:
+> > mvebu defconfig for 4.7 (part 2)
+> > 
+> > - enable AP806 and CP110 syscon driver in arm64 defconfig
+> > 
+> > 
+> 
+> Merged into next/defconfig, thanks!
 > 
 
-Merged into next/defconfig, thanks!
+I ended up undoing the merge before I pushed it out to the git server
+as I noticed you have both arm and arm64 changes in there.
+
+Can you still split up the branch in two?
 
 	Arnd
