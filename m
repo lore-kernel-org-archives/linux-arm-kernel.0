@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 10 May 2016 18:50:50 +0900
-Subject: [RFC PATCH 09/21] clk: uniphier: add clock driver for UniPhier
- PH1-LD20 SoC
+Date: Tue, 10 May 2016 18:50:46 +0900
+Subject: [RFC PATCH 05/21] clk: uniphier: add clock driver for UniPhier
+ PH1-sLD8 SoC
 In-Reply-To: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1462873862-30940-10-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462873862-30940-6-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,40 +14,40 @@ Please do not apply this patch.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/clk/uniphier/Kconfig             |  4 ++
- drivers/clk/uniphier/Makefile            |  1 +
- drivers/clk/uniphier/clk-uniphier-ld20.c | 83 ++++++++++++++++++++++++++++++++
- 3 files changed, 88 insertions(+)
- create mode 100644 drivers/clk/uniphier/clk-uniphier-ld20.c
+ drivers/clk/uniphier/Kconfig             |   4 ++
+ drivers/clk/uniphier/Makefile            |   1 +
+ drivers/clk/uniphier/clk-uniphier-sld8.c | 102 +++++++++++++++++++++++++++++++
+ 3 files changed, 107 insertions(+)
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-sld8.c
 
 diff --git a/drivers/clk/uniphier/Kconfig b/drivers/clk/uniphier/Kconfig
-index 1746aea..6e0a311 100644
+index d789e26..8e930c3 100644
 --- a/drivers/clk/uniphier/Kconfig
 +++ b/drivers/clk/uniphier/Kconfig
-@@ -30,4 +30,8 @@ config CLK_UNIPHIER_LD11
- 	tristate "Clock driver for UniPhier PH1-LD11 SoC"
- 	default ARM64
+@@ -14,4 +14,8 @@ config CLK_UNIPHIER_PRO4
+ 	tristate "Clock driver for UniPhier PH1-Pro4 SoC"
+ 	default ARM
  
-+config CLK_UNIPHIER_LD20
-+	tristate "Clock driver for UniPhier PH1-LD20 SoC"
-+	default ARM64
++config CLK_UNIPHIER_SLD8
++	tristate "Clock driver for UniPhier PH1-sLD8 SoC"
++	default ARM
 +
  endif
 diff --git a/drivers/clk/uniphier/Makefile b/drivers/clk/uniphier/Makefile
-index e056771..59272a6 100644
+index ceed615..c7a8390 100644
 --- a/drivers/clk/uniphier/Makefile
 +++ b/drivers/clk/uniphier/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_CLK_UNIPHIER_SLD8)	+= clk-uniphier-sld8.o
- obj-$(CONFIG_CLK_UNIPHIER_PRO5)	+= clk-uniphier-pro5.o
- obj-$(CONFIG_CLK_UNIPHIER_PXS2)	+= clk-uniphier-pxs2.o
- obj-$(CONFIG_CLK_UNIPHIER_LD11)	+= clk-uniphier-ld11.o
-+obj-$(CONFIG_CLK_UNIPHIER_LD20)	+= clk-uniphier-ld20.o
-diff --git a/drivers/clk/uniphier/clk-uniphier-ld20.c b/drivers/clk/uniphier/clk-uniphier-ld20.c
+@@ -6,3 +6,4 @@ obj-y				+= clk-uniphier-mux.o
+ 
+ obj-$(CONFIG_CLK_UNIPHIER_LD4)	+= clk-uniphier-ld4.o
+ obj-$(CONFIG_CLK_UNIPHIER_PRO4)	+= clk-uniphier-pro4.o
++obj-$(CONFIG_CLK_UNIPHIER_SLD8)	+= clk-uniphier-sld8.o
+diff --git a/drivers/clk/uniphier/clk-uniphier-sld8.c b/drivers/clk/uniphier/clk-uniphier-sld8.c
 new file mode 100644
-index 0000000..a15a59b
+index 0000000..74574ba
 --- /dev/null
-+++ b/drivers/clk/uniphier/clk-uniphier-ld20.c
-@@ -0,0 +1,83 @@
++++ b/drivers/clk/uniphier/clk-uniphier-sld8.c
+@@ -0,0 +1,102 @@
 +/*
 + * Copyright (C) 2016 Socionext Inc.
 + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
@@ -64,20 +64,29 @@ index 0000000..a15a59b
 + */
 +
 +#include <linux/module.h>
-+#include <linux/of.h>
 +#include <linux/platform_device.h>
 +
 +#include "clk-uniphier.h"
 +
-+static const struct uniphier_clk_data uniphier_ld20_clk_data[] = {
++static const struct uniphier_clk_data uniphier_sld8_clk_data[] = {
 +	{
 +		.name = "spll",
 +		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
 +		.output_index = -1,
 +		.data.factor = {
 +			.parent_name = "ref",
-+			.mult = 80,
++			.mult = 64,
 +			.div = 1,
++		},
++	},
++	{
++		.name = "upll",
++		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
++		.output_index = -1,
++		.data.factor = {
++			.parent_name = "ref",
++			.mult = 288,
++			.div = 25,
 +		},
 +	},
 +	{
@@ -87,17 +96,27 @@ index 0000000..a15a59b
 +		.data.factor = {
 +			.parent_name = "spll",
 +			.mult = 1,
-+			.div = 34,
++			.div = 20,
 +		},
 +	},
 +	{
-+		.name = "fi2c",
++		.name = "i2c",
 +		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
 +		.output_index = 1,
 +		.data.factor = {
 +			.parent_name = "spll",
 +			.mult = 1,
-+			.div = 50,
++			.div = 16,
++		},
++	},
++	{
++		.name = "ehci",
++		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
++		.output_index = 5,
++		.data.factor = {
++			.parent_name = "upll",
++			.mult = 1,
++			.div = 12,
 +		},
 +	},
 +	{
@@ -106,30 +125,30 @@ index 0000000..a15a59b
 +		.output_index = 7,
 +		.data.gate = {
 +			.parent_name = NULL,
-+			.reg = 0x200c,
-+			.mask = BIT(8),
-+			.enable_val = BIT(8),
++			.reg = 0x2104,
++			.mask = BIT(10),
++			.enable_val = BIT(10),
 +		},
 +	},
 +	{ /* sentinel */ }
 +};
 +
-+static int uniphier_ld20_clk_probe(struct platform_device *pdev)
++static int uniphier_sld8_clk_probe(struct platform_device *pdev)
 +{
-+	return uniphier_clk_probe(pdev, uniphier_ld20_clk_data);
++	return uniphier_clk_probe(pdev, uniphier_sld8_clk_data);
 +}
 +
-+static struct platform_driver uniphier_ld20_clk_driver = {
-+	.probe = uniphier_ld20_clk_probe,
++static struct platform_driver uniphier_sld8_clk_driver = {
++	.probe = uniphier_sld8_clk_probe,
 +	.remove = uniphier_clk_remove,
 +	.driver = {
-+		.name = "uniphier-ld20-clk",
++		.name = "uniphier-sld8-clk",
 +	},
 +};
-+module_platform_driver(uniphier_ld20_clk_driver);
++module_platform_driver(uniphier_sld8_clk_driver);
 +
 +MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier PH1-LD20 System Clock Driver");
++MODULE_DESCRIPTION("UniPhier PH1-sLD8 System Clock Driver");
 +MODULE_LICENSE("GPL");
 -- 
 1.9.1
