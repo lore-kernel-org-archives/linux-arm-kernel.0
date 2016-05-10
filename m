@@ -1,103 +1,150 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 10 May 2016 16:23:30 +0800
-Subject: [PATCH 2/6] usb: xhci-mtk: make IPPC register optional
+Date: Tue, 10 May 2016 16:23:33 +0800
+Subject: [PATCH 5/6] arm64: dts: mediatek: add USB3 DRD driver
 In-Reply-To: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1462868614-20602-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1462868614-20602-6-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make IPPC register optional to support host side of dual-role mode,
-due to it is moved into common glue layer for simplification.
+USB3 DRD driver is added for MT8173-EVB, and xHCI driver
+becomes its subnode
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk.c |   32 +++++++++++++++++++++++++++-----
- 1 file changed, 27 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   46 +++++++++++++++++++++++++--
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   28 ++++++++++++----
+ 2 files changed, 65 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 79959f1..dc86832 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
- 	int ret;
- 	int i;
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 7453a47..682dfd7 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -34,6 +34,11 @@
  
-+	if (ippc == NULL)
-+		return 0;
+ 	chosen { };
+ 
++	extcon_usb: extcon_iddig {
++		compatible = "linux,extcon-usb-gpio";
++		id-gpio = <&pio 16 GPIO_ACTIVE_HIGH>;
++	};
 +
- 	/* power on host ip */
- 	value = readl(&ippc->ip_pw_ctr1);
- 	value &= ~CTRL1_IP_HOST_PDN;
-@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
- 	int ret;
- 	int i;
- 
-+	if (ippc == NULL)
-+		return 0;
+ 	usb_p1_vbus: regulator at 0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb_vbus";
+@@ -42,6 +47,16 @@
+ 		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
 +
- 	/* power down all u3 ports */
- 	for (i = 0; i < mtk->num_u3_ports; i++) {
- 		value = readl(&ippc->u3_ctrl_p[i]);
-@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
- 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
- 	u32 value;
- 
-+	if (ippc == NULL)
-+		return 0;
++	usb_p0_vbus: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
 +
- 	/* reset whole ip */
- 	value = readl(&ippc->ip_pw_ctr0);
- 	value |= CTRL0_IP_SW_RST;
-@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
- /* called during probe() after chip reset completes */
- static int xhci_mtk_setup(struct usb_hcd *hcd)
- {
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
- 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
- 	int ret;
+ };
  
-@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
- 		ret = xhci_mtk_ssusb_config(mtk);
- 		if (ret)
- 			return ret;
-+	}
+ &i2c1 {
+@@ -205,6 +220,20 @@
+ 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+ 		};
+ 	};
 +
-+	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
-+	if (ret)
-+		return ret;
++	usb_id_pins_float: usb_iddig_pull_up {
++		pins_iddig {
++			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
++			bias-pull-up;
++		};
++	};
 +
-+	if (usb_hcd_is_primary_hcd(hcd)) {
-+		mtk->num_u3_ports = xhci->num_usb3_ports;
-+		mtk->num_u2_ports = xhci->num_usb2_ports;
- 		ret = xhci_mtk_sch_init(mtk);
- 		if (ret)
- 			return ret;
- 	}
++	usb_id_pins_ground: usb_iddig_pull_down {
++		pins_iddig {
++			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
++			bias-pull-down;
++		};
++	};
+ };
  
--	return xhci_gen_setup(hcd, xhci_mtk_quirks);
-+	return ret;
- }
+ &pwm0 {
+@@ -431,12 +460,25 @@
+ 	status = "okay";
+ };
  
- static int xhci_mtk_probe(struct platform_device *pdev)
-@@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 	hcd->rsrc_start = res->start;
- 	hcd->rsrc_len = resource_size(res);
++&ssusb {
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p0_vbus>;
++	extcon = <&extcon_usb>;
++	dr_mode = "otg";
++	mediatek,enable-wakeup;
++	pinctrl-names = "default", "id_float", "id_ground";
++	pinctrl-0 = <&usb_id_pins_float>;
++	pinctrl-1 = <&usb_id_pins_float>;
++	pinctrl-2 = <&usb_id_pins_ground>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
  
-+	mtk->ippc_regs = NULL;
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	mtk->ippc_regs = devm_ioremap_resource(dev, res);
--	if (IS_ERR(mtk->ippc_regs)) {
--		ret = PTR_ERR(mtk->ippc_regs);
--		goto put_usb2_hcd;
-+	if (res) {	/* ippc register is optional */
-+		mtk->ippc_regs = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(mtk->ippc_regs)) {
-+			ret = PTR_ERR(mtk->ippc_regs);
-+			goto put_usb2_hcd;
-+		}
- 	}
+-&usb30 {
++&usb_host {
+ 	vusb33-supply = <&mt6397_vusb_reg>;
+ 	vbus-supply = <&usb_p1_vbus>;
+-	mediatek,wakeup-src = <1>;
++	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index eab7efc..34821db 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -548,11 +548,14 @@
+ 			status = "disabled";
+ 		};
  
- 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
+-		usb30: usb at 11270000 {
+-			compatible = "mediatek,mt8173-xhci";
+-			reg = <0 0x11270000 0 0x1000>,
++		ssusb: usb at 11271000 {
++			compatible = "mediatek,mt8173-mtu3";
++			reg = <0 0x11271000 0 0x3000>,
+ 			      <0 0x11280700 0 0x0100>;
+-			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++			reg-names = "mac", "ippc";
++			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
++			phys = <&phy_port0 PHY_TYPE_USB3>,
++			       <&phy_port1 PHY_TYPE_USB2>;
+ 			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+ 			clocks = <&topckgen CLK_TOP_USB30_SEL>,
+ 				 <&pericfg CLK_PERI_USB0>,
+@@ -560,10 +563,21 @@
+ 			clock-names = "sys_ck",
+ 				      "wakeup_deb_p0",
+ 				      "wakeup_deb_p1";
+-			phys = <&phy_port0 PHY_TYPE_USB3>,
+-			       <&phy_port1 PHY_TYPE_USB2>;
+ 			mediatek,syscon-wakeup = <&pericfg>;
+-			status = "okay";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++			status = "disabled";
++
++			usb_host: xhci at 11270000 {
++				compatible = "mediatek,mt8173-xhci";
++				reg = <0 0x11270000 0 0x1000>;
++				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++				power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++				clocks = <&topckgen CLK_TOP_USB30_SEL>;
++				clock-names = "sys_ck";
++				status = "disabled";
++			};
+ 		};
+ 
+ 		u3phy: usb-phy at 11290000 {
 -- 
 1.7.9.5
