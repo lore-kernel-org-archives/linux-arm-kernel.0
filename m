@@ -1,26 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 May 2016 13:58:26 +0200
-Subject: [PATCH v8 1/3] gpio: dt-bindings: add wd,mbl-gpio bindings
-In-Reply-To: <9bc9349d6e13d81c6200b0cd8fa20c76263043f6.1462543458.git.chunkeey@googlemail.com>
-References: <cover.1462543457.git.chunkeey@googlemail.com>
- <9bc9349d6e13d81c6200b0cd8fa20c76263043f6.1462543458.git.chunkeey@googlemail.com>
-Message-ID: <CACRpkdbqifjgD0hV+mV5bwu-LKmX8huMQhpJQ4wUCXmXZeSfyQ@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Tue, 10 May 2016 14:00:01 +0200
+Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
+In-Reply-To: <CACRpkdZ=KsPL1mBS1bLi=jYsv=Vb1QNBi8XPAJW50doPcwBuZg@mail.gmail.com>
+References: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
+ <CACRpkdZ=KsPL1mBS1bLi=jYsv=Vb1QNBi8XPAJW50doPcwBuZg@mail.gmail.com>
+Message-ID: <5731CD41.60506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2016 at 3:08 PM, Christian Lamparter
-<chunkeey@googlemail.com> wrote:
 
-> This patch adds the device tree bindings for the Western Digital's
-> MyBook Live memory-mapped GPIO controllers.
+
+On 05/10/2016 01:50 PM, Linus Walleij wrote:
+> On Fri, Apr 29, 2016 at 4:25 PM,  <patrice.chotard@st.com> wrote:
 >
-> The gpios will be supported by gpio-mmio code of the
-> GPIO generic library.
+>> From: Patrice Chotard <patrice.chotard@st.com>
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Patch applied! Because this gives good debuggability.
 >
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+> But think about refactorings:
+>
+>> +static bool stm32_pconf_input_get(struct stm32_gpio_bank *bank,
+>> +       unsigned int offset)
+>> +{
+>> +       unsigned long flags;
+>> +       u32 val;
+>> +
+>> +       clk_enable(bank->clk);
+>> +       spin_lock_irqsave(&bank->lock, flags);
+>> +
+>> +       val = !!(readl_relaxed(bank->base + STM32_GPIO_IDR) & BIT(offset));
+>> +
+>> +       spin_unlock_irqrestore(&bank->lock, flags);
+>> +       clk_disable(bank->clk);
+>> +
+>> +       return val;
+>> +}
+>> +
+>> +static bool stm32_pconf_output_get(struct stm32_gpio_bank *bank,
+>> +       unsigned int offset)
+>> +{
+>> +       unsigned long flags;
+>> +       u32 val;
+>> +
+>> +       clk_enable(bank->clk);
+>> +       spin_lock_irqsave(&bank->lock, flags);
+>> +       val = !!(readl_relaxed(bank->base + STM32_GPIO_ODR) & BIT(offset));
+>> +
+>> +       spin_unlock_irqrestore(&bank->lock, flags);
+>> +       clk_disable(bank->clk);
+>> +
+>> +       return val;
+>> +}
+Hi Linus
 
-Looks OK to me and Rob has ACKed so patch applied.
+> Don't you think these two look very similar for example.
 
-Yours,
-Linus Walleij
+You 're right, i will rework this in a separate patch
+
+Thanks
+
+Patrice
+
+>
+> But that can be fixed later, debuggability is more important.
+>
+> Yours,
+> Linus Walleij
