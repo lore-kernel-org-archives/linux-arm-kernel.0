@@ -1,197 +1,249 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 09:34:56 +0200
-Subject: [PATCH v9 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 2/3: msi changes
-In-Reply-To: <50F1DA1B-3760-474F-A401-43AA26A5F6B6@caviumnetworks.com>
-References: <1462375094-2390-1-git-send-email-eric.auger@linaro.org>
- <9C17BA6B-7304-47CA-A287-77FB41D96AD3@caviumnetworks.com>
- <573040D6.9050803@linaro.org>
- <50F1DA1B-3760-474F-A401-43AA26A5F6B6@caviumnetworks.com>
-Message-ID: <57318F20.4010103@linaro.org>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Tue, 10 May 2016 15:42:07 +0800
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160506123731.GA11959@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
+ <572C8B30.7000005@huawei.com> <20160506123731.GA11959@yury-N73SV>
+Message-ID: <573190CF.6030408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chalamarla,
-> On 5/9/16, 12:48 AM, "Eric Auger" <eric.auger@linaro.org> wrote:
-> 
->> Hi Chalarmala,
->> On 05/05/2016 07:44 PM, Chalamarla, Tirumalesh wrote:
->>> Hi Eric,
->>>
->>> Does this series supports gicv3-its emulation?
->>> Do we have a tree with all the dependent patches
->> GICv3 ITS emulation support comes with:
->> [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
->> http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/5738
+Hi, Yury
+
+On 2016/5/6 20:37, Yury Norov wrote:
+> On Fri, May 06, 2016 at 08:16:48PM +0800, Zhangjian (Bamvor) wrote:
+>> Hi,
 >>
->> My series just allows PCI device MSI transactions to reach the host MSI
->> frame through the SMMU. Only host GICv2m has been tested at the moment
->> with a guest exposed with a GICv2m too.
-> 
-> 
-> I wanted to test this series on Cavium Thunder, but the only mode supported is Gicv3 with ITS, is there a chance 
-> That I get a tree with all the dependencies?
-I can prepare a kernel tree with all the dependencies including ITS
-patches supporting get_doorbell_info.
-
-Then on userspace side:
-- do you plan to use QEMU?
-- then can you expose your guest with a GICv3 + v2m? I think this should
-work.
-
-exposing ITS to the guest requires a respin of Pavel's series:
-[Qemu-devel] [RFC PATCH v3 0/5] vITS support
-(https://lists.gnu.org/archive/html/qemu-devel/2015-11/msg05197.html)
-and has more complex kernel dependencies.
-
-I think exposing the guest with GICv3 + v2m should work
-
-Best Regards
-
-Eric
->>> Thanks,
->>> Tirumalesh. 
->>> On 5/4/16, 8:18 AM, "linux-arm-kernel on behalf of Eric Auger" <linux-arm-kernel-bounces at lists.infradead.org on behalf of eric.auger@linaro.org> wrote:
+>> On 2016/4/6 6:08, Yury Norov wrote:
+>>> From: Andrew Pinski <apinski@cavium.com>
 >>>
->>>> This series implements the MSI address mapping/unmapping in the MSI layer.
->>>> IOMMU binding happens on pci_enable_msi since this function can sleep and
->>>> return errors. On msi_domain_set_affinity, msi_domain_(de)activate, which
->>>> are not allowed to sleep, we simply look for the already existing binding.
->>>>
->>>> A new MSI domain info flag value is introduced to report whether the msi
->>>> domain implements IRQ remapping. GIC v3 ITS is the first MSI controller
->>>> advertising it. This flag value will be used by VFIO subsystem to
->>>> determine whether MSI forwarding is safe.
->>>>
->>>> More details & context can be found at:
->>>> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
->>>>
->>>> Best Regards
->>>>
->>>> Eric
->>>>
->>>> Applies on top of PART 1/3. Also depends on
->>>> [PATCH 1/3] iommu: Add MMIO mapping type,
->>>> http://comments.gmane.org/gmane.linux.kernel.iommu/12869
->>>>
->>>> Git: complete series available at
->>>> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc6-pcie-passthrough-v9-msi-v9
->>>>
->>>> This branch contains all parts in v9.
->>>>
->>>> History:
->>>>
->>>> v8 -> v9:
->>>> - use a union in irq_chip_msi_doorbell_info + boolean telling whether the
->>>>  doorbell is percpu
->>>> - decouple irq_data parsing from the actual mapping/unmapping in
->>>>  msi_handle_doorbell_mappings
->>>> - fix misc style issues
->>>>
->>>> v7 -> v8:
->>>> take into account Marc's comments:
->>>> - use iommu_msi_msg_pa_to_va with new proto
->>>> - change in irq_chip_msi_doorbell_info struct definition:
->>>>  prot and size became shared between all doorbells and phys_addr_t __percpu
->>>> - cleanups in v2m irqchip
->>>> - eventually did not touch MSI_FLAG_IRQ_REMAPPING naming
->>>> - On msi_handle_doorbell_mappings, stop on the first irqchip where doorbells
->>>>  can be found
->>>> - fix resource deallocation on mapping failure in msi_domain_alloc_irqs
->>>>
->>>> v6 -> v7:
->>>> - do alloc/map handling on pci_enable_msi and search on msi_(de)domain_activate
->>>> - add msi_doorbell_info callback in irq-chip to retrieve the characteristics
->>>>  of doorbells
->>>>
->>>> RFC v5 -> patch v6:
->>>> - split to ease the review process
->>>> - rebase on default iommu domain code (irq_data_to_msi_mapping_domain
->>>>  checks IOMMU_DOMAIN_DMA type)
->>>> - fix unmap sequence on msi_domain_set_affinity (reported by Marc):
->>>>  unmap the previous doorbell when the new one has been mapped & written to
->>>>  the device, ie. irq_chip_write_msi_msg.
->>>> - "msi: msi_compose wrapper removed" following change above
->>>> - add size parameter to iommu_get_reserved_iova API following Marc's request
->>>>
->>>> RFC v4 -> RFC v5:
->>>> - take into account Thomas' comments on MSI related patches
->>>>  - split "msi: IOMMU map the doorbell address when needed"
->>>>  - increase readability and add comments
->>>>  - fix style issues
->>>> - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
->>>> - platform ITS now advertises IOMMU_CAP_INTR_REMAP
->>>> - fix compilation issue with CONFIG_IOMMU API unset
->>>> - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
->>>>
->>>> RFC v3 -> v4:
->>>> - Move doorbell mapping/unmapping in msi.c
->>>> - fix ref count issue on set_affinity: in case of a change in the address
->>>>  the previous address is decremented
->>>> - doorbell map/unmap now is done on msi composition. Should allow the use
->>>>  case for platform MSI controllers
->>>> - create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
->>>>  to reserved IOVA management (looking like dma-iommu glue)
->>>> - series reordering to ease the review:
->>>>  - first part is related to IOMMU
->>>>  - second related to MSI sub-system
->>>>  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
->>>> - expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
->>>>  [this partially addresses Marc's comments on iommu_get/put_single_reserved
->>>>   size/alignment problematic - which I did not ignore - but I don't know
->>>>   how much I can do at the moment]
->>>>
->>>> RFC v2 -> RFC v3:
->>>> - should fix wrong handling of some CONFIG combinations:
->>>>  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
->>>> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
->>>>
->>>> PATCH v1 -> RFC v2:
->>>> - reverted to RFC since it looks more reasonable ;-) the code is split
->>>>  between VFIO, IOMMU, MSI controller and I am not sure I did the right
->>>>  choices. Also API need to be further discussed.
->>>> - iova API usage in arm-smmu.c.
->>>> - MSI controller natively programs the MSI addr with either the PA or IOVA.
->>>>  This is not done anymore in vfio-pci driver as suggested by Alex.
->>>> - check irq remapping capability of the group
->>>>
->>>> RFC v1 [2] -> PATCH v1:
->>>> - use the existing dma map/unmap ioctl interface with a flag to register a
->>>>  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
->>>> - a single reserved IOVA contiguous region now is allowed
->>>> - use of an RB tree indexed by PA to store allocated reserved slots
->>>> - use of a vfio_domain iova_domain to manage iova allocation within the
->>>>  window provided by the userspace
->>>> - vfio alloc_map/unmap_free take a vfio_group handle
->>>> - vfio_group handle is cached in vfio_pci_device
->>>> - add ref counting to bindings
->>>> - user modality enabled at the end of the series
->>>>
->>>>
->>>> Eric Auger (8):
->>>>  genirq/msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
->>>>  irqchip/gic-v3-its: ITS advertises MSI_FLAG_IRQ_REMAPPING
->>>>  genirq/msi: export msi_get_domain_info
->>>>  genirq/msi: msi_compose wrapper
->>>>  genirq/irq: introduce msi_doorbell_info
->>>>  irqchip/gicv2m: implement msi_doorbell_info callback
->>>>  genirq/msi: map/unmap the MSI doorbells on msi_domain_alloc/free_irqs
->>>>  genirq/msi: use the MSI doorbell's IOVA when requested
->>>>
->>>> drivers/irqchip/irq-gic-v2m.c                 |  16 +++
->>>> drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   3 +-
->>>> drivers/irqchip/irq-gic-v3-its-platform-msi.c |   3 +-
->>>> include/linux/irq.h                           |  15 ++-
->>>> include/linux/msi.h                           |   2 +
->>>> kernel/irq/msi.c                              | 136 +++++++++++++++++++++++---
->>>> 6 files changed, 161 insertions(+), 14 deletions(-)
->>>>
->>>> -- 
->>>> 1.9.1
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>> Add a separate syscall-table for ILP32, which dispatches either to native
+>>> LP64 system call implementation or to compat-syscalls, as appropriate.
+>>>
+>>> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+>>> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+>>> ---
+>>>   arch/arm64/include/asm/unistd.h | 11 ++++++-
+>>>   arch/arm64/kernel/Makefile      |  2 +-
+>>>   arch/arm64/kernel/entry.S       | 12 +++++++-
+>>>   arch/arm64/kernel/sys_ilp32.c   | 65 +++++++++++++++++++++++++++++++++++++++++
+>>>   4 files changed, 87 insertions(+), 3 deletions(-)
+>>>   create mode 100644 arch/arm64/kernel/sys_ilp32.c
+>>>
+>>> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+>>> index 2971dea..5ea18ef 100644
+>>> --- a/arch/arm64/include/asm/unistd.h
+>>> +++ b/arch/arm64/include/asm/unistd.h
+>>> @@ -13,9 +13,18 @@
+>>>    * You should have received a copy of the GNU General Public License
+>>>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>    */
+>>> +
+>>> +#ifdef CONFIG_COMPAT
+>>> +#define __ARCH_WANT_COMPAT_STAT64
+>>> +#endif
+>>> +
+>>> +#ifdef CONFIG_ARM64_ILP32
+>>> +#define __ARCH_WANT_COMPAT_SYS_PREADV64
+>>> +#define __ARCH_WANT_COMPAT_SYS_PWRITEV64
+>>> +#endif
+>>> +
+>>>   #ifdef CONFIG_AARCH32_EL0
+>>>   #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+>>> -#define __ARCH_WANT_COMPAT_STAT64
+>>>   #define __ARCH_WANT_SYS_GETHOSTNAME
+>>>   #define __ARCH_WANT_SYS_PAUSE
+>>>   #define __ARCH_WANT_SYS_GETPGRP
+>>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>>> index 9dfdf86..7aa65ea 100644
+>>> --- a/arch/arm64/kernel/Makefile
+>>> +++ b/arch/arm64/kernel/Makefile
+>>> @@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+>>>   arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+>>>   					   sys_compat.o entry32.o		\
+>>>   					   ../../arm/kernel/opcodes.o binfmt_elf32.o
+>>> -arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
+>>> +arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
+>>>   arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+>>>   arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+>>>   arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>>> index cf4d1ae..1f7a145 100644
+>>> --- a/arch/arm64/kernel/entry.S
+>>> +++ b/arch/arm64/kernel/entry.S
+>>> @@ -715,9 +715,13 @@ ENDPROC(ret_from_fork)
+>>>    */
+>>>   	.align	6
+>>>   el0_svc:
+>>> -	adrp	stbl, sys_call_table		// load syscall table pointer
+>>>   	uxtw	scno, w8			// syscall number in w8
+>>>   	mov	sc_nr, #__NR_syscalls
+>>> +#ifdef CONFIG_ARM64_ILP32
+>>> +	ldr	x16, [tsk, #TI_FLAGS]
+>>> +	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
+>>> +#endif
+>>> +	adrp	stbl, sys_call_table		// load syscall table pointer
+>>>   el0_svc_naked:					// compat entry point
+>>>   	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+>>>   	enable_dbg_and_irq
+>>> @@ -737,6 +741,12 @@ ni_sys:
+>>>   	b	ret_fast_syscall
+>>>   ENDPROC(el0_svc)
+>>>
+>>> +#ifdef CONFIG_ARM64_ILP32
+>>> +el0_ilp32_svc:
+>>> +	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
+>>> +	b el0_svc_naked
+>>> +#endif
+>>> +
+>>>   	/*
+>>>   	 * This is the really slow path.  We're going to be doing context
+>>>   	 * switches, and waiting for our parent to respond.
+>>> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
+>>> new file mode 100644
+>>> index 0000000..0996d8e
+>>> --- /dev/null
+>>> +++ b/arch/arm64/kernel/sys_ilp32.c
+>>> @@ -0,0 +1,65 @@
+>>> +/*
+>>> + * AArch64- ILP32 specific system calls implementation
+>>> + *
+>>> + * Copyright (C) 2016 Cavium Inc.
+>>> + * Author: Andrew Pinski <apinski@cavium.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <linux/compiler.h>
+>>> +#include <linux/errno.h>
+>>> +#include <linux/fs.h>
+>>> +#include <linux/mm.h>
+>>> +#include <linux/msg.h>
+>>> +#include <linux/export.h>
+>>> +#include <linux/sched.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/syscalls.h>
+>>> +#include <linux/compat.h>
+>>> +#include <asm-generic/syscalls.h>
+>>> +
+>>> +/* Using non-compat syscalls where necessary */
+>>> +#define compat_sys_fadvise64_64        sys_fadvise64_64
+>>> +#define compat_sys_fallocate           sys_fallocate
+>>> +#define compat_sys_ftruncate64         sys_ftruncate
+>>> +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
+>>> +#define compat_sys_pread64             sys_pread64
+>>> +#define compat_sys_pwrite64            sys_pwrite64
+>>> +#define compat_sys_readahead           sys_readahead
+>>> +#define compat_sys_shmat               sys_shmat
+>>> +#define compat_sys_sync_file_range     sys_sync_file_range
+>>> +#define compat_sys_truncate64          sys_truncate
+>>> +#define sys_llseek                     sys_lseek
+>>> +#define sys_mmap2		       sys_mmap
+>> I am a little bit confused here. We wrap the mmap to mmap2 in glibc
+>> without shift the 4096 and We map mmap2 to mmap in kernel which
+>> means we shift with the real page size. It works unless the
+>> application want to mmap the offset bigger then 2G. In ILP32 app,
+>> if the offset is bigger than 2G(e.g. 0xfb000000), it is a negative
+>> number and extend to 64bit nagetive number in kernel
+>> (0xfffffff fb000000). I add the "COMPAT_SYSCALL_WRAP6(mmap, ...)" in
+>> kernel/compat_wrapper.c. But it is not works. I am not sure if it is
+>> already sign extended in userspace.
 >>
+>> On the other hand, I read the code of mmap in arm and other
+>> architecture. Usually, they will shift 4096 in userspace and shift
+>> others in kernel if needed. Should we follow the similar ways or we
+>> could call mmap_pgoff in glibc and do the shift according the real
+>> page shift(getpages())?
+>>
+>> Thanks
+>>
+>> Bamvor
+>>
+>>
+>
+> Hi,
+>
+> AFAIR, here we don't shift offset, as it's 64-bit both in user-
+> and kernel-space,
+In your ilp32-2.22 branch, you wrapper mmap to mmap2 in which type of
+offset is off_t. And off_t is 32bit in ilp32, correct?
+"sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c"
+/* mmap is provided by mmap as they are the same. */
+void *__mmap (void *__addr, size_t __len, int __prot,
+                      int __flags, int __fd, __off_t __offset)
+{
+    void *result;
+    result = (void *)
+      INLINE_SYSCALL (mmap2, 6, __addr,
+                      __len, __prot, __flags, __fd, __offset);
+    return result;
+}
+> and just pass it from user to kernel thru glibc
+> with no changes.
+>
+> It definitely works, as there are many mappings made by linker and
+> libc in 2G+ area, and there are no problems with them. This is a
+> typical ILP32 application map:
+Ok, the different is I am talking about the offset in mmap. I am NOT
+talking about the map result.
+If I run my test case with strace:
+"strace -e trace=mmap ./mmap.arm64_ilp32 0xfb000000 0x1000", here is
+the part of log:
+
+1 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xf7721000
+2 mmap(NULL, 65536, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xf7557000
+3 page size<0x1000>, offset is <0xfb000000>
+4 mmap(NULL, 4096, PROT_READ, MAP_SHARED, 3, 0xfffffffffb000000) = -1 EINVAL (Invalid argument)
+5 mmap of mmapfile failed
+
+As you said, line 1 and 2 show that mmap could map above 2G. But it
+is NOT what I want to discussion.
+As I said, when I pass the offset above 2G(e.g. 0xfb0000000), we
+could find that the actual offset pass to kernel is
+0xfffffffffb000000(reference line 4).
+It will fail if I map in /dev/mmem. It will not fail if the fd is
+a normal file. But in both of case the offset is wrong.
+
+Regards
+
+Bamvor
+
+> 00400000-00401000 r-xp 00000000 08:00 130400     /root/mykill
+> 00410000-00411000 rwxp 00000000 08:00 130400     /root/mykill
+> 00527000-00549000 rwxp 00000000 00:00 0          [heap]
+> c6278000-c6298000 rwxp 00000000 00:00 0
+> c6298000-c63d0000 r-xp 00000000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
+> c63d0000-c63e0000 ---p 00138000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
+> c63e0000-c63e2000 r-xp 00138000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
+> c63e2000-c63e3000 rwxp 0013a000 08:00 135293     /root/sys-root/libilp32/libc-2.22.so
+> c63e3000-c63e6000 rwxp 00000000 00:00 0
+> c63e6000-c63fc000 r-xp 00000000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
+> c63fc000-c640b000 ---p 00016000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
+> c640b000-c640c000 r-xp 00015000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
+> c640c000-c640d000 rwxp 00016000 08:00 135313     /root/sys-root/libilp32/libpthread-2.22.so
+> c640d000-c640f000 rwxp 00000000 00:00 0
+> c640f000-c642c000 r-xp 00000000 08:00 135288     /root/sys-root/libilp32/ld-2.22.so
+> c6437000-c6439000 rwxp 00000000 00:00 0
+> c6439000-c643a000 r--p 00000000 00:00 0          [vvar]
+> c643a000-c643b000 r-xp 00000000 00:00 0          [vdso]
+> c643b000-c643c000 r-xp 0001c000 08:00 135288     /root/sys-root/libilp32/ld-2.22.so
+> c643c000-c643d000 rwxp 0001d000 08:00 135288     /root/sys-root/libilp32/ld-2.22.so
+> ffe2d000-ffe4e000 rw-p 00000000 00:00 0          [stack]
+>
+>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
