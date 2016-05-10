@@ -1,69 +1,103 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 10 May 2016 16:23:28 +0800
-Subject: Add MediaTek USB3 DRD Driver
-Message-ID: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+Date: Tue, 10 May 2016 16:23:30 +0800
+Subject: [PATCH 2/6] usb: xhci-mtk: make IPPC register optional
+In-Reply-To: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1462868614-20602-3-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 5e3e992dc3c02eda12f5cf984a18a57f0207333d Mon Sep 17 00:00:00 2001
-From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Date: Tue, 10 May 2016 16:04:25 +0800
-Subject: [PATCH 0/6] Add MediaTek USB3 DRD Driver
+Make IPPC register optional to support host side of dual-role mode,
+due to it is moved into common glue layer for simplification.
 
-These patches introduce the MediaTek USB3 dual-role controller
-driver.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/host/xhci-mtk.c |   32 +++++++++++++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
 
-The driver can be configured as Dual-Role Device (DRD),
-Peripheral Only and Host Only (xHCI) modes. It works well
-with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
-tested on MT8173 platform which only contains USB2.0 device IP,
-and on MT6290 platform which contains USB3.0 device IP.
-
-
-Chunfeng Yun (6):
-  dt-bindings: mt8173-xhci: support host side of dual-role mode
-  usb: xhci-mtk: make IPPC register optional
-  dt-bindings: mtu3: add devicetree bindings
-  usb: Add MediaTek USB3 DRD Driver
-  arm64: dts: mediatek: add USB3 DRD driver
-  pinctrl: mt8173: set GPIO16 to usb iddig mode
-
- .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++
- Documentation/devicetree/bindings/usb/mtu3.txt     |   86 ++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   46 +-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   28 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h      |    2 +-
- drivers/usb/Kconfig                                |    2 +
- drivers/usb/Makefile                               |    1 +
- drivers/usb/host/xhci-mtk.c                        |   32 +-
- drivers/usb/mtu3/Kconfig                           |   47 ++
- drivers/usb/mtu3/Makefile                          |   20 +
- drivers/usb/mtu3/mtu3.h                            |  422 ++++++++++
- drivers/usb/mtu3/mtu3_core.c                       |  877 +++++++++++++++++++
- drivers/usb/mtu3/mtu3_dr.c                         |  353 ++++++++
- drivers/usb/mtu3/mtu3_dr.h                         |  108 +++
- drivers/usb/mtu3/mtu3_gadget.c                     |  735 ++++++++++++++++
- drivers/usb/mtu3/mtu3_gadget_ep0.c                 |  889 ++++++++++++++++++++
- drivers/usb/mtu3/mtu3_host.c                       |  294 +++++++
- drivers/usb/mtu3/mtu3_hw_regs.h                    |  474 +++++++++++
- drivers/usb/mtu3/mtu3_plat.c                       |  496 +++++++++++
- drivers/usb/mtu3/mtu3_qmu.c                        |  599 +++++++++++++
- drivers/usb/mtu3/mtu3_qmu.h                        |   43 +
- 21 files changed, 5587 insertions(+), 15 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/mtu3.txt
- create mode 100644 drivers/usb/mtu3/Kconfig
- create mode 100644 drivers/usb/mtu3/Makefile
- create mode 100644 drivers/usb/mtu3/mtu3.h
- create mode 100644 drivers/usb/mtu3/mtu3_core.c
- create mode 100644 drivers/usb/mtu3/mtu3_dr.c
- create mode 100644 drivers/usb/mtu3/mtu3_dr.h
- create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
- create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
- create mode 100644 drivers/usb/mtu3/mtu3_host.c
- create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
- create mode 100644 drivers/usb/mtu3/mtu3_plat.c
- create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
- create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
-
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 79959f1..dc86832 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power on host ip */
+ 	value = readl(&ippc->ip_pw_ctr1);
+ 	value &= ~CTRL1_IP_HOST_PDN;
+@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power down all u3 ports */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+ 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+ 	u32 value;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* reset whole ip */
+ 	value = readl(&ippc->ip_pw_ctr0);
+ 	value |= CTRL0_IP_SW_RST;
+@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+ /* called during probe() after chip reset completes */
+ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ {
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+ 	int ret;
+ 
+@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ 		ret = xhci_mtk_ssusb_config(mtk);
+ 		if (ret)
+ 			return ret;
++	}
++
++	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
++	if (ret)
++		return ret;
++
++	if (usb_hcd_is_primary_hcd(hcd)) {
++		mtk->num_u3_ports = xhci->num_usb3_ports;
++		mtk->num_u2_ports = xhci->num_usb2_ports;
+ 		ret = xhci_mtk_sch_init(mtk);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	return xhci_gen_setup(hcd, xhci_mtk_quirks);
++	return ret;
+ }
+ 
+ static int xhci_mtk_probe(struct platform_device *pdev)
+@@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
++	mtk->ippc_regs = NULL;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	mtk->ippc_regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(mtk->ippc_regs)) {
+-		ret = PTR_ERR(mtk->ippc_regs);
+-		goto put_usb2_hcd;
++	if (res) {	/* ippc register is optional */
++		mtk->ippc_regs = devm_ioremap_resource(dev, res);
++		if (IS_ERR(mtk->ippc_regs)) {
++			ret = PTR_ERR(mtk->ippc_regs);
++			goto put_usb2_hcd;
++		}
+ 	}
+ 
+ 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
 -- 
 1.7.9.5
