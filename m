@@ -1,90 +1,77 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Tue, 10 May 2016 20:39:41 +0800
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <7091358.aJt1stteb5@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <9651510.pg5Vmm8vKS@wuerfel> <5731AE2E.2050403@huawei.com>
- <7091358.aJt1stteb5@wuerfel>
-Message-ID: <5731D68D.2090109@huawei.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 10 May 2016 14:42:02 +0200
+Subject: [PATCH] ARM: at91/defconfig: sama5: add CONFIG_FHANDLE
+In-Reply-To: <5731D49E.3080307@denx.de>
+References: <572CC603.4000102@denx.de>
+ <1462867383-31961-1-git-send-email-nicolas.ferre@atmel.com>
+ <5731D49E.3080307@denx.de>
+Message-ID: <5731D71A.5080500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le 10/05/2016 14:31, Marek Vasut a ?crit :
+> On 05/10/2016 10:03 AM, Nicolas Ferre wrote:
+>> CONFIG_FHANDLE is listed as a mandatory kernel option for systemd. So
+>> explicitly enable it to allow easy use of systemd userspace.
+>>
+>> Reported-by: Marek Vasut <marex@denx.de>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>> Hi Marek,
+> 
+> Hi!
+> 
+>> It seems that on my side, CONFIG_FHANDLE is not selected automatically...
+>> So I add this patch: can you tell me your thoughts?
+> 
+> Uh, weird, I tried this on next just now:
+> 
+> linux-2.6$ git describe HEAD
+> next-20160510
+> 
+> linux-2.6$ export ARCH=arm ; export CROSS_COMPILE=arm-linux-gnueabi-
+> 
+> linux-2.6$ make sama5_defconfig ; grep FHANDLE .config
+>   HOSTCC  scripts/basic/fixdep
+>   HOSTCC  scripts/kconfig/conf.o
+>   SHIPPED scripts/kconfig/zconf.tab.c
+>   SHIPPED scripts/kconfig/zconf.lex.c
+>   SHIPPED scripts/kconfig/zconf.hash.c
+>   HOSTCC  scripts/kconfig/zconf.tab.o
+>   HOSTLD  scripts/kconfig/conf
+> #
+> # configuration written to .config
+> #
+> CONFIG_FHANDLE=y
 
-On 2016/5/10 19:48, Arnd Bergmann wrote:
-> On Tuesday 10 May 2016 17:47:26 Zhangjian wrote:
->> On 2016/5/10 16:36, Arnd Bergmann wrote:
->>> On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
->>>> On 2016/5/6 20:37, Yury Norov wrote:
->>
->> "include/uapi/asm-generic/posix_types.h" is uapi, we could not check
->> "ARCH_32BIT_OFF_T" here. Besides, the `__kernel_long_t` is long which
->> mean it is 32bit in ILP32. should we define something like x32?
->>       ```
->>       diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
->>       index 7985ff6..9baa8d3 100644
->>       --- a/arch/arm64/include/uapi/asm/posix_types.h
->>       +++ b/arch/arm64/include/uapi/asm/posix_types.h
->
-> glibc does not use the definition of __kernel_off_t, it has its own
-> copy, so changing the kernel headers would do nothing.
-Yes, I think so. I am puzzle that how do we ensure that all the new
-32bit architecture will define off_t as 64bit after introduce
-ARCH_32BIT_OFF_T and do not change any other code?
->
->>       @@ -5,6 +5,9 @@ typedef unsigned short __kernel_old_uid_t;
->>        typedef unsigned short __kernel_old_gid_t;
->>         #define __kernel_old_uid_t __kernel_old_uid_t
->>
->>        +typedef long long __kernel_long_t;
->>        +typedef unsigned long long __kernel_ulong_t;
->>        +
->>         #include <asm-generic/posix_types.h>
->>
->>         #endif /*  __ASM_POSIX_TYPES_H */u
->>       ```
->
-> This would break all sorts of things, because __kernel_long_t/__kernel_ulong_t
-> are not just used for off_t but also other things.
-Yes. But if we do not change __kernel_long_t and __kernel_ulong_t, the
-application of ilp32 will think size of long in kernel is 32bit. Is that
-correct?
->
->>
->> On the other hand, glibc define it own off_t in "bits/types.h":
->>       __STD_TYPE __OFF_T_TYPE __off_t;        /* Type of file sizes and offsets.  */
->>       __STD_TYPE __OFF64_T_TYPE __off64_t;    /* Type of file sizes and offsets (LFS).  */
->>
->> in "sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h":
->>       #define __OFF_T_TYPE            __SLONGWORD_TYPE
->>       #define __OFF64_T_TYPE          __SQUAD_TYPE
->>
->> If we define off_t as 64bit in glibc:
->>       #define __OFF_T_TYPE           __SQUAD_TYPE
->>
->> Should We need to align all the off_t syscall to 64bit syscall in
->> kernel?
->>
->
-> Yes, this is the change that I think we need to make, along with
-> the same change for __INO_T_TYPE and
->
-> #define __OFF_T_MATCHES_OFF64_T        1
-> #define __INO_T_MATCHES_INO64_T        1
->
-> If I read the rest of the glibc headers right, that should be all we need
-> to ensure that both off_t and off64_t match the __kernel_loff_t based
-> syscalls.
-Ok, I will test the ltp syscall test.
-With this changes, the issue I mentioned should be fixed. But we still
-use mmap2 syscall for ILP32 application when we pass the offset instead
-of page offset. Is it correct?
+Absolutely. The patch f76be61755c5 ("Make CONFIG_FHANDLE default y") has
+been added in v4.6-rc2... while I was doing my tests on at91-next that
+is based on v4.6-rc1 :-\
 
-Regards
+Anyway. It's in now. Thanks,
 
-Bamvor
+Bye,
+   Nicolas
 
->
-> 	Arnd
->
+>>  arch/arm/configs/sama5_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+>> index 307f92b31e57..9cb1a85bb166 100644
+>> --- a/arch/arm/configs/sama5_defconfig
+>> +++ b/arch/arm/configs/sama5_defconfig
+>> @@ -1,6 +1,7 @@
+>>  # CONFIG_LOCALVERSION_AUTO is not set
+>>  # CONFIG_SWAP is not set
+>>  CONFIG_SYSVIPC=y
+>> +CONFIG_FHANDLE=y
+>>  CONFIG_IRQ_DOMAIN_DEBUG=y
+>>  CONFIG_LOG_BUF_SHIFT=14
+>>  CONFIG_CGROUPS=y
+>>
+> 
+> 
+
+
+-- 
+Nicolas Ferre
