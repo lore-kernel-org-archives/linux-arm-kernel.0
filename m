@@ -1,147 +1,105 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 16:54:03 +0200
-Subject: [PATCH v9 2/7] vfio/type1: vfio_find_dma accepting a type argument
-In-Reply-To: <20160509164928.518a05a8@t450s.home>
-References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
- <1462362858-2925-3-git-send-email-eric.auger@linaro.org>
- <20160509164928.518a05a8@t450s.home>
-Message-ID: <5731F60B.6040105@linaro.org>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 10 May 2016 16:58:32 +0200
+Subject: [PATCH v3a] KVM: arm/arm64: pmu: abstract access to number of SPIs
+In-Reply-To: <1462890906-6134-1-git-send-email-andre.przywara@arm.com>
+References: <5731AF57.2040707@linaro.org>
+ <1462890906-6134-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160510145832.cv3ozila3kisije6@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 05/10/2016 12:49 AM, Alex Williamson wrote:
-> On Wed,  4 May 2016 11:54:13 +0000
-> Eric Auger <eric.auger@linaro.org> wrote:
+On Tue, May 10, 2016 at 03:35:06PM +0100, Andre Przywara wrote:
+> Currently the PMU uses a member of the struct vgic_dist directly,
+> which not only breaks abstraction, but will fail with the new VGIC.
+> Abstract this access in the VGIC header file.
 > 
->> In our RB-tree we now have slots of different types (USER and RESERVED).
->> It becomes useful to be able to search for dma slots of a specific type or
->> any type. This patch proposes an implementation for that modality and also
->> changes the existing callers using the USER type.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  drivers/vfio/vfio_iommu_type1.c | 63 ++++++++++++++++++++++++++++++++++-------
->>  1 file changed, 53 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->> index aaf5a6c..2d769d4 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -98,23 +98,64 @@ struct vfio_group {
->>   * into DMA'ble space using the IOMMU
->>   */
->>  
->> -static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
->> -				      dma_addr_t start, size_t size)
->> +/**
->> + * vfio_find_dma_from_node: looks for a dma slot intersecting a window
->> + * from a given rb tree node
->> + * @top: top rb tree node where the search starts (including this node)
->> + * @start: window start
->> + * @size: window size
->> + * @type: window type
->> + */
->> +static struct vfio_dma *vfio_find_dma_from_node(struct rb_node *top,
->> +						dma_addr_t start, size_t size,
->> +						enum vfio_iova_type type)
->>  {
->> -	struct rb_node *node = iommu->dma_list.rb_node;
->> +	struct rb_node *node = top;
->> +	struct vfio_dma *dma;
->>  
->>  	while (node) {
->> -		struct vfio_dma *dma = rb_entry(node, struct vfio_dma, node);
->> -
->> +		dma = rb_entry(node, struct vfio_dma, node);
->>  		if (start + size <= dma->iova)
->>  			node = node->rb_left;
->>  		else if (start >= dma->iova + dma->size)
->>  			node = node->rb_right;
->>  		else
->> +			break;
->> +	}
->> +	if (!node)
->> +		return NULL;
->> +
->> +	/* a dma slot intersects our window, check the type also matches */
->> +	if (type == VFIO_IOVA_ANY || dma->type == type)
->> +		return dma;
->> +
->> +	/* restart 2 searches skipping the current node */
->> +	if (start < dma->iova) {
->> +		dma = vfio_find_dma_from_node(node->rb_left, start,
->> +					      size, type);
->> +		if (dma)
->>  			return dma;
->>  	}
->> +	if (start + size > dma->iova + dma->size)
->> +		dma = vfio_find_dma_from_node(node->rb_right, start,
->> +					      size, type);
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Hi Eric, Marc,
 > 
-> It might be nice to split this little bit of trickery out to a separate
-> patch so that you can better explain what it does.  It's really not
-> needed until we start creating user-type entries, so it shouldn't hurt
-> bisection.
-OK I will
+> as this if-statement was quite confusing (it wasn't even the negation
+> that was wrong), I rewrote it a bit to be more readable.
+> This one works now with PPIs (after fixing kvmtool).
+> 
+> Does that make sense?
+> 
+> Cheers,
+> Andre.
+> 
+>  include/kvm/arm_vgic.h |  2 ++
+>  virt/kvm/arm/pmu.c     | 19 +++++++++++--------
+>  2 files changed, 13 insertions(+), 8 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 6a98e05..d406f8e 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -351,6 +351,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+> +				 ((i) < (k)->arch.vgic.nr_irqs))
+>  
+>  int vgic_v2_probe(struct device_node *vgic_node,
+>  		  const struct vgic_ops **ops,
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 575c7aa..6ab9d6b 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -436,6 +436,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * For one VM the interrupt type must be same for each vcpu.
+> + * As a PPI, the interrupt number is the same for all vcpus,
+> + * while as an SPI it must be a separate number per vcpu.
+> + */
+>  static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
 
-Regards
+While at it, I'd change this function name to have 'pmu' in it. It's
+just a static function, but without pmu in it it looks a bit confusing
+now to check the irq is [a valid] spi or ppi number, and then to call
+the generically named 'irq_is_valid' on it as well.
 
-Eric
+Thanks,
+drew
+
+>  {
+>  	int i;
+> @@ -457,6 +462,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+>  	return true;
+>  }
+>  
+> +#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
+>  
+>  int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>  {
+> @@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>  		if (get_user(irq, uaddr))
+>  			return -EFAULT;
+>  
+> -		/*
+> -		 * The PMU overflow interrupt could be a PPI or SPI, but for one
+> -		 * VM the interrupt type must be same for each vcpu. As a PPI,
+> -		 * the interrupt number is the same for all vcpus, while as an
+> -		 * SPI it must be a separate number per vcpu.
+> -		 */
+> -		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
+> -		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+> +		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
+> +		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
+> +			return -EINVAL;
+> +
+> +		if (!irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+>  			return -EINVAL;
+>  
+>  		if (kvm_arm_pmu_irq_initialized(vcpu))
+> -- 
+> 2.7.3
 > 
->> +	return dma;
->> +}
->> +
->> +/**
->> + * vfio_find_dma: find a dma slot intersecting a given window
->> + * @iommu: vfio iommu handle
->> + * @start: window base iova
->> + * @size: window size
->> + * @type: window type
->> + */
->> +static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
->> +				      dma_addr_t start, size_t size,
->> +				      enum vfio_iova_type type)
->> +{
->> +	struct rb_node *top_node = iommu->dma_list.rb_node;
->>  
->> -	return NULL;
->> +	return vfio_find_dma_from_node(top_node, start, size, type);
->>  }
->>  
->>  static void vfio_link_dma(struct vfio_iommu *iommu, struct vfio_dma *new)
->> @@ -488,19 +529,21 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
->>  	 * mappings within the range.
->>  	 */
->>  	if (iommu->v2) {
->> -		dma = vfio_find_dma(iommu, unmap->iova, 0);
->> +		dma = vfio_find_dma(iommu, unmap->iova, 0, VFIO_IOVA_USER);
->>  		if (dma && dma->iova != unmap->iova) {
->>  			ret = -EINVAL;
->>  			goto unlock;
->>  		}
->> -		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0);
->> +		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0,
->> +				    VFIO_IOVA_USER);
->>  		if (dma && dma->iova + dma->size != unmap->iova + unmap->size) {
->>  			ret = -EINVAL;
->>  			goto unlock;
->>  		}
->>  	}
->>  
->> -	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
->> +	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size,
->> +				    VFIO_IOVA_USER))) {
->>  		if (!iommu->v2 && unmap->iova > dma->iova)
->>  			break;
->>  		unmapped += dma->size;
->> @@ -604,7 +647,7 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
->>  
->>  	mutex_lock(&iommu->lock);
->>  
->> -	if (vfio_find_dma(iommu, iova, size)) {
->> +	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
->>  		mutex_unlock(&iommu->lock);
->>  		return -EEXIST;
->>  	}
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
