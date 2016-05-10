@@ -1,44 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 10 May 2016 16:42:17 +0200
-Subject: [GIT PULL] ARM: mvebu: defconfig for v4.7 (#2)
-In-Reply-To: <2554522.hzQidgmgjq@wuerfel> (Arnd Bergmann's message of "Tue, 10
- May 2016 14:13:57 +0200")
-References: <87pot8sct4.fsf@free-electrons.com> <13443700.NUC16SCx6V@wuerfel>
- <2554522.hzQidgmgjq@wuerfel>
-Message-ID: <87vb2mnfee.fsf@free-electrons.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 10 May 2016 09:43:11 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.7, part3
+Message-ID: <1462891391-13876-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., mai 10 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Arnd, Kevin, and Olof:
 
-> On Tuesday 10 May 2016 14:05:48 Arnd Bergmann wrote:
->> On Friday 29 April 2016 16:35:19 Gregory CLEMENT wrote:
->> > mvebu defconfig for 4.7 (part 2)
->> > 
->> > - enable AP806 and CP110 syscon driver in arm64 defconfig
->> > 
->> > 
->> 
->> Merged into next/defconfig, thanks!
->> 
->
-> I ended up undoing the merge before I pushed it out to the git server
-> as I noticed you have both arm and arm64 changes in there.
->
-> Can you still split up the branch in two?
+If not too late, please pull in this patch for v4.7.
 
-As seen on IRC I am about to send a PR with a new mvebu/defconfig64
-branch as the only change here was related to arm64.
+Thanks,
+Dinh
 
-Gregory
+The following changes since commit 02da2d72174c61988eb4456b53f405e3ebdebce4:
 
->
-> 	Arnd
+  Linux 4.6-rc5 (2016-04-24 16:17:05 -0700)
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_for_next_v4.7_dts_part_3
+
+for you to fetch changes up to fca689561e8170ad954b982b9ce2160a06d9435e:
+
+  ARM: dts: socfpga: add ethernet alias on Arria10 (2016-05-03 09:25:21 -0500)
+
+----------------------------------------------------------------
+SoCFPGA DTS update for v4.7, part 3
+- Add ethernet alias on Arria10
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: dts: socfpga: add ethernet alias on Arria10
+
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
