@@ -1,29 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 16:18:20 +0200
-Subject: [GIT PULL] ARM: dts: exynos: Devfreq for v4.7
-In-Reply-To: <1462367136-28627-1-git-send-email-k.kozlowski@samsung.com>
-References: <1462367136-28627-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <4199175.Sym2be3WAj@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 May 2016 15:22:20 +0100
+Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world switch
+ backend
+In-Reply-To: <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
+ <20160510140454.GG27623@cbox>
+ <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
+Message-ID: <5731EE9C.5000201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 May 2016 15:05:36 Krzysztof Kozlowski wrote:
-> Topic branch for Device Tree changes adding new generic devfreq driver, for
-> v4.7:
-> 1. Add bus nodes for Exynos3250, Exynos4x12, Exynos4210 and Exynos542x.
-> 2. Split out common PPMU (Performance Monitoring Unit) nodes into separate
->    DTSI. The PPMU provides performance data for devfreq.
-> 3. Add NoCP (Network on Chip Probe) node for Exynos542x. On this SoC, like PPMU
->    on older designs, provides performance data for devfreq.
-> 4. Enable DFVS (Dynamic Voltage and Frequency Scaling) on boards:
->    - Exynos3250 Rinato,
->    - Exynos4412 Odroid-X/X2/U3 and Trats2,
->    - Exynos5422 Odroid XU3/XU3-Lite/XU4.
+On 10/05/16 15:15, Peter Maydell wrote:
+> On 10 May 2016 at 15:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> On Fri, May 06, 2016 at 11:45:32AM +0100, Andre Przywara wrote:
+>>> +     /*
+>>> +      * Currently all guest IRQs are Group1, as Group0 would result
+>>> +      * in a FIQ in the guest, which it wouldn't expect.
+>>
+>> I still don't like or understand this comment.  This should simply say
+>> that we're making a gross assumption about all interrupts being group1
+>> here.
 > 
+> It's not really an assumption so much as it's a missing feature (aka bug):
+> there's no reason the vGIC shouldn't support group 0 interrupts. We
+> just get away with only supporting group 1 because Linux guests
+> happen to only use group 1 interrupts. If/when the vGIC gains support
+> for group0 interrupts, then it should reset with interrupts configured
+> in group0 by default.
 > 
+>>> +      * Eventually we want to make this configurable, so we may
+>>> +      * revisit this in the future.
+>>> +      */
+> 
+> The only reason to make it configurable is to work around a guest
+> kernel bug whereby Linux assumes that all interrupts start out
+> in Group1. Marc sent out a patch earlier today that fixes that bug:
+>  https://lkml.org/lkml/2016/5/10/297
+> Depending on how long it takes you to fix this missing vgic feature,
+> such kernels may all be long-forgotten, in which case you can
+> get away without the config option :-)
 
-Merged into next/late now, so we can track the clk dependency more easily.
+I've CC'd stable for this particular patch, so hopefully we won't have
+to make it configurable as people will diligently update their
+kernels... I also have a patch for handling both groups in KVM, but I'll
+hold onto it until we have something we agree on for the bulk of the code.
 
 Thanks,
 
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
