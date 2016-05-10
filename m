@@ -1,59 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 10 May 2016 21:00:57 -0700
-Subject: [PATCH v2] pinctrl: rockchip: fix pull setting error for rk3399
-In-Reply-To: <1462937968-4952-1-git-send-email-wxt@rock-chips.com>
-References: <1462937968-4952-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=UXFj9Pq64Ksf8fWtCTffujuZjh8JR4OEmR7=vMTycP1Q@mail.gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed, 11 May 2016 03:24:05 +0800
+Subject: [PATCH v8 1/8] i2c: rk3x: add documentation to fields in "struct
+ rk3x_i2c"
+In-Reply-To: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1462908252-27016-2-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
-
-On Tue, May 10, 2016 at 8:39 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> From: David Wu <david.wu@rock-chips.com>
->
-> This patch fixes the pinctrl pull bias setting, since the pull up/down
-> setting is the contrary for gpio0(just the gpio0a and gpio0b) and
-> gpio2(just the gpio2c and gpio2d).
->
-> From the TRM said, the gpio0a pull polarity setting:
-> gpio0a_p
-> GPIO0A PE/PS programmation section, every
-> GPIO bit corresponding to 2bits[PS:PE]
-> 2'b00: Z(Normal operation);
-> 2'b11: weak 1(pull-up);
-> 2'b01: weak 0(pull-down);
-> 2'b10: Z(Normal operation);
->
-> Then, the other gpios setting as the following:
-> gpio1a_p (e.g.: gpio1, gpio2a, gpio2b, gpio3...)
-> GPIO1A PU/PD programmation section, every
-> GPIO bit corresponding to 2bits
-> 2'b00: Z(Normal operation);
-> 2'b01: weak 1(pull-up);
-> 2'b10: weak 0(pull-down);
-> 2'b11: Z(Normal operation);
->
-> For example,(rk3399evb board)
-> sdmmc_cd --->gpio0_a7
-> localhost / # io -r -4 0xff320040
-> ff320040: 00004d5f
-> In general,the value should be 0x0000cd5f since the pin has been set
-> in the dts.
->
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: linux-gpio at vger.kernel.org
-> ---
->
-> Changes in v2:
-> - As Doug commnets on https://patchwork.kernel.org/patch/9056961/
-> - update the commit for gpio2.
-> - change the print error messgae.
->
->  drivers/pinctrl/pinctrl-rockchip.c | 179 ++++++++++++++++++++++++++-----------
->  1 file changed, 127 insertions(+), 52 deletions(-)
-
+Signed-off-by: David Wu <david.wu@rock-chips.com>
 Reviewed-by: Douglas Anderson <dianders@chromium.org>
+---
+Change in v8:
+- none
+
+ drivers/i2c/busses/i2c-rk3x.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 80bed02..7e45d51 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -90,6 +90,26 @@ struct rk3x_i2c_soc_data {
+ 	int grf_offset;
+ };
+ 
++/**
++ * struct rk3x_i2c - private data of the controller
++ * @adap: corresponding I2C adapter
++ * @dev: device for this controller
++ * @soc_data: related soc data struct
++ * @regs: virtual memory area
++ * @clk: clock of i2c bus
++ * @clk_rate_nb: i2c clk rate change notify
++ * @t: I2C known timing information
++ * @lock: spinlock for the i2c bus
++ * @wait: the waitqueue to wait for i2c transfer
++ * @busy: the condition for the event to wait for
++ * @msg: current i2c message
++ * @addr: addr of i2c slave device
++ * @mode: mode of i2c transfer
++ * @is_last_msg: flag determines whether it is the last msg in this transfer
++ * @state: state of i2c transfer
++ * @processed: byte length which has been send or received
++ * @error: error code for i2c transfer
++ */
+ struct rk3x_i2c {
+ 	struct i2c_adapter adap;
+ 	struct device *dev;
+@@ -116,7 +136,7 @@ struct rk3x_i2c {
+ 
+ 	/* I2C state machine */
+ 	enum rk3x_i2c_state state;
+-	unsigned int processed; /* sent/received bytes */
++	unsigned int processed;
+ 	int error;
+ };
+ 
+-- 
+1.9.1
