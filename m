@@ -1,42 +1,21 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 10 May 2016 14:20:42 +0200
-Subject: [GIT PULL] at91: defconfig for 4.7 #2
-Message-ID: <1462882842-23968-1-git-send-email-nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 14:24:48 +0200
+Subject: [GIT PULL] Ux500 defconfig updates for v4.7
+In-Reply-To: <CACRpkdb6t3QEk6PfTLUXTCCNVWPvq+=BVb1DKJY7q-9HU7+Haw@mail.gmail.com>
+References: <CACRpkdaf39+gQzBb5U9gM5n17QwsNd7FxTbd3J+hLcuBNczKWA@mail.gmail.com>
+ <24266746.WXjeqcnmtv@wuerfel>
+ <CACRpkdb6t3QEk6PfTLUXTCCNVWPvq+=BVb1DKJY7q-9HU7+Haw@mail.gmail.com>
+Message-ID: <13037240.fYhUNtFjsc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Tuesday 10 May 2016 14:14:45 Linus Walleij wrote:
+> Ux500 defconfig update for v4.7:
+> - Remove the unused MACH_UX500_DT option from the multi_v7 defconfig
+> - Remove staging driver from u8500_defconfig
+> - Update sensor support in u8500_defconfig
+> 
 
-A couple of defconfig updates for AT91. They both touch our own
-sama5_defconfig only.
+Pulled into next/defconfig, thanks for the quick update!
 
-Thanks, best regards,
-
-The following changes since commit ed87957b18f238516e578e5dbd44a5db11300831:
-
-  ARM: multi_v7_defconfig: add the Atmel sama5d2-compatible ADC driver (2016-04-27 14:07:59 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig2
-
-for you to fetch changes up to f0d523668cb122905a541cb6b86e3ae49260ae5e:
-
-  ARM: at91/defconfig: sama5: add CONFIG_FHANDLE (2016-05-10 09:57:44 +0200)
-
-----------------------------------------------------------------
-Second batch of defconfig:
-- sama5_defconfig: update to support easy use of systemd userspace
-
-----------------------------------------------------------------
-Marek Vasut (1):
-      ARM: at91: sama5: Update defconfig
-
-Nicolas Ferre (1):
-      ARM: at91/defconfig: sama5: add CONFIG_FHANDLE
-
- arch/arm/configs/sama5_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
--- 
-Nicolas Ferre
+	Arnd
