@@ -1,51 +1,136 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 10 May 2016 09:10:04 +0200
-Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
-In-Reply-To: <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
-References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
- <20160425115758.GA4874@lukather>
- <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
- <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
- <20160509090615.6272f8ca@erd979>
- <CACRpkdbZmL9Cqp-ubzyxd7fWUFOVsS1DCxsfG02kSpbWu_rbZQ@mail.gmail.com>
- <20160509161728.3aee1134@erd979>
- <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
-Message-ID: <20160510071004.GA7318@kroah.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 10 May 2016 12:43:21 +0530
+Subject: [PATCH 2/2] i2c: qup: support SMBus block read
+In-Reply-To: <1462317959-11632-2-git-send-email-nkaje@codeaurora.org>
+References: <1462317959-11632-1-git-send-email-nkaje@codeaurora.org>
+ <1462317959-11632-2-git-send-email-nkaje@codeaurora.org>
+Message-ID: <000b01d1aa8b$7317a300$5946e900$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 04:27:00PM +0200, Linus Walleij wrote:
-> On Mon, May 9, 2016 at 4:17 PM, Robin van der Gracht <robin@protonic.nl> wrote:
-> > On Mon, 9 May 2016 15:19:26 +0200
-> > Linus Walleij <linus.walleij@linaro.org> wrote:
-> >
-> >> On Mon, May 9, 2016 at 9:06 AM, Robin van der Gracht
-> >> <robin@protonic.nl> wrote:
-> >>
-> >> > If you guys feel like auxdisplay is not the right subsystem for the
-> >> > driver, and would like me to move it, please share.
-> >>
-> >> The best would be if you volunteer to maintain it and bring
-> >> it forward.
-> >
-> > Thats fine. Would it suffice if I submit another patch adding myself
-> > to the maintainers file?
++additional lists
+
+> I2C QUP driver relies on SMBus emulation support from the framework.
+> To handle SMBus block reads, the driver should check I2C_M_RECV_LEN flag
+> and should read the first byte received as the message length.
 > 
-> That's half of it, if Miguel does not come back then his name
-> should be removed as the second step.
+> The driver configures the QUP hardware to read one byte. Once the message
+> length is known from this byte, the QUP hardware is configured to read the
+> rest.
 > 
-> You also need to have an idea on a path to funnel accumulated
-> patches upstream to Torvalds. The recent patches to this
-> subsystem were funneled by Greg, so we should ask him how
-> he prefer to proceed.
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+> ---
+>  drivers/i2c/busses/i2c-qup.c | 95 ++++++++++++++++++++++++++++++-------
+> -------
+>  1 file changed, 66 insertions(+), 29 deletions(-)
 > 
-> Greg, what do you prefer?
+> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index
+> ef31b26..2658b67 100644
+> --- a/drivers/i2c/busses/i2c-qup.c
+> +++ b/drivers/i2c/busses/i2c-qup.c
+> @@ -526,38 +526,49 @@ static int qup_i2c_set_tags(u8 *tags, struct
+> qup_i2c_dev *qup,
+> 
+>  	int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
+> 
+> -	if (qup->blk.pos == 0) {
+> -		tags[len++] = QUP_TAG_V2_START;
+> -		tags[len++] = addr & 0xff;
+> +	/* Handle SMBus block data read */
+> +	if ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN)
+> &&
+> +	    (msg->len > 1)) {
+> +		tags[len++] = QUP_TAG_V2_DATARD_STOP;
+> +		data_len = qup_i2c_get_data_len(qup);
+> +		tags[len++] = data_len - 1;
+> +	} else {
+> +		if (qup->blk.pos == 0) {
+> +			tags[len++] = QUP_TAG_V2_START;
+> +			tags[len++] = addr & 0xff;
+> 
+> -		if (msg->flags & I2C_M_TEN)
+> -			tags[len++] = addr >> 8;
+> -	}
+> +			if (msg->flags & I2C_M_TEN)
+> +				tags[len++] = addr >> 8;
+> +		}
+> 
+> -	/* Send _STOP commands for the last block */
+> -	if (last) {
+> -		if (msg->flags & I2C_M_RD)
+> -			tags[len++] = QUP_TAG_V2_DATARD_STOP;
+> -		else
+> -			tags[len++] = QUP_TAG_V2_DATAWR_STOP;
+> -	} else {
+> -		if (msg->flags & I2C_M_RD)
+> +		/* Send _STOP commands for the last block */
+> +		if ((msg->flags & I2C_M_RD)
+> +			&& (msg->flags & I2C_M_RECV_LEN)) {
+>  			tags[len++] = QUP_TAG_V2_DATARD;
+> -		else
+> -			tags[len++] = QUP_TAG_V2_DATAWR;
+> -	}
+> +		} else if (last) {
+> +			if (msg->flags & I2C_M_RD)
+> +				tags[len++] = QUP_TAG_V2_DATARD_STOP;
+> +			else
+> +				tags[len++] = QUP_TAG_V2_DATAWR_STOP;
+> +		} else {
+> +			if (msg->flags & I2C_M_RD)
+> +				tags[len++] = QUP_TAG_V2_DATARD;
+> +			else
+> +				tags[len++] = QUP_TAG_V2_DATAWR;
+> +		}
+> 
+> -	data_len = qup_i2c_get_data_len(qup);
+> +		data_len = qup_i2c_get_data_len(qup);
+> 
+> -	/* 0 implies 256 bytes */
+> -	if (data_len == QUP_READ_LIMIT)
+> -		tags[len++] = 0;
+> -	else
+> -		tags[len++] = data_len;
+> +		/* 0 implies 256 bytes */
+> +		if (data_len == QUP_READ_LIMIT)
+> +			tags[len++] = 0;
+> +		else
+> +			tags[len++] = data_len;
+> 
+> -	if ((msg->flags & I2C_M_RD) && last && is_dma) {
+> -		tags[len++] = QUP_BAM_INPUT_EOT;
+> -		tags[len++] = QUP_BAM_FLUSH_STOP;
+> +		if ((msg->flags & I2C_M_RD) && last && is_dma) {
+> +			tags[len++] = QUP_BAM_INPUT_EOT;
+> +			tags[len++] = QUP_BAM_FLUSH_STOP;
+> +		}
+>  	}
+> 
+   Will it look simpler if we add a qup_i2c_set_tags_smb instead and add an
+   Comment ? Here it is not clear how this is different from a normal read.
 
-I don't care :)
+<snip..>
 
-I can keep doing this, sending stuff to Linus through my char/misc tree,
-or it can go through someone else's tree, it doesn't bother me...
+> +
+> +		/* Handle SMBus block read length */
+> +		if ((msg->flags & I2C_M_RECV_LEN) && (msg->len == 1)) {
+> +			if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
+> +				ret = -EPROTO;
+> +				goto err;
+> +			}
+> +			msg->len += msg->buf[0];
+> +			qup->pos = 0;
+> +			qup_i2c_set_read_mode_v2(qup, msg->len);
+> +			qup_i2c_issue_xfer_v2(qup, msg);
+> +			ret = qup_i2c_wait_for_complete(qup, msg);
+> +			if (ret)
+> +				goto err;
+> +			qup_i2c_set_blk_data(qup, msg);
+> +		}
+>  	} while (qup->blk.pos < qup->blk.count);
+       
+         When v2 mode is not supported this should return an error,
+         in qup_i2c_xfer for msg->flags & I2C_M_RECV_LEN
 
-thanks,
-
-greg k-h
+Regards,
+ Sricharan
