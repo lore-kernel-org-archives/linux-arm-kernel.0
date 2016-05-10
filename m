@@ -1,97 +1,237 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 10 May 2016 10:00:12 -0700
-Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB PCIe
- bindings
-In-Reply-To: <4513390.VWu0VVAxOl@wuerfel>
-References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
- <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
- <4513390.VWu0VVAxOl@wuerfel>
-Message-ID: <5732139C.80101@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 10 May 2016 18:18:46 +0100
+Subject: [PATCH v2] KVM: arm/arm64: vgic-new: fix overlap check for device
+ addresses
+In-Reply-To: <5731DF3C.6020201@arm.com>
+References: <5731DF3C.6020201@arm.com>
+Message-ID: <1462900726-14666-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2016 02:15 PM, Arnd Bergmann wrote:
->> +Required properties:
->> +- compatible: must be one of: "brcm,bcm7425-pcie"
->> +			      "brcm,bcm7435-pcie"
->> +			      "brcm,bcm7445-pcie"
->> +
->> +- reg: specifies the physical base address of the controller registers and
->> +  its length
->> +
->> +- interrupt-parent: must be a reference (phandle) to the parent interrupt
->> +  controller in the system (7038-l1-intc on MIPS, GIC on ARM/ARM64)
->> +
->> +- interrrupts: first interrupt must be the Level 1 interrupt number corresponding
->> +  to the main PCIe RC interrupt, second interrupt must be the MSI interrupt
->> +  See the interrupt-parent documentation for the number of cells and their meaning:
->> +  MIPS: Documentation/devicetree/bindings/interrupt-controller/brcm,bcm7038-l1-intc.txt
->> +  ARM/ARM64: Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
->> +
->> +- interrupt-names: must be "pcie", and if present "msi"
-> 
-> When I suggested splitting out the MSI support, I was thinking (but not writing)
-> that you'd use an msi-parent property to refer to the node that holds the
-> msi-controller as well.
+When userland sets the base addresses for the GIC register frames,
+the kernel tries to make sure that the regions for the distributor and
+the one for the CPU interface or the redistributors do not overlap.
+Currently this check only works properly for GICv2.
+For a GICv3 we need the number of VCPUs to compute the size of the
+redistributor region, which we only know for sure at init time.
+So move the overlap check from kvm_vgic_addr() to the model specific
+map_resources() implementation.
+This also allows us to simplify the existing checking code a bit.
 
-Oh got it now, and it can actually refer to iself.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi,
 
-> 
->> +- ranges: ranges for the PCI outbound windows, no I/O or prefetchable windows
->> +  must be specified here, only non-prefetchable. 32-bits windows or 64-bits
->> +  windows are allowed based on the host processor's capabilities (ARM w/ LPAE,
->> +  ARM64).
-> 
-> So this supports 64-bit non-prefetchable windows? Usually 64-bit windows
-> are prefetchable.
+so another rework, now hopefully really covering GICv3 properly.
+For consistency I also moved the GICv2 check to init time. This is
+a slightly different behaviour, but shouldn't make a difference, as
+the init call can fail as well - for instance if no addresses have been
+set up at all.
 
-I have yet to verify this, but on ARM64-based STB this should indeed be
-the case.
+Cheers,
+Andre.
 
-> 
->> +- brcm,log2-scb-sizes: log2 size of the SCB window that is mapped to PCIe space
->> +  there must be exactly one value per memory controller present in the system
->> +  (ranges from 1 to 3)
-> 
-> I'm still not too happy with this property. I see no reason for the log2
-> format (rather than length in bytes, or offset/length tuples, or dma-ranges,
-> or phandles pointing to the memory controllers). I think we need to discuss
-> this some more.
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++-----------------------------
+ virt/kvm/arm/vgic/vgic-v2.c         | 22 ++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c         | 27 ++++++++++++++++++++
+ 3 files changed, 60 insertions(+), 39 deletions(-)
 
-The two critical pieces of information that the PCIe RC needs are:
-
-- number of memory controllers present in the system to avoid
-configuring a window to a non-existing or non-populated memory controller
-
-- size of the memory populated on the memory controller
-
-You would think that we should somehow be able to derive this
-information from the "memory" node, but there are a few caveats:
-
-- on MIPS platforms, we have discontiguous physical memory ranges (256MB
-@ 0x0, then 768MB or 1792MB @ 0x 0x20000000 and 1GB @ 0x90000000), yet
-the PCIe RC does not know about the hole(s)
-
-- on ARM platforms, we have an identiy mapping for the PAs below 4GB,
-but when we cross it, we have additional non-linear memory regions
-
-Both of these memory nodes would imply we know how to identify which
-physical address belongs to which memory controller, while this is
-actually possible and known, it creates a dependency on another piece of
-driver to provide that information.
-
-We do have memory controller nodes populated in the Device Tree, however
-their binding (out of tree for the moment) does only specify their
-programmable register interface, and not how how much physical memory
-and where they provide to the system.
-
-It does seem like we should be able to utilize the "dma-ranges" property
-to determine both the memory controller number and their respective
-populated memory sizes.
-
-In the case where we have an identiy mapping though, this seems a little
-redundant, but less of a stretch than our custom properties and nodes.
-
-Does that sound reasonable to you?
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 2122ff2..9e736a7 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -19,43 +19,19 @@
+ #include <asm/kvm_mmu.h>
+ #include "vgic.h"
+ 
+-/* common helpers */
+-
+-static int vgic_ioaddr_overlap(struct kvm *kvm)
+-{
+-	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
+-	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
+-
+-	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
+-		return 0;
+-	if ((dist <= cpu && dist + KVM_VGIC_V2_DIST_SIZE > cpu) ||
+-	    (cpu <= dist && cpu + KVM_VGIC_V2_CPU_SIZE > dist))
+-		return -EBUSY;
+-	return 0;
+-}
+-
+-static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+-			      phys_addr_t addr, phys_addr_t size)
++static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
++			     phys_addr_t addr, phys_addr_t alignment)
+ {
+-	int ret;
+-
+ 	if (addr & ~KVM_PHYS_MASK)
+ 		return -E2BIG;
+ 
+-	if (addr & (SZ_4K - 1))
++	if (!IS_ALIGNED(addr, alignment))
+ 		return -EINVAL;
+ 
+ 	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
+ 		return -EEXIST;
+-	if (addr + size < addr)
+-		return -EINVAL;
+-
+-	*ioaddr = addr;
+-	ret = vgic_ioaddr_overlap(kvm);
+-	if (ret)
+-		*ioaddr = VGIC_ADDR_UNDEF;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ /**
+@@ -70,40 +46,38 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+  * interface in the VM physical address space.  These addresses are properties
+  * of the emulated core/SoC and therefore user space initially knows this
+  * information.
++ * Check them for sanity (alignment, double assignment). We can't check for
++ * overlapping regions in case of a virtual GICv3 here, since we don't know
++ * the number of VCPUs yet, so we defer this check to map_resources().
+  */
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ {
+ 	int r = 0;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	int type_needed;
+-	phys_addr_t *addr_ptr, block_size;
+-	phys_addr_t alignment;
++	phys_addr_t *addr_ptr, alignment;
+ 
+ 	mutex_lock(&kvm->lock);
+ 	switch (type) {
+ 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+ 		addr_ptr = &vgic->vgic_dist_base;
+-		block_size = KVM_VGIC_V2_DIST_SIZE;
+ 		alignment = SZ_4K;
+ 		break;
+ 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+ 		addr_ptr = &vgic->vgic_cpu_base;
+-		block_size = KVM_VGIC_V2_CPU_SIZE;
+ 		alignment = SZ_4K;
+ 		break;
+ #ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+ 		addr_ptr = &vgic->vgic_dist_base;
+-		block_size = KVM_VGIC_V3_DIST_SIZE;
+ 		alignment = SZ_64K;
+ 		break;
+ 	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+ 		addr_ptr = &vgic->vgic_redist_base;
+-		block_size = KVM_VGIC_V3_REDIST_SIZE;
+ 		alignment = SZ_64K;
+ 		break;
+ #endif
+@@ -118,11 +92,9 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 	}
+ 
+ 	if (write) {
+-		if (!IS_ALIGNED(*addr, alignment))
+-			r = -EINVAL;
+-		else
+-			r = vgic_ioaddr_assign(kvm, addr_ptr,
+-					       *addr, block_size);
++		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
++		if (!r)
++			*addr_ptr = *addr;
+ 	} else {
+ 		*addr = *addr_ptr;
+ 	}
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 4493593..fe6e3bd 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -225,6 +225,22 @@ void vgic_v2_enable(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
+ }
+ 
++/* check for overlapping regions and for regions crossing the end of memory */
++static bool vgic_check_addresses(gpa_t dist_base, gpa_t cpu_base)
++{
++	if (dist_base + KVM_VGIC_V2_DIST_SIZE < dist_base)
++		return false;
++	if (cpu_base + KVM_VGIC_V2_CPU_SIZE < cpu_base)
++		return false;
++
++	if (dist_base + KVM_VGIC_V2_DIST_SIZE <= cpu_base)
++		return true;
++	if (cpu_base + KVM_VGIC_V2_CPU_SIZE <= dist_base)
++		return true;
++
++	return false;
++}
++
+ int vgic_v2_map_resources(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -240,6 +256,12 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
++	if (!vgic_check_addresses(dist->vgic_dist_base, dist->vgic_cpu_base)) {
++		kvm_err("VGIC CPU and dist frames overlap\n");
++		ret = -EINVAL;
++		goto out;
++	}
++
+ 	/*
+ 	 * Initialize the vgic if this hasn't already been done on demand by
+ 	 * accessing the vgic state from userspace.
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 6d7422f..fa444a7 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -221,6 +221,27 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+ }
+ 
++/* check for overlapping regions and for regions crossing the end of memory */
++static bool vgic_check_addresses(struct kvm *kvm)
++{
++	struct vgic_dist *d = &kvm->arch.vgic;
++	gpa_t redist_size = KVM_VGIC_V3_REDIST_SIZE;
++
++	redist_size *= atomic_read(&kvm->online_vcpus);
++
++	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
++		return false;
++	if (d->vgic_redist_base + redist_size < d->vgic_redist_base)
++		return false;
++
++	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE <= d->vgic_redist_base)
++		return true;
++	if (d->vgic_redist_base + redist_size <= d->vgic_dist_base)
++		return true;
++
++	return false;
++}
++
+ int vgic_v3_map_resources(struct kvm *kvm)
+ {
+ 	int ret = 0;
+@@ -236,6 +257,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
++	if (!vgic_check_addresses(kvm)) {
++		kvm_err("VGIC redist and dist frames overlap\n");
++		ret = -EINVAL;
++		goto out;
++	}
++
+ 	/*
+ 	 * For a VGICv3 we require the userland to explicitly initialize
+ 	 * the VGIC before we need to use it.
 -- 
-Florian
+2.7.3
