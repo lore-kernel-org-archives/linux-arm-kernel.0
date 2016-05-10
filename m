@@ -1,30 +1,29 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 10 May 2016 20:56:10 +0200
-Subject: [PATCH] serial: Make SERIAL_MPS2_UART depend on ARCH_MPS2
-Message-ID: <1462906570-27684-1-git-send-email-geert+renesas@glider.be>
+Date: Tue, 10 May 2016 20:59:57 +0200
+Subject: [PATCH -trivial 2/3] ARM: Spelling s/paltform/platform/g
+In-Reply-To: <1462906798-27993-1-git-send-email-geert+renesas@glider.be>
+References: <1462906798-27993-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1462906798-27993-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling support for the UART on the ARM MPS2 platform only make sense
-when compiling for the ARM MPS2 platform, unless compile-testing.
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/tty/serial/Kconfig | 2 +-
+ arch/arm/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index b84810aa8621d8b1..3def7478ca44f573 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1457,7 +1457,7 @@ config SERIAL_MPS2_UART_CONSOLE
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2d756aa471f33316..c01039b81d6eeb13 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -897,7 +897,7 @@ config MACH_STM32F429
+ 	default y
  
- config SERIAL_MPS2_UART
- 	bool "MPS2 UART port"
--	depends on ARM || COMPILE_TEST
-+	depends on ARCH_MPS2 || COMPILE_TEST
- 	select SERIAL_CORE
- 	help
- 	  This driver support the UART ports on ARM MPS2.
+ config ARCH_MPS2
+-	bool "ARM MPS2 paltform"
++	bool "ARM MPS2 platform"
+ 	depends on ARM_SINGLE_ARMV7M
+ 	select ARM_AMBA
+ 	select CLKSRC_MPS2
 -- 
 1.9.1
