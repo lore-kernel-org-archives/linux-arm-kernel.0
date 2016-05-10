@@ -1,93 +1,37 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 10:33:40 +0200
-Subject: [PATCH v3 06/55] KVM: arm/arm64: arch_timer: Remove irq_phys_map
-In-Reply-To: <1462531568-9799-7-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-7-git-send-email-andre.przywara@arm.com>
-Message-ID: <57319CE4.30608@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 May 2016 10:36:40 +0200
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <573190CF.6030408@huawei.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160506123731.GA11959@yury-N73SV> <573190CF.6030408@huawei.com>
+Message-ID: <9651510.pg5Vmm8vKS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 05/06/2016 12:45 PM, Andre Przywara wrote:
-> Now that the interface between the arch timer and the VGIC does not
-> require passing the irq_phys_map entry pointer anymore, let's remove
-> it from the virtual arch timer and use the virtual IRQ number instead
-> directly.
-> The remaining pointer returned by kvm_vgic_map_phys_irq() will be
-> removed in the following patch.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v1 .. v2:
-> - remove extra virt_irq member from struct, instead use irq.irq directly
-> 
-> Changelog v2 .. v3:
-> - remove bogus validity check from kvm_vgic_unmap_phys_irq()
-> 
->  include/kvm/arm_arch_timer.h |  3 ---
->  virt/kvm/arm/arch_timer.c    | 10 ++++------
->  2 files changed, 4 insertions(+), 9 deletions(-)
-> 
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index b651aed..a47b7de 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -53,9 +53,6 @@ struct arch_timer_cpu {
->  	/* Timer IRQ */
->  	struct kvm_irq_level		irq;
->  
-> -	/* VGIC mapping */
-> -	struct irq_phys_map		*map;
-> -
->  	/* Active IRQ state caching */
->  	bool				active_cleared_last;
->  };
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 29d597d..f2cd188 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -176,10 +176,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
->  
->  	timer->active_cleared_last = false;
->  	timer->irq.level = new_level;
-> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
-> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
->  				   timer->irq.level);
->  	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-> -					 timer->map->virt_irq,
-> +					 timer->irq.irq,
->  					 timer->irq.level);
->  	WARN_ON(ret);
->  }
-> @@ -277,7 +277,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
->  	* exit.
->  	*/
->  	phys_active = timer->irq.level ||
-> -			kvm_vgic_map_is_active(vcpu, timer->map->virt_irq);
-> +			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
->  
->  	/*
->  	 * We want to avoid hitting the (re)distributor as much as
-> @@ -379,7 +379,6 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  	if (WARN_ON(IS_ERR(map)))
->  		return PTR_ERR(map);
->  
-> -	timer->map = map;
->  	return 0;
->  }
->  
-> @@ -522,8 +521,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  
->  	timer_disarm(timer);
-> -	if (timer->map)
-> -		kvm_vgic_unmap_phys_irq(vcpu, timer->map->virt_irq);
-> +	kvm_vgic_unmap_phys_irq(vcpu, timer->irq.irq);
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
+> On 2016/5/6 20:37, Yury Norov wrote:
+> > On Fri, May 06, 2016 at 08:16:48PM +0800, Zhangjian (Bamvor) wrote:
+> >
+> > AFAIR, here we don't shift offset, as it's 64-bit both in user-
+> > and kernel-space,
+> In your ilp32-2.22 branch, you wrapper mmap to mmap2 in which type of
+> offset is off_t. And off_t is 32bit in ilp32, correct?
+> "sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c"
+> /* mmap is provided by mmap as they are the same. */
+> void *__mmap (void *__addr, size_t __len, int __prot,
+>                       int __flags, int __fd, __off_t __offset)
+> {
+>     void *result;
+>     result = (void *)
+>       INLINE_SYSCALL (mmap2, 6, __addr,
+>                       __len, __prot, __flags, __fd, __offset);
+>     return result;
+> }
 
-Eric
->  }
->  
->  void kvm_timer_enable(struct kvm *kvm)
-> 
+__off_t should be 'long long' on new architectures, and map
+to __kernel_loff_t.
+
+Can you see how it is defined?
+
+	Arnd
