@@ -1,35 +1,40 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 07:33:06 +0200
-Subject: [PATCH v2 20/22] ARM: dts: exynos: Move common
- Exynos5410/542x/5800 nodes to new DTSI
-In-Reply-To: <9e642e0d-87e1-4661-0233-acecf0082f24@osg.samsung.com>
+Date: Tue, 10 May 2016 07:35:47 +0200
+Subject: [PATCH v2 22/22] ARM: dts: exynos: Add initial support for Odroid
+ XU board
+In-Reply-To: <cbcb5657-8825-83cf-688f-d565ac7ecbab@osg.samsung.com>
 References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
- <1462734367-5619-21-git-send-email-krzk@kernel.org>
- <9e642e0d-87e1-4661-0233-acecf0082f24@osg.samsung.com>
-Message-ID: <57317292.2080004@kernel.org>
+ <1462734367-5619-23-git-send-email-krzk@kernel.org>
+ <cbcb5657-8825-83cf-688f-d565ac7ecbab@osg.samsung.com>
+Message-ID: <57317333.5010309@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2016 11:53 PM, Javier Martinez Canillas wrote:
+On 05/10/2016 12:02 AM, Javier Martinez Canillas wrote:
 > Hello Krzysztof,
 > 
 > On 05/08/2016 03:06 PM, Krzysztof Kozlowski wrote:
->> The Exynos5410/542x/5800 are very similar designs. Create new new
-> 
-> s/new new/a new
-> 
->> DTSI with common nodes to remove DTS duplication. Although currently
->> only MCT and SysRAM are shared but in future more nodes will be added to
->> common file.
+>> The Hardkernel's Odroid XU board was first design with big.LITTLE SoC
+>> from Samsung: the Exynos5410. Comparing now to more popular Odroid XU3
+>> the differences are:
+>> 1. Exynos5410 instead of 5422,
+>> 2. DisplayPort,
+>> 3. Main PMIC: Maxim 77802 instead of S2MPS11,
+>> 4. USB3503+LAN9730 instead of integrated LAN9514,
+>> 5. eMMC 4.5 instead of eMMC 5.0,
 >>
->> The patch should not have functional impact.
+>> This patch adds initial support for the XU board with working basic
+>> functions, eMMC/SD and USB (including attached ethernet adapter).
 >>
+>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> ---
 > 
-> A nice way to check this is to diff the disassembled compiled DTBs with
-> and without the patch and making sure that the resulted DTS is the same.
+> This DTS has some TODO's, FIXME's and commented input supplies. Probably
+> this patch should had been an RFC? or you should mention about these in
+> the commit message to understand why are there.
 
-Yes, that is what I've done. Recently there is a tool making that even
-easier: dtx_diff.
+I have to clean it up or fix these notes. Actually I was quite surprised
+that board worked fine with this basic setup.
 
 Best regards,
 Krzysztof
