@@ -1,175 +1,83 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 10 May 2016 20:50:11 +0930
-Subject: [PATCH 2/4] drvers/clk: Support fourth generation Aspeed SoCs
-In-Reply-To: <20160509224953.GZ3492@codeaurora.org>
-References: <1462797111-14271-1-git-send-email-joel@jms.id.au>
- <1462797111-14271-3-git-send-email-joel@jms.id.au>
- <20160509224953.GZ3492@codeaurora.org>
-Message-ID: <CACPK8Xfq=Pfy=7GYuS7LJs-CFJOimBUoHA=Y6NHb4=DRcOnvfQ@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 14:17:22 +0300
+Subject: [PATCH 15/23] mmc: sdhci-esdhc-imx: support setting tuning start
+ point
+In-Reply-To: <1460741387-23815-16-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-16-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5731C342.5060309@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 8:19 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 05/09, Joel Stanley wrote:
->> diff --git a/drivers/clk/aspeed/clk-g4.c b/drivers/clk/aspeed/clk-g4.c
->> new file mode 100644
->> index 000000000000..91677e9177f5
->> --- /dev/null
->> +++ b/drivers/clk/aspeed/clk-g4.c
->> @@ -0,0 +1,109 @@
->> +/*
->> + * Copyright 2016 IBM Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License
->> + * as published by the Free Software Foundation; either version
->> + * 2 of the License, or (at your option) any later version.
->> + */
->> +
->> +#include <linux/clk.h>
->
-> Hopefully this include isn't needed.
+On 15/04/16 20:29, Dong Aisheng wrote:
+> The delay cells of some SoCs may have less delay per one cell,
+> for such SoCs, user could set the start delay cell point to bypass
+> the first a few meaningless tuning commands.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-It was required for clk_get_rate in aspeed_of_pclk_clk_init. As I
-mention below, I reworked it to avoid this.
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
->
->> +#include <linux/clk-provider.h>
->> +#include <linux/io.h>
->> +#include <linux/of_address.h>
->> +#include <linux/clkdev.h>
->> +
->> +static void __init aspeed_of_hpll_clk_init(struct device_node *node)
->> +{
->> +     struct clk *clk, *clkin_clk;
->> +     void __iomem *base;
->> +     int reg, rate, clkin;
->> +     const char *name = node->name;
->> +     const char *parent_name;
->> +     const int rates[][4] = {
->> +             {384, 360, 336, 408},
->> +             {400, 375, 350, 425},
->> +     };
->> +
->> +     of_property_read_string(node, "clock-output-names", &name);
->> +     parent_name = of_clk_get_parent_name(node, 0);
->> +
->> +     base = of_iomap(node, 0);
->> +     if (!base) {
->> +             pr_err("%s: of_iomap failed\n", node->full_name);
->> +             return;
->> +     }
->> +     reg = readl(base);
->> +     iounmap(base);
->> +
->> +     clkin_clk = of_clk_get(node, 0);
->> +     if (IS_ERR(clkin_clk)) {
->> +             pr_err("%s: of_clk_get failed\n", node->full_name);
->> +             return;
->> +     }
->> +
->> +     clkin = clk_get_rate(clkin_clk);
->> +
->> +     reg = (reg >> 8) & 0x2;
->> +
->> +     if (clkin == 48000000 || clkin == 24000000)
->> +             rate = rates[0][reg] * 1000000;
->> +     else if (clkin == 25000000)
->> +             rate = rates[1][reg] * 1000000;
->> +     else {
->> +             pr_err("%s: unknown clkin frequency %dHz\n",
->> +                             node->full_name, clkin);
->> +             WARN_ON(1);
->> +     }
->> +
->> +     clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
->
-> Please write a proper clk driver that sets clkin to be the parent
-> of this clk registered here and then calculates the frequency
-> based on the parent clk rate and the strapping registers via the
-> recalc rate callback.
-
-After a few goes I understood what you meant here.
-
-Is the pclk part okay? I modified the pclk part use a fixed factor
-clock instead of the fixed clock, so I could drop the pclk_get_rate
-call below.
-
-> Also please move this to a platform driver
-> instead of using CLK_OF_DECLARE assuming this isn't required for
-> any timers in the system.
-
-Can you clarify here? We do use the rate of pclk (the apb clock) in
-the clocksource driver to calculate our count_per_tick value.
-
->
->> +     if (IS_ERR(clk)) {
->> +             pr_err("%s: failed to register clock\n", node->full_name);
->> +             return;
->> +     }
->> +
->> +     clk_register_clkdev(clk, NULL, name);
->
-> Do you have clkdev users? If not then please drop this.
-
-I think the answer is no. I will drop.
-
->> +     of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +}
->> +CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,g4-hpll-clock",
->> +            aspeed_of_hpll_clk_init);
->> +
->> +static void __init aspeed_of_apb_clk_init(struct device_node *node)
->> +{
->> +     struct clk *clk, *hpll_clk;
->> +     void __iomem *base;
->> +     int reg, rate;
->> +     const char *name = node->name;
->> +     const char *parent_name;
->> +
->> +     of_property_read_string(node, "clock-output-names", &name);
->> +     parent_name = of_clk_get_parent_name(node, 0);
->> +
->> +     base = of_iomap(node, 0);
->> +     if (!base) {
->> +             pr_err("%s: of_iomap failed\n", node->full_name);
->> +             return;
->> +     }
->> +     reg = readl(base);
->> +     iounmap(base);
->> +
->> +     hpll_clk = of_clk_get(node, 0);
->> +     if (IS_ERR(hpll_clk)) {
->> +             pr_err("%s: of_clk_get failed\n", node->full_name);
->> +             return;
->> +     }
->> +
->> +     reg = (reg >> 23) & 0x3;
->> +     rate = clk_get_rate(hpll_clk) / (2 + 2 * reg);
->> +
->> +     clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
->> +     if (IS_ERR(clk)) {
->> +             pr_err("%s: failed to register clock\n", node->full_name);
->> +             return;
->> +     }
->> +
->> +     clk_register_clkdev(clk, NULL, name);
->> +     of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +}
->> +CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,g4-apb-clock",
->> +            aspeed_of_apb_clk_init);
->
-> Following on Rob's comment, please combine this into one driver
-> instead of having different DT nodes for different clks that are
-> all really part of one clock controller hw block.
-
-Ok, I have had a go at this. In our case the clock registers are part
-of the "SCU" IP; a collection of disparate functions that happen to
-include clock control. Is syscon the right thing to use here?
-
-regmap = syscon_regmap_lookup_by_compatible("aspeed,ast2400-syscon-scu");
-ret = regmap_read(hpll->regmap, 0x70, &reg);
-
-Cheers,
-
-Joel
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c          | 14 +++++++++++---
+>  include/linux/platform_data/mmc-esdhc-imx.h |  1 +
+>  2 files changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index d02db66..9f9be3f 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -75,7 +75,8 @@
+>  #define ESDHC_TUNING_CTRL		0xcc
+>  #define ESDHC_STD_TUNING_EN		(1 << 24)
+>  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
+> -#define ESDHC_TUNING_START_TAP		0x1
+> +#define ESDHC_TUNING_START_TAP_DEFAULT	0x1
+> +#define ESDHC_TUNING_START_TAP_MASK	0xff
+>  #define ESDHC_TUNING_STEP_MASK		0x00070000
+>  #define ESDHC_TUNING_STEP_SHIFT		16
+>  
+> @@ -489,7 +490,12 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
+>  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
+>  				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
+> -				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP;
+> +				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT;
+> +				if (imx_data->boarddata.tuning_start_tap) {
+> +					tuning_ctrl &= ~ESDHC_TUNING_START_TAP_MASK;
+> +					tuning_ctrl |= imx_data->boarddata.tuning_start_tap;
+> +				}
+> +
+>  				if (imx_data->boarddata.tuning_step) {
+>  					tuning_ctrl &= ~ESDHC_TUNING_STEP_MASK;
+>  					tuning_ctrl |= imx_data->boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
+> @@ -975,6 +981,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+>  		boarddata->wp_type = ESDHC_WP_GPIO;
+>  
+>  	of_property_read_u32(np, "fsl,tuning-step", &boarddata->tuning_step);
+> +	of_property_read_u32(np, "fsl,tuning-start-tap",
+> +			     &boarddata->tuning_start_tap);
+>  
+>  	if (of_find_property(np, "no-1-8-v", NULL))
+>  		boarddata->support_vsel = false;
+> @@ -1197,7 +1205,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  
+>  	if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
+>  		writel(readl(host->ioaddr + ESDHC_TUNING_CTRL) |
+> -			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP,
+> +			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT,
+>  			host->ioaddr + ESDHC_TUNING_CTRL);
+>  
+>  	if (imx_data->socdata->flags & ESDHC_FLAG_ERR004536)
+> diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
+> index 95ccab3..7daa78a 100644
+> --- a/include/linux/platform_data/mmc-esdhc-imx.h
+> +++ b/include/linux/platform_data/mmc-esdhc-imx.h
+> @@ -46,5 +46,6 @@ struct esdhc_platform_data {
+>  	bool support_vsel;
+>  	unsigned int delay_line;
+>  	unsigned int tuning_step;       /* The delay cell steps in tuning procedure */
+> +	unsigned int tuning_start_tap;	/* The start delay cell point in tuning procedure */
+>  };
+>  #endif /* __ASM_ARCH_IMX_ESDHC_H */
+> 
