@@ -1,128 +1,297 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 10 May 2016 17:18:57 +0200
-Subject: [BISECTED] Regression v4.6-rc1 : nanosleep doesn't return on
- AT91SAM9
-In-Reply-To: <CACQ1gAj4xD1httj=gMKFCfeOnVjSKk+J-y_yZpCkTSiLeTAA4A@mail.gmail.com>
-References: <CACQ1gAg6cKqjaqcV70m2VS5R4_kZEgWTiqzSqDxSjvfrYYxbzg@mail.gmail.com>
- <CACQ1gAipruXcO=xpooYDOdqZbtESD35wxDf7xNrg4zuuRv1wew@mail.gmail.com>
- <20160510164712.56261bb4@bbrezillon>
- <CACQ1gAj4xD1httj=gMKFCfeOnVjSKk+J-y_yZpCkTSiLeTAA4A@mail.gmail.com>
-Message-ID: <5731FBE1.2090202@atmel.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 10 May 2016 17:19:51 +0200
+Subject: [PATCH V7 01/11] PCI: Provide common functions for ECAM mapping
+In-Reply-To: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+Message-ID: <1462893601-8937-2-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/05/2016 16:59, Richard Genoud a ?crit :
-> 2016-05-10 16:47 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
->> Hi Richard,
->>
->> On Tue, 10 May 2016 16:25:25 +0200
->> Richard Genoud <richard.genoud@gmail.com> wrote:
->>
->>> 2016-05-10 15:58 GMT+02:00 Richard Genoud <richard.genoud@gmail.com>:
->>>> Hi,
->>>>
->>>> Starting with 4.6-rc1, a sleep 1 doesn't return :
->>>>
->>>> execve("/bin/sleep", ["sleep", "1"], ["USER=root", "SHLVL=1",
->>>> "OLDPWD=/var", "HOME=/", "TERM=vt102",
->>>> "PATH=/sbin:/usr/sbin:/bin:/usr/bin", "SHELL=/bin/sh", "PWD=/"]) = 0
->>>> uname({sysname="Linux", nodename="LNS",
->>>> release="4.5.0-09406-g46e595a17dcf", version="#72 Tue May 10 15:41:34
->>>> CEST 2016", machine="armv5tejl", domainname="(none)"}) = 0
->>>> brk(0)                                  = 0x153000
->>>> brk(0x153d20)                           = 0x153d20
->>>> set_tls(0x1534c0, 0x14d1e4, 0, 0x153d20, 0x14e368) = 0
->>>> readlink("/proc/self/exe", "/bin/busybox", 4096) = 12
->>>> brk(0x174d20)                           = 0x174d20
->>>> brk(0x175000)                           = 0x175000
->>>> getuid32()                              = 0
->>>> rt_sigprocmask(SIG_BLOCK, [CHLD], [], 8) = 0
->>>> rt_sigaction(SIGCHLD, NULL, {SIG_DFL, [], 0}, 8) = 0
->>>> rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
->>>> nanosleep({1, 0},
->>>>
->>>> And the heartbeat led doesn't blink anymore (full on), as if the
->>>> timers never fire.
->>>>
->>>> The platform is an AT91SAM9G35-CM.
->>>>
->>>> git bisect gives a merge as the 1st bad commit :(
->>>> first bad commit: [46e595a17dcf11404f713845ecb5b06b92a94e43] Merge tag
->>>> 'armsoc-drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>>
->>>
->>> I went a little further in tracking that down, starting from the merge
->>> (1st bad commit) and reverting some commits.
->>> It seems that the culprit is :
->>> commit 863a81c3be1d931bdae6426e231add9334311f13
->>> Author: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> Date:   Fri Sep 5 09:54:13 2014 +0200
->>>     clk: at91: make use of syscon to share PMC registers in several drivers
->>>
->>> Here are the commits I've reverted :
->>>
->>> git log --oneline --decorate -20
->>> 849cdaa0cf04 (HEAD, tag: good) Revert "clk: at91: make use of syscon
->>> to share PMC registers in several drivers"
->>> 4bd6dde95321 (tag: last_bad) Revert "clk: at91: make use of
->>> syscon/regmap internally"
->>> a56dacaa24c4 (tag: always_bad) Revert "clk: at91: remove IRQ handling
->>> and use polling"
->>> 33edfe7a2de6 Revert "clk: at91: pmc: merge at91_pmc_init in atmel_pmc_probe"
->>> 0b22bb649eae Revert "clk: at91: pmc: move pmc structures to C file"
->>> 14994fdff366 Revert "ARM: at91: pm: simply call at91_pm_init"
->>> 6f0821175327 (tag: still_bad) Revert "ARM: at91: pm: find and remap the pmc"
->>> b52bbf7fad1b Revert "ARM: at91: pm: move idle functions to pm.c"
->>> dffb1a5f68b9 Revert "ARM: at91: remove useless includes and function prototypes"
->>> db352691dcc1 Revert "usb: gadget: atmel: access the PMC using regmap"
->>> f7b5433dbbc8 Revert "clk: at91: pmc: drop at91_pmc_base"
->>> 6e6dfc0d91c0 Revert "clk: at91: pmc: remove useless capacities handling"
->>> ceddd3f88ada Revert "clk: at91: remove useless includes"
->>> 46e595a17dcf (tag: bad) Merge tag 'armsoc-drivers' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>> e3b1f64e04f5 Merge tag 'armsoc-defconfig' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>> 915c56bc01d6 Merge tag 'armsoc-dt64' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>> 5a6b7e53d035 Merge tag 'armsoc-dt' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>> 8c6d4082fc6a Merge tag 'armsoc-arm64' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>> 33b3d2e88c9e Merge tag 'armsoc-soc' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>> e88fa1b8b00a Merge tag 'armsoc-cleanup' of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
->>
->> Thanks for the detailed report.
->>
->> Can you try again after applying this patch [1]?
->>
->> Regards,
->>
->> Boris
->>
->> [1]http://code.bulix.org/dx1c0t-98377
-> 
-> Yes, it works.
-> Big thumbs up, that was fast !
-> 
-> Less than 1 hour between the report and the patch ! :)
+From: Jayachandran C <jchandra@broadcom.com>
 
-Yes, absolutely terrific! Thanks Boris.
+Add config option PCI_ECAM and file drivers/pci/ecam.c to provide
+generic functions for accessing memory mapped PCI config space.
 
-I'd like you to test with this instead as it's the real range of the IP:
-+ reg = <0xfffffc00 0x110>;
+The API is defined in drivers/pci/ecam.h and is written to replace the
+API in drivers/pci/host/pci-host-common.h. The file defines a new
+'struct pci_config_window' to hold the information related to a PCI
+config area and its mapping. This structure is expected to be used as
+sysdata for controllers that have ECAM based mapping.
 
-Even I'm pretty confident ;-) Can you please do this for us ?
+Helper functions are provided to setup the mapping, free the mapping
+and to implement the map_bus method in 'struct pci_ops'
 
-> This is clearly 4.6 material (as it's a regression from 4.5), but it's
-> maybe a little late.
-> Anrd, Nicolas, what do you think ?
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+---
+ drivers/pci/Kconfig  |   3 +
+ drivers/pci/Makefile |   2 +
+ drivers/pci/ecam.c   | 161 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/ecam.h   |  62 ++++++++++++++++++++
+ 4 files changed, 228 insertions(+)
+ create mode 100644 drivers/pci/ecam.c
+ create mode 100644 drivers/pci/ecam.h
 
-I sent a PR this morning to Arnd with a "fix"... I hope that he won't be
-annoyed if I send him another one this evening...  But clearly, it's a
-regression and a pretty bad one :-\
-
-Thanks a lot for this report Richard,
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index 209292e..56389be 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -83,6 +83,9 @@ config HT_IRQ
+ config PCI_ATS
+ 	bool
+ 
++config PCI_ECAM
++	bool
++
+ config PCI_IOV
+ 	bool "PCI IOV support"
+ 	depends on PCI
+diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+index 2154092..1fa6925 100644
+--- a/drivers/pci/Makefile
++++ b/drivers/pci/Makefile
+@@ -55,6 +55,8 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
+ 
+ obj-$(CONFIG_PCI_STUB) += pci-stub.o
+ 
++obj-$(CONFIG_PCI_ECAM) += ecam.o
++
+ obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
+ 
+ obj-$(CONFIG_OF) += of.o
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+new file mode 100644
+index 0000000..3d52005
+--- /dev/null
++++ b/drivers/pci/ecam.c
+@@ -0,0 +1,161 @@
++/*
++ * Copyright 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
++ */
++
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/slab.h>
++
++#include "ecam.h"
++
++/*
++ * On 64 bit systems, we do a single ioremap for the whole config space
++ * since we have enough virtual address range available. On 32 bit, do an
++ * ioremap per bus.
++ */
++static const bool per_bus_mapping = !config_enabled(CONFIG_64BIT);
++
++/*
++ * Create a PCI config space window
++ *  - reserve mem region
++ *  - alloc struct pci_config_window with space for all mappings
++ *  - ioremap the config space
++ */
++struct pci_config_window *pci_ecam_create(struct device *dev,
++		struct resource *cfgres, struct resource *busr,
++		struct pci_ecam_ops *ops)
++{
++	struct pci_config_window *cfg;
++	unsigned int bus_range, bus_range_max, bsz;
++	int i, err;
++
++	if (busr->start > busr->end)
++		return ERR_PTR(-EINVAL);
++
++	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
++	if (!cfg)
++		return ERR_PTR(-ENOMEM);
++
++	cfg->ops = ops;
++	cfg->busr.start = busr->start;
++	cfg->busr.end = busr->end;
++	cfg->busr.flags = IORESOURCE_BUS;
++	bus_range = resource_size(&cfg->busr);
++	bus_range_max = resource_size(cfgres) >> ops->bus_shift;
++	if (bus_range > bus_range_max) {
++		dev_warn(dev, "bus max %#x reduced to %#x",
++					bus_range, bus_range_max);
++		bus_range = bus_range_max;
++		cfg->busr.end = busr->start + bus_range - 1;
++	}
++	bsz = 1 << ops->bus_shift;
++
++	cfg->res.start = cfgres->start;
++	cfg->res.end = cfgres->end;
++	cfg->res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++	cfg->res.name = "PCI ECAM";
++
++	err = request_resource(&iomem_resource, &cfg->res);
++	if (err) {
++		dev_err(dev, "request ECAM res %pR failed\n", &cfg->res);
++		goto err_exit;
++	}
++
++	if (per_bus_mapping) {
++		cfg->winp = kcalloc(bus_range, sizeof(*cfg->winp), GFP_KERNEL);
++		if (!cfg->winp)
++			goto err_exit_malloc;
++		for (i = 0; i < bus_range; i++) {
++			cfg->winp[i] = ioremap(cfgres->start + i * bsz, bsz);
++			if (!cfg->winp[i])
++				goto err_exit_iomap;
++		}
++	} else {
++		cfg->win = ioremap(cfgres->start, bus_range * bsz);
++		if (!cfg->win)
++			goto err_exit_iomap;
++	}
++
++	if (ops->init) {
++		err = ops->init(dev, cfg);
++		if (err)
++			goto err_exit;
++	}
++	dev_info(dev, "ECAM at %pR for %pR\n", &cfg->res, &cfg->busr);
++	return cfg;
++
++err_exit_iomap:
++	dev_err(dev, "ECAM ioremap failed\n");
++err_exit_malloc:
++	err = -ENOMEM;
++err_exit:
++	pci_ecam_free(cfg);
++	return ERR_PTR(err);
++}
++
++void pci_ecam_free(struct pci_config_window *cfg)
++{
++	int i;
++
++	if (per_bus_mapping) {
++		if (cfg->winp) {
++			for (i = 0; i < resource_size(&cfg->busr); i++)
++				if (cfg->winp[i])
++					iounmap(cfg->winp[i]);
++			kfree(cfg->winp);
++		}
++	} else {
++		if (cfg->win)
++			iounmap(cfg->win);
++	}
++	if (cfg->res.parent)
++		release_resource(&cfg->res);
++	kfree(cfg);
++}
++
++/*
++ * Function to implement the pci_ops ->map_bus method
++ */
++void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
++			       int where)
++{
++	struct pci_config_window *cfg = bus->sysdata;
++	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
++	unsigned int busn = bus->number;
++	void __iomem *base;
++
++	if (busn < cfg->busr.start || busn > cfg->busr.end)
++		return NULL;
++
++	busn -= cfg->busr.start;
++	if (per_bus_mapping)
++		base = cfg->winp[busn];
++	else
++		base = cfg->win + (busn << cfg->ops->bus_shift);
++	return base + (devfn << devfn_shift) + where;
++}
++
++/* ECAM ops */
++struct pci_ecam_ops pci_generic_ecam_ops = {
++	.bus_shift	= 20,
++	.pci_ops	= {
++		.map_bus	= pci_ecam_map_bus,
++		.read		= pci_generic_config_read,
++		.write		= pci_generic_config_write,
++	}
++};
+diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+new file mode 100644
+index 0000000..57de00d
+--- /dev/null
++++ b/drivers/pci/ecam.h
+@@ -0,0 +1,62 @@
++/*
++ * Copyright 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
++ */
++#ifndef DRIVERS_PCI_ECAM_H
++#define DRIVERS_PCI_ECAM_H
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++/*
++ * struct to hold pci ops and bus shift of the config window
++ * for a PCI controller.
++ */
++struct pci_config_window;
++struct pci_ecam_ops {
++	unsigned int			bus_shift;
++	struct pci_ops			pci_ops;
++	int				(*init)(struct device *,
++						struct pci_config_window *);
++};
++
++/*
++ * struct to hold the mappings of a config space window. This
++ * is expected to be used as sysdata for PCI controlllers which
++ * use ECAM.
++ */
++struct pci_config_window {
++	struct resource			res;
++	struct resource			busr;
++	void				*priv;
++	struct pci_ecam_ops		*ops;
++	union {
++		void __iomem		*win;	/* 64-bit single mapping */
++		void __iomem		**winp; /* 32-bit per bus mapping */
++	};
++};
++
++/* create and free for pci_config_window */
++struct pci_config_window *pci_ecam_create(struct device *dev,
++		struct resource *cfgres, struct resource *busr,
++		struct pci_ecam_ops *ops);
++void pci_ecam_free(struct pci_config_window *cfg);
++
++/* map_bus when ->sysdata is an instance of pci_config_window */
++void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
++			       int where);
++/* default ECAM ops, bus shift 20, generic read and write */
++extern struct pci_ecam_ops pci_generic_ecam_ops;
++
++#endif
 -- 
-Nicolas Ferre
+1.9.1
