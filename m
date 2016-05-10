@@ -1,49 +1,30 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 May 2016 11:48:06 -0700
-Subject: [PATCH 2/5] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <20160510141658.GP19473@dell>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-3-git-send-email-lee.jones@linaro.org>
- <20160506184842.GE1256@tuxbot> <20160510141658.GP19473@dell>
-Message-ID: <20160510184806.GK1256@tuxbot>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 10 May 2016 20:56:10 +0200
+Subject: [PATCH] serial: Make SERIAL_MPS2_UART depend on ARCH_MPS2
+Message-ID: <1462906570-27684-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 10 May 07:16 PDT 2016, Lee Jones wrote:
+Enabling support for the UART on the ARM MPS2 platform only make sense
+when compiling for the ARM MPS2 platform, unless compile-testing.
 
-> On Fri, 06 May 2016, Bjorn Andersson wrote:
-> 
-> > On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
-> > 
-> > > - of_rproc_byindex(): look-up and obtain a reference to a rproc
-> > >   		      using the DT phandle "rprocs" and a index.
-> > > 
-> > > - of_rproc_byname():  lookup and obtain a reference to a rproc
-> > >   		      using the DT phandle "rprocs" and "rproc-names".
-> > > 
-> > > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > 
-> > I like the idea of having these helpers, but we already have
-> > rproc_get_by_phandle() so these helpers should be built upon that rather
-> > than adding the additional list.
-> 
-> Since this is a framework consideration, don't you think it would be
-> better to standardise the phandle name?  This is common practice when
-> coding at a subsystem level.  Some in use examples include; "clocks",
-> "power-domains", "mboxes", "dmas", "phys", "resets", "gpios", etc.
-> 
-> Considering the aforementioned examples, I figured "rprocs" would be
-> suitable.
-> 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/tty/serial/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-To summarize our chat for the record and others.
-
-
-I'm definitely in favour of this and think "rprocs" and "rproc-names"
-sounds good.  My comment was only regarding the duplicated
-implementation.
-
-Regards,
-Bjorn
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index b84810aa8621d8b1..3def7478ca44f573 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1457,7 +1457,7 @@ config SERIAL_MPS2_UART_CONSOLE
+ 
+ config SERIAL_MPS2_UART
+ 	bool "MPS2 UART port"
+-	depends on ARM || COMPILE_TEST
++	depends on ARCH_MPS2 || COMPILE_TEST
+ 	select SERIAL_CORE
+ 	help
+ 	  This driver support the UART ports on ARM MPS2.
+-- 
+1.9.1
