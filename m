@@ -1,136 +1,77 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Tue, 10 May 2016 12:43:21 +0530
-Subject: [PATCH 2/2] i2c: qup: support SMBus block read
-In-Reply-To: <1462317959-11632-2-git-send-email-nkaje@codeaurora.org>
-References: <1462317959-11632-1-git-send-email-nkaje@codeaurora.org>
- <1462317959-11632-2-git-send-email-nkaje@codeaurora.org>
-Message-ID: <000b01d1aa8b$7317a300$5946e900$@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 10 May 2016 09:18:49 +0200
+Subject: [PATCH] firmware/drivers/psci: Fix unused functions when
+ CONFIG_CPU_IDLE=n
+Message-ID: <1462864729-11793-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+additional lists
+On the ARM64 architecture, when CPUIDLE is not set in the configuration,
+the compilation raises a couple of warnings:
 
-> I2C QUP driver relies on SMBus emulation support from the framework.
-> To handle SMBus block reads, the driver should check I2C_M_RECV_LEN flag
-> and should read the first byte received as the message length.
-> 
-> The driver configures the QUP hardware to read one byte. Once the message
-> length is known from this byte, the QUP hardware is configured to read the
-> rest.
-> 
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->  drivers/i2c/busses/i2c-qup.c | 95 ++++++++++++++++++++++++++++++-------
-> -------
->  1 file changed, 66 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index
-> ef31b26..2658b67 100644
-> --- a/drivers/i2c/busses/i2c-qup.c
-> +++ b/drivers/i2c/busses/i2c-qup.c
-> @@ -526,38 +526,49 @@ static int qup_i2c_set_tags(u8 *tags, struct
-> qup_i2c_dev *qup,
-> 
->  	int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
-> 
-> -	if (qup->blk.pos == 0) {
-> -		tags[len++] = QUP_TAG_V2_START;
-> -		tags[len++] = addr & 0xff;
-> +	/* Handle SMBus block data read */
-> +	if ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN)
-> &&
-> +	    (msg->len > 1)) {
-> +		tags[len++] = QUP_TAG_V2_DATARD_STOP;
-> +		data_len = qup_i2c_get_data_len(qup);
-> +		tags[len++] = data_len - 1;
-> +	} else {
-> +		if (qup->blk.pos == 0) {
-> +			tags[len++] = QUP_TAG_V2_START;
-> +			tags[len++] = addr & 0xff;
-> 
-> -		if (msg->flags & I2C_M_TEN)
-> -			tags[len++] = addr >> 8;
-> -	}
-> +			if (msg->flags & I2C_M_TEN)
-> +				tags[len++] = addr >> 8;
-> +		}
-> 
-> -	/* Send _STOP commands for the last block */
-> -	if (last) {
-> -		if (msg->flags & I2C_M_RD)
-> -			tags[len++] = QUP_TAG_V2_DATARD_STOP;
-> -		else
-> -			tags[len++] = QUP_TAG_V2_DATAWR_STOP;
-> -	} else {
-> -		if (msg->flags & I2C_M_RD)
-> +		/* Send _STOP commands for the last block */
-> +		if ((msg->flags & I2C_M_RD)
-> +			&& (msg->flags & I2C_M_RECV_LEN)) {
->  			tags[len++] = QUP_TAG_V2_DATARD;
-> -		else
-> -			tags[len++] = QUP_TAG_V2_DATAWR;
-> -	}
-> +		} else if (last) {
-> +			if (msg->flags & I2C_M_RD)
-> +				tags[len++] = QUP_TAG_V2_DATARD_STOP;
-> +			else
-> +				tags[len++] = QUP_TAG_V2_DATAWR_STOP;
-> +		} else {
-> +			if (msg->flags & I2C_M_RD)
-> +				tags[len++] = QUP_TAG_V2_DATARD;
-> +			else
-> +				tags[len++] = QUP_TAG_V2_DATAWR;
-> +		}
-> 
-> -	data_len = qup_i2c_get_data_len(qup);
-> +		data_len = qup_i2c_get_data_len(qup);
-> 
-> -	/* 0 implies 256 bytes */
-> -	if (data_len == QUP_READ_LIMIT)
-> -		tags[len++] = 0;
-> -	else
-> -		tags[len++] = data_len;
-> +		/* 0 implies 256 bytes */
-> +		if (data_len == QUP_READ_LIMIT)
-> +			tags[len++] = 0;
-> +		else
-> +			tags[len++] = data_len;
-> 
-> -	if ((msg->flags & I2C_M_RD) && last && is_dma) {
-> -		tags[len++] = QUP_BAM_INPUT_EOT;
-> -		tags[len++] = QUP_BAM_FLUSH_STOP;
-> +		if ((msg->flags & I2C_M_RD) && last && is_dma) {
-> +			tags[len++] = QUP_BAM_INPUT_EOT;
-> +			tags[len++] = QUP_BAM_FLUSH_STOP;
-> +		}
->  	}
-> 
-   Will it look simpler if we add a qup_i2c_set_tags_smb instead and add an
-   Comment ? Here it is not clear how this is different from a normal read.
+drivers/firmware/psci.c:70:12: warning: 'psci_pd_power_off' defined but not used [-Wunused-function]
+drivers/firmware/psci.c:273:12: warning: 'psci_set_suspend_mode_osi' defined but not used [-Wunused-function]
 
-<snip..>
+Fix those warnings by moving the functions inside the #ifdef CONFIG_CPU_IDLE
+section.
 
-> +
-> +		/* Handle SMBus block read length */
-> +		if ((msg->flags & I2C_M_RECV_LEN) && (msg->len == 1)) {
-> +			if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
-> +				ret = -EPROTO;
-> +				goto err;
-> +			}
-> +			msg->len += msg->buf[0];
-> +			qup->pos = 0;
-> +			qup_i2c_set_read_mode_v2(qup, msg->len);
-> +			qup_i2c_issue_xfer_v2(qup, msg);
-> +			ret = qup_i2c_wait_for_complete(qup, msg);
-> +			if (ret)
-> +				goto err;
-> +			qup_i2c_set_blk_data(qup, msg);
-> +		}
->  	} while (qup->blk.pos < qup->blk.count);
-       
-         When v2 mode is not supported this should return an error,
-         in qup_i2c_xfer for msg->flags & I2C_M_RECV_LEN
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/firmware/psci.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-Regards,
- Sricharan
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 9c6a1f9..d7e0632 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -54,7 +54,6 @@
+  */
+ static int resident_cpu = -1;
+ static bool psci_has_osi_pd;
+-static bool psci_suspend_mode_is_osi;
+ static DEFINE_PER_CPU(u32, cluster_state_id);
+ 
+ static inline u32 psci_get_composite_state_id(u32 cpu_state)
+@@ -67,13 +66,6 @@ static inline void psci_reset_composite_state_id(void)
+ 	this_cpu_write(cluster_state_id, 0);
+ }
+ 
+-static int psci_pd_power_off(u32 state_idx, u32 param,
+-		const struct cpumask *mask)
+-{
+-	__this_cpu_add(cluster_state_id, param);
+-	return 0;
+-}
+-
+ bool psci_tos_resident_on(int cpu)
+ {
+ 	return cpu == resident_cpu;
+@@ -270,6 +262,11 @@ static int __init psci_features(u32 psci_func_id)
+ 			      psci_func_id, 0, 0);
+ }
+ 
++#ifdef CONFIG_CPU_IDLE
++static bool psci_suspend_mode_is_osi;
++
++static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
++
+ static int psci_set_suspend_mode_osi(bool enable)
+ {
+ 	int ret;
+@@ -290,8 +287,12 @@ static int psci_set_suspend_mode_osi(bool enable)
+ 	return psci_to_linux_errno(ret);
+ }
+ 
+-#ifdef CONFIG_CPU_IDLE
+-static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
++static int psci_pd_power_off(u32 state_idx, u32 param,
++		const struct cpumask *mask)
++{
++	__this_cpu_add(cluster_state_id, param);
++	return 0;
++}
+ 
+ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+-- 
+1.9.1
