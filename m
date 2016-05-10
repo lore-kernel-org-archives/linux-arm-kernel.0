@@ -1,36 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 10:39:28 +0100
-Subject: [PATCH v3 15/55] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
-In-Reply-To: <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <5731AC50.5020809@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 12:35:44 +0300
+Subject: [PATCH 12/23] mmc: sdhci-esdhc-imx: add esdhc specific suspend
+ resume callback
+In-Reply-To: <1460741387-23815-13-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-13-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5731AB70.30009@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/16 11:45, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On 15/04/16 20:29, Dong Aisheng wrote:
+> It will be used for platform specific suspend/resume state save/restore
+> work for some low power mode like Mega/Fast or LPSR mode.
 > 
-> Provide a vgic_queue_irq() function which decides whether a given
-> IRQ needs to be queued to a VCPU's ap_list.
-> This should be called whenever an IRQ becomes pending or enabled,
-> either as a result of userspace injection, from in-kernel emulated
-> devices like the architected timer or from MMIO accesses to the
-> distributor emulation.
-> Also provides the necessary functions to allow userland to inject an
-> IRQ to a guest.
-> Since this is the first code that starts using our locking mechanism, we
-> add some (hopefully) clear documentation of our locking strategy and
-> requirements along with this patch.
-> 
-> [Andre: refactor out vgic_queue_irq_unlock()]
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 03980db..6fef6bc 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -1254,6 +1254,16 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>  }
+>  
+>  #ifdef CONFIG_PM
+> +static int sdhci_esdhc_suspend(struct device *dev)
+> +{
+> +	return sdhci_pltfm_suspend(dev);
+> +}
+> +
+> +static int sdhci_esdhc_resume(struct device *dev)
+> +{
+> +	return sdhci_pltfm_resume(dev);
+> +}
+> +
+>  static int sdhci_esdhc_runtime_suspend(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> @@ -1289,7 +1299,7 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
+>  #endif
+>  
+>  static const struct dev_pm_ops sdhci_esdhc_pmops = {
+> -	SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_suspend, sdhci_pltfm_resume)
+> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_esdhc_suspend, sdhci_esdhc_resume)
+>  	SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
+>  				sdhci_esdhc_runtime_resume, NULL)
+>  };
+> 
