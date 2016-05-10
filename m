@@ -1,309 +1,358 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 10 May 2016 11:25:56 +0200
-Subject: [PATCH v3 15/55] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
-In-Reply-To: <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <5731A924.8040805@linaro.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 10 May 2016 14:59:27 +0530
+Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI
+ with CPU thermal nodes
+In-Reply-To: <573198BE.6020900@samsung.com>
+References: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
+ <CANAwSgT9SY3kj8+beMpc1xGoC=rMBSya+2v2dyZQp6ykH+V0=g@mail.gmail.com>
+ <573198BE.6020900@samsung.com>
+Message-ID: <CANAwSgTy6p9AVmmOWATpSO1JqVbwE0v+y_y-RLd+32RnNJTA+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 05/06/2016 12:45 PM, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Provide a vgic_queue_irq() function which decides whether a given
-nit: now called vgic_queue_irq_unlock
-> IRQ needs to be queued to a VCPU's ap_list.
-> This should be called whenever an IRQ becomes pending or enabled,
-> either as a result of userspace injection, from in-kernel emulated
-> devices like the architected timer or from MMIO accesses to the
-> distributor emulation.
-> Also provides the necessary functions to allow userland to inject an
-> IRQ to a guest.
-> Since this is the first code that starts using our locking mechanism, we
-> add some (hopefully) clear documentation of our locking strategy and
-> requirements along with this patch.
-> 
-> [Andre: refactor out vgic_queue_irq_unlock()]
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - add spinlock checks protected by CONFIG_DEBUG_SPINLOCK
-> - add more comments to vgic_target_oracle
-> - remove BUG_ON() if IRQ is neither edge or level
-> - rename vgic_queue_irq() to vgic_queue_irq_unlock()
-> - simplify initial check in vgic_queue_irq_unlock()
-> - extend retry loop to ask the oracle again
-> - minor comment fixes
-> 
-> Changelog v1 .. v2:
-> - move most IRQ injection code into vgic_update_irq_pending()
-> 
->  include/kvm/vgic/vgic.h  |   3 +
->  virt/kvm/arm/vgic/vgic.c | 209 +++++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h |   1 +
->  3 files changed, 213 insertions(+)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 39933ee..2bfb42c 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -181,6 +181,9 @@ struct vgic_cpu {
->  	u64 live_lrs;
->  };
->  
-> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> +			bool level);
-> +
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(false)
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index fb45537..92b78a0 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -19,8 +19,31 @@
->  
->  #include "vgic.h"
->  
-> +#define CREATE_TRACE_POINTS
-> +#include "../trace.h"
-> +
-> +#ifdef CONFIG_DEBUG_SPINLOCK
-> +#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
-> +#else
-> +#define DEBUG_SPINLOCK_BUG_ON(p)
-> +#endif
-> +
->  struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
->  
-> +/*
-> + * Locking order is always:
-> + *   vgic_cpu->ap_list_lock
-> + *     vgic_irq->irq_lock
-> + *
-> + * (that is, always take the ap_list_lock before the struct vgic_irq lock).
-> + *
-> + * When taking more than one ap_list_lock at the same time, always take the
-> + * lowest numbered VCPU's ap_list_lock first, so:
-> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
-> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
-> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
-> + */
-> +
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid)
->  {
-> @@ -39,3 +62,189 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  	WARN(1, "Looking up struct vgic_irq for reserved INTID");
->  	return NULL;
->  }
-> +
-> +/**
-> + * kvm_vgic_target_oracle - compute the target vcpu for an irq
-> + *
-> + * @irq:	The irq to route. Must be already locked.
-> + *
-> + * Based on the current state of the interrupt (enabled, pending,
-> + * active, vcpu and target_vcpu), compute the next vcpu this should be
-> + * given to. Return NULL if this shouldn't be injected at all.
-> + *
-> + * Requires the IRQ lock to be held.
-> + */
-> +static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
-> +{
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-> +
-> +	/* If the interrupt is active, it must stay on the current vcpu */
-> +	if (irq->active)
-> +		return irq->vcpu;
-> +
-> +	/*
-> +	 * If the IRQ is not active but enabled and pending, we should direct
-> +	 * it to its configured target VCPU.
-> +	 */
-> +	if (irq->enabled && irq->pending)
-> +		return irq->target_vcpu;
-> +
-> +	/* If neither active nor pending and enabled, then this IRQ should not
-> +	 * be queued to any VCPU.
-> +	 */
-> +	return NULL;
-> +}
-> +
-> +/*
-> + * Only valid injection if changing level for level-triggered IRQs or for a
-> + * rising edge.
-> + */
-> +static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-> +{
-> +	switch (irq->config) {
-> +	case VGIC_CONFIG_LEVEL:
-> +		return irq->line_level != level;
-> +	case VGIC_CONFIG_EDGE:
-> +		return level;
-> +	}
-> +
-> +	return false;
-> +}
-> +
-> +/*
-> + * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
-> + * Do the queuing if necessary, taking the right locks in the right order.
-> + * Returns true when the IRQ was queued, false otherwise.
-> + *
-> + * Needs to be entered with the IRQ lock already held, but will return
-> + * with all locks dropped.
-> + */
-> +bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-> +
-> +retry:
-> +	vcpu = vgic_target_oracle(irq);
-> +	if (irq->vcpu || !vcpu) {
-> +		/*
-> +		 * If this IRQ is already on a VCPU's ap_list, then it
-> +		 * cannot be moved or modified and there is no more work for
-> +		 * us to do.
-> +		 *
-> +		 * Otherwise, if the irq is not pending and enabled, it does
-> +		 * not need to be inserted into an ap_list and there is also
-> +		 * no more work for us to do.
-> +		 */
-> +		spin_unlock(&irq->irq_lock);
-> +		return false;
-> +	}
-> +
-> +	/*
-> +	 * We must unlock the irq lock to take the ap_list_lock where
-> +	 * we are going to insert this new pending interrupt.
-> +	 */
-> +	spin_unlock(&irq->irq_lock);
-> +
-> +	/* someone can do stuff here, which we re-check below */
-> +
-> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +	spin_lock(&irq->irq_lock);
-> +
-> +	/*
-> +	 * Did something change behind our backs?
-> +	 *
-> +	 * There are two cases:
-> +	 * 1) The irq became pending or active behind our backs and/or
-> +	 *    the irq->vcpu field was set correspondingly when putting
-> +	 *    the irq on an ap_list. Then drop the locks and return.
-Don't we actually implement 3 cases here:
-1) the IRQ was queued in our back
-2) the IRQ was disabled/turned not pending in our back
-3) someone changed the affinity?
-> +	 * 2) Someone changed the affinity on this irq behind our
-> +	 *    backs and we are now holding the wrong ap_list_lock.
-> +	 *    Then drop the locks and try the new VCPU.
-> +	 */
-> +	if (irq->vcpu || !(irq->pending && irq->enabled)) {
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +		return false;
-> +	}
-> +
-> +	if (irq->target_vcpu != vcpu) {
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		goto retry;
-> +	}
-> +
-> +	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
-> +	irq->vcpu = vcpu;
-> +
-> +	spin_unlock(&irq->irq_lock);
-> +	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +
-> +	kvm_vcpu_kick(vcpu);
-> +
-> +	return true;
-> +}
-> +
-> +static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> +				   unsigned int intid, bool level,
-> +				   bool mapped_irq)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +	struct vgic_irq *irq;
-> +	int ret;
-> +
-> +	trace_vgic_update_irq_pending(cpuid, intid, level);
-> +
-> +	vcpu = kvm_get_vcpu(kvm, cpuid);
-> +	if (!vcpu && intid < VGIC_NR_PRIVATE_IRQS)
-> +		return -EINVAL;
-> +
-> +	irq = vgic_get_irq(kvm, vcpu, intid);
-> +	if (!irq)
-> +		return -EINVAL;
-> +
-> +	if (irq->hw != mapped_irq)
-> +		return -EINVAL;
-> +
-> +	spin_lock(&irq->irq_lock);
-> +
-> +	if (!vgic_validate_injection(irq, level)) {
-> +		/* Nothing to see here, move along... */
-> +		spin_unlock(&irq->irq_lock);
-> +		return 0;
-> +	}
-> +
-> +	if (irq->config == VGIC_CONFIG_LEVEL) {
-> +		irq->line_level = level;
-> +		irq->pending = level || irq->soft_pending;
-> +	} else {
-> +		irq->pending = true;
-> +	}
-> +
-> +	vgic_queue_irq_unlock(kvm, irq);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-> + * @kvm:     The VM structure pointer
-> + * @cpuid:   The CPU for PPIs
-> + * @intid:   The INTID to inject a new state to.
-> + * @level:   Edge-triggered:  true:  to trigger the interrupt
-> + *			      false: to ignore the call
-> + *	     Level-sensitive  true:  raise the input signal
-> + *			      false: lower the input signal
-> + *
-> + * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-> + * level-sensitive interrupts.  You can think of the level parameter as 1
-> + * being HIGH and 0 being LOW and all devices being active-HIGH.
-> + */
-> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> +			bool level)
-> +{
-> +	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 61b8d22..c625767 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -18,5 +18,6 @@
->  
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
-> +bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
->  
->  #endif
-> 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Hi Krzysztof,
 
-Eric
+On 10 May 2016 at 13:45, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> On 05/10/2016 08:43 AM, Anand Moon wrote:
+>> Hi Krzysztof ,
+>>
+>> On 9 May 2016 at 11:49, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>>> Include the CPU thermal nodes directly in Odroid XU3-family common DTS
+>>> because it is the only user of it. Keeping it in separate DTSI node does
+>>> not bring benefits because:
+>>> 1. It is not re-usable on other non-fan boards (fan is referenced),
+>>> 2. It won't be re-used on future Odroid XU board because different
+>>>    CPU cluster behavior.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi      | 103 ---------------------
+>>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  94 ++++++++++++++++++-
+>>>  2 files changed, 92 insertions(+), 105 deletions(-)
+>>>  delete mode 100644 arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>>> deleted file mode 100644
+>>> index 3e4c4ad96d63..000000000000
+>>> --- a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+>>> +++ /dev/null
+>>> @@ -1,103 +0,0 @@
+>>> -/*
+>>> - * Device tree sources for Exynos5422 thermal zone
+>>> - *
+>>> - * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
+>>> - *                     Anand Moon <linux.amoon@gmail.com>
+>>> - *
+>>> - * This program is free software; you can redistribute it and/or modify
+>>> - * it under the terms of the GNU General Public License version 2 as
+>>> - * published by the Free Software Foundation.
+>>> - *
+>>> - */
+>>> -
+>>> -#include <dt-bindings/thermal/thermal.h>
+>>> -
+>>> -/ {
+>>> -       thermal-zones {
+>>> -               cpu0_thermal: cpu0-thermal {
+>>> -                       thermal-sensors = <&tmu_cpu0 0>;
+>>> -                       polling-delay-passive = <250>;
+>>> -                       polling-delay = <0>;
+>>> -                       trips {
+>>> -                               cpu_alert0: cpu-alert-0 {
+>>> -                                       temperature = <50000>; /* millicelsius */
+>>> -                                       hysteresis = <5000>; /* millicelsius */
+>>> -                                       type = "active";
+>>> -                               };
+>>> -                               cpu_alert1: cpu-alert-1 {
+>>> -                                       temperature = <60000>; /* millicelsius */
+>>> -                                       hysteresis = <5000>; /* millicelsius */
+>>> -                                       type = "active";
+>>> -                               };
+>>> -                               cpu_alert2: cpu-alert-2 {
+>>> -                                       temperature = <70000>; /* millicelsius */
+>>> -                                       hysteresis = <5000>; /* millicelsius */
+>>> -                                       type = "active";
+>>> -                               };
+>>> -                               cpu_crit0: cpu-crit-0 {
+>>> -                                       temperature = <120000>; /* millicelsius */
+>>> -                                       hysteresis = <0>; /* millicelsius */
+>>> -                                       type = "critical";
+>>> -                               };
+>>> -                               /*
+>>> -                                * Exyunos542x support only 4 trip-points
+>>> -                                * so for these polling mode is required.
+>>> -                                * Start polling at temperature level of last
+>>> -                                * interrupt-driven trip: cpu_alert2
+>>> -                                */
+>>> -                               cpu_alert3: cpu-alert-3 {
+>>> -                                       temperature = <70000>; /* millicelsius */
+>>> -                                       hysteresis = <10000>; /* millicelsius */
+>>> -                                       type = "passive";
+>>> -                               };
+>>> -                               cpu_alert4: cpu-alert-4 {
+>>> -                                       temperature = <85000>; /* millicelsius */
+>>> -                                       hysteresis = <10000>; /* millicelsius */
+>>> -                                       type = "passive";
+>>> -                               };
+>>> -
+>>> -                       };
+>>> -                       cooling-maps {
+>>> -                               map0 {
+>>> -                                    trip = <&cpu_alert0>;
+>>> -                                    cooling-device = <&fan0 0 1>;
+>>> -                               };
+>>> -                               map1 {
+>>> -                                    trip = <&cpu_alert1>;
+>>> -                                    cooling-device = <&fan0 1 2>;
+>>> -                               };
+>>> -                               map2 {
+>>> -                                    trip = <&cpu_alert2>;
+>>> -                                    cooling-device = <&fan0 2 3>;
+>>> -                               };
+>>> -                               /*
+>>> -                                * When reaching cpu_alert3, reduce CPU
+>>> -                                * by 2 steps. On Exynos5422/5800 that would
+>>> -                                * be: 1500 MHz and 1100 MHz.
+>>> -                                */
+>>> -                               map3 {
+>>> -                                    trip = <&cpu_alert3>;
+>>> -                                    cooling-device = <&cpu0 0 2>;
+>>> -                               };
+>>> -                               map4 {
+>>> -                                    trip = <&cpu_alert3>;
+>>> -                                    cooling-device = <&cpu4 0 2>;
+>>> -                               };
+>>> -
+>>> -                               /*
+>>> -                                * When reaching cpu_alert4, reduce CPU
+>>> -                                * further, down to 600 MHz (11 steps for big,
+>>> -                                * 7 steps for LITTLE).
+>>> -                                */
+>>> -                               map5 {
+>>> -                                    trip = <&cpu_alert4>;
+>>> -                                    cooling-device = <&cpu0 3 7>;
+>>> -                               };
+>>> -                               map6 {
+>>> -                                    trip = <&cpu_alert4>;
+>>> -                                    cooling-device = <&cpu4 3 11>;
+>>> -                               };
+>>> -                       };
+>>> -               };
+>>> -       };
+>>> -};
+>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> index 2a4e10bc8801..ff05041835e5 100644
+>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> @@ -1,9 +1,11 @@
+>>>  /*
+>>>   * Hardkernel Odroid XU3 board device tree source
+>>>   *
+>>> - * Copyright (c) 2014 Collabora Ltd.
+>>>   * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>>>   *             http://www.samsung.com
+>>> + * Copyright (c) 2014 Collabora Ltd.
+>>> + * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
+>>> + *                    Anand Moon <linux.amoon@gmail.com>
+>>>   *
+>>>   * This program is free software; you can redistribute it and/or modify
+>>>   * it under the terms of the GNU General Public License version 2 as
+>>> @@ -16,7 +18,6 @@
+>>>  #include <dt-bindings/sound/samsung-i2s.h>
+>>>  #include "exynos5800.dtsi"
+>>>  #include "exynos5422-cpus.dtsi"
+>>> -#include "exynos5422-cpu-thermal.dtsi"
+>>>
+>>>  / {
+>>>         memory {
+>>> @@ -54,6 +55,95 @@
+>>>                 #cooling-cells = <2>;
+>>>                 cooling-levels = <0 130 170 230>;
+>>>         };
+>>> +
+>>> +       thermal-zones {
+>>> +               cpu0_thermal: cpu0-thermal {
+>>> +                       thermal-sensors = <&tmu_cpu0 0>;
+>>> +                       polling-delay-passive = <250>;
+>>> +                       polling-delay = <0>;
+>>> +                       trips {
+>>> +                               cpu_alert0: cpu-alert-0 {
+>>> +                                       temperature = <50000>; /* millicelsius */
+>>> +                                       hysteresis = <5000>; /* millicelsius */
+>>> +                                       type = "active";
+>>> +                               };
+>>> +                               cpu_alert1: cpu-alert-1 {
+>>> +                                       temperature = <60000>; /* millicelsius */
+>>> +                                       hysteresis = <5000>; /* millicelsius */
+>>> +                                       type = "active";
+>>> +                               };
+>>> +                               cpu_alert2: cpu-alert-2 {
+>>> +                                       temperature = <70000>; /* millicelsius */
+>>> +                                       hysteresis = <5000>; /* millicelsius */
+>>> +                                       type = "active";
+>>> +                               };
+>>> +                               cpu_crit0: cpu-crit-0 {
+>>> +                                       temperature = <120000>; /* millicelsius */
+>>> +                                       hysteresis = <0>; /* millicelsius */
+>>> +                                       type = "critical";
+>>> +                               };
+>>> +                               /*
+>>> +                                * Exynos542x supports only 4 trip-points
+>>> +                                * so for these polling mode is required.
+>>> +                                * Start polling at temperature level of last
+>>> +                                * interrupt-driven trip: cpu_alert2
+>>> +                                */
+>>> +                               cpu_alert3: cpu-alert-3 {
+>>> +                                       temperature = <70000>; /* millicelsius */
+>>> +                                       hysteresis = <10000>; /* millicelsius */
+>>> +                                       type = "passive";
+>>> +                               };
+>>> +                               cpu_alert4: cpu-alert-4 {
+>>> +                                       temperature = <85000>; /* millicelsius */
+>>> +                                       hysteresis = <10000>; /* millicelsius */
+>>> +                                       type = "passive";
+>>> +                               };
+>>> +
+>>> +                       };
+>>> +                       cooling-maps {
+>>> +                               map0 {
+>>> +                                    trip = <&cpu_alert0>;
+>>> +                                    cooling-device = <&fan0 0 1>;
+>>> +                               };
+>>> +                               map1 {
+>>> +                                    trip = <&cpu_alert1>;
+>>> +                                    cooling-device = <&fan0 1 2>;
+>>> +                               };
+>>> +                               map2 {
+>>> +                                    trip = <&cpu_alert2>;
+>>> +                                    cooling-device = <&fan0 2 3>;
+>>> +                               };
+>>> +                               /*
+>>> +                                * When reaching cpu_alert3, reduce CPU
+>>> +                                * by 2 steps. On Exynos5422/5800 that would
+>>> +                                * be: 1500 MHz and 1100 MHz.
+>>> +                                */
+>>> +                               map3 {
+>>> +                                    trip = <&cpu_alert3>;
+>>> +                                    cooling-device = <&cpu0 0 2>;
+>>> +                               };
+>>> +                               map4 {
+>>> +                                    trip = <&cpu_alert3>;
+>>> +                                    cooling-device = <&cpu4 0 2>;
+>>> +                               };
+>>> +
+>>> +                               /*
+>>> +                                * When reaching cpu_alert4, reduce CPU
+>>> +                                * further, down to 600 MHz (11 steps for big,
+>>> +                                * 7 steps for LITTLE).
+>>> +                                */
+>>> +                               map5 {
+>>> +                                    trip = <&cpu_alert4>;
+>>> +                                    cooling-device = <&cpu0 3 7>;
+>>> +                               };
+>>> +                               map6 {
+>>> +                                    trip = <&cpu_alert4>;
+>>> +                                    cooling-device = <&cpu4 3 11>;
+>>> +                               };
+>>> +                       };
+>>> +               };
+>>> +       };
+>>> +
+>>>  };
+>>>
+>>>  &bus_wcore {
+>>> --
+>>> 1.9.1
+>>>
+>>
+>> Could you defer this patch, during my testing with pm-qa from linaro.
+>>
+>> git://git.linaro.org/tools/pm-qa.git
+>>
+>> When their is running of thermal test case cpu usage reaches around
+>> 300+ percentage
+>> and some time's the Odroid XU4 hang down.
+>> -------------------------------------------------------------------------
+>> [ 1028.056619] CPU4: shutdown
+>> [ 1148.510372] IRQ54 no longer affine to CPU5
+>> [ 1148.511864] CPU5: shutdown
+>> [ 1268.921073] IRQ55 no longer affine to CPU6
+>> [ 1268.922564] CPU6: shutdown
+>> [ 1389.271930] cpu cpu4: Failed to find opp_table: -19
+>> [ 1389.301668] IRQ56 no longer affine to CPU7
+>> [ 1389.303132] CPU7: shutdown
+>> [ 1510.538424] cpu cpu4: opp_list_debug_create_link: Failed to create link
+>> [ 1510.543762] cpu cpu4: _add_opp_dev: Failed to register opp debugfs (-12)
+>> [ 1510.550625] cpu cpu7: opp_list_debug_create_link: Failed to create link
+>> [ 1510.557037] cpu cpu7: _add_opp_dev: Failed to register opp debugfs (-12)
+>> [ 1510.664649] cpu cpu5: cpufreq_init: failed to get clk: -2
+>> [ 1510.720567] cpu cpu6: cpufreq_init: failed to get clk: -2
+>> [ 1510.788280] cpu cpu7: cpufreq_init: failed to get clk: -2
+>> root at odroidxu4l:/home/odroid/study/linaro/pm-qa# killall heat_cpu
+>>
+>> -------------------------------------------------------------------------
+>> And some time I observed that the board will poweroff on reaching
+>> temperature 120 degree C.
+>> when I am compiling the kernel with or above. make -j8
+>> -------------------------------------------------------------------------
+>> root at odroidxu4l:~#  * Starting NTP server ntpd                           [ OK ]
+>> saned disabled; edit /etc/default/saned
+>> [ 4118.924470] thermal thermal_zone3: critical temperature reached(121
+>> C),shutting down
+>> [ 4119.014327] thermal thermal_zone3: critical temperature reached(121
+>> C),shutting down
+>>
+>> Broadcast message from root at odroidxu4l
+>>         (unknown) at 20:41 ...
+>>
+>> The system is going down for power off NOW!
+>>
+>> Broadcast message from root at odroidxu4l
+>>         (unknown) at 20:41 ...
+>>
+>> The system is going down for power off NOW!
+>> [ 4119.431386] thermal thermal_zone3: critical temperature reached(121
+>> C),shutting down
+>> [ 4120.206709] thermal thermal_zone3: critical temperature reached(120
+>> C),shutting down
+>>
+>> Broadcast message from root at odroidxu4l
+>>         (unknown) at 20:41 ...
+>>
+>> The system is going down for power off NOW!
+>> wait-for-state stop/waiting
+>> [ 4157.574406] reboo
+>>
+>> U-Boot 2016.03-00665-g563d8d9-dirty (Apr 04 2016 - 22:27:07 +0930) for
+>> ODROID-XU3
+>>
+>> CPU:   Exynos5422 @ 800 MHz
+>> Model: Odroid XU3 based on EXYNOS5422
+>> Board: Odroid XU3 based on EXYNOS5422
+>> Type:  xu4
+>> DRAM:  2 GiB
+>> MMC:   EXYNOS DWMMC: 0, EXYNOS DWMMC: 1
+>> *** Warning - bad CRC, using default environment
+>> -------------------------------------------------------------------------
+>> Once the thermal issue is fixed we can redo this changes.
+>
+> I am sorry but I do not understand.
+> 1. Are you saying that my patch causes the issue?
+> 2. Are you saying that I should not send some patches because of
+> conflicting work? (that would be peculiar...)
+> 3. Are you saying that I should not apply this patch to me tree because
+> of conflicting work?
+> 4. Other?
+>
+> Best regards.
+> Krzysztof
+>
+>
+
+Sorry for the confusion it's not about you patch.
+The feature is not working correctly as per my testing with the
+original source code.
+It need to be more tuned or some other approach to the issue need to found.
+
+Best Regards
+-Anand Moon
