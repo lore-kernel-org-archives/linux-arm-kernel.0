@@ -1,237 +1,167 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 10 May 2016 18:18:46 +0100
-Subject: [PATCH v2] KVM: arm/arm64: vgic-new: fix overlap check for device
- addresses
-In-Reply-To: <5731DF3C.6020201@arm.com>
-References: <5731DF3C.6020201@arm.com>
-Message-ID: <1462900726-14666-1-git-send-email-andre.przywara@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 May 2016 18:24:34 +0100
+Subject: [PATCH v9 5/7] vfio/type1: also check IRQ remapping capability at
+ msi domain
+In-Reply-To: <57320803.8070506@linaro.org>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
+ <20160509164942.5af8b30d@t450s.home> <57320803.8070506@linaro.org>
+Message-ID: <57321952.2020206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userland sets the base addresses for the GIC register frames,
-the kernel tries to make sure that the regions for the distributor and
-the one for the CPU interface or the redistributors do not overlap.
-Currently this check only works properly for GICv2.
-For a GICv3 we need the number of VCPUs to compute the size of the
-redistributor region, which we only know for sure at init time.
-So move the overlap check from kvm_vgic_addr() to the model specific
-map_resources() implementation.
-This also allows us to simplify the existing checking code a bit.
+Hi Eric,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Hi,
+On 10/05/16 17:10, Eric Auger wrote:
+> Hi Alex,
+> On 05/10/2016 12:49 AM, Alex Williamson wrote:
+>> On Wed,  4 May 2016 11:54:16 +0000
+>> Eric Auger <eric.auger@linaro.org> wrote:
+>>
+>>> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+>>> by the msi controller. vfio_safe_irq_domain allows to check whether
+>>> interrupts are "safe" for a given device. They are if the device does
+>>> not use MSI
+>>
+>> Are we sure we're not opening a security hole here?  An MSI is simply a
+>> DMA write, so really whether or not a device uses MSI is irrelevant.
+>> If it can generate a DMA to the MSI doorbell then we need to be
+>> protected and I think we pretty much need to assume that devices are
+>> DMA capable.  Do the MSI domain checks cover this?
+> Let me try to rephrase: we check the device is not attached to an MSI
+> controller (I think this is the semantic of dev_get_msi_domain(dev)).
+>
+> If it is not, we don't have to care about MSI isolation: there will be
+> no IOMMU binding between the device and any MSI doorbell. If it is we
+> check the msi domain is backed by an MSI controller able to perform MSI
+> isolation.
+ >
+> So effectively "usage of MSIs" is improper - since it is decided after
+> the group attachment anyway  - and the commit message should rather
+> state "if the device is linked to an MSI controller" (dt msi-parent
+> notion I think).
 
-so another rework, now hopefully really covering GICv3 properly.
-For consistency I also moved the GICv2 check to init time. This is
-a slightly different behaviour, but shouldn't make a difference, as
-the init call can fail as well - for instance if no addresses have been
-set up at all.
+Hmm, I think Alex has a point here - on a GICv2m I can happily fire 
+arbitrary MSIs from _a shell_ (using /dev/mem), and the CPUs definitely 
+aren't in an MSI domain, so I don't think it's valid to assume that a 
+device using only wired interrupts, therefore with no connection to any 
+MSI controller, isn't still capable of maliciously spewing DMA all over 
+any and every doorbell region in the system.
 
-Cheers,
-Andre.
+Robin.
 
- virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++-----------------------------
- virt/kvm/arm/vgic/vgic-v2.c         | 22 ++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c         | 27 ++++++++++++++++++++
- 3 files changed, 60 insertions(+), 39 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 2122ff2..9e736a7 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -19,43 +19,19 @@
- #include <asm/kvm_mmu.h>
- #include "vgic.h"
- 
--/* common helpers */
--
--static int vgic_ioaddr_overlap(struct kvm *kvm)
--{
--	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
--	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
--
--	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
--		return 0;
--	if ((dist <= cpu && dist + KVM_VGIC_V2_DIST_SIZE > cpu) ||
--	    (cpu <= dist && cpu + KVM_VGIC_V2_CPU_SIZE > dist))
--		return -EBUSY;
--	return 0;
--}
--
--static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
--			      phys_addr_t addr, phys_addr_t size)
-+static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
-+			     phys_addr_t addr, phys_addr_t alignment)
- {
--	int ret;
--
- 	if (addr & ~KVM_PHYS_MASK)
- 		return -E2BIG;
- 
--	if (addr & (SZ_4K - 1))
-+	if (!IS_ALIGNED(addr, alignment))
- 		return -EINVAL;
- 
- 	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
- 		return -EEXIST;
--	if (addr + size < addr)
--		return -EINVAL;
--
--	*ioaddr = addr;
--	ret = vgic_ioaddr_overlap(kvm);
--	if (ret)
--		*ioaddr = VGIC_ADDR_UNDEF;
- 
--	return ret;
-+	return 0;
- }
- 
- /**
-@@ -70,40 +46,38 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
-  * interface in the VM physical address space.  These addresses are properties
-  * of the emulated core/SoC and therefore user space initially knows this
-  * information.
-+ * Check them for sanity (alignment, double assignment). We can't check for
-+ * overlapping regions in case of a virtual GICv3 here, since we don't know
-+ * the number of VCPUs yet, so we defer this check to map_resources().
-  */
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- {
- 	int r = 0;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	int type_needed;
--	phys_addr_t *addr_ptr, block_size;
--	phys_addr_t alignment;
-+	phys_addr_t *addr_ptr, alignment;
- 
- 	mutex_lock(&kvm->lock);
- 	switch (type) {
- 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
- 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
- 		addr_ptr = &vgic->vgic_dist_base;
--		block_size = KVM_VGIC_V2_DIST_SIZE;
- 		alignment = SZ_4K;
- 		break;
- 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
- 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
- 		addr_ptr = &vgic->vgic_cpu_base;
--		block_size = KVM_VGIC_V2_CPU_SIZE;
- 		alignment = SZ_4K;
- 		break;
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- 	case KVM_VGIC_V3_ADDR_TYPE_DIST:
- 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
- 		addr_ptr = &vgic->vgic_dist_base;
--		block_size = KVM_VGIC_V3_DIST_SIZE;
- 		alignment = SZ_64K;
- 		break;
- 	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
- 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
- 		addr_ptr = &vgic->vgic_redist_base;
--		block_size = KVM_VGIC_V3_REDIST_SIZE;
- 		alignment = SZ_64K;
- 		break;
- #endif
-@@ -118,11 +92,9 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 	}
- 
- 	if (write) {
--		if (!IS_ALIGNED(*addr, alignment))
--			r = -EINVAL;
--		else
--			r = vgic_ioaddr_assign(kvm, addr_ptr,
--					       *addr, block_size);
-+		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
-+		if (!r)
-+			*addr_ptr = *addr;
- 	} else {
- 		*addr = *addr_ptr;
- 	}
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 4493593..fe6e3bd 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -225,6 +225,22 @@ void vgic_v2_enable(struct kvm_vcpu *vcpu)
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
- }
- 
-+/* check for overlapping regions and for regions crossing the end of memory */
-+static bool vgic_check_addresses(gpa_t dist_base, gpa_t cpu_base)
-+{
-+	if (dist_base + KVM_VGIC_V2_DIST_SIZE < dist_base)
-+		return false;
-+	if (cpu_base + KVM_VGIC_V2_CPU_SIZE < cpu_base)
-+		return false;
-+
-+	if (dist_base + KVM_VGIC_V2_DIST_SIZE <= cpu_base)
-+		return true;
-+	if (cpu_base + KVM_VGIC_V2_CPU_SIZE <= dist_base)
-+		return true;
-+
-+	return false;
-+}
-+
- int vgic_v2_map_resources(struct kvm *kvm)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
-@@ -240,6 +256,12 @@ int vgic_v2_map_resources(struct kvm *kvm)
- 		goto out;
- 	}
- 
-+	if (!vgic_check_addresses(dist->vgic_dist_base, dist->vgic_cpu_base)) {
-+		kvm_err("VGIC CPU and dist frames overlap\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
- 	/*
- 	 * Initialize the vgic if this hasn't already been done on demand by
- 	 * accessing the vgic state from userspace.
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6d7422f..fa444a7 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -221,6 +221,27 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
- }
- 
-+/* check for overlapping regions and for regions crossing the end of memory */
-+static bool vgic_check_addresses(struct kvm *kvm)
-+{
-+	struct vgic_dist *d = &kvm->arch.vgic;
-+	gpa_t redist_size = KVM_VGIC_V3_REDIST_SIZE;
-+
-+	redist_size *= atomic_read(&kvm->online_vcpus);
-+
-+	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
-+		return false;
-+	if (d->vgic_redist_base + redist_size < d->vgic_redist_base)
-+		return false;
-+
-+	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE <= d->vgic_redist_base)
-+		return true;
-+	if (d->vgic_redist_base + redist_size <= d->vgic_dist_base)
-+		return true;
-+
-+	return false;
-+}
-+
- int vgic_v3_map_resources(struct kvm *kvm)
- {
- 	int ret = 0;
-@@ -236,6 +257,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 		goto out;
- 	}
- 
-+	if (!vgic_check_addresses(kvm)) {
-+		kvm_err("VGIC redist and dist frames overlap\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
- 	/*
- 	 * For a VGICv3 we require the userland to explicitly initialize
- 	 * the VGIC before we need to use it.
--- 
-2.7.3
+> Does it sound better?
+>
+> Regards
+>
+> Eric
+>>
+>>> or if the device uses MSI and the msi-parent controller
+>>> supports IRQ remapping.
+>>>
+>>> Then we check at group level if all devices have safe interrupts: if not,
+>>> we only allow the group to be attached if allow_unsafe_interrupts is set.
+>>>
+>>> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+>>> changed in next patch.
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>
+>>> ---
+>>> v3 -> v4:
+>>> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
+>>>    and irq_remapping into safe_irq_domains
+>>>
+>>> v2 -> v3:
+>>> - protect vfio_msi_parent_irq_remapping_capable with
+>>>    CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>>> ---
+>>>   drivers/vfio/vfio_iommu_type1.c | 44 +++++++++++++++++++++++++++++++++++++++--
+>>>   1 file changed, 42 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+>>> index 4d3a6f1..2fc8197 100644
+>>> --- a/drivers/vfio/vfio_iommu_type1.c
+>>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>>> @@ -37,6 +37,8 @@
+>>>   #include <linux/vfio.h>
+>>>   #include <linux/workqueue.h>
+>>>   #include <linux/msi-iommu.h>
+>>> +#include <linux/irqdomain.h>
+>>> +#include <linux/msi.h>
+>>>
+>>>   #define DRIVER_VERSION  "0.2"
+>>>   #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+>>> @@ -777,6 +779,33 @@ static int vfio_bus_type(struct device *dev, void *data)
+>>>   	return 0;
+>>>   }
+>>>
+>>> +/**
+>>> + * vfio_safe_irq_domain: returns whether the irq domain
+>>> + * the device is attached to is safe with respect to MSI isolation.
+>>> + * If the irq domain is not an MSI domain, we return it is safe.
+>>> + *
+>>> + * @dev: device handle
+>>> + * @data: unused
+>>> + * returns 0 if the irq domain is safe, -1 if not.
+>>> + */
+>>> +static int vfio_safe_irq_domain(struct device *dev, void *data)
+>>> +{
+>>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>>> +	struct irq_domain *domain;
+>>> +	struct msi_domain_info *info;
+>>> +
+>>> +	domain = dev_get_msi_domain(dev);
+>>> +	if (!domain)
+>>> +		return 0;
+>>> +
+>>> +	info = msi_get_domain_info(domain);
+>>> +
+>>> +	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
+>>> +		return -1;
+>>> +#endif
+>>> +	return 0;
+>>> +}
+>>> +
+>>>   static int vfio_iommu_replay(struct vfio_iommu *iommu,
+>>>   			     struct vfio_domain *domain)
+>>>   {
+>>> @@ -870,7 +899,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>>   	struct vfio_group *group, *g;
+>>>   	struct vfio_domain *domain, *d;
+>>>   	struct bus_type *bus = NULL;
+>>> -	int ret;
+>>> +	int ret, safe_irq_domains;
+>>>
+>>>   	mutex_lock(&iommu->lock);
+>>>
+>>> @@ -893,6 +922,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>>
+>>>   	group->iommu_group = iommu_group;
+>>>
+>>> +	/*
+>>> +	 * Determine if all the devices of the group have a safe irq domain
+>>> +	 * with respect to MSI isolation
+>>> +	 */
+>>> +	safe_irq_domains = !iommu_group_for_each_dev(iommu_group, &bus,
+>>> +				       vfio_safe_irq_domain);
+>>> +
+>>>   	/* Determine bus_type in order to allocate a domain */
+>>>   	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
+>>>   	if (ret)
+>>> @@ -920,8 +956,12 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>>   	INIT_LIST_HEAD(&domain->group_list);
+>>>   	list_add(&group->next, &domain->group_list);
+>>>
+>>> +	/*
+>>> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
+>>> +	 * must support IRQ remapping/interrupt translation
+>>> +	 */
+>>>   	if (!allow_unsafe_interrupts &&
+>>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+>>> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !safe_irq_domains)) {
+>>>   		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+>>>   		       __func__);
+>>>   		ret = -EPERM;
+>>
+>
