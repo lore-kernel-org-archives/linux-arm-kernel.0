@@ -1,58 +1,46 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 May 2016 13:50:11 +0200
-Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
-In-Reply-To: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
-References: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdZ=KsPL1mBS1bLi=jYsv=Vb1QNBi8XPAJW50doPcwBuZg@mail.gmail.com>
+Date: Tue, 10 May 2016 13:52:54 +0200
+Subject: [RFC v5 3/4] gpio: move clps711x, moxart,
+ ts4800 and gpio-ge into gpio-generic
+In-Reply-To: <1518049.pLhlI1cuZi@debian64>
+References: <cover.1461888822.git.chunkeey@googlemail.com>
+ <9e5cc9e957144bd5d4081573ef959f931281eaaa.1461888822.git.chunkeey@googlemail.com>
+ <CACRpkdaX1xeGJxV9K-GkTAh87SctqyhkJ+VN6mwUdtD19tz99g@mail.gmail.com>
+ <1518049.pLhlI1cuZi@debian64>
+Message-ID: <CACRpkdbXM2Bnzv_qTwz6sWkpCgx3q2ihiEMbeb+5DJj+DT+GAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2016 at 4:25 PM,  <patrice.chotard@st.com> wrote:
+On Fri, Apr 29, 2016 at 9:06 PM, Christian Lamparter
+<chunkeey@googlemail.com> wrote:
+> On Friday, April 29, 2016 04:18:20 PM Linus Walleij wrote:
 
-> From: Patrice Chotard <patrice.chotard@st.com>
+>> Very elegant. Let's wait for some feedback/ACKs from
+>> the driver maintainers, but this looks very nice.
+
+> Oh by the way: who's maintaining them? get_maintainer.pl just
+> lists the usual gpio people.
+
+I usually just git log drivers/gpio/gpio-foo.c
+and see what turns up, then sift out to avoid any generic
+maintenance patches and mail the remaining people who
+made real functional changes and seem  to be using the
+real hardware.
+
+> Anyway, I'll rebase my patch series (without the two patches you
+> had already merged)
+
+Awesome.
+
+>> Do you want to address Andy's optimization suggestion directly
+>> or as a follow-on patch?
 >
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Oh, this is a RFC. I didn't expect anything to be merged just yet.
+> Of course, I'll try to integrate his suggestion. I'll do that once
+> I reply to Rob/Mark/You about the "linux,gpio-mmio",
+> "memory-mapped-gpio" situation etc.
 
-Patch applied! Because this gives good debuggability.
-
-But think about refactorings:
-
-> +static bool stm32_pconf_input_get(struct stm32_gpio_bank *bank,
-> +       unsigned int offset)
-> +{
-> +       unsigned long flags;
-> +       u32 val;
-> +
-> +       clk_enable(bank->clk);
-> +       spin_lock_irqsave(&bank->lock, flags);
-> +
-> +       val = !!(readl_relaxed(bank->base + STM32_GPIO_IDR) & BIT(offset));
-> +
-> +       spin_unlock_irqrestore(&bank->lock, flags);
-> +       clk_disable(bank->clk);
-> +
-> +       return val;
-> +}
-> +
-> +static bool stm32_pconf_output_get(struct stm32_gpio_bank *bank,
-> +       unsigned int offset)
-> +{
-> +       unsigned long flags;
-> +       u32 val;
-> +
-> +       clk_enable(bank->clk);
-> +       spin_lock_irqsave(&bank->lock, flags);
-> +       val = !!(readl_relaxed(bank->base + STM32_GPIO_ODR) & BIT(offset));
-> +
-> +       spin_unlock_irqrestore(&bank->lock, flags);
-> +       clk_disable(bank->clk);
-> +
-> +       return val;
-> +}
-
-Don't you think these two look very similar for example.
-
-But that can be fixed later, debuggability is more important.
+True, OK no hurries, I just liked the patches a lot.
 
 Yours,
 Linus Walleij
