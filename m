@@ -1,33 +1,51 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 10 May 2016 09:55:56 +0300
-Subject: [PATCH 10/23] mmc: core: disable auto retune during card
- detection process
-In-Reply-To: <20160429074258.GA28427@shlinux2.ap.freescale.net>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-11-git-send-email-aisheng.dong@nxp.com>
- <571A1D85.3020200@intel.com>
- <CAA+hA=R9JfV4ScuM=OZ3VHdSiQiMO9io8mQQDNXfkTwNv7RVvg@mail.gmail.com>
- <5721B602.6010306@intel.com>
- <20160428132249.GB27560@shlinux2.ap.freescale.net>
- <57230515.9030602@intel.com>
- <20160429074258.GA28427@shlinux2.ap.freescale.net>
-Message-ID: <573185FC.5060506@intel.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 10 May 2016 09:10:04 +0200
+Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
+In-Reply-To: <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
+References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+ <20160425115758.GA4874@lukather>
+ <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
+ <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
+ <20160509090615.6272f8ca@erd979>
+ <CACRpkdbZmL9Cqp-ubzyxd7fWUFOVsS1DCxsfG02kSpbWu_rbZQ@mail.gmail.com>
+ <20160509161728.3aee1134@erd979>
+ <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
+Message-ID: <20160510071004.GA7318@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/16 10:42, Dong Aisheng wrote:
-> And IMX6DL ARD is even worser due to it's using common
-> mmc_send_tuning() function.
-> root at imx6qdlsolo:~# 
-> root at imx6qdlsolo:~# [  129.462564] sysrq: SysRq : Changing Loglevel
-> [  129.466902] sysrq: Loglevel set to 8
-> [  131.616078] sdhci-esdhc-imx 2198000.usdhc: desired SD clock: 198000000, actual: 198000000
-> [  131.625311] sdhci-esdhc-imx 2198000.usdhc: change pinctrl state for uhs 6
-> [  131.632133] sdhci-esdhc-imx 2198000.usdhc: desired SD clock: 198000000, actual: 198000000
-> [  131.642121] mmc0: starting CMD13 arg 59b40000 flags 00000195
-> [  131.648925] sdhci-esdhc-imx 2198000.usdhc: tunning with delay 0x0 ESDHC_TUNE_CTRL_STATUS 0x0
-> [  131.657818] mmc0: starting CMD19 arg 00000000 flags 00000035
-> [  131.663518] mmc0:     blksz 64 blocks 1 flags 00000200 tsac 150 ms nsac 0
-> [  131.670835] mmc0: req done (CMD19): -123: 00000000 00000000 00000000 00000000
+On Mon, May 09, 2016 at 04:27:00PM +0200, Linus Walleij wrote:
+> On Mon, May 9, 2016 at 4:17 PM, Robin van der Gracht <robin@protonic.nl> wrote:
+> > On Mon, 9 May 2016 15:19:26 +0200
+> > Linus Walleij <linus.walleij@linaro.org> wrote:
+> >
+> >> On Mon, May 9, 2016 at 9:06 AM, Robin van der Gracht
+> >> <robin@protonic.nl> wrote:
+> >>
+> >> > If you guys feel like auxdisplay is not the right subsystem for the
+> >> > driver, and would like me to move it, please share.
+> >>
+> >> The best would be if you volunteer to maintain it and bring
+> >> it forward.
+> >
+> > Thats fine. Would it suffice if I submit another patch adding myself
+> > to the maintainers file?
+> 
+> That's half of it, if Miguel does not come back then his name
+> should be removed as the second step.
+> 
+> You also need to have an idea on a path to funnel accumulated
+> patches upstream to Torvalds. The recent patches to this
+> subsystem were funneled by Greg, so we should ask him how
+> he prefer to proceed.
+> 
+> Greg, what do you prefer?
 
-You should stop here because -123 is -ENOMEDIUM
+I don't care :)
+
+I can keep doing this, sending stuff to Linus through my char/misc tree,
+or it can go through someone else's tree, it doesn't bother me...
+
+thanks,
+
+greg k-h
