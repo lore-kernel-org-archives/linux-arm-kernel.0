@@ -1,42 +1,97 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon,  9 May 2016 17:04:12 -0700
-Subject: [PATCH 2/6] drivers: net: xgene: fix sharing of irqs
+Date: Mon,  9 May 2016 17:04:13 -0700
+Subject: [PATCH 3/6] drivers: net: xgene: fix ununiform latency across queues
 In-Reply-To: <1462838656-22043-1-git-send-email-isubramanian@apm.com>
 References: <1462838656-22043-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1462838656-22043-3-git-send-email-isubramanian@apm.com>
+Message-ID: <1462838656-22043-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since hardware doesn't allow sharing of interrupts,
-this patch fixes the same by removing IRQF_SHARED flag.
+This patch addresses ununiform latency across queues by adding
+more queues to match with, upto number of CPU cores.
+
+Also, number of interrupts are increased and the channel numbers
+are reordered.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Toan Le <toanle@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 30 ++++++++++++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  8 +++----
+ 2 files changed, 27 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index aa87049..ed90664 100644
+index ed90664..e75d1a9 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -630,7 +630,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- 		ring = pdata->rx_ring[i];
- 		irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
- 		ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
--				       IRQF_SHARED, ring->irq_name, ring);
-+				       0, ring->irq_name, ring);
- 		if (ret) {
- 			netdev_err(ndev, "Failed to request irq %s\n",
- 				   ring->irq_name);
-@@ -641,7 +641,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- 		ring = pdata->tx_ring[i]->cp_ring;
- 		irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
- 		ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
--				       IRQF_SHARED, ring->irq_name, ring);
-+				       0, ring->irq_name, ring);
- 		if (ret) {
- 			netdev_err(ndev, "Failed to request irq %s\n",
- 				   ring->irq_name);
+@@ -1247,6 +1247,13 @@ static int xgene_enet_get_irqs(struct xgene_enet_pdata *pdata)
+ 	for (i = 0; i < max_irqs; i++) {
+ 		ret = platform_get_irq(pdev, i);
+ 		if (ret <= 0) {
++			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
++				max_irqs = i;
++				pdata->rxq_cnt = max_irqs / 2;
++				pdata->txq_cnt = max_irqs / 2;
++				pdata->cq_cnt = max_irqs / 2;
++				break;
++			}
+ 			dev_err(dev, "Unable to get ENET IRQ\n");
+ 			ret = ret ? : -ENXIO;
+ 			return ret;
+@@ -1450,19 +1457,28 @@ static void xgene_enet_setup_ops(struct xgene_enet_pdata *pdata)
+ 		pdata->port_ops = &xgene_xgport_ops;
+ 		pdata->cle_ops = &xgene_cle3in_ops;
+ 		pdata->rm = RM0;
+-		pdata->rxq_cnt = XGENE_NUM_RX_RING;
+-		pdata->txq_cnt = XGENE_NUM_TX_RING;
+-		pdata->cq_cnt = XGENE_NUM_TXC_RING;
++		if (!pdata->rxq_cnt) {
++			pdata->rxq_cnt = XGENE_NUM_RX_RING;
++			pdata->txq_cnt = XGENE_NUM_TX_RING;
++			pdata->cq_cnt = XGENE_NUM_TXC_RING;
++		}
+ 		break;
+ 	}
+ 
+ 	if (pdata->enet_id == XGENE_ENET1) {
+ 		switch (pdata->port_id) {
+ 		case 0:
+-			pdata->cpu_bufnum = START_CPU_BUFNUM_0;
+-			pdata->eth_bufnum = START_ETH_BUFNUM_0;
+-			pdata->bp_bufnum = START_BP_BUFNUM_0;
+-			pdata->ring_num = START_RING_NUM_0;
++			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
++				pdata->cpu_bufnum = X2_START_CPU_BUFNUM_0;
++				pdata->eth_bufnum = X2_START_ETH_BUFNUM_0;
++				pdata->bp_bufnum = X2_START_BP_BUFNUM_0;
++				pdata->ring_num = START_RING_NUM_0;
++			} else {
++				pdata->cpu_bufnum = START_CPU_BUFNUM_0;
++				pdata->eth_bufnum = START_ETH_BUFNUM_0;
++				pdata->bp_bufnum = START_BP_BUFNUM_0;
++				pdata->ring_num = START_RING_NUM_0;
++			}
+ 			break;
+ 		case 1:
+ 			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+index 0a2887b..cc40c30 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+@@ -49,10 +49,10 @@
+ #define XGENE_ENET_MSS	1448
+ #define XGENE_MIN_ENET_FRAME_SIZE	60
+ 
+-#define XGENE_MAX_ENET_IRQ	8
+-#define XGENE_NUM_RX_RING	4
+-#define XGENE_NUM_TX_RING	4
+-#define XGENE_NUM_TXC_RING	4
++#define XGENE_MAX_ENET_IRQ	16
++#define XGENE_NUM_RX_RING	8
++#define XGENE_NUM_TX_RING	8
++#define XGENE_NUM_TXC_RING	8
+ 
+ #define START_CPU_BUFNUM_0	0
+ #define START_ETH_BUFNUM_0	2
 -- 
 1.9.1
