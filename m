@@ -1,77 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 May 2016 09:18:49 +0200
-Subject: [PATCH] firmware/drivers/psci: Fix unused functions when
- CONFIG_CPU_IDLE=n
-Message-ID: <1462864729-11793-1-git-send-email-daniel.lezcano@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 10 May 2016 09:27:29 +0200
+Subject: [GIT PULL] at91: fixes for 4.6 #1
+Message-ID: <1462865249-28552-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the ARM64 architecture, when CPUIDLE is not set in the configuration,
-the compilation raises a couple of warnings:
+Arnd, Olof, Kevin,
 
-drivers/firmware/psci.c:70:12: warning: 'psci_pd_power_off' defined but not used [-Wunused-function]
-drivers/firmware/psci.c:273:12: warning: 'psci_set_suspend_mode_osi' defined but not used [-Wunused-function]
+Here is a late fix for AT91. Sorry to have figure it out so late in the
+development cycle but we had to confirm it was an error with the documentation
+of two products.
+So, as the compatibility string is in since 4.6-rc1 and that the previous one
+works okay, it's a good opportunity to switch back to the one that works without
+introducing a intermediary bug.
+The revert on driver code and the removal of the useless additional
+compatibility string will be queued for 4.7 through NAND/MTD.
 
-Fix those warnings by moving the functions inside the #ifdef CONFIG_CPU_IDLE
-section.
+Thanks, best regards,
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/firmware/psci.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+The following changes since commit 02da2d72174c61988eb4456b53f405e3ebdebce4:
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 9c6a1f9..d7e0632 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -54,7 +54,6 @@
-  */
- static int resident_cpu = -1;
- static bool psci_has_osi_pd;
--static bool psci_suspend_mode_is_osi;
- static DEFINE_PER_CPU(u32, cluster_state_id);
- 
- static inline u32 psci_get_composite_state_id(u32 cpu_state)
-@@ -67,13 +66,6 @@ static inline void psci_reset_composite_state_id(void)
- 	this_cpu_write(cluster_state_id, 0);
- }
- 
--static int psci_pd_power_off(u32 state_idx, u32 param,
--		const struct cpumask *mask)
--{
--	__this_cpu_add(cluster_state_id, param);
--	return 0;
--}
--
- bool psci_tos_resident_on(int cpu)
- {
- 	return cpu == resident_cpu;
-@@ -270,6 +262,11 @@ static int __init psci_features(u32 psci_func_id)
- 			      psci_func_id, 0, 0);
- }
- 
-+#ifdef CONFIG_CPU_IDLE
-+static bool psci_suspend_mode_is_osi;
-+
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+
- static int psci_set_suspend_mode_osi(bool enable)
- {
- 	int ret;
-@@ -290,8 +287,12 @@ static int psci_set_suspend_mode_osi(bool enable)
- 	return psci_to_linux_errno(ret);
- }
- 
--#ifdef CONFIG_CPU_IDLE
--static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+static int psci_pd_power_off(u32 state_idx, u32 param,
-+		const struct cpumask *mask)
-+{
-+	__this_cpu_add(cluster_state_id, param);
-+	return 0;
-+}
- 
- static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- {
+  Linux 4.6-rc5 (2016-04-24 16:17:05 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to b8453d4ee9e24c6590dd0eecbab1c3cc2028317f:
+
+  ARM: dts: at91: sama5d2: use "atmel,sama5d3-nfc" compatible for nfc (2016-05-10 09:09:47 +0200)
+
+----------------------------------------------------------------
+One fix for 4.6:
+- error in the documentation led to wrongly add a new NAND Flash Controller
+  type. Switch back to the previous compatible one.
+
+----------------------------------------------------------------
+Wenyou Yang (1):
+      ARM: dts: at91: sama5d2: use "atmel,sama5d3-nfc" compatible for nfc
+
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 -- 
-1.9.1
+Nicolas Ferre
