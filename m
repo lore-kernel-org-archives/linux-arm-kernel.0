@@ -1,46 +1,52 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 10 May 2016 20:54:01 +0930
-Subject: [PATCH 1/2] doc/devicetree: Add Aspeed watchdog timer bindings
-In-Reply-To: <20160509203831.GA20352@rob-hp-laptop>
-References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
- <1462797277-14969-2-git-send-email-joel@jms.id.au>
- <20160509203831.GA20352@rob-hp-laptop>
-Message-ID: <CACPK8XeAhn=h=-LKjFZJ9UibnXiYLvy5R=1=FsNZJn0Hk1O36Q@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 14:19:40 +0300
+Subject: [PATCH 18/23] mmc: sdhci-esdhc-imx: enable hw auto retuning for
+ STD_TUNING
+In-Reply-To: <1460741387-23815-19-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-19-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5731C3CC.1000806@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 6:08 AM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, May 09, 2016 at 10:04:36PM +0930, Joel Stanley wrote:
->> Signed-off-by: Joel Stanley <joel@jms.id.au>
->> ---
->>  Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
->>
->> diff --git a/Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt b/Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
->> new file mode 100644
->> index 000000000000..58184b161e0d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
->> @@ -0,0 +1,14 @@
->> +Aspeed Watchdog Timer
->> +
->> +Required properties:
->> + - compatible: must be "aspeed,wdt"
->
-> This should have the specific SOCs listed.
+On 15/04/16 20:29, Dong Aisheng wrote:
+> Enable HW auto retuning when set SDHCI_CTRL_EXEC_TUNING and clear it
+> when clear SDHCI_CTRL_TUNED_CLK.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Thanks, I'll fix it.
+I presume this patch should wait for patch 17, but nevertheless:
 
-In the cases where the drivers had no change in the IP between
-versions of the soc I wondered if it was neater to have a generic
-string. You're saying that's wrong and we prefer using multiple
-strings for all the SoCs instead?
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
->> +     wdt1: wdt at 1e785000 {
->
-> IIRC, "watchdog at ..." is the correct generic name.
-
-Cheers,
-
-Joel
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 9f9be3f..a582a83 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -44,6 +44,7 @@
+>  #define  ESDHC_MIX_CTRL_AC23EN		(1 << 7)
+>  #define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
+>  #define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
+> +#define  ESDHC_MIX_CTRL_AUTO_TUNE_EN	(1 << 24)
+>  #define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
+>  #define  ESDHC_MIX_CTRL_HS400_EN	(1 << 26)
+>  /* Bits 3 and 6 are not SDHCI standard definitions */
+> @@ -484,11 +485,13 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  			} else {
+>  				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
+>  				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
+> +				m &= ~ESDHC_MIX_CTRL_AUTO_TUNE_EN;
+>  			}
+>  
+>  			if (val & SDHCI_CTRL_EXEC_TUNING) {
+>  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
+>  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
+> +				m |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
+>  				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
+>  				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT;
+>  				if (imx_data->boarddata.tuning_start_tap) {
+> 
