@@ -1,185 +1,199 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 May 2016 15:35:02 +0100
-Subject: [PATCH v3 18/55] KVM: arm/arm64: vgic-new: Add GICv2 world switch
- backend
-In-Reply-To: <20160510141119.GB20499@cbox>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-19-git-send-email-andre.przywara@arm.com>
- <20160510133043.GF27623@cbox> <5731E52A.9000402@arm.com>
- <20160510141119.GB20499@cbox>
-Message-ID: <5731F196.4040906@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 10 May 2016 16:40:24 +0200
+Subject: [PATCH RESEND 2/3] pwm: kona: Add support for Broadcom iproc pwm
+ controller
+In-Reply-To: <1459261350-23851-3-git-send-email-yendapally.reddy@broadcom.com>
+References: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1459261350-23851-3-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <20160510144024.GA7149@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 15:11, Christoffer Dall wrote:
-> On Tue, May 10, 2016 at 02:42:02PM +0100, Marc Zyngier wrote:
->> On 10/05/16 14:30, Christoffer Dall wrote:
->>> On Fri, May 06, 2016 at 11:45:31AM +0100, Andre Przywara wrote:
->>>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>>
->>>> Processing maintenance interrupts and accessing the list registers
->>>> are dependent on the host's GIC version.
->>>> Introduce vgic-v2.c to contain GICv2 specific functions.
->>>> Implement the GICv2 specific code for syncing the emulation state
->>>> into the VGIC registers.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>> Changelog RFC..v1:
->>>> - remove explicit LR_STATE clearing on maintenance interrupt handling
->>>> - improve documentation for vgic_v2_populate_lr()
->>>> - remove WARN_ON on non-edge IRQs in maintenance interrupts
->>>> - simplify multi-CPU source SGI handling
->>>>
->>>> Changelog v1 .. v2:
->>>> - inject the IRQ priority into the list register
->>>>
->>>> Changelog v2 .. v3:
->>>> - cleanup diff containing rebase artifacts
->>>>
->>>>  include/linux/irqchip/arm-gic.h |   1 +
->>>>  virt/kvm/arm/vgic/vgic-v2.c     | 178 ++++++++++++++++++++++++++++++++++++++++
->>>>  virt/kvm/arm/vgic/vgic.c        |   6 ++
->>>>  virt/kvm/arm/vgic/vgic.h        |   6 ++
->>>>  4 files changed, 191 insertions(+)
->>>>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
->>>>
->>>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
->>>> index 9c94026..be0d26f 100644
->>>> --- a/include/linux/irqchip/arm-gic.h
->>>> +++ b/include/linux/irqchip/arm-gic.h
->>>> @@ -76,6 +76,7 @@
->>>>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
->>>>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->>>>  #define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
->>>> +#define GICH_LR_PRIORITY_SHIFT		23
->>>>  #define GICH_LR_STATE			(3 << 28)
->>>>  #define GICH_LR_PENDING_BIT		(1 << 28)
->>>>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
->>>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->>>> new file mode 100644
->>>> index 0000000..4cee616
->>>> --- /dev/null
->>>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->>>> @@ -0,0 +1,178 @@
->>>> +/*
->>>> + * Copyright (C) 2015, 2016 ARM Ltd.
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + *
->>>> + * You should have received a copy of the GNU General Public License
->>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>> + */
->>>> +
->>>> +#include <linux/irqchip/arm-gic.h>
->>>> +#include <linux/kvm.h>
->>>> +#include <linux/kvm_host.h>
->>>> +
->>>> +#include "vgic.h"
->>>> +
->>>> +/*
->>>> + * Call this function to convert a u64 value to an unsigned long * bitmask
->>>> + * in a way that works on both 32-bit and 64-bit LE and BE platforms.
->>>> + *
->>>> + * Warning: Calling this function may modify *val.
->>>> + */
->>>> +static unsigned long *u64_to_bitmask(u64 *val)
->>>> +{
->>>> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
->>>> +	*val = (*val >> 32) | (*val << 32);
->>>> +#endif
->>>> +	return (unsigned long *)val;
->>>> +}
->>>> +
->>>> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
->>>> +{
->>>> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
->>>> +
->>>> +	if (cpuif->vgic_misr & GICH_MISR_EOI) {
->>>> +		u64 eisr = cpuif->vgic_eisr;
->>>> +		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
->>>> +		int lr;
->>>> +
->>>> +		for_each_set_bit(lr, eisr_bmap, kvm_vgic_global_state.nr_lr) {
->>>> +			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
->>>> +
->>>> +			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
->>>> +
->>>> +			kvm_notify_acked_irq(vcpu->kvm, 0,
->>>> +					     intid - VGIC_NR_PRIVATE_IRQS);
->>>> +
->>>
->>> why do we need to do this?  I cannot find any consumers of this info
->>> after we've left the hyp code.
->>
->> I believe that's for vhost and irqfd. Or am I misreading your question?
->>
+On Tue, Mar 29, 2016 at 10:22:29AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
+> Update the kona driver to support Broadcom iproc pwm controller
 > 
-> I meant the setting of the bits in vgic_elrsr (sorry, badly placed
-> comment)...
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> ---
+>  drivers/pwm/Kconfig        |   6 +-
+>  drivers/pwm/pwm-bcm-kona.c | 183 +++++++++++++++++++++++++++++++++++++++------
+>  2 files changed, 163 insertions(+), 26 deletions(-)
 > 
->>> Also, I think I offered a comment about why we would potentially need
->>> this in the first place.  This is the famous race where hardware doesn't
->>> guarantee consistency between the MISR and ELRSR right?
->>
->> That's the one (except it is between EISR and ELRSR). I don't have your
->> initial comment at hand, but would something like the following do?
->>
->> 			/*
->> 			 * The maintenance interrupt may not have had a
->> 			 * chance to update ELRSR, so let's mark the LRs
->> 			 * presents in EISR as empty.
->> 			 */
->>>
->>>> +			cpuif->vgic_elrsr |= 1ULL << lr;
-> 
-> so, why are we doing this?
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index c182efc..e45ea33 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -76,9 +76,11 @@ config PWM_ATMEL_TCB
+>  
+>  config PWM_BCM_KONA
+>  	tristate "Kona PWM support"
+> -	depends on ARCH_BCM_MOBILE
+> +	depends on ARCH_BCM_MOBILE || ARCH_BCM_IPROC
+> +	default ARCH_BCM_IPROC
 
-Ah! I finally see what you mean: we don't reuse LRs at all with the new code
-base, so knowing which LR is empty is irrelevant. In which case, something
-like that should be done:
+Why the default? Typically you'd enable this in one or more of the
+default configurations. default ARCH_* is really only useful if the
+driver is essential. PWM doesn't usually fall into this category.
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index e88b5aa..5a8f4d4 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -52,8 +52,6 @@ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
- 
- 			kvm_notify_acked_irq(vcpu->kvm, 0,
- 					     intid - VGIC_NR_PRIVATE_IRQS);
--
--			cpuif->vgic_elrsr |= 1ULL << lr;
- 		}
- 	}
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 53f7847..4102f0f 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -43,8 +43,6 @@ void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
- 
- 			kvm_notify_acked_irq(vcpu->kvm, 0,
- 					     intid - VGIC_NR_PRIVATE_IRQS);
--
--			cpuif->vgic_elrsr |= 1ULL << lr;
- 		}
- 
- 		/*
+> diff --git a/drivers/pwm/pwm-bcm-kona.c b/drivers/pwm/pwm-bcm-kona.c
+> index c634183..ef152e3a 100644
+> --- a/drivers/pwm/pwm-bcm-kona.c
+> +++ b/drivers/pwm/pwm-bcm-kona.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/math64.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pwm.h>
+>  #include <linux/slab.h>
+> @@ -47,30 +48,90 @@
+>  
+>  #define PWM_CONTROL_OFFSET			(0x00000000)
+>  #define PWM_CONTROL_SMOOTH_SHIFT(chan)		(24 + (chan))
+> -#define PWM_CONTROL_TYPE_SHIFT(chan)		(16 + (chan))
+> +#define PWM_CONTROL_TYPE_SHIFT(shift, chan)	(shift + chan)
 
-I'll give it a spin, just to be safe.
+You need to put the parameters into parentheses to avoid expansion from
+potentially messing up the expression.
 
-Thanks,
+>  #define PWM_CONTROL_POLARITY_SHIFT(chan)	(8 + (chan))
+>  #define PWM_CONTROL_TRIGGER_SHIFT(chan)		(chan)
+>  
+>  #define PRESCALE_OFFSET				(0x00000004)
+> -#define PRESCALE_SHIFT(chan)			((chan) << 2)
+> -#define PRESCALE_MASK(chan)			(0x7 << PRESCALE_SHIFT(chan))
+> +#define PRESCALE_SHIFT				(0x00000004)
+> +#define PRESCALE_MASK				(0x00000007)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Hmm... this looks odd. Why are you dropping the chan parameter here?
+
+>  #define PRESCALE_MIN				(0x00000000)
+>  #define PRESCALE_MAX				(0x00000007)
+>  
+> -#define PERIOD_COUNT_OFFSET(chan)		(0x00000008 + ((chan) << 3))
+> +#define PERIOD_COUNT_OFFSET(offset, chan)	(offset + (chan << 3))
+
+Need parentheses here as well.
+
+>  #define PERIOD_COUNT_MIN			(0x00000002)
+>  #define PERIOD_COUNT_MAX			(0x00ffffff)
+> +#define KONA_PERIOD_COUNT_OFFSET		(0x00000008)
+>  
+> -#define DUTY_CYCLE_HIGH_OFFSET(chan)		(0x0000000c + ((chan) << 3))
+> +#define DUTY_CYCLE_HIGH_OFFSET(offset, chan)	(offset + (chan << 3))
+>  #define DUTY_CYCLE_HIGH_MIN			(0x00000000)
+>  #define DUTY_CYCLE_HIGH_MAX			(0x00ffffff)
+> +#define KONA_DUTY_CYCLE_HIGH_OFFSET		(0x0000000c)
+> +
+> +#define PWM_CHANNEL_CNT				(0x00000006)
+> +#define SIGNAL_PUSH_PULL			(0x00000001)
+> +#define PWMOUT_TYPE_SHIFT			(0x00000010)
+> +
+> +#define IPROC_PRESCALE_OFFSET			(0x00000024)
+> +#define IPROC_PRESCALE_SHIFT			(0x00000006)
+> +#define IPROC_PRESCALE_MAX			(0x0000003f)
+> +
+> +#define IPROC_PERIOD_COUNT_OFFSET		(0x00000004)
+> +#define IPROC_PERIOD_COUNT_MIN			(0x00000002)
+> +#define IPROC_PERIOD_COUNT_MAX			(0x0000ffff)
+> +
+> +#define IPROC_DUTY_CYCLE_HIGH_OFFSET		(0x00000008)
+> +#define IPROC_DUTY_CYCLE_HIGH_MIN		(0x00000000)
+> +#define IPROC_DUTY_CYCLE_HIGH_MAX		(0x0000ffff)
+> +
+> +#define IPROC_PWM_CHANNEL_CNT			(0x00000004)
+> +#define IPROC_SIGNAL_PUSH_PULL			(0x00000000)
+> +#define IPROC_PWMOUT_TYPE_SHIFT			(0x0000000f)
+> +
+> +/*
+> + * pwm controller reg structure
+> + *
+> + * @prescale_offset: prescale register offset
+> + * @period_offset: period register offset
+> + * @duty_offset: duty register offset
+> + * @no_of_channels: number of channels
+> + * @out_type_shift: out type shift in the register
+> + * @signal_type: push-pull or open drain
+> + * @prescale_max: prescale max
+> + * @prescale_shift: prescale shift in register
+> + * @prescale_ch_ascending: prescale ch order in prescale register
+> + * @duty_cycle_max: value of max duty cycle
+> + * @duty_cycle_min: value of min duty cycle
+> + * @period_count_max: max period count val
+> + * @period_count_min: min period count val
+> + * @smooth_output_support: pwm smooth output support
+> + */
+> +struct kona_pwmc_reg {
+> +	u32 prescale_offset;
+> +	u32 period_offset;
+> +	u32 duty_offset;
+> +	u32 no_of_channels;
+> +	u32 out_type_shift;
+> +	u32 signal_type;
+> +	u32 prescale_max;
+> +	u32 prescale_shift;
+> +	bool prescale_ch_ascending;
+> +	u32 duty_cycle_max;
+> +	u32 duty_cycle_min;
+> +	u32 period_count_max;
+> +	u32 period_count_min;
+> +	bool smooth_output_support;
+> +};
+
+This is rather tedious. It looks to me like this isn't very similar to
+the existing driver. Register offsets move around, bitfield positions
+change, feature set is different. Might be better off turning this into
+a separate driver after all.
+
+> +static const struct kona_pwmc_reg kona_pwmc_reg_data = {
+> +	.prescale_offset = PRESCALE_OFFSET,
+> +	.period_offset = KONA_PERIOD_COUNT_OFFSET,
+> +	.duty_offset = KONA_DUTY_CYCLE_HIGH_OFFSET,
+> +	.no_of_channels = PWM_CHANNEL_CNT,
+> +	.out_type_shift = PWMOUT_TYPE_SHIFT,
+> +	.signal_type = SIGNAL_PUSH_PULL,
+> +	.prescale_max = PRESCALE_MAX,
+> +	.prescale_shift = PRESCALE_SHIFT,
+> +	.prescale_ch_ascending = false,
+> +	.duty_cycle_max = DUTY_CYCLE_HIGH_MAX,
+> +	.duty_cycle_min = DUTY_CYCLE_HIGH_MIN,
+> +	.period_count_max = PERIOD_COUNT_MAX,
+> +	.period_count_min = PERIOD_COUNT_MIN,
+> +	.smooth_output_support = true,
+> +};
+> +
+> +static const struct kona_pwmc_reg iproc_pwmc_reg_data = {
+> +	.prescale_offset = IPROC_PRESCALE_OFFSET,
+> +	.period_offset = IPROC_PERIOD_COUNT_OFFSET,
+> +	.duty_offset = IPROC_DUTY_CYCLE_HIGH_OFFSET,
+> +	.no_of_channels = IPROC_PWM_CHANNEL_CNT,
+> +	.out_type_shift = IPROC_PWMOUT_TYPE_SHIFT,
+> +	.signal_type = IPROC_SIGNAL_PUSH_PULL,
+> +	.prescale_max = IPROC_PRESCALE_MAX,
+> +	.prescale_shift = IPROC_PRESCALE_SHIFT,
+> +	.prescale_ch_ascending = true,
+> +	.duty_cycle_max = IPROC_DUTY_CYCLE_HIGH_MAX,
+> +	.duty_cycle_min = IPROC_DUTY_CYCLE_HIGH_MIN,
+> +	.period_count_max = IPROC_PERIOD_COUNT_MAX,
+> +	.period_count_min = IPROC_PERIOD_COUNT_MIN,
+> +	.smooth_output_support = false,
+> +};
+
+This looks like you could possible support a lot more hardware with this
+driver because it's now almost completely parameterized.
+
+I don't see much sense in keeping this in the same driver and I think
+it'd be better to write a new one from scratch, even if that means
+slight duplication.
+
+Or you'll have to make a very compelling argument as to why this is the
+better option.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160510/8ebc180a/attachment.sig>
