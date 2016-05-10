@@ -1,97 +1,173 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon,  9 May 2016 17:04:13 -0700
-Subject: [PATCH 3/6] drivers: net: xgene: fix ununiform latency across queues
+Date: Mon,  9 May 2016 17:04:14 -0700
+Subject: [PATCH 4/6] drivers: net: xgene: fix statistics counters race
+ condition
 In-Reply-To: <1462838656-22043-1-git-send-email-isubramanian@apm.com>
 References: <1462838656-22043-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1462838656-22043-4-git-send-email-isubramanian@apm.com>
+Message-ID: <1462838656-22043-5-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addresses ununiform latency across queues by adding
-more queues to match with, upto number of CPU cores.
-
-Also, number of interrupts are increased and the channel numbers
-are reordered.
+This patch fixes the race condition on updating the statistics
+counters by moving the counters to the ring structure.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Toan Le <toanle@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 30 ++++++++++++++++++------
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  8 +++----
- 2 files changed, 27 insertions(+), 11 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   | 17 +++++++----
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h   |  2 ++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 39 ++++++++++++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h | 10 ++++++
+ 4 files changed, 52 insertions(+), 16 deletions(-)
 
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index 457f745..0050878 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -223,23 +223,28 @@ void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
+ 
+ 	switch (status) {
+ 	case INGRESS_CRC:
+-		stats->rx_crc_errors++;
++		ring->rx_crc_errors++;
++		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_CHECKSUM:
+ 	case INGRESS_CHECKSUM_COMPUTE:
+-		stats->rx_errors++;
++		ring->rx_errors++;
++		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_TRUNC_FRAME:
+-		stats->rx_frame_errors++;
++		ring->rx_frame_errors++;
++		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_PKT_LEN:
+-		stats->rx_length_errors++;
++		ring->rx_length_errors++;
++		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_PKT_UNDER:
+-		stats->rx_frame_errors++;
++		ring->rx_frame_errors++;
++		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_FIFO_OVERRUN:
+-		stats->rx_fifo_errors++;
++		ring->rx_fifo_errors++;
+ 		break;
+ 	default:
+ 		break;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+index ba7da98..ecfeffe 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+@@ -201,6 +201,8 @@ enum xgene_enet_rm {
+ #define USERINFO_LEN			32
+ #define FPQNUM_POS			32
+ #define FPQNUM_LEN			12
++#define ELERR_POS                       46
++#define ELERR_LEN                       2
+ #define NV_POS				50
+ #define NV_LEN				1
+ #define LL_POS				51
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index ed90664..e75d1a9 100644
+index e75d1a9..d992ae8 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -1247,6 +1247,13 @@ static int xgene_enet_get_irqs(struct xgene_enet_pdata *pdata)
- 	for (i = 0; i < max_irqs; i++) {
- 		ret = platform_get_irq(pdev, i);
- 		if (ret <= 0) {
-+			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
-+				max_irqs = i;
-+				pdata->rxq_cnt = max_irqs / 2;
-+				pdata->txq_cnt = max_irqs / 2;
-+				pdata->cq_cnt = max_irqs / 2;
-+				break;
-+			}
- 			dev_err(dev, "Unable to get ENET IRQ\n");
- 			ret = ret ? : -ENXIO;
- 			return ret;
-@@ -1450,19 +1457,28 @@ static void xgene_enet_setup_ops(struct xgene_enet_pdata *pdata)
- 		pdata->port_ops = &xgene_xgport_ops;
- 		pdata->cle_ops = &xgene_cle3in_ops;
- 		pdata->rm = RM0;
--		pdata->rxq_cnt = XGENE_NUM_RX_RING;
--		pdata->txq_cnt = XGENE_NUM_TX_RING;
--		pdata->cq_cnt = XGENE_NUM_TXC_RING;
-+		if (!pdata->rxq_cnt) {
-+			pdata->rxq_cnt = XGENE_NUM_RX_RING;
-+			pdata->txq_cnt = XGENE_NUM_TX_RING;
-+			pdata->cq_cnt = XGENE_NUM_TXC_RING;
-+		}
- 		break;
+@@ -443,8 +443,8 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+ 
+ 	skb_tx_timestamp(skb);
+ 
+-	pdata->stats.tx_packets++;
+-	pdata->stats.tx_bytes += skb->len;
++	tx_ring->tx_packets++;
++	tx_ring->tx_bytes += skb->len;
+ 
+ 	pdata->ring_ops->wr_cmd(tx_ring, count);
+ 	return NETDEV_TX_OK;
+@@ -483,12 +483,12 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
+ 	skb = buf_pool->rx_skb[skb_index];
+ 
+ 	/* checking for error */
+-	status = GET_VAL(LERR, le64_to_cpu(raw_desc->m0));
++	status = (GET_VAL(ELERR, le64_to_cpu(raw_desc->m0)) << LERR_LEN) ||
++		  GET_VAL(LERR, le64_to_cpu(raw_desc->m0));
+ 	if (unlikely(status > 2)) {
+ 		dev_kfree_skb_any(skb);
+ 		xgene_enet_parse_error(rx_ring, netdev_priv(rx_ring->ndev),
+ 				       status);
+-		pdata->stats.rx_dropped++;
+ 		ret = -EIO;
+ 		goto out;
+ 	}
+@@ -506,8 +506,8 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
+ 		xgene_enet_skip_csum(skb);
  	}
  
- 	if (pdata->enet_id == XGENE_ENET1) {
- 		switch (pdata->port_id) {
- 		case 0:
--			pdata->cpu_bufnum = START_CPU_BUFNUM_0;
--			pdata->eth_bufnum = START_ETH_BUFNUM_0;
--			pdata->bp_bufnum = START_BP_BUFNUM_0;
--			pdata->ring_num = START_RING_NUM_0;
-+			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
-+				pdata->cpu_bufnum = X2_START_CPU_BUFNUM_0;
-+				pdata->eth_bufnum = X2_START_ETH_BUFNUM_0;
-+				pdata->bp_bufnum = X2_START_BP_BUFNUM_0;
-+				pdata->ring_num = START_RING_NUM_0;
-+			} else {
-+				pdata->cpu_bufnum = START_CPU_BUFNUM_0;
-+				pdata->eth_bufnum = START_ETH_BUFNUM_0;
-+				pdata->bp_bufnum = START_BP_BUFNUM_0;
-+				pdata->ring_num = START_RING_NUM_0;
-+			}
- 			break;
- 		case 1:
- 			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+-	pdata->stats.rx_packets++;
+-	pdata->stats.rx_bytes += datalen;
++	rx_ring->rx_packets++;
++	rx_ring->rx_bytes += datalen;
+ 	napi_gro_receive(&rx_ring->napi, skb);
+ out:
+ 	if (--rx_ring->nbufpool == 0) {
+@@ -1127,11 +1127,30 @@ static struct rtnl_link_stats64 *xgene_enet_get_stats64(
+ {
+ 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+ 	struct rtnl_link_stats64 *stats = &pdata->stats;
++	struct xgene_enet_desc_ring *ring;
++	int i;
++
++	memset(stats, 0, sizeof(struct rtnl_link_stats64));
++	for (i = 0; i < pdata->txq_cnt; i++) {
++		ring = pdata->tx_ring[i];
++		if (ring) {
++			stats->tx_packets += ring->tx_packets;
++			stats->tx_bytes += ring->tx_bytes;
++		}
++	}
+ 
+-	stats->rx_errors += stats->rx_length_errors +
+-			    stats->rx_crc_errors +
+-			    stats->rx_frame_errors +
+-			    stats->rx_fifo_errors;
++	for (i = 0; i < pdata->rxq_cnt; i++) {
++		ring = pdata->rx_ring[i];
++		if (ring) {
++			stats->rx_packets += ring->rx_packets;
++			stats->rx_bytes += ring->rx_bytes;
++			stats->rx_errors += ring->rx_length_errors +
++				ring->rx_crc_errors +
++				ring->rx_frame_errors +
++				ring->rx_fifo_errors;
++			stats->rx_dropped += ring->rx_dropped;
++		}
++	}
+ 	memcpy(storage, &pdata->stats, sizeof(struct rtnl_link_stats64));
+ 
+ 	return storage;
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index 0a2887b..cc40c30 100644
+index cc40c30..092fbec 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -49,10 +49,10 @@
- #define XGENE_ENET_MSS	1448
- #define XGENE_MIN_ENET_FRAME_SIZE	60
+@@ -121,6 +121,16 @@ struct xgene_enet_desc_ring {
+ 		struct xgene_enet_raw_desc16 *raw_desc16;
+ 	};
+ 	__le64 *exp_bufs;
++	u64 tx_packets;
++	u64 tx_bytes;
++	u64 rx_packets;
++	u64 rx_bytes;
++	u64 rx_dropped;
++	u64 rx_errors;
++	u64 rx_length_errors;
++	u64 rx_crc_errors;
++	u64 rx_frame_errors;
++	u64 rx_fifo_errors;
+ };
  
--#define XGENE_MAX_ENET_IRQ	8
--#define XGENE_NUM_RX_RING	4
--#define XGENE_NUM_TX_RING	4
--#define XGENE_NUM_TXC_RING	4
-+#define XGENE_MAX_ENET_IRQ	16
-+#define XGENE_NUM_RX_RING	8
-+#define XGENE_NUM_TX_RING	8
-+#define XGENE_NUM_TXC_RING	8
- 
- #define START_CPU_BUFNUM_0	0
- #define START_ETH_BUFNUM_0	2
+ struct xgene_mac_ops {
 -- 
 1.9.1
