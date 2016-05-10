@@ -1,141 +1,135 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Tue, 10 May 2016 17:47:26 +0800
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <9651510.pg5Vmm8vKS@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160506123731.GA11959@yury-N73SV> <573190CF.6030408@huawei.com>
- <9651510.pg5Vmm8vKS@wuerfel>
-Message-ID: <5731AE2E.2050403@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 10 May 2016 18:50:49 +0900
+Subject: [RFC PATCH 08/21] clk: uniphier: add clock driver for UniPhier
+ PH1-LD11 SoC
+In-Reply-To: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462873862-30940-9-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+This series is just for review.
+Please do not apply this patch.
 
-On 2016/5/10 16:36, Arnd Bergmann wrote:
-> On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
->> On 2016/5/6 20:37, Yury Norov wrote:
->>> On Fri, May 06, 2016 at 08:16:48PM +0800, Zhangjian (Bamvor) wrote:
->>>
->>> AFAIR, here we don't shift offset, as it's 64-bit both in user-
->>> and kernel-space,
->> In your ilp32-2.22 branch, you wrapper mmap to mmap2 in which type of
->> offset is off_t. And off_t is 32bit in ilp32, correct?
->> "sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c"
->> /* mmap is provided by mmap as they are the same. */
->> void *__mmap (void *__addr, size_t __len, int __prot,
->>                        int __flags, int __fd, __off_t __offset)
->> {
->>      void *result;
->>      result = (void *)
->>        INLINE_SYSCALL (mmap2, 6, __addr,
->>                        __len, __prot, __flags, __fd, __offset);
->>      return result;
->> }
->
-> __off_t should be 'long long' on new architectures, and map
-> to __kernel_loff_t.
->
-> Can you see how it is defined?
-For kernel part, in "include/uapi/asm-generic/posix_types.h":
-     #ifndef __kernel_long_t
-     typedef long            __kernel_long_t;
-     typedef unsigned long   __kernel_ulong_t;
-     #endif
-     typedef __kernel_long_t __kernel_off_t;
-in "include/linux/types.h":
-     typedef __kernel_off_t          off_t;
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-"include/uapi/asm-generic/posix_types.h" is uapi, we could not check
-"ARCH_32BIT_OFF_T" here. Besides, the `__kernel_long_t` is long which
-mean it is 32bit in ILP32. should we define something like x32?
-     ```
-     diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
-     index 7985ff6..9baa8d3 100644
-     --- a/arch/arm64/include/uapi/asm/posix_types.h
-     +++ b/arch/arm64/include/uapi/asm/posix_types.h
-     @@ -5,6 +5,9 @@ typedef unsigned short __kernel_old_uid_t;
-      typedef unsigned short __kernel_old_gid_t;
-       #define __kernel_old_uid_t __kernel_old_uid_t
+ drivers/clk/uniphier/Kconfig             |  4 ++
+ drivers/clk/uniphier/Makefile            |  1 +
+ drivers/clk/uniphier/clk-uniphier-ld11.c | 83 ++++++++++++++++++++++++++++++++
+ 3 files changed, 88 insertions(+)
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-ld11.c
 
-      +typedef long long __kernel_long_t;
-      +typedef unsigned long long __kernel_ulong_t;
-      +
-       #include <asm-generic/posix_types.h>
-
-       #endif /*  __ASM_POSIX_TYPES_H */u
-     ```
-After this definition, the following kernel types is 64bit in ILP32:
-     typedef __kernel_long_t         __kernel_suseconds_t;
-     typedef __kernel_long_t __kernel_ssize_t;
-     typedef __kernel_long_t __kernel_ptrdiff_t;
-     typedef __kernel_long_t __kernel_off_t;
-     typedef __kernel_long_t __kernel_time_t;
-     typedef __kernel_long_t __kernel_clock_t;
-     typedef __kernel_ulong_t __kernel_ino_t;
-     typedef __kernel_ulong_t __kernel_size_t;
-
-But it is not a generic way to define off_t to 64bit if
-ARCH_32BIT_OFF_T is not defined. How about this one? We need to
-define `__kernel_off_t` on all the old 32bit architecture like
-arm:
-```
-diff --git a/arch/arm/include/uapi/asm/posix_types.h b/arch/arm/include/uapi/asm/posix_types.h
-index d2de9cb..f9d065c 100644
---- a/arch/arm/include/uapi/asm/posix_types.h
-+++ b/arch/arm/include/uapi/asm/posix_types.h
-@@ -32,6 +32,9 @@ typedef unsigned short                __kernel_gid_t;
-  typedef unsigned short         __kernel_old_dev_t;
-  #define __kernel_old_dev_t __kernel_old_dev_t
-
-+typedef __kernel_long_t        __kernel_off_t;
-+#define __kernel_off_t
+diff --git a/drivers/clk/uniphier/Kconfig b/drivers/clk/uniphier/Kconfig
+index d4a3d55..1746aea 100644
+--- a/drivers/clk/uniphier/Kconfig
++++ b/drivers/clk/uniphier/Kconfig
+@@ -26,4 +26,8 @@ config CLK_UNIPHIER_PXS2
+ 	tristate "Clock driver for UniPhier ProXstream2/PH1-LD6b SoC"
+ 	default ARM
+ 
++config CLK_UNIPHIER_LD11
++	tristate "Clock driver for UniPhier PH1-LD11 SoC"
++	default ARM64
 +
-  #include <asm-generic/posix_types.h>
-
-  #endif
-```
-And We could change the generic posix_types.h a little bit:
-```
-diff --git a/include/uapi/asm-generic/posix_types.h b/include/uapi/asm-generic/posix_types.h
-index fe74fcc..7bbaf04 100644
---- a/include/uapi/asm-generic/posix_types.h
-+++ b/include/uapi/asm-generic/posix_types.h
-@@ -80,10 +80,13 @@ typedef struct {
-  } __kernel_fsid_t;
-  #endif
-
-+#ifndef __kernel_off_t
-+typedef long long __kernel_off_t;
-+#endif
+ endif
+diff --git a/drivers/clk/uniphier/Makefile b/drivers/clk/uniphier/Makefile
+index 20a274f..e056771 100644
+--- a/drivers/clk/uniphier/Makefile
++++ b/drivers/clk/uniphier/Makefile
+@@ -9,3 +9,4 @@ obj-$(CONFIG_CLK_UNIPHIER_PRO4)	+= clk-uniphier-pro4.o
+ obj-$(CONFIG_CLK_UNIPHIER_SLD8)	+= clk-uniphier-sld8.o
+ obj-$(CONFIG_CLK_UNIPHIER_PRO5)	+= clk-uniphier-pro5.o
+ obj-$(CONFIG_CLK_UNIPHIER_PXS2)	+= clk-uniphier-pxs2.o
++obj-$(CONFIG_CLK_UNIPHIER_LD11)	+= clk-uniphier-ld11.o
+diff --git a/drivers/clk/uniphier/clk-uniphier-ld11.c b/drivers/clk/uniphier/clk-uniphier-ld11.c
+new file mode 100644
+index 0000000..5b8536a
+--- /dev/null
++++ b/drivers/clk/uniphier/clk-uniphier-ld11.c
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (C) 2016 Socionext Inc.
++ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-  /*
-   * anything below here should be completely generic
-   */
--typedef __kernel_long_t        __kernel_off_t;
-  typedef long long      __kernel_loff_t;
-  typedef __kernel_long_t        __kernel_time_t;
-  typedef __kernel_long_t        __kernel_clock_t;
-```
-
-On the other hand, glibc define it own off_t in "bits/types.h":
-     __STD_TYPE __OFF_T_TYPE __off_t;        /* Type of file sizes and offsets.  */
-     __STD_TYPE __OFF64_T_TYPE __off64_t;    /* Type of file sizes and offsets (LFS).  */
-
-in "sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h":
-     #define __OFF_T_TYPE            __SLONGWORD_TYPE
-     #define __OFF64_T_TYPE          __SQUAD_TYPE
-
-If we define off_t as 64bit in glibc:
-     #define __OFF_T_TYPE           __SQUAD_TYPE
-
-Should We need to align all the off_t syscall to 64bit syscall in
-kernel?
-
-Regards
-
-Bamvor
-
-
-> 	Arnd
->
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "clk-uniphier.h"
++
++static const struct uniphier_clk_data uniphier_ld11_clk_data[] = {
++	{
++		.name = "spll",
++		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
++		.output_index = -1,
++		.data.factor = {
++			.parent_name = "ref",
++			.mult = 80,
++			.div = 1,
++		},
++	},
++	{
++		.name = "uart",
++		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
++		.output_index = 0,
++		.data.factor = {
++			.parent_name = "spll",
++			.mult = 1,
++			.div = 34,
++		},
++	},
++	{
++		.name = "fi2c",
++		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,
++		.output_index = 1,
++		.data.factor = {
++			.parent_name = "spll",
++			.mult = 1,
++			.div = 50,
++		},
++	},
++	{
++		.name = "stdmac",
++		.type = UNIPHIER_CLK_TYPE_GATE,
++		.output_index = 7,
++		.data.gate = {
++			.parent_name = NULL,
++			.reg = 0x200c,
++			.mask = BIT(8),
++			.enable_val = BIT(8),
++		},
++	},
++	{ /* sentinel */ }
++};
++
++static int uniphier_ld11_clk_probe(struct platform_device *pdev)
++{
++	return uniphier_clk_probe(pdev, uniphier_ld11_clk_data);
++}
++
++static struct platform_driver uniphier_ld11_clk_driver = {
++	.probe = uniphier_ld11_clk_probe,
++	.remove = uniphier_clk_remove,
++	.driver = {
++		.name = "uniphier-ld11-clk",
++	},
++};
++module_platform_driver(uniphier_ld11_clk_driver);
++
++MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
++MODULE_DESCRIPTION("UniPhier PH1-LD11 System Clock Driver");
++MODULE_LICENSE("GPL");
+-- 
+1.9.1
