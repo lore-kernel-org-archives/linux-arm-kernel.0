@@ -1,19 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 22:18:20 +0200
-Subject: [GIT PULL] arm64: tegra: Enable GM20B GPU on Tegra210
-In-Reply-To: <1461946869-26124-3-git-send-email-thierry.reding@gmail.com>
-References: <1461946869-26124-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <2527075.TJdy0Md9Y9@wuerfel>
+Date: Tue, 10 May 2016 22:16:22 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.7 (#1)
+In-Reply-To: <87twi6nfad.fsf@free-electrons.com>
+References: <87twi6nfad.fsf@free-electrons.com>
+Message-ID: <15112851.U73dTNcfKF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 April 2016 18:21:08 Thierry Reding wrote:
-> arm64: tegra: Enable GM20B GPU on Tegra210
+On Tuesday 10 May 2016 16:44:42 Gregory CLEMENT wrote:
+> Hi,
 > 
-> Complement the GM20B GPU device tree node on Tegra210 with missing
-> properties to make it usable.
+> Here is the first pull request for defconfig64 for mvebu for v4.7.
 > 
+> Gregory
+> 
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> 
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.7-1
+> 
+> for you to fetch changes up to e5d8b0ad5ae4c70a7081865a3c6c83ae1afe3087:
+> 
+>   arm64: configs: add options useful for Armada 7K/8K support (2016-05-10 14:42:23 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu defconfig for arm64 for 4.7
+> 
+> - update arm64 defconfig with options useful for Armada 7K/8K support
+> 
+> ----------------------------------------------------------------
 
-Pulled into next/dt64, thanks!
+Pulled into next/arm64, thanks for the respin!
 
 	Arnd
