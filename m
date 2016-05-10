@@ -1,174 +1,277 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Tue, 10 May 2016 15:08:20 +0200
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20160510144143.1965ee5e@bbrezillon>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop> <20160503185153.5cfddc32@bbrezillon>
- <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
- <20160504113852.10a2dd84@bbrezillon>
- <CAL_Jsq+4aL5znA3zOKdcJb+pEXhVOQthkFF6DN2+P6U37t2o6g@mail.gmail.com>
- <20160504153547.60d736bb@bbrezillon> <20160510100448.49834120@bbrezillon>
- <20160510110742.GI687@leverpostej> <20160510144143.1965ee5e@bbrezillon>
-Message-ID: <CACh+v5M2yZ403+VwvRMYeGwfhpP+aCGnnNhiQ1wjrxS5fVGVEA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 10 May 2016 15:11:16 +0200
+Subject: [PATCH v3 17/55] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
+ framework
+In-Reply-To: <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160510131116.GE27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-10 14:41 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> On Tue, 10 May 2016 12:07:42 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
->
->> On Tue, May 10, 2016 at 10:04:48AM +0200, Boris Brezillon wrote:
->> > On Wed, 4 May 2016 15:35:47 +0200
->> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
->> >
->> > > On Wed, 4 May 2016 08:06:10 -0500
->> > > Rob Herring <robh@kernel.org> wrote:
->> > >
->> > > > On Wed, May 4, 2016 at 4:38 AM, Boris Brezillon
->> > > > <boris.brezillon@free-electrons.com> wrote:
->> > > > > Hi Rob,
->> > > > >
->> > > > > On Tue, 3 May 2016 14:11:04 -0500
->> > > > > Rob Herring <robh@kernel.org> wrote:
->> > > > >
->> > > > >> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
->> > > > >> <boris.brezillon@free-electrons.com> wrote:
->> > > > >> > Hi Rob,
->> > > > >> >
->> > > > >> > On Tue, 3 May 2016 11:40:19 -0500
->> > > > >> > Rob Herring <robh@kernel.org> wrote:
->> > > > >> >
->> > > > >> >> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:
->> > > > >> >> > The EBI (External Bus Interface) is used to access external peripherals
->> > > > >> >> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
->> > > > >> >> > Each device is assigned a CS line and an address range and can have its
->> > > > >> >> > own configuration (timings, access mode, bus width, ...).
->> > > > >> >> > This driver provides a generic DT binding to configure a device according
->> > > > >> >> > to its requirements.
->> > > > >> >> > For specific device controllers (like the NAND one) the SMC timings
->> > > > >> >> > should be configured by the controller driver through the matrix and smc
->> > > > >> >> > syscon regmaps.
->> > > >
->> > > > [...]
->> > > >
->> > > > >> >> > +EBI bus configuration associated with specific chip-select will be defined in
->> > > > >> >> > +the configs subnode. This configs node will in turn contain several subnodes
->> > > > >> >> > +named config-<cs-id>, each of them containing the following properties.
->> > > > >> >>
->> > > > >> >> This is a bit unusual. Why not just part of the child device nodes?
->> > > > >> >
->> > > > >> > Oh, come on! I reworked the binding because Mark complained about the
->> > > > >> > previous binding which was doing exactly what you're suggesting. Can
->> > > > >> > you please be consistent in your reviews...
->> > > > >>
->> > > > >> No, Mark and I both have our opinions. Which part of this patch
->> > > > >> explains the history?
->> > > > >
->> > > > > Hm, it's in patch 1/2 (just dropped the cover letter, which might not
->> > > > > be such a good idea).
->> > > > >
->> > > > >> If the revision history is not in the patch, I'm
->> > > > >> not looking at it.
->> > > > >>
->> > > > >> My issue with it this way is that it has invented yet another way to
->> > > > >> describe timings. I would like to be consistent across external bus
->> > > > >> descriptions, but we're not very consistent to begin with though. The
->> > > > >> most common seems to be the way you first did it. But I agree that it
->> > > > >> is kind of screwy to have an intermediate node unless the controller
->> > > > >> itself has sub-blocks within it and is not the established way to
->> > > > >> describe a bus with chip selects. I would either put the properties
->> > > > >> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
->> > > > >> in the device node. I'd call it timings instead of config, but that's
->> > > > >> just bikeshedding.
->> > > > >
->> > > > > Well, it's not only describing timings (see atmel,bus-width,
->> > > > > atmel,byte-access-type, ...), but I'm fine with either names :).
->> > > > >
->> > > > >>
->> > > > >> memory-controller at 1000 {
->> > > > >>   ...
->> > > > >>   flash at 0,0 {
->> > > > >>     timings {
->> > > > >>       ...
->> > > > >>     };
->> > > > >>   };
->> > > > >> };
->> > > > >
->> > > > > Okay. Mark, what do you think of this approach?
->> > > > >
->> > > > > Note that one of my previous version was defining timings directly in
->> > > > > the EBI device node, and Arnd noted that doing so may cause problems
->> > > > > if one of the EBI property (or the config/timing node name) conflict
->> > > > > with the sub-device binding, which is why I decided to put the EBI
->> > > > > config definitions in a separate subnode.
->> > > >
->> > > > You have vendor prefixes on all the properties so I don't think a
->> > > > collision is really a problem. It's also an established pattern in
->> > > > i.MX WEIM and OMAP GPMC (which are hiding in bindings/bus/) and I
->> > > > prefer consistency.
->> > >
->> > > So let's summarize that.
->> > >
->> > > memory-controller at 1000 {
->> > >   ...
->> > >   flash at 0,0 {
->> > >           atmel,<ebi-prop-name> = <value>;
->> > >           ...
->> > >           <flash-device-prop> = <value>;
->> > >   };
->> > > };
->> > >
->> > > Would everyone agree on this representation?
->> > >
->> > > With this approach, it's a bit more complicated to detect the case
->> > > where we want to keep bootloader/firmware config, but it should be
->> > > doable (it's much more easier to test for the presence of a
->> > > config/timing node than verifying that either all or none of the
->> > > mandatory properties are here).
->> > >
->> > > Still remains the problem mentioned by Jean-Jacques: what if the
->> > > sub-device takes 2 CS lines. Should we apply the same setting to those
->> > > slots?
->> > >
->> >
->> > Rob, Mark, Arnd, can you take a decision regarding this binding? This
->> > driver is floating around for quite some time, and we were asked to
->> > rework the binding several times (in time in an opposite direction).
->> >
->> > For the record, here is the thread I mentioned earlier [1]. In his
->> > answer, Arnd suggests to put timing and bus config description
->> > outside of the sub-device node. Mark recently complained about this
->> > representation, which led me to the configs/config-X appraoch, and now
->> > Rob suggests to go back to the first proposal.
->> >
->> > I'm fine doing that, but can you please all confirm that you agree on
->> > this binding?
->>
->> Sorry for the delay in getting round to this, and sorry that this
->> appears to be going in circles.
->>
->> Please go with Rob's suggestion.
->
-> Okay. This changes a bit the constraints defined in the binding doc
-> (no default values for undefined properties: we just keep the
-> bootloader/firmware config), but otherwise should be easy to implement.
->
->>
->> I'm not sure about the case where a device takes 2 CS lines. I would
->> assume that in practice that a sub-device covered my multiple CS lines
->> expects the same timings for all its MMIO space, and so having that
->> uniform makes sense. Do we have a counter-example?
->
-> Nope, I don't. JJH had one (interfacing with an FPGA), maybe he can
-> detail this use case.
->
-I don't either. It makes sense that a single device with 2 CS uses the
-same timings.
-My use case was the other way around: 1 CS for several devices.
+On Fri, May 06, 2016 at 11:45:30AM +0100, Andre Przywara wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Implement the framework for syncing IRQs between our emulation and
+> the list registers, which represent the guest's view of IRQs.
+> This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
+> which gets called on guest entry and exit.
+> The code talking to the actual GICv2/v3 hardware is added in the
+> following patches.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
 
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+> Changelog RFC..v1:
+> - split out vgic_clear_lr() from vgic_populate_lr()
+> - rename vgic_populate_lrs() to vgic_flush_lr_state()
+> - clean all LRs when the distributor is disabled
+> - use list_del() instead of list_del_init()
+> - add comments to explain the direction of sync/flush_hwstate
+> - remove unneeded BUG_ON(in_interrupt()
+> 
+> Changelog v2 .. v3:
+> - remove bogus v2 specific rebase leftovers
+> 
+>  include/kvm/vgic/vgic.h  |   4 +
+>  virt/kvm/arm/vgic/vgic.c | 193 +++++++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h |   2 +
+>  3 files changed, 199 insertions(+)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 2bfb42c..5fae4a9 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -190,6 +190,10 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  #define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+>  			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+>  
+> +bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+> +void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+> +void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+> +
+>  /**
+>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+>   *
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 4fb20fd..c6f8b9b 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -305,3 +305,196 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  {
+>  	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+>  }
+> +
+> +/**
+> + * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+> + *
+> + * @vcpu: The VCPU pointer
+> + *
+> + * Go over the list of "interesting" interrupts, and prune those that we
+> + * won't have to consider in the near future.
+> + */
+> +static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	struct vgic_irq *irq, *tmp;
+> +
+> +retry:
+> +	spin_lock(&vgic_cpu->ap_list_lock);
+> +
+> +	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
+> +		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
+> +
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		BUG_ON(vcpu != irq->vcpu);
+> +
+> +		target_vcpu = vgic_target_oracle(irq);
+> +
+> +		if (!target_vcpu) {
+> +			/*
+> +			 * We don't need to process this interrupt any
+> +			 * further, move it off the list.
+> +			 */
+> +			list_del(&irq->ap_list);
+> +			irq->vcpu = NULL;
+> +			spin_unlock(&irq->irq_lock);
+> +			continue;
+> +		}
+> +
+> +		if (target_vcpu == vcpu) {
+> +			/* We're on the right CPU */
+> +			spin_unlock(&irq->irq_lock);
+> +			continue;
+> +		}
+> +
+> +		/* This interrupt looks like it has to be migrated. */
+> +
+> +		spin_unlock(&irq->irq_lock);
+> +		spin_unlock(&vgic_cpu->ap_list_lock);
+> +
+> +		/*
+> +		 * Ensure locking order by always locking the smallest
+> +		 * ID first.
+> +		 */
+> +		if (vcpu->vcpu_id < target_vcpu->vcpu_id) {
+> +			vcpuA = vcpu;
+> +			vcpuB = target_vcpu;
+> +		} else {
+> +			vcpuA = target_vcpu;
+> +			vcpuB = vcpu;
+> +		}
+> +
+> +		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+> +		spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		/*
+> +		 * If the affinity has been preserved, move the
+> +		 * interrupt around. Otherwise, it means things have
+> +		 * changed while the interrupt was unlocked, and we
+> +		 * need to replay this.
+> +		 *
+> +		 * In all cases, we cannot trust the list not to have
+> +		 * changed, so we restart from the beginning.
+> +		 */
+> +		if (target_vcpu == vgic_target_oracle(irq)) {
+> +			struct vgic_cpu *new_cpu = &target_vcpu->arch.vgic_cpu;
+> +
+> +			list_del(&irq->ap_list);
+> +			irq->vcpu = target_vcpu;
+> +			list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
+> +		}
+> +
+> +		spin_unlock(&irq->irq_lock);
+> +		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+> +		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+> +		goto retry;
+> +	}
+> +
+> +	spin_unlock(&vgic_cpu->ap_list_lock);
+> +}
+> +
+> +static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> +
+> +static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> +
+> +/* Requires the ap_list_lock and the irq_lock to be held. */
+> +static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+> +				    struct vgic_irq *irq, int lr)
+> +{
+> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
+> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +}
+> +
+> +static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
+> +{
+> +}
+> +
+> +static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> +
+> +static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	struct vgic_irq *irq;
+> +	int count = 0;
+> +
+> +	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+> +		spin_lock(&irq->irq_lock);
+> +		/* GICv2 SGIs can count for more than one... */
+> +		if (vgic_irq_is_sgi(irq->intid) && irq->source)
+> +			count += hweight8(irq->source);
+> +		else
+> +			count++;
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +	return count;
+> +}
+> +
+> +/* Requires the VCPU's ap_list_lock to be held. */
+> +static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	struct vgic_irq *irq;
+> +	int count = 0;
+> +
+> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+> +
+> +	if (unlikely(!vcpu->kvm->arch.vgic.enabled))
+> +		goto out_clean;
+> +
+> +	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr) {
+> +		vgic_set_underflow(vcpu);
+> +		vgic_sort_ap_list(vcpu);
+> +	}
+> +
+> +	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		if (unlikely(vgic_target_oracle(irq) != vcpu))
+> +			goto next;
+> +
+> +		/*
+> +		 * If we get an SGI with multiple sources, try to get
+> +		 * them in all at once.
+> +		 */
+> +		do {
+> +			vgic_populate_lr(vcpu, irq, count++);
+> +		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
+> +
+> +next:
+> +		spin_unlock(&irq->irq_lock);
+> +
+> +		if (count == kvm_vgic_global_state.nr_lr)
+> +			break;
+> +	}
+> +
+> +out_clean:
+> +	vcpu->arch.vgic_cpu.used_lrs = count;
+> +
+> +	/* Nuke remaining LRs */
+> +	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
+> +		vgic_clear_lr(vcpu, count);
+> +}
+> +
+> +/* Sync back the hardware VGIC state into our emulation after a guest's run. */
+> +void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+> +{
+> +	vgic_process_maintenance_interrupt(vcpu);
+> +	vgic_fold_lr_state(vcpu);
+> +	vgic_prune_ap_list(vcpu);
+> +}
+> +
+> +/* Flush our emulation state into the GIC hardware before entering the guest. */
+> +void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+> +{
+> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> +	vgic_flush_lr_state(vcpu);
+> +	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index c625767..29b96b9 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -16,6 +16,8 @@
+>  #ifndef __KVM_ARM_VGIC_NEW_H__
+>  #define __KVM_ARM_VGIC_NEW_H__
+>  
+> +#define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+> +
+>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  			      u32 intid);
+>  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+> -- 
+> 2.7.3
+> 
