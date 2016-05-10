@@ -1,277 +1,100 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 10 May 2016 15:11:16 +0200
-Subject: [PATCH v3 17/55] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
- framework
-In-Reply-To: <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160510131116.GE27623@cbox>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 16:07:53 +0300
+Subject: [PATCH 22/23] mmc: sdhci-esdhc-imx: move tuning static
+ configuration into hwinit function
+In-Reply-To: <1460741387-23815-23-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-23-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5731DD29.3020307@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:45:30AM +0100, Andre Przywara wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On 15/04/16 20:29, Dong Aisheng wrote:
+> Move tuning static configuration into hwinit function.
+> Tuning configuration may also be lost in low power mode,
+> so need restore in hwinit().
 > 
-> Implement the framework for syncing IRQs between our emulation and
-> the list registers, which represent the guest's view of IRQs.
-> This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
-> which gets called on guest entry and exit.
-> The code talking to the actual GICv2/v3 hardware is added in the
-> following patches.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
 > ---
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> Changelog RFC..v1:
-> - split out vgic_clear_lr() from vgic_populate_lr()
-> - rename vgic_populate_lrs() to vgic_flush_lr_state()
-> - clean all LRs when the distributor is disabled
-> - use list_del() instead of list_del_init()
-> - add comments to explain the direction of sync/flush_hwstate
-> - remove unneeded BUG_ON(in_interrupt()
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 36 ++++++++++++++++++------------------
+>  1 file changed, 18 insertions(+), 18 deletions(-)
 > 
-> Changelog v2 .. v3:
-> - remove bogus v2 specific rebase leftovers
-> 
->  include/kvm/vgic/vgic.h  |   4 +
->  virt/kvm/arm/vgic/vgic.c | 193 +++++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h |   2 +
->  3 files changed, 199 insertions(+)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 2bfb42c..5fae4a9 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -190,6 +190,10 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->  #define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
->  			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
->  
-> +bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
-> +void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
-> +void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-> +
->  /**
->   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
->   *
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 4fb20fd..c6f8b9b 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -305,3 +305,196 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 95f3632..98aa6b5 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -483,7 +483,6 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
+>  			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
+>  			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
+> -			u32 tuning_ctrl;
+>  			if (val & SDHCI_CTRL_TUNED_CLK) {
+>  				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
+>  			} else {
+> @@ -496,18 +495,6 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
+>  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
+>  				m |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
+> -				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
+> -				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT;
+> -				if (imx_data->boarddata.tuning_start_tap) {
+> -					tuning_ctrl &= ~ESDHC_TUNING_START_TAP_MASK;
+> -					tuning_ctrl |= imx_data->boarddata.tuning_start_tap;
+> -				}
+> -
+> -				if (imx_data->boarddata.tuning_step) {
+> -					tuning_ctrl &= ~ESDHC_TUNING_STEP_MASK;
+> -					tuning_ctrl |= imx_data->boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
+> -				}
+> -				writel(tuning_ctrl, host->ioaddr + ESDHC_TUNING_CTRL);
+>  			} else {
+>  				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
+>  			}
+> @@ -982,6 +969,7 @@ static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
 >  {
->  	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
->  }
-> +
-> +/**
-> + * vgic_prune_ap_list - Remove non-relevant interrupts from the list
-> + *
-> + * @vcpu: The VCPU pointer
-> + *
-> + * Go over the list of "interesting" interrupts, and prune those that we
-> + * won't have to consider in the near future.
-> + */
-> +static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	struct vgic_irq *irq, *tmp;
-> +
-> +retry:
-> +	spin_lock(&vgic_cpu->ap_list_lock);
-> +
-> +	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
-> +		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
-> +
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		BUG_ON(vcpu != irq->vcpu);
-> +
-> +		target_vcpu = vgic_target_oracle(irq);
-> +
-> +		if (!target_vcpu) {
-> +			/*
-> +			 * We don't need to process this interrupt any
-> +			 * further, move it off the list.
-> +			 */
-> +			list_del(&irq->ap_list);
-> +			irq->vcpu = NULL;
-> +			spin_unlock(&irq->irq_lock);
-> +			continue;
-> +		}
-> +
-> +		if (target_vcpu == vcpu) {
-> +			/* We're on the right CPU */
-> +			spin_unlock(&irq->irq_lock);
-> +			continue;
-> +		}
-> +
-> +		/* This interrupt looks like it has to be migrated. */
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vgic_cpu->ap_list_lock);
-> +
-> +		/*
-> +		 * Ensure locking order by always locking the smallest
-> +		 * ID first.
-> +		 */
-> +		if (vcpu->vcpu_id < target_vcpu->vcpu_id) {
-> +			vcpuA = vcpu;
-> +			vcpuB = target_vcpu;
-> +		} else {
-> +			vcpuA = target_vcpu;
-> +			vcpuB = vcpu;
-> +		}
-> +
-> +		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-> +		spin_lock(&vcpuB->arch.vgic_cpu.ap_list_lock);
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		/*
-> +		 * If the affinity has been preserved, move the
-> +		 * interrupt around. Otherwise, it means things have
-> +		 * changed while the interrupt was unlocked, and we
-> +		 * need to replay this.
-> +		 *
-> +		 * In all cases, we cannot trust the list not to have
-> +		 * changed, so we restart from the beginning.
-> +		 */
-> +		if (target_vcpu == vgic_target_oracle(irq)) {
-> +			struct vgic_cpu *new_cpu = &target_vcpu->arch.vgic_cpu;
-> +
-> +			list_del(&irq->ap_list);
-> +			irq->vcpu = target_vcpu;
-> +			list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
-> +		}
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
-> +		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-> +		goto retry;
-> +	}
-> +
-> +	spin_unlock(&vgic_cpu->ap_list_lock);
-> +}
-> +
-> +static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +
-> +static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +
-> +/* Requires the ap_list_lock and the irq_lock to be held. */
-> +static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
-> +				    struct vgic_irq *irq, int lr)
-> +{
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-> +}
-> +
-> +static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
-> +{
-> +}
-> +
-> +static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +
-> +static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	struct vgic_irq *irq;
-> +	int count = 0;
-> +
-> +	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-> +		spin_lock(&irq->irq_lock);
-> +		/* GICv2 SGIs can count for more than one... */
-> +		if (vgic_irq_is_sgi(irq->intid) && irq->source)
-> +			count += hweight8(irq->source);
-> +		else
-> +			count++;
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +	return count;
-> +}
-> +
-> +/* Requires the VCPU's ap_list_lock to be held. */
-> +static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	struct vgic_irq *irq;
-> +	int count = 0;
-> +
-> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
-> +
-> +	if (unlikely(!vcpu->kvm->arch.vgic.enabled))
-> +		goto out_clean;
-> +
-> +	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr) {
-> +		vgic_set_underflow(vcpu);
-> +		vgic_sort_ap_list(vcpu);
-> +	}
-> +
-> +	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		if (unlikely(vgic_target_oracle(irq) != vcpu))
-> +			goto next;
-> +
-> +		/*
-> +		 * If we get an SGI with multiple sources, try to get
-> +		 * them in all at once.
-> +		 */
-> +		do {
-> +			vgic_populate_lr(vcpu, irq, count++);
-> +		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
-> +
-> +next:
-> +		spin_unlock(&irq->irq_lock);
-> +
-> +		if (count == kvm_vgic_global_state.nr_lr)
-> +			break;
-> +	}
-> +
-> +out_clean:
-> +	vcpu->arch.vgic_cpu.used_lrs = count;
-> +
-> +	/* Nuke remaining LRs */
-> +	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
-> +		vgic_clear_lr(vcpu, count);
-> +}
-> +
-> +/* Sync back the hardware VGIC state into our emulation after a guest's run. */
-> +void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	vgic_process_maintenance_interrupt(vcpu);
-> +	vgic_fold_lr_state(vcpu);
-> +	vgic_prune_ap_list(vcpu);
-> +}
-> +
-> +/* Flush our emulation state into the GIC hardware before entering the guest. */
-> +void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +	vgic_flush_lr_state(vcpu);
-> +	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index c625767..29b96b9 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -16,6 +16,8 @@
->  #ifndef __KVM_ARM_VGIC_NEW_H__
->  #define __KVM_ARM_VGIC_NEW_H__
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+> +	int tmp;
 >  
-> +#define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+>  	if (esdhc_is_usdhc(imx_data)) {
+>  		/*
+> @@ -1013,6 +1001,23 @@ static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
+>  
+>  		/* disable DLL_CTRL delay line settings */
+>  		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
 > +
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
-> -- 
-> 2.7.3
+> +		if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
+> +			tmp = readl(host->ioaddr + ESDHC_TUNING_CTRL);
+> +			tmp |= ESDHC_STD_TUNING_EN |
+> +				ESDHC_TUNING_START_TAP_DEFAULT;
+> +			if (imx_data->boarddata.tuning_start_tap) {
+> +				tmp &= ~ESDHC_TUNING_START_TAP_MASK;
+> +				tmp |= imx_data->boarddata.tuning_start_tap;
+> +			}
+> +
+> +			if (imx_data->boarddata.tuning_step) {
+> +				tmp &= ~ESDHC_TUNING_STEP_MASK;
+> +				tmp |= imx_data->boarddata.tuning_step
+> +					<< ESDHC_TUNING_STEP_SHIFT;
+> +			}
+> +			writel(tmp, host->ioaddr + ESDHC_TUNING_CTRL);
+> +		}
+>  	}
+>  }
+>  
+> @@ -1226,11 +1231,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  		sdhci_esdhc_ops.platform_execute_tuning =
+>  					esdhc_executing_tuning;
+>  
+> -	if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
+> -		writel(readl(host->ioaddr + ESDHC_TUNING_CTRL) |
+> -			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT,
+> -			host->ioaddr + ESDHC_TUNING_CTRL);
+> -
+>  	if (imx_data->socdata->flags & ESDHC_FLAG_ERR004536)
+>  		host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+>  
 > 
