@@ -1,111 +1,69 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 10 May 2016 16:23:31 +0800
-Subject: [PATCH 3/6] dt-bindings: mtu3: add devicetree bindings
-In-Reply-To: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1462868614-20602-4-git-send-email-chunfeng.yun@mediatek.com>
+Date: Tue, 10 May 2016 16:23:28 +0800
+Subject: Add MediaTek USB3 DRD Driver
+Message-ID: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a DT binding doc for MediaTek USB3 DRD driver
+>From 5e3e992dc3c02eda12f5cf984a18a57f0207333d Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Tue, 10 May 2016 16:04:25 +0800
+Subject: [PATCH 0/6] Add MediaTek USB3 DRD Driver
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- Documentation/devicetree/bindings/usb/mtu3.txt |   86 ++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
+These patches introduce the MediaTek USB3 dual-role controller
+driver.
+
+The driver can be configured as Dual-Role Device (DRD),
+Peripheral Only and Host Only (xHCI) modes. It works well
+with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
+tested on MT8173 platform which only contains USB2.0 device IP,
+and on MT6290 platform which contains USB3.0 device IP.
+
+
+Chunfeng Yun (6):
+  dt-bindings: mt8173-xhci: support host side of dual-role mode
+  usb: xhci-mtk: make IPPC register optional
+  dt-bindings: mtu3: add devicetree bindings
+  usb: Add MediaTek USB3 DRD Driver
+  arm64: dts: mediatek: add USB3 DRD driver
+  pinctrl: mt8173: set GPIO16 to usb iddig mode
+
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++
+ Documentation/devicetree/bindings/usb/mtu3.txt     |   86 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   46 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   28 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h      |    2 +-
+ drivers/usb/Kconfig                                |    2 +
+ drivers/usb/Makefile                               |    1 +
+ drivers/usb/host/xhci-mtk.c                        |   32 +-
+ drivers/usb/mtu3/Kconfig                           |   47 ++
+ drivers/usb/mtu3/Makefile                          |   20 +
+ drivers/usb/mtu3/mtu3.h                            |  422 ++++++++++
+ drivers/usb/mtu3/mtu3_core.c                       |  877 +++++++++++++++++++
+ drivers/usb/mtu3/mtu3_dr.c                         |  353 ++++++++
+ drivers/usb/mtu3/mtu3_dr.h                         |  108 +++
+ drivers/usb/mtu3/mtu3_gadget.c                     |  735 ++++++++++++++++
+ drivers/usb/mtu3/mtu3_gadget_ep0.c                 |  889 ++++++++++++++++++++
+ drivers/usb/mtu3/mtu3_host.c                       |  294 +++++++
+ drivers/usb/mtu3/mtu3_hw_regs.h                    |  474 +++++++++++
+ drivers/usb/mtu3/mtu3_plat.c                       |  496 +++++++++++
+ drivers/usb/mtu3/mtu3_qmu.c                        |  599 +++++++++++++
+ drivers/usb/mtu3/mtu3_qmu.h                        |   43 +
+ 21 files changed, 5587 insertions(+), 15 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/usb/mtu3.txt
+ create mode 100644 drivers/usb/mtu3/Kconfig
+ create mode 100644 drivers/usb/mtu3/Makefile
+ create mode 100644 drivers/usb/mtu3/mtu3.h
+ create mode 100644 drivers/usb/mtu3/mtu3_core.c
+ create mode 100644 drivers/usb/mtu3/mtu3_dr.c
+ create mode 100644 drivers/usb/mtu3/mtu3_dr.h
+ create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
+ create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
+ create mode 100644 drivers/usb/mtu3/mtu3_host.c
+ create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
+ create mode 100644 drivers/usb/mtu3/mtu3_plat.c
+ create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
+ create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
 
-diff --git a/Documentation/devicetree/bindings/usb/mtu3.txt b/Documentation/devicetree/bindings/usb/mtu3.txt
-new file mode 100644
-index 0000000..ff142a5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mtu3.txt
-@@ -0,0 +1,86 @@
-+The device node for Mediatek USB3.0 DRD controller
-+
-+Required properties:
-+ - compatible : should be "mediatek,mt8173-mtu3"
-+ - reg : specifies physical base address and size of the registers
-+ - reg-names: should be "mac" for device IP and "ippc" for IP port control
-+ - interrupts : interrupt used by the device IP
-+ - power-domains : a phandle to USB power domain node to control USB's
-+	mtcmos
-+ - vusb33-supply : regulator of USB avdd3.3v
-+ - clocks : a list of phandle + clock-specifier pairs, one for each
-+	entry in clock-names
-+ - clock-names : must contain "sys_ck" for clock of controller;
-+	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
-+	depends on "mediatek,enable-wakeup"
-+ - phys : a list of phandle + phy specifier pairs
-+ - dr_mode : should be one of "host", "peripheral" or "otg",
-+	refer to usb/generic.txt
-+
-+Optional properties:
-+ - #address-cells, #size-cells : should be '2' if the device has sub-nodes
-+	with 'reg' property
-+ - ranges : allows valid 1:1 translation between child's address space and
-+	parent's address space
-+ - extcon : external connector for vbus and idpin changes detection, needed
-+	when supports dual-role mode.
-+ - vbus-supply : reference to the VBUS regulator, needed when supports
-+	dual-role mode.
-+ - pinctl-names : a pinctrl state named "default" must be defined,
-+	"id_float" and "id_ground" are optinal which depends on
-+	"mediatek,enable-manual-drd"
-+ - pinctrl-0 : pin control group
-+	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
-+
-+ - maximum-speed : valid arguments are "super-speed", "high-speed" and
-+	"full-speed"; refer to usb/generic.txt
-+ - mediatek,enable-wakeup : supports ip sleep wakeup used by host mode
-+ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-+	control register, it depends on "mediatek,enable-wakeup".
-+ - mediatek,enable-manual-drd : supports manual dual-role switch by sysfs
-+	interface; only used when receptacle is TYPE-A and also wants to support
-+	dual-role mode.
-+
-+Sub-nodes:
-+The xhci should be added as subnode to mtu3 as shown in the following example
-+if host mode is enabled. The DT binding details of xhci can be found in:
-+Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-+
-+Example:
-+ssusb: usb at 11271000 {
-+	compatible = "mediatek,mt8173-mtu3";
-+	reg = <0 0x11271000 0 0x3000>,
-+	      <0 0x11280700 0 0x0100>;
-+	reg-names = "mac", "ippc";
-+	interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-+	phys = <&phy_port0 PHY_TYPE_USB3>,
-+	       <&phy_port1 PHY_TYPE_USB2>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+		 <&pericfg CLK_PERI_USB0>,
-+		 <&pericfg CLK_PERI_USB1>;
-+	clock-names = "sys_ck",
-+		      "wakeup_deb_p0",
-+		      "wakeup_deb_p1";
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p0_vbus>;
-+	extcon = <&extcon_usb>;
-+	dr_mode = "otg";
-+	mediatek,enable-wakeup;
-+	mediatek,syscon-wakeup = <&pericfg>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	ranges;
-+	status = "disabled";
-+
-+	usb_host: xhci at 11270000 {
-+		compatible = "mediatek,mt8173-xhci";
-+		reg = <0 0x11270000 0 0x1000>;
-+		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+		clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+		clock-names = "sys_ck";
-+		vusb33-supply = <&mt6397_vusb_reg>;
-+		status = "disabled";
-+	};
-+};
 -- 
 1.7.9.5
