@@ -1,65 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 10 May 2016 15:54:57 +0200
-Subject: [RFC PATCH 12/21] reset: uniphier: add core support for
- UniPhier reset driver
-In-Reply-To: <1462873862-30940-13-git-send-email-yamada.masahiro@socionext.com>
-References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
- <1462873862-30940-13-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1462888497.9155.9.camel@pengutronix.de>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Tue, 10 May 2016 19:25:47 +0530
+Subject: [PATCH RESEND 0/3] pwm support for Broadcom iProc SoC's
+In-Reply-To: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
+References: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <CAL2FKYkxugMVsFaFugPNKWwBjpo+2Mkt4x+=c-OgU5PcsOqiuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 10.05.2016, 18:50 +0900 schrieb Masahiro Yamada:
-[...]
-> +static int uniphier_reset_update(struct reset_controller_dev *rcdev,
-> +				 unsigned long id, bool assert)
-> +{
-> +	struct uniphier_reset_priv *priv = to_uniphier_reset_priv(rcdev);
-> +	const struct uniphier_reset_data *p;
-> +	bool handled = false;
-> +
-> +	for (p = priv->data; p->id != UNIPHIER_RESET_ID_END; p++) {
-> +		unsigned int val;
-> +		int ret;
-> +
-> +		if (p->id != id)
-> +			continue;
-> +
-> +		val = p->deassert_val;
-> +		if (assert)
-> +			val = ~val;
-> +
-> +		ret = regmap_write_bits(priv->regmap, p->reg, p->mask, val);
+Hi Thierry,
 
-What is the difference between mask and deassert_val? Couldn't you just
-assign
-	val = assert ? 0 : p->mask;
-?
+  Can you please provide review comments for this patch set.
 
-> +static const struct reset_control_ops uniphier_reset_ops = {
-> +	.assert = uniphier_reset_assert,
-> +	.deassert = uniphier_reset_deassert,
-> +	.status = uniphier_reset_status,
-> +};
-> +
-> +int uniphier_reset_probe(struct platform_device *pdev,
-> +			 const struct uniphier_reset_data *data)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct uniphier_reset_priv *priv;
-> +	const struct uniphier_reset_data *p;
-> +	struct regmap *regmap;
-> +	unsigned int nr_resets = 0;
-> +
-> +	/* parent should be MFD and syscon node */
-> +	regmap = syscon_node_to_regmap(dev->parent->of_node);
-> +	if (IS_ERR(regmap)) {
-> +		dev_err(dev, "failed to get regmap\n");
+Thanks
+Dhananjay
 
-syscon_node_to_regmap can return different error codes. It might be
-helpful to use
-	dev_err(dev, "failed to get regmap: %d\n", PTR_ERR(regmap));
-here.
-
-regards
-Philipp
+On Tue, Mar 29, 2016 at 7:52 PM, Yendapally Reddy Dhananjaya Reddy
+<yendapally.reddy@broadcom.com> wrote:
+> This patchset contains the pwm support for the Broadcom's iProc SoC's.
+>
+> The first patch provides the documentation details and the
+> second patch contains the controller support details. The third patch
+> contains the enable method for Northstar Plus SoC.
+>
+> This patch series has been tested on NSP bcm958625HR board with oscilloscope.
+> The pwm is not enabled for this board as the pins are open and not used.
+>
+> This patch series is based on v4.6.0-rc1 and is available from github
+> repo: https://github.com/Broadcom/cygnus-linux.git
+> branch: iproc-pwm-v1
+>
+> This patch series was originally sent on 03/01/16.
+> See https://lkml.org/lkml/2016/3/1/487
+>
+> Yendapally Reddy Dhananjaya Reddy (3):
+>   Documentation: dt: Add Broadcom iproc pwm controller binding
+>   pwm: kona: Add support for Broadcom iproc pwm controller
+>   ARM: dts: NSP: Add PWM Support to DT
+>
+>  .../devicetree/bindings/pwm/brcm,kona-pwm.txt      |   2 +-
+>  arch/arm/boot/dts/bcm-nsp.dtsi                     |   8 +
+>  drivers/pwm/Kconfig                                |   6 +-
+>  drivers/pwm/pwm-bcm-kona.c                         | 183 ++++++++++++++++++---
+>  4 files changed, 172 insertions(+), 27 deletions(-)
+>
+> --
+> 2.1.0
+>
