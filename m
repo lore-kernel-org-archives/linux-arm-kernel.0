@@ -1,34 +1,34 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 22:09:17 +0200
-Subject: [PATCH v3 14/27] ARM: dts: exynos: Prepare for inclusion of
- exynos5.dtsi in exynos5410.dtsi
+Date: Tue, 10 May 2016 22:09:21 +0200
+Subject: [PATCH v3 18/27] ARM: dts: exynos: Enable UART3 on Exynos5410
 In-Reply-To: <1462910970-1812-1-git-send-email-krzk@kernel.org>
 References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462910970-1812-15-git-send-email-krzk@kernel.org>
+Message-ID: <1462910970-1812-19-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'sromc' label to SROM memory controller in common exynos5.dtsi so it
-can be referenced by inheriting DTSI.
+Just like other Exynos5 family SoCs, this one has four UARTs. Configure
+clocks for UART3 and enable it.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/exynos5.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5410.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index c5d198c70b86..30a0b63b06c9 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -35,7 +35,7 @@
- 		reg = <0x10000000 0x100>;
- 	};
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index c0540eb76271..62dc3b4aef93 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -215,7 +215,8 @@
+ };
  
--	memory-controller at 12250000 {
-+	sromc: memory-controller at 12250000 {
- 		compatible = "samsung,exynos4210-srom";
- 		reg = <0x12250000 0x14>;
- 	};
+ &serial_3 {
+-	status = "disabled";
++	clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
++	clock-names = "uart", "clk_uart_baud0";
+ };
+ 
+ &sromc {
 -- 
 2.5.0
