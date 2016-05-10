@@ -1,34 +1,48 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 May 2016 22:09:08 +0200
-Subject: [PATCH v3 05/27] ARM: dts: exynos: Switch MCT node to a new fin_pll
- clock
+Date: Tue, 10 May 2016 22:09:12 +0200
+Subject: [PATCH v3 09/27] ARM: dts: exynos: Re-order alphabetically Exynos5420
+ SD0/SD1 pinctrl nodes
 In-Reply-To: <1462910970-1812-1-git-send-email-krzk@kernel.org>
 References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
-Message-ID: <1462910970-1812-6-git-send-email-krzk@kernel.org>
+Message-ID: <1462910970-1812-10-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk-exynos5410 driver now provides the "fin_pll" external fixed
-clock. Switch the Multi-Core Timer to this clock.
+The 'sd0_rclk' was put in the middle of SD1 nodes. Remove the confusion.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/exynos5410.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 7a56aec2c5ba..233149abfb62 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -125,7 +125,7 @@
- 			interrupts = <0>, <1>, <2>, <3>,
- 				<4>, <5>, <6>, <7>,
- 				<8>, <9>, <10>, <11>;
--			clocks = <&fin_pll>, <&clock CLK_MCT>;
-+			clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
- 			clock-names = "fin_pll", "mct";
+diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+index 130563b2ca95..14beb7e07323 100644
+--- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+@@ -193,17 +193,17 @@
+ 		samsung,pin-drv = <3>;
+ 	};
  
- 			interrupt_map: interrupt-map {
+-	sd1_clk: sd1-clk {
+-		samsung,pins = "gpc1-0";
++	sd0_rclk: sd0-rclk {
++		samsung,pins = "gpc0-7";
+ 		samsung,pin-function = <2>;
+-		samsung,pin-pud = <0>;
++		samsung,pin-pud = <1>;
+ 		samsung,pin-drv = <3>;
+ 	};
+ 
+-	sd0_rclk: sd0-rclk {
+-		samsung,pins = "gpc0-7";
++	sd1_clk: sd1-clk {
++		samsung,pins = "gpc1-0";
+ 		samsung,pin-function = <2>;
+-		samsung,pin-pud = <1>;
++		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <3>;
+ 	};
+ 
 -- 
 2.5.0
