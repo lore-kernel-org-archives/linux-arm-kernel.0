@@ -1,37 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 10:36:40 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <573190CF.6030408@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160506123731.GA11959@yury-N73SV> <573190CF.6030408@huawei.com>
-Message-ID: <9651510.pg5Vmm8vKS@wuerfel>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 11:35:29 +0300
+Subject: [PATCH 17/23] mmc: sdhci: add standard hw auto retuning support
+In-Reply-To: <1460741387-23815-18-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-18-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <57319D51.8030907@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 May 2016 15:42:07 Zhangjian wrote:
-> On 2016/5/6 20:37, Yury Norov wrote:
-> > On Fri, May 06, 2016 at 08:16:48PM +0800, Zhangjian (Bamvor) wrote:
-> >
-> > AFAIR, here we don't shift offset, as it's 64-bit both in user-
-> > and kernel-space,
-> In your ilp32-2.22 branch, you wrapper mmap to mmap2 in which type of
-> offset is off_t. And off_t is 32bit in ilp32, correct?
-> "sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c"
-> /* mmap is provided by mmap as they are the same. */
-> void *__mmap (void *__addr, size_t __len, int __prot,
->                       int __flags, int __fd, __off_t __offset)
-> {
->     void *result;
->     result = (void *)
->       INLINE_SYSCALL (mmap2, 6, __addr,
->                       __len, __prot, __flags, __fd, __offset);
->     return result;
-> }
+On 15/04/16 20:29, Dong Aisheng wrote:
+> If HW supports SDHCI_TUNING_MODE_3 which is auto retuning, we won't
 
-__off_t should be 'long long' on new architectures, and map
-to __kernel_loff_t.
+Since this is about tuning mode 3, could you put that in the subject e.g.
+"Add support for auto re-tuning (tuning mode 3)"
 
-Can you see how it is defined?
+> retune during runtime suspend and resume, instead we use Re-tuning
+> Request signaled via SDHCI_INT_RETUNE interrupt to do retuning and
+> hw auto retuning during data transfer to guarantee the signal sample
+> window correction.
+> 
+> This can avoid a mass of repeatly retuning during small file system
 
-	Arnd
+repeatly -> repeatedly
+
+> data access and improve the performance.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 18 ++++++++++++++----
+>  drivers/mmc/host/sdhci.h |  3 +++
+>  2 files changed, 17 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 2eb0e34..0027b87 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -252,6 +252,9 @@ static void sdhci_init(struct sdhci_host *host, int soft)
+>  		    SDHCI_INT_TIMEOUT | SDHCI_INT_DATA_END |
+>  		    SDHCI_INT_RESPONSE;
+>  
+> +	if (host->tuning_mode == SDHCI_TUNING_MODE_3)
+
+Tuning mode 2 uses this as well.  Might as well add it here.
+
+> +		host->ier |= SDHCI_INT_RETUNE;
+> +
+>  	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>  
+> @@ -2477,6 +2480,9 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+>  			pr_err("%s: Card is consuming too much power!\n",
+>  				mmc_hostname(host->mmc));
+>  
+> +		if (intmask & SDHCI_INT_RETUNE)
+> +			mmc_retune_needed(host->mmc);
+> +
+
+Also need to add SDHCI_INT_RETUNE to the bits cleared further on, otherwise
+it will show up in the "Unexpected interrupt" message
+
+>  		if (intmask & SDHCI_INT_CARD_INT) {
+>  			sdhci_enable_sdio_irq_nolock(host, false);
+>  			host->thread_isr |= SDHCI_INT_CARD_INT;
+> @@ -2575,8 +2581,10 @@ int sdhci_suspend_host(struct sdhci_host *host)
+>  {
+>  	sdhci_disable_card_detection(host);
+>  
+> -	mmc_retune_timer_stop(host->mmc);
+> -	mmc_retune_needed(host->mmc);
+> +	if (host->tuning_mode == SDHCI_TUNING_MODE_1) {
+> +		mmc_retune_timer_stop(host->mmc);
+> +		mmc_retune_needed(host->mmc);
+> +	}
+
+Probably wouldn't hurt to stop the timer always whether it's going or not.
+And tuning mode 2 is not auto re-tuning, so I would still expect to need
+re-tuning after power loss i.e.
+
+	mmc_retune_timer_stop(host->mmc);
+	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+		mmc_retune_needed(host->mmc);
+
+>  
+>  	if (!device_may_wakeup(mmc_dev(host->mmc))) {
+>  		host->ier = 0;
+> @@ -2651,8 +2659,10 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
+>  {
+>  	unsigned long flags;
+>  
+> -	mmc_retune_timer_stop(host->mmc);
+> -	mmc_retune_needed(host->mmc);
+> +	if (host->tuning_mode == SDHCI_TUNING_MODE_1) {
+> +		mmc_retune_timer_stop(host->mmc);
+> +		mmc_retune_needed(host->mmc);
+> +	}
+
+Ditto
+
+>  
+>  	spin_lock_irqsave(&host->lock, flags);
+>  	host->ier &= SDHCI_INT_CARD_INT;
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index afa4de8..2c2404f 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -128,6 +128,7 @@
+>  #define  SDHCI_INT_CARD_INSERT	0x00000040
+>  #define  SDHCI_INT_CARD_REMOVE	0x00000080
+>  #define  SDHCI_INT_CARD_INT	0x00000100
+> +#define  SDHCI_INT_RETUNE	0x00001000
+>  #define  SDHCI_INT_ERROR	0x00008000
+>  #define  SDHCI_INT_TIMEOUT	0x00010000
+>  #define  SDHCI_INT_CRC		0x00020000
+> @@ -514,6 +515,8 @@ struct sdhci_host {
+>  	unsigned int		tuning_count;	/* Timer count for re-tuning */
+>  	unsigned int		tuning_mode;	/* Re-tuning mode supported by host */
+>  #define SDHCI_TUNING_MODE_1	0
+> +#define SDHCI_TUNING_MODE_2	1
+> +#define SDHCI_TUNING_MODE_3	2
+>  
+>  	unsigned long private[0] ____cacheline_aligned;
+>  };
+> 
