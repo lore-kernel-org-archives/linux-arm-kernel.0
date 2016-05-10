@@ -1,297 +1,134 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 10 May 2016 17:19:51 +0200
-Subject: [PATCH V7 01/11] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <1462893601-8937-1-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
-Message-ID: <1462893601-8937-2-git-send-email-tn@semihalf.com>
+Date: Tue, 10 May 2016 17:19:50 +0200
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host controller
+Message-ID: <1462893601-8937-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jayachandran C <jchandra@broadcom.com>
+>From the functionality point of view this series may be split into the
+following logic parts:
+1. New ECAM API and update for users of the pci-host-common API
+2. Necessary fixes as the preparation for using driver on ARM64.
+3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+4. Enable above driver on ARM64
 
-Add config option PCI_ECAM and file drivers/pci/ecam.c to provide
-generic functions for accessing memory mapped PCI config space.
+Patches has been built on top of 4.6-rc7 and can be found here:
+git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v7)
 
-The API is defined in drivers/pci/ecam.h and is written to replace the
-API in drivers/pci/host/pci-host-common.h. The file defines a new
-'struct pci_config_window' to hold the information related to a PCI
-config area and its mapping. This structure is expected to be used as
-sysdata for controllers that have ECAM based mapping.
+This has been tested on Cavium ThunderX server. Any help in reviewing and
+testing is very appreciated.
 
-Helper functions are provided to setup the mapping, free the mapping
-and to implement the map_bus method in 'struct pci_ops'
+v6 -> v7
+- drop quirks handling
+- changes for ACPI companion and domain number assignment approach
+- implement arch pcibios_{add|remove}_bus and call acpi_pci_{add|remove}_bus from there
+- cleanups around nomenclature
+- use resources oriented API for ECAM
+- fix for based address calculation before mapping ECAM region
+- remove useless lock for MCFG lookup
+- move MCFG stuff to separated file pci_mcfg.c
+- drop MCFG entries caching
+- rebase against 4.6-rc7
 
-Signed-off-by: Jayachandran C <jchandra@broadcom.com>
----
- drivers/pci/Kconfig  |   3 +
- drivers/pci/Makefile |   2 +
- drivers/pci/ecam.c   | 161 +++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/pci/ecam.h   |  62 ++++++++++++++++++++
- 4 files changed, 228 insertions(+)
+v5 -> v6
+- drop idea of x86 MMCONFIG code refactoring
+- integrate JC's patches which introduce new ECAM API:
+  https://lkml.org/lkml/2016/4/11/907
+  git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+- integrate Sinan's fix for releasing IO resources, see patch [06/13]
+- added ACPI support for ThunderX ECAM and PEM drivers
+- rebase against 4.6-rc2
+
+v4 -> v5
+- drop MCFG refactoring group patches 1-6 from series v4 and integrate Jayachandran's patch
+  https://patchwork.ozlabs.org/patch/575525/
+- rewrite PCI legacy IRQs allocation
+- squash two patches 11 and 12 from series v4, fixed bisection issue
+- changelog improvements
+- rebase against 4.5-rc3
+
+v3 -> v4
+- drop Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
+- add Lorenzo's fix patch 19/24
+- ACPI PCI bus domain number assigning cleanup
+- change resource management, we now claim and reassign resources
+- improvements for applying quirks
+- drop Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
+- rebase against 4.5-rc1
+
+v2 -> v3
+- fix legacy IRQ assigning and IO ports registration
+- remove reference to arch specific companion device for ia64
+- move ACPI PCI host controller driver to pci_root.c
+- drop generic domain assignment for x86 and ia64 as I am not
+  able to run all necessary test variants
+- drop patch which cleaned legacy IRQ assignment since it belongs to
+  Mathew's series:
+  https://patchwork.ozlabs.org/patch/557504/
+- extend MCFG quirk code
+- rebase against 4.4
+
+v1 -> v2
+- move non-arch specific piece of code to dirver/acpi/ directory
+- fix IO resource handling
+- introduce PCI config accessors quirks matching
+- moved ACPI_COMPANION_SET to generic code
+
+v1 - https://lkml.org/lkml/2015/10/27/504
+v2 - https://lkml.org/lkml/2015/12/16/246
+v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
+v4 - https://lkml.org/lkml/2016/2/4/646
+v5 - https://lkml.org/lkml/2016/2/16/426
+v6 - https://lkml.org/lkml/2016/4/15/594
+
+Jayachandran C (2):
+  PCI: Provide common functions for ECAM mapping
+  PCI: generic, thunder: update to use generic ECAM API
+
+Tomasz Nowicki (9):
+  pci, of: Move the PCI I/O space management to PCI core code.
+  pci: Add new function to unmap IO resources.
+  acpi, pci: Support IO resources when parsing PCI host bridge
+    resources.
+  pci, acpi: Provide a way to assign bus domain number.
+  pci, acpi: Handle ACPI companion assignment.
+  pci, acpi: Support for ACPI based generic PCI host controller
+  arm64, pci, acpi: ACPI support for legacy IRQs parsing and
+    consolidation with DT code.
+  arm64, pci, acpi: Provide ACPI-specific prerequisites for PCI bus
+    enumeration.
+  arm64, pci, acpi: Start using ACPI based PCI host controller driver
+    for ARM64.
+
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/kernel/pci.c             |  34 +++-----
+ drivers/acpi/Kconfig                |   8 ++
+ drivers/acpi/Makefile               |   1 +
+ drivers/acpi/pci_mcfg.c             |  97 ++++++++++++++++++++++
+ drivers/acpi/pci_root.c             |  33 ++++++++
+ drivers/acpi/pci_root_generic.c     | 149 +++++++++++++++++++++++++++++++++
+ drivers/of/address.c                | 116 +-------------------------
+ drivers/pci/Kconfig                 |   3 +
+ drivers/pci/Makefile                |   2 +
+ drivers/pci/ecam.c                  | 161 ++++++++++++++++++++++++++++++++++++
+ drivers/pci/ecam.h                  |  72 ++++++++++++++++
+ drivers/pci/host/Kconfig            |   1 +
+ drivers/pci/host/pci-host-common.c  | 114 +++++++++++--------------
+ drivers/pci/host/pci-host-common.h  |  47 -----------
+ drivers/pci/host/pci-host-generic.c |  52 +++---------
+ drivers/pci/host/pci-thunder-ecam.c |  39 ++-------
+ drivers/pci/host/pci-thunder-pem.c  |  92 ++++++++++-----------
+ drivers/pci/pci.c                   | 150 ++++++++++++++++++++++++++++++++-
+ drivers/pci/probe.c                 |   2 +
+ include/linux/of_address.h          |   9 --
+ include/linux/pci-acpi.h            |  14 ++++
+ include/linux/pci.h                 |  11 ++-
+ 23 files changed, 823 insertions(+), 385 deletions(-)
+ create mode 100644 drivers/acpi/pci_mcfg.c
+ create mode 100644 drivers/acpi/pci_root_generic.c
  create mode 100644 drivers/pci/ecam.c
  create mode 100644 drivers/pci/ecam.h
+ delete mode 100644 drivers/pci/host/pci-host-common.h
 
-diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-index 209292e..56389be 100644
---- a/drivers/pci/Kconfig
-+++ b/drivers/pci/Kconfig
-@@ -83,6 +83,9 @@ config HT_IRQ
- config PCI_ATS
- 	bool
- 
-+config PCI_ECAM
-+	bool
-+
- config PCI_IOV
- 	bool "PCI IOV support"
- 	depends on PCI
-diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-index 2154092..1fa6925 100644
---- a/drivers/pci/Makefile
-+++ b/drivers/pci/Makefile
-@@ -55,6 +55,8 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
- 
- obj-$(CONFIG_PCI_STUB) += pci-stub.o
- 
-+obj-$(CONFIG_PCI_ECAM) += ecam.o
-+
- obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
- 
- obj-$(CONFIG_OF) += of.o
-diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-new file mode 100644
-index 0000000..3d52005
---- /dev/null
-+++ b/drivers/pci/ecam.c
-@@ -0,0 +1,161 @@
-+/*
-+ * Copyright 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation (the "GPL").
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 (GPLv2) for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 (GPLv2) along with this source code.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/pci.h>
-+#include <linux/slab.h>
-+
-+#include "ecam.h"
-+
-+/*
-+ * On 64 bit systems, we do a single ioremap for the whole config space
-+ * since we have enough virtual address range available. On 32 bit, do an
-+ * ioremap per bus.
-+ */
-+static const bool per_bus_mapping = !config_enabled(CONFIG_64BIT);
-+
-+/*
-+ * Create a PCI config space window
-+ *  - reserve mem region
-+ *  - alloc struct pci_config_window with space for all mappings
-+ *  - ioremap the config space
-+ */
-+struct pci_config_window *pci_ecam_create(struct device *dev,
-+		struct resource *cfgres, struct resource *busr,
-+		struct pci_ecam_ops *ops)
-+{
-+	struct pci_config_window *cfg;
-+	unsigned int bus_range, bus_range_max, bsz;
-+	int i, err;
-+
-+	if (busr->start > busr->end)
-+		return ERR_PTR(-EINVAL);
-+
-+	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-+	if (!cfg)
-+		return ERR_PTR(-ENOMEM);
-+
-+	cfg->ops = ops;
-+	cfg->busr.start = busr->start;
-+	cfg->busr.end = busr->end;
-+	cfg->busr.flags = IORESOURCE_BUS;
-+	bus_range = resource_size(&cfg->busr);
-+	bus_range_max = resource_size(cfgres) >> ops->bus_shift;
-+	if (bus_range > bus_range_max) {
-+		dev_warn(dev, "bus max %#x reduced to %#x",
-+					bus_range, bus_range_max);
-+		bus_range = bus_range_max;
-+		cfg->busr.end = busr->start + bus_range - 1;
-+	}
-+	bsz = 1 << ops->bus_shift;
-+
-+	cfg->res.start = cfgres->start;
-+	cfg->res.end = cfgres->end;
-+	cfg->res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+	cfg->res.name = "PCI ECAM";
-+
-+	err = request_resource(&iomem_resource, &cfg->res);
-+	if (err) {
-+		dev_err(dev, "request ECAM res %pR failed\n", &cfg->res);
-+		goto err_exit;
-+	}
-+
-+	if (per_bus_mapping) {
-+		cfg->winp = kcalloc(bus_range, sizeof(*cfg->winp), GFP_KERNEL);
-+		if (!cfg->winp)
-+			goto err_exit_malloc;
-+		for (i = 0; i < bus_range; i++) {
-+			cfg->winp[i] = ioremap(cfgres->start + i * bsz, bsz);
-+			if (!cfg->winp[i])
-+				goto err_exit_iomap;
-+		}
-+	} else {
-+		cfg->win = ioremap(cfgres->start, bus_range * bsz);
-+		if (!cfg->win)
-+			goto err_exit_iomap;
-+	}
-+
-+	if (ops->init) {
-+		err = ops->init(dev, cfg);
-+		if (err)
-+			goto err_exit;
-+	}
-+	dev_info(dev, "ECAM at %pR for %pR\n", &cfg->res, &cfg->busr);
-+	return cfg;
-+
-+err_exit_iomap:
-+	dev_err(dev, "ECAM ioremap failed\n");
-+err_exit_malloc:
-+	err = -ENOMEM;
-+err_exit:
-+	pci_ecam_free(cfg);
-+	return ERR_PTR(err);
-+}
-+
-+void pci_ecam_free(struct pci_config_window *cfg)
-+{
-+	int i;
-+
-+	if (per_bus_mapping) {
-+		if (cfg->winp) {
-+			for (i = 0; i < resource_size(&cfg->busr); i++)
-+				if (cfg->winp[i])
-+					iounmap(cfg->winp[i]);
-+			kfree(cfg->winp);
-+		}
-+	} else {
-+		if (cfg->win)
-+			iounmap(cfg->win);
-+	}
-+	if (cfg->res.parent)
-+		release_resource(&cfg->res);
-+	kfree(cfg);
-+}
-+
-+/*
-+ * Function to implement the pci_ops ->map_bus method
-+ */
-+void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
-+			       int where)
-+{
-+	struct pci_config_window *cfg = bus->sysdata;
-+	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
-+	unsigned int busn = bus->number;
-+	void __iomem *base;
-+
-+	if (busn < cfg->busr.start || busn > cfg->busr.end)
-+		return NULL;
-+
-+	busn -= cfg->busr.start;
-+	if (per_bus_mapping)
-+		base = cfg->winp[busn];
-+	else
-+		base = cfg->win + (busn << cfg->ops->bus_shift);
-+	return base + (devfn << devfn_shift) + where;
-+}
-+
-+/* ECAM ops */
-+struct pci_ecam_ops pci_generic_ecam_ops = {
-+	.bus_shift	= 20,
-+	.pci_ops	= {
-+		.map_bus	= pci_ecam_map_bus,
-+		.read		= pci_generic_config_read,
-+		.write		= pci_generic_config_write,
-+	}
-+};
-diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
-new file mode 100644
-index 0000000..57de00d
---- /dev/null
-+++ b/drivers/pci/ecam.h
-@@ -0,0 +1,62 @@
-+/*
-+ * Copyright 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation (the "GPL").
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 (GPLv2) for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 (GPLv2) along with this source code.
-+ */
-+#ifndef DRIVERS_PCI_ECAM_H
-+#define DRIVERS_PCI_ECAM_H
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+/*
-+ * struct to hold pci ops and bus shift of the config window
-+ * for a PCI controller.
-+ */
-+struct pci_config_window;
-+struct pci_ecam_ops {
-+	unsigned int			bus_shift;
-+	struct pci_ops			pci_ops;
-+	int				(*init)(struct device *,
-+						struct pci_config_window *);
-+};
-+
-+/*
-+ * struct to hold the mappings of a config space window. This
-+ * is expected to be used as sysdata for PCI controlllers which
-+ * use ECAM.
-+ */
-+struct pci_config_window {
-+	struct resource			res;
-+	struct resource			busr;
-+	void				*priv;
-+	struct pci_ecam_ops		*ops;
-+	union {
-+		void __iomem		*win;	/* 64-bit single mapping */
-+		void __iomem		**winp; /* 32-bit per bus mapping */
-+	};
-+};
-+
-+/* create and free for pci_config_window */
-+struct pci_config_window *pci_ecam_create(struct device *dev,
-+		struct resource *cfgres, struct resource *busr,
-+		struct pci_ecam_ops *ops);
-+void pci_ecam_free(struct pci_config_window *cfg);
-+
-+/* map_bus when ->sysdata is an instance of pci_config_window */
-+void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
-+			       int where);
-+/* default ECAM ops, bus shift 20, generic read and write */
-+extern struct pci_ecam_ops pci_generic_ecam_ops;
-+
-+#endif
 -- 
 1.9.1
