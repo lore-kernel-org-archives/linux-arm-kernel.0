@@ -1,41 +1,112 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 May 2016 10:24:28 +0900
-Subject: [PATCH v6 7/9] extcon: max8997: Fix inconsistent indenting
-In-Reply-To: <1462519636-3250-6-git-send-email-k.kozlowski@samsung.com>
-References: <1462519289-2356-2-git-send-email-k.kozlowski@samsung.com>
- <1462519636-3250-1-git-send-email-k.kozlowski@samsung.com>
- <1462519636-3250-6-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5731384C.6000209@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 10 May 2016 11:29:05 +1000
+Subject: linux-next: build failure after merge of the net-next tree
+Message-ID: <20160510112905.5bffcad8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi all,
 
-On 2016? 05? 06? 16:27, Krzysztof Kozlowski wrote:
-> Fix smatch warning:
-> 	max8997_muic_probe() warn: inconsistent indenting
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/extcon/extcon-max8997.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/extcon/extcon-max8997.c b/drivers/extcon/extcon-max8997.c
-> index 0afa3e8b5dc3..cf8de5be2405 100644
-> --- a/drivers/extcon/extcon-max8997.c
-> +++ b/drivers/extcon/extcon-max8997.c
-> @@ -737,7 +737,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Set initial path for UART */
-> -	 max8997_muic_set_path(info, info->path_uart, true);
-> +	max8997_muic_set_path(info, info->path_uart, true);
->  
->  	/* Set ADC debounce time */
->  	max8997_muic_set_debounce_time(info, ADC_DEBOUNCE_TIME_25MS);
-> 
+After merging the net-next tree, today's linux-next build (x86_64
+allmodconfig) failed like this:
 
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+net/qrtr/smd.c:106:14: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .callback = qcom_smd_qrtr_callback,
+              ^
+net/qrtr/smd.c:106:14: note: (near initialization for 'qcom_smd_qrtr_driver.callback')
 
-Thanks,
-Chanwoo Choi
+Caused by commit
+
+  bdabad3e363d ("net: Add Qualcomm IPC router")
+
+interacting with commit
+
+  b853cb9628bf ("soc: qcom: smd: Make callback pass channel reference")
+
+from the arm-soc tree.
+
+I added the following merge fix patch (and it turned out I needed the
+new stubs).
+
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Tue, 10 May 2016 11:14:06 +1000
+Subject: [PATCH] soc: qcom: smd: fix for Qualcomm IPC router and callback API
+ change
+
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ include/linux/soc/qcom/smd.h | 9 +++++++++
+ net/qrtr/smd.c               | 9 ++++++---
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/include/linux/soc/qcom/smd.h b/include/linux/soc/qcom/smd.h
+index 086e36d76be9..fbebbfc82ed3 100644
+--- a/include/linux/soc/qcom/smd.h
++++ b/include/linux/soc/qcom/smd.h
+@@ -70,6 +70,15 @@ static inline void qcom_smd_driver_unregister(struct qcom_smd_driver *drv)
+ 	WARN_ON(1);
+ }
+ 
++static inline void *qcom_smd_get_drvdata(struct qcom_smd_channel *channel)
++{
++	return NULL;
++}
++
++static inline void qcom_smd_set_drvdata(struct qcom_smd_channel *channel, void *data)
++{
++}
++
+ static inline int qcom_smd_send(struct qcom_smd_channel *channel,
+ 				const void *data, int len)
+ {
+diff --git a/net/qrtr/smd.c b/net/qrtr/smd.c
+index 84ebce73aa23..0d11132b3370 100644
+--- a/net/qrtr/smd.c
++++ b/net/qrtr/smd.c
+@@ -21,13 +21,14 @@
+ struct qrtr_smd_dev {
+ 	struct qrtr_endpoint ep;
+ 	struct qcom_smd_channel *channel;
++	struct device *dev;
+ };
+ 
+ /* from smd to qrtr */
+-static int qcom_smd_qrtr_callback(struct qcom_smd_device *sdev,
++static int qcom_smd_qrtr_callback(struct qcom_smd_channel *channel,
+ 				  const void *data, size_t len)
+ {
+-	struct qrtr_smd_dev *qdev = dev_get_drvdata(&sdev->dev);
++	struct qrtr_smd_dev *qdev = qcom_smd_get_drvdata(channel);
+ 	int rc;
+ 
+ 	if (!qdev)
+@@ -35,7 +36,7 @@ static int qcom_smd_qrtr_callback(struct qcom_smd_device *sdev,
+ 
+ 	rc = qrtr_endpoint_post(&qdev->ep, data, len);
+ 	if (rc == -EINVAL) {
+-		dev_err(&sdev->dev, "invalid ipcrouter packet\n");
++		dev_err(qdev->dev, "invalid ipcrouter packet\n");
+ 		/* return 0 to let smd drop the packet */
+ 		rc = 0;
+ 	}
+@@ -73,12 +74,14 @@ static int qcom_smd_qrtr_probe(struct qcom_smd_device *sdev)
+ 		return -ENOMEM;
+ 
+ 	qdev->channel = sdev->channel;
++	qdev->dev = &sdev->dev;
+ 	qdev->ep.xmit = qcom_smd_qrtr_send;
+ 
+ 	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO);
+ 	if (rc)
+ 		return rc;
+ 
++	qcom_smd_set_drvdata(sdev->channel, qdev);
+ 	dev_set_drvdata(&sdev->dev, qdev);
+ 
+ 	dev_dbg(&sdev->dev, "Qualcomm SMD QRTR driver probed\n");
+-- 
+2.7.0
+
+-- 
+Cheers,
+Stephen Rothwell
