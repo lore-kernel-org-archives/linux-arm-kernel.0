@@ -1,40 +1,22 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 10 May 2016 14:27:20 +0900
-Subject: [PATCH] mfd: core: check existence of enable/disable callbacks
-Message-ID: <1462858040-13174-1-git-send-email-yamada.masahiro@socionext.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 10 May 2016 07:27:01 +0200
+Subject: [PATCH v2 06/22] ARM: dts: exynos: Remove old fixed-clock provider
+ on SMDK5410
+In-Reply-To: <723d088c-ada7-a18f-87a2-e7caaf2c56fd@osg.samsung.com>
+References: <1462734367-5619-1-git-send-email-krzk@kernel.org>
+ <1462734367-5619-7-git-send-email-krzk@kernel.org>
+ <723d088c-ada7-a18f-87a2-e7caaf2c56fd@osg.samsung.com>
+Message-ID: <57317125.5030702@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Child devices may not know if their MFD cells have enable/disable
-callbacks.
+On 05/09/2016 10:24 PM, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 05/08/2016 03:05 PM, Krzysztof Kozlowski wrote:
+>> All "fin_pll" clock users are switched to the new one, provided by
+> 
+> s/are switched/were switched
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/mfd/mfd-core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-index 88bd1b1..95dbf3a 100644
---- a/drivers/mfd/mfd-core.c
-+++ b/drivers/mfd/mfd-core.c
-@@ -33,7 +33,7 @@ int mfd_cell_enable(struct platform_device *pdev)
- 	int err = 0;
- 
- 	/* only call enable hook if the cell wasn't previously enabled */
--	if (atomic_inc_return(cell->usage_count) == 1)
-+	if (atomic_inc_return(cell->usage_count) == 1 && cell->enable)
- 		err = cell->enable(pdev);
- 
- 	/* if the enable hook failed, decrement counter to allow retries */
-@@ -50,7 +50,7 @@ int mfd_cell_disable(struct platform_device *pdev)
- 	int err = 0;
- 
- 	/* only disable if no other clients are using it */
--	if (atomic_dec_return(cell->usage_count) == 0)
-+	if (atomic_dec_return(cell->usage_count) == 0 && cell->disable)
- 		err = cell->disable(pdev);
- 
- 	/* if the disable hook failed, increment to allow retries */
--- 
-1.9.1
+Thanks for spotting this,
+Krzysztof
