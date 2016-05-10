@@ -1,156 +1,267 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 May 2016 12:07:42 +0100
-Subject: [PATCH v7 2/2] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20160510100448.49834120@bbrezillon>
-References: <1461845007-23139-1-git-send-email-boris.brezillon@free-electrons.com>
- <1461845007-23139-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160503164019.GA1604@rob-hp-laptop>
- <20160503185153.5cfddc32@bbrezillon>
- <CAL_Jsq+cTvW=wUUQmD2R-nZ9m3U5E00yEfLy=-Z_X6EQZRO4NQ@mail.gmail.com>
- <20160504113852.10a2dd84@bbrezillon>
- <CAL_Jsq+4aL5znA3zOKdcJb+pEXhVOQthkFF6DN2+P6U37t2o6g@mail.gmail.com>
- <20160504153547.60d736bb@bbrezillon>
- <20160510100448.49834120@bbrezillon>
-Message-ID: <20160510110742.GI687@leverpostej>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 10 May 2016 20:40:21 +0930
+Subject: [PATCH 2/2] watchdog: Add Aspeed watchdog driver
+In-Reply-To: <5730A339.80006@roeck-us.net>
+References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
+ <1462797277-14969-3-git-send-email-joel@jms.id.au>
+ <5730A339.80006@roeck-us.net>
+Message-ID: <CACPK8XfK4Qt2GaSL7eVoNkCawbtXqFX9bGRcgyAyq7R2yuSZkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 10:04:48AM +0200, Boris Brezillon wrote:
-> On Wed, 4 May 2016 15:35:47 +0200
-> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> 
-> > On Wed, 4 May 2016 08:06:10 -0500
-> > Rob Herring <robh@kernel.org> wrote:
-> > 
-> > > On Wed, May 4, 2016 at 4:38 AM, Boris Brezillon
-> > > <boris.brezillon@free-electrons.com> wrote:  
-> > > > Hi Rob,
-> > > >
-> > > > On Tue, 3 May 2016 14:11:04 -0500
-> > > > Rob Herring <robh@kernel.org> wrote:
-> > > >    
-> > > >> On Tue, May 3, 2016 at 11:51 AM, Boris Brezillon
-> > > >> <boris.brezillon@free-electrons.com> wrote:    
-> > > >> > Hi Rob,
-> > > >> >
-> > > >> > On Tue, 3 May 2016 11:40:19 -0500
-> > > >> > Rob Herring <robh@kernel.org> wrote:
-> > > >> >    
-> > > >> >> On Thu, Apr 28, 2016 at 02:03:27PM +0200, Boris Brezillon wrote:    
-> > > >> >> > The EBI (External Bus Interface) is used to access external peripherals
-> > > >> >> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> > > >> >> > Each device is assigned a CS line and an address range and can have its
-> > > >> >> > own configuration (timings, access mode, bus width, ...).
-> > > >> >> > This driver provides a generic DT binding to configure a device according
-> > > >> >> > to its requirements.
-> > > >> >> > For specific device controllers (like the NAND one) the SMC timings
-> > > >> >> > should be configured by the controller driver through the matrix and smc
-> > > >> >> > syscon regmaps.    
-> > > 
-> > > [...]
-> > >   
-> > > >> >> > +EBI bus configuration associated with specific chip-select will be defined in
-> > > >> >> > +the configs subnode. This configs node will in turn contain several subnodes
-> > > >> >> > +named config-<cs-id>, each of them containing the following properties.    
-> > > >> >>
-> > > >> >> This is a bit unusual. Why not just part of the child device nodes?    
-> > > >> >
-> > > >> > Oh, come on! I reworked the binding because Mark complained about the
-> > > >> > previous binding which was doing exactly what you're suggesting. Can
-> > > >> > you please be consistent in your reviews...    
-> > > >>
-> > > >> No, Mark and I both have our opinions. Which part of this patch
-> > > >> explains the history?    
-> > > >
-> > > > Hm, it's in patch 1/2 (just dropped the cover letter, which might not
-> > > > be such a good idea).
-> > > >    
-> > > >> If the revision history is not in the patch, I'm
-> > > >> not looking at it.
-> > > >>
-> > > >> My issue with it this way is that it has invented yet another way to
-> > > >> describe timings. I would like to be consistent across external bus
-> > > >> descriptions, but we're not very consistent to begin with though. The
-> > > >> most common seems to be the way you first did it. But I agree that it
-> > > >> is kind of screwy to have an intermediate node unless the controller
-> > > >> itself has sub-blocks within it and is not the established way to
-> > > >> describe a bus with chip selects. I would either put the properties
-> > > >> directly in the child nodes (e.g. flash at 0,0) or put your config nodes
-> > > >> in the device node. I'd call it timings instead of config, but that's
-> > > >> just bikeshedding.    
-> > > >
-> > > > Well, it's not only describing timings (see atmel,bus-width,
-> > > > atmel,byte-access-type, ...), but I'm fine with either names :).
-> > > >    
-> > > >>
-> > > >> memory-controller at 1000 {
-> > > >>   ...
-> > > >>   flash at 0,0 {
-> > > >>     timings {
-> > > >>       ...
-> > > >>     };
-> > > >>   };
-> > > >> };    
-> > > >
-> > > > Okay. Mark, what do you think of this approach?
-> > > >
-> > > > Note that one of my previous version was defining timings directly in
-> > > > the EBI device node, and Arnd noted that doing so may cause problems
-> > > > if one of the EBI property (or the config/timing node name) conflict
-> > > > with the sub-device binding, which is why I decided to put the EBI
-> > > > config definitions in a separate subnode.    
-> > > 
-> > > You have vendor prefixes on all the properties so I don't think a
-> > > collision is really a problem. It's also an established pattern in
-> > > i.MX WEIM and OMAP GPMC (which are hiding in bindings/bus/) and I
-> > > prefer consistency.  
-> > 
-> > So let's summarize that.
-> > 
-> > memory-controller at 1000 {
-> > 	...
-> > 	flash at 0,0 {
-> > 		atmel,<ebi-prop-name> = <value>;
-> > 		...
-> > 		<flash-device-prop> = <value>;
-> > 	};
-> > };
-> > 
-> > Would everyone agree on this representation?
-> > 
-> > With this approach, it's a bit more complicated to detect the case
-> > where we want to keep bootloader/firmware config, but it should be
-> > doable (it's much more easier to test for the presence of a
-> > config/timing node than verifying that either all or none of the
-> > mandatory properties are here).
-> > 
-> > Still remains the problem mentioned by Jean-Jacques: what if the
-> > sub-device takes 2 CS lines. Should we apply the same setting to those
-> > slots?
-> > 
-> 
-> Rob, Mark, Arnd, can you take a decision regarding this binding? This
-> driver is floating around for quite some time, and we were asked to
-> rework the binding several times (in time in an opposite direction).
-> 
-> For the record, here is the thread I mentioned earlier [1]. In his
-> answer, Arnd suggests to put timing and bus config description
-> outside of the sub-device node. Mark recently complained about this
-> representation, which led me to the configs/config-X appraoch, and now
-> Rob suggests to go back to the first proposal.
-> 
-> I'm fine doing that, but can you please all confirm that you agree on
-> this binding?
+Hey Guenter,
 
-Sorry for the delay in getting round to this, and sorry that this
-appears to be going in circles.
+Thanks for the review.
 
-Please go with Rob's suggestion.
+On Tue, May 10, 2016 at 12:18 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> +#define WDT_STATUS             0x00
+>> +#define WDT_RELOAD_VALUE       0x04
+>> +#define WDT_RESTART            0x08
+>> +#define WDT_CTRL               0x0C
+>> +#define   WDT_CTRL_RESET_MODE_SOC      (0x00 << 5)
+>> +#define   WDT_CTRL_RESET_MODE_FULL_CHIP        (0x01 << 5)
+>> +#define          WDT_CTRL_1MHZ_CLK             BIT(4)
+>> +#define          WDT_CTRL_WDT_EXT              BIT(3)
+>> +#define          WDT_CTRL_WDT_INTR             BIT(2)
+>> +#define   WDT_CTRL_RESET_SYSTEM                BIT(1)
+>> +#define   WDT_CTRL_ENABLE              BIT(0)
+>> +
+>> +#define        WDT_RESTART_MAGIC       0x4755
+>
+>
+> Please don't use tabs after #define.
 
-I'm not sure about the case where a device takes 2 CS lines. I would
-assume that in practice that a sub-device covered my multiple CS lines
-expects the same timings for all its MMIO space, and so having that
-uniform makes sense. Do we have a counter-example?
+Oops, typo. Thanks.
 
-Thanks,
-Mark.
+>
+>> +
+>> +static struct aspeed_wdt *to_aspeed_wdt(struct watchdog_device *wdd)
+>> +{
+>> +       return container_of(wdd, struct aspeed_wdt, wdd);
+>> +}
+>> +
+>> +
+>
+> Please no double empty lines.
+>
+>> +static void aspeed_wdt_enable(struct aspeed_wdt *wdt, int count)
+>> +{
+>> +       wdt->ctrl |= WDT_CTRL_ENABLE;
+>> +
+>> +       writel(0, wdt->base + WDT_CTRL);
+>> +       writel(count, wdt->base + WDT_RELOAD_VALUE);
+>> +       writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
+>> +       writel(wdt->ctrl, wdt->base + WDT_CTRL);
+>
+>
+> Is it really necessary to write 0 into the ctrl register when enabling
+> the watchdog ? Problem with it is two-fold: It changes the clock rate
+> for a brief period of time, and it disables the watchdog while updating
+> the timeout. Both is undesirable unless really needed.
+
+In general I agree. However, the datasheet explicitly spells out these
+four steps in this order. Writing zero is a shortcut; I could write
+ctrl with the enable bit set to zero.
+
+We've been using the driver in this fashion for the past year.
+
+>> +}
+>> +
+>> +static int aspeed_wdt_start(struct watchdog_device *wdd)
+>> +{
+>> +       struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
+>> +
+>> +       dev_dbg(wdd->parent, "starting with timeout of %d (rate %lu)\n",
+>> +                       wdd->timeout, wdt->rate);
+>
+>
+> Are those dev_dbg() really useful ?
+
+I did use them in writing the driver. They can go.
+
+>
+>> +       aspeed_wdt_enable(wdt, wdd->timeout * wdt->rate);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int aspeed_wdt_stop(struct watchdog_device *wdd)
+>> +{
+>> +       struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
+>> +
+>> +       wdt->ctrl &= ~WDT_CTRL_ENABLE;
+>> +       writel(wdt->ctrl, wdt->base + WDT_CTRL);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int aspeed_wdt_ping(struct watchdog_device *wdd)
+>> +{
+>> +       struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
+>> +
+>> +       dev_dbg(wdd->parent, "ping\n");
+>> +       writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
+>> +       return 0;
+>> +}
+>> +
+>> +static int aspeed_wdt_set_timeout(struct watchdog_device *wdd,
+>> +                                 unsigned int timeout)
+>> +{
+>> +       dev_dbg(wdd->parent, "timeout set to %u\n", timeout);
+>> +       wdd->timeout = timeout;
+>> +
+>> +       return aspeed_wdt_start(wdd);
+>> +}
+>> +
+>> +static int aspeed_wdt_restart(struct watchdog_device *wdd,
+>> +                             unsigned long action, void *data)
+>> +{
+>> +       struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
+>> +
+>> +       aspeed_wdt_enable(wdt, 128 * wdt->rate / 1000);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct watchdog_ops aspeed_wdt_ops = {
+>> +       .start          = aspeed_wdt_start,
+>> +       .stop           = aspeed_wdt_stop,
+>> +       .ping           = aspeed_wdt_ping,
+>> +       .set_timeout    = aspeed_wdt_set_timeout,
+>> +       .restart        = aspeed_wdt_restart,
+>> +       .owner          = THIS_MODULE,
+>> +};
+>> +
+>> +static const struct watchdog_info aspeed_wdt_info = {
+>> +       .options        = WDIOF_KEEPALIVEPING
+>> +                       | WDIOF_MAGICCLOSE
+>> +                       | WDIOF_SETTIMEOUT,
+>> +       .identity       = KBUILD_MODNAME,
+>> +};
+>> +
+>> +static int aspeed_wdt_remove(struct platform_device *pdev)
+>> +{
+>> +       struct aspeed_wdt *wdt = platform_get_drvdata(pdev);
+>> +
+>> +       watchdog_unregister_device(&wdt->wdd);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int aspeed_wdt_probe(struct platform_device *pdev)
+>> +{
+>> +       struct aspeed_wdt *wdt;
+>> +       struct resource *res;
+>> +       int ret;
+>> +
+>> +       wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>> +       if (!wdt)
+>> +               return -ENOMEM;
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       wdt->base = devm_ioremap_resource(&pdev->dev, res);
+>> +       if (IS_ERR(wdt->base))
+>> +               return PTR_ERR(wdt->base);
+>> +
+>> +       /*
+>> +        * The ast2400 wdt can run at PCLK, or 1MHz. The ast2500 only
+>> +        * runs at 1MHz. We chose to always run at 1MHz, as there's no
+>> +        * good reason to have a faster watchdog counter.
+>> +        */
+>> +       wdt->rate = 1000000;
+>
+>
+> Why not just use a define ?
+
+I will add one.
+
+The comment is informative though for people who read the ast2400
+datasheet and wonder why we don't provide the option clocking with
+pclk, I will leave it in.
+
+>> +       wdt->wdd.info = &aspeed_wdt_info;
+>> +       wdt->wdd.ops = &aspeed_wdt_ops;
+>> +       wdt->wdd.min_timeout = 1;
+>> +       wdt->wdd.max_timeout = 0x10000000U / wdt->rate;
+>> +       wdt->wdd.parent = &pdev->dev;
+>> +
+>> +       wdt->wdd.timeout = min(wdt->wdd.max_timeout, 30U);
+>
+>
+> Pretty much the same here. Since max_timeout is a constant,
+> it is well known that it is larger than 30 seconds.
+> Might as well use defines for max_timeout and timeout.
+
+Ok.
+
+>
+>> +       watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev);
+>> +
+>> +       wdt->ctrl = WDT_CTRL_RESET_MODE_SOC |
+>
+>
+> Only reset tha SoC ? Are you sure this is what you want ?
+
+I think this is left over from experiments when tracking down a reset
+bug in u-boot. I will confirm and change it back to FULL_CHIP.
+
+>
+>> +               WDT_CTRL_1MHZ_CLK |
+>> +               WDT_CTRL_RESET_SYSTEM;
+>> +
+>> +       /* Ensure hardware is in consistent state */
+>> +       aspeed_wdt_stop(&wdt->wdd);
+>> +
+>
+> An alternative might be to check if the watchdog is running, and inform
+> the watchdog core about it so it can generate heartbeats as required
+> until user space opens the watchdog device. This would ensure that the
+> system is protected during boot.
+
+I will implement this.
+
+> ctrl is really static except for the enable flag. Not really sure
+> if having a variable for it has any real benefits - you might as well
+> just read the register and update the enable flag instead as needed when
+> starting or stopping the watchdog. Is there a reason for not doing that ?
+
+Not really. I find it cleaner to keep a copy of the register instead
+of read-modify-write, but if you feel strongly about it I can change.
+
+>
+>> +       ret = watchdog_register_device(&wdt->wdd);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "failed to register\n");
+>> +               goto err;
+>
+>
+> Unnecessary goto. Just return.
+
+Ok.
+
+>
+>
+>> +       }
+>> +
+>> +       dev_info(&pdev->dev, "rate %lu, max timeout %u, timeout %d\n",
+>> +                wdt->rate, wdt->wdd.max_timeout, wdt->wdd.timeout);
+>> +
+>> +       platform_set_drvdata(pdev, wdt);
+>> +err:
+>> +       return ret;
+>> +}
+>> +
+>> +static struct platform_driver aspeed_watchdog_driver = {
+>> +       .probe = aspeed_wdt_probe,
+>> +       .remove = aspeed_wdt_remove,
+>> +       .driver = {
+>> +               .name = KBUILD_MODNAME,
+>> +               .of_match_table = of_match_ptr(aspeed_wdt_of_table),
+>> +       },
+>> +};
+>> +module_platform_driver(aspeed_watchdog_driver);
+>> +
+>> +MODULE_DESCRIPTION("Aspeed Watchdog Driver");
+>> +MODULE_LICENSE("GPL");
+>>
+>
