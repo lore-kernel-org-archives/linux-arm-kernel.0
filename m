@@ -1,93 +1,85 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 10 May 2016 20:20:32 +0200
-Subject: [PATCH V7 05/11] acpi, pci: Support IO resources when parsing PCI
- host bridge resources.
-In-Reply-To: <1462893601-8937-6-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-6-git-send-email-tn@semihalf.com>
-Message-ID: <CAJZ5v0j-jiGmMWoyd-ab4qiKGAScbxMskqUThBQxkOxPR8unMA@mail.gmail.com>
+From: luke.starrett@broadcom.com (Luke Starrett)
+Date: Tue, 10 May 2016 14:27:27 -0400
+Subject: [PATCH 1/1] arm64: Add ARM64 optimized IP checksum routine
+Message-ID: <1462904847-28369-1-git-send-email-luke.starrett@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> Platforms that have memory mapped IO port (such as ARM64) need special
-> handling for PCI I/O resources. For host bridge's resource probing case
-> these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
->
-> The same I/O resources need to be released after hotplug
-> removal so that it can be re-added back by the pci_remap_iospace
-> function during insertion. As a consequence we unmap I/O resources
-> with pci_unmap_iospace when we release host bridge resources.
->
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/pci_root.c | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index ae3fe4e..cb3071d 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -719,6 +719,34 @@ next:
->                         resource_list_add_tail(entry, resources);
->         }
->  }
-> +static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
-> +{
-> +#ifdef PCI_IOBASE
+This change implements an optimized checksum for arm64, based loosely on
+the original arch/arm implementation.  Load-pair is used for the initial
+16B load, reducing the overall number of loads to two for packets without
+IP options.  Instruction count is reduced by ~3x compared to generic C
+implementation.  Changes were tested against LE and BE operation and for
+all possible mis-alignments.
 
-Same comment about the #ifdefs as in the other patch.
+Signed-off-by: Luke Starrett <luke.starrett@broadcom.com>
+---
+ arch/arm64/include/asm/checksum.h | 57 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 arch/arm64/include/asm/checksum.h
 
-> +       struct resource *res = entry->res;
-> +       resource_size_t cpu_addr = res->start;
-> +       resource_size_t pci_addr = cpu_addr - entry->offset;
-> +       resource_size_t length = resource_size(res);
-> +       unsigned long port;
-> +
-> +       if (pci_register_io_range(cpu_addr, length))
-> +               goto err;
-> +
-> +       port = pci_address_to_pio(cpu_addr);
-> +       if (port == (unsigned long)-1)
-> +               goto err;
-> +
-> +       res->start = port;
-> +       res->end = port + length - 1;
-> +       entry->offset = port - pci_addr;
-> +
-> +       if (pci_remap_iospace(res, cpu_addr) < 0)
-> +               goto err;
-
-An empty line here?
-
-> +       pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
-> +       return;
-> +err:
-> +       res->flags |= IORESOURCE_DISABLED;
-> +#endif
-> +}
->
->  int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
->  {
-> @@ -740,6 +768,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
->                         "no IO and memory resources present in _CRS\n");
->         else {
->                 resource_list_for_each_entry_safe(entry, tmp, list) {
-> +                       if (entry->res->flags & IORESOURCE_IO)
-> +                               acpi_pci_root_remap_iospace(entry);
-> +
->                         if (entry->res->flags & IORESOURCE_DISABLED)
->                                 resource_list_destroy_entry(entry);
->                         else
-> @@ -811,6 +842,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
->
->         resource_list_for_each_entry(entry, &bridge->windows) {
->                 res = entry->res;
-> +               if (res->flags & IORESOURCE_IO)
-> +                       pci_unmap_iospace(res);
->                 if (res->parent &&
->                     (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
->                         release_resource(res);
-> --
+diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
+new file mode 100644
+index 0000000..15629d7
+--- /dev/null
++++ b/arch/arm64/include/asm/checksum.h
+@@ -0,0 +1,57 @@
++/*
++ * Copyright 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
++ *
++ * ip_fast_csum() loosely derived from original arch/arm implementation
++ */
++
++#ifndef __ASM_ARM64_CHECKSUM_H
++#define __ASM_ARM64_CHECKSUM_H
++
++/*
++ * This is a version of ip_compute_csum() optimized for IP headers,
++ * which always checksum on 4 octet boundaries.
++ */
++static inline __sum16
++ip_fast_csum(const void *iph, unsigned int ihl)
++{
++	u64 tmp, sum;
++
++	__asm__ __volatile__ (
++"	ldp	%0, %3, [%1], #16\n"
++"	sub	%2, %2, #4\n"
++"	adds	%0, %0, %3\n"
++"1:	ldr	%w3, [%1], #4\n"
++"	sub	%2, %2, #1\n"
++"	adcs	%0, %0, %3\n"
++"	tst	%2, #15\n"
++"	bne	1b\n"
++"	adc	%0, %0, xzr\n"
++"	ror	%3, %0, #32\n"
++"	add     %0, %0, %3\n"
++"	lsr	%0, %0, #32\n"
++"	ror	%w3, %w0, #16\n"
++"	add     %w0, %w0, %w3\n"
++"	lsr	%0, %0, #16\n"
++	: "=r" (sum), "=r" (iph), "=r" (ihl), "=r" (tmp)
++	: "1" (iph), "2" (ihl)
++	: "cc", "memory");
++
++	return (__force __sum16)(~sum);
++}
++
++#define ip_fast_csum ip_fast_csum
++#include <asm-generic/checksum.h>
++
++#endif	/* __ASM_ARM64_CHECKSUM_H */
+-- 
+2.1.0
