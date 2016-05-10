@@ -1,24 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 May 2016 11:30:31 +0200
-Subject: [GIT PULL] at91: fixes for 4.6 #1
-In-Reply-To: <1462865249-28552-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1462865249-28552-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <5465950.OCrl9K6RLM@wuerfel>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 May 2016 12:30:02 +0300
+Subject: [PATCH 11/23] mmc: sdhci-esdhci-imx: remove
+ SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
+In-Reply-To: <1460741387-23815-12-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-12-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5731AA1A.9000504@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 May 2016 09:27:29 Nicolas Ferre wrote:
-> Here is a late fix for AT91. Sorry to have figure it out so late in the
-> development cycle but we had to confirm it was an error with the documentation
-> of two products.
-> So, as the compatibility string is in since 4.6-rc1 and that the previous one
-> works okay, it's a good opportunity to switch back to the one that works without
-> introducing a intermediary bug.
-> The revert on driver code and the removal of the useless additional
-> compatibility string will be queued for 4.7 through NAND/MTD.
+On 15/04/16 20:29, Dong Aisheng wrote:
+> The driver has already implemented the private .set_timeout()
+> callback for common SDHCI code to do correct timeout value setting,
+> it does not need call sdhci_calc_timeout(), so this quirk actually
+> is not working. Remove it now.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Thanks, pulled into the fixes. I ended up taking the text above as the
-commit log for the merge, as it was more descriptive than the shorter
-version you had in the tag.
+Pedantically, the subject needs:
 
-	Arnd
+	sdhci-esdhci-imx -> sdhci-esdhc-imx
+
+Otherwise:
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 2d300d8..03980db 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -1147,8 +1147,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  	if (IS_ERR(imx_data->pins_default))
+>  		dev_warn(mmc_dev(host->mmc), "could not get default state\n");
+>  
+> -	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+> -
+>  	if (imx_data->socdata->flags & ESDHC_FLAG_ENGCM07207)
+>  		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
+>  		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
+> 
