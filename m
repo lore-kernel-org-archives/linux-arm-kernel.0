@@ -1,45 +1,78 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 10 May 2016 19:54:17 +0200
-Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <1462893601-8937-9-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-9-git-send-email-tn@semihalf.com>
-Message-ID: <CAJZ5v0hp1+D4Hd+6EQeZb_WNn6JK=55h8AAOwAWYX2CwATP0dw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 10 May 2016 10:55:49 -0700
+Subject: [PATCH] arm64: kernel: Fix incorrect brk randomization
+Message-ID: <20160510175549.GA20496@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> This patch is going to implement generic PCI host controller for
-> ACPI world, similar to what pci-host-generic.c driver does for DT world.
->
-> All such drivers, which we have seen so far, were implemented within
-> arch/ directory since they had some arch assumptions (x86 and ia64).
-> However, they all are doing similar thing, so it makes sense to find
-> some common code and abstract it into the generic driver.
->
-> In order to handle PCI config space regions properly, we define new
-> MCFG interface which does sanity checks on MCFG table and keeps its
-> root pointer. User is able to lookup MCFG regions based on that root
-> pointer and specified domain:bus_start:bus_end touple. We are using
-> pci_mmcfg_late_init old prototype to avoid another function name.
->
-> The implementation of pci_acpi_scan_root() looks up the MCFG entries
-> and sets up a new mapping (regions are not mapped until host controller ask
-> for it). Generic PCI functions are used for accessing config space.
-> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
-> to create and access ECAM mappings.
->
-> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
-> should be made on a per-architecture basis.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  drivers/acpi/Kconfig            |   8 +++
->  drivers/acpi/Makefile           |   1 +
->  drivers/acpi/pci_mcfg.c         |  97 ++++++++++++++++++++++++++
->  drivers/acpi/pci_root_generic.c | 149 ++++++++++++++++++++++++++++++++++++++++
+This fixes two issues with the arm64 brk randomziation. First, the
+STACK_RND_MASK was being used incorrectly. The original code was:
 
-Why do we need a new file?  Would there be any problem with adding
-that code to pci_root.c?
+	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
+
+STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit), with 4K pages where
+PAGE_SHIFT is 12:
+
+	#define STACK_RND_MASK	(test_thread_flag(TIF_32BIT) ? \
+						0x7ff >> (PAGE_SHIFT - 12) : \
+						0x3ffff >> (PAGE_SHIFT - 12))
+
+This means the resulting offset from base would be 0x7ff0001 or 0x3ffff0001,
+which is wrong since it creates an unaligned end address. It was likely
+intended to be:
+
+	unsigned long range_end = base + ((STACK_RND_MASK + 1) << PAGE_SHIFT)
+
+Which would result in offsets of 0x800000 (32-bit) and 0x40000000 (64-bit).
+
+However, even this corrected 32-bit compat offset (0x00800000) is much
+smaller than native ARM's brk randomization value (0x02000000):
+
+	unsigned long arch_randomize_brk(struct mm_struct *mm)
+	{
+	        unsigned long range_end = mm->brk + 0x02000000;
+	        return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
+	}
+
+So, instead of basing arm64's brk randomization on mistaken STACK_RND_MASK
+calculations, just use specific corrected values for compat (0x2000000)
+and native arm64 (0x40000000).
+
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm64/kernel/process.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 80624829db61..0d0969bcd76d 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -382,13 +382,14 @@ unsigned long arch_align_stack(unsigned long sp)
+ 	return sp & ~0xf;
+ }
+ 
+-static unsigned long randomize_base(unsigned long base)
+-{
+-	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
+-	return randomize_range(base, range_end, 0) ? : base;
+-}
+-
+ unsigned long arch_randomize_brk(struct mm_struct *mm)
+ {
+-	return randomize_base(mm->brk);
++	unsigned long range_end = mm->brk;
++
++	if (test_thread_flag(TIF_32BIT))
++		range_end += 0x02000000;
++	else
++		range_end += 0x40000000;
++
++	return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
+ }
+-- 
+2.6.3
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
