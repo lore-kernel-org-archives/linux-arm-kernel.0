@@ -1,64 +1,76 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 10 May 2016 13:06:56 +0300
-Subject: [PATCH v2 0/3] video: fbdev: imxfb: make it work again
-In-Reply-To: <20160510090547.GQ30822@pengutronix.de>
-References: <1462354998-5792-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5731A02A.2070309@ti.com> <20160510090547.GQ30822@pengutronix.de>
-Message-ID: <5731B2C0.3040404@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 10 May 2016 11:07:28 +0100
+Subject: [PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge
+ device companion assignment to core code.
+In-Reply-To: <20160510015336.GA29582@localhost>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-2-git-send-email-tn@semihalf.com>
+ <292578579.uIxhMjkdfG@vostro.rjw.lan>
+ <20160510015336.GA29582@localhost>
+Message-ID: <20160510100728.GA15552@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/05/16 12:05, Uwe Kleine-K?nig wrote:
-> Hello Tomi,
+On Mon, May 09, 2016 at 08:53:36PM -0500, Bjorn Helgaas wrote:
+> On Tue, May 10, 2016 at 12:56:37AM +0200, Rafael J. Wysocki wrote:
+> > On Friday, April 15, 2016 07:06:36 PM Tomasz Nowicki wrote:
+> > > Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
+> > > bridge initialization. They both use arch-specific sysdata to pass down
+> > > parent device reference and both rely on NULL parent in pci_create_root_bus()
+> > > to validate sysdata content.
+> > 
+> > No, this is not relied on for that.  It is just NULL, because we don't
+> > have a physical parent device representation for the PCI host bridge.
+> > 
+> > > It looks hacky and prevents us from getting some firmware specific
+> > > info for PCI host controller based on its acpi_device structure
+> > > in generic pci_create_root_bus() function.
+> > 
+> > You can't get that info without adding ACPI-specific code to that function
+> > anyway.
+> > 
+> > > However, we overcome that blocker by passing down parent device via
+> > > pci_create_root_bus parameter (as the ACPI device type).
+> > 
+> > Which is completely wrong.
+> > 
+> > > Then we use ACPI_COMPANION_SET in core code
+> > > for ACPI boot method only. ACPI_COMPANION_SET is safe to run for all
+> > > cases DT, ACPI and DT&ACPI.
+> > > 
+> > > Since now PCI core code is setting ACPI companion device for us,
+> > > x86 & ia64 specific ACPI companion device setting turns out to be dead now.
+> > > We can get rid of it, including related companion reference from
+> > > PCI sysdata structure. Aslo, PCI_CONTROLLER macro cannot return valid
+> > > companion device anymore. Therefore we need to convert its usage to
+> > > ACPI_COMPANION.
 > 
-> On Tue, May 10, 2016 at 11:47:38AM +0300, Tomi Valkeinen wrote:
->> On 04/05/16 12:43, Uwe Kleine-K?nig wrote:
->>> this is v2 of the series which addresses the review comments I got vor
->>> (implicit) v1.
->>>
->>> For patch 2 the question is still open if this is the right fix, but
->>> without this the display doesn't stay on. Patches 1 and 3 should be
->>> applicable independant of patch 2.
->>
->> I picked patches 1 and 3, they look fine.
+> I think getting rid of arch-specific sysdata is a good goal (at least
+> for things like the domain and ACPI companion that are really not
+> arch-specific).
 > 
-> Thanks.
+> But I'm afraid I've been guilty of allowing the perfect to be the
+> enemy of the good.  I think it will be more useful in the end if we
+> can get as much of this work in v4.7 as possible, even if there's more
+> polishing we'd like to do later.
 > 
->> I still think patch 2 is just broken, it doesn't make sense to me.
-> 
-> What do you think should happen during startup? Something should call
-> the set_power callback to enable the device? Or should that only happen
-> when something writes to /dev/fb0?
+> What if we keep the x86 and ia64 handling of ACPI_COMPANION the way it
+> is today, and do it the same way for arm64?  Then later, after we
+> merge Arnd's work to make a generic pci_register_host() or similar, I
+> suspect we might be able to unify the ACPI_COMPANION stuff more
+> easily.  If the driver (acpi/pci_root.c) allocates the struct
+> pci_host_bridge, then maybe it will be able to fill in the domain and
+> set up the ACPI_COMPANION before it calls the scan interface.
 
-I think the panel should be enabled at startup, as with fbdev there's no
-specific enable call. So I don't have a problem with enabling the panel
-at startup, but just that the regulator enables/disables don't seem to
-match.
+Ok, JC already solved that problem like this:
 
->> If the regulator is enabled in probe, then it's always on, and
->> imxfb_lcd_set_power() should be removed as it never has any effect. But
->> that doesn't sound correct, as presumably the imxfb_lcd_set_power() has
->> worked at some point.
-> 
-> I think it worked back when unused regulators were not disabled during
-> boot.
+http://www.spinics.net/lists/arm-kernel/msg478167.html
+http://www.spinics.net/lists/arm-kernel/msg478169.html
 
-Is imxfb_lcd_set_power() ever called, or just not at startup? If it is
-called properly later, then perhaps you just need to kick it at startup
-time to enable it. Maybe imxfb_lcd_set_power(lcd, FB_BLANK_UNBLANK);
+Since ARM64 relies on PCI_DOMAINS_GENERIC (DT) I do not see any other
+way of pulling it off quickly (and in a really generic way), sysdata
+is the only way of handling it in ACPI unless we start clutching
+at straws (which we already did with the ACPI companion hacks).
 
-Did you try unloading the module (both when the LCD is enabled and when
-it's disabled), and seeing that the regulator gets disabled when you
-unload it?
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160510/8144c3b2/attachment.sig>
+Thanks,
+Lorenzo
