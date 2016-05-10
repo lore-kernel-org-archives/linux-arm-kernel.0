@@ -1,53 +1,302 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 10 May 2016 06:25:09 -0700
-Subject: [PATCH 2/2] watchdog: Add Aspeed watchdog driver
-In-Reply-To: <CACPK8XfK4Qt2GaSL7eVoNkCawbtXqFX9bGRcgyAyq7R2yuSZkA@mail.gmail.com>
-References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
- <1462797277-14969-3-git-send-email-joel@jms.id.au>
- <5730A339.80006@roeck-us.net>
- <CACPK8XfK4Qt2GaSL7eVoNkCawbtXqFX9bGRcgyAyq7R2yuSZkA@mail.gmail.com>
-Message-ID: <5731E135.8000100@roeck-us.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 10 May 2016 15:30:43 +0200
+Subject: [PATCH v3 18/55] KVM: arm/arm64: vgic-new: Add GICv2 world
+ switch backend
+In-Reply-To: <1462531568-9799-19-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-19-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160510133043.GF27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+On Fri, May 06, 2016 at 11:45:31AM +0100, Andre Przywara wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Processing maintenance interrupts and accessing the list registers
+> are dependent on the host's GIC version.
+> Introduce vgic-v2.c to contain GICv2 specific functions.
+> Implement the GICv2 specific code for syncing the emulation state
+> into the VGIC registers.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog RFC..v1:
+> - remove explicit LR_STATE clearing on maintenance interrupt handling
+> - improve documentation for vgic_v2_populate_lr()
+> - remove WARN_ON on non-edge IRQs in maintenance interrupts
+> - simplify multi-CPU source SGI handling
+> 
+> Changelog v1 .. v2:
+> - inject the IRQ priority into the list register
+> 
+> Changelog v2 .. v3:
+> - cleanup diff containing rebase artifacts
+> 
+>  include/linux/irqchip/arm-gic.h |   1 +
+>  virt/kvm/arm/vgic/vgic-v2.c     | 178 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.c        |   6 ++
+>  virt/kvm/arm/vgic/vgic.h        |   6 ++
+>  4 files changed, 191 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
+> 
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 9c94026..be0d26f 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -76,6 +76,7 @@
+>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
+>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+>  #define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
+> +#define GICH_LR_PRIORITY_SHIFT		23
+>  #define GICH_LR_STATE			(3 << 28)
+>  #define GICH_LR_PENDING_BIT		(1 << 28)
+>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> new file mode 100644
+> index 0000000..4cee616
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -0,0 +1,178 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/irqchip/arm-gic.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include "vgic.h"
+> +
+> +/*
+> + * Call this function to convert a u64 value to an unsigned long * bitmask
+> + * in a way that works on both 32-bit and 64-bit LE and BE platforms.
+> + *
+> + * Warning: Calling this function may modify *val.
+> + */
+> +static unsigned long *u64_to_bitmask(u64 *val)
+> +{
+> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
+> +	*val = (*val >> 32) | (*val << 32);
+> +#endif
+> +	return (unsigned long *)val;
+> +}
+> +
+> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> +
+> +	if (cpuif->vgic_misr & GICH_MISR_EOI) {
+> +		u64 eisr = cpuif->vgic_eisr;
+> +		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
+> +		int lr;
+> +
+> +		for_each_set_bit(lr, eisr_bmap, kvm_vgic_global_state.nr_lr) {
+> +			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
+> +
+> +			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
+> +
+> +			kvm_notify_acked_irq(vcpu->kvm, 0,
+> +					     intid - VGIC_NR_PRIVATE_IRQS);
+> +
 
-On 05/10/2016 04:10 AM, Joel Stanley wrote:
+why do we need to do this?  I cannot find any consumers of this info
+after we've left the hyp code.
 
-[ ... ]
+Also, I think I offered a comment about why we would potentially need
+this in the first place.  This is the famous race where hardware doesn't
+guarantee consistency between the MISR and ELRSR right?
 
->>> +
->>> +       /*
->>> +        * The ast2400 wdt can run at PCLK, or 1MHz. The ast2500 only
->>> +        * runs at 1MHz. We chose to always run at 1MHz, as there's no
->>> +        * good reason to have a faster watchdog counter.
->>> +        */
->>> +       wdt->rate = 1000000;
->>
->>
->> Why not just use a define ?
->
-> I will add one.
->
-> The comment is informative though for people who read the ast2400
-> datasheet and wonder why we don't provide the option clocking with
-> pclk, I will leave it in.
->
-
-The comment is ok. I just find it unnecessary to have a variable
-instead of a constant.
-
-[ ... ]
->
->> ctrl is really static except for the enable flag. Not really sure
->> if having a variable for it has any real benefits - you might as well
->> just read the register and update the enable flag instead as needed when
->> starting or stopping the watchdog. Is there a reason for not doing that ?
->
-> Not really. I find it cleaner to keep a copy of the register instead
-> of read-modify-write, but if you feel strongly about it I can change.
->
-
-No worries. Not worth arguing about.
-
-Guenter
+> +			cpuif->vgic_elrsr |= 1ULL << lr;
+> +		}
+> +	}
+> +
+> +	/* check and disable underflow maintenance IRQ */
+> +	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
+> +
+> +	/*
+> +	 * In the next iterations of the vcpu loop, if we sync the
+> +	 * vgic state after flushing it, but before entering the guest
+> +	 * (this happens for pending signals and vmid rollovers), then
+> +	 * make sure we don't pick up any old maintenance interrupts
+> +	 * here.
+> +	 */
+> +	cpuif->vgic_eisr = 0;
+> +}
+> +
+> +void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> +
+> +	cpuif->vgic_hcr |= GICH_HCR_UIE;
+> +}
+> +
+> +/*
+> + * transfer the content of the LRs back into the corresponding ap_list:
+> + * - active bit is transferred as is
+> + * - pending bit is
+> + *   - transferred as is in case of edge sensitive IRQs
+> + *   - set to the line-level (resample time) for level sensitive IRQs
+> + */
+> +void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> +	int lr;
+> +
+> +	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
+> +		u32 val = cpuif->vgic_lr[lr];
+> +		u32 intid = val & GICH_LR_VIRTUALID;
+> +		struct vgic_irq *irq;
+> +
+> +		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		/* Always preserve the active bit */
+> +		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
+> +
+> +		/* Edge is the only case where we preserve the pending bit */
+> +		if (irq->config == VGIC_CONFIG_EDGE &&
+> +		    (val & GICH_LR_PENDING_BIT)) {
+> +			irq->pending = true;
+> +
+> +			if (vgic_irq_is_sgi(intid)) {
+> +				u32 cpuid = val & GICH_LR_PHYSID_CPUID;
+> +
+> +				cpuid >>= GICH_LR_PHYSID_CPUID_SHIFT;
+> +				irq->source |= (1 << cpuid);
+> +			}
+> +		}
+> +
+> +		/* Clear soft pending state when level IRQs have been acked */
+> +		if (irq->config == VGIC_CONFIG_LEVEL &&
+> +		    !(val & GICH_LR_PENDING_BIT)) {
+> +			irq->soft_pending = false;
+> +			irq->pending = irq->line_level;
+> +		}
+> +
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +}
+> +
+> +/*
+> + * Populates the particular LR with the state of a given IRQ:
+> + * - for an edge sensitive IRQ the pending state is cleared in struct vgic_irq
+> + * - for a level sensitive IRQ the pending state value is unchanged;
+> + *   it is dictated directly by the input level
+> + *
+> + * If @irq describes an SGI with multiple sources, we choose the
+> + * lowest-numbered source VCPU and clear that bit in the source bitmap.
+> + *
+> + * The irq_lock must be held by the caller.
+> + */
+> +void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+> +{
+> +	u32 val = irq->intid;
+> +
+> +	if (irq->pending) {
+> +		val |= GICH_LR_PENDING_BIT;
+> +
+> +		if (irq->config == VGIC_CONFIG_EDGE)
+> +			irq->pending = false;
+> +
+> +		if (vgic_irq_is_sgi(irq->intid)) {
+> +			u32 src = ffs(irq->source);
+> +
+> +			BUG_ON(!src);
+> +			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
+> +			irq->source &= ~(1 << (src - 1));
+> +			if (irq->source)
+> +				irq->pending = true;
+> +		}
+> +	}
+> +
+> +	if (irq->active)
+> +		val |= GICH_LR_ACTIVE_BIT;
+> +
+> +	if (irq->hw) {
+> +		val |= GICH_LR_HW;
+> +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+> +	} else {
+> +		if (irq->config == VGIC_CONFIG_LEVEL)
+> +			val |= GICH_LR_EOI;
+> +	}
+> +
+> +	/* The GICv2 LR only holds five bits of priority. */
+> +	val |= (irq->priority >> 3) << GICH_LR_PRIORITY_SHIFT;
+> +
+> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = val;
+> +}
+> +
+> +void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
+> +{
+> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index c6f8b9b..68d885c 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -397,10 +397,12 @@ retry:
+>  
+>  static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
+>  {
+> +	vgic_v2_process_maintenance(vcpu);
+>  }
+>  
+>  static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+>  {
+> +	vgic_v2_fold_lr_state(vcpu);
+>  }
+>  
+>  /* Requires the ap_list_lock and the irq_lock to be held. */
+> @@ -409,14 +411,18 @@ static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+>  {
+>  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
+>  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +
+> +	vgic_v2_populate_lr(vcpu, irq, lr);
+>  }
+>  
+>  static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
+>  {
+> +	vgic_v2_clear_lr(vcpu, lr);
+>  }
+>  
+>  static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
+>  {
+> +	vgic_v2_set_underflow(vcpu);
+>  }
+>  
+>  static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 29b96b9..0db490e 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -22,4 +22,10 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  			      u32 intid);
+>  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+>  
+> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
+> +void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
+> +void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+> +void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
+> +void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
+> +
+>  #endif
+> -- 
+> 2.7.3
+> 
