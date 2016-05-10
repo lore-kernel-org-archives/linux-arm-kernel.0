@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 10 May 2016 18:50:56 +0900
-Subject: [RFC PATCH 15/21] reset: uniphier: add reset driver for UniPhier
- PH1-sLD8 SoC
+Date: Tue, 10 May 2016 18:51:00 +0900
+Subject: [RFC PATCH 19/21] reset: uniphier: add reset driver for UniPhier
+ PH1-LD20 SoC
 In-Reply-To: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1462873862-30940-16-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1462873862-30940-20-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,37 +16,37 @@ Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
  drivers/reset/uniphier/Kconfig               |  4 +++
  drivers/reset/uniphier/Makefile              |  1 +
- drivers/reset/uniphier/reset-uniphier-sld8.c | 46 ++++++++++++++++++++++++++++
+ drivers/reset/uniphier/reset-uniphier-ld20.c | 46 ++++++++++++++++++++++++++++
  3 files changed, 51 insertions(+)
- create mode 100644 drivers/reset/uniphier/reset-uniphier-sld8.c
+ create mode 100644 drivers/reset/uniphier/reset-uniphier-ld20.c
 
 diff --git a/drivers/reset/uniphier/Kconfig b/drivers/reset/uniphier/Kconfig
-index 1633093..307d563 100644
+index d9a2123..8509e71 100644
 --- a/drivers/reset/uniphier/Kconfig
 +++ b/drivers/reset/uniphier/Kconfig
-@@ -14,4 +14,8 @@ config RESET_UNIPHIER_PRO4
- 	tristate "Reset driver for UniPhier PH1-Pro4 SoC"
+@@ -30,4 +30,8 @@ config RESET_UNIPHIER_LD11
+ 	tristate "Reset driver for UniPhier PH1-LD11 SoC"
  	default ARM
  
-+config RESET_UNIPHIER_SLD8
-+	tristate "Reset driver for UniPhier PH1-sLD8 SoC"
-+	default ARM
++config RESET_UNIPHIER_LD20
++	tristate "Reset driver for UniPhier PH1-LD20 SoC"
++	default ARM64
 +
  endif
 diff --git a/drivers/reset/uniphier/Makefile b/drivers/reset/uniphier/Makefile
-index d496fe8..e1001c6 100644
+index f25f648..a33cb0a 100644
 --- a/drivers/reset/uniphier/Makefile
 +++ b/drivers/reset/uniphier/Makefile
-@@ -2,3 +2,4 @@ obj-y					+= reset-uniphier-core.o
- 
- obj-$(CONFIG_RESET_UNIPHIER_LD4)	+= reset-uniphier-ld4.o
- obj-$(CONFIG_RESET_UNIPHIER_PRO4)	+= reset-uniphier-pro4.o
-+obj-$(CONFIG_RESET_UNIPHIER_SLD8)	+= reset-uniphier-sld8.o
-diff --git a/drivers/reset/uniphier/reset-uniphier-sld8.c b/drivers/reset/uniphier/reset-uniphier-sld8.c
+@@ -6,3 +6,4 @@ obj-$(CONFIG_RESET_UNIPHIER_SLD8)	+= reset-uniphier-sld8.o
+ obj-$(CONFIG_RESET_UNIPHIER_PRO5)	+= reset-uniphier-pro5.o
+ obj-$(CONFIG_RESET_UNIPHIER_PXS2)	+= reset-uniphier-pxs2.o
+ obj-$(CONFIG_RESET_UNIPHIER_LD11)	+= reset-uniphier-ld11.o
++obj-$(CONFIG_RESET_UNIPHIER_LD20)	+= reset-uniphier-ld20.o
+diff --git a/drivers/reset/uniphier/reset-uniphier-ld20.c b/drivers/reset/uniphier/reset-uniphier-ld20.c
 new file mode 100644
-index 0000000..736abd0
+index 0000000..8edda31
 --- /dev/null
-+++ b/drivers/reset/uniphier/reset-uniphier-sld8.c
++++ b/drivers/reset/uniphier/reset-uniphier-ld20.c
 @@ -0,0 +1,46 @@
 +/*
 + * Copyright (C) 2016 Socionext Inc.
@@ -68,31 +68,31 @@ index 0000000..736abd0
 +
 +#include "reset-uniphier.h"
 +
-+static const struct uniphier_reset_data uniphier_sld8_reset_data[] = {
++static const struct uniphier_reset_data uniphier_ld20_reset_data[] = {
 +	{
 +		.id = 7,
-+		.reg = 0x2000,
-+		.mask = BIT(10),
-+		.deassert_val = BIT(10),
++		.reg = 0x200c,
++		.mask = BIT(8),
++		.deassert_val = BIT(8),
 +	},
 +	{ .id = UNIPHIER_RESET_ID_END }
 +};
 +
-+static int uniphier_sld8_reset_probe(struct platform_device *pdev)
++static int uniphier_ld20_reset_probe(struct platform_device *pdev)
 +{
-+	return uniphier_reset_probe(pdev, uniphier_sld8_reset_data);
++	return uniphier_reset_probe(pdev, uniphier_ld20_reset_data);
 +}
 +
-+static struct platform_driver uniphier_sld8_reset_driver = {
-+	.probe = uniphier_sld8_reset_probe,
++static struct platform_driver uniphier_ld20_reset_driver = {
++	.probe = uniphier_ld20_reset_probe,
 +	.driver = {
-+		.name = "uniphier-sld8-reset",
++		.name = "uniphier-ld20-reset",
 +	},
 +};
-+module_platform_driver(uniphier_sld8_reset_driver);
++module_platform_driver(uniphier_ld20_reset_driver);
 +
 +MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier PH1-sLD8 Reset Controller Driver");
++MODULE_DESCRIPTION("UniPhier PH1-LD20 Reset Controller Driver");
 +MODULE_LICENSE("GPL");
 -- 
 1.9.1
