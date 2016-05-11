@@ -1,46 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 May 2016 14:43:44 +0200
-Subject: [PATCH 0/2] ARM: dts: sun6i: Drop constraints on dc1sw regulator
-In-Reply-To: <1462944194-6920-1-git-send-email-wens@csie.org>
-References: <1462944194-6920-1-git-send-email-wens@csie.org>
-Message-ID: <20160511124344.GO3733@lukather>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 11 May 2016 08:44:16 -0400
+Subject: [PATCH v3 27/27] ARM: dts: exynos: Add RTC and I2C to Exynos5410
+In-Reply-To: <1462910970-1812-28-git-send-email-krzk@kernel.org>
+References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
+ <1462910970-1812-28-git-send-email-krzk@kernel.org>
+Message-ID: <b1f47282-f70e-4354-9146-9b4b27ba1726@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 01:23:12PM +0800, Chen-Yu Tsai wrote:
-> Hi Arnd, Olof,
+Hello Krzysztof,
+
+On 05/10/2016 04:09 PM, Krzysztof Kozlowski wrote:
+> Configure Exynos5410-specific properties of RTC, I2C and HSI2C nodes.
+> This still does not enable them on the board level though.
 > 
-> Here are 2 last minute fixes for 4.6. The 2 patches drop constaints on
-> the dc1sw regulator for 2 A31s tablets. I checked with Maxime and he said
-> to send them directly to you.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm/boot/dts/exynos5410.dtsi | 66 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
 > 
-> The issue was first brought up and fixed for A23/A33 Q8 tablets in commit
-> dcf5341f0150 ("ARM: dts: sun8i-q8-common: Do not set constraints on dc1sw
-> regulator"). It was brought up again yesterday on IRC, and I realized that
-> 2 sun6i A31s tablet DTS files also had this setting. The setting causes
-> PMIC regulator registration to fail, and since among other things, mmc
-> depends on the regulators, the system will likely hang.
-> 
-> There seems to be a fix for this queued up for 4.7: commit 45389c47526d
-> ("regulator: core: Add early supply resolution for regulators") in the
-> regulator "supply" topic branch. So we should be able to revert these
-> fixes in 4.7.
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index dd4d6d752865..ae64cb0a8efd 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -114,6 +114,9 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		/* i2c_0-3 are defined in exynos5.dtsi */
+> +		/* hsi2c_4-7 are defined in exynos5xx.dtsi */
+> +
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I don't think these comments are needed. For each DTS, there are usually a lot of
+nodes defined in higher levels of the DT hierarchy but isn't common to mention it.
 
-For the two patches.
+Specially since the mentioned nodes are referenced here by their labels so it is
+implicit that are defined in one of the included DTSI (or dtc will fail to build).
 
-Thanks!
-Maxime
+The actual change looks good to me though:
 
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160511/abb6a4b8/attachment.sig>
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
