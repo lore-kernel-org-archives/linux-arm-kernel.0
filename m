@@ -1,131 +1,158 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 May 2016 15:40:03 +0100
-Subject: [PATCH v3 23/55] KVM: arm/arm64: vgic-new: Add CTLR, TYPER and
- IIDR handlers
-In-Reply-To: <57333554.9070908@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-24-git-send-email-andre.przywara@arm.com>
- <20160511120533.GM27623@cbox> <57332AD8.6050306@arm.com>
- <20160511131556.GR27623@cbox> <57333359.3000505@arm.com>
- <57333554.9070908@arm.com>
-Message-ID: <57334443.2060501@arm.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 11 May 2016 14:45:51 +0000
+Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB
+ PCIe bindings
+In-Reply-To: <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
+References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
+ <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <8520D5D51A55D047800579B094147198258955CE@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/16 14:36, Andre Przywara wrote:
-> Hi,
 > 
-> On 11/05/16 14:27, Marc Zyngier wrote:
->> On 11/05/16 14:15, Christoffer Dall wrote:
->>> On Wed, May 11, 2016 at 01:51:36PM +0100, Marc Zyngier wrote:
->>>> On 11/05/16 13:05, Christoffer Dall wrote:
->>>>> On Fri, May 06, 2016 at 11:45:36AM +0100, Andre Przywara wrote:
->>>>>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>>>>
->>>>>> Those three registers are v2 emulation specific, so their implementation
->>>>>> lives entirely in vgic-mmio-v2.c. Also they are handled in one function,
->>>>>> as their implementation is pretty simple.
->>>>>> When the guest enables the distributor, we kick all VCPUs to get
->>>>>> potentially pending interrupts serviced.
->>>>>>
->>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>>>> ---
->>>>>> Changelog RFC..v1:
->>>>>> - kick VCPUs is the distributor gets enabled
->>>>>> - improve comment
->>>>>>
->>>>>> Changelog v1 .. v2:
->>>>>> - adapt to new MMIO framework
->>>>>> - use switch() statements to improve readability
->>>>>>
->>>>>> Changelog v2 .. v3:
->>>>>> - add vgic_kick_vcpus() implementation
->>>>>>
->>>>>>  include/linux/irqchip/arm-gic.h  |  1 +
->>>>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 48 +++++++++++++++++++++++++++++++++++++++-
->>>>>>  virt/kvm/arm/vgic/vgic.c         | 15 +++++++++++++
->>>>>>  virt/kvm/arm/vgic/vgic.h         |  4 ++++
->>>>>>  4 files changed, 67 insertions(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
->>>>>> index be0d26f..fd05185 100644
->>>>>> --- a/include/linux/irqchip/arm-gic.h
->>>>>> +++ b/include/linux/irqchip/arm-gic.h
->>>>>> @@ -33,6 +33,7 @@
->>>>>>  
->>>>>>  #define GIC_DIST_CTRL			0x000
->>>>>>  #define GIC_DIST_CTR			0x004
->>>>>> +#define GIC_DIST_IIDR			0x008
->>>>>>  #define GIC_DIST_IGROUP			0x080
->>>>>>  #define GIC_DIST_ENABLE_SET		0x100
->>>>>>  #define GIC_DIST_ENABLE_CLEAR		0x180
->>>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>>>> index 2729a22..69e96f7 100644
->>>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>>>> @@ -20,9 +20,55 @@
->>>>>>  #include "vgic.h"
->>>>>>  #include "vgic-mmio.h"
->>>>>>  
->>>>>> +static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
->>>>>> +					    gpa_t addr, unsigned int len)
->>>>>> +{
->>>>>> +	u32 value;
->>>>>> +
->>>>>> +	switch (addr & 0x0c) {
->>>>>> +	case GIC_DIST_CTRL:
->>>>>> +		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
->>>>>> +		break;
->>>>>> +	case GIC_DIST_CTR:
->>>>>> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
->>>>>> +		value = (value >> 5) - 1;
->>>>>> +		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
->>>>>> +		break;
->>>>>> +	case GIC_DIST_IIDR:
->>>>>> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
->>>>>> +		break;
->>>>>> +	default:
->>>>>> +		return 0;
->>>>>> +	}
->>>>>> +
->>>>>> +	return extract_bytes(value, addr & 3, len);
->>>>>> +}
->>>>>> +
->>>>>> +static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
->>>>>> +				    gpa_t addr, unsigned int len,
->>>>>> +				    unsigned long val)
->>>>>> +{
->>>>>> +	switch (addr & 0x0c) {
->>>>>> +	case GIC_DIST_CTRL:
->>>>>> +		if (!(addr & 1)) {
->>>>>
->>>>> what is this !(addr & 1) check?
->>>>
->>>> We check that the write includes the lowest byte of the register. But as
->>>> we only have aligned accesses, it probably doesn't matter... I'll hack
->>>> that away.
->>>>
->>> where do we check to only have aligned accesses?
->>
->> Looks like a missing feature. The v2 spec says:
->>
->> 4.1.4 GIC register access
->> All registers support 32-bit word accesses with the access type defined
->> in Table 4-1 on page 4-73 and Table 4-2 on page 4-74.
->> In addition, the GICD_IPRIORITYRn, GICD_ITARGETSRn, GICD_CPENDSGIRn, and
->> GICD_SPENDSGIRn registers support byte accesses.
->>
->> Similar thing for v3 (8.1.3).
->>
->> By the look of it, we should add checks in all accessors. I'll get onto it.
+>  .../devicetree/bindings/pci/brcm,brcmstb-pcie.txt  | 98
+> ++++++++++++++++++++++
+>  1 file changed, 98 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
 > 
-> What about to tag every register in our vgic_register_region with a
-> possible access width and do a generic check in
-> dispatch_mmio_{read,write}? Then we wouldn't need to touch every handler.
+> diff --git a/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
+> b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
+> new file mode 100644
+> index 000000000000..3682b0f0bc26
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
+> @@ -0,0 +1,98 @@
+> +Broadcom STB PCIe Host Controller Device Tree Bindings
+> +
+> +This document describes the binding of the PCIe Root Complex hardware
+> +found in Broadcom Set Top Box System-on-Chips such as BCM7425 (MIPS),
+> +BCM7435 (MIPS) and
+> +BCM7445 (ARMv7).
+> +
+> +Required properties:
+> +- compatible: must be one of: "brcm,bcm7425-pcie"
+> +			      "brcm,bcm7435-pcie"
+> +			      "brcm,bcm7445-pcie"
+> +
+> +- reg: specifies the physical base address of the controller registers
+> +and
+> +  its length
+> +
+> +- interrupt-parent: must be a reference (phandle) to the parent
+> +interrupt
+> +  controller in the system (7038-l1-intc on MIPS, GIC on ARM/ARM64)
+> +
+> +- interrrupts: first interrupt must be the Level 1 interrupt number
+> +corresponding
+> +  to the main PCIe RC interrupt, second interrupt must be the MSI
+> +interrupt
+> +  See the interrupt-parent documentation for the number of cells and their
+> meaning:
+> +  MIPS:
+> +Documentation/devicetree/bindings/interrupt-controller/brcm,bcm7038-
+> l1-
+> +intc.txt
+> +  ARM/ARM64:
+> +Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> +
+> +- interrupt-names: must be "pcie", and if present "msi"
+> +
+> +- interrupt-map: see pci.txt
+> +
+> +- interrupt-map-mask: see pci.txt
+> +
+> +- #address-cells: must be set to <3>, see pci.txt
+> +
+> +- #size-cells: must be set to <2>, see pci.txt
+> +
+> +- ranges: ranges for the PCI outbound windows, no I/O or prefetchable
+> +windows
+> +  must be specified here, only non-prefetchable. 32-bits windows or
+> +64-bits
+> +  windows are allowed based on the host processor's capabilities (ARM
+> +w/ LPAE,
+> +  ARM64).
+> +
+> +- #interrupt-cells: set to <1>, see pci.txt
+> +
+> +- brcm,log2-scb-sizes: log2 size of the SCB window that is mapped to
+> +PCIe space
+> +  there must be exactly one value per memory controller present in the
+> +system
+> +  (ranges from 1 to 3)
 
-That's my plan.
+Can you please give more insight on what does this property do ?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Bharat
+> +
+> +Optional properties:
+> +
+> +- msi-controller: indicates that this is a MSI controller node (when
+> +supported)
+> +
+> +- clocks: phandle to the functional clock that feeds into the PCIe RC
+> +block
+> +
+> +- clock-names: the name(s) of the clocks specified in 'clocks'.  Note
+> +  that if the 'clocks' property is given, 'clock-names' is mandatory,
+> +  and the name of the clock is expected to be "pcie".
+> +
+> +- brcm,ssc: boolean that indicates usage of spread-spectrum clocking
+> +
+> +- brcm,gen: integer that indicates desired forced generation of link: 1
+> +=> 2.5
+> +  Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps. Will override the auto-negotation
+> +if
+> +  specified.
+> +
+> +- <*>-supply: see
+> +Documentation/devicetree/bindings/regulator/regulator.txt
+> +
+> +- <*>-supply-names: see
+> +Documentation/devicetree/bindings/regulator/regulator.txt
+> +
+> +Example Node:
+> +
+> +This example assumes that the top-level #address-cells = <2> and
+> +#size-cells = <2>, e.g: ARM LPAE configuration.
+> +
+> +	pcie0: pcie-controller at f0460000 {
+> +		reg = <0x0 0xf0460000 0x0 0x9310>;
+> +		interrupts = <0x0 0x33 0x4>, <0x0 0x34, 0x4>;
+> +		interrupt-names = "pcie", "msi";
+> +		compatible = "brcm,bcm7445-pcie";
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +
+> +		/* Two non-prefetchable 32-bits memory space, each of
+> 128MB
+> + 		 * with the following mapping:
+> +		 * PCIe address		=> CPU physical address space
+> +		 * 0x00_0000_0000	=> 0x00_C000_0000
+> +		 * 0x00_0800_0000	=> 0x00_C800_0000
+> +		 */
+> +		ranges = <0x02000000 0x00000000 0x00000000 0x00000000
+> 0xc0000000 0x00000000 0x08000000>,
+> +			 <0x02000000 0x00000000 0x08000000 0x00000000
+> 0xc8000000 0x00000000 0x08000000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0xf800 0 0 7>;
+> +		interrupt-map = <0 0 0 1 &intc 47 3
+> +				 0 0 0 2 &intc 48 3
+> +				 0 0 0 3 &intc 49 3
+> +				 0 0 0 4 &intc 50 3>;
+> +		clocks = <&pcie0>;
+> +		clock-names = "pcie";
+> +		brcm,ssc;
+> +		brcm,log2-scb-sizes = <0x1e 0x1e 0x1e>;
+> +		vreg-wifi-pwr-supply-names = "vreg-wifi-pwr";
+> +		vreg-wifi-pwr-supply = <&vreg-wifi-pwr>;
+> +	};
+> --
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
