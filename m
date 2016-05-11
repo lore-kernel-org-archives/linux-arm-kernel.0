@@ -1,64 +1,27 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Wed, 11 May 2016 16:03:08 +0200
-Subject: [PATCHv3 1/4] ARM: dts: r8a7790: Reference both DMA controllers
-In-Reply-To: <CAMuHMdWoPThi0w6siA5LJ60oEH6JMv4x80b_Spg5aF-uHq3WqQ@mail.gmail.com>
-References: <1462972438-20797-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1462972438-20797-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <CAMuHMdWoPThi0w6siA5LJ60oEH6JMv4x80b_Spg5aF-uHq3WqQ@mail.gmail.com>
-Message-ID: <20160511140308.GD3256@bigcity.dyn.berto.se>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 11 May 2016 10:11:50 -0400
+Subject: [PATCH 1/2] ARM: EXYNOS: Move pm_domains driver to
+ drivers/soc/samsung
+In-Reply-To: <1462888341-21963-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462888341-21963-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <61ec0a28-1b40-d66e-d349-f40463bd1637@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-05-11 15:45:17 +0200, Geert Uytterhoeven wrote:
-> Hi Niklas,
-> 
-> On Wed, May 11, 2016 at 3:13 PM, Niklas S?derlund
-> <niklas.soderlund+renesas@ragnatech.se> wrote:
-> > R-Car Gen2 have two DMA controllers, which are equivalent. Add
-> > references to both dmac0 and dmac1 so the driver can choose which one to
-> > use.
-> >
-> > Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> > ---
-> >  arch/arm/boot/dts/r8a7790.dtsi | 131 ++++++++++++++++++++++++-----------------
-> >  1 file changed, 78 insertions(+), 53 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> > index 83cf23c..14fcd19 100644
-> > --- a/arch/arm/boot/dts/r8a7790.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> 
-> > @@ -755,9 +773,9 @@
-> >                 clocks = <&mstp3_clks R8A7790_CLK_SCIF2>, <&zs_clk>,
-> >                          <&scif_clk>;
-> >                 clock-names = "fck", "brg_int", "scif_clk";
-> > -               dmas = <&dmac0 0x2b>, <&dmac0 0x2c>;
-> > -               dma-names = "tx", "rx";
-> > -               power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-> 
-> Please keep the above line.
+Hello Krzysztof,
 
-My mistake, the above line was not meant to be removed.. thanks for 
-pointing it out.
+On 05/10/2016 09:52 AM, Krzysztof Kozlowski wrote:
+> Exynos PM domains driver does not have mach-specific dependencies so it
+> can be safely moved out of arm/mach-exynos to drivers/soc. This in
+> future will allow re-using it on ARM64 boards.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-> 
-> > +               dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
-> > +                      <&dmac1 0x2b>, <&dmac1 0x2c>;
-> > +               dma-names = "tx", "rx", "tx", "rx";
-> >                 status = "disabled";
-> >         };
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
+Best regards,
 -- 
-Regards,
-Niklas S?derlund
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
