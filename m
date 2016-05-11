@@ -1,49 +1,27 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 12 May 2016 00:24:44 +0100
-Subject: [PATCH] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <57333533.2030206@linaro.org>
-References: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
- <20160511122730.GU2839@codeblueprint.co.uk>
- <57333533.2030206@linaro.org>
-Message-ID: <20160511232444.GY2839@codeblueprint.co.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 11 May 2016 16:41:54 -0700
+Subject: [PATCH v8 8/8] i2c: rk3x: support fast-mode plus for rk3399
+In-Reply-To: <5153288.jNhUuzGC3g@phil>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908794-27333-1-git-send-email-david.wu@rock-chips.com>
+ <5153288.jNhUuzGC3g@phil>
+Message-ID: <CAD=FV=VzQ8PRokgAaTV00L31mcXFEzBG8c1NB4+Rqyx75hwwDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 May, at 09:35:47PM, Shannon Zhao wrote:
-> > 
-> > Also, why do you need to setup efi.runtime_version here? Isn't that
-> > done inside uefi_init()?
-> > 
-> I don't see any codes which setup efi.runtime_version in uefi_init().
- 
-Look in the EFI tree,
+Heiko,
 
-  https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/tree/drivers/firmware/efi/arm-init.c?h=next#n120
+On Wed, May 11, 2016 at 2:09 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Additionally, the i2c-noob in me would wish for a short sentence on where
+> the timing values come from (measured, somewhere in the TRM I didn't find or
+> something completely different).
 
-> > Here is how I would have expected this patch to look:
-> > 
-> >   - Add FDT code to find hypervisor EFI params
-> > 
-> >   - Force enable EFI_RUNTIME_SERVICES for Xen and call
-> >     xen_efi_runtime_setup() inside xen_guest_init()
-> > 
-> >   - Change arm_enable_runtime_services() to handle the case where
-> >     EFI_RUNTIME_SERVICES is already set
-> > 
-> > Am I misunderstanding some ordering issues?
-> 
-> Since xen_guest_init() and arm_enable_runtime_services() are both
-> early_initcall and the calling order is random I think.
+If you search for "UM10204" you'll find the first link is
+<http://www.nxp.com/documents/user_manual/UM10204.pdf>.  That appears
+to be the official standard.  At least that's what
+<http://www.i2c-bus.org/fast-mode-plus/> says (though they have an old
+link).
 
-Urgh, right, I missed that.
+Agree that it wouldn't hurt to mention that in the commit message.
 
-> And when we call xen_efi_runtime_setup() and setup
-> efi.runtime_version in xen_guest_init(), the efi.systab might be
-> NULL. So it needs to map the systanle explicitly before we use
-> efi.systab.
-
-Could you explain why you need to copy efi.runtime_version instead of
-letting the existing code in uefi_init() set it up?
-
-Also, efi.systab isn't used by xen_efi_runtime_setup() as far I can
-see, not sure why you need that either?
+-Doug
