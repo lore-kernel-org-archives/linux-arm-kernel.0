@@ -1,87 +1,66 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 11 May 2016 18:53:10 +0800
-Subject: [PATCH 1/2] regulator: Add support for parsing operation mode
-In-Reply-To: <1462957929-20105-2-git-send-email-henryc.chen@mediatek.com>
-References: <1462957929-20105-1-git-send-email-henryc.chen@mediatek.com>
- <1462957929-20105-2-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <CAGS+omBy4neiPwQ60x6m4SRHFUkp_v80t+swQUL8JF45Uph+yw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 May 2016 12:55:01 +0200
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160511075438.GA15628@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <57329320.1000500@huawei.com> <20160511075438.GA15628@yury-N73SV>
+Message-ID: <5842999.Zgpfq4gkVz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Henry,
+On Wednesday 11 May 2016 11:04:38 Yury Norov wrote:
+> On Wed, May 11, 2016 at 10:04:16AM +0800, Zhangjian (Bamvor) wrote:
+> [...]
+> 
+> > >>Ok, I will test the ltp syscall test.
+> > >>With this changes, the issue I mentioned should be fixed. But we still
+> > >>use mmap2 syscall for ILP32 application when we pass the offset instead
+> > >>of page offset. Is it correct?
+> > >
+> > >I don't remember. It's probably not important whether we have the shift
+> > >in there, as long as it's independent of the actual kernel page size and
+> > >user space and kernel agree on the calling conventions.
+> > Well. I am ok with where to shift the pages size because we get the same
+> > result. I was just thinking if we should get rid of the name of mmap2 in our
+> > ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
+> > if they do not know the implementations.
+> > 
+> 
+> This is what generic unistd.h does. If you want to change it, you'd
+> change each arch that uses generic unistd.h.
+> 
 
-On Wed, May 11, 2016 at 5:12 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
->
-> Some regulators support their operating mode to be changed by
-> consumers for module specific purpose.
->
-> This patch adds support to parse those properties and fill the
-> regulator constraints so the regulator core can call the
-> regualtor_set_mode to change the modes.
->
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/regulator/regulator.txt | 10 ++++++++++
->  drivers/regulator/of_regulator.c                          | 14 ++++++++++++++
->  2 files changed, 24 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-> index ecfc593..88f98f0 100644
-> --- a/Documentation/devicetree/bindings/regulator/regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-> @@ -49,6 +49,16 @@ Optional properties:
->         0: Disable active discharge.
->         1: Enable active discharge.
->         Absence of this property will leave configuration to default.
-> +- regulator-allow-change-mode: allow the regulator mode to be configured
+Generic unistd.h has this:
 
-As mentioned by broonie earlier, the explicit 'allow' property is
-redundant, if regulator-supported-modes is present, then set
-REGULATOR_CHANGE_MODE invalid_ops_mask , else leave it clear.
+#ifdef __SYSCALL_COMPAT
+#define __SC_COMP_3264(_nr, _32, _64, _comp) __SYSCALL(_nr, _comp)
+#else
+#define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
+#endif
 
-> +- regulator-supported-modes: Regulators can run in a variety of different operating
-> +  modes depending on output load. This allows further system power savings by
-> +  selecting the best (and most efficient) regulator mode for a desired load.
-> +  The definition for each of these operation is defined at
-> +  include/linux/regulator/consumer.h
-> +       0: FAST.
-> +       1: NORMAL.
-> +       2: IDLE.
-> +       3: STANDBY.
->
->  Deprecated properties:
->  - regulator-compatible: If a regulator chip contains multiple
-> diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
-> index 6b0aa80..12fe8c8 100644
-> --- a/drivers/regulator/of_regulator.c
-> +++ b/drivers/regulator/of_regulator.c
+#define __NR3264_mmap 222
+__SC_3264(__NR3264_mmap, sys_mmap2, sys_mmap)
 
-Also, I thought binding document changes are generally in a separate
-patch from their implementation.
 
--Dan
+#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
+#define __NR_mmap __NR3264_mmap
+#else
+#define __NR_mmap2 __NR3264_mmap
+#endif
 
-> @@ -167,6 +167,20 @@ static void of_get_regulation_constraints(struct device_node *np,
->                 suspend_state = NULL;
->                 suspend_np = NULL;
->         }
-> +
-> +       if (of_property_read_bool(np, "regulator-allow-change-mode"))
-> +               constraints->valid_ops_mask |= REGULATOR_CHANGE_MODE;
-> +
-> +       ret = of_property_count_elems_of_size(np,
-> +                                             "regulator-supported-modes",
-> +                                             sizeof(u32));
-> +       for (i = 0; i < ret; i++) {
-> +               u32 mode;
-> +
-> +               of_property_read_u32_index(np, "regulator-supported-modes",
-> +                                          i, &mode);
-> +               constraints->valid_modes_mask |= (1 << mode);
-> +       }
->  }
->
->  /**
-> --
-> 1.8.1.1.dirty
->
+So by default we get __NR_mmap2 and sys_mmap2 on 32-bit ABIs, but
+__NR_mmap and sys_mmap on 64-bit ABIs, as it should be.
+
+The problem is that arch/arm64/kernel/sys_ilp32.c now overrides
+this to use __NR_mmap2 with sys_mmap, so we have a mismatch. I think
+we should either override both the implementation and the number,
+or neither of them.
+
+I think what happened is that you chose to override sys_mmap because
+sys_mmap2 sometimes takes an off_t argument, however the kernel
+just treats it as 'unsigned long', with a range of 44 bits for the
+offset. Using sys_mmap with a __kernel_loff_t argument gives
+us 64-bit range, but if we do that, I think it should be __NR_mmap.
+
+	Arnd
