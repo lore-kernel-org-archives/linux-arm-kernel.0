@@ -1,100 +1,54 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 11 May 2016 14:30:35 -0700
-Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <CAJZ5v0h8zBEZ2nLLdk62r7uqHizUfVWamUVEriBGe1XBE6462Q@mail.gmail.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
- <20160511104032.GA31374@arm.com>
- <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
- <57339F39.3040603@caviumnetworks.com>
- <CAJZ5v0h8zBEZ2nLLdk62r7uqHizUfVWamUVEriBGe1XBE6462Q@mail.gmail.com>
-Message-ID: <5733A47B.8030908@caviumnetworks.com>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Wed, 11 May 2016 14:36:16 -0700
+Subject: [PATCH v2 0/6] Support BCM23550 SoC
+Message-ID: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2016 02:22 PM, Rafael J. Wysocki wrote:
-> On Wed, May 11, 2016 at 11:08 PM, David Daney <ddaney@caviumnetworks.com> wrote:
->> On 05/11/2016 01:35 PM, Rafael J. Wysocki wrote:
->>>
->>> On Wed, May 11, 2016 at 12:40 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>>
->>>> On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
->>>>>
->>>>> On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com>
->>>>> wrote:
->>>>>>
->>>>>> From: David Daney <david.daney@cavium.com>
->>>>>>
->>>>>> Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
->>>>>> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
->>>>>> AArch32 state")
->>>>
->>>>
->>>> [...]
->>>>
->>>>>> David Daney (2):
->>>>>>     arm64, numa: Cleanup NUMA disabled messages.
->>>>>>     acpi, numa, srat: Improve SRAT error detection and add messages.
->>>>>>
->>>>>> Hanjun Guo (11):
->>>>>>     acpi, numa: Use pr_fmt() instead of printk
->>>>>>     acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
->>>>>>     acpi, numa: remove duplicate NULL check
->>>>>>     acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
->>>>>>     arm64, numa: rework numa_add_memblk()
->>>>>>     x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
->>>>>>     acpi, numa: move bad_srat() and srat_disabled() to
->>>>>>       drivers/acpi/numa.c
->>>>>>     acpi, numa: remove unneeded acpi_numa=1
->>>>>>     acpi, numa: Move acpi_numa_memory_affinity_init() to
->>>>>>       drivers/acpi/numa.c
->>>>>>     arm64, acpi, numa: NUMA support based on SRAT and SLIT
->>>>>>     acpi, numa: Enable ACPI based NUMA on ARM64
->>>>>>
->>>>>> Robert Richter (1):
->>>>>>     acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
->>>>>
->>>>>
->>>>> I need ACKs from the ARM64 maintainers on patches [6-7/13] and
->>>>> [13-14/14].
->>>>
->>>>
->>>> There's also a dependency on the arm64 for-next/core branch, so I've been
->>>> largely ignoring this as far as 4.6 is concerned and was planning to take
->>>> a proper look for 4.7 once the upcoming merge window is out of the way.
->>>
->>>
->>> That would be 4.7 and 4.8 respectively I suppose?
->>>
->>> Anyway, Catalin has ACKed all of them except for the [13/14], so
->>> technically I can apply [1-12/14] now and then [13-14/14] can be
->>> applied when they are ready.
->>>
->>> Do you think there will be any problems with merging [6-7/14] into 4.7
->>> via the ACPI tree?
->>>
->>
->> I would defer to the arm64 maintainers for decisions about the arm64
->> specific parts of the patch set.  That said, many of the arm64 specific
->> patches depend on the arm64 for-next/core branch, so you would have to be
->> careful about merge ordering if you pull these in before the for-next/core
->> branch is merged.
->
-> Fair enough.  I will wait for an update then.
->
->> Also FWIW, I plan on addressing Catalin's comments about 13/14 and posting a
->> new version of the patch set in the next day or two.
->
-> OK, but in that case it won't be considered for 4.7 (at least not by
-> me), so I'd suggest sending it in the second half of the 4.7 merge
-> window (or about that time).
+This patchset introduces support for the BCM23550 SoC and the Broadcom
+Sparrow development board.
 
-To be candid, I would very much like for you to pull in as many of the 
-patches as you are comfortable with as soon as possible.
+It modifies the BCM21664 support slightly to share code between the two.
 
-I don't know where Will and Catalin stand on this, and their opinion is 
-obviously important, but getting 1-12/14 merged to v4.7 and deferring 
-the last two for v4.8 would simplify the whole process for me.  The 
-drawback is carrying dead code around until the final parts are merged.
+With this patchset, a multi-v7 kernel brings up all 4 CPUs on a Sparrow
+board, and gets to a shell prompt. Many of the IP blocks that are shared
+with BCM28155 and BCM21664 are also functional, although not all have
+been thoroughly tested.
 
-David Daney
+Changes since v1
+- Moved chosen node from dtsi to dts file
+- Added stdout-path property to chosen node in dts
+- Removed "-cpu-method" from CPU enable method name
+
+Chris Brand (6):
+  power: Introduce Broadcom kona reset driver
+  arm: bcm21664: Remove reset code
+  docs: Document BCM23550 bindings
+  arm: Add support for Broadcom BCM23550 SoC
+  arm: BCM23550 SMP support
+  arm: dt: bcm23550: Add device tree files
+
+ .../bindings/arm/bcm/brcm,bcm23550-cpu-method.txt  |  36 ++
+ .../devicetree/bindings/arm/bcm/brcm,bcm23550.txt  |  15 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/bcm23550-sparrow.dts             |  80 ++++
+ arch/arm/boot/dts/bcm23550.dtsi                    | 415 +++++++++++++++++++++
+ arch/arm/mach-bcm/Kconfig                          |  12 +-
+ arch/arm/mach-bcm/Makefile                         |   5 +-
+ arch/arm/mach-bcm/board_bcm21664.c                 |  42 ---
+ arch/arm/mach-bcm/board_bcm23550.c                 |  25 ++
+ arch/arm/mach-bcm/platsmp.c                        |  58 +++
+ drivers/power/reset/Kconfig                        |  10 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/brcm-kona-reset.c              |  75 ++++
+ 14 files changed, 732 insertions(+), 46 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
+ create mode 100644 arch/arm/boot/dts/bcm23550-sparrow.dts
+ create mode 100644 arch/arm/boot/dts/bcm23550.dtsi
+ create mode 100644 arch/arm/mach-bcm/board_bcm23550.c
+ create mode 100644 drivers/power/reset/brcm-kona-reset.c
+
+-- 
+1.9.1
