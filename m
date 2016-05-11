@@ -1,27 +1,47 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 11 May 2016 08:33:46 -0400
-Subject: [PATCH v3 25/27] ARM: dts: exynos: Move HSI2C nodes to
- exynos54xx.dtsi
-In-Reply-To: <1462910970-1812-26-git-send-email-krzk@kernel.org>
-References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
- <1462910970-1812-26-git-send-email-krzk@kernel.org>
-Message-ID: <10927e67-86cb-8d4d-ed2c-1ac480b4e50f@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 May 2016 14:34:22 +0200
+Subject: [PATCH] drm: mediatek: add COMMON_CLK dependency
+Message-ID: <1462970100-240687-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On kernel builds without COMMON_CLK, the newly added mediatek drm
+driver fails to build:
 
-On 05/10/2016 04:09 PM, Krzysztof Kozlowski wrote:
-> The USI/HSI2C nodes can be mostly shared between Exynos5420 and
-> Exynos5410 so move them to common DTSI.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c:130:16: error: field 'pll_hw' has incomplete type
+  struct clk_hw pll_hw;
+                ^~~~~~
+In file included from ../include/linux/clk.h:16:0,
+                 from ../drivers/gpu/drm/mediatek/mtk_mipi_tx.c:14:
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c: In function 'mtk_mipi_tx_from_clk_hw':
+include/linux/kernel.h:831:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                ^
+/drivers/gpu/drm/mediatek/mtk_mipi_tx.c:136:9: note: in expansion of macro 'container_of'
+  return container_of(hw, struct mtk_mipi_tx, pll_hw);
+         ^~~~~~~~~~~~
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c: At top level:
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c:302:21: error: variable 'mtk_mipi_tx_pll_ops' has initializer but incomplete type
+ static const struct clk_ops mtk_mipi_tx_pll_ops = {
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+This adds the required Kconfig dependency.
 
-Best regards,
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/drm/mediatek/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
+index eeefc971801a..0c06a69d7f04 100644
+--- a/drivers/gpu/drm/mediatek/Kconfig
++++ b/drivers/gpu/drm/mediatek/Kconfig
+@@ -2,6 +2,7 @@ config DRM_MEDIATEK
+ 	tristate "DRM Support for Mediatek SoCs"
+ 	depends on DRM
+ 	depends on ARCH_MEDIATEK || (ARM && COMPILE_TEST)
++	depends on COMMON_CLK
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
+ 	select DRM_MIPI_DSI
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.7.0
