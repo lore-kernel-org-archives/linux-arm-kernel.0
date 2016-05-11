@@ -1,107 +1,83 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 11 May 2016 02:43:11 +0200
-Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 11 May 2016 09:53:35 +0900
+Subject: Help needed with kexec on arm64
+In-Reply-To: <DB5PR04MB1688F09062B2A5ECACCA4D80E6710@DB5PR04MB1688.eurprd04.prod.outlook.com>
+References: <DB5PR04MB168845795D86B4CE5BA5656FE68B0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <1458230896.3391.18.camel@infradead.org>
+ <CAB5YjtBEO=efjhcFdVOaZqG13qK3uzCbS5SFym5hhw-n+_QLhw@mail.gmail.com>
+ <DB5PR04MB1688A6D4385B76DAFF71D364E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
+ <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
+ <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160405052341.GA19476@linaro.org>
+ <DB5PR04MB1688F09062B2A5ECACCA4D80E6710@DB5PR04MB1688.eurprd04.prod.outlook.com>
+Message-ID: <20160511005334.GA8417@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com> wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
-> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
-> AArch32 state")
->
-> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
-> NUMA domain information from SRAT and SLIT table, so parse those two
-> tables to get mappings from cpu/mem to numa node configuration and
-> system locality.
->
-> v6 updates:
->
->  - Changed message printed in 13/14 to omit meaningless "cpu"
->    number. (noted by Dennis Chen and Hanjun Guo)
->
->  - New patch 7/14 to print different messages for NUMA disabled case.
->    (noted by Dennis Chen)
->
->  - Squashed two patches into 14/14.
->
->  - Added Reviewed-by to 4/14
->
-> v5 updates:
->
->  - Fixed ia64 build failure by gating some unused functions with #if
->    CONFIG_{X86,ARM64}.
->
->  - Fixed section mismatch errors for X86 case.
->
->  - Removed unneeded #include from some files.
->
->  - Tested to build cleanly on ARM64, X86_64, IA64
->
-> v4 updates:
->
->  - Updated from Hanjun Guo's v3 patches.
->
->  - Rebased on top of v16 of device-tree NUMA patches.
->
->  - Reordered some of the changes so that we don't introduce code and
->    then change it several times in the patch set.  New code is
->    introduced in its final form.  Code reused from x86 is first moved
->    with no change, and then a separate patch to make any needed
->    changes.
->
->  - code that is used only by ia64, moved to architecture specific
->    files.
->
-> v3 updates:
->  - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
->    that for acpi/numa.c (patch 2/12)
->
->  - Remove the duplicate NULL check for table print (patch 3/12)
->
->  - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
->    dummy function for acpi_numa_arch_fixup()
->
->  - Solve the problem that the mapping from logical cpu to numa node
->    is wrong which spotted out by Lorenzo
->
->  - cleanups for x86 and move acpi_numa_slit_init() and some other
->    functions to common place, then reduce the duplicate of x86
->    and arm64 (patch 7-12/12).
->
->  - rebased on top of 4.4 and Ganapat's v9 patch set.
->
->
-> David Daney (2):
->   arm64, numa: Cleanup NUMA disabled messages.
->   acpi, numa, srat: Improve SRAT error detection and add messages.
->
-> Hanjun Guo (11):
->   acpi, numa: Use pr_fmt() instead of printk
->   acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
->   acpi, numa: remove duplicate NULL check
->   acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
->   arm64, numa: rework numa_add_memblk()
->   x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
->   acpi, numa: move bad_srat() and srat_disabled() to
->     drivers/acpi/numa.c
->   acpi, numa: remove unneeded acpi_numa=1
->   acpi, numa: Move acpi_numa_memory_affinity_init() to
->     drivers/acpi/numa.c
->   arm64, acpi, numa: NUMA support based on SRAT and SLIT
->   acpi, numa: Enable ACPI based NUMA on ARM64
->
-> Robert Richter (1):
->   acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+Hi,
 
-I need ACKs from the ARM64 maintainers on patches [6-7/13] and [13-14/14].
+On Tue, May 10, 2016 at 12:32:15PM +0000, Harninder Rai wrote:
+> > 
+> > This means that there is no enough space left at this point.
+> > I guess that you are using too big initramfs against 64MB of total memory.
+> > Just increase the memory size for crash dump kernel.
+> > 
+> > -Takahiro AKASHI
+> 
+> Hello Takahiro Akashi,
+> 
+> I used a smaller initramfs (as you suggested) and my crash kernel has moved further but it again dumped with the following log messages. Any further pointers?
 
-The rest looks good to me, so I can apply the series once the above
-have been ACKed.
+It seems that you have already reached the point of kicking up "init"
+process, and this means that crash dump kernel itself successfully
+booted.
 
+> Does this mean that there isn't enough memory to save the core file or something? Because the error mostly are related to OOM killer process
+
+Apparently lack of memory is a cause of OOM killer, but the core file
+has nothing to do with this issue.
+I think that you don't have enough memory for the system yet.
+
+-Takahiro AKASHI
+
+> 
+> [    8.833434] Freeing unused kernel memory: 748K (ffff800000a3a000 - ffff800000af5000)
+> [    8.848924] init: Console is alive
+> [    8.856866] mmc0: new high speed SDHC card at address b368
+> [    8.868239] mmcblk0: mmc0:b368 SDC   3.75 GiB
+> [    8.873913]  mmcblk0: p1
+> [    9.855930] init: - preinit -
+> Press the [f] key and hit [enter] to enter failsafe mode
+> Press the [1], [2], [3] or [4] key and hit [enter] to select the debug level
+> [   12.896779] procd: - early -
+> [   12.977417] kworker/u16:0 invoked oom-killer: gfp_mask=0x27000c0, order=2, oom_score_adj=0
+> [   12.994568] CPU: 0 PID: 6 Comm: kworker/u16:0 Not tainted 4.5.0-rc6-00038-gae2804a-dirty #5
+> [   13.002950] Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+> [   13.009333] Workqueue: events_unbound call_usermodehelper_exec_work
+> [   13.015623] Call trace:
+> [   13.018076] [<ffff800000089760>] dump_backtrace+0x0/0x1ac
+> [   13.023492] [<ffff800000089920>] show_stack+0x14/0x1c
+> [   13.028560] [<ffff80000032c1d4>] dump_stack+0x8c/0xb0
+> [   13.033627] [<ffff8000001aebdc>] dump_header.isra.7+0x4c/0x18c
+> [   13.039480] [<ffff800000152130>] oom_kill_process+0x26c/0x45c
+> [   13.045243] [<ffff800000152688>] out_of_memory+0x2e0/0x32c
+> [   13.050745] [<ffff800000156c68>] __alloc_pages_nodemask+0x83c/0x848
+> [   13.057031] [<ffff800000156f78>] alloc_kmem_pages_node+0x30/0xa8
+> [   13.063058] [<ffff8000000b776c>] copy_process.isra.42.part.43+0x128/0x1488
+> [   13.069955] [<ffff8000000b8c4c>] _do_fork+0xcc/0x338
+> [   13.074934] [<ffff8000000b8f04>] kernel_thread+0x34/0x3c
+> [   13.080261] [<ffff8000000cb8e0>] call_usermodehelper_exec_work+0x2c/0xd8
+> [   13.086984] [<ffff8000000ce4b0>] process_one_work+0x134/0x2f4
+> [   13.092747] [<ffff8000000ce6c8>] worker_thread+0x58/0x43c
+> [   13.098162] [<ffff8000000d3f88>] kthread+0xd8/0xec
+> [   13.102967] [<ffff800000085cd0>] ret_from_fork+0x10/0x40
+> [   13.261745] Mem-Info:
+> 
+> Thanks and Regards
+> Harry++
+
+-- 
 Thanks,
-Rafael
+-Takahiro AKASHI
