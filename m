@@ -1,35 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 11 May 2016 20:15:12 +0800
-Subject: [GIT PULL] i.MX clock fixes for 4.6, take 2
-In-Reply-To: <20160506180217.GW3492@codeaurora.org>
-References: <20160503133605.GN5874@tiger>
- <20160506180217.GW3492@codeaurora.org>
-Message-ID: <20160511121512.GP5874@tiger>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 May 2016 14:17:11 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable Exynos MFC driver as
+ module
+In-Reply-To: <d36b1ca3-413a-8a19-ad96-0775593e4337@osg.samsung.com>
+References: <1462914448-24480-1-git-send-email-javier@osg.samsung.com>
+ <1462914448-24480-2-git-send-email-javier@osg.samsung.com>
+ <5732D0BF.3020207@samsung.com>
+ <d36b1ca3-413a-8a19-ad96-0775593e4337@osg.samsung.com>
+Message-ID: <573322C7.40203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:02:17AM -0700, Stephen Boyd wrote:
-> On 05/03, Shawn Guo wrote:
-> > The following changes since commit 7196c52c9377df0175b510ff5896bda524f7345e:
-> > 
-> >   clk: imx6q: fix typo in CAN clock definition (2016-04-13 15:27:15 +0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-fixes-4.6-2
-> > 
-> > for you to fetch changes up to 3397c2c45b1b6f54834dfeae30a73046f33ca943:
-> > 
-> >   ARM: dts: imx35: restore existing used clock enumeration (2016-04-18 12:37:21 +0800)
-> > 
-> > ----------------------------------------------------------------
-> > The i.MX clock fixes for 4.6, take 2:
-> >  - Fix the commit 3713e3f5e927 ("clk: imx35: define two clocks for rtc")
-> >    which messed up the clock enumeration when adding new clock.
+On 05/11/2016 02:14 PM, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> This commit wasn't introduced in this merge window, so I'm going
-> to pull this into clk-next unless you have some justification.
+> On 05/11/2016 02:27 AM, Krzysztof Kozlowski wrote:
+>> On 05/10/2016 11:07 PM, Javier Martinez Canillas wrote:
+>>> Exynos SoCs have a Multi Format Video Hardware Codec (MFC) IP block that
+>>> can be used to {en,de}code video streams by hardware. Enable support for
+>>> its driver as a module so the MFC can be tested.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
+>>> ---
+>>>
+>>> This patch depends on https://patchwork.kernel.org/patch/8970711/
+>>>
+>>>  arch/arm/configs/multi_v7_defconfig | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>
+>>
+>> Both patches look good but only exynos_defconfig ended in Patchwork.
+>> This one did not... because you forgot to Cc the samsung-soc list.
+>>
+> 
+> Sigh, this time I used the cc list suggested by get_maintainers.pl and
+> forgot to double check if was complete. I'll resend and cc samsung-soc.
 
-That's fine.  Thanks, Stephen.
+No need. I found it on arm-kernel patchwork and I will apply it from there.
 
-Shawn
+Best regards,
+Krzysztof
