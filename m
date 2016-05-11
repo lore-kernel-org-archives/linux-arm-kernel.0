@@ -1,72 +1,59 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 11 May 2016 09:39:34 +0200
-Subject: [PATCH V7 05/11] acpi, pci: Support IO resources when parsing PCI
- host bridge resources.
-In-Reply-To: <CAJZ5v0j-jiGmMWoyd-ab4qiKGAScbxMskqUThBQxkOxPR8unMA@mail.gmail.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-6-git-send-email-tn@semihalf.com>
- <CAJZ5v0j-jiGmMWoyd-ab4qiKGAScbxMskqUThBQxkOxPR8unMA@mail.gmail.com>
-Message-ID: <5732E1B6.1000709@semihalf.com>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Wed, 11 May 2016 09:46:35 +0200
+Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
+In-Reply-To: <20160510071004.GA7318@kroah.com>
+References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+ <20160425115758.GA4874@lukather>
+ <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
+ <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
+ <20160509090615.6272f8ca@erd979>
+ <CACRpkdbZmL9Cqp-ubzyxd7fWUFOVsS1DCxsfG02kSpbWu_rbZQ@mail.gmail.com>
+ <20160509161728.3aee1134@erd979>
+ <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
+ <20160510071004.GA7318@kroah.com>
+Message-ID: <20160511094635.299db364@erd979>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.05.2016 20:20, Rafael J. Wysocki wrote:
-> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->> Platforms that have memory mapped IO port (such as ARM64) need special
->> handling for PCI I/O resources. For host bridge's resource probing case
->> these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
->>
->> The same I/O resources need to be released after hotplug
->> removal so that it can be re-added back by the pci_remap_iospace
->> function during insertion. As a consequence we unmap I/O resources
->> with pci_unmap_iospace when we release host bridge resources.
->>
->> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>   drivers/acpi/pci_root.c | 33 +++++++++++++++++++++++++++++++++
->>   1 file changed, 33 insertions(+)
->>
->> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
->> index ae3fe4e..cb3071d 100644
->> --- a/drivers/acpi/pci_root.c
->> +++ b/drivers/acpi/pci_root.c
->> @@ -719,6 +719,34 @@ next:
->>                          resource_list_add_tail(entry, resources);
->>          }
->>   }
->> +static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
->> +{
->> +#ifdef PCI_IOBASE
->
-> Same comment about the #ifdefs as in the other patch.
+On Tue, 10 May 2016 09:10:04 +0200
+Greg KH <gregkh@linuxfoundation.org> wrote:
 
-OK
+> On Mon, May 09, 2016 at 04:27:00PM +0200, Linus Walleij wrote:
+> > On Mon, May 9, 2016 at 4:17 PM, Robin van der Gracht
+> > <robin@protonic.nl> wrote:  
+> > > On Mon, 9 May 2016 15:19:26 +0200
+> > > Linus Walleij <linus.walleij@linaro.org> wrote:
+> > >  
+> > >> On Mon, May 9, 2016 at 9:06 AM, Robin van der Gracht
+> > >> <robin@protonic.nl> wrote:
+> > >>  
+> > >> > If you guys feel like auxdisplay is not the right subsystem
+> > >> > for the driver, and would like me to move it, please share.  
+> > >>
+> > >> The best would be if you volunteer to maintain it and bring
+> > >> it forward.  
+> > >
+> > > Thats fine. Would it suffice if I submit another patch adding
+> > > myself to the maintainers file?  
+> > 
+> > That's half of it, if Miguel does not come back then his name
+> > should be removed as the second step.
+> > 
+> > You also need to have an idea on a path to funnel accumulated
+> > patches upstream to Torvalds. The recent patches to this
+> > subsystem were funneled by Greg, so we should ask him how
+> > he prefer to proceed.
+> > 
+> > Greg, what do you prefer?  
+> 
+> I don't care :)
+> 
+> I can keep doing this, sending stuff to Linus through my char/misc
+> tree, or it can go through someone else's tree, it doesn't bother
+> me...
 
->
->> +       struct resource *res = entry->res;
->> +       resource_size_t cpu_addr = res->start;
->> +       resource_size_t pci_addr = cpu_addr - entry->offset;
->> +       resource_size_t length = resource_size(res);
->> +       unsigned long port;
->> +
->> +       if (pci_register_io_range(cpu_addr, length))
->> +               goto err;
->> +
->> +       port = pci_address_to_pio(cpu_addr);
->> +       if (port == (unsigned long)-1)
->> +               goto err;
->> +
->> +       res->start = port;
->> +       res->end = port + length - 1;
->> +       entry->offset = port - pci_addr;
->> +
->> +       if (pci_remap_iospace(res, cpu_addr) < 0)
->> +               goto err;
->
-> An empty line here?
+Soo.. You're allowing me to send patches to you so you can funnel
+them through your channel (for now)?
 
-yes, empty line would be nice here.
-
-Tomasz
+Kind regards,
+Robin 
