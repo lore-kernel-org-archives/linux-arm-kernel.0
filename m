@@ -1,73 +1,85 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 11 May 2016 14:08:09 -0700
-Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
- <20160511104032.GA31374@arm.com>
- <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
-Message-ID: <57339F39.3040603@caviumnetworks.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 11 May 2016 23:09:43 +0200
+Subject: [PATCH v8 8/8] i2c: rk3x: support fast-mode plus for rk3399
+In-Reply-To: <1462908794-27333-1-git-send-email-david.wu@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908794-27333-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <5153288.jNhUuzGC3g@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2016 01:35 PM, Rafael J. Wysocki wrote:
-> On Wed, May 11, 2016 at 12:40 PM, Will Deacon <will.deacon@arm.com> wrote:
->> On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
->>> On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com> wrote:
->>>> From: David Daney <david.daney@cavium.com>
->>>>
->>>> Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
->>>> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
->>>> AArch32 state")
->>
->> [...]
->>
->>>> David Daney (2):
->>>>    arm64, numa: Cleanup NUMA disabled messages.
->>>>    acpi, numa, srat: Improve SRAT error detection and add messages.
->>>>
->>>> Hanjun Guo (11):
->>>>    acpi, numa: Use pr_fmt() instead of printk
->>>>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
->>>>    acpi, numa: remove duplicate NULL check
->>>>    acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
->>>>    arm64, numa: rework numa_add_memblk()
->>>>    x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
->>>>    acpi, numa: move bad_srat() and srat_disabled() to
->>>>      drivers/acpi/numa.c
->>>>    acpi, numa: remove unneeded acpi_numa=1
->>>>    acpi, numa: Move acpi_numa_memory_affinity_init() to
->>>>      drivers/acpi/numa.c
->>>>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
->>>>    acpi, numa: Enable ACPI based NUMA on ARM64
->>>>
->>>> Robert Richter (1):
->>>>    acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
->>>
->>> I need ACKs from the ARM64 maintainers on patches [6-7/13] and [13-14/14].
->>
->> There's also a dependency on the arm64 for-next/core branch, so I've been
->> largely ignoring this as far as 4.6 is concerned and was planning to take
->> a proper look for 4.7 once the upcoming merge window is out of the way.
->
-> That would be 4.7 and 4.8 respectively I suppose?
->
-> Anyway, Catalin has ACKed all of them except for the [13/14], so
-> technically I can apply [1-12/14] now and then [13-14/14] can be
-> applied when they are ready.
->
-> Do you think there will be any problems with merging [6-7/14] into 4.7
-> via the ACPI tree?
->
+Am Mittwoch, 11. Mai 2016, 03:33:14 schrieb David Wu:
 
-I would defer to the arm64 maintainers for decisions about the arm64 
-specific parts of the patch set.  That said, many of the arm64 specific 
-patches depend on the arm64 for-next/core branch, so you would have to 
-be careful about merge ordering if you pull these in before the 
-for-next/core branch is merged.
+please always try to also provide some sort of commit message.
 
-Also FWIW, I plan on addressing Catalin's comments about 13/14 and 
-posting a new version of the patch set in the next day or two.
+---
+Implement fast mode plus that allows bus speeds of up to 1MHz.
+.....
 
-Thanks for looking at these,
-David Daney
+---
+
+Additionally, the i2c-noob in me would wish for a short sentence on where 
+the timing values come from (measured, somewhere in the TRM I didn't find or 
+something completely different).
+
+
+Patch content itself looks good, so with a suitable commit message,
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> ---
+> Change in v8:
+> - None
+> 
+>  drivers/i2c/busses/i2c-rk3x.c | 21 +++++++++++++++++----
+>  1 file changed, 17 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 25ed1ad..0ba25ee 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -126,6 +126,17 @@ static const struct i2c_spec_values fast_mode_spec =
+> { .min_hold_buffer_ns = 1300,
+>  };
+> 
+> +static const struct i2c_spec_values fast_mode_plus_spec = {
+> +	.min_hold_start_ns = 260,
+> +	.min_low_ns = 500,
+> +	.min_high_ns = 260,
+> +	.min_setup_start_ns = 260,
+> +	.max_data_hold_ns = 400,
+> +	.min_data_setup_ns = 50,
+> +	.min_setup_stop_ns = 260,
+> +	.min_hold_buffer_ns = 500,
+> +};
+> +
+>  /**
+>   * struct rk3x_i2c_calced_timings:
+>   * @div_low: Divider output for low
+> @@ -531,8 +542,10 @@ static const struct i2c_spec_values
+> *rk3x_i2c_get_spec(unsigned int speed) {
+>  	if (speed <= 100000)
+>  		return &standard_mode_spec;
+> -	else
+> +	else if (speed <= 400000)
+>  		return &fast_mode_spec;
+> +	else
+> +		return &fast_mode_plus_spec;
+>  }
+> 
+>  /**
+> @@ -743,9 +756,9 @@ static int rk3x_i2c_v1_calc_timings(unsigned long
+> clk_rate, const struct i2c_spec_values *spec;
+>  	int ret = 0;
+> 
+> -	/* Support standard-mode and fast-mode */
+> -	if (WARN_ON(t->bus_freq_hz > 400000))
+> -		t->bus_freq_hz = 400000;
+> +	/* Support standard-mode, fast-mode and fast-mode plus */
+> +	if (WARN_ON(t->bus_freq_hz > 1000000))
+> +		t->bus_freq_hz = 1000000;
+> 
+>  	/* prevent scl_rate_khz from becoming 0 */
+>  	if (WARN_ON(t->bus_freq_hz < 1000))
