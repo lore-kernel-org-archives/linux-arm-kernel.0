@@ -1,83 +1,101 @@
 From: chris.brand@broadcom.com (Chris Brand)
-Date: Wed, 11 May 2016 14:36:18 -0700
-Subject: [PATCH v2 2/6] arm: bcm21664: Remove reset code
+Date: Wed, 11 May 2016 14:36:19 -0700
+Subject: [PATCH v2 3/6] docs: Document BCM23550 bindings
 In-Reply-To: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
 References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
-Message-ID: <1463002582-6875-3-git-send-email-chris.brand@broadcom.com>
+Message-ID: <1463002582-6875-4-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kona reset driver now provides this functionality.
+Add binding document for Broadcom BCM23550 SoC.
+
+BCM23550 has a Cluster Dormant Control IP block that holds cores
+in an idle state. Introduce a new CPU enable method in which the CDC is
+accessed to bring the core online.
 
 Signed-off-by: Chris Brand <chris.brand@broadcom.com>
 ---
- arch/arm/mach-bcm/board_bcm21664.c | 42 --------------------------------------
- 1 file changed, 42 deletions(-)
+ .../bindings/arm/bcm/brcm,bcm23550-cpu-method.txt  | 36 ++++++++++++++++++++++
+ .../devicetree/bindings/arm/bcm/brcm,bcm23550.txt  | 15 +++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+ 3 files changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
 
-diff --git a/arch/arm/mach-bcm/board_bcm21664.c b/arch/arm/mach-bcm/board_bcm21664.c
-index 82ad5687771f..65b3db06e57a 100644
---- a/arch/arm/mach-bcm/board_bcm21664.c
-+++ b/arch/arm/mach-bcm/board_bcm21664.c
-@@ -11,53 +11,12 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/of_address.h>
- #include <linux/of_platform.h>
--#include <linux/io.h>
- 
- #include <asm/mach/arch.h>
- 
- #include "kona_l2_cache.h"
- 
--#define RSTMGR_DT_STRING		"brcm,bcm21664-resetmgr"
--
--#define RSTMGR_REG_WR_ACCESS_OFFSET	0
--#define RSTMGR_REG_CHIP_SOFT_RST_OFFSET	4
--
--#define RSTMGR_WR_PASSWORD		0xa5a5
--#define RSTMGR_WR_PASSWORD_SHIFT	8
--#define RSTMGR_WR_ACCESS_ENABLE		1
--
--static void bcm21664_restart(enum reboot_mode mode, const char *cmd)
--{
--	void __iomem *base;
--	struct device_node *resetmgr;
--
--	resetmgr = of_find_compatible_node(NULL, NULL, RSTMGR_DT_STRING);
--	if (!resetmgr) {
--		pr_emerg("Couldn't find " RSTMGR_DT_STRING "\n");
--		return;
--	}
--	base = of_iomap(resetmgr, 0);
--	if (!base) {
--		pr_emerg("Couldn't map " RSTMGR_DT_STRING "\n");
--		return;
--	}
--
--	/*
--	 * A soft reset is triggered by writing a 0 to bit 0 of the soft reset
--	 * register. To write to that register we must first write the password
--	 * and the enable bit in the write access enable register.
--	 */
--	writel((RSTMGR_WR_PASSWORD << RSTMGR_WR_PASSWORD_SHIFT) |
--		RSTMGR_WR_ACCESS_ENABLE,
--		base + RSTMGR_REG_WR_ACCESS_OFFSET);
--	writel(0, base + RSTMGR_REG_CHIP_SOFT_RST_OFFSET);
--
--	/* Wait for reset */
--	while (1);
--}
--
- static void __init bcm21664_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-@@ -71,6 +30,5 @@ static const char * const bcm21664_dt_compat[] = {
- 
- DT_MACHINE_START(BCM21664_DT, "BCM21664 Broadcom Application Processor")
- 	.init_machine = bcm21664_init,
--	.restart = bcm21664_restart,
- 	.dt_compat = bcm21664_dt_compat,
- MACHINE_END
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
+new file mode 100644
+index 000000000000..a3af54c0e404
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
+@@ -0,0 +1,36 @@
++Broadcom Kona Family CPU Enable Method
++--------------------------------------
++This binding defines the enable method used for starting secondary
++CPUs in the following Broadcom SoCs:
++  BCM23550
++
++The enable method is specified by defining the following required
++properties in the "cpu" device tree node:
++  - enable-method = "brcm,bcm23550";
++  - secondary-boot-reg = <...>;
++
++The secondary-boot-reg property is a u32 value that specifies the
++physical address of the register used to request the ROM holding pen
++code release a secondary CPU.  The value written to the register is
++formed by encoding the target CPU id into the low bits of the
++physical start address it should jump to.
++
++Example:
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++		};
++
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++			enable-method = "brcm,bcm23550";
++			secondary-boot-reg = <0x3500417c>;
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
+new file mode 100644
+index 000000000000..080baad923d6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
+@@ -0,0 +1,15 @@
++Broadcom BCM23550 device tree bindings
++--------------------------------------
++
++This document describes the device tree bindings for boards with the BCM23550
++SoC.
++
++Required root node property:
++  - compatible: brcm,bcm23550
++
++Example:
++	/ {
++		model = "BCM23550 SoC";
++		compatible = "brcm,bcm23550";
++		[...]
++	}
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ccc62f145306..37765e76db71 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -194,6 +194,7 @@ nodes to be present and contain the properties described below.
+ 			    "allwinner,sun8i-a23"
+ 			    "arm,psci"
+ 			    "arm,realview-smp"
++			    "brcm,bcm23550"
+ 			    "brcm,bcm-nsp-smp"
+ 			    "brcm,brahma-b15"
+ 			    "marvell,armada-375-smp"
 -- 
 1.9.1
