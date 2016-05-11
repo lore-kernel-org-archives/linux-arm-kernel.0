@@ -1,97 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 11 May 2016 11:11:01 +0100
-Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
-In-Reply-To: <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-8-git-send-email-tn@semihalf.com>
- <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
-Message-ID: <20160511101101.GA16101@red-moon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 11 May 2016 12:11:56 +0200
+Subject: [PATCH] ARM: dts: at91: sam9x5: Fix the memory range assigned to
+ the PMC
+In-Reply-To: <1462957202-22671-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1462957202-22671-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5733056C.9000100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 08:37:00PM +0200, Rafael J. Wysocki wrote:
-> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> > This patch provides a way to set the ACPI companion in PCI code.
-> > We define acpi_pci_set_companion() to set the ACPI companion pointer and
-> > call it from PCI core code. The function is stub for now.
-> >
-> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > ---
-> >  drivers/pci/probe.c      | 2 ++
-> >  include/linux/pci-acpi.h | 4 ++++
-> >  2 files changed, 6 insertions(+)
-> >
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 8004f67..fb0b752 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -12,6 +12,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/module.h>
-> >  #include <linux/cpumask.h>
-> > +#include <linux/pci-acpi.h>
-> >  #include <linux/pci-aspm.h>
-> >  #include <linux/aer.h>
-> >  #include <linux/acpi.h>
-> > @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >         bridge->dev.parent = parent;
-> >         bridge->dev.release = pci_release_host_bridge_dev;
-> >         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-> > +       acpi_pci_set_companion(bridge);
+Le 11/05/2016 11:00, Boris Brezillon a ?crit :
+> The memory range assigned to the PMC (Power Management Controller) was
+> not including the PMC_PCR register which are used to control peripheral
+> clocks.
 > 
-> Yes, we'll probably add something similar here.
+> This was working fine thanks to the page granularity of ioremap(), but
+> started to fail when we switched to syscon/regmap, because regmap is
+> making sure that all accesses are falling into the reserved range.
 > 
-> Do I think now is the right time to do that?  No.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reported-by: Richard Genoud <richard.genoud@gmail.com>
+> Tested-by: Richard Genoud <richard.genoud@gmail.com>
+> Fixes: 863a81c3be1d ("clk: at91: make use of syscon to share PMC registers in several drivers")
+> Cc: <stable@vger.kernel.org>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks Boris!
+
+
+> ---
+> Hi Arnd,
 > 
-> >         error = pcibios_root_bridge_prepare(bridge);
-> >         if (error) {
-> >                 kfree(bridge);
-> > diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> > index 09f9f02..1baa515 100644
-> > --- a/include/linux/pci-acpi.h
-> > +++ b/include/linux/pci-acpi.h
-> > @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
-> >  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
-> >  #endif /* CONFIG_ACPI */
-> >
-> > +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
-> > +{
-> > +}
-> > +
-> >  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
-> >  {
-> >         return 0;
-> > --
+> This patch is fixing a regression reported by Richard. Since this
+> regression was introduced in 4.6-rc1 it would be great if you could
+> take it before 4.6 is released.
+
+Arnd, arm-soc guys,
+
+I can build a Pull-Request instantly today, if you wish: just tell me if
+you prefer.
+
+Bye,
+
+> ---
+>  arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Honestly, to me it looks like this series is trying very hard to avoid
-> doing any PCI host bridge configuration stuff from arch/arm64/
-> although (a) that might be simpler and (b) it would allow us to
-> identify the code that's common between *all* architectures using ACPI
-> support for host bridge configuration and to move *that* to a common
-> place later.  As done here it seems to be following the "ARM64 is
-> generic and the rest of the world is special" line which isn't really
-> helpful.
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 0827d59..cd0cd5f 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -106,7 +106,7 @@
+>  
+>  			pmc: pmc at fffffc00 {
+>  				compatible = "atmel,at91sam9x5-pmc", "syscon";
+> -				reg = <0xfffffc00 0x100>;
+> +				reg = <0xfffffc00 0x200>;
+>  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>  				interrupt-controller;
+>  				#address-cells = <1>;
+> 
 
-I think patch [1-2] should be merged regardless (they may require minor
-tweaks if we decide to move pci_acpi_scan_root() to arch/arm64 though,
-for include files location). I guess you are referring to patch 8 in
-your comments above, which boils down to deciding whether:
 
-- pci_acpi_scan_root() (and unfortunately all the MCFG/ECAM handling that
-  goes with it) should live in arch/arm64 or drivers/acpi
-
-acpi_pci_bus_domain_nr() is a bit more problematic since it is meant
-to be called from PCI core code (ARM64 selects PCI_DOMAINS_GENERIC for
-DT and same kernel has to work with OF and ACPI selected) and it is
-arch specific (because what we have in bus->sysdata is arch specific,
-waiting for the domain number to be embedded in struct pci_host_bridge).
-
-Your point is fair, I am not sure that moving the pci_acpi_scan_root()
-to arch/arm64 would make things much simpler though, it is just a matter
-of deciding where that code has to live.
-
-How do you want us to proceed ?
-
-Thanks,
-Lorenzo
+-- 
+Nicolas Ferre
