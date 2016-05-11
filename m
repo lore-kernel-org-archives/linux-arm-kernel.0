@@ -1,68 +1,34 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 May 2016 09:33:13 -0500
-Subject: [PATCH v2 1/2] doc/devicetree: Add Aspeed VIC bindings
-In-Reply-To: <1462802317-27086-2-git-send-email-joel@jms.id.au>
-References: <462797239-14765-1-git-send-email-joel@jms.id.au>
- <1462802317-27086-1-git-send-email-joel@jms.id.au>
- <1462802317-27086-2-git-send-email-joel@jms.id.au>
-Message-ID: <20160511143313.GA7426@rob-hp-laptop>
+Date: Wed, 11 May 2016 09:34:22 -0500
+Subject: [PATCH v5 1/4] ASoC: davinci-mcbsp: add binding for McBSP
+In-Reply-To: <1462804522-29544-2-git-send-email-petr@barix.com>
+References: <1462804522-29544-1-git-send-email-petr@barix.com>
+ <1462804522-29544-2-git-send-email-petr@barix.com>
+Message-ID: <20160511143422.GA21634@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 11:28:36PM +0930, Joel Stanley wrote:
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+On Mon, May 09, 2016 at 04:35:19PM +0200, Petr Kulhavy wrote:
+> Add devicetree binding for the TI DA850/OMAP-L138/AM18xx
+> MultiChannel Buffered Serial Port (McBSP)
+> 
+> The optional register range "dat" is not implemented at the moment.
+> The current driver supports only DMA into RX/TX registers but no FIFO.
+> Once the FIFO is implemented in the driver the "dat" range will be used.
+> 
+> Signed-off-by: Petr Kulhavy <petr@barix.com>
 > ---
-> v2:
->   Fix device tree binding example, thanks Baruch and Arnd for pointing this out
+> v1: initial
+> v2: add missing TC channel in dmas properties (for compatibility with the new EDMA3 binding)
+>     remove "-audio" postfix from the compatible string
+>     remove "channel-combine" property
+> v3: remove the index note from the "mpu" property.
+>     specify exactly the supported platforms in compatible string
+> v4: minor correction in the example ("interrupt names"), re-added index note to the "mpu" property.
+> v5: example updated to match da850.dtsi: using "sound@" and removed leading zeros from the reg property
 > 
->  .../interrupt-controller/aspeed,ast2400-vic.txt    | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt b/Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
-> new file mode 100644
-> index 000000000000..86dede1755a2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
-> @@ -0,0 +1,24 @@
-> +Aspeed Vectored Interrupt Controller
-> +
-> +These bindings are for the Aspeed AST2400 interrupt controller register layout.
-> +The SoC has an legacy register layout, but this driver does not support that
-> +mode of operation.
-> +
-> +Required properties:
-> +
-> +- compatible : should be "aspeed,ast2400-vic".
-> +
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The value shall be 1.
+>  .../devicetree/bindings/sound/davinci-mcbsp.txt    | 52 ++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
 
-No need for level vs. edge flags?
-
-> +- valid-sources : bitmask of valid irq sources
-
-Drop this. Either all interrupt controllers need this or none of 
-them do. The valid sources are the ones described in the DT.
-
-> +
-> +Example:
-> +
-> + vic: interrupt-controller {
-
-Needs a unit address.
-
-> +      compatible = "aspeed,ast2400-vic";
-> +      interrupt-controller;
-> +      #interrupt-cells = <1>;
-> +      valid-sources = < 0xffffffff 0x0007ffff>;
-> +      reg = <0x1e6c0080 0x80>;
-> + };
-> -- 
-> 2.8.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Rob Herring <robh@kernel.org>
