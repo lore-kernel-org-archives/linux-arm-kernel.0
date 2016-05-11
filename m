@@ -1,90 +1,48 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 11 May 2016 11:18:04 +0530
-Subject: [PATCH 1/8] mfd: tps65218: Remove redundant read wrapper
+Date: Wed, 11 May 2016 11:18:06 +0530
+Subject: [PATCH 3/8] mfd: tps65218: Use mfd_add_devices instead of
+ of_platform_populate
 In-Reply-To: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
 References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1462945691-904-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <1462945691-904-4-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently read directly calls the repmap read function. Hence
-remove the redundant wrapper and use regmap read wherever
-needed.
+mfd_add_devices enables parsing device tree nodes without compatibles
+for child nodes. Replace of_platform_populate with mfd_add_devices.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- drivers/mfd/tps65218.c                 | 16 +---------------
- drivers/regulator/tps65218-regulator.c |  3 ++-
- include/linux/mfd/tps65218.h           |  2 --
- 3 files changed, 3 insertions(+), 18 deletions(-)
+ drivers/mfd/tps65218.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-index 80b9dc3..f20a531 100644
+index f20a531..b8b3a58 100644
 --- a/drivers/mfd/tps65218.c
 +++ b/drivers/mfd/tps65218.c
-@@ -34,20 +34,6 @@
+@@ -33,6 +33,10 @@
+ 
  #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
  
++static const struct mfd_cell tps65218_cells[] = {
++	{ .name = "tps65218-regulator", },
++};
++
  /**
-- * tps65218_reg_read: Read a single tps65218 register.
-- *
-- * @tps: Device to read from.
-- * @reg: Register to read.
-- * @val: Contians the value
-- */
--int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
--			unsigned int *val)
--{
--	return regmap_read(tps->regmap, reg, val);
--}
--EXPORT_SYMBOL_GPL(tps65218_reg_read);
--
--/**
   * tps65218_reg_write: Write a single tps65218 register.
   *
-  * @tps65218: Device to write to.
-@@ -93,7 +79,7 @@ static int tps65218_update_bits(struct tps65218 *tps, unsigned int reg,
- 	int ret;
- 	unsigned int data;
- 
--	ret = tps65218_reg_read(tps, reg, &data);
-+	ret = regmap_read(tps->regmap, reg, &data);
- 	if (ret) {
- 		dev_err(tps->dev, "Read from reg 0x%x failed\n", reg);
+@@ -236,8 +240,10 @@ static int tps65218_probe(struct i2c_client *client,
+ 	if (ret < 0)
  		return ret;
-diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
-index a5e5634..679ab2f 100644
---- a/drivers/regulator/tps65218-regulator.c
-+++ b/drivers/regulator/tps65218-regulator.c
-@@ -22,6 +22,7 @@
- #include <linux/err.h>
- #include <linux/platform_device.h>
- #include <linux/of_device.h>
-+#include <linux/regmap.h>
- #include <linux/regulator/of_regulator.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
-@@ -224,7 +225,7 @@ static int tps65218_pmic_get_current_limit(struct regulator_dev *dev)
- 	unsigned int index;
- 	struct tps65218 *tps = rdev_get_drvdata(dev);
  
--	retval = tps65218_reg_read(tps, dev->desc->csel_reg, &index);
-+	retval = regmap_read(tps->regmap, dev->desc->csel_reg, &index);
- 	if (retval < 0)
- 		return retval;
+-	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+-				   &client->dev);
++	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
++			      ARRAY_SIZE(tps65218_cells), NULL, 0,
++			      regmap_irq_get_domain(tps->irq_data));
++
+ 	if (ret < 0)
+ 		goto err_irq;
  
-diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
-index d58f3b5..7c9241f 100644
---- a/include/linux/mfd/tps65218.h
-+++ b/include/linux/mfd/tps65218.h
-@@ -276,8 +276,6 @@ struct tps65218 {
- 	struct regmap *regmap;
- };
- 
--int tps65218_reg_read(struct tps65218 *tps, unsigned int reg,
--					unsigned int *val);
- int tps65218_reg_write(struct tps65218 *tps, unsigned int reg,
- 			unsigned int val, unsigned int level);
- int tps65218_set_bits(struct tps65218 *tps, unsigned int reg,
 -- 
 1.9.1
