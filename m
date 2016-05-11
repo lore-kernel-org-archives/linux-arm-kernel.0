@@ -1,51 +1,48 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Wed, 11 May 2016 20:14:00 +0200
-Subject: [PATCH v3 00/27] ARM: dts: exynos: Add initial support for
- Odroid XU
-In-Reply-To: <09dcc771-40e2-8be0-de73-bc1db37d6804@osg.samsung.com>
-References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
- <09dcc771-40e2-8be0-de73-bc1db37d6804@osg.samsung.com>
-Message-ID: <20160511181400.GA8265@kozik-lap>
+From: matthew@mattleach.net (Matthew Leach)
+Date: Wed, 11 May 2016 19:18:31 +0100
+Subject: [PATCH] ARM: dts: exynos: Enable AX88760 USB hub on Origen board
+In-Reply-To: <1462950412-16681-1-git-send-email-k.kozlowski@samsung.com>
+ (Krzysztof Kozlowski's message of "Wed, 11 May 2016 09:06:52 +0200")
+References: <1462950412-16681-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <87y47gwj9k.fsf@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 11:41:34AM -0400, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 05/10/2016 04:09 PM, Krzysztof Kozlowski wrote:
-> > Hi,
-> > 
-> > Patchset adds necessary clocks, reorganizes existing stuff and finally
-> > adds Odroid XU support.
-> > 
-> > 
-> > Changes since v2
-> > ================
-> > 1. Got global-ack from Stephen for the clock changes. I think merging
-> >    everything through arm-soc might be the easiest but:
-> >    a. In such case I will prepare a tag with clock changes,
-> >    b. Anyway I will wait for response from Sylwester and Tomasz.
-> > 2. Applied comments from Javier and added his Reviewed-by.
-> > 3. Patch 22: added ack from Rob.
-> > 4. Minor improvements in existing patches.
-> > 5. Five new patches at the end: 23-27 (not reviewed yet).
-> >    Some of them could be squashed with existing ones but existing
-> >    changes got reviews. Although the final Odroid XU DTS works fine but
-> >    in general this is still work-in-progress so I suspect it will grow.
-> >    I am releasing it early following Linux concept. :)
-> > 
-> > Patchset is available at my private repo @github:
-> > https://github.com/krzk/linux.git for-next/odroid-xu-v3
-> > 
-> 
-> I have tested this branch on both an Exynos5422 Odroid XU4 board and an
-> Exynos5800 Peach Pi Chromebook. All the peripherals are working correctly.
-> 
-> So for all patches affecting Exynos54xx/5800 (9,12,13,14,16,19,20,21,25):
-> 
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Hi Krzysztof,
 
-Thanks!
+Sorry for not acting on the feedback sooner - I lost the email in my
+Inbox!
 
-Best regards,
-Krzysztof
+I've tested the patch on my Origen board and it works fine.  One small
+comment in-line.
+
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+
+> From: Matthew Leach <matthew@mattleach.net>
+>
+> Enable the Origen's usb phy and ohci devices in the device tree.  Also
+> add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
+> the AX88760 hub is powered.
+>
+> Signed-off-by: Matthew Leach <matthew@mattleach.net>
+> [k.kozlowski: Extend nodes by label notation instead of path]
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-origen.dts | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+> index 8bca699b7f20..4c59bdb0e6f3 100644
+> --- a/arch/arm/boot/dts/exynos4412-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4412-origen.dts
+> @@ -77,12 +77,29 @@
+>  			clock-frequency = <24000000>;
+>  		};
+>  	};
+> +
+
+I think we could loose this line break?
+
+Thanks,
+-- 
+Matt
