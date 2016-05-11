@@ -1,87 +1,68 @@
-From: absahu@codeaurora.org (Abhishek Sahu)
-Date: Wed, 11 May 2016 23:04:17 +0530
-Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
-In-Reply-To: <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
-References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
- <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
- <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
-Message-ID: <934365f2bd30f242d8548e2a27483679@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 11 May 2016 10:37:57 -0700
+Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-05-11 21:27, Sricharan wrote:
-> Hi,
-> 
->> 1. Current QCOM I2C driver hangs when sending data to address 
->> 0x03-0x07
->> in some scenarios. The QUP controller generates invalid write in this
->> case,
->> since these addresses are reserved for different bus formats.
->> 
->> 2. Also, the error handling is done by I2C QUP ISR in the case of DMA
->> mode.
->> The state need to be RESET in case of any error for clearing the 
->> available
->> data in FIFO, which otherwise leaves the BAM DMA controller in hang 
->> state.
->> 
->> This patch fixes the above two issues by clearing the error bits from 
->> I2C
->> and
->> QUP status in ISR in case of I2C error, QUP error and resets the QUP 
->> state
->> to
->> clear the FIFO data.
->> 
->> Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
->> ---
->>  drivers/i2c/busses/i2c-qup.c | 14 ++++++++------
->>  1 file changed, 8 insertions(+), 6 deletions(-)
->> 
->> diff --git a/drivers/i2c/busses/i2c-qup.c 
->> b/drivers/i2c/busses/i2c-qup.c
->> index
->> 23eaabb..8c2f1bc 100644
->> --- a/drivers/i2c/busses/i2c-qup.c
->> +++ b/drivers/i2c/busses/i2c-qup.c
->> @@ -213,14 +213,16 @@ static irqreturn_t qup_i2c_interrupt(int irq, 
->> void
->> *dev)
->>  	bus_err &= I2C_STATUS_ERROR_MASK;
->>  	qup_err &= QUP_STATUS_ERROR_FLAGS;
->> 
->> -	if (qup_err) {
->> -		/* Clear Error interrupt */
->> +	/* Clear the error bits in QUP_ERROR_FLAGS */
->> +	if (qup_err)
->>  		writel(qup_err, qup->base + QUP_ERROR_FLAGS);
->> -		goto done;
->> -	}
->> 
->> -	if (bus_err) {
->> -		/* Clear Error interrupt */
->> +	/* Clear the error bits in QUP_I2C_STATUS */
->> +	if (bus_err)
->> +		writel(bus_err, qup->base + QUP_I2C_STATUS);
->> +
->> +	/* Reset the QUP State in case of error */
->> +	if (qup_err || bus_err) {
->>  		writel(QUP_RESET_STATE, qup->base + QUP_STATE);
->>  		goto done;
->>  	}
->        In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the 
-> end, when
->        there is no error. So would it be fine if we do it there 
-> unconditionally ?
-> 
-> Regards,
->  Sricharan
+Hi,
 
-RESET the QUP state wouldn't create any issue in the case of multiple 
-calls.
-The existing code also RESET the QUP state for bus_err but it is not 
-clearing
-status bits.
+On Tue, May 10, 2016 at 12:31 PM, David Wu <david.wu@rock-chips.com> wrote:
+>  static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>  {
+>         struct i2c_timings *t = &i2c->t;
+>         struct rk3x_i2c_calced_timings calc;
+>         u64 t_low_ns, t_high_ns;
+> +       u32 val;
+>         int ret;
+>
+> -       ret = rk3x_i2c_calc_divs(clk_rate, t, &calc);
+> +       ret = i2c->soc_data->calc_timings(clk_rate, t, &calc);
+>         WARN_ONCE(ret != 0, "Could not reach SCL freq %u", t->bus_freq_hz);
+>
+> -       clk_enable(i2c->clk);
+> +       clk_enable(i2c->pclk);
+> +
+>         i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
+>                    REG_CLKDIV);
+> -       clk_disable(i2c->clk);
+> +
+> +       val = i2c_readl(i2c, REG_CON);
+> +       val &= ~REG_CON_TUNING_MASK;
+> +       val |= calc.tuning;
+> +       i2c_writel(i2c, val, REG_CON);
 
--- 
-Abhishek Sahu
+Another subtle bug here.  You need to be holding the spinlock here
+since you're doing a read-modify-write of a register that is also
+touched by the interrupt handler.  We never needed it before because
+the previous register update wasn't touched by anyone else and it was
+a single atomic write.
+
+Also: technically if we are midway through a transfer when all this
+happens then there will be a very short period of time when the two
+timing-related registers won't match with each other.  I have no idea
+how much that would matter, but in the very least it seems wise to
+minimize the time where they mismatch.  So I'd probably write:
+
+       spin_lock_irqsave(&i2c->lock, flags);
+       val = i2c_readl(i2c, REG_CON);
+       val &= ~REG_CON_TUNING_MASK;
+       val |= calc.tuning;
+       i2c_writel(i2c, val, REG_CON);
+       i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
+                  REG_CLKDIV);
+       spin_unlock_irqrestore(&i2c->lock, flags);
+
+...if we really end up with on a system with a dynamically changing
+clock that uses the new-style timing and we see real problems, we can
+always try to come up with a way to avoid any problems.  Sound OK?
+
+
+Otherwise, I think things look good to me.  Caesar's comments would
+also be good to fix.
+
+
+-Doug
