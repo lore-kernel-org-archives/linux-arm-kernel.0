@@ -1,72 +1,50 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Wed, 11 May 2016 20:51:55 +0200
-Subject: [PATCH] phy: exynos-mipi-video: avoid uninitialized variable use
-In-Reply-To: <1462971012-562097-1-git-send-email-arnd@arndb.de>
-References: <1462971012-562097-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160511185155.GB8265@kozik-lap>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 May 2016 20:53:38 +0200
+Subject: [PATCH] ARM: dts: exynos: Enable AX88760 USB hub on Origen board
+In-Reply-To: <87y47gwj9k.fsf@mattleach.net>
+References: <1462950412-16681-1-git-send-email-k.kozlowski@samsung.com>
+ <87y47gwj9k.fsf@mattleach.net>
+Message-ID: <20160511185338.GA10164@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 02:49:53PM +0200, Arnd Bergmann wrote:
-> A rework of the exynos-mipi-video driver caused a warning
-> about the new __set_phy_state function potentially accessing
-> a variable before its initialization:
+On Wed, May 11, 2016 at 07:18:31PM +0100, Matthew Leach wrote:
+> Hi Krzysztof,
 > 
-> drivers/phy/phy-exynos-mipi-video.c: In function '__set_phy_state':
-> drivers/phy/phy-exynos-mipi-video.c:238:13: error: 'val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->   return val & data->resetn_val;
->          ~~~~^~~~~~~~~~~~~~~~~~
-> drivers/phy/phy-exynos-mipi-video.c:235:6: note: 'val' was declared here
->   u32 val;
+> Sorry for not acting on the feedback sooner - I lost the email in my
+> Inbox!
 > 
-> The failure scenario here is the offset passed into a the
-> stub regmap_read() function that does not modify its output,
-> however regmap_read() can also fail for other reasons, so
-> adding error handling (in this case, returning zero from
-> is_running) seems the best solution.
+> I've tested the patch on my Origen board and it works fine.  One small
+> comment in-line.
 > 
-> Note that this warning showed up with the ARM s5pv210_defconfig,
-> indicating that we most likely want to either enable CONFIG_REGMAP
-> in that defconfig as well, or disable the phy-exynos-mipi-video
-> driver.
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 97a3042f7616 ("phy: exynos-mipi-video: Rewrite handling of phy registers")
-> ---
->  drivers/phy/phy-exynos-mipi-video.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> > From: Matthew Leach <matthew@mattleach.net>
+> >
+> > Enable the Origen's usb phy and ohci devices in the device tree.  Also
+> > add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
+> > the AX88760 hub is powered.
+> >
+> > Signed-off-by: Matthew Leach <matthew@mattleach.net>
+> > [k.kozlowski: Extend nodes by label notation instead of path]
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos4412-origen.dts | 17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+> > index 8bca699b7f20..4c59bdb0e6f3 100644
+> > --- a/arch/arm/boot/dts/exynos4412-origen.dts
+> > +++ b/arch/arm/boot/dts/exynos4412-origen.dts
+> > @@ -77,12 +77,29 @@
+> >  			clock-frequency = <24000000>;
+> >  		};
+> >  	};
+> > +
 > 
-> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-> index cc093ebfda94..8b851f718123 100644
-> --- a/drivers/phy/phy-exynos-mipi-video.c
-> +++ b/drivers/phy/phy-exynos-mipi-video.c
-> @@ -233,8 +233,12 @@ static inline int __is_running(const struct exynos_mipi_phy_desc *data,
->  			struct exynos_mipi_video_phy *state)
->  {
->  	u32 val;
+> I think we could loose this line break?
 
-Other way would be to initialize val=0 since there is no real error code
-returned. Anyway:
+Yeah, that slipped through my fingers.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
+Thanks for testing,
 Krzysztof
-
-> +	int ret;
-> +
-> +	ret = regmap_read(state->regmaps[data->resetn_map], data->resetn_reg, &val);
-> +	if (ret)
-> +		return 0;
->  
-> -	regmap_read(state->regmaps[data->resetn_map], data->resetn_reg, &val);
->  	return val & data->resetn_val;
->  }
->  
-> -- 
-> 2.7.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
