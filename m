@@ -1,44 +1,49 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 11 May 2016 19:19:10 -0400
-Subject: [PATCH v2 3/3] arm: dts: bcm5301x: Add syscon based reboot in DT
-In-Reply-To: <1463008750-13902-1-git-send-email-jonmason@broadcom.com>
-References: <1463008750-13902-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1463008750-13902-4-git-send-email-jonmason@broadcom.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 12 May 2016 00:24:44 +0100
+Subject: [PATCH] Xen: EFI: Parse DT parameters for Xen specific UEFI
+In-Reply-To: <57333533.2030206@linaro.org>
+References: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
+ <20160511122730.GU2839@codeblueprint.co.uk>
+ <57333533.2030206@linaro.org>
+Message-ID: <20160511232444.GY2839@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ability to reboot via a reset of the processor.  This is
-achieved via a write of 0x39 to the CRU Reset Register.  Unfortunately,
-this only resets the core and not the other IP blocks.  So if possible,
-other methods should be used on the individual boards.
-
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index ffc4a9b..d4e1672 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -246,6 +246,18 @@
- 				     "sata2";
- 	};
+On Wed, 11 May, at 09:35:47PM, Shannon Zhao wrote:
+> > 
+> > Also, why do you need to setup efi.runtime_version here? Isn't that
+> > done inside uefi_init()?
+> > 
+> I don't see any codes which setup efi.runtime_version in uefi_init().
  
-+	cru: cru at 1800c184 {
-+		compatible = "syscon";
-+		reg = <0x1800c184 0x4>;
-+	};
-+
-+	reboot at 1800c184 {
-+		compatible ="syscon-reboot";
-+		regmap = <&cru>;
-+		offset = <0>;
-+		mask = <0x39>;
-+	};
-+
- 	nand: nand at 18028000 {
- 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
- 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
--- 
-1.9.1
+Look in the EFI tree,
+
+  https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/tree/drivers/firmware/efi/arm-init.c?h=next#n120
+
+> > Here is how I would have expected this patch to look:
+> > 
+> >   - Add FDT code to find hypervisor EFI params
+> > 
+> >   - Force enable EFI_RUNTIME_SERVICES for Xen and call
+> >     xen_efi_runtime_setup() inside xen_guest_init()
+> > 
+> >   - Change arm_enable_runtime_services() to handle the case where
+> >     EFI_RUNTIME_SERVICES is already set
+> > 
+> > Am I misunderstanding some ordering issues?
+> 
+> Since xen_guest_init() and arm_enable_runtime_services() are both
+> early_initcall and the calling order is random I think.
+
+Urgh, right, I missed that.
+
+> And when we call xen_efi_runtime_setup() and setup
+> efi.runtime_version in xen_guest_init(), the efi.systab might be
+> NULL. So it needs to map the systanle explicitly before we use
+> efi.systab.
+
+Could you explain why you need to copy efi.runtime_version instead of
+letting the existing code in uefi_init() set it up?
+
+Also, efi.systab isn't used by xen_efi_runtime_setup() as far I can
+see, not sure why you need that either?
