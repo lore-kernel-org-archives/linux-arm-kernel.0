@@ -1,166 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 14:05:33 +0200
-Subject: [PATCH v3 23/55] KVM: arm/arm64: vgic-new: Add CTLR, TYPER and
- IIDR handlers
-In-Reply-To: <1462531568-9799-24-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-24-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160511120533.GM27623@cbox>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 May 2016 14:12:16 +0200
+Subject: [PATCH] clk: samsung: exynos3250: Move PLL rates data to init section
+In-Reply-To: <1462968134-6085-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462968134-6085-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1462968736-7568-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:45:36AM +0100, Andre Przywara wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Those three registers are v2 emulation specific, so their implementation
-> lives entirely in vgic-mmio-v2.c. Also they are handled in one function,
-> as their implementation is pretty simple.
-> When the guest enables the distributor, we kick all VCPUs to get
-> potentially pending interrupts serviced.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - kick VCPUs is the distributor gets enabled
-> - improve comment
-> 
-> Changelog v1 .. v2:
-> - adapt to new MMIO framework
-> - use switch() statements to improve readability
-> 
-> Changelog v2 .. v3:
-> - add vgic_kick_vcpus() implementation
-> 
->  include/linux/irqchip/arm-gic.h  |  1 +
->  virt/kvm/arm/vgic/vgic-mmio-v2.c | 48 +++++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic.c         | 15 +++++++++++++
->  virt/kvm/arm/vgic/vgic.h         |  4 ++++
->  4 files changed, 67 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index be0d26f..fd05185 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -33,6 +33,7 @@
->  
->  #define GIC_DIST_CTRL			0x000
->  #define GIC_DIST_CTR			0x004
-> +#define GIC_DIST_IIDR			0x008
->  #define GIC_DIST_IGROUP			0x080
->  #define GIC_DIST_ENABLE_SET		0x100
->  #define GIC_DIST_ENABLE_CLEAR		0x180
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index 2729a22..69e96f7 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -20,9 +20,55 @@
->  #include "vgic.h"
->  #include "vgic-mmio.h"
->  
-> +static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
-> +					    gpa_t addr, unsigned int len)
-> +{
-> +	u32 value;
-> +
-> +	switch (addr & 0x0c) {
-> +	case GIC_DIST_CTRL:
-> +		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
-> +		break;
-> +	case GIC_DIST_CTR:
-> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> +		value = (value >> 5) - 1;
-> +		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
-> +		break;
-> +	case GIC_DIST_IIDR:
-> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> +		break;
-> +	default:
-> +		return 0;
-> +	}
-> +
-> +	return extract_bytes(value, addr & 3, len);
-> +}
-> +
-> +static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
-> +				    gpa_t addr, unsigned int len,
-> +				    unsigned long val)
-> +{
-> +	switch (addr & 0x0c) {
-> +	case GIC_DIST_CTRL:
-> +		if (!(addr & 1)) {
+The arrays with initialization data of PLLs can be moved to initconst
+section because they are referenced only from other initconst-level
+symbols.
 
-what is this !(addr & 1) check?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos3250.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +			struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +			bool was_enabled = dist->enabled;
-> +
-> +			dist->enabled = val & GICD_ENABLE;
-> +			if (!was_enabled && dist->enabled)
-> +				vgic_kick_vcpus(vcpu->kvm);
-> +		}
-> +		break;
-> +	case GIC_DIST_CTR:
-> +	case GIC_DIST_IIDR:
-> +		/* Nothing to do */
-> +		return;
-> +	}
-> +}
-> +
->  static const struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 12),
-> +		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
->  		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index c3dbcf3..5355de6 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -544,3 +544,18 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
->  
->  	return pending;
->  }
-> +
-> +void vgic_kick_vcpus(struct kvm *kvm)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +	int c;
-> +
-> +	/*
-> +	 * We've injected an interrupt, time to find out who deserves
-> +	 * a good kick...
-> +	 */
-> +	kvm_for_each_vcpu(c, vcpu, kvm) {
-> +		if (kvm_vgic_vcpu_pending_irq(vcpu))
-> +			kvm_vcpu_kick(vcpu);
-> +	}
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index fd9acaa..cf62015 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -16,11 +16,15 @@
->  #ifndef __KVM_ARM_VGIC_NEW_H__
->  #define __KVM_ARM_VGIC_NEW_H__
->  
-> +#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
-> +#define IMPLEMENTER_ARM		0x43b
-> +
->  #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
->  
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
-> +void vgic_kick_vcpus(struct kvm *kvm);
->  
->  void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
->  void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
-> -- 
-> 2.7.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index 057c3f0d0e35..b2513959252d 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -669,7 +669,7 @@ static const struct samsung_gate_clock gate_clks[] __initconst = {
+ };
+ 
+ /* APLL & MPLL & BPLL & UPLL */
+-static const struct samsung_pll_rate_table exynos3250_pll_rates[] = {
++static const struct samsung_pll_rate_table exynos3250_pll_rates[] __initconst = {
+ 	PLL_35XX_RATE(1200000000, 400, 4, 1),
+ 	PLL_35XX_RATE(1100000000, 275, 3, 1),
+ 	PLL_35XX_RATE(1066000000, 533, 6, 1),
+@@ -691,7 +691,7 @@ static const struct samsung_pll_rate_table exynos3250_pll_rates[] = {
+ };
+ 
+ /* EPLL */
+-static const struct samsung_pll_rate_table exynos3250_epll_rates[] = {
++static const struct samsung_pll_rate_table exynos3250_epll_rates[] __initconst = {
+ 	PLL_36XX_RATE(800000000, 200, 3, 1,     0),
+ 	PLL_36XX_RATE(288000000,  96, 2, 2,     0),
+ 	PLL_36XX_RATE(192000000, 128, 2, 3,     0),
+-- 
+1.9.1
