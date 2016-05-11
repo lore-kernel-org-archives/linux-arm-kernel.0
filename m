@@ -1,41 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 May 2016 11:40:23 -0700
-Subject: [GIT PULL] i.MX clock fixes for 4.6, take 2
-In-Reply-To: <20160511121512.GP5874@tiger>
-References: <20160503133605.GN5874@tiger>
- <20160506180217.GW3492@codeaurora.org>
- <20160511121512.GP5874@tiger>
-Message-ID: <20160511184023.GE3492@codeaurora.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 11 May 2016 20:41:04 +0200
+Subject: [PATCH v2 3/4] ARM64: Kconfig: Select the Amlogic Meson pin
+ controller driver
+In-Reply-To: <3200982.vJgYKNLqaA@wuerfel>
+References: <1462176138-29433-1-git-send-email-carlo@caione.org>
+ <1462176138-29433-4-git-send-email-carlo@caione.org>
+ <CACRpkdbTr7YUrzSQQci929ugBhTkJKWvpjdf5Wo3HkfVKFhGLw@mail.gmail.com>
+ <3200982.vJgYKNLqaA@wuerfel>
+Message-ID: <CAOQ7t2aLORBKiuZEp1BZ1+O-Yr5xvM9bjkFnfA9Yn9oZZefSnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11, Shawn Guo wrote:
-> On Fri, May 06, 2016 at 11:02:17AM -0700, Stephen Boyd wrote:
-> > On 05/03, Shawn Guo wrote:
-> > > The following changes since commit 7196c52c9377df0175b510ff5896bda524f7345e:
-> > > 
-> > >   clk: imx6q: fix typo in CAN clock definition (2016-04-13 15:27:15 +0800)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-fixes-4.6-2
-> > > 
-> > > for you to fetch changes up to 3397c2c45b1b6f54834dfeae30a73046f33ca943:
-> > > 
-> > >   ARM: dts: imx35: restore existing used clock enumeration (2016-04-18 12:37:21 +0800)
-> > > 
-> > > ----------------------------------------------------------------
-> > > The i.MX clock fixes for 4.6, take 2:
-> > >  - Fix the commit 3713e3f5e927 ("clk: imx35: define two clocks for rtc")
-> > >    which messed up the clock enumeration when adding new clock.
-> > 
-> > This commit wasn't introduced in this merge window, so I'm going
-> > to pull this into clk-next unless you have some justification.
-> 
-> That's fine.  Thanks, Stephen.
+On Wed, May 11, 2016 at 12:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 11 May 2016 10:53:35 Linus Walleij wrote:
+>> On Mon, May 2, 2016 at 10:02 AM, Carlo Caione <carlo@caione.org> wrote:
+>>
+>> > From: Carlo Caione <carlo@endlessm.com>
+>> >
+>> > Select the Meson pin controller driver also for the AArch64 Meson
+>> > platform.
+>> >
+>> > Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I guess this should get merged through the ARM SoC tree.
+>>
+>
+> I'd keep it together with the other changes for clarity and
+> merge it through your tree.
 
-Thanks. Pulled into clk-next.
+Linus,
+did you take it? otherwise I can merge it through my repo.
+
+Cheers,
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Carlo Caione
