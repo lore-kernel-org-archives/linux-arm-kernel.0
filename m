@@ -1,45 +1,109 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 11 May 2016 14:54:18 +0200
-Subject: [PATCH v3 27/27] ARM: dts: exynos: Add RTC and I2C to Exynos5410
-In-Reply-To: <b1f47282-f70e-4354-9146-9b4b27ba1726@osg.samsung.com>
-References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
- <1462910970-1812-28-git-send-email-krzk@kernel.org>
- <b1f47282-f70e-4354-9146-9b4b27ba1726@osg.samsung.com>
-Message-ID: <57332B7A.5070909@kernel.org>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 11 May 2016 12:53:25 +0000
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <57331290.7070104@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
+ <57331290.7070104@semihalf.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED8E264@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2016 02:44 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 05/10/2016 04:09 PM, Krzysztof Kozlowski wrote:
->> Configure Exynos5410-specific properties of RTC, I2C and HSI2C nodes.
->> This still does not enable them on the board level though.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> ---
->>  arch/arm/boot/dts/exynos5410.dtsi | 66 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 66 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
->> index dd4d6d752865..ae64cb0a8efd 100644
->> --- a/arch/arm/boot/dts/exynos5410.dtsi
->> +++ b/arch/arm/boot/dts/exynos5410.dtsi
->> @@ -114,6 +114,9 @@
->>  			status = "disabled";
->>  		};
->>  
->> +		/* i2c_0-3 are defined in exynos5.dtsi */
->> +		/* hsi2c_4-7 are defined in exynos5xx.dtsi */
->> +
-> 
-> I don't think these comments are needed. For each DTS, there are usually a lot of
-> nodes defined in higher levels of the DT hierarchy but isn't common to mention it.
-> 
-> Specially since the mentioned nodes are referenced here by their labels so it is
-> implicit that are defined in one of the included DTSI (or dtc will fail to build).
+Hi Tomasz
 
-Okay, if it does not make sense to you then I'll remove them.
+> -----Original Message-----
+> From: Tomasz Nowicki [mailto:tn at semihalf.com]
+> Sent: 11 May 2016 12:08
+> To: Gabriele Paoloni; helgaas at kernel.org; arnd at arndb.de;
+> will.deacon at arm.com; catalin.marinas at arm.com; rafael at kernel.org;
+> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
+> jchandra at broadcom.com
+> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
+> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
+> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
+> dhdang at apm.com; jeremy.linton at arm.com; liudongdong (C);
+> cov at codeaurora.org
+> Subject: Re: [PATCH V7 00/11] Support for generic ACPI based PCI host
+> controller
+> 
+> Hi Gabriele,
+> 
+> On 11.05.2016 12:41, Gabriele Paoloni wrote:
+> > Hi Tomasz
+> >
+> >> -----Original Message-----
+> >> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> >> owner at vger.kernel.org] On Behalf Of Tomasz Nowicki
+> >> Sent: 10 May 2016 16:20
+> >> To: helgaas at kernel.org; arnd at arndb.de; will.deacon at arm.com;
+> >> catalin.marinas at arm.com; rafael at kernel.org; hanjun.guo at linaro.org;
+> >> Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
+> jchandra at broadcom.com
+> >> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
+> >> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
+> >> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
+> >> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> >> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+> >> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
+> >> dhdang at apm.com; jeremy.linton at arm.com; liudongdong (C);
+> >> cov at codeaurora.org; Tomasz Nowicki
+> >> Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+> >> controller
+> >>
+> >>  From the functionality point of view this series may be split into
+> the
+> >> following logic parts:
+> >> 1. New ECAM API and update for users of the pci-host-common API
+> >> 2. Necessary fixes as the preparation for using driver on ARM64.
+> >> 3. Use new MCFG interface and implement generic ACPI based PCI host
+> >> controller driver.
+> >> 4. Enable above driver on ARM64
+> >>
+> >> Patches has been built on top of 4.6-rc7 and can be found here:
+> >> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v7)
+> >>
+> >> This has been tested on Cavium ThunderX server. Any help in
+> reviewing
+> >> and
+> >> testing is very appreciated.
+> >>
+> >> v6 -> v7
+> >> - drop quirks handling
+> >
+> > Maybe I missed something in the v6 discussion thread; when was it
+> > decided to drop quirk handling?
+> 
+> I had such requests in previous series.
+> 
+> >
+> > I think it is important to have this in place to accommodate
+> different
+> > vendors. If the intention is to keep this patchset "clean" maybe
+> > we can add it as a separate patch on top later on...
+> >
+> > What's your view?
+> 
+> Yes, keeping these things separated should help in review. Obviously I
+> agree that we need quirk handling but currently there is no
+> implementation which we all agree upon. For the test, you can use quirk
+> handling approach from the previous series until we sort out final
+> solution.
 
-Thanks for review!
-Krzysztof
+Great
+
+This explains perfectly
+
+We will apply previous series quirks and try to test the patchset
+from Huawei side
+
+Many Thanks
+
+Gab
+
+> 
+> Thanks,
+> Tomasz
