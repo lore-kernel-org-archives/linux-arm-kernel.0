@@ -1,57 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 May 2016 16:37:53 +0100
-Subject: [PULL 00/29] KVM/ARM Changes for v4.7
-In-Reply-To: <57334E72.9010109@redhat.com>
-References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
- <57334E72.9010109@redhat.com>
-Message-ID: <573351D1.4060303@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 11 May 2016 16:37:42 +0100
+Subject: [PATCH v5 5/5] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <1462981062-24909-1-git-send-email-sudeep.holla@arm.com>
+References: <1462981062-24909-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1462981062-24909-6-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/16 16:23, Paolo Bonzini wrote:
-> 
-> 
-> On 11/05/2016 15:29, Christoffer Dall wrote:
->> Hi Paolo and Radim,
->>
->> Here is the initial set of changes for KVM/ARM for v4.7.
->>
->> Sorry I'm a bit late with these, but we were trying to get the new vgic
->> implementation in as part of this, but I have decided to send this pull
->> request now, and we can follow up with another for the new VGIC,
->> assuming we feel like we have that in place in a few days.
-> 
-> Don't worry, you're not late at all.  I've pulled this to kvm/queue.
-> 
->> There are a few changes in this pull request touching things outside
->> KVM, but they should all carry the necessary acks and it made the
->> merge process much easier to do it this way.
-> 
-> The following are properly acked:
-> 
->     arm64: Reuse TCR field definitions for EL1 and EL2
->     arm64: Introduce pmd_thp_or_huge
-> 
-> I wouldn't have minded more explicit Acked-bys for the following:
-> 
->     irqchip/gic-v2: Gather ACPI specific data in a single structure
->     irqchip/gic-v2: Parse and export virtual GIC information
->     irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
->     irqchip/gic-v3: Gather all ACPI specific data in a single structure
->     irqchip/gic-v3: Parse and export virtual GIC information
-> 
-> I guess it's fine since Marc Zyngier is maintainer for both KVM and
-> irqchip, still it's never wrong to get more acks. :)
+Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+enable ACPI_PROCESSOR_IDLE for ARM64 too.
 
-Ah, I really thought I acked them. The email must have been stuck in my
-head...
+This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
 
-So more formally and for documentation purposes:
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/acpi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks,
-
-	M.
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 093bfcc4f9c3..de5c7c09de69 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+ config ACPI_PROCESSOR
+ 	tristate "Processor"
+ 	depends on X86 || IA64 || ARM64
+-	select ACPI_PROCESSOR_IDLE if X86 || IA64
++	select ACPI_PROCESSOR_IDLE
+ 	select ACPI_CPU_FREQ_PSS if X86 || IA64
+ 	default y
+ 	help
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
