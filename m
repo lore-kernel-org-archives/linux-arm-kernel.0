@@ -1,124 +1,119 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 11 May 2016 22:30:51 +0200
-Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
-In-Reply-To: <20160511101101.GA16101@red-moon>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-8-git-send-email-tn@semihalf.com>
- <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
- <20160511101101.GA16101@red-moon>
-Message-ID: <CAJZ5v0hgw929W5PjF0PqT+ssiOHd8TeJoSQcz4NUiAovZY2pfQ@mail.gmail.com>
+From: matija.glavinic-pecotic.ext@nokia.com (Matija Glavinic Pecotic)
+Date: Wed, 11 May 2016 22:33:51 +0200
+Subject: [PATCH] [ARM] Fix A15 798181 errata initialization
+Message-ID: <5733972F.9040502@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 12:11 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, May 10, 2016 at 08:37:00PM +0200, Rafael J. Wysocki wrote:
->> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->> > This patch provides a way to set the ACPI companion in PCI code.
->> > We define acpi_pci_set_companion() to set the ACPI companion pointer and
->> > call it from PCI core code. The function is stub for now.
->> >
->> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> > ---
->> >  drivers/pci/probe.c      | 2 ++
->> >  include/linux/pci-acpi.h | 4 ++++
->> >  2 files changed, 6 insertions(+)
->> >
->> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> > index 8004f67..fb0b752 100644
->> > --- a/drivers/pci/probe.c
->> > +++ b/drivers/pci/probe.c
->> > @@ -12,6 +12,7 @@
->> >  #include <linux/slab.h>
->> >  #include <linux/module.h>
->> >  #include <linux/cpumask.h>
->> > +#include <linux/pci-acpi.h>
->> >  #include <linux/pci-aspm.h>
->> >  #include <linux/aer.h>
->> >  #include <linux/acpi.h>
->> > @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->> >         bridge->dev.parent = parent;
->> >         bridge->dev.release = pci_release_host_bridge_dev;
->> >         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
->> > +       acpi_pci_set_companion(bridge);
->>
->> Yes, we'll probably add something similar here.
->>
->> Do I think now is the right time to do that?  No.
->>
->> >         error = pcibios_root_bridge_prepare(bridge);
->> >         if (error) {
->> >                 kfree(bridge);
->> > diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
->> > index 09f9f02..1baa515 100644
->> > --- a/include/linux/pci-acpi.h
->> > +++ b/include/linux/pci-acpi.h
->> > @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
->> >  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
->> >  #endif /* CONFIG_ACPI */
->> >
->> > +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
->> > +{
->> > +}
->> > +
->> >  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
->> >  {
->> >         return 0;
->> > --
->>
->> Honestly, to me it looks like this series is trying very hard to avoid
->> doing any PCI host bridge configuration stuff from arch/arm64/
->> although (a) that might be simpler and (b) it would allow us to
->> identify the code that's common between *all* architectures using ACPI
->> support for host bridge configuration and to move *that* to a common
->> place later.  As done here it seems to be following the "ARM64 is
->> generic and the rest of the world is special" line which isn't really
->> helpful.
->
-> I think patch [1-2] should be merged regardless (they may require minor
-> tweaks if we decide to move pci_acpi_scan_root() to arch/arm64 though,
-> for include files location). I guess you are referring to patch 8 in
-> your comments above, which boils down to deciding whether:
->
-> - pci_acpi_scan_root() (and unfortunately all the MCFG/ECAM handling that
->   goes with it) should live in arch/arm64 or drivers/acpi
+Current errata initialization doesn't take properly revision and REVIDR
+into account. Depending on the core revision, revidr bits should not be
+taken into account. Errata misleadingly declares r3p3 to be error-free,
+but this is not the case. Include rp3p3 in errata initialization.
 
-To be precise, everything under #ifdef CONFIG_ACPI_PCI_HOST_GENERIC or
-equivalent is de facto ARM64-specific, because (as it stands in the
-patch series) ARM64 is the only architecture that will select that
-option.  Unless you are aware of any more architectures planning to
-use ACPI (and I'm not aware of any), it will stay the only
-architecture selecting it in the foreseeable future.
+Here are possible fixes defined in revidr register for r2 and r3 [1,2]:
 
-Therefore you could replace CONFIG_ACPI_PCI_HOST_GENERIC with
-CONFIG_ARM64 everywhere in that code which is why in my opinion the
-code should live somewhere under arch/arm64/.
+r0p0-r2p1: No fixes applied
 
-Going forward, it should be possible to identify common parts of the
-PCI host bridge configuration code in arch/ and move it to
-drivers/acpi/ or drivers/pci/, but I bet that won't be the entire code
-this series puts under CONFIG_ACPI_PCI_HOST_GENERIC.
+r2p2,r2p3:
 
-The above leads to a quite straightforward conclusion about the order
-in which to do things: I'd add ACPI support for PCI host bridge on
-ARM64 following what's been done on ia64 (as x86 is more quirky and
-kludgy overall) as far as reasonably possible first and then think
-about moving common stuff to a common place.
+REVIDR[4]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+REVIDR[9]: Not defined
 
-> acpi_pci_bus_domain_nr() is a bit more problematic since it is meant
-> to be called from PCI core code (ARM64 selects PCI_DOMAINS_GENERIC for
-> DT and same kernel has to work with OF and ACPI selected) and it is
-> arch specific (because what we have in bus->sysdata is arch specific,
-> waiting for the domain number to be embedded in struct pci_host_bridge).
->
-> Your point is fair, I am not sure that moving the pci_acpi_scan_root()
-> to arch/arm64 would make things much simpler though, it is just a matter
-> of deciding where that code has to live.
->
-> How do you want us to proceed ?
+r2p4,r3p0,r3p1,r3p2:
 
-Pretty much as stated above. :-)
+REVIDR[4]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+REVIDR[9]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+	   - This is an update to a previously released ECO.
 
-Thanks,
-Rafael
+r3p3:
+
+REVIDR[4]: Reserved
+REVIDR[9]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+	   - This is an update to a previously released ECO.
+
+And here is proposed handling from the same documents [1,2]:
+
+* In r3p2 and earlier versions with REVIDR[4]= 0,the full workaround is
+  required.
+* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=0, only the
+  portion of the workaround up to the end of step 6 is required.
+* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=1, no
+  workaround is required.
+* In r3p3, if REVIDR[9]=0, only the portion of the workaround up
+  to the end of step 6 is required.
+* In r3p3, if REVIDR[9]=1, no workaround is required.
+
+These imply following:
+
+REVIDR[9] set -> No WA
+REVIDR[4] set, REVIDR[9] cleared -> Partial WA
+Both cleared -> Full WA
+
+Where certain bits should and should not be taken into account
+depending on whether they are defined for the revision.
+
+Although not explicitly mentioned in the errata note, REVIDR[9] set,
+with REVIDR[4] cleared is valid combination which requires no WA. This
+is confirmed by ARM support and errata will be updated.
+
+[1] ARM CortexTM-A15 MPCore - NEON
+    Product revision r3
+    Software Developers Errata Notice
+    ARM-EPM-028093 v20.0 Released
+
+[2] ARM CortexTM-A15 MPCore - NEON
+    Product Revision r2
+    Software Developers Errata Notice
+    ARM-EPM-028090 v19.3 Released
+
+Signed-off-by: Matija Glavinic Pecotic <matija.glavinic-pecotic.ext@nokia.com>
+Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+---
+ arch/arm/kernel/smp_tlb.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 2e72be4..b624758 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -93,17 +93,30 @@ void erratum_a15_798181_init(void)
+ 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
+ 
+ 	/* Brahma-B15 r0p0..r0p2 affected
+-	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
+-	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)
++	 * Cortex-A15 r0p0..r3p3 w/o ECO fix affected
++	 */
++	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2) {
+ 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
+-	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
+-		 (revidr & 0x210) != 0x210) {
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f2) {
++		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f4) {
+ 		if (revidr & 0x10)
+ 			erratum_a15_798181_handler =
+ 				erratum_a15_798181_partial;
+ 		else
+ 			erratum_a15_798181_handler =
+ 				erratum_a15_798181_broadcast;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x413fc0f3) {
++		if ((revidr & 0x210) == 0)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_broadcast;
++		else if (revidr & 0x10)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x414fc0f0) {
++		if ((revidr & 0x200) == 0)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
+ 	}
+ }
+ #endif
+-- 
+2.1.4
