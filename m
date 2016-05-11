@@ -1,139 +1,252 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 14:26:48 +0200
-Subject: [PATCH v3 18/55] KVM: arm/arm64: vgic-new: Add GICv2 world
- switch backend
-In-Reply-To: <573317DC.4060200@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-19-git-send-email-andre.przywara@arm.com>
- <5731EBBE.7060203@linaro.org> <573317DC.4060200@arm.com>
-Message-ID: <20160511122648.GN27623@cbox>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 11 May 2016 13:27:30 +0100
+Subject: [PATCH] Xen: EFI: Parse DT parameters for Xen specific UEFI
+In-Reply-To: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160511122730.GU2839@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 12:30:36PM +0100, Andre Przywara wrote:
-> Hi,
+On Fri, 06 May, at 04:32:06PM, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> On 10/05/16 15:10, Eric Auger wrote:
-> > On 05/06/2016 12:45 PM, Andre Przywara wrote:
-> >> From: Marc Zyngier <marc.zyngier@arm.com>
-> >>
-> >> Processing maintenance interrupts and accessing the list registers
-> >> are dependent on the host's GIC version.
-> >> Introduce vgic-v2.c to contain GICv2 specific functions.
-> >> Implement the GICv2 specific code for syncing the emulation state
-> >> into the VGIC registers.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >> Changelog RFC..v1:
-> >> - remove explicit LR_STATE clearing on maintenance interrupt handling
-> >> - improve documentation for vgic_v2_populate_lr()
-> >> - remove WARN_ON on non-edge IRQs in maintenance interrupts
-> >> - simplify multi-CPU source SGI handling
-> >>
-> >> Changelog v1 .. v2:
-> >> - inject the IRQ priority into the list register
-> >>
-> >> Changelog v2 .. v3:
-> >> - cleanup diff containing rebase artifacts
-> >>
-> >>  include/linux/irqchip/arm-gic.h |   1 +
-> >>  virt/kvm/arm/vgic/vgic-v2.c     | 178 ++++++++++++++++++++++++++++++++++++++++
-> >>  virt/kvm/arm/vgic/vgic.c        |   6 ++
-> >>  virt/kvm/arm/vgic/vgic.h        |   6 ++
-> >>  4 files changed, 191 insertions(+)
-> >>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
-> >>
-> >> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> >> index 9c94026..be0d26f 100644
-> >> --- a/include/linux/irqchip/arm-gic.h
-> >> +++ b/include/linux/irqchip/arm-gic.h
-> >> @@ -76,6 +76,7 @@
-> >>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
-> >>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
-> >>  #define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
-> >> +#define GICH_LR_PRIORITY_SHIFT		23
-> >>  #define GICH_LR_STATE			(3 << 28)
-> >>  #define GICH_LR_PENDING_BIT		(1 << 28)
-> >>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
-> >> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> >> new file mode 100644
-> >> index 0000000..4cee616
-> >> --- /dev/null
-> >> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> >> @@ -0,0 +1,178 @@
-> >> +/*
-> >> + * Copyright (C) 2015, 2016 ARM Ltd.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +
-> >> +#include <linux/irqchip/arm-gic.h>
-> >> +#include <linux/kvm.h>
-> >> +#include <linux/kvm_host.h>
-> >> +
-> >> +#include "vgic.h"
-> >> +
-> >> +/*
-> >> + * Call this function to convert a u64 value to an unsigned long * bitmask
-> >> + * in a way that works on both 32-bit and 64-bit LE and BE platforms.
-> >> + *
-> >> + * Warning: Calling this function may modify *val.
-> >> + */
-> >> +static unsigned long *u64_to_bitmask(u64 *val)
-> >> +{
-> >> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
-> >> +	*val = (*val >> 32) | (*val << 32);
-> >> +#endif
-> >> +	return (unsigned long *)val;
-> >> +}
-> >> +
-> >> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-> >> +
-> >> +	if (cpuif->vgic_misr & GICH_MISR_EOI) {
-> >> +		u64 eisr = cpuif->vgic_eisr;
-> >> +		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
-> >> +		int lr;
-> >> +
-> >> +		for_each_set_bit(lr, eisr_bmap, kvm_vgic_global_state.nr_lr) {
-> > Didn't we say we could use vcpu->arch.vgic_cpu.used_lrs here?
+> Add a new function to parse DT parameters for Xen specific UEFI just
+> like the way for normal UEFI. Then it could reuse the existing codes.
 > 
-> Why would that be useful? Don't we just want to see those LRs that had a
-> maintenance interrupt received? I don't see the point if iterating over
-> the used LRs, where we need to check for this condition somehow manually?
-> Or what am I missing here?
+> If Xen supports EFI, initialize runtime services.
+ 
+This commit log would benefit from a little expansion. I'd like to see
+information that answers the following questions,
 
-if we get rid of eisr eventually we can optimize the reading of that
-away, but I honestly don't think we should be pursuing this straight
-away.
+ - How do the Xen DT paramters differ from bare metal?
+ - What existing code is reused with your patch?
+ - How are Xen runtime services different from bare metal?
+ - Why is it OK to force enable EFI runtime services for Xen?
 
-> 
-> >> +			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
-> >> +
-> >> +			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
-> >> +
-> >> +			kvm_notify_acked_irq(vcpu->kvm, 0,
-> >> +					     intid - VGIC_NR_PRIVATE_IRQS);
-> >> +
-> >> +			cpuif->vgic_elrsr |= 1ULL << lr;
-> 
-> So are we good with removing this line (and the respective one in v3)?
-> 
-Yes.
+I think it would also be good to explicitly state that we do not
+expect to find both Xen EFI DT parameters and bare metal EFI DT
+parameters when performing the search; the two should be mutually
+exclusive.
 
--Christoffer
+> CC: Matt Fleming <matt@codeblueprint.co.uk>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> Drop using of EFI_PARAVIRT. Discussion can be found from [1].
+> [1] https://lkml.org/lkml/2016/4/29/8
+> ---
+>  arch/arm/include/asm/efi.h         |  2 +
+>  arch/arm/xen/enlighten.c           | 16 ++++++++
+>  arch/arm64/include/asm/efi.h       |  2 +
+>  drivers/firmware/efi/arm-runtime.c | 70 +++++++++++++++++++++++---------
+>  drivers/firmware/efi/efi.c         | 81 ++++++++++++++++++++++++++++++--------
+>  5 files changed, 137 insertions(+), 34 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+> index e0eea72..5ba4343 100644
+> --- a/arch/arm/include/asm/efi.h
+> +++ b/arch/arm/include/asm/efi.h
+> @@ -52,9 +52,11 @@ static inline void efi_set_pgd(struct mm_struct *mm)
+>  
+>  void efi_virtmap_load(void);
+>  void efi_virtmap_unload(void);
+> +int xen_arm_enable_runtime_services(void);
+>  
+>  #else
+>  #define efi_init()
+> +#define xen_arm_enable_runtime_services() (0)
+>  #endif /* CONFIG_EFI */
+>  
+>  /* arch specific definitions used by the stub code */
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 13e3e9f..3362870 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -16,6 +16,7 @@
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+>  #include <asm/system_misc.h>
+> +#include <asm/efi.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irqreturn.h>
+>  #include <linux/module.h>
+> @@ -261,6 +262,13 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
+>  	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
+>  		hyper_node.version = s + strlen(hyper_node.prefix);
+>  
+> +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+> +		/* Check if Xen supports EFI */
+> +		if ((of_get_flat_dt_subnode_by_name(node, "uefi") > 0) &&
+> +		    !efi_runtime_disabled())
+> +			set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+
+The above comment could do with including similar information to the
+commit log as to why we want to force enable runtime services. For x86
+we have this,
+
+	 *
+	 * When EFI_PARAVIRT is in force then we could not map runtime
+	 * service memory region because we do not have direct access to it.
+	 * However, runtime services are available through proxy functions
+	 * (e.g. in case of Xen dom0 EFI implementation they call special
+	 * hypercall which executes relevant EFI functions) and that is why
+	 * they are always enabled.
+	 */
+
+We need something similar here.
+
+> @@ -338,6 +346,7 @@ static int __init xen_guest_init(void)
+>  {
+>  	struct xen_add_to_physmap xatp;
+>  	struct shared_info *shared_info_page = NULL;
+> +	int ret;
+>  
+>  	if (!xen_domain())
+>  		return 0;
+> @@ -352,6 +361,13 @@ static int __init xen_guest_init(void)
+>  		return -ENODEV;
+>  	}
+>  
+> +	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_BOOT) &&
+> +	    efi_enabled(EFI_RUNTIME_SERVICES)) {
+> +		ret = xen_arm_enable_runtime_services();
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+
+Is it ever possible to have EFI_RUNTIME_SERVICES set but
+efi_enabled(EFI_BOOT) and IS_ENABLED(CONFIG_XEN_EFI) be false inside
+this function? If the answer is "no", I'd suggest just reducing this
+down to,
+
+	/*
+	 * The fdt parsing code will have set EFI_RUNTIME_SERVICES if
+	 * it found Xen EFI parameters. Force enable runtime services.
+	 */ 
+	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+		ret = xen_arm_enable_runtime_services();
+		if (ret)
+			return ret;
+	}
+
+But first, see my comments below.
+
+> @@ -39,6 +40,33 @@ static struct mm_struct efi_mm = {
+>  	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
+>  };
+>  
+> +static int __init efi_remap_init(void)
+> +{
+> +	u64 mapsize;
+> +
+> +	pr_info("Remapping and enabling EFI services.\n");
+> +
+> +	mapsize = memmap.map_end - memmap.map;
+> +	memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
+> +						   mapsize);
+> +	if (!memmap.map) {
+> +		pr_err("Failed to remap EFI memory map\n");
+> +		return -ENOMEM;
+> +	}
+> +	memmap.map_end = memmap.map + mapsize;
+> +	efi.memmap = &memmap;
+> +
+> +	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+> +						   sizeof(efi_system_table_t));
+> +	if (!efi.systab) {
+> +		pr_err("Failed to remap EFI System Table\n");
+> +		return -ENOMEM;
+> +	}
+> +	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+> +
+> +	return 0;
+> +}
+> +
+>  static bool __init efi_virtmap_init(void)
+>  {
+>  	efi_memory_desc_t *md;
+> @@ -75,7 +103,7 @@ static bool __init efi_virtmap_init(void)
+>   */
+>  static int __init arm_enable_runtime_services(void)
+>  {
+> -	u64 mapsize;
+> +	int ret;
+>  
+>  	if (!efi_enabled(EFI_BOOT)) {
+>  		pr_info("EFI services will not be available.\n");
+> @@ -87,25 +115,14 @@ static int __init arm_enable_runtime_services(void)
+>  		return 0;
+>  	}
+>  
+> -	pr_info("Remapping and enabling EFI services.\n");
+> -
+> -	mapsize = memmap.map_end - memmap.map;
+> -	memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
+> -						   mapsize);
+> -	if (!memmap.map) {
+> -		pr_err("Failed to remap EFI memory map\n");
+> -		return -ENOMEM;
+> +	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+> +		pr_info("EFI runtime services access via paravirt.\n");
+> +		return 0;
+>  	}
+> -	memmap.map_end = memmap.map + mapsize;
+> -	efi.memmap = &memmap;
+>  
+> -	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+> -						   sizeof(efi_system_table_t));
+> -	if (!efi.systab) {
+> -		pr_err("Failed to remap EFI System Table\n");
+> -		return -ENOMEM;
+> -	}
+> -	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+> +	ret = efi_remap_init();
+> +	if (ret)
+> +		return ret;
+>  
+>  	if (!efi_virtmap_init()) {
+>  		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+> @@ -122,6 +139,23 @@ static int __init arm_enable_runtime_services(void)
+>  }
+>  early_initcall(arm_enable_runtime_services);
+>  
+> +int __init xen_arm_enable_runtime_services(void)
+> +{
+> +	int ret;
+> +
+> +	ret = efi_remap_init();
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+> +		/* Set up runtime services function pointers for Xen Dom0 */
+> +		xen_efi_runtime_setup();
+> +		efi.runtime_version = efi.systab->hdr.revision;
+> +	}
+> +
+> +	return 0;
+> +}
+
+Since you call efi_remap_init() in both of these functions, couldn't
+you leave the existing code alone and bail after setting up the memory
+map and systab in arm_enable_runtime_services()?
+
+Also, why do you need to setup efi.runtime_version here? Isn't that
+done inside uefi_init()?
+
+Here is how I would have expected this patch to look:
+
+  - Add FDT code to find hypervisor EFI params
+
+  - Force enable EFI_RUNTIME_SERVICES for Xen and call
+    xen_efi_runtime_setup() inside xen_guest_init()
+
+  - Change arm_enable_runtime_services() to handle the case where
+    EFI_RUNTIME_SERVICES is already set
+
+Am I misunderstanding some ordering issues?
