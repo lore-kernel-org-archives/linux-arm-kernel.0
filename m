@@ -1,40 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 May 2016 09:12:06 +0200
-Subject: [PATCH] devicetree: sunxi: Add OLinuXino Lime2 eMMC to the
- Makefile
-In-Reply-To: <1462906820-5203-1-git-send-email-oliver@schinagl.nl>
-References: <1462906820-5203-1-git-send-email-oliver@schinagl.nl>
-Message-ID: <20160511071206.GN3733@lukather>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 11 May 2016 09:11 +0200
+Subject: [PATCH v2] pinctrl: rockchip: fix pull setting error for rk3399
+In-Reply-To: <1462937968-4952-1-git-send-email-wxt@rock-chips.com>
+References: <1462937968-4952-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1493162.roERW60dFE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
-
-On Tue, May 10, 2016 at 09:00:20PM +0200, Olliver Schinagl wrote:
-> ARM: dts: sunxi: Add a olinuxino-lime2-emmc added the new emmc equipped
-> lime2 but forgot its Makefile. This patch adds an entry to the Makefile.
+Am Mittwoch, 11. Mai 2016, 11:39:28 schrieb Caesar Wang:
+> From: David Wu <david.wu@rock-chips.com>
 > 
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> ---
-> Maxime, I'm sorry for ommitting the Makefile initially, if it is not merged yet,
-> maybe just squash it with the previous patch?
+> This patch fixes the pinctrl pull bias setting, since the pull up/down
+> setting is the contrary for gpio0(just the gpio0a and gpio0b) and
+> gpio2(just the gpio2c and gpio2d).
+> 
+> From the TRM said, the gpio0a pull polarity setting:
+> gpio0a_p
+> GPIO0A PE/PS programmation section, every
+> GPIO bit corresponding to 2bits[PS:PE]
+> 2'b00: Z(Normal operation);
+> 2'b11: weak 1(pull-up);
+> 2'b01: weak 0(pull-down);
+> 2'b10: Z(Normal operation);
 
-It's merged, and have been sent to armsoc.
+This could mention gpio2c and gpio2d as well, as the code now does.
 
-Please resend with arm at kernel.org, asking them to apply it directly
-(and keep chen-yu and I in cc).
+Otherwise the patch looks good and I also compared with the TRM, so
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160511/ecdea871/attachment.sig>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
