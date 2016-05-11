@@ -1,65 +1,60 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Wed, 11 May 2016 18:12:56 +0800
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <4876119.A8fbdncu9Z@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <4119683.coHZhzaE6c@wuerfel> <57329320.1000500@huawei.com>
- <4876119.A8fbdncu9Z@wuerfel>
-Message-ID: <573305A8.50406@huawei.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 11 May 2016 18:31:19 +0800
+Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
+In-Reply-To: <20160511093255.GO19428@n2100.arm.linux.org.uk>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
+ <20160511085203.GN19428@n2100.arm.linux.org.uk>
+ <20160511091338.GC10825@dhcp-128-65.nay.redhat.com>
+ <20160511093255.GO19428@n2100.arm.linux.org.uk>
+Message-ID: <20160511103119.GD10825@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+On 05/11/16 at 10:32am, Russell King - ARM Linux wrote:
+> On Wed, May 11, 2016 at 05:13:38PM +0800, Dave Young wrote:
+> > On 05/11/16 at 09:52am, Russell King - ARM Linux wrote:
+> > > I think you're confusing things.  DT doesn't contain the boot alias
+> > > memory ranges - it's not a separate chunk of memory.  It's an alias
+> > > of the same physical address space found higher in the physical
+> > > address range.
+> > 
+> > Hmm, if we forget about kexec how does the 1st kernel get boot memory?
+> > not from DT?
+> 
+> Just like any other ARM system, it pulls itself up by its shoe laces.
+> 
+> The kernel assumes that it has been placed into RAM with at least 32KiB
+> of writable memory below it, which it uses for the initial page tables.
+> It "guesses" that the executing address, rounded down to I-forget-what-
+> boundary gives the base address of physical memory.
+> 
+> It sets the page table up using that assumption.  The kernel gets going
+> with C code, and only _then_ parses the DTB.
+> 
+> If we then find that we're running on TI Keystone 2, part of the early
+> platform initialisation specifies to the ARM core code that the kernel
+> is to switch a high physical address space > 4GiB, and this provokes
+> a "dance" where we tear the MMU back down, run some more assembly code
+> to fix up the page tables, and re-initialise the MMU before returning
+> to the kernel C code, this time running in the high physical address
+> space.  This break-modify-make is an architecture requirement.  We
+> also record the physical address delta between the original physical
+> address space and the high physical address space so that we can reverse
+> the translation for code which needs identity mapping (eg, SMP bringup.)
+> 
+> The DTB only contains the high physical address space memory information,
+> and the kernel now parses the DTB, and sets the page tables up properly
+> for the running system.
 
-On 2016/5/11 16:09, Arnd Bergmann wrote:
- > On Wednesday 11 May 2016 10:04:16 Zhangjian wrote:
- >>> I don't remember. It's probably not important whether we have the shift
- >>> in there, as long as it's independent of the actual kernel page size and
- >>> user space and kernel agree on the calling conventions.
- >> Well. I am ok with where to shift the pages size because we get the same
- >> result. I was just thinking if we should get rid of the name of mmap2 in our
- >> ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
- >> if they do not know the implementations.
- >
- > That is a good point: If the implementation matches the mmap() behavior rather than
- > mmap2(), we should rename the macro by doing
- >
- > #undef __NR_mmap2
- > #define __NR_mmap 222
- >
- > in the uapi/asm/unistd.h file for ilp32 mode.
-Do you mean define the following things in kernel:
-```
-diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
-index 1caadc2..3f79640 100644
---- a/arch/arm64/include/uapi/asm/unistd.h
-+++ b/arch/arm64/include/uapi/asm/unistd.h
-@@ -14,3 +14,9 @@
-   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-   */
-  #include <asm-generic/unistd.h>
-+
-+#ifdef __ILP32__
-+#undef __NR_mmap2
-+#define __NR_mmap 222
-+#endif /* #ifdef __ILP32__ */
-+
-```
-Then glibc could call mmap instead of mmap2.
-I could not try it now. Because after change off_t to 64bit in glibc, stat
-is fail. I may need to revert the stat relative patch.
+Thanks for the explanation, so the DTB does not contain the delta info
+Please ignore the noise then.
 
- > Alternatively we can keep the
- > __NR_mmap2 definition but then we need to pass the pgoff (value shifted by
- > 12 bits) argument rather than the size in bytes.
-It means that we could reuse the existing code of mmap2 in kernel and glibc.
-But we need to shift twice when kernel is 64k page.
-It seems that the first method is more clear. Suggestion?
-
-Regards
-
-Bamvor
- >
- >   Arnd
- >
+> 
+> > > If we put it in DT, then we need a way to also describe that it is an
+> > > alias of some other bit of physical memory.
+> > 
+> > I may missed the background, I just want kexec to get infomation just like
+> > the normal kernel.
+> 
+> See above.  What you're asking for isn't really possible.
