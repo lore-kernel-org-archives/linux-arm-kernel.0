@@ -1,88 +1,167 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 15:30:12 +0200
-Subject: [PULL 19/29] clocksource: arm_arch_timer: Gather KVM specific
- information in a structure
+Date: Wed, 11 May 2016 15:30:05 +0200
+Subject: [PULL 12/29] kvm-arm: Add explicit hyp page table modifiers
 In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
 References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1462973422-10021-20-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1462973422-10021-13-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Introduce a structure which are filled up by the arch timer driver and
-used by the virtual timer in KVM.
+We have common routines to modify hyp and stage2 page tables
+based on the 'kvm' parameter. For a smoother transition to
+using separate routines for each, duplicate the routines
+and modify the copy to work on hyp.
 
-The first member of this structure will be the timecounter. More members
-will be added later.
+Marks the forked routines with _hyp_ and gets rid of the
+kvm parameter which is no longer needed and is NULL for hyp.
+Also, gets rid of calls to kvm_tlb_flush_by_vmid_ipa() calls
+from the hyp versions. Uses explicit host page table accessors
+instead of the kvm_* page table helpers.
 
-A stub for the new helper isn't introduced because KVM requires the arch
-timer for both ARM64 and ARM32.
-
-The function arch_timer_get_timecounter is kept for the time being and
-will be dropped in a subsequent patch.
-
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 12 +++++++++---
- include/clocksource/arm_arch_timer.h |  5 +++++
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/kvm/mmu.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 99 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5152b38..62bdfe7 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -468,11 +468,16 @@ static struct cyclecounter cyclecounter = {
- 	.mask	= CLOCKSOURCE_MASK(56),
- };
- 
--static struct timecounter timecounter;
-+static struct arch_timer_kvm_info arch_timer_kvm_info;
-+
-+struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
-+{
-+	return &arch_timer_kvm_info;
-+}
- 
- struct timecounter *arch_timer_get_timecounter(void)
- {
--	return &timecounter;
-+	return &arch_timer_kvm_info.timecounter;
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index f93f717..af526f6 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -388,6 +388,100 @@ static void stage2_flush_vm(struct kvm *kvm)
+ 	srcu_read_unlock(&kvm->srcu, idx);
  }
  
- static void __init arch_counter_register(unsigned type)
-@@ -500,7 +505,8 @@ static void __init arch_counter_register(unsigned type)
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
- 	cyclecounter.mult = clocksource_counter.mult;
- 	cyclecounter.shift = clocksource_counter.shift;
--	timecounter_init(&timecounter, &cyclecounter, start_count);
-+	timecounter_init(&arch_timer_kvm_info.timecounter,
-+			 &cyclecounter, start_count);
- 
- 	/* 56 bits minimum, so we assume worst case rollover */
- 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 25d0914..9101ed6b 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -49,11 +49,16 @@ enum arch_timer_reg {
- 
- #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
- 
-+struct arch_timer_kvm_info {
-+	struct timecounter timecounter;
-+};
++static void clear_hyp_pgd_entry(pgd_t *pgd)
++{
++	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0UL);
++	pgd_clear(pgd);
++	pud_free(NULL, pud_table);
++	put_page(virt_to_page(pgd));
++}
 +
- #ifdef CONFIG_ARM_ARCH_TIMER
++static void clear_hyp_pud_entry(pud_t *pud)
++{
++	pmd_t *pmd_table __maybe_unused = pmd_offset(pud, 0);
++	VM_BUG_ON(pud_huge(*pud));
++	pud_clear(pud);
++	pmd_free(NULL, pmd_table);
++	put_page(virt_to_page(pud));
++}
++
++static void clear_hyp_pmd_entry(pmd_t *pmd)
++{
++	pte_t *pte_table = pte_offset_kernel(pmd, 0);
++	VM_BUG_ON(pmd_thp_or_huge(*pmd));
++	pmd_clear(pmd);
++	pte_free_kernel(NULL, pte_table);
++	put_page(virt_to_page(pmd));
++}
++
++static void unmap_hyp_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
++{
++	pte_t *pte, *start_pte;
++
++	start_pte = pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			kvm_set_pte(pte, __pte(0));
++			put_page(virt_to_page(pte));
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++
++	if (hyp_pte_table_empty(start_pte))
++		clear_hyp_pmd_entry(pmd);
++}
++
++static void unmap_hyp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
++{
++	phys_addr_t next;
++	pmd_t *pmd, *start_pmd;
++
++	start_pmd = pmd = pmd_offset(pud, addr);
++	do {
++		next = pmd_addr_end(addr, end);
++		/* Hyp doesn't use huge pmds */
++		if (!pmd_none(*pmd))
++			unmap_hyp_ptes(pmd, addr, next);
++	} while (pmd++, addr = next, addr != end);
++
++	if (hyp_pmd_table_empty(start_pmd))
++		clear_hyp_pud_entry(pud);
++}
++
++static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
++{
++	phys_addr_t next;
++	pud_t *pud, *start_pud;
++
++	start_pud = pud = pud_offset(pgd, addr);
++	do {
++		next = pud_addr_end(addr, end);
++		/* Hyp doesn't use huge puds */
++		if (!pud_none(*pud))
++			unmap_hyp_pmds(pud, addr, next);
++	} while (pud++, addr = next, addr != end);
++
++	if (hyp_pud_table_empty(start_pud))
++		clear_hyp_pgd_entry(pgd);
++}
++
++static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
++{
++	pgd_t *pgd;
++	phys_addr_t addr = start, end = start + size;
++	phys_addr_t next;
++
++	/*
++	 * We don't unmap anything from HYP, except at the hyp tear down.
++	 * Hence, we don't have to invalidate the TLBs here.
++	 */
++	pgd = pgdp + pgd_index(addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		if (!pgd_none(*pgd))
++			unmap_hyp_puds(pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
++}
++
+ /**
+  * free_boot_hyp_pgd - free HYP boot page tables
+  *
+@@ -398,14 +492,14 @@ void free_boot_hyp_pgd(void)
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
  
- extern u32 arch_timer_get_rate(void);
- extern u64 (*arch_timer_read_counter)(void);
- extern struct timecounter *arch_timer_get_timecounter(void);
-+extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
+ 	if (boot_hyp_pgd) {
+-		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
++		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
++		unmap_hyp_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+ 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+ 		boot_hyp_pgd = NULL;
+ 	}
  
- #else
+ 	if (hyp_pgd)
+-		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
++		unmap_hyp_range(hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
  
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ }
+@@ -430,9 +524,9 @@ void free_hyp_pgds(void)
+ 
+ 	if (hyp_pgd) {
+ 		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+-			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
++			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+-			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
++			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 
+ 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+ 		hyp_pgd = NULL;
 -- 
 2.1.2.330.g565301e.dirty
