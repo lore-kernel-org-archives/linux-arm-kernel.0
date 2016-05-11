@@ -1,29 +1,154 @@
-From: dannenberg@ti.com (Andreas Dannenberg)
-Date: Wed, 11 May 2016 08:09:13 -0500
-Subject: [PATCH 2/2] ARM: dts: dra7: Add ti,secure-ram node to ocmcram1
- node
-In-Reply-To: <1462909782-14639-3-git-send-email-d-gerlach@ti.com>
-References: <1462909782-14639-1-git-send-email-d-gerlach@ti.com>
- <1462909782-14639-3-git-send-email-d-gerlach@ti.com>
-Message-ID: <20160511130913.GS20461@borg.dal.design.ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 May 2016 15:11:06 +0200
+Subject: [PATCH v3 25/55] KVM: arm/arm64: vgic-new: Add PENDING registers
+ handlers
+In-Reply-To: <1462531568-9799-26-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-26-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160511131106.GP27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 02:49:42PM -0500, Dave Gerlach wrote:
-> Secure variants of DRA7xx and AM57xx SoCs may need to reserve a region
-> of the SRAM for use by secure software. To account for this, add a child
-> node to the ocmcram1 node that will act as a placeholder at the start
-> of the SRAM for the reserved region of memory that may be required
-> by secure services. The node is added with size 0 so that by default
-> parts will have the full space available but the bootloader or board dts
-> file is able to resize the node as needed depending on how much reserved
-> space is needed, if any, so end users of the ocmcram1 region on HS parts
-> must be aware that a smaller amount of SRAM than expected may be available.
+On Fri, May 06, 2016 at 11:45:38AM +0100, Andre Przywara wrote:
+> The pending register handlers are shared between the v2 and v3
+> emulation, so their implementation goes into vgic-mmio.c, to be easily
+> referenced from the v3 emulation as well later.
+> For level triggered interrupts the real line level is unaffected by
+> this write, so we keep this state separate and combine it with the
+> device's level to get the actual pending state.
 > 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog RFC..v1:
+> - remove IRQ lock from read handler
+> - remove TODO from clear pending handler
+> 
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 60 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h    | 12 ++++++++
+>  3 files changed, 74 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index 448d1da..4b87e0a 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -76,9 +76,9 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
+>  		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 077ae86..4df1af7 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -102,6 +102,66 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = (addr & 0x7f) * 8;
+> +	u32 value = 0;
+> +	int i;
+> +
+> +	/* Loop over all IRQs affected by this read */
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->pending)
+> +			value |= (1U << i);
 
-Reviewed-by: Andreas Dannenberg <dannenberg@ti.com>
+same question as on the previous patch
 
---
-Andreas Dannenberg
-Texas Instruments Inc
+> +	}
+> +
+> +	return extract_bytes(value, addr & 3, len);
+> +}
+> +
+> +void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+> +			      gpa_t addr, unsigned int len,
+> +			      unsigned long val)
+> +{
+> +	u32 intid = (addr & 0x7f) * 8;
+> +	int i;
+> +
+> +	for_each_set_bit(i, &val, len * 8) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		irq->pending = true;
+> +		if (irq->config == VGIC_CONFIG_LEVEL)
+> +			irq->soft_pending = true;
+> +
+> +		vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +	}
+> +}
+> +
+> +void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+> +			      gpa_t addr, unsigned int len,
+> +			      unsigned long val)
+> +{
+> +	u32 intid = (addr & 0x7f) * 8;
+> +	int i;
+> +
+> +	for_each_set_bit(i, &val, len * 8) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		if (irq->config == VGIC_CONFIG_LEVEL) {
+> +			irq->soft_pending = false;
+> +			irq->pending = irq->line_level;
+> +		} else {
+> +			irq->pending = false;
+> +		}
+> +
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +}
+> +
+>  static int match_region(const void *key, const void *elt)
+>  {
+>  	const unsigned int offset = (unsigned long)key;
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 188909a..d4fc029 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -85,6 +85,18 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
+>  			     gpa_t addr, unsigned int len,
+>  			     unsigned long val);
+>  
+> +unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len);
+> +
+> +void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+> +			      gpa_t addr, unsigned int len,
+> +			      unsigned long val);
+> +
+> +void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+> +			      gpa_t addr, unsigned int len,
+> +			      unsigned long val);
+> +
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+>  #endif
+> -- 
+> 2.7.3
+> 
+
+Otherwise this looks good.
+
+Thanks,
+-Christoffer
