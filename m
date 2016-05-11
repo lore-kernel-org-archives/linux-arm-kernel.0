@@ -1,105 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 May 2016 13:51:36 +0100
-Subject: [PATCH v3 23/55] KVM: arm/arm64: vgic-new: Add CTLR, TYPER and
- IIDR handlers
-In-Reply-To: <20160511120533.GM27623@cbox>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-24-git-send-email-andre.przywara@arm.com>
- <20160511120533.GM27623@cbox>
-Message-ID: <57332AD8.6050306@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 11 May 2016 14:54:18 +0200
+Subject: [PATCH v3 27/27] ARM: dts: exynos: Add RTC and I2C to Exynos5410
+In-Reply-To: <b1f47282-f70e-4354-9146-9b4b27ba1726@osg.samsung.com>
+References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
+ <1462910970-1812-28-git-send-email-krzk@kernel.org>
+ <b1f47282-f70e-4354-9146-9b4b27ba1726@osg.samsung.com>
+Message-ID: <57332B7A.5070909@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/16 13:05, Christoffer Dall wrote:
-> On Fri, May 06, 2016 at 11:45:36AM +0100, Andre Przywara wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Those three registers are v2 emulation specific, so their implementation
->> lives entirely in vgic-mmio-v2.c. Also they are handled in one function,
->> as their implementation is pretty simple.
->> When the guest enables the distributor, we kick all VCPUs to get
->> potentially pending interrupts serviced.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Changelog RFC..v1:
->> - kick VCPUs is the distributor gets enabled
->> - improve comment
->>
->> Changelog v1 .. v2:
->> - adapt to new MMIO framework
->> - use switch() statements to improve readability
->>
->> Changelog v2 .. v3:
->> - add vgic_kick_vcpus() implementation
->>
->>  include/linux/irqchip/arm-gic.h  |  1 +
->>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 48 +++++++++++++++++++++++++++++++++++++++-
->>  virt/kvm/arm/vgic/vgic.c         | 15 +++++++++++++
->>  virt/kvm/arm/vgic/vgic.h         |  4 ++++
->>  4 files changed, 67 insertions(+), 1 deletion(-)
->>
->> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
->> index be0d26f..fd05185 100644
->> --- a/include/linux/irqchip/arm-gic.h
->> +++ b/include/linux/irqchip/arm-gic.h
->> @@ -33,6 +33,7 @@
->>  
->>  #define GIC_DIST_CTRL			0x000
->>  #define GIC_DIST_CTR			0x004
->> +#define GIC_DIST_IIDR			0x008
->>  #define GIC_DIST_IGROUP			0x080
->>  #define GIC_DIST_ENABLE_SET		0x100
->>  #define GIC_DIST_ENABLE_CLEAR		0x180
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> index 2729a22..69e96f7 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> @@ -20,9 +20,55 @@
->>  #include "vgic.h"
->>  #include "vgic-mmio.h"
->>  
->> +static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
->> +					    gpa_t addr, unsigned int len)
->> +{
->> +	u32 value;
->> +
->> +	switch (addr & 0x0c) {
->> +	case GIC_DIST_CTRL:
->> +		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
->> +		break;
->> +	case GIC_DIST_CTR:
->> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
->> +		value = (value >> 5) - 1;
->> +		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
->> +		break;
->> +	case GIC_DIST_IIDR:
->> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
->> +		break;
->> +	default:
->> +		return 0;
->> +	}
->> +
->> +	return extract_bytes(value, addr & 3, len);
->> +}
->> +
->> +static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
->> +				    gpa_t addr, unsigned int len,
->> +				    unsigned long val)
->> +{
->> +	switch (addr & 0x0c) {
->> +	case GIC_DIST_CTRL:
->> +		if (!(addr & 1)) {
+On 05/11/2016 02:44 PM, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> what is this !(addr & 1) check?
+> On 05/10/2016 04:09 PM, Krzysztof Kozlowski wrote:
+>> Configure Exynos5410-specific properties of RTC, I2C and HSI2C nodes.
+>> This still does not enable them on the board level though.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> ---
+>>  arch/arm/boot/dts/exynos5410.dtsi | 66 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 66 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+>> index dd4d6d752865..ae64cb0a8efd 100644
+>> --- a/arch/arm/boot/dts/exynos5410.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+>> @@ -114,6 +114,9 @@
+>>  			status = "disabled";
+>>  		};
+>>  
+>> +		/* i2c_0-3 are defined in exynos5.dtsi */
+>> +		/* hsi2c_4-7 are defined in exynos5xx.dtsi */
+>> +
+> 
+> I don't think these comments are needed. For each DTS, there are usually a lot of
+> nodes defined in higher levels of the DT hierarchy but isn't common to mention it.
+> 
+> Specially since the mentioned nodes are referenced here by their labels so it is
+> implicit that are defined in one of the included DTSI (or dtc will fail to build).
 
-We check that the write includes the lowest byte of the register. But as
-we only have aligned accesses, it probably doesn't matter... I'll hack
-that away.
+Okay, if it does not make sense to you then I'll remove them.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks for review!
+Krzysztof
