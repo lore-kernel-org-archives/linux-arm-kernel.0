@@ -1,69 +1,17 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 11 May 2016 21:27:40 +0530
-Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
-In-Reply-To: <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
-References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
- <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
-Message-ID: <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 May 2016 18:01:44 +0200
+Subject: More build fixes for omapdrm in current -next
+Message-ID: <1462982509-342936-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+A couple more errors showed up in linux-next in the last few
+days, all because of missing header files. I have not seen these
+before, and most configurations appear to be fine. There
+must have been an implicit inclusion somewhere before that
+just got removed, but I couldn't find it and doing the
+explicit #include should always be better here.
 
-> 1. Current QCOM I2C driver hangs when sending data to address 0x03-0x07
-> in some scenarios. The QUP controller generates invalid write in this
-case,
-> since these addresses are reserved for different bus formats.
-> 
-> 2. Also, the error handling is done by I2C QUP ISR in the case of DMA
-mode.
-> The state need to be RESET in case of any error for clearing the available
-> data in FIFO, which otherwise leaves the BAM DMA controller in hang state.
-> 
-> This patch fixes the above two issues by clearing the error bits from I2C
-and
-> QUP status in ISR in case of I2C error, QUP error and resets the QUP state
-to
-> clear the FIFO data.
-> 
-> Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-> ---
->  drivers/i2c/busses/i2c-qup.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index
-> 23eaabb..8c2f1bc 100644
-> --- a/drivers/i2c/busses/i2c-qup.c
-> +++ b/drivers/i2c/busses/i2c-qup.c
-> @@ -213,14 +213,16 @@ static irqreturn_t qup_i2c_interrupt(int irq, void
-> *dev)
->  	bus_err &= I2C_STATUS_ERROR_MASK;
->  	qup_err &= QUP_STATUS_ERROR_FLAGS;
-> 
-> -	if (qup_err) {
-> -		/* Clear Error interrupt */
-> +	/* Clear the error bits in QUP_ERROR_FLAGS */
-> +	if (qup_err)
->  		writel(qup_err, qup->base + QUP_ERROR_FLAGS);
-> -		goto done;
-> -	}
-> 
-> -	if (bus_err) {
-> -		/* Clear Error interrupt */
-> +	/* Clear the error bits in QUP_I2C_STATUS */
-> +	if (bus_err)
-> +		writel(bus_err, qup->base + QUP_I2C_STATUS);
-> +
-> +	/* Reset the QUP State in case of error */
-> +	if (qup_err || bus_err) {
->  		writel(QUP_RESET_STATE, qup->base + QUP_STATE);
->  		goto done;
->  	}
-       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the end,
-when
-       there is no error. So would it be fine if we do it there
-unconditionally ?
+Please apply for 4.7 to avoid regressing on randconfig builds.
 
-Regards,
- Sricharan
+	Arnd
