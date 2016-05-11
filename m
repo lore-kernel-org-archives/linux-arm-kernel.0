@@ -1,55 +1,97 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 11 May 2016 12:37:58 +0200
-Subject: [RFC PATCH 13/21] reset: uniphier: add reset driver for
- UniPhier PH1-LD4 SoC
-In-Reply-To: <1462962853.2924.19.camel@pengutronix.de>
-References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
- <1462873862-30940-14-git-send-email-yamada.masahiro@socionext.com>
- <1462883138.9155.3.camel@pengutronix.de>
- <CAK7LNASY=Kg-KOMue09_YRoxrBAnXP00oqG4AC2iQM1HJgLc7A@mail.gmail.com>
- <1462962853.2924.19.camel@pengutronix.de>
-Message-ID: <1462963078.2924.23.camel@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 May 2016 11:39:29 +0100
+Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.05.2016, 12:34 +0200 schrieb Philipp Zabel:
-> Hi Masahiro,
-> 
-> Am Mittwoch, den 11.05.2016, 11:52 +0900 schrieb Masahiro Yamada:
-> > Hi Philipp,
-> > 
-> > 
-> > 2016-05-10 21:25 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> > > Hi Masahiro,
-> > >
-> > > Am Dienstag, den 10.05.2016, 18:50 +0900 schrieb Masahiro Yamada:
-> > >> This series is just for review.
-> > >> Please do not apply this patch.
-> > >>
-> > >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > >
-> > > No need for all these tiny drivers. If you probe from DT as Lee
-> > > requests, you can let of_device_id.data point to a compatible specific
-> > > uniphier_reset_data.
-> > >
-> > 
-> > I will need to fill the table a bit more to complete this work,
-> > but I do not think this reset driver will become as big as the clk driver.
-> > (I guess it will be less than 1000 lines.)
-> > 
-> > If you prefer a single file for the whole of this SoC family,
-> > I can squash all the files into one.
-> > (I can split it if I need to do so in the future.)
-> 
-> I'm fine with split files if you think the complete lists are too long,
-> but in that case export the uniphier_reset_data
+On Wed, Apr 27, 2016 at 11:07:15AM -0700, David Daney wrote:
+> +static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
+> +{
+> +	unsigned long madt_end, entry;
+> +	struct acpi_table_madt *madt;
+> +	acpi_size tbl_size;
+> +
+> +	if (ACPI_FAILURE(acpi_get_table_with_size(ACPI_SIG_MADT, 0,
+> +			(struct acpi_table_header **)&madt, &tbl_size)))
+> +		return -ENODEV;
+> +
+> +	entry = (unsigned long)madt;
+> +	madt_end = entry + madt->header.length;
+> +
+> +	/* Parse all entries looking for a match. */
+> +	entry += sizeof(struct acpi_table_madt);
+> +	while (entry + sizeof(struct acpi_subtable_header) < madt_end) {
+> +		struct acpi_subtable_header *header =
+> +			(struct acpi_subtable_header *)entry;
+> +
+> +		if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+> +			struct acpi_madt_generic_interrupt *gicc =
+> +				container_of(header,
+> +				struct acpi_madt_generic_interrupt, header);
+> +
+> +			if ((gicc->flags & ACPI_MADT_ENABLED) &&
+> +			    (gicc->uid == acpi_id)) {
+> +				*mpidr = gicc->arm_mpidr;
+> +				early_acpi_os_unmap_memory(madt, tbl_size);
+> +				return 0;
+> +			}
+> +		}
+> +		entry += header->length;
+> +	}
+> +
+> +	early_acpi_os_unmap_memory(madt, tbl_size);
+> +	return -ENODEV;
+> +}
+> +
+> +/* Callback for Proximity Domain -> ACPI processor UID mapping */
+> +void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+> +{
+> +	int pxm, node;
+> +	u64 mpidr;
+> +
+> +	if (srat_disabled())
+> +		return;
+> +
+> +	if (pa->header.length < sizeof(struct acpi_srat_gicc_affinity)) {
+> +		pr_err("SRAT: Invalid SRAT header length: %d\n",
+> +			pa->header.length);
+> +		bad_srat();
+> +		return;
+> +	}
+> +
+> +	if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+> +		return;
+> +
+> +	if (cpus_in_srat >= NR_CPUS) {
+> +		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
+> +			     NR_CPUS);
+> +		return;
+> +	}
+> +
+> +	pxm = pa->proximity_domain;
+> +	node = acpi_map_pxm_to_node(pxm);
+> +
+> +	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+> +		pr_err("SRAT: Too many proximity domains %d\n", pxm);
+> +		bad_srat();
+> +		return;
+> +	}
+> +
+> +	if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
+> +		pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
+> +			pxm, pa->acpi_processor_uid);
+> +		bad_srat();
+> +		return;
+> +	}
 
-"... and use them from a single platform driver." I wanted to add here
-before I tripped over the send button.
+I wonder whether you could replace the get_mpidr_in_madt() function with
+something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
+duplicates functionality already available elsewhere.
 
-> I don't care about the lists being in a single file so much as I'd
-> prefer to avoid the duplicated boilerplate of one module_platform_driver
-> per SoC family member.
-
-best regards
-Philipp
+-- 
+Catalin
