@@ -1,53 +1,69 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 17:42:52 +0200
-Subject: [PULL 00/29] KVM/ARM Changes for v4.7
-In-Reply-To: <57334E72.9010109@redhat.com>
-References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
- <57334E72.9010109@redhat.com>
-Message-ID: <20160511154252.GX27623@cbox>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 11 May 2016 21:27:40 +0530
+Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
+In-Reply-To: <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
+References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+ <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
+Message-ID: <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 05:23:30PM +0200, Paolo Bonzini wrote:
-> 
-> 
-> On 11/05/2016 15:29, Christoffer Dall wrote:
-> > Hi Paolo and Radim,
-> > 
-> > Here is the initial set of changes for KVM/ARM for v4.7.
-> > 
-> > Sorry I'm a bit late with these, but we were trying to get the new vgic
-> > implementation in as part of this, but I have decided to send this pull
-> > request now, and we can follow up with another for the new VGIC,
-> > assuming we feel like we have that in place in a few days.
-> 
-> Don't worry, you're not late at all.  I've pulled this to kvm/queue.
-> 
-> > There are a few changes in this pull request touching things outside
-> > KVM, but they should all carry the necessary acks and it made the
-> > merge process much easier to do it this way.
-> 
-> The following are properly acked:
-> 
->     arm64: Reuse TCR field definitions for EL1 and EL2
->     arm64: Introduce pmd_thp_or_huge
-> 
-> I wouldn't have minded more explicit Acked-bys for the following:
-> 
->     irqchip/gic-v2: Gather ACPI specific data in a single structure
->     irqchip/gic-v2: Parse and export virtual GIC information
->     irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
->     irqchip/gic-v3: Gather all ACPI specific data in a single structure
->     irqchip/gic-v3: Parse and export virtual GIC information
-> 
-> I guess it's fine since Marc Zyngier is maintainer for both KVM and
-> irqchip, still it's never wrong to get more acks. :)
-> 
-Jason Cooper also acked them all; I swear I intended to add his acks to
-all of these specifically, but I must've forgotten.
+Hi,
 
-I have forwarded you his ack for reference.  Let me know if you need me
-to do anything else.
+> 1. Current QCOM I2C driver hangs when sending data to address 0x03-0x07
+> in some scenarios. The QUP controller generates invalid write in this
+case,
+> since these addresses are reserved for different bus formats.
+> 
+> 2. Also, the error handling is done by I2C QUP ISR in the case of DMA
+mode.
+> The state need to be RESET in case of any error for clearing the available
+> data in FIFO, which otherwise leaves the BAM DMA controller in hang state.
+> 
+> This patch fixes the above two issues by clearing the error bits from I2C
+and
+> QUP status in ISR in case of I2C error, QUP error and resets the QUP state
+to
+> clear the FIFO data.
+> 
+> Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
+> ---
+>  drivers/i2c/busses/i2c-qup.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index
+> 23eaabb..8c2f1bc 100644
+> --- a/drivers/i2c/busses/i2c-qup.c
+> +++ b/drivers/i2c/busses/i2c-qup.c
+> @@ -213,14 +213,16 @@ static irqreturn_t qup_i2c_interrupt(int irq, void
+> *dev)
+>  	bus_err &= I2C_STATUS_ERROR_MASK;
+>  	qup_err &= QUP_STATUS_ERROR_FLAGS;
+> 
+> -	if (qup_err) {
+> -		/* Clear Error interrupt */
+> +	/* Clear the error bits in QUP_ERROR_FLAGS */
+> +	if (qup_err)
+>  		writel(qup_err, qup->base + QUP_ERROR_FLAGS);
+> -		goto done;
+> -	}
+> 
+> -	if (bus_err) {
+> -		/* Clear Error interrupt */
+> +	/* Clear the error bits in QUP_I2C_STATUS */
+> +	if (bus_err)
+> +		writel(bus_err, qup->base + QUP_I2C_STATUS);
+> +
+> +	/* Reset the QUP State in case of error */
+> +	if (qup_err || bus_err) {
+>  		writel(QUP_RESET_STATE, qup->base + QUP_STATE);
+>  		goto done;
+>  	}
+       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the end,
+when
+       there is no error. So would it be fine if we do it there
+unconditionally ?
 
-Thanks,
--Christoffer
+Regards,
+ Sricharan
