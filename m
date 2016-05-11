@@ -1,54 +1,211 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2016 10:34:48 +0200
-Subject: [PATCH v5 08/17] gpio: port LoCoMo gpio support from old driver
-In-Reply-To: <20150614152710.GG7557@n2100.arm.linux.org.uk>
-References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
- <1433797008-6246-9-git-send-email-dbaryshkov@gmail.com>
- <20150614152710.GG7557@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYsf+wEy0juA1ZnpmY8O+aDTt7YketSD-AesBjZmVmzeA@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 11 May 2016 10:38:46 +0200
+Subject: [PATCH v9 5/7] vfio/type1: also check IRQ remapping capability at
+ msi domain
+In-Reply-To: <57321952.2020206@arm.com>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <1462362858-2925-6-git-send-email-eric.auger@linaro.org>
+ <20160509164942.5af8b30d@t450s.home> <57320803.8070506@linaro.org>
+ <57321952.2020206@arm.com>
+Message-ID: <5732EF96.4070001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 14, 2015 at 5:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> [Dmitry]
+Hi Robin, Alex,
+On 05/10/2016 07:24 PM, Robin Murphy wrote:
+> Hi Eric,
+> 
+> On 10/05/16 17:10, Eric Auger wrote:
+>> Hi Alex,
+>> On 05/10/2016 12:49 AM, Alex Williamson wrote:
+>>> On Wed,  4 May 2016 11:54:16 +0000
+>>> Eric Auger <eric.auger@linaro.org> wrote:
+>>>
+>>>> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is
+>>>> abstracted
+>>>> by the msi controller. vfio_safe_irq_domain allows to check whether
+>>>> interrupts are "safe" for a given device. They are if the device does
+>>>> not use MSI
+>>>
+>>> Are we sure we're not opening a security hole here?  An MSI is simply a
+>>> DMA write, so really whether or not a device uses MSI is irrelevant.
+>>> If it can generate a DMA to the MSI doorbell then we need to be
+>>> protected and I think we pretty much need to assume that devices are
+>>> DMA capable.  Do the MSI domain checks cover this?
+>> Let me try to rephrase: we check the device is not attached to an MSI
+>> controller (I think this is the semantic of dev_get_msi_domain(dev)).
+>>
+>> If it is not, we don't have to care about MSI isolation: there will be
+>> no IOMMU binding between the device and any MSI doorbell. If it is we
+>> check the msi domain is backed by an MSI controller able to perform MSI
+>> isolation.
+>>
+>> So effectively "usage of MSIs" is improper - since it is decided after
+>> the group attachment anyway  - and the commit message should rather
+>> state "if the device is linked to an MSI controller" (dt msi-parent
+>> notion I think).
+> 
+> Hmm, I think Alex has a point here - on a GICv2m I can happily fire
+> arbitrary MSIs from _a shell_ (using /dev/mem), and the CPUs definitely
+> aren't in an MSI domain, so I don't think it's valid to assume that a
+> device using only wired interrupts, therefore with no connection to any
+> MSI controller, isn't still capable of maliciously spewing DMA all over
+> any and every doorbell region in the system.
 
->> +     regmap_write(lg->regmap, LOCOMO_GPO, 0x00);
->> +     regmap_write(lg->regmap, LOCOMO_GPE, 0x00);
->> +     regmap_write(lg->regmap, LOCOMO_GPD, 0x00);
->> +     regmap_write(lg->regmap, LOCOMO_GIE, 0x00);
->
-> Do we really want to initialise all outputs like this?  It suffers from
-> the problem I mention above - it sets all outputs to zero, then sets
-> them as inputs, which can lead to glitching.  What if (eg) the LCD was
-> left enabled?  This would mean you're not going through the proper
-> power-down sequence for the LCD (for example).
+Sorry but I still don't get the point. For the device to reach the
+doorbell there must be an IOMMU mapping.
 
-This looks dangerous indeed, why did I miss that before.
+- if the device is not attached to an MSI domain, there won't be any
+doorbell iommu mapping built by this series, so no risk, right?
 
-Is it possible to just leave these registers as-is, or, in case
-you want to know at all times their actual states, implement
-the .get_direction() callback? They the kernel can explore
-the direction and value of the lines.
+The device will be allowed to reach only memory iommu mapped by
+userspace with VFIO DMA MAP standard API. Of course if the userspace can
+mmap all the host PA that's a more general issue, right?
 
-> TBH, I think GPIO needs to have a way to claim output GPIOs _without_
-> programming their current state for situations like this.  That seems
-> to have been an oversight in the model for a while now - it's impossible
-> to claim GPIO outputs without setting their initial value,
+- If the device is attached to an MSI domain (msi-parent link), 2 cases:
+1) the MSI controller advertises MSI isolation (ITS cases), no risk
+2) the MSI controller does not advertise MSI isolation (GICv2m), there
+is a security hole.
+   a) by default we reject the device attachment
+   b) if the userspace overrides the safe interrupt option he accepts
+the security hole
 
-It is possible in the new descriptor API, you can claim a GPIO
-for a device with (see <linux/gpio/consumer.h>
+What am I missing?
 
-enum gpiod_flags {
-        GPIOD_ASIS      = 0,
-(...)
+Best Regards
 
-I understand it may be a bit thick to ask to migrate the whole
-SA1100 codebase to GPIO descriptors though, I don't know how
-many machines and drivers that would affect.
-
-I'd consider a patch retrofitting this into the old
-API if it would see some real use case.
-
-Yours,
-Linus Walleij
+Eric
+> 
+> Robin.
+> 
+>> Does it sound better?
+>>
+>> Regards
+>>
+>> Eric
+>>>
+>>>> or if the device uses MSI and the msi-parent controller
+>>>> supports IRQ remapping.
+>>>>
+>>>> Then we check at group level if all devices have safe interrupts: if
+>>>> not,
+>>>> we only allow the group to be attached if allow_unsafe_interrupts is
+>>>> set.
+>>>>
+>>>> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+>>>> changed in next patch.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>
+>>>> ---
+>>>> v3 -> v4:
+>>>> - rename vfio_msi_parent_irq_remapping_capable into
+>>>> vfio_safe_irq_domain
+>>>>    and irq_remapping into safe_irq_domains
+>>>>
+>>>> v2 -> v3:
+>>>> - protect vfio_msi_parent_irq_remapping_capable with
+>>>>    CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>>>> ---
+>>>>   drivers/vfio/vfio_iommu_type1.c | 44
+>>>> +++++++++++++++++++++++++++++++++++++++--
+>>>>   1 file changed, 42 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/vfio/vfio_iommu_type1.c
+>>>> b/drivers/vfio/vfio_iommu_type1.c
+>>>> index 4d3a6f1..2fc8197 100644
+>>>> --- a/drivers/vfio/vfio_iommu_type1.c
+>>>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>>>> @@ -37,6 +37,8 @@
+>>>>   #include <linux/vfio.h>
+>>>>   #include <linux/workqueue.h>
+>>>>   #include <linux/msi-iommu.h>
+>>>> +#include <linux/irqdomain.h>
+>>>> +#include <linux/msi.h>
+>>>>
+>>>>   #define DRIVER_VERSION  "0.2"
+>>>>   #define DRIVER_AUTHOR   "Alex Williamson
+>>>> <alex.williamson@redhat.com>"
+>>>> @@ -777,6 +779,33 @@ static int vfio_bus_type(struct device *dev,
+>>>> void *data)
+>>>>       return 0;
+>>>>   }
+>>>>
+>>>> +/**
+>>>> + * vfio_safe_irq_domain: returns whether the irq domain
+>>>> + * the device is attached to is safe with respect to MSI isolation.
+>>>> + * If the irq domain is not an MSI domain, we return it is safe.
+>>>> + *
+>>>> + * @dev: device handle
+>>>> + * @data: unused
+>>>> + * returns 0 if the irq domain is safe, -1 if not.
+>>>> + */
+>>>> +static int vfio_safe_irq_domain(struct device *dev, void *data)
+>>>> +{
+>>>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>>>> +    struct irq_domain *domain;
+>>>> +    struct msi_domain_info *info;
+>>>> +
+>>>> +    domain = dev_get_msi_domain(dev);
+>>>> +    if (!domain)
+>>>> +        return 0;
+>>>> +
+>>>> +    info = msi_get_domain_info(domain);
+>>>> +
+>>>> +    if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
+>>>> +        return -1;
+>>>> +#endif
+>>>> +    return 0;
+>>>> +}
+>>>> +
+>>>>   static int vfio_iommu_replay(struct vfio_iommu *iommu,
+>>>>                    struct vfio_domain *domain)
+>>>>   {
+>>>> @@ -870,7 +899,7 @@ static int vfio_iommu_type1_attach_group(void
+>>>> *iommu_data,
+>>>>       struct vfio_group *group, *g;
+>>>>       struct vfio_domain *domain, *d;
+>>>>       struct bus_type *bus = NULL;
+>>>> -    int ret;
+>>>> +    int ret, safe_irq_domains;
+>>>>
+>>>>       mutex_lock(&iommu->lock);
+>>>>
+>>>> @@ -893,6 +922,13 @@ static int vfio_iommu_type1_attach_group(void
+>>>> *iommu_data,
+>>>>
+>>>>       group->iommu_group = iommu_group;
+>>>>
+>>>> +    /*
+>>>> +     * Determine if all the devices of the group have a safe irq
+>>>> domain
+>>>> +     * with respect to MSI isolation
+>>>> +     */
+>>>> +    safe_irq_domains = !iommu_group_for_each_dev(iommu_group, &bus,
+>>>> +                       vfio_safe_irq_domain);
+>>>> +
+>>>>       /* Determine bus_type in order to allocate a domain */
+>>>>       ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
+>>>>       if (ret)
+>>>> @@ -920,8 +956,12 @@ static int vfio_iommu_type1_attach_group(void
+>>>> *iommu_data,
+>>>>       INIT_LIST_HEAD(&domain->group_list);
+>>>>       list_add(&group->next, &domain->group_list);
+>>>>
+>>>> +    /*
+>>>> +     * to advertise safe interrupts either the IOMMU or the MSI
+>>>> controllers
+>>>> +     * must support IRQ remapping/interrupt translation
+>>>> +     */
+>>>>       if (!allow_unsafe_interrupts &&
+>>>> -        !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+>>>> +        (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
+>>>> !safe_irq_domains)) {
+>>>>           pr_warn("%s: No interrupt remapping support.  Use the
+>>>> module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU
+>>>> support on this platform\n",
+>>>>                  __func__);
+>>>>           ret = -EPERM;
+>>>
+>>
+> 
