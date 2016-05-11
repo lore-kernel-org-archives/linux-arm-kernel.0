@@ -1,26 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2016 10:53:35 +0200
-Subject: [PATCH v2 3/4] ARM64: Kconfig: Select the Amlogic Meson pin
- controller driver
-In-Reply-To: <1462176138-29433-4-git-send-email-carlo@caione.org>
+Date: Wed, 11 May 2016 10:54:35 +0200
+Subject: [PATCH v2 0/4] Amlogic: GXBB: Add pin controller
+In-Reply-To: <m2bn4jbbzn.fsf@baylibre.com>
 References: <1462176138-29433-1-git-send-email-carlo@caione.org>
- <1462176138-29433-4-git-send-email-carlo@caione.org>
-Message-ID: <CACRpkdbTr7YUrzSQQci929ugBhTkJKWvpjdf5Wo3HkfVKFhGLw@mail.gmail.com>
+ <m2bn4jbbzn.fsf@baylibre.com>
+Message-ID: <CACRpkdbFm0g-7vayj9KVVEGHWvPbSehD=Yd8Xn-hZc-aKTpEpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 2, 2016 at 10:02 AM, Carlo Caione <carlo@caione.org> wrote:
+On Fri, May 6, 2016 at 2:35 PM, Kevin Hilman <khilman@baylibre.com> wrote:
 
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Select the Meson pin controller driver also for the AArch64 Meson
-> platform.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Linus, with your ack, we could keep this series together, or if you
+> prefer, you can take patch 1, and Carlo can take the others through his
+> tree.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I've applied 1/4.
 
-I guess this should get merged through the ARM SoC tree.
+The rest can go in wherever, they seem pretty orthogonal.
 
 Yours,
 Linus Walleij
