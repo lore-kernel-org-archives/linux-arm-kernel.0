@@ -1,48 +1,56 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 11 May 2016 17:33:11 +0100
-Subject: [PATCH] usb: dwc3: st: Fix USB_DR_MODE_PERIPHERAL configuration.
-Message-ID: <1462984391-605-1-git-send-email-peter.griffin@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 11 May 2016 09:35:29 -0700
+Subject: [PATCH v8 6/8] dt-bindings: i2c: rk3x: add support for rk3399
+In-Reply-To: <1462908647-27236-1-git-send-email-david.wu@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908647-27236-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <CAD=FV=VzL8AfzUnPYgsf_NqPgbp2_o_qJC7-DWHmekWVQ-Es=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set USB3_FORCE_VBUSVALID when configured for USB_DR_MODE_PERIPHERAL
-mode, as it is required to have a working setup.
+Hi,
 
-This worked on the internal driver by relying on the reset
-value of the syscfg register as the bits aren't explicity cleared
-and set like the upstream driver.
+On Tue, May 10, 2016 at 12:30 PM, David Wu <david.wu@rock-chips.com> wrote:
+> The bus clock and function clock are separated at rk3399,
+> and others use one clock as the bus clock and function clock.
+>
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> ---
+> Change in v8:
+> - remove error description.
+>
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> index 0b4a85f..5429301 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> @@ -6,10 +6,20 @@ RK3xxx SoCs.
+>  Required properties :
+>
+>   - reg : Offset and length of the register set for the device
+> - - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
+> -               "rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
+> + - compatible: should be one of the following:
+> +   - "rockchip,rk3066-i2c": for rk3066
+> +   - "rockchip,rk3188-i2c": for rk3188
+> +   - "rockchip,rk3228-i2c": for rk3228
+> +   - "rockchip,rk3288-i2c": for rk3288
+> +   - "rockchip,rk3399-i2c": for rk3399
+>   - interrupts : interrupt number
+> - - clocks : parent clock
+> + - clocks: See ../clock/clock-bindings.txt
+> +   - For older hardware (rk3066, rk3188, rk3228, rk3288):
+> +     - There is one clock that's used both to derive the functional clock
+> +       for the device and as the bus clock.
+> +   - For newer hardware (rk3399): specified by name
+> +     - "i2c": REQUIRED. This is used to derive the functional clock.
+> +     - "pclk": REQUIRED. This is the bus clock.
 
-Also add a comment about what setting this bit means.
+Depending on what Rob thinks, it might make sense to remove the above
+two "REQUIRED" bits.  That would match his earlier feedback since
+we're still in the "Required" section and thus it is redundant.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/usb/dwc3/dwc3-st.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/dwc3/dwc3-st.c b/drivers/usb/dwc3/dwc3-st.c
-index 5c0adb9..50d6ae6 100644
---- a/drivers/usb/dwc3/dwc3-st.c
-+++ b/drivers/usb/dwc3/dwc3-st.c
-@@ -129,12 +129,18 @@ static int st_dwc3_drd_init(struct st_dwc3 *dwc3_data)
- 	switch (dwc3_data->dr_mode) {
- 	case USB_DR_MODE_PERIPHERAL:
- 
--		val &= ~(USB3_FORCE_VBUSVALID | USB3_DELAY_VBUSVALID
-+		val &= ~(USB3_DELAY_VBUSVALID
- 			| USB3_SEL_FORCE_OPMODE | USB3_FORCE_OPMODE(0x3)
- 			| USB3_SEL_FORCE_DPPULLDOWN2 | USB3_FORCE_DPPULLDOWN2
- 			| USB3_SEL_FORCE_DMPULLDOWN2 | USB3_FORCE_DMPULLDOWN2);
- 
--		val |= USB3_DEVICE_NOT_HOST;
-+		/*
-+		 * USB3_PORT2_FORCE_VBUSVALID When '1' and when
-+		 * USB3_PORT2_DEVICE_NOT_HOST = 1, forces VBUSVLDEXT2 input
-+		 * of the pico PHY to 1.
-+		 */
-+
-+		val |= USB3_DEVICE_NOT_HOST | USB3_FORCE_VBUSVALID;
- 		break;
- 
- 	case USB_DR_MODE_HOST:
--- 
-1.9.1
+-Doug
