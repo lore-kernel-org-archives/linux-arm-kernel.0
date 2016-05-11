@@ -1,121 +1,129 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 10 May 2016 22:24:06 -0500
-Subject: [PATCH v2 5/5] vf610-soc: Add Vybrid SoC device tree binding
- documentation
-In-Reply-To: <cab9edb2184ec13341a1dae1de9c7ebc@agner.ch>
-References: <cover.1462171989.git.maitysanchayan@gmail.com>
- <65f3a7bd7a9faf1b390644d7c599c69683c753c4.1462171990.git.maitysanchayan@gmail.com>
- <20160504023026.GB5382@rob-hp-laptop>
- <20160505082758.GB18151@Sanchayan-Arch.localdomain>
- <CAL_JsqL1qQu_u=6xosP8UmR3oXLawbVz=Hap0wDm7aN4mjK2GA@mail.gmail.com>
- <4ca82be6c1d434c612868b441e9f6e1f@agner.ch>
- <CAL_JsqL7sjdONYad6sXM1KXFCjooANuN7WYg-paV9LnKnuMTnA@mail.gmail.com>
- <cab9edb2184ec13341a1dae1de9c7ebc@agner.ch>
-Message-ID: <CAL_JsqLpdu1jpSkU5G0An4_7N3f-DOAF34zSmx2DmB_X7KTMUg@mail.gmail.com>
+From: oss@buserror.net (Scott Wood)
+Date: Tue, 10 May 2016 22:26:26 -0500
+Subject: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for
+ T4240-R1.0-R2.0
+In-Reply-To: <5159406.HOFrj7pRfW@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <4448030.Zs8fVnr3nm@wuerfel>
+ <HE1PR04MB0889B52134A43C0E7A452B7BF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <5159406.HOFrj7pRfW@wuerfel>
+Message-ID: <1462937186.16584.77.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 9, 2016 at 8:13 PM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2016-05-09 15:58, Rob Herring wrote:
->> On Mon, May 9, 2016 at 1:25 PM, Stefan Agner <stefan@agner.ch> wrote:
->>> On 2016-05-09 10:14, Rob Herring wrote:
->>>> On Thu, May 5, 2016 at 3:27 AM,  <maitysanchayan@gmail.com> wrote:
->>>>> Hello Rob,
->>>>>
->>>>> On 16-05-03 21:30:26, Rob Herring wrote:
->>>>>> On Mon, May 02, 2016 at 12:35:04PM +0530, Sanchayan Maity wrote:
->>>>>> > Add device tree binding documentation for Vybrid SoC.
+On Thu, 2016-05-05 at 13:10 +0200, Arnd Bergmann wrote:
+> On Thursday 05 May 2016 09:41:32 Yangbo Lu wrote:
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: Thursday, May 05, 2016 4:32 PM
+> > > To: linuxppc-dev at lists.ozlabs.org
+> > > Cc: Yangbo Lu; linux-mmc at vger.kernel.org; devicetree at vger.kernel.org;
+> > > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > > linux-clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> > > foundation.org; netdev at vger.kernel.org; Mark Rutland;
+> > > ulf.hansson at linaro.org; Russell King; Bhupesh Sharma; Joerg Roedel;
+> > > Santosh Shilimkar; Yang-Leo Li; Scott Wood; Rob Herring; Claudiu Manoil;
+> > > Kumar Gala; Xiaobo Xie; Qiang Zhao
+> > > Subject: Re: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-
+> > > R1.0-R2.0
+> > > 
+> > > On Thursday 05 May 2016 11:12:30 Yangbo Lu wrote:
+> > > > IIRC, it is the same IP block as i.MX and Arnd's point is this won't
+> > > > even compile on !PPC. It is things like this that prevent sharing the
+> > > > driver.
+> > 
+> > The whole point of using the MMIO SVR instead of the PPC SPR is so that
+> > it will work on ARM...  The guts driver should build on any platform as
+> > long as OF is enabled, and if it doesn't find a node to bind to it will
+> > return 0 for SVR, and the eSDHC driver will continue (after printing an
+> > error that should be removed) without the ability to test for errata
+> > based on SVR.
+> 
+> It feels like a bad design to have to come up with a different
+> method for each SoC type here when they all do the same thing
+> and want to identify some variant of the chip to do device
+> specific quirks.
+> 
+> As far as I'm concerned, every driver in drivers/soc that needs to
+> export a symbol to be used by a device driver is an indication that
+> we don't have the right set of abstractions yet. There are cases
+> that are not worth abstracting because the functionality is rather
+> obscure and only a couple of drivers for one particular chip
+> ever need it.
+> 
+> Finding out the version of the SoC does not look like this case.
 
-[...]
+I'm open to new ways of abstracting this, but can that please be discussed
+after these patches are merged?  This patchset is fixing a problem, the
+existing abstraction is unappealing and not widely adopted, a new abstraction
+is not ready, and we're only touching code for our hardware.
 
->>>>> Basically being a standalone platform driver, there was need of a compatible
->>>>> property to bind on. Introducing a separate device tree node for it's sake
->>>>> didn't seem appropriate so the alteration to SoC node's compatible.
->>>>
->>>> Ah, so you are designing a node around the needs of a Linux specific
->>>> driver. Don't do that. DT describes the h/w and this node is not a h/w
->>>> block.
->>>>
->>>> Create a platform device based on a matching SOC compatible string
->>>> instead and make your driver find the information it needs directly
->>>> from the relevant nodes like the ROM node.
->>>
->>> That reads like my words a year ago:
->>> https://lkml.org/lkml/2015/5/22/408
->>>
->>> Initially pretty much everything was hard-coded in the driver.
->>>
->>> Arnd then pushed to use more descriptive in the device tree.
->>>
->>> Of course, we should not end up making up relations which are not there
->>> in hardware. We need to find the right balance.
->>>
->>> Here is my suggestion:
->>> 1. Add "fsl,vf610-soc-bus" as compatible string to the soc node, use it
->>> to bind the "soc bus driver" as a platform driver located in driver/soc/
->>
->> I'm not convinced this is a h/w block. This keeps coming up and I
->> think this is a kernel problem, not a DT problem. Let's face it that
->> there are drivers at the SOC level which don't fit into a DT node.
->> They may be the exception, but they are a common exception. My
->> proposal for how to deal with these cases is here[1].
->
-> Probably "fsl,vf610-soc" would be better than "fsl,vf610-soc-bus".
+Oh, and the existing abstraction isn't even "existing".  I don't see any
+examples where soc_device is being used like this -- or even any way for a
+driver (the one consuming the information, not the soc "driver") to get a
+reference to the soc_device that's been registered short of searching for the
+device object by name -- and you're asking for new functionality in
+drivers/base/soc.c.
 
-But the node in question is just the bus part of the SoC. Things like
-cpus are not included.
+> > > I think the first four patches take care of building for ARM,
+> > > but the problem remains if you want to enable COMPILE_TEST as
+> > > we need for certain automated checking.
+> > 
+> > What specific problem is there with COMPILE_TEST?
+> 
+> COMPILE_TEST is solvable here and the way it is implemented in this
+> case (selecting FSL_GUTS from the driver) indeed looks like it works
+> correctly, but it's still awkward that this means building the
+> SoC specific ID stuff into the vmlinux binary for any driver that
+> uses something like that for a particular SoC.
 
-> But the SoC is definitely a h/w block! Despite all the individual
-> silicon in there, I can even touch the SoC ;-)
+Please keep in mind that this is a Freescale-specific driver... it's not as if
+we're attaching this dependency to common SDHCI code.
 
-Can't argue with that...
+> 
+> > > > Dealing with Si revs is a common problem. We should have a
+> > > > common solution. There is soc_device for this purpose.
+> > > 
+> > > Exactly. The last time this came up, I think we agreed to implement a
+> > > helper using glob_match() on the soc_device strings. Unfortunately
+> > > this hasn't happened then, but I'd still prefer that over yet another
+> > > vendor-specific way of dealing with the generic issue.
+> > 
+> > soc_device would require encoding the SVR as a string and then decoding
+> > the string, which is more complicated and error prone than having
+> > platform-specific code test a platform-specific number. 
+> 
+> You already need to encode it as a string to register the soc_device,
 
-> But yeah, I understand what you are saying... We model it as a
-> container, and do not attribute any specific thing directly to it. But
-> aren't there other containers where we bind to? Is it wrong to bind a
-> driver to a container, if that driver implements issues concerning that
-> level..?
+No we don't, because we don't already register a soc_device on arm64 or ppc
+(and it looks like whatever does get registered on at least some relevant
+arm32 chips is not particularly useful).
 
-It is supposed to be a bus, not just a container. However, we probably
-don't generally fully and accurately model the buses in SoCs so DT
-ends up being just a container frequently. If the bus is more than
-simple-bus, then it should have some resource that needs to be
-controlled to enable the bus.
+> and the driver just needs to pass a glob string, so the only part that
+> is missing is the generic function that takes the string from the
+> driver and passes that to glob_match for the soc_device.
 
->
-> The two drivers under drivers/soc/ which implement the SoC bus API and
-> both use a compatible string on a container level (e.g.
-> arm,realview-pb11mp-soc in arch/arm/boot/dts/arm-realview-pb11mp.dts).
+"just"
 
-I'm not sure Realview and Integrator are models to follow. They are a
-bit unique in their h/w design.
+And what would the glob look like?
 
->
->>
->> I also think drivers/soc is a mess because it is randomly used or not.
->> IMO, using it should not be at the whim of whomever does SOC support.
->
-> Are you talking about random drivers under drivers/soc/ or the ones
-> which implement the SoC bus API? I think that is not the same...
+I'd rather not write kernel code as if it were a shell/Perl script.
 
-The SoC bus API.
+> > And when would it get registered on arm64, which doesn't have
+> > platform code?
+> 
+> Whenever the soc driver is loaded, as is the case now. The match
+> function can return -EPROBE_DEFER if no SoC device is registered
+> yet.
 
-> If SoC bus, agreed, it is a mess. Not only its adoption is sparse, the
-> specification is also interpreted differently across different SoC's,
-> which I brought up in the past:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333765.html
->
-> But it exports really useful information to user space, and that has
-> real value in practice.
+That's too late for some places where we need access to SVR, e.g. clock
+drivers (which use CLK_OF_DECLARE and are initialized very early, not as part
+of the driver model and thus can't defer).  Currently we have an #ifdef
+CONFIG_PPC for this in drivers/clk/clk-qoriq.c... Maybe we should have done
+that here as well, and saved some grief. :-)  At least until an erratum pops
+up on an ARM-based chip.
 
-Yes, but the information exported has nothing really to do with a bus.
-The "bus" part of it is more sub-classing platform_bus_type for all
-platform devices on an SOC. That container may or may not directly
-correspond to the bus structure of the SOC as defined in DT. I guess
-it is the mixing of really 2 independent things that I don't like and
-has made its use sparse. We should perhaps mandate using the bus (for
-what I described) and make the information part separate and be able
-to populate it from any driver (e.g. an SoC syscon driver which reads
-the SOC revision).
+And what happens if we're running on arm32, and thus the arch code already
+registered an soc_device with a different (and less useful) encoding?
 
-Rob
+-Scott
