@@ -1,26 +1,97 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Wed, 11 May 2016 12:06:01 +0200
-Subject: [patch V4 02/31] bitops: Include generic parity.h in some
- architectures' bitops.h
-In-Reply-To: <1462957641-24241-1-git-send-email-zengzhaoxiu@163.com>
-References: <1462955158-28394-1-git-send-email-zengzhaoxiu@163.com>
- <1462957641-24241-1-git-send-email-zengzhaoxiu@163.com>
-Message-ID: <20160511100601.GY24250@axis.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 11 May 2016 11:11:01 +0100
+Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
+In-Reply-To: <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-8-git-send-email-tn@semihalf.com>
+ <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
+Message-ID: <20160511101101.GA16101@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 05:06:17PM +0800, zengzhaoxiu at 163.com wrote:
-> From: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
+On Tue, May 10, 2016 at 08:37:00PM +0200, Rafael J. Wysocki wrote:
+> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> > This patch provides a way to set the ACPI companion in PCI code.
+> > We define acpi_pci_set_companion() to set the ACPI companion pointer and
+> > call it from PCI core code. The function is stub for now.
+> >
+> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> > ---
+> >  drivers/pci/probe.c      | 2 ++
+> >  include/linux/pci-acpi.h | 4 ++++
+> >  2 files changed, 6 insertions(+)
+> >
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index 8004f67..fb0b752 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -12,6 +12,7 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/module.h>
+> >  #include <linux/cpumask.h>
+> > +#include <linux/pci-acpi.h>
+> >  #include <linux/pci-aspm.h>
+> >  #include <linux/aer.h>
+> >  #include <linux/acpi.h>
+> > @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> >         bridge->dev.parent = parent;
+> >         bridge->dev.release = pci_release_host_bridge_dev;
+> >         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+> > +       acpi_pci_set_companion(bridge);
 > 
-> Simply use the generic version.
+> Yes, we'll probably add something similar here.
 > 
-> Signed-off-by: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
-> Acked-by: Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> [for avr32]
+> Do I think now is the right time to do that?  No.
+> 
+> >         error = pcibios_root_bridge_prepare(bridge);
+> >         if (error) {
+> >                 kfree(bridge);
+> > diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> > index 09f9f02..1baa515 100644
+> > --- a/include/linux/pci-acpi.h
+> > +++ b/include/linux/pci-acpi.h
+> > @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+> >  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+> >  #endif /* CONFIG_ACPI */
+> >
+> > +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
+> > +{
+> > +}
+> > +
+> >  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
+> >  {
+> >         return 0;
+> > --
+> 
+> Honestly, to me it looks like this series is trying very hard to avoid
+> doing any PCI host bridge configuration stuff from arch/arm64/
+> although (a) that might be simpler and (b) it would allow us to
+> identify the code that's common between *all* architectures using ACPI
+> support for host bridge configuration and to move *that* to a common
+> place later.  As done here it seems to be following the "ARM64 is
+> generic and the rest of the world is special" line which isn't really
+> helpful.
 
-For the CRIS part:
+I think patch [1-2] should be merged regardless (they may require minor
+tweaks if we decide to move pci_acpi_scan_root() to arch/arm64 though,
+for include files location). I guess you are referring to patch 8 in
+your comments above, which boils down to deciding whether:
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+- pci_acpi_scan_root() (and unfortunately all the MCFG/ECAM handling that
+  goes with it) should live in arch/arm64 or drivers/acpi
 
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+acpi_pci_bus_domain_nr() is a bit more problematic since it is meant
+to be called from PCI core code (ARM64 selects PCI_DOMAINS_GENERIC for
+DT and same kernel has to work with OF and ACPI selected) and it is
+arch specific (because what we have in bus->sysdata is arch specific,
+waiting for the domain number to be embedded in struct pci_host_bridge).
+
+Your point is fair, I am not sure that moving the pci_acpi_scan_root()
+to arch/arm64 would make things much simpler though, it is just a matter
+of deciding where that code has to live.
+
+How do you want us to proceed ?
+
+Thanks,
+Lorenzo
