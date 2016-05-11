@@ -1,119 +1,167 @@
-From: matija.glavinic-pecotic.ext@nokia.com (Matija Glavinic Pecotic)
-Date: Wed, 11 May 2016 22:33:51 +0200
-Subject: [PATCH] [ARM] Fix A15 798181 errata initialization
-Message-ID: <5733972F.9040502@nokia.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 11 May 2016 13:34:44 -0700
+Subject: [Patch v4 5/8] firmware: qcom: scm: Convert to streaming DMA APIS
+In-Reply-To: <1462976158-26016-6-git-send-email-andy.gross@linaro.org>
+References: <1462976158-26016-1-git-send-email-andy.gross@linaro.org>
+ <1462976158-26016-6-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160511203444.GX1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current errata initialization doesn't take properly revision and REVIDR
-into account. Depending on the core revision, revidr bits should not be
-taken into account. Errata misleadingly declares r3p3 to be error-free,
-but this is not the case. Include rp3p3 in errata initialization.
+On Wed 11 May 07:15 PDT 2016, Andy Gross wrote:
 
-Here are possible fixes defined in revidr register for r2 and r3 [1,2]:
+> This patch converts the Qualcomm SCM driver to use the streaming DMA APIs
+> for communication buffers.
+> 
 
-r0p0-r2p1: No fixes applied
+Some style issues in qcom_scm_call(), but functionality wise I think
+this looks good (with the open question on packing of rsp and rps->buf).
 
-r2p2,r2p3:
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>  drivers/firmware/qcom_scm-32.c | 152 +++++++++++++----------------------------
+>  drivers/firmware/qcom_scm.c    |   6 +-
+>  drivers/firmware/qcom_scm.h    |  10 +--
+>  3 files changed, 58 insertions(+), 110 deletions(-)
+> 
+> diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
+[..]
+>  /**
+>   * qcom_scm_call() - Send an SCM command
+> - * @svc_id: service identifier
+> - * @cmd_id: command identifier
+> - * @cmd_buf: command buffer
+> - * @cmd_len: length of the command buffer
+> - * @resp_buf: response buffer
+> - * @resp_len: length of the response buffer
+> + * @dev:	struct device
+> + * @svc_id:	service identifier
+> + * @cmd_id:	command identifier
+> + * @cmd_buf:	command buffer
+> + * @cmd_len:	length of the command buffer
+> + * @resp_buf:	response buffer
+> + * @resp_len:	length of the response buffer
 
-REVIDR[4]: 798181 Moving a virtual page that is being accessed by
-	   an active process can lead to unexpected behavior
-REVIDR[9]: Not defined
+Leaving the indentation alone clarifies that your changes is just the
+addition of "dev".
 
-r2p4,r3p0,r3p1,r3p2:
+>   *
+>   * Sends a command to the SCM and waits for the command to finish processing.
+>   *
+> @@ -247,42 +172,60 @@ static void qcom_scm_inv_range(unsigned long start, unsigned long end)
+>   * and response buffers is taken care of by qcom_scm_call; however, callers are
+>   * responsible for any other cached buffers passed over to the secure world.
+>   */
+> -static int qcom_scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf,
+> -			size_t cmd_len, void *resp_buf, size_t resp_len)
+> +static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
+> +			 const void *cmd_buf, size_t cmd_len, void *resp_buf,
+> +			 size_t resp_len)
+>  {
+>  	int ret;
+>  	struct qcom_scm_command *cmd;
+>  	struct qcom_scm_response *rsp;
+> -	unsigned long start, end;
+> +	size_t alloc_len = sizeof(*cmd) + sizeof(struct qcom_scm_response) +
+> +			   cmd_len + resp_len;
 
-REVIDR[4]: 798181 Moving a virtual page that is being accessed by
-	   an active process can lead to unexpected behavior
-REVIDR[9]: 798181 Moving a virtual page that is being accessed by
-	   an active process can lead to unexpected behavior
-	   - This is an update to a previously released ECO.
+This would be cleaner if written:
 
-r3p3:
+size_t alloc_len = sizeof(*cmd) + cmd_len + sizeof(*rsp) + resp_len;
 
-REVIDR[4]: Reserved
-REVIDR[9]: 798181 Moving a virtual page that is being accessed by
-	   an active process can lead to unexpected behavior
-	   - This is an update to a previously released ECO.
+> +	dma_addr_t cmd_phys;
+> +	u32 offset;
+>  
+> -	cmd = alloc_qcom_scm_command(cmd_len, resp_len);
+> +	cmd = kzalloc(PAGE_ALIGN(alloc_len), GFP_KERNEL);
+>  	if (!cmd)
+>  		return -ENOMEM;
+>  
+> +	cmd->len = cpu_to_le32(alloc_len);
+> +	offset = offsetof(struct qcom_scm_command, buf);
+> +	cmd->buf_offset = cpu_to_le32(offset);
 
-And here is proposed handling from the same documents [1,2]:
+Sure this is the offset of the buf in *cmd, but based on the rest of my
+comments below I would have dropped the offset variable and just used
+sizeof(*cmd).
 
-* In r3p2 and earlier versions with REVIDR[4]= 0,the full workaround is
-  required.
-* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=0, only the
-  portion of the workaround up to the end of step 6 is required.
-* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=1, no
-  workaround is required.
-* In r3p3, if REVIDR[9]=0, only the portion of the workaround up
-  to the end of step 6 is required.
-* In r3p3, if REVIDR[9]=1, no workaround is required.
+> +	cmd->resp_hdr_offset = cpu_to_le32(offset + cmd_len);
 
-These imply following:
+But this would be more intuitive as sizeof(*cmd) + cmd_len;
 
-REVIDR[9] set -> No WA
-REVIDR[4] set, REVIDR[9] cleared -> Partial WA
-Both cleared -> Full WA
+> +
+>  	cmd->id = cpu_to_le32((svc_id << 10) | cmd_id);
+>  	if (cmd_buf)
+>  		memcpy(qcom_scm_get_command_buffer(cmd), cmd_buf, cmd_len);
 
-Where certain bits should and should not be taken into account
-depending on whether they are defined for the revision.
+Somewhat unrelated, but we should probably just inline this helper in
+favour of writing "cmd->buf".
 
-Although not explicitly mentioned in the errata note, REVIDR[9] set,
-with REVIDR[4] cleared is valid combination which requires no WA. This
-is confirmed by ARM support and errata will be updated.
+>  
+> +	cmd_phys = dma_map_single(dev, cmd, alloc_len, DMA_TO_DEVICE);
 
-[1] ARM CortexTM-A15 MPCore - NEON
-    Product revision r3
-    Software Developers Errata Notice
-    ARM-EPM-028093 v20.0 Released
+Unless there's a guarantee that the resp buffer is packed onto the
+response we should probably map the entire page(s).
 
-[2] ARM CortexTM-A15 MPCore - NEON
-    Product Revision r2
-    Software Developers Errata Notice
-    ARM-EPM-028090 v19.3 Released
+> +	if (dma_mapping_error(dev, cmd_phys)) {
+> +		kfree(cmd);
+> +		return -ENOMEM;
+> +	}
+> +
+>  	mutex_lock(&qcom_scm_lock);
+> -	ret = __qcom_scm_call(cmd);
+> +	ret = smc(cmd_phys);
+> +	if (ret < 0)
+> +		ret = qcom_scm_remap_error(ret);
+>  	mutex_unlock(&qcom_scm_lock);
+>  	if (ret)
+>  		goto out;
+>  
+>  	rsp = qcom_scm_command_to_response(cmd);
+> -	start = (unsigned long)rsp;
+>  
+>  	do {
+> -		qcom_scm_inv_range(start, start + sizeof(*rsp));
+> +		dma_sync_single_for_cpu(dev, cmd_phys + cmd_len + offset,
 
-Signed-off-by: Matija Glavinic Pecotic <matija.glavinic-pecotic.ext@nokia.com>
-Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
----
- arch/arm/kernel/smp_tlb.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+Same here, would be easier to read if it was
+  cmd_phys + sizeof(*cmd) + cmd_len;
 
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index 2e72be4..b624758 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -93,17 +93,30 @@ void erratum_a15_798181_init(void)
- 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
- 
- 	/* Brahma-B15 r0p0..r0p2 affected
--	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
--	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)
-+	 * Cortex-A15 r0p0..r3p3 w/o ECO fix affected
-+	 */
-+	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2) {
- 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
--	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
--		 (revidr & 0x210) != 0x210) {
-+	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f2) {
-+		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
-+	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f4) {
- 		if (revidr & 0x10)
- 			erratum_a15_798181_handler =
- 				erratum_a15_798181_partial;
- 		else
- 			erratum_a15_798181_handler =
- 				erratum_a15_798181_broadcast;
-+	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x413fc0f3) {
-+		if ((revidr & 0x210) == 0)
-+			erratum_a15_798181_handler =
-+				erratum_a15_798181_broadcast;
-+		else if (revidr & 0x10)
-+			erratum_a15_798181_handler =
-+				erratum_a15_798181_partial;
-+	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x414fc0f0) {
-+		if ((revidr & 0x200) == 0)
-+			erratum_a15_798181_handler =
-+				erratum_a15_798181_partial;
- 	}
- }
- #endif
--- 
-2.1.4
+Or even:
+  cmd_phys + le32_to_cpu(cmd->resp_hdr_offset);
+
+> +					sizeof(*rsp), DMA_FROM_DEVICE);
+>  	} while (!rsp->is_complete);
+>  
+> -	end = (unsigned long)qcom_scm_get_response_buffer(rsp) + resp_len;
+> -	qcom_scm_inv_range(start, end);
+> -
+> -	if (resp_buf)
+> +	if (resp_buf) {
+> +		dma_sync_single_for_cpu(dev, cmd_phys + alloc_len - resp_len,
+
+Do we know that the firmware always set
+  rsp->buf_offset = sizeof(*rsp)
+
+Would be clearer (and safe from this assumption) if you have it as:
+  cmd_phys + le32_to_cpu(cmd->resp_hdr_offset) + le32_to_cpu(rsp->buf_offset);
+
+> +					resp_len, DMA_FROM_DEVICE);
+>  		memcpy(resp_buf, qcom_scm_get_response_buffer(rsp), resp_len);
+
+And as we just calculated that offset, we can drop the
+qcom_scm_get_response_buffer() single use helper.
+
+> +	}
+>  out:
+> -	free_qcom_scm_command(cmd);
+> +	dma_unmap_single(dev, cmd_phys, alloc_len, DMA_TO_DEVICE);
+> +	kfree(cmd);
+>  	return ret;
+>  }
+>  
+
+The rest looks good.
+
+Regards,
+Bjorn
