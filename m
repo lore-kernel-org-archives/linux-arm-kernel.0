@@ -1,59 +1,102 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2016 10:32:55 +0100
-Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
-In-Reply-To: <20160511091338.GC10825@dhcp-128-65.nay.redhat.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
- <20160511085203.GN19428@n2100.arm.linux.org.uk>
- <20160511091338.GC10825@dhcp-128-65.nay.redhat.com>
-Message-ID: <20160511093255.GO19428@n2100.arm.linux.org.uk>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Wed, 11 May 2016 11:34:33 +0200
+Subject: [PATCH v9 0/2] gpio: add DT support for memory-mapped GPIOs
+Message-ID: <cover.1462911225.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 05:13:38PM +0800, Dave Young wrote:
-> On 05/11/16 at 09:52am, Russell King - ARM Linux wrote:
-> > I think you're confusing things.  DT doesn't contain the boot alias
-> > memory ranges - it's not a separate chunk of memory.  It's an alias
-> > of the same physical address space found higher in the physical
-> > address range.
-> 
-> Hmm, if we forget about kexec how does the 1st kernel get boot memory?
-> not from DT?
+This patch series adds device tree support for generic memory-mapped GPIOs.
+The GPIO library already allows drivers and architecture support code to
+reuse generic code for managing a GPIO chip. Currently, a developer has
+to create a platform device "basic-mmio-gpio" and attach a bgpio_pdata
+platform data structure to make use of it. However, for architectures
+which rely on the device tree to enumerate devices, creating custom
+platform devices is another extra step that can be avoided by having
+direct support via a device tree binding.
 
-Just like any other ARM system, it pulls itself up by its shoe laces.
+I initially came across this patch [0] from ?lvaro Fern?ndez Rojas,
+while looking for an easy way to add support for the GPIO of my
+WD MyBook Live [1] (APM82181). His generic approach patch allowed
+me to easily get the GPIO (and the connected LEDs, buttons, gpiohogs)
+up and running. Even thought, Mr. Fernandez initially developed it
+for his work on the brcm63xx [2].
 
-The kernel assumes that it has been placed into RAM with at least 32KiB
-of writable memory below it, which it uses for the initial page tables.
-It "guesses" that the executing address, rounded down to I-forget-what-
-boundary gives the base address of physical memory.
+The third patch (which can be applied at a later time) moves gpio-clps711x,
+gpio-ge, gpio-moxart and gpio-ts4800 into gpio-mmio.c. The old driver files
+and makefile entries have been removed. The Kconfig entries for these
+drivers are kept for compatibility reasons.
 
-It sets the page table up using that assumption.  The kernel gets going
-with C code, and only _then_ parses the DTB.
+And finally, the most important stat about the series:
+	>>> 328 insertions(+), 380 deletions(-) <<<
+	It still removes more lines than it adds!
+	(This also includes the dt binding)
 
-If we then find that we're running on TI Keystone 2, part of the early
-platform initialisation specifies to the ARM core code that the kernel
-is to switch a high physical address space > 4GiB, and this provokes
-a "dance" where we tear the MMU back down, run some more assembly code
-to fix up the page tables, and re-initialise the MMU before returning
-to the kernel C code, this time running in the high physical address
-space.  This break-modify-make is an architecture requirement.  We
-also record the physical address delta between the original physical
-address space and the high physical address space so that we can reverse
-the translation for code which needs identity mapping (eg, SMP bringup.)
+Thanks!
 
-The DTB only contains the high physical address space memory information,
-and the kernel now parses the DTB, and sets the page tables up properly
-for the running system.
+[0] <https://patchwork.ozlabs.org/patch/422121/>
+[1] <https://github.com/chunkeey/MBL-openwrt>
+[2] <https://wiki.openwrt.org/doc/hardware/soc/soc.broadcom.bcm63xx>
 
-> > If we put it in DT, then we need a way to also describe that it is an
-> > alias of some other bit of physical memory.
-> 
-> I may missed the background, I just want kexec to get infomation just like
-> the normal kernel.
+changelog:
 
-See above.  What you're asking for isn't really possible.
+v8 -> v9:
+	- made dt match table grep-able
+	- reorganized bgpio_dt_parse
+	- dropped already applied patch (dt binding) from the series
+
+v7 -> v8:
+	- removed ngpio property parser and most flags parsers
+	- converted clps711x to switch case for GPIO
+	- retained original Kconfig syms which now select GPIO_GENERIC_PLATFORM
+
+v6 -> v7:
+	- finally made a PATCH series (based on linux-gpio devel branch)
+	- added Rob Herring's ACK to the dt bindings
+	- cc'd clps711x, gpio-ge, moxart and ts4800 authors for driver
+	  changes.
+
+v5 -> v6:
+	- rewrote bindings and driver patch to fit the wd,mbl-gpio
+	- unified parser code for gpio-ge, gpio-moxart and gpio-ts4800
+	- fixed gpio chip's base being overwritten with bogus "0"
+	- fixed compat driver crash when reload gpio-generic.ko module
+	- dropped already applied patches from the series
+	- rebased code on linus' devel tree
+	- moved dt bindings patch to the top of the series
+
+v4 -> v5:
+	- reverted rename of gpio-mmio.c back to gpio-generic.c
+	- fixed Andy Shevchenko's comments
+	- consolidated changes from clps711x, gpio-ge, gpio-moxart and
+	  gpio-ts4800 into one patch.
+
+v3 -> v4:
+	- renamed gpio-generic.c to gpio-mmio.c
+	- changed compat. string to "linux,gpio-mmio"
+	- integrated Cirrus clps711x driver
+	- integrated GE FGPA gpio-ge driver
+	- integrated MOXA ART GPIO driver
+	- integrated TS4800 gpio driver
+	- reshuffled patches, reworded commits, fixed spelling errors, etc.
+
+Christian Lamparter (1):
+  gpio: move clps711x, moxart, ts4800 and gpio-ge into gpio-mmio
+
+?lvaro Fern?ndez Rojas (1):
+  gpio: mmio: add DT support for memory-mapped GPIOs
+
+ drivers/gpio/Kconfig         |  16 ++-
+ drivers/gpio/Makefile        |   4 -
+ drivers/gpio/gpio-clps711x.c |  91 --------------
+ drivers/gpio/gpio-ge.c       | 114 ------------------
+ drivers/gpio/gpio-mmio.c     | 280 ++++++++++++++++++++++++++++++++++++++++++-
+ drivers/gpio/gpio-moxart.c   |  84 -------------
+ drivers/gpio/gpio-ts4800.c   |  81 -------------
+ 7 files changed, 290 insertions(+), 380 deletions(-)
+ delete mode 100644 drivers/gpio/gpio-clps711x.c
+ delete mode 100644 drivers/gpio/gpio-ge.c
+ delete mode 100644 drivers/gpio/gpio-moxart.c
+ delete mode 100644 drivers/gpio/gpio-ts4800.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.8.1
