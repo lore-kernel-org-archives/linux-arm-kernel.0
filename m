@@ -1,67 +1,41 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed, 11 May 2016 03:33:14 +0800
-Subject: [PATCH v8 8/8] i2c: rk3x: support fast-mode plus for rk3399
-In-Reply-To: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1462908794-27333-1-git-send-email-david.wu@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 11 May 2016 13:23:12 +0800
+Subject: [PATCH 0/2] ARM: dts: sun6i: Drop constraints on dc1sw regulator
+Message-ID: <1462944194-6920-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
-Change in v8:
-- None
+Hi Arnd, Olof,
 
- drivers/i2c/busses/i2c-rk3x.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+Here are 2 last minute fixes for 4.6. The 2 patches drop constaints on
+the dc1sw regulator for 2 A31s tablets. I checked with Maxime and he said
+to send them directly to you.
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 25ed1ad..0ba25ee 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -126,6 +126,17 @@ static const struct i2c_spec_values fast_mode_spec = {
- 	.min_hold_buffer_ns = 1300,
- };
- 
-+static const struct i2c_spec_values fast_mode_plus_spec = {
-+	.min_hold_start_ns = 260,
-+	.min_low_ns = 500,
-+	.min_high_ns = 260,
-+	.min_setup_start_ns = 260,
-+	.max_data_hold_ns = 400,
-+	.min_data_setup_ns = 50,
-+	.min_setup_stop_ns = 260,
-+	.min_hold_buffer_ns = 500,
-+};
-+
- /**
-  * struct rk3x_i2c_calced_timings:
-  * @div_low: Divider output for low
-@@ -531,8 +542,10 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
- {
- 	if (speed <= 100000)
- 		return &standard_mode_spec;
--	else
-+	else if (speed <= 400000)
- 		return &fast_mode_spec;
-+	else
-+		return &fast_mode_plus_spec;
- }
- 
- /**
-@@ -743,9 +756,9 @@ static int rk3x_i2c_v1_calc_timings(unsigned long clk_rate,
- 	const struct i2c_spec_values *spec;
- 	int ret = 0;
- 
--	/* Support standard-mode and fast-mode */
--	if (WARN_ON(t->bus_freq_hz > 400000))
--		t->bus_freq_hz = 400000;
-+	/* Support standard-mode, fast-mode and fast-mode plus */
-+	if (WARN_ON(t->bus_freq_hz > 1000000))
-+		t->bus_freq_hz = 1000000;
- 
- 	/* prevent scl_rate_khz from becoming 0 */
- 	if (WARN_ON(t->bus_freq_hz < 1000))
+The issue was first brought up and fixed for A23/A33 Q8 tablets in commit
+dcf5341f0150 ("ARM: dts: sun8i-q8-common: Do not set constraints on dc1sw
+regulator"). It was brought up again yesterday on IRC, and I realized that
+2 sun6i A31s tablet DTS files also had this setting. The setting causes
+PMIC regulator registration to fail, and since among other things, mmc
+depends on the regulators, the system will likely hang.
+
+There seems to be a fix for this queued up for 4.7: commit 45389c47526d
+("regulator: core: Add early supply resolution for regulators") in the
+regulator "supply" topic branch. So we should be able to revert these
+fixes in 4.7.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sun6i: primo81: Drop constraints on dc1sw regulator
+  ARM: dts: sun6i: yones-toptech-bs1078-v2: Drop constraints on dc1sw
+    regulator
+
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts                 | 2 --
+ arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts | 2 --
+ 2 files changed, 4 deletions(-)
+
 -- 
-1.9.1
+2.8.1
