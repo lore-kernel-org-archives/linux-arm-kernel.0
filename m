@@ -1,74 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 11 May 2016 17:14:07 +0200
-Subject: [PATCH] ARM: dts: at91: sam9x5: Fix the memory range assigned to
- the PMC
-In-Reply-To: <5733056C.9000100@atmel.com>
-References: <1462957202-22671-1-git-send-email-boris.brezillon@free-electrons.com>
- <5733056C.9000100@atmel.com>
-Message-ID: <57334C3F.5010605@atmel.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 11 May 2016 17:23:30 +0200
+Subject: [PULL 00/29] KVM/ARM Changes for v4.7
+In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
+References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <57334E72.9010109@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/05/2016 12:11, Nicolas Ferre a ?crit :
-> Le 11/05/2016 11:00, Boris Brezillon a ?crit :
->> The memory range assigned to the PMC (Power Management Controller) was
->> not including the PMC_PCR register which are used to control peripheral
->> clocks.
->>
->> This was working fine thanks to the page granularity of ioremap(), but
->> started to fail when we switched to syscon/regmap, because regmap is
->> making sure that all accesses are falling into the reserved range.
->>
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> Reported-by: Richard Genoud <richard.genoud@gmail.com>
->> Tested-by: Richard Genoud <richard.genoud@gmail.com>
->> Fixes: 863a81c3be1d ("clk: at91: make use of syscon to share PMC registers in several drivers")
->> Cc: <stable@vger.kernel.org>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Thanks Boris!
-> 
-> 
->> ---
->> Hi Arnd,
->>
->> This patch is fixing a regression reported by Richard. Since this
->> regression was introduced in 4.6-rc1 it would be great if you could
->> take it before 4.6 is released.
-> 
-> Arnd, arm-soc guys,
-> 
-> I can build a Pull-Request instantly today, if you wish: just tell me if
-> you prefer.
-
-Actually, I've just sent one so that we don't loose time:
-
-"[GIT PULL] at91: fixes for 4.6 #2"
-
-Bye,
-
->> ---
->>  arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index 0827d59..cd0cd5f 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -106,7 +106,7 @@
->>  
->>  			pmc: pmc at fffffc00 {
->>  				compatible = "atmel,at91sam9x5-pmc", "syscon";
->> -				reg = <0xfffffc00 0x100>;
->> +				reg = <0xfffffc00 0x200>;
->>  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
->>  				interrupt-controller;
->>  				#address-cells = <1>;
->>
-> 
-> 
 
 
--- 
-Nicolas Ferre
+On 11/05/2016 15:29, Christoffer Dall wrote:
+> Hi Paolo and Radim,
+> 
+> Here is the initial set of changes for KVM/ARM for v4.7.
+> 
+> Sorry I'm a bit late with these, but we were trying to get the new vgic
+> implementation in as part of this, but I have decided to send this pull
+> request now, and we can follow up with another for the new VGIC,
+> assuming we feel like we have that in place in a few days.
+
+Don't worry, you're not late at all.  I've pulled this to kvm/queue.
+
+> There are a few changes in this pull request touching things outside
+> KVM, but they should all carry the necessary acks and it made the
+> merge process much easier to do it this way.
+
+The following are properly acked:
+
+    arm64: Reuse TCR field definitions for EL1 and EL2
+    arm64: Introduce pmd_thp_or_huge
+
+I wouldn't have minded more explicit Acked-bys for the following:
+
+    irqchip/gic-v2: Gather ACPI specific data in a single structure
+    irqchip/gic-v2: Parse and export virtual GIC information
+    irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
+    irqchip/gic-v3: Gather all ACPI specific data in a single structure
+    irqchip/gic-v3: Parse and export virtual GIC information
+
+I guess it's fine since Marc Zyngier is maintainer for both KVM and
+irqchip, still it's never wrong to get more acks. :)
+
+Thanks,
+
+Paolo
+
+> Hope this works for you guys.
+> 
+> For a description of the content, see below; otherwise:
+> 
+> The following changes since commit 06a71a24bae57a07afee9cda6b00495347d8a448:
+> 
+>   arm64: KVM: unregister notifiers in hyp mode teardown path (2016-04-06 13:47:52 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.7
+> 
+> for you to fetch changes up to 06485053244480f5f403d8f89b8617bd7d549113:
+> 
+>   kvm: arm64: Enable hardware updates of the Access Flag for Stage 2 page tables (2016-05-09 22:23:08 +0200)
