@@ -1,66 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 May 2016 17:59:01 +0100
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <5842999.Zgpfq4gkVz@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <57329320.1000500@huawei.com> <20160511075438.GA15628@yury-N73SV>
- <5842999.Zgpfq4gkVz@wuerfel>
-Message-ID: <20160511165900.GM3051@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 May 2016 18:27:33 +0100
+Subject: Applied "spi: dw-pci: Spelling s/paltforms/platforms/g" to the spi
+ tree
+In-Reply-To: <1462906798-27993-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <E1b0Xv3-0000TA-HX@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 12:55:01PM +0200, Arnd Bergmann wrote:
-> On Wednesday 11 May 2016 11:04:38 Yury Norov wrote:
-> > On Wed, May 11, 2016 at 10:04:16AM +0800, Zhangjian (Bamvor) wrote:
-> > [...]
-> > 
-> > > >>Ok, I will test the ltp syscall test.
-> > > >>With this changes, the issue I mentioned should be fixed. But we still
-> > > >>use mmap2 syscall for ILP32 application when we pass the offset instead
-> > > >>of page offset. Is it correct?
-> > > >
-> > > >I don't remember. It's probably not important whether we have the shift
-> > > >in there, as long as it's independent of the actual kernel page size and
-> > > >user space and kernel agree on the calling conventions.
-> > > Well. I am ok with where to shift the pages size because we get the same
-> > > result. I was just thinking if we should get rid of the name of mmap2 in our
-> > > ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
-> > > if they do not know the implementations.
-> > > 
-> > 
-> > This is what generic unistd.h does. If you want to change it, you'd
-> > change each arch that uses generic unistd.h.
-> 
-> Generic unistd.h has this:
-> 
-> #ifdef __SYSCALL_COMPAT
-> #define __SC_COMP_3264(_nr, _32, _64, _comp) __SYSCALL(_nr, _comp)
-> #else
-> #define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
-> #endif
-> 
-> #define __NR3264_mmap 222
-> __SC_3264(__NR3264_mmap, sys_mmap2, sys_mmap)
-> 
-> 
-> #if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-> #define __NR_mmap __NR3264_mmap
-> #else
-> #define __NR_mmap2 __NR3264_mmap
-> #endif
-> 
-> So by default we get __NR_mmap2 and sys_mmap2 on 32-bit ABIs, but
-> __NR_mmap and sys_mmap on 64-bit ABIs, as it should be.
-> 
-> The problem is that arch/arm64/kernel/sys_ilp32.c now overrides
-> this to use __NR_mmap2 with sys_mmap, so we have a mismatch. I think
-> we should either override both the implementation and the number,
-> or neither of them.
+The patch
 
-I would vote for "neither of them" (so we use __NR_mmap2 and sys_mmap2)
-to keep it close to new 32-bit architectures, even though we would have
-some shifts by 12 in both glibc and kernel.
+   spi: dw-pci: Spelling s/paltforms/platforms/g
 
+has been applied to the spi tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 3208a1ccb23018c650ff9e08c4bd1c8b01f6d8f1 Mon Sep 17 00:00:00 2001
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+Date: Tue, 10 May 2016 20:59:58 +0200
+Subject: [PATCH] spi: dw-pci: Spelling s/paltforms/platforms/g
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-dw-pci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-dw-pci.c b/drivers/spi/spi-dw-pci.c
+index 332ccb0539a7..ef7db75c92c1 100644
+--- a/drivers/spi/spi-dw-pci.c
++++ b/drivers/spi/spi-dw-pci.c
+@@ -67,7 +67,7 @@ static int spi_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	dws->irq = pdev->irq;
+ 
+ 	/*
+-	 * Specific handling for paltforms, like dma setup,
++	 * Specific handling for platforms, like dma setup,
+ 	 * clock rate, FIFO depth.
+ 	 */
+ 	if (desc) {
 -- 
-Catalin
+2.8.1
