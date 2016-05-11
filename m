@@ -1,43 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 11 May 2016 08:38:55 +0100
-Subject: [RFC PATCH 01/21] mfd: uniphier: add UniPhier MFD driver
-In-Reply-To: <CAK7LNATmuN647=avdqAMahLU+9Bq4m4TkXe5f7q=pi8m=UrXBg@mail.gmail.com>
-References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
- <1462873862-30940-2-git-send-email-yamada.masahiro@socionext.com>
- <20160510112622.GL19473@dell>
- <CAK7LNATmuN647=avdqAMahLU+9Bq4m4TkXe5f7q=pi8m=UrXBg@mail.gmail.com>
-Message-ID: <20160511073855.GQ19473@dell>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 11 May 2016 09:39:34 +0200
+Subject: [PATCH V7 05/11] acpi, pci: Support IO resources when parsing PCI
+ host bridge resources.
+In-Reply-To: <CAJZ5v0j-jiGmMWoyd-ab4qiKGAScbxMskqUThBQxkOxPR8unMA@mail.gmail.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-6-git-send-email-tn@semihalf.com>
+ <CAJZ5v0j-jiGmMWoyd-ab4qiKGAScbxMskqUThBQxkOxPR8unMA@mail.gmail.com>
+Message-ID: <5732E1B6.1000709@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 May 2016, Masahiro Yamada wrote:
+On 10.05.2016 20:20, Rafael J. Wysocki wrote:
+> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+>> Platforms that have memory mapped IO port (such as ARM64) need special
+>> handling for PCI I/O resources. For host bridge's resource probing case
+>> these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
+>>
+>> The same I/O resources need to be released after hotplug
+>> removal so that it can be re-added back by the pci_remap_iospace
+>> function during insertion. As a consequence we unmap I/O resources
+>> with pci_unmap_iospace when we release host bridge resources.
+>>
+>> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/acpi/pci_root.c | 33 +++++++++++++++++++++++++++++++++
+>>   1 file changed, 33 insertions(+)
+>>
+>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+>> index ae3fe4e..cb3071d 100644
+>> --- a/drivers/acpi/pci_root.c
+>> +++ b/drivers/acpi/pci_root.c
+>> @@ -719,6 +719,34 @@ next:
+>>                          resource_list_add_tail(entry, resources);
+>>          }
+>>   }
+>> +static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
+>> +{
+>> +#ifdef PCI_IOBASE
+>
+> Same comment about the #ifdefs as in the other patch.
 
-> Hi Lee,
-> 
-> 2016-05-10 20:26 GMT+09:00 Lee Jones <lee.jones@linaro.org>:
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, uniphier_mfd_match);
-> >
-> > NACK.  Please do not mix MFD and DT registration.
-> 
-> OK, thanks for review.
-> 
-> 
-> My basic thought was:
-> 
->   - Add an MFD node to my DTS only once.
->     If I need to expand it in the future, I will just
->     need to modify drivers/mtd/uniphier-mfd.c.
->     It is just kernel-internal modification, so it does not
->     bother DT binding at all.
-> 
->   - Simplify the node topology of DTS.
+OK
 
-Just describe the hardware in DT.  If you do so accurately, there
-should be no requirement to change it (in theory).
+>
+>> +       struct resource *res = entry->res;
+>> +       resource_size_t cpu_addr = res->start;
+>> +       resource_size_t pci_addr = cpu_addr - entry->offset;
+>> +       resource_size_t length = resource_size(res);
+>> +       unsigned long port;
+>> +
+>> +       if (pci_register_io_range(cpu_addr, length))
+>> +               goto err;
+>> +
+>> +       port = pci_address_to_pio(cpu_addr);
+>> +       if (port == (unsigned long)-1)
+>> +               goto err;
+>> +
+>> +       res->start = port;
+>> +       res->end = port + length - 1;
+>> +       entry->offset = port - pci_addr;
+>> +
+>> +       if (pci_remap_iospace(res, cpu_addr) < 0)
+>> +               goto err;
+>
+> An empty line here?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+yes, empty line would be nice here.
+
+Tomasz
