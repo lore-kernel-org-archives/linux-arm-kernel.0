@@ -1,44 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2016 10:52:46 +0200
-Subject: [PATCH v2 2/4] documentation: Add compatibles for Amlogic Meson
- GXBB pin controllers
-In-Reply-To: <1462176138-29433-3-git-send-email-carlo@caione.org>
-References: <1462176138-29433-1-git-send-email-carlo@caione.org>
- <1462176138-29433-3-git-send-email-carlo@caione.org>
-Message-ID: <CACRpkdZQHX2YFh7CFpaagrY+BBtyAejdUs4F7ow+3+9+F6mU-A@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2016 09:52:03 +0100
+Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
+In-Reply-To: <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160511085203.GN19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 2, 2016 at 10:02 AM, Carlo Caione <carlo@caione.org> wrote:
+On Wed, May 11, 2016 at 04:29:23PM +0800, Dave Young wrote:
+> Hi, Russell
+> 
+> On 04/28/16 at 10:26am, Russell King - ARM Linux wrote:
+> > These changes are required for TI Keystone2 kexec to be functional.  TI
+> > Keystone2 has the run-time view of physical memory above 4GiB, but with
+> > a boot time alias below 4GiB which can only be used during the early
+> > boot.
+> > 
+> > This means we need to translate run-time physical addresses (which the
+> > kernel uses) to boot-time physical addresses, which, having discussed
+> > with Eric, is what the kexec tools and kexec kernel API requires.
+> > 
+> > We publish a special set of boot time resources in /proc/iomem, which
+> > the (modified) kexec tools look for in preference to the normal resources.
+> > Hence, if these are found, the kexec tools make use of these resources,
+> > and thus kexec tools use the boot-time view of physical memory.
+> 
+> I think getting memory ranges from device tree will be better than
+> adding more stuff to /proc/iomem. Geoff's arm64 kexec patches is using dtb
+> you can refer to the patchset.
 
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Add the two new compatibles for the Amlogic Meson GXBB pin controllers.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> index 32f4a2d..fe7fe0b 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> @@ -5,6 +5,8 @@ Required properties for the root node:
->                       "amlogic,meson8b-cbus-pinctrl"
->                       "amlogic,meson8-aobus-pinctrl"
->                       "amlogic,meson8b-aobus-pinctrl"
-> +                     "amlogic,meson-gxbb-periphs-pinctrl"
-> +                     "amlogic,meson-gxbb-aobus-pinctrl"
->   - reg: address and size of registers controlling irq functionality
+I think you're confusing things.  DT doesn't contain the boot alias
+memory ranges - it's not a separate chunk of memory.  It's an alias
+of the same physical address space found higher in the physical
+address range.
 
-This does NOT apply to the pin control tree because upstream does
-NOT look like this. It looks like that in linux-next however.
+If we put it in DT, then we need a way to also describe that it is an
+alias of some other bit of physical memory.
 
-So I guess this must be patched somewhere else
-than the pin control tree, so apply it there:
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
