@@ -1,67 +1,106 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 11 May 2016 08:30:23 -0700
-Subject: [PATCH] arm64: kernel: Fix incorrect brk randomization
-In-Reply-To: <20160511152938.GA24039@arm.com>
-References: <20160510175549.GA20496@www.outflux.net>
- <1462959868.2834.17.camel@linaro.org>
- <CAGXu5jLy4e1d8oQMAm8JTgCjyCPb_i3QvMw+gT3_H6WeAatO1Q@mail.gmail.com>
- <20160511152938.GA24039@arm.com>
-Message-ID: <CAGXu5jJ1__kKUt0Q9SrAFJaE66a0dGQV5w5Y=-8+aYNW_FEZXQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 11 May 2016 16:33:06 +0100
+Subject: [PATCH v12 00/10] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+Message-ID: <573350B2.4010701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 8:29 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, May 11, 2016 at 08:27:14AM -0700, Kees Cook wrote:
->> On Wed, May 11, 2016 at 2:44 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> > On Tue, 2016-05-10 at 10:55 -0700, Kees Cook wrote:
->> >> This fixes two issues with the arm64 brk randomziation. First, the
->> >> STACK_RND_MASK was being used incorrectly. The original code was:
->> >>
->> >>       unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
->> >>
->> >> STACK_RND_MASK is 0x7ff (32-bit) or 0x3ffff (64-bit), with 4K pages where
->> >> PAGE_SHIFT is 12:
->> >>
->> >>       #define STACK_RND_MASK  (test_thread_flag(TIF_32BIT) ? \
->> >>                                               0x7ff >> (PAGE_SHIFT - 12) : \
->> >>                                               0x3ffff >> (PAGE_SHIFT - 12))
->> >>
->> >> This means the resulting offset from base would be 0x7ff0001 or 0x3ffff0001,
->> >> which is wrong since it creates an unaligned end address. It was likely
->> >> intended to be:
->> >>
->> >>       unsigned long range_end = base + ((STACK_RND_MASK + 1) << PAGE_SHIFT)
->> >>
->> >> Which would result in offsets of 0x800000 (32-bit) and 0x40000000 (64-bit).
->> >>
->> >> However, even this corrected 32-bit compat offset (0x00800000) is much
->> >> smaller than native ARM's brk randomization value (0x02000000):
->> >>
->> >>       unsigned long arch_randomize_brk(struct mm_struct *mm)
->> >>       {
->> >>               unsigned long range_end = mm->brk + 0x02000000;
->> >>               return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
->> >>       }
->> >>
->> >> So, instead of basing arm64's brk randomization on mistaken STACK_RND_MASK
->> >> calculations, just use specific corrected values for compat (0x2000000)
->> >> and native arm64 (0x40000000).
->> >>
->> >> Signed-off-by: Kees Cook <keescook@chromium.org>
->> >
->> > There seems to be a helper 'is_compat_task()' that does
->> > 'test_thread_flag(TIF_32BIT)' so could perhaps be used instead, but
->> > that's too nit-picky. This change makes things more consistent with
->>
->> Oh, good call. Yeah, none of the other .c code does direct tests for
->> the TIF_32BIT flag, so I'll use the helper and send a v2. Thanks!
->
-> I already applied it with that change and Tixy's reviewed-by. Thanks!
+Hi David,
 
-Oh! Perfect, thanks! :)
+On 27/04/16 19:52, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+> first seen in October 2013. This version attempts to address concerns raised by
+> reviewers and also fixes problems discovered during testing.
+> 
+> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+> and return probes(kretprobes) support for ARM64.
+> 
+> The kprobes mechanism makes use of software breakpoint and single stepping
+> support available in the ARM v8 kernel.
 
--Kees
+I applied this series on v4.6-rc7, and built the sample kprobes. They work fine,
+unless I throw ftrace into the mix too.
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+I enabled the function_graph tracer, then tried to load the jprobe example module:
+-------------------------%<-------------------------
+root at ubuntu:/sys/kernel/debug/tracing# insmod /root/jprobe_example.ko
+Planted jprobe at ffffff80080c8f20, handler addr ffffff8000bb3000
+root at ubuntu:/sys/kernel/debug/tracing# jprobe: clone_flags = 0x1200011, stack_st
+art = 0x0 stack_size = 0x0
+Bad mode in Synchronous Abort handler detected, code 0x86000005 -- IABT (current
+ EL)
+CPU: 5 PID: 1047 Comm: systemd-udevd Not tainted 4.6.0-rc7+ #4064
+Hardware name: ARM Juno development board (r1) (DT)
+task: ffffffc975948300 ti: ffffffc974e4c000 task.ti: ffffffc974e4c000
+PC is at 0x0
+LR is@0x0
+
+pc : [<0000000000000000>] lr : [<0000000000000000>] pstate: 60000145
+sp : ffffffc974e4ff00
+x29: 0000000001200011 x28: ffffffc974e4c000
+x27: ffffff80088d0000 x26: 00000000000000dc
+x25: 0000000000000120 x24: 0000000000000015
+x23: 0000000060000000 x22: 0000007fa1b40e60
+x21: 0000007fa1ce70d0 x20: 0000000000000000
+x19: 0000000000000000 x18: 0000000000000a03
+x17: 0000007fa1b40d90 x16: ffffff80080c9708
+x15: 003b9aca00000000 x14: 0000007fddb7e5c0
+x13: 0000007fa1b40e2c x12: 0000000000d00ff0
+x11: ffffff8009c4d000 x10: ffffff800920c000
+x9 : ffffff8008f5c000 x8 : ffffffc976c06800
+x7 : 000000000006daf2 x6 : 0000000000000015
+x5 : 0000000000000004 x4 : ffffffc96e8690a0
+x3 : 0000001ed7cbab74 x2 : ffffffc96e869000
+x1 : 0000000000000000 x0 : 0000000000000000
+
+Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
+Modules linked in: jprobe_example
+CPU: 5 PID: 1047 Comm: systemd-udevd Not tainted 4.6.0-rc7+ #4064
+Hardware name: ARM Juno development board (r1) (DT)
+task: ffffffc975948300 ti: ffffffc974e4c000 task.ti: ffffffc974e4c000
+PC is at 0x0
+LR is at 0x0
+
+pc : [<0000000000000000>] lr : [<0000000000000000>] pstate: 60000145
+sp : ffffffc974e4ff00
+x29: 0000000001200011 x28: ffffffc974e4c000
+x27: ffffff80088d0000 x26: 00000000000000dc
+x25: 0000000000000120 x24: 0000000000000015
+x23: 0000000060000000 x22: 0000007fa1b40e60
+x21: 0000007fa1ce70d0 x20: 0000000000000000
+x19: 0000000000000000 x18: 0000000000000a03
+x17: 0000007fa1b40d90 x16: ffffff80080c9708
+x15: 003b9aca00000000 x14: 0000007fddb7e5c0
+x13: 0000007fa1b40e2c x12: 0000000000d00ff0
+x11: ffffff8009c4d000 x10: ffffff800920c000
+x9 : ffffff8008f5c000 x8 : ffffffc976c06800
+x7 : 000000000006daf2 x6 : 0000000000000015
+x5 : 0000000000000004 x4 : ffffffc96e8690a0
+x3 : 0000001ed7cbab74 x2 : ffffffc96e869000
+x1 : 0000000000000000 x0 : 0000000000000000
+
+Process systemd-udevd (pid: 1047, stack limit = 0xffffffc974e4c020)
+Stack: (0xffffffc974e4ff00 to 0xffffffc974e50000)
+ff00: 0000000000000417 0000007fa1ce76f0 00000000000000dc 0000000000000417
+ff20: 00000000ffffffff 0000007fddb7ecf8 0000000000000005 ffffffffffffffff
+ff40: 00000000ff000001 003b9aca00000000 000000555b3868b0 0000007fa1b40d90
+ff60: 0000000000000a03 0000007fddb7e5c0 0000000000000000 0000007fddb7e5e0
+ff80: 000000555b358000 000000558f56f0e0 0000000000000000 000000558f574f00
+ffa0: 000000558f574f00 00000000000004fa 000000558f56f010 0000007fddb7e600
+ffc0: 0000007fa1b40e2c 0000007fddb7e5c0 0000007fa1b40e60 0000000060000000
+ffe0: 0000000001200011 00000000000000dc 0004000084000200 0800000002000000
+Call trace:
+[<          (null)>]           (null)
+Code: bad PC value
+---[ end trace 35d24aad799c2941 ]---
+-------------------------%<-------------------------
+
+
+Thanks,
+
+
+James
