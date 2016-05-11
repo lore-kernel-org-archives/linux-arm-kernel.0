@@ -1,47 +1,40 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 11 May 2016 19:19:08 -0400
-Subject: [PATCH v2 1/3] ARM: dts: bcm5301x: Add TWD WD Support to DT
+Date: Wed, 11 May 2016 19:19:09 -0400
+Subject: [PATCH v2 2/3] ARM: dts: bcm5301x: Add I2C support to the DT
 In-Reply-To: <1463008750-13902-1-git-send-email-jonmason@broadcom.com>
 References: <1463008750-13902-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1463008750-13902-2-git-send-email-jonmason@broadcom.com>
+Message-ID: <1463008750-13902-3-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the ARM TWD Watchdog to the bcm5301x device tree.  The
-ARM TWD timer allocated the register space for the WDT, so this patch
-necessitated shrinking that.  Also, the GIC masks were added for these.
+Add I2C support to the bcm5301x Device Tree.  Since no driver changes
+are needed to enable this hardware, only the device tree changes are
+required to make this functional.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/bcm5301x.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 65a1309..4b9887f 100644
+index 4b9887f..ffc4a9b 100644
 --- a/arch/arm/boot/dts/bcm5301x.dtsi
 +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -66,10 +66,19 @@
- 			clocks = <&periph_clk>;
+@@ -218,6 +218,15 @@
  		};
+ 	};
  
--		local-timer at 20600 {
-+		timer at 20600 {
- 			compatible = "arm,cortex-a9-twd-timer";
--			reg = <0x20600 0x100>;
--			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x20600 0x20>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&periph_clk>;
-+		};
++	i2c0: i2c at 18009000 {
++		compatible = "brcm,iproc-i2c";
++		reg = <0x18009000 0x50>;
++		interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-frequency = <100000>;
++	};
 +
-+		watchdog at 20620 {
-+			compatible = "arm,cortex-a9-twd-wdt";
-+			reg = <0x20620 0x20>;
-+			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&periph_clk>;
- 		};
- 
+ 	lcpll0: lcpll0 at 1800c100 {
+ 		#clock-cells = <1>;
+ 		compatible = "brcm,nsp-lcpll0";
 -- 
 1.9.1
