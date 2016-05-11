@@ -1,65 +1,73 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 11 May 2016 22:45:56 +0200
-Subject: [PATCH v4 2/5] ACPI / processor_idle: Add support for Low Power
- Idle(LPI) states
-In-Reply-To: <57334A66.6070004@arm.com>
-References: <1461069013-13292-1-git-send-email-sudeep.holla@arm.com>
- <1461069013-13292-3-git-send-email-sudeep.holla@arm.com>
- <1857618.TLitUhExSh@vostro.rjw.lan> <57334A66.6070004@arm.com>
-Message-ID: <CAJZ5v0gbkQmgGuVBxficJjVrOudRTgKKFFp6tFRCG-Byud8Ozg@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 11 May 2016 14:08:09 -0700
+Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
+ <20160511104032.GA31374@arm.com>
+ <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
+Message-ID: <57339F39.3040603@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 5:06 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 11/05/16 01:03, Rafael J. Wysocki wrote:
+On 05/11/2016 01:35 PM, Rafael J. Wysocki wrote:
+> On Wed, May 11, 2016 at 12:40 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
+>>> On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+>>>> From: David Daney <david.daney@cavium.com>
+>>>>
+>>>> Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+>>>> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
+>>>> AArch32 state")
 >>
->> On Tuesday, April 19, 2016 01:30:10 PM Sudeep Holla wrote:
+>> [...]
+>>
+>>>> David Daney (2):
+>>>>    arm64, numa: Cleanup NUMA disabled messages.
+>>>>    acpi, numa, srat: Improve SRAT error detection and add messages.
+>>>>
+>>>> Hanjun Guo (11):
+>>>>    acpi, numa: Use pr_fmt() instead of printk
+>>>>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>>>>    acpi, numa: remove duplicate NULL check
+>>>>    acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>>>>    arm64, numa: rework numa_add_memblk()
+>>>>    x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>>>>    acpi, numa: move bad_srat() and srat_disabled() to
+>>>>      drivers/acpi/numa.c
+>>>>    acpi, numa: remove unneeded acpi_numa=1
+>>>>    acpi, numa: Move acpi_numa_memory_affinity_init() to
+>>>>      drivers/acpi/numa.c
+>>>>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>>>>    acpi, numa: Enable ACPI based NUMA on ARM64
+>>>>
+>>>> Robert Richter (1):
+>>>>    acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
 >>>
-
-[cut]
-
+>>> I need ACKs from the ARM64 maintainers on patches [6-7/13] and [13-14/14].
 >>
->> My main concern about the flattening of _LPI is that at one point we'll
->> probably decide to unflatten it and that will change the behavior for
->> current users.  There needs to be a plan for that IMO.
->>
+>> There's also a dependency on the arm64 for-next/core branch, so I've been
+>> largely ignoring this as far as 4.6 is concerned and was planning to take
+>> a proper look for 4.7 once the upcoming merge window is out of the way.
 >
-> Are you referring the OS co-ordinated mode ? If yes, I agree. If not,
-> can you explain why would we not flatten the LPI states ?
-
-If the platform doesn't autopromote core-level states into
-package-level states, then having access to unflattened hierarchy may
-be useful.  In some cases the exit latency of core states may be
-acceptable, while the exit latency of package states may not be, for
-example.
-
-Also the scheduler may want to know which cores are in one package
-(from the idle states perspective) at one point.
-
-[cut]
-
->>> +
->>> +       for (i = 0; i < fl_scnt && i < CPUIDLE_STATE_MAX; i++) {
->>> +               lpi = &pr->power.lpi_states[i];
->>> +
->>> +               state = &drv->states[i];
->>> +               snprintf(state->name, CPUIDLE_NAME_LEN, "LPI-%d", i);
->>> +               strlcpy(state->desc, lpi->desc, CPUIDLE_DESC_LEN);
->>> +               state->exit_latency = lpi->wake_latency;
->>> +               state->target_residency = lpi->min_residency;
->>> +               if (lpi->arch_flags)
->>> +                       state->flags |= CPUIDLE_FLAG_TIMER_STOP;
->>> +               state->enter = acpi_idle_lpi_enter;
->>
->>
->> No ->enter_freeze ?
->>
+> That would be 4.7 and 4.8 respectively I suppose?
 >
-> I don't have a system to test this. Also IIUC the cpuidle does support
-> suspend-to-idle even when ->enter_freeze is not implemented right.
-> Can we add it later once I find a way to test. Correctly no wakeup on my
-> test platform :(
+> Anyway, Catalin has ACKed all of them except for the [13/14], so
+> technically I can apply [1-12/14] now and then [13-14/14] can be
+> applied when they are ready.
+>
+> Do you think there will be any problems with merging [6-7/14] into 4.7
+> via the ACPI tree?
+>
 
-Fair enough.
+I would defer to the arm64 maintainers for decisions about the arm64 
+specific parts of the patch set.  That said, many of the arm64 specific 
+patches depend on the arm64 for-next/core branch, so you would have to 
+be careful about merge ordering if you pull these in before the 
+for-next/core branch is merged.
+
+Also FWIW, I plan on addressing Catalin's comments about 13/14 and 
+posting a new version of the patch set in the next day or two.
+
+Thanks for looking at these,
+David Daney
