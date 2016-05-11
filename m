@@ -1,42 +1,24 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 10 May 2016 17:02:55 -0700
-Subject: [PATCH 2/2] ARM64: dts: rockchip: enable eMMC for rk3399 EVB
-In-Reply-To: <1462924975-69072-1-git-send-email-briannorris@chromium.org>
-References: <1462924975-69072-1-git-send-email-briannorris@chromium.org>
-Message-ID: <1462924975-69072-2-git-send-email-briannorris@chromium.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 11 May 2016 02:07:38 +0200
+Subject: [PATCH v4 4/5] arm64: add support for ACPI Low Power Idle(LPI)
+In-Reply-To: <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
+References: <1461069013-13292-1-git-send-email-sudeep.holla@arm.com>
+ <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <3620725.8soc3SaFWB@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'mmc-hs400-enhanced-strobe' property has been acked by Rob Herring,
-though it's still not merged.
+On Tuesday, April 19, 2016 01:30:12 PM Sudeep Holla wrote:
+> This patch adds appropriate callbacks to support ACPI Low Power Idle
+> (LPI) on ARM64.
+> 
+> It also selects ARCH_SUPPORTS_ACPI_PROCESSOR_LPI if ACPI is enabled
+> on ARM64.
 
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Can you remind me why we need the ARCH_SUPPORTS_ACPI_PROCESSOR_LPI thing in
+addition to the previously defined ARCH_SUPPORTS_ACPI_PROCESSOR_CSTATE?
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index 1a3eb1482050..ccfd2bcf02e1 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -89,6 +89,18 @@
- 	status = "okay";
- };
- 
-+&emmc_phy {
-+	status = "okay";
-+};
-+
-+&sdhci {
-+	bus-width = <8>;
-+	mmc-hs400-1_8v;
-+	non-removable;
-+	mmc-hs400-enhanced-strobe;
-+	status = "okay";
-+};
-+
- &uart2 {
- 	status = "okay";
- };
--- 
-2.8.0.rc3.226.g39d4020
+I thought supporting LPI would not require an arch Kconfig option.
+
+Thanks,
+Rafael
