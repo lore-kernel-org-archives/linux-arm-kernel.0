@@ -1,220 +1,91 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 11 May 2016 14:21:23 -0700
-Subject: [Patch v4 6/8] firmware: qcom: scm: Add support for ARM64 SoCs
-In-Reply-To: <1462976158-26016-7-git-send-email-andy.gross@linaro.org>
-References: <1462976158-26016-1-git-send-email-andy.gross@linaro.org>
- <1462976158-26016-7-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160511212123.GY1256@tuxbot>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 11 May 2016 23:22:48 +0200
+Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <57339F39.3040603@caviumnetworks.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
+ <20160511104032.GA31374@arm.com>
+ <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
+ <57339F39.3040603@caviumnetworks.com>
+Message-ID: <CAJZ5v0h8zBEZ2nLLdk62r7uqHizUfVWamUVEriBGe1XBE6462Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 11 May 07:15 PDT 2016, Andy Gross wrote:
+On Wed, May 11, 2016 at 11:08 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 05/11/2016 01:35 PM, Rafael J. Wysocki wrote:
+>>
+>> On Wed, May 11, 2016 at 12:40 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>
+>>> On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
+>>>>
+>>>> On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com>
+>>>> wrote:
+>>>>>
+>>>>> From: David Daney <david.daney@cavium.com>
+>>>>>
+>>>>> Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+>>>>> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
+>>>>> AArch32 state")
+>>>
+>>>
+>>> [...]
+>>>
+>>>>> David Daney (2):
+>>>>>    arm64, numa: Cleanup NUMA disabled messages.
+>>>>>    acpi, numa, srat: Improve SRAT error detection and add messages.
+>>>>>
+>>>>> Hanjun Guo (11):
+>>>>>    acpi, numa: Use pr_fmt() instead of printk
+>>>>>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>>>>>    acpi, numa: remove duplicate NULL check
+>>>>>    acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>>>>>    arm64, numa: rework numa_add_memblk()
+>>>>>    x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>>>>>    acpi, numa: move bad_srat() and srat_disabled() to
+>>>>>      drivers/acpi/numa.c
+>>>>>    acpi, numa: remove unneeded acpi_numa=1
+>>>>>    acpi, numa: Move acpi_numa_memory_affinity_init() to
+>>>>>      drivers/acpi/numa.c
+>>>>>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>>>>>    acpi, numa: Enable ACPI based NUMA on ARM64
+>>>>>
+>>>>> Robert Richter (1):
+>>>>>    acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+>>>>
+>>>>
+>>>> I need ACKs from the ARM64 maintainers on patches [6-7/13] and
+>>>> [13-14/14].
+>>>
+>>>
+>>> There's also a dependency on the arm64 for-next/core branch, so I've been
+>>> largely ignoring this as far as 4.6 is concerned and was planning to take
+>>> a proper look for 4.7 once the upcoming merge window is out of the way.
+>>
+>>
+>> That would be 4.7 and 4.8 respectively I suppose?
+>>
+>> Anyway, Catalin has ACKed all of them except for the [13/14], so
+>> technically I can apply [1-12/14] now and then [13-14/14] can be
+>> applied when they are ready.
+>>
+>> Do you think there will be any problems with merging [6-7/14] into 4.7
+>> via the ACPI tree?
+>>
+>
+> I would defer to the arm64 maintainers for decisions about the arm64
+> specific parts of the patch set.  That said, many of the arm64 specific
+> patches depend on the arm64 for-next/core branch, so you would have to be
+> careful about merge ordering if you pull these in before the for-next/core
+> branch is merged.
 
-[..]
-> diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
-[..]
-> +
-> +#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
-> +			   (((a) & 0xff) << 4) | \
-> +			   (((b) & 0xff) << 6) | \
-> +			   (((c) & 0xff) << 8) | \
-> +			   (((d) & 0xff) << 10) | \
-> +			   (((e) & 0xff) << 12) | \
-> +			   (((f) & 0xff) << 14) | \
-> +			   (((g) & 0xff) << 16) | \
-> +			   (((h) & 0xff) << 18) | \
-> +			   (((i) & 0xff) << 20) | \
-> +			   (((j) & 0xff) << 22) | \
-> +			   (num & 0xffff))
+Fair enough.  I will wait for an update then.
 
-Sorry, haven't payed attention to the body of this macro before; but
-it's "wrong".
+> Also FWIW, I plan on addressing Catalin's comments about 13/14 and posting a
+> new version of the patch set in the next day or two.
 
-num is 4 bits all other entries are 2 bits each. So it should be:
+OK, but in that case it won't be considered for 4.7 (at least not by
+me), so I'd suggest sending it in the second half of the 4.7 merge
+window (or about that time).
 
-#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
-			   (((a) & 0x3) << 4) | \
-			   (((b) & 0x3) << 6) | \
-			   (((c) & 0x3) << 8) | \
-			   (((d) & 0x3) << 10) | \
-			   (((e) & 0x3) << 12) | \
-			   (((f) & 0x3) << 14) | \
-			   (((g) & 0x3) << 16) | \
-			   (((h) & 0x3) << 18) | \
-			   (((i) & 0x3) << 20) | \
-			   (((j) & 0x3) << 22) | \
-			   (num & 0xf))
-
-> +
-> +#define QCOM_SCM_ARGS(...) QCOM_SCM_ARGS_IMPL(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-> +
-> +/**
-> + * struct qcom_scm_desc
-> + * @arginfo:	Metadata describing the arguments in args[]
-> + * @args:	The array of arguments for the secure syscall
-> + * @res:	The values returned by the secure syscall
-> + */
-> +struct qcom_scm_desc {
-> +	u32 arginfo;
-> +	u64 args[MAX_QCOM_SCM_ARGS];
-> +	struct arm_smccc_res res;
-> +};
-> +
-> +static u64 qcom_smccc_convention = -1;
-> +static DEFINE_MUTEX(qcom_scm_lock);
-> +
-> +#define QCOM_SCM_EBUSY_WAIT_MS 30
-> +#define QCOM_SCM_EBUSY_MAX_RETRY 20
-> +
-> +#define N_EXT_QCOM_SCM_ARGS 7
-> +#define FIRST_EXT_ARG_IDX 3
-> +#define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
-> +
-> +/**
-> + * qcom_scm_call() - Invoke a syscall in the secure world
-> + * @dev:	device
-> + * @svc_id:	service identifier
-> + * @cmd_id:	command identifier
-> + * @fn_id:	The function ID for this syscall
-
-You don't have a fn_id parameter anymore.
-
-> + * @desc:	Descriptor structure containing arguments and return values
-> + *
-> + * Sends a command to the SCM and waits for the command to finish processing.
-> + * This should *only* be called in pre-emptible context.
-> +*/
-> +static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
-> +			 struct qcom_scm_desc *desc)
-> +{
-> +	int arglen = desc->arginfo & 0xf;
-> +	int ret, retry_count = 0, i;
-> +	u32 fn_id = QCOM_SCM_FNID(svc_id, cmd_id);
-> +	u64 cmd, x5 = desc->args[FIRST_EXT_ARG_IDX];
-> +	dma_addr_t args_phys = 0;
-> +	void *args_virt = NULL;
-> +	size_t alloc_len;
-> +
-> +	if (unlikely(arglen > N_REGISTER_ARGS)) {
-> +		alloc_len = N_EXT_QCOM_SCM_ARGS * sizeof(u64);
-> +		args_virt = kzalloc(PAGE_ALIGN(alloc_len), GFP_KERNEL);
-> +
-> +		if (!args_virt)
-> +			return qcom_scm_remap_error(-ENOMEM);
-> +
-> +		if (qcom_smccc_convention == ARM_SMCCC_SMC_32) {
-> +			__le32 *args = args_virt;
-> +
-> +			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
-> +				args[i] = cpu_to_le32(desc->args[i +
-> +						      FIRST_EXT_ARG_IDX]);
-> +		} else {
-> +			__le64 *args = args_virt;
-> +
-> +			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
-> +				args[i] = cpu_to_le64(desc->args[i +
-> +						      FIRST_EXT_ARG_IDX]);
-> +		}
-> +
-> +		args_phys = dma_map_single(dev, args_virt, alloc_len,
-> +					   DMA_TO_DEVICE);
-> +
-> +		if (dma_mapping_error(dev, args_phys)) {
-> +			kfree(args_virt);
-> +			return qcom_scm_remap_error(-ENOMEM);
-> +		}
-> +
-> +		x5 = args_phys;
-> +	}
-> +
-> +	do {
-> +		mutex_lock(&qcom_scm_lock);
-> +
-> +		cmd = ARM_SMCCC_CALL_VAL(ARM_SMCCC_STD_CALL,
-> +					 qcom_smccc_convention,
-> +					 ARM_SMCCC_OWNER_SIP, fn_id);
-> +
-> +		do {
-> +			arm_smccc_smc(cmd, arglen, desc->args[0], desc->args[1],
-> +				      desc->args[2], x5, 0, 0, &desc->res);
-
-Looking at downstream you should pass the entirety of arginfo as the
-second parameter. Currently you only set the num bits, but there are a
-few cases when these bits should be set.
-
-> +		} while (desc->res.a0 == QCOM_SCM_INTERRUPTED);
-> +
-> +		mutex_unlock(&qcom_scm_lock);
-> +
-> +		if (desc->res.a0 == QCOM_SCM_V2_EBUSY) {
-> +			if (retry_count++ > QCOM_SCM_EBUSY_MAX_RETRY)
-> +				break;
-> +			msleep(QCOM_SCM_EBUSY_WAIT_MS);
-> +		}
-> +	}  while (desc->res.a0 == QCOM_SCM_V2_EBUSY);
-> +
-> +	if (args_virt) {
-> +		dma_unmap_single(dev, args_phys, alloc_len, DMA_TO_DEVICE);
-> +		kfree(args_virt);
-> +	}
-> +
-> +	if (desc->res.a0 < 0)
-> +		return qcom_scm_remap_error(ret);
-
-Probably not ret, as this is unused.
-
-> +
-> +	return 0;
-> +}
->  
->  /**
->   * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
-> - * @entry: Entry point function for the cpus
-> - * @cpus: The cpumask of cpus that will use the entry point
-> + * @entry:	Entry point function for the cpus
-> + * @cpus:	The cpumask of cpus that will use the entry point
-
-Unnecessary indentation change.
-
->   *
->   * Set the cold boot address of the cpus. Any cpu outside the supported
->   * range would be removed from the cpu present mask.
-> @@ -29,20 +165,21 @@ int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
->  
->  /**
->   * qcom_scm_set_warm_boot_addr() - Set the warm boot address for cpus
-> - * @entry: Entry point function for the cpus
-> - * @cpus: The cpumask of cpus that will use the entry point
-> + * @entry:	Entry point function for the cpus
-> + * @cpus:	The cpumask of cpus that will use the entry point
-
-Unnecessary indentation change, and you missed adding "dev".
-
->   *
->   * Set the Linux entry point for the SCM to transfer control to when coming
->   * out of a power down. CPU power down may be executed on cpuidle or hotplug.
->   */
-> -int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
-> +int __qcom_scm_set_warm_boot_addr(struct device *dev, void *entry,
-> +				  const cpumask_t *cpus)
->  {
->  	return -ENOTSUPP;
->  }
->  
->  /**
->   * qcom_scm_cpu_power_down() - Power down the cpu
-> - * @flags - Flags to flush cache
-> + * @flags:	Flags to flush cache
-
-I presume this one is ok...
-
->   *
->   * This is an end point to power down cpu. If there was a pending interrupt,
->   * the control would return from this function, otherwise, the cpu jumps to the
-> @@ -52,12 +189,63 @@ void __qcom_scm_cpu_power_down(u32 flags)
->  {
->  }
->  
-
-Regards,
-Bjorn
+Thanks,
+Rafael
