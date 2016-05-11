@@ -1,75 +1,35 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 10 May 2016 18:19:19 -0700
-Subject: [PATCH 2/2] ARM64: dts: rockchip: enable eMMC for rk3399 EVB
-In-Reply-To: <d8dc5609-3cf6-80ce-462b-d46f0ea6dcff@rock-chips.com>
-References: <1462924975-69072-1-git-send-email-briannorris@chromium.org>
- <1462924975-69072-2-git-send-email-briannorris@chromium.org>
- <d8dc5609-3cf6-80ce-462b-d46f0ea6dcff@rock-chips.com>
-Message-ID: <20160511011919.GB77327@google.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 11 May 2016 10:51:51 +0900
+Subject: [RFC PATCH 01/21] mfd: uniphier: add UniPhier MFD driver
+In-Reply-To: <20160510112622.GL19473@dell>
+References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
+ <1462873862-30940-2-git-send-email-yamada.masahiro@socionext.com>
+ <20160510112622.GL19473@dell>
+Message-ID: <CAK7LNATmuN647=avdqAMahLU+9Bq4m4TkXe5f7q=pi8m=UrXBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Lee,
 
-On Wed, May 11, 2016 at 08:59:24AM +0800, Shawn Lin wrote:
-> On 2016/5/11 8:02, Brian Norris wrote:
-> >The 'mmc-hs400-enhanced-strobe' property has been acked by Rob Herring,
-> >though it's still not merged.
-> >
-> 
-> Hi Brain,
-> 
-> I'm not sure whether it's acceptable to upstream new property which
-> isn't merged yet. My major concern is that as the patchset supporting
-> h400es will go through mmc tree, so if Ulf should want to shorten the
-> name (e.g mmc-hs400-es), you would respin this patch.
+2016-05-10 20:26 GMT+09:00 Lee Jones <lee.jones@linaro.org>:
+>> +};
+>> +MODULE_DEVICE_TABLE(of, uniphier_mfd_match);
+>
+> NACK.  Please do not mix MFD and DT registration.
+
+OK, thanks for review.
 
 
-Well, Heiko can determine when to accept this. I wanted to post it to
-get things moving, but I can drop that property for now if it's going to
-cause difficulty.
+My basic thought was:
 
-> Thanks.
-> 
-> >Signed-off-by: Brian Norris <briannorris@chromium.org>
-> >---
+  - Add an MFD node to my DTS only once.
+    If I need to expand it in the future, I will just
+    need to modify drivers/mtd/uniphier-mfd.c.
+    It is just kernel-internal modification, so it does not
+    bother DT binding at all.
 
-BTW, I meant to note here that I haven't personally tested this EVB. I
-have tested other boards. This patch mostly serves the purpose of an
-example user, for my purposes.
+  - Simplify the node topology of DTS.
 
-Brian
-
-> > arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 12 ++++++++++++
-> > 1 file changed, 12 insertions(+)
-> >
-> >diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> >index 1a3eb1482050..ccfd2bcf02e1 100644
-> >--- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> >+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-> >@@ -89,6 +89,18 @@
-> > 	status = "okay";
-> > };
-> >
-> >+&emmc_phy {
-> >+	status = "okay";
-> >+};
-> >+
-> >+&sdhci {
-> >+	bus-width = <8>;
-> >+	mmc-hs400-1_8v;
-> >+	non-removable;
-> >+	mmc-hs400-enhanced-strobe;
-> >+	status = "okay";
-> >+};
-> >+
-> > &uart2 {
-> > 	status = "okay";
-> > };
-> >
-> 
-> 
-> -- 
-> Best Regards
-> Shawn Lin
-> 
+-- 
+Best Regards
+Masahiro Yamada
