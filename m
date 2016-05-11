@@ -1,20 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2016 10:58:42 +0200
-Subject: [PATCH] pinctrl: meson: Fix eth_tx_en bit index
-In-Reply-To: <1462730389-10961-2-git-send-email-serveralex@gmail.com>
-References: <1462730389-10961-1-git-send-email-serveralex@gmail.com>
- <1462730389-10961-2-git-send-email-serveralex@gmail.com>
-Message-ID: <CACRpkdZz631dio28wqa71uZe3=NSZO55RCxZaQSixfH-o1f4Cw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 11 May 2016 11:00:02 +0200
+Subject: [PATCH] ARM: dts: at91: sam9x5: Fix the memory range assigned to the
+ PMC
+Message-ID: <1462957202-22671-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2016 at 7:59 PM, Alexander M?ller <serveralex@gmail.com> wrote:
+The memory range assigned to the PMC (Power Management Controller) was
+not including the PMC_PCR register which are used to control peripheral
+clocks.
 
-> Fix pinctrl eth_tx_en bit index according to Hardkernel ODROID-C1 datasheet.
->
-> Signed-off-by: Alexander M?ller <serveralex@gmail.com>
+This was working fine thanks to the page granularity of ioremap(), but
+started to fail when we switched to syscon/regmap, because regmap is
+making sure that all accesses are falling into the reserved range.
 
-Carlo can you review this change?
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Richard Genoud <richard.genoud@gmail.com>
+Tested-by: Richard Genoud <richard.genoud@gmail.com>
+Fixes: 863a81c3be1d ("clk: at91: make use of syscon to share PMC registers in several drivers")
+Cc: <stable@vger.kernel.org>
+---
+Hi Arnd,
 
-Yours,
-Linus Walleij
+This patch is fixing a regression reported by Richard. Since this
+regression was introduced in 4.6-rc1 it would be great if you could
+take it before 4.6 is released.
+
+Thanks,
+
+Boris
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 0827d59..cd0cd5f 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -106,7 +106,7 @@
+ 
+ 			pmc: pmc at fffffc00 {
+ 				compatible = "atmel,at91sam9x5-pmc", "syscon";
+-				reg = <0xfffffc00 0x100>;
++				reg = <0xfffffc00 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				interrupt-controller;
+ 				#address-cells = <1>;
+-- 
+2.7.4
