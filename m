@@ -1,54 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 11 May 2016 15:45:17 +0200
-Subject: [PATCHv3 1/4] ARM: dts: r8a7790: Reference both DMA controllers
-In-Reply-To: <1462972438-20797-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1462972438-20797-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1462972438-20797-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <CAMuHMdWoPThi0w6siA5LJ60oEH6JMv4x80b_Spg5aF-uHq3WqQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 May 2016 15:30:16 +0200
+Subject: [PULL 23/29] irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
+In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
+References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1462973422-10021-24-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+From: Julien Grall <julien.grall@arm.com>
 
-On Wed, May 11, 2016 at 3:13 PM, Niklas S?derlund
-<niklas.soderlund+renesas@ragnatech.se> wrote:
-> R-Car Gen2 have two DMA controllers, which are equivalent. Add
-> references to both dmac0 and dmac1 so the driver can choose which one to
-> use.
->
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> ---
->  arch/arm/boot/dts/r8a7790.dtsi | 131 ++++++++++++++++++++++++-----------------
->  1 file changed, 78 insertions(+), 53 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 83cf23c..14fcd19 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+Currently, most of the pr_* messages in the GICv3 driver don't have a
+prefix.  Add one to make clear where the messages come from.
 
-> @@ -755,9 +773,9 @@
->                 clocks = <&mstp3_clks R8A7790_CLK_SCIF2>, <&zs_clk>,
->                          <&scif_clk>;
->                 clock-names = "fck", "brg_int", "scif_clk";
-> -               dmas = <&dmac0 0x2b>, <&dmac0 0x2c>;
-> -               dma-names = "tx", "rx";
-> -               power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+Signed-off-by: Julien Grall <julien.grall@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Please keep the above line.
-
-> +               dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
-> +                      <&dmac1 0x2b>, <&dmac1 0x2c>;
-> +               dma-names = "tx", "rx", "tx", "rx";
->                 status = "disabled";
->         };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 5b7d3c2..6dc6f03 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -15,6 +15,8 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#define pr_fmt(fmt)	"GICv3: " fmt
++
+ #include <linux/acpi.h>
+ #include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+-- 
+2.1.2.330.g565301e.dirty
