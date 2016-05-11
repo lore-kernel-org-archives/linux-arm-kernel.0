@@ -1,9 +1,9 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 15:30:03 +0200
-Subject: [PULL 10/29] kvm-arm: arm64: Introduce hyp page table empty checks
+Date: Wed, 11 May 2016 15:30:01 +0200
+Subject: [PULL 08/29] kvm-arm: arm: Introduce hyp page table empty checks
 In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
 References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1462973422-10021-11-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1462973422-10021-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,36 +14,29 @@ a given table entry is empty. This will be used explicitly
 once we switch to explicit routines for hyp page table walk.
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index e3f53e3..edf3c62 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -249,6 +249,20 @@ static inline bool kvm_page_empty(void *ptr)
- #endif
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 7d207b4..5522cdd 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -160,7 +160,11 @@ static inline bool kvm_page_empty(void *ptr)
  
- 
+ #define kvm_pte_table_empty(kvm, ptep) kvm_page_empty(ptep)
+ #define kvm_pmd_table_empty(kvm, pmdp) kvm_page_empty(pmdp)
+-#define kvm_pud_table_empty(kvm, pudp) (0)
++#define kvm_pud_table_empty(kvm, pudp) false
++
 +#define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
-+
-+#ifdef __PAGETABLE_PMD_FOLDED
-+#define hyp_pmd_table_empty(pmdp) (0)
-+#else
 +#define hyp_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
-+#endif
-+
-+#ifdef __PAGETABLE_PUD_FOLDED
-+#define hyp_pud_table_empty(pudp) (0)
-+#else
-+#define hyp_pud_table_empty(pudp) kvm_page_empty(pudp)
-+#endif
-+
- struct kvm;
++#define hyp_pud_table_empty(pudp) false
  
- #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ static inline void *kvm_get_hwpgd(struct kvm *kvm)
+ {
 -- 
 2.1.2.330.g565301e.dirty
