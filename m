@@ -1,154 +1,350 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 11 May 2016 14:45:51 +0000
-Subject: [PATCH v2 1/2] Documentation: DT: bindings: Add Broadcom STB
- PCIe bindings
-In-Reply-To: <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
+Date: Wed, 11 May 2016 14:47:45 +0000
+Subject: [PATCH v2 2/2] pci: host: Add Broadcom STB PCIE RC controller
+In-Reply-To: <1462475700-1654-3-git-send-email-f.fainelli@gmail.com>
 References: <1462475700-1654-1-git-send-email-f.fainelli@gmail.com>
- <1462475700-1654-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <8520D5D51A55D047800579B094147198258955CE@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <1462475700-1654-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <8520D5D51A55D047800579B094147198258955D9@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
->  .../devicetree/bindings/pci/brcm,brcmstb-pcie.txt  | 98
-> ++++++++++++++++++++++
->  1 file changed, 98 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
-> b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
-> new file mode 100644
-> index 000000000000..3682b0f0bc26
+> +
+> +static struct pci_ops brcm_pcie_ops = {
+> +	.read = brcm_pcie_read_config,
+> +	.write = brcm_pcie_write_config,
+> +};
+> +
+> +static int brcm_pcie_probe(struct platform_device *pdev) {
+> +	struct device_node *dn = pdev->dev.of_node;
+> +	const u32 *log2_scb_sizes, *dma_ranges;
+> +	const struct brcm_pcie_cfg_data *data;
+> +	const struct of_device_id *of_id;
+> +	struct brcm_pcie *pcie;
+> +	void __iomem *base;
+> +	struct resource *r;
+> +	int i, rlen, ret;
+> +	u32 tmp;
+> +
+> +	pcie = devm_kzalloc(&pdev->dev, sizeof(struct brcm_pcie),
+> GFP_KERNEL);
+> +	if (!pcie)
+> +		return -ENOMEM;
+> +
+> +	of_id = of_match_node(brcm_pcie_match, dn);
+> +	if (!of_id)
+> +		return -EINVAL;
+> +
+> +	data = of_id->data;
+> +	pcie->type = data->type;
+> +	pcie->ops = &data->ops;
+> +
+> +	platform_set_drvdata(pdev, pcie);
+> +
+> +	INIT_LIST_HEAD(&pcie->resource);
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	ret = of_alias_get_id(dn, "pcie");
+> +	if (ret >= 0)
+> +		pcie->num = ret;
+> +
+> +	pcie->clk = devm_clk_get(&pdev->dev, "pcie");
+> +	if (IS_ERR(pcie->clk)) {
+> +		dev_err(&pdev->dev, "could not get clock\n");
+> +		pcie->clk = NULL;
+> +	}
+> +
+> +	ret = clk_prepare_enable(pcie->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "could not enable clock\n");
+> +		return ret;
+> +	}
+> +
+> +	pcie->dn = dn;
+> +	pcie->base = base;
+> +	pcie->dev = &pdev->dev;
+> +	pcie->dev->of_node = dn;
+> +	pcie->gen = 0;
+> +
+> +	ret = of_property_read_u32(dn, "brcm,gen", &tmp);
+> +	if (ret == 0) {
+> +		if (tmp > 0 && tmp < 3)
+> +			pcie->gen = (int)tmp;
+> +		else
+> +			dev_warn(pcie->dev, "bad DT value for prop
+> 'brcm,gen");
+> +	} else if (ret != -EINVAL) {
+> +		dev_warn(pcie->dev, "error reading DT prop 'brcm,gen");
+> +	}
+> +
+> +	pcie->ssc = of_property_read_bool(dn, "brcm,ssc");
+> +
+> +	/* Get the value for the log2 of the scb sizes. Subtract 15 from
+> +	 * each because the target register field has 0==disabled and 1==6KB.
+> +	 */
+> +	log2_scb_sizes = of_get_property(dn, "brcm,log2-scb-sizes", &rlen);
+> +	if (log2_scb_sizes) {
+> +		for (i = 0; i < rlen / sizeof(u32); i++) {
+> +			pcie->scb_size_vals[i]
+> +				= (int)of_read_number(log2_scb_sizes + i, 1)
+> +					- 15;
+> +			pcie->num_memc++;
+> +		}
+> +	}
+In your device tree documentation this is required property, what if this property 
+is missing ?
+> +
+> +	/* Look for the dma-ranges property.  If it exists, issue a warning
+> +	 * as PCIe drivers may not work.  This is because the identity
+> +	 * mapping between system memory and PCIe space is not
+> preserved,
+> +	 * and we need Linux to massage the dma_addr_t values it gets
+> +	 * from dma memory allocation.  This functionality will be added
+> +	 * in the near future.
+> +	 */
+> +	dma_ranges = of_get_property(dn, "dma-ranges", &rlen);
+> +	if (dma_ranges != NULL)
+> +		dev_warn(pcie->dev, "no identity map; PCI drivers may fail");
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +		ret = irq_of_parse_and_map(pdev->dev.of_node, 1);
+> +		if (ret == 0)
+> +			dev_warn(pcie->dev, "cannot get msi intr; MSI
+> disabled\n");
+> +		else
+> +			pcie->msi_irq = ret;
+> +	}
+> +
+> +	ret = of_pci_get_host_bridge_resources(dn, 0, 0xff,
+> +					       &pcie->resource, NULL);
+> +	if (ret) {
+> +		dev_err(pcie->dev, "ranges parsing failed\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = brcm_pcie_setup_early(pcie);
+> +	if (ret)
+> +		goto out_err_clk;
+> +
+> +	/* If setup bridge fails, it cleans up behind itself */
+> +	ret = brcm_setup_pcie_bridge(pcie);
+> +	if (ret)
+> +		goto out_err;
+> +
+> +	pcie->bus = pci_scan_root_bus(pcie->dev, pcie->num,
+> &brcm_pcie_ops,
+> +				      pcie, &pcie->resource);
+> +	if (!pcie->bus) {
+> +		ret = -ENOMEM;
+> +		goto out_err_bus;
+> +	}
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> +		brcm_pcie_msi_chip_set(pcie);
+> +
+> +	pci_bus_size_bridges(pcie->bus);
+> +	pci_bus_assign_resources(pcie->bus);
+> +
+> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +	pci_bus_add_devices(pcie->bus);
+> +
+> +	return 0;
+> +
+> +out_err_bus:
+> +	brcm_pcie_enter_l23(pcie);
+> +	brcm_pcie_turn_off(pcie);
+> +out_err_clk:
+> +	clk_disable_unprepare(pcie->clk);
+> +out_err:
+> +	return ret;
+> +}
+> +
+> +static int brcm_pcie_remove(struct platform_device *pdev) {
+> +	return brcm_pcie_suspend(&pdev->dev);
+> +}
+> +
+> +static struct platform_driver brcm_pcie_driver = {
+> +	.probe = brcm_pcie_probe,
+> +	.remove = brcm_pcie_remove,
+> +	.driver = {
+> +		.name = "brcm-pcie",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = brcm_pcie_match,
+> +		.pm = &brcm_pcie_pm_ops,
+> +	},
+> +};
+> +module_platform_driver(brcm_pcie_driver);
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("Broadcom STB PCIE RC driver");
+> +MODULE_AUTHOR("Broadcom");
+> diff --git a/drivers/pci/host/pcie-brcmstb.h b/drivers/pci/host/pcie-
+> brcmstb.h new file mode 100644 index 000000000000..b4a507423bb0
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/brcm,brcmstb-pcie.txt
-> @@ -0,0 +1,98 @@
-> +Broadcom STB PCIe Host Controller Device Tree Bindings
+> +++ b/drivers/pci/host/pcie-brcmstb.h
+> @@ -0,0 +1,160 @@
+> +#ifndef __PCIE_BRCMSTB_H
+> +#define __PCIE_BRCMSTB_H
 > +
-> +This document describes the binding of the PCIe Root Complex hardware
-> +found in Broadcom Set Top Box System-on-Chips such as BCM7425 (MIPS),
-> +BCM7435 (MIPS) and
-> +BCM7445 (ARMv7).
+> +#include <linux/io.h>
 > +
-> +Required properties:
-> +- compatible: must be one of: "brcm,bcm7425-pcie"
-> +			      "brcm,bcm7435-pcie"
-> +			      "brcm,bcm7445-pcie"
+> +/* Broadcom PCIE Offsets */
+> +#define PCIE_RC_CFG_PCIE_LINK_CAPABILITY		0x00b8
+> +#define PCIE_RC_CFG_PCIE_LINK_STATUS_CONTROL
+> 	0x00bc
+> +#define PCIE_RC_CFG_PCIE_ROOT_CAP_CONTROL		0x00c8
+> +#define PCIE_RC_CFG_PCIE_LINK_STATUS_CONTROL_2
+> 	0x00dc
+> +#define PCIE_RC_CFG_VENDOR_VENDOR_SPECIFIC_REG1
+> 	0x0188
+> +#define PCIE_RC_CFG_PRIV1_ID_VAL3			0x043c
+> +#define PCIE_RC_DL_MDIO_ADDR				0x1100
+> +#define PCIE_RC_DL_MDIO_WR_DATA
+> 	0x1104
+> +#define PCIE_RC_DL_MDIO_RD_DATA
+> 	0x1108
+> +#define PCIE_MISC_MISC_CTRL				0x4008
+> +#define PCIE_MISC_CPU_2_PCIE_MEM_WIN0_LO		0x400c
+> +#define PCIE_MISC_CPU_2_PCIE_MEM_WIN0_HI		0x4010
+> +#define PCIE_MISC_RC_BAR1_CONFIG_LO			0x402c
+> +#define PCIE_MISC_RC_BAR1_CONFIG_HI			0x4030
+> +#define PCIE_MISC_RC_BAR2_CONFIG_LO			0x4034
+> +#define PCIE_MISC_RC_BAR2_CONFIG_HI			0x4038
+> +#define PCIE_MISC_RC_BAR3_CONFIG_LO			0x403c
+> +#define PCIE_MISC_RC_BAR3_CONFIG_HI			0x4040
+> +#define PCIE_MISC_MSI_BAR_CONFIG_LO			0x4044
+> +#define PCIE_MISC_MSI_BAR_CONFIG_HI			0x4048
+> +#define PCIE_MISC_MSI_DATA_CONFIG			0x404c
+> +#define PCIE_MISC_PCIE_CTRL				0x4064
+> +#define PCIE_MISC_PCIE_STATUS				0x4068
+> +#define PCIE_MISC_REVISION				0x406c
+> +#define PCIE_MISC_CPU_2_PCIE_MEM_WIN0_BASE_LIMIT	0x4070
+> +#define PCIE_MISC_HARD_PCIE_HARD_DEBUG
+> 	0x4204
+> +#define PCIE_INTR2_CPU_BASE				0x4300
+> +#define PCIE_MSI_INTR2_BASE				0x4500
 > +
-> +- reg: specifies the physical base address of the controller registers
-> +and
-> +  its length
+> +#define PCIE_RGR1_SW_INIT_1				0x9210
+> +#define PCIE_EXT_CFG_INDEX				0x9000
+> +#define PCIE_EXT_CFG_DATA				0x9004
 > +
-> +- interrupt-parent: must be a reference (phandle) to the parent
-> +interrupt
-> +  controller in the system (7038-l1-intc on MIPS, GIC on ARM/ARM64)
+> +/* BCM7425 specific register offsets */
+> +#define BCM7425_PCIE_RGR1_SW_INIT_1			0x8010
+> +#define BCM7425_PCIE_EXT_CFG_INDEX			0x8300
+> +#define BCM7425_PCIE_EXT_CFG_DATA			0x8304
 > +
-> +- interrrupts: first interrupt must be the Level 1 interrupt number
-> +corresponding
-> +  to the main PCIe RC interrupt, second interrupt must be the MSI
-> +interrupt
-> +  See the interrupt-parent documentation for the number of cells and their
-> meaning:
-> +  MIPS:
-> +Documentation/devicetree/bindings/interrupt-controller/brcm,bcm7038-
-> l1-
-> +intc.txt
-> +  ARM/ARM64:
-> +Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> +#define PCI_BUSNUM_SHIFT		20
+> +#define PCI_SLOT_SHIFT			15
+> +#define PCI_FUNC_SHIFT			12
 > +
-> +- interrupt-names: must be "pcie", and if present "msi"
+> +#define BRCM_NUM_PCI_OUT_WINS		4
+> +#define BRCM_MAX_SCB			4
 > +
-> +- interrupt-map: see pci.txt
+> +/* Offsets from PCIE_INTR2_CPU_BASE and PCIE_MSI_INTR2_BASE */
+> +#define STATUS				0x0
+> +#define SET				0x4
+> +#define CLR				0x8
+> +#define MASK_STATUS			0xc
+> +#define MASK_SET			0x10
+> +#define MASK_CLR			0x14
 > +
-> +- interrupt-map-mask: see pci.txt
+> +enum brcm_pcie_type {
+> +	BCM7425,
+> +	BCM7435,
+> +	GENERIC,
+> +};
 > +
-> +- #address-cells: must be set to <3>, see pci.txt
+> +struct brcm_pcie;
 > +
-> +- #size-cells: must be set to <2>, see pci.txt
+> +/* Chip-specific PCIe operations (read/write config and reset) */
+> +struct brcm_pcie_ll_ops {
+> +	u32 (*read_config)(struct brcm_pcie *pcie, int cfg_idx);
+> +	void (*write_config)(struct brcm_pcie *pcie, int cfg_idx, u32 val);
+> +	void (*rgr1_sw_init)(struct brcm_pcie *pcie, u32 mask,
+> +			     int shift, u32 val);
+> +};
 > +
-> +- ranges: ranges for the PCI outbound windows, no I/O or prefetchable
-> +windows
-> +  must be specified here, only non-prefetchable. 32-bits windows or
-> +64-bits
-> +  windows are allowed based on the host processor's capabilities (ARM
-> +w/ LPAE,
-> +  ARM64).
+> +struct brcm_pcie_cfg_data {
+> +	const enum brcm_pcie_type type;
+> +	const struct brcm_pcie_ll_ops ops;
+> +};
 > +
-> +- #interrupt-cells: set to <1>, see pci.txt
+> +struct brcm_msi;
 > +
-> +- brcm,log2-scb-sizes: log2 size of the SCB window that is mapped to
-> +PCIe space
-> +  there must be exactly one value per memory controller present in the
-> +system
-> +  (ranges from 1 to 3)
-
-Can you please give more insight on what does this property do ?
-
-Bharat
+> +/* Internal Bus Controller Information.*/ struct brcm_pcie {
+> +	void __iomem		*base;
+> +	bool			suspended;
+> +	struct clk		*clk;
+> +	struct device_node	*dn;
+> +	bool			ssc;
+> +	int			gen;
+> +	int			scb_size_vals[BRCM_MAX_SCB];
+> +	struct pci_bus		*bus;
+> +	struct device		*dev;
+> +	struct list_head	resource;
+> +	int			msi_irq;
+> +	struct brcm_msi		*msi;
+> +	unsigned int		rev;
+> +	unsigned int		num;
+> +	bool			bridge_setup_done;
+> +	enum brcm_pcie_type	type;
+> +	const struct brcm_pcie_ll_ops *ops;
+> +	unsigned int		num_memc;
+> +};
 > +
-> +Optional properties:
+> +/* Helper functions to access read/write config space and software init
+> +which
+> + * are chip-specific
+> + */
+> +static inline u32 brcm_pcie_ll_read_config(struct brcm_pcie *pcie, int
+> +cfg_idx) {
+> +	return pcie->ops->read_config(pcie, cfg_idx); }
 > +
-> +- msi-controller: indicates that this is a MSI controller node (when
-> +supported)
+> +static inline void brcm_pcie_ll_write_config(struct brcm_pcie *pcie,
+> +					     int cfg_idx, u32 val)
+> +{
+> +	pcie->ops->write_config(pcie, cfg_idx, val); }
 > +
-> +- clocks: phandle to the functional clock that feeds into the PCIe RC
-> +block
+> +static inline void brcm_pcie_rgr1_sw_init(struct brcm_pcie *pcie, u32 mask,
+> +					  int shift, u32 val)
+> +{
+> +	pcie->ops->rgr1_sw_init(pcie, mask, shift, val); }
 > +
-> +- clock-names: the name(s) of the clocks specified in 'clocks'.  Note
-> +  that if the 'clocks' property is given, 'clock-names' is mandatory,
-> +  and the name of the clock is expected to be "pcie".
+> +/*
+> + * MIPS endianness is configured by boot strap, which also reverses all
+> + * bus endianness (i.e., big-endian CPU + big endian bus ==> native
+> + * endian I/O).
+> + *
+> + * Other architectures (e.g., ARM) either do not support big endian, or
+> + * else leave I/O in little endian mode.
+> + */
+> +static inline u32 bpcie_readl(void __iomem *base) {
+> +	if (IS_ENABLED(CONFIG_MIPS))
+> +		return __raw_readl(base);
+> +	else
+> +		return readl(base);
+> +}
 > +
-> +- brcm,ssc: boolean that indicates usage of spread-spectrum clocking
+> +static inline void bpcie_writel(u32 val, void __iomem *base) {
+> +	if (IS_ENABLED(CONFIG_MIPS))
+> +		__raw_writel(val, base);
+> +	else
+> +		writel(val, base);
+> +}
 > +
-> +- brcm,gen: integer that indicates desired forced generation of link: 1
-> +=> 2.5
-> +  Gbps, 2 => 5.0 Gbps, 3 => 8.0 Gbps. Will override the auto-negotation
-> +if
-> +  specified.
+> +#ifdef CONFIG_PCIE_BRCMSTB_MSI
+> +int brcm_pcie_enable_msi(struct brcm_pcie *pcie, int nr); void
+> +brcm_pcie_msi_chip_set(struct brcm_pcie *pcie); #else static inline int
+> +brcm_pcie_enable_msi(struct brcm_pcie *pcie, int nr) {
+> +	return 0;
+> +}
+> +static inline void brcm_pcie_msi_chip_set(struct brcm_pcie *pcie) { }
+> +#endif
 > +
-> +- <*>-supply: see
-> +Documentation/devicetree/bindings/regulator/regulator.txt
-> +
-> +- <*>-supply-names: see
-> +Documentation/devicetree/bindings/regulator/regulator.txt
-> +
-> +Example Node:
-> +
-> +This example assumes that the top-level #address-cells = <2> and
-> +#size-cells = <2>, e.g: ARM LPAE configuration.
-> +
-> +	pcie0: pcie-controller at f0460000 {
-> +		reg = <0x0 0xf0460000 0x0 0x9310>;
-> +		interrupts = <0x0 0x33 0x4>, <0x0 0x34, 0x4>;
-> +		interrupt-names = "pcie", "msi";
-> +		compatible = "brcm,bcm7445-pcie";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +
-> +		/* Two non-prefetchable 32-bits memory space, each of
-> 128MB
-> + 		 * with the following mapping:
-> +		 * PCIe address		=> CPU physical address space
-> +		 * 0x00_0000_0000	=> 0x00_C000_0000
-> +		 * 0x00_0800_0000	=> 0x00_C800_0000
-> +		 */
-> +		ranges = <0x02000000 0x00000000 0x00000000 0x00000000
-> 0xc0000000 0x00000000 0x08000000>,
-> +			 <0x02000000 0x00000000 0x08000000 0x00000000
-> 0xc8000000 0x00000000 0x08000000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0xf800 0 0 7>;
-> +		interrupt-map = <0 0 0 1 &intc 47 3
-> +				 0 0 0 2 &intc 48 3
-> +				 0 0 0 3 &intc 49 3
-> +				 0 0 0 4 &intc 50 3>;
-> +		clocks = <&pcie0>;
-> +		clock-names = "pcie";
-> +		brcm,ssc;
-> +		brcm,log2-scb-sizes = <0x1e 0x1e 0x1e>;
-> +		vreg-wifi-pwr-supply-names = "vreg-wifi-pwr";
-> +		vreg-wifi-pwr-supply = <&vreg-wifi-pwr>;
-> +	};
+> +#endif /* __PCIE_BRCMSTB_H */
 > --
 > 2.1.0
 > 
