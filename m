@@ -1,52 +1,126 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 May 2016 15:15:41 -0700
-Subject: [linux-sunxi] Re: [PATCH v4 01/11] clk: sunxi: Add display and
- TCON0 clocks driver
-In-Reply-To: <1462907459.9981.0.camel@plaes.org>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
- <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160506223002.GE3492@codeaurora.org>
- <20160508200308.GF6167@lukather>
- <20160509223238.GW3492@codeaurora.org>
- <20160509223924.GX3492@codeaurora.org>
- <1462907459.9981.0.camel@plaes.org>
-Message-ID: <20160511221541.GG3492@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 12 May 2016 00:29:02 +0200
+Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <5733A47B.8030908@caviumnetworks.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
+ <20160511104032.GA31374@arm.com>
+ <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
+ <57339F39.3040603@caviumnetworks.com>
+ <CAJZ5v0h8zBEZ2nLLdk62r7uqHizUfVWamUVEriBGe1XBE6462Q@mail.gmail.com>
+ <5733A47B.8030908@caviumnetworks.com>
+Message-ID: <CAJZ5v0gBTANFntBSkyaRtt-BKOMC+pz_R9CwM6wKnp=Ni1dPFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10, Priit Laes wrote:
-> On Mon, 2016-05-09 at 15:39 -0700, Stephen Boyd wrote:
-> > On 05/09, Stephen Boyd wrote:
-> > > 
-> > > 
-> > > Ok I applied this one to clk-next.
-> > > 
-> > And I squashed this in to silence the following checker warning.
-> > 
-> > drivers/clk/sunxi/clk-sun4i-display.c:110:33: warning: Variable
-> > length array is used.
-> > 
-> > ---8<---
-> > diff --git a/drivers/clk/sunxi/clk-sun4i-display.c
-> > b/drivers/clk/sunxi/clk-sun4i-display.c
-> > index f02e250e64ed..f8ff6c4a5633 100644
-> > --- a/drivers/clk/sunxi/clk-sun4i-display.c
-> > +++ b/drivers/clk/sunxi/clk-sun4i-display.c
-> > @@ -107,7 +107,7 @@ static int sun4i_a10_display_reset_xlate(struct
-> > reset_controller_dev *rcdev,
-> > ?static void __init sun4i_a10_display_init(struct device_node *node,
-> > ?					??const struct
-> > sun4i_a10_display_clk_data *data)
-> > ?{
-> > -	const char *parents[data->parents];
-> > +	const char *parents[4];
-> 
-> This change breaks at least de_[bf]e clocks which have 3 clock parents.
-> 
+On Wed, May 11, 2016 at 11:30 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 05/11/2016 02:22 PM, Rafael J. Wysocki wrote:
+>>
+>> On Wed, May 11, 2016 at 11:08 PM, David Daney <ddaney@caviumnetworks.com>
+>> wrote:
+>>>
+>>> On 05/11/2016 01:35 PM, Rafael J. Wysocki wrote:
+>>>>
+>>>>
+>>>> On Wed, May 11, 2016 at 12:40 PM, Will Deacon <will.deacon@arm.com>
+>>>> wrote:
+>>>>>
+>>>>>
+>>>>> On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
+>>>>>>
+>>>>>>
+>>>>>> On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com>
+>>>>>> wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> From: David Daney <david.daney@cavium.com>
+>>>>>>>
+>>>>>>> Based on
+>>>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+>>>>>>> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check
+>>>>>>> for
+>>>>>>> AArch32 state")
+>>>>>
+>>>>>
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>>>> David Daney (2):
+>>>>>>>     arm64, numa: Cleanup NUMA disabled messages.
+>>>>>>>     acpi, numa, srat: Improve SRAT error detection and add messages.
+>>>>>>>
+>>>>>>> Hanjun Guo (11):
+>>>>>>>     acpi, numa: Use pr_fmt() instead of printk
+>>>>>>>     acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>>>>>>>     acpi, numa: remove duplicate NULL check
+>>>>>>>     acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>>>>>>>     arm64, numa: rework numa_add_memblk()
+>>>>>>>     x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>>>>>>>     acpi, numa: move bad_srat() and srat_disabled() to
+>>>>>>>       drivers/acpi/numa.c
+>>>>>>>     acpi, numa: remove unneeded acpi_numa=1
+>>>>>>>     acpi, numa: Move acpi_numa_memory_affinity_init() to
+>>>>>>>       drivers/acpi/numa.c
+>>>>>>>     arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>>>>>>>     acpi, numa: Enable ACPI based NUMA on ARM64
+>>>>>>>
+>>>>>>> Robert Richter (1):
+>>>>>>>     acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> I need ACKs from the ARM64 maintainers on patches [6-7/13] and
+>>>>>> [13-14/14].
+>>>>>
+>>>>>
+>>>>>
+>>>>> There's also a dependency on the arm64 for-next/core branch, so I've
+>>>>> been
+>>>>> largely ignoring this as far as 4.6 is concerned and was planning to
+>>>>> take
+>>>>> a proper look for 4.7 once the upcoming merge window is out of the way.
+>>>>
+>>>>
+>>>>
+>>>> That would be 4.7 and 4.8 respectively I suppose?
+>>>>
+>>>> Anyway, Catalin has ACKed all of them except for the [13/14], so
+>>>> technically I can apply [1-12/14] now and then [13-14/14] can be
+>>>> applied when they are ready.
+>>>>
+>>>> Do you think there will be any problems with merging [6-7/14] into 4.7
+>>>> via the ACPI tree?
+>>>>
+>>>
+>>> I would defer to the arm64 maintainers for decisions about the arm64
+>>> specific parts of the patch set.  That said, many of the arm64 specific
+>>> patches depend on the arm64 for-next/core branch, so you would have to be
+>>> careful about merge ordering if you pull these in before the
+>>> for-next/core
+>>> branch is merged.
+>>
+>>
+>> Fair enough.  I will wait for an update then.
+>>
+>>> Also FWIW, I plan on addressing Catalin's comments about 13/14 and
+>>> posting a
+>>> new version of the patch set in the next day or two.
+>>
+>>
+>> OK, but in that case it won't be considered for 4.7 (at least not by
+>> me), so I'd suggest sending it in the second half of the 4.7 merge
+>> window (or about that time).
+>
+>
+> To be candid, I would very much like for you to pull in as many of the
+> patches as you are comfortable with as soon as possible.
+>
+> I don't know where Will and Catalin stand on this, and their opinion is
+> obviously important, but getting 1-12/14 merged to v4.7 and deferring the
+> last two for v4.8 would simplify the whole process for me.  The drawback is
+> carrying dead code around until the final parts are merged.
 
-I just used the largest data->parents number, which was 4. How
-does that break anything?
+That is not unheard of, however.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+OK, I'll try to put the [1-12/14] into my linux-next branch early next
+week and we'll see if that triggers any conflicts.
