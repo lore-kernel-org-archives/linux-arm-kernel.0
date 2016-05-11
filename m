@@ -1,90 +1,61 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 11 May 2016 15:18:00 +0100
-Subject: [PATCH v3 24/55] KVM: arm/arm64: vgic-new: Add ENABLE registers
- handlers
-In-Reply-To: <5733300C.9070304@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-25-git-send-email-andre.przywara@arm.com>
- <20160511123423.GO27623@cbox> <5733300C.9070304@arm.com>
-Message-ID: <57333F18.5030605@arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 11 May 2016 09:15:50 -0500
+Subject: [Patch v4 0/8] Qualcomm SCM Rework
+Message-ID: <1462976158-26016-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following set of patches does a bit of rework on the existing
+Qualcomm SCM firmware.  The first couple of patches deals with turning
+the current SCM into a platform driver.  The next couple are cleanups
+that make adding the 64 support a little easier.  I added in a patch to
+convert the scm-32 to use DMA streaming APIs.
 
-On 11/05/16 14:13, Marc Zyngier wrote:
-> On 11/05/16 13:34, Christoffer Dall wrote:
->> On Fri, May 06, 2016 at 11:45:37AM +0100, Andre Przywara wrote:
->>> As the enable register handlers are shared between the v2 and v3
->>> emulation, their implementation goes into vgic-mmio.c, to be easily
->>> referenced from the v3 emulation as well later.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> Changelog RFC..v1:
->>> - use lower bits of address to determine IRQ number
->>> - remove TODO, confirmed to be fine
->>>
->>> Changelog v1 .. v2:
->>> - adapt to new MMIO framework
->>>
->>>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
->>>  virt/kvm/arm/vgic/vgic-mmio.c    | 56 ++++++++++++++++++++++++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic-mmio.h    | 11 ++++++++
->>>  3 files changed, 69 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>> index 69e96f7..448d1da 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>> @@ -72,9 +72,9 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
->>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
->>>  		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
->>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
->>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
->>> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
->>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
->>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
->>> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
->>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
->>>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
->>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->>> index 41cf4f4..077ae86 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->>> @@ -46,6 +46,62 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
->>>  	/* Ignore */
->>>  }
->>>  
->>> +/*
->>> + * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
->>> + * of the enabled bit, so there is only one function for both here.
->>> + */
->>> +unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
->>> +				    gpa_t addr, unsigned int len)
->>> +{
->>> +	u32 intid = (addr & 0x7f) * 8;
->>
->> is there anything we can do about this to make it more intuitive?  A
->> macro to generate the mask/offset based on bits per interrupt or
->> something?
-> 
-> Untested (and thus probably wrong):
-> 
-> #define VGIC_ADDR_IRQ_MASK(bits) ((1024 - 1) >> (4 - (bits))
-> #define VGIC_ADDR_IRQ_MULT(bits) (8 / (bits))
-> #define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
-> 					 VGIC_ADDR_IRQ_MULT(bits))
-> 
+I took Kumar's 64 bit support patch and modified it to use the arm_smccc
+calls.  This simplified things quite a bit.
 
-Would:
+Lastly, there are a few DT patches to add the firmware node for a couple of the
+supported platforms.
 
-#define VGIC_ADDR_IRQ_MASK(bits) GENMASK_ULL((bits) + 10 - 1 - 1, 0)
-#define VGIC_ADDR_TO_INTID(addr, bits) (((addr) &		\
-			VGIC_ADDR_IRQ_MASK(bits)) * 64 / (bits) / 8)
+Changes from v3:
+  * Added compatibles for the specific platforms requiring one clock.
+  * All other platforms will use the generic binding that requires 3 clocks.
 
-work for all bitnesses?
+Changes from v2:
+  * Added use of streaming DMA APIs for scm-32.
+  * Changed DT binding to simplify compats.
+  * Removed Kconfig.platform change that selected QCOM_SCM for ARM64
+  * Fixed misc comments
+  * Changed init function to populate the device differently.
+  * Fixed missing of_node_put
 
-Cheers,
-Andre.
+Changes from v1:
+  * Changed binding to reflect proper firmware node usage
+  * Added arch_initcall to populate the firmware device, if present
+  * Fixed various review comments
+  * Removed extraneous includes from SCM 64 file.
+
+Andy Gross (7):
+  dt/bindings: firmware: Add Qualcomm SCM binding
+  firmware: qcom: scm: Convert SCM to platform driver
+  firmware: qcom: scm: Use atomic SCM for cold boot
+  firmware: qcom: scm: Generalize shared error map
+  firmware: qcom: scm: Convert to streaming DMA APIS
+  dts: qcom: apq8084: Add SCM firmware node
+  arm64: dts: msm8916: Add SCM firmware node
+
+Kumar Gala (1):
+  firmware: qcom: scm: Add support for ARM64 SoCs
+
+ .../devicetree/bindings/firmware/qcom,scm.txt      |  28 +++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   8 +
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   8 +
+ drivers/firmware/qcom_scm-32.c                     | 234 +++++++++------------
+ drivers/firmware/qcom_scm-64.c                     | 208 +++++++++++++++++-
+ drivers/firmware/qcom_scm.c                        | 171 ++++++++++++++-
+ drivers/firmware/qcom_scm.h                        |  31 ++-
+ 7 files changed, 526 insertions(+), 162 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+
+-- 
+1.9.1
