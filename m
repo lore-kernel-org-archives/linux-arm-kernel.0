@@ -1,75 +1,56 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 15:30:10 +0200
-Subject: [PULL 17/29] arm64: kvm: Add support for 16K pages
+Date: Wed, 11 May 2016 15:30:13 +0200
+Subject: [PULL 20/29] clocksource: arm_arch_timer: Extend arch_timer_kvm_info
+ to get the virtual IRQ
 In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
 References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1462973422-10021-18-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1462973422-10021-21-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Julien Grall <julien.grall@arm.com>
 
-Now that we can handle stage-2 page tables independent
-of the host page table levels, wire up the 16K page
-support.
+Currently, the firmware table is parsed by the virtual timer code in
+order to retrieve the virtual timer interrupt. However, this is already
+done by the arch timer driver.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+To avoid code duplication, extend arch_timer_kvm_info to get the virtual
+IRQ.
+
+Note that the KVM code will be modified in a subsequent patch.
+
+Signed-off-by: Julien Grall <julien.grall@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_arm.h | 13 +++++++++++--
- arch/arm64/kvm/Kconfig           |  1 -
- 2 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 2 ++
+ include/clocksource/arm_arch_timer.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 1281d98..c6cbb36 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -114,6 +114,7 @@
- #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
- #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
- #define VTCR_EL2_TG0_4K		TCR_TG0_4K
-+#define VTCR_EL2_TG0_16K	TCR_TG0_16K
- #define VTCR_EL2_TG0_64K	TCR_TG0_64K
- #define VTCR_EL2_SH0_MASK	TCR_SH0_MASK
- #define VTCR_EL2_SH0_INNER	TCR_SH0_INNER
-@@ -139,7 +140,7 @@
-  * (see hyp-init.S).
-  *
-  * Note that when using 4K pages, we concatenate two first level page tables
-- * together.
-+ * together. With 16K pages, we concatenate 16 first level page tables.
-  *
-  * The magic numbers used for VTTBR_X in this patch can be found in Tables
-  * D4-23 and D4-25 in ARM DDI 0487A.b.
-@@ -157,7 +158,15 @@
-  */
- #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
- #define VTTBR_X_TGRAN_MAGIC		38
--#else
-+#elif defined(CONFIG_ARM64_16K_PAGES)
-+/*
-+ * Stage2 translation configuration:
-+ * 16kB pages (TG0 = 2)
-+ * 2 level page tables (SL = 1)
-+ */
-+#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
-+#define VTTBR_X_TGRAN_MAGIC		42
-+#else	/* 4K */
- /*
-  * Stage2 translation configuration:
-  * 4kB pages (TG0 = 0)
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index de7450d..aa2e34e 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -22,7 +22,6 @@ config KVM_ARM_VGIC_V3
- config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
- 	depends on OF
--	depends on !ARM64_16K_PAGES
- 	select MMU_NOTIFIER
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 62bdfe7..bb58224 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -750,6 +750,8 @@ static void __init arch_timer_init(void)
+ 
+ 	arch_timer_register();
+ 	arch_timer_common_init();
++
++	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
+ }
+ 
+ static void __init arch_timer_of_init(struct device_node *np)
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 9101ed6b..9dd996a 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -51,6 +51,7 @@ enum arch_timer_reg {
+ 
+ struct arch_timer_kvm_info {
+ 	struct timecounter timecounter;
++	int virtual_irq;
+ };
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER
 -- 
 2.1.2.330.g565301e.dirty
