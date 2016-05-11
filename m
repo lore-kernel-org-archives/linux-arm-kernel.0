@@ -1,48 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 11:39:19 +0200
-Subject: [PATCH v3 19/55] KVM: arm/arm64: vgic-new: Add GICv3 world
- switch backend
-In-Reply-To: <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-20-git-send-email-andre.przywara@arm.com>
- <20160510140454.GG27623@cbox>
- <CAFEAcA9U9qqsSJt7RfNJmDutCsYwnaPGfi-sEcnxYYjSm5C8sA@mail.gmail.com>
-Message-ID: <20160511093919.GJ27623@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 May 2016 10:40:57 +0100
+Subject: [PATCH] arm64: cpuinfo: Missing NULL terminator in
+ compat_hwcap_str
+In-Reply-To: <5732FD9C.8000503@arm.com>
+References: <1462891231-17605-1-git-send-email-julien.grall@arm.com>
+ <20160510145441.GC10785@leverpostej> <5732FD9C.8000503@arm.com>
+Message-ID: <20160511094057.GE26564@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 03:15:12PM +0100, Peter Maydell wrote:
-> On 10 May 2016 at 15:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Fri, May 06, 2016 at 11:45:32AM +0100, Andre Przywara wrote:
-> >> +     /*
-> >> +      * Currently all guest IRQs are Group1, as Group0 would result
-> >> +      * in a FIQ in the guest, which it wouldn't expect.
+On Wed, May 11, 2016 at 10:38:36AM +0100, Julien Grall wrote:
+> Hi Mark,
+> 
+> On 10/05/2016 15:54, Mark Rutland wrote:
+> >On Tue, May 10, 2016 at 03:40:31PM +0100, Julien Grall wrote:
+> >>The loop that browses the array compat_hwcap_str will stop when a NULL
+> >>is encountered, however NULL is missing at the end of array. This will
+> >>result to overrun until one NULL is found somewhere in the memory.
 > >
-> > I still don't like or understand this comment.  This should simply say
-> > that we're making a gross assumption about all interrupts being group1
-> > here.
+> >Probably worth adding something like:
+> >
+> >Note for backporting: commit 12d11817eaafa414 ("arm64: Move
+> >/proc/cpuinfo handling code") moved this code. Prior to that commit, the
+> >same change should be made in arch/arm64/kernel/setup.c.
 > 
-> It's not really an assumption so much as it's a missing feature (aka bug):
-> there's no reason the vGIC shouldn't support group 0 interrupts. We
-> just get away with only supporting group 1 because Linux guests
-> happen to only use group 1 interrupts. If/when the vGIC gains support
-> for group0 interrupts, then it should reset with interrupts configured
-> in group0 by default.
-> 
-> >> +      * Eventually we want to make this configurable, so we may
-> >> +      * revisit this in the future.
-> >> +      */
-> 
-> The only reason to make it configurable is to work around a guest
-> kernel bug whereby Linux assumes that all interrupts start out
-> in Group1. Marc sent out a patch earlier today that fixes that bug:
->  https://lkml.org/lkml/2016/5/10/297
-> Depending on how long it takes you to fix this missing vgic feature,
-> such kernels may all be long-forgotten, in which case you can
-> get away without the config option :-)
-> 
-Agreed with all of the above.  My nit here is simply that if we don't
-implement grouping support now, then it's just a gross hack, and we
-should just state that until we fix it properly.
+> I can resend the patch with this changes.
 
--Christoffer
+No need, I've already applied it locally with Mark's suggestions.
+
+Will
