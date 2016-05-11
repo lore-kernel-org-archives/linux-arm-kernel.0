@@ -1,48 +1,27 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 11 May 2016 20:26:52 +0200
-Subject: [PATCH v8 3/8] i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
-In-Reply-To: <1462908252-27016-4-git-send-email-david.wu@rock-chips.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <1462908252-27016-4-git-send-email-david.wu@rock-chips.com>
-Message-ID: <2477327.hJjg0APDhg@phil>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Wed, 11 May 2016 11:32:26 -0700
+Subject: [PATCH 6/6] pinctrl: mt8173: set GPIO16 to usb iddig mode
+In-Reply-To: <CACRpkdaeD5mk7LXEWnE0=Xute8-JA-fa4tVt4fYhujEXeq2+9w@mail.gmail.com>
+References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462868614-20602-7-git-send-email-chunfeng.yun@mediatek.com>
+ <CACRpkdaeD5mk7LXEWnE0=Xute8-JA-fa4tVt4fYhujEXeq2+9w@mail.gmail.com>
+Message-ID: <1462991546.11623.3.camel@mussux00>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 11. Mai 2016, 03:24:07 schrieb David Wu:
-> Call rk3x_i2c_setup() before rk3x_i2c_start()
-
-That beginning of the sentence could use a tiny improvement, like
-
-----
-rk3x_i2c_setup() gets called directly before rk3x_i2c_start()
-----
-
-to make it obvious what happens in the code.
-
-But a nice small improvement
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-> and the last thing in setup was to clean the IPD,
-> so no reason to do it at the beginning of start.
+On Wed, 2016-05-11 at 13:56 +0200, Linus Walleij wrote:
+> On Tue, May 10, 2016 at 10:23 AM, Chunfeng Yun
+> <chunfeng.yun@mediatek.com> wrote:
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> ---
-> Change in v8:
-> - none
+> > the default mode of GPIO16 pin is gpio, when set EINT16 to
+> > IRQ_TYPE_LEVEL_HIGH, no interrupt is triggered, it can be
+> > fixed when set its default mode as usb iddig.
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 > 
->  drivers/i2c/busses/i2c-rk3x.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index 1e2677a..9eeb4e5 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -174,7 +174,6 @@ static void rk3x_i2c_start(struct rk3x_i2c *i2c)
->  {
->  	u32 val;
-> 
-> -	rk3x_i2c_clean_ipd(i2c);
->  	i2c_writel(i2c, REG_INT_START, REG_IEN);
-> 
->  	/* enable adapter with correct mode, send START condition */
+
+Chunfeng, GPIO16 can be used as EINT16 mode, but the pinmux should be 0.
+If you want to set its default mode to iddig, you should set it in dts.
+
+Yours,
+Hongzhou
