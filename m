@@ -1,207 +1,126 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 15:30:18 +0200
-Subject: [PULL 25/29] irqchip/gic-v3: Parse and export virtual GIC information
-In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
-References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1462973422-10021-26-git-send-email-christoffer.dall@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 11 May 2016 14:36:20 +0100
+Subject: [PATCH v3 23/55] KVM: arm/arm64: vgic-new: Add CTLR, TYPER and
+ IIDR handlers
+In-Reply-To: <57333359.3000505@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-24-git-send-email-andre.przywara@arm.com>
+ <20160511120533.GM27623@cbox> <57332AD8.6050306@arm.com>
+ <20160511131556.GR27623@cbox> <57333359.3000505@arm.com>
+Message-ID: <57333554.9070908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@arm.com>
+Hi,
 
-Fill up the recently introduced gic_kvm_info with the hardware
-information used for virtualization.
+On 11/05/16 14:27, Marc Zyngier wrote:
+> On 11/05/16 14:15, Christoffer Dall wrote:
+>> On Wed, May 11, 2016 at 01:51:36PM +0100, Marc Zyngier wrote:
+>>> On 11/05/16 13:05, Christoffer Dall wrote:
+>>>> On Fri, May 06, 2016 at 11:45:36AM +0100, Andre Przywara wrote:
+>>>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>
+>>>>> Those three registers are v2 emulation specific, so their implementation
+>>>>> lives entirely in vgic-mmio-v2.c. Also they are handled in one function,
+>>>>> as their implementation is pretty simple.
+>>>>> When the guest enables the distributor, we kick all VCPUs to get
+>>>>> potentially pending interrupts serviced.
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>>> ---
+>>>>> Changelog RFC..v1:
+>>>>> - kick VCPUs is the distributor gets enabled
+>>>>> - improve comment
+>>>>>
+>>>>> Changelog v1 .. v2:
+>>>>> - adapt to new MMIO framework
+>>>>> - use switch() statements to improve readability
+>>>>>
+>>>>> Changelog v2 .. v3:
+>>>>> - add vgic_kick_vcpus() implementation
+>>>>>
+>>>>>  include/linux/irqchip/arm-gic.h  |  1 +
+>>>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 48 +++++++++++++++++++++++++++++++++++++++-
+>>>>>  virt/kvm/arm/vgic/vgic.c         | 15 +++++++++++++
+>>>>>  virt/kvm/arm/vgic/vgic.h         |  4 ++++
+>>>>>  4 files changed, 67 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+>>>>> index be0d26f..fd05185 100644
+>>>>> --- a/include/linux/irqchip/arm-gic.h
+>>>>> +++ b/include/linux/irqchip/arm-gic.h
+>>>>> @@ -33,6 +33,7 @@
+>>>>>  
+>>>>>  #define GIC_DIST_CTRL			0x000
+>>>>>  #define GIC_DIST_CTR			0x004
+>>>>> +#define GIC_DIST_IIDR			0x008
+>>>>>  #define GIC_DIST_IGROUP			0x080
+>>>>>  #define GIC_DIST_ENABLE_SET		0x100
+>>>>>  #define GIC_DIST_ENABLE_CLEAR		0x180
+>>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>> index 2729a22..69e96f7 100644
+>>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>> @@ -20,9 +20,55 @@
+>>>>>  #include "vgic.h"
+>>>>>  #include "vgic-mmio.h"
+>>>>>  
+>>>>> +static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+>>>>> +					    gpa_t addr, unsigned int len)
+>>>>> +{
+>>>>> +	u32 value;
+>>>>> +
+>>>>> +	switch (addr & 0x0c) {
+>>>>> +	case GIC_DIST_CTRL:
+>>>>> +		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
+>>>>> +		break;
+>>>>> +	case GIC_DIST_CTR:
+>>>>> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+>>>>> +		value = (value >> 5) - 1;
+>>>>> +		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+>>>>> +		break;
+>>>>> +	case GIC_DIST_IIDR:
+>>>>> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+>>>>> +		break;
+>>>>> +	default:
+>>>>> +		return 0;
+>>>>> +	}
+>>>>> +
+>>>>> +	return extract_bytes(value, addr & 3, len);
+>>>>> +}
+>>>>> +
+>>>>> +static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
+>>>>> +				    gpa_t addr, unsigned int len,
+>>>>> +				    unsigned long val)
+>>>>> +{
+>>>>> +	switch (addr & 0x0c) {
+>>>>> +	case GIC_DIST_CTRL:
+>>>>> +		if (!(addr & 1)) {
+>>>>
+>>>> what is this !(addr & 1) check?
+>>>
+>>> We check that the write includes the lowest byte of the register. But as
+>>> we only have aligned accesses, it probably doesn't matter... I'll hack
+>>> that away.
+>>>
+>> where do we check to only have aligned accesses?
+> 
+> Looks like a missing feature. The v2 spec says:
+> 
+> 4.1.4 GIC register access
+> All registers support 32-bit word accesses with the access type defined
+> in Table 4-1 on page 4-73 and Table 4-2 on page 4-74.
+> In addition, the GICD_IPRIORITYRn, GICD_ITARGETSRn, GICD_CPENDSGIRn, and
+> GICD_SPENDSGIRn registers support byte accesses.
+> 
+> Similar thing for v3 (8.1.3).
+> 
+> By the look of it, we should add checks in all accessors. I'll get onto it.
 
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- drivers/irqchip/irq-gic-v3.c           | 114 ++++++++++++++++++++++++++++++++-
- include/linux/irqchip/arm-gic-common.h |   1 +
- 2 files changed, 114 insertions(+), 1 deletion(-)
+What about to tag every register in our vgic_register_region with a
+possible access width and do a generic check in
+dispatch_mmio_{read,write}? Then we wouldn't need to touch every handler.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 6a9f5ff..05a8560 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- 
- #include <linux/irqchip.h>
-+#include <linux/irqchip/arm-gic-common.h>
- #include <linux/irqchip/arm-gic-v3.h>
- 
- #include <asm/cputype.h>
-@@ -58,6 +59,8 @@ struct gic_chip_data {
- static struct gic_chip_data gic_data __read_mostly;
- static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
- 
-+static struct gic_kvm_info gic_v3_kvm_info;
-+
- #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() + SZ_64K)
-@@ -903,6 +906,30 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
- 	return 0;
- }
- 
-+static void __init gic_of_setup_kvm_info(struct device_node *node)
-+{
-+	int ret;
-+	struct resource r;
-+	u32 gicv_idx;
-+
-+	gic_v3_kvm_info.type = GIC_V3;
-+
-+	gic_v3_kvm_info.maint_irq = irq_of_parse_and_map(node, 0);
-+	if (!gic_v3_kvm_info.maint_irq)
-+		return;
-+
-+	if (of_property_read_u32(node, "#redistributor-regions",
-+				 &gicv_idx))
-+		gicv_idx = 1;
-+
-+	gicv_idx += 3;	/* Also skip GICD, GICC, GICH */
-+	ret = of_address_to_resource(node, gicv_idx, &r);
-+	if (!ret)
-+		gic_v3_kvm_info.vcpu = r;
-+
-+	gic_set_kvm_info(&gic_v3_kvm_info);
-+}
-+
- static int __init gic_of_init(struct device_node *node, struct device_node *parent)
- {
- 	void __iomem *dist_base;
-@@ -954,8 +981,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 
- 	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
- 			     redist_stride, &node->fwnode);
--	if (!err)
-+	if (!err) {
-+		gic_of_setup_kvm_info(node);
- 		return 0;
-+	}
- 
- out_unmap_rdist:
- 	for (i = 0; i < nr_redist_regions; i++)
-@@ -976,6 +1005,9 @@ static struct
- 	struct redist_region *redist_regs;
- 	u32 nr_redist_regions;
- 	bool single_redist;
-+	u32 maint_irq;
-+	int maint_irq_mode;
-+	phys_addr_t vcpu_base;
- } acpi_data __initdata;
- 
- static void __init
-@@ -1112,7 +1144,85 @@ static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
- 	return true;
- }
- 
-+static int __init gic_acpi_parse_virt_madt_gicc(struct acpi_subtable_header *header,
-+						const unsigned long end)
-+{
-+	struct acpi_madt_generic_interrupt *gicc =
-+		(struct acpi_madt_generic_interrupt *)header;
-+	int maint_irq_mode;
-+	static int first_madt = true;
-+
-+	/* Skip unusable CPUs */
-+	if (!(gicc->flags & ACPI_MADT_ENABLED))
-+		return 0;
-+
-+	maint_irq_mode = (gicc->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
-+		ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
-+
-+	if (first_madt) {
-+		first_madt = false;
-+
-+		acpi_data.maint_irq = gicc->vgic_interrupt;
-+		acpi_data.maint_irq_mode = maint_irq_mode;
-+		acpi_data.vcpu_base = gicc->gicv_base_address;
-+
-+		return 0;
-+	}
-+
-+	/*
-+	 * The maintenance interrupt and GICV should be the same for every CPU
-+	 */
-+	if ((acpi_data.maint_irq != gicc->vgic_interrupt) ||
-+	    (acpi_data.maint_irq_mode != maint_irq_mode) ||
-+	    (acpi_data.vcpu_base != gicc->gicv_base_address))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static bool __init gic_acpi_collect_virt_info(void)
-+{
-+	int count;
-+
-+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-+				      gic_acpi_parse_virt_madt_gicc, 0);
-+
-+	return (count > 0);
-+}
-+
- #define ACPI_GICV3_DIST_MEM_SIZE (SZ_64K)
-+#define ACPI_GICV2_VCTRL_MEM_SIZE	(SZ_4K)
-+#define ACPI_GICV2_VCPU_MEM_SIZE	(SZ_8K)
-+
-+static void __init gic_acpi_setup_kvm_info(void)
-+{
-+	int irq;
-+
-+	if (!gic_acpi_collect_virt_info()) {
-+		pr_warn("Unable to get hardware information used for virtualization\n");
-+		return;
-+	}
-+
-+	gic_v3_kvm_info.type = GIC_V3;
-+
-+	irq = acpi_register_gsi(NULL, acpi_data.maint_irq,
-+				acpi_data.maint_irq_mode,
-+				ACPI_ACTIVE_HIGH);
-+	if (irq <= 0)
-+		return;
-+
-+	gic_v3_kvm_info.maint_irq = irq;
-+
-+	if (acpi_data.vcpu_base) {
-+		struct resource *vcpu = &gic_v3_kvm_info.vcpu;
-+
-+		vcpu->flags = IORESOURCE_MEM;
-+		vcpu->start = acpi_data.vcpu_base;
-+		vcpu->end = vcpu->start + ACPI_GICV2_VCPU_MEM_SIZE - 1;
-+	}
-+
-+	gic_set_kvm_info(&gic_v3_kvm_info);
-+}
- 
- static int __init
- gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
-@@ -1161,6 +1271,8 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
- 		goto out_fwhandle_free;
- 
- 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
-+	gic_acpi_setup_kvm_info();
-+
- 	return 0;
- 
- out_fwhandle_free:
-diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
-index ef34f6f..c647b05 100644
---- a/include/linux/irqchip/arm-gic-common.h
-+++ b/include/linux/irqchip/arm-gic-common.h
-@@ -15,6 +15,7 @@
- 
- enum gic_type {
- 	GIC_V2,
-+	GIC_V3,
- };
- 
- struct gic_kvm_info {
--- 
-2.1.2.330.g565301e.dirty
+Cheers,
+Andre.
