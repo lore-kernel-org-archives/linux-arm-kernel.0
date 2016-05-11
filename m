@@ -1,42 +1,46 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 May 2016 14:12:16 +0200
-Subject: [PATCH] clk: samsung: exynos3250: Move PLL rates data to init section
-In-Reply-To: <1462968134-6085-1-git-send-email-k.kozlowski@samsung.com>
-References: <1462968134-6085-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1462968736-7568-1-git-send-email-k.kozlowski@samsung.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 11 May 2016 08:14:51 -0400
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable Exynos MFC driver as
+ module
+In-Reply-To: <5732D0BF.3020207@samsung.com>
+References: <1462914448-24480-1-git-send-email-javier@osg.samsung.com>
+ <1462914448-24480-2-git-send-email-javier@osg.samsung.com>
+ <5732D0BF.3020207@samsung.com>
+Message-ID: <d36b1ca3-413a-8a19-ad96-0775593e4337@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arrays with initialization data of PLLs can be moved to initconst
-section because they are referenced only from other initconst-level
-symbols.
+Hello Krzysztof,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/clk/samsung/clk-exynos3250.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 05/11/2016 02:27 AM, Krzysztof Kozlowski wrote:
+> On 05/10/2016 11:07 PM, Javier Martinez Canillas wrote:
+>> Exynos SoCs have a Multi Format Video Hardware Codec (MFC) IP block that
+>> can be used to {en,de}code video streams by hardware. Enable support for
+>> its driver as a module so the MFC can be tested.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
+>> ---
+>>
+>> This patch depends on https://patchwork.kernel.org/patch/8970711/
+>>
+>>  arch/arm/configs/multi_v7_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+> 
+> 
+> Both patches look good but only exynos_defconfig ended in Patchwork.
+> This one did not... because you forgot to Cc the samsung-soc list.
+>
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index 057c3f0d0e35..b2513959252d 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -669,7 +669,7 @@ static const struct samsung_gate_clock gate_clks[] __initconst = {
- };
+Sigh, this time I used the cc list suggested by get_maintainers.pl and
+forgot to double check if was complete. I'll resend and cc samsung-soc.
  
- /* APLL & MPLL & BPLL & UPLL */
--static const struct samsung_pll_rate_table exynos3250_pll_rates[] = {
-+static const struct samsung_pll_rate_table exynos3250_pll_rates[] __initconst = {
- 	PLL_35XX_RATE(1200000000, 400, 4, 1),
- 	PLL_35XX_RATE(1100000000, 275, 3, 1),
- 	PLL_35XX_RATE(1066000000, 533, 6, 1),
-@@ -691,7 +691,7 @@ static const struct samsung_pll_rate_table exynos3250_pll_rates[] = {
- };
- 
- /* EPLL */
--static const struct samsung_pll_rate_table exynos3250_epll_rates[] = {
-+static const struct samsung_pll_rate_table exynos3250_epll_rates[] __initconst = {
- 	PLL_36XX_RATE(800000000, 200, 3, 1,     0),
- 	PLL_36XX_RATE(288000000,  96, 2, 2,     0),
- 	PLL_36XX_RATE(192000000, 128, 2, 3,     0),
+> Best regards,
+> Krzysztod
+> 
+
+Best regards,
 -- 
-1.9.1
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
