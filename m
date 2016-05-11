@@ -1,66 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 May 2016 12:55:01 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <20160511075438.GA15628@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <57329320.1000500@huawei.com> <20160511075438.GA15628@yury-N73SV>
-Message-ID: <5842999.Zgpfq4gkVz@wuerfel>
+Date: Wed, 11 May 2016 12:56:03 +0200
+Subject: [PATCH v2 3/4] ARM64: Kconfig: Select the Amlogic Meson pin
+ controller driver
+In-Reply-To: <CACRpkdbTr7YUrzSQQci929ugBhTkJKWvpjdf5Wo3HkfVKFhGLw@mail.gmail.com>
+References: <1462176138-29433-1-git-send-email-carlo@caione.org>
+ <1462176138-29433-4-git-send-email-carlo@caione.org>
+ <CACRpkdbTr7YUrzSQQci929ugBhTkJKWvpjdf5Wo3HkfVKFhGLw@mail.gmail.com>
+Message-ID: <3200982.vJgYKNLqaA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 May 2016 11:04:38 Yury Norov wrote:
-> On Wed, May 11, 2016 at 10:04:16AM +0800, Zhangjian (Bamvor) wrote:
-> [...]
+On Wednesday 11 May 2016 10:53:35 Linus Walleij wrote:
+> On Mon, May 2, 2016 at 10:02 AM, Carlo Caione <carlo@caione.org> wrote:
 > 
-> > >>Ok, I will test the ltp syscall test.
-> > >>With this changes, the issue I mentioned should be fixed. But we still
-> > >>use mmap2 syscall for ILP32 application when we pass the offset instead
-> > >>of page offset. Is it correct?
-> > >
-> > >I don't remember. It's probably not important whether we have the shift
-> > >in there, as long as it's independent of the actual kernel page size and
-> > >user space and kernel agree on the calling conventions.
-> > Well. I am ok with where to shift the pages size because we get the same
-> > result. I was just thinking if we should get rid of the name of mmap2 in our
-> > ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
-> > if they do not know the implementations.
-> > 
+> > From: Carlo Caione <carlo@endlessm.com>
+> >
+> > Select the Meson pin controller driver also for the AArch64 Meson
+> > platform.
+> >
+> > Signed-off-by: Carlo Caione <carlo@endlessm.com>
 > 
-> This is what generic unistd.h does. If you want to change it, you'd
-> change each arch that uses generic unistd.h.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I guess this should get merged through the ARM SoC tree.
 > 
 
-Generic unistd.h has this:
+I'd keep it together with the other changes for clarity and
+merge it through your tree.
 
-#ifdef __SYSCALL_COMPAT
-#define __SC_COMP_3264(_nr, _32, _64, _comp) __SYSCALL(_nr, _comp)
-#else
-#define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
-#endif
-
-#define __NR3264_mmap 222
-__SC_3264(__NR3264_mmap, sys_mmap2, sys_mmap)
-
-
-#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-#define __NR_mmap __NR3264_mmap
-#else
-#define __NR_mmap2 __NR3264_mmap
-#endif
-
-So by default we get __NR_mmap2 and sys_mmap2 on 32-bit ABIs, but
-__NR_mmap and sys_mmap on 64-bit ABIs, as it should be.
-
-The problem is that arch/arm64/kernel/sys_ilp32.c now overrides
-this to use __NR_mmap2 with sys_mmap, so we have a mismatch. I think
-we should either override both the implementation and the number,
-or neither of them.
-
-I think what happened is that you chose to override sys_mmap because
-sys_mmap2 sometimes takes an off_t argument, however the kernel
-just treats it as 'unsigned long', with a range of 44 bits for the
-offset. Using sys_mmap with a __kernel_loff_t argument gives
-us 64-bit range, but if we do that, I think it should be __NR_mmap.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
