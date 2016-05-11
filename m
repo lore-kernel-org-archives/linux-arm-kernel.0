@@ -1,41 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 May 2016 07:49:19 +0200
-Subject: [PATCH] ARM: dts: exynos: Only Odroid XU3-family boards use DTSI
- with CPU thermal nodes
-In-Reply-To: <CANAwSgQGhrBca7=Ow8+Hh9t0W9HWp=F43KR0Frfpx9fGngPSaw@mail.gmail.com>
-References: <1462774789-15360-1-git-send-email-k.kozlowski@samsung.com>
- <CANAwSgT9SY3kj8+beMpc1xGoC=rMBSya+2v2dyZQp6ykH+V0=g@mail.gmail.com>
- <573198BE.6020900@samsung.com>
- <CANAwSgTy6p9AVmmOWATpSO1JqVbwE0v+y_y-RLd+32RnNJTA+Q@mail.gmail.com>
- <5731D764.8070007@samsung.com>
- <CANAwSgRsjdQh6ygT__5XcH8-cF9Ch+zbk8oupebwYzY1kCZu6g@mail.gmail.com>
- <5731EA1B.4070201@samsung.com>
- <CANAwSgQGhrBca7=Ow8+Hh9t0W9HWp=F43KR0Frfpx9fGngPSaw@mail.gmail.com>
-Message-ID: <5732C7DF.2080800@samsung.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 11 May 2016 11:18:03 +0530
+Subject: [PATCH 0/8] regulator: tps65218: Clean ups
+Message-ID: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2016 09:45 PM, Anand Moon wrote:
-> Hi Krzysztof,
-> 
-> Sorry I am not able to explain my self clearly.
-> But I have once gain tested these changes.
-> 
-> Only could you append with following changes.
-> --------------------------------------------------------
-> +                               cpu_crit0: cpu-crit-0 {
-> +                                       temperature = <120000>; /*
-> millicelsius */
-> +                                       hysteresis = <5000>; /* millicelsius */
-> +                                       type = "critical";
-> +                               };
-> --------------------------------------------------------
-> hysteresis time help to adjust the present and past temperature inputs
-> before critical shutdown.
+The series cleans up mainly the regulator driver and implements
+the device tree parsing using the regulator framework. Removes
+all the redundant compatibles for the individual regulators.
 
-I need more details why you want this patch. What is the point of
-hysteresis on critical trip point? When reaching this trip point the
-system shutdowns... there is nothing more to do, I think.
+One of the patch removes redundant read wrapper and makes
+use of regmap_read wherever necessary.
 
-Best regards,
-Krzysztof
+The series is checked for all the regulator registrations on
+am437x-gp-evm and am437x-sk-evm.
+
+Keerthy (8):
+  mfd: tps65218: Remove redundant read wrapper
+  Documentation: regulator: tps65218: Updates according to changes with
+    parsing
+  mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
+  regulator: tps65218: Remove all the compatibles
+  ARM: dts: AM437X-GP-EVM: Remove redundant regulator compatibles
+  ARM: dts: AM437X-SK-EVM: Remove redundant regulator compatibles
+  ARM: dts: AM437X-CM-T43: Remove redundant regulator compatibles
+  ARM: dts: AM43X-EPOS-EVM: Remove redundant regulator compatibles
+
+ .../devicetree/bindings/regulator/tps65218.txt     |  88 +++++++++++---
+ arch/arm/boot/dts/am437x-cm-t43.dts                |   6 -
+ arch/arm/boot/dts/am437x-gp-evm.dts                |   6 -
+ arch/arm/boot/dts/am437x-sk-evm.dts                |   5 -
+ arch/arm/boot/dts/am43x-epos-evm.dts               |   7 --
+ drivers/mfd/tps65218.c                             |  24 ++--
+ drivers/regulator/tps65218-regulator.c             | 134 ++++++++-------------
+ include/linux/mfd/tps65218.h                       |   2 -
+ 8 files changed, 127 insertions(+), 145 deletions(-)
+
+-- 
+1.9.1
