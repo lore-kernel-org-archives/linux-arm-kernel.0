@@ -1,97 +1,55 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 11 May 2016 12:34:34 +0200
-Subject: [RFC PATCH 12/21] reset: uniphier: add core support for
- UniPhier reset driver
-In-Reply-To: <CAK7LNASpxbW81A7YGQuAqmBdBty4BC6Z8sko8YepXOPnVqSjAQ@mail.gmail.com>
+Date: Wed, 11 May 2016 12:37:58 +0200
+Subject: [RFC PATCH 13/21] reset: uniphier: add reset driver for
+ UniPhier PH1-LD4 SoC
+In-Reply-To: <1462962853.2924.19.camel@pengutronix.de>
 References: <1462873862-30940-1-git-send-email-yamada.masahiro@socionext.com>
- <1462873862-30940-13-git-send-email-yamada.masahiro@socionext.com>
- <1462888497.9155.9.camel@pengutronix.de>
- <CAK7LNASpxbW81A7YGQuAqmBdBty4BC6Z8sko8YepXOPnVqSjAQ@mail.gmail.com>
-Message-ID: <1462962874.2924.20.camel@pengutronix.de>
+ <1462873862-30940-14-git-send-email-yamada.masahiro@socionext.com>
+ <1462883138.9155.3.camel@pengutronix.de>
+ <CAK7LNASY=Kg-KOMue09_YRoxrBAnXP00oqG4AC2iQM1HJgLc7A@mail.gmail.com>
+ <1462962853.2924.19.camel@pengutronix.de>
+Message-ID: <1462963078.2924.23.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.05.2016, 11:46 +0900 schrieb Masahiro Yamada:
-> Hi Philipp,
+Am Mittwoch, den 11.05.2016, 12:34 +0200 schrieb Philipp Zabel:
+> Hi Masahiro,
 > 
+> Am Mittwoch, den 11.05.2016, 11:52 +0900 schrieb Masahiro Yamada:
+> > Hi Philipp,
+> > 
+> > 
+> > 2016-05-10 21:25 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> > > Hi Masahiro,
+> > >
+> > > Am Dienstag, den 10.05.2016, 18:50 +0900 schrieb Masahiro Yamada:
+> > >> This series is just for review.
+> > >> Please do not apply this patch.
+> > >>
+> > >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > >
+> > > No need for all these tiny drivers. If you probe from DT as Lee
+> > > requests, you can let of_device_id.data point to a compatible specific
+> > > uniphier_reset_data.
+> > >
+> > 
+> > I will need to fill the table a bit more to complete this work,
+> > but I do not think this reset driver will become as big as the clk driver.
+> > (I guess it will be less than 1000 lines.)
+> > 
+> > If you prefer a single file for the whole of this SoC family,
+> > I can squash all the files into one.
+> > (I can split it if I need to do so in the future.)
 > 
-> 2016-05-10 22:54 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> > Am Dienstag, den 10.05.2016, 18:50 +0900 schrieb Masahiro Yamada:
-> > [...]
-> >> +static int uniphier_reset_update(struct reset_controller_dev *rcdev,
-> >> +                              unsigned long id, bool assert)
-> >> +{
-> >> +     struct uniphier_reset_priv *priv = to_uniphier_reset_priv(rcdev);
-> >> +     const struct uniphier_reset_data *p;
-> >> +     bool handled = false;
-> >> +
-> >> +     for (p = priv->data; p->id != UNIPHIER_RESET_ID_END; p++) {
-> >> +             unsigned int val;
-> >> +             int ret;
-> >> +
-> >> +             if (p->id != id)
-> >> +                     continue;
-> >> +
-> >> +             val = p->deassert_val;
-> >> +             if (assert)
-> >> +                     val = ~val;
-> >> +
-> >> +             ret = regmap_write_bits(priv->regmap, p->reg, p->mask, val);
-> >
-> > What is the difference between mask and deassert_val? Couldn't you just
-> > assign
-> >         val = assert ? 0 : p->mask;
-> > ?
-> 
-> 
-> I need to handle both active-high resets and active-low resets.
+> I'm fine with split files if you think the complete lists are too long,
+> but in that case export the uniphier_reset_data
 
-I see. I hadn't seen any active-high resets in your lists yet. If you
-need them, you obviously can't simplify this much.
+"... and use them from a single platform driver." I wanted to add here
+before I tripped over the send button.
 
-> I thought two ways to do that.
-> 
-> 
-> [1] Have mask and a flag indicating active-low/active-high,
->     like follows:
-> 
->      if (flag & UNIPHIER_RST_ACTIVE_LOW)
->           assert = !assert;
->      val = assert ? 0 : p->mask;
-> 
-> [2] Have mask and deassert_val as in this patch
->
-> [1] cannot manage a case where one register contains
-> active-low bits and active-high bits mixed in it.
-> 
-> 
-> 
-> For example, let's say reset bits are BIT(1) and BIT(0).
-> 
-> [2] can solve this case as follows:
-> 
-> (a) If both bit1 and bit0 are active-high.
->      .mask = BIT(1) | BIT(0);
->      .deassert_val = 0;
-> 
-> (b) If bit1 is active-high and bit0 is active-low
->      .mask = BIT(1) | BIT(0);
->      .deassert_val =  BIT(0);
-> 
-> (c) If bit1 is active-low and bit0 is active-high
->      .mask = BIT(1) | BIT(0);
->      .deassert_val =  BIT(1);
-> 
-> (d) If both bit1 and bit0 are active-low
->      .mask = BIT(1) | BIT(0);
->      .deassert_val = BIT(1) | BIT(0);
-> 
-> 
-> I have not been hit by such a complicated case though.
+> I don't care about the lists being in a single file so much as I'd
+> prefer to avoid the duplicated boilerplate of one module_platform_driver
+> per SoC family member.
 
-In general it is a good idea not to add complexity for theoretical
-cases, on the other hand [1] isn't really much less complex. Can I ask
-you to invert the logic, though, and use assert_val instead?
-
-regards
+best regards
 Philipp
