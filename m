@@ -1,136 +1,83 @@
 From: chris.brand@broadcom.com (Chris Brand)
-Date: Wed, 11 May 2016 14:36:17 -0700
-Subject: [PATCH v2 1/6] power: Introduce Broadcom kona reset driver
+Date: Wed, 11 May 2016 14:36:18 -0700
+Subject: [PATCH v2 2/6] arm: bcm21664: Remove reset code
 In-Reply-To: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
 References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
-Message-ID: <1463002582-6875-2-git-send-email-chris.brand@broadcom.com>
+Message-ID: <1463002582-6875-3-git-send-email-chris.brand@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver supports reset on both BCM21664 and BCM23550.
-Code is being moved from arch/arm/mach-bcm/board_bcm21664.c
+The kona reset driver now provides this functionality.
 
 Signed-off-by: Chris Brand <chris.brand@broadcom.com>
 ---
- drivers/power/reset/Kconfig           | 10 +++++
- drivers/power/reset/Makefile          |  1 +
- drivers/power/reset/brcm-kona-reset.c | 75 +++++++++++++++++++++++++++++++++++
- 3 files changed, 86 insertions(+)
- create mode 100644 drivers/power/reset/brcm-kona-reset.c
+ arch/arm/mach-bcm/board_bcm21664.c | 42 --------------------------------------
+ 1 file changed, 42 deletions(-)
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 0a6408a39c66..1a7c49f3650a 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -38,6 +38,16 @@ config POWER_RESET_AXXIA
+diff --git a/arch/arm/mach-bcm/board_bcm21664.c b/arch/arm/mach-bcm/board_bcm21664.c
+index 82ad5687771f..65b3db06e57a 100644
+--- a/arch/arm/mach-bcm/board_bcm21664.c
++++ b/arch/arm/mach-bcm/board_bcm21664.c
+@@ -11,53 +11,12 @@
+  * GNU General Public License for more details.
+  */
  
- 	  Say Y if you have an Axxia family SoC.
+-#include <linux/of_address.h>
+ #include <linux/of_platform.h>
+-#include <linux/io.h>
  
-+config POWER_RESET_BRCMKONA
-+	bool "Broadcom Kona reset driver"
-+	depends on ARM || COMPILE_TEST
-+	default ARCH_BCM_MOBILE
-+	help
-+	  This driver provides restart support for Broadcom Kona chips.
-+
-+	  Say Y here if you have a Broadcom Kona-based board and you wish
-+	  to have restart support.
-+
- config POWER_RESET_BRCMSTB
- 	bool "Broadcom STB reset driver"
- 	depends on ARM || MIPS || COMPILE_TEST
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 096fa67047f6..ddb9a5b35480 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -2,6 +2,7 @@ obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
- obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
- obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
- obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
-+obj-$(CONFIG_POWER_RESET_BRCMKONA) += brcm-kona-reset.o
- obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
- obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
- obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
-diff --git a/drivers/power/reset/brcm-kona-reset.c b/drivers/power/reset/brcm-kona-reset.c
-new file mode 100644
-index 000000000000..d6f2070be89c
---- /dev/null
-+++ b/drivers/power/reset/brcm-kona-reset.c
-@@ -0,0 +1,75 @@
-+/*
-+ * Copyright (C) 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/reboot.h>
-+
-+#include <asm/mach/arch.h>
-+
-+#define RSTMGR_REG_WR_ACCESS_OFFSET	0
-+#define RSTMGR_REG_CHIP_SOFT_RST_OFFSET	4
-+
-+#define RSTMGR_WR_PASSWORD		0xa5a5
-+#define RSTMGR_WR_PASSWORD_SHIFT	8
-+#define RSTMGR_WR_ACCESS_ENABLE		1
-+
-+static void __iomem *kona_reset_base;
-+
-+static int kona_reset_handler(struct notifier_block *this,
-+				unsigned long mode, void *cmd)
-+{
-+	/*
-+	 * A soft reset is triggered by writing a 0 to bit 0 of the soft reset
-+	 * register. To write to that register we must first write the password
-+	 * and the enable bit in the write access enable register.
-+	 */
-+	writel((RSTMGR_WR_PASSWORD << RSTMGR_WR_PASSWORD_SHIFT) |
-+		RSTMGR_WR_ACCESS_ENABLE,
-+		kona_reset_base + RSTMGR_REG_WR_ACCESS_OFFSET);
-+	writel(0, kona_reset_base + RSTMGR_REG_CHIP_SOFT_RST_OFFSET);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block kona_reset_nb = {
-+	.notifier_call = kona_reset_handler,
-+	.priority = 128,
-+};
-+
-+static int kona_reset_probe(struct platform_device *pdev)
-+{
-+	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	kona_reset_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(kona_reset_base))
-+		return PTR_ERR(kona_reset_base);
-+
-+	return register_restart_handler(&kona_reset_nb);
-+}
-+
-+static const struct of_device_id of_match[] = {
-+	{ .compatible = "brcm,bcm21664-resetmgr" },
-+	{},
-+};
-+
-+static struct platform_driver bcm_kona_reset_driver = {
-+	.probe = kona_reset_probe,
-+	.driver = {
-+		.name = "brcm-kona-reset",
-+		.of_match_table = of_match,
-+	},
-+};
-+
-+builtin_platform_driver(bcm_kona_reset_driver);
+ #include <asm/mach/arch.h>
+ 
+ #include "kona_l2_cache.h"
+ 
+-#define RSTMGR_DT_STRING		"brcm,bcm21664-resetmgr"
+-
+-#define RSTMGR_REG_WR_ACCESS_OFFSET	0
+-#define RSTMGR_REG_CHIP_SOFT_RST_OFFSET	4
+-
+-#define RSTMGR_WR_PASSWORD		0xa5a5
+-#define RSTMGR_WR_PASSWORD_SHIFT	8
+-#define RSTMGR_WR_ACCESS_ENABLE		1
+-
+-static void bcm21664_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	void __iomem *base;
+-	struct device_node *resetmgr;
+-
+-	resetmgr = of_find_compatible_node(NULL, NULL, RSTMGR_DT_STRING);
+-	if (!resetmgr) {
+-		pr_emerg("Couldn't find " RSTMGR_DT_STRING "\n");
+-		return;
+-	}
+-	base = of_iomap(resetmgr, 0);
+-	if (!base) {
+-		pr_emerg("Couldn't map " RSTMGR_DT_STRING "\n");
+-		return;
+-	}
+-
+-	/*
+-	 * A soft reset is triggered by writing a 0 to bit 0 of the soft reset
+-	 * register. To write to that register we must first write the password
+-	 * and the enable bit in the write access enable register.
+-	 */
+-	writel((RSTMGR_WR_PASSWORD << RSTMGR_WR_PASSWORD_SHIFT) |
+-		RSTMGR_WR_ACCESS_ENABLE,
+-		base + RSTMGR_REG_WR_ACCESS_OFFSET);
+-	writel(0, base + RSTMGR_REG_CHIP_SOFT_RST_OFFSET);
+-
+-	/* Wait for reset */
+-	while (1);
+-}
+-
+ static void __init bcm21664_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+@@ -71,6 +30,5 @@ static const char * const bcm21664_dt_compat[] = {
+ 
+ DT_MACHINE_START(BCM21664_DT, "BCM21664 Broadcom Application Processor")
+ 	.init_machine = bcm21664_init,
+-	.restart = bcm21664_restart,
+ 	.dt_compat = bcm21664_dt_compat,
+ MACHINE_END
 -- 
 1.9.1
