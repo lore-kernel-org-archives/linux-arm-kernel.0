@@ -1,49 +1,43 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 11 May 2016 17:40:16 +0100
-Subject: [PATCH] ARM: STi: Update machine _namestr to be more generic.
-Message-ID: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 11 May 2016 17:56:54 +0100
+Subject: [PATCH] arm64: do not enforce strict 16 byte alignment to stack
+ pointer
+Message-ID: <1462985814-16146-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This string is used by dump_stack and as we now support
-more SoC's than just STiH415/6 it is misleading to have
-the current string in the stack trace.
+From: Colin Ian King <colin.king@canonical.com>
 
-This patch updates it to be more generic for the STi
-family of SoCs.
+copy_thread should not be enforcing 16 byte aligment and returning
+-EINVAL. Other architectures trap misaligned stack access with SIGBUS
+so arm64 should follow this convention, so remove the strict enforcement
+check.
 
-So instead of looking like this
+For example, currently clone(2) fails with -EINVAL when passing
+a misaligned stack and this gives little clue to what is wrong. Instead,
+it is arguable that a SIGBUS on the fist access to a misaligned stack
+allows one to figure out that it is a misaligned stack issue rather
+than trying to figure out why an unconventional (and undocumented)
+-EINVAL is being returned.
 
-[  271.672555] Hardware name: STiH415/416 SoC with Flattened Device Tree
-[  271.678998] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
-[  271.686746] [<c030bb54>] (show_stack) from [<c058bc4c>] (dump_stack+0x98/0xac)
-[snip]
-
-it now looks like this:
-
-[    2.669879] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc3-00026-g38a1ce6-dirty #76
-[    2.677973] Hardware name: STi SoC with Flattened Device Tree
-[    2.683723] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
-[    2.691472] [<c030bb54>] (show_stack) from [<c058bc0c>] (dump_stack+0x98/0xac)
-[snip]
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- arch/arm/mach-sti/board-dt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/process.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index ae10fb2..cfee0ef 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -23,7 +23,7 @@ static const char *const stih41x_dt_match[] __initconst = {
- 	NULL
- };
- 
--DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
-+DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
- 	.dt_compat	= stih41x_dt_match,
- 	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
- 			  L310_AUX_CTRL_DATA_PREFETCH |
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 5655f756..8414971 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -258,9 +258,6 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 		if (stack_start) {
+ 			if (is_compat_thread(task_thread_info(p)))
+ 				childregs->compat_sp = stack_start;
+-			/* 16-byte aligned stack mandatory on AArch64 */
+-			else if (stack_start & 15)
+-				return -EINVAL;
+ 			else
+ 				childregs->sp = stack_start;
+ 		}
 -- 
-1.9.1
+2.8.1
