@@ -1,106 +1,76 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 May 2016 13:55:20 +0100
-Subject: [PATCH 1/1] arm64: Add ARM64 optimized IP checksum routine
-In-Reply-To: <1462904847-28369-1-git-send-email-luke.starrett@broadcom.com>
-References: <1462904847-28369-1-git-send-email-luke.starrett@broadcom.com>
-Message-ID: <57332BB8.9060004@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 11 May 2016 14:58:14 +0200
+Subject: [PATCH v9 3/7] vfio/type1: bypass unmap/unpin and replay for
+ VFIO_IOVA_RESERVED slots
+In-Reply-To: <20160509164936.1a5ae402@t450s.home>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <1462362858-2925-4-git-send-email-eric.auger@linaro.org>
+ <20160509164936.1a5ae402@t450s.home>
+Message-ID: <57332C66.30105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luke,
+Hi Alex,
+On 05/10/2016 12:49 AM, Alex Williamson wrote:
+> On Wed,  4 May 2016 11:54:14 +0000
+> Eric Auger <eric.auger@linaro.org> wrote:
+> 
+>> Before allowing the end-user to create VFIO_IOVA_RESERVED dma slots,
+>> let's implement the expected behavior for removal and replay. As opposed
+>> to user dma slots, IOVAs are not systematically bound to PAs and PAs are
+>> not pinned. VFIO just initializes the IOVA "aperture". IOVAs are allocated
+>> outside of the VFIO framework, typically the MSI layer which is
+>> responsible to free and unmap them. The MSI mapping resources are freeed
+>> by the IOMMU driver on domain destruction.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v7 -> v8:
+>> - do no destroy anything anymore, just bypass unmap/unpin and iommu_map
+>>   on replay
+>> ---
+>>  drivers/vfio/vfio_iommu_type1.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+>> index 2d769d4..94a9916 100644
+>> --- a/drivers/vfio/vfio_iommu_type1.c
+>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>> @@ -391,7 +391,7 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>>  	struct vfio_domain *domain, *d;
+>>  	long unlocked = 0;
+>>  
+>> -	if (!dma->size)
+>> +	if (!dma->size || dma->type != VFIO_IOVA_USER)
+>>  		return;
+>>  	/*
+>>  	 * We use the IOMMU to track the physical addresses, otherwise we'd
+>> @@ -727,6 +727,9 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+>>  		dma = rb_entry(n, struct vfio_dma, node);
+>>  		iova = dma->iova;
+>>  
+>> +		if (dma->type == VFIO_IOVA_RESERVED)
+>> +			continue;
+>> +
+> 
+> But you do still need some sort of replay mechanism, right?  Not to
+> replay the IOVA to PA mapping, but to call iommu_msi_set_aperture() for
+> the new domain.  How will you know that this entry is an MSI reserved
+> range or something else?  Perhaps we can't have a generic "reserved"
+> type here.
+Thanks for spotting this bug. I was not testing this case yet and
+effectively I need to replay the set_aperture.
 
-On 10/05/16 19:27, Luke Starrett wrote:
-> This change implements an optimized checksum for arm64, based loosely on
-> the original arch/arm implementation.  Load-pair is used for the initial
-> 16B load, reducing the overall number of loads to two for packets without
-> IP options.  Instruction count is reduced by ~3x compared to generic C
-> implementation.  Changes were tested against LE and BE operation and for
-> all possible mis-alignments.
->
-> Signed-off-by: Luke Starrett <luke.starrett@broadcom.com>
-> ---
->   arch/arm64/include/asm/checksum.h | 57 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 57 insertions(+)
->   create mode 100644 arch/arm64/include/asm/checksum.h
->
-> diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-> new file mode 100644
-> index 0000000..15629d7
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/checksum.h
-> @@ -0,0 +1,57 @@
-> +/*
-> + * Copyright 2016 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation (the "GPL").
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License version 2 (GPLv2) for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * version 2 (GPLv2) along with this source code.
-> + *
-> + * ip_fast_csum() loosely derived from original arch/arm implementation
-> + */
-> +
-> +#ifndef __ASM_ARM64_CHECKSUM_H
-> +#define __ASM_ARM64_CHECKSUM_H
-> +
-> +/*
-> + * This is a version of ip_compute_csum() optimized for IP headers,
-> + * which always checksum on 4 octet boundaries.
-> + */
-> +static inline __sum16
-> +ip_fast_csum(const void *iph, unsigned int ihl)
-> +{
-> +	u64 tmp, sum;
-> +
-> +	__asm__ __volatile__ (
-> +"	ldp	%0, %3, [%1], #16\n"
-> +"	sub	%2, %2, #4\n"
-> +"	adds	%0, %0, %3\n"
-> +"1:	ldr	%w3, [%1], #4\n"
-> +"	sub	%2, %2, #1\n"
-> +"	adcs	%0, %0, %3\n"
+Thanks for the review
 
-This looks suspicious - the following tst is going to zero the carry 
-flag, so either setting the flags is unnecessary, or things are working 
-by chance.
+Best Regards
 
-> +"	tst	%2, #15\n"
-> +"	bne	1b\n"
-> +"	adc	%0, %0, xzr\n"
+Eric
 
-Similarly, you should never get here with the carry flag set, so this is 
-just a pointless nop.
-
-> +"	ror	%3, %0, #32\n"
-> +"	add     %0, %0, %3\n"
-> +"	lsr	%0, %0, #32\n"
-> +"	ror	%w3, %w0, #16\n"
-> +"	add     %w0, %w0, %w3\n"
-> +"	lsr	%0, %0, #16\n"
-> +	: "=r" (sum), "=r" (iph), "=r" (ihl), "=r" (tmp)
-> +	: "1" (iph), "2" (ihl)
-> +	: "cc", "memory");
-> +
-> +	return (__force __sum16)(~sum);
-> +}
-
-Given that dodginess, and that there doesn't seem to be anything here 
-which absolutely _demands_ assembly voodoo, can we not just have an 
-optimised C implementation working on larger chunks, along the lines of 
-Alpha?
-
-Robin.
-
-> +
-> +#define ip_fast_csum ip_fast_csum
-> +#include <asm-generic/checksum.h>
-> +
-> +#endif	/* __ASM_ARM64_CHECKSUM_H */
->
+> 
+>>  		while (iova < dma->iova + dma->size) {
+>>  			phys_addr_t phys = iommu_iova_to_phys(d->domain, iova);
+>>  			size_t size;
+> 
