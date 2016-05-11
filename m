@@ -1,40 +1,32 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Wed, 11 May 2016 10:27:07 +0200
-Subject: [PATCH 1/1] devicetree: sunxi: Add OLinuXino Lime2 eMMC to the
- Makefile
-Message-ID: <1462955227-4454-1-git-send-email-oliver@schinagl.nl>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 11 May 2016 16:29:23 +0800
+Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
+In-Reply-To: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+Message-ID: <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: dts: sunxi: Add a olinuxino-lime2-emmc added the new emmc equipped
-lime2 but forgot its Makefile. This patch adds an entry to the Makefile.
+Hi, Russell
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
----
-Hi list,
+On 04/28/16 at 10:26am, Russell King - ARM Linux wrote:
+> These changes are required for TI Keystone2 kexec to be functional.  TI
+> Keystone2 has the run-time view of physical memory above 4GiB, but with
+> a boot time alias below 4GiB which can only be used during the early
+> boot.
+> 
+> This means we need to translate run-time physical addresses (which the
+> kernel uses) to boot-time physical addresses, which, having discussed
+> with Eric, is what the kexec tools and kexec kernel API requires.
+> 
+> We publish a special set of boot time resources in /proc/iomem, which
+> the (modified) kexec tools look for in preference to the normal resources.
+> Hence, if these are found, the kexec tools make use of these resources,
+> and thus kexec tools use the boot-time view of physical memory.
 
-would it be possible to squash or atleast add this patch with/to my previous
-patch, ARM: dts: sunxi: Add a olinuxino-lime2-emmc? I mistakenly forgot to
-add the changes to the Makefile in the patch.
+I think getting memory ranges from device tree will be better than
+adding more stuff to /proc/iomem. Geoff's arm64 kexec patches is using dtb
+you can refer to the patchset.
 
-Sorry, and thank you!
-
-Olliver
-
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 95c1923..07f4cf8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -695,6 +695,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-olimex-som-evb.dtb \
- 	sun7i-a20-olinuxino-lime.dtb \
- 	sun7i-a20-olinuxino-lime2.dtb \
-+	sun7i-a20-olinuxino-lime2-emmc.dtb \
- 	sun7i-a20-olinuxino-micro.dtb \
- 	sun7i-a20-orangepi.dtb \
- 	sun7i-a20-orangepi-mini.dtb \
--- 
-2.8.1
+Thanks
+Dave
