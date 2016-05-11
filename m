@@ -1,39 +1,28 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 11 May 2016 13:29:48 +0100
-Subject: [PATCH] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <CANLsYkxUyiUfdjm39SvhKSvmddPLFP3JFAeHpYuxgPyZfexw6w@mail.gmail.com>
-References: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
- <CANLsYkxUyiUfdjm39SvhKSvmddPLFP3JFAeHpYuxgPyZfexw6w@mail.gmail.com>
-Message-ID: <20160511122948.GV2839@codeblueprint.co.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 11 May 2016 08:31:00 -0400
+Subject: [PATCH v3 23/27] dt-bindings: clock: Add I2C, HSI2C and RTC clock
+ IDs to Exynos5410
+In-Reply-To: <1462910970-1812-24-git-send-email-krzk@kernel.org>
+References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
+ <1462910970-1812-24-git-send-email-krzk@kernel.org>
+Message-ID: <ee0b3b8f-d499-c735-1b46-1710e2e91b59@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 06 May, at 09:52:42AM, Mathieu Poirier wrote:
-> > +static int __init efi_remap_init(void)
-> > +{
-> > +       u64 mapsize;
-> > +
-> > +       pr_info("Remapping and enabling EFI services.\n");
-> > +
-> > +       mapsize = memmap.map_end - memmap.map;
-> > +       memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
-> > +                                                  mapsize);
-> > +       if (!memmap.map) {
-> > +               pr_err("Failed to remap EFI memory map\n");
-> > +               return -ENOMEM;
-> > +       }
-> > +       memmap.map_end = memmap.map + mapsize;
-> > +       efi.memmap = &memmap;
-> > +
-> > +       efi.systab = (__force void *)ioremap_cache(efi_system_table,
-> > +                                                  sizeof(efi_system_table_t));
-> > +       if (!efi.systab) {
+Hello Krzysztof,
+
+On 05/10/2016 04:09 PM, Krzysztof Kozlowski wrote:
+> Add IDs for I2C, USI (HSI2C) and RTC clocks to Exynos5410. Use the same
+> number as for Exynos5420 just in case in future these drivers were
+> merged.
 > 
-> Is there a reason why memmap.map isn't iounmap() in the error path?
-> The original code didn't have it either, hence the question.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
 
-I suspect that is a bug.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-In reality, if you can't access the EFI System Table because you fail
-to map it I would guess you are going to crash very, very quickly
-anyhow.
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
