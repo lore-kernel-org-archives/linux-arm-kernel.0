@@ -1,35 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 May 2016 22:15:20 +0200
-Subject: [PATCH] drm: mediatek: remove IOMMU_DMA select
-In-Reply-To: <1462997501-982363-1-git-send-email-arnd@arndb.de>
-References: <1462982509-342936-1-git-send-email-arnd@arndb.de>
- <1462997501-982363-1-git-send-email-arnd@arndb.de>
-Message-ID: <3436915.Zo8cThvXaA@wuerfel>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 11 May 2016 22:30:51 +0200
+Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
+In-Reply-To: <20160511101101.GA16101@red-moon>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-8-git-send-email-tn@semihalf.com>
+ <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
+ <20160511101101.GA16101@red-moon>
+Message-ID: <CAJZ5v0hgw929W5PjF0PqT+ssiOHd8TeJoSQcz4NUiAovZY2pfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 May 2016 22:11:07 Arnd Bergmann wrote:
-> We get a harmless build warning when trying to use the mediatek
-> DRM driver with IOMMU support disabled:
-> 
-> warning: (DRM_MEDIATEK) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT)
-> 
-> However, the IOMMU_DMA symbol is not meant to be used by drivers
-> at all, and this driver doesn't seem to have a strict dependency
-> on it other than using the mediatek IOMMU driver that does.
-> 
-> Since we also want to be able to do compile tests with the
-> driver on other platforms, the IOMMU_DMA symbol should not
-> be selected here.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> If someone has a better explanation about why the 'select' is here,
-> let me know, it certainly seems out of place.
+On Wed, May 11, 2016 at 12:11 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, May 10, 2016 at 08:37:00PM +0200, Rafael J. Wysocki wrote:
+>> On Tue, May 10, 2016 at 5:19 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+>> > This patch provides a way to set the ACPI companion in PCI code.
+>> > We define acpi_pci_set_companion() to set the ACPI companion pointer and
+>> > call it from PCI core code. The function is stub for now.
+>> >
+>> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> > ---
+>> >  drivers/pci/probe.c      | 2 ++
+>> >  include/linux/pci-acpi.h | 4 ++++
+>> >  2 files changed, 6 insertions(+)
+>> >
+>> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> > index 8004f67..fb0b752 100644
+>> > --- a/drivers/pci/probe.c
+>> > +++ b/drivers/pci/probe.c
+>> > @@ -12,6 +12,7 @@
+>> >  #include <linux/slab.h>
+>> >  #include <linux/module.h>
+>> >  #include <linux/cpumask.h>
+>> > +#include <linux/pci-acpi.h>
+>> >  #include <linux/pci-aspm.h>
+>> >  #include <linux/aer.h>
+>> >  #include <linux/acpi.h>
+>> > @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>> >         bridge->dev.parent = parent;
+>> >         bridge->dev.release = pci_release_host_bridge_dev;
+>> >         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+>> > +       acpi_pci_set_companion(bridge);
+>>
+>> Yes, we'll probably add something similar here.
+>>
+>> Do I think now is the right time to do that?  No.
+>>
+>> >         error = pcibios_root_bridge_prepare(bridge);
+>> >         if (error) {
+>> >                 kfree(bridge);
+>> > diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+>> > index 09f9f02..1baa515 100644
+>> > --- a/include/linux/pci-acpi.h
+>> > +++ b/include/linux/pci-acpi.h
+>> > @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+>> >  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+>> >  #endif /* CONFIG_ACPI */
+>> >
+>> > +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
+>> > +{
+>> > +}
+>> > +
+>> >  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
+>> >  {
+>> >         return 0;
+>> > --
+>>
+>> Honestly, to me it looks like this series is trying very hard to avoid
+>> doing any PCI host bridge configuration stuff from arch/arm64/
+>> although (a) that might be simpler and (b) it would allow us to
+>> identify the code that's common between *all* architectures using ACPI
+>> support for host bridge configuration and to move *that* to a common
+>> place later.  As done here it seems to be following the "ARM64 is
+>> generic and the rest of the world is special" line which isn't really
+>> helpful.
+>
+> I think patch [1-2] should be merged regardless (they may require minor
+> tweaks if we decide to move pci_acpi_scan_root() to arch/arm64 though,
+> for include files location). I guess you are referring to patch 8 in
+> your comments above, which boils down to deciding whether:
+>
+> - pci_acpi_scan_root() (and unfortunately all the MCFG/ECAM handling that
+>   goes with it) should live in arch/arm64 or drivers/acpi
 
-Sorry, I didn't mean to send this as a reply to "More build fixes for
-omapdrm in current -next", I copied the wrong command line.
+To be precise, everything under #ifdef CONFIG_ACPI_PCI_HOST_GENERIC or
+equivalent is de facto ARM64-specific, because (as it stands in the
+patch series) ARM64 is the only architecture that will select that
+option.  Unless you are aware of any more architectures planning to
+use ACPI (and I'm not aware of any), it will stay the only
+architecture selecting it in the foreseeable future.
 
-I'll resend it if necessary.
+Therefore you could replace CONFIG_ACPI_PCI_HOST_GENERIC with
+CONFIG_ARM64 everywhere in that code which is why in my opinion the
+code should live somewhere under arch/arm64/.
 
-	Arnd
+Going forward, it should be possible to identify common parts of the
+PCI host bridge configuration code in arch/ and move it to
+drivers/acpi/ or drivers/pci/, but I bet that won't be the entire code
+this series puts under CONFIG_ACPI_PCI_HOST_GENERIC.
+
+The above leads to a quite straightforward conclusion about the order
+in which to do things: I'd add ACPI support for PCI host bridge on
+ARM64 following what's been done on ia64 (as x86 is more quirky and
+kludgy overall) as far as reasonably possible first and then think
+about moving common stuff to a common place.
+
+> acpi_pci_bus_domain_nr() is a bit more problematic since it is meant
+> to be called from PCI core code (ARM64 selects PCI_DOMAINS_GENERIC for
+> DT and same kernel has to work with OF and ACPI selected) and it is
+> arch specific (because what we have in bus->sysdata is arch specific,
+> waiting for the domain number to be embedded in struct pci_host_bridge).
+>
+> Your point is fair, I am not sure that moving the pci_acpi_scan_root()
+> to arch/arm64 would make things much simpler though, it is just a matter
+> of deciding where that code has to live.
+>
+> How do you want us to proceed ?
+
+Pretty much as stated above. :-)
+
+Thanks,
+Rafael
