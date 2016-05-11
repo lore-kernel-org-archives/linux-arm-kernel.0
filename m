@@ -1,66 +1,80 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 11 May 2016 12:11:56 +0200
-Subject: [PATCH] ARM: dts: at91: sam9x5: Fix the memory range assigned to
- the PMC
-In-Reply-To: <1462957202-22671-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1462957202-22671-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5733056C.9000100@atmel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 11 May 2016 12:13:06 +0200
+Subject: [PATCH v8 0/2] memory: add Atmel EBI (External Bus Interface) driver
+Message-ID: <1462961588-23004-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/05/2016 11:00, Boris Brezillon a ?crit :
-> The memory range assigned to the PMC (Power Management Controller) was
-> not including the PMC_PCR register which are used to control peripheral
-> clocks.
-> 
-> This was working fine thanks to the page granularity of ioremap(), but
-> started to fail when we switched to syscon/regmap, because regmap is
-> making sure that all accesses are falling into the reserved range.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Richard Genoud <richard.genoud@gmail.com>
-> Tested-by: Richard Genoud <richard.genoud@gmail.com>
-> Fixes: 863a81c3be1d ("clk: at91: make use of syscon to share PMC registers in several drivers")
-> Cc: <stable@vger.kernel.org>
+The EBI (External Bus Interface) is used to access external peripherals
+(NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+Each device is assigned a CS line and an address range and can have its
+own configuration (timings, access mode, bus width, ...).
+This driver provides a generic DT binding to configure a device according
+to its requirements.
+For specific device controllers (like the NAND one) the SMC timings
+should be configured by the controller driver through the matrix and
+smc syscon regmaps.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Thanks Boris!
+Changes since v7:
+- move EBI bus config properties directly in the sub-device node
+- prefix all EBI/SMC properties with atmel,smc-
+- rework the driver to take the new binding into account
+- disable the subdevice when EBI implementation fails to configure
+  the bus as requested
 
+Changes since v6:
+- rework the binding to put per-device config information into a
+  separate subnode and have devices connected to the EBI bus
+  defined as direct children of the EBI node
+- make all EBI timings mandatory
+- keep adding sub-devices when a failure occurs on one of them
 
-> ---
-> Hi Arnd,
-> 
-> This patch is fixing a regression reported by Richard. Since this
-> regression was introduced in 4.6-rc1 it would be great if you could
-> take it before 4.6 is released.
+Changes since v5:
+- remove the "atmel,specialized-logic" property: now all devices are
+  are attached to the SMC logic by default, and specialized drivers
+  (like the NAND controller one), should change this configuration
+  manually.
+- provide hardware readout to allow partial config description.
+  This is mainly here to keep existing platforms (where everything
+  is configured by the bootloader/bootstrap) in working state.
+- rename "atmel,tdf-optimized" into "atmel,tdf-mode" and switch from
+  a boolean to string property to properly support partial config
 
-Arnd, arm-soc guys,
+Changes since v4:
+- fix inconsistencies in SMC and MATRIX registers definition
+- add missing compatible strings for at91sam9rl SoC
+- fix DT bindings documentation
+- replace "atmel,generic-dev" property by "atmel,specialized-logic"
 
-I can build a Pull-Request instantly today, if you wish: just tell me if
-you prefer.
+Changes since v3:
+- added AT91_MATRIX_USBPUCR_PUON definition
+- removed useless macros (those directly returning SoC specific register
+  offsets)
+- use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
+  syscon_node_to_regmap
+- drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
 
-Bye,
+Changes since v2:
+- minor fixes int DT bindings doc
+- fix SMC macros
+- make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
 
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 0827d59..cd0cd5f 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -106,7 +106,7 @@
->  
->  			pmc: pmc at fffffc00 {
->  				compatible = "atmel,at91sam9x5-pmc", "syscon";
-> -				reg = <0xfffffc00 0x100>;
-> +				reg = <0xfffffc00 0x200>;
->  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
->  				interrupt-controller;
->  				#address-cells = <1>;
-> 
+Changes since v1:
+- almost everything :-)
 
+Boris Brezillon (2):
+  memory: add Atmel EBI (External Bus Interface) driver
+  memory: atmel-ebi: add DT bindings documentation
+
+ .../bindings/memory-controllers/atmel,ebi.txt      | 136 ++++
+ drivers/memory/Kconfig                             |  11 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/atmel-ebi.c                         | 771 +++++++++++++++++++++
+ 4 files changed, 919 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+ create mode 100644 drivers/memory/atmel-ebi.c
 
 -- 
-Nicolas Ferre
+2.7.4
