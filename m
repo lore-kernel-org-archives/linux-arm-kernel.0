@@ -1,98 +1,49 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 11 May 2016 18:56:08 -0400
-Subject: [PATCH 1/2] arm64: dts: NS2: Add all of the UARTs
-Message-ID: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
+Date: Wed, 11 May 2016 18:56:09 -0400
+Subject: [PATCH 2/2] arm64: dts: NS2: Add CCI-400 PMU support
+In-Reply-To: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
+References: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <1463007369-13071-2-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add all of the UARTs present on NS2 and enable them in the SVK device
-tree file.  Also, do some magic to make sure that uart3 is discovered as
-ttyS0 (as that is the console UART).
+Add support to the Northstar 2 Device tree file for the ARM CCI-400 PMU.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 16 ++++++++++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index 7cd3640..b062a44 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -40,10 +40,14 @@
- 
- 	aliases {
- 		serial0 = &uart3;
-+		serial1 = &uart0;
-+		serial2 = &uart1;
-+		serial3 = &uart2;
- 	};
- 
- 	chosen {
- 		stdout-path = "serial0:115200n8";
-+		bootargs = "earlycon=uart8250,mmio32,0x66130000";
- 	};
- 
- 	memory {
-@@ -68,6 +72,18 @@
- 	status = "ok";
- };
- 
-+&uart0 {
-+	status = "ok";
-+};
-+
-+&uart1 {
-+	status = "ok";
-+};
-+
-+&uart2 {
-+	status = "ok";
-+};
-+
- &uart3 {
- 	status = "ok";
- };
 diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 788ed8f..c77a9e8 100644
+index c77a9e8..d1dc812 100644
 --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -357,6 +357,36 @@
- 			status = "disabled";
+@@ -279,6 +279,26 @@
+ 				      IRQ_TYPE_LEVEL_HIGH)>;
  		};
  
-+		uart0: serial at 66100000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x66100000 0x100>;
-+			interrupts = <GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&iprocslow>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
++		cci at 65590000 {
++			compatible = "arm,cci-400";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x65590000 0x1000>;
++			ranges = <0 0x65590000 0x10000>;
++
++			pmu at 9000 {
++				compatible = "arm,cci-400-pmu,r1",
++					     "arm,cci-400-pmu";
++				reg = <0x9000 0x4000>;
++				interrupts = <GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 348 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 349 IRQ_TYPE_LEVEL_HIGH>;
++			};
 +		};
 +
-+		uart1: serial at 66110000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x66110000 0x100>;
-+			interrupts = <GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&iprocslow>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 66120000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x66120000 0x100>;
-+			interrupts = <GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&iprocslow>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
- 		uart3: serial at 66130000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x66130000 0x100>;
+ 		timer0: timer at 66030000 {
+ 			compatible = "arm,sp804", "arm,primecell";
+ 			reg = <0x66030000 0x1000>;
 -- 
 1.9.1
