@@ -1,58 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2016 10:44:36 +0200
-Subject: [PATCH v2] pinctrl: rockchip: fix pull setting error for rk3399
-In-Reply-To: <1462937968-4952-1-git-send-email-wxt@rock-chips.com>
-References: <1462937968-4952-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <CACRpkdasLu0ZtOBuyfE=BG6TwY=-NY7Xksywv3jimNGXyx08AQ@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 11 May 2016 11:44:33 +0300
+Subject: [PATCH v3 0/7] ARM/ASoC: OMAP3: Fix McBSP2/3 sidetone support
+In-Reply-To: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <69ff65ee-e5d1-09fb-fd91-8d7b4d8fdda4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 5:39 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+Tony, Paul,
 
-> From: David Wu <david.wu@rock-chips.com>
->
-> This patch fixes the pinctrl pull bias setting, since the pull up/down
-> setting is the contrary for gpio0(just the gpio0a and gpio0b) and
-> gpio2(just the gpio2c and gpio2d).
->
-> From the TRM said, the gpio0a pull polarity setting:
-> gpio0a_p
-> GPIO0A PE/PS programmation section, every
-> GPIO bit corresponding to 2bits[PS:PE]
-> 2'b00: Z(Normal operation);
-> 2'b11: weak 1(pull-up);
-> 2'b01: weak 0(pull-down);
-> 2'b10: Z(Normal operation);
->
-> Then, the other gpios setting as the following:
-> gpio1a_p (e.g.: gpio1, gpio2a, gpio2b, gpio3...)
-> GPIO1A PU/PD programmation section, every
-> GPIO bit corresponding to 2bits
-> 2'b00: Z(Normal operation);
-> 2'b01: weak 1(pull-up);
-> 2'b10: weak 0(pull-down);
-> 2'b11: Z(Normal operation);
->
-> For example,(rk3399evb board)
-> sdmmc_cd --->gpio0_a7
-> localhost / # io -r -4 0xff320040
-> ff320040: 00004d5f
-> In general,the value should be 0x0000cd5f since the pin has been set
-> in the dts.
->
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: linux-gpio at vger.kernel.org
+On 04/29/16 13:53, Peter Ujfalusi wrote:
+> Hi,
+> 
+> Based on the ongoing discussion on v2 (ARM: OMAP3: Fix McBSP2/3 hwmod setup for
+> sidetone) I have dropped the removal of the sidetone hwmod and only corrected
+> it. The series now includes all related changes needed to have correct sidetone
+> support whenever we boot in legacy or in DT mode.
+> 
+> This time the ASoC part have dependency on earlier patches so they can not be
+> applied separately.
+
+How should we proceed from here? I don't want to start designing the ST
+separation infrastructure which would be based on this series, but if there
+are outstanding issues found on this, I would need to go back to the drawing
+board.
+The separation will be mostly new code and code shuffle in ASoC, but for
+legacy I will need to build up something in arch as well, so I would need at
+least one release cycle to start with things.
+
+-- 
+P?ter
+
+> Regards,
+> Peter
 > ---
->
-> Changes in v2:
-> - As Doug commnets on https://patchwork.kernel.org/patch/9056961/
-> - update the commit for gpio2.
-> - change the print error messgae.
-
-Patch applied with the Review tags.
-
-Yours,
-Linus Walleij
+> Peter Ujfalusi (7):
+>   ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+>   ARM: dts: omap3: Add clocks to McBSP nodes
+>   ARM: OMAP3: McBSP: New callback for McBSP2/3 ICLK idle configuration
+>   ARM: OMAP3: pdata-quirks: Add support for McBSP2/3 sidetone handling
+>   ASoc: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to
+>     omap_mcbsp_cleanup()
+>   ASoC: omap-mcbsp: sidetone: Use the new callback for iclk handling
+>   ARM: OMAP2+: McBSP: Remove the old iclk allow/deny idle code
+> 
+>  arch/arm/boot/dts/omap3.dtsi                | 10 ++++++++++
+>  arch/arm/mach-omap2/mcbsp.c                 | 31 ++++++++++++++++-------------
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 24 ++++------------------
+>  arch/arm/mach-omap2/pdata-quirks.c          | 18 +++++++++++++++++
+>  include/linux/platform_data/asoc-ti-mcbsp.h |  4 +++-
+>  sound/soc/omap/mcbsp.c                      | 21 +++++++++++++------
+>  sound/soc/omap/mcbsp.h                      |  3 ++-
+>  sound/soc/omap/omap-mcbsp.c                 |  5 ++++-
+>  8 files changed, 73 insertions(+), 43 deletions(-)
+> 
