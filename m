@@ -1,29 +1,57 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 11 May 2016 11:13:23 +0200
-Subject: [PATCH] pinctrl: meson: Fix eth_tx_en bit index
-In-Reply-To: <CACRpkdZz631dio28wqa71uZe3=NSZO55RCxZaQSixfH-o1f4Cw@mail.gmail.com>
-References: <1462730389-10961-1-git-send-email-serveralex@gmail.com>
- <1462730389-10961-2-git-send-email-serveralex@gmail.com>
- <CACRpkdZz631dio28wqa71uZe3=NSZO55RCxZaQSixfH-o1f4Cw@mail.gmail.com>
-Message-ID: <CAOQ7t2bK-9Ogw4aRhLYPFFJrwEevq_SuOJ6LjxwhJrJgcW+e-A@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 11 May 2016 17:13:38 +0800
+Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
+In-Reply-To: <20160511085203.GN19428@n2100.arm.linux.org.uk>
+References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
+ <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
+ <20160511085203.GN19428@n2100.arm.linux.org.uk>
+Message-ID: <20160511091338.GC10825@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 10:58 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Sun, May 8, 2016 at 7:59 PM, Alexander M?ller <serveralex@gmail.com> wrote:
->
->> Fix pinctrl eth_tx_en bit index according to Hardkernel ODROID-C1 datasheet.
->>
->> Signed-off-by: Alexander M?ller <serveralex@gmail.com>
->
-> Carlo can you review this change?
+On 05/11/16 at 09:52am, Russell King - ARM Linux wrote:
+> On Wed, May 11, 2016 at 04:29:23PM +0800, Dave Young wrote:
+> > Hi, Russell
+> > 
+> > On 04/28/16 at 10:26am, Russell King - ARM Linux wrote:
+> > > These changes are required for TI Keystone2 kexec to be functional.  TI
+> > > Keystone2 has the run-time view of physical memory above 4GiB, but with
+> > > a boot time alias below 4GiB which can only be used during the early
+> > > boot.
+> > > 
+> > > This means we need to translate run-time physical addresses (which the
+> > > kernel uses) to boot-time physical addresses, which, having discussed
+> > > with Eric, is what the kexec tools and kexec kernel API requires.
+> > > 
+> > > We publish a special set of boot time resources in /proc/iomem, which
+> > > the (modified) kexec tools look for in preference to the normal resources.
+> > > Hence, if these are found, the kexec tools make use of these resources,
+> > > and thus kexec tools use the boot-time view of physical memory.
+> > 
+> > I think getting memory ranges from device tree will be better than
+> > adding more stuff to /proc/iomem. Geoff's arm64 kexec patches is using dtb
+> > you can refer to the patchset.
+> 
+> I think you're confusing things.  DT doesn't contain the boot alias
+> memory ranges - it's not a separate chunk of memory.  It's an alias
+> of the same physical address space found higher in the physical
+> address range.
 
-Acked-by: Carlo Caione <carlo@endlessm.com>
+Hmm, if we forget about kexec how does the 1st kernel get boot memory?
+not from DT?
 
-just to let you know this patch has been posted also as part of a
-bigger patchset here
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/498960
+> 
+> If we put it in DT, then we need a way to also describe that it is an
+> alias of some other bit of physical memory.
 
--- 
-Carlo Caione
+I may missed the background, I just want kexec to get infomation just like
+the normal kernel.
+
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+Thanks
+Dave
