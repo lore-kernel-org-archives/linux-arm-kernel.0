@@ -1,324 +1,593 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 May 2016 13:38:12 +0200
-Subject: [PATCH v3 18/55] KVM: arm/arm64: vgic-new: Add GICv2 world switch
- backend
-In-Reply-To: <573317DC.4060200@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-19-git-send-email-andre.przywara@arm.com>
- <5731EBBE.7060203@linaro.org> <573317DC.4060200@arm.com>
-Message-ID: <573319A4.30905@linaro.org>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Wed, 11 May 2016 19:43:06 +0800
+Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <57331ACA.5020605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2016 01:30 PM, Andre Przywara wrote:
-> Hi,
-> 
-> On 10/05/16 15:10, Eric Auger wrote:
->> On 05/06/2016 12:45 PM, Andre Przywara wrote:
->>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>> Processing maintenance interrupts and accessing the list registers
->>> are dependent on the host's GIC version.
->>> Introduce vgic-v2.c to contain GICv2 specific functions.
->>> Implement the GICv2 specific code for syncing the emulation state
->>> into the VGIC registers.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> Changelog RFC..v1:
->>> - remove explicit LR_STATE clearing on maintenance interrupt handling
->>> - improve documentation for vgic_v2_populate_lr()
->>> - remove WARN_ON on non-edge IRQs in maintenance interrupts
->>> - simplify multi-CPU source SGI handling
->>>
->>> Changelog v1 .. v2:
->>> - inject the IRQ priority into the list register
->>>
->>> Changelog v2 .. v3:
->>> - cleanup diff containing rebase artifacts
->>>
->>>  include/linux/irqchip/arm-gic.h |   1 +
->>>  virt/kvm/arm/vgic/vgic-v2.c     | 178 ++++++++++++++++++++++++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic.c        |   6 ++
->>>  virt/kvm/arm/vgic/vgic.h        |   6 ++
->>>  4 files changed, 191 insertions(+)
->>>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
->>>
->>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
->>> index 9c94026..be0d26f 100644
->>> --- a/include/linux/irqchip/arm-gic.h
->>> +++ b/include/linux/irqchip/arm-gic.h
->>> @@ -76,6 +76,7 @@
->>>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
->>>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->>>  #define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
->>> +#define GICH_LR_PRIORITY_SHIFT		23
->>>  #define GICH_LR_STATE			(3 << 28)
->>>  #define GICH_LR_PENDING_BIT		(1 << 28)
->>>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
->>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->>> new file mode 100644
->>> index 0000000..4cee616
->>> --- /dev/null
->>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->>> @@ -0,0 +1,178 @@
->>> +/*
->>> + * Copyright (C) 2015, 2016 ARM Ltd.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/irqchip/arm-gic.h>
->>> +#include <linux/kvm.h>
->>> +#include <linux/kvm_host.h>
->>> +
->>> +#include "vgic.h"
->>> +
->>> +/*
->>> + * Call this function to convert a u64 value to an unsigned long * bitmask
->>> + * in a way that works on both 32-bit and 64-bit LE and BE platforms.
->>> + *
->>> + * Warning: Calling this function may modify *val.
->>> + */
->>> +static unsigned long *u64_to_bitmask(u64 *val)
->>> +{
->>> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
->>> +	*val = (*val >> 32) | (*val << 32);
->>> +#endif
->>> +	return (unsigned long *)val;
->>> +}
->>> +
->>> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
->>> +{
->>> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
->>> +
->>> +	if (cpuif->vgic_misr & GICH_MISR_EOI) {
->>> +		u64 eisr = cpuif->vgic_eisr;
->>> +		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
->>> +		int lr;
->>> +
->>> +		for_each_set_bit(lr, eisr_bmap, kvm_vgic_global_state.nr_lr) {
->> Didn't we say we could use vcpu->arch.vgic_cpu.used_lrs here?
-> 
-> Why would that be useful? Don't we just want to see those LRs that had a
-> maintenance interrupt received? I don't see the point if iterating over
-> the used LRs, where we need to check for this condition somehow manually?
-> Or what am I missing here?
 
-Well I thought that there is no use inspecting bits corresponding to
-unused LRs, no?
 
-Cheers
+? 2016?05?11? 03:31, David Wu ??:
+> - new method to caculate i2c timings for rk3399:
+>    There was an timing issue about "repeated start" time at the I2C
+>    controller of version0, controller appears to drop SDA at .875x (7/8)
+>    programmed clk high. On version 1 of the controller, the rule(.875x)
+>    isn't enough to meet tSU;STA
+>    requirements on 100k's Standard-mode. To resolve this issue,
+>    sda_update_config, start_setup_config and stop_setup_config for I2C
+>    timing information are added, new rules are designed to calculate
+>    the timing information at new v1.
+> - pclk and function clk are separated at rk3399
+>
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+> Changes in v8:
+> - update tuning in RKI2C_CON register by doing a read-modify-write (Doug)
+> - new method to use pclk and clk (Doug)
+>
+> Changes in v7:
+> - transform into a 9 series patches (Doug)
+> - drop highspeed with mastercode, and support fast-mode plus (Doug)
 
-Eric
-> 
->>> +			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
->>> +
->>> +			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
->>> +
->>> +			kvm_notify_acked_irq(vcpu->kvm, 0,
->>> +					     intid - VGIC_NR_PRIVATE_IRQS);
->>> +
->>> +			cpuif->vgic_elrsr |= 1ULL << lr;
-> 
-> So are we good with removing this line (and the respective one in v3)?
-> 
-> Cheers,
-> Andre.
-> 
->>> +		}
->>> +	}
->>> +
->>> +	/* check and disable underflow maintenance IRQ */
->> check?
->>
->> Besides
->> Reviewed-by: Eric Auger <eric.auger@linaro.org>
->>
->> Eric
->>> +	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
->>> +
->>> +	/*
->>> +	 * In the next iterations of the vcpu loop, if we sync the
->>> +	 * vgic state after flushing it, but before entering the guest
->>> +	 * (this happens for pending signals and vmid rollovers), then
->>> +	 * make sure we don't pick up any old maintenance interrupts
->>> +	 * here.
->>> +	 */
->>> +	cpuif->vgic_eisr = 0;
->>> +}
->>> +
->>> +void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
->>> +{
->>> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
->>> +
->>> +	cpuif->vgic_hcr |= GICH_HCR_UIE;
->>> +}
->>> +
->>> +/*
->>> + * transfer the content of the LRs back into the corresponding ap_list:
->>> + * - active bit is transferred as is
->>> + * - pending bit is
->>> + *   - transferred as is in case of edge sensitive IRQs
->>> + *   - set to the line-level (resample time) for level sensitive IRQs
->>> + */
->>> +void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->>> +{
->>> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
->>> +	int lr;
->>> +
->>> +	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
->>> +		u32 val = cpuif->vgic_lr[lr];
->>> +		u32 intid = val & GICH_LR_VIRTUALID;
->>> +		struct vgic_irq *irq;
->>> +
->>> +		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
->>> +
->>> +		spin_lock(&irq->irq_lock);
->>> +
->>> +		/* Always preserve the active bit */
->>> +		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
->>> +
->>> +		/* Edge is the only case where we preserve the pending bit */
->>> +		if (irq->config == VGIC_CONFIG_EDGE &&
->>> +		    (val & GICH_LR_PENDING_BIT)) {
->>> +			irq->pending = true;
->>> +
->>> +			if (vgic_irq_is_sgi(intid)) {
->>> +				u32 cpuid = val & GICH_LR_PHYSID_CPUID;
->>> +
->>> +				cpuid >>= GICH_LR_PHYSID_CPUID_SHIFT;
->>> +				irq->source |= (1 << cpuid);
->>> +			}
->>> +		}
->>> +
->>> +		/* Clear soft pending state when level IRQs have been acked */
->>> +		if (irq->config == VGIC_CONFIG_LEVEL &&
->>> +		    !(val & GICH_LR_PENDING_BIT)) {
->>> +			irq->soft_pending = false;
->>> +			irq->pending = irq->line_level;
->>> +		}
->>> +
->>> +		spin_unlock(&irq->irq_lock);
->>> +	}
->>> +}
->>> +
->>> +/*
->>> + * Populates the particular LR with the state of a given IRQ:
->>> + * - for an edge sensitive IRQ the pending state is cleared in struct vgic_irq
->>> + * - for a level sensitive IRQ the pending state value is unchanged;
->>> + *   it is dictated directly by the input level
->>> + *
->>> + * If @irq describes an SGI with multiple sources, we choose the
->>> + * lowest-numbered source VCPU and clear that bit in the source bitmap.
->>> + *
->>> + * The irq_lock must be held by the caller.
->>> + */
->>> +void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->>> +{
->>> +	u32 val = irq->intid;
->>> +
->>> +	if (irq->pending) {
->>> +		val |= GICH_LR_PENDING_BIT;
->>> +
->>> +		if (irq->config == VGIC_CONFIG_EDGE)
->>> +			irq->pending = false;
->>> +
->>> +		if (vgic_irq_is_sgi(irq->intid)) {
->>> +			u32 src = ffs(irq->source);
->>> +
->>> +			BUG_ON(!src);
->>> +			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
->>> +			irq->source &= ~(1 << (src - 1));
->>> +			if (irq->source)
->>> +				irq->pending = true;
->>> +		}
->>> +	}
->>> +
->>> +	if (irq->active)
->>> +		val |= GICH_LR_ACTIVE_BIT;
->>> +
->>> +	if (irq->hw) {
->>> +		val |= GICH_LR_HW;
->>> +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
->>> +	} else {
->>> +		if (irq->config == VGIC_CONFIG_LEVEL)
->>> +			val |= GICH_LR_EOI;
->>> +	}
->>> +
->>> +	/* The GICv2 LR only holds five bits of priority. */
->>> +	val |= (irq->priority >> 3) << GICH_LR_PRIORITY_SHIFT;
->>> +
->>> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = val;
->>> +}
->>> +
->>> +void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
->>> +{
->>> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
->>> +}
->>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->>> index c6f8b9b..68d885c 100644
->>> --- a/virt/kvm/arm/vgic/vgic.c
->>> +++ b/virt/kvm/arm/vgic/vgic.c
->>> @@ -397,10 +397,12 @@ retry:
->>>  
->>>  static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
->>>  {
->>> +	vgic_v2_process_maintenance(vcpu);
->>>  }
->>>  
->>>  static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
->>>  {
->>> +	vgic_v2_fold_lr_state(vcpu);
->>>  }
->>>  
->>>  /* Requires the ap_list_lock and the irq_lock to be held. */
->>> @@ -409,14 +411,18 @@ static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
->>>  {
->>>  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vcpu->arch.vgic_cpu.ap_list_lock));
->>>  	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
->>> +
->>> +	vgic_v2_populate_lr(vcpu, irq, lr);
->>>  }
->>>  
->>>  static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
->>>  {
->>> +	vgic_v2_clear_lr(vcpu, lr);
->>>  }
->>>  
->>>  static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
->>>  {
->>> +	vgic_v2_set_underflow(vcpu);
->>>  }
->>>  
->>>  static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
->>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->>> index 29b96b9..0db490e 100644
->>> --- a/virt/kvm/arm/vgic/vgic.h
->>> +++ b/virt/kvm/arm/vgic/vgic.h
->>> @@ -22,4 +22,10 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->>>  			      u32 intid);
->>>  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
->>>  
->>> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
->>> +void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
->>> +void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
->>> +void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
->>> +void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
->>> +
->>>  #endif
->>>
->>
+Tested-by: Caesar Wang <wxt@rock-chips.com>
+Few comments below:
+
+
+I picked David's patches up for my rk3399 evb board.
+Add the needed i2c devices for dts.
+
+localhost / #modprobe i2c-dev
+localhost / # i2cdump -f -y 0 0x1b
+No size specified (using byte-data access)
+      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f 0123456789abcdef
+00: 18 01 09 21 01 13 01 00 00 00 00 01 01 00 00 00 ???!???....??...
+10: 80 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ??..............
+20: 00 5f 00 6f ff 00 00 00 10 00 ff 0f ff 02 01 0f ._.o....?..?.???
+30: 00 00 01 0f 00 00 02 03 00 00 09 00 00 0c 00 0a ..??..??..?..?.?
+40: 00 0c 00 0c 00 07 00 0a 00 0c 00 00 00 5f 00 03 .?.?.?.?.?..._.?
+50: 06 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ??..............
+60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+70: 00 cf 03 00 28 00 0c 1c 80 19 00 34 12 00 71 00 .??.(.????.4?.q.
+80: 10 50 1f ac 00 40 00 49 00 00 c0 44 41 01 00 00 ?P??. at .I..?DA?..
+90: 55 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 U...............
+a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+localhost / # i2cset -f -y 0 0x1b 0x90 0xff
+localhost / # i2cdump -f -y 0 0x1b |grep 90
+  No size specified (using byte-data access)
+90: ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+
+The i2c devices are working for my board.
+
+run:
+modprobe i2c-dev; for i in $(seq 0 8); do echo ==BUS $i; i2cdetect -y -q 
+$i; done
+See the output message,and mesure the i2c frequency.
+
+
+
+
+
+>
+>   drivers/i2c/busses/i2c-rk3x.c | 289 +++++++++++++++++++++++++++++++++++++++---
+>   1 file changed, 270 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 9791797..25ed1ad 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -58,6 +58,12 @@ enum {
+>   #define REG_CON_LASTACK   BIT(5) /* 1: send NACK after last received byte */
+>   #define REG_CON_ACTACK    BIT(6) /* 1: stop if NACK is received */
+>   
+> +#define REG_CON_TUNING_MASK GENMASK(15, 8)
+> +
+> +#define REG_CON_SDA_CFG(cfg) ((cfg) << 8)
+> +#define REG_CON_STA_CFG(cfg) ((cfg) << 12)
+> +#define REG_CON_STO_CFG(cfg) ((cfg) << 14)
+> +
+>   /* REG_MRXADDR bits */
+>   #define REG_MRXADDR_VALID(x) BIT(24 + (x)) /* [x*8+7:x*8] of MRX[R]ADDR valid */
+>   
+> @@ -77,40 +83,62 @@ enum {
+>   
+>   /**
+>    * struct i2c_spec_values:
+> + * @min_hold_start_ns: min hold time (repeated) START condition
+>    * @min_low_ns: min LOW period of the SCL clock
+>    * @min_high_ns: min HIGH period of the SCL cloc
+>    * @min_setup_start_ns: min set-up time for a repeated START conditio
+>    * @max_data_hold_ns: max data hold time
+> + * @min_data_setup_ns: min data set-up time
+> + * @min_setup_stop_ns: min set-up time for STOP condition
+> + * @min_hold_buffer_ns: min bus free time between a STOP and
+> + * START condition
+>    */
+>   struct i2c_spec_values {
+> +	unsigned long min_hold_start_ns;
+>   	unsigned long min_low_ns;
+>   	unsigned long min_high_ns;
+>   	unsigned long min_setup_start_ns;
+>   	unsigned long max_data_hold_ns;
+> +	unsigned long min_data_setup_ns;
+> +	unsigned long min_setup_stop_ns;
+> +	unsigned long min_hold_buffer_ns;
+>   };
+>   
+>   static const struct i2c_spec_values standard_mode_spec = {
+> +	.min_hold_start_ns = 4000,
+>   	.min_low_ns = 4700,
+>   	.min_high_ns = 4000,
+>   	.min_setup_start_ns = 4700,
+>   	.max_data_hold_ns = 3450,
+> +	.min_data_setup_ns = 250,
+> +	.min_setup_stop_ns = 4000,
+> +	.min_hold_buffer_ns = 4700,
+>   };
+>   
+>   static const struct i2c_spec_values fast_mode_spec = {
+> +	.min_hold_start_ns = 600,
+>   	.min_low_ns = 1300,
+>   	.min_high_ns = 600,
+>   	.min_setup_start_ns = 600,
+>   	.max_data_hold_ns = 900,
+> +	.min_data_setup_ns = 100,
+> +	.min_setup_stop_ns = 600,
+> +	.min_hold_buffer_ns = 1300,
+>   };
+>   
+>   /**
+>    * struct rk3x_i2c_calced_timings:
+>    * @div_low: Divider output for low
+>    * @div_high: Divider output for high
+> + * @tuning: Used to adjust setup/hold data time,
+> + * setup/hold start time and setup stop time for
+> + * v1's calc_timings, the tuning should all be 0
+> + * for old hardware anyone using v0's calc_timings.
+>    */
+>   struct rk3x_i2c_calced_timings {
+>   	unsigned long div_low;
+>   	unsigned long div_high;
+> +	unsigned int tuning;
+>   };
+>   
+>   enum rk3x_i2c_state {
+> @@ -123,9 +151,12 @@ enum rk3x_i2c_state {
+>   
+>   /**
+>    * @grf_offset: offset inside the grf regmap for setting the i2c type
+> + * @calc_timings: Callback function for i2c timing information calculated
+>    */
+>   struct rk3x_i2c_soc_data {
+>   	int grf_offset;
+> +	int (*calc_timings)(unsigned long, struct i2c_timings *,
+> +			    struct rk3x_i2c_calced_timings *);
+>   };
+>   
+>   /**
+> @@ -134,7 +165,8 @@ struct rk3x_i2c_soc_data {
+>    * @dev: device for this controller
+>    * @soc_data: related soc data struct
+>    * @regs: virtual memory area
+> - * @clk: clock of i2c bus
+> + * @clk: function clk for rk3399 or function & Bus clks for others
+> + * @pclk: Bus clk for rk3399
+>    * @clk_rate_nb: i2c clk rate change notify
+>    * @t: I2C known timing information
+>    * @lock: spinlock for the i2c bus
+> @@ -156,6 +188,7 @@ struct rk3x_i2c {
+>   	/* Hardware resources */
+>   	void __iomem *regs;
+>   	struct clk *clk;
+> +	struct clk *pclk;
+>   	struct notifier_block clk_rate_nb;
+>   
+>   	/* Settings */
+> @@ -200,12 +233,12 @@ static inline void rk3x_i2c_clean_ipd(struct rk3x_i2c *i2c)
+>    */
+>   static void rk3x_i2c_start(struct rk3x_i2c *i2c)
+>   {
+> -	u32 val;
+> +	u32 val = i2c_readl(i2c, REG_CON) & REG_CON_TUNING_MASK;
+>   
+>   	i2c_writel(i2c, REG_INT_START, REG_IEN);
+>   
+>   	/* enable adapter with correct mode, send START condition */
+> -	val = REG_CON_EN | REG_CON_MOD(i2c->mode) | REG_CON_START;
+> +	val |= REG_CON_EN | REG_CON_MOD(i2c->mode) | REG_CON_START;
+>   
+>   	/* if we want to react to NACK, set ACTACK bit */
+>   	if (!(i2c->msg->flags & I2C_M_IGNORE_NAK))
+> @@ -513,9 +546,9 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
+>    * a best-effort divider value is returned in divs. If the target rate is
+>    * too high, we silently use the highest possible rate.
+>    */
+> -static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+> -			      struct i2c_timings *t,
+> -			      struct rk3x_i2c_calced_timings *t_calc)
+> +static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
+> +				    struct i2c_timings *t,
+> +				    struct rk3x_i2c_calced_timings *t_calc)
+>   {
+>   	unsigned long min_low_ns, min_high_ns;
+>   	unsigned long max_low_ns, min_total_ns;
+> @@ -661,20 +694,189 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+>   	return ret;
+>   }
+>   
+> +/**
+> + * Calculate timing values for desired SCL frequency
+> + *
+> + * @clk_rate: I2C input clock rate
+> + * @t: Known I2C timing information
+> + * @t_calc: Caculated rk3x private timings that would be written into regs
+> +
+
+miss the '* ' , i guess
+> + * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+> + * a best-effort divider value is returned in divs. If the target rate is
+> + * too high, we silently use the highest possible rate.
+> + * The following formulas are v1's method to calculate timings.
+> + *
+> + * l = divl + 1;
+> + * h = divh + 1;
+> + * s = sda_update_config + 1;
+> + * u = start_setup_config + 1;
+> + * p = stop_setup_config + 1;
+> + * T = Tclk_i2c;
+> +
+
+Ditto
+> + * tHigh = 8 * h * T;
+> + * tLow = 8 * l * T;
+> +
+
+Ditto
+> + * tHD;sda = (l * s + 1) * T;
+> + * tSU;sda = [(8 - s) * l + 1] * T;
+> + * tI2C = 8 * (l + h) * T;
+> +
+
+Ditto
+> + * tSU;sta = (8h * u + 1) * T;
+> + * tHD;sta = [8h * (u + 1) - 1] * T;
+> + * tSU;sto = (8h * p + 1) * T;
+> + */
+> +static int rk3x_i2c_v1_calc_timings(unsigned long clk_rate,
+> +				    struct i2c_timings *t,
+> +				    struct rk3x_i2c_calced_timings *t_calc)
+> +{
+> +	unsigned long min_low_ns, min_high_ns, min_total_ns;
+> +	unsigned long min_setup_start_ns, min_setup_data_ns;
+> +	unsigned long min_setup_stop_ns, max_hold_data_ns;
+> +
+> +	unsigned long clk_rate_khz, scl_rate_khz;
+> +
+> +	unsigned long min_low_div, min_high_div;
+> +
+> +	unsigned long min_div_for_hold, min_total_div;
+> +	unsigned long extra_div, extra_low_div;
+> +	unsigned long sda_update_cfg, stp_sta_cfg, stp_sto_cfg;
+> +
+> +	const struct i2c_spec_values *spec;
+> +	int ret = 0;
+> +
+> +	/* Support standard-mode and fast-mode */
+> +	if (WARN_ON(t->bus_freq_hz > 400000))
+> +		t->bus_freq_hz = 400000;
+> +
+> +	/* prevent scl_rate_khz from becoming 0 */
+> +	if (WARN_ON(t->bus_freq_hz < 1000))
+> +		t->bus_freq_hz = 1000;
+> +
+> +	/*
+> +	 * min_low_ns: The minimum number of ns we need to hold low to
+> +	 *	       meet I2C specification, should include fall time.
+> +	 * min_high_ns: The minimum number of ns we need to hold high to
+> +	 *	        meet I2C specification, should include rise time.
+> +	 */
+> +	spec = rk3x_i2c_get_spec(t->bus_freq_hz);
+> +
+> +	/* calculate min-divh and min-divl */
+> +	clk_rate_khz = DIV_ROUND_UP(clk_rate, 1000);
+> +	scl_rate_khz = t->bus_freq_hz / 1000;
+> +	min_total_div = DIV_ROUND_UP(clk_rate_khz, scl_rate_khz * 8);
+> +
+> +	min_high_ns = t->scl_rise_ns + spec->min_high_ns;
+> +	min_high_div = DIV_ROUND_UP(clk_rate_khz * min_high_ns, 8 * 1000000);
+> +
+> +	min_low_ns = t->scl_fall_ns + spec->min_low_ns;
+> +	min_low_div = DIV_ROUND_UP(clk_rate_khz * min_low_ns, 8 * 1000000);
+> +
+> +	/*
+> +	 * Final divh and divl must be greater than 0, otherwise the
+> +	 * hardware would not output the i2c clk.
+> +	 */
+> +	min_high_div = (min_high_div < 1) ? 2 : min_high_div;
+> +	min_low_div = (min_low_div < 1) ? 2 : min_low_div;
+> +
+> +	/* These are the min dividers needed for min hold times. */
+> +	min_div_for_hold = (min_low_div + min_high_div);
+> +	min_total_ns = min_low_ns + min_high_ns;
+> +
+> +	/*
+> +	 * This is the maximum divider so we don't go over the maximum.
+> +	 * We don't round up here (we round down) since this is a maximum.
+> +	 */
+> +	 if (min_div_for_hold >= min_total_div) {
+> +		/*
+> +		 * Time needed to meet hold requirements is important.
+> +		 * Just use that.
+> +		 */
+> +		t_calc->div_low = min_low_div;
+> +		t_calc->div_high = min_high_div;
+> +	} else {
+> +		/*
+> +		 * We've got to distribute some time among the low and high
+> +		 * so we don't run too fast.
+> +		 * We'll try to split things up by the scale of min_low_div and
+> +		 * min_high_div, biasing slightly towards having a higher div
+> +		 * for low (spend more time low).
+> +		 */
+> +		extra_div = min_total_div - min_div_for_hold;
+> +		extra_low_div = DIV_ROUND_UP(min_low_div * extra_div,
+> +					     min_div_for_hold);
+> +
+> +		t_calc->div_low = min_low_div + extra_low_div;
+> +		t_calc->div_high = min_high_div + (extra_div - extra_low_div);
+> +	}
+> +
+> +	/*
+> +	 * calculate sda data hold count by the rules, data_upd_st:3
+> +	 * is a appropriate value to reduce calculated times.
+> +	 */
+> +	for (sda_update_cfg = 3; sda_update_cfg > 0; sda_update_cfg--) {
+> +		max_hold_data_ns =  DIV_ROUND_UP((sda_update_cfg
+> +						 * (t_calc->div_low) + 1)
+> +						 * 1000000, clk_rate_khz);
+> +		min_setup_data_ns =  DIV_ROUND_UP(((8 - sda_update_cfg)
+> +						 * (t_calc->div_low) + 1)
+> +						 * 1000000, clk_rate_khz);
+> +		if ((max_hold_data_ns < spec->max_data_hold_ns) &&
+> +		    (min_setup_data_ns > spec->min_data_setup_ns))
+> +			break;
+> +	}
+> +
+> +	/* calculate setup start config */
+> +	min_setup_start_ns = t->scl_rise_ns + spec->min_setup_start_ns;
+> +	stp_sta_cfg = DIV_ROUND_UP(clk_rate_khz * min_setup_start_ns
+> +			   - 1000000, 8 * 1000000 * (t_calc->div_high));
+> +
+> +	/* calculate setup stop config */
+> +	min_setup_stop_ns = t->scl_rise_ns + spec->min_setup_stop_ns;
+> +	stp_sto_cfg = DIV_ROUND_UP(clk_rate_khz * min_setup_stop_ns
+> +			   - 1000000, 8 * 1000000 * (t_calc->div_high));
+> +
+> +	t_calc->tuning = REG_CON_SDA_CFG(--sda_update_cfg) |
+> +			 REG_CON_STA_CFG(--stp_sta_cfg) |
+> +			 REG_CON_STO_CFG(--stp_sto_cfg);
+> +
+> +	t_calc->div_low--;
+> +	t_calc->div_high--;
+> +
+> +	/* Maximum divider supported by hw is 0xffff */
+> +	if (t_calc->div_low > 0xffff) {
+> +		t_calc->div_low = 0xffff;
+> +		ret = -EINVAL;
+> +	}
+> +
+> +	if (t_calc->div_high > 0xffff) {
+> +		t_calc->div_high = 0xffff;
+> +		ret = -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>   static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>   {
+>   	struct i2c_timings *t = &i2c->t;
+>   	struct rk3x_i2c_calced_timings calc;
+>   	u64 t_low_ns, t_high_ns;
+> +	u32 val;
+>   	int ret;
+>   
+> -	ret = rk3x_i2c_calc_divs(clk_rate, t, &calc);
+> +	ret = i2c->soc_data->calc_timings(clk_rate, t, &calc);
+>   	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", t->bus_freq_hz);
+>   
+> -	clk_enable(i2c->clk);
+> +	clk_enable(i2c->pclk);
+> +
+>   	i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
+>   		   REG_CLKDIV);
+> -	clk_disable(i2c->clk);
+> +
+> +	val = i2c_readl(i2c, REG_CON);
+> +	val &= ~REG_CON_TUNING_MASK;
+> +	val |= calc.tuning;
+> +	i2c_writel(i2c, val, REG_CON);
+> +
+> +	clk_disable(i2c->pclk);
+>   
+>   	t_low_ns = div_u64(((u64)calc.div_low + 1) * 8 * 1000000000, clk_rate);
+>   	t_high_ns = div_u64(((u64)calc.div_high + 1) * 8 * 1000000000,
+> @@ -712,7 +914,13 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+>   
+>   	switch (event) {
+>   	case PRE_RATE_CHANGE:
+> -		if (rk3x_i2c_calc_divs(ndata->new_rate, &i2c->t, &calc) != 0)
+> +		/*
+> +		 * Try the calculation (but don't store the result) ahead of
+> +		 * time to see if we need to block the clock change.  Timings
+> +		 * shouldn't actually take effect until rk3x_i2c_adapt_div().
+> +		 */
+> +		if (i2c->soc_data->calc_timings(ndata->new_rate, &i2c->t,
+> +						&calc) != 0)
+>   			return NOTIFY_STOP;
+>   
+>   		/* scale up */
+> @@ -822,12 +1030,14 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
+>   {
+>   	struct rk3x_i2c *i2c = (struct rk3x_i2c *)adap->algo_data;
+>   	unsigned long timeout, flags;
+> +	u32 val;
+>   	int ret = 0;
+>   	int i;
+>   
+>   	spin_lock_irqsave(&i2c->lock, flags);
+>   
+>   	clk_enable(i2c->clk);
+> +	clk_enable(i2c->pclk);
+>   
+>   	i2c->is_last_msg = false;
+>   
+> @@ -861,7 +1071,9 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
+>   
+>   			/* Force a STOP condition without interrupt */
+>   			i2c_writel(i2c, 0, REG_IEN);
+> -			i2c_writel(i2c, REG_CON_EN | REG_CON_STOP, REG_CON);
+> +			val = i2c_readl(i2c, REG_CON) & REG_CON_TUNING_MASK;
+> +			val |= REG_CON_EN | REG_CON_STOP;
+> +			i2c_writel(i2c, val, REG_CON);
+>   
+>   			i2c->state = STATE_IDLE;
+>   
+> @@ -875,7 +1087,9 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
+>   		}
+>   	}
+>   
+> +	clk_disable(i2c->pclk);
+>   	clk_disable(i2c->clk);
+> +
+>   	spin_unlock_irqrestore(&i2c->lock, flags);
+>   
+>   	return ret < 0 ? ret : num;
+> @@ -893,18 +1107,27 @@ static const struct i2c_algorithm rk3x_i2c_algorithm = {
+>   
+>   static const struct rk3x_i2c_soc_data rk3066_soc_data = {
+>   	.grf_offset = 0x154,
+> +	.calc_timings = rk3x_i2c_v0_calc_timings,
+>   };
+>   
+>   static const struct rk3x_i2c_soc_data rk3188_soc_data = {
+>   	.grf_offset = 0x0a4,
+> +	.calc_timings = rk3x_i2c_v0_calc_timings,
+>   };
+>   
+>   static const struct rk3x_i2c_soc_data rk3228_soc_data = {
+>   	.grf_offset = -1,
+> +	.calc_timings = rk3x_i2c_v0_calc_timings,
+>   };
+>   
+>   static const struct rk3x_i2c_soc_data rk3288_soc_data = {
+>   	.grf_offset = -1,
+> +	.calc_timings = rk3x_i2c_v0_calc_timings,
+> +};
+> +
+> +static const struct rk3x_i2c_soc_data rk3399_soc_data = {
+> +	.grf_offset = -1,
+> +	.calc_timings = rk3x_i2c_v1_calc_timings,
+>   };
+>   
+>   static const struct of_device_id rk3x_i2c_match[] = {
+> @@ -924,6 +1147,10 @@ static const struct of_device_id rk3x_i2c_match[] = {
+>   		.compatible = "rockchip,rk3288-i2c",
+>   		.data = (void *)&rk3288_soc_data
+>   	},
+> +	{
+> +		.compatible = "rockchip,rk3399-i2c",
+> +		.data = (void *)&rk3399_soc_data
+> +	},
+>   	{},
+>   };
+>   MODULE_DEVICE_TABLE(of, rk3x_i2c_match);
+> @@ -963,12 +1190,6 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>   	spin_lock_init(&i2c->lock);
+>   	init_waitqueue_head(&i2c->wait);
+>   
+> -	i2c->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(i2c->clk)) {
+> -		dev_err(&pdev->dev, "cannot get clock\n");
+> -		return PTR_ERR(i2c->clk);
+> -	}
+> -
+>   	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	i2c->regs = devm_ioremap_resource(&pdev->dev, mem);
+>   	if (IS_ERR(i2c->regs))
+> @@ -1022,17 +1243,44 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>   
+>   	platform_set_drvdata(pdev, i2c);
+>   
+> +	if (i2c->soc_data->calc_timings == rk3x_i2c_v0_calc_timings) {
+> +		/* Only one clock to use for bus clock and peripheral clock */
+> +		i2c->clk = devm_clk_get(&pdev->dev, NULL);
+> +		i2c->pclk = i2c->clk;
+> +	} else {
+> +		i2c->clk = devm_clk_get(&pdev->dev, "i2c");
+> +		i2c->pclk = devm_clk_get(&pdev->dev, "pclk");
+> +	}
+> +
+> +	if (IS_ERR(i2c->clk)) {
+> +		ret = PTR_ERR(i2c->clk);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "Can't get bus clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +	if (IS_ERR(i2c->pclk)) {
+> +		ret = PTR_ERR(i2c->pclk);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "Can't get periph clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>   	ret = clk_prepare(i2c->clk);
+>   	if (ret < 0) {
+> -		dev_err(&pdev->dev, "Could not prepare clock\n");
+> +		dev_err(&pdev->dev, "Can't prepare bus clk: %d\n", ret);
+>   		return ret;
+>   	}
+> +	ret = clk_prepare(i2c->pclk);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "Can't prepare periph clock: %d\n", ret);
+> +		goto err_clk;
+> +	}
+>   
+>   	i2c->clk_rate_nb.notifier_call = rk3x_i2c_clk_notifier_cb;
+>   	ret = clk_notifier_register(i2c->clk, &i2c->clk_rate_nb);
+>   	if (ret != 0) {
+>   		dev_err(&pdev->dev, "Unable to register clock notifier\n");
+> -		goto err_clk;
+> +		goto err_pclk;
+>   	}
+>   
+>   	clk_rate = clk_get_rate(i2c->clk);
+> @@ -1050,6 +1298,8 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>   
+>   err_clk_notifier:
+>   	clk_notifier_unregister(i2c->clk, &i2c->clk_rate_nb);
+> +err_pclk:
+> +	clk_unprepare(i2c->pclk);
+>   err_clk:
+>   	clk_unprepare(i2c->clk);
+>   	return ret;
+> @@ -1062,6 +1312,7 @@ static int rk3x_i2c_remove(struct platform_device *pdev)
+>   	i2c_del_adapter(&i2c->adap);
+>   
+>   	clk_notifier_unregister(i2c->clk, &i2c->clk_rate_nb);
+> +	clk_unprepare(i2c->pclk);
+>   	clk_unprepare(i2c->clk);
+>   
+>   	return 0;
+
+
+-- 
+Thanks,
+Caesar
