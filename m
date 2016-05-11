@@ -1,49 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 May 2016 11:40:32 +0100
-Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
-In-Reply-To: <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
-Message-ID: <20160511104032.GA31374@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 May 2016 11:42:05 +0100
+Subject: [patch V4 02/31] bitops: Include generic parity.h in some
+ architectures' bitops.h
+In-Reply-To: <1462957641-24241-1-git-send-email-zengzhaoxiu@163.com>
+References: <1462955158-28394-1-git-send-email-zengzhaoxiu@163.com>
+ <1462957641-24241-1-git-send-email-zengzhaoxiu@163.com>
+Message-ID: <20160511104205.GE3051@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
-> On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com> wrote:
-> > From: David Daney <david.daney@cavium.com>
-> >
-> > Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
-> > for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
-> > AArch32 state")
-
-[...]
-
-> > David Daney (2):
-> >   arm64, numa: Cleanup NUMA disabled messages.
-> >   acpi, numa, srat: Improve SRAT error detection and add messages.
-> >
-> > Hanjun Guo (11):
-> >   acpi, numa: Use pr_fmt() instead of printk
-> >   acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
-> >   acpi, numa: remove duplicate NULL check
-> >   acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
-> >   arm64, numa: rework numa_add_memblk()
-> >   x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
-> >   acpi, numa: move bad_srat() and srat_disabled() to
-> >     drivers/acpi/numa.c
-> >   acpi, numa: remove unneeded acpi_numa=1
-> >   acpi, numa: Move acpi_numa_memory_affinity_init() to
-> >     drivers/acpi/numa.c
-> >   arm64, acpi, numa: NUMA support based on SRAT and SLIT
-> >   acpi, numa: Enable ACPI based NUMA on ARM64
-> >
-> > Robert Richter (1):
-> >   acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+On Wed, May 11, 2016 at 05:06:17PM +0800, zengzhaoxiu at 163.com wrote:
+> From: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
 > 
-> I need ACKs from the ARM64 maintainers on patches [6-7/13] and [13-14/14].
+> Simply use the generic version.
+> 
+> Signed-off-by: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
+> Acked-by: Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> [for avr32]
+> ---
+>  arch/arc/include/asm/bitops.h      | 1 +
+>  arch/arm/include/asm/bitops.h      | 1 +
+>  arch/arm64/include/asm/bitops.h    | 1 +
+>  arch/avr32/include/asm/bitops.h    | 1 +
+>  arch/c6x/include/asm/bitops.h      | 1 +
+>  arch/cris/include/asm/bitops.h     | 1 +
+>  arch/frv/include/asm/bitops.h      | 1 +
+>  arch/h8300/include/asm/bitops.h    | 1 +
+>  arch/hexagon/include/asm/bitops.h  | 1 +
+>  arch/m32r/include/asm/bitops.h     | 1 +
+>  arch/m68k/include/asm/bitops.h     | 1 +
+>  arch/metag/include/asm/bitops.h    | 1 +
+>  arch/mn10300/include/asm/bitops.h  | 1 +
+>  arch/openrisc/include/asm/bitops.h | 1 +
+>  arch/parisc/include/asm/bitops.h   | 1 +
+>  arch/s390/include/asm/bitops.h     | 1 +
+>  arch/sh/include/asm/bitops.h       | 1 +
+>  arch/xtensa/include/asm/bitops.h   | 1 +
 
-There's also a dependency on the arm64 for-next/core branch, so I've been
-largely ignoring this as far as 4.6 is concerned and was planning to take
-a proper look for 4.7 once the upcoming merge window is out of the way.
+For arm64:
 
-Will
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
