@@ -1,44 +1,26 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2016 09:52:03 +0100
-Subject: [PATCH 00/12] Fixing TI Keystone2 kexec
-In-Reply-To: <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <20160511082923.GC8995@dhcp-128-65.nay.redhat.com>
-Message-ID: <20160511085203.GN19428@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 May 2016 10:53:35 +0200
+Subject: [PATCH v2 3/4] ARM64: Kconfig: Select the Amlogic Meson pin
+ controller driver
+In-Reply-To: <1462176138-29433-4-git-send-email-carlo@caione.org>
+References: <1462176138-29433-1-git-send-email-carlo@caione.org>
+ <1462176138-29433-4-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkdbTr7YUrzSQQci929ugBhTkJKWvpjdf5Wo3HkfVKFhGLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 04:29:23PM +0800, Dave Young wrote:
-> Hi, Russell
-> 
-> On 04/28/16 at 10:26am, Russell King - ARM Linux wrote:
-> > These changes are required for TI Keystone2 kexec to be functional.  TI
-> > Keystone2 has the run-time view of physical memory above 4GiB, but with
-> > a boot time alias below 4GiB which can only be used during the early
-> > boot.
-> > 
-> > This means we need to translate run-time physical addresses (which the
-> > kernel uses) to boot-time physical addresses, which, having discussed
-> > with Eric, is what the kexec tools and kexec kernel API requires.
-> > 
-> > We publish a special set of boot time resources in /proc/iomem, which
-> > the (modified) kexec tools look for in preference to the normal resources.
-> > Hence, if these are found, the kexec tools make use of these resources,
-> > and thus kexec tools use the boot-time view of physical memory.
-> 
-> I think getting memory ranges from device tree will be better than
-> adding more stuff to /proc/iomem. Geoff's arm64 kexec patches is using dtb
-> you can refer to the patchset.
+On Mon, May 2, 2016 at 10:02 AM, Carlo Caione <carlo@caione.org> wrote:
 
-I think you're confusing things.  DT doesn't contain the boot alias
-memory ranges - it's not a separate chunk of memory.  It's an alias
-of the same physical address space found higher in the physical
-address range.
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Select the Meson pin controller driver also for the AArch64 Meson
+> platform.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-If we put it in DT, then we need a way to also describe that it is an
-alias of some other bit of physical memory.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I guess this should get merged through the ARM SoC tree.
+
+Yours,
+Linus Walleij
