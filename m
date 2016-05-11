@@ -1,112 +1,168 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 May 2016 15:30:19 +0200
-Subject: [PULL 26/29] KVM: arm/arm64: arch_timer: Rely on the arch timer to
- parse the firmware tables
+Date: Wed, 11 May 2016 15:30:02 +0200
+Subject: [PULL 09/29] kvm-arm: arm64: Introduce stage2 page table helpers
 In-Reply-To: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
 References: <1462973422-10021-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1462973422-10021-27-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1462973422-10021-10-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-The firmware table is currently parsed by the virtual timer code in
-order to retrieve the virtual timer interrupt. However, this is already
-done by the arch timer driver.
+Introduce stage2 page table helpers for arm64. With the fake
+page table level still in place, the stage2 table has the same
+number of levels as that of the host (and hyp), so they all
+fallback to the host version.
 
-To avoid code duplication, use the newly function arch_timer_get_kvm_info()
-which return all the information required by the virtual timer code.
-
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- virt/kvm/arm/arch_timer.c | 40 +++++++++++-----------------------------
- 1 file changed, 11 insertions(+), 29 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h        | 29 +----------
+ arch/arm64/include/asm/stage2_pgtable.h | 86 +++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm64/include/asm/stage2_pgtable.h
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 9aaa35d..409db33 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -17,7 +17,6 @@
-  */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 9a3409f..e3f53e3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -91,6 +91,8 @@ alternative_endif
+ #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
+ #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
  
- #include <linux/cpu.h>
--#include <linux/of_irq.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
-@@ -438,45 +437,29 @@ static struct notifier_block kvm_timer_cpu_nb = {
- 	.notifier_call = kvm_timer_cpu_notify,
- };
++#include <asm/stage2_pgtable.h>
++
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+@@ -156,35 +158,8 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
  
--static const struct of_device_id arch_timer_of_match[] = {
--	{ .compatible	= "arm,armv7-timer",	},
--	{ .compatible	= "arm,armv8-timer",	},
--	{},
--};
+-/*
+- * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
+- * the entire IPA input range with a single pgd entry, and we would only need
+- * one pgd entry.  Note that in this case, the pgd is actually not used by
+- * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
+- * structure for the kernel pgtable macros to work.
+- */
+-#if PGDIR_SHIFT > KVM_PHYS_SHIFT
+-#define PTRS_PER_S2_PGD_SHIFT	0
+-#else
+-#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
+-#endif
+-#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
 -
- int kvm_timer_hyp_init(void)
+ #define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+ 
+-/*
+- * If we are concatenating first level stage-2 page tables, we would have less
+- * than or equal to 16 pointers in the fake PGD, because that's what the
+- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
+- * represents the first level for the host, and we add 1 to go to the next
+- * level (which uses contatenation) for the stage-2 tables.
+- */
+-#if PTRS_PER_S2_PGD <= 16
+-#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
+-#else
+-#define KVM_PREALLOC_LEVEL	(0)
+-#endif
+-
+ static inline void *kvm_get_hwpgd(struct kvm *kvm)
  {
--	struct device_node *np;
--	unsigned int ppi;
-+	struct arch_timer_kvm_info *info;
- 	int err;
- 
--	timecounter = arch_timer_get_timecounter();
--	if (!timecounter)
--		return -ENODEV;
-+	info = arch_timer_get_kvm_info();
-+	timecounter = &info->timecounter;
- 
--	np = of_find_matching_node(NULL, arch_timer_of_match);
--	if (!np) {
--		kvm_err("kvm_arch_timer: can't find DT node\n");
-+	if (info->virtual_irq <= 0) {
-+		kvm_err("kvm_arch_timer: invalid virtual timer IRQ: %d\n",
-+			info->virtual_irq);
- 		return -ENODEV;
- 	}
-+	host_vtimer_irq = info->virtual_irq;
- 
--	ppi = irq_of_parse_and_map(np, 2);
--	if (!ppi) {
--		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
--		err = -EINVAL;
--		goto out;
--	}
--
--	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
-+	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
- 				 "kvm guest timer", kvm_get_running_vcpus());
- 	if (err) {
- 		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
--			ppi, err);
-+			host_vtimer_irq, err);
- 		goto out;
- 	}
- 
--	host_vtimer_irq = ppi;
--
- 	err = __register_cpu_notifier(&kvm_timer_cpu_nb);
- 	if (err) {
- 		kvm_err("Cannot register timer CPU notifier\n");
-@@ -489,14 +472,13 @@ int kvm_timer_hyp_init(void)
- 		goto out_free;
- 	}
- 
--	kvm_info("%s IRQ%d\n", np->name, ppi);
-+	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
- 	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
- 
- 	goto out;
- out_free:
--	free_percpu_irq(ppi, kvm_get_running_vcpus());
-+	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
- out:
--	of_node_put(np);
- 	return err;
- }
- 
+ 	pgd_t *pgd = kvm->arch.pgd;
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+new file mode 100644
+index 0000000..0ec218f
+--- /dev/null
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -0,0 +1,86 @@
++/*
++ * Copyright (C) 2016 - ARM Ltd
++ *
++ * stage2 page table helpers
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ARM64_S2_PGTABLE_H_
++#define __ARM64_S2_PGTABLE_H_
++
++#include <asm/pgtable.h>
++
++/*
++ * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
++ * the entire IPA input range with a single pgd entry, and we would only need
++ * one pgd entry.  Note that in this case, the pgd is actually not used by
++ * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
++ * structure for the kernel pgtable macros to work.
++ */
++#if PGDIR_SHIFT > KVM_PHYS_SHIFT
++#define PTRS_PER_S2_PGD_SHIFT	0
++#else
++#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
++#endif
++#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
++
++/*
++ * If we are concatenating first level stage-2 page tables, we would have less
++ * than or equal to 16 pointers in the fake PGD, because that's what the
++ * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
++ * represents the first level for the host, and we add 1 to go to the next
++ * level (which uses contatenation) for the stage-2 tables.
++ */
++#if PTRS_PER_S2_PGD <= 16
++#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
++#else
++#define KVM_PREALLOC_LEVEL	(0)
++#endif
++
++#define stage2_pgd_none(pgd)				pgd_none(pgd)
++#define stage2_pgd_clear(pgd)				pgd_clear(pgd)
++#define stage2_pgd_present(pgd)				pgd_present(pgd)
++#define stage2_pgd_populate(pgd, pud)			pgd_populate(NULL, pgd, pud)
++#define stage2_pud_offset(pgd, address)			pud_offset(pgd, address)
++#define stage2_pud_free(pud)				pud_free(NULL, pud)
++
++#define stage2_pud_none(pud)				pud_none(pud)
++#define stage2_pud_clear(pud)				pud_clear(pud)
++#define stage2_pud_present(pud)				pud_present(pud)
++#define stage2_pud_populate(pud, pmd)			pud_populate(NULL, pud, pmd)
++#define stage2_pmd_offset(pud, address)			pmd_offset(pud, address)
++#define stage2_pmd_free(pmd)				pmd_free(NULL, pmd)
++
++#define stage2_pud_huge(pud)				pud_huge(pud)
++
++#define stage2_pgd_addr_end(address, end)		pgd_addr_end(address, end)
++#define stage2_pud_addr_end(address, end)		pud_addr_end(address, end)
++#define stage2_pmd_addr_end(address, end)		pmd_addr_end(address, end)
++
++#define stage2_pte_table_empty(ptep)			kvm_page_empty(ptep)
++#ifdef __PGTABLE_PMD_FOLDED
++#define stage2_pmd_table_empty(pmdp)			(0)
++#else
++#define stage2_pmd_table_empty(pmdp)			((KVM_PREALLOC_LEVEL < 2) && kvm_page_empty(pmdp))
++#endif
++
++#ifdef __PGTABLE_PUD_FOLDED
++#define stage2_pud_table_empty(pudp)			(0)
++#else
++#define stage2_pud_table_empty(pudp)			((KVM_PREALLOC_LEVEL < 1) && kvm_page_empty(pudp))
++#endif
++
++#define stage2_pgd_index(addr)				(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
++
++#endif	/* __ARM64_S2_PGTABLE_H_ */
 -- 
 2.1.2.330.g565301e.dirty
