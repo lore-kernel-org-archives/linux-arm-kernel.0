@@ -1,31 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 11 May 2016 10:13:09 -0400
-Subject: [PATCH 2/2] soc: samsung: pm_domains: Prepare for supporting
- ARMv8 Exynos
-In-Reply-To: <1462888341-21963-2-git-send-email-k.kozlowski@samsung.com>
-References: <1462888341-21963-1-git-send-email-k.kozlowski@samsung.com>
- <1462888341-21963-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <7a62ff75-187e-06ef-8331-c056a7eee4e7@osg.samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 May 2016 09:14:29 -0500
+Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
+In-Reply-To: <20160510021826.GE1129@earth>
+References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160509200657.GA3379@rob-hp-laptop> <5730F8BA.5000402@gmail.com>
+ <CAL_JsqJPZS1ne_xAuBFtCc5L1HKFJf0LDUJ7CRSFXhc3adkTfA@mail.gmail.com>
+ <20160510021826.GE1129@earth>
+Message-ID: <20160511141429.GA5894@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 05/10/2016 09:52 AM, Krzysztof Kozlowski wrote:
-> The ARMv8 Exynos family (Exynos5433 and Exynos7420) uses different value
-> (0xf instead of 0x7) for controlling the power domain on/off registers
-> (both for control and for status).
+On Tue, May 10, 2016 at 04:18:27AM +0200, Sebastian Reichel wrote:
+> Hi,
 > 
-> Choose the value depending on the compatible. This prepares the driver
-> for supporting ARMv8 SoCs.
+> On Mon, May 09, 2016 at 04:07:35PM -0500, Rob Herring wrote:
+> > There's already a pwm-led binding that can be used. Though there
+> > may be missing consumer IR to LED subsystem support in the kernel.
+> > You could list both compatibles, use the rx51 IR driver now, and
+> > then move to pwm-led driver in the future.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+> Well from a purely HW point of view it's a PWM connected led. The
+> usage is completely different though. Usually PWM is used to control
+> the LED's brightness via the duty cycle (basic concept: enabling led
+> only 50% of time reduces brightness to 50%).
+> 
+> In the IR led's case the aim is generating a specific serial pattern
+> instead. For this task it uses a dmtimer in PWM mode and a second
+> one to reconfigure the pwm timer.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+In that case, it will probably never be a generic driver.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> I don't know about a good name, but rx51 should be replaced with
+> n900 in the compatible string. So maybe "nokia,n900-infrared-diode".
+
+That's fine, but the shorter '-ir' was too.
+
+Rob
