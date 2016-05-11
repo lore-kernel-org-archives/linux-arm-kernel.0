@@ -1,56 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 May 2016 09:06:52 +0200
-Subject: [PATCH] ARM: dts: exynos: Enable AX88760 USB hub on Origen board
-Message-ID: <1462950412-16681-1-git-send-email-k.kozlowski@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 May 2016 09:12:06 +0200
+Subject: [PATCH] devicetree: sunxi: Add OLinuXino Lime2 eMMC to the
+ Makefile
+In-Reply-To: <1462906820-5203-1-git-send-email-oliver@schinagl.nl>
+References: <1462906820-5203-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160511071206.GN3733@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Leach <matthew@mattleach.net>
+Hi Oliver,
 
-Enable the Origen's usb phy and ohci devices in the device tree.  Also
-add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
-the AX88760 hub is powered.
+On Tue, May 10, 2016 at 09:00:20PM +0200, Olliver Schinagl wrote:
+> ARM: dts: sunxi: Add a olinuxino-lime2-emmc added the new emmc equipped
+> lime2 but forgot its Makefile. This patch adds an entry to the Makefile.
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+> Maxime, I'm sorry for ommitting the Makefile initially, if it is not merged yet,
+> maybe just squash it with the previous patch?
 
-Signed-off-by: Matthew Leach <matthew@mattleach.net>
-[k.kozlowski: Extend nodes by label notation instead of path]
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos4412-origen.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+It's merged, and have been sent to armsoc.
 
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-index 8bca699b7f20..4c59bdb0e6f3 100644
---- a/arch/arm/boot/dts/exynos4412-origen.dts
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -77,12 +77,29 @@
- 			clock-frequency = <24000000>;
- 		};
- 	};
-+
- };
- 
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
- 
-+&exynos_usbphy {
-+	status = "okay";
-+};
-+
-+&ehci {
-+	samsung,vbus-gpio = <&gpx3 5 1>;
-+	status = "okay";
-+
-+	port at 1{
-+		status = "okay";
-+	};
-+	port at 2 {
-+		status = "okay";
-+	};
-+};
-+
- &fimd {
- 	pinctrl-0 = <&lcd_clk &lcd_data24 &pwm1_out>;
- 	pinctrl-names = "default";
+Please resend with arm at kernel.org, asking them to apply it directly
+(and keep chen-yu and I in cc).
+
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160511/ecdea871/attachment.sig>
