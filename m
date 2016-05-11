@@ -1,37 +1,18 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 11 May 2016 11:18:11 +0200
-Subject: [PATCH 0/7] pinctrl: meson: Add a bunch more pins
-In-Reply-To: <CACRpkdY99HWOQ4fhuYuPZ4JpwK6s75TXYpaBaBxhLLJFRLCd6w@mail.gmail.com>
-References: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
- <CACRpkdY99HWOQ4fhuYuPZ4JpwK6s75TXYpaBaBxhLLJFRLCd6w@mail.gmail.com>
-Message-ID: <CAOQ7t2Ys-zow-wn4p5chYxrYrjun-9_5p4_Xij6bXLApyt5itw@mail.gmail.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Wed, 11 May 2016 17:12:07 +0800
+Subject: Add support for regulator operation mode of mt6397 
+Message-ID: <1462957929-20105-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 10:57 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Fri, May 6, 2016 at 4:21 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->
->> Add support for several more devices, both in the EE domain and in the
->> AO domain.  Also, add the pins to the corresponding DTS files.
->>
->> Tested on odroid-c2 and Amlogic P200 boards, and verified with working
->> ethernet.
->>
->> Depends on the initial GXBB pinctrl support from Carlo[1].  Also
->> available in my git tree[2] with all the dependencies included.
->
-> Carlo can you review Kevin's patches? I'd like to apply them if
-> nothing's controversial about them.
+Some regulators support different operating modes, but there is no suitable
+property that can pass the opeation mode constraints on runtime at present.
 
-Go ahead and apply them:
+This series making the change to specify supported modes as a devicetree list.
+Consumers can change or get the regulator operation mode by regulator_set_mode
+/regulator_get_mode and define the support operating mode on devicetree.
 
-Acked-by: Carlo Caione <carlo@endlessm.com>
-
-The ack is on the formal correctness since I still do not have access
-to the datasheet.
-
-Thanks,
-
--- 
-Carlo Caione
+There is a requirement from SVS driver. SVS calibartion requires that the
+regulator be in its low-noise (pwm mode) state at boot, but at all other times
+it can be normal mode for power saving.
+http://www.spinics.net/lists/devicetree/msg111204.html
