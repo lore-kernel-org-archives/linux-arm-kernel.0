@@ -1,109 +1,106 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 11 May 2016 12:53:25 +0000
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <57331290.7070104@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
- <57331290.7070104@semihalf.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED8E264@lhreml503-mbs>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 11 May 2016 13:55:20 +0100
+Subject: [PATCH 1/1] arm64: Add ARM64 optimized IP checksum routine
+In-Reply-To: <1462904847-28369-1-git-send-email-luke.starrett@broadcom.com>
+References: <1462904847-28369-1-git-send-email-luke.starrett@broadcom.com>
+Message-ID: <57332BB8.9060004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz
+Hi Luke,
 
-> -----Original Message-----
-> From: Tomasz Nowicki [mailto:tn at semihalf.com]
-> Sent: 11 May 2016 12:08
-> To: Gabriele Paoloni; helgaas at kernel.org; arnd at arndb.de;
-> will.deacon at arm.com; catalin.marinas at arm.com; rafael at kernel.org;
-> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
-> jchandra at broadcom.com
-> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
-> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
-> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
-> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
-> dhdang at apm.com; jeremy.linton at arm.com; liudongdong (C);
-> cov at codeaurora.org
-> Subject: Re: [PATCH V7 00/11] Support for generic ACPI based PCI host
-> controller
-> 
-> Hi Gabriele,
-> 
-> On 11.05.2016 12:41, Gabriele Paoloni wrote:
-> > Hi Tomasz
-> >
-> >> -----Original Message-----
-> >> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> >> owner at vger.kernel.org] On Behalf Of Tomasz Nowicki
-> >> Sent: 10 May 2016 16:20
-> >> To: helgaas at kernel.org; arnd at arndb.de; will.deacon at arm.com;
-> >> catalin.marinas at arm.com; rafael at kernel.org; hanjun.guo at linaro.org;
-> >> Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
-> jchandra at broadcom.com
-> >> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
-> >> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
-> >> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
-> >> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> >> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
-> >> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
-> >> dhdang at apm.com; jeremy.linton at arm.com; liudongdong (C);
-> >> cov at codeaurora.org; Tomasz Nowicki
-> >> Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
-> >> controller
-> >>
-> >>  From the functionality point of view this series may be split into
-> the
-> >> following logic parts:
-> >> 1. New ECAM API and update for users of the pci-host-common API
-> >> 2. Necessary fixes as the preparation for using driver on ARM64.
-> >> 3. Use new MCFG interface and implement generic ACPI based PCI host
-> >> controller driver.
-> >> 4. Enable above driver on ARM64
-> >>
-> >> Patches has been built on top of 4.6-rc7 and can be found here:
-> >> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v7)
-> >>
-> >> This has been tested on Cavium ThunderX server. Any help in
-> reviewing
-> >> and
-> >> testing is very appreciated.
-> >>
-> >> v6 -> v7
-> >> - drop quirks handling
-> >
-> > Maybe I missed something in the v6 discussion thread; when was it
-> > decided to drop quirk handling?
-> 
-> I had such requests in previous series.
-> 
-> >
-> > I think it is important to have this in place to accommodate
-> different
-> > vendors. If the intention is to keep this patchset "clean" maybe
-> > we can add it as a separate patch on top later on...
-> >
-> > What's your view?
-> 
-> Yes, keeping these things separated should help in review. Obviously I
-> agree that we need quirk handling but currently there is no
-> implementation which we all agree upon. For the test, you can use quirk
-> handling approach from the previous series until we sort out final
-> solution.
+On 10/05/16 19:27, Luke Starrett wrote:
+> This change implements an optimized checksum for arm64, based loosely on
+> the original arch/arm implementation.  Load-pair is used for the initial
+> 16B load, reducing the overall number of loads to two for packets without
+> IP options.  Instruction count is reduced by ~3x compared to generic C
+> implementation.  Changes were tested against LE and BE operation and for
+> all possible mis-alignments.
+>
+> Signed-off-by: Luke Starrett <luke.starrett@broadcom.com>
+> ---
+>   arch/arm64/include/asm/checksum.h | 57 +++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 57 insertions(+)
+>   create mode 100644 arch/arm64/include/asm/checksum.h
+>
+> diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
+> new file mode 100644
+> index 0000000..15629d7
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/checksum.h
+> @@ -0,0 +1,57 @@
+> +/*
+> + * Copyright 2016 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
+> + *
+> + * ip_fast_csum() loosely derived from original arch/arm implementation
+> + */
+> +
+> +#ifndef __ASM_ARM64_CHECKSUM_H
+> +#define __ASM_ARM64_CHECKSUM_H
+> +
+> +/*
+> + * This is a version of ip_compute_csum() optimized for IP headers,
+> + * which always checksum on 4 octet boundaries.
+> + */
+> +static inline __sum16
+> +ip_fast_csum(const void *iph, unsigned int ihl)
+> +{
+> +	u64 tmp, sum;
+> +
+> +	__asm__ __volatile__ (
+> +"	ldp	%0, %3, [%1], #16\n"
+> +"	sub	%2, %2, #4\n"
+> +"	adds	%0, %0, %3\n"
+> +"1:	ldr	%w3, [%1], #4\n"
+> +"	sub	%2, %2, #1\n"
+> +"	adcs	%0, %0, %3\n"
 
-Great
+This looks suspicious - the following tst is going to zero the carry 
+flag, so either setting the flags is unnecessary, or things are working 
+by chance.
 
-This explains perfectly
+> +"	tst	%2, #15\n"
+> +"	bne	1b\n"
+> +"	adc	%0, %0, xzr\n"
 
-We will apply previous series quirks and try to test the patchset
-from Huawei side
+Similarly, you should never get here with the carry flag set, so this is 
+just a pointless nop.
 
-Many Thanks
+> +"	ror	%3, %0, #32\n"
+> +"	add     %0, %0, %3\n"
+> +"	lsr	%0, %0, #32\n"
+> +"	ror	%w3, %w0, #16\n"
+> +"	add     %w0, %w0, %w3\n"
+> +"	lsr	%0, %0, #16\n"
+> +	: "=r" (sum), "=r" (iph), "=r" (ihl), "=r" (tmp)
+> +	: "1" (iph), "2" (ihl)
+> +	: "cc", "memory");
+> +
+> +	return (__force __sum16)(~sum);
+> +}
 
-Gab
+Given that dodginess, and that there doesn't seem to be anything here 
+which absolutely _demands_ assembly voodoo, can we not just have an 
+optimised C implementation working on larger chunks, along the lines of 
+Alpha?
 
-> 
-> Thanks,
-> Tomasz
+Robin.
+
+> +
+> +#define ip_fast_csum ip_fast_csum
+> +#include <asm-generic/checksum.h>
+> +
+> +#endif	/* __ASM_ARM64_CHECKSUM_H */
+>
