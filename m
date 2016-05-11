@@ -1,24 +1,107 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 11 May 2016 02:07:38 +0200
-Subject: [PATCH v4 4/5] arm64: add support for ACPI Low Power Idle(LPI)
-In-Reply-To: <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
-References: <1461069013-13292-1-git-send-email-sudeep.holla@arm.com>
- <1461069013-13292-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <3620725.8soc3SaFWB@vostro.rjw.lan>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 11 May 2016 02:43:11 +0200
+Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 19, 2016 01:30:12 PM Sudeep Holla wrote:
-> This patch adds appropriate callbacks to support ACPI Low Power Idle
-> (LPI) on ARM64.
-> 
-> It also selects ARCH_SUPPORTS_ACPI_PROCESSOR_LPI if ACPI is enabled
-> on ARM64.
+On Wed, Apr 27, 2016 at 8:07 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> Based on git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+> for-next/core branch at commit 643d703d2d2d ("arm64: compat: Check for
+> AArch32 state")
+>
+> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
+> NUMA domain information from SRAT and SLIT table, so parse those two
+> tables to get mappings from cpu/mem to numa node configuration and
+> system locality.
+>
+> v6 updates:
+>
+>  - Changed message printed in 13/14 to omit meaningless "cpu"
+>    number. (noted by Dennis Chen and Hanjun Guo)
+>
+>  - New patch 7/14 to print different messages for NUMA disabled case.
+>    (noted by Dennis Chen)
+>
+>  - Squashed two patches into 14/14.
+>
+>  - Added Reviewed-by to 4/14
+>
+> v5 updates:
+>
+>  - Fixed ia64 build failure by gating some unused functions with #if
+>    CONFIG_{X86,ARM64}.
+>
+>  - Fixed section mismatch errors for X86 case.
+>
+>  - Removed unneeded #include from some files.
+>
+>  - Tested to build cleanly on ARM64, X86_64, IA64
+>
+> v4 updates:
+>
+>  - Updated from Hanjun Guo's v3 patches.
+>
+>  - Rebased on top of v16 of device-tree NUMA patches.
+>
+>  - Reordered some of the changes so that we don't introduce code and
+>    then change it several times in the patch set.  New code is
+>    introduced in its final form.  Code reused from x86 is first moved
+>    with no change, and then a separate patch to make any needed
+>    changes.
+>
+>  - code that is used only by ia64, moved to architecture specific
+>    files.
+>
+> v3 updates:
+>  - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
+>    that for acpi/numa.c (patch 2/12)
+>
+>  - Remove the duplicate NULL check for table print (patch 3/12)
+>
+>  - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
+>    dummy function for acpi_numa_arch_fixup()
+>
+>  - Solve the problem that the mapping from logical cpu to numa node
+>    is wrong which spotted out by Lorenzo
+>
+>  - cleanups for x86 and move acpi_numa_slit_init() and some other
+>    functions to common place, then reduce the duplicate of x86
+>    and arm64 (patch 7-12/12).
+>
+>  - rebased on top of 4.4 and Ganapat's v9 patch set.
+>
+>
+> David Daney (2):
+>   arm64, numa: Cleanup NUMA disabled messages.
+>   acpi, numa, srat: Improve SRAT error detection and add messages.
+>
+> Hanjun Guo (11):
+>   acpi, numa: Use pr_fmt() instead of printk
+>   acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>   acpi, numa: remove duplicate NULL check
+>   acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>   arm64, numa: rework numa_add_memblk()
+>   x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>   acpi, numa: move bad_srat() and srat_disabled() to
+>     drivers/acpi/numa.c
+>   acpi, numa: remove unneeded acpi_numa=1
+>   acpi, numa: Move acpi_numa_memory_affinity_init() to
+>     drivers/acpi/numa.c
+>   arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>   acpi, numa: Enable ACPI based NUMA on ARM64
+>
+> Robert Richter (1):
+>   acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
 
-Can you remind me why we need the ARCH_SUPPORTS_ACPI_PROCESSOR_LPI thing in
-addition to the previously defined ARCH_SUPPORTS_ACPI_PROCESSOR_CSTATE?
+I need ACKs from the ARM64 maintainers on patches [6-7/13] and [13-14/14].
 
-I thought supporting LPI would not require an arch Kconfig option.
+The rest looks good to me, so I can apply the series once the above
+have been ACKed.
 
 Thanks,
 Rafael
