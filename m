@@ -1,56 +1,49 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 May 2016 09:35:29 -0700
-Subject: [PATCH v8 6/8] dt-bindings: i2c: rk3x: add support for rk3399
-In-Reply-To: <1462908647-27236-1-git-send-email-david.wu@rock-chips.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <1462908647-27236-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAD=FV=VzL8AfzUnPYgsf_NqPgbp2_o_qJC7-DWHmekWVQ-Es=A@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 11 May 2016 17:40:16 +0100
+Subject: [PATCH] ARM: STi: Update machine _namestr to be more generic.
+Message-ID: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This string is used by dump_stack and as we now support
+more SoC's than just STiH415/6 it is misleading to have
+the current string in the stack trace.
 
-On Tue, May 10, 2016 at 12:30 PM, David Wu <david.wu@rock-chips.com> wrote:
-> The bus clock and function clock are separated at rk3399,
-> and others use one clock as the bus clock and function clock.
->
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> ---
-> Change in v8:
-> - remove error description.
->
->  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> index 0b4a85f..5429301 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-> @@ -6,10 +6,20 @@ RK3xxx SoCs.
->  Required properties :
->
->   - reg : Offset and length of the register set for the device
-> - - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
-> -               "rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
-> + - compatible: should be one of the following:
-> +   - "rockchip,rk3066-i2c": for rk3066
-> +   - "rockchip,rk3188-i2c": for rk3188
-> +   - "rockchip,rk3228-i2c": for rk3228
-> +   - "rockchip,rk3288-i2c": for rk3288
-> +   - "rockchip,rk3399-i2c": for rk3399
->   - interrupts : interrupt number
-> - - clocks : parent clock
-> + - clocks: See ../clock/clock-bindings.txt
-> +   - For older hardware (rk3066, rk3188, rk3228, rk3288):
-> +     - There is one clock that's used both to derive the functional clock
-> +       for the device and as the bus clock.
-> +   - For newer hardware (rk3399): specified by name
-> +     - "i2c": REQUIRED. This is used to derive the functional clock.
-> +     - "pclk": REQUIRED. This is the bus clock.
+This patch updates it to be more generic for the STi
+family of SoCs.
 
-Depending on what Rob thinks, it might make sense to remove the above
-two "REQUIRED" bits.  That would match his earlier feedback since
-we're still in the "Required" section and thus it is redundant.
+So instead of looking like this
 
--Doug
+[  271.672555] Hardware name: STiH415/416 SoC with Flattened Device Tree
+[  271.678998] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
+[  271.686746] [<c030bb54>] (show_stack) from [<c058bc4c>] (dump_stack+0x98/0xac)
+[snip]
+
+it now looks like this:
+
+[    2.669879] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc3-00026-g38a1ce6-dirty #76
+[    2.677973] Hardware name: STi SoC with Flattened Device Tree
+[    2.683723] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
+[    2.691472] [<c030bb54>] (show_stack) from [<c058bc0c>] (dump_stack+0x98/0xac)
+[snip]
+
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ arch/arm/mach-sti/board-dt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index ae10fb2..cfee0ef 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -23,7 +23,7 @@ static const char *const stih41x_dt_match[] __initconst = {
+ 	NULL
+ };
+ 
+-DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
++DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
+ 	.dt_compat	= stih41x_dt_match,
+ 	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
+ 			  L310_AUX_CTRL_DATA_PREFETCH |
+-- 
+1.9.1
