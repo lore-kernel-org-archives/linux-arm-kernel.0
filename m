@@ -1,62 +1,120 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2016 09:57:56 -0700
-Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
-In-Reply-To: <CAPjucKb2PLSZcD3YZ9xQk1F62ugFaGAkBBqMp5GmoWFd0H8Vfg@mail.gmail.com>
-References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
- <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
- <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
- <20160505184609.GB5995@atomide.com>
- <2822D1C2B9B19F4A8261F756A13373F801BEF7B4@DFLE11.ent.ti.com>
- <CAPjucKb+4vd8Ar3MATCuTx+9R36PeB0hbvwDaAD1KTZFCiVJEA@mail.gmail.com>
- <2822D1C2B9B19F4A8261F756A13373F801BF86D2@DFLE11.ent.ti.com>
- <2822D1C2B9B19F4A8261F756A13373F801BF8703@DFLE11.ent.ti.com>
- <CAPjucKb2PLSZcD3YZ9xQk1F62ugFaGAkBBqMp5GmoWFd0H8Vfg@mail.gmail.com>
-Message-ID: <20160512165755.GR5995@atomide.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 12 May 2016 18:08:41 +0100
+Subject: [PATCH] arm64: Implement optimised IP checksum helpers
+In-Reply-To: <a3d91ddf-565d-5cef-0a56-39154e3a00d2@broadcom.com>
+References: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
+ <a3d91ddf-565d-5cef-0a56-39154e3a00d2@broadcom.com>
+Message-ID: <5734B899.3040207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eduard Gavin <egavin@iseebcn.com> [160509 07:43]:
-> Dear Nishanth,
->   In igepV5 the LDO7 is connected to:
->     VDDA_DSIPORTA - ball AA33
->     VDDA_DSIPORTC - ball AE33
->     VDDA_HDMI - ball AN25
->   LDO4 is connected to:
->     VPP1 - ball AD9
+Hi Luke,
 
-Thanks for the info, here's an updated patch with comments and now
-using 1.8V instead of the 2.0V omap5-board-common.dtsi.
+On 12/05/16 16:34, Luke Starrett wrote:
+> Hi Robin,
+>
+> I pulled this in to a userspace test app expecting that the __uint128_t
+> type might cause GCC to emit 'ldp'.  Seems like that was that your
+> intent based on your commit note.  Instead I see two 64b loads (ldr Xn),
+> and a single 32b load (ldr Wn) for the trailing 4B.  This was with
+> Linaro GCC 4.9-2015.06.
 
-Regards,
+GCC 5 happily emits ldp there, but indeed I couldn't figure out how to 
+convince GCC 4 to do so. From a quick ferret around in the GCC Git, it 
+looks like the relevant optimisations may have only gone in post-4.9.
 
-Tony
+> Otherwise, the C cycle count looks good enough compared to the asm version.
 
-8< -----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 9 May 2016 07:51:00 -0700
-Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
+Yeah, compiling as standalone functions with GCC 5 I get 19 instructions 
+vs. 17 for the asm, but the loop logic gets optimised out completely 
+when ihl is a compile-time constant (e.g. inet_gro_receive())
 
-Fix ldo7 source for HDMI on igepv5.
+Cheers,
+Robin.
 
-Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/boot/dts/omap5-igep0050.dts
-+++ b/arch/arm/boot/dts/omap5-igep0050.dts
-@@ -35,6 +35,16 @@
- 	};
- };
- 
-+/*
-+ * LDO7 is used for HDMI: VDDA_DSIPORTA - ball AA33, VDDA_DSIPORTC - ball AE33
-+ * VDDA_HDMI - ball AN25. LDO4 is: VPP1 - ball AD9.
-+ */
-+&ldo7_reg {
-+	status = "okay";
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+};
-+
- &omap5_pmx_core {
- 	i2c4_pins: pinmux_i2c4_pins {
- 		pinctrl-single,pins = <
+>
+> Thanks,
+>
+> Luke
+>
+>
+> On 5/12/2016 10:26 AM, Robin Murphy wrote:
+>> AArch64 is capable of 128-bit memory accesses without alignment
+>> restrictions, which makes it both possible and highly practical to slurp
+>> up a typical 20-byte IP header in just 2 loads. Implement our own
+>> version of ip_fast_checksum() to take advantage of that, resulting in
+>> considerably fewer instructions and memory accesses than the generic
+>> version. We can also get more optimal code generation for csum_fold() by
+>> defining it a slightly different way round from the generic version, so
+>> throw that into the mix too.
+>>
+>> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> Having spent an evening poring over disassembler output, it turns out
+>> that there's really no need to drop into asm for this, hurrah! I've
+>> taken it for a spin on both big and little-endian, with no ill effects.
+>>
+>>   arch/arm64/include/asm/checksum.h | 49
+>> +++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 49 insertions(+)
+>>   create mode 100644 arch/arm64/include/asm/checksum.h
+>>
+>> diff --git a/arch/arm64/include/asm/checksum.h
+>> b/arch/arm64/include/asm/checksum.h
+>> new file mode 100644
+>> index 000000000000..7e975ffce837
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/checksum.h
+>> @@ -0,0 +1,49 @@
+>> +/*
+>> + * Copyright (C) 2016 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#ifndef __ASM_CHECKSUM_H
+>> +#define __ASM_CHECKSUM_H
+>> +
+>> +static inline __sum16 csum_fold(__wsum csum)
+>> +{
+>> +    u32 sum = (__force u32)csum;
+>> +    sum += (sum >> 16) | (sum << 16);
+>> +    return ~(__force __sum16)(sum >> 16);
+>> +}
+>> +#define csum_fold csum_fold
+>> +
+>> +static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
+>> +{
+>> +    __uint128_t tmp;
+>> +    u64 sum;
+>> +
+>> +    tmp = *(const __uint128_t *)iph;
+>> +    iph += 16;
+>> +    ihl -= 4;
+>> +    tmp += ((tmp >> 64) | (tmp << 64));
+>> +    sum = tmp >> 64;
+>> +    do {
+>> +        sum += *(const u32 *)iph;
+>> +        iph += 4;
+>> +    } while (--ihl);
+>> +
+>> +    sum += ((sum >> 32) | (sum << 32));
+>> +    return csum_fold(sum >> 32);
+>> +}
+>> +#define ip_fast_csum ip_fast_csum
+>> +
+>> +#include <asm-generic/checksum.h>
+>> +
+>> +#endif    /* __ASM_CHECKSUM_H */
+>
