@@ -1,74 +1,47 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 12 May 2016 14:52:59 +0200
-Subject: [RFC 0/9] IOMMU probe deferral support
-In-Reply-To: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
-References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <f192d4a0-9e13-4ae2-d3da-058e2e092634@samsung.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Thu, 12 May 2016 20:52:46 +0800
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160512082427.GA1587@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <573305A8.50406@huawei.com> <5733149C.4030903@huawei.com>
+ <5250356.myv9GIZ34h@wuerfel> <5733FC71.8070101@huawei.com>
+ <20160512082427.GA1587@yury-N73SV>
+Message-ID: <57347C9E.7010708@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
+On 2016/5/12 16:24, Yury Norov wrote:
+> On Thu, May 12, 2016 at 11:45:53AM +0800, Zhangjian (Bamvor) wrote:
+>
+> [...]
+>
+>>> Hmm, that is indeed tricky. I think COMPAT_SYSCALL_WRAP4 rightfully
+>>> refuses the loff_t argument here, as the common case is that this is
+>>> not possible.
+>> It works if I apply the following patch, I defined the wrong `__TYPE_IS_xxx`
+>> yesterday. Should we merge this into ILP32 series or send the compat.h
+>> and syscalls.h individually? The current series of ILP32 is a little bit
+>> long and hard to review.
+>> diff --git a/include/linux/compat.h b/include/linux/compat.h
+>> index ba6ebe0..22a9565 100644
+>> --- a/include/linux/compat.h
+>> +++ b/include/linux/compat.h
+>> @@ -747,7 +747,8 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
+>>   #ifndef __SC_COMPAT_CAST
+>>   #define __SC_COMPAT_CAST(t, a) ({                                      \
+>>          BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&              \
+>> -                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));            \
+>> +                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t) &&           \
+>> +                    !__TYPE_IS_LOFFT(t));                              \
+>
+> I think it's wrong, as loff_t is 64-bit in 32-bit userspace, and this
+> will clear meaningful data in top halve.
+Yes. It is my fault. The original thoughts is clear the up 32bit for size_t.
+How should we skip the loff_t?
 
-On 2016-04-25 17:58, Sricharan R wrote:
-> This is mostly a repost of the probe deferral series from
-> Laurent Pinchart [1]. Added a check to fix boot with ACPI.
-> Adapted arm-smmu driver to work with deferred probing and added
-> a new api for the below reason. This is based on the generic iommu binding
-> series from Robin Murphy <robin.murphy@arm.com>.
+Regards
 
-Thanks for this patchset. I'm working on some serious rework in exynos power
-domains and clocks support code and it turned out that I need this feature
-to resolve probing order. It works fine on my internal tree, where some
-iommu controllers cannot get their clocks early enough.
-
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> Now associating a group with an master has become mandatory and happens
-> when the master is added to the bus using BUS_ADD_DEVICE from iommu core.
-> But the iommu has to be ready before this using early iommu registration
-> and also master should have been added to the iommu using xlate. So, when
-> trying to get rid of the early registration and using late probing for iommu
-> devices to sort out the probing order, the newly added api is meant to be
-> called during the late probing to add the master to the iommu. add_iommu_group
-> could be modified to do the same though.
->
-> The one issue here is the DRIVER_BIND notifier from iommu core
-> might be called at a wrong point since the addition of a group to the device
-> happens after this.
->
-> Will be good to know the right direction to proceed on this fully.
->
-> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
->
-> Laurent Pinchart (6):
->    arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
->    of: dma: Move range size workaround to of_dma_get_range()
->    of: dma: Make of_dma_deconfigure() public
->    of: dma: Split of_configure_dma() into mask and ops configuration
->    drivers: platform: Configure dma operations at probe time
->    iommu: of: Handle IOMMU lookup failure with deferred probing or error
->
-> Sricharan R (3):
->    drivers: iommu: Add a new add device api
->    drivers: of: call iommu_bus_add_dev after iommu_configure_ops
->    drivers: iommu: arm-smmu: Set iommu_ops in probe
->
->   arch/arm/mm/dma-mapping.c |  9 ++++++
->   drivers/base/platform.c   | 13 ++++++++
->   drivers/iommu/arm-smmu.c  | 34 ++------------------
->   drivers/iommu/iommu.c     | 12 +++++++
->   drivers/iommu/of_iommu.c  | 16 ++++++++--
->   drivers/of/address.c      | 20 ++++++++++--
->   drivers/of/device.c       | 81 +++++++++++++++++++++++++++++++----------------
->   drivers/of/platform.c     | 16 ++++------
->   drivers/pci/probe.c       |  3 +-
->   include/linux/iommu.h     |  1 +
->   include/linux/of_device.h | 14 ++++++--
->   11 files changed, 141 insertions(+), 78 deletions(-)
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Bamvor
