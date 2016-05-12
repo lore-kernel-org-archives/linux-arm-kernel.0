@@ -1,27 +1,113 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 May 2016 16:41:54 -0700
-Subject: [PATCH v8 8/8] i2c: rk3x: support fast-mode plus for rk3399
-In-Reply-To: <5153288.jNhUuzGC3g@phil>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <1462908794-27333-1-git-send-email-david.wu@rock-chips.com>
- <5153288.jNhUuzGC3g@phil>
-Message-ID: <CAD=FV=VzQ8PRokgAaTV00L31mcXFEzBG8c1NB4+Rqyx75hwwDg@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 11 May 2016 17:06:13 -0700
+Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
+ <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
+Message-ID: <5733C8F5.6090206@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On 05/11/2016 03:39 AM, Catalin Marinas wrote:
+> On Wed, Apr 27, 2016 at 11:07:15AM -0700, David Daney wrote:
+>> +static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
+>> +{
+>> +	unsigned long madt_end, entry;
+>> +	struct acpi_table_madt *madt;
+>> +	acpi_size tbl_size;
+>> +
+>> +	if (ACPI_FAILURE(acpi_get_table_with_size(ACPI_SIG_MADT, 0,
+>> +			(struct acpi_table_header **)&madt, &tbl_size)))
+>> +		return -ENODEV;
+>> +
+>> +	entry = (unsigned long)madt;
+>> +	madt_end = entry + madt->header.length;
+>> +
+>> +	/* Parse all entries looking for a match. */
+>> +	entry += sizeof(struct acpi_table_madt);
+>> +	while (entry + sizeof(struct acpi_subtable_header) < madt_end) {
+>> +		struct acpi_subtable_header *header =
+>> +			(struct acpi_subtable_header *)entry;
+>> +
+>> +		if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+>> +			struct acpi_madt_generic_interrupt *gicc =
+>> +				container_of(header,
+>> +				struct acpi_madt_generic_interrupt, header);
+>> +
+>> +			if ((gicc->flags & ACPI_MADT_ENABLED) &&
+>> +			    (gicc->uid == acpi_id)) {
+>> +				*mpidr = gicc->arm_mpidr;
+>> +				early_acpi_os_unmap_memory(madt, tbl_size);
+>> +				return 0;
+>> +			}
+>> +		}
+>> +		entry += header->length;
+>> +	}
+>> +
+>> +	early_acpi_os_unmap_memory(madt, tbl_size);
+>> +	return -ENODEV;
+>> +}
+>> +
+>> +/* Callback for Proximity Domain -> ACPI processor UID mapping */
+>> +void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+>> +{
+>> +	int pxm, node;
+>> +	u64 mpidr;
+>> +
+>> +	if (srat_disabled())
+>> +		return;
+>> +
+>> +	if (pa->header.length < sizeof(struct acpi_srat_gicc_affinity)) {
+>> +		pr_err("SRAT: Invalid SRAT header length: %d\n",
+>> +			pa->header.length);
+>> +		bad_srat();
+>> +		return;
+>> +	}
+>> +
+>> +	if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+>> +		return;
+>> +
+>> +	if (cpus_in_srat >= NR_CPUS) {
+>> +		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
+>> +			     NR_CPUS);
+>> +		return;
+>> +	}
+>> +
+>> +	pxm = pa->proximity_domain;
+>> +	node = acpi_map_pxm_to_node(pxm);
+>> +
+>> +	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+>> +		pr_err("SRAT: Too many proximity domains %d\n", pxm);
+>> +		bad_srat();
+>> +		return;
+>> +	}
+>> +
+>> +	if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
+>> +		pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
+>> +			pxm, pa->acpi_processor_uid);
+>> +		bad_srat();
+>> +		return;
+>> +	}
+>
+> I wonder whether you could replace the get_mpidr_in_madt() function with
+> something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
+> duplicates functionality already available elsewhere.
+>
 
-On Wed, May 11, 2016 at 2:09 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Additionally, the i2c-noob in me would wish for a short sentence on where
-> the timing values come from (measured, somewhere in the TRM I didn't find or
-> something completely different).
+I just tried that, and it doesn't work.
 
-If you search for "UM10204" you'll find the first link is
-<http://www.nxp.com/documents/user_manual/UM10204.pdf>.  That appears
-to be the official standard.  At least that's what
-<http://www.i2c-bus.org/fast-mode-plus/> says (though they have an old
-link).
+The problem is that this code is being run very early in the boot, and 
+kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used 
+once we have working kmalloc.  We need to extract the NUMA information 
+early like this precisely because it is needed to initializing the slab 
+system
 
-Agree that it wouldn't hurt to mention that in the commit message.
+Notice that we are using early_acpi_os_unmap_memory() et al. in 
+get_mpidr_in_madt() explicitly for this reason.
 
--Doug
+In summary: I don't think we need another revision of this patch, it is 
+like this for a good reason.
+
+David Daney
