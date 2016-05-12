@@ -1,112 +1,92 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 12 May 2016 16:01:54 +0100
-Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <1461783185-9056-6-git-send-email-dave.long@linaro.org>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-6-git-send-email-dave.long@linaro.org>
-Message-ID: <57349AE2.3060507@arm.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Thu, 12 May 2016 23:07:34 +0800
+Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <5733D7AA.1060500@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+ <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
+ <5733D7AA.1060500@rock-chips.com>
+Message-ID: <57349C36.4030401@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David, Sandeepa,
+Hi Doug?
 
-On 27/04/16 19:53, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+? 2016/5/12 9:08, David.Wu ??:
+> Hi Doug,
+>
+> ? 2016/5/12 1:37, Doug Anderson ??:
+>> Hi,
+>>
+>> On Tue, May 10, 2016 at 12:31 PM, David Wu <david.wu@rock-chips.com>
+>> wrote:
+>>>   static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long
+>>> clk_rate)
+>>>   {
+>>>          struct i2c_timings *t = &i2c->t;
+>>>          struct rk3x_i2c_calced_timings calc;
+>>>          u64 t_low_ns, t_high_ns;
+>>> +       u32 val;
+>>>          int ret;
+>>>
+>>> -       ret = rk3x_i2c_calc_divs(clk_rate, t, &calc);
+>>> +       ret = i2c->soc_data->calc_timings(clk_rate, t, &calc);
+>>>          WARN_ONCE(ret != 0, "Could not reach SCL freq %u",
+>>> t->bus_freq_hz);
+>>>
+>>> -       clk_enable(i2c->clk);
+>>> +       clk_enable(i2c->pclk);
+>>> +
+>>>          i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low &
+>>> 0xffff),
+>>>                     REG_CLKDIV);
+>>> -       clk_disable(i2c->clk);
+>>> +
+>>> +       val = i2c_readl(i2c, REG_CON);
+>>> +       val &= ~REG_CON_TUNING_MASK;
+>>> +       val |= calc.tuning;
+>>> +       i2c_writel(i2c, val, REG_CON);
+>>
+>> Another subtle bug here.  You need to be holding the spinlock here
+>> since you're doing a read-modify-write of a register that is also
+>> touched by the interrupt handler.  We never needed it before because
+>> the previous register update wasn't touched by anyone else and it was
+>> a single atomic write.
+>>
+>> Also: technically if we are midway through a transfer when all this
+>> happens then there will be a very short period of time when the two
+>> timing-related registers won't match with each other.  I have no idea
+>> how much that would matter, but in the very least it seems wise to
+>> minimize the time where they mismatch.  So I'd probably write:
+>>
+>>         spin_lock_irqsave(&i2c->lock, flags);
+>>         val = i2c_readl(i2c, REG_CON);
+>>         val &= ~REG_CON_TUNING_MASK;
+>>         val |= calc.tuning;
+>>         i2c_writel(i2c, val, REG_CON);
+>>         i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
+>>                    REG_CLKDIV);
+>>         spin_unlock_irqrestore(&i2c->lock, flags);
+>>
+>> ...if we really end up with on a system with a dynamically changing
+>> clock that uses the new-style timing and we see real problems, we can
+>> always try to come up with a way to avoid any problems.  Sound OK?
+>>
+>>
+>
+> Good, add spin_lock is very necessary for atomic write here, thanks for
+> your advice.
 
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> new file mode 100644
-> index 0000000..dfa1b1f
-> --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -0,0 +1,520 @@
-> +/*
-> + * arch/arm64/kernel/kprobes.c
-> + *
-> + * Kprobes support for ARM64
-> + *
-> + * Copyright (C) 2013 Linaro Limited.
-> + * Author: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/kprobes.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/stop_machine.h>
-> +#include <linux/stringify.h>
-> +#include <asm/traps.h>
-> +#include <asm/ptrace.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/debug-monitors.h>
-> +#include <asm/system_misc.h>
-> +#include <asm/insn.h>
-> +#include <asm/uaccess.h>
-> +
-> +#include "kprobes-arm64.h"
-> +
-> +#define MIN_STACK_SIZE(addr)	min((unsigned long)MAX_STACK_SIZE,	\
-> +	(unsigned long)current_thread_info() + THREAD_START_SP - (addr))
+I also found a subtle bug, it would clean the con register by use 
+"i2c_writel(i2c, 0, REG_CON)" in rk3x_i2c_stop(). So i think it would be 
+fixed by using read-modify-write way here in next version.
 
-What if we probe something called on the irq stack?
-This needs the on_irq_stack() checks too, the start/end can be found from the
-per-cpu irq_stack value.
-
-[ ... ]
-
-> +int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +	struct jprobe *jp = container_of(p, struct jprobe, kp);
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +	long stack_ptr = kernel_stack_pointer(regs);
-> +
-> +	kcb->jprobe_saved_regs = *regs;
-> +	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
-> +	       MIN_STACK_SIZE(stack_ptr));
-
-I wonder if we need this stack save/restore?
-
-The comment next to the equivalent code for x86 says:
-> gcc assumes that the callee owns the argument space and could overwrite it,
-> e.g. tailcall optimization. So, to be absolutely safe we also save and
-> restore enough stack bytes to cover the argument area.
-
-On arm64 the first eight arguments are passed in registers, so we might not need
-this stack copy. (sparc and powerpc work like this too, their versions of this
-function don't copy chunks of the stack).
-
-... then I went looking for functions with >8 arguments...
-
-Looking at the arm64 defconfig dwarf debug data, there are 71 of these that
-don't get inlined, picking at random:
-> rockchip_clk_register_pll() has 13
-> fib_dump_info() has 11
-> vma_merge() has 10
-> vring_create_virtqueue() has 10
-etc...
-
-So we do need this stack copying, so that we can probe these function without
-risking the arguments being modified.
-
-It may be worth including a comment to the effect that this stack save/restore
-is needed for functions that pass >8 arguments where the pre-handler may change
-these values on the stack.
-
-
-> +	preempt_enable_no_resched();
-> +	return 1;
-> +}
-> +
-
-
-Thanks,
-
-James
+>
+>> Otherwise, I think things look good to me.  Caesar's comments would
+>> also be good to fix.
+>>
+>>
+>> -Doug
+>>
+>>
+>>
