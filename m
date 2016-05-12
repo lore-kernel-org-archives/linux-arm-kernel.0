@@ -1,238 +1,150 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 May 2016 21:28:28 +0200
-Subject: [PATCH v3 51/55] KVM: arm/arm64: vgic-new: vgic_init: implement
- map_resources
-In-Reply-To: <1462531568-9799-52-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-52-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160512192828.GR27623@cbox>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Thu, 12 May 2016 21:28:09 +0200
+Subject: [PATCH v9.1] gpio: mmio: add DT support for memory-mapped GPIOs
+In-Reply-To: <0a1ab2b6-b4c5-44d7-abb4-ce1e9da7e477@gmail.com>
+References: <0a1ab2b6-b4c5-44d7-abb4-ce1e9da7e477@gmail.com>
+Message-ID: <3e75e8316ceac62f61f3ffc839faaac8789ca936.1463078228.git.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:46:04AM +0100, Andre Przywara wrote:
-> From: Eric Auger <eric.auger@linaro.org>
-> 
-> map_resources is the last initialization step. It is executed on
-> 1st VCPU run. At that stage the code checks the userspace has provided
-> the base addresses for the relevant VGIC regions, which depend on
-> the type of VGIC that is exposed to the guest.
-> 
-> The function also forces the vgic_init if it has not been executed yet
-> (only allowed for VGIC v2).
-> 
-> for GICv2, The VGIC CPU interface is mapped onto the GIC virtual CPU
-> interface.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/vgic/vgic.h       |  1 +
->  virt/kvm/arm/vgic/vgic-init.c | 27 +++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v2.c   | 47 +++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c   | 44 ++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h      |  7 +++++++
->  5 files changed, 126 insertions(+)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 538078a..07c3011 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -208,6 +208,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type);
->  void kvm_vgic_destroy(struct kvm *kvm);
->  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
->  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
-> +int kvm_vgic_map_resources(struct kvm *kvm);
->  int kvm_vgic_hyp_init(void);
->  
->  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 3f9c137..7fefb12 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -321,6 +321,33 @@ int vgic_lazy_init(struct kvm *kvm)
->  	return ret;
->  }
->  
-> +/* RESOURCE MAPPING */
-> +
-> +/**
-> + * Map the MMIO regions depending on the VGIC model exposed to the guest
-> + * called on the first VCPU run.
-> + * Also map the virtual CPU interface into the VM.
-> + * v2/v3 derivatives call vgic_init if not already done.
-> + * Completion can be tested by vgic_ready
+From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
 
-s/Completion can be tested by vgic_ready/
- vgic_ready() returns true if this function has succeeded/
+This patch adds support for defining memory-mapped GPIOs which
+are compatible with the existing gpio-mmio interface. The generic
+library provides support for many memory-mapped GPIO controllers
+that are found in various on-board FPGA and ASIC solutions that
+are used to control board's switches, LEDs, chip-selects,
+Ethernet/USB PHY power, etc.
 
-> + */
-> +int kvm_vgic_map_resources(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&kvm->lock);
-> +	if (!irqchip_in_kernel(kvm))
-> +		goto out;
-> +
-> +	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-> +		ret = vgic_v2_map_resources(kvm);
-> +	else
-> +		ret = vgic_v3_map_resources(kvm);
-> +out:
-> +	mutex_unlock(&kvm->lock);
-> +	return ret;
-> +}
-> +
->  /* GENERIC PROBE */
->  
->  static void vgic_init_maintenance_interrupt(void *info)
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 48aa877..1e411f5 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -216,6 +216,53 @@ void vgic_v2_enable(struct kvm_vcpu *vcpu)
->  {
->  }
->  
-> +int vgic_v2_map_resources(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	int ret = 0;
-> +
-> +	if (vgic_ready(kvm))
-> +		goto out;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
-> +	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
-> +		kvm_err("Need to set vgic cpu and dist addresses first\n");
-> +		ret = -ENXIO;
-> +		goto out;
-> +	}
-> +
-> +	/*
-> +	 * Initialize the vgic if this hasn't already been done on demand by
-> +	 * accessing the vgic state from userspace.
-> +	 */
-> +	ret = vgic_init(kvm);
-> +	if (ret) {
-> +		kvm_err("Unable to initialize VGIC dynamic data structures\n");
-> +		goto out;
-> +	}
-> +
-> +	ret = vgic_register_dist_iodev(kvm, dist->vgic_dist_base, VGIC_V2);
-> +	if (ret) {
-> +		kvm_err("Unable to register VGIC MMIO regions\n");
-> +		goto out;
-> +	}
-> +
-> +	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
-> +				    kvm_vgic_global_state.vcpu_base,
-> +				    KVM_VGIC_V2_CPU_SIZE, true);
-> +	if (ret) {
-> +		kvm_err("Unable to remap VGIC CPU to VCPU\n");
-> +		goto out;
-> +	}
-> +
-> +	dist->ready = true;
-> +
-> +out:
-> +	if (ret)
-> +		kvm_vgic_destroy(kvm);
-> +	return ret;
-> +}
-> +
->  /**
->   * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
->   * @node:	pointer to the DT node
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 7cab5b9..4bfd42a 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -200,6 +200,50 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  {
->  }
->  
-> +int vgic_v3_map_resources(struct kvm *kvm)
-> +{
-> +	int ret = 0;
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +
-> +	if (vgic_ready(kvm))
-> +		goto out;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
-> +	    IS_VGIC_ADDR_UNDEF(dist->vgic_redist_base)) {
-> +		kvm_err("Need to set vgic distributor addresses first\n");
-> +		ret = -ENXIO;
-> +		goto out;
-> +	}
-> +
-> +	/*
-> +	 * For a VGICv3 we require the userland to explicitly initialize
-> +	 * the VGIC before we need to use it.
-> +	 */
-> +	if (!vgic_initialized(kvm)) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	ret = vgic_register_dist_iodev(kvm, dist->vgic_dist_base, VGIC_V3);
-> +	if (ret) {
-> +		kvm_err("Unable to register VGICv3 dist MMIO regions\n");
-> +		goto out;
-> +	}
-> +
-> +	ret = vgic_register_redist_iodevs(kvm, dist->vgic_redist_base);
-> +	if (ret) {
-> +		kvm_err("Unable to register VGICv3 redist MMIO regions\n");
-> +		goto out;
-> +	}
-> +
-> +	dist->ready = true;
-> +
-> +out:
-> +	if (ret)
-> +		kvm_vgic_destroy(kvm);
-> +	return ret;
-> +}
-> +
->  /**
->   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
->   * @node:	pointer to the DT node
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index cad04eb..5c7dc99 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -45,6 +45,7 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v2_enable(struct kvm_vcpu *vcpu);
->  int vgic_v2_probe(struct device_node *vgic_node);
-> +int vgic_v2_map_resources(struct kvm *kvm);
->  int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
->  			     enum vgic_type);
->  
-> @@ -58,6 +59,7 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v3_enable(struct kvm_vcpu *vcpu);
->  int vgic_v3_probe(struct device_node *vgic_node);
-> +int vgic_v3_map_resources(struct kvm *kvm);
->  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
->  #else
->  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
-> @@ -100,6 +102,11 @@ static inline int vgic_v3_probe(struct device_node *vgic_node)
->  	return -ENODEV;
->  }
->  
-> +static inline int vgic_v3_map_resources(struct kvm *kvm)
-> +{
-> +	return -ENODEV;
-> +}
-> +
->  static inline int vgic_register_redist_iodevs(struct kvm *kvm,
->  					      gpa_t dist_base_address)
->  {
-> -- 
-> 2.7.3
-> 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+For setting GPIOs there are three configurations:
+	1. single input/output register resource (named "dat"),
+	2. set/clear pair (named "set" and "clr"),
+	3. single output register resource and single input resource
+	   ("set" and dat").
+
+The configuration is detected by which resources are present.
+For the single output register, this drives a 1 by setting a bit
+and a zero by clearing a bit.  For the set clr pair, this drives
+a 1 by setting a bit in the set register and clears it by setting
+a bit in the clear register.
+
+For setting the GPIO direction, there are three configurations:
+	a. simple bidirectional GPIOs that requires no configuration.
+	b. an output direction register (named "dirout")
+	   where a 1 bit indicates the GPIO is an output.
+	c. an input direction register (named "dirin")
+	   where a 1 bit indicates the GPIO is an input.
+
+The first user for this binding is "wd,mbl-gpio".
+
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+---
+ drivers/gpio/gpio-mmio.c | 68 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 66 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpio/gpio-mmio.c b/drivers/gpio/gpio-mmio.c
+index 6c1cb3b..f72e40e 100644
+--- a/drivers/gpio/gpio-mmio.c
++++ b/drivers/gpio/gpio-mmio.c
+@@ -61,6 +61,8 @@ o        `                     ~~~~\___/~~~~    ` controller in FPGA is ,.`
+ #include <linux/bitops.h>
+ #include <linux/platform_device.h>
+ #include <linux/mod_devicetable.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ static void bgpio_write8(void __iomem *reg, unsigned long data)
+ {
+@@ -569,6 +571,58 @@ static void __iomem *bgpio_map(struct platform_device *pdev,
+ 	return devm_ioremap_resource(&pdev->dev, r);
+ }
+ 
++#ifdef CONFIG_OF
++static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
++				     struct bgpio_pdata *pdata,
++				     unsigned long *flags)
++{
++	struct device *dev = &pdev->dev;
++
++	pdata->base = -1;
++
++	if (of_property_read_bool(dev->of_node, "no-output"))
++		*flags |= BGPIOF_NO_OUTPUT;
++
++	return 0;
++}
++
++static const struct of_device_id bgpio_of_match[] = {
++	{ .compatible = "wd,mbl-gpio", .data = bgpio_basic_mmio_parse_dt },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, bgpio_of_match);
++
++static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
++					  unsigned long *flags)
++{
++	const int (*parse_dt)(struct platform_device *,
++			      struct bgpio_pdata *, unsigned long *);
++	struct bgpio_pdata *pdata;
++	int err;
++
++	parse_dt = of_device_get_match_data(&pdev->dev);
++	if (!parse_dt)
++		return NULL;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(struct bgpio_pdata),
++			     GFP_KERNEL);
++	if (!pdata)
++		return ERR_PTR(-ENOMEM);
++
++	err = parse_dt(pdev, pdata, flags);
++	if (err)
++		return ERR_PTR(err);
++
++	return pdata;
++}
++#else
++static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
++					  unsigned long *flags)
++{
++	return NULL;
++}
++#endif /* CONFIG_OF */
++
+ static int bgpio_pdev_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -579,10 +633,19 @@ static int bgpio_pdev_probe(struct platform_device *pdev)
+ 	void __iomem *dirout;
+ 	void __iomem *dirin;
+ 	unsigned long sz;
+-	unsigned long flags = pdev->id_entry->driver_data;
++	unsigned long flags = 0;
+ 	int err;
+ 	struct gpio_chip *gc;
+-	struct bgpio_pdata *pdata = dev_get_platdata(dev);
++	struct bgpio_pdata *pdata;
++
++	pdata = bgpio_parse_dt(pdev, &flags);
++	if (IS_ERR(pdata))
++		return PTR_ERR(pdata);
++
++	if (!pdata) {
++		pdata = dev_get_platdata(dev);
++		flags = pdev->id_entry->driver_data;
++	}
+ 
+ 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");
+ 	if (!r)
+@@ -646,6 +709,7 @@ MODULE_DEVICE_TABLE(platform, bgpio_id_table);
+ static struct platform_driver bgpio_driver = {
+ 	.driver = {
+ 		.name = "basic-mmio-gpio",
++		.of_match_table = of_match_ptr(bgpio_of_match),
+ 	},
+ 	.id_table = bgpio_id_table,
+ 	.probe = bgpio_pdev_probe,
+-- 
+2.8.1
