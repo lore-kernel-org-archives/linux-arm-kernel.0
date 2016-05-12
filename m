@@ -1,43 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2016 13:35:06 -0700
-Subject: [PATCH RESEND 0/4] arm: dts: am57xx: Correct the thermal
- thresholds
-In-Reply-To: <57316262.80003@ti.com>
-References: <1461837949-11116-1-git-send-email-j-keerthy@ti.com>
- <57316262.80003@ti.com>
-Message-ID: <20160512203505.GV5995@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 12 May 2016 23:38:08 +0300
+Subject: [PATCH v3 0/6] Add R8A7794/SILK sound DT support
+Message-ID: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-* Keerthy <a0393675@ti.com> [160509 21:25]:
-> Tony,
-> 
-> On Thursday 28 April 2016 03:35 PM, Keerthy wrote:
-> >Noticed that earlier post had a wrong list name hence resending the
-> >series.
-> >
-> >Currently all the am57xx versions are wrongly re-using the dra7  thermal
-> >threholds. Introduing the correct thermal thresholds based on industrial
-> >or commercial grade silicon present on the individual boards.
-> >
-> >Tested on AM57XX-BEAGLE-X15 (Commercial) and AM572X-IDK(Industrial)
-> >for the trip_point node sysfs temperatures.
-> >
-> 
-> A Gentle ping on this series.
+   Here's the set of 6 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160509-v4.6-rc7' tag. I'm adding the sound device tree support
+for the R8A7794 SoC based SILK board.
 
-I already have these in Linux next for v4.7 merge window:
+[1/6] ARM: dts: r8a7794: add audio clocks
+[2/6] ARM: dts: r8a7794: add MSTP5 clocks
+[3/6] ARM: dts: r8a7794: add MSTP10 clocks
+[4/6] ARM: dts: r8a7794: add Audio-DMAC support
+[5/6] ARM: dts: r8a7794: add sound support
+[6/6] ARM: dts: silk: add sound support
 
-5b6042237dc8 ("ARM: dts: am57xx-idk: Include Industrial grade  thermal thresholds")
-266e62f97539 ("ARM: dts: am57xx-beagle-x15: Include the commercial grade thresholds")
-cf9b7d5e9cfd ("ARM: dts: am57xx: Introduce industrial grade thermal thresholds")
-286db0a516e0 ("ARM: dts: am57xx: Introduce commercial grade thermal thresholds")
-
-Care to check if those are OK? If fixes are needed, please post an
-incremental patch against current Linux next.
-
-Regards,
-
-Tony
+WBR, Sergei
