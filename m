@@ -1,72 +1,76 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 May 2016 15:25:02 +0300
-Subject: [RFC] Reset pins of phys and their representation in a device tree
-In-Reply-To: <20160512071542.GC30822@pengutronix.de>
-References: <20160512071542.GC30822@pengutronix.de>
-Message-ID: <e75ab3a0-da5e-fef1-d5e1-65c37e7714eb@cogentembedded.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 12 May 2016 17:59:23 +0530
+Subject: [PATCH v8 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma device
+ tree binding documentation
+Message-ID: <1463056164-3210-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Device-tree binding documentation for Xilinx zynqmp dma engine used in
+Zynq UltraScale+ MPSoC.
 
-On 5/12/2016 10:15 AM, Uwe Kleine-K?nig wrote:
+Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes in v8:
+- Removed all the software runtime configuration parameters
+  from the binding doc as suggested by the Lars.
+Changes in v7:
+- None.
+Changes in v6:
+- Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
+  from the binding doc as it allow broken combinations when dma-coherent
+  is set as suggested by Rob.
+- Fixed minor comments given by Rob related coding(lower case DT node name).
+Changes in v5:
+- Use dma-coherent flag for coherent transfers as suggested by rob.
+- Removed unnecessary properties from binding doc as suggested by Rob.
+Changes in v4:
+- None
+Changes in v3:
+- None
+Changes in v2:
+- None.
 
-> I have a machine here where the reset pin of the phy is connected to a
-> GPIO.
->
-> There are different possibilities available today to handle this
-> situation, here are the ones I'm aware of:
->
->  - Use a gpio-hog to set the reset gpio to non-active
->    This might result in dependency problems (and that's what I am
->    currently faced with) because there is no connection in the device
->    tree between the hog and the phy.
->
->  - [Documentation/devicetree/bindings/net/fsl-fec.txt]
->    The fec node supports properties
->
-> 	phy-reset-gpios = <&gpio2 14 0>;
-> 	phy-reset-duration = <200> /* milliseconds */;
->
->    Something similar exists in TI's vendor kernel
->    (http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/17d192b999ee904ced223c16cef76111a51c461b)
->    with different (and IMHO bader) naming.
->    This is the wrong place to specify the gpios; they shouldn't be in the
->    mac's node, but in a phy node instead.
->
-> So what I actually want is to put the gpio specification in the right
-> place and let it look as follows:
->
-> 	mymdiobus {
-> 		[...]
-> 		myfirstphy: ethernet-phy at 0 {
-> 			compatible = "ethernet-phy-ieee802.3-c22";
-> 			reg = <0>;
->
-> 			reset-gpios = <&gpio2 14 0>;
-> 			reset-duration-ms = <200>;
-> 		};
->
-> 		mysecondphy: ethernet-phy at 2 {
-> 			compatible = "ethernet-phy-ieee802.3-c22";
-> 			reg = <2>;
->
-> 			reset-gpios = <&gpio3 10 0>;
-> 			reset-duration-ms = <200>;
-> 		};
-> 	};
->
-> And with this we could defer probe of &myfirstphy if &gpio2 isn't
-> available yet.
->
-> Does this sound sensible? Does something like that already exist which I
-> missed? Any further ideas/comments?
+ .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
 
-http://patchwork.ozlabs.org/patch/616495/
-
-    I'll post a new version RSN.
-
-> Best regards
-> Uwe
-
-MBR, Sergei
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+new file mode 100644
+index 0000000..eea9924
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+@@ -0,0 +1,30 @@
++Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
++memory to device and device to memory transfers. It also has flow
++control and rate control support for slave/peripheral dma access.
++
++Required properties:
++- compatible		: Should be "xlnx,zynqmp-dma-1.0"
++- reg			: Memory map for gdma/adma module access.
++- interrupt-parent	: Interrupt controller the interrupt is routed through
++- interrupts		: Should contain DMA channel interrupt.
++- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
++- clock-names		: List of input clocks "clk_main", "clk_apb"
++			  (see clock bindings for details)
++
++Optional properties:
++- xlnx,include-sg	: Indicates the controller to operate in simple or
++			  scatter gather dma mode
++- dma-coherent		: Present if dma operations are coherent.
++
++Example:
++++++++++
++fpd_dma_chan1: dma at fd500000 {
++	compatible = "xlnx,zynqmp-dma-1.0";
++	reg = <0x0 0xFD500000 0x1000>;
++	interrupt-parent = <&gic>;
++	interrupts = <0 117 4>;
++	clock-names = "clk_main", "clk_apb";
++	xlnx,bus-width = <128>;
++	xlnx,include-sg;
++	dma-coherent;
++};
+-- 
+2.1.1
