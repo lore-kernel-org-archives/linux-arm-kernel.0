@@ -1,61 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 May 2016 23:01:30 +0200
-Subject: [PATCH] soc: mtk-pmic-wrap: avoid integer overflow warning
-Message-ID: <1463086904-2493288-1-git-send-email-arnd@arndb.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 12 May 2016 14:09:24 -0700
+Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <57349C36.4030401@rock-chips.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+ <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
+ <5733D7AA.1060500@rock-chips.com> <57349C36.4030401@rock-chips.com>
+Message-ID: <CAD=FV=W1-DDtuLUzW1uLiFxuhpnmhnKB1od_yweY=WJ-4u3=kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM64, the mtk-pmic-wrap driver causes a harmless warning:
+David,
 
-mtk-pmic-wrap.c:1062:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-mtk-pmic-wrap.c:1074:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-mtk-pmic-wrap.c:1086:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-  .int_en_all = ~(BIT(31) | BIT(1)),
+On Thu, May 12, 2016 at 8:07 AM, David.Wu <david.wu@rock-chips.com> wrote:
+> I also found a subtle bug, it would clean the con register by use
+> "i2c_writel(i2c, 0, REG_CON)" in rk3x_i2c_stop(). So i think it would be
+> fixed by using read-modify-write way here in next version.
 
-The problem is that the result of the BIT() macro is an 'unsigned long',
-so taking the bitwise NOT operation of that results in an integer
-with the upper 32 bits all set and that cannot be assigned to a
-'u32' variable without loss of information.
+Good catch.  I look forward to the next version (maybe the last
+version, since this series is looking really good).
 
-This is harmless because we were never interested in the upper bits
-here anyway, so we can shut up the warning by adding a simple cast
-to 'u32'.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 3c3e56df526e..a003ba26ca6e 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -1059,7 +1059,7 @@ static const struct pmic_wrapper_type pwrap_mt2701 = {
- 	.regs = mt2701_regs,
- 	.type = PWRAP_MT2701,
- 	.arb_en_all = 0x3f,
--	.int_en_all = ~(BIT(31) | BIT(2)),
-+	.int_en_all = ~(u32)(BIT(31) | BIT(2)),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE_NEW,
- 	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
- 	.has_bridge = 0,
-@@ -1071,7 +1071,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
- 	.regs = mt8135_regs,
- 	.type = PWRAP_MT8135,
- 	.arb_en_all = 0x1ff,
--	.int_en_all = ~(BIT(31) | BIT(1)),
-+	.int_en_all = ~(u32)(BIT(31) | BIT(1)),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
- 	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
- 	.has_bridge = 1,
-@@ -1083,7 +1083,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
- 	.regs = mt8173_regs,
- 	.type = PWRAP_MT8173,
- 	.arb_en_all = 0x3f,
--	.int_en_all = ~(BIT(31) | BIT(1)),
-+	.int_en_all = ~(u32)(BIT(31) | BIT(1)),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
- 	.wdt_src = PWRAP_WDT_SRC_MASK_NO_STAUPD,
- 	.has_bridge = 0,
--- 
-2.7.0
+-Doug
