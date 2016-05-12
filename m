@@ -1,56 +1,24 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 May 2016 23:45:08 +0300
-Subject: [PATCH v3 2/6] ARM: dts: r8a7794: add MSTP5 clocks
-In-Reply-To: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
-References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
-Message-ID: <1576909.nm8MtQ2Ln5@wasted.cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 May 2016 13:46:02 -0700
+Subject: [PATCH V2] ARM: dts: am57xx-idk-common: Fix input supply names
+In-Reply-To: <1462541877-20032-1-git-send-email-nm@ti.com>
+References: <1462541877-20032-1-git-send-email-nm@ti.com>
+Message-ID: <20160512204601.GY5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some MSTP5 clocks to the R8A7794 device tree.
+* Nishanth Menon <nm@ti.com> [160506 06:39]:
+> Palmas Regulator is an exception and does not follow the standard
+> "vin-supply" common definitions for all regulators, as a result of this,
+> the input supplies are not reported to regulator framework, with the
+> obvious result of not being appropriately mapped. Fix the same.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> Changes since V1:
+> 	- fix up fat fingered deletion of regulator name of ldortc
+> V1: https://patchwork.kernel.org/patch/9028201/
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Applying into omap-for-v4.7/dt as a fix for the merge window.
 
----
-Changes in version 3:
-- refreshed the patch.
-
-Changes in version 2:
-- added "the" article to the change log.
-
- arch/arm/boot/dts/r8a7794.dtsi            |    9 +++++++++
- include/dt-bindings/clock/r8a7794-clock.h |    1 +
- 2 files changed, 10 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1172,6 +1172,15 @@
- 			clock-indices = <R8A7794_CLK_IRQC>;
- 			clock-output-names = "irqc";
- 		};
-+		mstp5_clks: mstp5_clks at e6150144 {
-+			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
-+			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
-+					 R8A7794_CLK_THERMAL R8A7794_CLK_PWM>;
-+			clock-output-names = "audmac0", "thermal", "pwm";
-+		};
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7794-clock.h
-@@ -67,6 +67,7 @@
- #define R8A7794_CLK_IRQC		7
- 
- /* MSTP5 */
-+#define R8A7794_CLK_AUDIO_DMAC0		2
- #define R8A7794_CLK_THERMAL		22
- #define R8A7794_CLK_PWM			23
- 
+Tony
