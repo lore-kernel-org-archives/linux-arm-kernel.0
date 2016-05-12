@@ -1,64 +1,42 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 12 May 2016 15:49:30 +0100
-Subject: [PATCH v12 06/10] arm64: Treat all entry code as non-kprobe-able
-In-Reply-To: <1461783185-9056-7-git-send-email-dave.long@linaro.org>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-7-git-send-email-dave.long@linaro.org>
-Message-ID: <573497FA.5030309@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 12 May 2016 16:54:08 +0200
+Subject: [PATCH 1/3] dmaengine: at_xdmac: align descriptors on 64 bits
+Message-ID: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David, Pratyush
+Having descriptors aligned on 64 bits allows update CNDA and CUBC in an
+atomic way.
 
-On 27/04/16 19:53, David Long wrote:
-> From: Pratyush Anand <panand@redhat.com>
-> 
-> Entry symbols are not kprobe safe. So blacklist them for kprobing.
-> 
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
+eXtended DMA Controller driver")
+Cc: stable at vger.kernel.org #v4.1 and later
+---
+ drivers/dma/at_xdmac.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index dfa1b1f..6a1292b 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -29,6 +29,7 @@
->  #include <asm/system_misc.h>
->  #include <asm/insn.h>
->  #include <asm/uaccess.h>
-> +#include <asm-generic/sections.h>
->  
->  #include "kprobes-arm64.h"
->  
-> @@ -514,6 +515,15 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->  	return 1;
->  }
->  
-> +bool arch_within_kprobe_blacklist(unsigned long addr)
-> +{
-> +	return  (addr >= (unsigned long)__kprobes_text_start &&
-> +		 addr < (unsigned long)__kprobes_text_end) ||
-> +		(addr >= (unsigned long)__entry_text_start &&
-> +		 addr < (unsigned long)__entry_text_end) ||
-> +		 !!search_exception_tables(addr);
-> +}
-> +
-
-Looking at __kvm_hyp_vector, we don't have support for handling breakpoints at
-EL2, so we should forbid kprobing these address ranges too:
-__hyp_text_start -> __hyp_text_end
-__hyp_idmap_text_start -> __hyp_idmap_text_end
-
-These can probably be guarded with is_kernel_in_hyp_mode(), if this is true then
-we are running with VHE where this code runs at the same exception level as the
-rest of the kernel, so we can probe them. (In this case you may want to add
-'eret' to aarch64_insn_is_branch() in patch 2)
-
-
-Probing things in the kernel idmap sounds dangerous! Lets blacklist that too:
-__idmap_text_start -> __idmap_text_end
-
-
-
-Thanks,
-
-James
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 8e304b1..ba9b0b7 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -242,7 +242,7 @@ struct at_xdmac_lld {
+ 	u32		mbr_dus;	/* Destination Microblock Stride Register */
+ };
+ 
+-
++/* 64-bit alignment needed to update CNDA and CUBC registers in an atomic way. */
+ struct at_xdmac_desc {
+ 	struct at_xdmac_lld		lld;
+ 	enum dma_transfer_direction	direction;
+@@ -253,7 +253,7 @@ struct at_xdmac_desc {
+ 	unsigned int			xfer_size;
+ 	struct list_head		descs_list;
+ 	struct list_head		xfer_node;
+-};
++} __aligned(sizeof(u64));
+ 
+ static inline void __iomem *at_xdmac_chan_reg_base(struct at_xdmac *atxdmac, unsigned int chan_nb)
+ {
+-- 
+2.5.0
