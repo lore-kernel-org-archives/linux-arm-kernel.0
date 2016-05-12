@@ -1,100 +1,67 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 12 May 2016 16:54:09 +0200
-Subject: [PATCH 2/3] dmaengine: at_xdmac: fix residue corruption
+Date: Thu, 12 May 2016 16:54:10 +0200
+Subject: [PATCH 3/3] dmaengine: at_xdmac: double FIFO flush needed to compute
+ residue
 In-Reply-To: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1463064854-6719-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1463064854-6719-3-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An unexpected value of CUBC can lead to a corrupted residue. A more
-complex sequence is needed to detect an inaccurate value for NCA or CUBC.
+Due to the way CUBC register is updated, a double flush is needed to
+compute an accurate residue. First flush aim is to get data from the DMA
+FIFO and second one ensures that we won't report data which are not in
+memory.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
 eXtended DMA Controller driver")
 Cc: stable at vger.kernel.org #v4.1 and later
 ---
- drivers/dma/at_xdmac.c | 54 ++++++++++++++++++++++++++++++--------------------
- 1 file changed, 32 insertions(+), 22 deletions(-)
+ drivers/dma/at_xdmac.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index ba9b0b7..b02494e 100644
+index b02494e..75bd662 100644
 --- a/drivers/dma/at_xdmac.c
 +++ b/drivers/dma/at_xdmac.c
-@@ -1400,6 +1400,7 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 	u32			cur_nda, check_nda, cur_ubc, mask, value;
- 	u8			dwidth = 0;
- 	unsigned long		flags;
-+	bool			initd;
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
- 	if (ret == DMA_COMPLETE)
-@@ -1435,34 +1436,43 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+@@ -1425,7 +1425,16 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 	residue = desc->xfer_size;
+ 	/*
+ 	 * Flush FIFO: only relevant when the transfer is source peripheral
+-	 * synchronized.
++	 * synchronized. Flush is needed before reading CUBC because data in
++	 * the FIFO are not reported by CUBC. Reporting a residue of the
++	 * transfer length while we have data in FIFO can cause issue.
++	 * Usecase: atmel USART has a timeout which means I have received
++	 * characters but there is no more character received for a while. On
++	 * timeout, it requests the residue. If the data are in the DMA FIFO,
++	 * we will return a residue of the transfer length. It means no data
++	 * received. If an application is waiting for these data, it will hang
++	 * since we won't have another USART timeout without receiving new
++	 * data.
+ 	 */
+ 	mask = AT_XDMAC_CC_TYPE | AT_XDMAC_CC_DSYNC;
+ 	value = AT_XDMAC_CC_TYPE_PER_TRAN | AT_XDMAC_CC_DSYNC_PER2MEM;
+@@ -1481,6 +1490,19 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
  	}
  
  	/*
--	 * When processing the residue, we need to read two registers but we
--	 * can't do it in an atomic way. AT_XDMAC_CNDA is used to find where
--	 * we stand in the descriptor list and AT_XDMAC_CUBC is used
--	 * to know how many data are remaining for the current descriptor.
--	 * Since the dma channel is not paused to not loose data, between the
--	 * AT_XDMAC_CNDA and AT_XDMAC_CUBC read, we may have change of
--	 * descriptor.
--	 * For that reason, after reading AT_XDMAC_CUBC, we check if we are
--	 * still using the same descriptor by reading a second time
--	 * AT_XDMAC_CNDA. If AT_XDMAC_CNDA has changed, it means we have to
--	 * read again AT_XDMAC_CUBC.
-+	 * The easiest way to compute the residue should be to pause the DMA
-+	 * but doing this can lead to miss some data as some devices don't
-+	 * have FIFO.
-+	 * We need to read several registers because:
-+	 * - DMA is running therefore a descriptor change is possible while
-+	 * reading these registers
-+	 * - When the block transfer is done, the value of the CUBC register
-+	 * is set to its initial value until the fetch of the next descriptor.
-+	 * This value will corrupt the residue calculation so we have to skip
-+	 * it.
-+	 *
-+	 * INITD --------                    ------------
-+	 *              |____________________|
-+	 *       _______________________  _______________
-+	 * NDA       @desc2             \/   @desc3
-+	 *       _______________________/\_______________
-+	 *       __________  ___________  _______________
-+	 * CUBC       0    \/ MAX desc1 \/  MAX desc2
-+	 *       __________/\___________/\_______________
-+	 *
-+	 * Since descriptors are aligned on 64 bits, we can assume that
-+	 * the update of NDA and CUBC is atomic.
- 	 * Memory barriers are used to ensure the read order of the registers.
--	 * A max number of retries is set because unlikely it can never ends if
--	 * we are transferring a lot of data with small buffers.
-+	 * A max number of retries is set because unlikely it could never ends.
- 	 */
--	cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
--	rmb();
--	cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
- 	for (retry = 0; retry < AT_XDMAC_RESIDUE_MAX_RETRIES; retry++) {
--		rmb();
- 		check_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
--
--		if (likely(cur_nda == check_nda))
--			break;
--
--		cur_nda = check_nda;
-+		rmb();
-+		initd = !!(at_xdmac_chan_read(atchan, AT_XDMAC_CC) & AT_XDMAC_CC_INITD);
- 		rmb();
- 		cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
-+		rmb();
-+		cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
-+		rmb();
++	 * Flush FIFO: only relevant when the transfer is source peripheral
++	 * synchronized. Another flush is needed here because CUBC is updated
++	 * when the controller sends the data write command. It can lead to
++	 * report data that are not written in the memory or the device. The
++	 * FIFO flush ensures that data are really written.
++	 */
++	if ((desc->lld.mbr_cfg & mask) == value) {
++		at_xdmac_write(atxdmac, AT_XDMAC_GSWF, atchan->mask);
++		while (!(at_xdmac_chan_read(atchan, AT_XDMAC_CIS) & AT_XDMAC_CIS_FIS))
++			cpu_relax();
++	}
 +
-+		if ((check_nda == cur_nda) && initd)
-+			break;
- 	}
- 
- 	if (unlikely(retry >= AT_XDMAC_RESIDUE_MAX_RETRIES)) {
++	/*
+ 	 * Remove size of all microblocks already transferred and the current
+ 	 * one. Then add the remaining size to transfer of the current
+ 	 * microblock.
 -- 
 2.5.0
