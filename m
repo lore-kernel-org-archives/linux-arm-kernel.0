@@ -1,101 +1,109 @@
-From: luke.starrett@broadcom.com (Luke Starrett)
-Date: Thu, 12 May 2016 11:34:37 -0400
-Subject: [PATCH] arm64: Implement optimised IP checksum helpers
-In-Reply-To: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
-References: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
-Message-ID: <a3d91ddf-565d-5cef-0a56-39154e3a00d2@broadcom.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 12 May 2016 17:37:34 +0200
+Subject: [PATCH 1/3] tty/serial: atmel: re-integrate status check in irq
+ handler
+Message-ID: <1463067456-6983-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I pulled this in to a userspace test app expecting that the __uint128_t 
-type might cause GCC to emit 'ldp'.  Seems like that was that your 
-intent based on your commit note.  Instead I see two 64b loads (ldr Xn), 
-and a single 32b load (ldr Wn) for the trailing 4B.  This was with 
-Linaro GCC 4.9-2015.06.
+The IRQ status check and related actions was done in the tasklet without
+benefit. So, move it back to the IRQ context to simplify IRQ handling and
+having the possibility to split the tasklet in two separated ones for
+receive and transmit actions.
 
-Otherwise, the C cycle count looks good enough compared to the asm version.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 43 ++++++++++++++++-----------------------
+ 1 file changed, 17 insertions(+), 26 deletions(-)
 
-Thanks,
-
-Luke
-
-
-On 5/12/2016 10:26 AM, Robin Murphy wrote:
-> AArch64 is capable of 128-bit memory accesses without alignment
-> restrictions, which makes it both possible and highly practical to slurp
-> up a typical 20-byte IP header in just 2 loads. Implement our own
-> version of ip_fast_checksum() to take advantage of that, resulting in
-> considerably fewer instructions and memory accesses than the generic
-> version. We can also get more optimal code generation for csum_fold() by
-> defining it a slightly different way round from the generic version, so
-> throw that into the mix too.
->
-> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->
-> Having spent an evening poring over disassembler output, it turns out
-> that there's really no need to drop into asm for this, hurrah! I've
-> taken it for a spin on both big and little-endian, with no ill effects.
->
->   arch/arm64/include/asm/checksum.h | 49 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 49 insertions(+)
->   create mode 100644 arch/arm64/include/asm/checksum.h
->
-> diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-> new file mode 100644
-> index 000000000000..7e975ffce837
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/checksum.h
-> @@ -0,0 +1,49 @@
-> +/*
-> + * Copyright (C) 2016 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_CHECKSUM_H
-> +#define __ASM_CHECKSUM_H
-> +
-> +static inline __sum16 csum_fold(__wsum csum)
-> +{
-> +	u32 sum = (__force u32)csum;
-> +	sum += (sum >> 16) | (sum << 16);
-> +	return ~(__force __sum16)(sum >> 16);
-> +}
-> +#define csum_fold csum_fold
-> +
-> +static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
-> +{
-> +	__uint128_t tmp;
-> +	u64 sum;
-> +
-> +	tmp = *(const __uint128_t *)iph;
-> +	iph += 16;
-> +	ihl -= 4;
-> +	tmp += ((tmp >> 64) | (tmp << 64));
-> +	sum = tmp >> 64;
-> +	do {
-> +		sum += *(const u32 *)iph;
-> +		iph += 4;
-> +	} while (--ihl);
-> +
-> +	sum += ((sum >> 32) | (sum << 32));
-> +	return csum_fold(sum >> 32);
-> +}
-> +#define ip_fast_csum ip_fast_csum
-> +
-> +#include <asm-generic/checksum.h>
-> +
-> +#endif	/* __ASM_CHECKSUM_H */
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 954941d..8854ac6 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -146,9 +146,7 @@ struct atmel_uart_port {
+ 	struct scatterlist		sg_tx;
+ 	struct scatterlist		sg_rx;
+ 	struct tasklet_struct	tasklet;
+-	unsigned int		irq_status;
+ 	unsigned int		irq_status_prev;
+-	unsigned int		status_change;
+ 	unsigned int		tx_len;
+ 
+ 	struct circ_buf		rx_ring;
+@@ -1237,14 +1235,27 @@ atmel_handle_status(struct uart_port *port, unsigned int pending,
+ 		    unsigned int status)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++	unsigned int status_change;
+ 
+ 	if (pending & (ATMEL_US_RIIC | ATMEL_US_DSRIC | ATMEL_US_DCDIC
+ 				| ATMEL_US_CTSIC)) {
+-		atmel_port->irq_status = status;
+-		atmel_port->status_change = atmel_port->irq_status ^
+-					    atmel_port->irq_status_prev;
++		status_change = status ^ atmel_port->irq_status_prev;
+ 		atmel_port->irq_status_prev = status;
+-		tasklet_schedule(&atmel_port->tasklet);
++
++		if (status_change & (ATMEL_US_RI | ATMEL_US_DSR
++					| ATMEL_US_DCD | ATMEL_US_CTS)) {
++			/* TODO: All reads to CSR will clear these interrupts! */
++			if (status_change & ATMEL_US_RI)
++				port->icount.rng++;
++			if (status_change & ATMEL_US_DSR)
++				port->icount.dsr++;
++			if (status_change & ATMEL_US_DCD)
++				uart_handle_dcd_change(port, !(status & ATMEL_US_DCD));
++			if (status_change & ATMEL_US_CTS)
++				uart_handle_cts_change(port, !(status & ATMEL_US_CTS));
++
++			wake_up_interruptible(&port->state->port.delta_msr_wait);
++		}
+ 	}
+ }
+ 
+@@ -1575,31 +1586,12 @@ static void atmel_tasklet_func(unsigned long data)
+ {
+ 	struct uart_port *port = (struct uart_port *)data;
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+-	unsigned int status = atmel_port->irq_status;
+-	unsigned int status_change = atmel_port->status_change;
+ 
+ 	/* The interrupt handler does not take the lock */
+ 	spin_lock(&port->lock);
+ 
+ 	atmel_port->schedule_tx(port);
+ 
+-	if (status_change & (ATMEL_US_RI | ATMEL_US_DSR
+-				| ATMEL_US_DCD | ATMEL_US_CTS)) {
+-		/* TODO: All reads to CSR will clear these interrupts! */
+-		if (status_change & ATMEL_US_RI)
+-			port->icount.rng++;
+-		if (status_change & ATMEL_US_DSR)
+-			port->icount.dsr++;
+-		if (status_change & ATMEL_US_DCD)
+-			uart_handle_dcd_change(port, !(status & ATMEL_US_DCD));
+-		if (status_change & ATMEL_US_CTS)
+-			uart_handle_cts_change(port, !(status & ATMEL_US_CTS));
+-
+-		wake_up_interruptible(&port->state->port.delta_msr_wait);
+-
+-		atmel_port->status_change = 0;
+-	}
+-
+ 	atmel_port->schedule_rx(port);
+ 
+ 	spin_unlock(&port->lock);
+@@ -1833,7 +1825,6 @@ static int atmel_startup(struct uart_port *port)
+ 
+ 	/* Save current CSR for comparison in atmel_tasklet_func() */
+ 	atmel_port->irq_status_prev = atmel_get_lines_status(port);
+-	atmel_port->irq_status = atmel_port->irq_status_prev;
+ 
+ 	/*
+ 	 * Finally, enable the serial port
+-- 
+2.5.0
