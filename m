@@ -1,39 +1,17 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 12 May 2016 17:37:36 +0200
-Subject: [PATCH 3/3] tty/serial: atmel: add comment for the ring buffer size
- macro
-In-Reply-To: <1463067456-6983-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1463067456-6983-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1463067456-6983-3-git-send-email-ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 May 2016 17:46:06 +0200
+Subject: [GIT PULL] at91: fixes for 4.6 #2
+In-Reply-To: <1462979534-29347-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1462979534-29347-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4044486.EpCxRlo97u@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a macro named ATMEL_SERIAL_RINGSIZE which suggesting that it
-corresponds to the real size of the ring buffer. Let warn people that
-there is a factor of four since allocation size is
-sizeof(struct atmel_uart_char) * ATMEL_SERIAL_RINGSIZE.
+On Wednesday 11 May 2016 17:12:14 Nicolas Ferre wrote:
+> Another regression reported by Richard yesterday and quickly fixed by Boris.
+> Since this regression was introduced in 4.6-rc1 it would be great if you could
+> take it before 4.6 is released.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/tty/serial/atmel_serial.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Applied to fixes, thanks!
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 6c1ec7d..8570163 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -108,6 +108,12 @@ struct atmel_uart_char {
- 	u16		ch;
- };
- 
-+/*
-+ * Be careful, the real size of the ring buffer is
-+ * sizeof(atmel_uart_char) * ATMEL_SERIAL_RINGSIZE. It means that ring buffer
-+ * can contain up to 1024 characters in PIO mode and up to 4096 characters in
-+ * DMA mode.
-+ */
- #define ATMEL_SERIAL_RINGSIZE 1024
- 
- /*
--- 
-2.5.0
+	Arnd
