@@ -1,52 +1,39 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 12 May 2016 16:46:34 +0200
-Subject: [PATCH 1/2] pinctrl: stm32: fix warning
-In-Reply-To: <1463064395-4669-1-git-send-email-patrice.chotard@st.com>
-References: <1463064395-4669-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1463064395-4669-2-git-send-email-patrice.chotard@st.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 12 May 2016 16:47:22 +0200
+Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
+In-Reply-To: <CACRpkdawoqfqN8YeojyrzPru2fwrFMidc1e2v7yxHRpPf+rK6w@mail.gmail.com>
+References: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
+ <CACRpkdZ=KsPL1mBS1bLi=jYsv=Vb1QNBi8XPAJW50doPcwBuZg@mail.gmail.com>
+ <5733364A.3090606@st.com>
+ <CACRpkdawoqfqN8YeojyrzPru2fwrFMidc1e2v7yxHRpPf+rK6w@mail.gmail.com>
+Message-ID: <5734977A.1090409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
 
-fix compilation warning :
-drivers/pinctrl/stm32/pinctrl-stm32.c:823:7: warning: too many arguments for format [-Wformat-extra-args]
-           speeds[speed], "speed");
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- drivers/pinctrl/stm32/pinctrl-stm32.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On 05/12/2016 03:40 PM, Linus Walleij wrote:
+> On Wed, May 11, 2016 at 3:40 PM, Patrice Chotard <patrice.chotard@st.com> wrote:
+>> On 05/10/2016 01:50 PM, Linus Walleij wrote:
+>> Sorry i didn't pay attention, but there is a compilation warning in this
+>> patch.
+>>
+>> drivers/pinctrl/stm32/pinctrl-stm32.c:823:7: warning: too many arguments for
+>> format [-Wformat-extra-args]
+>>         speeds[speed], "speed");
+>>
+>>
+>> What do you prefer ?
+>>   _ me to submit a v2 fixing this warning and at the same occasion include
+>> the requested code factorization
+>>   _ or submit additionnal patchset ?
+> Just send a patch on top fixing this.
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index 1527740..249da52 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -806,21 +806,21 @@ static void stm32_pconf_dbg_show(struct pinctrl_dev *pctldev,
- 		drive = stm32_pconf_get_driving(bank, offset);
- 		speed = stm32_pconf_get_speed(bank, offset);
- 		val = stm32_pconf_output_get(bank, offset);
--		seq_printf(s, "- %s - %s - %s - %s %s",
-+		seq_printf(s, "- %s - %s - %s - %s speed",
- 			   val ? "high" : "low",
- 			   drive ? "open drain" : "push pull",
- 			   biasing[bias],
--			   speeds[speed], "speed");
-+			   speeds[speed]);
- 		break;
- 
- 	/* alternate */
- 	case 2:
- 		drive = stm32_pconf_get_driving(bank, offset);
- 		speed = stm32_pconf_get_speed(bank, offset);
--		seq_printf(s, "%d - %s -%s", alt,
-+		seq_printf(s, "%d - %s -%s - %s speed", alt,
- 			   drive ? "open drain" : "push pull",
- 			   biasing[bias],
--			   speeds[speed], "speed");
-+			   speeds[speed]);
- 		break;
- 
- 	/* analog */
--- 
-1.9.1
+Series just send
+
+Thanks
+Patrice
+
+>
+> Yours,
+> Linus Walleij
