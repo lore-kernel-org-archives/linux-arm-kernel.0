@@ -1,39 +1,47 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 12 May 2016 20:06:15 +0800
-Subject: [PATCH v4 18/18] Revert "of/platform: export
- of_default_bus_match_table"
+Date: Thu, 12 May 2016 20:06:14 +0800
+Subject: [PATCH v4 17/18] of: unittest: use of_platform_default_populate() to
+ populate default bus
 In-Reply-To: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1463054775-18170-19-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1463054775-18170-18-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit b80443c2211c7daaabd20fbbe9e7beb3fa3408e0.
+Use helper of_platform_default_populate() in linux/of_platform
+when possible, instead of calling of_platform_populate() with
+the default match table.
 
-After covering to use helper of_platform_default_populate() to populate
-the default bus, no need to export of_default_bus_match_table anymore.
-
-Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Frank Rowand <frowand.list@gmail.com>
 Cc: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/of/platform.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/of/unittest.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index f601b30..3ea8610 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -32,7 +32,6 @@ const struct of_device_id of_default_bus_match_table[] = {
- #endif /* CONFIG_ARM_AMBA */
- 	{} /* Empty terminated list */
- };
--EXPORT_SYMBOL(of_default_bus_match_table);
+diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+index e986e6e..e72cee3 100644
+--- a/drivers/of/unittest.c
++++ b/drivers/of/unittest.c
+@@ -772,7 +772,7 @@ static void __init of_unittest_platform_populate(void)
+ 	};
  
- static int of_dev_node_match(struct device *dev, void *data)
- {
+ 	np = of_find_node_by_path("/testcase-data");
+-	of_platform_populate(np, of_default_bus_match_table, NULL, NULL);
++	of_platform_default_populate(np, NULL, NULL);
+ 
+ 	/* Test that a missing irq domain returns -EPROBE_DEFER */
+ 	np = of_find_node_by_path("/testcase-data/testcase-device1");
+@@ -1885,8 +1885,7 @@ static void __init of_unittest_overlay(void)
+ 		goto out;
+ 	}
+ 
+-	ret = of_platform_populate(bus_np, of_default_bus_match_table,
+-			NULL, NULL);
++	ret = of_platform_default_populate(bus_np, NULL, NULL);
+ 	if (ret != 0) {
+ 		unittest(0, "could not populate bus @ \"%s\"\n", bus_path);
+ 		goto out;
 -- 
 1.7.12.4
