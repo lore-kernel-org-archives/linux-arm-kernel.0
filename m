@@ -1,23 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 12 May 2016 14:09:24 -0700
-Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
-In-Reply-To: <57349C36.4030401@rock-chips.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
- <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
- <5733D7AA.1060500@rock-chips.com> <57349C36.4030401@rock-chips.com>
-Message-ID: <CAD=FV=W1-DDtuLUzW1uLiFxuhpnmhnKB1od_yweY=WJ-4u3=kQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 13 May 2016 00:16:17 +0300
+Subject: [PATCH v3 0/6] Add R8A7794/SILK sound DT support
+In-Reply-To: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
+References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
+Message-ID: <7d19e749-8264-9004-64f4-aefabda699c6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+Hello.
 
-On Thu, May 12, 2016 at 8:07 AM, David.Wu <david.wu@rock-chips.com> wrote:
-> I also found a subtle bug, it would clean the con register by use
-> "i2c_writel(i2c, 0, REG_CON)" in rk3x_i2c_stop(). So i think it would be
-> fixed by using read-modify-write way here in next version.
+On 05/12/2016 11:38 PM, Sergei Shtylyov wrote:
 
-Good catch.  I look forward to the next version (maybe the last
-version, since this series is looking really good).
+>    Here's the set of 6 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20160509-v4.6-rc7' tag. I'm adding the sound device tree support
+> for the R8A7794 SoC based SILK board.
+>
+> [1/6] ARM: dts: r8a7794: add audio clocks
+> [2/6] ARM: dts: r8a7794: add MSTP5 clocks
+> [3/6] ARM: dts: r8a7794: add MSTP10 clocks
+> [4/6] ARM: dts: r8a7794: add Audio-DMAC support
+> [5/6] ARM: dts: r8a7794: add sound support
+> [6/6] ARM: dts: silk: add sound support
 
--Doug
+    Oops, forgot to mention that patch #5 depends on the R-Car sound patch 
+posted yesterday in order to get interpreted as intended (it uses a disabled 
+SRC node).
+
+WBR, Sergei
