@@ -1,66 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 12 May 2016 09:15:42 +0200
-Subject: [RFC] Reset pins of phys and their representation in a device tree
-Message-ID: <20160512071542.GC30822@pengutronix.de>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Thu, 12 May 2016 15:13:29 +0800
+Subject: [PATCH v6 3/4] arm64: dts: mt8173: Add GCE node
+In-Reply-To: <1463037210-863-1-git-send-email-hs.liao@mediatek.com>
+References: <1463037210-863-1-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1463037210-863-4-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds the device node of the GCE hardware for CMDQ module.
 
-I have a machine here where the reset pin of the phy is connected to a
-GPIO.
+Signed-off-by: HS Liao <hs.liao@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-There are different possibilities available today to handle this
-situation, here are the ones I'm aware of:
-
- - Use a gpio-hog to set the reset gpio to non-active
-   This might result in dependency problems (and that's what I am
-   currently faced with) because there is no connection in the device
-   tree between the hog and the phy.
-
- - [Documentation/devicetree/bindings/net/fsl-fec.txt]
-   The fec node supports properties
-
-	phy-reset-gpios = <&gpio2 14 0>;
-	phy-reset-duration = <200> /* milliseconds */;
-
-   Something similar exists in TI's vendor kernel
-   (http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/17d192b999ee904ced223c16cef76111a51c461b)
-   with different (and IMHO bader) naming.
-   This is the wrong place to specify the gpios; they shouldn't be in the
-   mac's node, but in a phy node instead.
-
-So what I actually want is to put the gpio specification in the right
-place and let it look as follows:
-
-	mymdiobus {
-		[...]
-		myfirstphy: ethernet-phy at 0 {
-			compatible = "ethernet-phy-ieee802.3-c22";
-			reg = <0>;
-
-			reset-gpios = <&gpio2 14 0>;
-			reset-duration-ms = <200>;
-		};
-
-		mysecondphy: ethernet-phy at 2 {
-			compatible = "ethernet-phy-ieee802.3-c22";
-			reg = <2>;
-
-			reset-gpios = <&gpio3 10 0>;
-			reset-duration-ms = <200>;
-		};
-	};
-
-And with this we could defer probe of &myfirstphy if &gpio2 isn't
-available yet.
-
-Does this sound sensible? Does something like that already exist which I
-missed? Any further ideas/comments?
-
-Best regards
-Uwe
-
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index eab7efc..63d1718 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -300,6 +300,14 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		gce: gce at 10212000 {
++			compatible = "mediatek,mt8173-gce";
++			reg = <0 0x10212000 0 0x1000>;
++			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&infracfg CLK_INFRA_GCE>;
++			clock-names = "gce";
++		};
++
+ 		gic: interrupt-controller at 10220000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
