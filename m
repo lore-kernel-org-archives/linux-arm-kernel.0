@@ -1,63 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 May 2016 23:21:42 +0300
-Subject: [PATCH 2/2] musb: sunxi: Set state to A_WAIT_VRISE when enabling
- VBus
-In-Reply-To: <1463077869-13224-2-git-send-email-hdegoede@redhat.com>
-References: <1463077869-13224-1-git-send-email-hdegoede@redhat.com>
- <1463077869-13224-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <b60f2279-77e8-c7c3-c857-a2dfef20d3d6@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 May 2016 13:26:57 -0700
+Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
+In-Reply-To: <5734D733.9060400@ti.com>
+References: <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
+ <20160505184609.GB5995@atomide.com>
+ <2822D1C2B9B19F4A8261F756A13373F801BEF7B4@DFLE11.ent.ti.com>
+ <CAPjucKb+4vd8Ar3MATCuTx+9R36PeB0hbvwDaAD1KTZFCiVJEA@mail.gmail.com>
+ <2822D1C2B9B19F4A8261F756A13373F801BF86D2@DFLE11.ent.ti.com>
+ <2822D1C2B9B19F4A8261F756A13373F801BF8703@DFLE11.ent.ti.com>
+ <CAPjucKb2PLSZcD3YZ9xQk1F62ugFaGAkBBqMp5GmoWFd0H8Vfg@mail.gmail.com>
+ <20160512165755.GR5995@atomide.com> <5734D733.9060400@ti.com>
+Message-ID: <20160512202656.GU5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Nishanth Menon <nm@ti.com> [160512 12:21]:
+> On 05/12/2016 11:57 AM, Tony Lindgren wrote:
+> > + * LDO7 is used for HDMI: VDDA_DSIPORTA - ball AA33, VDDA_DSIPORTC - ball AE33
+> > + * VDDA_HDMI - ball AN25. LDO4 is: VPP1 - ball AD9.
+> 
+> We should set ldo4_reg as 2v as well (default in omap5-board-common is
+> 1.8v). VPP1 should be 2v to prevent efuse from being messed up.
 
-On 05/12/2016 09:31 PM, Hans de Goede wrote:
+Oh OK, here's the patch updated for ldo4.
 
-> When the board is powering attached usb devices via the otg port
-> sometimes / on some devices it takes slightly too long for the VBus
+Tony
 
-    I think it's either VBUS or Vbus, not this strange spelling.
+8< --------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 12 May 2016 09:51:51 -0700
+Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
 
-> detection code in phy-sun4i-usb.c to signal that VBus is high after
-> enabling VBus and the musb hardware signals a MUSB_INTR_VBUSERROR
-> interrupt.
->
-> This commit sets the otg state to A_WAIT_VRISE upon enabling Vbus
-> making musb_stage0_irq() ignore the first VBUSERR_RETRY_COUNT
-> VBUSERROR interrupts, fixing connection issues in these cases.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/usb/musb/sunxi.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index 2c33d9b..2ee48fb 100644
-> --- a/drivers/usb/musb/sunxi.c
-> +++ b/drivers/usb/musb/sunxi.c
-> @@ -112,7 +112,7 @@ static void sunxi_musb_work(struct work_struct *work)
->  		if (test_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags)) {
->  			set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
->  			musb->xceiv->otg->default_a = 1;
-> -			musb->xceiv->otg->state = OTG_STATE_A_IDLE;
-> +			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
->  			MUSB_HST_MODE(musb);
->  			devctl |= MUSB_DEVCTL_SESSION;
->  		} else {
-> @@ -145,9 +145,10 @@ static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
->  {
->  	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
->
-> -	if (is_on)
-> +	if (is_on) {
->  		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
-> -	else
-> +		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
-> +	} else
->  		clear_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+Fix ldo7 source for HDMI on igepv5.
 
-   CodingStyle, all *if* branches should use {} if one uses {}.
+Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-[...]
-
-MBR, Sergei
+--- a/arch/arm/boot/dts/omap5-igep0050.dts
++++ b/arch/arm/boot/dts/omap5-igep0050.dts
+@@ -35,6 +35,22 @@
+ 	};
+ };
+ 
++/* LDO4 is VPP1 - ball AD9 */
++&ldo4_reg {
++	regulator-min-microvolt = <2000000>;
++	regulator-max-microvolt = <2000000>;
++};
++
++/*
++ * LDO7 is used for HDMI: VDDA_DSIPORTA - ball AA33, VDDA_DSIPORTC - ball AE33,
++ * VDDA_HDMI - ball AN25
++ */
++&ldo7_reg {
++	status = "okay";
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++};
++
+ &omap5_pmx_core {
+ 	i2c4_pins: pinmux_i2c4_pins {
+ 		pinctrl-single,pins = <
