@@ -1,46 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2016 13:53:56 -0700
-Subject: [PATCH 1/2] ARM: dts: igep00x0: Add SD card-detect.
-In-Reply-To: <CABxcv=nqdETAJBpO-akYipuHH6F6vy5wxHX+dOt9=0CKTTkt=Q@mail.gmail.com>
-References: <1462568554-7868-1-git-send-email-enric.balletbo@collabora.com>
- <CABxcv=nZ1hjVGnNG65eKDrxAYFBcavML+GjxXtfTcVO5N83xkA@mail.gmail.com>
- <572D0B10.60908@collabora.com>
- <CABxcv=nqdETAJBpO-akYipuHH6F6vy5wxHX+dOt9=0CKTTkt=Q@mail.gmail.com>
-Message-ID: <20160512205356.GA5995@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 May 2016 23:01:30 +0200
+Subject: [PATCH] soc: mtk-pmic-wrap: avoid integer overflow warning
+Message-ID: <1463086904-2493288-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [160506 14:28]:
-> Hello Enric,
-> 
-> On Fri, May 6, 2016 at 5:22 PM, Enric Balletbo i Serra
-> <enric.balletbo@collabora.com> wrote:
-> > Hi Javier,
-> >
-> > On 06/05/16 23:07, Javier Martinez Canillas wrote:
-> >> Hello Enric,
-> >>
-> >> On Fri, May 6, 2016 at 5:02 PM, Enric Balletbo i Serra
-> >> <enric.balletbo@collabora.com> wrote:
-> >>> Fix SD card remove/insert detection by adding the correct card-detect
-> >>> pin. All IGEP OMAP3 based boards use the same card-detect pin.
-> >>>
-> >>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> >>> Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
-> >>
-> >> Shouldn't his be Suggested-by: Ladislav Michl <ladis@linux-mips.org> instead?
-> >>
-> >> Or if the patch was originally from Ladis, then he should remain the
-> >> author with your S-o-B after his.
-> >>
-> >
-> > Well Ladis sent the same patch as I had in my local repository for long
-> > time, so to be strict the correct is have two authors and two S-o-B. My bad
-> > is not send the patch before.
-> 
-> Got it, then I think is correct to have both S-o-B. Thanks for the
-> clarification.
+On ARM64, the mtk-pmic-wrap driver causes a harmless warning:
 
-OK thanks for checking, applying both into omap-for-v4.7/dt.
+mtk-pmic-wrap.c:1062:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+mtk-pmic-wrap.c:1074:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+mtk-pmic-wrap.c:1086:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+  .int_en_all = ~(BIT(31) | BIT(1)),
 
-Tony
+The problem is that the result of the BIT() macro is an 'unsigned long',
+so taking the bitwise NOT operation of that results in an integer
+with the upper 32 bits all set and that cannot be assigned to a
+'u32' variable without loss of information.
+
+This is harmless because we were never interested in the upper bits
+here anyway, so we can shut up the warning by adding a simple cast
+to 'u32'.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index 3c3e56df526e..a003ba26ca6e 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -1059,7 +1059,7 @@ static const struct pmic_wrapper_type pwrap_mt2701 = {
+ 	.regs = mt2701_regs,
+ 	.type = PWRAP_MT2701,
+ 	.arb_en_all = 0x3f,
+-	.int_en_all = ~(BIT(31) | BIT(2)),
++	.int_en_all = ~(u32)(BIT(31) | BIT(2)),
+ 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE_NEW,
+ 	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
+ 	.has_bridge = 0,
+@@ -1071,7 +1071,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
+ 	.regs = mt8135_regs,
+ 	.type = PWRAP_MT8135,
+ 	.arb_en_all = 0x1ff,
+-	.int_en_all = ~(BIT(31) | BIT(1)),
++	.int_en_all = ~(u32)(BIT(31) | BIT(1)),
+ 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
+ 	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
+ 	.has_bridge = 1,
+@@ -1083,7 +1083,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
+ 	.regs = mt8173_regs,
+ 	.type = PWRAP_MT8173,
+ 	.arb_en_all = 0x3f,
+-	.int_en_all = ~(BIT(31) | BIT(1)),
++	.int_en_all = ~(u32)(BIT(31) | BIT(1)),
+ 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
+ 	.wdt_src = PWRAP_WDT_SRC_MASK_NO_STAUPD,
+ 	.has_bridge = 0,
+-- 
+2.7.0
