@@ -1,51 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 12 May 2016 10:24:02 +0100
-Subject: [PATCH] drm: mediatek: remove IOMMU_DMA select
-In-Reply-To: <1462997501-982363-1-git-send-email-arnd@arndb.de>
-References: <1462982509-342936-1-git-send-email-arnd@arndb.de>
- <1462997501-982363-1-git-send-email-arnd@arndb.de>
-Message-ID: <57344BB2.8020608@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 10:25:45 +0100
+Subject: [PATCH] arm64: do not enforce strict 16 byte alignment to stack
+ pointer
+In-Reply-To: <1462985814-16146-1-git-send-email-colin.king@canonical.com>
+References: <1462985814-16146-1-git-send-email-colin.king@canonical.com>
+Message-ID: <20160512092545.GC11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/16 21:11, Arnd Bergmann wrote:
-> We get a harmless build warning when trying to use the mediatek
-> DRM driver with IOMMU support disabled:
->
-> warning: (DRM_MEDIATEK) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT)
->
-> However, the IOMMU_DMA symbol is not meant to be used by drivers
-> at all, and this driver doesn't seem to have a strict dependency
-> on it other than using the mediatek IOMMU driver that does.
->
-> Since we also want to be able to do compile tests with the
-> driver on other platforms, the IOMMU_DMA symbol should not
-> be selected here.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Wed, May 11, 2016 at 05:56:54PM +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> copy_thread should not be enforcing 16 byte aligment and returning
+> -EINVAL. Other architectures trap misaligned stack access with SIGBUS
+> so arm64 should follow this convention, so remove the strict enforcement
+> check.
+> 
+> For example, currently clone(2) fails with -EINVAL when passing
+> a misaligned stack and this gives little clue to what is wrong. Instead,
+> it is arguable that a SIGBUS on the fist access to a misaligned stack
+> allows one to figure out that it is a misaligned stack issue rather
+> than trying to figure out why an unconventional (and undocumented)
+> -EINVAL is being returned.
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 > ---
-> If someone has a better explanation about why the 'select' is here,
-> let me know, it certainly seems out of place.
+>  arch/arm64/kernel/process.c | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 5655f756..8414971 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -258,9 +258,6 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>  		if (stack_start) {
+>  			if (is_compat_thread(task_thread_info(p)))
+>  				childregs->compat_sp = stack_start;
+> -			/* 16-byte aligned stack mandatory on AArch64 */
+> -			else if (stack_start & 15)
+> -				return -EINVAL;
+>  			else
+>  				childregs->sp = stack_start;
+>  		}
 
-Ack - it's neither an IOMMU driver nor a DMA API implementation, so it 
-has no business with IOMMU_DMA. If there's an IOMMU dependency in 
-general it should be on MTK_IOMMU, not underlying implementation details.
+As we discussed on the linux-man list, I don't expect this change to
+break existing working user apps since they pass an aligned stack
+already. I really doubt anyone relies on the -EINVAL here.
 
-Robin.
+That said, I don't think we should add a cc stable (which you haven't
+anyway), at least we have a point in time where this change was made. As
+the patch stands:
 
->   drivers/gpu/drm/mediatek/Kconfig | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
-> index 0c06a69d7f04..545973f6b743 100644
-> --- a/drivers/gpu/drm/mediatek/Kconfig
-> +++ b/drivers/gpu/drm/mediatek/Kconfig
-> @@ -7,7 +7,6 @@ config DRM_MEDIATEK
->   	select DRM_KMS_HELPER
->   	select DRM_MIPI_DSI
->   	select DRM_PANEL
-> -	select IOMMU_DMA
->   	select MEMORY
->   	select MTK_SMI
->   	help
->
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+(but let's wait for Will's opinion as well)
