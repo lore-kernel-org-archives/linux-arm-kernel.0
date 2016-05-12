@@ -1,73 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 May 2016 15:06:39 +0200
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <57347BD4.8010105@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <2733875.IzutTZKHMc@wuerfel> <57347BD4.8010105@huawei.com>
-Message-ID: <4521594.dSmlmmAdFg@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 12 May 2016 14:08:29 +0100
+Subject: [PATCH] arm64: kgdb: Match pstate size with gdbserver protocol
+In-Reply-To: <20160510143156.GB10785@leverpostej>
+References: <1462815566-15086-1-git-send-email-daniel.thompson@linaro.org>
+ <20160510104511.GH687@leverpostej>
+ <df946c87-162f-fdda-879b-76b4ad1a1c7a@linaro.org>
+ <20160510143156.GB10785@leverpostej>
+Message-ID: <daaec290-2d7c-551a-1129-4b672b7ef739@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 May 2016 20:49:24 Zhangjian wrote:
-> Hi,
-> 
-> On 2016/5/12 17:21, Arnd Bergmann wrote:
-> > On Thursday 12 May 2016 10:17:58 Catalin Marinas wrote:
-> >> On Wed, May 11, 2016 at 09:30:07PM +0200, Arnd Bergmann wrote:
-> >>> On Wednesday 11 May 2016 17:59:01 Catalin Marinas wrote:
-> >>>
-> >>> I don't think the shifts are a problem, the main downside would be
-> >>> the limit to 44 bits of file offsets (16TB files), but it's also
-> >>> unclear if that is a practical problem at all. If it is, we run
-> >>> into the same problem on all other 32-bit architectures too.
-> >>
-> >> I hope people are seriously thinking of moving to an LP64 ABI if they
-> >> have such large file offset needs.
-> >
-> > Good point. 44 bits of file size is certainly enough for mmap()
-> > on a 32-bit task: you would only be able to map a very small fraction
-> > of the file anyway, and if you want to map larger files, and should
-> > move to 64-bit tasks long before this becomes a limitation.
-> Hi,
-> 
-> I apply the following patch in order to make use of the REAL mmmap2. LTP
-> test pass in litle endian. mmap16 successful with segfault in big endian.
-> 
-> BTW, I saw the similar code in tile, mips, microblaze and s390 compat. Should
-> we merge these code into a common syscall wrapper?
+On 10/05/16 15:31, Mark Rutland wrote:
+> On Tue, May 10, 2016 at 02:41:54PM +0100, Daniel Thompson wrote:
+>> On 10/05/16 11:45, Mark Rutland wrote:
+>>>> When commit 44679a4f142b ("arm64: KGDB: Add step debugging support") was
+>>>> introduced it was paired with a gdb patch that made an incompatible
+>>>> change to the gdbserver protocol. This patch was eventually merged into
+>>>> the gdb sources:
+>>>> https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=a4d9ba85ec5597a6a556afe26b712e878374b9dd
+>>>>
+>>>> The change to the protocol was mostly made to simplify big-endian support
+>>>> inside the kernel gdb stub.
+>>>
+>>> While that was how we discovered the inconsistency, a major concern is
+>>> that SPSR_EL* (i.e. PSTATE), as accessed by MRS/MSR is a 64-bit
+>>> quantity, even if the upper 32 bits are RES0 today.
+>>>
+>>> It is conceivable that the upper 32 bits could be used in future (as
+>>> happened with CLIDR_EL1), and for this reason we expose those upper 32
+>>> bits from the kernel, and treat system registers as 64-bit quantities
+>>> generally.
+>>
+>> These cases are not exactly the same.
+>>
+>> CLIDR_ELx is (or was) architecturally defined as a 64-bit register
+>> and explicitly marks the upper 32-bits as RES0.
+>>
+>> That is not the case for SPSR_ELx; this register is architecturally
+>> defined to be 32-bit.
+>
+> The below doesn't necessarily change your subsequent argument, but that
+> isn't quite true.
+>
+> The two cases are in fact identical if you dig into the history a bit
+> further. Take a look in an earlier revision of the ARM ARM (e.g. ARM DDI
+> 0487A.b), where it was explicitly stated:
+>
+> 	Attributes
+> 		CLIDR_EL1 is a 32-bit register.
 
-I think that's a good idea. The function used to be slightly different
-for each architecture, but now it seems we have a significant number
-of identical implementations that we could just merge them together
-into one.
+I see. I only when back as far as A.e ...
 
-sys_mmap_pgoff was originally introduced as the common implementation
-and it reduced the amount of duplication a lot, but as its units
-are based on PAGE_SIZE rather than hardwired 4096 bytes, it's
-not as useful.
 
-> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-> index d85fe94..2cd72eb 100644
-> --- a/arch/arm64/kernel/sys_ilp32.c
-> +++ b/arch/arm64/kernel/sys_ilp32.c
-> @@ -41,7 +41,16 @@
->   #define compat_sys_sync_file_range     sys_sync_file_range
->   #define compat_sys_truncate64          sys_truncate
->   #define sys_llseek                     sys_lseek
-> -#define sys_mmap2                     sys_mmap
-> +
-> +SYSCALL_DEFINE6(mmap2, unsigned long, addr, unsigned long, len,
-> +       unsigned long, prot, unsigned long, flags, unsigned long, fd,
-> +       unsigned long, pgoff)
-> +{
-> +       if (pgoff & (~PAGE_MASK >> 12))
-> +               return -EINVAL;
-> +
-> +       return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> (PAGE_SHIFT-12));
-> +}
-> 
+> Based on this, my PoV is that any register that the ARM ARM describes as
+> "a 32-bit register" is a 64-bit register for which the upper 32 bits are
+> RES0.
 
-Looks good to me.
+Understood.
 
-	Arnd
+>> I know that doesn't *prevent* SPSR_ELx from being expanded in the
+>> future it is not unreasonable for gdb to design its wire protocol
+>> based on the description found in the architecture manual.
+>>
+>>> So this was also about ensuring the interface was consistent and to some
+>>> extent future-proof.
+>>
+>> gdb remote protocol is already future proof and has never at any
+>> point contradicted the architecture.
+>>
+>> However the changes to the protocol in 7.7.x and 7.8.0 were
+>> analogous to an unexpected ABI change rather than a carefully
+>> controlled introduction of a new feature. Like the kernel, once
+>> detected, they were reversed ;-) .
+>
+> To be clear, I don't disagree with this. The ARM ARM is at best
+> amigibious w.r.t. what it means by "a 32-bit register", and that's the
+> only point of contention.
+
+Agree... such ambiguity strikes me as a particularly serious problem for 
+switchable context registers since it takes *very* close attention to 
+the ARM ARM for an existing OS to determine that it is required to treat 
+the upper 32-bits of context should-be-zero-or-preserved.
+
+
+> However, we should make note of the above as a key point of rationale,
+> as it affects other decisions we make in this area.
+
+Ok. I'll add comments describing how the gdbremote protocol is 
+interpreting the spec.
+
+
+Daniel.
