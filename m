@@ -1,146 +1,43 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Thu, 12 May 2016 11:31:50 -0700
-Subject: [PATCH v3] mmc: dw_mmc: rockchip: Set the drive phase properly
-Message-ID: <1463077910-25914-1-git-send-email-dianders@chromium.org>
+From: luke.starrett@broadcom.com (Luke Starrett)
+Date: Thu, 12 May 2016 14:32:25 -0400
+Subject: [PATCH] arm64: Implement optimised IP checksum helpers
+In-Reply-To: <5734B899.3040207@arm.com>
+References: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
+ <a3d91ddf-565d-5cef-0a56-39154e3a00d2@broadcom.com>
+ <5734B899.3040207@arm.com>
+Message-ID: <49017ef4-1e96-3684-dec1-5f013724f8f2@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Historically for Rockchip devices we've relied on the power-on
-default (or perhaps the firmware setting) to get the correct drive
-phase for dw_mmc devices.  This worked OK for the most part, but:
+Hi Robin,
 
-* Relying on the setting just "being right" is a bit fragile.
+On 5/12/2016 1:08 PM, Robin Murphy wrote:
+> Hi Luke,
+>
+> On 12/05/16 16:34, Luke Starrett wrote:
+>> Hi Robin,
+>>
+>> I pulled this in to a userspace test app expecting that the __uint128_t
+>> type might cause GCC to emit 'ldp'.  Seems like that was that your
+>> intent based on your commit note.  Instead I see two 64b loads (ldr Xn),
+>> and a single 32b load (ldr Wn) for the trailing 4B.  This was with
+>> Linaro GCC 4.9-2015.06.
+>
+> GCC 5 happily emits ldp there, but indeed I couldn't figure out how to 
+> convince GCC 4 to do so. From a quick ferret around in the GCC Git, it 
+> looks like the relevant optimisations may have only gone in post-4.9.
+>
+Not a problem.  I was just curious for my own selfish reasons.
 
-* As soon as there is an instance where the power on default is wrong or
-  where the firmware didn't configure this properly then we'll get a
-  mysterious failure.
+>> Otherwise, the C cycle count looks good enough compared to the asm 
+>> version.
+>
+> Yeah, compiling as standalone functions with GCC 5 I get 19 
+> instructions vs. 17 for the asm, but the loop logic gets optimised out 
+> completely when ihl is a compile-time constant (e.g. inet_gro_receive())
+>
 
-In commit 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card
-initialization") we actually started setting this explicitly in the
-kernel, but that commit wasn't quite right and also wasn't quite
-enough.  See <https://patchwork.kernel.org/patch/9085311/> for some
-details.
+I updated to Linaro GCC 5.3-2016.02, and saw what you described.  I ran 
+some smoke testing against a random header generator.  LGTM.
 
-Let's explicitly set this phase in dw_mmc.
-
-The comments inside this patch try to explain the situation quite
-throughly, but the high level overview of this is:
-
-Before this patch on rk3288 devices tested (after revert of the clock
-patch described above):
-* eMMC: 180 degrees
-* SDMMC/SDIO0/SDIO1: 90 degrees
-
-After this patch:
-* Use 90 degree phase offset usually.
-* Use 180 degree phase offset for MMC_DDR52, SDR104, HS200.
-
-That means we are _changing_ behavior for those devices in this way:
-
-* If we have HS200 eMMC or DDR52 eMMC, we'll run ID mode at 90
-  degrees (vs 180) but otherwise have no change.
-
-* For any non-HS200 / non-DDR52 eMMC devices we'll now _always_ run at
-  90 degrees (vs 180).  It seems fairly unlikely that building modern
-  hardware is using an eMMC that isn't using DDR52 or HS200, of course.
-
-* For SDR104 cards we'll now run with 180 degree phase offset (vs 90).
-  It's expected that 90 degree phase offset would have worked OK, but
-  this gives us extra margin.
-
-I have tested this by inserting my collection of uSD cards (mostly UHS,
-though a few not) into a veyron_minnie and confirmed that they still
-seem to enumerate properly.  For a subset of them I tried putting a
-filesystem on them and also tried running mmc_test.
-
-Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card initialization")
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
----
-Changes in v3:
-- Fixed minor typo; point that this really fixes something in desc.
-- Add Shawn's Reviewed-by
-
-Changes in v2:
-- Now use 90 degrees for some modes; updated comments to say why.
-
- drivers/mmc/host/dw_mmc-rockchip.c | 64 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
-
-diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-index 8c20b81cafd8..b9e4fe5a2393 100644
---- a/drivers/mmc/host/dw_mmc-rockchip.c
-+++ b/drivers/mmc/host/dw_mmc-rockchip.c
-@@ -66,6 +66,70 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
- 	/* Make sure we use phases which we can enumerate with */
- 	if (!IS_ERR(priv->sample_clk))
- 		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
-+
-+	/*
-+	 * Set the drive phase offset based on speed mode to achieve hold times.
-+	 *
-+	 * NOTE: this is _not_ a value that is dynamically tuned and is also
-+	 * _not_ a value that will vary from board to board.  It is a value
-+	 * that could vary between different SoC models if they had massively
-+	 * different output clock delays inside their dw_mmc IP block (delay_o),
-+	 * but since it's OK to overshoot a little we don't need to do complex
-+	 * calculations and can pick values that will just work for everyone.
-+	 *
-+	 * When picking values we'll stick with picking 0/90/180/270 since
-+	 * those can be made very accurately on all known Rockchip SoCs.
-+	 *
-+	 * Note that these values match values from the DesignWare Databook
-+	 * tables for the most part except for SDR12 and "ID mode".  For those
-+	 * two modes the databook calculations assume a clock in of 50MHz.  As
-+	 * seen above, we always use a clock in rate that is exactly the
-+	 * card's input clock (times RK3288_CLKGEN_DIV, but that gets divided
-+	 * back out before the controller sees it).
-+	 *
-+	 * From measurement of a single device, it appears that delay_o is
-+	 * about .5 ns.  Since we try to leave a bit of margin, it's expected
-+	 * that numbers here will be fine even with much larger delay_o
-+	 * (the 1.4 ns assumed by the DesignWare Databook would result in the
-+	 * same results, for instance).
-+	 */
-+	if (!IS_ERR(priv->drv_clk)) {
-+		int phase;
-+
-+		/*
-+		 * In almost all cases a 90 degree phase offset will provide
-+		 * sufficient hold times across all valid input clock rates
-+		 * assuming delay_o is not absurd for a given SoC.  We'll use
-+		 * that as a default.
-+		 */
-+		phase = 90;
-+
-+		switch (ios->timing) {
-+		case MMC_TIMING_MMC_DDR52:
-+			/*
-+			 * Since clock in rate with MMC_DDR52 is doubled when
-+			 * bus width is 8 we need to double the phase offset
-+			 * to get the same timings.
-+			 */
-+			if (ios->bus_width == MMC_BUS_WIDTH_8)
-+				phase = 180;
-+			break;
-+		case MMC_TIMING_UHS_SDR104:
-+		case MMC_TIMING_MMC_HS200:
-+			/*
-+			 * In the case of 150 MHz clock (typical max for
-+			 * Rockchip SoCs), 90 degree offset will add a delay
-+			 * of 1.67 ns.  That will meet min hold time of .8 ns
-+			 * as long as clock output delay is < .87 ns.  On
-+			 * SoCs measured this seems to be OK, but it doesn't
-+			 * hurt to give margin here, so we use 180.
-+			 */
-+			phase = 180;
-+			break;
-+		}
-+
-+		clk_set_phase(priv->drv_clk, phase);
-+	}
- }
- 
- #define NUM_PHASES			360
--- 
-2.8.0.rc3.226.g39d4020
+Acked-by: Luke Starrett <luke.starrett@broadcom.com>
