@@ -1,93 +1,60 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 12 May 2016 14:08:29 +0100
-Subject: [PATCH] arm64: kgdb: Match pstate size with gdbserver protocol
-In-Reply-To: <20160510143156.GB10785@leverpostej>
-References: <1462815566-15086-1-git-send-email-daniel.thompson@linaro.org>
- <20160510104511.GH687@leverpostej>
- <df946c87-162f-fdda-879b-76b4ad1a1c7a@linaro.org>
- <20160510143156.GB10785@leverpostej>
-Message-ID: <daaec290-2d7c-551a-1129-4b672b7ef739@linaro.org>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 12 May 2016 21:08:59 +0800
+Subject: [PATCH v7 0/5] ACPI: parse the SPCR table
+In-Reply-To: <bc91f503-cee5-db03-51bf-a36ef3e95a1f@linaro.org>
+References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
+ <1bff98e3-2d94-ed76-1165-ed7d43bbfcf3@jonmasters.org>
+ <bc91f503-cee5-db03-51bf-a36ef3e95a1f@linaro.org>
+Message-ID: <5734806B.50705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/16 15:31, Mark Rutland wrote:
-> On Tue, May 10, 2016 at 02:41:54PM +0100, Daniel Thompson wrote:
->> On 10/05/16 11:45, Mark Rutland wrote:
->>>> When commit 44679a4f142b ("arm64: KGDB: Add step debugging support") was
->>>> introduced it was paired with a gdb patch that made an incompatible
->>>> change to the gdbserver protocol. This patch was eventually merged into
->>>> the gdb sources:
->>>> https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=a4d9ba85ec5597a6a556afe26b712e878374b9dd
->>>>
->>>> The change to the protocol was mostly made to simplify big-endian support
->>>> inside the kernel gdb stub.
->>>
->>> While that was how we discovered the inconsistency, a major concern is
->>> that SPSR_EL* (i.e. PSTATE), as accessed by MRS/MSR is a 64-bit
->>> quantity, even if the upper 32 bits are RES0 today.
->>>
->>> It is conceivable that the upper 32 bits could be used in future (as
->>> happened with CLIDR_EL1), and for this reason we expose those upper 32
->>> bits from the kernel, and treat system registers as 64-bit quantities
->>> generally.
+
+
+On 2016/5/12 19:52, Aleksey Makarov wrote:
+> Hi Jon,
+> 
+> In v7 I addressed the issues that were brought up by Rafael J . Wysocki
+> (but I still do not have ACK from ACPI people).
+> 
+> The issue with D02 will be addressed in a separate patch.
+> 
+> There possibly is an issue with 16550 and command line console with I am
+> investigating and probably will address in a separate patch.
+
+
+Sound good, and will retest this in D02 with the coming patch, and
+
+Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+
+BRs,
+Kefeng
+
+> 
+> I know no other problems with it and reviewers seem happy.
+> 
+> So I believe this patchset could be pulled.  If needed, I will send v8.
+> 
+> Thank you
+> Aleksey Makarov
+> 
+> On 05/12/2016 11:20 AM, Jon Masters wrote:
+>> On 03/31/2016 09:40 AM, Aleksey Makarov wrote:
 >>
->> These cases are not exactly the same.
+>>> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+>>> Console Redirection Table) [2] as a mandatory ACPI table that
+>>> specifies the configuration of serial console.
 >>
->> CLIDR_ELx is (or was) architecturally defined as a 64-bit register
->> and explicitly marks the upper 32-bits as RES0.
+>> Hi Aleksey,
 >>
->> That is not the case for SPSR_ELx; this register is architecturally
->> defined to be 32-bit.
->
-> The below doesn't necessarily change your subsequent argument, but that
-> isn't quite true.
->
-> The two cases are in fact identical if you dig into the history a bit
-> further. Take a look in an earlier revision of the ARM ARM (e.g. ARM DDI
-> 0487A.b), where it was explicitly stated:
->
-> 	Attributes
-> 		CLIDR_EL1 is a 32-bit register.
-
-I see. I only when back as far as A.e ...
-
-
-> Based on this, my PoV is that any register that the ARM ARM describes as
-> "a 32-bit register" is a 64-bit register for which the upper 32 bits are
-> RES0.
-
-Understood.
-
->> I know that doesn't *prevent* SPSR_ELx from being expanded in the
->> future it is not unreasonable for gdb to design its wire protocol
->> based on the description found in the architecture manual.
+>> Can you summarize the status of this patch series?
 >>
->>> So this was also about ensuring the interface was consistent and to some
->>> extent future-proof.
+>> Jon.
 >>
->> gdb remote protocol is already future proof and has never at any
->> point contradicted the architecture.
->>
->> However the changes to the protocol in 7.7.x and 7.8.0 were
->> analogous to an unexpected ABI change rather than a carefully
->> controlled introduction of a new feature. Like the kernel, once
->> detected, they were reversed ;-) .
->
-> To be clear, I don't disagree with this. The ARM ARM is at best
-> amigibious w.r.t. what it means by "a 32-bit register", and that's the
-> only point of contention.
-
-Agree... such ambiguity strikes me as a particularly serious problem for 
-switchable context registers since it takes *very* close attention to 
-the ARM ARM for an existing OS to determine that it is required to treat 
-the upper 32-bits of context should-be-zero-or-preserved.
-
-
-> However, we should make note of the above as a key point of rationale,
-> as it affects other decisions we make in this area.
-
-Ok. I'll add comments describing how the gdbremote protocol is 
-interpreting the spec.
-
-
-Daniel.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
