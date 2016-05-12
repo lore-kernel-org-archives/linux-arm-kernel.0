@@ -1,34 +1,41 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu, 12 May 2016 14:35:38 +0000
-Subject: [PATCH 4/4] ARM: bcm2835: add thermal driver to default_config
-In-Reply-To: <1463063738-11506-1-git-send-email-kernel@martin.sperl.org>
-References: <1463063738-11506-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1463063738-11506-5-git-send-email-kernel@martin.sperl.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 13 May 2016 00:13:11 +0930
+Subject: [PATCH v3 0/2] irqchip: Support Aspeed IRQ controller
+In-Reply-To: <1462802317-27086-1-git-send-email-joel@jms.id.au>
+References: <1462802317-27086-1-git-send-email-joel@jms.id.au>
+Message-ID: <1463064193-2178-1-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Hello All,
 
-Add the thermal driver to list of compiled modules
-in the default config for bcm2835.
+This adds support for the IRQ controller found in the Aspeed ast2400 and
+ast2500 BMC SoCs.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- arch/arm/configs/bcm2835_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+It's been tested on the ast2400 in an OpenPower Palmetto system, and on the
+ast2500-edk developer kit.
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 29a44bd..634e07e 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -71,6 +71,8 @@ CONFIG_SPI_BCM2835=y
- CONFIG_SPI_BCM2835AUX=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_THERMAL=y
-+CONFIG_BCM2835_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_BCM2835_WDT=y
- CONFIG_FB=y
+V2 has a fix for the compatible string in the device tree bindings.
+
+V3 drops the valid-sources bitmasks and adds a unit address to the example in
+the bindings
+
+Cheers,
+
+Joel
+
+Benjamin Herrenschmidt (1):
+  irqchip: Add irq controller for Aspeed
+
+Joel Stanley (1):
+  doc/devicetree: Add Aspeed VIC bindings
+
+ .../interrupt-controller/aspeed,ast2400-vic.txt    |  22 ++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-aspeed-vic.c                   | 230 +++++++++++++++++++++
+ 3 files changed, 253 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/aspeed,ast2400-vic.txt
+ create mode 100644 drivers/irqchip/irq-aspeed-vic.c
+
 -- 
-2.1.4
+2.8.1
