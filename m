@@ -1,98 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 May 2016 15:54:03 +0100
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160512143415.GD30205@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
- <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
- <20160512134431.GB30205@yury-N73SV>
- <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
- <20160512142016.GH11226@e104818-lin.cambridge.arm.com>
- <20160512143415.GD30205@yury-N73SV>
-Message-ID: <20160512145402.GI11226@e104818-lin.cambridge.arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 12 May 2016 16:54:09 +0200
+Subject: [PATCH 2/3] dmaengine: at_xdmac: fix residue corruption
+In-Reply-To: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1463064854-6719-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 05:34:15PM +0300, Yury Norov wrote:
-> On Thu, May 12, 2016 at 03:20:16PM +0100, Catalin Marinas wrote:
-> > On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
-> > > On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
-> > > > On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
-> > > > > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
-> > > > > > I debugged preadv02 and pwritev02 failures and found very weird bug.
-> > > > > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> > > > > > of vector, and kernel reports successful read/write.
-> > > > > > 
-> > > > > > There are 2 problems:
-> > > > > > 1. How kernel allows such address to be passed to fs subsystem;
-> > > > > > 2. How fs successes to read/write at non-mapped, and in fact non-user
-> > > > > > address.
-> > > > > > 
-> > > > > > I don't know the answer on 2'nd question, and it might be something
-> > > > > > generic. But I investigated first problem.
-> > > > > > 
-> > > > > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
-> > > > > > validate user address, and on arm64 it ends up with checking buffer
-> > > > > > end against current_thread_info()->addr_limit.
-> > > > > > 
-> > > > > > current_thread_info()->addr_limit for ilp32, and most probably for
-> > > > > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
-> > > > > > It happens because on thread creation we call flush_old_exec() to set 
-> > > > > > addr_limit, and completely ignore compat mode there.
-> > > 
-> > > [...]
-> > > 
-> > > > > > --- a/arch/arm64/kernel/binfmt_elf32.c
-> > > > > > +++ b/arch/arm64/kernel/binfmt_elf32.c
-> > > > > > @@ -12,6 +12,7 @@
-> > > > > >  do {						\
-> > > > > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
-> > > > > >  	set_thread_flag(TIF_32BIT);		\
-> > > > > > +	set_fs(TASK_SIZE_32);			\
-> > > > > >  } while (0)
-> > > > > >  
-> > > > > >  #define COMPAT_ARCH_DLINFO
-> > > > > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-> > > > > > index a934fd4..a8599c6 100644
-> > > > > > --- a/arch/arm64/kernel/binfmt_ilp32.c
-> > > > > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
-> > > > > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
-> > > > > >  do {									\
-> > > > > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
-> > > > > >  	clear_thread_flag(TIF_32BIT);					\
-> > > > > > +	set_fs(TASK_SIZE_32);						\
-> > > > > >  } while (0)
-> > > > > 
-> > > > > I don't think we need these two. AFAICT, flush_old_exec() takes care of
-> > > > > setting the USER_DS for the new thread.
-> > > > 
-> > > > That's true, but USER_DS depends on personality which is not set yet
-> > > > for new thread, as I wrote above. In fact, I tried correct USER_DS
-> > > > only, and it doesn't work
-> > > 
-> > > Ah, it looks like load_elf_binary() sets the personality after
-> > > flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
-> > > maximum 64-bit task value, so they should have a similar issue with
-> > > native 32-bit vs compat behaviour.
-> > 
-> > I think we have another problem. flush_old_exec() calls the arm64
-> > flush_thread() where tls_thread_flush() checks for is_compat_task(). So
-> > starting a 32-bit application from a 64-bit one not go on the correct
-> > path.
-> 
-> As per now, all native, aarch32 and ilp32 tasks can exec() any
-> binaries they need.
+An unexpected value of CUBC can lead to a corrupted residue. A more
+complex sequence is needed to detect an inaccurate value for NCA or CUBC.
 
-And that's correct.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
+eXtended DMA Controller driver")
+Cc: stable at vger.kernel.org #v4.1 and later
+---
+ drivers/dma/at_xdmac.c | 54 ++++++++++++++++++++++++++++++--------------------
+ 1 file changed, 32 insertions(+), 22 deletions(-)
 
-> Are you think it's wrong? If so, how we coild run
-> first compat application (maybe shell), it there are only lp64 tasks
-> on the system?
-
-What I meant is that we rely on flush_old_exec() to initialise the TLS
-register for the compat task but it currently depends on what the parent
-is. I think tls_thread_flush() should actually drop the is_compat_task()
-thread and always initialise all the TLS registers.
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index ba9b0b7..b02494e 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1400,6 +1400,7 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 	u32			cur_nda, check_nda, cur_ubc, mask, value;
+ 	u8			dwidth = 0;
+ 	unsigned long		flags;
++	bool			initd;
+ 
+ 	ret = dma_cookie_status(chan, cookie, txstate);
+ 	if (ret == DMA_COMPLETE)
+@@ -1435,34 +1436,43 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 	}
+ 
+ 	/*
+-	 * When processing the residue, we need to read two registers but we
+-	 * can't do it in an atomic way. AT_XDMAC_CNDA is used to find where
+-	 * we stand in the descriptor list and AT_XDMAC_CUBC is used
+-	 * to know how many data are remaining for the current descriptor.
+-	 * Since the dma channel is not paused to not loose data, between the
+-	 * AT_XDMAC_CNDA and AT_XDMAC_CUBC read, we may have change of
+-	 * descriptor.
+-	 * For that reason, after reading AT_XDMAC_CUBC, we check if we are
+-	 * still using the same descriptor by reading a second time
+-	 * AT_XDMAC_CNDA. If AT_XDMAC_CNDA has changed, it means we have to
+-	 * read again AT_XDMAC_CUBC.
++	 * The easiest way to compute the residue should be to pause the DMA
++	 * but doing this can lead to miss some data as some devices don't
++	 * have FIFO.
++	 * We need to read several registers because:
++	 * - DMA is running therefore a descriptor change is possible while
++	 * reading these registers
++	 * - When the block transfer is done, the value of the CUBC register
++	 * is set to its initial value until the fetch of the next descriptor.
++	 * This value will corrupt the residue calculation so we have to skip
++	 * it.
++	 *
++	 * INITD --------                    ------------
++	 *              |____________________|
++	 *       _______________________  _______________
++	 * NDA       @desc2             \/   @desc3
++	 *       _______________________/\_______________
++	 *       __________  ___________  _______________
++	 * CUBC       0    \/ MAX desc1 \/  MAX desc2
++	 *       __________/\___________/\_______________
++	 *
++	 * Since descriptors are aligned on 64 bits, we can assume that
++	 * the update of NDA and CUBC is atomic.
+ 	 * Memory barriers are used to ensure the read order of the registers.
+-	 * A max number of retries is set because unlikely it can never ends if
+-	 * we are transferring a lot of data with small buffers.
++	 * A max number of retries is set because unlikely it could never ends.
+ 	 */
+-	cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
+-	rmb();
+-	cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
+ 	for (retry = 0; retry < AT_XDMAC_RESIDUE_MAX_RETRIES; retry++) {
+-		rmb();
+ 		check_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
+-
+-		if (likely(cur_nda == check_nda))
+-			break;
+-
+-		cur_nda = check_nda;
++		rmb();
++		initd = !!(at_xdmac_chan_read(atchan, AT_XDMAC_CC) & AT_XDMAC_CC_INITD);
+ 		rmb();
+ 		cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
++		rmb();
++		cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
++		rmb();
++
++		if ((check_nda == cur_nda) && initd)
++			break;
+ 	}
+ 
+ 	if (unlikely(retry >= AT_XDMAC_RESIDUE_MAX_RETRIES)) {
 -- 
-Catalin
+2.5.0
