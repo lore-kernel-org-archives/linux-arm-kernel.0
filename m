@@ -1,69 +1,99 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Thu, 12 May 2016 11:03:17 -0700
-Subject: [PATCH 2/2] clk: rockchip: fix the rk3399 sdmmc sample shift
-In-Reply-To: <1463076197-15900-1-git-send-email-dianders@chromium.org>
-References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
-Message-ID: <1463076197-15900-2-git-send-email-dianders@chromium.org>
+Date: Thu, 12 May 2016 11:03:16 -0700
+Subject: [PATCH 1/2] Revert "clk: rockchip: reset init state before mmc card
+ initialization"
+Message-ID: <1463076197-15900-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like every other Rockhip device, the MMC "_sample" clocks should
-have a shift of 0, not a shift of 1.  The rk3399 TRM agrees.  Presumably
-these values were set to 0 because of a typo.
+This reverts commit 7a03fe6f48f3 ("clk: rockchip: reset init state
+before mmc card initialization").
 
-Things _sorta_ would have worked with the incorrect sample phase shift
-because of the register layout but wouldn't have been ideal and we would
-have skipped lots of phases.  Also: we would never actually enabled the
-fine delay unless we happened to have 128 or more delay elements.
+Though not totally obvious from the commit message nor from the source
+code, that commit appears to be trying to reset the "_drv" MMC clocks to
+90 degrees (note that the "_sample" MMC clocks have a shift of 0 so are
+not touched).
 
-This is expected behavior before this patch:
-* Try to set:     0 degrees +   1 delay elements
-  Actually get:   0 degrees +   0 delay elements
-* Try to set:    90 degrees +   0 delay elements
-  Actually get: 180 degrees +   0 delay elements
-* Try to set:   180 degrees +   0 delay elements
-  Actually get:   0 degrees +   0 delay elements
-* Try to set:   270 degrees +   0 delay elements
-  Actually get: 180 degrees +   0 delay elements
-* Try to set:     0 degrees + 129 delay elements
-  Actually get:   0 degrees +   2 delay elements
-* Try to set:   180 degrees + 129 delay elements
-  Actually get:   0 degrees +   3 delay elements
-* Try to set:     0 degrees + 130 delay elements
-  Actually get:   0 degrees +   4 delay elements
+The major problem here is that it doesn't properly reset things.  The
+phase is a two bit field and the commit only touches one of the two
+bits.  Thus the commit had the following affect:
+- phase   0  => phase  90
+- phase  90  => phase  90
+- phase 180  => phase 270
+- phase 270  => phase 270
 
-I verified that old code had a problem by turning on debug printouts and
-seeing that the old code would report this for one SD card I had:
-  Good phase range 347-101 (115 len)
-  Good phase range 202-326 (125 len)
+Things get even weirder if you happen to have a bootloader that was
+actually using delay elements (should be no reason to, but you never
+know), since those are additional bits that weren't touched by the
+original patch.
 
-After my fix, it went down to one big good range for the same card.
-This is more expected:
-  Good phase range 189-1 (173 len)
-  Good phase range 82-85 (4 len)
-  Good phase range 166-168 (3 len)
+This is unlikely to be what we actually want.  Checking on rk3288-veyron
+devices, I can see that the bootloader leaves these clocks as:
+- emmc:  phase 180
+- sdmmc: phase 90
+- sdio0: phase 90
 
+Thus on rk3288-veyron devices the commit we're reverting had the effect
+of changing the eMMC clock to phase 270.  This probably explains the
+scattered reports I've heard of eMMC devices not working on some veyron
+devices when using the upstream kernel.
+
+The original commit was presumably made because previously the kernel
+didn't touch the "_drv" phase at all and relied on whatever value was
+there when the kernel started.  If someone was using a bootloader that
+touched the "_drv" phase then, indeed, we should have code in the kernel
+to fix that.  ...and also, to get ideal timings, we should also have the
+kernel change the phase depending on the speed mode.  In fact, that's
+the subject of a recent patch I posted at
+<https://patchwork.kernel.org/patch/9075141/>.
+
+Ideally, we should take both the patch posted to dw_mmc and this
+revert.  Since those will likely go through different trees, here I
+describe behavior with the combos:
+
+1. Just this revert: likely will fix rk3288-veyron eMMC on some devices
+   + other cases; might break someone with a strange bootloader that
+   sets the phase to 0 or one that uses delay elements (pretty
+   unpredicable what would happen in that case).
+2. Just dw_mmc patch: fixes everyone.  Effectly the dw_mmc patch will
+   totally override the broken patch and fix everything.
+3. Both patches: fixes everyone.  Once dw_mmc is initting properly then
+   any defaults from the clock code doesn't mattery.
+
+Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card initialization")
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- drivers/clk/rockchip/clk-rk3399.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/rockchip/clk-mmc-phase.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 291543f52caa..14ff3e109e1e 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -895,10 +895,10 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 			RK3399_CLKGATE_CON(6), 1, GFLAGS),
+diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
+index bc856f21f6b2..5b18265c2306 100644
+--- a/drivers/clk/rockchip/clk-mmc-phase.c
++++ b/drivers/clk/rockchip/clk-mmc-phase.c
+@@ -41,8 +41,6 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw *hw,
+ #define ROCKCHIP_MMC_DEGREE_MASK 0x3
+ #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
+ #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
+-#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
+-#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
  
- 	MMC(SCLK_SDMMC_DRV,     "sdmmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
--	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
-+	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 0),
+ #define PSECS_PER_SEC 1000000000000LL
  
- 	MMC(SCLK_SDIO_DRV,      "sdio_drv",    "clk_sdio",  RK3399_SDIO_CON0,  1),
--	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  1),
-+	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  0),
+@@ -162,15 +160,6 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+ 	mmc_clock->reg = reg;
+ 	mmc_clock->shift = shift;
  
- 	/* pcie */
- 	COMPOSITE(SCLK_PCIE_PM, "clk_pcie_pm", mux_pll_src_cpll_gpll_npll_24m_p, 0,
+-	/*
+-	 * Assert init_state to soft reset the CLKGEN
+-	 * for mmc tuning phase and degree
+-	 */
+-	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
+-		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
+-				     ROCKCHIP_MMC_INIT_STATE_RESET,
+-				     mmc_clock->shift), mmc_clock->reg);
+-
+ 	clk = clk_register(NULL, &mmc_clock->hw);
+ 	if (IS_ERR(clk))
+ 		kfree(mmc_clock);
 -- 
 2.8.0.rc3.226.g39d4020
