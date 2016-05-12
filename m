@@ -1,47 +1,31 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 12 May 2016 20:06:14 +0800
-Subject: [PATCH v4 17/18] of: unittest: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1463054775-18170-18-git-send-email-wangkefeng.wang@huawei.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 12 May 2016 07:08:36 -0500
+Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
+In-Reply-To: <57345FDF.4000804@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-8-git-send-email-tn@semihalf.com>
+ <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
+ <20160511101101.GA16101@red-moon>
+ <CAJZ5v0hgw929W5PjF0PqT+ssiOHd8TeJoSQcz4NUiAovZY2pfQ@mail.gmail.com>
+ <20160511224314.GD28812@localhost> <57345FDF.4000804@semihalf.com>
+Message-ID: <20160512120836.GF28812@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper of_platform_default_populate() in linux/of_platform
-when possible, instead of calling of_platform_populate() with
-the default match table.
+On Thu, May 12, 2016 at 12:50:07PM +0200, Tomasz Nowicki wrote:
+> On 12.05.2016 00:43, Bjorn Helgaas wrote:
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/of/unittest.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+> >@@ -70,9 +71,11 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+> >  	cfg->res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+> >  	cfg->res.name = "PCI ECAM";
+> >
+> >-	err = request_resource(&iomem_resource, &cfg->res);
+> >-	if (err) {
+> >-		dev_err(dev, "request ECAM res %pR failed\n", &cfg->res);
+> >+	conflict = request_resource(&iomem_resource, &cfg->res);
+> 
+> We need request_resource_conflict here then:
+> -	conflict = request_resource(&iomem_resource, &cfg->res);
+> +	conflict = request_resource_conflict(&iomem_resource, &cfg->res);
 
-diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
-index e986e6e..e72cee3 100644
---- a/drivers/of/unittest.c
-+++ b/drivers/of/unittest.c
-@@ -772,7 +772,7 @@ static void __init of_unittest_platform_populate(void)
- 	};
- 
- 	np = of_find_node_by_path("/testcase-data");
--	of_platform_populate(np, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(np, NULL, NULL);
- 
- 	/* Test that a missing irq domain returns -EPROBE_DEFER */
- 	np = of_find_node_by_path("/testcase-data/testcase-device1");
-@@ -1885,8 +1885,7 @@ static void __init of_unittest_overlay(void)
- 		goto out;
- 	}
- 
--	ret = of_platform_populate(bus_np, of_default_bus_match_table,
--			NULL, NULL);
-+	ret = of_platform_default_populate(bus_np, NULL, NULL);
- 	if (ret != 0) {
- 		unittest(0, "could not populate bus @ \"%s\"\n", bus_path);
- 		goto out;
--- 
-1.7.12.4
+Whoops, fixed, thanks!
