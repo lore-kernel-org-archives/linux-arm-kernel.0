@@ -1,67 +1,60 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 12 May 2016 16:54:10 +0200
-Subject: [PATCH 3/3] dmaengine: at_xdmac: double FIFO flush needed to compute
- residue
-In-Reply-To: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1463064854-6719-3-git-send-email-ludovic.desroches@atmel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 12 May 2016 16:56:59 +0200 (CEST)
+Subject: [PATCH 3/4] ARM: dts: bcm2835: add the bcm2835-sdram-controller
+ to the dt
+In-Reply-To: <1463056732-5607-4-git-send-email-kernel@martin.sperl.org>
+References: <1463056732-5607-1-git-send-email-kernel@martin.sperl.org>
+ <1463056732-5607-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <73859954.21004.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the way CUBC register is updated, a double flush is needed to
-compute an accurate residue. First flush aim is to get data from the DMA
-FIFO and second one ensures that we won't report data which are not in
-memory.
+Hi,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
-eXtended DMA Controller driver")
-Cc: stable at vger.kernel.org #v4.1 and later
----
- drivers/dma/at_xdmac.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+> kernel at martin.sperl.org hat am 12. Mai 2016 um 14:38 geschrieben:
+> 
+> 
+> From: Martin Sperl <kernel@martin.sperl.org>
+> 
+> Add the bcm2835 sdram controller to the device tree.
+> 
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> ---
+>  arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index 8aaf193..9db9d97 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -22,6 +22,12 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  
+> +		memory-controller at 7e002000 {
+> +			compatible = "brcm,bcm2835-sdram";
+> +			reg = <0x7e002000 0x58>, <0x7e002800 0x58>;
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index b02494e..75bd662 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -1425,7 +1425,16 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 	residue = desc->xfer_size;
- 	/*
- 	 * Flush FIFO: only relevant when the transfer is source peripheral
--	 * synchronized.
-+	 * synchronized. Flush is needed before reading CUBC because data in
-+	 * the FIFO are not reported by CUBC. Reporting a residue of the
-+	 * transfer length while we have data in FIFO can cause issue.
-+	 * Usecase: atmel USART has a timeout which means I have received
-+	 * characters but there is no more character received for a while. On
-+	 * timeout, it requests the residue. If the data are in the DMA FIFO,
-+	 * we will return a residue of the transfer length. It means no data
-+	 * received. If an application is waiting for these data, it will hang
-+	 * since we won't have another USART timeout without receiving new
-+	 * data.
- 	 */
- 	mask = AT_XDMAC_CC_TYPE | AT_XDMAC_CC_DSYNC;
- 	value = AT_XDMAC_CC_TYPE_PER_TRAN | AT_XDMAC_CC_DSYNC_PER2MEM;
-@@ -1481,6 +1490,19 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 	}
- 
- 	/*
-+	 * Flush FIFO: only relevant when the transfer is source peripheral
-+	 * synchronized. Another flush is needed here because CUBC is updated
-+	 * when the controller sends the data write command. It can lead to
-+	 * report data that are not written in the memory or the device. The
-+	 * FIFO flush ensures that data are really written.
-+	 */
-+	if ((desc->lld.mbr_cfg & mask) == value) {
-+		at_xdmac_write(atxdmac, AT_XDMAC_GSWF, atchan->mask);
-+		while (!(at_xdmac_chan_read(atchan, AT_XDMAC_CIS) & AT_XDMAC_CIS_FIS))
-+			cpu_relax();
-+	}
-+
-+	/*
- 	 * Remove size of all microblocks already transferred and the current
- 	 * one. Then add the remaining size to transfer of the current
- 	 * microblock.
--- 
-2.5.0
+where do you get these addresses?
+
+According to register documentation [1] the adresses belong to the interrupt
+controller.
+
+Maybe 0x7ee00000 is the right address.
+
+[1] - https://github.com/hermanhermitage/videocoreiv/wiki/Register-Documentation
+
+> +			clocks = <&clocks BCM2835_CLOCK_SDRAM>;
+> +		};
+> +
+>  		timer at 7e003000 {
+>  			compatible = "brcm,bcm2835-system-timer";
+>  			reg = <0x7e003000 0x1000>;
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
