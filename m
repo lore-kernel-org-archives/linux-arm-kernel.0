@@ -1,51 +1,90 @@
-From: yt.shen@mediatek.com (yt.shen at mediatek.com)
-Date: Thu, 12 May 2016 19:49:52 +0800
-Subject: [RFC 0/3] MT2701 DRM support
-Message-ID: <1463053795-55455-1-git-send-email-yt.shen@mediatek.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 13:59:40 +0200
+Subject: [PATCH v3 34/55] KVM: arm/arm64: vgic-new: Add GICv3
+ redistributor IIDR and TYPER handler
+In-Reply-To: <1462531568-9799-35-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-35-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512115940.GE27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YT Shen <yt.shen@mediatek.com>
-
-This is MT2701 DRM support RFC, based on MT8173 DRM patch v16.
-Most codes are the same, except some register changed.
-
-For example:
- - DISP_OVL address offset changed, color format definition changed.
- - DISP_RDMA fifo size changed.
- - DISP_COLOR offset changed.
-
-We add a new component DISP_BLS, and the connection settings are updated.
-And we have shadow register support in MT2701.
-
-The RFC depends on MT2701 iommu/smi driver.
-https://patchwork.kernel.org/patch/9043411/ ("dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and smi"),
-https://patchwork.kernel.org/patch/9043391/ ("iommu/mediatek: move the common struct into header file"),
-https://patchwork.kernel.org/patch/9043421/ ("memory/mediatek: add support for mt2701"),
-https://patchwork.kernel.org/patch/9043451/ ("iommu/mediatek: add support for mtk iommu generation one HW"),
-https://patchwork.kernel.org/patch/9043471/ ("ARM: dts: mt2701: add iommu/smi dtsi node for mt2701"),
-
-Thanks,
-yt.shen
-
-YT Shen (3):
-  dt-bindings: drm/mediatek: Add display binding for Mediatek SoC MT2701
-  drm/mediatek: add support for Mediatek SoC MT2701
-  arm: dts: mt2701: Add display subsystem related nodes for MT2701
-
- .../bindings/display/mediatek/mediatek,disp.txt    |    1 +
- arch/arm/boot/dts/mt2701.dtsi                      |  117 +++++++++++++++
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c            |   49 +++++--
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c           |   36 ++++-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   78 ++++++----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c             |  151 +++++++++++++++-----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h             |    2 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |   63 +++++++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |   15 ++
- drivers/gpu/drm/mediatek/mtk_drm_drv.c             |   72 ++++++++--
- drivers/gpu/drm/mediatek/mtk_drm_drv.h             |    9 ++
- drivers/gpu/drm/mediatek/mtk_drm_gem.c             |    4 +
- 12 files changed, 491 insertions(+), 106 deletions(-)
-
--- 
-1.7.9.5
+On Fri, May 06, 2016 at 11:45:47AM +0100, Andre Przywara wrote:
+> The redistributor TYPER tells the OS about the associated MPIDR,
+> also the LAST bit is crucial to determine the number of redistributors.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 44 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 42 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 5f4558c..d137242 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -71,6 +71,46 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
+>  }
+>  
+>  /*
+> + * We use a compressed version of the MPIDR (all 32 bits in one 32-bit word)
+> + * when we store the target MPIDR written by the guest.
+> + */
+> +static u32 compress_mpidr(unsigned long mpidr)
+> +{
+> +	u32 ret;
+> +
+> +	ret = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8;
+> +	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16;
+> +	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24;
+> +
+> +	return ret;
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+> +					      gpa_t addr, unsigned int len)
+> +{
+> +	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(vcpu);
+> +	int target_vcpu_id = vcpu->vcpu_id;
+> +	u64 value;
+> +
+> +	value = (u64)compress_mpidr(mpidr) << 32;
+> +	value |= ((target_vcpu_id & 0xffff) << 8);
+> +	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
+> +		value |= GICR_TYPER_LAST;
+> +
+> +	return extract_bytes(value, addr & 7, len);
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	u32 value;
+> +
+> +	value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+> +	return extract_bytes(value, addr & 3, len);
+> +}
+> +
+> +/*
+>   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+>   * redistributors, while SPIs are covered by registers in the distributor
+>   * block. Trying to set private IRQs in this block gets ignored.
+> @@ -127,9 +167,9 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> +		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+> -- 
+> 2.7.3
+> 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
