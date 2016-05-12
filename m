@@ -1,57 +1,50 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 12 May 2016 18:03:00 +0200
-Subject: [PATCH 0/4] add minimal bcm2835-sdram driver
-In-Reply-To: <527736177.22944.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
-References: <1463056732-5607-1-git-send-email-kernel@martin.sperl.org>
- <1861597197.20753.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
- <B30D094A-1E5A-4777-8F2A-C3D53AF89044@martin.sperl.org>
- <527736177.22944.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
-Message-ID: <9C676BB7-E96C-4526-B0FD-2D441C1200CC@martin.sperl.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 12 May 2016 21:39:50 +0530
+Subject: [RESEND PATCH v4 1/3] dmaengine: vdma: Add config structure to
+ differentiate dmas
+In-Reply-To: <1463046228-21651-2-git-send-email-appanad@xilinx.com>
+References: <1463046228-21651-1-git-send-email-appanad@xilinx.com>
+ <1463046228-21651-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20160512160950.GF2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 12.05.2016, at 17:55, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+On Thu, May 12, 2016 at 03:13:46PM +0530, Kedareswara rao Appana wrote:
+> This patch adds config structure in the driver to differentiate
+> AXI DMA's and to add more features(clock support etc..) to these DMA's.
 > 
-> Hi,
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+>  drivers/dma/xilinx/xilinx_vdma.c | 83 ++++++++++++++++++++++++----------------
+>  1 file changed, 51 insertions(+), 32 deletions(-)
 > 
->> Martin Sperl <kernel@martin.sperl.org> hat am 12. Mai 2016 um 17:28
->> geschrieben:
->> 
->> 
->> 
->>> On 12.05.2016, at 16:50, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->>> 
->>> Hi Martin,
->>> 
->>>> kernel at martin.sperl.org hat am 12. Mai 2016 um 14:38 geschrieben:
->>>> 
->>>> 
->>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>> 
->>>> As the sdram clock is a critical clock to the system
->>>> the minimal bcm2835-sdram driver claims (and enables)
->>>> this clock and also exposes the corresponding sdram
->>>> registers via debugfs.
->>> 
->>> sounds like this driver should fix an clock handling issue. Unfortunately
->>> this
->>> isn't a solution in case the driver is disabled.
->> Unfortunately there is no way around this - the driver has
->> to be enabled so that the sdram clock or the parent pll,
->> which typically is plld_core, never gets disabled.
->> 
->> The only other option would be marking the clock as critical
->> for those legacy drivers.
-> 
-> i would prefer this option. Since this would be more a fix we could get this
-> faster in, it's more clear why we are doing that and less to review.
-> 
-> Did i miss a drawback?
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+> index 626939b..1d50e05 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -342,6 +342,10 @@ struct xilinx_dma_chan {
+>  	void (*start_transfer)(struct xilinx_dma_chan *chan);
+>  };
+>  
+> +struct dma_config {
 
-We had long discussions already on that - and HAND_OFF did not make
-it into the kernel either.
+xilinx_dma_config ?
 
-I had hoped that this was simple enough.
+This makes reader believe that thismight be coething related to dmaengine
+core
 
-Martin
+>  static const struct of_device_id xilinx_dma_of_ids[] = {
+> -	{ .compatible = "xlnx,axi-dma-1.00.a",
+> -	  .data = (void *)XDMA_TYPE_AXIDMA },
+> -	{ .compatible = "xlnx,axi-cdma-1.00.a",
+> -	  .data = (void *)XDMA_TYPE_CDMA },
+> -	{ .compatible = "xlnx,axi-vdma-1.00.a",
+> -	  .data = (void *)XDMA_TYPE_VDMA },
+> +	{ .compatible = "xlnx,axi-dma-1.00.a", .data = &axidma_config },
+> +	{ .compatible = "xlnx,axi-cdma-1.00.a", .data = &axicdma_config },
+> +	{ .compatible = "xlnx,axi-vdma-1.00.a", .data = &axivdma_config },
+
+why do we want a struct for this and not pass XDMA_TYPE_xxx as .data
+
+-- 
+~Vinod
