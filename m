@@ -1,51 +1,69 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 12 May 2016 12:58:30 -0500
-Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
-In-Reply-To: <20160512061843.GA6187@chewinlnx07.qualcomm.com>
-References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
- <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
- <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
- <934365f2bd30f242d8548e2a27483679@codeaurora.org>
- <20160512051347.GE8453@hector.attlocal.net>
- <20160512061843.GA6187@chewinlnx07.qualcomm.com>
-Message-ID: <20160512175830.GA32019@hector>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Thu, 12 May 2016 11:03:17 -0700
+Subject: [PATCH 2/2] clk: rockchip: fix the rk3399 sdmmc sample shift
+In-Reply-To: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+Message-ID: <1463076197-15900-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 11:48:43AM +0530, Abhishek Sahu wrote:
-> On Thu, May 12, 2016 at 12:13:47AM -0500, Andy Gross wrote:
-> > On Wed, May 11, 2016 at 11:04:17PM +0530, Abhishek Sahu wrote:
-> > 
-> > <snip>
-> > 
-> > > >       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the
-> > > >end, when
-> > > >       there is no error. So would it be fine if we do it there
-> > > >unconditionally ?
-> > > >
-> > > >Regards,
-> > > > Sricharan
-> > > 
-> > > RESET the QUP state wouldn't create any issue in the case of multiple calls.
-> > > The existing code also RESET the QUP state for bus_err but it is not
-> > > clearing
-> > > status bits.
-> > 
-> > It'd be better to not reset the QUP inside the ISR at all.  I think the better
-> > solution is making the reset occur in the xfer function.  So just clear the bits
-> > like you should in the isr, and defer reset till later.
-> 
-> This is a HW workaround for QUP where we need to RESET the core in
-> ISR. When interrupt is level triggerd, more than one interrupt may
-> fire in error cases and QUP will generate these interrupts after
-> completion of current interrupt. Thus we reset the core immediately
-> in the ISR to ward off the next interrupt.
+Just like every other Rockhip device, the MMC "_sample" clocks should
+have a shift of 0, not a shift of 1.  The rk3399 TRM agrees.  Presumably
+these values were set to 0 because of a typo.
 
-I wonder if that was just an expedient solution.  And it seems like it could be
-a little racy as a poll is not being done to make sure the QUP state machine
-transitions to reset.  Is there any documentation/errata on this?  Or is this
-just from commit comments?
+Things _sorta_ would have worked with the incorrect sample phase shift
+because of the register layout but wouldn't have been ideal and we would
+have skipped lots of phases.  Also: we would never actually enabled the
+fine delay unless we happened to have 128 or more delay elements.
 
+This is expected behavior before this patch:
+* Try to set:     0 degrees +   1 delay elements
+  Actually get:   0 degrees +   0 delay elements
+* Try to set:    90 degrees +   0 delay elements
+  Actually get: 180 degrees +   0 delay elements
+* Try to set:   180 degrees +   0 delay elements
+  Actually get:   0 degrees +   0 delay elements
+* Try to set:   270 degrees +   0 delay elements
+  Actually get: 180 degrees +   0 delay elements
+* Try to set:     0 degrees + 129 delay elements
+  Actually get:   0 degrees +   2 delay elements
+* Try to set:   180 degrees + 129 delay elements
+  Actually get:   0 degrees +   3 delay elements
+* Try to set:     0 degrees + 130 delay elements
+  Actually get:   0 degrees +   4 delay elements
 
-Regards,
-Andy
+I verified that old code had a problem by turning on debug printouts and
+seeing that the old code would report this for one SD card I had:
+  Good phase range 347-101 (115 len)
+  Good phase range 202-326 (125 len)
+
+After my fix, it went down to one big good range for the same card.
+This is more expected:
+  Good phase range 189-1 (173 len)
+  Good phase range 82-85 (4 len)
+  Good phase range 166-168 (3 len)
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 291543f52caa..14ff3e109e1e 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -895,10 +895,10 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKGATE_CON(6), 1, GFLAGS),
+ 
+ 	MMC(SCLK_SDMMC_DRV,     "sdmmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
+-	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
++	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 0),
+ 
+ 	MMC(SCLK_SDIO_DRV,      "sdio_drv",    "clk_sdio",  RK3399_SDIO_CON0,  1),
+-	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  1),
++	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  0),
+ 
+ 	/* pcie */
+ 	COMPOSITE(SCLK_PCIE_PM, "clk_pcie_pm", mux_pll_src_cpll_gpll_npll_24m_p, 0,
+-- 
+2.8.0.rc3.226.g39d4020
