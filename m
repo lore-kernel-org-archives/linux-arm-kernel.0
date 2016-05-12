@@ -1,77 +1,131 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 May 2016 10:17:58 +0100
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <4989778.Fs81NJurjH@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <5842999.Zgpfq4gkVz@wuerfel>
- <20160511165900.GM3051@e104818-lin.cambridge.arm.com>
- <4989778.Fs81NJurjH@wuerfel>
-Message-ID: <20160512091758.GB11226@e104818-lin.cambridge.arm.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 12 May 2016 11:19:43 +0200
+Subject: [PATCH 0/5] clk: bcm2835: add flags for mash and parent clocks
+In-Reply-To: <877ff1yfg8.fsf@eliezer.anholt.net>
+References: <1462463608-22940-1-git-send-email-kernel@martin.sperl.org>
+ <87h9e6yb6i.fsf@eliezer.anholt.net> <57319C89.7040705@martin.sperl.org>
+ <877ff1yfg8.fsf@eliezer.anholt.net>
+Message-ID: <57344AAF.8000205@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 09:30:07PM +0200, Arnd Bergmann wrote:
-> On Wednesday 11 May 2016 17:59:01 Catalin Marinas wrote:
-> > On Wed, May 11, 2016 at 12:55:01PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 11 May 2016 11:04:38 Yury Norov wrote:
-> > > > On Wed, May 11, 2016 at 10:04:16AM +0800, Zhangjian (Bamvor) wrote:
-> > > > [...]
-> > > > 
-> > > > > >>Ok, I will test the ltp syscall test.
-> > > > > >>With this changes, the issue I mentioned should be fixed. But we still
-> > > > > >>use mmap2 syscall for ILP32 application when we pass the offset instead
-> > > > > >>of page offset. Is it correct?
-> > > > > >
-> > > > > >I don't remember. It's probably not important whether we have the shift
-> > > > > >in there, as long as it's independent of the actual kernel page size and
-> > > > > >user space and kernel agree on the calling conventions.
-> > > > > Well. I am ok with where to shift the pages size because we get the same
-> > > > > result. I was just thinking if we should get rid of the name of mmap2 in our
-> > > > > ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
-> > > > > if they do not know the implementations.
-> > > > > 
-> > > > 
-> > > > This is what generic unistd.h does. If you want to change it, you'd
-> > > > change each arch that uses generic unistd.h.
-> > > 
-> > > Generic unistd.h has this:
-> > > 
-> > > #ifdef __SYSCALL_COMPAT
-> > > #define __SC_COMP_3264(_nr, _32, _64, _comp) __SYSCALL(_nr, _comp)
-> > > #else
-> > > #define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
-> > > #endif
-> > > 
-> > > #define __NR3264_mmap 222
-> > > __SC_3264(__NR3264_mmap, sys_mmap2, sys_mmap)
-> > > 
-> > > 
-> > > #if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-> > > #define __NR_mmap __NR3264_mmap
-> > > #else
-> > > #define __NR_mmap2 __NR3264_mmap
-> > > #endif
-> > > 
-> > > So by default we get __NR_mmap2 and sys_mmap2 on 32-bit ABIs, but
-> > > __NR_mmap and sys_mmap on 64-bit ABIs, as it should be.
-> > > 
-> > > The problem is that arch/arm64/kernel/sys_ilp32.c now overrides
-> > > this to use __NR_mmap2 with sys_mmap, so we have a mismatch. I think
-> > > we should either override both the implementation and the number,
-> > > or neither of them.
-> > 
-> > I would vote for "neither of them" (so we use __NR_mmap2 and sys_mmap2)
-> > to keep it close to new 32-bit architectures, even though we would have
-> > some shifts by 12 in both glibc and kernel.
-> 
-> I don't think the shifts are a problem, the main downside would be
-> the limit to 44 bits of file offsets (16TB files), but it's also
-> unclear if that is a practical problem at all. If it is, we run
-> into the same problem on all other 32-bit architectures too.
 
-I hope people are seriously thinking of moving to an LP64 ABI if they
-have such large file offset needs.
 
--- 
-Catalin
+On 10.05.2016 19:45, Eric Anholt wrote:
+> Martin Sperl <kernel@martin.sperl.org> writes:
+>
+>> On 10.05.2016 03:05, Eric Anholt wrote:
+>>> kernel at martin.sperl.org writes:
+>>>
+>>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>>
+>>>> Allow flags to be set on a per clock index basis, which control:
+>>>> * the parent clocks selected when not setting clocks explicitly
+>>>
+>>> I don't think we need this other than avoiding PLLC.  What else do you
+>>> want to filter, and why?
+>> What about potentially disabling PLLA_per or PLLH_aux?
+>> Under some circumstances it may make sense to avoid those clocks.
+>> (or testdebug for that matter).
+>
+> PLLH and its descendents are only used by vc4, and the parent choice
+> done by this driver for pllh is correct.
+>
+> I don't know what you mean by "potentially disabling PLLA_PER".
+>
+> We don't expose the testdebug parents, because they're of no use to us.
+For all practical purposes we still have all the clocks as potential
+parents during automatic clock selection - and that includes:
+PLLA_PER, PLLH_AUX and TESTDEBUGX.
+
+Not all of them are enabled, but some are - so If I select an i2s 
+frequency of "3903125" then plla_per will get used with a divider of 2.
+
+>>>> * the clock mode with regards to integer only or higher order mash
+>>>
+>>> Please provide justification in the commit message explaining why there
+>>> is no obvious mash setting to just implement in clk-bcm2835.c, but that
+>>> that a better policy can be encoded in the DT.
+>>
+>> The normal fractional divider will vary the effective period length
+>> between int(div)/Fparent and (int(div)+1)/Fparent.
+>>
+>> So the device (say DAC or other) connected needs to support in
+>> principle Fparent/int(div) as a clock.
+>>
+>> But for higher order mash the HW will spread the period length between:
+>> (int(div)-3)/Fparent and (int(div)+4)/Fparent.
+>>
+>> This value may be outside of the frequencies supported by the attached
+>> HW. That is why mash is not enabled by default for mash clocks - only
+>> div.
+>>
+>> That is also why we need to have this configurable.
+>>
+>> Also obviously higher parent clock frequencies result in higher dividers
+>> for the same target-frequency. So the above effect is less dramatic
+>> when using plld_per (or pllc for that matter) compared to the main
+>> 19.2MHz oscillator, as for 32bit stereo audio at 96kHz (equivalent to
+>> 6144000Hz) in the first case we have a divider of 81.38 while for the
+>> second (osc) case we have a divider of 3.125.
+>>
+>> The use of mash3 is impossible for osc but the use of mash 2 would
+>> spread the frequencies between 9.6MHz (div=2) and 3.84MHz (div=5).
+>>
+>> For plld_per as parent using mash3 instead we get the range:
+>> 6410256.4Hz (div=78) and 5882352.9Hz (div=85), which is a much more
+>> acceptable range and should not impact the device that much.
+>>
+>> So enabling mash 3 by default is not in the best interest hence it is
+>> not done.
+>
+> It sounds like you're optimizing for reducing frequency spread.  That
+> sounds fairly easy to do in the parent-choice function.
+
+You misunderstand my argument here!
+
+I know that it may be automated, but you may have different devices
+connected to: i2s/pcm, pwm, gp and slim.
+
+Some of them need the audio spreading, while others need a stable
+waveform - as mentioned mash3 varies the period between:
+(divi-2)/fparent and (divi+4)/fparent in discrete steps
+For this the worsted case is a requested frequency that results
+in a divider between 4 and 5.
+
+Also some DAC require a STABLE clock waveform on i2s with
+specific requirements for ton/(ton+toff) between 40% and 60%,
+as they have their own internal PLL, while others do not need
+this kind of behavior and can handle variable period-length.
+But then these DAC still have a minimum period length, which we
+may not exceed.
+
+So making an automatic selection is not possible hence
+we need a means to configure the supported mash level
+to get the best results in all cases.
+
+>
+>> As a side note: selection of parent oscillator and corresponding mash
+>> may have distinct noise behavior on the same device, where for
+>> 32bit*2 at 48k it is the main oscillator with mash3 while the second best
+>> match would be pllc with mash2 - not mash3, which has the worsted SN
+>> from all tested!
+>
+> But PLLC continues to be unusable, since it's changed at runtime, and
+> evaluating its noise characteristics based on a snapshot of its
+> frequency doesn't make any sense.
+That was a general side note not necessarily related to PLLC.
+But this may be better handled by a generic clock driver
+similar to clk-fixed-factor.
+
+>
+>> This behavior obviously changes with different "target frequencies"
+>> so it may even be necessary to account for the different target
+>> frequencies.
+>
+> This is why encoding mash in the DT doesn't make any sense to me.  You
+> need a runtime policy for choosing the mash setting based on the
+> frequency requested, so let's figure out what policy we actually want.
+See the argument of different devices/DAC with different requirements.
+There is no way for any of this to work automatically and make every
+client happy.
