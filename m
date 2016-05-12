@@ -1,112 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 May 2016 18:22:03 +0100
-Subject: [PATCH v2] arm64: fix current_thread_info()->addr_limit setup
-In-Reply-To: <1463069163-374-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1463069163-374-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160512172203.GL11226@e104818-lin.cambridge.arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 12 May 2016 12:58:30 -0500
+Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
+In-Reply-To: <20160512061843.GA6187@chewinlnx07.qualcomm.com>
+References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+ <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
+ <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
+ <934365f2bd30f242d8548e2a27483679@codeaurora.org>
+ <20160512051347.GE8453@hector.attlocal.net>
+ <20160512061843.GA6187@chewinlnx07.qualcomm.com>
+Message-ID: <20160512175830.GA32019@hector>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 07:06:03PM +0300, Yury Norov wrote:
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 24ed037..fda75ce 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -138,7 +138,10 @@ typedef struct user_fpsimd_state elf_fpregset_t;
->   */
->  #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
->  
-> -#define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
-> +#define SET_PERSONALITY(ex) do {					\
-> +	clear_thread_flag(TIF_32BIT);					\
-> +	set_fs(TASK_SIZE_64);						\
-> +} while (0)
->  
->  #define ARCH_DLINFO							\
->  do {									\
-> @@ -181,7 +184,11 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
->  					 ((x)->e_flags & EF_ARM_EABI_MASK))
->  
->  #define compat_start_thread		compat_start_thread
-> -#define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
-> +#define COMPAT_SET_PERSONALITY(ex) do {					\
-> +	set_thread_flag(TIF_32BIT);					\
-> +	set_fs(TASK_SIZE_32);						\
-> +} while (0)
-> +
->  #define COMPAT_ARCH_DLINFO
->  extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
->  				      int uses_interp);
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 0685d74..5b269e6 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -60,7 +60,7 @@ extern int fixup_exception(struct pt_regs *regs);
->  #define KERNEL_DS	(-1UL)
->  #define get_ds()	(KERNEL_DS)
->  
-> -#define USER_DS		TASK_SIZE_64
-> +#define USER_DS		TASK_SIZE
+On Thu, May 12, 2016 at 11:48:43AM +0530, Abhishek Sahu wrote:
+> On Thu, May 12, 2016 at 12:13:47AM -0500, Andy Gross wrote:
+> > On Wed, May 11, 2016 at 11:04:17PM +0530, Abhishek Sahu wrote:
+> > 
+> > <snip>
+> > 
+> > > >       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the
+> > > >end, when
+> > > >       there is no error. So would it be fine if we do it there
+> > > >unconditionally ?
+> > > >
+> > > >Regards,
+> > > > Sricharan
+> > > 
+> > > RESET the QUP state wouldn't create any issue in the case of multiple calls.
+> > > The existing code also RESET the QUP state for bus_err but it is not
+> > > clearing
+> > > status bits.
+> > 
+> > It'd be better to not reset the QUP inside the ISR at all.  I think the better
+> > solution is making the reset occur in the xfer function.  So just clear the bits
+> > like you should in the isr, and defer reset till later.
+> 
+> This is a HW workaround for QUP where we need to RESET the core in
+> ISR. When interrupt is level triggerd, more than one interrupt may
+> fire in error cases and QUP will generate these interrupts after
+> completion of current interrupt. Thus we reset the core immediately
+> in the ISR to ward off the next interrupt.
 
-We can avoid the USER_DS change as long as SET_PERSONALITY updates the
-thread's addr_limit. There are very few explicit set_fs(USER_DS) calls
-and they are on the thread exit path (or exec).
+I wonder if that was just an expedient solution.  And it seems like it could be
+a little racy as a poll is not being done to make sure the QUP state machine
+transitions to reset.  Is there any documentation/errata on this?  Or is this
+just from commit comments?
 
-That's unless we try to make a generic set_fs(USER_DS) addition to
-something like setup_new_exec() and we wouldn't need the SET_PERSONALITY
-changes:
 
-diff --git a/fs/exec.c b/fs/exec.c
-index c4010b8207a1..54cc537f5986 100644
---- a/fs/exec.c
-+++ b/fs/exec.c
-@@ -1226,6 +1226,9 @@ EXPORT_SYMBOL(would_dump);
- 
- void setup_new_exec(struct linux_binprm * bprm)
- {
-+	/* set the address limit for the new executable */
-+	set_fs(USER_DS);
-+
- 	arch_pick_mmap_layout(current->mm);
- 
- 	/* This is the point of no return */
-
->  #define get_fs()	(current_thread_info()->addr_limit)
->  
->  static inline void set_fs(mm_segment_t fs)
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 8062482..2b25930 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -211,17 +211,13 @@ static void tls_thread_flush(void)
->  {
->  	asm ("msr tpidr_el0, xzr");
->  
-> -	if (is_compat_task()) {
-> -		current->thread.tp_value = 0;
-> -
-> -		/*
-> -		 * We need to ensure ordering between the shadow state and the
-> -		 * hardware state, so that we don't corrupt the hardware state
-> -		 * with a stale shadow state during context switch.
-> -		 */
-> -		barrier();
-> -		asm ("msr tpidrro_el0, xzr");
-> -	}
-> +	/*
-> +	 * We need to ensure ordering between the shadow state and the
-> +	 * hardware state, so that we don't corrupt the hardware state
-> +	 * with a stale shadow state during context switch.
-> +	 */
-> +	barrier();
-> +	asm ("msr tpidrro_el0, xzr");
->  }
-
-Why did you dropped tp_value initialisation? Context switching on native
-64-bit tasks rely on copying the tpidr_el0 in and out of tp_value.
-However, compat tasks use the read-only tpidrro_el0 register set
-explicitly via a system call. Until this call happens, the TLS register
-would contain some garbage after the thread has been switched back in.
-
--- 
-Catalin
+Regards,
+Andy
