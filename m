@@ -1,60 +1,78 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 12 May 2016 20:31:09 +0200
-Subject: [PATCH 2/2] musb: sunxi: Set state to A_WAIT_VRISE when enabling VBus
-In-Reply-To: <1463077869-13224-1-git-send-email-hdegoede@redhat.com>
-References: <1463077869-13224-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1463077869-13224-2-git-send-email-hdegoede@redhat.com>
+Date: Thu, 12 May 2016 20:31:08 +0200
+Subject: [PATCH 1/2] musb: sunxi: Add set_mode platform function
+Message-ID: <1463077869-13224-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the board is powering attached usb devices via the otg port
-sometimes / on some devices it takes slightly too long for the VBus
-detection code in phy-sun4i-usb.c to signal that VBus is high after
-enabling VBus and the musb hardware signals a MUSB_INTR_VBUSERROR
-interrupt.
-
-This commit sets the otg state to A_WAIT_VRISE upon enabling Vbus
-making musb_stage0_irq() ignore the first VBUSERR_RETRY_COUNT
-VBUSERROR interrupts, fixing connection issues in these cases.
+Move the mode handling to the platform_set_mode callback.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/usb/musb/sunxi.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/usb/musb/sunxi.c | 30 +++++++++++++++++++-----------
+ 1 file changed, 19 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 2c33d9b..2ee48fb 100644
+index fdab423..2c33d9b 100644
 --- a/drivers/usb/musb/sunxi.c
 +++ b/drivers/usb/musb/sunxi.c
-@@ -112,7 +112,7 @@ static void sunxi_musb_work(struct work_struct *work)
- 		if (test_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags)) {
- 			set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
- 			musb->xceiv->otg->default_a = 1;
--			musb->xceiv->otg->state = OTG_STATE_A_IDLE;
-+			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
- 			MUSB_HST_MODE(musb);
- 			devctl |= MUSB_DEVCTL_SESSION;
- 		} else {
-@@ -145,9 +145,10 @@ static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
- {
- 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+@@ -264,15 +264,6 @@ static int sunxi_musb_init(struct musb *musb)
+ 	if (ret)
+ 		goto error_unregister_notifier;
  
--	if (is_on)
-+	if (is_on) {
- 		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
--	else
-+		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
-+	} else
- 		clear_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+-	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
+-		ret = phy_power_on(glue->phy);
+-		if (ret)
+-			goto error_phy_exit;
+-		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+-		/* Stop musb work from turning vbus off again */
+-		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+-	}
+-
+ 	musb->isr = sunxi_musb_interrupt;
  
- 	schedule_work(&glue->work);
-@@ -325,6 +326,7 @@ static int sunxi_set_mode(struct musb *musb, u8 mode)
- 		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
- 		/* Stop musb work from turning vbus off again */
- 		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
-+		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
- 	}
+ 	/* Stop the musb-core from doing runtime pm (not supported on sunxi) */
+@@ -280,8 +271,6 @@ static int sunxi_musb_init(struct musb *musb)
  
  	return 0;
+ 
+-error_phy_exit:
+-	phy_exit(glue->phy);
+ error_unregister_notifier:
+ 	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
+ 		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+@@ -323,6 +312,24 @@ static int sunxi_musb_exit(struct musb *musb)
+ 	return 0;
+ }
+ 
++static int sunxi_set_mode(struct musb *musb, u8 mode)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++	int ret;
++
++	if (mode == MUSB_HOST) {
++		ret = phy_power_on(glue->phy);
++		if (ret)
++			return ret;
++
++		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
++		/* Stop musb work from turning vbus off again */
++		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++	}
++
++	return 0;
++}
++
+ static void sunxi_musb_enable(struct musb *musb)
+ {
+ 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+@@ -569,6 +576,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
+ 	.exit		= sunxi_musb_exit,
+ 	.enable		= sunxi_musb_enable,
+ 	.disable	= sunxi_musb_disable,
++	.set_mode	= sunxi_set_mode,
+ 	.fifo_offset	= sunxi_musb_fifo_offset,
+ 	.ep_offset	= sunxi_musb_ep_offset,
+ 	.busctl_offset	= sunxi_musb_busctl_offset,
 -- 
 2.7.4
