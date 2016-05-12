@@ -1,55 +1,326 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Thu, 12 May 2016 12:25:00 +0200
-Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
-In-Reply-To: <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
-References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
- <20160425115758.GA4874@lukather>
- <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
- <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
- <20160509090615.6272f8ca@erd979>
- <CACRpkdbZmL9Cqp-ubzyxd7fWUFOVsS1DCxsfG02kSpbWu_rbZQ@mail.gmail.com>
- <20160509161728.3aee1134@erd979>
- <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
-Message-ID: <20160512122500.11411882@erd979>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 12:26:30 +0200
+Subject: [PATCH v3 32/55] KVM: arm/arm64: vgic-new: Add GICv3 MMIO
+ handling framework
+In-Reply-To: <1462531568-9799-33-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-33-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512102630.GC27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 May 2016 16:27:00 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> On Mon, May 9, 2016 at 4:17 PM, Robin van der Gracht
-> <robin@protonic.nl> wrote:
-> > On Mon, 9 May 2016 15:19:26 +0200
-> > Linus Walleij <linus.walleij@linaro.org> wrote:
-> >  
-> >> On Mon, May 9, 2016 at 9:06 AM, Robin van der Gracht
-> >> <robin@protonic.nl> wrote:
-> >>  
-> >> > If you guys feel like auxdisplay is not the right subsystem for
-> >> > the driver, and would like me to move it, please share.  
-> >>
-> >> The best would be if you volunteer to maintain it and bring
-> >> it forward.  
-> >
-> > Thats fine. Would it suffice if I submit another patch adding myself
-> > to the maintainers file?  
+On Fri, May 06, 2016 at 11:45:45AM +0100, Andre Przywara wrote:
+> Create a new file called vgic-mmio-v3.c and describe the GICv3
+> distributor and redistributor registers there.
+> This adds a special macro to deal with the split of SGI/PPI in the
+> redistributor and SPIs in the distributor, which allows us to reuse
+> the existing GICv2 handlers for those registers which are compatible.
+> Also we provide a function to deal with the registration of the two
+> separate redistributor frames per VCPU.
 > 
-> That's half of it, if Miguel does not come back then his name
-> should be removed as the second step.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> ---
+> Changelog RFC..v1:
+> - adapt to new MMIO registration approach:
+>   register one device for the distributor and two for each VCPU
+> - implement special handling for private interrupts
+> - remove empty stub functions
+> - make IGROUPR return RAO
 > 
+> Changelog v1 .. v2:
+> - adapt to new framework, introduce vgic-mmio-v3.c
+> - remove userland register access functions (for now)
+> - precompute .len when describing a VGIC register
+> - add missed pointer incrementation on registering redist regions
+> - replace _nyi stub functions with raz/wi versions
+> 
+> Changelog v2 .. v3:
+> - replace inclusion of kvm/vgic/vgic.h with kvm/arm_vgic.h
+> - add prototype and stub code for vgic_register_redist_iodevs
+> - rename register struct variables _rdbase_ and _sgibase_
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 191 +++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.c    |   5 +
+>  virt/kvm/arm/vgic/vgic-mmio.h    |   2 +
+>  virt/kvm/arm/vgic/vgic.h         |   7 ++
+>  4 files changed, 205 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v3.c
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> new file mode 100644
+> index 0000000..06c7ec5
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -0,0 +1,191 @@
+> +/*
+> + * VGICv3 MMIO handling functions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/irqchip/arm-gic-v3.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <kvm/iodev.h>
+> +#include <kvm/arm_vgic.h>
+> +
+> +#include <asm/kvm_emulate.h>
+> +
+> +#include "vgic.h"
+> +#include "vgic-mmio.h"
+> +
+> +/*
+> + * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+> + * redistributors, while SPIs are covered by registers in the distributor
+> + * block. Trying to set private IRQs in this block gets ignored.
+> + * We take some special care here to fix the calculation of the register
+> + * offset.
+> + */
+> +#define REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(off, read_ops, write_ops, bpi) \
+> +	{								\
+> +		.reg_offset = off,					\
+> +		.bits_per_irq = bpi,					\
+> +		.len = (bpi * VGIC_NR_PRIVATE_IRQS) / 8,		\
+> +		.read = vgic_mmio_read_raz,				\
+> +		.write = vgic_mmio_write_wi,				\
+> +	}, {								\
+> +		.reg_offset = off + (bpi * VGIC_NR_PRIVATE_IRQS) / 8,	\
+> +		.bits_per_irq = bpi,					\
+> +		.len = (bpi * (1024 - VGIC_NR_PRIVATE_IRQS)) / 8,	\
+> +		.read = read_ops,					\
+> +		.write = write_ops,					\
+> +	}
+> +
+> +static const struct vgic_register_region vgic_v3_dist_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 16),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICENABLER,
+> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISPENDR,
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICACTIVER,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IPRIORITYR,
+> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ITARGETSR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICFGR,
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGRPMODR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 64),
+> +	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
+> +};
+> +
+> +static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
+> +};
+> +
+> +static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
+> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
+> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICENABLER0,
+> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ISPENDR0,
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICPENDR0,
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICACTIVER0,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IPRIORITYR0,
+> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 32),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICFGR0,
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IGRPMODR0,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_NSACR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +};
+> +
+> +unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+> +{
+> +	dev->regions = vgic_v3_dist_registers;
+> +	dev->nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
+> +
+> +	kvm_iodevice_init(&dev->dev, &kvm_io_gic_ops);
+> +
+> +	return SZ_64K;
+> +}
+> +
+> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+> +{
+> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+> +	struct kvm_vcpu *vcpu;
+> +	struct vgic_io_device *devices, *device;
+> +	int c, ret = 0;
+> +
+> +	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+> +			  GFP_KERNEL);
+> +	if (!devices)
+> +		return -ENOMEM;
+> +
+> +	device = devices;
+> +	kvm_for_each_vcpu(c, vcpu, kvm) {
+> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
+> +		device->base_addr = redist_base_address;
+> +		device->regions = vgic_v3_rdbase_registers;
+> +		device->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+> +		device->redist_vcpu = vcpu;
+> +
+> +		mutex_lock(&kvm->slots_lock);
+> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+> +					      redist_base_address,
+> +					      SZ_64K, &device->dev);
+> +		mutex_unlock(&kvm->slots_lock);
+> +
+> +		if (ret)
+> +			break;
+> +
+> +		device++;
+> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
+> +		device->base_addr = redist_base_address + SZ_64K;
+> +		device->regions = vgic_v3_sgibase_registers;
+> +		device->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
+> +		device->redist_vcpu = vcpu;
+> +
+> +		mutex_lock(&kvm->slots_lock);
+> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+> +					      redist_base_address + SZ_64K,
+> +					      SZ_64K, &device->dev);
+> +		mutex_unlock(&kvm->slots_lock);
+> +		if (ret) {
+> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> +						  &devices[c * 2].dev);
+> +			break;
+> +		}
+> +		device++;
+> +		redist_base_address += 2 * SZ_64K;
 
-First half is completed. I've added myself as maintainer for the
-driver I've posted recently (HT16K33 LED CONTROLLER DRIVER).
+while I think this whole thing is actually correct, I think it could
+have been much more clear by, in the beginning of the loop doing:
 
-According to MAINTAINERS, Miguel maintains:
- - CFAG12864B LCD DRIVER
- - CFAG12864BFB LCD FRAMEBUFFER DRIVER
- - KS0108 LCD CONTROLLER DRIVER
- - AUXILIARY DISPLAY DRIVERS
+	gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+	gpa_t sgi_base = rd_base + SZ_64K;
+	struct vgic_io_device *rd_dev = &devices[c];
+	struct vgic_io_device *sgi_dev = &devices[c + 1];
 
-AFAIK, I should not be judge in Miguels case.
+and then referring directly to these variables.
 
-@linus: I'll send my patches to Greg if you agree on this.
+> +	}
+> +
+> +	if (ret) {
+> +		for (c--; c >= 0; c--) {
 
-Kind regards,
-Robin van der Gracht
+holy dark mother of all that's evil; I think this is correct.
+
+> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> +						  &devices[c * 2].dev);
+> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> +						  &devices[c * 2 + 1].dev);
+
+do we really need this though?  Can't we just rely on KVM to tear down
+thew whole bus infrastructure as we're returning an error anyway?
+
+(have you looked at what the unregister_dev function does, it's full of
+kmallocs and other fun stuff).
+
+
+Thanks,
+-Christoffer
+
+> +		}
+> +		kfree(devices);
+> +	} else {
+> +		kvm->arch.vgic.redist_iodevs = devices;
+> +	}
+> +
+> +	return ret;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 19fed56..d1b88d2 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -502,6 +502,11 @@ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
+>  	case VGIC_V2:
+>  		len = vgic_v2_init_dist_iodev(io_device);
+>  		break;
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +	case VGIC_V3:
+> +		len = vgic_v3_init_dist_iodev(io_device);
+> +		break;
+> +#endif
+>  	default:
+>  		BUG_ON(1);
+>  	}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 884eb71..3585ac6 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -123,4 +123,6 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>  
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+> +unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
+> +
+>  #endif
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index cf62015..39a8a65 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -40,6 +40,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+>  void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+>  void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
+>  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
+> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -61,6 +62,12 @@ static inline void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
+>  static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+>  {
+>  }
+> +
+> +static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+> +					      gpa_t dist_base_address)
+> +{
+> +	return -ENODEV;
+> +}
+>  #endif
+>  
+>  #endif
+> -- 
+> 2.7.3
+> 
