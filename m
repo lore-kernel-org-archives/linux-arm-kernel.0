@@ -1,340 +1,117 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Thu, 12 May 2016 15:13:48 +0530
-Subject: [RESEND PATCH v4 3/3] dmaengine: vdma: Add clock support
-In-Reply-To: <1463046228-21651-1-git-send-email-appanad@xilinx.com>
-References: <1463046228-21651-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1463046228-21651-4-git-send-email-appanad@xilinx.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 10:49:16 +0100
+Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <5733C8F5.6090206@caviumnetworks.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
+ <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
+ <5733C8F5.6090206@caviumnetworks.com>
+Message-ID: <20160512094915.GD11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added basic clock support for axi dma's.
-The clocks are requested at probe and released at remove.
+On Wed, May 11, 2016 at 05:06:13PM -0700, David Daney wrote:
+> On 05/11/2016 03:39 AM, Catalin Marinas wrote:
+> >On Wed, Apr 27, 2016 at 11:07:15AM -0700, David Daney wrote:
+> >>+static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
+> >>+{
+> >>+	unsigned long madt_end, entry;
+> >>+	struct acpi_table_madt *madt;
+> >>+	acpi_size tbl_size;
+> >>+
+> >>+	if (ACPI_FAILURE(acpi_get_table_with_size(ACPI_SIG_MADT, 0,
+> >>+			(struct acpi_table_header **)&madt, &tbl_size)))
+> >>+		return -ENODEV;
+> >>+
+> >>+	entry = (unsigned long)madt;
+> >>+	madt_end = entry + madt->header.length;
+> >>+
+> >>+	/* Parse all entries looking for a match. */
+> >>+	entry += sizeof(struct acpi_table_madt);
+> >>+	while (entry + sizeof(struct acpi_subtable_header) < madt_end) {
+> >>+		struct acpi_subtable_header *header =
+> >>+			(struct acpi_subtable_header *)entry;
+> >>+
+> >>+		if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+> >>+			struct acpi_madt_generic_interrupt *gicc =
+> >>+				container_of(header,
+> >>+				struct acpi_madt_generic_interrupt, header);
+> >>+
+> >>+			if ((gicc->flags & ACPI_MADT_ENABLED) &&
+> >>+			    (gicc->uid == acpi_id)) {
+> >>+				*mpidr = gicc->arm_mpidr;
+> >>+				early_acpi_os_unmap_memory(madt, tbl_size);
+> >>+				return 0;
+> >>+			}
+> >>+		}
+> >>+		entry += header->length;
+> >>+	}
+> >>+
+> >>+	early_acpi_os_unmap_memory(madt, tbl_size);
+> >>+	return -ENODEV;
+> >>+}
+> >>+
+> >>+/* Callback for Proximity Domain -> ACPI processor UID mapping */
+> >>+void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
+> >>+{
+> >>+	int pxm, node;
+> >>+	u64 mpidr;
+> >>+
+> >>+	if (srat_disabled())
+> >>+		return;
+> >>+
+> >>+	if (pa->header.length < sizeof(struct acpi_srat_gicc_affinity)) {
+> >>+		pr_err("SRAT: Invalid SRAT header length: %d\n",
+> >>+			pa->header.length);
+> >>+		bad_srat();
+> >>+		return;
+> >>+	}
+> >>+
+> >>+	if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
+> >>+		return;
+> >>+
+> >>+	if (cpus_in_srat >= NR_CPUS) {
+> >>+		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
+> >>+			     NR_CPUS);
+> >>+		return;
+> >>+	}
+> >>+
+> >>+	pxm = pa->proximity_domain;
+> >>+	node = acpi_map_pxm_to_node(pxm);
+> >>+
+> >>+	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+> >>+		pr_err("SRAT: Too many proximity domains %d\n", pxm);
+> >>+		bad_srat();
+> >>+		return;
+> >>+	}
+> >>+
+> >>+	if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
+> >>+		pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
+> >>+			pxm, pa->acpi_processor_uid);
+> >>+		bad_srat();
+> >>+		return;
+> >>+	}
+> >
+> >I wonder whether you could replace the get_mpidr_in_madt() function with
+> >something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
+> >duplicates functionality already available elsewhere.
+> 
+> I just tried that, and it doesn't work.
+> 
+> The problem is that this code is being run very early in the boot, and
+> kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used
+> once we have working kmalloc.  We need to extract the NUMA information early
+> like this precisely because it is needed to initializing the slab system
+> 
+> Notice that we are using early_acpi_os_unmap_memory() et al. in
+> get_mpidr_in_madt() explicitly for this reason.
+> 
+> In summary: I don't think we need another revision of this patch, it is like
+> this for a good reason.
 
-Reviewed-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
- drivers/dma/xilinx/xilinx_vdma.c | 226 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 224 insertions(+), 2 deletions(-)
+Slightly confusing, in another reply you said you are going to address
+my comment. So, is it doable?
 
-diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-index 1d50e05..31ae528 100644
---- a/drivers/dma/xilinx/xilinx_vdma.c
-+++ b/drivers/dma/xilinx/xilinx_vdma.c
-@@ -44,6 +44,7 @@
- #include <linux/of_platform.h>
- #include <linux/of_irq.h>
- #include <linux/slab.h>
-+#include <linux/clk.h>
- 
- #include "../dmaengine.h"
- 
-@@ -344,6 +345,9 @@ struct xilinx_dma_chan {
- 
- struct dma_config {
- 	enum xdma_ip_type dmatype;
-+	int (*clk_init)(struct platform_device *pdev, struct clk **axi_clk,
-+			struct clk **tx_clk, struct clk **txs_clk,
-+			struct clk **rx_clk, struct clk **rxs_clk);
- };
- 
- /**
-@@ -355,7 +359,13 @@ struct dma_config {
-  * @has_sg: Specifies whether Scatter-Gather is present or not
-  * @flush_on_fsync: Flush on frame sync
-  * @ext_addr: Indicates 64 bit addressing is supported by dma device
-+ * @pdev: Platform device structure pointer
-  * @dma_config: DMA config structure
-+ * @axi_clk: DMA Axi4-lite interace clock
-+ * @tx_clk: DMA mm2s clock
-+ * @txs_clk: DMA mm2s stream clock
-+ * @rx_clk: DMA s2mm clock
-+ * @rxs_clk: DMA s2mm stream clock
-  */
- struct xilinx_dma_device {
- 	void __iomem *regs;
-@@ -365,7 +375,13 @@ struct xilinx_dma_device {
- 	bool has_sg;
- 	u32 flush_on_fsync;
- 	bool ext_addr;
-+	struct platform_device  *pdev;
- 	const struct dma_config *dma_config;
-+	struct clk *axi_clk;
-+	struct clk *tx_clk;
-+	struct clk *txs_clk;
-+	struct clk *rx_clk;
-+	struct clk *rxs_clk;
- };
- 
- /* Macros */
-@@ -1756,6 +1772,195 @@ static void xilinx_dma_chan_remove(struct xilinx_dma_chan *chan)
- 	list_del(&chan->common.device_node);
- }
- 
-+static int axidma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
-+			    struct clk **tx_clk, struct clk **rx_clk,
-+			    struct clk **sg_clk, struct clk **tmp_clk)
-+{
-+	int err;
-+
-+	*tmp_clk = NULL;
-+
-+	*axi_clk = devm_clk_get(&pdev->dev, "s_axi_lite_aclk");
-+	if (IS_ERR(*axi_clk)) {
-+		err = PTR_ERR(*axi_clk);
-+		dev_err(&pdev->dev, "failed to get axi_aclk (%u)\n", err);
-+		return err;
-+	}
-+
-+	*tx_clk = devm_clk_get(&pdev->dev, "m_axi_mm2s_aclk");
-+	if (IS_ERR(*tx_clk))
-+		*tx_clk = NULL;
-+
-+	*rx_clk = devm_clk_get(&pdev->dev, "m_axi_s2mm_aclk");
-+	if (IS_ERR(*rx_clk))
-+		*rx_clk = NULL;
-+
-+	*sg_clk = devm_clk_get(&pdev->dev, "m_axi_sg_aclk");
-+	if (IS_ERR(*sg_clk))
-+		*sg_clk = NULL;
-+
-+	err = clk_prepare_enable(*axi_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable axi_clk (%u)\n", err);
-+		return err;
-+	}
-+
-+	err = clk_prepare_enable(*tx_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
-+		goto err_disable_axiclk;
-+	}
-+
-+	err = clk_prepare_enable(*rx_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable rx_clk (%u)\n", err);
-+		goto err_disable_txclk;
-+	}
-+
-+	err = clk_prepare_enable(*sg_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable sg_clk (%u)\n", err);
-+		goto err_disable_rxclk;
-+	}
-+
-+	return 0;
-+
-+err_disable_rxclk:
-+	clk_disable_unprepare(*rx_clk);
-+err_disable_txclk:
-+	clk_disable_unprepare(*tx_clk);
-+err_disable_axiclk:
-+	clk_disable_unprepare(*axi_clk);
-+
-+	return err;
-+}
-+
-+static int axicdma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
-+			    struct clk **dev_clk, struct clk **tmp_clk,
-+			    struct clk **tmp1_clk, struct clk **tmp2_clk)
-+{
-+	int err;
-+
-+	*tmp_clk = NULL;
-+	*tmp1_clk = NULL;
-+	*tmp2_clk = NULL;
-+
-+	*axi_clk = devm_clk_get(&pdev->dev, "s_axi_lite_aclk");
-+	if (IS_ERR(*axi_clk)) {
-+		err = PTR_ERR(*axi_clk);
-+		dev_err(&pdev->dev, "failed to get axi_clk (%u)\n", err);
-+		return err;
-+	}
-+
-+	*dev_clk = devm_clk_get(&pdev->dev, "m_axi_aclk");
-+	if (IS_ERR(*dev_clk)) {
-+		err = PTR_ERR(*dev_clk);
-+		dev_err(&pdev->dev, "failed to get dev_clk (%u)\n", err);
-+		return err;
-+	}
-+
-+	err = clk_prepare_enable(*axi_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable axi_clk (%u)\n", err);
-+		return err;
-+	}
-+
-+	err = clk_prepare_enable(*dev_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable dev_clk (%u)\n", err);
-+		goto err_disable_axiclk;
-+	}
-+
-+	return 0;
-+
-+err_disable_axiclk:
-+	clk_disable_unprepare(*axi_clk);
-+
-+	return err;
-+}
-+
-+static int axivdma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
-+			    struct clk **tx_clk, struct clk **txs_clk,
-+			    struct clk **rx_clk, struct clk **rxs_clk)
-+{
-+	int err;
-+
-+	*axi_clk = devm_clk_get(&pdev->dev, "s_axi_lite_aclk");
-+	if (IS_ERR(*axi_clk)) {
-+		err = PTR_ERR(*axi_clk);
-+		dev_err(&pdev->dev, "failed to get axi_aclk (%u)\n", err);
-+		return err;
-+	}
-+
-+	*tx_clk = devm_clk_get(&pdev->dev, "m_axi_mm2s_aclk");
-+	if (IS_ERR(*tx_clk))
-+		*tx_clk = NULL;
-+
-+	*txs_clk = devm_clk_get(&pdev->dev, "m_axis_mm2s_aclk");
-+	if (IS_ERR(*txs_clk))
-+		*txs_clk = NULL;
-+
-+	*rx_clk = devm_clk_get(&pdev->dev, "m_axi_s2mm_aclk");
-+	if (IS_ERR(*rx_clk))
-+		*rx_clk = NULL;
-+
-+	*rxs_clk = devm_clk_get(&pdev->dev, "s_axis_s2mm_aclk");
-+	if (IS_ERR(*rxs_clk))
-+		*rxs_clk = NULL;
-+
-+	err = clk_prepare_enable(*axi_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable axi_clk (%u)\n", err);
-+		return err;
-+	}
-+
-+	err = clk_prepare_enable(*tx_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable tx_clk (%u)\n", err);
-+		goto err_disable_axiclk;
-+	}
-+
-+	err = clk_prepare_enable(*txs_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable txs_clk (%u)\n", err);
-+		goto err_disable_txclk;
-+	}
-+
-+	err = clk_prepare_enable(*rx_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable rx_clk (%u)\n", err);
-+		goto err_disable_txsclk;
-+	}
-+
-+	err = clk_prepare_enable(*rxs_clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable rxs_clk (%u)\n", err);
-+		goto err_disable_rxclk;
-+	}
-+
-+	return 0;
-+
-+err_disable_rxclk:
-+	clk_disable_unprepare(*rx_clk);
-+err_disable_txsclk:
-+	clk_disable_unprepare(*txs_clk);
-+err_disable_txclk:
-+	clk_disable_unprepare(*tx_clk);
-+err_disable_axiclk:
-+	clk_disable_unprepare(*axi_clk);
-+
-+	return err;
-+}
-+
-+static void xdma_disable_allclks(struct xilinx_dma_device *xdev)
-+{
-+	clk_disable_unprepare(xdev->rxs_clk);
-+	clk_disable_unprepare(xdev->rx_clk);
-+	clk_disable_unprepare(xdev->txs_clk);
-+	clk_disable_unprepare(xdev->tx_clk);
-+	clk_disable_unprepare(xdev->axi_clk);
-+}
-+
- /**
-  * xilinx_dma_chan_probe - Per Channel Probing
-  * It get channel features from the device tree entry and
-@@ -1899,14 +2104,17 @@ static struct dma_chan *of_dma_xilinx_xlate(struct of_phandle_args *dma_spec,
- 
- static const struct dma_config axidma_config = {
- 	.dmatype = XDMA_TYPE_AXIDMA,
-+	.clk_init = axidma_clk_init,
- };
- 
- static const struct dma_config axicdma_config = {
- 	.dmatype = XDMA_TYPE_CDMA,
-+	.clk_init = axicdma_clk_init,
- };
- 
- static const struct dma_config axivdma_config = {
- 	.dmatype = XDMA_TYPE_VDMA,
-+	.clk_init = axivdma_clk_init,
- };
- 
- static const struct of_device_id xilinx_dma_of_ids[] = {
-@@ -1925,6 +2133,9 @@ MODULE_DEVICE_TABLE(of, xilinx_dma_of_ids);
-  */
- static int xilinx_dma_probe(struct platform_device *pdev)
- {
-+	int (*clk_init)(struct platform_device *, struct clk **, struct clk **,
-+			struct clk **, struct clk **, struct clk **)
-+					= axivdma_clk_init;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct xilinx_dma_device *xdev;
- 	struct device_node *child, *np = pdev->dev.of_node;
-@@ -1942,10 +2153,17 @@ static int xilinx_dma_probe(struct platform_device *pdev)
- 		const struct of_device_id *match;
- 
- 		match = of_match_node(xilinx_dma_of_ids, np);
--		if (match && match->data)
-+		if (match && match->data) {
- 			xdev->dma_config = match->data;
-+			clk_init = xdev->dma_config->clk_init;
-+		}
- 	}
- 
-+	err = clk_init(pdev, &xdev->axi_clk, &xdev->tx_clk, &xdev->txs_clk,
-+		       &xdev->rx_clk, &xdev->rxs_clk);
-+	if (err)
-+		return err;
-+
- 	/* Request and map I/O memory */
- 	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	xdev->regs = devm_ioremap_resource(&pdev->dev, io);
-@@ -2018,7 +2236,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
- 	for_each_child_of_node(node, child) {
- 		err = xilinx_dma_chan_probe(xdev, child);
- 		if (err < 0)
--			goto error;
-+			goto disable_clks;
- 	}
- 
- 	if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-@@ -2042,6 +2260,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+disable_clks:
-+	xdma_disable_allclks(xdev);
- error:
- 	for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
- 		if (xdev->chan[i])
-@@ -2069,6 +2289,8 @@ static int xilinx_dma_remove(struct platform_device *pdev)
- 		if (xdev->chan[i])
- 			xilinx_dma_chan_remove(xdev->chan[i]);
- 
-+	xdma_disable_allclks(xdev);
-+
- 	return 0;
- }
- 
 -- 
-2.1.1
+Catalin
