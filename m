@@ -1,40 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 May 2016 16:39:35 -0700
-Subject: [PATCHv2 00/28] ARM: OMAP2+: hwmod module clock type support
-In-Reply-To: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
-References: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20160512233935.GN3492@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 May 2016 01:41:11 +0200
+Subject: [PATCH 1/2] Revert "clk: rockchip: reset init state before mmc
+ card initialization"
+In-Reply-To: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+Message-ID: <2083095.luTHhmZ9EO@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14, Tero Kristo wrote:
-> Hi,
-> 
-> v2 contains following changes in comparison to v1:
-> 
-> - Patch ordering changed a bit, clk/ti, mach-omap2, dts patches are now
->   mostly grouped together, with the exception of the introduction of
->   clock helper API, which is needed by everything else. Please note
->   that the ordering must be preserved between mach-omap2/clk-driver/dts
->   to avoid boot problems.
-> - Dropped hwmod data removal patches for now, this allows booting with
->   either new or old DTS data.
-> - Fixed a typo in the hwmod clock driver timeout handling, the comparison
->   for timeout against ktime_us_delta was wrong causing too short
->   timeouts, this was apparent with cpuidle enabled on OMAP4
-> - Added patch #6 to fetch hwmod main clock based on the hwmod name itself,
->   if found, ignore main_clk / clkctrl setup for the hwmod
-> - Added patch #7 to fix issue in omap2 timer caused by patch #6, with
->   dynamic parsing of main clock, the hwmod must be setup before attempting
->   to access main_clk.
+Am Donnerstag, 12. Mai 2016, 11:03:16 schrieb Douglas Anderson:
 
-What's the general design goal of this series? This cover letter
-is more like a change and test log instead of an overall argument
-for why the series should be merged so I'm left to piecing
-together the commit text from the 28 different patches. I suspect
-it's to get rid of DT_CLK macros and do something with hwmod in a
-more generic way, but that's all I got.
+Not sure what the policy is for revert-subjects in the clock-tree, but I 
+guess
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+clk: rockchip: Revert "reset init state before mmc card initialization"
+
+might look nicer?
+
+> This reverts commit 7a03fe6f48f3 ("clk: rockchip: reset init state
+> before mmc card initialization").
+
+I've tested these two patches together with the dw_mmc one and everything 
+that worked before still works (tuning on veyron-jerry) and everything that 
+didn't work still doesn't work (tuning on firefly [likely a regulator issue]).
+
+And re-checking the code against the TRM I now also see the mask that is to 
+short (1 bit in the code vs. the actual 2 bits described in the manual)
+
+[...]
+
+> 1. Just this revert: likely will fix rk3288-veyron eMMC on some devices
+>    + other cases; might break someone with a strange bootloader that
+>    sets the phase to 0 or one that uses delay elements (pretty
+>    unpredicable what would happen in that case).
+> 2. Just dw_mmc patch: fixes everyone.  Effectly the dw_mmc patch will
+>    totally override the broken patch and fix everything.
+> 3. Both patches: fixes everyone.  Once dw_mmc is initting properly then
+>    any defaults from the clock code doesn't mattery.
+
+I'm still trying to make up my mind on how to proceed - aka in which order 
+patches should get picked up.
+
+Going with the "if it isn't upstream it doesn't exist" mantra Rob wrote 
+somewhere some days ago, taking this revert should not hurt anything, as all 
+the non-veyron devices currently don't support any tuning at all.
+
+So I'd think except for the issue Shawn was originally trying to fix (for 
+some non-mainline board?) it should be possible to take this patch any time 
+independently of the dw_mmc part.
+
+If Stephen or Mike want to do this directly, this is
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+> Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card
+> initialization")
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
