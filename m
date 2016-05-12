@@ -1,125 +1,79 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 12 May 2016 10:06:11 -0400
-Subject: [RFC] Reset pins of phys and their representation in a device tree
-In-Reply-To: <CAGb2v64=iEA4VS3r4-ctVR6OKu_rRbiZytDtuQJ_LDr8JPq0Pg@mail.gmail.com>
-References: <20160512071542.GC30822@pengutronix.de>
- <e75ab3a0-da5e-fef1-d5e1-65c37e7714eb@cogentembedded.com>
- <CABxcv==YQshEvUw2a91nqjqrT3JU52Yzy4RbcWiTS-nWMf2m=Q@mail.gmail.com>
- <CAGb2v64=iEA4VS3r4-ctVR6OKu_rRbiZytDtuQJ_LDr8JPq0Pg@mail.gmail.com>
-Message-ID: <CABxcv=maDoyayE3HaxXsvBhHS5GEQuMD0F7nRONKoFuEaXOZFQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 15:07:35 +0100
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160512134431.GB30205@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+ <20160512134431.GB30205@yury-N73SV>
+Message-ID: <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ChenYu
+On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
+> On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
+> > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > > I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > > of vector, and kernel reports successful read/write.
+> > > 
+> > > There are 2 problems:
+> > > 1. How kernel allows such address to be passed to fs subsystem;
+> > > 2. How fs successes to read/write at non-mapped, and in fact non-user
+> > > address.
+> > > 
+> > > I don't know the answer on 2'nd question, and it might be something
+> > > generic. But I investigated first problem.
+> > > 
+> > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+> > > validate user address, and on arm64 it ends up with checking buffer
+> > > end against current_thread_info()->addr_limit.
+> > > 
+> > > current_thread_info()->addr_limit for ilp32, and most probably for
+> > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+> > > It happens because on thread creation we call flush_old_exec() to set 
+> > > addr_limit, and completely ignore compat mode there.
 
-On Thu, May 12, 2016 at 9:49 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi,
->
-> On Thu, May 12, 2016 at 9:40 PM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
->> [adding Krzysztof as cc]
->>
->> On Thu, May 12, 2016 at 8:25 AM, Sergei Shtylyov
->> <sergei.shtylyov@cogentembedded.com> wrote:
->>> Hello.
->>>
->>>
->>> On 5/12/2016 10:15 AM, Uwe Kleine-K?nig wrote:
->>>
->>>> I have a machine here where the reset pin of the phy is connected to a
->>>> GPIO.
->>>>
->>>> There are different possibilities available today to handle this
->>>> situation, here are the ones I'm aware of:
->>>>
->>>>  - Use a gpio-hog to set the reset gpio to non-active
->>>>    This might result in dependency problems (and that's what I am
->>>>    currently faced with) because there is no connection in the device
->>>>    tree between the hog and the phy.
->>>>
->>>>  - [Documentation/devicetree/bindings/net/fsl-fec.txt]
->>>>    The fec node supports properties
->>>>
->>>>         phy-reset-gpios = <&gpio2 14 0>;
->>>>         phy-reset-duration = <200> /* milliseconds */;
->>>>
->>>>    Something similar exists in TI's vendor kernel
->>>>
->>>> (http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/17d192b999ee904ced223c16cef76111a51c461b)
->>>>    with different (and IMHO bader) naming.
->>>>    This is the wrong place to specify the gpios; they shouldn't be in the
->>>>    mac's node, but in a phy node instead.
->>>>
->>>> So what I actually want is to put the gpio specification in the right
->>>> place and let it look as follows:
->>>>
->>>>         mymdiobus {
->>>>                 [...]
->>>>                 myfirstphy: ethernet-phy at 0 {
->>>>                         compatible = "ethernet-phy-ieee802.3-c22";
->>>>                         reg = <0>;
->>>>
->>>>                         reset-gpios = <&gpio2 14 0>;
->>>>                         reset-duration-ms = <200>;
->>>>                 };
->>>>
->>>>                 mysecondphy: ethernet-phy at 2 {
->>>>                         compatible = "ethernet-phy-ieee802.3-c22";
->>>>                         reg = <2>;
->>>>
->>>>                         reset-gpios = <&gpio3 10 0>;
->>>>                         reset-duration-ms = <200>;
->>>>                 };
->>>>         };
->>>>
->>>> And with this we could defer probe of &myfirstphy if &gpio2 isn't
->>>> available yet.
->>>>
->>>> Does this sound sensible? Does something like that already exist which I
->>>> missed? Any further ideas/comments?
->>>
->>>
->>> http://patchwork.ozlabs.org/patch/616495/
->>>
->>>    I'll post a new version RSN.
->>>
->>
->> This seems to be similar to what's needed by MMC/SD/SDIO devices (i.e:
->> a WiFi chip) that needs some power sequence for reset and be
->> enumerable.
->>
->> Krzysztof has been working  to make the MMC pwrseq framework more
->> generic [0] since he wants to use it also for built-in USB devices.
->>
->> From a quick look at the patches mentioned in this thread, it seems
->> that the same framework can be used to reset the PHYs unless I'm
->> missing something. Have you considered using this? It would be good if
->> there is a consistent way to define the power sequence for devices
->> across the different subsystems.
->>
->> [0]: https://lkml.org/lkml/2016/5/5/230
->
-> You probably missed the part that Rob nacked the bindings in that
-> series?
->
+[...]
 
-No, I didn't miss that. AFAICT the way forward is still being
-discussed as you can see from the last email in that thread from Ulf
-[0].
+> > > --- a/arch/arm64/kernel/binfmt_elf32.c
+> > > +++ b/arch/arm64/kernel/binfmt_elf32.c
+> > > @@ -12,6 +12,7 @@
+> > >  do {						\
+> > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> > >  	set_thread_flag(TIF_32BIT);		\
+> > > +	set_fs(TASK_SIZE_32);			\
+> > >  } while (0)
+> > >  
+> > >  #define COMPAT_ARCH_DLINFO
+> > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> > > index a934fd4..a8599c6 100644
+> > > --- a/arch/arm64/kernel/binfmt_ilp32.c
+> > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
+> > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+> > >  do {									\
+> > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
+> > >  	clear_thread_flag(TIF_32BIT);					\
+> > > +	set_fs(TASK_SIZE_32);						\
+> > >  } while (0)
+> > 
+> > I don't think we need these two. AFAICT, flush_old_exec() takes care of
+> > setting the USER_DS for the new thread.
+> 
+> That's true, but USER_DS depends on personality which is not set yet
+> for new thread, as I wrote above. In fact, I tried correct USER_DS
+> only, and it doesn't work
 
-And yes, the DT bindings is likely to change (keeping the backward
-compat for MMC) which is good,  but still the power sequence
-management code can be reused across subsystems.
+Ah, it looks like load_elf_binary() sets the personality after
+flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
+maximum 64-bit task value, so they should have a similar issue with
+native 32-bit vs compat behaviour.
 
-> Putting the reset gpios under the PHY nodes and handling it from
-> phylib is probably the way to go. I'd like to ask for regulator
-> and clock support as well, if possible.
->
+So what exactly is LTP complaining about? Is different error (like
+EFAULT vs EINVAL) or not getting an error at all.
 
-A GPIO array, clock and regulator (after Krzysztof patch) is already
-supported by the pwrseq_simple provider for example.
+(I need to update my LTP, the preadv tests appeared in December last
+year)
 
-> Regards
-> ChenYu
-
-[0]: https://lkml.org/lkml/2016/5/10/320
+-- 
+Catalin
