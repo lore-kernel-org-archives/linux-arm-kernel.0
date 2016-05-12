@@ -1,92 +1,79 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Thu, 12 May 2016 23:07:34 +0800
-Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
-In-Reply-To: <5733D7AA.1060500@rock-chips.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
- <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
- <5733D7AA.1060500@rock-chips.com>
-Message-ID: <57349C36.4030401@rock-chips.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 12 May 2016 16:08:31 +0100
+Subject: [PATCH v3 17/55] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
+ framework
+In-Reply-To: <20160512114651.GB2370@cbox>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
+ <20160512114651.GB2370@cbox>
+Message-ID: <57349C6F.8050406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug?
+Hi,
 
-? 2016/5/12 9:08, David.Wu ??:
-> Hi Doug,
->
-> ? 2016/5/12 1:37, Doug Anderson ??:
->> Hi,
+On 12/05/16 12:46, Christoffer Dall wrote:
+> On Fri, May 06, 2016 at 11:45:30AM +0100, Andre Przywara wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
 >>
->> On Tue, May 10, 2016 at 12:31 PM, David Wu <david.wu@rock-chips.com>
->> wrote:
->>>   static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long
->>> clk_rate)
->>>   {
->>>          struct i2c_timings *t = &i2c->t;
->>>          struct rk3x_i2c_calced_timings calc;
->>>          u64 t_low_ns, t_high_ns;
->>> +       u32 val;
->>>          int ret;
->>>
->>> -       ret = rk3x_i2c_calc_divs(clk_rate, t, &calc);
->>> +       ret = i2c->soc_data->calc_timings(clk_rate, t, &calc);
->>>          WARN_ONCE(ret != 0, "Could not reach SCL freq %u",
->>> t->bus_freq_hz);
->>>
->>> -       clk_enable(i2c->clk);
->>> +       clk_enable(i2c->pclk);
->>> +
->>>          i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low &
->>> 0xffff),
->>>                     REG_CLKDIV);
->>> -       clk_disable(i2c->clk);
->>> +
->>> +       val = i2c_readl(i2c, REG_CON);
->>> +       val &= ~REG_CON_TUNING_MASK;
->>> +       val |= calc.tuning;
->>> +       i2c_writel(i2c, val, REG_CON);
+>> Implement the framework for syncing IRQs between our emulation and
+>> the list registers, which represent the guest's view of IRQs.
+>> This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
+>> which gets called on guest entry and exit.
+>> The code talking to the actual GICv2/v3 hardware is added in the
+>> following patches.
 >>
->> Another subtle bug here.  You need to be holding the spinlock here
->> since you're doing a read-modify-write of a register that is also
->> touched by the interrupt handler.  We never needed it before because
->> the previous register update wasn't touched by anyone else and it was
->> a single atomic write.
->>
->> Also: technically if we are midway through a transfer when all this
->> happens then there will be a very short period of time when the two
->> timing-related registers won't match with each other.  I have no idea
->> how much that would matter, but in the very least it seems wise to
->> minimize the time where they mismatch.  So I'd probably write:
->>
->>         spin_lock_irqsave(&i2c->lock, flags);
->>         val = i2c_readl(i2c, REG_CON);
->>         val &= ~REG_CON_TUNING_MASK;
->>         val |= calc.tuning;
->>         i2c_writel(i2c, val, REG_CON);
->>         i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
->>                    REG_CLKDIV);
->>         spin_unlock_irqrestore(&i2c->lock, flags);
->>
->> ...if we really end up with on a system with a dynamically changing
->> clock that uses the new-style timing and we see real problems, we can
->> always try to come up with a way to avoid any problems.  Sound OK?
->>
->>
->
-> Good, add spin_lock is very necessary for atomic write here, thanks for
-> your advice.
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+> 
+> [...]
+> 
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index 4fb20fd..c6f8b9b 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+> 
+> [...]
+> 
+>> +
+>> +/* Requires the VCPU's ap_list_lock to be held. */
+>> +static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +	struct vgic_irq *irq;
+>> +	int count = 0;
+>> +
+>> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+>> +
+>> +	if (unlikely(!vcpu->kvm->arch.vgic.enabled))
+>> +		goto out_clean;
+> 
+> 
+> I know I said I reviewed this, but thinking about this more carefully,
+> doesn't the enable bit actually tell us if forwarding of pending
+> interrupts is enabled, but not whether or not the vgic exists?
+> 
+> So you could imagine a guest that turns off the GIC, but still has
+> active interrupts that it wants to disable/EOI, in the case of
+> shutdown/reboot for example, or is this architecturally not allowed?
 
-I also found a subtle bug, it would clean the con register by use 
-"i2c_writel(i2c, 0, REG_CON)" in rk3x_i2c_stop(). So i think it would be 
-fixed by using read-modify-write way here in next version.
+I guess you are right, the spec talks only about GICD.CTLR[Enable]
+controlling the forwarding of pending interrupts to the CPU interface.
+If you don't want interrupts at all, I guess you disable the CPU interface.
 
->
->> Otherwise, I think things look good to me.  Caesar's comments would
->> also be good to fix.
->>
->>
->> -Doug
->>
->>
->>
+So we just don't put pending IRQs in the LR, but only active ones.
+I am coding this right now.
+
+Cheers,
+Andre
+
+> 
+> If it is, then we should, at least theoretically, still forward active
+> interrupts in LRs despite the enabled bit being clear, but modify the
+> oracle to take the global enable bit into account.
+> 
+> Thanks,
+> -Christoffer
