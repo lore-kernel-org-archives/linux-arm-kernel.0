@@ -1,59 +1,86 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 12 May 2016 20:16:25 +0800
-Subject: [PATCH v3 0/2] arm64: mm: Enhance Virtual kernel memory layout
-In-Reply-To: <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1463055387-19289-1-git-send-email-wangkefeng.wang@huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 14:12:26 +0200
+Subject: [PATCH v3 35/55] KVM: arm/arm64: vgic-new: Add GICv3 IDREGS
+ register handler
+In-Reply-To: <1462531568-9799-36-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-36-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512121226.GF27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a micro enhance for Virtual kernel memory layout. Show bss info,
-and make each line with single pr_cont().
+On Fri, May 06, 2016 at 11:45:48AM +0100, Andre Przywara wrote:
+> We implement the only one ID register that is required by the
+> architecture, also this is the one that Linux actually checks.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 20 ++++++++++++++++++--
+>  1 file changed, 18 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index d137242..48fba9c 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -110,6 +110,22 @@ static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+>  	return extract_bytes(value, addr & 3, len);
+>  }
+>  
+> +static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+> +					      gpa_t addr, unsigned int len)
+> +{
+> +	u32 regnr = (addr & 0x3f) - (GICD_IDREGS & 0x3f);
 
-With this patchset,
+this regnr thing is confusing, because it's not an index, it's an
+address offset.
 
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
-[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
-[    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008755000   (  6996 KB)
-[    0.000000]     .rodata : 0xffffff8008755000 - 0xffffff8008a3d000   (  2976 KB)
-[    0.000000]       .init : 0xffffff8008a3d000 - 0xffffff8008b09000   (   816 KB)
-[    0.000000]       .data : 0xffffff8008b09000 - 0xffffff8008ba6800   (   630 KB)
-[    0.000000]        .bss : 0xffffff8008ba6800 - 0xffffff8008be3738   (   244 KB)
-[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-[    0.000000]               0xffffffbdc0000000 - 0xffffffbdc8000000   (   128 MB actual)
-[    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
-[    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
-[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc200000000   (  8192 MB)
+why can't you do:
 
-Before,
+	switch (addr & 0xffff) {
+	case GICD_PIDR2:
+	}
 
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
-[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
-[    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008753000   (  6988 KB)
-    .rodata : 0xffffff8008753000 - 0xffffff8008a3a000   (  2972 KB)
-      .init : 0xffffff8008a3a000 - 0xffffff8008b06000   (   816 KB)
-      .data : 0xffffff8008b06000 - 0xffffff8008ba2400   (   625 KB)
-[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-              0xffffffbdc0000000 - 0xffffffbdc8000000   (   128 MB actual)
-[    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
-[    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
-[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc200000000   (  8192 MB)
 
-Changes since v2:
-- Add tested/ack by James Morse.
-- Remove restrictive printing, keep the same as mm/dump.c.
-
-Changes since v1:
-- Drop vector info and spilt the patch, suggested by James Morse.
-
-Kefeng Wang (2):
-  arm64: mm: make pr_cont() per line in Virtual kernel memory layout
-  arm64: mm: Show bss segment in kernel memory layout
-
- arch/arm64/mm/init.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
-
--- 
-2.6.0.GIT
+> +	u32 reg = 0;
+> +
+> +	switch (regnr + GICD_IDREGS) {
+> +	case GICD_PIDR2:
+> +		/* report a GICv3 compliant implementation */
+> +		reg = 0x3b;
+> +		break;
+> +	}
+> +
+> +	return extract_bytes(reg, addr & 3, len);
+> +}
+> +
+>  /*
+>   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+>   * redistributors, while SPIs are covered by registers in the distributor
+> @@ -160,7 +176,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 64),
+>  	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
+> +		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48),
+>  };
+>  
+>  static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+> @@ -175,7 +191,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
+> +		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48),
+>  };
+>  
+>  static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+> -- 
+> 2.7.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
