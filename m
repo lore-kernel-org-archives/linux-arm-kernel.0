@@ -1,24 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2016 10:08:57 -0700
-Subject: [PATCH 5/8] ARM: dts: AM437X-GP-EVM: Remove redundant regulator
- compatibles
-In-Reply-To: <1462945691-904-6-git-send-email-j-keerthy@ti.com>
-References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
- <1462945691-904-6-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160512170857.GS5995@atomide.com>
+Date: Thu, 12 May 2016 10:12:44 -0700
+Subject: [PATCH] ARM: OMAP5 / DRA7: Introduce workaround for 801819
+In-Reply-To: <1438876464-15424-1-git-send-email-nm@ti.com>
+References: <1438876464-15424-1-git-send-email-nm@ti.com>
+Message-ID: <20160512171244.GT5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Nishanth Menon <nm@ti.com> [150806 08:57]:
+> Add workaround for Cortex-A15 ARM erratum 801819 which says in summary
+> that "A livelock can occur in the L2 cache arbitration that might
+> prevent a snoop from completing. Under certain conditions this can
+> cause the system to deadlock. "
 
-* Keerthy <j-keerthy@ti.com> [160510 22:56]:
-> With the device tree parsing using the regulator framework
-> there is a no longer a need for separate compatibles for
-> individual regulator nodes. Hence removing them all.
-
-Please resend the dts related clean-up patches separately
-once the rest of the dependencies are merged. I'm unable to
-keep track of these dependencies myself :)
+Thanks for the late reminder, this has totally fallen through the
+cracks. Applying into omap-for-v4.7/fixes. Once merged to mainline,
+it can be requested for stable if needed.
 
 Regards,
 
