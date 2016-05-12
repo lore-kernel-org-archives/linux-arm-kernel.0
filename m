@@ -1,121 +1,74 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 12 May 2016 20:10:21 +0100
-Subject: [PATCH v3 45/55] KVM: arm/arm64: vgic-new: Add userland access to
- VGIC dist registers
-In-Reply-To: <20160512184110.GK27623@cbox>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-46-git-send-email-andre.przywara@arm.com>
- <20160512184110.GK27623@cbox>
-Message-ID: <5734D51D.3000105@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 12 May 2016 14:19:15 -0500
+Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
+In-Reply-To: <20160512165755.GR5995@atomide.com>
+References: <1461925297-9734-1-git-send-email-peter.ujfalusi@ti.com>
+ <6ee9d67a-e907-715a-f3f5-d90a470314c3@ti.com>
+ <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
+ <20160505184609.GB5995@atomide.com>
+ <2822D1C2B9B19F4A8261F756A13373F801BEF7B4@DFLE11.ent.ti.com>
+ <CAPjucKb+4vd8Ar3MATCuTx+9R36PeB0hbvwDaAD1KTZFCiVJEA@mail.gmail.com>
+ <2822D1C2B9B19F4A8261F756A13373F801BF86D2@DFLE11.ent.ti.com>
+ <2822D1C2B9B19F4A8261F756A13373F801BF8703@DFLE11.ent.ti.com>
+ <CAPjucKb2PLSZcD3YZ9xQk1F62ugFaGAkBBqMp5GmoWFd0H8Vfg@mail.gmail.com>
+ <20160512165755.GR5995@atomide.com>
+Message-ID: <5734D733.9060400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12/05/16 19:41, Christoffer Dall wrote:
-> On Fri, May 06, 2016 at 11:45:58AM +0100, Andre Przywara wrote:
->> Userland may want to save and restore the state of the in-kernel VGIC,
->> so we provide the code which takes a userland request and translate
->> that into calls to our MMIO framework.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 49 insertions(+), 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
->> index c952f6f..bb33af8 100644
->> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
->> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
->> @@ -264,7 +264,55 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+On 05/12/2016 11:57 AM, Tony Lindgren wrote:
+> * Eduard Gavin <egavin@iseebcn.com> [160509 07:43]:
+>> Dear Nishanth,
+>>   In igepV5 the LDO7 is connected to:
+>>     VDDA_DSIPORTA - ball AA33
+>>     VDDA_DSIPORTC - ball AE33
+>>     VDDA_HDMI - ball AN25
+>>   LDO4 is connected to:
+>>     VPP1 - ball AD9
 > 
-> come to think of it, this is GICv2 specific right?
+> Thanks for the info, here's an updated patch with comments and now
+> using 1.8V instead of the 2.0V omap5-board-common.dtsi.
 > 
-> why don't we call it vgic_v2_attr_regs_access then?
+> Regards,
 > 
-> and should it really live in this file?
-
-Mmmh, at the moment every userland access is v2 specific, but
-potentially this function should cover GICv3 as well, I think. We might
-need some adjustments once this will be implemented, but in general I
-don't see anything too v2 specific in here?
-
->>  				 struct kvm_device_attr *attr,
->>  				 u32 *reg, bool is_write)
->>  {
->> -	return -ENXIO;
->> +	gpa_t addr;
->> +	int cpuid, ret, c;
->> +	struct kvm_vcpu *vcpu, *tmp_vcpu;
->> +
->> +	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
->> +		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
->> +	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
->> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
->> +
->> +	mutex_lock(&dev->kvm->lock);
->> +
->> +	ret = vgic_init(dev->kvm);
->> +	if (ret)
->> +		goto out;
->> +
->> +	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
->> +		ret = -EINVAL;
->> +		goto out;
->> +	}
->> +
->> +	/*
->> +	 * Ensure that no other VCPU is running by checking the vcpu->cpu
->> +	 * field.  If no other VPCUs are running we can safely access the VGIC
->> +	 * state, because even if another VPU is run after this point, that
->> +	 * VCPU will not touch the vgic state, because it will block on
->> +	 * getting the vgic->lock in kvm_vgic_sync_hwstate().
->> +	 */
+> Tony
 > 
-> eh, I don't see us grabbing any vgic->lock (does that still exist?)
-> here?
-
-Yeah, that scared me the other day too.
-In fact I think we cannot guarantee this requirement anymore with our
-existing locks - but maybe we can pause the guest explicitly as we do
-now for the clear-active handler?
-
-Cheers,
-Andre.
-
->> +	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
->> +		if (unlikely(tmp_vcpu->cpu != -1)) {
->> +			ret = -EBUSY;
->> +			goto out;
->> +		}
->> +	}
->> +
->> +	switch (attr->group) {
->> +	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
->> +		ret = -EINVAL;
->> +		break;
->> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
->> +		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
->> +		break;
->> +	default:
->> +		ret = -EINVAL;
->> +		break;
->> +	}
->> +
->> +out:
->> +	mutex_unlock(&dev->kvm->lock);
->> +	return ret;
->>  }
->>  
->>  /* V2 ops */
->> -- 
->> 2.7.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe kvm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 8< -----------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 9 May 2016 07:51:00 -0700
+> Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
 > 
-> Thanks,
-> -Christoffer
+> Fix ldo7 source for HDMI on igepv5.
 > 
+> Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/arch/arm/boot/dts/omap5-igep0050.dts
+> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
+> @@ -35,6 +35,16 @@
+>  	};
+>  };
+>  
+> +/*
+> + * LDO7 is used for HDMI: VDDA_DSIPORTA - ball AA33, VDDA_DSIPORTC - ball AE33
+> + * VDDA_HDMI - ball AN25. LDO4 is: VPP1 - ball AD9.
+
+We should set ldo4_reg as 2v as well (default in omap5-board-common is
+1.8v). VPP1 should be 2v to prevent efuse from being messed up.
+
+> + */
+> +&ldo7_reg {
+> +	status = "okay";
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +};
+> +
+>  &omap5_pmx_core {
+>  	i2c4_pins: pinmux_i2c4_pins {
+>  		pinctrl-single,pins = <
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
