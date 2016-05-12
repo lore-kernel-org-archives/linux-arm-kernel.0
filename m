@@ -1,59 +1,113 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 12 May 2016 08:27:08 -0700
-Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <20160512094915.GD11226@e104818-lin.cambridge.arm.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
- <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
- <5733C8F5.6090206@caviumnetworks.com>
- <20160512094915.GD11226@e104818-lin.cambridge.arm.com>
-Message-ID: <5734A0CC.8010600@caviumnetworks.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 16:28:06 +0100
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160512142457.GC30205@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+ <20160512134431.GB30205@yury-N73SV>
+ <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+ <20160512142457.GC30205@yury-N73SV>
+Message-ID: <20160512152805.GJ11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2016 02:49 AM, Catalin Marinas wrote:
-> On Wed, May 11, 2016 at 05:06:13PM -0700, David Daney wrote:
->> On 05/11/2016 03:39 AM, Catalin Marinas wrote:
-[...]
->>>
->>> I wonder whether you could replace the get_mpidr_in_madt() function with
->>> something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
->>> duplicates functionality already available elsewhere.
->>
->> I just tried that, and it doesn't work.
->>
->> The problem is that this code is being run very early in the boot, and
->> kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used
->> once we have working kmalloc.  We need to extract the NUMA information early
->> like this precisely because it is needed to initializing the slab system
->>
->> Notice that we are using early_acpi_os_unmap_memory() et al. in
->> get_mpidr_in_madt() explicitly for this reason.
->>
->> In summary: I don't think we need another revision of this patch, it is like
->> this for a good reason.
->
-> Slightly confusing, in another reply you said you are going to address
-> my comment. So, is it doable?
+On Thu, May 12, 2016 at 05:24:57PM +0300, Yury Norov wrote:
+> On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
+> > On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
+> > > On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
+> > > > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > > > > I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > > > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > > > > of vector, and kernel reports successful read/write.
+> > > > > 
+> > > > > There are 2 problems:
+> > > > > 1. How kernel allows such address to be passed to fs subsystem;
+> > > > > 2. How fs successes to read/write at non-mapped, and in fact non-user
+> > > > > address.
+> > > > > 
+> > > > > I don't know the answer on 2'nd question, and it might be something
+> > > > > generic. But I investigated first problem.
+> > > > > 
+> > > > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+> > > > > validate user address, and on arm64 it ends up with checking buffer
+> > > > > end against current_thread_info()->addr_limit.
+> > > > > 
+> > > > > current_thread_info()->addr_limit for ilp32, and most probably for
+> > > > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+> > > > > It happens because on thread creation we call flush_old_exec() to set 
+> > > > > addr_limit, and completely ignore compat mode there.
+> > 
+> > [...]
+> > 
+> > > > > --- a/arch/arm64/kernel/binfmt_elf32.c
+> > > > > +++ b/arch/arm64/kernel/binfmt_elf32.c
+> > > > > @@ -12,6 +12,7 @@
+> > > > >  do {						\
+> > > > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> > > > >  	set_thread_flag(TIF_32BIT);		\
+> > > > > +	set_fs(TASK_SIZE_32);			\
+> > > > >  } while (0)
+> > > > >  
+> > > > >  #define COMPAT_ARCH_DLINFO
+> > > > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > > index a934fd4..a8599c6 100644
+> > > > > --- a/arch/arm64/kernel/binfmt_ilp32.c
+> > > > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+> > > > >  do {									\
+> > > > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
+> > > > >  	clear_thread_flag(TIF_32BIT);					\
+> > > > > +	set_fs(TASK_SIZE_32);						\
+> > > > >  } while (0)
+> > > > 
+> > > > I don't think we need these two. AFAICT, flush_old_exec() takes care of
+> > > > setting the USER_DS for the new thread.
+> > > 
+> > > That's true, but USER_DS depends on personality which is not set yet
+> > > for new thread, as I wrote above. In fact, I tried correct USER_DS
+> > > only, and it doesn't work
+> > 
+> > Ah, it looks like load_elf_binary() sets the personality after
+> > flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
+> > maximum 64-bit task value, so they should have a similar issue with
+> > native 32-bit vs compat behaviour.
+> 
+> Hmmm. If so, it means we'd introduce generic fix. It would be removing 
+> set_fs() from flush_old_exec() and appending it to load_elf_binary()
+> after SET_PERSONALITY(). But I think it should be agreed with other
+> arches developers.
 
-I don't think so.
+The set_fs() in flush_old_exec() is probably fine, it may be meant to
+re-set the USER_DS for the old thread.
 
-My previous reply, to the thread in 0/14, was prematurely made with the 
-incorrect assumption that it was a simple change.  Now, after really 
-digging in to the code, and attempting to do as you suggested, I have 
-changed my mind.
+It appears that at least powerpc and x86 don't have different USER_DS
+setting for native and compat, so moving the set_fs() call further down
+would not make any difference for them, nor will it fix the preadv02 LTP
+test (if it fails for them, I haven't checked).
 
-As I indicated above, there are no remaining suggestions or requests for 
-changes to this patch set pending action.  Unless people find additional 
-problems, I think it is ready for merging.
+> I've sent standalone patch for aarch64 (you in CC) so let's move
+> discussion there.
 
-I know that Will and Rafael were discussing the proper timing for 
-merging this in the other thread, so I leave it in their hands at this 
-point.
+I've seen the patch but we would lose some discussion history here. I
+think we should continue this thread and just summarise the conclusion
+in reply to the other patch. This thread is also available on
+linux-arch, in case other architecture maintainers follow it.
 
-Thanks,
-David Daney
+> > So what exactly is LTP complaining about? Is different error (like
+> > EFAULT vs EINVAL) or not getting an error at all.
+>  
+> It should be EINVAL, but it succeed. The other problem is that
+> following fs routines does not complain on wrong address.
 
+I see. The test asks the kernel to write a single byte (out of maximum
+64) to the user address 0xffffffff. In the absence of the access_ok()
+check, this operation succeeds. If the preadv syscall gets 2 bytes as
+the count, then it would fail with EFAULT.
 
->
+While it's not really a bug, I agree that for matching the native 32-bit
+behavior (basically for other syscalls like those involving vfs_read()),
+the simplest fix would be to have a dynamic USER_DS.
+
+-- 
+Catalin
