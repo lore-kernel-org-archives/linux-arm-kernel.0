@@ -1,25 +1,93 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Thu, 12 May 2016 16:22:26 +0200
-Subject: [PATCH] deb-pkg: add the shared header file for arm64
-In-Reply-To: <1463043837-4348-1-git-send-email-shijie.huang@arm.com>
-References: <1463043837-4348-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <573491A2.7070809@suse.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 12 May 2016 17:24:57 +0300
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+ <20160512134431.GB30205@yury-N73SV>
+ <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+Message-ID: <20160512142457.GC30205@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-05-12 11:03, Huang Shijie wrote:
-> The arch/arm/include/asm/opcodes.h is also used by the arm64.
-> This patch copies it to the arm64 deb package.
+On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
+> On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
+> > On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
+> > > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > > > I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > > > of vector, and kernel reports successful read/write.
+> > > > 
+> > > > There are 2 problems:
+> > > > 1. How kernel allows such address to be passed to fs subsystem;
+> > > > 2. How fs successes to read/write at non-mapped, and in fact non-user
+> > > > address.
+> > > > 
+> > > > I don't know the answer on 2'nd question, and it might be something
+> > > > generic. But I investigated first problem.
+> > > > 
+> > > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+> > > > validate user address, and on arm64 it ends up with checking buffer
+> > > > end against current_thread_info()->addr_limit.
+> > > > 
+> > > > current_thread_info()->addr_limit for ilp32, and most probably for
+> > > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+> > > > It happens because on thread creation we call flush_old_exec() to set 
+> > > > addr_limit, and completely ignore compat mode there.
 > 
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
->  scripts/package/builddeb | 6 ++++++
->  1 file changed, 6 insertions(+)
+> [...]
+> 
+> > > > --- a/arch/arm64/kernel/binfmt_elf32.c
+> > > > +++ b/arch/arm64/kernel/binfmt_elf32.c
+> > > > @@ -12,6 +12,7 @@
+> > > >  do {						\
+> > > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> > > >  	set_thread_flag(TIF_32BIT);		\
+> > > > +	set_fs(TASK_SIZE_32);			\
+> > > >  } while (0)
+> > > >  
+> > > >  #define COMPAT_ARCH_DLINFO
+> > > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > index a934fd4..a8599c6 100644
+> > > > --- a/arch/arm64/kernel/binfmt_ilp32.c
+> > > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+> > > >  do {									\
+> > > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
+> > > >  	clear_thread_flag(TIF_32BIT);					\
+> > > > +	set_fs(TASK_SIZE_32);						\
+> > > >  } while (0)
+> > > 
+> > > I don't think we need these two. AFAICT, flush_old_exec() takes care of
+> > > setting the USER_DS for the new thread.
+> > 
+> > That's true, but USER_DS depends on personality which is not set yet
+> > for new thread, as I wrote above. In fact, I tried correct USER_DS
+> > only, and it doesn't work
+> 
+> Ah, it looks like load_elf_binary() sets the personality after
+> flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
+> maximum 64-bit task value, so they should have a similar issue with
+> native 32-bit vs compat behaviour.
 
+Hmmm. If so, it means we'd introduce generic fix. It would be removing 
+set_fs() from flush_old_exec() and appending it to load_elf_binary()
+after SET_PERSONALITY(). But I think it should be agreed with other
+arches developers. I've sent standalone patch for aarch64 (you in CC)
+so let's move discussion there.
 
-Hi Huang,
+> So what exactly is LTP complaining about? Is different error (like
+> EFAULT vs EINVAL) or not getting an error at all.
+ 
+It should be EINVAL, but it succeed. The other problem is that
+following fs routines does not complain on wrong address.
 
-this is fixed (admittedly in a more aggressive way) by 962475ac2f96
-("builddeb: fix missing headers in linux-headers package") in linux-next.
+> (I need to update my LTP, the preadv tests appeared in December last
+> year)
+> 
 
-Michal
+preadv02 was extended with this testcase in April.
+
+> -- 
+> Catalin
