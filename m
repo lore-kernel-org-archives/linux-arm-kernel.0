@@ -1,79 +1,59 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 12 May 2016 16:08:31 +0100
-Subject: [PATCH v3 17/55] KVM: arm/arm64: vgic-new: Add IRQ sync/flush
- framework
-In-Reply-To: <20160512114651.GB2370@cbox>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-18-git-send-email-andre.przywara@arm.com>
- <20160512114651.GB2370@cbox>
-Message-ID: <57349C6F.8050406@arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 12 May 2016 08:27:08 -0700
+Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <20160512094915.GD11226@e104818-lin.cambridge.arm.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
+ <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
+ <5733C8F5.6090206@caviumnetworks.com>
+ <20160512094915.GD11226@e104818-lin.cambridge.arm.com>
+Message-ID: <5734A0CC.8010600@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12/05/16 12:46, Christoffer Dall wrote:
-> On Fri, May 06, 2016 at 11:45:30AM +0100, Andre Przywara wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
+On 05/12/2016 02:49 AM, Catalin Marinas wrote:
+> On Wed, May 11, 2016 at 05:06:13PM -0700, David Daney wrote:
+>> On 05/11/2016 03:39 AM, Catalin Marinas wrote:
+[...]
+>>>
+>>> I wonder whether you could replace the get_mpidr_in_madt() function with
+>>> something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
+>>> duplicates functionality already available elsewhere.
 >>
->> Implement the framework for syncing IRQs between our emulation and
->> the list registers, which represent the guest's view of IRQs.
->> This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
->> which gets called on guest entry and exit.
->> The code talking to the actual GICv2/v3 hardware is added in the
->> following patches.
+>> I just tried that, and it doesn't work.
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
-> 
-> [...]
-> 
->> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->> index 4fb20fd..c6f8b9b 100644
->> --- a/virt/kvm/arm/vgic/vgic.c
->> +++ b/virt/kvm/arm/vgic/vgic.c
-> 
-> [...]
-> 
->> +
->> +/* Requires the VCPU's ap_list_lock to be held. */
->> +static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
->> +{
->> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +	struct vgic_irq *irq;
->> +	int count = 0;
->> +
->> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
->> +
->> +	if (unlikely(!vcpu->kvm->arch.vgic.enabled))
->> +		goto out_clean;
-> 
-> 
-> I know I said I reviewed this, but thinking about this more carefully,
-> doesn't the enable bit actually tell us if forwarding of pending
-> interrupts is enabled, but not whether or not the vgic exists?
-> 
-> So you could imagine a guest that turns off the GIC, but still has
-> active interrupts that it wants to disable/EOI, in the case of
-> shutdown/reboot for example, or is this architecturally not allowed?
+>> The problem is that this code is being run very early in the boot, and
+>> kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used
+>> once we have working kmalloc.  We need to extract the NUMA information early
+>> like this precisely because it is needed to initializing the slab system
+>>
+>> Notice that we are using early_acpi_os_unmap_memory() et al. in
+>> get_mpidr_in_madt() explicitly for this reason.
+>>
+>> In summary: I don't think we need another revision of this patch, it is like
+>> this for a good reason.
+>
+> Slightly confusing, in another reply you said you are going to address
+> my comment. So, is it doable?
 
-I guess you are right, the spec talks only about GICD.CTLR[Enable]
-controlling the forwarding of pending interrupts to the CPU interface.
-If you don't want interrupts at all, I guess you disable the CPU interface.
+I don't think so.
 
-So we just don't put pending IRQs in the LR, but only active ones.
-I am coding this right now.
+My previous reply, to the thread in 0/14, was prematurely made with the 
+incorrect assumption that it was a simple change.  Now, after really 
+digging in to the code, and attempting to do as you suggested, I have 
+changed my mind.
 
-Cheers,
-Andre
+As I indicated above, there are no remaining suggestions or requests for 
+changes to this patch set pending action.  Unless people find additional 
+problems, I think it is ready for merging.
 
-> 
-> If it is, then we should, at least theoretically, still forward active
-> interrupts in LRs despite the enabled bit being clear, but modify the
-> oracle to take the global enable bit into account.
-> 
-> Thanks,
-> -Christoffer
+I know that Will and Rafael were discussing the proper timing for 
+merging this in the other thread, so I leave it in their hands at this 
+point.
+
+Thanks,
+David Daney
+
+
+>
