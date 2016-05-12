@@ -1,92 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 May 2016 14:35:34 +0100
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160512002000.GA30997@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
-Message-ID: <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 May 2016 14:36:43 +0100
+Subject: [PATCH v3 0/2] arm64: mm: Enhance Virtual kernel memory layout
+In-Reply-To: <1463055387-19289-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1463055387-19289-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160512133642.GC25355@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
-> I debugged preadv02 and pwritev02 failures and found very weird bug.
-> Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> of vector, and kernel reports successful read/write.
-> 
-> There are 2 problems:
-> 1. How kernel allows such address to be passed to fs subsystem;
-> 2. How fs successes to read/write at non-mapped, and in fact non-user
-> address.
-> 
-> I don't know the answer on 2'nd question, and it might be something
-> generic. But I investigated first problem.
-> 
-> The problem is that compat_rw_copy_check_uvector() uses access_ok() to
-> validate user address, and on arm64 it ends up with checking buffer
-> end against current_thread_info()->addr_limit.
-> 
-> current_thread_info()->addr_limit for ilp32, and most probably for
-> aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
-> It happens because on thread creation we call flush_old_exec() to set 
-> addr_limit, and completely ignore compat mode there.
+On Thu, May 12, 2016 at 08:16:25PM +0800, Kefeng Wang wrote:
+> This is a micro enhance for Virtual kernel memory layout. Show bss info,
+> and make each line with single pr_cont().
 
-I assume accesses beyond this address would fault anyway but I haven't
-checked the code paths.
+I already queued[1] the previous version of this after James acked it,
+so if you want to make further changes, please send incremental patches
+for review.
 
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 7a39683..6ba4952 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -146,6 +146,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
->  do {						\
->  	clear_thread_flag(TIF_32BIT_AARCH64);	\
->  	clear_thread_flag(TIF_32BIT);		\
-> +	set_fs(TASK_SIZE_64);			\
->  } while (0)
+Will
 
-See below.
-
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 19cfdc5..3b0dd8d 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -51,7 +51,7 @@
->  #define KERNEL_DS	(-1UL)
->  #define get_ds()	(KERNEL_DS)
->  
-> -#define USER_DS		TASK_SIZE_64
-> +#define USER_DS		TASK_SIZE
-
-I agree with this.
-
->  #define get_fs()	(current_thread_info()->addr_limit)
->  
->  static inline void set_fs(mm_segment_t fs)
-> diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
-> index 5487872..2e8d9f3 100644
-> --- a/arch/arm64/kernel/binfmt_elf32.c
-> +++ b/arch/arm64/kernel/binfmt_elf32.c
-> @@ -12,6 +12,7 @@
->  do {						\
->  	clear_thread_flag(TIF_32BIT_AARCH64);	\
->  	set_thread_flag(TIF_32BIT);		\
-> +	set_fs(TASK_SIZE_32);			\
->  } while (0)
->  
->  #define COMPAT_ARCH_DLINFO
-> diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-> index a934fd4..a8599c6 100644
-> --- a/arch/arm64/kernel/binfmt_ilp32.c
-> +++ b/arch/arm64/kernel/binfmt_ilp32.c
-> @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
->  do {									\
->  	set_thread_flag(TIF_32BIT_AARCH64);				\
->  	clear_thread_flag(TIF_32BIT);					\
-> +	set_fs(TASK_SIZE_32);						\
->  } while (0)
-
-I don't think we need these two. AFAICT, flush_old_exec() takes care of
-setting the USER_DS for the new thread.
-
--- 
-Catalin
+[1]
+https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=9974723e31d1fa99e3c0efb2ae6cbbf089c0080c
+https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=d32351c8242b7067b3f3e3a6caf7a387ff43f978
