@@ -1,145 +1,66 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 12 May 2016 11:13:54 +0800
-Subject: [PATCH v2] mmc: dw_mmc: rockchip: Set the drive phase properly
-In-Reply-To: <1463002848-580-1-git-send-email-dianders@chromium.org>
-References: <1463002848-580-1-git-send-email-dianders@chromium.org>
-Message-ID: <4ea71cf9-873f-960a-67cb-54da603fd628@rock-chips.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Thu, 12 May 2016 06:39:20 +0300
+Subject: [linux-sunxi] Re: [PATCH v4 01/11] clk: sunxi: Add display and
+ TCON0 clocks driver
+In-Reply-To: <20160511221541.GG3492@codeaurora.org>
+References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160506223002.GE3492@codeaurora.org> <20160508200308.GF6167@lukather>
+ <20160509223238.GW3492@codeaurora.org>
+ <20160509223924.GX3492@codeaurora.org> <1462907459.9981.0.camel@plaes.org>
+ <20160511221541.GG3492@codeaurora.org>
+Message-ID: <1463024360.16747.4.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/12 5:40, Douglas Anderson wrote:
-> Historically for Rockchip devices we've relied on the power-on
-> default (or perhaps the firmware setting) to get the correct drive
-> phase for dw_mmc devices.  This worked OK for the most part, but:
->
-> * Relying on the setting just "being right" is a bit fragile.
->
-> * As soon as there is an instance where the power on default is wrong or
->   where the firmware didn't configure this properly then we'll get a
->   mysterious failure.
->
-> Let's explicitly set this phase in the kernel.
->
-> The comments inside this patch try to explain the situation quite
-> throughly, but the high level overview of this is:
->
-> Before this patch on rk3288 devices tested:
-> * eMMC: 180 degrees
-> * SDMMC/SDIO0/SDIO1: 90 degrees
->
-> After this patch:
-> * Use 90 degree phase offset usually.
-> * Use 180 degree phase offset for MMC_DDR52, SDR104, HS200.
+On Wed, 2016-05-11 at 15:15 -0700, Stephen Boyd wrote:
+> On 05/10, Priit Laes wrote:
+> > 
+> > On Mon, 2016-05-09 at 15:39 -0700, Stephen Boyd wrote:
+> > > 
+> > > On 05/09, Stephen Boyd wrote:
+> > > > 
+> > > > 
+> > > > 
+> > > > Ok I applied this one to clk-next.
+> > > > 
+> > > And I squashed this in to silence the following checker warning.
+> > > 
+> > > drivers/clk/sunxi/clk-sun4i-display.c:110:33: warning: Variable
+> > > length array is used.
+> > > 
+> > > ---8<---
+> > > diff --git a/drivers/clk/sunxi/clk-sun4i-display.c
+> > > b/drivers/clk/sunxi/clk-sun4i-display.c
+> > > index f02e250e64ed..f8ff6c4a5633 100644
+> > > --- a/drivers/clk/sunxi/clk-sun4i-display.c
+> > > +++ b/drivers/clk/sunxi/clk-sun4i-display.c
+> > > @@ -107,7 +107,7 @@ static int
+> > > sun4i_a10_display_reset_xlate(struct
+> > > reset_controller_dev *rcdev,
+> > > ?static void __init sun4i_a10_display_init(struct device_node
+> > > *node,
+> > > ?					??const struct
+> > > sun4i_a10_display_clk_data *data)
+> > > ?{
+> > > -	const char *parents[data->parents];
+> > > +	const char *parents[4];
+> > This change breaks at least de_[bf]e clocks which have 3 clock
+> > parents.
 
-Thanks for doing this.
+> I just used the largest data->parents number, which was 4. How
+> does that break anything?
 
-Reviewed-by: Shawn Lin<shawn.lin@rock-chips.com>
+If you look at the?sun4i_a10_display_init, it contains this block:
 
->
-> That means we are _changing_ behavior for those devices in this way:
->
-> * If we have HS200 eMMC or DDR52 eMMC, we'll run ID mode at 90
->   degrees (vs 180) but otherwise have no change.
->
-> * For any non-HS200 / non-DDR52 eMMC devices we'll now _always_ run at
->   90 degrees (vs 180).  It seems fairly unlikely that building modern
->   hardware is using an eMMC that isn't using DDR52 or HS200, of course.
->
-> * For SDR104 cards we'll now run with 180 degree phase offset (vs 90).
->   It's expected that 90 degree phase offset would have worked OK, but
->   this gives us extra margin.
->
-> I have tested this by inserting my collection of uSD cards (mostly UHS,
-> though a few not) into a veyron_minnie and confirmed that they still
-> seem to enumerate properly.  For a subset of them I tried putting a
-> filesystem on them and also tried running mmc_test.
->
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
-> Changes in v2:
-> - Now use 90 degrees for some modes; updated comments to say why.
->
->  drivers/mmc/host/dw_mmc-rockchip.c | 64 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
->
-> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-> index 8c20b81cafd8..8068fa887db8 100644
-> --- a/drivers/mmc/host/dw_mmc-rockchip.c
-> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
-> @@ -66,6 +66,70 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->  	/* Make sure we use phases which we can enumerate with */
->  	if (!IS_ERR(priv->sample_clk))
->  		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
-> +
-> +	/*
-> +	 * Set the drive phase offset based on speed mode to achieve hold times.
-> +	 *
-> +	 * That this is _not_ a value that is dynamically tuned and is also
-> +	 * _not_ a value that will vary from board to board.  It is a value
-> +	 * that could vary between different SoC models if they had massively
-> +	 * different output clock delays inside their dw_mmc IP block (delay_o),
-> +	 * but since it's OK to overshoot a little we don't need to do complex
-> +	 * calculations and can pick values that will just work for everyone.
-> +	 *
-> +	 * When picking values we'll stick with picking 0/90/180/270 since
-> +	 * those can be made very accurately on all known Rockchip SoCs.
-> +	 *
-> +	 * Note that these values match values from the DesignWare Databook
-> +	 * tables for the most part except for SDR12 and "ID mode".  For those
-> +	 * two modes the databook calculations assume a clock in of 50MHz.  As
-> +	 * seen above, we always use a clock in rate that is exactly the
-> +	 * card's input clock (times RK3288_CLKGEN_DIV, but that gets divided
-> +	 * back out before the controller sees it).
-> +	 *
-> +	 * From measurement of a single device, it appears that delay_o is
-> +	 * about .5 ns.  Since we try to leave a bit of margin, it's expected
-> +	 * that numbers here will be fine even with much larger delay_o
-> +	 * (the 1.4 ns assumed by the DesignWare Databook would result in the
-> +	 * same results, for instance).
-> +	 */
-> +	if (!IS_ERR(priv->drv_clk)) {
-> +		int phase;
-> +
-> +		/*
-> +		 * In almost all cases a 90 degree phase offset will provide
-> +		 * sufficient hold times across all valid input clock rates
-> +		 * assuming delay_o is not absurd for a given SoC.  We'll use
-> +		 * that as a default.
-> +		 */
-> +		phase = 90;
-> +
-> +		switch (ios->timing) {
-> +		case MMC_TIMING_MMC_DDR52:
-> +			/*
-> +			 * Since clock in rate with MMC_DDR52 is doubled when
-> +			 * bus width is 8 we need to double the phase offset
-> +			 * to get the same timings.
-> +			 */
-> +			if (ios->bus_width == MMC_BUS_WIDTH_8)
-> +				phase = 180;
-> +			break;
-> +		case MMC_TIMING_UHS_SDR104:
-> +		case MMC_TIMING_MMC_HS200:
-> +			/*
-> +			 * In the case of 150 MHz clock (typical max for
-> +			 * Rockchip SoCs), 90 degree offset will add a delay
-> +			 * of 1.67 ns.  That will meet min hold time of .8 ns
-> +			 * as long as clock output delay is < .87 ns.  On
-> +			 * SoCs measured this seems to be OK, but it doesn't
-> +			 * hurt to give margin here, so we use 180.
-> +			 */
-> +			phase = 180;
-> +			break;
-> +		}
-> +
-> +		clk_set_phase(priv->drv_clk, phase);
-> +	}
->  }
->
->  #define NUM_PHASES			360
->
+? ? ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
+????if (ret != ARRAY_SIZE(parents)) {
+????????pr_err("%s: Could not retrieve the parents\n", clk_name);
+????????goto unmap;
+????}
 
+of_clk_parent_fill returns 3 for de_be/de_fe nodes, and
+ARRAY_SIZE(parents) is 4.
 
--- 
-Best Regards
-Shawn Lin
+P?ikest,
+Priit :)
