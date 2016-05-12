@@ -1,164 +1,114 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 12 May 2016 05:50:18 +0000
-Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
-In-Reply-To: <20160512035315.GA19408@piout.net>
-References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
- <20160512035315.GA19408@piout.net>
-Message-ID: <B256D81BAE5131468A838E5D7A2436410164FB80B8@penmbx01>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 12 May 2016 14:16:46 +0800
+Subject: [PATCH 1/2] arm64: dts: NS2: Add all of the UARTs
+In-Reply-To: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
+References: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <57341FCE.6050403@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2016?5?12? 11:53
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>; Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>;
-> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+On 2016/5/12 6:56, Jon Mason wrote:
+> Add all of the UARTs present on NS2 and enable them in the SVK device
+> tree file.  Also, do some magic to make sure that uart3 is discovered as
+> ttyS0 (as that is the console UART).
 > 
-> Hi,
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> ---
+>  arch/arm64/boot/dts/broadcom/ns2-svk.dts | 16 ++++++++++++++++
+>  arch/arm64/boot/dts/broadcom/ns2.dtsi    | 30 ++++++++++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
 > 
-> On 12/05/2016 at 09:05:34 +0800, Wenyou Yang wrote :
-> > In order to get lower consumption, as a workaround, suspend the USB
-> > PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
-> > Configuration Register while OHCI USB suspending.
-> >
-> 
-> Why is that a workaround?
+> diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> index 7cd3640..b062a44 100644
+> --- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> +++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> @@ -40,10 +40,14 @@
+>  
+>  	aliases {
+>  		serial0 = &uart3;
+> +		serial1 = &uart0;
+> +		serial2 = &uart1;
+> +		serial3 = &uart2;
+>  	};
+>  
+>  	chosen {
+>  		stdout-path = "serial0:115200n8";
+> +		bootargs = "earlycon=uart8250,mmio32,0x66130000";
 
-Because if these bits is not set as this patch, there is 5mA current left
-at VDDOSC rail during suspend. If apply this patch, this current will disappear.
+Hi Jon,
 
-So, I think it is a workaround.
+I submit a patch[1], with it, we can use earlycon without option to enable early console
+for "snps,dw-apb-uart", could you help me to test it, thanks.
 
-> 
-> > This suspend operation must be done before stopping the USB clock,
-> > resume after the USB clock enabled.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >
-> >  drivers/usb/host/ohci-at91.c | 63
-> > ++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 63 insertions(+)
-> >
-> > diff --git a/drivers/usb/host/ohci-at91.c
-> > b/drivers/usb/host/ohci-at91.c index d177372..ce898e0 100644
-> > --- a/drivers/usb/host/ohci-at91.c
-> > +++ b/drivers/usb/host/ohci-at91.c
-> > @@ -21,6 +21,8 @@
-> >  #include <linux/io.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/module.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/regmap.h>
-> >  #include <linux/usb.h>
-> >  #include <linux/usb/hcd.h>
-> >
-> > @@ -51,6 +53,7 @@ struct ohci_at91_priv {
-> >  	struct clk *hclk;
-> >  	bool clocked;
-> >  	bool wakeup;		/* Saved wake-up state for resume */
-> > +	struct regmap *sfr_regmap;
-> >  };
-> >  /* interface and function clocks; sometimes also an AHB clock */
-> >
-> > @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device
-> > *pdev)
-> >
-> >
-> > /*--------------------------------------------------------------------
-> > -----*/
-> >
-> > +struct regmap *at91_dt_syscon_sfr(void) {
-> > +	struct regmap *regmap;
-> > +
-> > +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-> > +	if (IS_ERR(regmap))
-> > +		return NULL;
-> > +
-> > +	return regmap;
-> > +}
-> > +
-> >  static void usb_hcd_at91_remove (struct usb_hcd *, struct
-> > platform_device *);
-> >
-> >  /* configure so an HC device and id are always provided */ @@ -197,6
-> > +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
-> >  		goto err;
-> >  	}
-> >
-> > +	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
-> > +
-> >  	board = hcd->self.controller->platform_data;
-> >  	ohci = hcd_to_ohci(hcd);
-> >  	ohci->num_ports = board->ports;
-> > @@ -581,6 +597,49 @@ static int ohci_hcd_at91_drv_remove(struct
-> platform_device *pdev)
-> >  	return 0;
-> >  }
-> >
-> > +#define SFR_OHCIICR		0x10
-> > +#define SFR_OHCIICR_SUSPEND_A	BIT(8)
-> > +#define SFR_OHCIICR_SUSPEND_B	BIT(9)
-> > +#define SFR_OHCIICR_SUSPEND_C	BIT(10)
-> > +
-> > +#define SFR_OHCIICR_USB_SUSPEND	(SFR_OHCIICR_SUSPEND_A | \
-> > +				 SFR_OHCIICR_SUSPEND_B | \
-> > +				 SFR_OHCIICR_SUSPEND_C)
-> > +
-> 
-> Those defines should go in a header file either in include/soc/at91 or in
-> include/linux/mfd
-> 
-> > +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable) {
-> > +	u32 regval;
-> > +	int ret;
-> > +
-> > +	if (IS_ERR(regmap))
-> > +		return PTR_ERR(regmap);
-> > +
-> > +	ret = regmap_read(regmap, SFR_OHCIICR, &regval);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	if (enable)
-> > +		regval &= ~SFR_OHCIICR_USB_SUSPEND;
-> > +	else
-> > +		regval |= SFR_OHCIICR_USB_SUSPEND;
-> > +
-> > +	regmap_write(regmap, SFR_OHCIICR, regval);
-> > +
-> > +	regmap_read(regmap, SFR_OHCIICR, &regval);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int ohci_at91_port_suspend(struct regmap *regmap) {
-> > +	return ohci_at91_port_ctrl(regmap, false); }
-> > +
-> > +static int ohci_at91_port_resume(struct regmap *regmap) {
-> > +	return ohci_at91_port_ctrl(regmap, true); }
-> > +
-> >  static int __maybe_unused
-> >  ohci_hcd_at91_drv_suspend(struct device *dev)  { @@ -618,6 +677,8 @@
-> > ohci_hcd_at91_drv_suspend(struct device *dev)
-> >  		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
-> >  		ohci->rh_state = OHCI_RH_HALTED;
-> >
-> > +		ohci_at91_port_suspend(ohci_at91->sfr_regmap);
-> > +
-> 
-> The main issue I see here is that you will call that function for all SoCs and it will
-> always fail unless it is running on a sama5d2. Maybe we could be smarter about
-> that.
-
-Can we use another compatible, such as "atmel,sama5d2-ohci" to differentiate it? 
+BRs,
+Kefeng
 
 
-Best Regards,
-Wenyou Yang
+[1] https://lkml.org/lkml/2016/5/11/34
+
+>  	};
+>  
+>  	memory {
+> @@ -68,6 +72,18 @@
+>  	status = "ok";
+>  };
+>  
+> +&uart0 {
+> +	status = "ok";
+> +};
+> +
+> +&uart1 {
+> +	status = "ok";
+> +};
+> +
+> +&uart2 {
+> +	status = "ok";
+> +};
+> +
+>  &uart3 {
+>  	status = "ok";
+>  };
+> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> index 788ed8f..c77a9e8 100644
+> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> @@ -357,6 +357,36 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		uart0: serial at 66100000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x66100000 0x100>;
+> +			interrupts = <GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&iprocslow>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			status = "disabled";
+> +		};
+> +
+> +		uart1: serial at 66110000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x66110000 0x100>;
+> +			interrupts = <GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&iprocslow>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			status = "disabled";
+> +		};
+> +
+> +		uart2: serial at 66120000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x66120000 0x100>;
+> +			interrupts = <GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&iprocslow>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			status = "disabled";
+> +		};
+> +
+>  		uart3: serial at 66130000 {
+>  			compatible = "snps,dw-apb-uart";
+>  			reg = <0x66130000 0x100>;
+> 
