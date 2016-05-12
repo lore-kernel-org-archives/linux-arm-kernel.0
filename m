@@ -1,48 +1,70 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 May 2016 18:41:26 -0700
-Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for
- DMA Mode
-In-Reply-To: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
-References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
-Message-ID: <20160512014126.GK3492@codeaurora.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 11 May 2016 18:45:48 -0700
+Subject: [PATCH 3/3] clk: bcm2835: Skip PLLC clocks when deciding on a new
+ clock parent
+In-Reply-To: <20160511225854.GI3492@codeaurora.org>
+References: <1462842090-2017-1-git-send-email-eric@anholt.net>
+ <1462842090-2017-4-git-send-email-eric@anholt.net>
+ <20160511225854.GI3492@codeaurora.org>
+Message-ID: <87mvnw82wj.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10, Abhishek Sahu wrote:
-> From: Charanya <charanya@codeaurora.org>
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-Was it intentional to only have one name here?
+> On 05/09, Eric Anholt wrote:
+>> If the firmware had set up a clock to source from PLLC, go along with
+>> it.  But if we're looking for a new parent, we don't want to switch it
+>> to PLLC because the firmware will force PLLC (and thus the AXI bus
+>> clock) to different frequencies during over-temp/under-voltage,
+>> without notification to Linux.
+>> 
+>> On my system, this moves the Linux-enabled HDMI state machine and DSI1
+>> escape clock over to plld_per from pllc_per.  EMMC still ends up on
+>> pllc_per, because the firmware had set it up to use that.
+>
+> Is it ok for EMMC rate to change with over-temp/under-voltage?
+> The description makes it sound like PLLC is for clks that want to
+> run at some system bus rate and they don't care about exact
+> frequencies.
 
-> 
-> The Data loss was happening with current QCOM MSM serial driver during
-> large file transfer due to simultaneous enabling of both UART and
-> DMA interrupt. When UART operates in DMA mode, RXLEV (Rx FIFO over
-> watermark) or RXSTALE (stale interrupts) should not be enabled,
-> since these conditions will be handled by DMA controller itself.
-> If these interrupts are enabled then normal UART ISR will read some
-> bytes of data from Rx Buffer and DMA controller will not receive
-> these bytes of data, which will cause data loss.
-> 
-> Now this patch removed the code for enabling of RXLEV and RXSTALE
-> interrupt in DMA Rx completion routine.
+I'm surprised it's OK for it to change, but the firmware is very
+intentionally putting it on PLLC (there's this #define for where most
+peripherals go, and EMMC doesn't use it and goes for PLLC instead).  If
+we do decide we want to override the firmware, I suspect we'll use
+assigned-clock-parents for that.
 
-I'm lost, we keep both these irqs masked (well only if uartdm
-version is 1.4 or greater) pretty much the entire time we're
-using DMA for RX. msm_start_rx_dma() will mask them and then when
-the callback completes we'll unmask them (the part that's deleted
-in this patch), but then we'll go back and remask them almost
-immediately because we call msm_start_rx_dma() from the dma
-completion handler.
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+>> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+>> index 1091012ecec6..1d8f29ea9f69 100644
+>> --- a/drivers/clk/bcm/clk-bcm2835.c
+>> +++ b/drivers/clk/bcm/clk-bcm2835.c
+>> @@ -1008,16 +1008,28 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
+>>  	return 0;
+>>  }
+>>  
+>> +static bool
+>> +bcm2835_clk_is_pllc(struct clk_hw *hw)
+>> +{
+>> +	if (!hw)
+>> +		return false;
+>> +
+>> +	return strncmp(clk_hw_get_name(hw), "pllc", 4) == 0;
+>
+> This strcmp is not great. Any chance we could look for the parent
+> by reading the hardware and knowing what bit corresponds to pllc
+> as a parent? That would be much nicer so that we don't rely on
+> string comparisons for something the hardware can tell us.
 
-Can you clearly describe how this is actually fixing any
-problems? What's the sequence of events that happens to cause
-corruption?
-
-This does raise the question though why we ever mask/unmask these
-interrupts if we're always going to keep them masked while doing
-DMA RX. Presumably if we can use DMA to RX, we can always use it
-and set things up properly at startup time instead of later on.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+We just have the parent index, but which indices are pllc dividers is
+different between bcm2835_clock_per_parents and
+bcm2835_clock_vpu_parents.  So, I guess it's possible, but seems more
+error-prone than the strncmp.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160511/cd7e6df2/attachment-0001.sig>
