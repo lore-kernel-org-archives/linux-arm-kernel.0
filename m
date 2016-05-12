@@ -1,186 +1,182 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 May 2016 14:40:15 +0200
-Subject: [PATCH v3 37/55] KVM: arm/arm64: vgic-new: Add GICv3 SGI system
- register trap handler
-In-Reply-To: <1462531568-9799-38-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-38-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160512124015.GI27623@cbox>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Thu, 12 May 2016 20:41:24 +0800
+Subject: [PATCH 4/5] iommu/mediatek: add support for mtk iommu
+ generation one HW
+In-Reply-To: <5731B7D8.8040304@arm.com>
+References: <1462780816-5288-1-git-send-email-honghui.zhang@mediatek.com>
+ <1462780816-5288-5-git-send-email-honghui.zhang@mediatek.com>
+ <5731B7D8.8040304@arm.com>
+Message-ID: <1463056884.29375.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:45:50AM +0100, Andre Przywara wrote:
-> In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
-> by a MMIO write, but with a system register write. KVM knows about
-> that register already, we just need to implement the handler and wire
-> it up to the core KVM/ARM code.
+Hi, Robin, Thanks very much for your comment, and sorry for the last
+reply format.
+
+On Tue, 2016-05-10 at 11:28 +0100, Robin Murphy wrote:
+> On 09/05/16 09:00, honghui.zhang at mediatek.com wrote:
+> [...]
+> > +static void *mtk_iommu_alloc_pgt(struct device *dev, size_t size, gfp_t gfp)
+> > +{
+> > +	dma_addr_t dma;
+> > +	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+> > +
+> > +	if (!pages)
+> > +		return NULL;
+> > +
+> > +	dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+> > +	if (dma_mapping_error(dev, dma))
+> > +		goto out_free;
+> > +	/*
+> > +	 * We depend on the IOMMU being able to work with any physical
+> > +	 * address directly, so if the DMA layer suggests otherwise by
+> > +	 * translating or truncating them, that bodes very badly...
+> > +	 */
+> > +	if (dma != virt_to_phys(pages))
+> > +		goto out_unmap;
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - add comment about SGI_AFFINITY_LEVEL macro
+> Given that you've only got a single table to allocate, and at 4MB it has 
+> a fair chance of failing beyond early boot time, just use 
+> dma_alloc_coherent() - you don't need to care about the dma <-> phys 
+> relationship because you don't have multi-level tables to walk. That 
+> way, you can get rid of all the awkward streaming DMA stuff, and also 
+> benefit from CMA to avoid allocation failures.
 > 
->  include/kvm/vgic/vgic.h          |   8 +++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 106 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 114 insertions(+)
+
+The dma_alloc_coheret interface is good enough for me, thanks.
+
+> > +	kmemleak_ignore(pages);
+> > +	return pages;
+> > +
+> > +out_unmap:
+> > +	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
+> > +	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
+> > +out_free:
+> > +	free_pages_exact(pages, size);
+> > +	return NULL;
+> > +
+> > +}
+> > +
+> > +static void mtk_iommu_free_pgt(struct device *dev, void *pages, size_t size)
+> > +{
+> > +	dma_unmap_single(dev, (dma_addr_t)virt_to_phys(pages),
+> > +			 size, DMA_TO_DEVICE);
+> > +	free_pages_exact(pages, size);
+> > +}
+> > +
+> > +static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
+> > +{
+> > +	struct mtk_iommu_domain *dom = data->m4u_dom;
+> > +
+> > +	spin_lock_init(&dom->pgtlock);
+> > +
+> > +	dom->pgt_va = mtk_iommu_alloc_pgt(data->dev,
+> > +				dom->pgt_size, GFP_KERNEL);
+> > +	if (!dom->pgt_va)
+> > +		return -ENOMEM;
+> > +
+> > +	dom->pgt_pa = virt_to_phys(dom->pgt_va);
+> > +
+> > +	writel(dom->pgt_pa, data->base + REG_MMU_PT_BASE_ADDR);
+> > +
+> > +	dom->cookie = (void *)data;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+> > +{
+> > +	struct mtk_iommu_domain *dom;
+> > +
+> > +	if (type != IOMMU_DOMAIN_UNMANAGED)
+> > +		return NULL;
+> > +
+> > +	dom = kzalloc(sizeof(*dom), GFP_KERNEL);
+> > +	if (!dom)
+> > +		return NULL;
+> > +
+> > +	/*
+> > +	 * MTK m4u support 4GB iova address space, and oly support 4K page
+> > +	 * mapping. So the pagetable size should be exactly as 4M.
+> > +	 */
+> > +	dom->pgt_size = SZ_4M;
 > 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 4ec1270..2c43eb8 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -209,6 +209,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
->  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->  
-> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
-> +#else
-> +static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
-> +{
-> +}
-> +#endif
-> +
->  /**
->   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
->   *
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 3bcc2c4..af12592 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -356,3 +356,109 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->  
->  	return ret;
->  }
-> +
-> +/*
-> + * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
-> + * generation register ICC_SGI1R_EL1) with a given VCPU.
-> + * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
-> + * return -1.
-> + */
-> +static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
-> +{
-> +	unsigned long affinity;
-> +	int level0;
-> +
-> +	/*
-> +	 * Split the current VCPU's MPIDR into affinity level 0 and the
-> +	 * rest as this is what we have to compare against.
-> +	 */
-> +	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
-> +	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
-> +	affinity &= ~MPIDR_LEVEL_MASK;
-> +
-> +	/* bail out if the upper three levels don't match */
-> +	if (sgi_aff != affinity)
-> +		return -1;
-> +
-> +	/* Is this VCPU's bit set in the mask ? */
-> +	if (!(sgi_cpu_mask & BIT(level0)))
-> +		return -1;
-> +
-> +	return level0;
-> +}
-> +
-> +/*
-> + * The ICC_SGI* registers encode the affinity differently from the MPIDR,
-> + * so provide a wrapper to use the existing defines to isolate a certain
-> + * affinity level.
-> + */
-> +#define SGI_AFFINITY_LEVEL(reg, level) \
-> +	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
-> +	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
+> If the table size is fixed, then why bother having a variable at all?
 
-Do we really prefer this over (untested):
-
-	static inline u64 decode_sgi_affinity(u64 reg)
-	{
-		u64 aff1, aff2, aff3;
-
-		aff1 = (reg & ICC_SGI1R_AFFINITY_1_MASK) >> ICC_SGI1R_AFFINITY_1_SHIFT;
-		aff2 = (reg & ICC_SGI1R_AFFINITY_2_MASK) >> ICC_SGI1R_AFFINITY_2_SHIFT;
-		aff3 = (reg & ICC_SGI1R_AFFINITY_3_MASK) >> ICC_SGI1R_AFFINITY_3_SHIFT;
-
-		return (aff1 << MPIDR_LEVEL_SHIFT(1)) |
-		       (aff2 << MPIDR_LEVEL_SHIFT(2)) |
-		       (aff3 << MPIDR_LEVEL_SHIFT(3));
-	}
-
-> +
-> +/**
-> + * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
-> + * @vcpu: The VCPU requesting a SGI
-> + * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
-> + *
-> + * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
-> + * This will trap in sys_regs.c and call this function.
-> + * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
-> + * target processors as well as a bitmask of 16 Aff0 CPUs.
-> + * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
-> + * check for matching ones. If this bit is set, we signal all, but not the
-> + * calling VCPU.
-> + */
-> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
-> +{
-> +	struct kvm *kvm = vcpu->kvm;
-> +	struct kvm_vcpu *c_vcpu;
-> +	u16 target_cpus;
-> +	u64 mpidr;
-> +	int sgi, c;
-> +	int vcpu_id = vcpu->vcpu_id;
-> +	bool broadcast;
-> +
-> +	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
-> +	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
-> +	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
-> +	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
-> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
-> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
-> +
-> +	/*
-> +	 * We iterate over all VCPUs to find the MPIDRs matching the request.
-> +	 * If we have handled one CPU, we clear its bit to detect early
-> +	 * if we are already finished. This avoids iterating through all
-> +	 * VCPUs when most of the times we just signal a single VCPU.
-> +	 */
-> +	kvm_for_each_vcpu(c, c_vcpu, kvm) {
-> +		struct vgic_irq *irq;
-> +
-> +		/* Exit early if we have dealt with all requested CPUs */
-> +		if (!broadcast && target_cpus == 0)
-> +			break;
-> +
-> +		/* Don't signal the calling VCPU */
-> +		if (broadcast && c == vcpu_id)
-> +			continue;
-> +
-> +		if (!broadcast) {
-> +			int level0;
-> +
-> +			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
-> +			if (level0 == -1)
-> +				continue;
-> +
-> +			/* remove this matching VCPU from the mask */
-> +			target_cpus &= ~BIT(level0);
-> +		}
-> +
-> +		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		irq->pending = true;
-> +
-> +		vgic_queue_irq_unlock(vcpu->kvm, irq);
-> +	}
-> +}
-> -- 
-> 2.7.3
+I will follow your advise for next version.
+thanks.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > +	return &dom->domain;
+> > +}
+> > +
+> > +static void mtk_iommu_domain_free(struct iommu_domain *domain)
+> > +{
+> > +	kfree(to_mtk_domain(domain));
+> > +}
+> > +
+> 
+> [...]
+> 
+> > +static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> > +			 phys_addr_t paddr, size_t size, int prot)
+> > +{
+> > +	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> > +	struct mtk_iommu_data *data = dom->cookie;
+> > +	unsigned int page_num = size >> MTK_IOMMU_PAGE_SHIFT;
+> 
+> Since you only advertise a single page size, this will always be 1, so 
+> you could either get rid of the loop here...
 
-otherwise:
+I would prefer your following advise to modify the pgsize_bitmap, thanks
+very much.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> > +	unsigned long flags;
+> > +	unsigned int i;
+> > +	u32 *pgt_base_iova;
+> > +	u32 pabase = (u32)paddr;
+> > +	int map_size = 0;
+> > +
+> > +	spin_lock_irqsave(&dom->pgtlock, flags);
+> > +	pgt_base_iova = dom->pgt_va + (iova  >> MTK_IOMMU_PAGE_SHIFT);
+> > +	for (i = 0; i < page_num; i++) {
+> > +		pgt_base_iova[i] = pabase | F_DESC_VALID | F_DESC_NONSEC;
+> > +		pabase += MTK_IOMMU_PAGE_SIZE;
+> > +		map_size += MTK_IOMMU_PAGE_SIZE;
+> > +	}
+> > +	dma_sync_single_for_device(data->dev,
+> > +			dom->pgt_pa + (iova >> MTK_IOMMU_PAGE_SHIFT),
+> > +			(size >> MTK_IOMMU_PAGE_SHIFT) * sizeof(u32),
+> > +			DMA_TO_DEVICE);
+> > +	spin_unlock_irqrestore(&dom->pgtlock, flags);
+> > +
+> > +	mtk_iommu_tlb_flush_range(data, iova, size);
+> > +
+> > +	return map_size;
+> > +}
+> 
+> [...]
+> 
+> > +static struct iommu_ops mtk_iommu_ops = {
+> > +	.domain_alloc	= mtk_iommu_domain_alloc,
+> > +	.domain_free	= mtk_iommu_domain_free,
+> > +	.attach_dev	= mtk_iommu_attach_device,
+> > +	.detach_dev	= mtk_iommu_detach_device,
+> > +	.map		= mtk_iommu_map,
+> > +	.unmap		= mtk_iommu_unmap,
+> > +	.map_sg		= default_iommu_map_sg,
+> > +	.iova_to_phys	= mtk_iommu_iova_to_phys,
+> > +	.add_device	= mtk_iommu_add_device,
+> > +	.remove_device	= mtk_iommu_remove_device,
+> > +	.device_group	= mtk_iommu_device_group,
+> > +	.pgsize_bitmap	= MTK_IOMMU_PAGE_SIZE,
+> > +};
+> 
+> ...or perhaps advertise .pgsize_bitmap = ~0UL << MTK_IOMMU_PAGE_SHIFT 
+> here, so you actually can handle multiple entries at once for larger 
+> mappings - given how simple the page table format is that doesn't seem 
+> too unreasonable, especially since it should give you a big efficiency 
+> win in terms of TLB maintenance.
+> 
+> Robin.
+> 
