@@ -1,59 +1,289 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 12 May 2016 16:19:48 +0300
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <4521594.dSmlmmAdFg@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <2733875.IzutTZKHMc@wuerfel> <57347BD4.8010105@huawei.com>
- <4521594.dSmlmmAdFg@wuerfel>
-Message-ID: <20160512131948.GA30205@yury-N73SV>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 12 May 2016 14:25:23 +0100
+Subject: [PATCH v3 13/55] KVM: arm/arm64: vgic-new: Add data structure
+ definitions
+In-Reply-To: <20160512121258.GG27623@cbox>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-14-git-send-email-andre.przywara@arm.com>
+ <20160512121258.GG27623@cbox>
+Message-ID: <57348443.3090906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 03:06:39PM +0200, Arnd Bergmann wrote:
-> On Thursday 12 May 2016 20:49:24 Zhangjian wrote:
-> > Hi,
-> > 
-> > On 2016/5/12 17:21, Arnd Bergmann wrote:
-> > > On Thursday 12 May 2016 10:17:58 Catalin Marinas wrote:
-> > >> On Wed, May 11, 2016 at 09:30:07PM +0200, Arnd Bergmann wrote:
-> > >>> On Wednesday 11 May 2016 17:59:01 Catalin Marinas wrote:
-> > >>>
-> > >>> I don't think the shifts are a problem, the main downside would be
-> > >>> the limit to 44 bits of file offsets (16TB files), but it's also
-> > >>> unclear if that is a practical problem at all. If it is, we run
-> > >>> into the same problem on all other 32-bit architectures too.
-> > >>
-> > >> I hope people are seriously thinking of moving to an LP64 ABI if they
-> > >> have such large file offset needs.
-> > >
-> > > Good point. 44 bits of file size is certainly enough for mmap()
-> > > on a 32-bit task: you would only be able to map a very small fraction
-> > > of the file anyway, and if you want to map larger files, and should
-> > > move to 64-bit tasks long before this becomes a limitation.
-> > Hi,
-> > 
-> > I apply the following patch in order to make use of the REAL mmmap2. LTP
-> > test pass in litle endian. mmap16 successful with segfault in big endian.
-> > 
-> > BTW, I saw the similar code in tile, mips, microblaze and s390 compat. Should
-> > we merge these code into a common syscall wrapper?
-> 
-> I think that's a good idea. The function used to be slightly different
-> for each architecture, but now it seems we have a significant number
-> of identical implementations that we could just merge them together
-> into one.
-> 
-> sys_mmap_pgoff was originally introduced as the common implementation
-> and it reduced the amount of duplication a lot, but as its units
-> are based on PAGE_SIZE rather than hardwired 4096 bytes, it's
-> not as useful.
-> 
+Hi,
 
-microblaze and mips (twice) are doing like this. And aarh32 as well,
-in arch/arm64/kernel/entry32.S
+On 12/05/16 13:12, Christoffer Dall wrote:
+> On Fri, May 06, 2016 at 11:45:26AM +0100, Andre Przywara wrote:
+>> From: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>> Add a new header file for the new and improved GIC implementation.
+>> The big change is that we now have a struct vgic_irq per IRQ instead
+>> of spreading all the information over various bitmaps.
+>>
+>> We include this new header conditionally from within the old header
+>> file for the time being to avoid touching all the users.
+>>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changes RFC .. v1:
+>> - adapt to 4.6-rc (adding live_lrs member)
+>> - elaborate on ap_list usage
+>>
+>> Changes v1 .. v2:
+>> - change data type of dist->enabled to bool
+>>
+>>  include/kvm/arm_vgic.h  |   5 ++
+>>  include/kvm/vgic/vgic.h | 201 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 206 insertions(+)
+>>  create mode 100644 include/kvm/vgic/vgic.h
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index c14ff77..d406f8e 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -19,6 +19,10 @@
+>>  #ifndef __ASM_ARM_KVM_VGIC_H
+>>  #define __ASM_ARM_KVM_VGIC_H
+>>  
+>> +#ifdef CONFIG_KVM_NEW_VGIC
+>> +#include <kvm/vgic/vgic.h>
+>> +#else
+>> +
+>>  #include <linux/kernel.h>
+>>  #include <linux/kvm.h>
+>>  #include <linux/irqreturn.h>
+>> @@ -366,4 +370,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
+>>  }
+>>  #endif
+>>  
+>> +#endif	/* old VGIC include */
+>>  #endif
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> new file mode 100644
+>> index 0000000..39933ee
+>> --- /dev/null
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -0,0 +1,201 @@
+>> +/*
+>> + * Copyright (C) 2015, 2016 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
+>> +#define __ASM_ARM_KVM_VGIC_VGIC_H
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/kvm.h>
+>> +#include <linux/irqreturn.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/types.h>
+>> +#include <kvm/iodev.h>
+>> +
+>> +#define VGIC_V3_MAX_CPUS	255
+>> +#define VGIC_V2_MAX_CPUS	8
+>> +#define VGIC_NR_IRQS_LEGACY     256
+>> +#define VGIC_NR_SGIS		16
+>> +#define VGIC_NR_PPIS		16
+>> +#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+>> +#define VGIC_MAX_PRIVATE	(VGIC_NR_PRIVATE_IRQS - 1)
+>> +#define VGIC_MAX_SPI		1019
+>> +#define VGIC_MAX_RESERVED	1023
+>> +#define VGIC_MIN_LPI		8192
+>> +
+>> +enum vgic_type {
+>> +	VGIC_V2,		/* Good ol' GICv2 */
+>> +	VGIC_V3,		/* New fancy GICv3 */
+>> +};
+>> +
+>> +/* same for all guests, as depending only on the _host's_ GIC model */
+>> +struct vgic_global {
+>> +	/* type of the host GIC */
+>> +	enum vgic_type		type;
+>> +
+>> +	/* Physical address of vgic virtual cpu interface */
+>> +	phys_addr_t		vcpu_base;
+>> +
+>> +	/* virtual control interface mapping */
+>> +	void __iomem		*vctrl_base;
+>> +
+>> +	/* Number of implemented list registers */
+>> +	int			nr_lr;
+>> +
+>> +	/* Maintenance IRQ number */
+> 
+> nit: this is the physial INTID, right?
+> 
+>> +	unsigned int		maint_irq;
+>> +
+>> +	/* maximum number of VCPUs allowed (GICv2 limits us to 8) */
+>> +	int			max_gic_vcpus;
+>> +
+>> +	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
+>> +	bool			can_emulate_gicv2;
+>> +};
+>> +
+>> +extern struct vgic_global kvm_vgic_global_state;
+>> +
+>> +#define VGIC_V2_MAX_LRS		(1 << 6)
+>> +#define VGIC_V3_MAX_LRS		16
+>> +#define VGIC_V3_LR_INDEX(lr)	(VGIC_V3_MAX_LRS - 1 - lr)
+>> +
+>> +enum vgic_irq_config {
+>> +	VGIC_CONFIG_EDGE = 0,
+>> +	VGIC_CONFIG_LEVEL
+>> +};
+>> +
+>> +struct vgic_irq {
+>> +	spinlock_t irq_lock;		/* Protects the content of the struct */
+>> +	struct list_head ap_list;
+>> +
+>> +	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
+>> +					 * SPIs and LPIs: The VCPU whose ap_list
+>> +					 * on which this is queued.
+> 
+> nit: s/on which this is queued/this is queued on/
+> 
+>> +					 */
+>> +
+>> +	struct kvm_vcpu *target_vcpu;	/* The VCPU that this interrupt should
+>> +					 * be send to, as a result of the
+> 
+> nit: s/send/sent/
 
-In previous submissions it was a patch that shares aarch32 code to
-ilp32. If we decided turn around again, I think, we'd pick up that patch.
+Both fixed.
 
-The other option is to make this hack generic, as so many arches use it.
+>> +					 * targets reg (v2) or the
+>> +					 * affinity reg (v3).
+>> +					 */
+>> +
+>> +	u32 intid;			/* Guest visible INTID */
+>> +	bool pending;
+>> +	bool line_level;		/* Level only */
+>> +	bool soft_pending;		/* Level only */
+>> +	bool active;			/* not used for LPIs */
+>> +	bool enabled;
+>> +	bool hw;			/* Tied to HW IRQ */
+>> +	u32 hwintid;			/* HW INTID number */
+>> +	union {
+>> +		u8 targets;			/* GICv2 target VCPUs mask */
+>> +		u32 mpidr;			/* GICv3 target VCPU */
+>> +	};
+>> +	u8 source;			/* GICv2 SGIs only */
+>> +	u8 priority;
+>> +	enum vgic_irq_config config;	/* Level or edge */
+>> +};
+>> +
+>> +struct vgic_dist {
+>> +	bool			in_kernel;
+>> +	bool			ready;
+>> +
+>> +	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
+>> +	u32			vgic_model;
+>> +
+>> +	int			nr_spis;
+>> +
+>> +	/* TODO: Consider moving to global state */
+>> +	/* Virtual control interface mapping */
+>> +	void __iomem		*vctrl_base;
+>> +
+>> +	/* base addresses in guest physical address space: */
+>> +	gpa_t			vgic_dist_base;		/* distributor */
+>> +	union {
+>> +		/* either a GICv2 CPU interface */
+>> +		gpa_t			vgic_cpu_base;
+>> +		/* or a number of GICv3 redistributor regions */
+>> +		gpa_t			vgic_redist_base;
+>> +	};
+>> +
+>> +	/* distributor enabled */
+>> +	bool			enabled;
+>> +
+>> +	struct vgic_irq		*spis;
+>> +};
+>> +
+>> +struct vgic_v2_cpu_if {
+>> +	u32		vgic_hcr;
+>> +	u32		vgic_vmcr;
+>> +	u32		vgic_misr;	/* Saved only */
+>> +	u64		vgic_eisr;	/* Saved only */
+>> +	u64		vgic_elrsr;	/* Saved only */
+>> +	u32		vgic_apr;
+>> +	u32		vgic_lr[VGIC_V2_MAX_LRS];
+>> +};
+>> +
+>> +struct vgic_v3_cpu_if {
+>> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+>> +	u32		vgic_hcr;
+>> +	u32		vgic_vmcr;
+>> +	u32		vgic_sre;	/* Restored only, change ignored */
+>> +	u32		vgic_misr;	/* Saved only */
+>> +	u32		vgic_eisr;	/* Saved only */
+>> +	u32		vgic_elrsr;	/* Saved only */
+>> +	u32		vgic_ap0r[4];
+>> +	u32		vgic_ap1r[4];
+>> +	u64		vgic_lr[VGIC_V3_MAX_LRS];
+>> +#endif
+>> +};
+>> +
+>> +struct vgic_cpu {
+>> +	/* CPU vif control registers for world switch */
+>> +	union {
+>> +		struct vgic_v2_cpu_if	vgic_v2;
+>> +		struct vgic_v3_cpu_if	vgic_v3;
+>> +	};
+>> +
+>> +	unsigned int used_lrs;
+>> +	struct vgic_irq private_irqs[VGIC_NR_PRIVATE_IRQS];
+>> +
+>> +	spinlock_t ap_list_lock;	/* Protects the ap_list */
+>> +
+>> +	/*
+>> +	 * List of IRQs that this VCPU should consider because they are either
+>> +	 * Active or Pending (hence the name; AP list), or because they recently
+>> +	 * were one of the two and need to be migrated off this list to another
+>> +	 * VCPU.
+>> +	 */
+>> +	struct list_head ap_list_head;
+>> +
+>> +	u64 live_lrs;
+>> +};
+>> +
+>> +#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>> +#define vgic_initialized(k)	(false)
+>> +#define vgic_ready(k)		((k)->arch.vgic.ready)
+>> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+>> +			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+> 
+> this should really be a static inline at this point.
+
+I think I tried this at the very beginning and it doesn't work. I get:
+
+In file included from include/kvm/arm_vgic.h:23:0,
+                 from arch/arm64/include/asm/kvm_host.h:39,
+                 from include/linux/kvm_host.h:36,
+                 from arch/arm64/kernel/asm-offsets.c:24:
+include/kvm/vgic/vgic.h: In function 'vgic_valid_spi':
+include/kvm/vgic/vgic.h:232:13: error: dereferencing pointer to
+incomplete type 'struct kvm'
+   (irq < kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS);
+             ^
+./Kbuild:80: recipe for target 'arch/arm64/kernel/asm-offsets.s' failed
+make[3]: *** [arch/arm64/kernel/asm-offsets.s] Error 1
+
+Is this because asm-offsets.s includes this file and struct kvm is
+opaque at this point?
+Or is my brain totally GICed by now?
+
+Cheers,
+Andre.
