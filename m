@@ -1,30 +1,107 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 12 May 2016 10:30:25 +0200
-Subject: [PATCH v8 8/8] i2c: rk3x: support fast-mode plus for rk3399
-In-Reply-To: <CAD=FV=VzQ8PRokgAaTV00L31mcXFEzBG8c1NB4+Rqyx75hwwDg@mail.gmail.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <5153288.jNhUuzGC3g@phil>
- <CAD=FV=VzQ8PRokgAaTV00L31mcXFEzBG8c1NB4+Rqyx75hwwDg@mail.gmail.com>
-Message-ID: <6806722.VBDbziL6YI@phil>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 May 2016 10:30:47 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 01/11] clk: sunxi: Add display and
+ TCON0 clocks driver
+In-Reply-To: <20160512065943.GX3733@lukather>
+References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160506223002.GE3492@codeaurora.org>
+ <20160508200308.GF6167@lukather>
+ <20160509223238.GW3492@codeaurora.org>
+ <20160509223924.GX3492@codeaurora.org>
+ <1462907459.9981.0.camel@plaes.org>
+ <20160511221541.GG3492@codeaurora.org>
+ <1463024360.16747.4.camel@plaes.org>
+ <20160512065943.GX3733@lukather>
+Message-ID: <20160512083047.GY3733@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 11. Mai 2016, 16:41:54 schrieb Doug Anderson:
-> Heiko,
+On Thu, May 12, 2016 at 08:59:43AM +0200, Maxime Ripard wrote:
+> On Thu, May 12, 2016 at 06:39:20AM +0300, Priit Laes wrote:
+> > On Wed, 2016-05-11 at 15:15 -0700, Stephen Boyd wrote:
+> > > On 05/10, Priit Laes wrote:
+> > > > 
+> > > > On Mon, 2016-05-09 at 15:39 -0700, Stephen Boyd wrote:
+> > > > > 
+> > > > > On 05/09, Stephen Boyd wrote:
+> > > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > Ok I applied this one to clk-next.
+> > > > > > 
+> > > > > And I squashed this in to silence the following checker warning.
+> > > > > 
+> > > > > drivers/clk/sunxi/clk-sun4i-display.c:110:33: warning: Variable
+> > > > > length array is used.
+> > > > > 
+> > > > > ---8<---
+> > > > > diff --git a/drivers/clk/sunxi/clk-sun4i-display.c
+> > > > > b/drivers/clk/sunxi/clk-sun4i-display.c
+> > > > > index f02e250e64ed..f8ff6c4a5633 100644
+> > > > > --- a/drivers/clk/sunxi/clk-sun4i-display.c
+> > > > > +++ b/drivers/clk/sunxi/clk-sun4i-display.c
+> > > > > @@ -107,7 +107,7 @@ static int
+> > > > > sun4i_a10_display_reset_xlate(struct
+> > > > > reset_controller_dev *rcdev,
+> > > > > ?static void __init sun4i_a10_display_init(struct device_node
+> > > > > *node,
+> > > > > ?					??const struct
+> > > > > sun4i_a10_display_clk_data *data)
+> > > > > ?{
+> > > > > -	const char *parents[data->parents];
+> > > > > +	const char *parents[4];
+> > > > This change breaks at least de_[bf]e clocks which have 3 clock
+> > > > parents.
+> > 
+> > > I just used the largest data->parents number, which was 4. How
+> > > does that break anything?
+> > 
+> > If you look at the?sun4i_a10_display_init, it contains this block:
+> > 
+> > ? ? ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
+> > ????if (ret != ARRAY_SIZE(parents)) {
+> > ????????pr_err("%s: Could not retrieve the parents\n", clk_name);
+> > ????????goto unmap;
+> > ????}
+> > 
+> > of_clk_parent_fill returns 3 for de_be/de_fe nodes, and
+> > ARRAY_SIZE(parents) is 4.
 > 
-> On Wed, May 11, 2016 at 2:09 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > Additionally, the i2c-noob in me would wish for a short sentence on
-> > where
-> > the timing values come from (measured, somewhere in the TRM I didn't
-> > find or something completely different).
-> 
-> If you search for "UM10204" you'll find the first link is
-> <http://www.nxp.com/documents/user_manual/UM10204.pdf>.  That appears
-> to be the official standard.  At least that's what
-> <http://www.i2c-bus.org/fast-mode-plus/> says (though they have an old
-> link).
+> Replacing both ARRAY_SIZE(parents) by data->parents would work though.
 
-I did find that document yesterday, but was to blind and somehow only saw the 
-separate table for highspeed-timings. On a closer look, I now also found the 
-timing-table for the other modes [due to the bigger font-size used there? 
-;-) ]
+I just tested on top of current next, and indeed the following patch
+is needed.
+
+Stephen, could you squash it in the former patch?
+
+diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+index 70803aa7028c..9780fac6d029 100644
+--- a/drivers/clk/sunxi/clk-sun4i-display.c
++++ b/drivers/clk/sunxi/clk-sun4i-display.c
+@@ -128,8 +128,8 @@ static void __init sun4i_a10_display_init(struct device_node *node,
+ 		return;
+ 	}
+ 
+-	ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
+-	if (ret != ARRAY_SIZE(parents)) {
++	ret = of_clk_parent_fill(node, parents, data->parents);
++	if (ret != data->parents) {
+ 		pr_err("%s: Could not retrieve the parents\n", clk_name);
+ 		goto unmap;
+ 	}
+
+Thanks!
+Maxime					  
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160512/bea383f2/attachment.sig>
