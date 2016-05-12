@@ -1,136 +1,146 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Thu, 12 May 2016 11:45:53 +0800
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <5250356.myv9GIZ34h@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <573305A8.50406@huawei.com> <5733149C.4030903@huawei.com>
- <5250356.myv9GIZ34h@wuerfel>
-Message-ID: <5733FC71.8070101@huawei.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 12 May 2016 05:53:15 +0200
+Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+In-Reply-To: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
+References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160512035315.GA19408@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+Hi,
 
-On 2016/5/11 22:50, Arnd Bergmann wrote:
-> On Wednesday 11 May 2016 19:16:44 Zhangjian wrote:
->> Hi,
->>
->> On 2016/5/11 18:12, Zhangjian (Bamvor) wrote:
->>> Hi, Arnd
->>>
->>> On 2016/5/11 16:09, Arnd Bergmann wrote:
->>>   > On Wednesday 11 May 2016 10:04:16 Zhangjian wrote:
->>>   >>> I don't remember. It's probably not important whether we have the shift
->>>   >>> in there, as long as it's independent of the actual kernel page size and
->>>   >>> user space and kernel agree on the calling conventions.
->>>   >> Well. I am ok with where to shift the pages size because we get the same
->>>   >> result. I was just thinking if we should get rid of the name of mmap2 in our
->>>   >> ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
->>>   >> if they do not know the implementations.
->>>   >
->>>   > That is a good point: If the implementation matches the mmap() behavior rather than
->>>   > mmap2(), we should rename the macro by doing
->>>   >
->>>   > #undef __NR_mmap2
->>>   > #define __NR_mmap 222
->>>   >
->>>   > in the uapi/asm/unistd.h file for ilp32 mode.
->>> Do you mean define the following things in kernel:
->>> ```
->>> diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
->>> index 1caadc2..3f79640 100644
->>> --- a/arch/arm64/include/uapi/asm/unistd.h
->>> +++ b/arch/arm64/include/uapi/asm/unistd.h
->>> @@ -14,3 +14,9 @@
->>>     * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>     */
->>>    #include <asm-generic/unistd.h>
->>> +
->>> +#ifdef __ILP32__
->>> +#undef __NR_mmap2
->>> +#define __NR_mmap 222
->>> +#endif /* #ifdef __ILP32__ */
->>> +
->>> ```
->>> Then glibc could call mmap instead of mmap2.
->>> I could not try it now. Because after change off_t to 64bit in glibc, stat
->>> is fail. I may need to revert the stat relative patch.
->> After revert stat relative patch in glibc, mmap01-mmap14 success. But mmap16
->> success with segfault. I will investigate it later.
->>
->> There is pointer and size_t in mmap, so, IIUC, we need to clear the top halves
->> of register by using COMPAT_SYSCALL_WRAP6.
->
-> Correct, good catch!
->
->> And after check the function in
->> arch/s390/kernel/compat_linux.c, I feel that we need to do the same thing for
->> pread64 and pwrite64.
->>
->
->> But I got following error when I try to add
->> COMPAT_SYSCALL_WRAP4(pread64, unsigned int, fd, char __user *, buf,
->> size_t, count, loff_t, pos);
->> COMPAT_SYSCALL_WRAP4(pwrite64, unsigned int, fd, const char __user *, buf,
->> size_t, count, loff_t, pos);
->>
->
-> Hmm, that is indeed tricky. I think COMPAT_SYSCALL_WRAP4 rightfully
-> refuses the loff_t argument here, as the common case is that this is
-> not possible.
-It works if I apply the following patch, I defined the wrong `__TYPE_IS_xxx`
-yesterday. Should we merge this into ILP32 series or send the compat.h
-and syscalls.h individually? The current series of ILP32 is a little bit
-long and hard to review.
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index ba6ebe0..22a9565 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -747,7 +747,8 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
-  #ifndef __SC_COMPAT_CAST
-  #define __SC_COMPAT_CAST(t, a) ({                                      \
-         BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&              \
--                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));            \
-+                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t) &&           \
-+                    !__TYPE_IS_LOFFT(t));                              \
-         ((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)));            \
-  })
-  #endif
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index 6e57d9c..66eb85d 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -47,6 +47,7 @@
-  #define __TYPE_IS_L(t) (__same_type((t)0, 0L))
-  #define __TYPE_IS_UL(t)        (__same_type((t)0, 0UL))
-  #define __TYPE_IS_LL(t) (__same_type((t)0, 0LL) || __same_type((t)0, 0ULL))
-+#define __TYPE_IS_LOFFT(t)     (__same_type((t)0, (loff_t)0))
-  #define __SC_LONG(t, a) __typeof(__builtin_choose_expr(__TYPE_IS_LL(t), 0LL, 0L)) a
-  #define __SC_CAST(t, a)        (t) a
-  #define __SC_ARGS(t, a)        a
-diff --git a/kernel/compat_wrapper.c b/kernel/compat_wrapper.c
-index 98b68b8..28f02d0 100644
---- a/kernel/compat_wrapper.c
-+++ b/kernel/compat_wrapper.c
-@@ -304,3 +304,7 @@ COMPAT_SYSCALL_WRAP3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
-  COMPAT_SYSCALL_WRAP6(sendto, int, fd, void __user *, buff, size_t, len,
-                      unsigned int, flags, struct sockaddr __user *, addr,
-                      int, addr_len);
-+COMPAT_SYSCALL_WRAP4(pread64, unsigned int, fd, char __user *, buf,
-+                       size_t, count, loff_t, pos);
-+COMPAT_SYSCALL_WRAP4(pwrite64, unsigned int, fd, const char __user *, buf,
-+                        size_t, count, loff_t, pos);
- >
- > Can you open-code this using a COMPAT_SYSCALL4 definition similar to what
- > arch/tile has, but without the merging of the two halves of the argument?
-I am lost here. Tile do not use the wrapper, and it do not use the loff_t
-either:
-COMPAT_SYSCALL_DEFINE6(pread64, unsigned int, fd, char __user *, ubuf,
-                        size_t, count, u32, dummy, u32, low, u32, high)
+On 12/05/2016 at 09:05:34 +0800, Wenyou Yang wrote :
+> In order to get lower consumption, as a workaround, suspend
+> the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
+> Configuration Register while OHCI USB suspending.
+> 
 
-Regards
+Why is that a workaround?
 
-Bamvor
-> 	Arnd
->
+> This suspend operation must be done before stopping the USB clock,
+> resume after the USB clock enabled.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+> 
+>  drivers/usb/host/ohci-at91.c | 63 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+> 
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index d177372..ce898e0 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/io.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+>  #include <linux/usb.h>
+>  #include <linux/usb/hcd.h>
+>  
+> @@ -51,6 +53,7 @@ struct ohci_at91_priv {
+>  	struct clk *hclk;
+>  	bool clocked;
+>  	bool wakeup;		/* Saved wake-up state for resume */
+> +	struct regmap *sfr_regmap;
+>  };
+>  /* interface and function clocks; sometimes also an AHB clock */
+>  
+> @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device *pdev)
+>  
+>  /*-------------------------------------------------------------------------*/
+>  
+> +struct regmap *at91_dt_syscon_sfr(void)
+> +{
+> +	struct regmap *regmap;
+> +
+> +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
+> +	if (IS_ERR(regmap))
+> +		return NULL;
+> +
+> +	return regmap;
+> +}
+> +
+>  static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
+>  
+>  /* configure so an HC device and id are always provided */
+> @@ -197,6 +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>  		goto err;
+>  	}
+>  
+> +	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
+> +
+>  	board = hcd->self.controller->platform_data;
+>  	ohci = hcd_to_ohci(hcd);
+>  	ohci->num_ports = board->ports;
+> @@ -581,6 +597,49 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#define SFR_OHCIICR		0x10
+> +#define SFR_OHCIICR_SUSPEND_A	BIT(8)
+> +#define SFR_OHCIICR_SUSPEND_B	BIT(9)
+> +#define SFR_OHCIICR_SUSPEND_C	BIT(10)
+> +
+> +#define SFR_OHCIICR_USB_SUSPEND	(SFR_OHCIICR_SUSPEND_A | \
+> +				 SFR_OHCIICR_SUSPEND_B | \
+> +				 SFR_OHCIICR_SUSPEND_C)
+> +
+
+Those defines should go in a header file either in include/soc/at91 or
+in include/linux/mfd
+
+> +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable)
+> +{
+> +	u32 regval;
+> +	int ret;
+> +
+> +	if (IS_ERR(regmap))
+> +		return PTR_ERR(regmap);
+> +
+> +	ret = regmap_read(regmap, SFR_OHCIICR, &regval);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (enable)
+> +		regval &= ~SFR_OHCIICR_USB_SUSPEND;
+> +	else
+> +		regval |= SFR_OHCIICR_USB_SUSPEND;
+> +
+> +	regmap_write(regmap, SFR_OHCIICR, regval);
+> +
+> +	regmap_read(regmap, SFR_OHCIICR, &regval);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ohci_at91_port_suspend(struct regmap *regmap)
+> +{
+> +	return ohci_at91_port_ctrl(regmap, false);
+> +}
+> +
+> +static int ohci_at91_port_resume(struct regmap *regmap)
+> +{
+> +	return ohci_at91_port_ctrl(regmap, true);
+> +}
+> +
+>  static int __maybe_unused
+>  ohci_hcd_at91_drv_suspend(struct device *dev)
+>  {
+> @@ -618,6 +677,8 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
+>  		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
+>  		ohci->rh_state = OHCI_RH_HALTED;
+>  
+> +		ohci_at91_port_suspend(ohci_at91->sfr_regmap);
+> +
+
+The main issue I see here is that you will call that function for all
+SoCs and it will always fail unless it is running on a sama5d2. Maybe we
+could be smarter about that.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
