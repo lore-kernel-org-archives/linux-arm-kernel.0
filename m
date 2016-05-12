@@ -1,79 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 May 2016 15:07:35 +0100
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160512134431.GB30205@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
- <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
- <20160512134431.GB30205@yury-N73SV>
-Message-ID: <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 12 May 2016 23:47:09 +0930
+Subject: [PATCH v2 0/2] watchdog: Add Aspeed watchdog driver
+In-Reply-To: <1462797277-14969-1-git-send-email-joel@jms.id.au>
+References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
+Message-ID: <1463062631-16432-1-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
-> On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
-> > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
-> > > I debugged preadv02 and pwritev02 failures and found very weird bug.
-> > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> > > of vector, and kernel reports successful read/write.
-> > > 
-> > > There are 2 problems:
-> > > 1. How kernel allows such address to be passed to fs subsystem;
-> > > 2. How fs successes to read/write at non-mapped, and in fact non-user
-> > > address.
-> > > 
-> > > I don't know the answer on 2'nd question, and it might be something
-> > > generic. But I investigated first problem.
-> > > 
-> > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
-> > > validate user address, and on arm64 it ends up with checking buffer
-> > > end against current_thread_info()->addr_limit.
-> > > 
-> > > current_thread_info()->addr_limit for ilp32, and most probably for
-> > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
-> > > It happens because on thread creation we call flush_old_exec() to set 
-> > > addr_limit, and completely ignore compat mode there.
+Hello,
 
-[...]
+These patches add support for the watchdog timer found in Aspeed ast2400 and
+ast2500 BMC SoCs.
 
-> > > --- a/arch/arm64/kernel/binfmt_elf32.c
-> > > +++ b/arch/arm64/kernel/binfmt_elf32.c
-> > > @@ -12,6 +12,7 @@
-> > >  do {						\
-> > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
-> > >  	set_thread_flag(TIF_32BIT);		\
-> > > +	set_fs(TASK_SIZE_32);			\
-> > >  } while (0)
-> > >  
-> > >  #define COMPAT_ARCH_DLINFO
-> > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-> > > index a934fd4..a8599c6 100644
-> > > --- a/arch/arm64/kernel/binfmt_ilp32.c
-> > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
-> > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
-> > >  do {									\
-> > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
-> > >  	clear_thread_flag(TIF_32BIT);					\
-> > > +	set_fs(TASK_SIZE_32);						\
-> > >  } while (0)
-> > 
-> > I don't think we need these two. AFAICT, flush_old_exec() takes care of
-> > setting the USER_DS for the new thread.
-> 
-> That's true, but USER_DS depends on personality which is not set yet
-> for new thread, as I wrote above. In fact, I tried correct USER_DS
-> only, and it doesn't work
+The u-boot that ships on the edk and with many systems leaves the watchdog
+running when jumping to the kernel, making this driver required for operation.
 
-Ah, it looks like load_elf_binary() sets the personality after
-flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
-maximum 64-bit task value, so they should have a similar issue with
-native 32-bit vs compat behaviour.
+It has been tested on the ast2400 in an OpenPower Palmetto, and the ast2500-edk
+dev board.
 
-So what exactly is LTP complaining about? Is different error (like
-EFAULT vs EINVAL) or not getting an error at all.
+Changes in v2:
 
-(I need to update my LTP, the preadv tests appeared in December last
-year)
+Addressed review from Guenter:
+ - dropped the drv_dbgs
+ - added defines for all of the constants
+ - clarified the type of reset we want
+ - leaves the watchdog running
+
+This also updates the device tree compatible string following review from Rob.
+As Arnd already took my device tree tree, I will send him a patch to fix that.
+
+Cheers,
+
+Joel
+
+Joel Stanley (2):
+  doc/devicetree: Add Aspeed watchdog timer bindings
+  watchdog: Add Aspeed watchdog driver
+
+ .../devicetree/bindings/watchdog/aspeed-wdt.txt    |  16 ++
+ drivers/watchdog/Kconfig                           |  13 ++
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/aspeed_wdt.c                      | 209 +++++++++++++++++++++
+ 4 files changed, 239 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/aspeed-wdt.txt
+ create mode 100644 drivers/watchdog/aspeed_wdt.c
 
 -- 
-Catalin
+2.8.1
