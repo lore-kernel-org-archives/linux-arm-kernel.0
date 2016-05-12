@@ -1,41 +1,119 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 May 2016 14:47:02 -0700
-Subject: [linux-sunxi] Re: [PATCH v4 01/11] clk: sunxi: Add display and
- TCON0 clocks driver
-In-Reply-To: <20160512083047.GY3733@lukather>
-References: <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160506223002.GE3492@codeaurora.org>
- <20160508200308.GF6167@lukather>
- <20160509223238.GW3492@codeaurora.org>
- <20160509223924.GX3492@codeaurora.org>
- <1462907459.9981.0.camel@plaes.org>
- <20160511221541.GG3492@codeaurora.org>
- <1463024360.16747.4.camel@plaes.org>
- <20160512065943.GX3733@lukather> <20160512083047.GY3733@lukather>
-Message-ID: <20160512214702.GL3492@codeaurora.org>
+From: matija.glavinic-pecotic.ext@nokia.com (Matija Glavinic Pecotic)
+Date: Thu, 12 May 2016 23:49:24 +0200
+Subject: [PATCH] ARM: Fix A15 798181 errata initialization
+Message-ID: <5734FA64.6040501@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12, Maxime Ripard wrote:
-> 
-> diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
-> index 70803aa7028c..9780fac6d029 100644
-> --- a/drivers/clk/sunxi/clk-sun4i-display.c
-> +++ b/drivers/clk/sunxi/clk-sun4i-display.c
-> @@ -128,8 +128,8 @@ static void __init sun4i_a10_display_init(struct device_node *node,
->  		return;
->  	}
->  
-> -	ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
-> -	if (ret != ARRAY_SIZE(parents)) {
-> +	ret = of_clk_parent_fill(node, parents, data->parents);
-> +	if (ret != data->parents) {
->  		pr_err("%s: Could not retrieve the parents\n", clk_name);
->  		goto unmap;
->  	}
+Current errata initialization doesn't take properly revision and REVIDR
+into account. Depending on the core revision, revidr bits should not be
+taken into account. Errata misleadingly declares r3p3 to be error-free,
+but this is not the case. Include rp3p3 in errata initialization.
 
-Ah ok. Thanks for catching that thinko and sending a patch.
+Here are possible fixes defined in revidr register for r2 and r3 [1,2]:
 
+r0p0-r2p1: No fixes applied
+
+r2p2,r2p3:
+
+REVIDR[4]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+REVIDR[9]: Not defined
+
+r2p4,r3p0,r3p1,r3p2:
+
+REVIDR[4]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+REVIDR[9]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+	   - This is an update to a previously released ECO.
+
+r3p3:
+
+REVIDR[4]: Reserved
+REVIDR[9]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+	   - This is an update to a previously released ECO.
+
+And here is proposed handling from the same documents [1,2]:
+
+* In r3p2 and earlier versions with REVIDR[4]= 0,the full workaround is
+  required.
+* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=0, only the
+  portion of the workaround up to the end of step 6 is required.
+* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=1, no
+  workaround is required.
+* In r3p3, if REVIDR[9]=0, only the portion of the workaround up
+  to the end of step 6 is required.
+* In r3p3, if REVIDR[9]=1, no workaround is required.
+
+These imply following:
+
+REVIDR[9] set -> No WA
+REVIDR[4] set, REVIDR[9] cleared -> Partial WA
+Both cleared -> Full WA
+
+Where certain bits should and should not be taken into account
+depending on whether they are defined for the revision.
+
+Although not explicitly mentioned in the errata note, REVIDR[9] set,
+with REVIDR[4] cleared is valid combination which requires no WA. This
+is confirmed by ARM support and errata will be updated.
+
+[1] ARM CortexTM-A15 MPCore - NEON
+    Product revision r3
+    Software Developers Errata Notice
+    ARM-EPM-028093 v20.0 Released
+
+[2] ARM CortexTM-A15 MPCore - NEON
+    Product Revision r2
+    Software Developers Errata Notice
+    ARM-EPM-028090 v19.3 Released
+
+Signed-off-by: Matija Glavinic Pecotic <matija.glavinic-pecotic.ext@nokia.com>
+Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+---
+ arch/arm/kernel/smp_tlb.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 2e72be4..b624758 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -93,17 +93,30 @@ void erratum_a15_798181_init(void)
+ 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
+ 
+ 	/* Brahma-B15 r0p0..r0p2 affected
+-	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
+-	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)
++	 * Cortex-A15 r0p0..r3p3 w/o ECO fix affected
++	 */
++	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2) {
+ 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
+-	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
+-		 (revidr & 0x210) != 0x210) {
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f2) {
++		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f4) {
+ 		if (revidr & 0x10)
+ 			erratum_a15_798181_handler =
+ 				erratum_a15_798181_partial;
+ 		else
+ 			erratum_a15_798181_handler =
+ 				erratum_a15_798181_broadcast;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x413fc0f3) {
++		if ((revidr & 0x210) == 0)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_broadcast;
++		else if (revidr & 0x10)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x414fc0f0) {
++		if ((revidr & 0x200) == 0)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
+ 	}
+ }
+ #endif
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.4
