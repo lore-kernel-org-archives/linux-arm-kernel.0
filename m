@@ -1,47 +1,101 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Thu, 12 May 2016 20:52:46 +0800
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <20160512082427.GA1587@yury-N73SV>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <573305A8.50406@huawei.com> <5733149C.4030903@huawei.com>
- <5250356.myv9GIZ34h@wuerfel> <5733FC71.8070101@huawei.com>
- <20160512082427.GA1587@yury-N73SV>
-Message-ID: <57347C9E.7010708@huawei.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 12 May 2016 14:54:35 +0200
+Subject: [PATCH v6 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <20160512085616.GA25355@arm.com>
+References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
+ <CAJZ5v0iMDQ4pWip4vyCos0o+1DFDvXQf4XZQqC4SGjJsDO4Lnw@mail.gmail.com>
+ <20160511104032.GA31374@arm.com>
+ <CAJZ5v0gQMR7OUyZo5Sa3bgMYZBzdnwFaktz9JCv1ocWXw7yHTg@mail.gmail.com>
+ <57339F39.3040603@caviumnetworks.com>
+ <CAJZ5v0h8zBEZ2nLLdk62r7uqHizUfVWamUVEriBGe1XBE6462Q@mail.gmail.com>
+ <5733A47B.8030908@caviumnetworks.com>
+ <CAJZ5v0gBTANFntBSkyaRtt-BKOMC+pz_R9CwM6wKnp=Ni1dPFA@mail.gmail.com>
+ <20160512085616.GA25355@arm.com>
+Message-ID: <CAJZ5v0iVf-+ngd-qDUk8Acf7mGrq0f8j2d_QtfxQxuBH_93t3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2016/5/12 16:24, Yury Norov wrote:
-> On Thu, May 12, 2016 at 11:45:53AM +0800, Zhangjian (Bamvor) wrote:
+On Thu, May 12, 2016 at 10:56 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, May 12, 2016 at 12:29:02AM +0200, Rafael J. Wysocki wrote:
+>> On Wed, May 11, 2016 at 11:30 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+>> > On 05/11/2016 02:22 PM, Rafael J. Wysocki wrote:
+>> >> On Wed, May 11, 2016 at 11:08 PM, David Daney <ddaney@caviumnetworks.com>
+>> >> wrote:
+>> >>> On 05/11/2016 01:35 PM, Rafael J. Wysocki wrote:
+>> >>>> On Wed, May 11, 2016 at 12:40 PM, Will Deacon <will.deacon@arm.com>
+>> >>>> wrote:
+>> >>>>> On Wed, May 11, 2016 at 02:43:11AM +0200, Rafael J. Wysocki wrote:
+>> >>>>> There's also a dependency on the arm64 for-next/core branch, so I've
+>> >>>>> been
+>> >>>>> largely ignoring this as far as 4.6 is concerned and was planning to
+>> >>>>> take
+>> >>>>> a proper look for 4.7 once the upcoming merge window is out of the way.
+>> >>>>
+>> >>>>
+>> >>>>
+>> >>>> That would be 4.7 and 4.8 respectively I suppose?
 >
-> [...]
+> Argh, yes, of course! :)
 >
->>> Hmm, that is indeed tricky. I think COMPAT_SYSCALL_WRAP4 rightfully
->>> refuses the loff_t argument here, as the common case is that this is
->>> not possible.
->> It works if I apply the following patch, I defined the wrong `__TYPE_IS_xxx`
->> yesterday. Should we merge this into ILP32 series or send the compat.h
->> and syscalls.h individually? The current series of ILP32 is a little bit
->> long and hard to review.
->> diff --git a/include/linux/compat.h b/include/linux/compat.h
->> index ba6ebe0..22a9565 100644
->> --- a/include/linux/compat.h
->> +++ b/include/linux/compat.h
->> @@ -747,7 +747,8 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
->>   #ifndef __SC_COMPAT_CAST
->>   #define __SC_COMPAT_CAST(t, a) ({                                      \
->>          BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&              \
->> -                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));            \
->> +                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t) &&           \
->> +                    !__TYPE_IS_LOFFT(t));                              \
+>> >>>>
+>> >>>> Anyway, Catalin has ACKed all of them except for the [13/14], so
+>> >>>> technically I can apply [1-12/14] now and then [13-14/14] can be
+>> >>>> applied when they are ready.
+>> >>>>
+>> >>>> Do you think there will be any problems with merging [6-7/14] into 4.7
+>> >>>> via the ACPI tree?
+>> >>>>
+>> >>>
+>> >>> I would defer to the arm64 maintainers for decisions about the arm64
+>> >>> specific parts of the patch set.  That said, many of the arm64 specific
+>> >>> patches depend on the arm64 for-next/core branch, so you would have to be
+>> >>> careful about merge ordering if you pull these in before the
+>> >>> for-next/core
+>> >>> branch is merged.
+>> >>
+>> >>
+>> >> Fair enough.  I will wait for an update then.
+>> >>
+>> >>> Also FWIW, I plan on addressing Catalin's comments about 13/14 and
+>> >>> posting a
+>> >>> new version of the patch set in the next day or two.
+>> >>
+>> >>
+>> >> OK, but in that case it won't be considered for 4.7 (at least not by
+>> >> me), so I'd suggest sending it in the second half of the 4.7 merge
+>> >> window (or about that time).
+>> >
+>> >
+>> > To be candid, I would very much like for you to pull in as many of the
+>> > patches as you are comfortable with as soon as possible.
+>> >
+>> > I don't know where Will and Catalin stand on this, and their opinion is
+>> > obviously important, but getting 1-12/14 merged to v4.7 and deferring the
+>> > last two for v4.8 would simplify the whole process for me.  The drawback is
+>> > carrying dead code around until the final parts are merged.
+>>
+>> That is not unheard of, however.
+>>
+>> OK, I'll try to put the [1-12/14] into my linux-next branch early next
+>> week and we'll see if that triggers any conflicts.
 >
-> I think it's wrong, as loff_t is 64-bit in 32-bit userspace, and this
-> will clear meaningful data in top halve.
-Yes. It is my fault. The original thoughts is clear the up 32bit for size_t.
-How should we skip the loff_t?
+> I'd really much rather this waited until after the merge window.
 
-Regards
+That's fine by me, so I guess my previous request for the next version
+to be sent by the end of the merge window applies. :-)
 
-Bamvor
+> My understanding is that it's bad practice to put stuff into -next during the
+> merge window,
+
+Unless you want to push that stuff to Linus during the merge window in
+progress, that is.
+
+> and you'd end up having to send a pull based on a random
+> commit (the arm64 pull request?) in the second half. On top of that, this
+> series would get very little exposure in -next during that time.
+>
+> On the other hand, putting this into linux-next after the merge window
+> gives us time for testing, allows David to rework patch 13 (which is aiming
+> for 4.8 anyway iiuc) and avoids merge window churn.
+
+OK
