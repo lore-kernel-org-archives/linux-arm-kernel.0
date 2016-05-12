@@ -1,70 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 May 2016 17:24:49 +0100
-Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <5734A0CC.8010600@caviumnetworks.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
- <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
- <5733C8F5.6090206@caviumnetworks.com>
- <20160512094915.GD11226@e104818-lin.cambridge.arm.com>
- <5734A0CC.8010600@caviumnetworks.com>
-Message-ID: <20160512162449.GK11226@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 May 2016 09:30:34 -0700
+Subject: [RFC PATCH 0/3] Add ioremap_exec and extend drivers/misc/sram.c
+In-Reply-To: <1462830111-28172-1-git-send-email-d-gerlach@ti.com>
+References: <1462830111-28172-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <20160512163033.GP5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 08:27:08AM -0700, David Daney wrote:
-> On 05/12/2016 02:49 AM, Catalin Marinas wrote:
-> >On Wed, May 11, 2016 at 05:06:13PM -0700, David Daney wrote:
-> >>On 05/11/2016 03:39 AM, Catalin Marinas wrote:
-> [...]
-> >>>
-> >>>I wonder whether you could replace the get_mpidr_in_madt() function with
-> >>>something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
-> >>>duplicates functionality already available elsewhere.
-> >>
-> >>I just tried that, and it doesn't work.
-> >>
-> >>The problem is that this code is being run very early in the boot, and
-> >>kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used
-> >>once we have working kmalloc.  We need to extract the NUMA information early
-> >>like this precisely because it is needed to initializing the slab system
-> >>
-> >>Notice that we are using early_acpi_os_unmap_memory() et al. in
-> >>get_mpidr_in_madt() explicitly for this reason.
-> >>
-> >>In summary: I don't think we need another revision of this patch, it is like
-> >>this for a good reason.
-> >
-> >Slightly confusing, in another reply you said you are going to address
-> >my comment. So, is it doable?
+* Dave Gerlach <d-gerlach@ti.com> [160509 14:44]:
+> Hi,
+> There are several instances when one would want to execute out of on-chip
+> SRAM, such as PM code on ARM platforms, so once again revisiting this
+> series to allow that. Seems that having a solution for allowing SRAM to be
+> mapped as executable will help clean up PM code on several ARM platforms and
+> also open the door for others like TI AM335x and AM437x. This was first sent
+> here [1] but this is rebased and updated for v4.6-rc.
 > 
-> I don't think so.
+> Many platforms have migrated to using the generic SRAM driver at
+> drivers/misc/sram.c but it doesn't seem like there is a clean solution
+> for the common problem of needing to map executable pages.
 > 
-> My previous reply, to the thread in 0/14, was prematurely made with the
-> incorrect assumption that it was a simple change.  Now, after really digging
-> in to the code, and attempting to do as you suggested, I have changed my
-> mind.
+> Currently I see several platforms (at-91, imx6, socfpga) taking the
+> address allocated by the genpool given by the SRAM driver and then calling
+> __arm_ioremap_exec on it again to get a new address that can be executed.
+> This doesn't seem like the cleanest solution, but maybe it works for code
+> that is under mach-xxx but what about code that migrates outside into the
+> drivers layer? Do any other architectures have a requirement for this?
+> 
+> I've converted omap3 PM code to use the generic SRAM driver which I'll send
+> in a series right after this one, and AM335x and AM437x can both make use of
+> this series as well and even go as far as to move a chunk of the PM
+> code into drivers (needs to be updated but sent long ago here [2]), but
+> that will be blocked if we don't have a generic way to ioremap memory as
+> exec, or at least a way to do it from drivers/.
+> 
+> If we don't want to go down this path, is there a better idea for how to
+> call ioremap_exec from drivers/ that we can all agree on?
 
-Would the snippet below help with avoiding any kmalloc calls? At a quick
-look, it seems that it's only map_mat_entry() that ends up using
-kmalloc() calls. Alternatively, exporting map_madt_entry() may work as
-well.
+Looks to me that this should allow moving the current SRAM code
+into drivers. So feel free to add:
 
-diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-index 33a38d604630..77af0a7df914 100644
---- a/drivers/acpi/processor_core.c
-+++ b/drivers/acpi/processor_core.c
-@@ -152,6 +152,9 @@ static phys_cpuid_t map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
- 	struct acpi_subtable_header *header;
- 	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;
- 
-+	if (!acpi_gbl_permanent_mmap)
-+		return phys_id;
-+
- 	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
- 		goto exit;
- 
-
--- 
-Catalin
+Acked-by: Tony Lindgren <tony@atomide.com>
