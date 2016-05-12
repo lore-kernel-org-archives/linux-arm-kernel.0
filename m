@@ -1,107 +1,131 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 May 2016 10:30:47 +0200
-Subject: [linux-sunxi] Re: [PATCH v4 01/11] clk: sunxi: Add display and
- TCON0 clocks driver
-In-Reply-To: <20160512065943.GX3733@lukather>
-References: <1461590572-4027-1-git-send-email-maxime.ripard@free-electrons.com>
- <1461590572-4027-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160506223002.GE3492@codeaurora.org>
- <20160508200308.GF6167@lukather>
- <20160509223238.GW3492@codeaurora.org>
- <20160509223924.GX3492@codeaurora.org>
- <1462907459.9981.0.camel@plaes.org>
- <20160511221541.GG3492@codeaurora.org>
- <1463024360.16747.4.camel@plaes.org>
- <20160512065943.GX3733@lukather>
-Message-ID: <20160512083047.GY3733@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 10:32:49 +0200
+Subject: [PATCH v3 28/55] KVM: arm/arm64: vgic-new: Add CONFIG registers
+ handlers
+In-Reply-To: <1462531568-9799-29-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-29-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512083249.GY27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 08:59:43AM +0200, Maxime Ripard wrote:
-> On Thu, May 12, 2016 at 06:39:20AM +0300, Priit Laes wrote:
-> > On Wed, 2016-05-11 at 15:15 -0700, Stephen Boyd wrote:
-> > > On 05/10, Priit Laes wrote:
-> > > > 
-> > > > On Mon, 2016-05-09 at 15:39 -0700, Stephen Boyd wrote:
-> > > > > 
-> > > > > On 05/09, Stephen Boyd wrote:
-> > > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > Ok I applied this one to clk-next.
-> > > > > > 
-> > > > > And I squashed this in to silence the following checker warning.
-> > > > > 
-> > > > > drivers/clk/sunxi/clk-sun4i-display.c:110:33: warning: Variable
-> > > > > length array is used.
-> > > > > 
-> > > > > ---8<---
-> > > > > diff --git a/drivers/clk/sunxi/clk-sun4i-display.c
-> > > > > b/drivers/clk/sunxi/clk-sun4i-display.c
-> > > > > index f02e250e64ed..f8ff6c4a5633 100644
-> > > > > --- a/drivers/clk/sunxi/clk-sun4i-display.c
-> > > > > +++ b/drivers/clk/sunxi/clk-sun4i-display.c
-> > > > > @@ -107,7 +107,7 @@ static int
-> > > > > sun4i_a10_display_reset_xlate(struct
-> > > > > reset_controller_dev *rcdev,
-> > > > > ?static void __init sun4i_a10_display_init(struct device_node
-> > > > > *node,
-> > > > > ?					??const struct
-> > > > > sun4i_a10_display_clk_data *data)
-> > > > > ?{
-> > > > > -	const char *parents[data->parents];
-> > > > > +	const char *parents[4];
-> > > > This change breaks at least de_[bf]e clocks which have 3 clock
-> > > > parents.
-> > 
-> > > I just used the largest data->parents number, which was 4. How
-> > > does that break anything?
-> > 
-> > If you look at the?sun4i_a10_display_init, it contains this block:
-> > 
-> > ? ? ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
-> > ????if (ret != ARRAY_SIZE(parents)) {
-> > ????????pr_err("%s: Could not retrieve the parents\n", clk_name);
-> > ????????goto unmap;
-> > ????}
-> > 
-> > of_clk_parent_fill returns 3 for de_be/de_fe nodes, and
-> > ARRAY_SIZE(parents) is 4.
+On Fri, May 06, 2016 at 11:45:41AM +0100, Andre Przywara wrote:
+> The config register handlers are shared between the v2 and v3
+> emulation, so their implementation goes into vgic-mmio.c, to be
+> easily referenced from the v3 emulation as well later.
 > 
-> Replacing both ARRAY_SIZE(parents) by data->parents would work though.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
+>  3 files changed, 54 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index 2e17250..2a953ec 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -88,7 +88,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 2),
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index d7fe9e6..19fed56 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -321,6 +321,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = (addr & 0xff) * 4;
+> +	u32 value = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < len * 4; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->config == VGIC_CONFIG_EDGE)
+> +			value |= (2U << (i * 2));
+> +	}
+> +
+> +	return extract_bytes(value, addr & 3, len);
+> +}
+> +
+> +void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> +			    gpa_t addr, unsigned int len,
+> +			    unsigned long val)
+> +{
+> +	u32 intid = (addr & 0xff) * 4;
+> +	int i;
+> +
+> +	for (i = 0; i < len * 4; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (intid + i < 16)
 
-I just tested on top of current next, and indeed the following patch
-is needed.
+s/16/VGIC_NR_SGIS/
 
-Stephen, could you squash it in the former patch?
+> +			continue;
 
-diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
-index 70803aa7028c..9780fac6d029 100644
---- a/drivers/clk/sunxi/clk-sun4i-display.c
-+++ b/drivers/clk/sunxi/clk-sun4i-display.c
-@@ -128,8 +128,8 @@ static void __init sun4i_a10_display_init(struct device_node *node,
- 		return;
- 	}
- 
--	ret = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
--	if (ret != ARRAY_SIZE(parents)) {
-+	ret = of_clk_parent_fill(node, parents, data->parents);
-+	if (ret != data->parents) {
- 		pr_err("%s: Could not retrieve the parents\n", clk_name);
- 		goto unmap;
- 	}
+It's implementation defined if software can program the configuration of
+PPIs, and since our timer code relies on its virtual PPI always being
+level triggered, I think we should change the above to
+VGIC_NR_PRIVATE_IRQS and then if someone ever needs a configurable
+virtual PPI, we can add that later.
 
-Thanks!
-Maxime					  
+> +
+> +		/*
+> +		 * The spec says that interrupts must be disabled before
+> +		 * changing the configuration to avoid UNDEFINED behaviour.
+> +		 */
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160512/bea383f2/attachment.sig>
+not sure what this comment tells us about the implementation?  Should we
+check that the IRQ is disabled before proceeding?
+
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		if (test_bit(i * 2 + 1, &val)) {
+> +			irq->config = VGIC_CONFIG_EDGE;
+> +		} else {
+> +			irq->config = VGIC_CONFIG_LEVEL;
+> +			irq->pending = irq->line_level | irq->soft_pending;
+> +		}
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +}
+> +
+>  static int match_region(const void *key, const void *elt)
+>  {
+>  	const unsigned int offset = (unsigned long)key;
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index cd04ac5..884eb71 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -114,6 +114,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+>  			      gpa_t addr, unsigned int len,
+>  			      unsigned long val);
+>  
+> +unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len);
+> +
+> +void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> +			    gpa_t addr, unsigned int len,
+> +			    unsigned long val);
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+>  #endif
+> -- 
+> 2.7.3
+> 
