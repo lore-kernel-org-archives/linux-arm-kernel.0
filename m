@@ -1,326 +1,188 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 May 2016 12:26:30 +0200
-Subject: [PATCH v3 32/55] KVM: arm/arm64: vgic-new: Add GICv3 MMIO
- handling framework
-In-Reply-To: <1462531568-9799-33-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-33-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160512102630.GC27623@cbox>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 12 May 2016 19:26:32 +0900
+Subject: [PATCH v9 1/2] gpio: mmio: add DT support for memory-mapped GPIOs
+In-Reply-To: <2c0675cd6f67bd487105c46c38c72d49d84d4df8.1462911225.git.chunkeey@googlemail.com>
+References: <cover.1462911225.git.chunkeey@googlemail.com>
+ <cover.1462911225.git.chunkeey@googlemail.com>
+ <2c0675cd6f67bd487105c46c38c72d49d84d4df8.1462911225.git.chunkeey@googlemail.com>
+Message-ID: <0a1ab2b6-b4c5-44d7-abb4-ce1e9da7e477@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:45:45AM +0100, Andre Przywara wrote:
-> Create a new file called vgic-mmio-v3.c and describe the GICv3
-> distributor and redistributor registers there.
-> This adds a special macro to deal with the split of SGI/PPI in the
-> redistributor and SPIs in the distributor, which allows us to reuse
-> the existing GICv2 handlers for those registers which are compatible.
-> Also we provide a function to deal with the registration of the two
-> separate redistributor frames per VCPU.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+On Wednesday, May 11, 2016 6:34:34 PM JST, Christian Lamparter wrote:
+> From: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+>
+> This patch adds support for defining memory-mapped GPIOs which
+> are compatible with the existing gpio-mmio interface. The generic
+> library provides support for many memory-mapped GPIO controllers
+> that are found in various on-board FPGA and ASIC solutions that
+> are used to control board's switches, LEDs, chip-selects,
+> Ethernet/USB PHY power, etc.
+>
+> For setting GPIO's there are three configurations:
+
+s/GPIO's/GPIOs
+
+> 	1. single input/output register resource (named "dat"),
+> 	2. set/clear pair (named "set" and "clr"),
+> 	3. single output register resource and single input resource
+> 	   ("set" and dat").
+>
+> The configuration is detected by which resources are present.
+> For the single output register, this drives a 1 by setting a bit
+> and a zero by clearing a bit.  For the set clr pair, this drives
+> a 1 by setting a bit in the set register and clears it by setting
+> a bit in the clear register. The configuration is detected by
+> which resources are present.
+
+The last sentence of this paragraph repeats for first one.
+
+>
+> For setting the GPIO direction, there are three configurations:
+> 	a. simple bidirectional GPIOs that requires no configuration.
+> 	b. an output direction register (named "dirout")
+> 	   where a 1 bit indicates the GPIO is an output.
+> 	c. an input direction register (named "dirin")
+> 	   where a 1 bit indicates the GPIO is an input.
+>
+> The first user for this binding is "wd,mbl-gpio".
+>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+> Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
 > ---
-> Changelog RFC..v1:
-> - adapt to new MMIO registration approach:
->   register one device for the distributor and two for each VCPU
-> - implement special handling for private interrupts
-> - remove empty stub functions
-> - make IGROUPR return RAO
-> 
-> Changelog v1 .. v2:
-> - adapt to new framework, introduce vgic-mmio-v3.c
-> - remove userland register access functions (for now)
-> - precompute .len when describing a VGIC register
-> - add missed pointer incrementation on registering redist regions
-> - replace _nyi stub functions with raz/wi versions
-> 
-> Changelog v2 .. v3:
-> - replace inclusion of kvm/vgic/vgic.h with kvm/arm_vgic.h
-> - add prototype and stub code for vgic_register_redist_iodevs
-> - rename register struct variables _rdbase_ and _sgibase_
-> 
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 191 +++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.c    |   5 +
->  virt/kvm/arm/vgic/vgic-mmio.h    |   2 +
->  virt/kvm/arm/vgic/vgic.h         |   7 ++
->  4 files changed, 205 insertions(+)
->  create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v3.c
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> new file mode 100644
-> index 0000000..06c7ec5
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -0,0 +1,191 @@
-> +/*
-> + * VGICv3 MMIO handling functions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <kvm/iodev.h>
-> +#include <kvm/arm_vgic.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +
-> +#include "vgic.h"
-> +#include "vgic-mmio.h"
-> +
-> +/*
-> + * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
-> + * redistributors, while SPIs are covered by registers in the distributor
-> + * block. Trying to set private IRQs in this block gets ignored.
-> + * We take some special care here to fix the calculation of the register
-> + * offset.
-> + */
-> +#define REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(off, read_ops, write_ops, bpi) \
-> +	{								\
-> +		.reg_offset = off,					\
-> +		.bits_per_irq = bpi,					\
-> +		.len = (bpi * VGIC_NR_PRIVATE_IRQS) / 8,		\
-> +		.read = vgic_mmio_read_raz,				\
-> +		.write = vgic_mmio_write_wi,				\
-> +	}, {								\
-> +		.reg_offset = off + (bpi * VGIC_NR_PRIVATE_IRQS) / 8,	\
-> +		.bits_per_irq = bpi,					\
-> +		.len = (bpi * (1024 - VGIC_NR_PRIVATE_IRQS)) / 8,	\
-> +		.read = read_ops,					\
-> +		.write = write_ops,					\
-> +	}
-> +
-> +static const struct vgic_register_region vgic_v3_dist_registers[] = {
-> +	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 16),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
-> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
-> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICENABLER,
-> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISPENDR,
-> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
-> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
-> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICACTIVER,
-> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IPRIORITYR,
-> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ITARGETSR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICFGR,
-> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGRPMODR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
-> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 64),
-> +	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
-> +};
-> +
-> +static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
-> +	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 48),
-> +};
-> +
-> +static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
-> +	REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
-> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
-> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ICENABLER0,
-> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ISPENDR0,
-> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ICPENDR0,
-> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
-> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ICACTIVER0,
-> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_IPRIORITYR0,
-> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 32),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_ICFGR0,
-> +		vgic_mmio_read_config, vgic_mmio_write_config, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_IGRPMODR0,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_NSACR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-> +};
-> +
-> +unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
-> +{
-> +	dev->regions = vgic_v3_dist_registers;
-> +	dev->nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
-> +
-> +	kvm_iodevice_init(&dev->dev, &kvm_io_gic_ops);
-> +
-> +	return SZ_64K;
-> +}
-> +
-> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
-> +{
-> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
-> +	struct kvm_vcpu *vcpu;
-> +	struct vgic_io_device *devices, *device;
-> +	int c, ret = 0;
-> +
-> +	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
-> +			  GFP_KERNEL);
-> +	if (!devices)
-> +		return -ENOMEM;
-> +
-> +	device = devices;
-> +	kvm_for_each_vcpu(c, vcpu, kvm) {
-> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
-> +		device->base_addr = redist_base_address;
-> +		device->regions = vgic_v3_rdbase_registers;
-> +		device->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
-> +		device->redist_vcpu = vcpu;
-> +
-> +		mutex_lock(&kvm->slots_lock);
-> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> +					      redist_base_address,
-> +					      SZ_64K, &device->dev);
-> +		mutex_unlock(&kvm->slots_lock);
-> +
-> +		if (ret)
-> +			break;
-> +
-> +		device++;
-> +		kvm_iodevice_init(&device->dev, &kvm_io_gic_ops);
-> +		device->base_addr = redist_base_address + SZ_64K;
-> +		device->regions = vgic_v3_sgibase_registers;
-> +		device->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
-> +		device->redist_vcpu = vcpu;
-> +
-> +		mutex_lock(&kvm->slots_lock);
-> +		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> +					      redist_base_address + SZ_64K,
-> +					      SZ_64K, &device->dev);
-> +		mutex_unlock(&kvm->slots_lock);
-> +		if (ret) {
-> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
-> +						  &devices[c * 2].dev);
-> +			break;
-> +		}
-> +		device++;
-> +		redist_base_address += 2 * SZ_64K;
-
-while I think this whole thing is actually correct, I think it could
-have been much more clear by, in the beginning of the loop doing:
-
-	gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
-	gpa_t sgi_base = rd_base + SZ_64K;
-	struct vgic_io_device *rd_dev = &devices[c];
-	struct vgic_io_device *sgi_dev = &devices[c + 1];
-
-and then referring directly to these variables.
-
-> +	}
-> +
-> +	if (ret) {
-> +		for (c--; c >= 0; c--) {
-
-holy dark mother of all that's evil; I think this is correct.
-
-> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
-> +						  &devices[c * 2].dev);
-> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
-> +						  &devices[c * 2 + 1].dev);
-
-do we really need this though?  Can't we just rely on KVM to tear down
-thew whole bus infrastructure as we're returning an error anyway?
-
-(have you looked at what the unregister_dev function does, it's full of
-kmallocs and other fun stuff).
-
-
-Thanks,
--Christoffer
-
-> +		}
-> +		kfree(devices);
-> +	} else {
-> +		kvm->arch.vgic.redist_iodevs = devices;
-> +	}
-> +
-> +	return ret;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 19fed56..d1b88d2 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -502,6 +502,11 @@ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
->  	case VGIC_V2:
->  		len = vgic_v2_init_dist_iodev(io_device);
->  		break;
-> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> +	case VGIC_V3:
-> +		len = vgic_v3_init_dist_iodev(io_device);
-> +		break;
-> +#endif
->  	default:
->  		BUG_ON(1);
->  	}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 884eb71..3585ac6 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -123,4 +123,6 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>  drivers/gpio/gpio-mmio.c | 68 
+> ++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 66 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-mmio.c b/drivers/gpio/gpio-mmio.c
+> index 6c1cb3b..f72e40e 100644
+> --- a/drivers/gpio/gpio-mmio.c
+> +++ b/drivers/gpio/gpio-mmio.c
+> @@ -61,6 +61,8 @@ o        `                     ~~~~\___/~~~~  
+>   ` controller in FPGA is ,.`
+>  #include <linux/bitops.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/mod_devicetable.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
 >  
->  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
->  
-> +unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-> +
->  #endif
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index cf62015..39a8a65 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -40,6 +40,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
->  void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
->  void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
->  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
-> +int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
->  #else
->  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  static void bgpio_write8(void __iomem *reg, unsigned long data)
 >  {
-> @@ -61,6 +62,12 @@ static inline void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
->  static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
->  {
+> @@ -569,6 +571,58 @@ static void __iomem *bgpio_map(struct 
+> platform_device *pdev,
+>  	return devm_ioremap_resource(&pdev->dev, r);
 >  }
-> +
-> +static inline int vgic_register_redist_iodevs(struct kvm *kvm,
-> +					      gpa_t dist_base_address)
-> +{
-> +	return -ENODEV;
-> +}
->  #endif
 >  
->  #endif
-> -- 
-> 2.7.3
-> 
+> +#ifdef CONFIG_OF
+> +static int bgpio_basic_mmio_parse_dt(struct platform_device *pdev,
+> +				     struct bgpio_pdata *pdata,
+> +				     unsigned long *flags)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +
+> +	pdata->base = -1;
+> +
+> +	if (of_property_read_bool(dev->of_node, "no-output"))
+> +		*flags |= BGPIOF_NO_OUTPUT;
+
+I don't think it is a good idea to add "generic" properties. Whether a 
+controller is capable of output or not should be determined by its 
+compatible string only, and not a vague property.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id bgpio_of_match[] = {
+> +	{ .compatible = "wd,mbl-gpio", .data = bgpio_basic_mmio_parse_dt },
+
+Mmm cannot you determine whether your controller is capable of output or 
+not just from the compatible property here? If so, the 
+bgpio_basic_mmio_parse_dt seems to be unneeded. If not, then this is 
+dependent on the wd,mbl-gpio binding and should be renamed accordingly.
+
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, bgpio_of_match);
+> +
+> +static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
+> +					  unsigned long *flags)
+> +{
+> +	const int (*parse_dt)(struct platform_device *,
+> +			      struct bgpio_pdata *, unsigned long *);
+> +	struct bgpio_pdata *pdata;
+> +	int err;
+> +
+> +	parse_dt = of_device_get_match_data(&pdev->dev);
+> +	if (!parse_dt)
+> +		return NULL;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(struct bgpio_pdata),
+> +			     GFP_KERNEL);
+> +	if (!pdata)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	err = parse_dt(pdev, pdata, flags);
+> +	if (err)
+> +		return ERR_PTR(err);
+> +
+> +	return pdata;
+> +}
+> +#else
+> +static struct bgpio_pdata *bgpio_parse_dt(struct platform_device *pdev,
+> +					  unsigned long *flags)
+> +{
+> +	return NULL;
+> +}
+> +#endif /* CONFIG_OF */
+> +
+>  static int bgpio_pdev_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -579,10 +633,19 @@ static int bgpio_pdev_probe(struct 
+> platform_device *pdev)
+>  	void __iomem *dirout;
+>  	void __iomem *dirin;
+>  	unsigned long sz;
+> -	unsigned long flags = pdev->id_entry->driver_data;
+> +	unsigned long flags = 0;
+>  	int err;
+>  	struct gpio_chip *gc;
+> -	struct bgpio_pdata *pdata = dev_get_platdata(dev);
+> +	struct bgpio_pdata *pdata;
+> +
+> +	pdata = bgpio_parse_dt(pdev, &flags);
+> +	if (IS_ERR(pdata))
+> +		return PTR_ERR(pdata);
+> +
+> +	if (!pdata) {
+> +		pdata = dev_get_platdata(dev);
+> +		flags = pdev->id_entry->driver_data;
+> +	}
+>  
+>  	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");
+>  	if (!r)
+> @@ -646,6 +709,7 @@ MODULE_DEVICE_TABLE(platform, bgpio_id_table);
+>  static struct platform_driver bgpio_driver = {
+>  	.driver = {
+>  		.name = "basic-mmio-gpio",
+> +		.of_match_table = of_match_ptr(bgpio_of_match),
+>  	},
+>  	.id_table = bgpio_id_table,
+>  	.probe = bgpio_pdev_probe,
+
+It seems to me that this patch does two things:
+
+1) Add code to support device tree lookup
+2) Add support for "wd,mbl-gpio".
+
+If true, these two things should be in their own patches. You should also 
+have another patch that adds the DT bindings for "wd,mbl-gpio", so I would 
+do things in that order:
+
+1/3: DT support for basic-mmio-gpio
+2/3: DT bindings for "wd,mbl-gpio" (and have them validated by the DT 
+people - e.g. do you really need a "reg" property or is it here just to fit 
+with what bgpio_pdev_probe expects? More about this on 2/2)
+3/3: Support for "wd,mbl-gpio" in basic-mmio-gpio
