@@ -1,151 +1,164 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 12 May 2016 11:10:20 +0530
-Subject: [PATCH 04/18] dmaengine: st_fdma: Add xp70 firmware loading
- mechanism.
-In-Reply-To: <20160511075740.GB25540@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1461236675-10176-1-git-send-email-peter.griffin@linaro.org>
- <1461236675-10176-5-git-send-email-peter.griffin@linaro.org>
- <20160426170048.GS2274@localhost>
- <20160511075740.GB25540@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20160512054020.GW2274@localhost>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 12 May 2016 05:50:18 +0000
+Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+In-Reply-To: <20160512035315.GA19408@piout.net>
+References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
+ <20160512035315.GA19408@piout.net>
+Message-ID: <B256D81BAE5131468A838E5D7A2436410164FB80B8@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 08:57:40AM +0100, Peter Griffin wrote:
-> > Above two seem to be generic code and should be moved to core, this way
-> > other drivers using ELF firmware binaries can reuse...
-> 
-> Do you mean add to dmaengine.c?
 
-Nope this is not specfic to dmaengine. Perhaps drivers/base/..
 
-> Certainly st_fdma_elf_sanity_check is fairly generic. st_fdma_elf_load_segments
-> is less so, especially st_fdma_seg_to_mem().
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: 2016?5?12? 11:53
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>; Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>;
+> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
 > 
-> > 
-> > > @@ -738,6 +925,15 @@ static int st_fdma_slave_config(struct dma_chan *chan,
-> > >  				struct dma_slave_config *slave_cfg)
-> > >  {
-> > >  	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
-> > > +	int ret;
-> > > +
-> > > +	if (!atomic_read(&fchan->fdev->fw_loaded)) {
-> > > +		ret = st_fdma_get_fw(fchan->fdev);
-> > 
-> > this seems quite an odd place to load firmware, can you explain why
-> > 
+> Hi,
 > 
-> Good question :) I've been round the houses a bit on the firmware loading.
+> On 12/05/2016 at 09:05:34 +0800, Wenyou Yang wrote :
+> > In order to get lower consumption, as a workaround, suspend the USB
+> > PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
+> > Configuration Register while OHCI USB suspending.
+> >
 > 
-> I will try and document here what I've tried and the different advantages /
-> disadvantages I've encountered.
+> Why is that a workaround?
 
-Per Linus, driver should load firmware on first open. So either you should
-do it while channel allocation or first descriptor allocation.
+Because if these bits is not set as this patch, there is 5mA current left
+at VDDOSC rail during suspend. If apply this patch, this current will disappear.
+
+So, I think it is a workaround.
 
 > 
-> In V3 patches, I used the device_config() hook. This can sleep (I think..it isn't
-> documented here [1]). This hook happens very close to the dma starting and the
-> rootfs / firmware is likely to be present. However I've sinced learnt that it
-> doesn't get  called in the memcpy case so is not a sufficient solution.
+> > This suspend operation must be done before stopping the USB clock,
+> > resume after the USB clock enabled.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> >
+> >  drivers/usb/host/ohci-at91.c | 63
+> > ++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 63 insertions(+)
+> >
+> > diff --git a/drivers/usb/host/ohci-at91.c
+> > b/drivers/usb/host/ohci-at91.c index d177372..ce898e0 100644
+> > --- a/drivers/usb/host/ohci-at91.c
+> > +++ b/drivers/usb/host/ohci-at91.c
+> > @@ -21,6 +21,8 @@
+> >  #include <linux/io.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/module.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/regmap.h>
+> >  #include <linux/usb.h>
+> >  #include <linux/usb/hcd.h>
+> >
+> > @@ -51,6 +53,7 @@ struct ohci_at91_priv {
+> >  	struct clk *hclk;
+> >  	bool clocked;
+> >  	bool wakeup;		/* Saved wake-up state for resume */
+> > +	struct regmap *sfr_regmap;
+> >  };
+> >  /* interface and function clocks; sometimes also an AHB clock */
+> >
+> > @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device
+> > *pdev)
+> >
+> >
+> > /*--------------------------------------------------------------------
+> > -----*/
+> >
+> > +struct regmap *at91_dt_syscon_sfr(void) {
+> > +	struct regmap *regmap;
+> > +
+> > +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
+> > +	if (IS_ERR(regmap))
+> > +		return NULL;
+> > +
+> > +	return regmap;
+> > +}
+> > +
+> >  static void usb_hcd_at91_remove (struct usb_hcd *, struct
+> > platform_device *);
+> >
+> >  /* configure so an HC device and id are always provided */ @@ -197,6
+> > +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+> >  		goto err;
+> >  	}
+> >
+> > +	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
+> > +
+> >  	board = hcd->self.controller->platform_data;
+> >  	ohci = hcd_to_ohci(hcd);
+> >  	ohci->num_ports = board->ports;
+> > @@ -581,6 +597,49 @@ static int ohci_hcd_at91_drv_remove(struct
+> platform_device *pdev)
+> >  	return 0;
+> >  }
+> >
+> > +#define SFR_OHCIICR		0x10
+> > +#define SFR_OHCIICR_SUSPEND_A	BIT(8)
+> > +#define SFR_OHCIICR_SUSPEND_B	BIT(9)
+> > +#define SFR_OHCIICR_SUSPEND_C	BIT(10)
+> > +
+> > +#define SFR_OHCIICR_USB_SUSPEND	(SFR_OHCIICR_SUSPEND_A | \
+> > +				 SFR_OHCIICR_SUSPEND_B | \
+> > +				 SFR_OHCIICR_SUSPEND_C)
+> > +
 > 
-> In part putting it here was to try and get firmware loading out of probe() based
-> on your feedback to v1 [2].
+> Those defines should go in a header file either in include/soc/at91 or in
+> include/linux/mfd
 > 
-> In V1 patches: - I was using request_firmware_nowait() in probe() in conjunction with
-> the CONFIG_FW_LOADER_USER_HELPER kernel option. I've since also learnt that this
-> kernel option is deprecated and shouldn't be used.
+> > +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable) {
+> > +	u32 regval;
+> > +	int ret;
+> > +
+> > +	if (IS_ERR(regmap))
+> > +		return PTR_ERR(regmap);
+> > +
+> > +	ret = regmap_read(regmap, SFR_OHCIICR, &regval);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	if (enable)
+> > +		regval &= ~SFR_OHCIICR_USB_SUSPEND;
+> > +	else
+> > +		regval |= SFR_OHCIICR_USB_SUSPEND;
+> > +
+> > +	regmap_write(regmap, SFR_OHCIICR, regval);
+> > +
+> > +	regmap_read(regmap, SFR_OHCIICR, &regval);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int ohci_at91_port_suspend(struct regmap *regmap) {
+> > +	return ohci_at91_port_ctrl(regmap, false); }
+> > +
+> > +static int ohci_at91_port_resume(struct regmap *regmap) {
+> > +	return ohci_at91_port_ctrl(regmap, true); }
+> > +
+> >  static int __maybe_unused
+> >  ohci_hcd_at91_drv_suspend(struct device *dev)  { @@ -618,6 +677,8 @@
+> > ohci_hcd_at91_drv_suspend(struct device *dev)
+> >  		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
+> >  		ohci->rh_state = OHCI_RH_HALTED;
+> >
+> > +		ohci_at91_port_suspend(ohci_at91->sfr_regmap);
+> > +
+> 
+> The main issue I see here is that you will call that function for all SoCs and it will
+> always fail unless it is running on a sama5d2. Maybe we could be smarter about
+> that.
 
-I think nowait version is better. Why do you need
-CONFIG_FW_LOADER_USER_HELPER?
+Can we use another compatible, such as "atmel,sama5d2-ohci" to differentiate it? 
 
-> Your feedback in v1 was to move firmware loading to device open [2]. However
-> what classes is  device open in the dmaengine context is not obvious.
 
-channel allocation or descriptor allocation
-
-> 
-> ===
-> 
-> device_alloc_chan_resources() hook
-> 
-> This is probably the hook closest to a device open in dmaengine context.
-> This hook can sleep so request_firmware can be called. However if all drivers
-> are built-in firmware loading still fails as ALSA drivers calls
-> devm_snd_dmaengine_pcm_register() which requests dma channels during *its* probe().
-> This happens way before the rootfs is present and thus firmware loading still
-> fails, and is still being done indirectly from a probe() anyway.
-> 
-> I had some discussion with Mark and Arnd on IRC, about the possibility of ALSA
-> not rquesting DMA channels during their probe(). Marks opinion I believe was
-> this wasn't a good solution as ALSA would be presenting devices to userspace 
-> that potentially don't exist & can't work.
-
-Hmmm, there are two parts, one is requesting the firmware and second is the
-loading part.
-
-Since descriptor allocation is atomic in nature, I think we should load the
-firmware using nowait version and if you can atomically copy then do so at
-first descriptor allocation. If not then you should copy in nowait handler
-
-> ===
-> 
-> *_prep_*() hooks
-> 
-> + Always get called before a DMA is started
-> 
-> - *prep* hooks can be called from atomic context so can't sleep [1] and can't use
->   request_firmware().
-> - I tried using request_firmwqare_nowait() with GFP_ATOMIC flag firmware. This
->   half works but firmware loading doesn't complete before the DMA is started which
->   means it often fails on the first DMA attempt.
-> 
->  ===
-> 
-> Suggested solution for v4 patches: -
-> 
-> Both Arnd, Mark and Lee initial suggestion on irc was that if the device is useless
-> without firmware, and the firmware isn't available then the driver should call
-> request_firmware() in probe() and -EPROBE_DEFER if not available.
-> 
-> This solution works well, in both the built-in and modules case. As the deffered
-> fdma driver re-probes after the rootfs has been mounted when the firmware is
-> available. The other ALSA depedencies then also re-probe and everything works
-> nicely (and you can be assured that the devices will actually work at this point).
-> 
-> This fdma driver and the ALSA ones will be enabled in multi_v7_defconfig as modules,
-> so it is only likely to be used as a module. However using -EPROBE_DEFER
-> mechanism, has the nice quality that if it is compiled as built-in you still end
-> up with a working system (albeit with a longer boot time).
-
-I think that makes sense, relying on deferred probing seems a better way to
-manage
-
-> 
-> Failing that the only other solution I can see is extending the dmaengine API to
-> provide another hook which can sleep, and must be called before a DMA
-> transation is started. Note that firmware isn't actually *required* until we
-> start the dma transaction, but the device is useless without this firmware. In fact
-> its "registers" are really just offsets into its DMEM so in theory even the
-> registers are totally firmware dependent.
-> 
-> Also I notice the only other dmaengine driver imx-sdma.c using firmware calls
-> request_firmware_nowait from its probe().
-> 
-> Are you happy with my proposed solutiion for v4? If not how would you like me to
-> implement this?
-> 
-> regards,
-> 
-> Peter.
-> 
-> [1] https://www.kernel.org/doc/Documentation/dmaengine/provider.txt
-> 
-> [2] https://lkml.org/lkml/2015/10/13/278
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-~Vinod
+Best Regards,
+Wenyou Yang
