@@ -1,28 +1,64 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 12 May 2016 16:50:54 +0200 (CEST)
-Subject: [PATCH 0/4] add minimal bcm2835-sdram driver
-In-Reply-To: <1463056732-5607-1-git-send-email-kernel@martin.sperl.org>
-References: <1463056732-5607-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1861597197.20753.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 12 May 2016 15:49:30 +0100
+Subject: [PATCH v12 06/10] arm64: Treat all entry code as non-kprobe-able
+In-Reply-To: <1461783185-9056-7-git-send-email-dave.long@linaro.org>
+References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+ <1461783185-9056-7-git-send-email-dave.long@linaro.org>
+Message-ID: <573497FA.5030309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Hi David, Pratyush
 
-> kernel at martin.sperl.org hat am 12. Mai 2016 um 14:38 geschrieben:
+On 27/04/16 19:53, David Long wrote:
+> From: Pratyush Anand <panand@redhat.com>
 > 
+> Entry symbols are not kprobe safe. So blacklist them for kprobing.
 > 
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> As the sdram clock is a critical clock to the system
-> the minimal bcm2835-sdram driver claims (and enables)
-> this clock and also exposes the corresponding sdram
-> registers via debugfs.
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
 
-sounds like this driver should fix an clock handling issue. Unfortunately this
-isn't a solution in case the driver is disabled.
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index dfa1b1f..6a1292b 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -29,6 +29,7 @@
+>  #include <asm/system_misc.h>
+>  #include <asm/insn.h>
+>  #include <asm/uaccess.h>
+> +#include <asm-generic/sections.h>
+>  
+>  #include "kprobes-arm64.h"
+>  
+> @@ -514,6 +515,15 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>  	return 1;
+>  }
+>  
+> +bool arch_within_kprobe_blacklist(unsigned long addr)
+> +{
+> +	return  (addr >= (unsigned long)__kprobes_text_start &&
+> +		 addr < (unsigned long)__kprobes_text_end) ||
+> +		(addr >= (unsigned long)__entry_text_start &&
+> +		 addr < (unsigned long)__entry_text_end) ||
+> +		 !!search_exception_tables(addr);
+> +}
+> +
 
-Does the GPU firmware handle the SDRAM controller or is it initialized by
-bootcode?
+Looking at __kvm_hyp_vector, we don't have support for handling breakpoints at
+EL2, so we should forbid kprobing these address ranges too:
+__hyp_text_start -> __hyp_text_end
+__hyp_idmap_text_start -> __hyp_idmap_text_end
 
-Stefan
+These can probably be guarded with is_kernel_in_hyp_mode(), if this is true then
+we are running with VHE where this code runs at the same exception level as the
+rest of the kernel, so we can probe them. (In this case you may want to add
+'eret' to aarch64_insn_is_branch() in patch 2)
+
+
+Probing things in the kernel idmap sounds dangerous! Lets blacklist that too:
+__idmap_text_start -> __idmap_text_end
+
+
+
+Thanks,
+
+James
