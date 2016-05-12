@@ -1,43 +1,112 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 12 May 2016 12:20:27 -0500
-Subject: [PATCH v2 1/2] doc/devicetree: Add Aspeed VIC bindings
-In-Reply-To: <1463014882.20290.203.camel@kernel.crashing.org>
-References: <462797239-14765-1-git-send-email-joel@jms.id.au>
- <1462802317-27086-1-git-send-email-joel@jms.id.au>
- <1462802317-27086-2-git-send-email-joel@jms.id.au>
- <20160511143313.GA7426@rob-hp-laptop>
- <1463014882.20290.203.camel@kernel.crashing.org>
-Message-ID: <CAL_JsqJDGmvDxm1kN1w6NQZs0JLeA-V=X_BWi=VOaMTwftLn-w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 18:22:03 +0100
+Subject: [PATCH v2] arm64: fix current_thread_info()->addr_limit setup
+In-Reply-To: <1463069163-374-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1463069163-374-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20160512172203.GL11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 8:01 PM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> On Wed, 2016-05-11 at 09:33 -0500, Rob Herring wrote:
->> > +- interrupt-controller : Identifies the node as an interrupt controller
->> > +- #interrupt-cells : Specifies the number of cells needed to encode an
->> > +  interrupt source. The value shall be 1.
->>
->> No need for level vs. edge flags?
->
-> That's an open question. Most interrupts are fixed. A handful of GPIOs
-> can be configured either way. For now I am relying on uboot setting up
-> the right config for them and I read it back at boot time, but we could
-> make it part of the binding I suppose.
+On Thu, May 12, 2016 at 07:06:03PM +0300, Yury Norov wrote:
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index 24ed037..fda75ce 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -138,7 +138,10 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+>   */
+>  #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
+>  
+> -#define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
+> +#define SET_PERSONALITY(ex) do {					\
+> +	clear_thread_flag(TIF_32BIT);					\
+> +	set_fs(TASK_SIZE_64);						\
+> +} while (0)
+>  
+>  #define ARCH_DLINFO							\
+>  do {									\
+> @@ -181,7 +184,11 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+>  					 ((x)->e_flags & EF_ARM_EABI_MASK))
+>  
+>  #define compat_start_thread		compat_start_thread
+> -#define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
+> +#define COMPAT_SET_PERSONALITY(ex) do {					\
+> +	set_thread_flag(TIF_32BIT);					\
+> +	set_fs(TASK_SIZE_32);						\
+> +} while (0)
+> +
+>  #define COMPAT_ARCH_DLINFO
+>  extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
+>  				      int uses_interp);
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 0685d74..5b269e6 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -60,7 +60,7 @@ extern int fixup_exception(struct pt_regs *regs);
+>  #define KERNEL_DS	(-1UL)
+>  #define get_ds()	(KERNEL_DS)
+>  
+> -#define USER_DS		TASK_SIZE_64
+> +#define USER_DS		TASK_SIZE
 
-It is almost standard to just use 2 cells here even if reserved for
-future use. Especially since the IP block seems to have registers to
-control that.
+We can avoid the USER_DS change as long as SET_PERSONALITY updates the
+thread's addr_limit. There are very few explicit set_fs(USER_DS) calls
+and they are on the thread exit path (or exec).
 
->
->> > +- valid-sources : bitmask of valid irq sources
->>
->> Drop this. Either all interrupt controllers need this or none of
->> them do. The valid sources are the ones described in the DT.
->
-> Looking at the code (I wrote that ages ago), this is only used for:
+That's unless we try to make a generic set_fs(USER_DS) addition to
+something like setup_new_exec() and we wouldn't need the SET_PERSONALITY
+changes:
 
-I'm guessing it came from the VIC binding. I never really liked the
-property, but not enough to worry about it.
+diff --git a/fs/exec.c b/fs/exec.c
+index c4010b8207a1..54cc537f5986 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1226,6 +1226,9 @@ EXPORT_SYMBOL(would_dump);
+ 
+ void setup_new_exec(struct linux_binprm * bprm)
+ {
++	/* set the address limit for the new executable */
++	set_fs(USER_DS);
++
+ 	arch_pick_mmap_layout(current->mm);
+ 
+ 	/* This is the point of no return */
 
-Rob
+>  #define get_fs()	(current_thread_info()->addr_limit)
+>  
+>  static inline void set_fs(mm_segment_t fs)
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 8062482..2b25930 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -211,17 +211,13 @@ static void tls_thread_flush(void)
+>  {
+>  	asm ("msr tpidr_el0, xzr");
+>  
+> -	if (is_compat_task()) {
+> -		current->thread.tp_value = 0;
+> -
+> -		/*
+> -		 * We need to ensure ordering between the shadow state and the
+> -		 * hardware state, so that we don't corrupt the hardware state
+> -		 * with a stale shadow state during context switch.
+> -		 */
+> -		barrier();
+> -		asm ("msr tpidrro_el0, xzr");
+> -	}
+> +	/*
+> +	 * We need to ensure ordering between the shadow state and the
+> +	 * hardware state, so that we don't corrupt the hardware state
+> +	 * with a stale shadow state during context switch.
+> +	 */
+> +	barrier();
+> +	asm ("msr tpidrro_el0, xzr");
+>  }
+
+Why did you dropped tp_value initialisation? Context switching on native
+64-bit tasks rely on copying the tpidr_el0 in and out of tp_value.
+However, compat tasks use the read-only tpidrro_el0 register set
+explicitly via a system call. Until this call happens, the TLS register
+would contain some garbage after the thread has been switched back in.
+
+-- 
+Catalin
