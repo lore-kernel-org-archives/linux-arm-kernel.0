@@ -1,86 +1,54 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 12 May 2016 11:23:15 -0700
-Subject: [PATCH 0/3] clk: bcm2835: critical clocks and parent selection
-In-Reply-To: <FD44F435-512C-49A5-B1F5-3C62AAF805AC@martin.sperl.org>
-References: <1462842090-2017-1-git-send-email-eric@anholt.net>
- <5731B8BA.30402@martin.sperl.org> <87a8jxyfua.fsf@eliezer.anholt.net>
- <FD44F435-512C-49A5-B1F5-3C62AAF805AC@martin.sperl.org>
-Message-ID: <87oa8b9lv0.fsf@eliezer.anholt.net>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 12 May 2016 19:24:08 +0100
+Subject: [PATCH v16 00/20] arm64 kexec kernel patches v16
+In-Reply-To: <cover.1460668521.git.geoff@infradead.org>
+References: <cover.1460668521.git.geoff@infradead.org>
+Message-ID: <5734CA48.7040706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Sperl <kernel@martin.sperl.org> writes:
+Hello Geoff,
 
->> On 10.05.2016, at 19:37, Eric Anholt <eric@anholt.net> wrote:
->> 
->> Martin Sperl <kernel@martin.sperl.org> writes:
->>> and also hsm (probably hardware security module):
->>> root at raspcm:~# cat /sys/kernel/debug/clk/hsm/regdump
->>> ctl = 0x000002d6
->>> div = 0x000030e0
->>> root at raspcm:~# cat /sys/kernel/debug/clk/hsm/clk_rate
->>> 163551916
->> 
->> That's the HDMI state machine (there's even a comment saying so),
->> controlled by the vc4 driver.
->> 
->>> So turning plld off stops sdram and hsm - at least that is my
->>> interpretation.
->>> 
->>> This means we need to define a clock property in firmware or
->>> we need a ram node making use of "mmio-sram" maybe?
->>> 
->>> Marking sdram as "critical" or "hand_off" could also solve that
->>> for the moment (but it does not solve all the other hidden
->>> clock dependencies of the firmware)
->> 
->> If there are other hidden dependencies, then we should figure them out.
+On 14/04/16 22:21, Geoff Levand wrote:
+> This series adds the core support for kexec re-boot and kdump on ARM64.  This
+> version of the series combines Takahiro's kdump patches with my kexec patches.
+> Please consider all patches for inclusion.
 >
-> But strangely the sdram (plus the below) is the only one with
-> plld that is enabled (unless it is one of the clocks we have not
-> added to the kernel side yet)
+> To load a second stage kernel and execute a kexec re-boot or to work with kdump
+> on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
+> merged upstream, are needed.  Please update to the latest if you have been using
+> an older version.
 >
-> Maybe there is something that derives directly from plld_core
-> or any of the other plld-dividers?
+> To examine vmcore (/proc/vmcore), you should use
+>    - gdb v7.7 or later
+>    - crash v7.1.1 or later
 
-Nothing I can find.
+I have been trying to use crash dump with your branch without much 
+success on juno-r2:
 
-> Core would indicate anything central to the videocore...
-> Anyway both plld_core as well as plld_per ad well as both
-> Pll_dsi that are running by default (but I doubt that the
-> Dsi would be relevant)
->
-> I guess you are in a better situation to figure out which
-> hidden HW blocks uses plld...
->
->> 
->>> --- a/drivers/clk/bcm/clk-bcm2835.c
->>> +++ b/drivers/clk/bcm/clk-bcm2835.c
->>> @@ -1655,7 +1655,8 @@ static const struct bcm2835_clk_desc 
->>> clk_desc_array[] = {
->>>                .ctl_reg = CM_SDCCTL,
->>>                .div_reg = CM_SDCDIV,
->>>                .int_bits = 6,
->>> -               .frac_bits = 0),
->>> +               .frac_bits = 0,
->>> +               .flags = CLK_IS_CRITICAL),
->>>        [BCM2835_CLOCK_V3D]     = REGISTER_VPU_CLK(
->>>                .name = "v3d",
->>>                .ctl_reg = CM_V3DCTL,
->> 
->> The Pi foundation folks believe that the cprman SDRAM clock isn't ever
->> used (there's a separate PLL in the SDRAM controller, and cprman is only
->> intended for unused low-power states), and at least in your sample of
->> the reg, it's not enabled.  Instead of grepping for clk_enable_count, it
-> See my comment above - it must be configured for some reason
-> during the boot process by the firmware .
+WARNING: could not find MAGIC_START!
+crash: cannot determine base kernel version
+crash: /root/vmlinux and /root/coredump.kernel do not match!
 
-You have to write the register to configure the sdram controller's clock
-parent.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160512/b537a4e4/attachment.sig>
+Looking at the debug log (-p 5), the translation va -> pa computed by 
+crash is wrong.
+
+The physical address expected is 0x80a76b28, but crash return 0x88a76b28.
+
+I am using crash built from [1] and the panic has been created using 
+/proc/sysrq-trigger.
+
+Also, crash dump seems to always report that Xen is running even when 
+KVM was in used (see logs [2]) below.
+
+Lastly, crash fails with an error after a couple of minutes (see logs [2]).
+
+How you seen such errors during your testing?
+
+Regards,
+
+[1] https://github.com/crash-utility/crash
+[2] http://pastebin.com/wC8w44SN
+
+-- 
+Julien Grall
