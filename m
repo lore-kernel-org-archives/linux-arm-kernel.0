@@ -1,28 +1,99 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 May 2016 15:41:12 +0200
-Subject: [PATCH 1/6] pinctrl: meson: Fix eth_tx_en bit index
-In-Reply-To: <m2r3d97wnc.fsf@baylibre.com>
-References: <1462910920-5462-1-git-send-email-serveralex@gmail.com>
- <1462910920-5462-2-git-send-email-serveralex@gmail.com>
- <m2r3d97wnc.fsf@baylibre.com>
-Message-ID: <CACRpkda40Gb4ye7_dBwOcsWZTT2V6qByVOyv_Z_Mg4RX+CLNiA@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 12 May 2016 16:44:31 +0300
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+Message-ID: <20160512134431.GB30205@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 11:48 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Alexander M?ller <serveralex@gmail.com> writes:
->
->> Fix pinctrl eth_tx_en bit index according to Hardkernel ODROID-C1 datasheet.
->>
->> Signed-off-by: Alexander M?ller <serveralex@gmail.com>
->
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
->
-> Linus, with your ack, we can take this through the amlogic tree, or feel
-> free to merge as a fix as it can go independetly of the rest of the
-> series if needed.
+On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
+> On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > of vector, and kernel reports successful read/write.
+> > 
+> > There are 2 problems:
+> > 1. How kernel allows such address to be passed to fs subsystem;
+> > 2. How fs successes to read/write at non-mapped, and in fact non-user
+> > address.
+> > 
+> > I don't know the answer on 2'nd question, and it might be something
+> > generic. But I investigated first problem.
+> > 
+> > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+> > validate user address, and on arm64 it ends up with checking buffer
+> > end against current_thread_info()->addr_limit.
+> > 
+> > current_thread_info()->addr_limit for ilp32, and most probably for
+> > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+> > It happens because on thread creation we call flush_old_exec() to set 
+> > addr_limit, and completely ignore compat mode there.
+> 
+> I assume accesses beyond this address would fault anyway but I haven't
+> checked the code paths.
+> 
+> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> > index 7a39683..6ba4952 100644
+> > --- a/arch/arm64/include/asm/elf.h
+> > +++ b/arch/arm64/include/asm/elf.h
+> > @@ -146,6 +146,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+> >  do {						\
+> >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> >  	clear_thread_flag(TIF_32BIT);		\
+> > +	set_fs(TASK_SIZE_64);			\
+> >  } while (0)
+> 
+> See below.
+> 
+> > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > index 19cfdc5..3b0dd8d 100644
+> > --- a/arch/arm64/include/asm/uaccess.h
+> > +++ b/arch/arm64/include/asm/uaccess.h
+> > @@ -51,7 +51,7 @@
+> >  #define KERNEL_DS	(-1UL)
+> >  #define get_ds()	(KERNEL_DS)
+> >  
+> > -#define USER_DS		TASK_SIZE_64
+> > +#define USER_DS		TASK_SIZE
+> 
+> I agree with this.
+> 
+> >  #define get_fs()	(current_thread_info()->addr_limit)
+> >  
+> >  static inline void set_fs(mm_segment_t fs)
+> > diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
+> > index 5487872..2e8d9f3 100644
+> > --- a/arch/arm64/kernel/binfmt_elf32.c
+> > +++ b/arch/arm64/kernel/binfmt_elf32.c
+> > @@ -12,6 +12,7 @@
+> >  do {						\
+> >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> >  	set_thread_flag(TIF_32BIT);		\
+> > +	set_fs(TASK_SIZE_32);			\
+> >  } while (0)
+> >  
+> >  #define COMPAT_ARCH_DLINFO
+> > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> > index a934fd4..a8599c6 100644
+> > --- a/arch/arm64/kernel/binfmt_ilp32.c
+> > +++ b/arch/arm64/kernel/binfmt_ilp32.c
+> > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+> >  do {									\
+> >  	set_thread_flag(TIF_32BIT_AARCH64);				\
+> >  	clear_thread_flag(TIF_32BIT);					\
+> > +	set_fs(TASK_SIZE_32);						\
+> >  } while (0)
+> 
+> I don't think we need these two. AFAICT, flush_old_exec() takes care of
+> setting the USER_DS for the new thread.
 
-I've merged this patch.
+That's true, but USER_DS depends on personality which is not set yet
+for new thread, as I wrote above. In fact, I tried correct USER_DS
+only, and it doesn't work
 
-Yours,
-Linus Walleij
+> 
+> -- 
+> Catalin
