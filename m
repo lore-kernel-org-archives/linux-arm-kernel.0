@@ -1,113 +1,97 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 11 May 2016 17:06:13 -0700
-Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
- <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
-Message-ID: <5733C8F5.6090206@caviumnetworks.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 12 May 2016 03:20:00 +0300
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20160512002000.GA30997@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2016 03:39 AM, Catalin Marinas wrote:
-> On Wed, Apr 27, 2016 at 11:07:15AM -0700, David Daney wrote:
->> +static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
->> +{
->> +	unsigned long madt_end, entry;
->> +	struct acpi_table_madt *madt;
->> +	acpi_size tbl_size;
->> +
->> +	if (ACPI_FAILURE(acpi_get_table_with_size(ACPI_SIG_MADT, 0,
->> +			(struct acpi_table_header **)&madt, &tbl_size)))
->> +		return -ENODEV;
->> +
->> +	entry = (unsigned long)madt;
->> +	madt_end = entry + madt->header.length;
->> +
->> +	/* Parse all entries looking for a match. */
->> +	entry += sizeof(struct acpi_table_madt);
->> +	while (entry + sizeof(struct acpi_subtable_header) < madt_end) {
->> +		struct acpi_subtable_header *header =
->> +			(struct acpi_subtable_header *)entry;
->> +
->> +		if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
->> +			struct acpi_madt_generic_interrupt *gicc =
->> +				container_of(header,
->> +				struct acpi_madt_generic_interrupt, header);
->> +
->> +			if ((gicc->flags & ACPI_MADT_ENABLED) &&
->> +			    (gicc->uid == acpi_id)) {
->> +				*mpidr = gicc->arm_mpidr;
->> +				early_acpi_os_unmap_memory(madt, tbl_size);
->> +				return 0;
->> +			}
->> +		}
->> +		entry += header->length;
->> +	}
->> +
->> +	early_acpi_os_unmap_memory(madt, tbl_size);
->> +	return -ENODEV;
->> +}
->> +
->> +/* Callback for Proximity Domain -> ACPI processor UID mapping */
->> +void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
->> +{
->> +	int pxm, node;
->> +	u64 mpidr;
->> +
->> +	if (srat_disabled())
->> +		return;
->> +
->> +	if (pa->header.length < sizeof(struct acpi_srat_gicc_affinity)) {
->> +		pr_err("SRAT: Invalid SRAT header length: %d\n",
->> +			pa->header.length);
->> +		bad_srat();
->> +		return;
->> +	}
->> +
->> +	if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
->> +		return;
->> +
->> +	if (cpus_in_srat >= NR_CPUS) {
->> +		pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may not be able to use all cpus\n",
->> +			     NR_CPUS);
->> +		return;
->> +	}
->> +
->> +	pxm = pa->proximity_domain;
->> +	node = acpi_map_pxm_to_node(pxm);
->> +
->> +	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
->> +		pr_err("SRAT: Too many proximity domains %d\n", pxm);
->> +		bad_srat();
->> +		return;
->> +	}
->> +
->> +	if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
->> +		pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in MADT\n",
->> +			pxm, pa->acpi_processor_uid);
->> +		bad_srat();
->> +		return;
->> +	}
->
-> I wonder whether you could replace the get_mpidr_in_madt() function with
-> something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
-> duplicates functionality already available elsewhere.
->
+Hi,
 
-I just tried that, and it doesn't work.
+I debugged preadv02 and pwritev02 failures and found very weird bug.
+Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+of vector, and kernel reports successful read/write.
 
-The problem is that this code is being run very early in the boot, and 
-kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used 
-once we have working kmalloc.  We need to extract the NUMA information 
-early like this precisely because it is needed to initializing the slab 
-system
+There are 2 problems:
+1. How kernel allows such address to be passed to fs subsystem;
+2. How fs successes to read/write at non-mapped, and in fact non-user
+address.
 
-Notice that we are using early_acpi_os_unmap_memory() et al. in 
-get_mpidr_in_madt() explicitly for this reason.
+I don't know the answer on 2'nd question, and it might be something
+generic. But I investigated first problem.
 
-In summary: I don't think we need another revision of this patch, it is 
-like this for a good reason.
+The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+validate user address, and on arm64 it ends up with checking buffer
+end against current_thread_info()->addr_limit.
 
-David Daney
+current_thread_info()->addr_limit for ilp32, and most probably for
+aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+It happens because on thread creation we call flush_old_exec() to set 
+addr_limit, and completely ignore compat mode there.
+
+This patch fixes it. It also fixes USER_DS macro to return different
+values depending on compat.
+
+This patch is enough to handle preadv02 and pwritev02, but problem #2
+is still there.
+
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/include/asm/elf.h     | 1 +
+ arch/arm64/include/asm/uaccess.h | 2 +-
+ arch/arm64/kernel/binfmt_elf32.c | 1 +
+ arch/arm64/kernel/binfmt_ilp32.c | 1 +
+ 4 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 7a39683..6ba4952 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -146,6 +146,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ do {						\
+ 	clear_thread_flag(TIF_32BIT_AARCH64);	\
+ 	clear_thread_flag(TIF_32BIT);		\
++	set_fs(TASK_SIZE_64);			\
+ } while (0)
+ 
+ #define ARCH_DLINFO							\
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 19cfdc5..3b0dd8d 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -51,7 +51,7 @@
+ #define KERNEL_DS	(-1UL)
+ #define get_ds()	(KERNEL_DS)
+ 
+-#define USER_DS		TASK_SIZE_64
++#define USER_DS		TASK_SIZE
+ #define get_fs()	(current_thread_info()->addr_limit)
+ 
+ static inline void set_fs(mm_segment_t fs)
+diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
+index 5487872..2e8d9f3 100644
+--- a/arch/arm64/kernel/binfmt_elf32.c
++++ b/arch/arm64/kernel/binfmt_elf32.c
+@@ -12,6 +12,7 @@
+ do {						\
+ 	clear_thread_flag(TIF_32BIT_AARCH64);	\
+ 	set_thread_flag(TIF_32BIT);		\
++	set_fs(TASK_SIZE_32);			\
+ } while (0)
+ 
+ #define COMPAT_ARCH_DLINFO
+diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+index a934fd4..a8599c6 100644
+--- a/arch/arm64/kernel/binfmt_ilp32.c
++++ b/arch/arm64/kernel/binfmt_ilp32.c
+@@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+ do {									\
+ 	set_thread_flag(TIF_32BIT_AARCH64);				\
+ 	clear_thread_flag(TIF_32BIT);					\
++	set_fs(TASK_SIZE_32);						\
+ } while (0)
+ 
+ #undef ARCH_DLINFO
+-- 
+2.5.0
