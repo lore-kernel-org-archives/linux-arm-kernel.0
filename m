@@ -1,34 +1,27 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 12 May 2016 15:58:55 -0700
-Subject: [PATCH 0/4] bcm2835: add thermal driver
-In-Reply-To: <1463063738-11506-1-git-send-email-kernel@martin.sperl.org>
-References: <1463063738-11506-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87ziruano0.fsf@eliezer.anholt.net>
+From: alcooperx@gmail.com (Alan Cooper)
+Date: Thu, 12 May 2016 19:02:36 -0400
+Subject: [PATCH 3/6] dt-bindings: mtu3: add devicetree bindings
+In-Reply-To: <1463037844.11651.118.camel@mhfsdcap03>
+References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462868614-20602-4-git-send-email-chunfeng.yun@mediatek.com>
+ <20160511145409.GA23042@rob-hp-laptop>
+ <1463037844.11651.118.camel@mhfsdcap03>
+Message-ID: <CAOGqxeUYEGKq5yhHbgcjPZtY06ZfDp2iCLZDqS3uyfCW523B4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On Thu, May 12, 2016 at 3:24 AM, chunfeng yun <chunfeng.yun@mediatek.com> wrote:
+>> > + - mediatek,enable-manual-drd : supports manual dual-role switch by sysfs
+>> > +   interface; only used when receptacle is TYPE-A and also wants to support
+>> > +   dual-role mode.
+>>
+>> sysfs is a Linux detail that doesn't apply to the binding. Does the
+>> property mean "the IP block supports or doesn't support switching"  or
+>> "I want to enable switching feature". Only the former belongs in DT.
+>>
+> It is the former case, and has little relation with sysfs interface.
+> I will modify it later, sorry for my unclear description.
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> Add thermal driver for the bcm2835 SOC.
->
-> Right now this driver does not set up the thermal device
-> itself, but relies on the fact that the firmware is setting
-> the device up correctly.
->
-> Also it is currently only reading from the register-set.
->
-> The driver also exposes the registers via debugfs.
-
-I had looked through before and decided that the FW was turning the
-tempsens clock on and off at runtime so we'd have to go through it for
-checking temperature.  Looking at it now, though, it keeps the clock
-running the entire time and just does a read periodically.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160512/7863f378/attachment.sig>
+Could the property name be just "enable-manual-drd" instead of
+"mediatek,enable-manual-drd"? I expect to have to add this
+functionality to our USB driver in the near future.
