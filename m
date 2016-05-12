@@ -1,84 +1,161 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 12 May 2016 15:53:02 +0800
-Subject: [PATCH v9 4/8] i2c: rk3x: Change SoC data to not use array
+Date: Thu, 12 May 2016 15:57:09 +0800
+Subject: [PATCH v9 5/8] i2c: rk3x: Move spec timing data to "static const"
+ structs
 In-Reply-To: <1463039586-8134-1-git-send-email-david.wu@rock-chips.com>
 References: <1463039586-8134-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1463039586-8134-5-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1463039829-8267-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specifying the i2c SoC data in an array provides very little benefit and
-gets unwieldly / confusing as the array grows since the next bit of code
-needs to refer to elements in the array by their raw integral index.
-
-Let's just create a single 'static const' structure for each SoC so that
-we can refer to these structures by ID.
+The i2c timing specs are really just constant data. There's no reason
+to write code to init them, so move them out to structures. This not
+only is a cleaner solution but it will reduce code duplication when we
+introduce a new variant of rk3x_i2c_calc_divs() in a future patch.
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 Suggested-by: Douglas Anderson <dianders@chromium.org>
 Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
 Change in v9:
 - none
 
-Change in v8:
+Changes in v8:
 - add commit description.
+- remove the spec values that were not needed, then
+  introduce the additional values in the rk3399 patch. 
 
- drivers/i2c/busses/i2c-rk3x.c | 38 ++++++++++++++++++++++++++++++--------
- 1 file changed, 30 insertions(+), 8 deletions(-)
+ drivers/i2c/busses/i2c-rk3x.c | 83 ++++++++++++++++++++++++++++---------------
+ 1 file changed, 55 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 9eeb4e5..d7a871f 100644
+index d7a871f..9791797 100644
 --- a/drivers/i2c/busses/i2c-rk3x.c
 +++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -864,17 +864,39 @@ static const struct i2c_algorithm rk3x_i2c_algorithm = {
- 	.functionality		= rk3x_i2c_func,
- };
+@@ -76,6 +76,34 @@ enum {
+ #define DEFAULT_SCL_RATE  (100 * 1000) /* Hz */
  
--static struct rk3x_i2c_soc_data soc_data[3] = {
--	{ .grf_offset = 0x154 }, /* rk3066 */
--	{ .grf_offset = 0x0a4 }, /* rk3188 */
--	{ .grf_offset = -1 },    /* no I2C switching needed */
-+static const struct rk3x_i2c_soc_data rk3066_soc_data = {
-+	.grf_offset = 0x154,
+ /**
++ * struct i2c_spec_values:
++ * @min_low_ns: min LOW period of the SCL clock
++ * @min_high_ns: min HIGH period of the SCL cloc
++ * @min_setup_start_ns: min set-up time for a repeated START conditio
++ * @max_data_hold_ns: max data hold time
++ */
++struct i2c_spec_values {
++	unsigned long min_low_ns;
++	unsigned long min_high_ns;
++	unsigned long min_setup_start_ns;
++	unsigned long max_data_hold_ns;
 +};
 +
-+static const struct rk3x_i2c_soc_data rk3188_soc_data = {
-+	.grf_offset = 0x0a4,
++static const struct i2c_spec_values standard_mode_spec = {
++	.min_low_ns = 4700,
++	.min_high_ns = 4000,
++	.min_setup_start_ns = 4700,
++	.max_data_hold_ns = 3450,
 +};
 +
-+static const struct rk3x_i2c_soc_data rk3228_soc_data = {
-+	.grf_offset = -1,
++static const struct i2c_spec_values fast_mode_spec = {
++	.min_low_ns = 1300,
++	.min_high_ns = 600,
++	.min_setup_start_ns = 600,
++	.max_data_hold_ns = 900,
 +};
 +
-+static const struct rk3x_i2c_soc_data rk3288_soc_data = {
-+	.grf_offset = -1,
- };
++/**
+  * struct rk3x_i2c_calced_timings:
+  * @div_low: Divider output for low
+  * @div_high: Divider output for high
+@@ -460,6 +488,21 @@ out:
+ }
  
- static const struct of_device_id rk3x_i2c_match[] = {
--	{ .compatible = "rockchip,rk3066-i2c", .data = (void *)&soc_data[0] },
--	{ .compatible = "rockchip,rk3188-i2c", .data = (void *)&soc_data[1] },
--	{ .compatible = "rockchip,rk3228-i2c", .data = (void *)&soc_data[2] },
--	{ .compatible = "rockchip,rk3288-i2c", .data = (void *)&soc_data[2] },
-+	{
-+		.compatible = "rockchip,rk3066-i2c",
-+		.data = (void *)&rk3066_soc_data
-+	},
-+	{
-+		.compatible = "rockchip,rk3188-i2c",
-+		.data = (void *)&rk3188_soc_data
-+	},
-+	{
-+		.compatible = "rockchip,rk3228-i2c",
-+		.data = (void *)&rk3228_soc_data
-+	},
-+	{
-+		.compatible = "rockchip,rk3288-i2c",
-+		.data = (void *)&rk3288_soc_data
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, rk3x_i2c_match);
+ /**
++ * Get timing values of I2C specification
++ *
++ * @speed: Desired SCL frequency
++ *
++ * Returns: Matched i2c spec values.
++ */
++static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
++{
++	if (speed <= 100000)
++		return &standard_mode_spec;
++	else
++		return &fast_mode_spec;
++}
++
++/**
+  * Calculate divider values for desired SCL frequency
+  *
+  * @clk_rate: I2C input clock rate
+@@ -474,10 +517,6 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+ 			      struct i2c_timings *t,
+ 			      struct rk3x_i2c_calced_timings *t_calc)
+ {
+-	unsigned long spec_min_low_ns, spec_min_high_ns;
+-	unsigned long spec_setup_start, spec_max_data_hold_ns;
+-	unsigned long data_hold_buffer_ns;
+-
+ 	unsigned long min_low_ns, min_high_ns;
+ 	unsigned long max_low_ns, min_total_ns;
+ 
+@@ -489,6 +528,8 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+ 	unsigned long min_div_for_hold, min_total_div;
+ 	unsigned long extra_div, extra_low_div, ideal_low_div;
+ 
++	unsigned long data_hold_buffer_ns = 50;
++	const struct i2c_spec_values *spec;
+ 	int ret = 0;
+ 
+ 	/* Only support standard-mode and fast-mode */
+@@ -511,22 +552,8 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+ 	 *	 This is because the i2c host on Rockchip holds the data line
+ 	 *	 for half the low time.
+ 	 */
+-	if (t->bus_freq_hz <= 100000) {
+-		/* Standard-mode */
+-		spec_min_low_ns = 4700;
+-		spec_setup_start = 4700;
+-		spec_min_high_ns = 4000;
+-		spec_max_data_hold_ns = 3450;
+-		data_hold_buffer_ns = 50;
+-	} else {
+-		/* Fast-mode */
+-		spec_min_low_ns = 1300;
+-		spec_setup_start = 600;
+-		spec_min_high_ns = 600;
+-		spec_max_data_hold_ns = 900;
+-		data_hold_buffer_ns = 50;
+-	}
+-	min_high_ns = t->scl_rise_ns + spec_min_high_ns;
++	spec = rk3x_i2c_get_spec(t->bus_freq_hz);
++	min_high_ns = t->scl_rise_ns + spec->min_high_ns;
+ 
+ 	/*
+ 	 * Timings for repeated start:
+@@ -536,14 +563,14 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+ 	 * We need to account for those rules in picking our "high" time so
+ 	 * we meet tSU;STA and tHD;STA times.
+ 	 */
+-	min_high_ns = max(min_high_ns,
+-		DIV_ROUND_UP((t->scl_rise_ns + spec_setup_start) * 1000, 875));
+-	min_high_ns = max(min_high_ns,
+-		DIV_ROUND_UP((t->scl_rise_ns + spec_setup_start +
+-			      t->sda_fall_ns + spec_min_high_ns), 2));
+-
+-	min_low_ns = t->scl_fall_ns + spec_min_low_ns;
+-	max_low_ns = spec_max_data_hold_ns * 2 - data_hold_buffer_ns;
++	min_high_ns = max(min_high_ns, DIV_ROUND_UP(
++		(t->scl_rise_ns + spec->min_setup_start_ns) * 1000, 875));
++	min_high_ns = max(min_high_ns, DIV_ROUND_UP(
++		(t->scl_rise_ns + spec->min_setup_start_ns + t->sda_fall_ns +
++		spec->min_high_ns), 2));
++
++	min_low_ns = t->scl_fall_ns + spec->min_low_ns;
++	max_low_ns =  spec->max_data_hold_ns * 2 - data_hold_buffer_ns;
+ 	min_total_ns = min_low_ns + min_high_ns;
+ 
+ 	/* Adjust to avoid overflow */
 -- 
 1.9.1
