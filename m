@@ -1,232 +1,133 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 12 May 2016 20:19:54 +0800
-Subject: [PATCH v2] Xen: EFI: Parse DT parameters for Xen specific UEFI
-Message-ID: <1463055594-14980-1-git-send-email-zhaoshenglong@huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 14:23:17 +0200
+Subject: [PATCH v3 13/55] KVM: arm/arm64: vgic-new: Add data structure
+ definitions
+In-Reply-To: <57347462.1020504@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-14-git-send-email-andre.przywara@arm.com>
+ <20160512121258.GG27623@cbox> <57347462.1020504@arm.com>
+Message-ID: <20160512122317.GC2370@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On Thu, May 12, 2016 at 01:17:38PM +0100, Marc Zyngier wrote:
+> On 12/05/16 13:12, Christoffer Dall wrote:
+> > On Fri, May 06, 2016 at 11:45:26AM +0100, Andre Przywara wrote:
+> >> From: Christoffer Dall <christoffer.dall@linaro.org>
+> >>
+> >> Add a new header file for the new and improved GIC implementation.
+> >> The big change is that we now have a struct vgic_irq per IRQ instead
+> >> of spreading all the information over various bitmaps.
+> >>
+> >> We include this new header conditionally from within the old header
+> >> file for the time being to avoid touching all the users.
+> >>
+> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >> Changes RFC .. v1:
+> >> - adapt to 4.6-rc (adding live_lrs member)
+> >> - elaborate on ap_list usage
+> >>
+> >> Changes v1 .. v2:
+> >> - change data type of dist->enabled to bool
+> >>
+> >>  include/kvm/arm_vgic.h  |   5 ++
+> >>  include/kvm/vgic/vgic.h | 201 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >>  2 files changed, 206 insertions(+)
+> >>  create mode 100644 include/kvm/vgic/vgic.h
+> >>
+> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> >> index c14ff77..d406f8e 100644
+> >> --- a/include/kvm/arm_vgic.h
+> >> +++ b/include/kvm/arm_vgic.h
+> >> @@ -19,6 +19,10 @@
+> >>  #ifndef __ASM_ARM_KVM_VGIC_H
+> >>  #define __ASM_ARM_KVM_VGIC_H
+> >>  
+> >> +#ifdef CONFIG_KVM_NEW_VGIC
+> >> +#include <kvm/vgic/vgic.h>
+> >> +#else
+> >> +
+> >>  #include <linux/kernel.h>
+> >>  #include <linux/kvm.h>
+> >>  #include <linux/irqreturn.h>
+> >> @@ -366,4 +370,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
+> >>  }
+> >>  #endif
+> >>  
+> >> +#endif	/* old VGIC include */
+> >>  #endif
+> >> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> >> new file mode 100644
+> >> index 0000000..39933ee
+> >> --- /dev/null
+> >> +++ b/include/kvm/vgic/vgic.h
+> >> @@ -0,0 +1,201 @@
+> >> +/*
+> >> + * Copyright (C) 2015, 2016 ARM Ltd.
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + *
+> >> + * You should have received a copy of the GNU General Public License
+> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >> + */
+> >> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
+> >> +#define __ASM_ARM_KVM_VGIC_VGIC_H
+> >> +
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/kvm.h>
+> >> +#include <linux/irqreturn.h>
+> >> +#include <linux/spinlock.h>
+> >> +#include <linux/types.h>
+> >> +#include <kvm/iodev.h>
+> >> +
+> >> +#define VGIC_V3_MAX_CPUS	255
+> >> +#define VGIC_V2_MAX_CPUS	8
+> >> +#define VGIC_NR_IRQS_LEGACY     256
+> >> +#define VGIC_NR_SGIS		16
+> >> +#define VGIC_NR_PPIS		16
+> >> +#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+> >> +#define VGIC_MAX_PRIVATE	(VGIC_NR_PRIVATE_IRQS - 1)
+> >> +#define VGIC_MAX_SPI		1019
+> >> +#define VGIC_MAX_RESERVED	1023
+> >> +#define VGIC_MIN_LPI		8192
+> >> +
+> >> +enum vgic_type {
+> >> +	VGIC_V2,		/* Good ol' GICv2 */
+> >> +	VGIC_V3,		/* New fancy GICv3 */
+> >> +};
+> >> +
+> >> +/* same for all guests, as depending only on the _host's_ GIC model */
+> >> +struct vgic_global {
+> >> +	/* type of the host GIC */
+> >> +	enum vgic_type		type;
+> >> +
+> >> +	/* Physical address of vgic virtual cpu interface */
+> >> +	phys_addr_t		vcpu_base;
+> >> +
+> >> +	/* virtual control interface mapping */
+> >> +	void __iomem		*vctrl_base;
+> >> +
+> >> +	/* Number of implemented list registers */
+> >> +	int			nr_lr;
+> >> +
+> >> +	/* Maintenance IRQ number */
+> > 
+> > nit: this is the physial INTID, right?
+> > 
+> >> +	unsigned int		maint_irq;
+> 
+> No, this is the actual Linux IRQ number.
+> 
+oh right, it's set by irq_of_parse_and_map.
 
-The EFI DT parameters for bare metal are located under /chosen node,
-while for Xen Dom0 they are located under /hyperviosr/uefi node. These
-parameters under /chosen and /hyperviosr/uefi are not expected to appear
-at the same time.
-Parse these EFI parameters and initialize EFI like the way for bare
-metal except the runtime services because the runtime services for Xen
-Dom0 are available through hypercalls and they are always enabled. So it
-sets the EFI_RUNTIME_SERVICES flag if it finds /hyperviosr/uefi node and
-bails out in arm_enable_runtime_services() when EFI_RUNTIME_SERVICES
-flag is set already.
-
-CC: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
-v2: rebase it on top of EFI and Xen next branch, add some comments to
-explain the codes. 
----
- arch/arm/xen/enlighten.c           | 22 +++++++++++
- drivers/firmware/efi/arm-runtime.c |  5 +++
- drivers/firmware/efi/efi.c         | 81 ++++++++++++++++++++++++++++++--------
- 3 files changed, 92 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 13e3e9f..d4f36eb 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -15,7 +15,9 @@
- #include <asm/paravirt.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/xen/xen-ops.h>
- #include <asm/system_misc.h>
-+#include <asm/efi.h>
- #include <linux/interrupt.h>
- #include <linux/irqreturn.h>
- #include <linux/module.h>
-@@ -261,6 +263,19 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
- 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
- 		hyper_node.version = s + strlen(hyper_node.prefix);
- 
-+	/*
-+	 * Check if Xen supports EFI by checking whether there is the
-+	 * "/hypervisor/uefi" node in DT. If so, runtime services are available
-+	 * through proxy functions (e.g. in case of Xen dom0 EFI implementation
-+	 * they call special hypercall which executes relevant EFI functions)
-+	 * and that is why they are always enabled.
-+	 */
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		if ((of_get_flat_dt_subnode_by_name(node, "uefi") > 0) &&
-+		    !efi_runtime_disabled())
-+			set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-+	}
-+
- 	return 0;
- }
- 
-@@ -352,6 +367,13 @@ static int __init xen_guest_init(void)
- 		return -ENODEV;
- 	}
- 
-+	/*
-+	 * The fdt parsing codes have set EFI_RUNTIME_SERVICES if Xen EFI
-+	 * parameters are found. Force enable runtime services.
-+	 */
-+	if (efi_enabled(EFI_RUNTIME_SERVICES))
-+		xen_efi_runtime_setup();
-+
- 	shared_info_page = (struct shared_info *)get_zeroed_page(GFP_KERNEL);
- 
- 	if (!shared_info_page) {
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 17ccf0a..c394b81 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -107,6 +107,11 @@ static int __init arm_enable_runtime_services(void)
- 		return 0;
- 	}
- 
-+	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-+		pr_info("EFI runtime services access via paravirt.\n");
-+		return 0;
-+	}
-+
- 	pr_info("Remapping and enabling EFI services.\n");
- 
- 	mapsize = efi.memmap.map_end - efi.memmap.map;
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 05509f3..1c6f9dd 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -472,12 +472,14 @@ device_initcall(efi_load_efivars);
- 		FIELD_SIZEOF(struct efi_fdt_params, field) \
- 	}
- 
--static __initdata struct {
-+struct params {
- 	const char name[32];
- 	const char propname[32];
- 	int offset;
- 	int size;
--} dt_params[] = {
-+};
-+
-+static __initdata struct params fdt_params[] = {
- 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
- 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
- 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-@@ -485,44 +487,91 @@ static __initdata struct {
- 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
- };
- 
-+static __initdata struct params xen_fdt_params[] = {
-+	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
-+};
-+
-+#define EFI_FDT_PARAMS_SIZE	ARRAY_SIZE(fdt_params)
-+
-+static __initdata struct {
-+	const char *uname;
-+	const char *subnode;
-+	struct params *params;
-+} dt_params[] = {
-+	{ "hypervisor", "uefi", xen_fdt_params },
-+	{ "chosen", NULL, fdt_params },
-+};
-+
- struct param_info {
- 	int found;
- 	void *params;
-+	const char *missing;
- };
- 
--static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
--				       int depth, void *data)
-+static int __init __find_uefi_params(unsigned long node,
-+				     struct param_info *info,
-+				     struct params *params)
- {
--	struct param_info *info = data;
- 	const void *prop;
- 	void *dest;
- 	u64 val;
- 	int i, len;
- 
--	if (depth != 1 || strcmp(uname, "chosen") != 0)
--		return 0;
--
--	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
--		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
--		if (!prop)
-+	for (i = 0; i < EFI_FDT_PARAMS_SIZE; i++) {
-+		prop = of_get_flat_dt_prop(node, params[i].propname, &len);
-+		if (!prop) {
-+			info->missing = params[i].name;
- 			return 0;
--		dest = info->params + dt_params[i].offset;
-+		}
-+
-+		dest = info->params + params[i].offset;
- 		info->found++;
- 
- 		val = of_read_number(prop, len / sizeof(u32));
- 
--		if (dt_params[i].size == sizeof(u32))
-+		if (params[i].size == sizeof(u32))
- 			*(u32 *)dest = val;
- 		else
- 			*(u64 *)dest = val;
- 
- 		if (efi_enabled(EFI_DBG))
--			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
--				dt_params[i].size * 2, val);
-+			pr_info("  %s: 0x%0*llx\n", params[i].name,
-+				params[i].size * 2, val);
- 	}
-+
- 	return 1;
- }
- 
-+static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
-+				       int depth, void *data)
-+{
-+	struct param_info *info = data;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		const char *subnode = dt_params[i].subnode;
-+
-+		if (depth != 1 || strcmp(uname, dt_params[i].uname) != 0) {
-+			info->missing = dt_params[i].params[0].name;
-+			continue;
-+		}
-+
-+		if (subnode) {
-+			node = of_get_flat_dt_subnode_by_name(node, subnode);
-+			if (node < 0)
-+				return 0;
-+		}
-+
-+		return __find_uefi_params(node, info, dt_params[i].params);
-+	}
-+
-+	return 0;
-+}
-+
- int __init efi_get_fdt_params(struct efi_fdt_params *params)
- {
- 	struct param_info info;
-@@ -538,7 +587,7 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
- 		pr_info("UEFI not found.\n");
- 	else if (!ret)
- 		pr_err("Can't find '%s' in device tree!\n",
--		       dt_params[info.found].name);
-+		       info.missing);
- 
- 	return ret;
- }
--- 
-2.0.4
+My bad,
+-Christoffer
