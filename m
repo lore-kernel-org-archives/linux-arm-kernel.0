@@ -1,28 +1,68 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 12 May 2016 15:52:58 +0800
-Subject: [PATCH v9 0/8] add i2c driver supported for rk3399
-Message-ID: <1463039586-8134-1-git-send-email-david.wu@rock-chips.com>
+Date: Thu, 12 May 2016 15:52:59 +0800
+Subject: [PATCH v9 1/8] i2c: rk3x: add documentation to fields in "struct
+ rk3x_i2c"
+In-Reply-To: <1463039586-8134-1-git-send-email-david.wu@rock-chips.com>
+References: <1463039586-8134-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1463039586-8134-2-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are three points differert from others:
- - new method to caculate i2c timings for rk3399
- - pclk and function clk are separated at rk3399
- - add fast-plus mode supported for rk3399
+Add kernel-doc documentation for the elements of the previously
+undocumented struct rk3x_i2c.
 
-David Wu (8):
-  i2c: rk3x: add documentation to fields in "struct rk3x_i2c"
-  i2c: rk3x: use struct "rk3x_i2c_calced_timings"
-  i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
-  i2c: rk3x: Change SoC data to not use array
-  i2c: rk3x: Move spec timing data to "static const" structs
-  dt-bindings: i2c: rk3x: add support for rk3399
-  i2c: rk3x: add i2c support for rk3399 soc
-  i2c: rk3x: support fast-mode plus for rk3399
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
+Change in v9:
+- add commit description.
 
- Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  16 +-
- drivers/i2c/busses/i2c-rk3x.c                      | 495 +++++++++++++++++----
- 2 files changed, 432 insertions(+), 79 deletions(-)
+Change in v8:
+- none
 
+ drivers/i2c/busses/i2c-rk3x.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 80bed02..7e45d51 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -90,6 +90,26 @@ struct rk3x_i2c_soc_data {
+ 	int grf_offset;
+ };
+ 
++/**
++ * struct rk3x_i2c - private data of the controller
++ * @adap: corresponding I2C adapter
++ * @dev: device for this controller
++ * @soc_data: related soc data struct
++ * @regs: virtual memory area
++ * @clk: clock of i2c bus
++ * @clk_rate_nb: i2c clk rate change notify
++ * @t: I2C known timing information
++ * @lock: spinlock for the i2c bus
++ * @wait: the waitqueue to wait for i2c transfer
++ * @busy: the condition for the event to wait for
++ * @msg: current i2c message
++ * @addr: addr of i2c slave device
++ * @mode: mode of i2c transfer
++ * @is_last_msg: flag determines whether it is the last msg in this transfer
++ * @state: state of i2c transfer
++ * @processed: byte length which has been send or received
++ * @error: error code for i2c transfer
++ */
+ struct rk3x_i2c {
+ 	struct i2c_adapter adap;
+ 	struct device *dev;
+@@ -116,7 +136,7 @@ struct rk3x_i2c {
+ 
+ 	/* I2C state machine */
+ 	enum rk3x_i2c_state state;
+-	unsigned int processed; /* sent/received bytes */
++	unsigned int processed;
+ 	int error;
+ };
+ 
 -- 
 1.9.1
