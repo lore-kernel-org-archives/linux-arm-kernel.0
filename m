@@ -1,68 +1,80 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 12 May 2016 16:03:23 -0700
-Subject: [PATCH 1/4] dt: bindings: add thermal device driver for bcm2835
-In-Reply-To: <1463063738-11506-2-git-send-email-kernel@martin.sperl.org>
-References: <1463063738-11506-1-git-send-email-kernel@martin.sperl.org>
- <1463063738-11506-2-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87wpmyangk.fsf@eliezer.anholt.net>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 12 May 2016 16:10:23 -0700
+Subject: [PATCH 2/2] clk: rockchip: fix the rk3399 sdmmc sample shift
+In-Reply-To: <1463076197-15900-2-git-send-email-dianders@chromium.org>
+References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+ <1463076197-15900-2-git-send-email-dianders@chromium.org>
+Message-ID: <20160512231023.GA63308@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On Thu, May 12, 2016 at 11:03:17AM -0700, Doug Anderson wrote:
+> Just like every other Rockhip device, the MMC "_sample" clocks should
+> have a shift of 0, not a shift of 1.  The rk3399 TRM agrees.  Presumably
+> these values were set to 0 because of a typo.
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> Add documentation for bcm2835 SOC thermal sensor.
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+I'll semi-disagree about the TRM: the TRM doesn't seem to agree with
+itself, so it sometimes agrees with you and sometimes doesn't :)
+
+On page 79 of the 2nd (?) book, it looks like {SDMMC,SDIO}_CON{0,}[2:1]
+are {drv,sample}_degree. But on page 208 of the 1st book, those are put
+at bits [1:0].
+
+Perhaps we can get a straight answer from Rockchip though.
+
+Brian
+
+> Things _sorta_ would have worked with the incorrect sample phase shift
+> because of the register layout but wouldn't have been ideal and we would
+> have skipped lots of phases.  Also: we would never actually enabled the
+> fine delay unless we happened to have 128 or more delay elements.
+> 
+> This is expected behavior before this patch:
+> * Try to set:     0 degrees +   1 delay elements
+>   Actually get:   0 degrees +   0 delay elements
+> * Try to set:    90 degrees +   0 delay elements
+>   Actually get: 180 degrees +   0 delay elements
+> * Try to set:   180 degrees +   0 delay elements
+>   Actually get:   0 degrees +   0 delay elements
+> * Try to set:   270 degrees +   0 delay elements
+>   Actually get: 180 degrees +   0 delay elements
+> * Try to set:     0 degrees + 129 delay elements
+>   Actually get:   0 degrees +   2 delay elements
+> * Try to set:   180 degrees + 129 delay elements
+>   Actually get:   0 degrees +   3 delay elements
+> * Try to set:     0 degrees + 130 delay elements
+>   Actually get:   0 degrees +   4 delay elements
+> 
+> I verified that old code had a problem by turning on debug printouts and
+> seeing that the old code would report this for one SD card I had:
+>   Good phase range 347-101 (115 len)
+>   Good phase range 202-326 (125 len)
+> 
+> After my fix, it went down to one big good range for the same card.
+> This is more expected:
+>   Good phase range 189-1 (173 len)
+>   Good phase range 82-85 (4 len)
+>   Good phase range 166-168 (3 len)
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 > ---
->  .../devicetree/bindings/thermal/bcm2835-thermal.txt      | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/bcm2835-thermal.txt
->
-> diff --git a/Documentation/devicetree/bindings/thermal/bcm2835-thermal.txt b/Documentation/devicetree/bindings/thermal/bcm2835-thermal.txt
-> new file mode 100644
-> index 0000000..607519a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/bcm2835-thermal.txt
-
-There's a naming convention for the BCM DT bindings these days where you
-basically name it after the compatible string, so this file should be
-moved to "brcm,bcm2835-thermal.txt" (yes, even though it's inconsistent
-with the rest of the files in the directory).
-
-> @@ -0,0 +1,16 @@
-> +Binding for Thermal Sensor driver for BCM2835 SoCs.
-> +
-> +Required parameters:
-> +-------------------
-> +
-> +compatible : 	should be: "brcm,bcm2835-thermal"
-
-Optional: change to 'should be: "brcm,bcm2835-thermal" or
-"brcm,bcm2837-thermal"' (see next review for explanation).
-
-I would also drop the space before the colons on the parameters, but as
-long as the filename is changed this patch is:
-
-Acked-by: Eric Anholt <eric@anholt.net>
-
-> +reg :		Address range of the thermal registers.
-> +clocks : 	Phandle of the clock used by the thermal sensor.
-> +
-> +Example:
-> +
-> +thermal: thermal at 0x7e212000 {
-> +	compatible = "brcm,bcm2835-thermal";
-> +	reg = <0x7e212000 0x8>;
-> +	clocks = <&clocks BCM2835_CLOCK_TSENS>;
-> +};
-> -- 
-> 2.1.4
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160512/f512b792/attachment.sig>
+>  drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> index 291543f52caa..14ff3e109e1e 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -895,10 +895,10 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>  			RK3399_CLKGATE_CON(6), 1, GFLAGS),
+>  
+>  	MMC(SCLK_SDMMC_DRV,     "sdmmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
+> -	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
+> +	MMC(SCLK_SDMMC_SAMPLE,  "sdmmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 0),
+>  
+>  	MMC(SCLK_SDIO_DRV,      "sdio_drv",    "clk_sdio",  RK3399_SDIO_CON0,  1),
+> -	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  1),
+> +	MMC(SCLK_SDIO_SAMPLE,   "sdio_sample", "clk_sdio",  RK3399_SDIO_CON1,  0),
+>  
+>  	/* pcie */
+>  	COMPOSITE(SCLK_PCIE_PM, "clk_pcie_pm", mux_pll_src_cpll_gpll_npll_24m_p, 0,
