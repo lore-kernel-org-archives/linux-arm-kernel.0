@@ -1,43 +1,38 @@
-From: absahu@codeaurora.org (Abhishek Sahu)
-Date: Thu, 12 May 2016 11:48:43 +0530
-Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
-In-Reply-To: <20160512051347.GE8453@hector.attlocal.net>
-References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
- <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
- <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
- <934365f2bd30f242d8548e2a27483679@codeaurora.org>
- <20160512051347.GE8453@hector.attlocal.net>
-Message-ID: <20160512061843.GA6187@chewinlnx07.qualcomm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 12 May 2016 11:59:58 +0530
+Subject: [PATCH v4 0/5] dmaengine: vdma: AXI DMA's enhancments
+In-Reply-To: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
+References: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160512062957.GA2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 12:13:47AM -0500, Andy Gross wrote:
-> On Wed, May 11, 2016 at 11:04:17PM +0530, Abhishek Sahu wrote:
-> 
-> <snip>
-> 
-> > >       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the
-> > >end, when
-> > >       there is no error. So would it be fine if we do it there
-> > >unconditionally ?
-> > >
-> > >Regards,
-> > > Sricharan
-> > 
-> > RESET the QUP state wouldn't create any issue in the case of multiple calls.
-> > The existing code also RESET the QUP state for bus_err but it is not
-> > clearing
-> > status bits.
-> 
-> It'd be better to not reset the QUP inside the ISR at all.  I think the better
-> solution is making the reset occur in the xfer function.  So just clear the bits
-> like you should in the isr, and defer reset till later.
+On Thu, Apr 07, 2016 at 10:59:40AM +0530, Kedareswara rao Appana wrote:
+> This patch series does some enhancments to the VDMA driver
+> which includes
+> --> Adding support for AXI DMA IP.
+> --> Adding support for AXI CDMA IP.
 
-This is a HW workaround for QUP where we need to RESET the core in
-ISR. When interrupt is level triggerd, more than one interrupt may
-fire in error cases and QUP will generate these interrupts after
-completion of current interrupt. Thus we reset the core immediately
-in the ISR to ward off the next interrupt.
+Applied all, thanks
+
+> 
+> Kedareswara rao Appana (5):
+>   dmaengine: vdma: Rename xilinx_vdma_ prefix to xilinx_dma
+>   Documentation: DT: vdma: update binding doc for AXI DMA
+>   dmaengine: vdma: Add Support for Xilinx AXI Direct Memory Access
+>     Engine
+>   Documentation: DT: vdma: update binding doc for AXI CDMA
+>   dmaengine: vdma: Add Support for Xilinx AXI Central Direct Memory
+>     Access Engine
+> 
+>  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   17 +-
+>  drivers/dma/xilinx/xilinx_vdma.c                   | 1326 ++++++++++++++------
+>  include/linux/dma/xilinx_dma.h                     |   14 +
+>  3 files changed, 1003 insertions(+), 354 deletions(-)
+> 
+> -- 
+> 2.1.2
+> 
 
 -- 
-Abhishek Sahu
+~Vinod
