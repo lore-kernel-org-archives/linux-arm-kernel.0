@@ -1,118 +1,79 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 12 May 2016 09:03:28 +0800
-Subject: [PATCH v6 13/14] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <5733C8F5.6090206@caviumnetworks.com>
-References: <1461780436-27182-1-git-send-email-ddaney.cavm@gmail.com>
- <1461780436-27182-14-git-send-email-ddaney.cavm@gmail.com>
- <20160511103929.GC3051@e104818-lin.cambridge.arm.com>
- <5733C8F5.6090206@caviumnetworks.com>
-Message-ID: <5733D660.7030604@linaro.org>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Thu, 12 May 2016 09:08:58 +0800
+Subject: [PATCH v8 7/8] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
+References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
+ <1462908698-27284-1-git-send-email-david.wu@rock-chips.com>
+ <CAD=FV=Uf-U3RBpgFbR3LkPAJTWqz3d02+H7iyA-SS-y=r3cXjA@mail.gmail.com>
+Message-ID: <5733D7AA.1060500@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/12 8:06, David Daney wrote:
-> On 05/11/2016 03:39 AM, Catalin Marinas wrote:
->> On Wed, Apr 27, 2016 at 11:07:15AM -0700, David Daney wrote:
->>> +static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
->>> +{
->>> +    unsigned long madt_end, entry;
->>> +    struct acpi_table_madt *madt;
->>> +    acpi_size tbl_size;
->>> +
->>> +    if (ACPI_FAILURE(acpi_get_table_with_size(ACPI_SIG_MADT, 0,
->>> +            (struct acpi_table_header **)&madt, &tbl_size)))
->>> +        return -ENODEV;
->>> +
->>> +    entry = (unsigned long)madt;
->>> +    madt_end = entry + madt->header.length;
->>> +
->>> +    /* Parse all entries looking for a match. */
->>> +    entry += sizeof(struct acpi_table_madt);
->>> +    while (entry + sizeof(struct acpi_subtable_header) < madt_end) {
->>> +        struct acpi_subtable_header *header =
->>> +            (struct acpi_subtable_header *)entry;
->>> +
->>> +        if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
->>> +            struct acpi_madt_generic_interrupt *gicc =
->>> +                container_of(header,
->>> +                struct acpi_madt_generic_interrupt, header);
->>> +
->>> +            if ((gicc->flags & ACPI_MADT_ENABLED) &&
->>> +                (gicc->uid == acpi_id)) {
->>> +                *mpidr = gicc->arm_mpidr;
->>> +                early_acpi_os_unmap_memory(madt, tbl_size);
->>> +                return 0;
->>> +            }
->>> +        }
->>> +        entry += header->length;
->>> +    }
->>> +
->>> +    early_acpi_os_unmap_memory(madt, tbl_size);
->>> +    return -ENODEV;
->>> +}
->>> +
->>> +/* Callback for Proximity Domain -> ACPI processor UID mapping */
->>> +void __init acpi_numa_gicc_affinity_init(struct
->>> acpi_srat_gicc_affinity *pa)
->>> +{
->>> +    int pxm, node;
->>> +    u64 mpidr;
->>> +
->>> +    if (srat_disabled())
->>> +        return;
->>> +
->>> +    if (pa->header.length < sizeof(struct acpi_srat_gicc_affinity)) {
->>> +        pr_err("SRAT: Invalid SRAT header length: %d\n",
->>> +            pa->header.length);
->>> +        bad_srat();
->>> +        return;
->>> +    }
->>> +
->>> +    if (!(pa->flags & ACPI_SRAT_GICC_ENABLED))
->>> +        return;
->>> +
->>> +    if (cpus_in_srat >= NR_CPUS) {
->>> +        pr_warn_once("SRAT: cpu_to_node_map[%d] is too small, may
->>> not be able to use all cpus\n",
->>> +                 NR_CPUS);
->>> +        return;
->>> +    }
->>> +
->>> +    pxm = pa->proximity_domain;
->>> +    node = acpi_map_pxm_to_node(pxm);
->>> +
->>> +    if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
->>> +        pr_err("SRAT: Too many proximity domains %d\n", pxm);
->>> +        bad_srat();
->>> +        return;
->>> +    }
->>> +
->>> +    if (get_mpidr_in_madt(pa->acpi_processor_uid, &mpidr)) {
->>> +        pr_err("SRAT: PXM %d with ACPI ID %d has no valid MPIDR in
->>> MADT\n",
->>> +            pxm, pa->acpi_processor_uid);
->>> +        bad_srat();
->>> +        return;
->>> +    }
->>
->> I wonder whether you could replace the get_mpidr_in_madt() function with
->> something like acpi_get_phys_id(). It looks like get_mpidr_in_madt()
->> duplicates functionality already available elsewhere.
->>
->
-> I just tried that, and it doesn't work.
->
-> The problem is that this code is being run very early in the boot, and
-> kmalloc cannot be used.  acpi_get_phys_id() and its ilk can only be used
-> once we have working kmalloc.  We need to extract the NUMA information
-> early like this precisely because it is needed to initializing the slab
-> system
->
-> Notice that we are using early_acpi_os_unmap_memory() et al. in
-> get_mpidr_in_madt() explicitly for this reason.
+Hi Doug,
 
-I got the same conclusion when I was preparing this patch set.
+? 2016/5/12 1:37, Doug Anderson ??:
+> Hi,
+>
+> On Tue, May 10, 2016 at 12:31 PM, David Wu <david.wu@rock-chips.com> wrote:
+>>   static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>>   {
+>>          struct i2c_timings *t = &i2c->t;
+>>          struct rk3x_i2c_calced_timings calc;
+>>          u64 t_low_ns, t_high_ns;
+>> +       u32 val;
+>>          int ret;
+>>
+>> -       ret = rk3x_i2c_calc_divs(clk_rate, t, &calc);
+>> +       ret = i2c->soc_data->calc_timings(clk_rate, t, &calc);
+>>          WARN_ONCE(ret != 0, "Could not reach SCL freq %u", t->bus_freq_hz);
+>>
+>> -       clk_enable(i2c->clk);
+>> +       clk_enable(i2c->pclk);
+>> +
+>>          i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
+>>                     REG_CLKDIV);
+>> -       clk_disable(i2c->clk);
+>> +
+>> +       val = i2c_readl(i2c, REG_CON);
+>> +       val &= ~REG_CON_TUNING_MASK;
+>> +       val |= calc.tuning;
+>> +       i2c_writel(i2c, val, REG_CON);
+>
+> Another subtle bug here.  You need to be holding the spinlock here
+> since you're doing a read-modify-write of a register that is also
+> touched by the interrupt handler.  We never needed it before because
+> the previous register update wasn't touched by anyone else and it was
+> a single atomic write.
+>
+> Also: technically if we are midway through a transfer when all this
+> happens then there will be a very short period of time when the two
+> timing-related registers won't match with each other.  I have no idea
+> how much that would matter, but in the very least it seems wise to
+> minimize the time where they mismatch.  So I'd probably write:
+>
+>         spin_lock_irqsave(&i2c->lock, flags);
+>         val = i2c_readl(i2c, REG_CON);
+>         val &= ~REG_CON_TUNING_MASK;
+>         val |= calc.tuning;
+>         i2c_writel(i2c, val, REG_CON);
+>         i2c_writel(i2c, (calc.div_high << 16) | (calc.div_low & 0xffff),
+>                    REG_CLKDIV);
+>         spin_unlock_irqrestore(&i2c->lock, flags);
+>
+> ...if we really end up with on a system with a dynamically changing
+> clock that uses the new-style timing and we see real problems, we can
+> always try to come up with a way to avoid any problems.  Sound OK?
+>
+>
 
-Thanks
-Hanjun
+Good, add spin_lock is very necessary for atomic write here, thanks for 
+your advice.
+
+> Otherwise, I think things look good to me.  Caesar's comments would
+> also be good to fix.
+>
+>
+> -Doug
+>
+>
+>
