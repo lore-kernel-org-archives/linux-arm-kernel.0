@@ -1,146 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 May 2016 05:53:15 +0200
-Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
-In-Reply-To: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
-References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160512035315.GA19408@piout.net>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 12 May 2016 00:02:45 -0500
+Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for
+ DMA Mode
+In-Reply-To: <20160512014126.GK3492@codeaurora.org>
+References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
+ <20160512014126.GK3492@codeaurora.org>
+Message-ID: <20160512050245.GD8453@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12/05/2016 at 09:05:34 +0800, Wenyou Yang wrote :
-> In order to get lower consumption, as a workaround, suspend
-> the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
-> Configuration Register while OHCI USB suspending.
+On Wed, May 11, 2016 at 06:41:26PM -0700, Stephen Boyd wrote:
+> On 05/10, Abhishek Sahu wrote:
+> > From: Charanya <charanya@codeaurora.org>
 > 
-
-Why is that a workaround?
-
-> This suspend operation must be done before stopping the USB clock,
-> resume after the USB clock enabled.
+> Was it intentional to only have one name here?
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
+> > 
+> > The Data loss was happening with current QCOM MSM serial driver during
+> > large file transfer due to simultaneous enabling of both UART and
+> > DMA interrupt. When UART operates in DMA mode, RXLEV (Rx FIFO over
+> > watermark) or RXSTALE (stale interrupts) should not be enabled,
+> > since these conditions will be handled by DMA controller itself.
+> > If these interrupts are enabled then normal UART ISR will read some
+> > bytes of data from Rx Buffer and DMA controller will not receive
+> > these bytes of data, which will cause data loss.
+> > 
+> > Now this patch removed the code for enabling of RXLEV and RXSTALE
+> > interrupt in DMA Rx completion routine.
 > 
->  drivers/usb/host/ohci-at91.c | 63 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
+> I'm lost, we keep both these irqs masked (well only if uartdm
+> version is 1.4 or greater) pretty much the entire time we're
+> using DMA for RX. msm_start_rx_dma() will mask them and then when
+> the callback completes we'll unmask them (the part that's deleted
+> in this patch), but then we'll go back and remask them almost
+> immediately because we call msm_start_rx_dma() from the dma
+> completion handler.
 > 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index d177372..ce898e0 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -21,6 +21,8 @@
->  #include <linux/io.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
->  #include <linux/usb.h>
->  #include <linux/usb/hcd.h>
->  
-> @@ -51,6 +53,7 @@ struct ohci_at91_priv {
->  	struct clk *hclk;
->  	bool clocked;
->  	bool wakeup;		/* Saved wake-up state for resume */
-> +	struct regmap *sfr_regmap;
->  };
->  /* interface and function clocks; sometimes also an AHB clock */
->  
-> @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device *pdev)
->  
->  /*-------------------------------------------------------------------------*/
->  
-> +struct regmap *at91_dt_syscon_sfr(void)
-> +{
-> +	struct regmap *regmap;
-> +
-> +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-> +	if (IS_ERR(regmap))
-> +		return NULL;
-> +
-> +	return regmap;
-> +}
-> +
->  static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
->  
->  /* configure so an HC device and id are always provided */
-> @@ -197,6 +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->  		goto err;
->  	}
->  
-> +	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
-> +
->  	board = hcd->self.controller->platform_data;
->  	ohci = hcd_to_ohci(hcd);
->  	ohci->num_ports = board->ports;
-> @@ -581,6 +597,49 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#define SFR_OHCIICR		0x10
-> +#define SFR_OHCIICR_SUSPEND_A	BIT(8)
-> +#define SFR_OHCIICR_SUSPEND_B	BIT(9)
-> +#define SFR_OHCIICR_SUSPEND_C	BIT(10)
-> +
-> +#define SFR_OHCIICR_USB_SUSPEND	(SFR_OHCIICR_SUSPEND_A | \
-> +				 SFR_OHCIICR_SUSPEND_B | \
-> +				 SFR_OHCIICR_SUSPEND_C)
-> +
+> Can you clearly describe how this is actually fixing any
+> problems? What's the sequence of events that happens to cause
+> corruption?
+> 
+> This does raise the question though why we ever mask/unmask these
+> interrupts if we're always going to keep them masked while doing
+> DMA RX. Presumably if we can use DMA to RX, we can always use it
+> and set things up properly at startup time instead of later on.
 
-Those defines should go in a header file either in include/soc/at91 or
-in include/linux/mfd
-
-> +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable)
-> +{
-> +	u32 regval;
-> +	int ret;
-> +
-> +	if (IS_ERR(regmap))
-> +		return PTR_ERR(regmap);
-> +
-> +	ret = regmap_read(regmap, SFR_OHCIICR, &regval);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (enable)
-> +		regval &= ~SFR_OHCIICR_USB_SUSPEND;
-> +	else
-> +		regval |= SFR_OHCIICR_USB_SUSPEND;
-> +
-> +	regmap_write(regmap, SFR_OHCIICR, regval);
-> +
-> +	regmap_read(regmap, SFR_OHCIICR, &regval);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ohci_at91_port_suspend(struct regmap *regmap)
-> +{
-> +	return ohci_at91_port_ctrl(regmap, false);
-> +}
-> +
-> +static int ohci_at91_port_resume(struct regmap *regmap)
-> +{
-> +	return ohci_at91_port_ctrl(regmap, true);
-> +}
-> +
->  static int __maybe_unused
->  ohci_hcd_at91_drv_suspend(struct device *dev)
->  {
-> @@ -618,6 +677,8 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
->  		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
->  		ohci->rh_state = OHCI_RH_HALTED;
->  
-> +		ohci_at91_port_suspend(ohci_at91->sfr_regmap);
-> +
-
-The main issue I see here is that you will call that function for all
-SoCs and it will always fail unless it is running on a sama5d2. Maybe we
-could be smarter about that.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thats probably the right thing to do.  We shouldn't be masking/unmasking
+the unused IRQs to begin with.
