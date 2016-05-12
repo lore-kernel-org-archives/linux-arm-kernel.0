@@ -1,274 +1,80 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 12 May 2016 23:47:11 +0930
-Subject: [PATCH v2 2/2] watchdog: Add Aspeed watchdog driver
-In-Reply-To: <1463062631-16432-1-git-send-email-joel@jms.id.au>
-References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
- <1463062631-16432-1-git-send-email-joel@jms.id.au>
-Message-ID: <1463062631-16432-3-git-send-email-joel@jms.id.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 15:20:16 +0100
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+ <20160512134431.GB30205@yury-N73SV>
+ <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+Message-ID: <20160512142016.GH11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provides generic watchdog features as well as reboot support for the
-Apeed SoC.
+On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
+> On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
+> > On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
+> > > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > > > I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > > > of vector, and kernel reports successful read/write.
+> > > > 
+> > > > There are 2 problems:
+> > > > 1. How kernel allows such address to be passed to fs subsystem;
+> > > > 2. How fs successes to read/write at non-mapped, and in fact non-user
+> > > > address.
+> > > > 
+> > > > I don't know the answer on 2'nd question, and it might be something
+> > > > generic. But I investigated first problem.
+> > > > 
+> > > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+> > > > validate user address, and on arm64 it ends up with checking buffer
+> > > > end against current_thread_info()->addr_limit.
+> > > > 
+> > > > current_thread_info()->addr_limit for ilp32, and most probably for
+> > > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+> > > > It happens because on thread creation we call flush_old_exec() to set 
+> > > > addr_limit, and completely ignore compat mode there.
+> 
+> [...]
+> 
+> > > > --- a/arch/arm64/kernel/binfmt_elf32.c
+> > > > +++ b/arch/arm64/kernel/binfmt_elf32.c
+> > > > @@ -12,6 +12,7 @@
+> > > >  do {						\
+> > > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> > > >  	set_thread_flag(TIF_32BIT);		\
+> > > > +	set_fs(TASK_SIZE_32);			\
+> > > >  } while (0)
+> > > >  
+> > > >  #define COMPAT_ARCH_DLINFO
+> > > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > index a934fd4..a8599c6 100644
+> > > > --- a/arch/arm64/kernel/binfmt_ilp32.c
+> > > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+> > > >  do {									\
+> > > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
+> > > >  	clear_thread_flag(TIF_32BIT);					\
+> > > > +	set_fs(TASK_SIZE_32);						\
+> > > >  } while (0)
+> > > 
+> > > I don't think we need these two. AFAICT, flush_old_exec() takes care of
+> > > setting the USER_DS for the new thread.
+> > 
+> > That's true, but USER_DS depends on personality which is not set yet
+> > for new thread, as I wrote above. In fact, I tried correct USER_DS
+> > only, and it doesn't work
+> 
+> Ah, it looks like load_elf_binary() sets the personality after
+> flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
+> maximum 64-bit task value, so they should have a similar issue with
+> native 32-bit vs compat behaviour.
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- drivers/watchdog/Kconfig      |  13 +++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/aspeed_wdt.c | 209 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 223 insertions(+)
- create mode 100644 drivers/watchdog/aspeed_wdt.c
+I think we have another problem. flush_old_exec() calls the arm64
+flush_thread() where tls_thread_flush() checks for is_compat_task(). So
+starting a 32-bit application from a 64-bit one not go on the correct
+path.
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index fb947655badd..4f0e2ded4785 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -661,6 +661,19 @@ config ATLAS7_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called atlas7_wdt.
- 
-+config ASPEED_WATCHDOG
-+	tristate "Aspeed watchdog support"
-+	depends on ARCH_ASPEED || COMPILE_TEST
-+	select WATCHDOG_CORE
-+	help
-+	  Say Y here to include support for the watchdog timer
-+	  in Apseed BMC SoCs.
-+
-+	  This driver is required to reboot the SoC.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called aspeed_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index feb6270fdbde..36855375e0ce 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -73,6 +73,7 @@ obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
- obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
- obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
- obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
-+obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/aspeed_wdt.c b/drivers/watchdog/aspeed_wdt.c
-new file mode 100644
-index 000000000000..f7ae41ef4121
---- /dev/null
-+++ b/drivers/watchdog/aspeed_wdt.c
-@@ -0,0 +1,209 @@
-+/*
-+ * Copyright 2016 IBM Corporation
-+ *
-+ * Joel Stanley <joel@jms.id.au>
-+ *
-+ * Based on the qcom-watchdog driver
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/watchdog.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+struct aspeed_wdt {
-+	struct watchdog_device	wdd;
-+	unsigned long		rate;
-+	void __iomem		*base;
-+	u32			ctrl;
-+};
-+
-+static const struct of_device_id aspeed_wdt_of_table[] = {
-+	{ .compatible = "aspeed,ast2400-wdt" },
-+	{ .compatible = "aspeed,ast2500-wdt" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, aspeed_wdt_of_table);
-+
-+#define WDT_STATUS		0x00
-+#define WDT_RELOAD_VALUE	0x04
-+#define WDT_RESTART		0x08
-+#define WDT_CTRL		0x0C
-+#define   WDT_CTRL_RESET_MODE_SOC	(0x00 << 5)
-+#define   WDT_CTRL_RESET_MODE_FULL_CHIP	(0x01 << 5)
-+#define   WDT_CTRL_1MHZ_CLK		BIT(4)
-+#define   WDT_CTRL_WDT_EXT		BIT(3)
-+#define   WDT_CTRL_WDT_INTR		BIT(2)
-+#define   WDT_CTRL_RESET_SYSTEM		BIT(1)
-+#define   WDT_CTRL_ENABLE		BIT(0)
-+
-+#define WDT_RESTART_MAGIC	0x4755
-+
-+#define WDT_MIN_TIMEOUT		1
-+/* 32 bits@1MHz, in milliseconds */
-+#define WDT_MAX_TIMEOUT_MS	4294967
-+#define WDT_DEFAULT_TIMEOUT	30
-+#define WDT_1MHZ_CLOCK		1000000
-+
-+static struct aspeed_wdt *to_aspeed_wdt(struct watchdog_device *wdd)
-+{
-+	return container_of(wdd, struct aspeed_wdt, wdd);
-+}
-+
-+static void aspeed_wdt_enable(struct aspeed_wdt *wdt, int count)
-+{
-+	wdt->ctrl |= WDT_CTRL_ENABLE;
-+
-+	writel(0, wdt->base + WDT_CTRL);
-+	writel(count, wdt->base + WDT_RELOAD_VALUE);
-+	writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
-+	writel(wdt->ctrl, wdt->base + WDT_CTRL);
-+}
-+
-+static int aspeed_wdt_start(struct watchdog_device *wdd)
-+{
-+	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-+
-+	aspeed_wdt_enable(wdt, wdd->timeout * wdt->rate);
-+
-+	return 0;
-+}
-+
-+static int aspeed_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-+
-+	wdt->ctrl &= ~WDT_CTRL_ENABLE;
-+	writel(wdt->ctrl, wdt->base + WDT_CTRL);
-+
-+	return 0;
-+}
-+
-+static int aspeed_wdt_ping(struct watchdog_device *wdd)
-+{
-+	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-+
-+	writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
-+
-+	return 0;
-+}
-+
-+static int aspeed_wdt_set_timeout(struct watchdog_device *wdd,
-+				  unsigned int timeout)
-+{
-+	wdd->timeout = timeout;
-+
-+	return aspeed_wdt_start(wdd);
-+}
-+
-+static int aspeed_wdt_restart(struct watchdog_device *wdd,
-+			      unsigned long action, void *data)
-+{
-+	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-+
-+	aspeed_wdt_enable(wdt, 128 * wdt->rate / 1000);
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_ops aspeed_wdt_ops = {
-+	.start		= aspeed_wdt_start,
-+	.stop		= aspeed_wdt_stop,
-+	.ping		= aspeed_wdt_ping,
-+	.set_timeout	= aspeed_wdt_set_timeout,
-+	.restart	= aspeed_wdt_restart,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static const struct watchdog_info aspeed_wdt_info = {
-+	.options	= WDIOF_KEEPALIVEPING
-+			| WDIOF_MAGICCLOSE
-+			| WDIOF_SETTIMEOUT,
-+	.identity	= KBUILD_MODNAME,
-+};
-+
-+static int aspeed_wdt_remove(struct platform_device *pdev)
-+{
-+	struct aspeed_wdt *wdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&wdt->wdd);
-+
-+	return 0;
-+}
-+
-+static int aspeed_wdt_probe(struct platform_device *pdev)
-+{
-+	struct aspeed_wdt *wdt;
-+	struct resource *res;
-+	int ret;
-+
-+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	wdt->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(wdt->base))
-+		return PTR_ERR(wdt->base);
-+
-+	/*
-+	 * The ast2400 wdt can run at PCLK, or 1MHz. The ast2500 only
-+	 * runs at 1MHz. We chose to always run at 1MHz, as there's no
-+	 * good reason to have a faster watchdog counter.
-+	 */
-+	wdt->rate = WDT_1MHZ_CLOCK;
-+	wdt->wdd.info = &aspeed_wdt_info;
-+	wdt->wdd.ops = &aspeed_wdt_ops;
-+	wdt->wdd.min_timeout = WDT_MIN_TIMEOUT;
-+	wdt->wdd.max_hw_heartbeat_ms = WDT_MAX_TIMEOUT_MS;
-+	wdt->wdd.parent = &pdev->dev;
-+
-+	wdt->wdd.timeout = WDT_DEFAULT_TIMEOUT;
-+	watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev);
-+
-+	/*
-+	 * Control reset on a per-device basis to ensure the
-+	 * host is not affected by a BMC reboot, so only reset
-+	 * the SOC and not the full chip
-+	 */
-+	wdt->ctrl = WDT_CTRL_RESET_MODE_SOC |
-+		WDT_CTRL_1MHZ_CLK |
-+		WDT_CTRL_RESET_SYSTEM;
-+
-+	if (readl(wdt->base + WDT_CTRL) & WDT_CTRL_ENABLE)  {
-+		aspeed_wdt_start(&wdt->wdd);
-+		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
-+	}
-+
-+	ret = watchdog_register_device(&wdt->wdd);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register\n");
-+		return ret;
-+	}
-+
-+	dev_info(&pdev->dev, "rate %lu, max timeout %u, timeout %d\n",
-+		 wdt->rate, wdt->wdd.max_timeout, wdt->wdd.timeout);
-+
-+	platform_set_drvdata(pdev, wdt);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver aspeed_watchdog_driver = {
-+	.probe = aspeed_wdt_probe,
-+	.remove = aspeed_wdt_remove,
-+	.driver = {
-+		.name = KBUILD_MODNAME,
-+		.of_match_table = of_match_ptr(aspeed_wdt_of_table),
-+	},
-+};
-+module_platform_driver(aspeed_watchdog_driver);
-+
-+MODULE_DESCRIPTION("Aspeed Watchdog Driver");
-+MODULE_LICENSE("GPL");
 -- 
-2.8.1
+Catalin
