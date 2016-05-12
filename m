@@ -1,80 +1,180 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
+From: marc.zyngier@arm.com (Marc Zyngier)
 Date: Thu, 12 May 2016 15:20:16 +0100
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
- <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
- <20160512134431.GB30205@yury-N73SV>
- <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
-Message-ID: <20160512142016.GH11226@e104818-lin.cambridge.arm.com>
+Subject: [PATCH v3 36/55] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER
+ register handlers
+In-Reply-To: <57348C8F.6080409@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-37-git-send-email-andre.przywara@arm.com>
+ <20160512122119.GH27623@cbox> <57347925.2030902@arm.com>
+ <57348C8F.6080409@arm.com>
+Message-ID: <57349120.1020402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
-> On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
-> > On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
-> > > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
-> > > > I debugged preadv02 and pwritev02 failures and found very weird bug.
-> > > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> > > > of vector, and kernel reports successful read/write.
-> > > > 
-> > > > There are 2 problems:
-> > > > 1. How kernel allows such address to be passed to fs subsystem;
-> > > > 2. How fs successes to read/write at non-mapped, and in fact non-user
-> > > > address.
-> > > > 
-> > > > I don't know the answer on 2'nd question, and it might be something
-> > > > generic. But I investigated first problem.
-> > > > 
-> > > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
-> > > > validate user address, and on arm64 it ends up with checking buffer
-> > > > end against current_thread_info()->addr_limit.
-> > > > 
-> > > > current_thread_info()->addr_limit for ilp32, and most probably for
-> > > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
-> > > > It happens because on thread creation we call flush_old_exec() to set 
-> > > > addr_limit, and completely ignore compat mode there.
+On 12/05/16 15:00, Andre Przywara wrote:
+> Hi,
 > 
-> [...]
+> On 12/05/16 13:37, Marc Zyngier wrote:
+>> On 12/05/16 13:21, Christoffer Dall wrote:
+>>> On Fri, May 06, 2016 at 11:45:49AM +0100, Andre Przywara wrote:
+>>>> Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
+>>>> register can handle, the new IROUTER register covers the whole range
+>>>> of possible target (V)CPUs by using the same MPIDR that the cores
+>>>> report themselves.
+>>>> In addition to translating this MPIDR into a vcpu pointer we store
+>>>> the originally written value as well. The architecture allows to
+>>>> write any values into the register, which must be read back as written.
+>>>>
+>>>> Since we don't support affinity level 3, we don't need to take care
+>>>> about the upper word of this 64-bit register, which simplifies the
+>>>> handling a bit.
+>>>>
+>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>> ---
+>>>> Changelog RFC..v1:
+>>>> - fold in and simplify vgic_v3_irq_change_affinity
+>>>>
+>>>> Changelog v1 .. v2:
+>>>> - adapt to new MMIO framework
+>>>>
+>>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 65 +++++++++++++++++++++++++++++++++++++++-
+>>>>  1 file changed, 64 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>>>> index 48fba9c..3bcc2c4 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>>>> @@ -86,6 +86,69 @@ static u32 compress_mpidr(unsigned long mpidr)
+>>>>  	return ret;
+>>>>  }
+>>>>  
+>>>> +static unsigned long decompress_mpidr(u32 value)
+>>>> +{
+>>>> +	unsigned long mpidr;
+>>>> +
+>>>> +	mpidr  = ((value >>  0) & 0xFF) << MPIDR_LEVEL_SHIFT(0);
+>>>> +	mpidr |= ((value >>  8) & 0xFF) << MPIDR_LEVEL_SHIFT(1);
+>>>> +	mpidr |= ((value >> 16) & 0xFF) << MPIDR_LEVEL_SHIFT(2);
+>>>> +	mpidr |= (u64)((value >> 24) & 0xFF) << MPIDR_LEVEL_SHIFT(3);
+>>>> +
+>>>> +	return mpidr;
+>>>> +}
+>>>> +
+>>>> +static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
+>>>> +					    gpa_t addr, unsigned int len)
+>>>> +{
+>>>> +	int intid = (addr & 0x1fff) / 8;
+>>>> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
+>>>> +	unsigned long mpidr;
+>>>> +
+>>>> +	if (!irq)
+>>>> +		return 0;
+>>>> +
+>>>> +	mpidr = decompress_mpidr(irq->mpidr);
+>>>
+>>> I'm unsure here; do we ned a READ_ONCE() in lieu taking the lock or are
+>>> we guaranteed that this is a single memory access even with compiler
+>>> inlining etc.?
+>>
+>> I can't imagine the compiler being stupid enough to read this multiple
+>> times, but better safe than sorry. +1 for READ_ONCE().
+>>
+>>>
+>>>> +	return extract_bytes(mpidr, addr & 7, len);
+>>>> +}
+>>>> +
+>>>> +static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+>>>> +				    gpa_t addr, unsigned int len,
+>>>> +				    unsigned long val)
+>>>> +{
+>>>> +	int intid = (addr & 0x1fff) / 8;
+>>>> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
+>>>> +	unsigned long mask = 0xffffffff;	/* upper word is WI */
+>>>> +	u64 mpidr;
+>>>> +
+>>>> +	if (!irq)
+>>>> +		return;
+>>>> +
+>>>> +	/*
+>>>> +	 * There are only two supported options:
+>>>> +	 * (1) aligned 64-bit access
+>>>> +	 * (2) aligned 32-bit access
+>>>> +	 *
+>>>> +	 * TODO: make this check generic and move it to dispatch_...()
+>>>> +	 */
+>>>> +	if (len != 4 && len != 8)
+>>>> +		return;
+>>>> +
+>>>> +
+>>>> +	/* The upper word is WI for us since we don't implement Aff3. */
+>>>> +	if (addr & 4)
+>>>> +		return;
+>>>> +
+>>>> +	spin_lock(&irq->irq_lock);
+>>>> +
+>>>> +	mpidr = decompress_mpidr(irq->mpidr);
+>>>> +	mpidr = (mpidr & ~mask) | (val & mask);
+>>>> +	irq->mpidr = compress_mpidr(mpidr);
+>>>> +	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, mpidr);
+>>>
+>>> this is weird because it doesn't preserve read-as-written semantics but
+>>> allows a guest to write something into the RES0 field and read that back
+>>> in the Aff3 field...
 > 
-> > > > --- a/arch/arm64/kernel/binfmt_elf32.c
-> > > > +++ b/arch/arm64/kernel/binfmt_elf32.c
-> > > > @@ -12,6 +12,7 @@
-> > > >  do {						\
-> > > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
-> > > >  	set_thread_flag(TIF_32BIT);		\
-> > > > +	set_fs(TASK_SIZE_32);			\
-> > > >  } while (0)
-> > > >  
-> > > >  #define COMPAT_ARCH_DLINFO
-> > > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-> > > > index a934fd4..a8599c6 100644
-> > > > --- a/arch/arm64/kernel/binfmt_ilp32.c
-> > > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
-> > > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
-> > > >  do {									\
-> > > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
-> > > >  	clear_thread_flag(TIF_32BIT);					\
-> > > > +	set_fs(TASK_SIZE_32);						\
-> > > >  } while (0)
-> > > 
-> > > I don't think we need these two. AFAICT, flush_old_exec() takes care of
-> > > setting the USER_DS for the new thread.
-> > 
-> > That's true, but USER_DS depends on personality which is not set yet
-> > for new thread, as I wrote above. In fact, I tried correct USER_DS
-> > only, and it doesn't work
+> Technically Aff3 is not RES0, even if the A3V bit is cleared.
+> The A3V bit just disables Aff3 on the CPU interface side, specifically
+> for ICC_SGI0R_EL1 & friends.
+> I think we agreed some time ago that we have to support read-as-written
+> for this register and don't forward this IRQ if the MPIDR is not valid,
+> as the spec demands.
 > 
-> Ah, it looks like load_elf_binary() sets the personality after
-> flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
-> maximum 64-bit task value, so they should have a similar issue with
-> native 32-bit vs compat behaviour.
+>> I don't see how we get this RES0/Aff3 mixup, but I can see other issues:
+>>
+>>>> +	unsigned long mask = 0xffffffff;	/* upper word is WI */
+>>
+>> followed by:
+>>
+>>>> +	mpidr = (mpidr & ~mask) | (val & mask);
+>>
+>> is not going to preserve the top bits on 32bit (assuming we could
+>> perform a 64bit access on 32bit, but still).
+> 
+> Which would be fixed by making mask a u64?
+> 
+>> Also, the mask preserves
+>> the IRM bit, which is wrong (we don't support 1-of-n distribution).
+> 
+> Agreed on this.
+> 
+>>
+>> Why don't we just have
+>>
+>> 	mpidr = val & GENMASK_ULL(23, 0);
+>>
+>> and let's be done with it? I must be missing something about this whole
+>> Aff3 thing...
+> 
+> Well, this would be a simple solution if we don't have to preserve bogus
+> MPIDRs.
+> The spec is a bit vague here:
+> "For each interrupt, a GIC implementation might support fewer than 256
+> values for an affinity level. In this case, some bits of the
+> corresponding affinity level field might be RO."
+> 
+> Not sure if this can apply to _all_ bits of an affinity level or not.
 
-I think we have another problem. flush_old_exec() calls the arm64
-flush_thread() where tls_thread_flush() checks for is_compat_task(). So
-starting a 32-bit application from a 64-bit one not go on the correct
-path.
+I believe it does. Take GIC500 for example: it only implements Aff0
+(only 8 cores) and Aff1 (32 clusters). Not even Aff2.
 
+> I think the key question is: do we need to preserve any MPIDR value
+> written into this register?
+
+I can't see why. What's the point of storing something you can't even
+address? Knowing the HW guys, they'd hate to have precious gates just to
+serve as an external brain pack for the SW dudes.
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
