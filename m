@@ -1,48 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 May 2016 17:37:59 +0100
-Subject: [RFC PATCH 1/3] asm-generic: io: Add exec versions of ioremap
-In-Reply-To: <1462830111-28172-2-git-send-email-d-gerlach@ti.com>
-References: <1462830111-28172-1-git-send-email-d-gerlach@ti.com>
- <1462830111-28172-2-git-send-email-d-gerlach@ti.com>
-Message-ID: <20160512163759.GW5783@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 May 2016 09:42:01 -0700
+Subject: [PATCH v3 0/7] ARM/ASoC: OMAP3: Fix McBSP2/3 sidetone support
+In-Reply-To: <69ff65ee-e5d1-09fb-fd91-8d7b4d8fdda4@ti.com>
+References: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
+ <69ff65ee-e5d1-09fb-fd91-8d7b4d8fdda4@ti.com>
+Message-ID: <20160512164201.GQ5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 04:41:49PM -0500, Dave Gerlach wrote:
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 66a978d05958..c6eef3c98074 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -400,6 +400,20 @@ EXPORT_SYMBOL(ioremap_wc);
->   * clocks that would affect normal memory for example. Please see
->   * CONFIG_GENERIC_ALLOCATOR for allocating external memory.
->   */
-> +void __iomem *ioremap_exec(resource_size_t res_cookie, size_t size)
-> +{
-> +	return arch_ioremap_caller(res_cookie, size, MT_MEMORY_RWX,
-> +				   __builtin_return_address(0));
-> +}
-> +EXPORT_SYMBOL(ioremap_exec);
-> +
-> +void __iomem *ioremap_exec_nocache(resource_size_t res_cookie, size_t size)
-> +{
-> +	return arch_ioremap_caller(res_cookie, size, MT_MEMORY_RWX_NONCACHED,
-> +				   __builtin_return_address(0));
-> +}
-> +EXPORT_SYMBOL(ioremap_exec_nocache);
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160511 01:46]:
+> Tony, Paul,
+> 
+> On 04/29/16 13:53, Peter Ujfalusi wrote:
+> > Hi,
+> > 
+> > Based on the ongoing discussion on v2 (ARM: OMAP3: Fix McBSP2/3 hwmod setup for
+> > sidetone) I have dropped the removal of the sidetone hwmod and only corrected
+> > it. The series now includes all related changes needed to have correct sidetone
+> > support whenever we boot in legacy or in DT mode.
+> > 
+> > This time the ASoC part have dependency on earlier patches so they can not be
+> > applied separately.
+> 
+> How should we proceed from here? I don't want to start designing the ST
+> separation infrastructure which would be based on this series, but if there
+> are outstanding issues found on this, I would need to go back to the drawing
+> board.
+> The separation will be mostly new code and code shuffle in ASoC, but for
+> legacy I will need to build up something in arch as well, so I would need at
+> least one release cycle to start with things.
 
-I think these should be called memremap_exec() and similar.  Please
-see the description of memremap() in kernel/memremap.c.  If you're
-going to be executing code, the region must not have I/O side effects
-and according to the new definition of memremap() vs ioremap(), the
-memremap() interfaces fit better.
+Well looks like we have all the acks, so I can apply these. We have
+not heard from Paul on this for a while, so let's wait few days for
+that.
 
-Please also get these reviewed by Dan Williams who provided the
-memremap() API.
+Meanwhile, Mark wanted to fix the subject for one of the patches, care
+to repost that at least? Or the whole series with acks, could be a
+pull request too against v4.6-rc1 :)
 
-Thanks.
+Regards,
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
