@@ -1,60 +1,52 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 12 May 2016 13:30:24 +0300
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <4326765.8HKKkI07Zs@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV> <4326765.8HKKkI07Zs@wuerfel>
-Message-ID: <20160512103024.GA7639@yury-N73SV>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 12 May 2016 13:29:40 +0300
+Subject: [PATCH] mmc: mmc: do not use CMD13 to get status after speed mode
+ switch
+In-Reply-To: <1463036431.11653.3.camel@mhfsdcap03>
+References: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
+ <5732E43E.8070800@intel.com> <1463036431.11653.3.camel@mhfsdcap03>
+Message-ID: <57345B14.7030308@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 11:19:21AM +0200, Arnd Bergmann wrote:
-> On Thursday 12 May 2016 03:20:00 Yury Norov wrote:
-> > 
-> > I debugged preadv02 and pwritev02 failures and found very weird bug.
-> > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> > of vector, and kernel reports successful read/write.
-> > 
-> > There are 2 problems:
-> > 1. How kernel allows such address to be passed to fs subsystem;
-> > 2. How fs successes to read/write at non-mapped, and in fact non-user
-> > address.
-> > 
-> > I don't know the answer on 2'nd question, and it might be something
-> > generic. But I investigated first problem.
-> > 
-> > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
-> > validate user address, and on arm64 it ends up with checking buffer
-> > end against current_thread_info()->addr_limit.
-> > 
-> > current_thread_info()->addr_limit for ilp32, and most probably for
-> > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
-> > It happens because on thread creation we call flush_old_exec() to set 
-> > addr_limit, and completely ignore compat mode there.
-> > 
-> > This patch fixes it. It also fixes USER_DS macro to return different
-> > values depending on compat.
-> > 
-> > This patch is enough to handle preadv02 and pwritev02, but problem #2
-> > is still there.
-> > 
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > 
-> 
-> Good catch!
-> 
-> Can you do a version of this patch that works on the current
-> mainline kernel and can be backported to fix aarch32 emulation?
-> 
-> For ilp32 mode, I think we can better fix arch/arm64/kernel/binfmt_ilp32.c
-> as it is introduced.
-> 
-> 	Arnd
-> 
+On 12/05/16 10:00, Chaotian Jing wrote:
+> On Wed, 2016-05-11 at 10:50 +0300, Adrian Hunter wrote:
+>> On 04/05/16 09:54, Chaotian Jing wrote:
+>>> Per JEDEC spec, it is not recommended to use CMD13 to get card status
+>>> after speed mode switch. below are two reason about this:
+>>> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
+>>> Therefore it is not recommended to use CMD13 to check busy completion
+>>> of the timing change indication.
+>>> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
+>>> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+>>>
+>>> this patch drops CMD13 when doing speed mode switch, if host do not
+>>> support MMC_CAP_WAIT_WHILE_BUSY and there is no ops->card_busy(),
+>>> then the only way is to wait a fixed timeout.
+>>
+>> This looks like it should be 3 patches:
+>> 	1. Change __mmc_switch
+>> 	2. Change HS200 and HS400 selection
+>> 	3. Change HS selection
+>>
+>> However there is another problem: card_busy is not the same as busy signal -
+>> see below.  So that needs to be sorted out first.
+>>
+> We should make that card_busy() is the same with busy signal asserted.
+> as you know, if card was not in busy state, all data pins should be high
+> level as it is pull-up by default. so that's no conflict to check card
+> busy signal by DAT0 or DAT0 ~ DAT3.
 
-OK, will do
+Potentially SDIO uses DAT1 for card interrupt, so that is a conflict right
+there.
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Also SDHCI does it backwards (don't ask me why) and considers 0000 to be
+busy, so there's another conflict.
+
+Some of the language in the SD and SDHCI specifications seems to indicate
+that checking all 4 DAT lines during voltage switch is optional i.e. only 1
+of the lines must be checked.  If that is true then we could change all the
+drivers over to check just DAT0, and expect that to work for both busy
+signalling and SD voltage switch checks.
+
+So it seems to me card_busy still needs to be sorted out first.
