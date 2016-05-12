@@ -1,63 +1,120 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2016 13:26:57 -0700
-Subject: [PATCH] ARM: dts: omap5-igep0050: Correct hdmi regulator
-In-Reply-To: <5734D733.9060400@ti.com>
-References: <20160504172634.GS5995@atomide.com> <572A38FD.9050801@ti.com>
- <20160505184609.GB5995@atomide.com>
- <2822D1C2B9B19F4A8261F756A13373F801BEF7B4@DFLE11.ent.ti.com>
- <CAPjucKb+4vd8Ar3MATCuTx+9R36PeB0hbvwDaAD1KTZFCiVJEA@mail.gmail.com>
- <2822D1C2B9B19F4A8261F756A13373F801BF86D2@DFLE11.ent.ti.com>
- <2822D1C2B9B19F4A8261F756A13373F801BF8703@DFLE11.ent.ti.com>
- <CAPjucKb2PLSZcD3YZ9xQk1F62ugFaGAkBBqMp5GmoWFd0H8Vfg@mail.gmail.com>
- <20160512165755.GR5995@atomide.com> <5734D733.9060400@ti.com>
-Message-ID: <20160512202656.GU5995@atomide.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Fri, 13 May 2016 01:57:55 +0530
+Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
+In-Reply-To: <CAPBZ5QdD6knEzQVW-BAgRSMcd=Gqv9_1Xt2LNc+qWgtre_2ZXQ@mail.gmail.com>
+References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+ <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
+ <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
+ <934365f2bd30f242d8548e2a27483679@codeaurora.org>
+ <20160512051347.GE8453@hector.attlocal.net>
+ <20160512061843.GA6187@chewinlnx07.qualcomm.com>
+ <20160512175830.GA32019@hector>
+ <20160512193229.GA10499@chewinlnx07.qualcomm.com>
+ <CAPBZ5QdD6knEzQVW-BAgRSMcd=Gqv9_1Xt2LNc+qWgtre_2ZXQ@mail.gmail.com>
+Message-ID: <20160512202755.GA3680@chewinlnx07.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [160512 12:21]:
-> On 05/12/2016 11:57 AM, Tony Lindgren wrote:
-> > + * LDO7 is used for HDMI: VDDA_DSIPORTA - ball AA33, VDDA_DSIPORTC - ball AE33
-> > + * VDDA_HDMI - ball AN25. LDO4 is: VPP1 - ball AD9.
+On Thu, May 12, 2016 at 03:05:39PM -0500, Andy Gross wrote:
+> On 12 May 2016 at 14:32, Abhishek Sahu <absahu@codeaurora.org> wrote:
+> > On Thu, May 12, 2016 at 12:58:30PM -0500, Andy Gross wrote:
+> >> On Thu, May 12, 2016 at 11:48:43AM +0530, Abhishek Sahu wrote:
+> >> > On Thu, May 12, 2016 at 12:13:47AM -0500, Andy Gross wrote:
+> >> > > On Wed, May 11, 2016 at 11:04:17PM +0530, Abhishek Sahu wrote:
+> >> > >
+> >> > > <snip>
+> >> > >
+> >> > > > >       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the
+> >> > > > >end, when
+> >> > > > >       there is no error. So would it be fine if we do it there
+> >> > > > >unconditionally ?
+> >> > > > >
+> >> > > > >Regards,
+> >> > > > > Sricharan
+> >> > > >
+> >> > > > RESET the QUP state wouldn't create any issue in the case of multiple calls.
+> >> > > > The existing code also RESET the QUP state for bus_err but it is not
+> >> > > > clearing
+> >> > > > status bits.
+> >> > >
+> >> > > It'd be better to not reset the QUP inside the ISR at all.  I think the better
+> >> > > solution is making the reset occur in the xfer function.  So just clear the bits
+> >> > > like you should in the isr, and defer reset till later.
+> >> >
+> >> > This is a HW workaround for QUP where we need to RESET the core in
+> >> > ISR. When interrupt is level triggerd, more than one interrupt may
+> >> > fire in error cases and QUP will generate these interrupts after
+> >> > completion of current interrupt. Thus we reset the core immediately
+> >> > in the ISR to ward off the next interrupt.
+> >>
+> >> I wonder if that was just an expedient solution.  And it seems like it could be
+> >> a little racy as a poll is not being done to make sure the QUP state machine
+> >> transitions to reset.  Is there any documentation/errata on this?  Or is this
+> >> just from commit comments?
+> >>
+> >>
+> >> Regards,
+> >> Andy
+> >
+> > Hi Andy,
+> >
+> > Thanks for your comments. We have only added the patch for clearing
+> > the error bits. This resetting of QUP is present in the base code
+> > itself. Since this QUP is being used by all the QCOM chips that's why
+> > we have not changed the existing QUP reset logic. We will look
+> > into reset polling logic separately and will post the patch for the
+> > same.
 > 
-> We should set ldo4_reg as 2v as well (default in omap5-board-common is
-> 1.8v). VPP1 should be 2v to prevent efuse from being messed up.
+> Yeah, it is present in the current code.  I hadn't seen any errata on
+> this issue, so that is why I was curious.  In many cases, the code in
+> the mainline driver was carried forward from the downstream CAF
+> driver.  I know the two don't look that similar in some regards, but
+> in most cases the actions taken are the same, even if it is not
+> obvious.
+> 
+> > We got the input for QUP RESET by referring our working internal
+> > drivers and we also faced the BAM hang issue in base upstream
+> > driver, if we don't do this RESET. If we schedule any transfer
+> > with DMA mode then the DMA Engine (BAM) will never get any interrupt
+> > for these errors, since the QUP interrupt handles the error cases.
+> > The BAM will generate the interrupt only when it will receive the
+> > requested amount of data. This reset will clear the QUP FIFO and
+> > we will get the BAM transfer completion interrupt by the existing
+> > logic present in the base bam transfer function.
+> 
+> Right.  If the QUP has an issue and isn't processing data, and you
+> have a BAM transaction pending for this, you have to not only ack the
+> qup error, but also terminate the BAM transaction.
+> 
+> What test case are you using to test out the error path?  Something
+> other than NACKs?
+> 
+> Regards,
+> 
+> Andy
 
-Oh OK, here's the patch updated for ldo4.
+Hi Andy,
 
-Tony
+We run the command i2cdetect for address 0x3 to 0x77. The QUP generates
+write error for address 0x3 to 0x7 apart from other bus errors since
+these are reserved addresses. I was getting the crash in non DMA mode
+and BAM hang in DMA mode before putting the fix.
 
-8< --------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 12 May 2016 09:51:51 -0700
-Subject: [PATCH] ARM: dts: Fix ldo7 source for HDMI on igepv5
+Also we have connected the I2C TPM and run the following script
+overnight for both DMA and Non DMA mode.  The script checks for
+all transfer length and we are generating multiple NACK and
+Non NACK error before each valid transfer.
 
-Fix ldo7 source for HDMI on igepv5.
+a=1
 
-Suggested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+while [ $a -lt 4096 ]
+do
+   echo $a
+   i2cdetect -y -a -r 0 0x03 0x77
+   tpm-manager get_random $a
+   i2cdetect -y -a -r 1 0x03 0x77
+   a=`expr $a + 1`
+done
 
---- a/arch/arm/boot/dts/omap5-igep0050.dts
-+++ b/arch/arm/boot/dts/omap5-igep0050.dts
-@@ -35,6 +35,22 @@
- 	};
- };
- 
-+/* LDO4 is VPP1 - ball AD9 */
-+&ldo4_reg {
-+	regulator-min-microvolt = <2000000>;
-+	regulator-max-microvolt = <2000000>;
-+};
-+
-+/*
-+ * LDO7 is used for HDMI: VDDA_DSIPORTA - ball AA33, VDDA_DSIPORTC - ball AE33,
-+ * VDDA_HDMI - ball AN25
-+ */
-+&ldo7_reg {
-+	status = "okay";
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+};
-+
- &omap5_pmx_core {
- 	i2c4_pins: pinmux_i2c4_pins {
- 		pinctrl-single,pins = <
+--
+Abhishek Sahu
