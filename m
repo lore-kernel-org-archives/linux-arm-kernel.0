@@ -1,43 +1,103 @@
-From: luke.starrett@broadcom.com (Luke Starrett)
-Date: Thu, 12 May 2016 14:32:25 -0400
-Subject: [PATCH] arm64: Implement optimised IP checksum helpers
-In-Reply-To: <5734B899.3040207@arm.com>
-References: <6ca77904d1eced60d86145dc5da361f3aefc6fec.1463062758.git.robin.murphy@arm.com>
- <a3d91ddf-565d-5cef-0a56-39154e3a00d2@broadcom.com>
- <5734B899.3040207@arm.com>
-Message-ID: <49017ef4-1e96-3684-dec1-5f013724f8f2@broadcom.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 20:41:10 +0200
+Subject: [PATCH v3 45/55] KVM: arm/arm64: vgic-new: Add userland access
+ to VGIC dist registers
+In-Reply-To: <1462531568-9799-46-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-46-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512184110.GK27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Fri, May 06, 2016 at 11:45:58AM +0100, Andre Przywara wrote:
+> Userland may want to save and restore the state of the in-kernel VGIC,
+> so we provide the code which takes a userland request and translate
+> that into calls to our MMIO framework.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 49 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index c952f6f..bb33af8 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -264,7 +264,55 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
 
-On 5/12/2016 1:08 PM, Robin Murphy wrote:
-> Hi Luke,
->
-> On 12/05/16 16:34, Luke Starrett wrote:
->> Hi Robin,
->>
->> I pulled this in to a userspace test app expecting that the __uint128_t
->> type might cause GCC to emit 'ldp'.  Seems like that was that your
->> intent based on your commit note.  Instead I see two 64b loads (ldr Xn),
->> and a single 32b load (ldr Wn) for the trailing 4B.  This was with
->> Linaro GCC 4.9-2015.06.
->
-> GCC 5 happily emits ldp there, but indeed I couldn't figure out how to 
-> convince GCC 4 to do so. From a quick ferret around in the GCC Git, it 
-> looks like the relevant optimisations may have only gone in post-4.9.
->
-Not a problem.  I was just curious for my own selfish reasons.
+come to think of it, this is GICv2 specific right?
 
->> Otherwise, the C cycle count looks good enough compared to the asm 
->> version.
->
-> Yeah, compiling as standalone functions with GCC 5 I get 19 
-> instructions vs. 17 for the asm, but the loop logic gets optimised out 
-> completely when ihl is a compile-time constant (e.g. inet_gro_receive())
->
+why don't we call it vgic_v2_attr_regs_access then?
 
-I updated to Linaro GCC 5.3-2016.02, and saw what you described.  I ran 
-some smoke testing against a random header generator.  LGTM.
+and should it really live in this file?
 
-Acked-by: Luke Starrett <luke.starrett@broadcom.com>
+>  				 struct kvm_device_attr *attr,
+>  				 u32 *reg, bool is_write)
+>  {
+> -	return -ENXIO;
+> +	gpa_t addr;
+> +	int cpuid, ret, c;
+> +	struct kvm_vcpu *vcpu, *tmp_vcpu;
+> +
+> +	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
+> +		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
+> +	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
+> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+> +
+> +	mutex_lock(&dev->kvm->lock);
+> +
+> +	ret = vgic_init(dev->kvm);
+> +	if (ret)
+> +		goto out;
+> +
+> +	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	/*
+> +	 * Ensure that no other VCPU is running by checking the vcpu->cpu
+> +	 * field.  If no other VPCUs are running we can safely access the VGIC
+> +	 * state, because even if another VPU is run after this point, that
+> +	 * VCPU will not touch the vgic state, because it will block on
+> +	 * getting the vgic->lock in kvm_vgic_sync_hwstate().
+> +	 */
+
+eh, I don't see us grabbing any vgic->lock (does that still exist?)
+here?
+
+> +	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
+> +		if (unlikely(tmp_vcpu->cpu != -1)) {
+> +			ret = -EBUSY;
+> +			goto out;
+> +		}
+> +	}
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+> +		ret = -EINVAL;
+> +		break;
+> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> +		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		break;
+> +	}
+> +
+> +out:
+> +	mutex_unlock(&dev->kvm->lock);
+> +	return ret;
+>  }
+>  
+>  /* V2 ops */
+> -- 
+> 2.7.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks,
+-Christoffer
