@@ -1,63 +1,200 @@
-From: dalias@libc.org (Rich Felker)
-Date: Thu, 12 May 2016 14:38:22 -0400
-Subject: [PATCH v4 10/18] sh: Remove unnecessary of_platform_populate
- with default match table
-In-Reply-To: <1463054775-18170-11-git-send-email-wangkefeng.wang@huawei.com>
-References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
- <1463054775-18170-11-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160512183822.GL21636@brightrain.aerifal.cx>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 20:47:40 +0200
+Subject: [PATCH v3 47/55] KVM: arm/arm64: vgic-new: Add userland GIC CPU
+ interface access
+In-Reply-To: <1462531568-9799-48-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-48-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512184740.GM27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 08:06:07PM +0800, Kefeng Wang wrote:
-> After patch "of/platform: Add common method to populate default bus",
-> it is possible for arch code to remove unnecessary callers about the
-> of_platform_populate with default match table.
+On Fri, May 06, 2016 at 11:46:00AM +0100, Andre Przywara wrote:
+> Using the VMCR accessors we provide access to GIC CPU interface state
+> to userland by wiring it up to the existing userland interface.
+> [Marc: move and make VMCR accessors static, streamline MMIO handlers]
 
-s/about the/of/ ?
+does this mean Marc did this and serves as credit or is it a lost
+reminder?
 
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Rich Felker <dalias@libc.org>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/sh/boards/of-generic.c | 14 --------------
->  1 file changed, 14 deletions(-)
 > 
-> diff --git a/arch/sh/boards/of-generic.c b/arch/sh/boards/of-generic.c
-> index b4d4313..911ffb9 100644
-> --- a/arch/sh/boards/of-generic.c
-> +++ b/arch/sh/boards/of-generic.c
-> @@ -9,7 +9,6 @@
->   */
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Changelog v2 .. v3:
+> - total rework, moving into vgic-mmio-v2.c
+> - move vmcr accessor wrapper functions into this file
+> - use the register description table for CPU i/f registers as well
+> - add RAZ/WI handling for the active priority registers
+> - streamline MMIO handler functions
+> 
+>  virt/kvm/arm/vgic/vgic-kvm-device.c |   2 +-
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c    | 104 ++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h            |   2 +
+>  3 files changed, 107 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index bb33af8..2122ff2 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -300,7 +300,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
 >  
->  #include <linux/of.h>
-> -#include <linux/of_platform.h>
->  #include <linux/of_fdt.h>
->  #include <linux/clocksource.h>
->  #include <linux/irqchip.h>
-> @@ -179,16 +178,3 @@ void __init arch_init_clk_ops(struct sh_clk_ops **ops, int idx)
->  void __init plat_irq_setup(void)
->  {
+>  	switch (attr->group) {
+>  	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+> -		ret = -EINVAL;
+> +		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
+>  		break;
+>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>  		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index c453e6f..0060539 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -206,6 +206,84 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>  	}
 >  }
-> -
-> -static int __init sh_of_device_init(void)
-> -{
-> -	pr_info("SH generic board support: populating platform devices\n");
-> -	if (of_have_populated_dt()) {
-> -		of_platform_populate(NULL, of_default_bus_match_table,
-> -				     NULL, NULL);
-> -	} else {
-> -		pr_crit("Device tree not populated\n");
-> -	}
-> -	return 0;
-> -}
-> -arch_initcall_sync(sh_of_device_init);
+>  
+> +static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> +{
+> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> +		vgic_v2_set_vmcr(vcpu, vmcr);
+> +	else
+> +		vgic_v3_set_vmcr(vcpu, vmcr);
+> +}
+> +
+> +static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> +{
+> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> +		vgic_v2_get_vmcr(vcpu, vmcr);
+> +	else
+> +		vgic_v3_get_vmcr(vcpu, vmcr);
+> +}
+> +
+> +#define GICC_ARCH_VERSION_V2	0x2
+> +
+> +/* These are for userland accesses only, there is no guest-facing emulation. */
+> +static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
+> +					   gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_vmcr vmcr;
+> +	u32 val;
+> +
+> +	vgic_get_vmcr(vcpu, &vmcr);
+> +
+> +	switch (addr & 0xff) {
+> +	case GIC_CPU_CTRL:
+> +		val = vmcr.ctlr;
+> +		break;
+> +	case GIC_CPU_PRIMASK:
+> +		val = vmcr.pmr;
+> +		break;
+> +	case GIC_CPU_BINPOINT:
+> +		val = vmcr.bpr;
+> +		break;
+> +	case GIC_CPU_ALIAS_BINPOINT:
+> +		val = vmcr.abpr;
+> +		break;
+> +	case GIC_CPU_IDENT:
+> +		val = ((PRODUCT_ID_KVM << 20) |
+> +		       (GICC_ARCH_VERSION_V2 << 16) |
+> +		       IMPLEMENTER_ARM);
+> +		break;
+> +	default:
+> +		return 0;
+> +	}
+> +
+> +	return extract_bytes(val, addr & 3, len);
+
+I don't think we allow anything than a full 32-bit aligned accesses
+from userspace - we shouldn't at least.
+
+> +}
+> +
+> +static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
+> +				   gpa_t addr, unsigned int len,
+> +				   unsigned long val)
+> +{
+> +	struct vgic_vmcr vmcr;
+> +
+> +	vgic_get_vmcr(vcpu, &vmcr);
+> +
+> +	switch (addr & 0xff) {
+> +	case GIC_CPU_CTRL:
+> +		vmcr.ctlr = val;
+> +		break;
+> +	case GIC_CPU_PRIMASK:
+> +		vmcr.pmr = val;
+> +		break;
+> +	case GIC_CPU_BINPOINT:
+> +		vmcr.bpr = val;
+> +		break;
+> +	case GIC_CPU_ALIAS_BINPOINT:
+> +		vmcr.abpr = val;
+> +		break;
+> +	}
+> +
+> +	vgic_set_vmcr(vcpu, &vmcr);
+> +}
+> +
+>  static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+> @@ -237,6 +315,21 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16),
+>  };
+>  
+> +static const struct vgic_register_region vgic_v2_cpu_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GIC_CPU_CTRL,
+> +		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GIC_CPU_PRIMASK,
+> +		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GIC_CPU_BINPOINT,
+> +		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GIC_CPU_ALIAS_BINPOINT,
+> +		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GIC_CPU_ACTIVEPRIO,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 16),
+> +	REGISTER_DESC_WITH_LENGTH(GIC_CPU_IDENT,
+> +		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4),
+> +};
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
+>  {
+>  	dev->regions = vgic_v2_dist_registers;
+> @@ -306,6 +399,17 @@ static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+>  	return ret;
+>  }
+>  
+> +int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +			  int offset, u32 *val)
+> +{
+> +	struct vgic_io_device dev = {
+> +		.regions = vgic_v2_cpu_registers,
+> +		.nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers),
+> +	};
+> +
+> +	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
+> +}
+> +
+>  int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  			 int offset, u32 *val)
+>  {
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 5260d23..7a69955 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -39,6 +39,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
+>  int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+>  int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  			 int offset, u32 *val);
+> +int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +			  int offset, u32 *val);
+>  void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
 > -- 
-> 1.7.12.4
+> 2.7.3
+> 
 
-I have not tested this, but as long as the new arch-generic code takes
-place at the same point in the init sequence (arch_initcall_sync), as
-it seems to, I don't expect any sh-specific breakage. In general I'm
-happy to see this kind of change.
-
-Rich
+Thanks,
+-Christoffer
