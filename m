@@ -1,168 +1,125 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 12 May 2016 15:00:47 +0100
-Subject: [PATCH v3 36/55] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER
- register handlers
-In-Reply-To: <57347925.2030902@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-37-git-send-email-andre.przywara@arm.com>
- <20160512122119.GH27623@cbox> <57347925.2030902@arm.com>
-Message-ID: <57348C8F.6080409@arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 12 May 2016 10:06:11 -0400
+Subject: [RFC] Reset pins of phys and their representation in a device tree
+In-Reply-To: <CAGb2v64=iEA4VS3r4-ctVR6OKu_rRbiZytDtuQJ_LDr8JPq0Pg@mail.gmail.com>
+References: <20160512071542.GC30822@pengutronix.de>
+ <e75ab3a0-da5e-fef1-d5e1-65c37e7714eb@cogentembedded.com>
+ <CABxcv==YQshEvUw2a91nqjqrT3JU52Yzy4RbcWiTS-nWMf2m=Q@mail.gmail.com>
+ <CAGb2v64=iEA4VS3r4-ctVR6OKu_rRbiZytDtuQJ_LDr8JPq0Pg@mail.gmail.com>
+Message-ID: <CABxcv=maDoyayE3HaxXsvBhHS5GEQuMD0F7nRONKoFuEaXOZFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello ChenYu
 
-On 12/05/16 13:37, Marc Zyngier wrote:
-> On 12/05/16 13:21, Christoffer Dall wrote:
->> On Fri, May 06, 2016 at 11:45:49AM +0100, Andre Przywara wrote:
->>> Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
->>> register can handle, the new IROUTER register covers the whole range
->>> of possible target (V)CPUs by using the same MPIDR that the cores
->>> report themselves.
->>> In addition to translating this MPIDR into a vcpu pointer we store
->>> the originally written value as well. The architecture allows to
->>> write any values into the register, which must be read back as written.
->>>
->>> Since we don't support affinity level 3, we don't need to take care
->>> about the upper word of this 64-bit register, which simplifies the
->>> handling a bit.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> Changelog RFC..v1:
->>> - fold in and simplify vgic_v3_irq_change_affinity
->>>
->>> Changelog v1 .. v2:
->>> - adapt to new MMIO framework
->>>
->>>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 65 +++++++++++++++++++++++++++++++++++++++-
->>>  1 file changed, 64 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->>> index 48fba9c..3bcc2c4 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->>> @@ -86,6 +86,69 @@ static u32 compress_mpidr(unsigned long mpidr)
->>>  	return ret;
->>>  }
->>>  
->>> +static unsigned long decompress_mpidr(u32 value)
->>> +{
->>> +	unsigned long mpidr;
->>> +
->>> +	mpidr  = ((value >>  0) & 0xFF) << MPIDR_LEVEL_SHIFT(0);
->>> +	mpidr |= ((value >>  8) & 0xFF) << MPIDR_LEVEL_SHIFT(1);
->>> +	mpidr |= ((value >> 16) & 0xFF) << MPIDR_LEVEL_SHIFT(2);
->>> +	mpidr |= (u64)((value >> 24) & 0xFF) << MPIDR_LEVEL_SHIFT(3);
->>> +
->>> +	return mpidr;
->>> +}
->>> +
->>> +static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
->>> +					    gpa_t addr, unsigned int len)
->>> +{
->>> +	int intid = (addr & 0x1fff) / 8;
->>> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
->>> +	unsigned long mpidr;
->>> +
->>> +	if (!irq)
->>> +		return 0;
->>> +
->>> +	mpidr = decompress_mpidr(irq->mpidr);
+On Thu, May 12, 2016 at 9:49 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi,
+>
+> On Thu, May 12, 2016 at 9:40 PM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
+>> [adding Krzysztof as cc]
 >>
->> I'm unsure here; do we ned a READ_ONCE() in lieu taking the lock or are
->> we guaranteed that this is a single memory access even with compiler
->> inlining etc.?
-> 
-> I can't imagine the compiler being stupid enough to read this multiple
-> times, but better safe than sorry. +1 for READ_ONCE().
-> 
+>> On Thu, May 12, 2016 at 8:25 AM, Sergei Shtylyov
+>> <sergei.shtylyov@cogentembedded.com> wrote:
+>>> Hello.
+>>>
+>>>
+>>> On 5/12/2016 10:15 AM, Uwe Kleine-K?nig wrote:
+>>>
+>>>> I have a machine here where the reset pin of the phy is connected to a
+>>>> GPIO.
+>>>>
+>>>> There are different possibilities available today to handle this
+>>>> situation, here are the ones I'm aware of:
+>>>>
+>>>>  - Use a gpio-hog to set the reset gpio to non-active
+>>>>    This might result in dependency problems (and that's what I am
+>>>>    currently faced with) because there is no connection in the device
+>>>>    tree between the hog and the phy.
+>>>>
+>>>>  - [Documentation/devicetree/bindings/net/fsl-fec.txt]
+>>>>    The fec node supports properties
+>>>>
+>>>>         phy-reset-gpios = <&gpio2 14 0>;
+>>>>         phy-reset-duration = <200> /* milliseconds */;
+>>>>
+>>>>    Something similar exists in TI's vendor kernel
+>>>>
+>>>> (http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/17d192b999ee904ced223c16cef76111a51c461b)
+>>>>    with different (and IMHO bader) naming.
+>>>>    This is the wrong place to specify the gpios; they shouldn't be in the
+>>>>    mac's node, but in a phy node instead.
+>>>>
+>>>> So what I actually want is to put the gpio specification in the right
+>>>> place and let it look as follows:
+>>>>
+>>>>         mymdiobus {
+>>>>                 [...]
+>>>>                 myfirstphy: ethernet-phy at 0 {
+>>>>                         compatible = "ethernet-phy-ieee802.3-c22";
+>>>>                         reg = <0>;
+>>>>
+>>>>                         reset-gpios = <&gpio2 14 0>;
+>>>>                         reset-duration-ms = <200>;
+>>>>                 };
+>>>>
+>>>>                 mysecondphy: ethernet-phy at 2 {
+>>>>                         compatible = "ethernet-phy-ieee802.3-c22";
+>>>>                         reg = <2>;
+>>>>
+>>>>                         reset-gpios = <&gpio3 10 0>;
+>>>>                         reset-duration-ms = <200>;
+>>>>                 };
+>>>>         };
+>>>>
+>>>> And with this we could defer probe of &myfirstphy if &gpio2 isn't
+>>>> available yet.
+>>>>
+>>>> Does this sound sensible? Does something like that already exist which I
+>>>> missed? Any further ideas/comments?
+>>>
+>>>
+>>> http://patchwork.ozlabs.org/patch/616495/
+>>>
+>>>    I'll post a new version RSN.
+>>>
 >>
->>> +	return extract_bytes(mpidr, addr & 7, len);
->>> +}
->>> +
->>> +static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
->>> +				    gpa_t addr, unsigned int len,
->>> +				    unsigned long val)
->>> +{
->>> +	int intid = (addr & 0x1fff) / 8;
->>> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
->>> +	unsigned long mask = 0xffffffff;	/* upper word is WI */
->>> +	u64 mpidr;
->>> +
->>> +	if (!irq)
->>> +		return;
->>> +
->>> +	/*
->>> +	 * There are only two supported options:
->>> +	 * (1) aligned 64-bit access
->>> +	 * (2) aligned 32-bit access
->>> +	 *
->>> +	 * TODO: make this check generic and move it to dispatch_...()
->>> +	 */
->>> +	if (len != 4 && len != 8)
->>> +		return;
->>> +
->>> +
->>> +	/* The upper word is WI for us since we don't implement Aff3. */
->>> +	if (addr & 4)
->>> +		return;
->>> +
->>> +	spin_lock(&irq->irq_lock);
->>> +
->>> +	mpidr = decompress_mpidr(irq->mpidr);
->>> +	mpidr = (mpidr & ~mask) | (val & mask);
->>> +	irq->mpidr = compress_mpidr(mpidr);
->>> +	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, mpidr);
+>> This seems to be similar to what's needed by MMC/SD/SDIO devices (i.e:
+>> a WiFi chip) that needs some power sequence for reset and be
+>> enumerable.
 >>
->> this is weird because it doesn't preserve read-as-written semantics but
->> allows a guest to write something into the RES0 field and read that back
->> in the Aff3 field...
+>> Krzysztof has been working  to make the MMC pwrseq framework more
+>> generic [0] since he wants to use it also for built-in USB devices.
+>>
+>> From a quick look at the patches mentioned in this thread, it seems
+>> that the same framework can be used to reset the PHYs unless I'm
+>> missing something. Have you considered using this? It would be good if
+>> there is a consistent way to define the power sequence for devices
+>> across the different subsystems.
+>>
+>> [0]: https://lkml.org/lkml/2016/5/5/230
+>
+> You probably missed the part that Rob nacked the bindings in that
+> series?
+>
 
-Technically Aff3 is not RES0, even if the A3V bit is cleared.
-The A3V bit just disables Aff3 on the CPU interface side, specifically
-for ICC_SGI0R_EL1 & friends.
-I think we agreed some time ago that we have to support read-as-written
-for this register and don't forward this IRQ if the MPIDR is not valid,
-as the spec demands.
+No, I didn't miss that. AFAICT the way forward is still being
+discussed as you can see from the last email in that thread from Ulf
+[0].
 
-> I don't see how we get this RES0/Aff3 mixup, but I can see other issues:
-> 
->>> +	unsigned long mask = 0xffffffff;	/* upper word is WI */
-> 
-> followed by:
-> 
->>> +	mpidr = (mpidr & ~mask) | (val & mask);
-> 
-> is not going to preserve the top bits on 32bit (assuming we could
-> perform a 64bit access on 32bit, but still).
+And yes, the DT bindings is likely to change (keeping the backward
+compat for MMC) which is good,  but still the power sequence
+management code can be reused across subsystems.
 
-Which would be fixed by making mask a u64?
+> Putting the reset gpios under the PHY nodes and handling it from
+> phylib is probably the way to go. I'd like to ask for regulator
+> and clock support as well, if possible.
+>
 
-> Also, the mask preserves
-> the IRM bit, which is wrong (we don't support 1-of-n distribution).
+A GPIO array, clock and regulator (after Krzysztof patch) is already
+supported by the pwrseq_simple provider for example.
 
-Agreed on this.
+> Regards
+> ChenYu
 
-> 
-> Why don't we just have
-> 
-> 	mpidr = val & GENMASK_ULL(23, 0);
-> 
-> and let's be done with it? I must be missing something about this whole
-> Aff3 thing...
-
-Well, this would be a simple solution if we don't have to preserve bogus
-MPIDRs.
-The spec is a bit vague here:
-"For each interrupt, a GIC implementation might support fewer than 256
-values for an affinity level. In this case, some bits of the
-corresponding affinity level field might be RO."
-
-Not sure if this can apply to _all_ bits of an affinity level or not.
-
-I think the key question is: do we need to preserve any MPIDR value
-written into this register?
-
-Cheers,
-Andre.
+[0]: https://lkml.org/lkml/2016/5/10/320
