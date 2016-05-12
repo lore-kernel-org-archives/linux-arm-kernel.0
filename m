@@ -1,31 +1,125 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 May 2016 15:40:38 +0200
-Subject: [PATCH] pinctrl: stm32: Implement .pin_config_dbg_show()
-In-Reply-To: <5733364A.3090606@st.com>
-References: <1461939943-24752-1-git-send-email-patrice.chotard@st.com>
- <CACRpkdZ=KsPL1mBS1bLi=jYsv=Vb1QNBi8XPAJW50doPcwBuZg@mail.gmail.com>
- <5733364A.3090606@st.com>
-Message-ID: <CACRpkdawoqfqN8YeojyrzPru2fwrFMidc1e2v7yxHRpPf+rK6w@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 15:41:39 +0200
+Subject: [PATCH v3 36/55] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER
+ register handlers
+In-Reply-To: <57347925.2030902@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-37-git-send-email-andre.przywara@arm.com>
+ <20160512122119.GH27623@cbox> <57347925.2030902@arm.com>
+Message-ID: <20160512134139.GA5878@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 3:40 PM, Patrice Chotard <patrice.chotard@st.com> wrote:
-> On 05/10/2016 01:50 PM, Linus Walleij wrote:
+On Thu, May 12, 2016 at 01:37:57PM +0100, Marc Zyngier wrote:
+> On 12/05/16 13:21, Christoffer Dall wrote:
+> > On Fri, May 06, 2016 at 11:45:49AM +0100, Andre Przywara wrote:
+> >> Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
+> >> register can handle, the new IROUTER register covers the whole range
+> >> of possible target (V)CPUs by using the same MPIDR that the cores
+> >> report themselves.
+> >> In addition to translating this MPIDR into a vcpu pointer we store
+> >> the originally written value as well. The architecture allows to
+> >> write any values into the register, which must be read back as written.
+> >>
+> >> Since we don't support affinity level 3, we don't need to take care
+> >> about the upper word of this 64-bit register, which simplifies the
+> >> handling a bit.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >> Changelog RFC..v1:
+> >> - fold in and simplify vgic_v3_irq_change_affinity
+> >>
+> >> Changelog v1 .. v2:
+> >> - adapt to new MMIO framework
+> >>
+> >>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 65 +++++++++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 64 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> >> index 48fba9c..3bcc2c4 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> >> @@ -86,6 +86,69 @@ static u32 compress_mpidr(unsigned long mpidr)
+> >>  	return ret;
+> >>  }
+> >>  
+> >> +static unsigned long decompress_mpidr(u32 value)
+> >> +{
+> >> +	unsigned long mpidr;
+> >> +
+> >> +	mpidr  = ((value >>  0) & 0xFF) << MPIDR_LEVEL_SHIFT(0);
+> >> +	mpidr |= ((value >>  8) & 0xFF) << MPIDR_LEVEL_SHIFT(1);
+> >> +	mpidr |= ((value >> 16) & 0xFF) << MPIDR_LEVEL_SHIFT(2);
+> >> +	mpidr |= (u64)((value >> 24) & 0xFF) << MPIDR_LEVEL_SHIFT(3);
+> >> +
+> >> +	return mpidr;
+> >> +}
+> >> +
+> >> +static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
+> >> +					    gpa_t addr, unsigned int len)
+> >> +{
+> >> +	int intid = (addr & 0x1fff) / 8;
+> >> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
+> >> +	unsigned long mpidr;
+> >> +
+> >> +	if (!irq)
+> >> +		return 0;
+> >> +
+> >> +	mpidr = decompress_mpidr(irq->mpidr);
+> > 
+> > I'm unsure here; do we ned a READ_ONCE() in lieu taking the lock or are
+> > we guaranteed that this is a single memory access even with compiler
+> > inlining etc.?
+> 
+> I can't imagine the compiler being stupid enough to read this multiple
+> times, but better safe than sorry. +1 for READ_ONCE().
+> 
+> > 
+> >> +	return extract_bytes(mpidr, addr & 7, len);
+> >> +}
+> >> +
+> >> +static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+> >> +				    gpa_t addr, unsigned int len,
+> >> +				    unsigned long val)
+> >> +{
+> >> +	int intid = (addr & 0x1fff) / 8;
+> >> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
+> >> +	unsigned long mask = 0xffffffff;	/* upper word is WI */
+> >> +	u64 mpidr;
+> >> +
+> >> +	if (!irq)
+> >> +		return;
+> >> +
+> >> +	/*
+> >> +	 * There are only two supported options:
+> >> +	 * (1) aligned 64-bit access
+> >> +	 * (2) aligned 32-bit access
+> >> +	 *
+> >> +	 * TODO: make this check generic and move it to dispatch_...()
+> >> +	 */
+> >> +	if (len != 4 && len != 8)
+> >> +		return;
+> >> +
+> >> +
+> >> +	/* The upper word is WI for us since we don't implement Aff3. */
+> >> +	if (addr & 4)
+> >> +		return;
+> >> +
+> >> +	spin_lock(&irq->irq_lock);
+> >> +
+> >> +	mpidr = decompress_mpidr(irq->mpidr);
+> >> +	mpidr = (mpidr & ~mask) | (val & mask);
+> >> +	irq->mpidr = compress_mpidr(mpidr);
+> >> +	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, mpidr);
+> > 
+> > this is weird because it doesn't preserve read-as-written semantics but
+> > allows a guest to write something into the RES0 field and read that back
+> > in the Aff3 field...
+> 
+> I don't see how we get this RES0/Aff3 mixup, but I can see other issues:
+> 
+oh, never mind, compress_mpidr expects aff3 in bits[39:32] and throws
+the rest away.
 
-> Sorry i didn't pay attention, but there is a compilation warning in this
-> patch.
->
-> drivers/pinctrl/stm32/pinctrl-stm32.c:823:7: warning: too many arguments for
-> format [-Wformat-extra-args]
->        speeds[speed], "speed");
->
->
-> What do you prefer ?
->  _ me to submit a v2 fixing this warning and at the same occasion include
-> the requested code factorization
->  _ or submit additionnal patchset ?
-
-Just send a patch on top fixing this.
-
-Yours,
-Linus Walleij
+/me hides under table.
