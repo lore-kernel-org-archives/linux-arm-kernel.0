@@ -1,68 +1,41 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 12 May 2016 15:43:04 -0700
-Subject: [PATCH 2/4] phy: rockchip-emmc: configure frequency range and drive
- impedance
-In-Reply-To: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
-References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
-Message-ID: <1463092986-61777-2-git-send-email-briannorris@chromium.org>
+Date: Thu, 12 May 2016 15:43:03 -0700
+Subject: [PATCH 1/4] phy: rockchip-emmc: give DLL some extra time to be ready
+Message-ID: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shawn Lin <shawn.lin@rock-chips.com>
 
-Signal integrity analysis has suggested we set these values. Do this in
-power_on(), so that they get reconfigured after suspend/resume.
+According to the databook, 10.2us is the max time for dll to be ready to
+work. However in testing, some chips need 20us for dll to be ready. This
+patch adds some extra margin for dllrdy to be ready, fixing our
+-ETIMEDOUT issues.
 
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 Signed-off-by: Brian Norris <briannorris@chromium.org>
 ---
- drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/phy/phy-rockchip-emmc.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
-index 48cbe691a889..5641dede32f6 100644
+index 6ebcf3e41c46..48cbe691a889 100644
 --- a/drivers/phy/phy-rockchip-emmc.c
 +++ b/drivers/phy/phy-rockchip-emmc.c
-@@ -56,6 +56,19 @@
- #define PHYCTRL_DLLRDY_SHIFT	0x5
- #define PHYCTRL_DLLRDY_DONE	0x1
- #define PHYCTRL_DLLRDY_GOING	0x0
-+#define PHYCTRL_FREQSEL_200M	0x0
-+#define PHYCTRL_FREQSEL_50M	0x1
-+#define PHYCTRL_FREQSEL_100M	0x2
-+#define PHYCTRL_FREQSEL_150M	0x3
-+#define PHYCTRL_FREQSEL_MASK	0x3
-+#define PHYCTRL_FREQSEL_SHIFT	0xc
-+#define PHYCTRL_DR_MASK		0x7
-+#define PHYCTRL_DR_SHIFT	0x4
-+#define PHYCTRL_DR_50OHM	0x0
-+#define PHYCTRL_DR_33OHM	0x1
-+#define PHYCTRL_DR_66OHM	0x2
-+#define PHYCTRL_DR_100OHM	0x3
-+#define PHYCTRL_DR_40OHM	0x4
- 
- struct rockchip_emmc_phy {
- 	unsigned int	reg_offset;
-@@ -154,6 +167,20 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
- 	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
- 	int ret = 0;
- 
-+	/* DLL operation: 170 to 200 MHz */
-+	regmap_write(rk_phy->reg_base,
-+		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
-+		     HIWORD_UPDATE(PHYCTRL_FREQSEL_200M,
-+				   PHYCTRL_FREQSEL_MASK,
-+				   PHYCTRL_FREQSEL_SHIFT));
-+
-+	/* Drive impedance: 50 Ohm */
-+	regmap_write(rk_phy->reg_base,
-+		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
-+		     HIWORD_UPDATE(PHYCTRL_DR_50OHM,
-+				   PHYCTRL_DR_MASK,
-+				   PHYCTRL_DR_SHIFT));
-+
- 	/* Power up emmc phy analog blocks */
- 	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
- 	if (ret)
+@@ -119,10 +119,11 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ 				   PHYCTRL_ENDLL_MASK,
+ 				   PHYCTRL_ENDLL_SHIFT));
+ 	/*
+-	 * After enable analog DLL circuits, we need extra 10.2us
+-	 * for dll to be ready for work.
++	 * After enable analog DLL circuits, we need an extra 10.2us
++	 * for dll to be ready for work. But according to testing, we
++	 * find some chips need more than 25us.
+ 	 */
+-	udelay(11);
++	udelay(30);
+ 	regmap_read(rk_phy->reg_base,
+ 		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+ 		    &dllrdy);
 -- 
 2.8.0.rc3.226.g39d4020
