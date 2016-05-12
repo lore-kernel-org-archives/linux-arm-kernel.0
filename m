@@ -1,95 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 May 2016 10:10:33 +0100
-Subject: [PATCH v3 27/55] KVM: arm/arm64: vgic-new: Add PRIORITY registers
- handlers
-In-Reply-To: <1462531568-9799-28-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-28-git-send-email-andre.przywara@arm.com>
-Message-ID: <57344889.1050802@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 May 2016 10:17:58 +0100
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <4989778.Fs81NJurjH@wuerfel>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <5842999.Zgpfq4gkVz@wuerfel>
+ <20160511165900.GM3051@e104818-lin.cambridge.arm.com>
+ <4989778.Fs81NJurjH@wuerfel>
+Message-ID: <20160512091758.GB11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/16 11:45, Andre Przywara wrote:
-> The priority register handlers are shared between the v2 and v3
-> emulation, so their implementation goes into vgic-mmio.c, to be
-> easily referenced from the v3 emulation as well later.
-> There is a corner case when we change the priority of a pending
-> interrupt which we don't handle at the moment.
+On Wed, May 11, 2016 at 09:30:07PM +0200, Arnd Bergmann wrote:
+> On Wednesday 11 May 2016 17:59:01 Catalin Marinas wrote:
+> > On Wed, May 11, 2016 at 12:55:01PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 11 May 2016 11:04:38 Yury Norov wrote:
+> > > > On Wed, May 11, 2016 at 10:04:16AM +0800, Zhangjian (Bamvor) wrote:
+> > > > [...]
+> > > > 
+> > > > > >>Ok, I will test the ltp syscall test.
+> > > > > >>With this changes, the issue I mentioned should be fixed. But we still
+> > > > > >>use mmap2 syscall for ILP32 application when we pass the offset instead
+> > > > > >>of page offset. Is it correct?
+> > > > > >
+> > > > > >I don't remember. It's probably not important whether we have the shift
+> > > > > >in there, as long as it's independent of the actual kernel page size and
+> > > > > >user space and kernel agree on the calling conventions.
+> > > > > Well. I am ok with where to shift the pages size because we get the same
+> > > > > result. I was just thinking if we should get rid of the name of mmap2 in our
+> > > > > ILP32 porting. Actually, it is mmap but we name it as mmap2. User may confused
+> > > > > if they do not know the implementations.
+> > > > > 
+> > > > 
+> > > > This is what generic unistd.h does. If you want to change it, you'd
+> > > > change each arch that uses generic unistd.h.
+> > > 
+> > > Generic unistd.h has this:
+> > > 
+> > > #ifdef __SYSCALL_COMPAT
+> > > #define __SC_COMP_3264(_nr, _32, _64, _comp) __SYSCALL(_nr, _comp)
+> > > #else
+> > > #define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
+> > > #endif
+> > > 
+> > > #define __NR3264_mmap 222
+> > > __SC_3264(__NR3264_mmap, sys_mmap2, sys_mmap)
+> > > 
+> > > 
+> > > #if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
+> > > #define __NR_mmap __NR3264_mmap
+> > > #else
+> > > #define __NR_mmap2 __NR3264_mmap
+> > > #endif
+> > > 
+> > > So by default we get __NR_mmap2 and sys_mmap2 on 32-bit ABIs, but
+> > > __NR_mmap and sys_mmap on 64-bit ABIs, as it should be.
+> > > 
+> > > The problem is that arch/arm64/kernel/sys_ilp32.c now overrides
+> > > this to use __NR_mmap2 with sys_mmap, so we have a mismatch. I think
+> > > we should either override both the implementation and the number,
+> > > or neither of them.
+> > 
+> > I would vote for "neither of them" (so we use __NR_mmap2 and sys_mmap2)
+> > to keep it close to new 32-bit architectures, even though we would have
+> > some shifts by 12 in both glibc and kernel.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v1 .. v2:
-> - adapt to new MMIO framework
-> 
->  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
->  virt/kvm/arm/vgic/vgic-mmio.c    | 39 +++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
->  3 files changed, 47 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index 054b52d..2e17250 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -84,7 +84,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
->  		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
->  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index dbf683e..d7fe9e6 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -282,6 +282,45 @@ retry:
->  	}
->  }
->  
-> +unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-> +				      gpa_t addr, unsigned int len)
-> +{
-> +	u32 intid = addr & 0x3ff;
-> +	int i;
-> +	u64 val = 0;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		val |= (u64)irq->priority << (i * 8);
-> +	}
-> +
-> +	return val;
-> +}
-> +
-> +/*
-> + * We currently don't handle changing the priority of an interrupt that
-> + * is already pending on a VCPU. If there is a need for this, we would
-> + * need to make this VCPU exit and re-evaluate the priorities, potentially
-> + * leading to this interrupt getting presented now to the guest (if it has
-> + * been masked by the priority mask before).
-> + */
-> +void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-> +			      gpa_t addr, unsigned int len,
-> +			      unsigned long val)
-> +{
-> +	u32 intid = addr & 0x3ff;
-> +	int i;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		irq->priority = (val >> (i * 8)) & 0xff;
+> I don't think the shifts are a problem, the main downside would be
+> the limit to 44 bits of file offsets (16TB files), but it's also
+> unclear if that is a practical problem at all. If it is, we run
+> into the same problem on all other 32-bit architectures too.
 
-This is wrong. We should only write the number of bits of priority we
-actually emulate. And given that we use a common framework for v2 and
-v3, this should probably be 5 bits (32 priorities should be enough for
-everybody).
+I hope people are seriously thinking of moving to an LP64 ABI if they
+have such large file offset needs.
 
-I'll try and cook something.
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
