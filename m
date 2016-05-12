@@ -1,40 +1,51 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu, 12 May 2016 14:52:02 +0300
-Subject: [PATCH v7 0/5] ACPI: parse the SPCR table
-In-Reply-To: <1bff98e3-2d94-ed76-1165-ed7d43bbfcf3@jonmasters.org>
-References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
- <1bff98e3-2d94-ed76-1165-ed7d43bbfcf3@jonmasters.org>
-Message-ID: <bc91f503-cee5-db03-51bf-a36ef3e95a1f@linaro.org>
+From: yt.shen@mediatek.com (yt.shen at mediatek.com)
+Date: Thu, 12 May 2016 19:49:52 +0800
+Subject: [RFC 0/3] MT2701 DRM support
+Message-ID: <1463053795-55455-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+From: YT Shen <yt.shen@mediatek.com>
 
-In v7 I addressed the issues that were brought up by Rafael J . Wysocki
-(but I still do not have ACK from ACPI people).
+This is MT2701 DRM support RFC, based on MT8173 DRM patch v16.
+Most codes are the same, except some register changed.
 
-The issue with D02 will be addressed in a separate patch.
+For example:
+ - DISP_OVL address offset changed, color format definition changed.
+ - DISP_RDMA fifo size changed.
+ - DISP_COLOR offset changed.
 
-There possibly is an issue with 16550 and command line console with I am
-investigating and probably will address in a separate patch.
+We add a new component DISP_BLS, and the connection settings are updated.
+And we have shadow register support in MT2701.
 
-I know no other problems with it and reviewers seem happy.
+The RFC depends on MT2701 iommu/smi driver.
+https://patchwork.kernel.org/patch/9043411/ ("dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and smi"),
+https://patchwork.kernel.org/patch/9043391/ ("iommu/mediatek: move the common struct into header file"),
+https://patchwork.kernel.org/patch/9043421/ ("memory/mediatek: add support for mt2701"),
+https://patchwork.kernel.org/patch/9043451/ ("iommu/mediatek: add support for mtk iommu generation one HW"),
+https://patchwork.kernel.org/patch/9043471/ ("ARM: dts: mt2701: add iommu/smi dtsi node for mt2701"),
 
-So I believe this patchset could be pulled.  If needed, I will send v8.
+Thanks,
+yt.shen
 
-Thank you
-Aleksey Makarov
+YT Shen (3):
+  dt-bindings: drm/mediatek: Add display binding for Mediatek SoC MT2701
+  drm/mediatek: add support for Mediatek SoC MT2701
+  arm: dts: mt2701: Add display subsystem related nodes for MT2701
 
-On 05/12/2016 11:20 AM, Jon Masters wrote:
-> On 03/31/2016 09:40 AM, Aleksey Makarov wrote:
-> 
->> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
->> Console Redirection Table) [2] as a mandatory ACPI table that
->> specifies the configuration of serial console.
-> 
-> Hi Aleksey,
-> 
-> Can you summarize the status of this patch series?
-> 
-> Jon.
-> 
+ .../bindings/display/mediatek/mediatek,disp.txt    |    1 +
+ arch/arm/boot/dts/mt2701.dtsi                      |  117 +++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c            |   49 +++++--
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c           |   36 ++++-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   78 ++++++----
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c             |  151 +++++++++++++++-----
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h             |    2 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |   63 +++++++-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |   15 ++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c             |   72 ++++++++--
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h             |    9 ++
+ drivers/gpu/drm/mediatek/mtk_drm_gem.c             |    4 +
+ 12 files changed, 491 insertions(+), 106 deletions(-)
+
+-- 
+1.7.9.5
