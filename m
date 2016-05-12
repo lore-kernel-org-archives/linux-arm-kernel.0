@@ -1,63 +1,89 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 12 May 2016 14:25:23 -0500
-Subject: [PATCH] ARM: dts: socfpga: fix definitions of serial console for
- Arria10
-Message-ID: <1463081123-3181-1-git-send-email-dinguyen@opensource.altera.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 May 2016 21:33:47 +0200
+Subject: [PATCH v3 53/55] KVM: arm/arm64: vgic-new: Wire up irqfd injection
+In-Reply-To: <1462531568-9799-54-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-54-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160512193347.GT27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Gerlach <mgerlach@opensource.altera.com>
+On Fri, May 06, 2016 at 11:46:06AM +0100, Andre Przywara wrote:
+> Connect to the new VGIC to the irqfd framework, so that we can
+> inject IRQs.
+> GSI routing and MSI routing is not yet implemented.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-irqfd.c | 52 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-irqfd.c
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+> new file mode 100644
+> index 0000000..c675513
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <trace/events/kvm.h>
+> +
+> +int kvm_irq_map_gsi(struct kvm *kvm,
+> +		    struct kvm_kernel_irq_routing_entry *entries,
+> +		    int gsi)
+> +{
+> +	return 0;
+> +}
+> +
+> +int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned int irqchip,
+> +			 unsigned int pin)
+> +{
+> +	return pin;
+> +}
+> +
+> +int kvm_set_irq(struct kvm *kvm, int irq_source_id,
+> +		u32 irq, int level, bool line_status)
+> +{
+> +	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
+> +
+> +	trace_kvm_set_irq(irq, level, irq_source_id);
+> +
+> +	BUG_ON(!vgic_initialized(kvm));
+> +
+> +	return kvm_vgic_inject_irq(kvm, 0, spi, level);
+> +}
+> +
+> +/* MSI not implemented yet */
+> +int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+> +		struct kvm *kvm, int irq_source_id,
+> +		int level, bool line_status)
+> +{
+> +	return 0;
+> +}
+> -- 
+> 2.7.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-The notion of which uart instance is serial0 or serial1
-is board specific rather than generic to the chip. This
-patch removes the serial aliases from generic chip dtsi
-and adds an appropriate alias to the board specific dtsi.
-By making the alias for serial0 point to uart1 for the arria10_socdk,
-the linux boot command line supports specifying console=ttyS0,115200
-for backwards compatibility, and it supports not specifying
-the console at all.
 
-Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria10.dtsi       | 5 -----
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 6 +++++-
- 2 files changed, 5 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 1c5e139..48658f9 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -22,11 +22,6 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	aliases {
--		serial0 = &uart0;
--		serial1 = &uart1;
--	};
--
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index 567df98..b1a4293 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -20,9 +20,13 @@
- 	model = "Altera SOCFPGA Arria 10";
- 	compatible = "altr,socfpga-arria10", "altr,socfpga";
- 
-+	aliases {
-+		serial0 = &uart1;
-+	};
-+
- 	chosen {
- 		bootargs = "earlyprintk";
--		stdout-path = "serial1:115200n8";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	memory {
--- 
-2.6.2
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
