@@ -1,104 +1,46 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 May 2016 10:35:49 +0200
-Subject: [PATCH v3 29/55] KVM: arm/arm64: vgic-new: Add TARGET registers
- handlers
-In-Reply-To: <1462531568-9799-30-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-30-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160512083549.GZ27623@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 May 2016 10:38:31 +0200
+Subject: [PATCH] ARM: samsung: improve static dma_mask definition
+Message-ID: <1463042333-281444-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2016 at 11:45:42AM +0100, Andre Przywara wrote:
-> The target register handlers are v2 emulation specific, so their
-> implementation lives entirely in vgic-mmio-v2.c.
-> We copy the old VGIC behaviour of assigning an IRQ to the first VCPU
-> set in the target mask instead of making it possibly pending on
-> multiple VCPUs.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - remove runtime VCPU determination from this v2-only register
-> - fold in implementation of vgic_v2_irq_change_affinity()
-> - replace ffs() with __ffs()
-> 
-> Changelog v1 .. v2:
-> - adapt to new MMIO framework
-> 
->  virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 42 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index 2a953ec..888529e 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -66,6 +66,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
-> +					   gpa_t addr, unsigned int len)
-> +{
-> +	u32 intid = addr & 0x3ff;
-> +	int i;
-> +	u64 val = 0;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		val |= (u64)irq->targets << (i * 8);
-> +	}
-> +
-> +	return val;
+When no DMA master devices are part of the kernel configuration,
+we get a warning about the unused dma mask definition:
 
-this register should allow byte access, so you're missing a call to
-extract_bytes() ?
+arch/arm/plat-samsung/devs.c:71:12: error: 'samsung_device_dma_mask' defined but not used [-Werror=unused-variable]
+ static u64 samsung_device_dma_mask = DMA_BIT_MASK(32);
 
+We could simply mark this as __maybe_unused to shut up that warning,
+but a nicer solution seems to be to have a separate mask for each
+device. The advantage is that a driver that happens to call
+dma_set_mask() on one device doesn't implicitly change the mask
+for the other devices as well. This is more of a theoretical
+problem, as obviously nothing does it for the devices in this
+file (or they would have always been broken), but it feels
+cleaner that way.
 
-> +}
-> +
-> +static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
-> +				   gpa_t addr, unsigned int len,
-> +				   unsigned long val)
-> +{
-> +	u32 intid = addr & 0x3ff;
-> +	int i;
-> +
-> +	/* GICD_ITARGETSR[0-7] are read-only */
-> +	if (intid < VGIC_NR_PRIVATE_IRQS)
-> +		return;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
-> +		int target;
-> +
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		irq->targets = (val >> (i * 8)) & 0xff;
+The definition works by creating an array in place so we can take
+the address of it and let the compiler generate a hidden symbol
+for it at compile time.
 
-this doesn't seem right given byte accesses either, and I don't see the
-fixups we have in the works fixing it...
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/plat-samsung/devs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +		target = irq->targets ? __ffs(irq->targets) : 0;
-> +		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +}
-> +
->  static const struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-> @@ -86,7 +127,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
->  		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +		vgic_mmio_read_target, vgic_mmio_write_target, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
->  		vgic_mmio_read_config, vgic_mmio_write_config, 2),
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
-> -- 
-> 2.7.3
-> 
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 84baa16f4c0b..e93aa6734147 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -68,7 +68,7 @@
+ #include <linux/platform_data/asoc-s3c.h>
+ #include <linux/platform_data/spi-s3c64xx.h>
+ 
+-static u64 samsung_device_dma_mask = DMA_BIT_MASK(32);
++#define samsung_device_dma_mask (*((u64[]) { DMA_BIT_MASK(32) }))
+ 
+ /* AC97 */
+ #ifdef CONFIG_CPU_S3C2440
+-- 
+2.7.0
