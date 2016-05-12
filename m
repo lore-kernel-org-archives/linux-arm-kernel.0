@@ -1,31 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 12 May 2016 07:08:36 -0500
-Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
-In-Reply-To: <57345FDF.4000804@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-8-git-send-email-tn@semihalf.com>
- <CAJZ5v0hM8WAr9GGku89zKgiVKt6ArHf=9CntRUyBjyMNUvie2A@mail.gmail.com>
- <20160511101101.GA16101@red-moon>
- <CAJZ5v0hgw929W5PjF0PqT+ssiOHd8TeJoSQcz4NUiAovZY2pfQ@mail.gmail.com>
- <20160511224314.GD28812@localhost> <57345FDF.4000804@semihalf.com>
-Message-ID: <20160512120836.GF28812@localhost>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 12 May 2016 20:06:11 +0800
+Subject: [PATCH v4 14/18] bus: imx-weim: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1463054775-18170-15-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 12:50:07PM +0200, Tomasz Nowicki wrote:
-> On 12.05.2016 00:43, Bjorn Helgaas wrote:
+Use helper of_platform_default_populate() in linux/of_platform
+when possible, instead of calling of_platform_populate() with
+the default match table.
 
-> >@@ -70,9 +71,11 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
-> >  	cfg->res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-> >  	cfg->res.name = "PCI ECAM";
-> >
-> >-	err = request_resource(&iomem_resource, &cfg->res);
-> >-	if (err) {
-> >-		dev_err(dev, "request ECAM res %pR failed\n", &cfg->res);
-> >+	conflict = request_resource(&iomem_resource, &cfg->res);
-> 
-> We need request_resource_conflict here then:
-> -	conflict = request_resource(&iomem_resource, &cfg->res);
-> +	conflict = request_resource_conflict(&iomem_resource, &cfg->res);
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Signed-off-by: Huang Shijie <b32955@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/bus/imx-weim.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Whoops, fixed, thanks!
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 1827fc4..4bd361d 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -163,9 +163,8 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+ 	}
+ 
+ 	if (have_child)
+-		ret = of_platform_populate(pdev->dev.of_node,
+-				   of_default_bus_match_table,
+-				   NULL, &pdev->dev);
++		ret = of_platform_default_populate(pdev->dev.of_node,
++						   NULL, &pdev->dev);
+ 	if (ret)
+ 		dev_err(&pdev->dev, "%s fail to create devices.\n",
+ 			pdev->dev.of_node->full_name);
+-- 
+1.7.12.4
