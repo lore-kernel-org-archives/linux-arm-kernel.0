@@ -1,44 +1,69 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 May 2016 09:22:42 +0100
-Subject: [PATCH 11/12] kexec: allow architectures to override boot mapping
-In-Reply-To: <20160512062627.GB2711@x1.redhat.com>
-References: <20160428092644.GX19428@n2100.arm.linux.org.uk>
- <E1aviFU-0000jk-9q@rmk-PC.arm.linux.org.uk>
- <20160512062627.GB2711@x1.redhat.com>
-Message-ID: <20160512082242.GQ19428@n2100.arm.linux.org.uk>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 12 May 2016 11:24:27 +0300
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <5733FC71.8070101@huawei.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <573305A8.50406@huawei.com> <5733149C.4030903@huawei.com>
+ <5250356.myv9GIZ34h@wuerfel> <5733FC71.8070101@huawei.com>
+Message-ID: <20160512082427.GA1587@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 02:26:27PM +0800, Baoquan He wrote:
-> On 04/28/16 at 10:28am, Russell King wrote:
-> > diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-> > index 52a3a221bcb2..99cb9dac7909 100644
-> > --- a/include/linux/kexec.h
-> > +++ b/include/linux/kexec.h
-> > @@ -318,6 +318,44 @@ int __weak arch_kexec_apply_relocations_add(const Elf_Ehdr *ehdr,
-> >  int __weak arch_kexec_apply_relocations(const Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-> >  					unsigned int relsec);
-> >  
-> > +#ifndef page_to_boot_pfn
-> > +static inline unsigned long page_to_boot_pfn(struct page *page)
-> > +{
-> > +	return page_to_pfn(page);
-> > +}
-> > +#endif
-> 
-> I am thinking if it's appropriate to introduce a new concept which only
-> exists in a certain system of a certain ARCH. Is it unavoidable? If have
-> to can we name it as kexec_page_to_pfn/kexec_pfn_to_page, etc? People
-> might not need to know about boot view physical address and kernel view
-> physical address things when they just want to understand kexec
-> implementation related to one ARCH except of ARM, even related to ARM
-> but not Keystone 2.
+On Thu, May 12, 2016 at 11:45:53AM +0800, Zhangjian (Bamvor) wrote:
 
-Well, what do you suggest we do instead?
+[...]
 
-Eric, please get involved in this discussion, as this was your idea.
+> >Hmm, that is indeed tricky. I think COMPAT_SYSCALL_WRAP4 rightfully
+> >refuses the loff_t argument here, as the common case is that this is
+> >not possible.
+> It works if I apply the following patch, I defined the wrong `__TYPE_IS_xxx`
+> yesterday. Should we merge this into ILP32 series or send the compat.h
+> and syscalls.h individually? The current series of ILP32 is a little bit
+> long and hard to review.
+> diff --git a/include/linux/compat.h b/include/linux/compat.h
+> index ba6ebe0..22a9565 100644
+> --- a/include/linux/compat.h
+> +++ b/include/linux/compat.h
+> @@ -747,7 +747,8 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
+>  #ifndef __SC_COMPAT_CAST
+>  #define __SC_COMPAT_CAST(t, a) ({                                      \
+>         BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&              \
+> -                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));            \
+> +                    !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t) &&           \
+> +                    !__TYPE_IS_LOFFT(t));                              \
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I think it's wrong, as loff_t is 64-bit in 32-bit userspace, and this
+will clear meaningful data in top halve.
+
+>         ((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)));            \
+>  })
+>  #endif
+> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+> index 6e57d9c..66eb85d 100644
+> --- a/include/linux/syscalls.h
+> +++ b/include/linux/syscalls.h
+> @@ -47,6 +47,7 @@
+>  #define __TYPE_IS_L(t) (__same_type((t)0, 0L))
+>  #define __TYPE_IS_UL(t)        (__same_type((t)0, 0UL))
+>  #define __TYPE_IS_LL(t) (__same_type((t)0, 0LL) || __same_type((t)0, 0ULL))
+> +#define __TYPE_IS_LOFFT(t)     (__same_type((t)0, (loff_t)0))
+>  #define __SC_LONG(t, a) __typeof(__builtin_choose_expr(__TYPE_IS_LL(t), 0LL, 0L)) a
+>  #define __SC_CAST(t, a)        (t) a
+>  #define __SC_ARGS(t, a)        a
+> diff --git a/kernel/compat_wrapper.c b/kernel/compat_wrapper.c
+> index 98b68b8..28f02d0 100644
+> --- a/kernel/compat_wrapper.c
+> +++ b/kernel/compat_wrapper.c
+> @@ -304,3 +304,7 @@ COMPAT_SYSCALL_WRAP3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
+>  COMPAT_SYSCALL_WRAP6(sendto, int, fd, void __user *, buff, size_t, len,
+>                      unsigned int, flags, struct sockaddr __user *, addr,
+>                      int, addr_len);
+> +COMPAT_SYSCALL_WRAP4(pread64, unsigned int, fd, char __user *, buf,
+> +                       size_t, count, loff_t, pos);
+> +COMPAT_SYSCALL_WRAP4(pwrite64, unsigned int, fd, const char __user *, buf,
+> +                        size_t, count, loff_t, pos);
+
+For cases like this I think we should write wrappers by hands. In
+unistd.h we can use __SC_WRAP, so they will work like wrappers
+generated by COMPAT_SYSCALL_WRAPx() 
