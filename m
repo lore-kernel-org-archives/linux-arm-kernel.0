@@ -1,53 +1,59 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Thu, 12 May 2016 11:58:04 +0100 (BST)
-Subject: [PATCH] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <20160512100410.GA2728@codeblueprint.co.uk>
-References: <1462523526-3172-1-git-send-email-zhaoshenglong@huawei.com>
- <20160511122730.GU2839@codeblueprint.co.uk> <57333533.2030206@linaro.org>
- <20160511232444.GY2839@codeblueprint.co.uk> <5733E8CF.3070004@huawei.com>
- <20160512100410.GA2728@codeblueprint.co.uk>
-Message-ID: <alpine.DEB.2.10.1605121138500.2494@sstabellini-ThinkPad-X260>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 12 May 2016 12:18:16 +0100
+Subject: [PATCH] ARM: STi: Update machine _namestr to be more generic.
+In-Reply-To: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
+References: <1462984816-705-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160512111816.GA1433@dell.open.watershed.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 May 2016, Matt Fleming wrote:
-> On Thu, 12 May, at 10:22:07AM, Shannon Zhao wrote:
-> > 
-> > As said above, I will rebase this patch on top of the EFI next branch.
+On Wed, 11 May 2016, Peter Griffin wrote:
+
+> This string is used by dump_stack and as we now support
+> more SoC's than just STiH415/6 it is misleading to have
+> the current string in the stack trace.
 > 
-> OK thanks.
+> This patch updates it to be more generic for the STi
+> family of SoCs.
 > 
-> Note that it is not possible to escape merge conflicts, since there
-> are changes in the xen tip tree that are not in the EFI next branch
-> and vice versa.
+> So instead of looking like this
 > 
-> For example these commits from xen/linux-next look relevant,
+> [  271.672555] Hardware name: STiH415/416 SoC with Flattened Device Tree
+> [  271.678998] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
+> [  271.686746] [<c030bb54>] (show_stack) from [<c058bc4c>] (dump_stack+0x98/0xac)
+> [snip]
 > 
->   8e147fcc3ffa ("FDT: Add a helper to get the subnode by given name")
->   37060935dc04 ("ARM64: XEN: Add a function to initialize Xen specific UEFI runtime services")
->   acb2c923a860 ("XEN: EFI: Move x86 specific codes to architecture directory")
->   055be2d42408 ("ARM: Xen: Document UEFI support on Xen ARM virtual platforms")
->   3915fea959b6 ("ARM: XEN: Move xen_early_init() before efi_init()")
-
->From a diffstat perspective, the changes introduced by these commits
-affect drivers/of/fdt.c, arch/arm/xen, arch/x86/xen, drivers/xen and
-little else. I don't think they should cause merge troubles.
-
-
-> Linus, Stefano, tip-folks: I'm soliciting opinions on the correct way
-> to handle this inter-tree dependency where we've got changes to EFI
-> code in two separate trees and Shannon wants to write patches on top
-> of both.
+> it now looks like this:
 > 
-> I'm guessing the best solution is to merge xen/linux-next and efi/next
-> into a topic branch either in the EFI tree or Xen tree, but I want to
-> be cautious of the branch history that will create.
+> [    2.669879] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc3-00026-g38a1ce6-dirty #76
+> [    2.677973] Hardware name: STi SoC with Flattened Device Tree
+> [    2.683723] [<c0310490>] (unwind_backtrace) from [<c030bb54>] (show_stack+0x10/0x14)
+> [    2.691472] [<c030bb54>] (show_stack) from [<c058bc0c>] (dump_stack+0x98/0xac)
+> [snip]
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/mach-sti/board-dt.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I am OK with that. You and I will have to be careful with the pull
-requests.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
+> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+> index ae10fb2..cfee0ef 100644
+> --- a/arch/arm/mach-sti/board-dt.c
+> +++ b/arch/arm/mach-sti/board-dt.c
+> @@ -23,7 +23,7 @@ static const char *const stih41x_dt_match[] __initconst = {
+>  	NULL
+>  };
+>  
+> -DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
+> +DT_MACHINE_START(STM, "STi SoC with Flattened Device Tree")
+>  	.dt_compat	= stih41x_dt_match,
+>  	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
+>  			  L310_AUX_CTRL_DATA_PREFETCH |
 
-> (In hindsight all of these change should have probably gone via the
-> EFI tree.)
-
-That is still possible if deemed best. 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
