@@ -1,99 +1,129 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Thu, 12 May 2016 11:03:16 -0700
-Subject: [PATCH 1/2] Revert "clk: rockchip: reset init state before mmc card
- initialization"
-Message-ID: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 12 May 2016 21:03:42 +0300
+Subject: [PATCH v2] arm64: fix current_thread_info()->addr_limit setup
+In-Reply-To: <20160512172203.GL11226@e104818-lin.cambridge.arm.com>
+References: <1463069163-374-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512172203.GL11226@e104818-lin.cambridge.arm.com>
+Message-ID: <20160512175154.GA13383@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 7a03fe6f48f3 ("clk: rockchip: reset init state
-before mmc card initialization").
+On Thu, May 12, 2016 at 06:22:03PM +0100, Catalin Marinas wrote:
+> On Thu, May 12, 2016 at 07:06:03PM +0300, Yury Norov wrote:
+> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> > index 24ed037..fda75ce 100644
+> > --- a/arch/arm64/include/asm/elf.h
+> > +++ b/arch/arm64/include/asm/elf.h
+> > @@ -138,7 +138,10 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+> >   */
+> >  #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
+> >  
+> > -#define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
+> > +#define SET_PERSONALITY(ex) do {					\
+> > +	clear_thread_flag(TIF_32BIT);					\
+> > +	set_fs(TASK_SIZE_64);						\
+> > +} while (0)
+> >  
+> >  #define ARCH_DLINFO							\
+> >  do {									\
+> > @@ -181,7 +184,11 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+> >  					 ((x)->e_flags & EF_ARM_EABI_MASK))
+> >  
+> >  #define compat_start_thread		compat_start_thread
+> > -#define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
+> > +#define COMPAT_SET_PERSONALITY(ex) do {					\
+> > +	set_thread_flag(TIF_32BIT);					\
+> > +	set_fs(TASK_SIZE_32);						\
+> > +} while (0)
+> > +
+> >  #define COMPAT_ARCH_DLINFO
+> >  extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
+> >  				      int uses_interp);
+> > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > index 0685d74..5b269e6 100644
+> > --- a/arch/arm64/include/asm/uaccess.h
+> > +++ b/arch/arm64/include/asm/uaccess.h
+> > @@ -60,7 +60,7 @@ extern int fixup_exception(struct pt_regs *regs);
+> >  #define KERNEL_DS	(-1UL)
+> >  #define get_ds()	(KERNEL_DS)
+> >  
+> > -#define USER_DS		TASK_SIZE_64
+> > +#define USER_DS		TASK_SIZE
+> 
+> We can avoid the USER_DS change as long as SET_PERSONALITY updates the
+> thread's addr_limit. There are very few explicit set_fs(USER_DS) calls
+> and they are on the thread exit path (or exec).
+> 
+> That's unless we try to make a generic set_fs(USER_DS) addition to
+> something like setup_new_exec() and we wouldn't need the SET_PERSONALITY
+> changes:
+> 
 
-Though not totally obvious from the commit message nor from the source
-code, that commit appears to be trying to reset the "_drv" MMC clocks to
-90 degrees (note that the "_sample" MMC clocks have a shift of 0 so are
-not touched).
+I think we'd better leave it fixed. Just because it's correct. Now it
+looks like we have fixed early usages (before SET_PERSONALITY()) of
+set_fs() explicitly, and normal usages (and possible in future) by
+fixing USER_DS.
 
-The major problem here is that it doesn't properly reset things.  The
-phase is a two bit field and the commit only touches one of the two
-bits.  Thus the commit had the following affect:
-- phase   0  => phase  90
-- phase  90  => phase  90
-- phase 180  => phase 270
-- phase 270  => phase 270
+> diff --git a/fs/exec.c b/fs/exec.c
+> index c4010b8207a1..54cc537f5986 100644
+> --- a/fs/exec.c
+> +++ b/fs/exec.c
+> @@ -1226,6 +1226,9 @@ EXPORT_SYMBOL(would_dump);
+>  
+>  void setup_new_exec(struct linux_binprm * bprm)
+>  {
+> +	/* set the address limit for the new executable */
+> +	set_fs(USER_DS);
+> +
+>  	arch_pick_mmap_layout(current->mm);
+>  
+>  	/* This is the point of no return */
+> 
+> >  #define get_fs()	(current_thread_info()->addr_limit)
+> >  
+> >  static inline void set_fs(mm_segment_t fs)
+> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > index 8062482..2b25930 100644
+> > --- a/arch/arm64/kernel/process.c
+> > +++ b/arch/arm64/kernel/process.c
+> > @@ -211,17 +211,13 @@ static void tls_thread_flush(void)
+> >  {
+> >  	asm ("msr tpidr_el0, xzr");
+> >  
+> > -	if (is_compat_task()) {
+> > -		current->thread.tp_value = 0;
+> > -
+> > -		/*
+> > -		 * We need to ensure ordering between the shadow state and the
+> > -		 * hardware state, so that we don't corrupt the hardware state
+> > -		 * with a stale shadow state during context switch.
+> > -		 */
+> > -		barrier();
+> > -		asm ("msr tpidrro_el0, xzr");
+> > -	}
+> > +	/*
+> > +	 * We need to ensure ordering between the shadow state and the
+> > +	 * hardware state, so that we don't corrupt the hardware state
+> > +	 * with a stale shadow state during context switch.
+> > +	 */
+> > +	barrier();
+> > +	asm ("msr tpidrro_el0, xzr");
+> >  }
+> 
+> Why did you dropped tp_value initialisation? Context switching on native
+> 64-bit tasks rely on copying the tpidr_el0 in and out of tp_value.
+> However, compat tasks use the read-only tpidrro_el0 register set
+> explicitly via a system call. Until this call happens, the TLS register
+> would contain some garbage after the thread has been switched back in.
+> 
 
-Things get even weirder if you happen to have a bootloader that was
-actually using delay elements (should be no reason to, but you never
-know), since those are additional bits that weren't touched by the
-original patch.
+OOPS, my fault. I just missed a line. Should I send v3, or you or Arnd
+can apply it and fix in your branch?
 
-This is unlikely to be what we actually want.  Checking on rk3288-veyron
-devices, I can see that the bootloader leaves these clocks as:
-- emmc:  phase 180
-- sdmmc: phase 90
-- sdio0: phase 90
-
-Thus on rk3288-veyron devices the commit we're reverting had the effect
-of changing the eMMC clock to phase 270.  This probably explains the
-scattered reports I've heard of eMMC devices not working on some veyron
-devices when using the upstream kernel.
-
-The original commit was presumably made because previously the kernel
-didn't touch the "_drv" phase at all and relied on whatever value was
-there when the kernel started.  If someone was using a bootloader that
-touched the "_drv" phase then, indeed, we should have code in the kernel
-to fix that.  ...and also, to get ideal timings, we should also have the
-kernel change the phase depending on the speed mode.  In fact, that's
-the subject of a recent patch I posted at
-<https://patchwork.kernel.org/patch/9075141/>.
-
-Ideally, we should take both the patch posted to dw_mmc and this
-revert.  Since those will likely go through different trees, here I
-describe behavior with the combos:
-
-1. Just this revert: likely will fix rk3288-veyron eMMC on some devices
-   + other cases; might break someone with a strange bootloader that
-   sets the phase to 0 or one that uses delay elements (pretty
-   unpredicable what would happen in that case).
-2. Just dw_mmc patch: fixes everyone.  Effectly the dw_mmc patch will
-   totally override the broken patch and fix everything.
-3. Both patches: fixes everyone.  Once dw_mmc is initting properly then
-   any defaults from the clock code doesn't mattery.
-
-Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card initialization")
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
- drivers/clk/rockchip/clk-mmc-phase.c | 11 -----------
- 1 file changed, 11 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-index bc856f21f6b2..5b18265c2306 100644
---- a/drivers/clk/rockchip/clk-mmc-phase.c
-+++ b/drivers/clk/rockchip/clk-mmc-phase.c
-@@ -41,8 +41,6 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw *hw,
- #define ROCKCHIP_MMC_DEGREE_MASK 0x3
- #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
- #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
--#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
--#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
- 
- #define PSECS_PER_SEC 1000000000000LL
- 
-@@ -162,15 +160,6 @@ struct clk *rockchip_clk_register_mmc(const char *name,
- 	mmc_clock->reg = reg;
- 	mmc_clock->shift = shift;
- 
--	/*
--	 * Assert init_state to soft reset the CLKGEN
--	 * for mmc tuning phase and degree
--	 */
--	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
--		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
--				     ROCKCHIP_MMC_INIT_STATE_RESET,
--				     mmc_clock->shift), mmc_clock->reg);
--
- 	clk = clk_register(NULL, &mmc_clock->hw);
- 	if (IS_ERR(clk))
- 		kfree(mmc_clock);
--- 
-2.8.0.rc3.226.g39d4020
+> -- 
+> Catalin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
