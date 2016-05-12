@@ -1,97 +1,54 @@
-From: hongbo.zhang@nxp.com (Hongbo Zhang)
-Date: Thu, 12 May 2016 09:42:29 +0000
-Subject: [PSCI DISCUSS] How to implement standby and suspend-to-ram by PSCI
-References: <DB3PR04MB0812DAA98F71C30E8A8832E3847D0@DB3PR04MB0812.eurprd04.prod.outlook.com>
- <572C9BF2.9010004@arm.com>
-Message-ID: <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 12 May 2016 15:13:47 +0530
+Subject: [RESEND PATCH v4 2/3] Documentation: DT: vdma: Add clock support for
+ dmas
+In-Reply-To: <1463046228-21651-1-git-send-email-appanad@xilinx.com>
+References: <1463046228-21651-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1463046228-21651-3-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+This patch updates the binding doc with clock description
+for AXI DMA's.
 
-On 2016?05?06? 21:28, Sudeep Holla wrote:
-> Hi Hongbo,
->
-> On 06/05/16 11:11, Hongbo Zhang wrote:
->> Hi Guys,
->> We know in the legacy kernel suspend codes, a typical suspend_ops->enter
->> callback is like this:
->>
->
-> [...]
->
->>
->> That means we implement standby and suspend-to-ram in one callback, and
->> these two state can be identified by an input parameter 'state'.
->>
->> While now PSCI is used for ARM to implement cores operations and power
->> management, for the above suspend_ops->enter we choose SYSTEM_SUSPEND
->> function, and this function is defined for suspend-to-ram, then here
->> comes the problem:
->>
->> How can we implement the standby state following the PSCI framework?
->>
->
-> Jisheng Zhang raised similar question few months back and we had a
-> discussion. Please have a look at the thread [1]
->
-I looked through that discussion, it seems better I continue to reply 
-there but I didn't book that mailing list, so I add linux-arm-kernel 
-list and Jisheng here.
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt        | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
->> I couldn't find other PSCI function which fits for standby well.
->> In the spec there isn't such a 'state' parameter passed for
->> SYSTEM_SUSPEND (only entry_point_address and context_id), can we change
->> the spec a bit, e.g. using one more register to pass another 'state'
->> parameter? is that acceptable? (similar like CPU_SUSPEND then)
->>
->
-> Since the standby state is not well defined on ARM systems, it's hard to
-> define the conditions like system suspend and hence difficult to
-> generalize in the spec. I think suspend-to-idle should suffice in your
-> case. Anyways its better to get more information on the definition of
-> standby on your platform.
->
-
-On our platform we have some shallow states which maps to cpuidle well, 
-and we have two more deeper states:
-
-Sleep state:
-All cores are in WFI state,
-Core cluster is in standby state, e.g. L2 cache is flushed then stops 
-snooping,
-Only those modules which are required to wake up the device still have a 
-running clock, other device modules in chip are clock gated.
-
-Deep sleep state:
-ARM cores and DDR controller are switched off,
-DDR is in self-refresh mode,
-VDD power to off domain IPs are removed, Only the blocks needed to 
-detect wake up and sequence the chip out of deep sleep are on.
-
-For the two states, except for the wake-up devices, all the other device 
-dirver's suspend callback needs to be called because those devices will 
-be clock or power gated off. So, the kernel suspend process (freeze 
-tasks, suspend devices etc) are needed for our sleep and deep sleep states.
-In fact we've already implemented these two stated by legacy way, e.g. 
-mapping sleep state to STANDBY and deep sleep to MEM, both states are 
-implemented in one traditional .enter callback and can be indexed by a 
-'state' parameter.
-
-While transferring to PSCI, we met the problem I mentioned.
-
-As to the freeze(suspend-to-idle), it is described as "a generic, pure 
-software, light-weight, system sleep state" in the Document, and the 
-fact is only acpi is using it, what's more, I don't think it satisfy us 
-well, because the freeze_enter() is executed before 
-disable_nonboot_cpus() and syscore_suspend(), while the later two are 
-necessary for us.
-
-So it seems another 'state' parameter for SYSTEM_SUSPEND can settle this 
-problem, but it is lack in the spec.
-
-There are diverse kinds of ARM SOC, and divers kind of peripheral 
-devices in each SOC, so even for the SYSTEM_SUSPEND, there may be 
-different states too(deeper or shallower states of each device, more or 
-less of devices are put to idle), the more the PSCI spec supports, the 
-better.
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+index fcc2b65..a1f2683 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -21,6 +21,18 @@ Required properties:
+ - dma-channel child node: Should have at least one channel and can have up to
+ 	two channels per device. This node specifies the properties of each
+ 	DMA channel (see child node properties below).
++- clocks: Input clock specifier. Refer to common clock bindings.
++- clock-names: List of input clocks
++	For VDMA:
++	Required elements: "s_axi_lite_aclk"
++	Optional elements: "m_axi_mm2s_aclk" "m_axi_s2mm_aclk",
++			   "m_axis_mm2s_aclk", "s_axis_s2mm_aclk"
++	For CDMA:
++	Required elements: "s_axi_lite_aclk", "m_axi_aclk"
++	FOR AXIDMA:
++	Required elements: "s_axi_lite_aclk"
++	Optional elements: "m_axi_mm2s_aclk", "m_axi_s2mm_aclk",
++			   "m_axi_sg_aclk"
+ 
+ Required properties for VDMA:
+ - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
+@@ -60,6 +72,9 @@ axi_vdma_0: axivdma at 40030000 {
+ 	xlnx,num-fstores = <0x8>;
+ 	xlnx,flush-fsync = <0x1>;
+ 	xlnx,addrwidth = <0x20>;
++	clocks = <&clk 0>, <&clk 1>, <&clk 2>, <&clk 3>, <&clk 4>;
++	clock-names = "s_axi_lite_aclk", "m_axi_mm2s_aclk", "m_axi_s2mm_aclk",
++		      "m_axis_mm2s_aclk", "s_axis_s2mm_aclk";
+ 	dma-channel at 40030000 {
+ 		compatible = "xlnx,axi-vdma-mm2s-channel";
+ 		interrupts = < 0 54 4 >;
+-- 
+2.1.1
