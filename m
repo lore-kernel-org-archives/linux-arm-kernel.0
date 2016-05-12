@@ -1,112 +1,74 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Thu, 12 May 2016 20:49:24 +0800
-Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <2733875.IzutTZKHMc@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <4989778.Fs81NJurjH@wuerfel>
- <20160512091758.GB11226@e104818-lin.cambridge.arm.com>
- <2733875.IzutTZKHMc@wuerfel>
-Message-ID: <57347BD4.8010105@huawei.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 12 May 2016 14:52:59 +0200
+Subject: [RFC 0/9] IOMMU probe deferral support
+In-Reply-To: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <f192d4a0-9e13-4ae2-d3da-058e2e092634@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On 2016/5/12 17:21, Arnd Bergmann wrote:
-> On Thursday 12 May 2016 10:17:58 Catalin Marinas wrote:
->> On Wed, May 11, 2016 at 09:30:07PM +0200, Arnd Bergmann wrote:
->>> On Wednesday 11 May 2016 17:59:01 Catalin Marinas wrote:
->>>
->>> I don't think the shifts are a problem, the main downside would be
->>> the limit to 44 bits of file offsets (16TB files), but it's also
->>> unclear if that is a practical problem at all. If it is, we run
->>> into the same problem on all other 32-bit architectures too.
->>
->> I hope people are seriously thinking of moving to an LP64 ABI if they
->> have such large file offset needs.
+
+On 2016-04-25 17:58, Sricharan R wrote:
+> This is mostly a repost of the probe deferral series from
+> Laurent Pinchart [1]. Added a check to fix boot with ACPI.
+> Adapted arm-smmu driver to work with deferred probing and added
+> a new api for the below reason. This is based on the generic iommu binding
+> series from Robin Murphy <robin.murphy@arm.com>.
+
+Thanks for this patchset. I'm working on some serious rework in exynos power
+domains and clocks support code and it turned out that I need this feature
+to resolve probing order. It works fine on my internal tree, where some
+iommu controllers cannot get their clocks early enough.
+
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> Now associating a group with an master has become mandatory and happens
+> when the master is added to the bus using BUS_ADD_DEVICE from iommu core.
+> But the iommu has to be ready before this using early iommu registration
+> and also master should have been added to the iommu using xlate. So, when
+> trying to get rid of the early registration and using late probing for iommu
+> devices to sort out the probing order, the newly added api is meant to be
+> called during the late probing to add the master to the iommu. add_iommu_group
+> could be modified to do the same though.
 >
-> Good point. 44 bits of file size is certainly enough for mmap()
-> on a 32-bit task: you would only be able to map a very small fraction
-> of the file anyway, and if you want to map larger files, and should
-> move to 64-bit tasks long before this becomes a limitation.
-Hi,
-
-I apply the following patch in order to make use of the REAL mmmap2. LTP
-test pass in litle endian. mmap16 successful with segfault in big endian.
-
-BTW, I saw the similar code in tile, mips, microblaze and s390 compat. Should
-we merge these code into a common syscall wrapper?
-
-kernel:
-diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-index d85fe94..2cd72eb 100644
---- a/arch/arm64/kernel/sys_ilp32.c
-+++ b/arch/arm64/kernel/sys_ilp32.c
-@@ -41,7 +41,16 @@
-  #define compat_sys_sync_file_range     sys_sync_file_range
-  #define compat_sys_truncate64          sys_truncate
-  #define sys_llseek                     sys_lseek
--#define sys_mmap2                     sys_mmap
-+
-+SYSCALL_DEFINE6(mmap2, unsigned long, addr, unsigned long, len,
-+       unsigned long, prot, unsigned long, flags, unsigned long, fd,
-+       unsigned long, pgoff)
-+{
-+       if (pgoff & (~PAGE_MASK >> 12))
-+               return -EINVAL;
-+
-+       return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> (PAGE_SHIFT-12));
-+}
-
-  asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
-  #define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
-
-glibc:
-diff --git a/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap.c b/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap.c
-index e69de29..f75e251 100644
---- a/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap.c
-+++ b/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap.c
-@@ -0,0 +1,2 @@
-+#include <sysdeps/unix/sysv/linux/generic/wordsize-32/mmap.c>
-+
-diff --git a/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c b/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c
-index c6c7f1d..6f1a141 100644
---- a/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c
-+++ b/sysdeps/unix/sysv/linux/aarch64/ilp32/mmap64.c
-@@ -1,29 +1 @@
--#include <errno.h>
--#include <unistd.h>
--#include <sys/mman.h>
--#include <string.h>
--
--#include <sysdep.h>
--#include <sys/syscall.h>
--
--/* mmap is provided by mmap as they are the same. */
--void *__mmap (void *__addr, size_t __len, int __prot,
--                    int __flags, int __fd, __off_t __offset)
--{
--   void *result;
--   result = (void *) INLINE_SYSCALL (mmap2, 6, __addr, __len, __prot, __flags,
--   return result;
--}
--/* mmap64 is provided by mmap as they are the same. */
--void *__mmap64 (void *__addr, size_t __len, int __prot,
--                    int __flags, int __fd, __off64_t __offset)
--{
--   void *result;
--   result = (void *)
--     INLINE_SYSCALL (mmap2, 6, __addr,
--                     __len, __prot, __flags, __fd, __offset);
--   return result;
--}
--weak_alias (__mmap, mmap)
--weak_alias (__mmap64, mmap64)
-+#include <sysdeps/unix/sysv/linux/mmap64.c>
-
-Regards
-
-Bamvor
-> 	Arnd
+> The one issue here is the DRIVER_BIND notifier from iommu core
+> might be called at a wrong point since the addition of a group to the device
+> happens after this.
 >
+> Will be good to know the right direction to proceed on this fully.
+>
+> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
+>
+> Laurent Pinchart (6):
+>    arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
+>    of: dma: Move range size workaround to of_dma_get_range()
+>    of: dma: Make of_dma_deconfigure() public
+>    of: dma: Split of_configure_dma() into mask and ops configuration
+>    drivers: platform: Configure dma operations at probe time
+>    iommu: of: Handle IOMMU lookup failure with deferred probing or error
+>
+> Sricharan R (3):
+>    drivers: iommu: Add a new add device api
+>    drivers: of: call iommu_bus_add_dev after iommu_configure_ops
+>    drivers: iommu: arm-smmu: Set iommu_ops in probe
+>
+>   arch/arm/mm/dma-mapping.c |  9 ++++++
+>   drivers/base/platform.c   | 13 ++++++++
+>   drivers/iommu/arm-smmu.c  | 34 ++------------------
+>   drivers/iommu/iommu.c     | 12 +++++++
+>   drivers/iommu/of_iommu.c  | 16 ++++++++--
+>   drivers/of/address.c      | 20 ++++++++++--
+>   drivers/of/device.c       | 81 +++++++++++++++++++++++++++++++----------------
+>   drivers/of/platform.c     | 16 ++++------
+>   drivers/pci/probe.c       |  3 +-
+>   include/linux/iommu.h     |  1 +
+>   include/linux/of_device.h | 14 ++++++--
+>   11 files changed, 141 insertions(+), 78 deletions(-)
+>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
