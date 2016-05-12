@@ -1,295 +1,106 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 May 2016 15:48:44 +0200
-Subject: [PATCH v3 13/55] KVM: arm/arm64: vgic-new: Add data structure
- definitions
-In-Reply-To: <57348443.3090906@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-14-git-send-email-andre.przywara@arm.com>
- <20160512121258.GG27623@cbox> <57348443.3090906@arm.com>
-Message-ID: <20160512134844.GB5878@cbox>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 May 2016 21:49:05 +0800
+Subject: [RFC] Reset pins of phys and their representation in a device tree
+In-Reply-To: <CABxcv==YQshEvUw2a91nqjqrT3JU52Yzy4RbcWiTS-nWMf2m=Q@mail.gmail.com>
+References: <20160512071542.GC30822@pengutronix.de>
+ <e75ab3a0-da5e-fef1-d5e1-65c37e7714eb@cogentembedded.com>
+ <CABxcv==YQshEvUw2a91nqjqrT3JU52Yzy4RbcWiTS-nWMf2m=Q@mail.gmail.com>
+Message-ID: <CAGb2v64=iEA4VS3r4-ctVR6OKu_rRbiZytDtuQJ_LDr8JPq0Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 02:25:23PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> On 12/05/16 13:12, Christoffer Dall wrote:
-> > On Fri, May 06, 2016 at 11:45:26AM +0100, Andre Przywara wrote:
-> >> From: Christoffer Dall <christoffer.dall@linaro.org>
-> >>
-> >> Add a new header file for the new and improved GIC implementation.
-> >> The big change is that we now have a struct vgic_irq per IRQ instead
-> >> of spreading all the information over various bitmaps.
-> >>
-> >> We include this new header conditionally from within the old header
-> >> file for the time being to avoid touching all the users.
-> >>
-> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >> Changes RFC .. v1:
-> >> - adapt to 4.6-rc (adding live_lrs member)
-> >> - elaborate on ap_list usage
-> >>
-> >> Changes v1 .. v2:
-> >> - change data type of dist->enabled to bool
-> >>
-> >>  include/kvm/arm_vgic.h  |   5 ++
-> >>  include/kvm/vgic/vgic.h | 201 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 206 insertions(+)
-> >>  create mode 100644 include/kvm/vgic/vgic.h
-> >>
-> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> index c14ff77..d406f8e 100644
-> >> --- a/include/kvm/arm_vgic.h
-> >> +++ b/include/kvm/arm_vgic.h
-> >> @@ -19,6 +19,10 @@
-> >>  #ifndef __ASM_ARM_KVM_VGIC_H
-> >>  #define __ASM_ARM_KVM_VGIC_H
-> >>  
-> >> +#ifdef CONFIG_KVM_NEW_VGIC
-> >> +#include <kvm/vgic/vgic.h>
-> >> +#else
-> >> +
-> >>  #include <linux/kernel.h>
-> >>  #include <linux/kvm.h>
-> >>  #include <linux/irqreturn.h>
-> >> @@ -366,4 +370,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
-> >>  }
-> >>  #endif
-> >>  
-> >> +#endif	/* old VGIC include */
-> >>  #endif
-> >> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> >> new file mode 100644
-> >> index 0000000..39933ee
-> >> --- /dev/null
-> >> +++ b/include/kvm/vgic/vgic.h
-> >> @@ -0,0 +1,201 @@
-> >> +/*
-> >> + * Copyright (C) 2015, 2016 ARM Ltd.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
-> >> +#define __ASM_ARM_KVM_VGIC_VGIC_H
-> >> +
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/kvm.h>
-> >> +#include <linux/irqreturn.h>
-> >> +#include <linux/spinlock.h>
-> >> +#include <linux/types.h>
-> >> +#include <kvm/iodev.h>
-> >> +
-> >> +#define VGIC_V3_MAX_CPUS	255
-> >> +#define VGIC_V2_MAX_CPUS	8
-> >> +#define VGIC_NR_IRQS_LEGACY     256
-> >> +#define VGIC_NR_SGIS		16
-> >> +#define VGIC_NR_PPIS		16
-> >> +#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
-> >> +#define VGIC_MAX_PRIVATE	(VGIC_NR_PRIVATE_IRQS - 1)
-> >> +#define VGIC_MAX_SPI		1019
-> >> +#define VGIC_MAX_RESERVED	1023
-> >> +#define VGIC_MIN_LPI		8192
-> >> +
-> >> +enum vgic_type {
-> >> +	VGIC_V2,		/* Good ol' GICv2 */
-> >> +	VGIC_V3,		/* New fancy GICv3 */
-> >> +};
-> >> +
-> >> +/* same for all guests, as depending only on the _host's_ GIC model */
-> >> +struct vgic_global {
-> >> +	/* type of the host GIC */
-> >> +	enum vgic_type		type;
-> >> +
-> >> +	/* Physical address of vgic virtual cpu interface */
-> >> +	phys_addr_t		vcpu_base;
-> >> +
-> >> +	/* virtual control interface mapping */
-> >> +	void __iomem		*vctrl_base;
-> >> +
-> >> +	/* Number of implemented list registers */
-> >> +	int			nr_lr;
-> >> +
-> >> +	/* Maintenance IRQ number */
-> > 
-> > nit: this is the physial INTID, right?
-> > 
-> >> +	unsigned int		maint_irq;
-> >> +
-> >> +	/* maximum number of VCPUs allowed (GICv2 limits us to 8) */
-> >> +	int			max_gic_vcpus;
-> >> +
-> >> +	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
-> >> +	bool			can_emulate_gicv2;
-> >> +};
-> >> +
-> >> +extern struct vgic_global kvm_vgic_global_state;
-> >> +
-> >> +#define VGIC_V2_MAX_LRS		(1 << 6)
-> >> +#define VGIC_V3_MAX_LRS		16
-> >> +#define VGIC_V3_LR_INDEX(lr)	(VGIC_V3_MAX_LRS - 1 - lr)
-> >> +
-> >> +enum vgic_irq_config {
-> >> +	VGIC_CONFIG_EDGE = 0,
-> >> +	VGIC_CONFIG_LEVEL
-> >> +};
-> >> +
-> >> +struct vgic_irq {
-> >> +	spinlock_t irq_lock;		/* Protects the content of the struct */
-> >> +	struct list_head ap_list;
-> >> +
-> >> +	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
-> >> +					 * SPIs and LPIs: The VCPU whose ap_list
-> >> +					 * on which this is queued.
-> > 
-> > nit: s/on which this is queued/this is queued on/
-> > 
-> >> +					 */
-> >> +
-> >> +	struct kvm_vcpu *target_vcpu;	/* The VCPU that this interrupt should
-> >> +					 * be send to, as a result of the
-> > 
-> > nit: s/send/sent/
-> 
-> Both fixed.
-> 
-> >> +					 * targets reg (v2) or the
-> >> +					 * affinity reg (v3).
-> >> +					 */
-> >> +
-> >> +	u32 intid;			/* Guest visible INTID */
-> >> +	bool pending;
-> >> +	bool line_level;		/* Level only */
-> >> +	bool soft_pending;		/* Level only */
-> >> +	bool active;			/* not used for LPIs */
-> >> +	bool enabled;
-> >> +	bool hw;			/* Tied to HW IRQ */
-> >> +	u32 hwintid;			/* HW INTID number */
-> >> +	union {
-> >> +		u8 targets;			/* GICv2 target VCPUs mask */
-> >> +		u32 mpidr;			/* GICv3 target VCPU */
-> >> +	};
-> >> +	u8 source;			/* GICv2 SGIs only */
-> >> +	u8 priority;
-> >> +	enum vgic_irq_config config;	/* Level or edge */
-> >> +};
-> >> +
-> >> +struct vgic_dist {
-> >> +	bool			in_kernel;
-> >> +	bool			ready;
-> >> +
-> >> +	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-> >> +	u32			vgic_model;
-> >> +
-> >> +	int			nr_spis;
-> >> +
-> >> +	/* TODO: Consider moving to global state */
-> >> +	/* Virtual control interface mapping */
-> >> +	void __iomem		*vctrl_base;
-> >> +
-> >> +	/* base addresses in guest physical address space: */
-> >> +	gpa_t			vgic_dist_base;		/* distributor */
-> >> +	union {
-> >> +		/* either a GICv2 CPU interface */
-> >> +		gpa_t			vgic_cpu_base;
-> >> +		/* or a number of GICv3 redistributor regions */
-> >> +		gpa_t			vgic_redist_base;
-> >> +	};
-> >> +
-> >> +	/* distributor enabled */
-> >> +	bool			enabled;
-> >> +
-> >> +	struct vgic_irq		*spis;
-> >> +};
-> >> +
-> >> +struct vgic_v2_cpu_if {
-> >> +	u32		vgic_hcr;
-> >> +	u32		vgic_vmcr;
-> >> +	u32		vgic_misr;	/* Saved only */
-> >> +	u64		vgic_eisr;	/* Saved only */
-> >> +	u64		vgic_elrsr;	/* Saved only */
-> >> +	u32		vgic_apr;
-> >> +	u32		vgic_lr[VGIC_V2_MAX_LRS];
-> >> +};
-> >> +
-> >> +struct vgic_v3_cpu_if {
-> >> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> >> +	u32		vgic_hcr;
-> >> +	u32		vgic_vmcr;
-> >> +	u32		vgic_sre;	/* Restored only, change ignored */
-> >> +	u32		vgic_misr;	/* Saved only */
-> >> +	u32		vgic_eisr;	/* Saved only */
-> >> +	u32		vgic_elrsr;	/* Saved only */
-> >> +	u32		vgic_ap0r[4];
-> >> +	u32		vgic_ap1r[4];
-> >> +	u64		vgic_lr[VGIC_V3_MAX_LRS];
-> >> +#endif
-> >> +};
-> >> +
-> >> +struct vgic_cpu {
-> >> +	/* CPU vif control registers for world switch */
-> >> +	union {
-> >> +		struct vgic_v2_cpu_if	vgic_v2;
-> >> +		struct vgic_v3_cpu_if	vgic_v3;
-> >> +	};
-> >> +
-> >> +	unsigned int used_lrs;
-> >> +	struct vgic_irq private_irqs[VGIC_NR_PRIVATE_IRQS];
-> >> +
-> >> +	spinlock_t ap_list_lock;	/* Protects the ap_list */
-> >> +
-> >> +	/*
-> >> +	 * List of IRQs that this VCPU should consider because they are either
-> >> +	 * Active or Pending (hence the name; AP list), or because they recently
-> >> +	 * were one of the two and need to be migrated off this list to another
-> >> +	 * VCPU.
-> >> +	 */
-> >> +	struct list_head ap_list_head;
-> >> +
-> >> +	u64 live_lrs;
-> >> +};
-> >> +
-> >> +#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-> >> +#define vgic_initialized(k)	(false)
-> >> +#define vgic_ready(k)		((k)->arch.vgic.ready)
-> >> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
-> >> +			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
-> > 
-> > this should really be a static inline at this point.
-> 
-> I think I tried this at the very beginning and it doesn't work. I get:
-> 
-> In file included from include/kvm/arm_vgic.h:23:0,
->                  from arch/arm64/include/asm/kvm_host.h:39,
->                  from include/linux/kvm_host.h:36,
->                  from arch/arm64/kernel/asm-offsets.c:24:
-> include/kvm/vgic/vgic.h: In function 'vgic_valid_spi':
-> include/kvm/vgic/vgic.h:232:13: error: dereferencing pointer to
-> incomplete type 'struct kvm'
->    (irq < kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS);
->              ^
-> ./Kbuild:80: recipe for target 'arch/arm64/kernel/asm-offsets.s' failed
-> make[3]: *** [arch/arm64/kernel/asm-offsets.s] Error 1
-> 
-> Is this because asm-offsets.s includes this file and struct kvm is
-> opaque at this point?
+Hi,
 
-Probably, but in this case, never mind, we can rework that another time.
+On Thu, May 12, 2016 at 9:40 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> [adding Krzysztof as cc]
+>
+> On Thu, May 12, 2016 at 8:25 AM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+>> Hello.
+>>
+>>
+>> On 5/12/2016 10:15 AM, Uwe Kleine-K?nig wrote:
+>>
+>>> I have a machine here where the reset pin of the phy is connected to a
+>>> GPIO.
+>>>
+>>> There are different possibilities available today to handle this
+>>> situation, here are the ones I'm aware of:
+>>>
+>>>  - Use a gpio-hog to set the reset gpio to non-active
+>>>    This might result in dependency problems (and that's what I am
+>>>    currently faced with) because there is no connection in the device
+>>>    tree between the hog and the phy.
+>>>
+>>>  - [Documentation/devicetree/bindings/net/fsl-fec.txt]
+>>>    The fec node supports properties
+>>>
+>>>         phy-reset-gpios = <&gpio2 14 0>;
+>>>         phy-reset-duration = <200> /* milliseconds */;
+>>>
+>>>    Something similar exists in TI's vendor kernel
+>>>
+>>> (http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/17d192b999ee904ced223c16cef76111a51c461b)
+>>>    with different (and IMHO bader) naming.
+>>>    This is the wrong place to specify the gpios; they shouldn't be in the
+>>>    mac's node, but in a phy node instead.
+>>>
+>>> So what I actually want is to put the gpio specification in the right
+>>> place and let it look as follows:
+>>>
+>>>         mymdiobus {
+>>>                 [...]
+>>>                 myfirstphy: ethernet-phy at 0 {
+>>>                         compatible = "ethernet-phy-ieee802.3-c22";
+>>>                         reg = <0>;
+>>>
+>>>                         reset-gpios = <&gpio2 14 0>;
+>>>                         reset-duration-ms = <200>;
+>>>                 };
+>>>
+>>>                 mysecondphy: ethernet-phy at 2 {
+>>>                         compatible = "ethernet-phy-ieee802.3-c22";
+>>>                         reg = <2>;
+>>>
+>>>                         reset-gpios = <&gpio3 10 0>;
+>>>                         reset-duration-ms = <200>;
+>>>                 };
+>>>         };
+>>>
+>>> And with this we could defer probe of &myfirstphy if &gpio2 isn't
+>>> available yet.
+>>>
+>>> Does this sound sensible? Does something like that already exist which I
+>>> missed? Any further ideas/comments?
+>>
+>>
+>> http://patchwork.ozlabs.org/patch/616495/
+>>
+>>    I'll post a new version RSN.
+>>
+>
+> This seems to be similar to what's needed by MMC/SD/SDIO devices (i.e:
+> a WiFi chip) that needs some power sequence for reset and be
+> enumerable.
+>
+> Krzysztof has been working  to make the MMC pwrseq framework more
+> generic [0] since he wants to use it also for built-in USB devices.
+>
+> From a quick look at the patches mentioned in this thread, it seems
+> that the same framework can be used to reset the PHYs unless I'm
+> missing something. Have you considered using this? It would be good if
+> there is a consistent way to define the power sequence for devices
+> across the different subsystems.
+>
+> [0]: https://lkml.org/lkml/2016/5/5/230
 
-> Or is my brain totally GICed by now?
-> 
+You probably missed the part that Rob nacked the bindings in that
+series?
 
-Haha, I definitely feel GICed!
+Putting the reset gpios under the PHY nodes and handling it from
+phylib is probably the way to go. I'd like to ask for regulator
+and clock support as well, if possible.
 
--Christoffer
+Regards
+ChenYu
