@@ -1,60 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 12 May 2016 16:56:59 +0200 (CEST)
-Subject: [PATCH 3/4] ARM: dts: bcm2835: add the bcm2835-sdram-controller
- to the dt
-In-Reply-To: <1463056732-5607-4-git-send-email-kernel@martin.sperl.org>
-References: <1463056732-5607-1-git-send-email-kernel@martin.sperl.org>
- <1463056732-5607-4-git-send-email-kernel@martin.sperl.org>
-Message-ID: <73859954.21004.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 12 May 2016 22:59:44 +0800
+Subject: [RFC 1/3] dt-bindings: drm/mediatek: Add display binding for
+ Mediatek SoC MT2701
+In-Reply-To: <1463053795-55455-2-git-send-email-yt.shen@mediatek.com>
+References: <1463053795-55455-1-git-send-email-yt.shen@mediatek.com>
+ <1463053795-55455-2-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1463065184.17225.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2016-05-12 at 19:49 +0800, yt.shen at mediatek.com wrote:
+> From: YT Shen <yt.shen@mediatek.com>
+> 
+> Add device tree binding documentation for the display subsystem in
+> Mediatek SoC MT2701
+> 
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> ---
+>  .../bindings/display/mediatek/mediatek,disp.txt    |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> index db6e77e..53b3cc3 100644
+> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> @@ -40,6 +40,7 @@ Required properties (all function blocks):
+>  	"mediatek,<chip>-dpi"        - DPI controller, see mediatek,dpi.txt
+>  	"mediatek,<chip>-disp-mutex" - display mutex
+>  	"mediatek,<chip>-disp-od"    - overdrive
+> +	"mediatek,<chip>-disp-bls"   - backlight
+>  - reg: Physical base address and length of the function block register space
+>  - interrupts: The interrupt signal from the function block (required, except for
+>    merge and split function blocks).
+
+
 Hi,
 
-> kernel at martin.sperl.org hat am 12. Mai 2016 um 14:38 geschrieben:
-> 
-> 
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> Add the bcm2835 sdram controller to the device tree.
-> 
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> ---
->  arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-> index 8aaf193..9db9d97 100644
-> --- a/arch/arm/boot/dts/bcm283x.dtsi
-> +++ b/arch/arm/boot/dts/bcm283x.dtsi
-> @@ -22,6 +22,12 @@
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  
-> +		memory-controller at 7e002000 {
-> +			compatible = "brcm,bcm2835-sdram";
-> +			reg = <0x7e002000 0x58>, <0x7e002800 0x58>;
+This one is in conflict with "Support Mediatek Soc MT2701 disp pwm"
+series Weiqing sent last week, which add disp-bls support to display pwm
+driver.
 
-where do you get these addresses?
-
-According to register documentation [1] the adresses belong to the interrupt
-controller.
-
-Maybe 0x7ee00000 is the right address.
-
-[1] - https://github.com/hermanhermitage/videocoreiv/wiki/Register-Documentation
-
-> +			clocks = <&clocks BCM2835_CLOCK_SDRAM>;
-> +		};
-> +
->  		timer at 7e003000 {
->  			compatible = "brcm,bcm2835-system-timer";
->  			reg = <0x7e003000 0x1000>;
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Joe.C
