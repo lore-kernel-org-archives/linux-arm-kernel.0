@@ -1,114 +1,43 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 12 May 2016 14:16:46 +0800
-Subject: [PATCH 1/2] arm64: dts: NS2: Add all of the UARTs
-In-Reply-To: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
-References: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <57341FCE.6050403@huawei.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Thu, 12 May 2016 11:48:43 +0530
+Subject: [PATCH 1/2] i2c: qup: Cleared the error bits in ISR
+In-Reply-To: <20160512051347.GE8453@hector.attlocal.net>
+References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
+ <1462797871-8595-2-git-send-email-absahu@codeaurora.org>
+ <000701d1ab9d$df9b3100$9ed19300$@codeaurora.org>
+ <934365f2bd30f242d8548e2a27483679@codeaurora.org>
+ <20160512051347.GE8453@hector.attlocal.net>
+Message-ID: <20160512061843.GA6187@chewinlnx07.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/5/12 6:56, Jon Mason wrote:
-> Add all of the UARTs present on NS2 and enable them in the SVK device
-> tree file.  Also, do some magic to make sure that uart3 is discovered as
-> ttyS0 (as that is the console UART).
+On Thu, May 12, 2016 at 12:13:47AM -0500, Andy Gross wrote:
+> On Wed, May 11, 2016 at 11:04:17PM +0530, Abhishek Sahu wrote:
 > 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->  arch/arm64/boot/dts/broadcom/ns2-svk.dts | 16 ++++++++++++++++
->  arch/arm64/boot/dts/broadcom/ns2.dtsi    | 30 ++++++++++++++++++++++++++++++
->  2 files changed, 46 insertions(+)
+> <snip>
 > 
-> diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-> index 7cd3640..b062a44 100644
-> --- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-> +++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-> @@ -40,10 +40,14 @@
->  
->  	aliases {
->  		serial0 = &uart3;
-> +		serial1 = &uart0;
-> +		serial2 = &uart1;
-> +		serial3 = &uart2;
->  	};
->  
->  	chosen {
->  		stdout-path = "serial0:115200n8";
-> +		bootargs = "earlycon=uart8250,mmio32,0x66130000";
-
-Hi Jon,
-
-I submit a patch[1], with it, we can use earlycon without option to enable early console
-for "snps,dw-apb-uart", could you help me to test it, thanks.
-
-BRs,
-Kefeng
-
-
-[1] https://lkml.org/lkml/2016/5/11/34
-
->  	};
->  
->  	memory {
-> @@ -68,6 +72,18 @@
->  	status = "ok";
->  };
->  
-> +&uart0 {
-> +	status = "ok";
-> +};
-> +
-> +&uart1 {
-> +	status = "ok";
-> +};
-> +
-> +&uart2 {
-> +	status = "ok";
-> +};
-> +
->  &uart3 {
->  	status = "ok";
->  };
-> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> index 788ed8f..c77a9e8 100644
-> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> @@ -357,6 +357,36 @@
->  			status = "disabled";
->  		};
->  
-> +		uart0: serial at 66100000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x66100000 0x100>;
-> +			interrupts = <GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&iprocslow>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart1: serial at 66110000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x66110000 0x100>;
-> +			interrupts = <GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&iprocslow>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart2: serial at 66120000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x66120000 0x100>;
-> +			interrupts = <GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&iprocslow>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			status = "disabled";
-> +		};
-> +
->  		uart3: serial at 66130000 {
->  			compatible = "snps,dw-apb-uart";
->  			reg = <0x66130000 0x100>;
+> > >       In qup_i2c_xfer and qup_i2c_xfer_v2 state is set to RESET at the
+> > >end, when
+> > >       there is no error. So would it be fine if we do it there
+> > >unconditionally ?
+> > >
+> > >Regards,
+> > > Sricharan
+> > 
+> > RESET the QUP state wouldn't create any issue in the case of multiple calls.
+> > The existing code also RESET the QUP state for bus_err but it is not
+> > clearing
+> > status bits.
 > 
+> It'd be better to not reset the QUP inside the ISR at all.  I think the better
+> solution is making the reset occur in the xfer function.  So just clear the bits
+> like you should in the isr, and defer reset till later.
+
+This is a HW workaround for QUP where we need to RESET the core in
+ISR. When interrupt is level triggerd, more than one interrupt may
+fire in error cases and QUP will generate these interrupts after
+completion of current interrupt. Thus we reset the core immediately
+in the ISR to ward off the next interrupt.
+
+-- 
+Abhishek Sahu
