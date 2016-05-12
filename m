@@ -1,52 +1,103 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 12 May 2016 17:28:57 +0200
-Subject: [PATCH 0/4] add minimal bcm2835-sdram driver
-In-Reply-To: <1861597197.20753.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
-References: <1463056732-5607-1-git-send-email-kernel@martin.sperl.org>
- <1861597197.20753.36a104a6-5284-487f-b397-da7ff0407f1f.open-xchange@email.1und1.de>
-Message-ID: <B30D094A-1E5A-4777-8F2A-C3D53AF89044@martin.sperl.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 12 May 2016 18:27:21 +0300
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160512145402.GI11226@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+ <20160512134431.GB30205@yury-N73SV>
+ <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+ <20160512142016.GH11226@e104818-lin.cambridge.arm.com>
+ <20160512143415.GD30205@yury-N73SV>
+ <20160512145402.GI11226@e104818-lin.cambridge.arm.com>
+Message-ID: <20160512152721.GA31729@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 12.05.2016, at 16:50, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+On Thu, May 12, 2016 at 03:54:03PM +0100, Catalin Marinas wrote:
+> On Thu, May 12, 2016 at 05:34:15PM +0300, Yury Norov wrote:
+> > On Thu, May 12, 2016 at 03:20:16PM +0100, Catalin Marinas wrote:
+> > > On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
+> > > > On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
+> > > > > On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
+> > > > > > On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > > > > > > I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > > > > > > Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > > > > > > of vector, and kernel reports successful read/write.
+> > > > > > > 
+> > > > > > > There are 2 problems:
+> > > > > > > 1. How kernel allows such address to be passed to fs subsystem;
+> > > > > > > 2. How fs successes to read/write at non-mapped, and in fact non-user
+> > > > > > > address.
+> > > > > > > 
+> > > > > > > I don't know the answer on 2'nd question, and it might be something
+> > > > > > > generic. But I investigated first problem.
+> > > > > > > 
+> > > > > > > The problem is that compat_rw_copy_check_uvector() uses access_ok() to
+> > > > > > > validate user address, and on arm64 it ends up with checking buffer
+> > > > > > > end against current_thread_info()->addr_limit.
+> > > > > > > 
+> > > > > > > current_thread_info()->addr_limit for ilp32, and most probably for
+> > > > > > > aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
+> > > > > > > It happens because on thread creation we call flush_old_exec() to set 
+> > > > > > > addr_limit, and completely ignore compat mode there.
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > > > --- a/arch/arm64/kernel/binfmt_elf32.c
+> > > > > > > +++ b/arch/arm64/kernel/binfmt_elf32.c
+> > > > > > > @@ -12,6 +12,7 @@
+> > > > > > >  do {						\
+> > > > > > >  	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> > > > > > >  	set_thread_flag(TIF_32BIT);		\
+> > > > > > > +	set_fs(TASK_SIZE_32);			\
+> > > > > > >  } while (0)
+> > > > > > >  
+> > > > > > >  #define COMPAT_ARCH_DLINFO
+> > > > > > > diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > > > > index a934fd4..a8599c6 100644
+> > > > > > > --- a/arch/arm64/kernel/binfmt_ilp32.c
+> > > > > > > +++ b/arch/arm64/kernel/binfmt_ilp32.c
+> > > > > > > @@ -59,6 +59,7 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+> > > > > > >  do {									\
+> > > > > > >  	set_thread_flag(TIF_32BIT_AARCH64);				\
+> > > > > > >  	clear_thread_flag(TIF_32BIT);					\
+> > > > > > > +	set_fs(TASK_SIZE_32);						\
+> > > > > > >  } while (0)
+> > > > > > 
+> > > > > > I don't think we need these two. AFAICT, flush_old_exec() takes care of
+> > > > > > setting the USER_DS for the new thread.
+> > > > > 
+> > > > > That's true, but USER_DS depends on personality which is not set yet
+> > > > > for new thread, as I wrote above. In fact, I tried correct USER_DS
+> > > > > only, and it doesn't work
+> > > > 
+> > > > Ah, it looks like load_elf_binary() sets the personality after
+> > > > flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
+> > > > maximum 64-bit task value, so they should have a similar issue with
+> > > > native 32-bit vs compat behaviour.
+> > > 
+> > > I think we have another problem. flush_old_exec() calls the arm64
+> > > flush_thread() where tls_thread_flush() checks for is_compat_task(). So
+> > > starting a 32-bit application from a 64-bit one not go on the correct
+> > > path.
+> > 
+> > As per now, all native, aarch32 and ilp32 tasks can exec() any
+> > binaries they need.
 > 
-> Hi Martin,
+> And that's correct.
 > 
->> kernel at martin.sperl.org hat am 12. Mai 2016 um 14:38 geschrieben:
->> 
->> 
->> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> As the sdram clock is a critical clock to the system
->> the minimal bcm2835-sdram driver claims (and enables)
->> this clock and also exposes the corresponding sdram
->> registers via debugfs.
+> > Are you think it's wrong? If so, how we coild run
+> > first compat application (maybe shell), it there are only lp64 tasks
+> > on the system?
 > 
-> sounds like this driver should fix an clock handling issue. Unfortunately this
-> isn't a solution in case the driver is disabled.
-Unfortunately there is no way around this - the driver has
-to be enabled so that the sdram clock or the parent pll,
-which typically is plld_core, never gets disabled.
-
-The only other option would be marking the clock as critical
-for those legacy drivers.
-
-See also the discussions around the clock register for the
-sdram clock, where we have the ?normal? clock and some
-pll as well - even if the ?normal? clock is disabled, 
-then clearing the sdram register (or the parent) freezes
-the system.
-
-> 
-> Does the GPU firmware handle the SDRAM controller or is it initialized by
-> bootcode?
+> What I meant is that we rely on flush_old_exec() to initialise the TLS
+> register for the compat task but it currently depends on what the parent
+> is. I think tls_thread_flush() should actually drop the is_compat_task()
+> thread and always initialise all the TLS registers.
 > 
 
-AFAIK it is enabled in bootcode.bin and - as of now - the firmware
-updates refresh cycles when SOC temperatures change.
-FW checks every 30 seconds unless there is a key set in config.txt,
-which - supposedly - produces a slight impact every 30 seconds to
-the system.
+OK. I'll do it in v2.
 
-Martin
+> -- 
+> Catalin
