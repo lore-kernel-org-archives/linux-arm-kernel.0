@@ -1,67 +1,48 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Thu, 12 May 2016 09:14:04 +0800
-Subject: [PATCH v8 6/8] dt-bindings: i2c: rk3x: add support for rk3399
-In-Reply-To: <CAD=FV=VzL8AfzUnPYgsf_NqPgbp2_o_qJC7-DWHmekWVQ-Es=A@mail.gmail.com>
-References: <1462908252-27016-1-git-send-email-david.wu@rock-chips.com>
- <1462908647-27236-1-git-send-email-david.wu@rock-chips.com>
- <CAD=FV=VzL8AfzUnPYgsf_NqPgbp2_o_qJC7-DWHmekWVQ-Es=A@mail.gmail.com>
-Message-ID: <5733D8DC.1010603@rock-chips.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 11 May 2016 18:41:26 -0700
+Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for
+ DMA Mode
+In-Reply-To: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
+References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
+Message-ID: <20160512014126.GK3492@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On 05/10, Abhishek Sahu wrote:
+> From: Charanya <charanya@codeaurora.org>
 
-? 2016/5/12 0:35, Doug Anderson ??:
-> Hi,
->
-> On Tue, May 10, 2016 at 12:30 PM, David Wu <david.wu@rock-chips.com> wrote:
->> The bus clock and function clock are separated at rk3399,
->> and others use one clock as the bus clock and function clock.
->>
->> Signed-off-by: David Wu <david.wu@rock-chips.com>
->> Reviewed-by: Douglas Anderson <dianders@chromium.org>
->> ---
->> Change in v8:
->> - remove error description.
->>
->>   Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 16 +++++++++++++---
->>   1 file changed, 13 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
->> index 0b4a85f..5429301 100644
->> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
->> @@ -6,10 +6,20 @@ RK3xxx SoCs.
->>   Required properties :
->>
->>    - reg : Offset and length of the register set for the device
->> - - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
->> -               "rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
->> + - compatible: should be one of the following:
->> +   - "rockchip,rk3066-i2c": for rk3066
->> +   - "rockchip,rk3188-i2c": for rk3188
->> +   - "rockchip,rk3228-i2c": for rk3228
->> +   - "rockchip,rk3288-i2c": for rk3288
->> +   - "rockchip,rk3399-i2c": for rk3399
->>    - interrupts : interrupt number
->> - - clocks : parent clock
->> + - clocks: See ../clock/clock-bindings.txt
->> +   - For older hardware (rk3066, rk3188, rk3228, rk3288):
->> +     - There is one clock that's used both to derive the functional clock
->> +       for the device and as the bus clock.
->> +   - For newer hardware (rk3399): specified by name
->> +     - "i2c": REQUIRED. This is used to derive the functional clock.
->> +     - "pclk": REQUIRED. This is the bus clock.
->
-> Depending on what Rob thinks, it might make sense to remove the above
-> two "REQUIRED" bits.  That would match his earlier feedback since
-> we're still in the "Required" section and thus it is redundant.
->
+Was it intentional to only have one name here?
 
-Okay, i make a little misunderstand for that, so i will fix it in next 
-version.
+> 
+> The Data loss was happening with current QCOM MSM serial driver during
+> large file transfer due to simultaneous enabling of both UART and
+> DMA interrupt. When UART operates in DMA mode, RXLEV (Rx FIFO over
+> watermark) or RXSTALE (stale interrupts) should not be enabled,
+> since these conditions will be handled by DMA controller itself.
+> If these interrupts are enabled then normal UART ISR will read some
+> bytes of data from Rx Buffer and DMA controller will not receive
+> these bytes of data, which will cause data loss.
+> 
+> Now this patch removed the code for enabling of RXLEV and RXSTALE
+> interrupt in DMA Rx completion routine.
 
-> -Doug
->
->
->
+I'm lost, we keep both these irqs masked (well only if uartdm
+version is 1.4 or greater) pretty much the entire time we're
+using DMA for RX. msm_start_rx_dma() will mask them and then when
+the callback completes we'll unmask them (the part that's deleted
+in this patch), but then we'll go back and remask them almost
+immediately because we call msm_start_rx_dma() from the dma
+completion handler.
+
+Can you clearly describe how this is actually fixing any
+problems? What's the sequence of events that happens to cause
+corruption?
+
+This does raise the question though why we ever mask/unmask these
+interrupts if we're always going to keep them masked while doing
+DMA RX. Presumably if we can use DMA to RX, we can always use it
+and set things up properly at startup time instead of later on.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
