@@ -1,46 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 May 2016 18:16:05 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.6
-Message-ID: <2596349.2VGvIuv4pS@wuerfel>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 13 May 2016 09:23:02 -0700
+Subject: [PATCH] arm64: bpf: jit JMP_JSET_{X,K}
+In-Reply-To: <1463121478-18484-1-git-send-email-zlim.lnx@gmail.com>
+References: <1463121478-18484-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <5a03c0b4-7686-6232-9c64-c6ec0f30edae@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 44549e8f5eea4e0a41b487b63e616cb089922b99:
+On 5/12/2016 11:37 PM, Zi Shen Lim wrote:
+> Original implementation commit e54bcde3d69d ("arm64: eBPF JIT compiler")
+> had the relevant code paths, but due to an oversight always fail jiting.
+>
+> As a result, we had been falling back to BPF interpreter whenever a BPF
+> program has JMP_JSET_{X,K} instructions.
+>
+> With this fix, we confirm that the corresponding tests in lib/test_bpf
+> continue to pass, and also jited.
+>
+> ...
+> [    2.784553] test_bpf: #30 JSET jited:1 188 192 197 PASS
+> [    2.791373] test_bpf: #31 tcpdump port 22 jited:1 325 677 625 PASS
+> [    2.808800] test_bpf: #32 tcpdump complex jited:1 323 731 991 PASS
+> ...
+> [    3.190759] test_bpf: #237 JMP_JSET_K: if (0x3 & 0x2) return 1 jited:1 110 PASS
+> [    3.192524] test_bpf: #238 JMP_JSET_K: if (0x3 & 0xffffffff) return 1 jited:1 98 PASS
+> [    3.211014] test_bpf: #249 JMP_JSET_X: if (0x3 & 0x2) return 1 jited:1 120 PASS
+> [    3.212973] test_bpf: #250 JMP_JSET_X: if (0x3 & 0xffffffff) return 1 jited:1 89 PASS
+> ...
+>
+> Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
 
-  Linux 4.6-rc7 (2016-05-08 14:38:32 -0700)
+Acked-by: Yang Shi <yang.shi@linaro.org>
 
-are available in the git repository at:
+Thanks,
+Yang
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 8a934ccbf90959877beec27780469e85f1c3f101:
-
-  Merge tag 'at91-fixes2' of git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91 into fixes (2016-05-12 17:44:53 +0200)
-
-----------------------------------------------------------------
-Three more bug fixes for ARM SoCs this week:
-
-- The Atmel sama5d2 was registering the wrong NFC device type
-- On Atmel sam9x5, the power management controller had an incorrect
-  register area size
-- On ARM64 Allwinner machine was not secting the generic irqchip
-  code, causing build errors in some configurations
-
-----------------------------------------------------------------
-Arnd Bergmann (2):
-      Merge tag 'at91-fixes' of git://git.kernel.org/.../nferre/linux-at91 into fixes
-      Merge tag 'at91-fixes2' of git://git.kernel.org/.../nferre/linux-at91 into fixes
-
-Boris Brezillon (1):
-      ARM: dts: at91: sam9x5: Fix the memory range assigned to the PMC
-
-Suzuki K Poulose (1):
-      arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
-
-Wenyou Yang (1):
-      ARM: dts: at91: sama5d2: use "atmel,sama5d3-nfc" compatible for nfc
-
- arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
- arch/arm/boot/dts/sama5d2.dtsi    | 2 +-
- arch/arm64/Kconfig.platforms      | 1 +
- 3 files changed, 3 insertions(+), 2 deletions(-)
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index 031ed08..d0d5190 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -478,6 +478,7 @@ emit_cond_jmp:
+>  		case BPF_JGE:
+>  			jmp_cond = A64_COND_CS;
+>  			break;
+> +		case BPF_JSET:
+>  		case BPF_JNE:
+>  			jmp_cond = A64_COND_NE;
+>  			break;
+>
