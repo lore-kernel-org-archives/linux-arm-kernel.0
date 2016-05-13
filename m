@@ -1,33 +1,67 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Fri, 13 May 2016 10:00:20 +0800
-Subject: [PATCH 3/6] dt-bindings: mtu3: add devicetree bindings
-In-Reply-To: <CAOGqxeUYEGKq5yhHbgcjPZtY06ZfDp2iCLZDqS3uyfCW523B4w@mail.gmail.com>
-References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462868614-20602-4-git-send-email-chunfeng.yun@mediatek.com>
- <20160511145409.GA23042@rob-hp-laptop>
- <1463037844.11651.118.camel@mhfsdcap03>
- <CAOGqxeUYEGKq5yhHbgcjPZtY06ZfDp2iCLZDqS3uyfCW523B4w@mail.gmail.com>
-Message-ID: <1463104820.11651.125.camel@mhfsdcap03>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 12 May 2016 19:11:25 -0700
+Subject: [PATCH 1/2] Revert "clk: rockchip: reset init state before mmc
+ card initialization"
+In-Reply-To: <2083095.luTHhmZ9EO@phil>
+References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+ <2083095.luTHhmZ9EO@phil>
+Message-ID: <CAD=FV=XVMQ025Z-+C4fVQUuof=9wnjvJKr2PtuJhxOVwo7TjSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Heiko,
 
-On Thu, 2016-05-12 at 19:02 -0400, Alan Cooper wrote:
-> On Thu, May 12, 2016 at 3:24 AM, chunfeng yun <chunfeng.yun@mediatek.com> wrote:
-> >> > + - mediatek,enable-manual-drd : supports manual dual-role switch by sysfs
-> >> > +   interface; only used when receptacle is TYPE-A and also wants to support
-> >> > +   dual-role mode.
-> >>
-> >> sysfs is a Linux detail that doesn't apply to the binding. Does the
-> >> property mean "the IP block supports or doesn't support switching"  or
-> >> "I want to enable switching feature". Only the former belongs in DT.
-> >>
-> > It is the former case, and has little relation with sysfs interface.
-> > I will modify it later, sorry for my unclear description.
-> 
-> Could the property name be just "enable-manual-drd" instead of
-> "mediatek,enable-manual-drd"? I expect to have to add this
-> functionality to our USB driver in the near future.
+On Thu, May 12, 2016 at 4:41 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Donnerstag, 12. Mai 2016, 11:03:16 schrieb Douglas Anderson:
+>
+> Not sure what the policy is for revert-subjects in the clock-tree, but I
+> guess
+>
+> clk: rockchip: Revert "reset init state before mmc card initialization"
+>
+> might look nicer?
 
-Do you mean provide some APIs to in common USB driver?
+Sure.  If you want me to re-post with that, let me know.  Else feel
+free to fix when applying.
+
+
+>> This reverts commit 7a03fe6f48f3 ("clk: rockchip: reset init state
+>> before mmc card initialization").
+>
+> I've tested these two patches together with the dw_mmc one and everything
+> that worked before still works (tuning on veyron-jerry) and everything that
+> didn't work still doesn't work (tuning on firefly [likely a regulator issue]).
+>
+> And re-checking the code against the TRM I now also see the mask that is to
+> short (1 bit in the code vs. the actual 2 bits described in the manual)
+>
+> [...]
+>
+>> 1. Just this revert: likely will fix rk3288-veyron eMMC on some devices
+>>    + other cases; might break someone with a strange bootloader that
+>>    sets the phase to 0 or one that uses delay elements (pretty
+>>    unpredicable what would happen in that case).
+>> 2. Just dw_mmc patch: fixes everyone.  Effectly the dw_mmc patch will
+>>    totally override the broken patch and fix everything.
+>> 3. Both patches: fixes everyone.  Once dw_mmc is initting properly then
+>>    any defaults from the clock code doesn't mattery.
+>
+> I'm still trying to make up my mind on how to proceed - aka in which order
+> patches should get picked up.
+>
+> Going with the "if it isn't upstream it doesn't exist" mantra Rob wrote
+> somewhere some days ago, taking this revert should not hurt anything, as all
+> the non-veyron devices currently don't support any tuning at all.
+
+Note that this patch can still affect devices that don't use tuning.
+MMC Hold times are important not just for high speed modes but even
+for low speed modes.
+
+
+> So I'd think except for the issue Shawn was originally trying to fix (for
+> some non-mainline board?) it should be possible to take this patch any time
+> independently of the dw_mmc part.
+
+Yeah, just not sure.  Shawn: do you know which specific device you
+were trying to fix with the original patch?  Is it OK to revert for
+now until the dw_mmc patch lands?
