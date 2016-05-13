@@ -1,67 +1,145 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Fri, 13 May 2016 10:42:23 +0800
-Subject: [PATCH] mmc: mmc: do not use CMD13 to get status after speed
- mode switch
-In-Reply-To: <57345B14.7030308@intel.com>
-References: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
- <5732E43E.8070800@intel.com> <1463036431.11653.3.camel@mhfsdcap03>
- <57345B14.7030308@intel.com>
-Message-ID: <1463107343.26133.6.camel@mhfsdcap03>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 12 May 2016 19:55:20 -0700
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+Message-ID: <CADaLNDnXiL2nYtSmd1h-9MSnUUY4S+dAEcFXRSE_jjWhqRzufQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-05-12 at 13:29 +0300, Adrian Hunter wrote:
-> On 12/05/16 10:00, Chaotian Jing wrote:
-> > On Wed, 2016-05-11 at 10:50 +0300, Adrian Hunter wrote:
-> >> On 04/05/16 09:54, Chaotian Jing wrote:
-> >>> Per JEDEC spec, it is not recommended to use CMD13 to get card status
-> >>> after speed mode switch. below are two reason about this:
-> >>> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
-> >>> Therefore it is not recommended to use CMD13 to check busy completion
-> >>> of the timing change indication.
-> >>> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
-> >>> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
-> >>>
-> >>> this patch drops CMD13 when doing speed mode switch, if host do not
-> >>> support MMC_CAP_WAIT_WHILE_BUSY and there is no ops->card_busy(),
-> >>> then the only way is to wait a fixed timeout.
-> >>
-> >> This looks like it should be 3 patches:
-> >> 	1. Change __mmc_switch
-> >> 	2. Change HS200 and HS400 selection
-> >> 	3. Change HS selection
-> >>
-> >> However there is another problem: card_busy is not the same as busy signal -
-> >> see below.  So that needs to be sorted out first.
-> >>
-> > We should make that card_busy() is the same with busy signal asserted.
-> > as you know, if card was not in busy state, all data pins should be high
-> > level as it is pull-up by default. so that's no conflict to check card
-> > busy signal by DAT0 or DAT0 ~ DAT3.
-> 
-> Potentially SDIO uses DAT1 for card interrupt, so that is a conflict right
-> there.
-> 
-> Also SDHCI does it backwards (don't ask me why) and considers 0000 to be
-> busy, so there's another conflict.
-> 
-> Some of the language in the SD and SDHCI specifications seems to indicate
-> that checking all 4 DAT lines during voltage switch is optional i.e. only 1
-> of the lines must be checked.  If that is true then we could change all the
-> drivers over to check just DAT0, and expect that to work for both busy
-> signalling and SD voltage switch checks.
-> 
-> So it seems to me card_busy still needs to be sorted out first.
+On Tue, May 10, 2016 at 8:19 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> From the functionality point of view this series may be split into the
+> following logic parts:
+> 1. New ECAM API and update for users of the pci-host-common API
+> 2. Necessary fixes as the preparation for using driver on ARM64.
+> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
+>
+> Patches has been built on top of 4.6-rc7 and can be found here:
+> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v7)
+>
+> This has been tested on Cavium ThunderX server. Any help in reviewing and
+> testing is very appreciated.
 
-One thing must point out is that the __mmc_switch() is only for MMC
-card. SD/SDIO will never use this interface.
-by the way, Per JEDEC SD3.0 spec, below is the quote from spec:
-"Completion of voltage switch sequence is checked by high level of
-DAT[3:0]. Any bit of DAT[3:0] can be checked depends on ability of the
-host."
-So that the implement of ops->card_busy() can be changed from check
-DAT[3:0] to only check DAT[0].
+I tried this series on APM X-Gene platforms (with ECAM fix-up quirk
+added) and PCIe works fine.
 
-In fact, for SD/SDIO voltage switch, if switch success, all DAT pins are
-high level and if switch failed, all data pins are low level.
-> 
+Regards,
+Duc Dang.
+>
+> v6 -> v7
+> - drop quirks handling
+> - changes for ACPI companion and domain number assignment approach
+> - implement arch pcibios_{add|remove}_bus and call acpi_pci_{add|remove}_bus from there
+> - cleanups around nomenclature
+> - use resources oriented API for ECAM
+> - fix for based address calculation before mapping ECAM region
+> - remove useless lock for MCFG lookup
+> - move MCFG stuff to separated file pci_mcfg.c
+> - drop MCFG entries caching
+> - rebase against 4.6-rc7
+>
+> v5 -> v6
+> - drop idea of x86 MMCONFIG code refactoring
+> - integrate JC's patches which introduce new ECAM API:
+>   https://lkml.org/lkml/2016/4/11/907
+>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+> - integrate Sinan's fix for releasing IO resources, see patch [06/13]
+> - added ACPI support for ThunderX ECAM and PEM drivers
+> - rebase against 4.6-rc2
+>
+> v4 -> v5
+> - drop MCFG refactoring group patches 1-6 from series v4 and integrate Jayachandran's patch
+>   https://patchwork.ozlabs.org/patch/575525/
+> - rewrite PCI legacy IRQs allocation
+> - squash two patches 11 and 12 from series v4, fixed bisection issue
+> - changelog improvements
+> - rebase against 4.5-rc3
+>
+> v3 -> v4
+> - drop Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
+> - add Lorenzo's fix patch 19/24
+> - ACPI PCI bus domain number assigning cleanup
+> - change resource management, we now claim and reassign resources
+> - improvements for applying quirks
+> - drop Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
+> - rebase against 4.5-rc1
+>
+> v2 -> v3
+> - fix legacy IRQ assigning and IO ports registration
+> - remove reference to arch specific companion device for ia64
+> - move ACPI PCI host controller driver to pci_root.c
+> - drop generic domain assignment for x86 and ia64 as I am not
+>   able to run all necessary test variants
+> - drop patch which cleaned legacy IRQ assignment since it belongs to
+>   Mathew's series:
+>   https://patchwork.ozlabs.org/patch/557504/
+> - extend MCFG quirk code
+> - rebase against 4.4
+>
+> v1 -> v2
+> - move non-arch specific piece of code to dirver/acpi/ directory
+> - fix IO resource handling
+> - introduce PCI config accessors quirks matching
+> - moved ACPI_COMPANION_SET to generic code
+>
+> v1 - https://lkml.org/lkml/2015/10/27/504
+> v2 - https://lkml.org/lkml/2015/12/16/246
+> v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
+> v4 - https://lkml.org/lkml/2016/2/4/646
+> v5 - https://lkml.org/lkml/2016/2/16/426
+> v6 - https://lkml.org/lkml/2016/4/15/594
+>
+> Jayachandran C (2):
+>   PCI: Provide common functions for ECAM mapping
+>   PCI: generic, thunder: update to use generic ECAM API
+>
+> Tomasz Nowicki (9):
+>   pci, of: Move the PCI I/O space management to PCI core code.
+>   pci: Add new function to unmap IO resources.
+>   acpi, pci: Support IO resources when parsing PCI host bridge
+>     resources.
+>   pci, acpi: Provide a way to assign bus domain number.
+>   pci, acpi: Handle ACPI companion assignment.
+>   pci, acpi: Support for ACPI based generic PCI host controller
+>   arm64, pci, acpi: ACPI support for legacy IRQs parsing and
+>     consolidation with DT code.
+>   arm64, pci, acpi: Provide ACPI-specific prerequisites for PCI bus
+>     enumeration.
+>   arm64, pci, acpi: Start using ACPI based PCI host controller driver
+>     for ARM64.
+>
+>  arch/arm64/Kconfig                  |   1 +
+>  arch/arm64/kernel/pci.c             |  34 +++-----
+>  drivers/acpi/Kconfig                |   8 ++
+>  drivers/acpi/Makefile               |   1 +
+>  drivers/acpi/pci_mcfg.c             |  97 ++++++++++++++++++++++
+>  drivers/acpi/pci_root.c             |  33 ++++++++
+>  drivers/acpi/pci_root_generic.c     | 149 +++++++++++++++++++++++++++++++++
+>  drivers/of/address.c                | 116 +-------------------------
+>  drivers/pci/Kconfig                 |   3 +
+>  drivers/pci/Makefile                |   2 +
+>  drivers/pci/ecam.c                  | 161 ++++++++++++++++++++++++++++++++++++
+>  drivers/pci/ecam.h                  |  72 ++++++++++++++++
+>  drivers/pci/host/Kconfig            |   1 +
+>  drivers/pci/host/pci-host-common.c  | 114 +++++++++++--------------
+>  drivers/pci/host/pci-host-common.h  |  47 -----------
+>  drivers/pci/host/pci-host-generic.c |  52 +++---------
+>  drivers/pci/host/pci-thunder-ecam.c |  39 ++-------
+>  drivers/pci/host/pci-thunder-pem.c  |  92 ++++++++++-----------
+>  drivers/pci/pci.c                   | 150 ++++++++++++++++++++++++++++++++-
+>  drivers/pci/probe.c                 |   2 +
+>  include/linux/of_address.h          |   9 --
+>  include/linux/pci-acpi.h            |  14 ++++
+>  include/linux/pci.h                 |  11 ++-
+>  23 files changed, 823 insertions(+), 385 deletions(-)
+>  create mode 100644 drivers/acpi/pci_mcfg.c
+>  create mode 100644 drivers/acpi/pci_root_generic.c
+>  create mode 100644 drivers/pci/ecam.c
+>  create mode 100644 drivers/pci/ecam.h
+>  delete mode 100644 drivers/pci/host/pci-host-common.h
+>
+> --
+> 1.9.1
+>
