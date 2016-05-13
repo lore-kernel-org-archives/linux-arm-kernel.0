@@ -1,47 +1,61 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 13 May 2016 14:45:34 +0300
-Subject: [PATCH v3 0/7] ARM/ASoC: OMAP3: Fix McBSP2/3 sidetone support
-In-Reply-To: <20160512164201.GQ5995@atomide.com>
-References: <1461927202-17677-1-git-send-email-peter.ujfalusi@ti.com>
- <69ff65ee-e5d1-09fb-fd91-8d7b4d8fdda4@ti.com>
- <20160512164201.GQ5995@atomide.com>
-Message-ID: <f7af7b30-563a-0048-9696-6ad0125d8f68@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 13 May 2016 13:47:17 +0200
+Subject: [PATCH V2 1/2] drivers: i2c: qup: Fix broken dma when
+ CONFIG_DEBUG_SG is enabled
+In-Reply-To: <1462534274-28925-2-git-send-email-sricharan@codeaurora.org>
+References: <1462534274-28925-1-git-send-email-sricharan@codeaurora.org>
+ <1462534274-28925-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160513114716.GI1778@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/16 19:42, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160511 01:46]:
->> Tony, Paul,
->>
->> On 04/29/16 13:53, Peter Ujfalusi wrote:
->>> Hi,
->>>
->>> Based on the ongoing discussion on v2 (ARM: OMAP3: Fix McBSP2/3 hwmod setup for
->>> sidetone) I have dropped the removal of the sidetone hwmod and only corrected
->>> it. The series now includes all related changes needed to have correct sidetone
->>> support whenever we boot in legacy or in DT mode.
->>>
->>> This time the ASoC part have dependency on earlier patches so they can not be
->>> applied separately.
->>
->> How should we proceed from here? I don't want to start designing the ST
->> separation infrastructure which would be based on this series, but if there
->> are outstanding issues found on this, I would need to go back to the drawing
->> board.
->> The separation will be mostly new code and code shuffle in ASoC, but for
->> legacy I will need to build up something in arch as well, so I would need at
->> least one release cycle to start with things.
+On Fri, May 06, 2016 at 05:01:13PM +0530, Sricharan R wrote:
+> With CONFIG_DEBUG_SG is enabled and when dma mode is used, below dump is seen, 
 > 
-> Well looks like we have all the acks, so I can apply these. We have
-> not heard from Paul on this for a while, so let's wait few days for
-> that.
+> ------------[ cut here ]------------ 
+> kernel BUG at include/linux/scatterlist.h:140! 
+> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP 
+> Modules linked in: 
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.0-00459-g9f087b9-dirty #7 
+> Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT) 
+> task: ffffffc036868000 ti: ffffffc036870000 task.ti: ffffffc036870000 
+> PC is at qup_sg_set_buf.isra.13+0x138/0x154 
+> LR is at qup_sg_set_buf.isra.13+0x50/0x154 
+> pc : [<ffffffc0005a0ed8>] lr : [<ffffffc0005a0df0>] pstate: 60000145 
+> sp : ffffffc0368735c0 
+> x29: ffffffc0368735c0 x28: ffffffc036873752 
+> x27: ffffffc035233018 x26: ffffffc000c4e000 
+> x25: 0000000000000000 x24: 0000000000000004 
+> x23: 0000000000000000 x22: ffffffc035233668 
+> x21: ffffff80004e3000 x20: ffffffc0352e0018 
+> x19: 0000004000000000 x18: 0000000000000028 
+> x17: 0000000000000004 x16: ffffffc0017a39c8 
+> x15: 0000000000001cdf x14: ffffffc0019929d8 
+> x13: ffffffc0352e0018 x12: 0000000000000000 
+> x11: 0000000000000001 x10: 0000000000000001 
+> x9 : ffffffc0012b2d70 x8 : ffffff80004e3000 
+> x7 : 0000000000000018 x6 : 0000000030000000 
+> x5 : ffffffc00199f018 x4 : ffffffc035233018 
+> x3 : 0000000000000004 x2 : 00000000c0000000 
+> x1 : 0000000000000003 x0 : 0000000000000000 
 > 
-> Meanwhile, Mark wanted to fix the subject for one of the patches, care
-> to repost that at least? Or the whole series with acks, could be a
-> pull request too against v4.6-rc1 :)
+> Process swapper/0 (pid: 1, stack limit = 0xffffffc036870020) 
+> Stack: (0xffffffc0368735c0 to 0xffffffc036874000) 
+> 
+> Change allocation of sg buffers from dma_coherent memory to kzalloc 
+> to fix the issue. 
 
-Thanks, I'll wait for couple of days for Paul to review and I will prepare v4
-and a pull request.
+This description describes what you do. But not why it is the correct
+solution to the OOPS. The OOPS  neither describes it. Please add some
+more explanation.
 
--- 
-P?ter
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Reviewed-by: Andy Gross <andy.gross@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160513/800326b8/attachment.sig>
