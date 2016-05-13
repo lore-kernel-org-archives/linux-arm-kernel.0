@@ -1,29 +1,33 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Fri, 13 May 2016 09:49:06 +0800
-Subject: [PATCH] deb-pkg: add the shared header file for arm64
-In-Reply-To: <573491A2.7070809@suse.com>
-References: <1463043837-4348-1-git-send-email-shijie.huang@arm.com>
- <573491A2.7070809@suse.com>
-Message-ID: <20160513014905.GA15321@sha-win-210.asiapac.arm.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Fri, 13 May 2016 10:00:20 +0800
+Subject: [PATCH 3/6] dt-bindings: mtu3: add devicetree bindings
+In-Reply-To: <CAOGqxeUYEGKq5yhHbgcjPZtY06ZfDp2iCLZDqS3uyfCW523B4w@mail.gmail.com>
+References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462868614-20602-4-git-send-email-chunfeng.yun@mediatek.com>
+ <20160511145409.GA23042@rob-hp-laptop>
+ <1463037844.11651.118.camel@mhfsdcap03>
+ <CAOGqxeUYEGKq5yhHbgcjPZtY06ZfDp2iCLZDqS3uyfCW523B4w@mail.gmail.com>
+Message-ID: <1463104820.11651.125.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 04:22:26PM +0200, Michal Marek wrote:
-> On 2016-05-12 11:03, Huang Shijie wrote:
-> > The arch/arm/include/asm/opcodes.h is also used by the arm64.
-> > This patch copies it to the arm64 deb package.
-> > 
-> > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> > ---
-> >  scripts/package/builddeb | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> 
-> 
-> Hi Huang,
-> 
-> this is fixed (admittedly in a more aggressive way) by 962475ac2f96
-> ("builddeb: fix missing headers in linux-headers package") in linux-next.
-okay. got it.
+Hi,
 
-thanks
-Huang Shijie
+On Thu, 2016-05-12 at 19:02 -0400, Alan Cooper wrote:
+> On Thu, May 12, 2016 at 3:24 AM, chunfeng yun <chunfeng.yun@mediatek.com> wrote:
+> >> > + - mediatek,enable-manual-drd : supports manual dual-role switch by sysfs
+> >> > +   interface; only used when receptacle is TYPE-A and also wants to support
+> >> > +   dual-role mode.
+> >>
+> >> sysfs is a Linux detail that doesn't apply to the binding. Does the
+> >> property mean "the IP block supports or doesn't support switching"  or
+> >> "I want to enable switching feature". Only the former belongs in DT.
+> >>
+> > It is the former case, and has little relation with sysfs interface.
+> > I will modify it later, sorry for my unclear description.
+> 
+> Could the property name be just "enable-manual-drd" instead of
+> "mediatek,enable-manual-drd"? I expect to have to add this
+> functionality to our USB driver in the near future.
+
+Do you mean provide some APIs to in common USB driver?
