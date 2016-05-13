@@ -1,47 +1,47 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Thu, 12 May 2016 23:37:58 -0700
-Subject: [PATCH] arm64: bpf: jit JMP_JSET_{X,K}
-Message-ID: <1463121478-18484-1-git-send-email-zlim.lnx@gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 13 May 2016 12:23:00 +0530
+Subject: [RFC 0/9] IOMMU probe deferral support
+In-Reply-To: <f192d4a0-9e13-4ae2-d3da-058e2e092634@samsung.com>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+ <f192d4a0-9e13-4ae2-d3da-058e2e092634@samsung.com>
+Message-ID: <000001d1ace4$1ac1e250$5045a6f0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Original implementation commit e54bcde3d69d ("arm64: eBPF JIT compiler")
-had the relevant code paths, but due to an oversight always fail jiting.
+Hi Marek,
 
-As a result, we had been falling back to BPF interpreter whenever a BPF
-program has JMP_JSET_{X,K} instructions.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Marek Szyprowski
+> Sent: Thursday, May 12, 2016 6:23 PM
+> To: Sricharan R <sricharan@codeaurora.org>; will.deacon at arm.com;
+> robin.murphy at arm.com; joro at 8bytes.org; iommu at lists.linux-
+> foundation.org; linux-arm-kernel at lists.infradead.org;
+> laurent.pinchart at ideasonboard.com
+> Subject: Re: [RFC 0/9] IOMMU probe deferral support
+> 
+> Hello,
+> 
+> 
+> On 2016-04-25 17:58, Sricharan R wrote:
+> > This is mostly a repost of the probe deferral series from Laurent
+> > Pinchart [1]. Added a check to fix boot with ACPI.
+> > Adapted arm-smmu driver to work with deferred probing and added a new
+> > api for the below reason. This is based on the generic iommu binding
+> > series from Robin Murphy <robin.murphy@arm.com>.
+> 
+> Thanks for this patchset. I'm working on some serious rework in exynos
+> power domains and clocks support code and it turned out that I need this
+> feature to resolve probing order. It works fine on my internal tree, where
+> some iommu controllers cannot get their clocks early enough.
+> 
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+   Thanks for testing. So the issue that I was facing also was the same
+where the iommu
+   controllers cannot get clocks early. So waiting for some suggestions if
+this is right/
+   or there is another way for doing this probe deferral?
 
-With this fix, we confirm that the corresponding tests in lib/test_bpf
-continue to pass, and also jited.
-
-...
-[    2.784553] test_bpf: #30 JSET jited:1 188 192 197 PASS
-[    2.791373] test_bpf: #31 tcpdump port 22 jited:1 325 677 625 PASS
-[    2.808800] test_bpf: #32 tcpdump complex jited:1 323 731 991 PASS
-...
-[    3.190759] test_bpf: #237 JMP_JSET_K: if (0x3 & 0x2) return 1 jited:1 110 PASS
-[    3.192524] test_bpf: #238 JMP_JSET_K: if (0x3 & 0xffffffff) return 1 jited:1 98 PASS
-[    3.211014] test_bpf: #249 JMP_JSET_X: if (0x3 & 0x2) return 1 jited:1 120 PASS
-[    3.212973] test_bpf: #250 JMP_JSET_X: if (0x3 & 0xffffffff) return 1 jited:1 89 PASS
-...
-
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
----
- arch/arm64/net/bpf_jit_comp.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 031ed08..d0d5190 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -478,6 +478,7 @@ emit_cond_jmp:
- 		case BPF_JGE:
- 			jmp_cond = A64_COND_CS;
- 			break;
-+		case BPF_JSET:
- 		case BPF_JNE:
- 			jmp_cond = A64_COND_NE;
- 			break;
--- 
-1.9.1
+Regards,
+ Sricharan
