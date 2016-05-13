@@ -1,24 +1,27 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 May 2016 11:44:37 +0100
-Subject: imx-drm: regression due to commit 503fe87bd0a8 ("gpu: ipu-v3:
- Fix imx-ipuv3-crtc module autoloading")
-In-Reply-To: <20160513123336.6996dd89@ipc1.ka-ro>
-References: <20160513123336.6996dd89@ipc1.ka-ro>
-Message-ID: <20160513104437.GT19428@n2100.arm.linux.org.uk>
+Date: Fri, 13 May 2016 11:48:02 +0100
+Subject: [PATCH 0/3] Clean up svc mode register state
+Message-ID: <20160513104802.GU19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 12:33:36PM +0200, Lothar Wa?mann wrote:
-> I'm always very suspicious when seeing code moving of_node's from
-> one device to another or assigning of_node's to platform devices that
-> weren't instantiated via DT.
+Three patches to clean up the saved register state for SW PAN:
 
-It's completely wrong to add an of_node to a device on the same bus
-that already has a device with the same of_node - doing so means
-that the bus matching code will match the same device driver to both
-devices, which may not be what you want to happen.
+* get rid of S_FRAME_SIZE, replacing it with PT_REGS_SIZE (which
+  is what all cases of this constant actually was describing).
+* provide svc_pt_regs to describe the SVC mode stack layout, which
+  may contain the additional DACR register above the pt_regs.
+* get rid of the horrid saved DACR access in __show_regs
 
-Just don't do it, it's a bug waiting to happen.
+ arch/arm/include/asm/assembler.h |  4 ++--
+ arch/arm/include/asm/ptrace.h    | 10 ++++++++++
+ arch/arm/kernel/asm-offsets.c    |  4 +++-
+ arch/arm/kernel/entry-armv.S     | 12 ++++++------
+ arch/arm/kernel/entry-common.S   |  2 +-
+ arch/arm/kernel/entry-header.S   |  8 ++++----
+ arch/arm/kernel/entry-v7m.S      |  2 +-
+ arch/arm/kernel/process.c        |  2 +-
+ 8 files changed, 28 insertions(+), 16 deletions(-)
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
