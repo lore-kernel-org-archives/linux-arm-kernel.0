@@ -1,45 +1,86 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 13 May 2016 14:40:31 +0300
-Subject: [PATCH 18/23] ARM: dts: lager: Fix W=1 dtc warnings
-In-Reply-To: <1463126163-29423-19-git-send-email-geert+renesas@glider.be>
-References: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
- <1463126163-29423-19-git-send-email-geert+renesas@glider.be>
-Message-ID: <749bd9bd-aeb9-49fe-b1f9-31da008ae696@cogentembedded.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 13 May 2016 13:42:09 +0200
+Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
+ host controller
+In-Reply-To: <CAJZ5v0jov37JErfRqw1bAkJzkyoGn+BsZLNLR5N=J3ZYu203GQ@mail.gmail.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-9-git-send-email-tn@semihalf.com>
+ <CAKc_7PVJmhiD8x=zw4N3sSDPD-jZz-wh8TPTuuTYEdxn3v78og@mail.gmail.com>
+ <CAJZ5v0jov37JErfRqw1bAkJzkyoGn+BsZLNLR5N=J3ZYu203GQ@mail.gmail.com>
+Message-ID: <5735BD91.3020206@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/13/2016 10:55 AM, Geert Uytterhoeven wrote:
 
-> Warning (unit_address_vs_reg): Node /keyboard/button at 1 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /keyboard/button at 2 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /keyboard/button at 3 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /keyboard/button at 4 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /fixedregulator at 0 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /regulator at 4 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /i2c at 8 has a unit name, but no reg property
+
+On 13.05.2016 13:31, Rafael J. Wysocki wrote:
+> On Fri, May 13, 2016 at 1:25 PM, Jayachandran C <jchandra@broadcom.com> wrote:
+>> On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+>>> This patch is going to implement generic PCI host controller for
+>>> ACPI world, similar to what pci-host-generic.c driver does for DT world.
+>>>
+>>> All such drivers, which we have seen so far, were implemented within
+>>> arch/ directory since they had some arch assumptions (x86 and ia64).
+>>> However, they all are doing similar thing, so it makes sense to find
+>>> some common code and abstract it into the generic driver.
+>>>
+>>> In order to handle PCI config space regions properly, we define new
+>>> MCFG interface which does sanity checks on MCFG table and keeps its
+>>> root pointer. User is able to lookup MCFG regions based on that root
+>>> pointer and specified domain:bus_start:bus_end touple. We are using
+>>> pci_mmcfg_late_init old prototype to avoid another function name.
+>>>
+>>> The implementation of pci_acpi_scan_root() looks up the MCFG entries
+>>> and sets up a new mapping (regions are not mapped until host controller ask
+>>> for it). Generic PCI functions are used for accessing config space.
+>>> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
+>>> to create and access ECAM mappings.
+>>>
+>>> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
+>>> should be made on a per-architecture basis.
+>>>
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>>> ---
+>> [....]
+>>
+>>> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+>>> index 1ad2176..1cccf57 100644
+>>> --- a/drivers/pci/ecam.h
+>>> +++ b/drivers/pci/ecam.h
+>>> @@ -45,6 +45,11 @@ struct pci_config_window {
+>>>                  void __iomem            *win;   /* 64-bit single mapping */
+>>>                  void __iomem            **winp; /* 32-bit per bus mapping */
+>>>          };
+>>> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
+>>> +       struct acpi_device              *companion; /* ACPI companion device */
+>>> +#endif
+>>> +       int                             domain;
+>>> +
+>>>   };
+>>
+>> Using struct pci_config_window to pass along domain and
+>> companion looks bad.  I think there are two possible options
+>> to do this better:
+>>
+>> 1. add a 'struct fwnode_handle *' or 'struct device *parent_dev'
+>>     instead of the companion and domain fields above. In case of
+>>     ACPI either of them can be used to get the acpi_device and
+>>     both  domain and companion can be set from that.
+>>
+>> 2. make pci_config_window fully embeddable by moving allocation
+>>     out of pci_ecam_create to its callers. Then it can be embedded
+>>     into acpi_pci_generic_root_info, and container_of can be used
+>>     to get acpi info from ->sysdata.
+>>
+>> The first option should be easier to implement but the second may
+>> be better on long run. I would leave it to the Bjorn or Rafael to
+>> suggest which is preferred.
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  arch/arm/boot/dts/r8a7790-lager.dts | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
+> Personally, I'd probably try to use fwnode_handle, but the second
+> option makes sense too in principle.
 >
-> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> index 749ba02b6a53a9de..c01e27868083147a 100644
-> --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-[...]
-> @@ -119,7 +119,7 @@
->  		};
->  	};
->
-> -	fixedregulator3v3: fixedregulator at 0 {
-> +	fixedregulator3v3: fixedregulator3v3 {
 
-    Likewise, could you drop "fixed"?
+Thanks for suggestions. I will try to use fwnode_handle
 
-[...]
-
-MBR, Sergei
+Tomasz
