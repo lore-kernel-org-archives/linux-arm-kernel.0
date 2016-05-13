@@ -1,46 +1,46 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri, 13 May 2016 09:15:38 +0300
-Subject: [PATCH 4/7] [media] ir-rx51: add DT support to driver
-In-Reply-To: <20160511141429.GA5894@rob-hp-laptop>
-References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1462634508-24961-5-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160509200657.GA3379@rob-hp-laptop> <5730F8BA.5000402@gmail.com>
- <CAL_JsqJPZS1ne_xAuBFtCc5L1HKFJf0LDUJ7CRSFXhc3adkTfA@mail.gmail.com>
- <20160510021826.GE1129@earth> <20160511141429.GA5894@rob-hp-laptop>
-Message-ID: <5735710A.6060404@gmail.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Fri, 13 May 2016 08:29:37 +0200
+Subject: [PATCH 3/4] ARM: bcm2835: add thermal node to device-tree of
+ bcm283x
+In-Reply-To: <87posqamh9.fsf@eliezer.anholt.net>
+References: <1463063738-11506-1-git-send-email-kernel@martin.sperl.org>
+ <1463063738-11506-4-git-send-email-kernel@martin.sperl.org>
+ <87posqamh9.fsf@eliezer.anholt.net>
+Message-ID: <FA3695BE-D1A7-44E3-9714-08B6A002EB06@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 11.05.2016 17:14, Rob Herring wrote:
-> On Tue, May 10, 2016 at 04:18:27AM +0200, Sebastian Reichel wrote:
->> Hi,
->>
->> On Mon, May 09, 2016 at 04:07:35PM -0500, Rob Herring wrote:
->>> There's already a pwm-led binding that can be used. Though there
->>> may be missing consumer IR to LED subsystem support in the kernel.
->>> You could list both compatibles, use the rx51 IR driver now, and
->>> then move to pwm-led driver in the future.
->>
->> Well from a purely HW point of view it's a PWM connected led. The
->> usage is completely different though. Usually PWM is used to control
->> the LED's brightness via the duty cycle (basic concept: enabling led
->> only 50% of time reduces brightness to 50%).
->>
->> In the IR led's case the aim is generating a specific serial pattern
->> instead. For this task it uses a dmtimer in PWM mode and a second
->> one to reconfigure the pwm timer.
->
-> In that case, it will probably never be a generic driver.
->
->> I don't know about a good name, but rx51 should be replaced with
->> n900 in the compatible string. So maybe "nokia,n900-infrared-diode".
->
-> That's fine, but the shorter '-ir' was too.
->
-
-I prefer the shorter "nokia,n900-ir", will resend the series with it 
-used, unless someone has concerns about it.
-
-Ivo
+> On 13.05.2016, at 01:24, Eric Anholt <eric@anholt.net> wrote:
+> 
+> kernel at martin.sperl.org writes:
+> 
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> Add the node for the thermal sensor of the bcm2835-soc
+>> to the device tree.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> ---
+>> arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
+>> 1 file changed, 6 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+>> index 9db9d97..525f1f2 100644
+>> --- a/arch/arm/boot/dts/bcm283x.dtsi
+>> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+>> @@ -159,6 +159,12 @@
+>> 			status = "disabled";
+>> 		};
+>> 
+>> +		thermal: thermal at 0x7e212000 {
+>> +			compatible = "brcm,bcm2835-thermal";
+>> +			reg = <0x7e212000 0x8>;
+>> +			clocks = <&clocks BCM2835_CLOCK_TSENS>;
+>> +		};
+>> +
+> 
+> You could drop the "thermal: " here since nothing refers to it.  Either
+> way,
+Actually you will refer to it in the device tree for the bcm2837
+so that you can set a different compatible string.
