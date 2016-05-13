@@ -1,76 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 May 2016 09:28:03 +0000
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <57358C2B.1010106@huawei.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
- <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
- <20160512134431.GB30205@yury-N73SV>
- <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
- <20160512142457.GC30205@yury-N73SV>
- <20160512152805.GJ11226@e104818-lin.cambridge.arm.com>
- <57358C2B.1010106@huawei.com>
-Message-ID: <20160513092802.GA13400@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 May 2016 11:28:26 +0200
+Subject: [PATCH] sched/core: don't include asm/mmu_context from drivers
+In-Reply-To: <CALCETrV_wgy0vpWiLYRJn1Q41C6adKKgbEOFthoAXiG601JPYQ@mail.gmail.com>
+References: <1461919995-21001-1-git-send-email-arnd@arndb.de>
+ <20160429094218.61b26849@gandalf.local.home>
+ <CALCETrV_wgy0vpWiLYRJn1Q41C6adKKgbEOFthoAXiG601JPYQ@mail.gmail.com>
+Message-ID: <8253941.065j8toVxx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 04:11:23PM +0800, Zhangjian (Bamvor) wrote:
-> On 2016/5/12 23:28, Catalin Marinas wrote:
-> >On Thu, May 12, 2016 at 05:24:57PM +0300, Yury Norov wrote:
-> >>On Thu, May 12, 2016 at 03:07:35PM +0100, Catalin Marinas wrote:
-> >>>On Thu, May 12, 2016 at 04:44:31PM +0300, Yury Norov wrote:
-> >>>>On Thu, May 12, 2016 at 02:35:34PM +0100, Catalin Marinas wrote:
-> >>>>>On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
-> >>>>>>I debugged preadv02 and pwritev02 failures and found very weird bug.
-> >>>>>>Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> >>>>>>of vector, and kernel reports successful read/write.
-> >>>>>>
-> >>>>>>There are 2 problems:
-> >>>>>>1. How kernel allows such address to be passed to fs subsystem;
-> >>>>>>2. How fs successes to read/write at non-mapped, and in fact non-user
-> >>>>>>address.
-> >>>>>>
-> >>>>>>I don't know the answer on 2'nd question, and it might be something
-> >>>>>>generic. But I investigated first problem.
-> >>>>>>
-> >>>>>>The problem is that compat_rw_copy_check_uvector() uses access_ok() to
-> >>>>>>validate user address, and on arm64 it ends up with checking buffer
-> >>>>>>end against current_thread_info()->addr_limit.
-> >>>>>>
-> >>>>>>current_thread_info()->addr_limit for ilp32, and most probably for
-> >>>>>>aarch32 is equal to aarch64 one, and so adress_ok() doesn't fail.
-> >>>>>>It happens because on thread creation we call flush_old_exec() to set
-> >>>>>>addr_limit, and completely ignore compat mode there.
-[...]
-> >>>>That's true, but USER_DS depends on personality which is not set yet
-> >>>>for new thread, as I wrote above. In fact, I tried correct USER_DS
-> >>>>only, and it doesn't work
-> >>>
-> >>>Ah, it looks like load_elf_binary() sets the personality after
-> >>>flush_old_exec(). Looking at powerpc and x86, they set USER_DS to the
-> >>>maximum 64-bit task value, so they should have a similar issue with
-> >>>native 32-bit vs compat behaviour.
-[...]
-> >>>So what exactly is LTP complaining about? Is different error (like
-> >>>EFAULT vs EINVAL) or not getting an error at all.
-> >>
-> >>It should be EINVAL, but it succeed. The other problem is that
-> >>following fs routines does not complain on wrong address.
+On Thursday 12 May 2016 22:46:56 Andy Lutomirski wrote:
+> On Fri, Apr 29, 2016 at 6:42 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> > On Fri, 29 Apr 2016 10:52:32 +0200
+> > Arnd Bergmann <arnd@arndb.de> wrote:
 > >
-> >I see. The test asks the kernel to write a single byte (out of maximum
-> >64) to the user address 0xffffffff.
+> >> This reverts the earlier fix attempt and works around the problem
+> >> by including both linux/mmu_context.h and asm/mmu_context.h from
+> >> kernel/sched/core.c. This is not a good solution but seems less
+> >> hacky than the alternatives.
+> >
+> > What about simply not compiling finish_arch_post_lock_switch() when
+> > building modules?
+> >
+> > (untested, not compiled or anything)
+> >
+> > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> > ---
+> > diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+> > index fa5b42d44985..3f22d1b6bac8 100644
+> > --- a/arch/arm/include/asm/mmu_context.h
+> > +++ b/arch/arm/include/asm/mmu_context.h
+> > @@ -66,6 +66,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
+> >                 cpu_switch_mm(mm->pgd, mm);
+> >  }
+> >
+> > +#ifndef MODULE
+> >  #define finish_arch_post_lock_switch \
+> >         finish_arch_post_lock_switch
+> >  static inline void finish_arch_post_lock_switch(void)
+> > @@ -87,6 +88,7 @@ static inline void finish_arch_post_lock_switch(void)
+> >                 preempt_enable_no_resched();
+> >         }
+> >  }
+> > +#endif /* !MODULE */
+> >
+> >  #endif /* CONFIG_MMU */
+> >
 > 
-> What address We should set for this limitation, TASK_SIZE or STACK_TOP?
-> It is same for 64bit application. But STACK_TOP(0xffff0000) is below
-> TASK_SIZE in 32bit application. The address above STACK_TOP is preserved
-> for 32bit application.
+> 
+> Can someone in arm land ack this so Ingo can apply it?
+> 
 
-The discussion is mainly around whether USER_DS for 32-bit compat apps
-should be the same as USER_DS for native 32-bit apps. Even for native
-32-bit kernels, we don't use STACK_TOP as addr_limit. A read/write from
-0xffffffff would fail in both cases anyway. I think the LTP test doesn't
-even try to access such memory but only to probe the range validity (I
-haven't managed to build the latest LTP yet).
+Sorry I forgot about this when I had my original patch in the
+randconfig patch stack. I've reverted this now and am testing
+with Steve's version. If I see no other regressions, I'll resend
+this with a proper changelog and Russell's Ack.
 
--- 
-Catalin
+	Arnd
