@@ -1,145 +1,67 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 13 May 2016 10:09:37 +0800
-Subject: [PATCH 1/2] arm64: dts: NS2: Add all of the UARTs
-In-Reply-To: <CAC3K-4qbkt3DCgd6qurNo3V+++x70bbFC--aunR0DbCTBvBNZg@mail.gmail.com>
-References: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
- <57341FCE.6050403@huawei.com>
- <CAC3K-4qbkt3DCgd6qurNo3V+++x70bbFC--aunR0DbCTBvBNZg@mail.gmail.com>
-Message-ID: <57353761.5020409@huawei.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Fri, 13 May 2016 10:42:23 +0800
+Subject: [PATCH] mmc: mmc: do not use CMD13 to get status after speed
+ mode switch
+In-Reply-To: <57345B14.7030308@intel.com>
+References: <1462344872-6448-1-git-send-email-chaotian.jing@mediatek.com>
+ <5732E43E.8070800@intel.com> <1463036431.11653.3.camel@mhfsdcap03>
+ <57345B14.7030308@intel.com>
+Message-ID: <1463107343.26133.6.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2016-05-12 at 13:29 +0300, Adrian Hunter wrote:
+> On 12/05/16 10:00, Chaotian Jing wrote:
+> > On Wed, 2016-05-11 at 10:50 +0300, Adrian Hunter wrote:
+> >> On 04/05/16 09:54, Chaotian Jing wrote:
+> >>> Per JEDEC spec, it is not recommended to use CMD13 to get card status
+> >>> after speed mode switch. below are two reason about this:
+> >>> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
+> >>> Therefore it is not recommended to use CMD13 to check busy completion
+> >>> of the timing change indication.
+> >>> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
+> >>> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+> >>>
+> >>> this patch drops CMD13 when doing speed mode switch, if host do not
+> >>> support MMC_CAP_WAIT_WHILE_BUSY and there is no ops->card_busy(),
+> >>> then the only way is to wait a fixed timeout.
+> >>
+> >> This looks like it should be 3 patches:
+> >> 	1. Change __mmc_switch
+> >> 	2. Change HS200 and HS400 selection
+> >> 	3. Change HS selection
+> >>
+> >> However there is another problem: card_busy is not the same as busy signal -
+> >> see below.  So that needs to be sorted out first.
+> >>
+> > We should make that card_busy() is the same with busy signal asserted.
+> > as you know, if card was not in busy state, all data pins should be high
+> > level as it is pull-up by default. so that's no conflict to check card
+> > busy signal by DAT0 or DAT0 ~ DAT3.
+> 
+> Potentially SDIO uses DAT1 for card interrupt, so that is a conflict right
+> there.
+> 
+> Also SDHCI does it backwards (don't ask me why) and considers 0000 to be
+> busy, so there's another conflict.
+> 
+> Some of the language in the SD and SDHCI specifications seems to indicate
+> that checking all 4 DAT lines during voltage switch is optional i.e. only 1
+> of the lines must be checked.  If that is true then we could change all the
+> drivers over to check just DAT0, and expect that to work for both busy
+> signalling and SD voltage switch checks.
+> 
+> So it seems to me card_busy still needs to be sorted out first.
 
+One thing must point out is that the __mmc_switch() is only for MMC
+card. SD/SDIO will never use this interface.
+by the way, Per JEDEC SD3.0 spec, below is the quote from spec:
+"Completion of voltage switch sequence is checked by high level of
+DAT[3:0]. Any bit of DAT[3:0] can be checked depends on ability of the
+host."
+So that the implement of ops->card_busy() can be changed from check
+DAT[3:0] to only check DAT[0].
 
-On 2016/5/12 22:46, Jon Mason wrote:
-> 
-> 
-> On Thu, May 12, 2016 at 2:16 AM, Kefeng Wang <wangkefeng.wang at huawei.com <mailto:wangkefeng.wang@huawei.com>> wrote:
-> 
-> 
-> 
->     On 2016/5/12 6:56, Jon Mason wrote:
->     > Add all of the UARTs present on NS2 and enable them in the SVK device
->     > tree file.  Also, do some magic to make sure that uart3 is discovered as
->     > ttyS0 (as that is the console UART).
->     >
->     > Signed-off-by: Jon Mason <jonmason at broadcom.com <mailto:jonmason@broadcom.com>>
->     > ---
->     >  arch/arm64/boot/dts/broadcom/ns2-svk.dts | 16 ++++++++++++++++
->     >  arch/arm64/boot/dts/broadcom/ns2.dtsi    | 30 ++++++++++++++++++++++++++++++
->     >  2 files changed, 46 insertions(+)
->     >
->     > diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
->     > index 7cd3640..b062a44 100644
->     > --- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
->     > +++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
->     > @@ -40,10 +40,14 @@
->     >
->     >       aliases {
->     >               serial0 = &uart3;
->     > +             serial1 = &uart0;
->     > +             serial2 = &uart1;
->     > +             serial3 = &uart2;
->     >       };
->     >
->     >       chosen {
->     >               stdout-path = "serial0:115200n8";
->     > +             bootargs = "earlycon=uart8250,mmio32,0x66130000";
-> 
->     Hi Jon,
-> 
->     I submit a patch[1], with it, we can use earlycon without option to enable early console
->     for "snps,dw-apb-uart", could you help me to test it, thanks.
-> 
-> 
-> Adding your change and removing the line above does not cause earlycon to work for me.  Is there any additional changes necessary for this to work?
-With my patch, the bootargs still need contain earlycon, but no need uart8250,mmio32,0x66130000;
-
-chosen {
-	stdout-path = "serial0:115200n8";
-	bootargs = "earlycon";
-}
-
-Hope it would work.
-
-BRs,
-Kefeng
-
-> 
-> Thanks,
-> Jon
->  
-> 
-> 
->     BRs,
->     Kefeng
-> 
-> 
->     [1] https://lkml.org/lkml/2016/5/11/34
-> 
->     >       };
->     >
->     >       memory {
->     > @@ -68,6 +72,18 @@
->     >       status = "ok";
->     >  };
->     >
->     > +&uart0 {
->     > +     status = "ok";
->     > +};
->     > +
->     > +&uart1 {
->     > +     status = "ok";
->     > +};
->     > +
->     > +&uart2 {
->     > +     status = "ok";
->     > +};
->     > +
->     >  &uart3 {
->     >       status = "ok";
->     >  };
->     > diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
->     > index 788ed8f..c77a9e8 100644
->     > --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
->     > +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
->     > @@ -357,6 +357,36 @@
->     >                       status = "disabled";
->     >               };
->     >
->     > +             uart0: serial at 66100000 {
->     > +                     compatible = "snps,dw-apb-uart";
->     > +                     reg = <0x66100000 0x100>;
->     > +                     interrupts = <GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH>;
->     > +                     clocks = <&iprocslow>;
->     > +                     reg-shift = <2>;
->     > +                     reg-io-width = <4>;
->     > +                     status = "disabled";
->     > +             };
->     > +
->     > +             uart1: serial at 66110000 {
->     > +                     compatible = "snps,dw-apb-uart";
->     > +                     reg = <0x66110000 0x100>;
->     > +                     interrupts = <GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH>;
->     > +                     clocks = <&iprocslow>;
->     > +                     reg-shift = <2>;
->     > +                     reg-io-width = <4>;
->     > +                     status = "disabled";
->     > +             };
->     > +
->     > +             uart2: serial at 66120000 {
->     > +                     compatible = "snps,dw-apb-uart";
->     > +                     reg = <0x66120000 0x100>;
->     > +                     interrupts = <GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH>;
->     > +                     clocks = <&iprocslow>;
->     > +                     reg-shift = <2>;
->     > +                     reg-io-width = <4>;
->     > +                     status = "disabled";
->     > +             };
->     > +
->     >               uart3: serial at 66130000 {
->     >                       compatible = "snps,dw-apb-uart";
->     >                       reg = <0x66130000 0x100>;
->     >
-> 
+In fact, for SD/SDIO voltage switch, if switch success, all DAT pins are
+high level and if switch failed, all data pins are low level.
 > 
