@@ -1,59 +1,158 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 13 May 2016 14:11:54 +0200
-Subject: [PATCH v3 00/27] ARM: dts: exynos: Add initial support for Odroid
- XU
-In-Reply-To: <5735C274.50504@arm.com>
-References: <1462910970-1812-1-git-send-email-krzk@kernel.org>
- <5735C274.50504@arm.com>
-Message-ID: <5735C48A.6030508@kernel.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 13 May 2016 13:23:02 +0100
+Subject: [PATCH v3 47/55] KVM: arm/arm64: vgic-new: Add userland GIC CPU
+ interface access
+In-Reply-To: <20160513115419.GH27623@cbox>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-48-git-send-email-andre.przywara@arm.com>
+ <20160512184740.GM27623@cbox> <5734D0F6.9090406@arm.com>
+ <20160513075323.GF27623@cbox> <5735B016.50207@arm.com>
+ <20160513115419.GH27623@cbox>
+Message-ID: <5735C726.6050003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2016 02:03 PM, Robin Murphy wrote:
-> Hi Krzysztof,
-> 
-> On 10/05/16 21:09, Krzysztof Kozlowski wrote:
+Hi,
+
+On 13/05/16 12:54, Christoffer Dall wrote:
+> On Fri, May 13, 2016 at 11:44:38AM +0100, Andre Przywara wrote:
 >> Hi,
 >>
->> Patchset adds necessary clocks, reorganizes existing stuff and finally
->> adds Odroid XU support.
+>> On 13/05/16 08:53, Christoffer Dall wrote:
+>>> On Thu, May 12, 2016 at 07:52:38PM +0100, Andre Przywara wrote:
+>>>> Hi,
+>>>>
+>>>> On 12/05/16 19:47, Christoffer Dall wrote:
+>>>>> On Fri, May 06, 2016 at 11:46:00AM +0100, Andre Przywara wrote:
+>>>>>> Using the VMCR accessors we provide access to GIC CPU interface state
+>>>>>> to userland by wiring it up to the existing userland interface.
+>>>>>> [Marc: move and make VMCR accessors static, streamline MMIO handlers]
+>>>>>
+>>>>> does this mean Marc did this and serves as credit or is it a lost
+>>>>> reminder?
+>>>>
+>>>> It was meant as credit. I thought that is the usual annotation for this?
+>>>>
+>>>
+>>> I'm not sure if that's the usual way, I read it as a reminder, but it's
+>>> not too important.  Mostly wanting to make sure we're not forgetting
+>>> some todo item.
+>>>
+>>>>>>
+>>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> ---
+>>>>>> Changelog v2 .. v3:
+>>>>>> - total rework, moving into vgic-mmio-v2.c
+>>>>>> - move vmcr accessor wrapper functions into this file
+>>>>>> - use the register description table for CPU i/f registers as well
+>>>>>> - add RAZ/WI handling for the active priority registers
+>>>>>> - streamline MMIO handler functions
+>>>>>>
+>>>>>>  virt/kvm/arm/vgic/vgic-kvm-device.c |   2 +-
+>>>>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c    | 104 ++++++++++++++++++++++++++++++++++++
+>>>>>>  virt/kvm/arm/vgic/vgic.h            |   2 +
+>>>>>>  3 files changed, 107 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>>>>>> index bb33af8..2122ff2 100644
+>>>>>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>>>>>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>>>>>> @@ -300,7 +300,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+>>>>>>  
+>>>>>>  	switch (attr->group) {
+>>>>>>  	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+>>>>>> -		ret = -EINVAL;
+>>>>>> +		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
+>>>>>>  		break;
+>>>>>>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>>>>>>  		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
+>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>>> index c453e6f..0060539 100644
+>>>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>>> @@ -206,6 +206,84 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>>>>>>  	}
+>>>>>>  }
+>>>>>>  
+>>>>>> +static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>>>>>> +{
+>>>>>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>>>>>> +		vgic_v2_set_vmcr(vcpu, vmcr);
+>>>>>> +	else
+>>>>>> +		vgic_v3_set_vmcr(vcpu, vmcr);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>>>>>> +{
+>>>>>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>>>>>> +		vgic_v2_get_vmcr(vcpu, vmcr);
+>>>>>> +	else
+>>>>>> +		vgic_v3_get_vmcr(vcpu, vmcr);
+>>>>>> +}
+>>>>>> +
+>>>>>> +#define GICC_ARCH_VERSION_V2	0x2
+>>>>>> +
+>>>>>> +/* These are for userland accesses only, there is no guest-facing emulation. */
+>>>>>> +static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
+>>>>>> +					   gpa_t addr, unsigned int len)
+>>>>>> +{
+>>>>>> +	struct vgic_vmcr vmcr;
+>>>>>> +	u32 val;
+>>>>>> +
+>>>>>> +	vgic_get_vmcr(vcpu, &vmcr);
+>>>>>> +
+>>>>>> +	switch (addr & 0xff) {
+>>>>>> +	case GIC_CPU_CTRL:
+>>>>>> +		val = vmcr.ctlr;
+>>>>>> +		break;
+>>>>>> +	case GIC_CPU_PRIMASK:
+>>>>>> +		val = vmcr.pmr;
+>>>>>> +		break;
+>>>>>> +	case GIC_CPU_BINPOINT:
+>>>>>> +		val = vmcr.bpr;
+>>>>>> +		break;
+>>>>>> +	case GIC_CPU_ALIAS_BINPOINT:
+>>>>>> +		val = vmcr.abpr;
+>>>>>> +		break;
+>>>>>> +	case GIC_CPU_IDENT:
+>>>>>> +		val = ((PRODUCT_ID_KVM << 20) |
+>>>>>> +		       (GICC_ARCH_VERSION_V2 << 16) |
+>>>>>> +		       IMPLEMENTER_ARM);
+>>>>>> +		break;
+>>>>>> +	default:
+>>>>>> +		return 0;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	return extract_bytes(val, addr & 3, len);
+>>>>>
+>>>>> I don't think we allow anything than a full 32-bit aligned accesses
+>>>>> from userspace - we shouldn't at least.
+>>>>
+>>>> Indeed - I think userland was always 32-bit only. And since last night
+>>>> we even enforce this. So potentially there are more extract_bytes()
+>>>> calls that can go.
+>>>>
+>>> Right.
 >>
->>
->> Changes since v2
->> ================
->> 1. Got global-ack from Stephen for the clock changes. I think merging
->>     everything through arm-soc might be the easiest but:
->>     a. In such case I will prepare a tag with clock changes,
->>     b. Anyway I will wait for response from Sylwester and Tomasz.
->> 2. Applied comments from Javier and added his Reviewed-by.
->> 3. Patch 22: added ack from Rob.
->> 4. Minor improvements in existing patches.
->> 5. Five new patches at the end: 23-27 (not reviewed yet).
->>     Some of them could be squashed with existing ones but existing
->>     changes got reviews. Although the final Odroid XU DTS works fine but
->>     in general this is still work-in-progress so I suspect it will grow.
->>     I am releasing it early following Linux concept. :)
->>
->> Patchset is available at my private repo @github:
->> https://github.com/krzk/linux.git for-next/odroid-xu-v3
+>> So can I replace every call to extract_bytes() with just a "return val;"
+>> for every register that allows 32-bit accesses only?
+>> I think that's safe now, just checking ...
 > 
-> Since I have one of these gathering dust on my desk, it's really cool to
-> see this series, thanks!
-> 
-> I've successfully booted that branch to a filesystem on SD card, but USB
-> clearly isn't quite right - the USB 2.0 hub is powered up, but only the
-> bottom right port will actually enumerate devices; the ethernet is
-> nowhere to be seen. However, if I drop into the bootloader and do a "usb
-> start" beforehand, it all keeps working into the kernel.
+> yes, I think the way we do it now, you simply return val (asuming you
+> build that variable at the right offset, even for byte accesses).
 
-Thanks for letting me know. I am testing the board from TFTP boot which
-means "usb start" in Uboot. I'll add it to my todo-list.
+??? If we only have word accesses, then we don't need to care about byte
+accesses? Or do I got something wrong here?
 
-> As for the USB
-> 3.0, though, the ports report over-current conditions shortly after the
-> XHCI probe despite having nothing plugged in :(
+> The only exception is for 32-bit accesses to 64-bit registers, where you
+> have to return either the upper or lower 32-bits.  I think you can still
+> use extract_bytes() there should you be so inclined.
 
-Yes, I am seeing this as well. Maybe the cause is lack regulator supplies?
+Yeah, in fact GICR_TYPER and GICD_IROUTER are the only users remaining
+afterwards. So I moved the declaration into vgic-mmio-v3.c and renamed
+it to extract_words() on the way.
+Will send the patch in a minute ...
 
-Best regards,
-Krzysztof
+Cheers,
+Andre.
