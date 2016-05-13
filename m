@@ -1,57 +1,56 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Fri, 13 May 2016 09:25:31 +0200
-Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
-In-Reply-To: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
-References: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
-Message-ID: <1463124331.2459.0.camel@lynxeye.de>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 13 May 2016 09:38:33 +0200
+Subject: [PATCH] ARM: dts: r8a7790: Correct unit names for cpu nodes
+Message-ID: <1463125113-28885-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 29.02.2016, 22:01 +0100 schrieb Lucas Stach:
-> This allows to switch the card signal voltage level to 1.8V,
-> which is needed for any ultra high speed modes to work.
-> 
-> Signed-off-by: Lucas Stach <dev@lynxeye.de>
-> ---
-> This needs the SDMMC memcomp pad calibration patches I just
-> sent out to be applied, otherwise the card voltage change will
-> fail with a message in the kernel log and a fall back to
-> high speed operation.
+Make the unit names for the cpu nodes match their reg properties.
 
-The patches this one depends on have been applied for some time now.
-Please pick up this patch.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Thanks,
-Lucas
-> ---
-> ?arch/arm/boot/dts/tegra30-beaver.dts | 3 ++-
-> ?1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts
-> b/arch/arm/boot/dts/tegra30-beaver.dts
-> index 1daed40..6b237f2 100644
-> --- a/arch/arm/boot/dts/tegra30-beaver.dts
-> +++ b/arch/arm/boot/dts/tegra30-beaver.dts
-> @@ -1848,7 +1848,7 @@
-> ?
-> ?				ldo5_reg: ldo5 {
-> ?					regulator-name =
-> "vddio_sdmmc,avdd_vdac";
-> -					regulator-min-microvolt =
-> <3300000>;
-> +					regulator-min-microvolt =
-> <1800000>;
-> ?					regulator-max-microvolt =
-> <3300000>;
-> ?					regulator-always-on;
-> ?				};
-> @@ -1919,6 +1919,7 @@
-> ?
-> ?	sdhci at 78000000 {
-> ?		status = "okay";
-> +		vqmmc-supply = <&ldo5_reg>;
-> ?		cd-gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
-> ?		wp-gpios = <&gpio TEGRA_GPIO(T, 3)
-> GPIO_ACTIVE_HIGH>;
-> ?		power-gpios = <&gpio TEGRA_GPIO(D, 7)
-> GPIO_ACTIVE_HIGH>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 83cf23cd26bb51e6..3b9e98be2f7b3122 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -92,7 +92,7 @@
+ 			next-level-cache = <&L2_CA15>;
+ 		};
+ 
+-		cpu4: cpu at 4 {
++		cpu4: cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+@@ -101,7 +101,7 @@
+ 			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+-		cpu5: cpu at 5 {
++		cpu5: cpu at 101 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+@@ -110,7 +110,7 @@
+ 			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+-		cpu6: cpu at 6 {
++		cpu6: cpu at 102 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+@@ -119,7 +119,7 @@
+ 			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+-		cpu7: cpu at 7 {
++		cpu7: cpu at 103 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x103>;
+-- 
+1.9.1
