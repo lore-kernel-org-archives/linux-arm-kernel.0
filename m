@@ -1,54 +1,39 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 May 2016 19:57:30 +0800
-Subject: [PATCH 2/2] net: pxa168_eth: Use dma_wmb/rmb where appropriate
+Date: Fri, 13 May 2016 19:57:29 +0800
+Subject: [PATCH 1/2] net: pxa168_eth: use {readl|writel}_relaxed instead of
+ readl/writel
 In-Reply-To: <1463140650-7038-1-git-send-email-jszhang@marvell.com>
 References: <1463140650-7038-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1463140650-7038-3-git-send-email-jszhang@marvell.com>
+Message-ID: <1463140650-7038-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the pxa168_eth driver to use the dma_rmb/wmb calls instead of the
-full barriers in order to improve performance: reduced 97ns/39ns on
-average in tx/rx path on Marvell BG4CT platform.
+Since appropriate memory barriers are already there, use the relaxed
+version to improve performance a bit.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/net/ethernet/marvell/pxa168_eth.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/marvell/pxa168_eth.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index db774e3..728a115 100644
+index c442f6a..db774e3 100644
 --- a/drivers/net/ethernet/marvell/pxa168_eth.c
 +++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -342,9 +342,9 @@ static void rxq_refill(struct net_device *dev)
- 		pep->rx_skb[used_rx_desc] = skb;
+@@ -286,12 +286,12 @@ static int pxa168_eth_stop(struct net_device *dev);
  
- 		/* Return the descriptor to DMA ownership */
--		wmb();
-+		dma_wmb();
- 		p_used_rx_desc->cmd_sts = BUF_OWNED_BY_DMA | RX_EN_INT;
--		wmb();
-+		dma_wmb();
+ static inline u32 rdl(struct pxa168_eth_private *pep, int offset)
+ {
+-	return readl(pep->base + offset);
++	return readl_relaxed(pep->base + offset);
+ }
  
- 		/* Move the used descriptor pointer to the next descriptor */
- 		pep->rx_used_desc_q = (used_rx_desc + 1) % pep->rx_ring_size;
-@@ -794,7 +794,7 @@ static int rxq_process(struct net_device *dev, int budget)
- 		rx_used_desc = pep->rx_used_desc_q;
- 		rx_desc = &pep->p_rx_desc_area[rx_curr_desc];
- 		cmd_sts = rx_desc->cmd_sts;
--		rmb();
-+		dma_rmb();
- 		if (cmd_sts & (BUF_OWNED_BY_DMA))
- 			break;
- 		skb = pep->rx_skb[rx_curr_desc];
-@@ -1289,7 +1289,7 @@ static int pxa168_eth_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ static inline void wrl(struct pxa168_eth_private *pep, int offset, u32 data)
+ {
+-	writel(data, pep->base + offset);
++	writel_relaxed(data, pep->base + offset);
+ }
  
- 	skb_tx_timestamp(skb);
- 
--	wmb();
-+	dma_wmb();
- 	desc->cmd_sts = BUF_OWNED_BY_DMA | TX_GEN_CRC | TX_FIRST_DESC |
- 			TX_ZERO_PADDING | TX_LAST_DESC | TX_EN_INT;
- 	wmb();
+ static void abort_dma(struct pxa168_eth_private *pep)
 -- 
 2.8.1
