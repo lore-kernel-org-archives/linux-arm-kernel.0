@@ -1,74 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 May 2016 15:30:13 +0200
-Subject: [PATCH] ARM: hide finish_arch_post_lock_switch from modules
-Message-ID: <1463146234-161304-1-git-send-email-arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 May 2016 14:32:12 +0100
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160513092802.GA13400@localhost.localdomain>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160512002000.GA30997@yury-N73SV>
+ <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
+ <20160512134431.GB30205@yury-N73SV>
+ <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
+ <20160512142457.GC30205@yury-N73SV>
+ <20160512152805.GJ11226@e104818-lin.cambridge.arm.com>
+ <57358C2B.1010106@huawei.com>
+ <20160513092802.GA13400@localhost.localdomain>
+Message-ID: <20160513133212.GC27232@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steven Rostedt <rostedt@goodmis.org>
+On Fri, May 13, 2016 at 09:28:03AM +0000, Catalin Marinas wrote:
+> > >>>>>On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
+> > >>>>>>I debugged preadv02 and pwritev02 failures and found very weird bug.
+> > >>>>>>Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
+> > >>>>>>of vector, and kernel reports successful read/write.
+[...]
+> The discussion is mainly around whether USER_DS for 32-bit compat apps
+> should be the same as USER_DS for native 32-bit apps. Even for native
+> 32-bit kernels, we don't use STACK_TOP as addr_limit. A read/write from
+> 0xffffffff would fail in both cases anyway. I think the LTP test doesn't
+> even try to access such memory but only to probe the range validity (I
+> haven't managed to build the latest LTP yet).
 
-The introduction of switch_mm_irqs_off() brought back an old bug
-regarding the use of preempt_enable_no_resched:
+OK, so I managed to get the latest LTP (tag 20160510) built for AArch32
+but the preadv02 does not fail:
 
-As part of 62b94a08da1b ("sched/preempt: Take away
-preempt_enable_no_resched() from modules"), the definition of
-preempt_enable_no_resched() is only available in built-in code,
-not in loadable modules, so we can't generally use it from header
-files. However, the ARM version of finish_arch_post_lock_switch()
-calls preempt_enable_no_resched() and is defined as a static
-inline function in asm/mmu_context.h. This in turn means we cannot
-include asm/mmu_context.h from modules.
+-----------------------------
+# uname -m
+aarch64
 
-With today's tip tree, asm/mmu_context.h gets included from
-linux/mmu_context.h, which is normally the exact pattern one would
-expect, but unfortunately, linux/mmu_context.h can be included from
-the vhost driver that is a loadable module, now causing this compile
-time error:
+# file ./testcases/bin/preadv02
+./testcases/bin/preadv02: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 2.6.32, BuildID[sha1]=98066291426e1d3ee49d8504ce2a5bd721ab7fe8, not stripped
 
-In file included from ../include/linux/mmu_context.h:4:0,
-                 from ../drivers/vhost/vhost.c:18:
-../arch/arm/include/asm/mmu_context.h: In function 'finish_arch_post_lock_switch':
-../arch/arm/include/asm/mmu_context.h:88:3: error: implicit declaration of function 'preempt_enable_no_resched' [-Werror=implicit-function-declaration]
-   preempt_enable_no_resched();
+# ./testcases/bin/preadv02
+preadv02.c:97: PASS: preadv() failed as expected: EINVAL
+preadv02.c:97: PASS: preadv() failed as expected: EINVAL
+preadv02.c:97: PASS: preadv() failed as expected: EINVAL
+preadv02.c:97: PASS: preadv() failed as expected: EFAULT
+preadv02.c:97: PASS: preadv() failed as expected: EBADF
+preadv02.c:97: PASS: preadv() failed as expected: EBADF
+preadv02.c:97: PASS: preadv() failed as expected: EISDIR
+preadv02.c:97: PASS: preadv() failed as expected: ESPIPE
 
-Andy already tried to fix the bug by including linux/preempt.h
-from asm/mmu_context.h, but that didn't help. I suggested reordering
-the header files, which wasn't popular, but Steve came up with this
-workaround instead:
+Summary:
+passed   8
+failed   0
+skipped  0
+warnings 0
+-----------------------------
 
-The finish_arch_post_lock_switch() definition is now also hidden
-inside of #ifdef MODULE, so we don't see anything referencing
-preempt_enable_no_resched() from a header file. I've built a
-few hundred randconfig kernels with this, and did not see any
-new problems.
+It's the 4th test above which passes iovec_base as -1 and expects
+EFAULT. However, it seems to get the expected error. I guess that even
+if access_ok() passes, the access to that location by the kernel would
+fail since there isn't anything mapped.
 
-Fixes: f98db6013c55 ("sched/core: Add switch_mm_irqs_off() and use it in the scheduler")
-Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/mmu_context.h | 2 ++
- 1 file changed, 2 insertions(+)
+With ILP32, however, STACK_TOP is TASK_SIZE and you may have the address
+mapped already. I still think the USER_DS fix is useful, though I need
+another way to check that it's actually a fix.
 
-diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index ed73babc0dc9..3cc14dd8587c 100644
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -67,6 +67,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
- 		cpu_switch_mm(mm->pgd, mm);
- }
- 
-+#ifndef MODULE
- #define finish_arch_post_lock_switch \
- 	finish_arch_post_lock_switch
- static inline void finish_arch_post_lock_switch(void)
-@@ -88,6 +89,7 @@ static inline void finish_arch_post_lock_switch(void)
- 		preempt_enable_no_resched();
- 	}
- }
-+#endif /* !MODULE */
- 
- #endif	/* CONFIG_MMU */
- 
 -- 
-2.7.0
+Catalin
