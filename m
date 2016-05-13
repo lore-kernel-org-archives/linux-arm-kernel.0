@@ -1,86 +1,22 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 13 May 2016 13:42:09 +0200
-Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <CAJZ5v0jov37JErfRqw1bAkJzkyoGn+BsZLNLR5N=J3ZYu203GQ@mail.gmail.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-9-git-send-email-tn@semihalf.com>
- <CAKc_7PVJmhiD8x=zw4N3sSDPD-jZz-wh8TPTuuTYEdxn3v78og@mail.gmail.com>
- <CAJZ5v0jov37JErfRqw1bAkJzkyoGn+BsZLNLR5N=J3ZYu203GQ@mail.gmail.com>
-Message-ID: <5735BD91.3020206@semihalf.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 13 May 2016 13:44:36 +0200
+Subject: [PATCH V2 0/2] drivers: i2c: qup: Some misc fixes
+In-Reply-To: <1462534274-28925-1-git-send-email-sricharan@codeaurora.org>
+References: <1462534274-28925-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160513114436.GH1778@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 06, 2016 at 05:01:12PM +0530, Sricharan R wrote:
+> One for fixing the bug with CONFIG_DEBUG_SG enabled and another
+> to suspend the transfer for all errors instead of just for nack.
 
+You haven't stated what was changed in V2.
 
-On 13.05.2016 13:31, Rafael J. Wysocki wrote:
-> On Fri, May 13, 2016 at 1:25 PM, Jayachandran C <jchandra@broadcom.com> wrote:
->> On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->>> This patch is going to implement generic PCI host controller for
->>> ACPI world, similar to what pci-host-generic.c driver does for DT world.
->>>
->>> All such drivers, which we have seen so far, were implemented within
->>> arch/ directory since they had some arch assumptions (x86 and ia64).
->>> However, they all are doing similar thing, so it makes sense to find
->>> some common code and abstract it into the generic driver.
->>>
->>> In order to handle PCI config space regions properly, we define new
->>> MCFG interface which does sanity checks on MCFG table and keeps its
->>> root pointer. User is able to lookup MCFG regions based on that root
->>> pointer and specified domain:bus_start:bus_end touple. We are using
->>> pci_mmcfg_late_init old prototype to avoid another function name.
->>>
->>> The implementation of pci_acpi_scan_root() looks up the MCFG entries
->>> and sets up a new mapping (regions are not mapped until host controller ask
->>> for it). Generic PCI functions are used for accessing config space.
->>> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
->>> to create and access ECAM mappings.
->>>
->>> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
->>> should be made on a per-architecture basis.
->>>
->>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->>> ---
->> [....]
->>
->>> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
->>> index 1ad2176..1cccf57 100644
->>> --- a/drivers/pci/ecam.h
->>> +++ b/drivers/pci/ecam.h
->>> @@ -45,6 +45,11 @@ struct pci_config_window {
->>>                  void __iomem            *win;   /* 64-bit single mapping */
->>>                  void __iomem            **winp; /* 32-bit per bus mapping */
->>>          };
->>> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
->>> +       struct acpi_device              *companion; /* ACPI companion device */
->>> +#endif
->>> +       int                             domain;
->>> +
->>>   };
->>
->> Using struct pci_config_window to pass along domain and
->> companion looks bad.  I think there are two possible options
->> to do this better:
->>
->> 1. add a 'struct fwnode_handle *' or 'struct device *parent_dev'
->>     instead of the companion and domain fields above. In case of
->>     ACPI either of them can be used to get the acpi_device and
->>     both  domain and companion can be set from that.
->>
->> 2. make pci_config_window fully embeddable by moving allocation
->>     out of pci_ecam_create to its callers. Then it can be embedded
->>     into acpi_pci_generic_root_info, and container_of can be used
->>     to get acpi info from ->sysdata.
->>
->> The first option should be easier to implement but the second may
->> be better on long run. I would leave it to the Bjorn or Rafael to
->> suggest which is preferred.
->
-> Personally, I'd probably try to use fwnode_handle, but the second
-> option makes sense too in principle.
->
-
-Thanks for suggestions. I will try to use fwnode_handle
-
-Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160513/b5db5a4b/attachment.sig>
