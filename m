@@ -1,74 +1,68 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Fri, 13 May 2016 16:55:48 +0530
-Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <1462893601-8937-9-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-9-git-send-email-tn@semihalf.com>
-Message-ID: <CAKc_7PVJmhiD8x=zw4N3sSDPD-jZz-wh8TPTuuTYEdxn3v78og@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Fri, 13 May 2016 14:26:26 +0300
+Subject: [PATCH 1/3] ARM: clps711x: Reduce static map size
+In-Reply-To: <1463138788-5390-1-git-send-email-shc_work@mail.ru>
+References: <1463138788-5390-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1463138788-5390-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> This patch is going to implement generic PCI host controller for
-> ACPI world, similar to what pci-host-generic.c driver does for DT world.
->
-> All such drivers, which we have seen so far, were implemented within
-> arch/ directory since they had some arch assumptions (x86 and ia64).
-> However, they all are doing similar thing, so it makes sense to find
-> some common code and abstract it into the generic driver.
->
-> In order to handle PCI config space regions properly, we define new
-> MCFG interface which does sanity checks on MCFG table and keeps its
-> root pointer. User is able to lookup MCFG regions based on that root
-> pointer and specified domain:bus_start:bus_end touple. We are using
-> pci_mmcfg_late_init old prototype to avoid another function name.
->
-> The implementation of pci_acpi_scan_root() looks up the MCFG entries
-> and sets up a new mapping (regions are not mapped until host controller ask
-> for it). Generic PCI functions are used for accessing config space.
-> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
-> to create and access ECAM mappings.
->
-> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
-> should be made on a per-architecture basis.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
-[....]
+Last CLPS711X CPU register is PLLR has 0xa5a8 address, so we can reduce
+the map to 48k and align the end of the static at VMALLOC_START.
 
-> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
-> index 1ad2176..1cccf57 100644
-> --- a/drivers/pci/ecam.h
-> +++ b/drivers/pci/ecam.h
-> @@ -45,6 +45,11 @@ struct pci_config_window {
->                 void __iomem            *win;   /* 64-bit single mapping */
->                 void __iomem            **winp; /* 32-bit per bus mapping */
->         };
-> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
-> +       struct acpi_device              *companion; /* ACPI companion device */
-> +#endif
-> +       int                             domain;
-> +
->  };
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/include/debug/clps711x.S              | 4 ++--
+ arch/arm/mach-clps711x/common.c                | 6 +++---
+ arch/arm/mach-clps711x/include/mach/hardware.h | 2 +-
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-Using struct pci_config_window to pass along domain and
-companion looks bad.  I think there are two possible options
-to do this better:
-
-1. add a 'struct fwnode_handle *' or 'struct device *parent_dev'
-   instead of the companion and domain fields above. In case of
-   ACPI either of them can be used to get the acpi_device and
-   both  domain and companion can be set from that.
-
-2. make pci_config_window fully embeddable by moving allocation
-   out of pci_ecam_create to its callers. Then it can be embedded
-   into acpi_pci_generic_root_info, and container_of can be used
-   to get acpi info from ->sysdata.
-
-The first option should be easier to implement but the second may
-be better on long run. I would leave it to the Bjorn or Rafael to
-suggest which is preferred.
-
-JC.
+diff --git a/arch/arm/include/debug/clps711x.S b/arch/arm/include/debug/clps711x.S
+index abe2254..c17ac5c 100644
+--- a/arch/arm/include/debug/clps711x.S
++++ b/arch/arm/include/debug/clps711x.S
+@@ -9,10 +9,10 @@
+ 
+ #ifndef CONFIG_DEBUG_CLPS711X_UART2
+ #define CLPS711X_UART_PADDR	(0x80000000 + 0x0000)
+-#define CLPS711X_UART_VADDR	(0xfeff0000 + 0x0000)
++#define CLPS711X_UART_VADDR	(0xfeff4000 + 0x0000)
+ #else
+ #define CLPS711X_UART_PADDR	(0x80000000 + 0x1000)
+-#define CLPS711X_UART_VADDR	(0xfeff0000 + 0x1000)
++#define CLPS711X_UART_VADDR	(0xfeff4000 + 0x1000)
+ #endif
+ 
+ #define SYSFLG		(0x0140)
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 671acc5a..bf62211 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -37,9 +37,9 @@ static struct map_desc clps711x_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)CLPS711X_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(CLPS711X_PHYS_BASE),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE
+-	}
++		.length		= 48 * SZ_1K,
++		.type		= MT_DEVICE,
++	},
+ };
+ 
+ void __init clps711x_map_io(void)
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 833129c..cfd0e2c 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -24,7 +24,7 @@
+ 
+ #include <mach/clps711x.h>
+ 
+-#define CLPS711X_VIRT_BASE	IOMEM(0xfeff0000)
++#define CLPS711X_VIRT_BASE	IOMEM(0xfeff4000)
+ 
+ #ifndef __ASSEMBLY__
+ #define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
+-- 
+2.4.9
