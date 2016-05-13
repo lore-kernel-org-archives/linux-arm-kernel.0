@@ -1,68 +1,118 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 May 2016 14:32:12 +0100
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160513092802.GA13400@localhost.localdomain>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
- <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
- <20160512134431.GB30205@yury-N73SV>
- <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
- <20160512142457.GC30205@yury-N73SV>
- <20160512152805.GJ11226@e104818-lin.cambridge.arm.com>
- <57358C2B.1010106@huawei.com>
- <20160513092802.GA13400@localhost.localdomain>
-Message-ID: <20160513133212.GC27232@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 May 2016 15:41:11 +0200
+Subject: [PATCH 3/3] ARM: dts: clps711x: Add basic Cirrus Logic CDB89712
+ Development board
+In-Reply-To: <1463142623.38124260@f381.i.mail.ru>
+References: <1463138788-5390-1-git-send-email-shc_work@mail.ru>
+ <9407200.bOeiVUkGKT@wuerfel> <1463142623.38124260@f381.i.mail.ru>
+Message-ID: <6057172.X40sTfvRlk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 09:28:03AM +0000, Catalin Marinas wrote:
-> > >>>>>On Thu, May 12, 2016 at 03:20:00AM +0300, Yury Norov wrote:
-> > >>>>>>I debugged preadv02 and pwritev02 failures and found very weird bug.
-> > >>>>>>Test passes {iovec_base = 0xffffffff, iovec_len = 64} as one element
-> > >>>>>>of vector, and kernel reports successful read/write.
-[...]
-> The discussion is mainly around whether USER_DS for 32-bit compat apps
-> should be the same as USER_DS for native 32-bit apps. Even for native
-> 32-bit kernels, we don't use STACK_TOP as addr_limit. A read/write from
-> 0xffffffff would fail in both cases anyway. I think the LTP test doesn't
-> even try to access such memory but only to probe the range validity (I
-> haven't managed to build the latest LTP yet).
+On Friday 13 May 2016 15:30:23 Alexander Shiyan wrote:
+> Hello.
+> 
+> > ???????, 13 ??? 2016, 15:00 +03:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> > 
+> > On Friday 13 May 2016 14:26:28 Alexander Shiyan wrote:
+> ...
+> > > +	soc {
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <1>;
+> > > +		compatible = "simple-bus";
+> > > +		interrupt-parent = <&intc>;
+> > > +		ranges;
+> > 
+> > All child devices seem to be in the 0x80000000-0x90000000
+> > range, maybe set the ranges property accordingly?
+> 
+> I do not quite understand that you want to change here.
 
-OK, so I managed to get the latest LTP (tag 20160510) built for AArch32
-but the preadv02 does not fail:
+I meant using the ranges property to describe the bus addresses
+without the 0x80000000 offset, like
 
------------------------------
-# uname -m
-aarch64
+	ranges = <0 0x8000000 0xc000>;
 
-# file ./testcases/bin/preadv02
-./testcases/bin/preadv02: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 2.6.32, BuildID[sha1]=98066291426e1d3ee49d8504ce2a5bd721ab7fe8, not stripped
+and then adapting the registers under the node to be based
+on the bus address.
 
-# ./testcases/bin/preadv02
-preadv02.c:97: PASS: preadv() failed as expected: EINVAL
-preadv02.c:97: PASS: preadv() failed as expected: EINVAL
-preadv02.c:97: PASS: preadv() failed as expected: EINVAL
-preadv02.c:97: PASS: preadv() failed as expected: EFAULT
-preadv02.c:97: PASS: preadv() failed as expected: EBADF
-preadv02.c:97: PASS: preadv() failed as expected: EBADF
-preadv02.c:97: PASS: preadv() failed as expected: EISDIR
-preadv02.c:97: PASS: preadv() failed as expected: ESPIPE
 
-Summary:
-passed   8
-failed   0
-skipped  0
-warnings 0
------------------------------
+> > > +		clks: clks at 80000000 {
+> > > +			#clock-cells = <1>;
+> > > +			compatible = "cirrus,clps711x-clk";
+> > > +			reg = <0x80000000 0xc000>;
+> > > +			startup-frequency = <73728000>;
+> > > +		};
+> ...
+> > > +		intc: intc at 80000000 {
+> > > +			compatible = "cirrus,clps711x-intc";
+> > > +			reg = <0x80000000 0x4000>;
+> > > +			interrupt-controller;
+> > > +			#interrupt-cells = <1>;
+> > > +		};
+> > 
+> > Better make the register ranges non-overlapping. This appears
+> > to start at the same place as the 'clks' node.
+> 
+> CLK driver uses:
+> #define CLPS711X_SYSCON1 (0x0100)
+> #define CLPS711X_SYSCON2 (0x1100)
+> ...
+> #define CLPS711X_PLLR (0xa5a8)
+> 
+> IRQCHIP driver uses:
+> #define CLPS711X_INTSR1 (0x0240)
+> ...
+> #define CLPS711X_INTSR2 (0x1240)
+> ...
+> #define CLPS711X_INTMR3 (0x2280)
+> 
+> So there is no way to do any else.
 
-It's the 4th test above which passes iovec_base as -1 and expects
-EFAULT. However, it seems to get the expected error. I guess that even
-if access_ok() passes, the access to that location by the kernel would
-fail since there isn't anything mapped.
+It sounds like what you have is a large system controller that
+has registers everywhere. Could you use syscon to access the
+individual registers instead?
 
-With ILP32, however, STACK_TOP is TASK_SIZE and you may have the address
-mapped already. I still think the USER_DS fix is useful, though I need
-another way to check that it's actually a fix.
+> > > +		porta: gpio at 80000000 {
+> > > +			compatible = "cirrus,clps711x-gpio";
+> > > +			reg = <0x80000000 0x1 0x80000040 0x1>;
+> > > +			gpio-controller;
+> > > +			#gpio-cells = <2>;
+> > > +		};
+> > > +
+> > > +		portb: gpio at 80000001 {
+> > > +			compatible = "cirrus,clps711x-gpio";
+> > > +			reg = <0x80000001 0x1 0x80000041 0x1>;
+> > > +			gpio-controller;
+> > > +			#gpio-cells = <2>;
+> > > +		};
+> > > +
+> > > +		portc: gpio at 80000002 {
+> > > +			compatible = "cirrus,clps711x-gpio";
+> > > +			reg = <0x80000002 0x1 0x80000042 0x1>;
+> > > +			gpio-controller;
+> > > +			#gpio-cells = <2>;
+> > > +			status = "disabled";
+> > > +		};
+> > > +
+> > > +		portd: gpio at 80000003 {
+> > > +			compatible = "cirrus,clps711x-gpio";
+> > > +			reg = <0x80000003 0x1 0x80000043 0x1>;
+> > > +			gpio-controller;
+> > > +			#gpio-cells = <2>;
+> > > +		};
+> > 
+> > These are all just single bytes. My guess is that there is
+> > actually one IP block that contains all the gpios, not
+> > four identical blocks.
+> 
+> These is a 8-bit registers with different properties, which parses in the
+> GPIO driver depending of alias (GPIO count, inverted logic etc.).
 
--- 
-Catalin
+The alias should not influence the interpretation of the registers.
+If each byte in there behaves differently, it would be better to
+have separate "compatible" strings instead. I still don't see why
+you can't just have one device node for all the registers and
+then create multiple gpio_chip instances from that though.
+
+	Arnd
