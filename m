@@ -1,121 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 13 May 2016 09:36:45 -0700
-Subject: [PATCH] arm64: enable CONFIG_SET_MODULE_RONX by default
-In-Reply-To: <CAKv+Gu_uofTP9df8wk1MT3eajebzUcbKeEaamO3yRBDDsyCuGg@mail.gmail.com>
-References: <1463138436-5073-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu_uofTP9df8wk1MT3eajebzUcbKeEaamO3yRBDDsyCuGg@mail.gmail.com>
-Message-ID: <CAGXu5jLbGXCdpQVcemajRu0EchBKfxZ9BS0hW+aHHVDd6RdGzQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 13 May 2016 09:38:16 -0700
+Subject: [PATCH 2/2] clk: rockchip: fix the rk3399 sdmmc sample shift
+In-Reply-To: <0261c4b4-7398-fe15-5e26-f92bfbe79f3c@rock-chips.com>
+References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
+ <1463076197-15900-2-git-send-email-dianders@chromium.org>
+ <20160512231023.GA63308@google.com>
+ <84673e7c-dd64-b2ca-5c7c-5c7f34d239d8@rock-chips.com>
+ <CAD=FV=WEAOwhDDBHBtuzSz35i0XRZw4LbFEnFCFYd-4NVH5d-g@mail.gmail.com>
+ <0261c4b4-7398-fe15-5e26-f92bfbe79f3c@rock-chips.com>
+Message-ID: <CAD=FV=UNVHrGeKj0N_1WQvL+PNBTrPTj1xmk-63F4hJhPuvkug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 5:00 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 13 May 2016 at 13:20, Mark Rutland <mark.rutland@arm.com> wrote:
->> The SET_MODULE_RONX protections are effectively the same as the
->> DEBUG_RODATA protections we enabled by default back in commit
->> 57efac2f7108e325 ("arm64: enable CONFIG_DEBUG_RODATA by default"). It
->> seems unusual to have one but not the other.
+Shawn,
+
+On Fri, May 13, 2016 at 12:46 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>> This should be possible to verify in one of two ways.  If the TRM has
+>> a typo and things truly _do_ start at 0 instead of 1, then:
 >>
->> As evidenced by the help text, the rationale appears to be that
->> SET_MODULE_RONX interacts poorly with tracing and patching, but both of
->> these make use of the insn framework, which takes SET_MODULE_RONX into
->> account. Any remaining issues are bugs which should be fixed regardless
->> of the default state of the option.
+>> 1. There will be roughly mirrors of valid ranges.
+>> 2. Things won't match up if we change tuning to use 180 course offsets
+>> and the rest fine offsets.
 >>
->> This patch enables DEBUG_SET_MODULE_RONX by default, and replaces the
->> help text with a new wording derived from the DEBUG_RODATA help text,
->> which better describes the functionality. Previously, the DEBUG_RODATA
->> entry was inconsistently indented with spaces, which are replaced with
->> tabs as with the other Kconfig entries.
->>
->> Additionally, the wording of recommended defaults is made consistent for
->> all options. These are placed in a new paragraph, unquoted, as a full
->> sentence (with a period/full stop) as this appears to be the most common
->> form per $(git grep 'in doubt').
->>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Kees Cook <keescook@chromium.org>
->> Cc: Laura Abbott <labbott@fedoraproject.org>
->> Cc: Will Deacon <will.deacon@arm.com>
+>> It would be ideal if you could confirm with the chip guys, but if you
 >
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Yay! :)
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
 >
->> ---
->>  arch/arm64/Kconfig.debug | 25 +++++++++++++------------
->>  1 file changed, 13 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
->> index 710fde4..0cc758c 100644
->> --- a/arch/arm64/Kconfig.debug
->> +++ b/arch/arm64/Kconfig.debug
->> @@ -12,7 +12,8 @@ config ARM64_PTDUMP
->>           who are working in architecture specific areas of the kernel.
->>           It is probably not a good idea to enable this feature in a production
->>           kernel.
->> -         If in doubt, say "N"
->> +
->> +         If in doubt, say N.
->>
->>  config PID_IN_CONTEXTIDR
->>         bool "Write the current PID to the CONTEXTIDR register"
->> @@ -38,15 +39,15 @@ config ARM64_RANDOMIZE_TEXT_OFFSET
->>           value.
->>
->>  config DEBUG_SET_MODULE_RONX
->> -        bool "Set loadable kernel module data as NX and text as RO"
->> -        depends on MODULES
->> -        help
->> -          This option helps catch unintended modifications to loadable
->> -          kernel module's text and read-only data. It also prevents execution
->> -          of module data. Such protection may interfere with run-time code
->> -          patching and dynamic kernel tracing - and they might also protect
->> -          against certain classes of kernel exploits.
->> -          If in doubt, say "N".
->> +       bool "Set loadable kernel module data as NX and text as RO"
->> +       depends on MODULES
->> +       default y
->> +       help
->> +         Is this is set, kernel module text and rodata will be made read-only.
->> +         This is to help catch accidental or malicious attempts to change the
->> +         kernel's executable code.
->> +
->> +         If in doubt, say Y.
->>
->>  config DEBUG_RODATA
->>         bool "Make kernel text and rodata read-only"
->> @@ -56,7 +57,7 @@ config DEBUG_RODATA
->>           is to help catch accidental or malicious attempts to change the
->>           kernel's executable code.
->>
->> -         If in doubt, say Y
->> +         If in doubt, say Y.
->>
->>  config DEBUG_ALIGN_RODATA
->>         depends on DEBUG_RODATA
->> @@ -69,7 +70,7 @@ config DEBUG_ALIGN_RODATA
->>           alignment and potentially wasted space. Turn on this option if
->>           performance is more important than memory pressure.
->>
->> -         If in doubt, say N
->> +         If in doubt, say N.
->>
->>  source "drivers/hwtracing/coresight/Kconfig"
->>
->> --
->> 1.9.1
->>
+> I have checked it before Xing upstreamed the code, but as your question on
+> the TRM, I check it with the  chip guys again.
+>
+> So the answer is that drv/sample stuff should refer to  Mobile Strorage
+> Host Controller section, and it will fit the future Socs from now on.
 
+OK, awesome.  I also did more quick tests by forcing dw_mmc to give me
+extra details about the tuning.  These tests agree with you.
 
+Please consider this patch abandoned.  Note that the previous patch
+(1/2) is still good as far as I know, so just this patch (2/2) should
+be abandoned.
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Thanks!  :)
+
+-Doug
