@@ -1,145 +1,42 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 12 May 2016 19:55:20 -0700
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <1462893601-8937-1-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
-Message-ID: <CADaLNDnXiL2nYtSmd1h-9MSnUUY4S+dAEcFXRSE_jjWhqRzufQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 13 May 2016 08:28:48 +0530
+Subject: [PATCH v4 03/18] arm: Remove unnecessary of_platform_populate
+ with default match table
+In-Reply-To: <1463054775-18170-4-git-send-email-wangkefeng.wang@huawei.com>
+References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1463054775-18170-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160513025848.GK9661@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 8:19 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> From the functionality point of view this series may be split into the
-> following logic parts:
-> 1. New ECAM API and update for users of the pci-host-common API
-> 2. Necessary fixes as the preparation for using driver on ARM64.
-> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
-> 4. Enable above driver on ARM64
->
-> Patches has been built on top of 4.6-rc7 and can be found here:
-> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v7)
->
-> This has been tested on Cavium ThunderX server. Any help in reviewing and
-> testing is very appreciated.
+On 12-05-16, 20:06, Kefeng Wang wrote:
+> After patch "of/platform: Add common method to populate default bus",
+> it is possible for arch code to remove unnecessary callers about the
+> of_platform_populate with default match table.
+> 
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Krzysztof Halasa <khalasa@piap.pl>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: Roland Stigge <stigge@antcom.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Tony Prisk <linux@prisktech.co.nz>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm/mach-spear/spear1310.c         |  2 --
+>  arch/arm/mach-spear/spear1340.c         |  1 -
 
-I tried this series on APM X-Gene platforms (with ECAM fix-up quirk
-added) and PCIe works fine.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Regards,
-Duc Dang.
->
-> v6 -> v7
-> - drop quirks handling
-> - changes for ACPI companion and domain number assignment approach
-> - implement arch pcibios_{add|remove}_bus and call acpi_pci_{add|remove}_bus from there
-> - cleanups around nomenclature
-> - use resources oriented API for ECAM
-> - fix for based address calculation before mapping ECAM region
-> - remove useless lock for MCFG lookup
-> - move MCFG stuff to separated file pci_mcfg.c
-> - drop MCFG entries caching
-> - rebase against 4.6-rc7
->
-> v5 -> v6
-> - drop idea of x86 MMCONFIG code refactoring
-> - integrate JC's patches which introduce new ECAM API:
->   https://lkml.org/lkml/2016/4/11/907
->   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
-> - integrate Sinan's fix for releasing IO resources, see patch [06/13]
-> - added ACPI support for ThunderX ECAM and PEM drivers
-> - rebase against 4.6-rc2
->
-> v4 -> v5
-> - drop MCFG refactoring group patches 1-6 from series v4 and integrate Jayachandran's patch
->   https://patchwork.ozlabs.org/patch/575525/
-> - rewrite PCI legacy IRQs allocation
-> - squash two patches 11 and 12 from series v4, fixed bisection issue
-> - changelog improvements
-> - rebase against 4.5-rc3
->
-> v3 -> v4
-> - drop Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
-> - add Lorenzo's fix patch 19/24
-> - ACPI PCI bus domain number assigning cleanup
-> - change resource management, we now claim and reassign resources
-> - improvements for applying quirks
-> - drop Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
-> - rebase against 4.5-rc1
->
-> v2 -> v3
-> - fix legacy IRQ assigning and IO ports registration
-> - remove reference to arch specific companion device for ia64
-> - move ACPI PCI host controller driver to pci_root.c
-> - drop generic domain assignment for x86 and ia64 as I am not
->   able to run all necessary test variants
-> - drop patch which cleaned legacy IRQ assignment since it belongs to
->   Mathew's series:
->   https://patchwork.ozlabs.org/patch/557504/
-> - extend MCFG quirk code
-> - rebase against 4.4
->
-> v1 -> v2
-> - move non-arch specific piece of code to dirver/acpi/ directory
-> - fix IO resource handling
-> - introduce PCI config accessors quirks matching
-> - moved ACPI_COMPANION_SET to generic code
->
-> v1 - https://lkml.org/lkml/2015/10/27/504
-> v2 - https://lkml.org/lkml/2015/12/16/246
-> v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
-> v4 - https://lkml.org/lkml/2016/2/4/646
-> v5 - https://lkml.org/lkml/2016/2/16/426
-> v6 - https://lkml.org/lkml/2016/4/15/594
->
-> Jayachandran C (2):
->   PCI: Provide common functions for ECAM mapping
->   PCI: generic, thunder: update to use generic ECAM API
->
-> Tomasz Nowicki (9):
->   pci, of: Move the PCI I/O space management to PCI core code.
->   pci: Add new function to unmap IO resources.
->   acpi, pci: Support IO resources when parsing PCI host bridge
->     resources.
->   pci, acpi: Provide a way to assign bus domain number.
->   pci, acpi: Handle ACPI companion assignment.
->   pci, acpi: Support for ACPI based generic PCI host controller
->   arm64, pci, acpi: ACPI support for legacy IRQs parsing and
->     consolidation with DT code.
->   arm64, pci, acpi: Provide ACPI-specific prerequisites for PCI bus
->     enumeration.
->   arm64, pci, acpi: Start using ACPI based PCI host controller driver
->     for ARM64.
->
->  arch/arm64/Kconfig                  |   1 +
->  arch/arm64/kernel/pci.c             |  34 +++-----
->  drivers/acpi/Kconfig                |   8 ++
->  drivers/acpi/Makefile               |   1 +
->  drivers/acpi/pci_mcfg.c             |  97 ++++++++++++++++++++++
->  drivers/acpi/pci_root.c             |  33 ++++++++
->  drivers/acpi/pci_root_generic.c     | 149 +++++++++++++++++++++++++++++++++
->  drivers/of/address.c                | 116 +-------------------------
->  drivers/pci/Kconfig                 |   3 +
->  drivers/pci/Makefile                |   2 +
->  drivers/pci/ecam.c                  | 161 ++++++++++++++++++++++++++++++++++++
->  drivers/pci/ecam.h                  |  72 ++++++++++++++++
->  drivers/pci/host/Kconfig            |   1 +
->  drivers/pci/host/pci-host-common.c  | 114 +++++++++++--------------
->  drivers/pci/host/pci-host-common.h  |  47 -----------
->  drivers/pci/host/pci-host-generic.c |  52 +++---------
->  drivers/pci/host/pci-thunder-ecam.c |  39 ++-------
->  drivers/pci/host/pci-thunder-pem.c  |  92 ++++++++++-----------
->  drivers/pci/pci.c                   | 150 ++++++++++++++++++++++++++++++++-
->  drivers/pci/probe.c                 |   2 +
->  include/linux/of_address.h          |   9 --
->  include/linux/pci-acpi.h            |  14 ++++
->  include/linux/pci.h                 |  11 ++-
->  23 files changed, 823 insertions(+), 385 deletions(-)
->  create mode 100644 drivers/acpi/pci_mcfg.c
->  create mode 100644 drivers/acpi/pci_root_generic.c
->  create mode 100644 drivers/pci/ecam.c
->  create mode 100644 drivers/pci/ecam.h
->  delete mode 100644 drivers/pci/host/pci-host-common.h
->
-> --
-> 1.9.1
->
+-- 
+viresh
