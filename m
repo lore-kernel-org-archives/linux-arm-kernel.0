@@ -1,55 +1,121 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Fri, 13 May 2016 09:23:02 -0700
-Subject: [PATCH] arm64: bpf: jit JMP_JSET_{X,K}
-In-Reply-To: <1463121478-18484-1-git-send-email-zlim.lnx@gmail.com>
-References: <1463121478-18484-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <5a03c0b4-7686-6232-9c64-c6ec0f30edae@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 13 May 2016 09:36:45 -0700
+Subject: [PATCH] arm64: enable CONFIG_SET_MODULE_RONX by default
+In-Reply-To: <CAKv+Gu_uofTP9df8wk1MT3eajebzUcbKeEaamO3yRBDDsyCuGg@mail.gmail.com>
+References: <1463138436-5073-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu_uofTP9df8wk1MT3eajebzUcbKeEaamO3yRBDDsyCuGg@mail.gmail.com>
+Message-ID: <CAGXu5jLbGXCdpQVcemajRu0EchBKfxZ9BS0hW+aHHVDd6RdGzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/12/2016 11:37 PM, Zi Shen Lim wrote:
-> Original implementation commit e54bcde3d69d ("arm64: eBPF JIT compiler")
-> had the relevant code paths, but due to an oversight always fail jiting.
+On Fri, May 13, 2016 at 5:00 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 13 May 2016 at 13:20, Mark Rutland <mark.rutland@arm.com> wrote:
+>> The SET_MODULE_RONX protections are effectively the same as the
+>> DEBUG_RODATA protections we enabled by default back in commit
+>> 57efac2f7108e325 ("arm64: enable CONFIG_DEBUG_RODATA by default"). It
+>> seems unusual to have one but not the other.
+>>
+>> As evidenced by the help text, the rationale appears to be that
+>> SET_MODULE_RONX interacts poorly with tracing and patching, but both of
+>> these make use of the insn framework, which takes SET_MODULE_RONX into
+>> account. Any remaining issues are bugs which should be fixed regardless
+>> of the default state of the option.
+>>
+>> This patch enables DEBUG_SET_MODULE_RONX by default, and replaces the
+>> help text with a new wording derived from the DEBUG_RODATA help text,
+>> which better describes the functionality. Previously, the DEBUG_RODATA
+>> entry was inconsistently indented with spaces, which are replaced with
+>> tabs as with the other Kconfig entries.
+>>
+>> Additionally, the wording of recommended defaults is made consistent for
+>> all options. These are placed in a new paragraph, unquoted, as a full
+>> sentence (with a period/full stop) as this appears to be the most common
+>> form per $(git grep 'in doubt').
+>>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Kees Cook <keescook@chromium.org>
+>> Cc: Laura Abbott <labbott@fedoraproject.org>
+>> Cc: Will Deacon <will.deacon@arm.com>
 >
-> As a result, we had been falling back to BPF interpreter whenever a BPF
-> program has JMP_JSET_{X,K} instructions.
->
-> With this fix, we confirm that the corresponding tests in lib/test_bpf
-> continue to pass, and also jited.
->
-> ...
-> [    2.784553] test_bpf: #30 JSET jited:1 188 192 197 PASS
-> [    2.791373] test_bpf: #31 tcpdump port 22 jited:1 325 677 625 PASS
-> [    2.808800] test_bpf: #32 tcpdump complex jited:1 323 731 991 PASS
-> ...
-> [    3.190759] test_bpf: #237 JMP_JSET_K: if (0x3 & 0x2) return 1 jited:1 110 PASS
-> [    3.192524] test_bpf: #238 JMP_JSET_K: if (0x3 & 0xffffffff) return 1 jited:1 98 PASS
-> [    3.211014] test_bpf: #249 JMP_JSET_X: if (0x3 & 0x2) return 1 jited:1 120 PASS
-> [    3.212973] test_bpf: #250 JMP_JSET_X: if (0x3 & 0xffffffff) return 1 jited:1 89 PASS
-> ...
->
-> Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Acked-by: Yang Shi <yang.shi@linaro.org>
+Yay! :)
 
-Thanks,
-Yang
+Acked-by: Kees Cook <keescook@chromium.org>
 
-> ---
->  arch/arm64/net/bpf_jit_comp.c | 1 +
->  1 file changed, 1 insertion(+)
+-Kees
+
 >
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index 031ed08..d0d5190 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -478,6 +478,7 @@ emit_cond_jmp:
->  		case BPF_JGE:
->  			jmp_cond = A64_COND_CS;
->  			break;
-> +		case BPF_JSET:
->  		case BPF_JNE:
->  			jmp_cond = A64_COND_NE;
->  			break;
->
+>> ---
+>>  arch/arm64/Kconfig.debug | 25 +++++++++++++------------
+>>  1 file changed, 13 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+>> index 710fde4..0cc758c 100644
+>> --- a/arch/arm64/Kconfig.debug
+>> +++ b/arch/arm64/Kconfig.debug
+>> @@ -12,7 +12,8 @@ config ARM64_PTDUMP
+>>           who are working in architecture specific areas of the kernel.
+>>           It is probably not a good idea to enable this feature in a production
+>>           kernel.
+>> -         If in doubt, say "N"
+>> +
+>> +         If in doubt, say N.
+>>
+>>  config PID_IN_CONTEXTIDR
+>>         bool "Write the current PID to the CONTEXTIDR register"
+>> @@ -38,15 +39,15 @@ config ARM64_RANDOMIZE_TEXT_OFFSET
+>>           value.
+>>
+>>  config DEBUG_SET_MODULE_RONX
+>> -        bool "Set loadable kernel module data as NX and text as RO"
+>> -        depends on MODULES
+>> -        help
+>> -          This option helps catch unintended modifications to loadable
+>> -          kernel module's text and read-only data. It also prevents execution
+>> -          of module data. Such protection may interfere with run-time code
+>> -          patching and dynamic kernel tracing - and they might also protect
+>> -          against certain classes of kernel exploits.
+>> -          If in doubt, say "N".
+>> +       bool "Set loadable kernel module data as NX and text as RO"
+>> +       depends on MODULES
+>> +       default y
+>> +       help
+>> +         Is this is set, kernel module text and rodata will be made read-only.
+>> +         This is to help catch accidental or malicious attempts to change the
+>> +         kernel's executable code.
+>> +
+>> +         If in doubt, say Y.
+>>
+>>  config DEBUG_RODATA
+>>         bool "Make kernel text and rodata read-only"
+>> @@ -56,7 +57,7 @@ config DEBUG_RODATA
+>>           is to help catch accidental or malicious attempts to change the
+>>           kernel's executable code.
+>>
+>> -         If in doubt, say Y
+>> +         If in doubt, say Y.
+>>
+>>  config DEBUG_ALIGN_RODATA
+>>         depends on DEBUG_RODATA
+>> @@ -69,7 +70,7 @@ config DEBUG_ALIGN_RODATA
+>>           alignment and potentially wasted space. Turn on this option if
+>>           performance is more important than memory pressure.
+>>
+>> -         If in doubt, say N
+>> +         If in doubt, say N.
+>>
+>>  source "drivers/hwtracing/coresight/Kconfig"
+>>
+>> --
+>> 1.9.1
+>>
+
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
