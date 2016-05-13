@@ -1,117 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 May 2016 14:00:35 +0200
-Subject: [PATCH 3/3] ARM: dts: clps711x: Add basic Cirrus Logic CDB89712
- Development board
-In-Reply-To: <1463138788-5390-4-git-send-email-shc_work@mail.ru>
-References: <1463138788-5390-1-git-send-email-shc_work@mail.ru>
- <1463138788-5390-4-git-send-email-shc_work@mail.ru>
-Message-ID: <9407200.bOeiVUkGKT@wuerfel>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 13 May 2016 19:57:30 +0800
+Subject: [PATCH 2/2] net: pxa168_eth: Use dma_wmb/rmb where appropriate
+In-Reply-To: <1463140650-7038-1-git-send-email-jszhang@marvell.com>
+References: <1463140650-7038-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1463140650-7038-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 May 2016 14:26:28 Alexander Shiyan wrote:
-> +&bus {
-> +	flash: root at 00000000 {
-> +		compatible = "cfi-flash";
-> +		reg = <0 0x00000000 0x01000000>;
-> +		bank-width = <2>;
-> +		linux,mtd-name = "physmap-flash.0";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +	};
+Update the pxa168_eth driver to use the dma_rmb/wmb calls instead of the
+full barriers in order to improve performance: reduced 97ns/39ns on
+average in tx/rx path on Marvell BG4CT platform.
 
-I've never seen the linux,mtd-name property before, but I think it's
-meant to refer to the name of the flash chip, not the
-name of the linux device.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/net/ethernet/marvell/pxa168_eth.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> +	aliases {
-> +		gpio0 = &porta;
-> +		gpio1 = &portb;
-> +		gpio2 = &portc;
-> +		gpio3 = &portd;
-> +		gpio4 = &porte;
-> +		serial0 = &uart1;
-> +		serial1 = &uart2;
-> +		spi0 = &spi;
-> +		timer0 = &timer1;
-> +		timer1 = &timer2;
-> +	};
-
-Please move this into the .dts file: not all boards necessarily have
-all of the above.
-
-> +	soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		interrupt-parent = <&intc>;
-> +		ranges;
-
-All child devices seem to be in the 0x80000000-0x90000000
-range, maybe set the ranges property accordingly?
-
-> +		clks: clks at 80000000 {
-> +			#clock-cells = <1>;
-> +			compatible = "cirrus,clps711x-clk";
-> +			reg = <0x80000000 0xc000>;
-> +			startup-frequency = <73728000>;
-> +		};
-
-Please fix the compatible strings for all devices to not
-have 'x' for wildcards. Normally you'd use the name of hte
-first chip to have this particular IP block.
-
-> +		intc: intc at 80000000 {
-> +			compatible = "cirrus,clps711x-intc";
-> +			reg = <0x80000000 0x4000>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +		};
-
-Better make the register ranges non-overlapping. This appears
-to start at the same place as the 'clks' node.
-
-> +		porta: gpio at 80000000 {
-> +			compatible = "cirrus,clps711x-gpio";
-> +			reg = <0x80000000 0x1 0x80000040 0x1>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +		};
-> +
-> +		portb: gpio at 80000001 {
-> +			compatible = "cirrus,clps711x-gpio";
-> +			reg = <0x80000001 0x1 0x80000041 0x1>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +		};
-> +
-> +		portc: gpio at 80000002 {
-> +			compatible = "cirrus,clps711x-gpio";
-> +			reg = <0x80000002 0x1 0x80000042 0x1>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			status = "disabled";
-> +		};
-> +
-> +		portd: gpio at 80000003 {
-> +			compatible = "cirrus,clps711x-gpio";
-> +			reg = <0x80000003 0x1 0x80000043 0x1>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +		};
-
-These are all just single bytes. My guess is that there is
-actually one IP block that contains all the gpios, not
-four identical blocks.
-
-> +		bus: bus at 80000180 {
-> +			#address-cells = <2>;
-> +			#size-cells = <1>;
-> +			compatible = "cirrus,clps711x-bus", "simple-bus";
-> +			clocks = <&clks CLPS711X_CLK_BUS>;
-> +			reg = <0x80000180 0x80>;
-
-If it has registers, it's not a 'simple-bus'. Is this an external
-bus controller perhaps?
-
-	Arnd
+diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
+index db774e3..728a115 100644
+--- a/drivers/net/ethernet/marvell/pxa168_eth.c
++++ b/drivers/net/ethernet/marvell/pxa168_eth.c
+@@ -342,9 +342,9 @@ static void rxq_refill(struct net_device *dev)
+ 		pep->rx_skb[used_rx_desc] = skb;
+ 
+ 		/* Return the descriptor to DMA ownership */
+-		wmb();
++		dma_wmb();
+ 		p_used_rx_desc->cmd_sts = BUF_OWNED_BY_DMA | RX_EN_INT;
+-		wmb();
++		dma_wmb();
+ 
+ 		/* Move the used descriptor pointer to the next descriptor */
+ 		pep->rx_used_desc_q = (used_rx_desc + 1) % pep->rx_ring_size;
+@@ -794,7 +794,7 @@ static int rxq_process(struct net_device *dev, int budget)
+ 		rx_used_desc = pep->rx_used_desc_q;
+ 		rx_desc = &pep->p_rx_desc_area[rx_curr_desc];
+ 		cmd_sts = rx_desc->cmd_sts;
+-		rmb();
++		dma_rmb();
+ 		if (cmd_sts & (BUF_OWNED_BY_DMA))
+ 			break;
+ 		skb = pep->rx_skb[rx_curr_desc];
+@@ -1289,7 +1289,7 @@ static int pxa168_eth_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 
+ 	skb_tx_timestamp(skb);
+ 
+-	wmb();
++	dma_wmb();
+ 	desc->cmd_sts = BUF_OWNED_BY_DMA | TX_GEN_CRC | TX_FIRST_DESC |
+ 			TX_ZERO_PADDING | TX_LAST_DESC | TX_EN_INT;
+ 	wmb();
+-- 
+2.8.1
