@@ -1,98 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 May 2016 12:20:36 +0100
-Subject: [PATCH] arm64: enable CONFIG_SET_MODULE_RONX by default
-Message-ID: <1463138436-5073-1-git-send-email-mark.rutland@arm.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Fri, 13 May 2016 16:55:48 +0530
+Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
+ host controller
+In-Reply-To: <1462893601-8937-9-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-9-git-send-email-tn@semihalf.com>
+Message-ID: <CAKc_7PVJmhiD8x=zw4N3sSDPD-jZz-wh8TPTuuTYEdxn3v78og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SET_MODULE_RONX protections are effectively the same as the
-DEBUG_RODATA protections we enabled by default back in commit
-57efac2f7108e325 ("arm64: enable CONFIG_DEBUG_RODATA by default"). It
-seems unusual to have one but not the other.
+On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> This patch is going to implement generic PCI host controller for
+> ACPI world, similar to what pci-host-generic.c driver does for DT world.
+>
+> All such drivers, which we have seen so far, were implemented within
+> arch/ directory since they had some arch assumptions (x86 and ia64).
+> However, they all are doing similar thing, so it makes sense to find
+> some common code and abstract it into the generic driver.
+>
+> In order to handle PCI config space regions properly, we define new
+> MCFG interface which does sanity checks on MCFG table and keeps its
+> root pointer. User is able to lookup MCFG regions based on that root
+> pointer and specified domain:bus_start:bus_end touple. We are using
+> pci_mmcfg_late_init old prototype to avoid another function name.
+>
+> The implementation of pci_acpi_scan_root() looks up the MCFG entries
+> and sets up a new mapping (regions are not mapped until host controller ask
+> for it). Generic PCI functions are used for accessing config space.
+> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
+> to create and access ECAM mappings.
+>
+> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
+> should be made on a per-architecture basis.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+[....]
 
-As evidenced by the help text, the rationale appears to be that
-SET_MODULE_RONX interacts poorly with tracing and patching, but both of
-these make use of the insn framework, which takes SET_MODULE_RONX into
-account. Any remaining issues are bugs which should be fixed regardless
-of the default state of the option.
+> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+> index 1ad2176..1cccf57 100644
+> --- a/drivers/pci/ecam.h
+> +++ b/drivers/pci/ecam.h
+> @@ -45,6 +45,11 @@ struct pci_config_window {
+>                 void __iomem            *win;   /* 64-bit single mapping */
+>                 void __iomem            **winp; /* 32-bit per bus mapping */
+>         };
+> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
+> +       struct acpi_device              *companion; /* ACPI companion device */
+> +#endif
+> +       int                             domain;
+> +
+>  };
 
-This patch enables DEBUG_SET_MODULE_RONX by default, and replaces the
-help text with a new wording derived from the DEBUG_RODATA help text,
-which better describes the functionality. Previously, the DEBUG_RODATA
-entry was inconsistently indented with spaces, which are replaced with
-tabs as with the other Kconfig entries.
+Using struct pci_config_window to pass along domain and
+companion looks bad.  I think there are two possible options
+to do this better:
 
-Additionally, the wording of recommended defaults is made consistent for
-all options. These are placed in a new paragraph, unquoted, as a full
-sentence (with a period/full stop) as this appears to be the most common
-form per $(git grep 'in doubt').
+1. add a 'struct fwnode_handle *' or 'struct device *parent_dev'
+   instead of the companion and domain fields above. In case of
+   ACPI either of them can be used to get the acpi_device and
+   both  domain and companion can be set from that.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig.debug | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+2. make pci_config_window fully embeddable by moving allocation
+   out of pci_ecam_create to its callers. Then it can be embedded
+   into acpi_pci_generic_root_info, and container_of can be used
+   to get acpi info from ->sysdata.
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 710fde4..0cc758c 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -12,7 +12,8 @@ config ARM64_PTDUMP
- 	  who are working in architecture specific areas of the kernel.
- 	  It is probably not a good idea to enable this feature in a production
- 	  kernel.
--	  If in doubt, say "N"
-+
-+	  If in doubt, say N.
- 
- config PID_IN_CONTEXTIDR
- 	bool "Write the current PID to the CONTEXTIDR register"
-@@ -38,15 +39,15 @@ config ARM64_RANDOMIZE_TEXT_OFFSET
- 	  value.
- 
- config DEBUG_SET_MODULE_RONX
--        bool "Set loadable kernel module data as NX and text as RO"
--        depends on MODULES
--        help
--          This option helps catch unintended modifications to loadable
--          kernel module's text and read-only data. It also prevents execution
--          of module data. Such protection may interfere with run-time code
--          patching and dynamic kernel tracing - and they might also protect
--          against certain classes of kernel exploits.
--          If in doubt, say "N".
-+	bool "Set loadable kernel module data as NX and text as RO"
-+	depends on MODULES
-+	default y
-+	help
-+	  Is this is set, kernel module text and rodata will be made read-only.
-+	  This is to help catch accidental or malicious attempts to change the
-+	  kernel's executable code.
-+
-+	  If in doubt, say Y.
- 
- config DEBUG_RODATA
- 	bool "Make kernel text and rodata read-only"
-@@ -56,7 +57,7 @@ config DEBUG_RODATA
- 	  is to help catch accidental or malicious attempts to change the
- 	  kernel's executable code.
- 
--	  If in doubt, say Y
-+	  If in doubt, say Y.
- 
- config DEBUG_ALIGN_RODATA
- 	depends on DEBUG_RODATA
-@@ -69,7 +70,7 @@ config DEBUG_ALIGN_RODATA
- 	  alignment and potentially wasted space. Turn on this option if
- 	  performance is more important than memory pressure.
- 
--	  If in doubt, say N
-+	  If in doubt, say N.
- 
- source "drivers/hwtracing/coresight/Kconfig"
- 
--- 
-1.9.1
+The first option should be easier to implement but the second may
+be better on long run. I would leave it to the Bjorn or Rafael to
+suggest which is preferred.
+
+JC.
