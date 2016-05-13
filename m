@@ -1,16 +1,17 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 13 May 2016 16:32:01 -0700
-Subject: [Patch v5 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
-In-Reply-To: <1463111221-6963-2-git-send-email-andy.gross@linaro.org>
+Date: Fri, 13 May 2016 16:33:06 -0700
+Subject: [Patch v5 2/8] firmware: qcom: scm: Convert SCM to platform driver
+In-Reply-To: <1463111221-6963-3-git-send-email-andy.gross@linaro.org>
 References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160513233201.GE1256@tuxbot>
+ <1463111221-6963-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160513233306.GF1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu 12 May 20:46 PDT 2016, Andy Gross wrote:
 
-> This patch adds the device tree support for the Qualcomm SCM firmware.
+> This patch converts the Qualcomm SCM firmware driver into a platform
+> driver.
 > 
 > Signed-off-by: Andy Gross <andy.gross@linaro.org>
 
