@@ -1,75 +1,72 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 May 2016 14:28:22 +0200
-Subject: [PATCH 3/3] dmaengine: at_xdmac: double FIFO flush needed to
- compute residue
-In-Reply-To: <1463064854-6719-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
- <1463064854-6719-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5735C866.70800@atmel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 13 May 2016 14:29:40 +0200
+Subject: [PATCH v3 43/55] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ access to VGIC registers
+In-Reply-To: <5735C767.7030807@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-44-git-send-email-andre.przywara@arm.com>
+ <20160512183016.GJ27623@cbox> <5735C767.7030807@arm.com>
+Message-ID: <20160513122940.GJ27623@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/05/2016 16:54, Ludovic Desroches a ?crit :
-> Due to the way CUBC register is updated, a double flush is needed to
-> compute an accurate residue. First flush aim is to get data from the DMA
-> FIFO and second one ensures that we won't report data which are not in
-> memory.
+On Fri, May 13, 2016 at 01:24:07PM +0100, Andre Przywara wrote:
+> Hi,
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
-> eXtended DMA Controller driver")
-> Cc: stable at vger.kernel.org #v4.1 and later
+> On 12/05/16 19:30, Christoffer Dall wrote:
+> > On Fri, May 06, 2016 at 11:45:56AM +0100, Andre Przywara wrote:
+> >> From: Eric Auger <eric.auger@linaro.org>
+> >>
+> >> This patch implements the switches for KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+> >> and KVM_DEV_ARM_VGIC_GRP_CPU_REGS API which allows the userspace to
+> >> access VGIC registers.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+[...]
 
-> ---
->  drivers/dma/at_xdmac.c | 24 +++++++++++++++++++++++-
->  1 file changed, 23 insertions(+), 1 deletion(-)
+> >> +int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+> >> +{
+> >> +	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+> >> +	const struct vgic_register_region *regions;
+> >> +	gpa_t addr;
+> >> +	int nr_regions, i, len;
+> >> +
+> >> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+> >> +
+> >> +	switch (attr->group) {
+> >> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> >> +		regions = vgic_v2_dist_registers;
+> >> +		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
+> >> +		break;
+> >> +	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+> >> +		return -ENXIO;		/* TODO: describe CPU i/f regs also */
+> >> +	default:
+> >> +		return -ENXIO;
+> >> +	}
+> >> +
+> >> +	for (i = 0; i < nr_regions; i++) {
+> >> +		if (regions[i].bits_per_irq)
+> >> +			len = (regions[i].bits_per_irq * nr_irqs) / 8;
+> >> +		else
+> >> +			len = regions[i].len;
+> >> +
+> >> +		if (regions[i].reg_offset <= addr &&
+> >> +		    regions[i].reg_offset + len > addr)
+> >> +			return 0;
+> > 
+> > should we check if addr is word-aligned ?
 > 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index b02494e..75bd662 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -1425,7 +1425,16 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
->  	residue = desc->xfer_size;
->  	/*
->  	 * Flush FIFO: only relevant when the transfer is source peripheral
-> -	 * synchronized.
-> +	 * synchronized. Flush is needed before reading CUBC because data in
-> +	 * the FIFO are not reported by CUBC. Reporting a residue of the
-> +	 * transfer length while we have data in FIFO can cause issue.
-> +	 * Usecase: atmel USART has a timeout which means I have received
-> +	 * characters but there is no more character received for a while. On
-> +	 * timeout, it requests the residue. If the data are in the DMA FIFO,
-> +	 * we will return a residue of the transfer length. It means no data
-> +	 * received. If an application is waiting for these data, it will hang
-> +	 * since we won't have another USART timeout without receiving new
-> +	 * data.
->  	 */
->  	mask = AT_XDMAC_CC_TYPE | AT_XDMAC_CC_DSYNC;
->  	value = AT_XDMAC_CC_TYPE_PER_TRAN | AT_XDMAC_CC_DSYNC_PER2MEM;
-> @@ -1481,6 +1490,19 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
->  	}
->  
->  	/*
-> +	 * Flush FIFO: only relevant when the transfer is source peripheral
-> +	 * synchronized. Another flush is needed here because CUBC is updated
-> +	 * when the controller sends the data write command. It can lead to
-> +	 * report data that are not written in the memory or the device. The
-> +	 * FIFO flush ensures that data are really written.
-> +	 */
-> +	if ((desc->lld.mbr_cfg & mask) == value) {
-> +		at_xdmac_write(atxdmac, AT_XDMAC_GSWF, atchan->mask);
-> +		while (!(at_xdmac_chan_read(atchan, AT_XDMAC_CIS) & AT_XDMAC_CIS_FIS))
-> +			cpu_relax();
-> +	}
-> +
-> +	/*
->  	 * Remove size of all microblocks already transferred and the current
->  	 * one. Then add the remaining size to transfer of the current
->  	 * microblock.
+> Do we care here? This is just the function that says whether we support
+> this register or not, so I don't see so much benefit in checking here.
+> A check would be more useful in get/set_attr, if this isn't even
+> enforced before.
 > 
 
+It's kind of weird that you can ask 'do you have an attribute with
+offset 0x2' and be told, 'yes', and then if you try to get it, you get
+'this attribute doesn't exist'.
 
--- 
-Nicolas Ferre
+Thanks,
+-Christoffer
